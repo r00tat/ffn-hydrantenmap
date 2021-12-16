@@ -118,7 +118,7 @@ statisch: ${hydrant.statischerDruck} bar`,
         />
       </Head>
 
-      <div id="map" style={{ height: '80vh' }}></div>
+      <div id="map" style={{ height: '86vh' }}></div>
     </>
   );
 }
