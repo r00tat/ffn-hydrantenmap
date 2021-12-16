@@ -3,7 +3,8 @@ import Head from 'next/head';
 // import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
 import useHydranten from '../hooks/useHydranten';
-import { availableLayers } from './tiles';
+import usePosition, { defaultPosition } from '../hooks/usePosition';
+import { availableLayers, createLayers, overlayLayers } from './tiles';
 
 const defaultTiles = 'basemap_hdpi';
 
@@ -11,56 +12,100 @@ export default function Map() {
   const [map, setMap] = useState<L.Map>();
   // const [layer, setLayer] = useState(defaultTiles);
   const hydranten = useHydranten();
+  const [[lat, long], gotPosition] = usePosition();
+  const [initialPositionSet, setInitialPositionSet] = useState(false);
+  const [hydrantenLayer, setHydrantenLayer] = useState(L.layerGroup([]));
+  const [positionMarker, setPositionMarker] = useState(
+    L.marker([lat, long])
+      // .setTooltipContent('aktuelle Position')
+      .bindPopup('aktuelle Position')
+  );
+
+  const [distanceLayer, setDistanceLayer] = useState(L.layerGroup());
 
   useEffect(() => {
-    const newMap = L.map('map').setView([47.9299452, 16.8359719], 15);
+    const newMap = L.map('map').setView(defaultPosition, 17);
 
-    const baseMaps: { [name: string]: L.TileLayer } = {};
-    Object.keys(availableLayers).map((name) => {
-      const layer = availableLayers[name];
-      baseMaps[name] = L.tileLayer(layer.url, layer.options);
-    });
+    const baseMaps = createLayers(availableLayers);
+    const overlayLayersForMap = createLayers(overlayLayers);
 
     baseMaps[defaultTiles].addTo(newMap);
+    hydrantenLayer.addTo(newMap);
+    distanceLayer.addTo(newMap);
 
-    const overlayMaps = {};
+    const overlayMaps = {
+      Hydranten: hydrantenLayer,
+      'Umkreis 50m': distanceLayer,
+      ...overlayLayersForMap,
+    };
     L.control.layers(baseMaps, overlayMaps).addTo(newMap);
 
     setMap(newMap);
     return () => {
       newMap.remove();
     };
-  }, []);
-  // useEffect(() => {
-  //   if (map) {
-  //     map?.eachLayer((layer) => {
-  //       if (layer) {
-  //         console.info(`removing layer: ${layer.getAttribution()}`);
-  //         layer.remove();
-  //       }
-  //     });
-  //     const tile: TileConfig =
-  //       availableLayers[layer] || availableLayers[defaultTiles];
-
-  //     L.tileLayer(tile.url, tile.options)?.addTo(map as L.Map);
-  //   }
-  // }, [map, layer]);
+  }, [positionMarker, hydrantenLayer, distanceLayer]);
 
   useEffect(() => {
     if (map) {
       // only add hydranten if we got the map
+      const resizeFactor = 0.25;
+      const hydrantIcon = L.icon({
+        iconUrl: '/icons/hydrant.png',
+        iconSize: [105 * resizeFactor, 123 * resizeFactor],
+        iconAnchor: [(105 * resizeFactor) / 2, 123 * resizeFactor * 0.9],
+        popupAnchor: [0, 0],
+      });
       hydranten.forEach((hydrant) => {
-        L.marker([hydrant.latitude, hydrant.longitude])
+        L.marker([hydrant.latitude, hydrant.longitude], {
+          icon: hydrantIcon,
+          title: `${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)
+${hydrant.ortschaft} ${hydrant.name}
+dynamisch: ${hydrant.dynamischerDruck} bar
+statisch: ${hydrant.statischerDruck} bar`,
+        })
           .bindPopup(
             `<b>${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)</b><br>
           ${hydrant.ortschaft} ${hydrant.name}<br>
           dynamisch: ${hydrant.dynamischerDruck} bar<br>
           statisch: ${hydrant.statischerDruck} bar<br>`
           )
-          .addTo(map);
+          // .bindTooltip(
+          //   L.tooltip({
+          //     permanent: true,
+          //   }).setContent(`${hydrant.zufluss}`)
+          // )
+          .addTo(hydrantenLayer);
       });
     }
-  }, [map, hydranten]);
+  }, [map, hydranten, hydrantenLayer]);
+
+  useEffect(() => {
+    if (gotPosition) {
+      console.info(`got new position ${lat} ${long}`);
+      positionMarker.setLatLng([lat, long]);
+      distanceLayer.clearLayers();
+      for (var i = 1; i <= 10; i++) {
+        L.circle([lat, long], {
+          color: 'black',
+          radius: i * 50, // every 50 meters
+          opacity: 0.3,
+          fill: false,
+        })
+          .bindPopup(`Entfernung: ${i * 50}m`)
+          .addTo(distanceLayer);
+      }
+    }
+  }, [positionMarker, gotPosition, lat, long, distanceLayer]);
+
+  useEffect(() => {
+    if (!initialPositionSet && gotPosition && map) {
+      console.info(`initial position, zooming to ${lat} ${long}`);
+      setInitialPositionSet(true);
+      map.setView([lat, long]);
+      positionMarker.addTo(map);
+    }
+  }, [initialPositionSet, gotPosition, map, lat, long, positionMarker]);
 
   return (
     <>
@@ -72,7 +117,7 @@ export default function Map() {
           crossOrigin=""
         />
       </Head>
-      <h1>FFN Map</h1>
+
       <div id="map" style={{ height: '80vh' }}></div>
     </>
   );
