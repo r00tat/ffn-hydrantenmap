@@ -48,7 +48,7 @@ export const availableLayers: TileConfigs = {
   basemap_ortofoto: {
     url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/{type}/google3857/{z}/{y}/{x}.{format}',
     options: {
-      maxZoom: 20,
+      maxZoom: 19,
       attribution:
         'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
       subdomains: ['', '1', '2', '3', '4'],
