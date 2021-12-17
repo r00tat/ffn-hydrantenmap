@@ -1,0 +1,32 @@
+image: google/cloud-sdk:alpine
+
+variables:
+  IMAGE: "eu.gcr.io/ffn-utils/hydrantenmap"
+
+stages:
+  - build
+  - test
+  - deploy
+
+before_script:
+  - |
+    # enable service account
+    if [[ -f "$GOOGLE_APPLICATION_CREDENTIALS" && -n "$(which gcloud)" ]]; then
+      gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    fi
+
+build_image:
+  stage: build
+  script:
+    - |
+      gcloud builds submit . -t $IMAGE:$CI_COMMIT_SHORT_SHA
+  only:
+    - "master"
+
+deploy_to_cloudrun:
+  stage: deploy
+  script:
+    - |
+      gcloud run deploy hydrantenmap --allow-unauthenticated --image $IMAGE:$CI_COMMIT_SHORT_SHA --max-instances=2 --region europe-west4
+  only:
+    - "master"
