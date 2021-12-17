@@ -2,6 +2,7 @@ image: google/cloud-sdk:alpine
 
 variables:
   IMAGE: "eu.gcr.io/ffn-utils/hydrantenmap"
+  CLOUDSDK_CORE_PROJECT: "ffn-utils"
 
 stages:
   - build
