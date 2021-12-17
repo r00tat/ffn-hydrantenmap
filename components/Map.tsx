@@ -1,9 +1,12 @@
 import L from 'leaflet';
 import Head from 'next/head';
-// import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
-import useHydranten from '../hooks/useHydranten';
-import usePosition, { defaultPosition } from '../hooks/usePosition';
+import useDistanceLayer from '../hooks/useDistanceLayer';
+import useDistanceMarker from '../hooks/useDistanceMarker';
+import useHydrantenLayer from '../hooks/useHydrantenLayer';
+import { defaultPosition } from '../hooks/usePosition';
+import usePositionMarker from '../hooks/usePositionMarker';
+import { usePositionContext } from './Position';
 import { availableLayers, createLayers, overlayLayers } from './tiles';
 
 const defaultTiles = 'basemap_hdpi';
@@ -11,17 +14,11 @@ const defaultTiles = 'basemap_hdpi';
 export default function Map() {
   const [map, setMap] = useState<L.Map>();
   // const [layer, setLayer] = useState(defaultTiles);
-  const hydranten = useHydranten();
-  const [[lat, long], gotPosition] = usePosition();
-  const [initialPositionSet, setInitialPositionSet] = useState(false);
-  const [hydrantenLayer, setHydrantenLayer] = useState(L.layerGroup([]));
-  const [positionMarker, setPositionMarker] = useState(
-    L.marker([lat, long])
-      // .setTooltipContent('aktuelle Position')
-      .bindPopup('aktuelle Position')
-  );
+  const hydrantenLayer = useHydrantenLayer(map);
 
-  const [distanceLayer, setDistanceLayer] = useState(L.layerGroup());
+  const distanceLayer = useDistanceLayer(map);
+  useDistanceMarker(map);
+  usePositionMarker(map);
 
   useEffect(() => {
     const newMap = L.map('map').setView(defaultPosition, 17);
@@ -44,67 +41,7 @@ export default function Map() {
     return () => {
       newMap.remove();
     };
-  }, [positionMarker, hydrantenLayer, distanceLayer]);
-
-  useEffect(() => {
-    if (map) {
-      // only add hydranten if we got the map
-      const hydrantIcon = L.icon({
-        iconUrl: '/icons/hydrant.png',
-        iconSize: [26, 31],
-        iconAnchor: [13, 28],
-        popupAnchor: [0, 0],
-      });
-      hydranten.forEach((hydrant) => {
-        L.marker([hydrant.latitude, hydrant.longitude], {
-          icon: hydrantIcon,
-          title: `${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)
-${hydrant.ortschaft} ${hydrant.name}
-dynamisch: ${hydrant.dynamischerDruck} bar
-statisch: ${hydrant.statischerDruck} bar`,
-        })
-          .bindPopup(
-            `<b>${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)</b><br>
-          ${hydrant.ortschaft} ${hydrant.name}<br>
-          dynamisch: ${hydrant.dynamischerDruck} bar<br>
-          statisch: ${hydrant.statischerDruck} bar<br>`
-          )
-          // .bindTooltip(
-          //   L.tooltip({
-          //     permanent: true,
-          //   }).setContent(`${hydrant.zufluss}`)
-          // )
-          .addTo(hydrantenLayer);
-      });
-    }
-  }, [map, hydranten, hydrantenLayer]);
-
-  useEffect(() => {
-    if (gotPosition) {
-      console.info(`got new position ${lat} ${long}`);
-      positionMarker.setLatLng([lat, long]);
-      distanceLayer.clearLayers();
-      for (var i = 1; i <= 10; i++) {
-        L.circle([lat, long], {
-          color: 'black',
-          radius: i * 50, // every 50 meters
-          opacity: 0.3,
-          fill: false,
-        })
-          .bindPopup(`Entfernung: ${i * 50}m`)
-          .addTo(distanceLayer);
-      }
-    }
-  }, [positionMarker, gotPosition, lat, long, distanceLayer]);
-
-  useEffect(() => {
-    if (!initialPositionSet && gotPosition && map) {
-      console.info(`initial position, zooming to ${lat} ${long}`);
-      setInitialPositionSet(true);
-      map.setView([lat, long]);
-      positionMarker.addTo(map);
-    }
-  }, [initialPositionSet, gotPosition, map, lat, long, positionMarker]);
+  }, [hydrantenLayer, distanceLayer]);
 
   return (
     <>
