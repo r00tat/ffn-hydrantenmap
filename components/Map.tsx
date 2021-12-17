@@ -49,11 +49,10 @@ export default function Map() {
   useEffect(() => {
     if (map) {
       // only add hydranten if we got the map
-      const resizeFactor = 0.25;
       const hydrantIcon = L.icon({
         iconUrl: '/icons/hydrant.png',
-        iconSize: [105 * resizeFactor, 123 * resizeFactor],
-        iconAnchor: [(105 * resizeFactor) / 2, 123 * resizeFactor * 0.9],
+        iconSize: [26, 31],
+        iconAnchor: [13, 28],
         popupAnchor: [0, 0],
       });
       hydranten.forEach((hydrant) => {
