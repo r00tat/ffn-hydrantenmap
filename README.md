@@ -30,8 +30,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ## deploy to GCP
 
 ```bash
-gcloud builds submit . -t eu.gcr.io/ffn-utils/hydrantenmap
-gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/ffn-utils/hydrantenmap --max-instances=2 --region europe-west3
+IMAGE_TAG=$(date +%Y%m%d-%H%M%S)
+gcloud builds submit . -t eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG
+gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG --max-instances=2 --region europe-west4
 ```
 
 ## Deploy on Vercel
