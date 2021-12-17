@@ -21,7 +21,7 @@ build_image:
     - |
       gcloud builds submit . -t $IMAGE:$CI_COMMIT_SHORT_SHA
   only:
-    - "master"
+    - "main"
 
 deploy_to_cloudrun:
   stage: deploy
@@ -29,4 +29,4 @@ deploy_to_cloudrun:
     - |
       gcloud run deploy hydrantenmap --allow-unauthenticated --image $IMAGE:$CI_COMMIT_SHORT_SHA --max-instances=2 --region europe-west4
   only:
-    - "master"
+    - "main"
