@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "name": "Hydrantenkarte FFN",
+  "short_name": "Hydrantenkarte",
+  "theme_color": "#1976d2",
+  "background_color": "#fffff",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/app-icon.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}
