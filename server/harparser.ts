@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as epsg from 'epsg';
 import * as proj4 from 'proj4';
 import { stringify } from 'csv-stringify/sync';
+import { Coordinates, GisObject, WgsObject } from './gis-objects';
 
 interface Metadata {
   id_attr: number;
@@ -26,24 +27,6 @@ interface Datapoint {
   [cValue: string]: any;
 }
 
-interface GisObject {
-  c_x: number;
-  c_y: number;
-  name: string;
-  [key: string]: any;
-}
-
-interface WgsObject {
-  lat: number;
-  lng: number;
-  name: string;
-  [key: string]: any;
-}
-interface Coordinates {
-  x: number;
-  y: number;
-}
-
 /**
  * source: https://agsolutions.at/en/blog/transforming-vienna-gis-to-wgs84-coordinates/
  * EPSG code 31256 = MGI Austria GK East, Gauss-Krüger M 34 (DKM), Greenwich
@@ -63,13 +46,13 @@ const gk34ToWgs84 = (x: number, y: number): Coordinates => {
 const main = async () => {
   console.info(`start`);
   const har = JSON.parse(
-    fs.readFileSync(`hydranten.har`, { encoding: 'utf8' })
+    fs.readFileSync(process.argv[2], { encoding: 'utf8' })
   );
 
   const reqs = har.log.entries;
   console.info(`${reqs.length} requests`);
   // console.info(`request 0: ${JSON.stringify(reqs[0], undefined, 2)}`);
-  const validRequests = reqs.filter(
+  const validRequests: any[] = reqs.filter(
     ({ request, response }: any) =>
       request.method === 'POST' &&
       // request.url.indexOf('https://gis.bgld.gv.at/Datenerhebung/synserver') >=
@@ -78,10 +61,25 @@ const main = async () => {
       response.status === 200
   );
   console.info(`${validRequests.length} matching requests`);
-  const gisObjects: GisObject[] = validRequests
+
+  fs.writeFileSync(
+    'output/requests.jsonl',
+    validRequests.map((o) => JSON.stringify(o)).join('\n')
+  );
+
+  const responseObjects: any[] = validRequests
     .map(({ response }: any) => JSON.parse(response.content.text))
     .filter((results: any) => results?.RES[0]?.RESULTS)
-    .map((result: any) => result?.RES[0]?.RESULTS)
+    .map((result: any) => result?.RES[0]?.RESULTS);
+
+  fs.writeFileSync(
+    'output/responses.jsonl',
+    responseObjects.map((o) => JSON.stringify(o)).join('\n')
+  );
+  console.info(`${responseObjects.length} responses`);
+
+  const gisObjects: GisObject[] = responseObjects
+
     .map((result: any) => {
       // get metadata
       const metadata: Metadata[] = result?.RECORD_METADATA?.ATTR || [];

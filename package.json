@@ -6,7 +6,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "extract": "npx tsc --outDir dist harparser.ts && node dist/harparser.js"
+    "extract": "npx tsc --outDir dist server/harparser && node dist/harparser.js",
+    "import": "npx tsc --outDir dist server/firestore-import && node dist/firestore-import.js"
   },
   "dependencies": {
     "@emotion/react": "^11.7.1",
@@ -16,6 +17,8 @@
     "csv-parse": "^5.0.3",
     "csv-stringify": "^6.0.4",
     "epsg": "^0.5.0",
+    "firebase": "^9.6.1",
+    "firebase-admin": "^10.0.1",
     "leaflet": "^1.7.1",
     "next": "12.0.7",
     "proj4": "^2.7.5",
