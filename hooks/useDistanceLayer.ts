@@ -18,9 +18,11 @@ export default function useDistanceLayer(map: L.Map | undefined) {
   const [distanceLayer] = useState(L.layerGroup());
   const [initialPositionSet, setInitialPositionSet] = useState(false);
   const [position, gotPosition] = usePositionContext();
-  const [legend, setLegend] = useState(
-    new L.Control({ position: 'bottomright' })
-  );
+  const [legend, setLegend] = useState<L.Control>();
+
+  useEffect(() => {
+    setLegend(new L.Control({ position: 'bottomright' }));
+  }, []);
 
   useEffect(() => {
     if (map && legend) {
@@ -43,7 +45,7 @@ export default function useDistanceLayer(map: L.Map | undefined) {
         return div;
       };
 
-      legend.addTo(map);
+      legend?.addTo(map);
     }
   }, [legend, map]);
 

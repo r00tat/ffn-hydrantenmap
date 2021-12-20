@@ -27,9 +27,14 @@ const getRecords = async () => {
     const firestore = firebaseAdmin.firestore();
 
     records =
-      (await firestore.collection('hydrant').get())?.docs?.map(
-        (doc) => doc.data() as Hydrant
-      ) || [];
+      (
+        await firestore
+          .collection('hydrant')
+          // filter only for one field
+          // .where('leistung', '>=', 1000)
+          // .where('leistung', '<=', 1200)
+          .get()
+      )?.docs?.map((doc) => doc.data() as Hydrant) || [];
   }
   return records;
 };
