@@ -17,18 +17,18 @@ export default function useHydrantenLayer(map: L.Map | undefined) {
         popupAnchor: [0, 0],
       });
       hydranten.forEach((hydrant) => {
-        L.marker([hydrant.latitude, hydrant.longitude], {
+        L.marker([hydrant.lat, hydrant.lng], {
           icon: hydrantIcon,
-          title: `${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)
+          title: `${hydrant.leistung} l/min (${hydrant.dimension}mm)
 ${hydrant.ortschaft} ${hydrant.name}
-dynamisch: ${hydrant.dynamischerDruck} bar
-statisch: ${hydrant.statischerDruck} bar`,
+dynamisch: ${hydrant.dynamsicher_druck} bar
+statisch: ${hydrant.statischer_druck} bar`,
         })
           .bindPopup(
-            `<b>${hydrant.zufluss} l/min (${hydrant.nenndurchmesser}mm)</b><br>
+            `<b>${hydrant.leistung} l/min (${hydrant.dimension}mm)</b><br>
           ${hydrant.ortschaft} ${hydrant.name}<br>
-          dynamisch: ${hydrant.dynamischerDruck} bar<br>
-          statisch: ${hydrant.statischerDruck} bar<br>`
+          dynamisch: ${hydrant.dynamsicher_druck} bar<br>
+          statisch: ${hydrant.statischer_druck} bar<br>`
           )
           // .bindTooltip(
           //   L.tooltip({

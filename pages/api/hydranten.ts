@@ -5,12 +5,12 @@ import { readFileSync } from 'fs';
 
 export interface Hydrant {
   name: string;
-  nenndurchmesser: string;
-  dynamischerDruck?: number;
-  statischerDruck?: number;
-  zufluss?: number;
-  latitude: number;
-  longitude: number;
+  dimension: string;
+  dynamsicher_druck?: number; // there's a typo in the API "Dynamsicher Druck"
+  statischer_druck?: number;
+  leistung?: number;
+  lat: number;
+  lng: number;
   ortschaft: string;
 }
 
