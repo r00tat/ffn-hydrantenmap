@@ -49,6 +49,8 @@ const main = async () => {
     fs.readFileSync(process.argv[2], { encoding: 'utf8' })
   );
 
+  const ortschaft: string = process.argv[3] || 'ND';
+
   const reqs = har.log.entries;
   console.info(`${reqs.length} requests`);
   // console.info(`request 0: ${JSON.stringify(reqs[0], undefined, 2)}`);
@@ -129,6 +131,7 @@ const main = async () => {
       ...g,
       lat: wgs.y,
       lng: wgs.x,
+      ortschaft,
     } as WgsObject;
   });
   fs.writeFileSync(
