@@ -19,6 +19,7 @@ function MyApp({ Component, pageProps }: AppProps) {
           content="Hydrantenkarte der Freiwilligen Feuerwehr Neusiedl am See"
         />
         <link rel="icon" href="/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <Box sx={{ flexGrow: 1 }}>

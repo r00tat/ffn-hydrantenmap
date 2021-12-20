@@ -2,6 +2,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { parse } from 'csv-parse/sync';
 import { readFileSync } from 'fs';
+import firebaseAdmin from '../../server/firebase/admin';
+import { GisWgsObject } from '../../server/gis-objects';
 
 export interface Hydrant {
   name: string;
@@ -20,21 +22,22 @@ export interface HydrantenResponse {
 
 let records: Hydrant[];
 
-const getRecords = () => {
+const getRecords = async () => {
   if (!records) {
-    const data = readFileSync(`${process.cwd()}/public/hydranten.csv`);
-    records = parse(data, {
-      columns: true,
-      skip_empty_lines: true,
-    });
+    const firestore = firebaseAdmin.firestore();
+
+    records =
+      (await firestore.collection('hydrant').get())?.docs?.map(
+        (doc) => doc.data() as Hydrant
+      ) || [];
   }
   return records;
 };
 
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<HydrantenResponse>
 ) {
-  const records = getRecords();
+  const records = await getRecords();
   res.status(200).json({ hydranten: records });
 }

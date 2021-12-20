@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
-import { parse } from 'csv-parse/sync';
-import { Hydrant } from '../pages/api/hydranten';
-import { firebaseApp, firestore } from '../components/firebase/app';
 import { collection, getDocs } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { firestore } from '../components/firebase/app';
+import { Hydrant } from '../pages/api/hydranten';
 
 export default function useHydranten() {
   const [hydranten, setHydranten] = useState<Hydrant[]>([]);
