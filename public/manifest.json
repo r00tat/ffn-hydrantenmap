@@ -3,7 +3,7 @@
   "name": "Hydrantenkarte FFN",
   "short_name": "Hydrantenkarte",
   "theme_color": "#1976d2",
-  "background_color": "#fffff",
+  "background_color": "#ffffff",
   "display": "standalone",
   "scope": "/",
   "start_url": "/",
