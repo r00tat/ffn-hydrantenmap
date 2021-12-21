@@ -7,7 +7,7 @@ export interface FirestoreDataLayerOptions {
   /**
    * icon
    */
-  icon: L.IconOptions;
+  icon: L.IconOptions | ((gisObject: GisWgsObject) => L.Icon);
   /**
    * firestore collection name
    */
@@ -50,10 +50,14 @@ export default function useFirestoreDataLayer(
     if (map && layerGroup) {
       layerGroup.clearLayers();
       // only add hydranten if we got the map
-      const markerIcon = L.icon(options.icon);
+      const markerIcon =
+        typeof options.icon === 'object' ? L.icon(options.icon) : undefined;
       records.forEach((gisObject: GisWgsObject) => {
         L.marker([gisObject.lat, gisObject.lng], {
-          icon: markerIcon,
+          icon:
+            typeof options.icon === 'function'
+              ? options.icon(gisObject)
+              : markerIcon,
           title: options.titleFn(gisObject),
         })
           .bindPopup(options.popupFn(gisObject))

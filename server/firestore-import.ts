@@ -48,7 +48,14 @@ const main = async () => {
       const n = Number.parseFloat(value);
       data[key] = Number.isNaN(n) ? value : n;
     });
-    batch.set(collection.doc(`${record.ortschaft}${record.name}`), data);
+    batch.set(
+      collection.doc(
+        `${record.ortschaft}${record.name}`
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, '_')
+      ),
+      data
+    );
   });
 
   batch.commit();

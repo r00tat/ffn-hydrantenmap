@@ -25,7 +25,7 @@ export default function useFirebaseCollection<T>(
 
   useEffect(() => {
     if (value) {
-      console.info(`got hydrant list`);
+      // console.info(`got firstore collection records`);
       setRecords(value?.docs.map((doc) => doc.data() as T));
     }
   }, [value]);

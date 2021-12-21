@@ -35,8 +35,12 @@ gcloud builds submit . -t eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG
 gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG --max-instances=2 --region europe-west4
 ```
 
-## Deploy on Vercel
+## Importing data
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Open the [Burgenland GIS](https://gis.bgld.gv.at/Datenerhebung/) login and open the developer tools. Select only one kind of objects (only Hydranten for example) and log the whole network requests. Export the network requests as har file.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=$PWD/config/service_account.json
+npm run extract hars/saugstelle.har ND
+npm run import saugstelle output/wgs.csv
+```
