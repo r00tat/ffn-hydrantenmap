@@ -19,12 +19,14 @@
     "epsg": "^0.5.0",
     "firebase": "^9.6.1",
     "firebase-admin": "^10.0.1",
+    "firebaseui": "^6.0.0",
     "leaflet": "^1.7.1",
     "next": "12.0.7",
     "proj4": "^2.7.5",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-firebase-hooks": "^4.0.1",
+    "react-firebaseui": "^6.0.0",
     "react-leaflet": "^3.2.2"
   },
   "devDependencies": {
