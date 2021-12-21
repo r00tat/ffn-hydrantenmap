@@ -9,11 +9,12 @@ export type PositionInfo = [L.LatLng, boolean, GeolocationPosition | undefined];
 export default function usePosition(): PositionInfo {
   const [position, setPosition] = useState<L.LatLng>(defaultPosition);
   const [isSet, setIsSet] = useState(false);
+  const [watchId, setWatchId] = useState<number>();
   const [location, setLocation] = useState<GeolocationPosition>();
 
   useEffect(() => {
     if (navigator.geolocation) {
-      navigator.geolocation.watchPosition((geolocation) => {
+      const id = navigator.geolocation.watchPosition((geolocation) => {
         setPosition(
           L.latLng([
             geolocation.coords.latitude,
@@ -24,10 +25,19 @@ export default function usePosition(): PositionInfo {
         setLocation(geolocation);
         setIsSet(true);
       });
+      setWatchId(id);
     } else {
       console.info(`geolocation not supported`);
     }
   }, []);
+
+  useEffect(() => {
+    if (watchId) {
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+      };
+    }
+  }, [watchId]);
 
   return [position, isSet, location];
 }

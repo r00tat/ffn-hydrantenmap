@@ -1,15 +1,20 @@
 import MenuIcon from '@mui/icons-material/Menu';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
+import CssBaseline from '@mui/material/CssBaseline';
 import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
+import React from 'react';
+import AppDrawer from '../components/AppDrawer';
 import '../styles/globals.css';
 import styles from '../styles/Home.module.css';
 
 function MyApp({ Component, pageProps }: AppProps) {
+  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+
   return (
     <div className={styles.container}>
       <Head>
@@ -21,6 +26,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         <link rel="icon" href="/favicon.ico" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
+      <CssBaseline enableColorScheme />
+
+      <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
       <Box sx={{ flexGrow: 1 }}>
         <AppBar position="static">
@@ -31,6 +39,7 @@ function MyApp({ Component, pageProps }: AppProps) {
               color="inherit"
               aria-label="menu"
               sx={{ mr: 2 }}
+              onClick={() => setIsDrawerOpen(!isDrawerOpen)}
             >
               <MenuIcon />
             </IconButton>

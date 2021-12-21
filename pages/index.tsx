@@ -1,6 +1,5 @@
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
-import Position from '../components/Position';
 
 const DynamicMap = dynamic(
   () => {

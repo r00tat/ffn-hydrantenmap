@@ -1,9 +1,8 @@
-import React, { useState, useContext, createContext } from 'react';
+import React, { createContext, useContext } from 'react';
 import usePosition, {
   defaultPosition,
   PositionInfo,
 } from '../hooks/usePosition';
-import L from 'leaflet';
 
 const PositionContext = createContext<PositionInfo>([
   defaultPosition,
