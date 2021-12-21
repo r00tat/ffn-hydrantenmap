@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { usePositionContext } from '../components/Position';
 import { defaultPosition } from '../hooks/usePosition';
 
-export default function useDistanceMarker(map: L.Map | undefined) {
+export default function useDistanceMarker(map: L.Map) {
   const [position] = usePositionContext();
   const [distanceMarker] = useState(L.marker(defaultPosition));
   const [distancePosition, setDistancePosition] = useState<L.LatLng>();

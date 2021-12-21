@@ -1,47 +1,20 @@
 import L from 'leaflet';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
-import useDistanceLayer from '../hooks/useDistanceLayer';
-import useDistanceMarker from '../hooks/useDistanceMarker';
-import useHydrantenLayer from '../hooks/useHydrantenLayer';
 import { defaultPosition } from '../hooks/usePosition';
-import usePositionMarker from '../hooks/usePositionMarker';
-import { usePositionContext } from './Position';
-import { availableLayers, createLayers, overlayLayers } from './tiles';
-
-const defaultTiles = 'basemap_hdpi';
+import MapLayer from './MapLayer';
 
 export default function Map() {
   const [map, setMap] = useState<L.Map>();
-  // const [layer, setLayer] = useState(defaultTiles);
-  const hydrantenLayer = useHydrantenLayer(map);
-
-  const distanceLayer = useDistanceLayer(map);
-  useDistanceMarker(map);
-  usePositionMarker(map);
 
   useEffect(() => {
     const newMap = L.map('map').setView(defaultPosition, 17);
-
-    const baseMaps = createLayers(availableLayers);
-    const overlayLayersForMap = createLayers(overlayLayers);
-
-    baseMaps[defaultTiles].addTo(newMap);
-    hydrantenLayer.addTo(newMap);
-    distanceLayer.addTo(newMap);
-
-    const overlayMaps = {
-      Hydranten: hydrantenLayer,
-      'Umkreis 50m': distanceLayer,
-      ...overlayLayersForMap,
-    };
-    L.control.layers(baseMaps, overlayMaps).addTo(newMap);
 
     setMap(newMap);
     return () => {
       newMap.remove();
     };
-  }, [hydrantenLayer, distanceLayer]);
+  }, []);
 
   return (
     <>
@@ -55,6 +28,8 @@ export default function Map() {
       </Head>
 
       <div id="map" style={{ height: '86vh' }}></div>
+
+      {map && <MapLayer map={map} />}
     </>
   );
 }

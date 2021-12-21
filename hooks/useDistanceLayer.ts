@@ -14,7 +14,7 @@ export const distances: number[] = Object.keys(distanceColors).map((key) =>
 );
 export const colors: string[] = Object.values(distanceColors);
 
-export default function useDistanceLayer(map: L.Map | undefined) {
+export default function useDistanceLayer(map: L.Map) {
   const [distanceLayer] = useState(L.layerGroup());
   const [initialPositionSet, setInitialPositionSet] = useState(false);
   const [position, gotPosition] = usePositionContext();
@@ -27,7 +27,7 @@ export default function useDistanceLayer(map: L.Map | undefined) {
   useEffect(() => {
     if (map && legend) {
       console.info(`adding legend`);
-      legend.onAdd = function () {
+      legend.onAdd = () => {
         console.info(`adding legend onadd`);
         var div = L.DomUtil.create('div', 'info legend');
 

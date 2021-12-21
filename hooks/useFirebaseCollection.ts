@@ -18,7 +18,7 @@ export default function useFirebaseCollection<T>(
   collectionName: string,
   queryConstraints: QueryConstraint[] = []
 ) {
-  const [records, setRecords] = useState<T[]>([]);
+  const [records, setRecords] = useState<Array<T>>([]);
   const [value, loading, error] = useCollection(
     query(collection(firestore, collectionName), ...queryConstraints)
   );

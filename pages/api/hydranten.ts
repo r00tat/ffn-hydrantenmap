@@ -5,14 +5,11 @@ import { readFileSync } from 'fs';
 import firebaseAdmin from '../../server/firebase/admin';
 import { GisWgsObject } from '../../server/gis-objects';
 
-export interface Hydrant {
-  name: string;
+export interface Hydrant extends GisWgsObject {
   dimension: string;
   dynamsicher_druck?: number; // there's a typo in the API "Dynamsicher Druck"
   statischer_druck?: number;
   leistung?: number;
-  lat: number;
-  lng: number;
   ortschaft: string;
 }
 
