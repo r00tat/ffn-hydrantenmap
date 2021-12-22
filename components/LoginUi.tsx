@@ -1,11 +1,10 @@
-import { Box, Button, Typography } from '@mui/material';
-import * as firebaseui from 'firebaseui';
-import { auth, firebaseApp } from '../components/firebase/app';
-import React, { useEffect, useState } from 'react';
+import { Button, Typography } from '@mui/material';
 import { EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
+import React from 'react';
 // import 'firebaseui/dist/firebaseui.css';
 import StyledFirebaseAuth from 'react-firebaseui/StyledFirebaseAuth';
-import * as firebase from 'firebase/compat/app';
+import { auth } from '../components/firebase/app';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 const uiConfig = {
   signInOptions: [
@@ -20,15 +19,7 @@ const uiConfig = {
 };
 
 export default function Login() {
-  const [isSignedIn, setIsSignedIn] = useState(false); // Local signed-in state.
-
-  // Listen to the Firebase Auth state and set the local state.
-  useEffect(() => {
-    const unregisterAuthObserver = auth.onAuthStateChanged((user) => {
-      setIsSignedIn(!!user);
-    });
-    return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
-  }, []);
+  const { isSignedIn } = useFirebaseLogin();
 
   if (isSignedIn) {
     return (
