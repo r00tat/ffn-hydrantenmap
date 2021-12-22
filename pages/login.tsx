@@ -1,9 +1,6 @@
 import { Box, Typography } from '@mui/material';
-import * as firebaseui from 'firebaseui';
-import { auth } from '../components/firebase/app';
-import React, { useEffect, useState } from 'react';
-import { EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
 import dynamic from 'next/dynamic';
+import React from 'react';
 
 const DynamicLogin = dynamic(
   () => {

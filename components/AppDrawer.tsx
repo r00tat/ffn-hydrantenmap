@@ -6,9 +6,11 @@ import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
+import UserIcon from '@mui/icons-material/Person';
 import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
-import * as React from 'react';
+import React, { useCallback } from 'react';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 export default function AppDrawer({
   isOpen,
@@ -17,17 +19,21 @@ export default function AppDrawer({
   isOpen: boolean;
   setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const toggleDrawer = (event: React.KeyboardEvent | React.MouseEvent) => {
-    if (
-      event.type === 'keydown' &&
-      ((event as React.KeyboardEvent).key === 'Tab' ||
-        (event as React.KeyboardEvent).key === 'Shift')
-    ) {
-      return;
-    }
+  const toggleDrawer = useCallback(
+    (event: React.KeyboardEvent | React.MouseEvent) => {
+      if (
+        event.type === 'keydown' &&
+        ((event as React.KeyboardEvent).key === 'Tab' ||
+          (event as React.KeyboardEvent).key === 'Shift')
+      ) {
+        return;
+      }
 
-    setIsOpen(!isOpen);
-  };
+      setIsOpen((prev) => !prev);
+    },
+    [setIsOpen]
+  );
+  const { isSignedIn, email } = useFirebaseLogin();
 
   const drawerItems = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
@@ -53,6 +59,17 @@ export default function AppDrawer({
                 </ListItem>
               </Link>
             ))}
+
+            {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
+              <Link href="/users" passHref>
+                <ListItem button key="users">
+                  <ListItemIcon>
+                    <UserIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Users" />
+                </ListItem>
+              </Link>
+            )}
           </List>
         </Box>
       </Drawer>

@@ -1,7 +1,5 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { parse } from 'csv-parse/sync';
-import { readFileSync } from 'fs';
 import firebaseAdmin from '../../server/firebase/admin';
 import { GisWgsObject } from '../../server/gis-objects';
 
