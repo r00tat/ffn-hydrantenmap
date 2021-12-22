@@ -1,18 +1,7 @@
-import {
-  collection,
-  getDocs,
-  query,
-  QueryConstraint,
-} from 'firebase/firestore';
+import { collection, query, QueryConstraint } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { firestore } from '../components/firebase/app';
 import { useCollection } from 'react-firebase-hooks/firestore';
-
-export interface QueryFilter {
-  field: string;
-  operator: '';
-  value: any;
-}
+import { firestore } from '../components/firebase/app';
 
 export default function useFirebaseCollection<T>(
   collectionName: string,
@@ -27,7 +16,9 @@ export default function useFirebaseCollection<T>(
     if (value) {
       // console.info(`got firstore collection records`);
       setRecords(value?.docs.map((doc) => doc.data() as T));
+    } else if (error) {
+      setRecords([]);
     }
-  }, [value]);
+  }, [error, value]);
   return records;
 }
