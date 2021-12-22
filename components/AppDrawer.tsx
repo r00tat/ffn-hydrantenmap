@@ -1,6 +1,6 @@
-import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
 import LoginIcon from '@mui/icons-material/Login';
+import MapIcon from '@mui/icons-material/Map';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
@@ -30,7 +30,7 @@ export default function AppDrawer({
   };
 
   const drawerItems = [
-    { text: 'Start', icon: <HomeIcon />, href: '/' },
+    { text: 'Karte', icon: <MapIcon />, href: '/' },
     { text: 'Login', icon: <LoginIcon />, href: '/login' },
     { text: 'About', icon: <InfoIcon />, href: '/about' },
   ];
