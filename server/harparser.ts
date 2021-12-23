@@ -43,13 +43,9 @@ const gk34ToWgs84 = (x: number, y: number): Coordinates => {
   return result;
 };
 
-const main = async () => {
+const harparser = async (inputFile: string, ortschaft = 'ND') => {
   console.info(`start`);
-  const har = JSON.parse(
-    fs.readFileSync(process.argv[2], { encoding: 'utf8' })
-  );
-
-  const ortschaft: string = process.argv[3] || 'ND';
+  const har = JSON.parse(fs.readFileSync(inputFile, { encoding: 'utf8' }));
 
   const reqs = har.log.entries;
   console.info(`${reqs.length} requests`);
@@ -145,8 +141,13 @@ const main = async () => {
     })
   );
   console.info(`wrote ${wgsGisObjects.length} converted objects`);
+
+  return 'output/wgs.csv';
 };
 
-main();
+if (require.main === module) {
+  console.info(`main harparser`);
+  harparser(process.argv[2], process.argv[3] || 'ND');
+}
 
-export {};
+export default harparser;

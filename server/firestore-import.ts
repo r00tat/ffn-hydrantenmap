@@ -7,20 +7,11 @@ interface GisWgsImportObject extends GisWgsObject {
   ortschaft: string;
 }
 
-const main = async () => {
-  if (process.argv.length < 4) {
-    console.error(
-      `Usage: ${process.argv[0]} ${process.argv[1]} collection file`
-    );
-    process.exit(1);
-  }
-
-  const inputCsv = process.argv[3];
+const firestoreImport = async (collectionName: string, inputCsv: string) => {
   if (!fs.existsSync(inputCsv)) {
     console.error(`file ${inputCsv} does not exist`);
     process.exit(2);
   }
-  const collectionName = process.argv[2];
 
   console.info(
     `starting import process for ${collectionName} from ${inputCsv}`
@@ -68,12 +59,22 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-(async () => {
-  try {
-    main();
-  } catch (err: any) {
-    console.error(`Import failed ${err.message}\n${err.stack}`);
+if (require.main === module) {
+  console.info(`main firestore import`);
+  if (process.argv.length < 4) {
+    console.error(
+      `Usage: ${process.argv[0]} ${process.argv[1]} collection file`
+    );
+    process.exit(1);
   }
-})();
 
-export { main };
+  (async () => {
+    try {
+      firestoreImport(process.argv[2], process.argv[3]);
+    } catch (err: any) {
+      console.error(`Import failed ${err.message}\n${err.stack}`);
+    }
+  })();
+}
+
+export default firestoreImport;

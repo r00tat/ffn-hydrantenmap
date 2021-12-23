@@ -7,7 +7,8 @@
     "start": "next start",
     "lint": "next lint",
     "extract": "npx tsc --outDir dist server/harparser && node dist/harparser.js",
-    "import": "npx tsc --outDir dist server/firestore-import && node dist/firestore-import.js"
+    "import": "npx tsc --outDir dist server/firestore-import && node dist/firestore-import.js",
+    "exportImport": "npx tsc --outDir dist server/export-import && node dist/export-import.js"
   },
   "dependencies": {
     "@emotion/react": "^11.7.1",
