@@ -8,7 +8,11 @@ export default function Map() {
   const [map, setMap] = useState<L.Map>();
 
   useEffect(() => {
-    const newMap = L.map('map').setView(defaultPosition, 17);
+    const newMap = L.map('map', {
+      center: defaultPosition,
+      zoom: 17,
+      maxZoom: 30,
+    });
 
     setMap(newMap);
     return () => {

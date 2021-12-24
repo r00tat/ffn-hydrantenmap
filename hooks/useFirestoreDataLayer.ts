@@ -1,7 +1,8 @@
-import L from 'leaflet';
+import L, { LayerGroup } from 'leaflet';
 import { useEffect, useState } from 'react';
 import { GisWgsObject } from '../server/gis-objects';
 import useFirebaseCollection from './useFirebaseCollection';
+import { MarkerClusterGroup } from 'leaflet.markercluster';
 
 export interface FirestoreDataLayerOptions {
   /**
@@ -21,7 +22,16 @@ export interface FirestoreDataLayerOptions {
    */
   popupFn: (gisObject: GisWgsObject) => string;
 
+  /**
+   * automatically add to the map, once data has been loaded
+   */
   autoAdd?: boolean;
+
+  /**
+   * cluster objects automatically together
+   * default: false
+   */
+  cluster?: boolean;
 }
 
 export default function useFirestoreDataLayer(
@@ -34,20 +44,27 @@ export default function useFirestoreDataLayer(
     []
   );
   const [layerGroup, setLayerGroup] = useState<L.LayerGroup>();
-  const { autoAdd = true } = options;
+  const { autoAdd = true, cluster = false } = options;
 
   useEffect(() => {
-    setLayerGroup(L.layerGroup([]));
-  }, []);
+    // setLayerGroup(L.layerGroup());
+    console.info(`setting markerclustergroup`);
+    setLayerGroup(
+      cluster ? (new MarkerClusterGroup() as LayerGroup) : L.layerGroup()
+    );
+  }, [cluster]);
 
   useEffect(() => {
     if (map && layerGroup && autoAdd) {
+      console.info(`adding firestore data to map`);
       layerGroup.addTo(map);
     }
   }, [layerGroup, map, autoAdd]);
 
   useEffect(() => {
     if (map && layerGroup) {
+      // window.setTimeout(() => {
+      console.info(`setting up markers`);
       layerGroup.clearLayers();
       // only add hydranten if we got the map
       const markerIcon =
@@ -63,6 +80,7 @@ export default function useFirestoreDataLayer(
           .bindPopup(options.popupFn(gisObject))
           .addTo(layerGroup);
       });
+      // }, 2000);
     }
   }, [map, records, layerGroup, options]);
 

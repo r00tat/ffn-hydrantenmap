@@ -35,6 +35,7 @@ export default function useHydrantenLayer(map: L.Map) {
   const hydrantenLayer = useFirestoreDataLayer(map, {
     icon: iconFn,
     collectionName: 'hydrant',
+    cluster: true,
     titleFn: (hydrant: GisWgsObject) =>
       `${hydrant.leistung} l/min (${hydrant.dimension}mm)
     ${hydrant.ortschaft} ${hydrant.name}

@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useDistanceLayer from '../hooks/useDistanceLayer';
 import useDistanceMarker from '../hooks/useDistanceMarker';
 import useGefahrObjekteLayer from '../hooks/useGefahrObjekteLayer';
@@ -9,6 +9,8 @@ import usePositionMarker from '../hooks/usePositionMarker';
 import useRisikoObjekteLayer from '../hooks/useRisikoObjekteLayer';
 import useSaugstellenLayer from '../hooks/useSaugstellenLayer';
 import { availableLayers, createLayers, overlayLayers } from './tiles';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 const defaultTiles = 'basemap_hdpi';
 
@@ -58,6 +60,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
     map,
     risikoLayer,
     saugstellenLayer,
+    gefahrLayer,
   ]);
 
   return <></>;
