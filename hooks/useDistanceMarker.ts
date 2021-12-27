@@ -25,7 +25,6 @@ export default function useDistanceMarker(map: L.Map) {
         // distanceMarker.bindPopup(`aktuelle Position`);
         const popup = distanceMarker.getPopup();
         if (popup) {
-          console.info(`popup set, opening`);
           popup.options.autoPan = false;
           distanceMarker.openPopup();
         }

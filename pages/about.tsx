@@ -45,6 +45,9 @@ export default function About() {
         für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten
         sind ausschließlich deren Betreiber verantwortlich.
       </Typography>
+
+      <Typography variant="h5">Version</Typography>
+      <Typography>Build id: {process.env.NEXT_PUBLIC_BUILD_ID}</Typography>
     </Paper>
   );
 }
