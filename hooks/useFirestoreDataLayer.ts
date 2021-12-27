@@ -64,7 +64,7 @@ export default function useFirestoreDataLayer(
   useEffect(() => {
     if (map && layerGroup) {
       // window.setTimeout(() => {
-      console.info(`setting up markers`);
+      // console.info(`setting up markers`);
       layerGroup.clearLayers();
       // only add hydranten if we got the map
       const markerIcon =

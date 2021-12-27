@@ -14,26 +14,32 @@ export default function useDistanceMarker(map: L.Map) {
       map.on('click', (e) => {
         // console.info(`clicked on ${(e as any).latlng}`);
         setDistancePosition((e as any).latlng as L.LatLng);
+        setInitialPositionSet(true);
       });
     }
   }, [map]);
 
   useEffect(() => {
     if (distancePosition && map && distanceMarker) {
-      if (!initialPositionSet) {
-        distanceMarker.addTo(map);
-        setInitialPositionSet(true);
-      }
-      distanceMarker
-        .setLatLng(distancePosition)
-        .bindPopup(
-          `Entfernung zum aktuellen Standort:<br>${Math.round(
-            distancePosition.distanceTo(position)
-          )}m`
-        )
-        .openPopup();
+      distanceMarker.setLatLng(distancePosition).openPopup();
     }
-  }, [distancePosition, map, distanceMarker, position, initialPositionSet]);
+  }, [distanceMarker, distancePosition, map]);
+
+  useEffect(() => {
+    if (initialPositionSet) {
+      distanceMarker.addTo(map);
+    }
+  }, [distanceMarker, initialPositionSet, map]);
+
+  useEffect(() => {
+    if (distancePosition) {
+      distanceMarker.bindPopup(
+        `Entfernung zum aktuellen Standort:<br>${Math.round(
+          distancePosition.distanceTo(position)
+        )}m`
+      );
+    }
+  }, [distanceMarker, distancePosition, position]);
 
   return distanceMarker;
 }
