@@ -3,7 +3,7 @@ import { EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
 import React from 'react';
 // import 'firebaseui/dist/firebaseui.css';
 import StyledFirebaseAuth from 'react-firebaseui/StyledFirebaseAuth';
-import { auth } from '../components/firebase/app';
+import { auth } from './firebase';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 const uiConfig = {

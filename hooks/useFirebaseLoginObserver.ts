@@ -1,6 +1,6 @@
 import { User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { auth } from '../components/firebase/app';
+import { auth } from '../components/firebase';
 
 export interface LoginStatus {
   isSignedIn: boolean;
