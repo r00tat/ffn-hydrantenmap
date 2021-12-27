@@ -5,25 +5,34 @@ import { defaultPosition } from '../hooks/usePosition';
 
 export default function useDistanceMarker(map: L.Map) {
   const [position] = usePositionContext();
-  const [distanceMarker] = useState(L.marker(defaultPosition));
+  const [distanceMarker] = useState(
+    L.marker(defaultPosition).bindPopup('aktuelle Position')
+  );
   const [distancePosition, setDistancePosition] = useState<L.LatLng>();
   const [initialPositionSet, setInitialPositionSet] = useState(false);
 
   useEffect(() => {
     if (map) {
       map.on('click', (e) => {
-        // console.info(`clicked on ${(e as any).latlng}`);
-        setDistancePosition((e as any).latlng as L.LatLng);
-        setInitialPositionSet(true);
+        const pos = (e as any).latlng as L.LatLng;
+        console.info(`clicked on ${pos}`);
+        if (!initialPositionSet) {
+          console.info(`adding distance marker to map`);
+          distanceMarker.addTo(map);
+          setInitialPositionSet(true);
+        }
+        distanceMarker.setLatLng(pos);
+        // distanceMarker.bindPopup(`aktuelle Position`);
+        const popup = distanceMarker.getPopup();
+        if (popup) {
+          console.info(`popup set, opening`);
+          popup.options.autoPan = false;
+          distanceMarker.openPopup();
+        }
+        setDistancePosition(pos);
       });
     }
-  }, [map]);
-
-  useEffect(() => {
-    if (distancePosition && map && distanceMarker) {
-      distanceMarker.setLatLng(distancePosition).openPopup();
-    }
-  }, [distanceMarker, distancePosition, map]);
+  }, [distanceMarker, initialPositionSet, map]);
 
   useEffect(() => {
     if (initialPositionSet) {
@@ -38,6 +47,10 @@ export default function useDistanceMarker(map: L.Map) {
           distancePosition.distanceTo(position)
         )}m`
       );
+      const popup = distanceMarker.getPopup();
+      if (popup) {
+        popup.options.autoPan = false;
+      }
     }
   }, [distanceMarker, distancePosition, position]);
 
