@@ -11,6 +11,8 @@ import useSaugstellenLayer from '../hooks/useSaugstellenLayer';
 import { availableLayers, createLayers, overlayLayers } from './tiles';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import MapActionButtons from './MapActionButtons';
+import { useFirecallLayer } from '../hooks/useFirecallLayer';
 
 const defaultTiles = 'basemap_hdpi';
 
@@ -26,6 +28,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
   const loeschteichLayer = useLoeschteicheLayer(map);
   const risikoLayer = useRisikoObjekteLayer(map);
   const gefahrLayer = useGefahrObjekteLayer(map);
+  const firecallLayer = useFirecallLayer(map);
   useDistanceMarker(map);
   usePositionMarker(map);
 
@@ -36,11 +39,13 @@ export default function MapLayer({ map }: MapLayerOptions) {
       saugstellenLayer &&
       loeschteichLayer &&
       risikoLayer &&
-      gefahrLayer
+      gefahrLayer &&
+      firecallLayer
     ) {
       const overlayLayersForMap = createLayers(overlayLayers);
       distanceLayer.addTo(map);
       const overlayMaps = {
+        Einsatz: firecallLayer,
         Hydranten: hydrantenLayer,
         Saugstellen: saugstellenLayer,
         Loeschteiche: loeschteichLayer,
@@ -61,7 +66,12 @@ export default function MapLayer({ map }: MapLayerOptions) {
     risikoLayer,
     saugstellenLayer,
     gefahrLayer,
+    firecallLayer,
   ]);
 
-  return <></>;
+  return (
+    <>
+      <MapActionButtons map={map} />
+    </>
+  );
 }

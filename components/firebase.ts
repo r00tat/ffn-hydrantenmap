@@ -24,4 +24,5 @@ export default app;
 export { app as firebaseApp };
 export const analytics: Analytics = getAnalytics(app);
 export const firestore: Firestore = getFirestore(app);
+export const db = firestore;
 export const auth: Auth = getAuth(app);

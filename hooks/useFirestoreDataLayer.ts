@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { GisWgsObject } from '../server/gis-objects';
 import useFirebaseCollection from './useFirebaseCollection';
 import { MarkerClusterGroup } from 'leaflet.markercluster';
+import { QueryConstraint } from 'firebase/firestore';
 
 export interface FirestoreDataLayerOptions {
   /**
@@ -13,14 +14,17 @@ export interface FirestoreDataLayerOptions {
    * firestore collection name
    */
   collectionName: string;
+
+  queryConstraints?: QueryConstraint[];
+  pathSegments?: string[];
   /**
    * render marker title as text
    */
-  titleFn: (gisObject: GisWgsObject) => string;
+  titleFn?: (gisObject: GisWgsObject) => string;
   /**
    * render popup html
    */
-  popupFn: (gisObject: GisWgsObject) => string;
+  popupFn?: (gisObject: GisWgsObject) => string;
 
   /**
    * automatically add to the map, once data has been loaded
@@ -32,6 +36,8 @@ export interface FirestoreDataLayerOptions {
    * default: false
    */
   cluster?: boolean;
+
+  markerOptions?: L.MarkerOptions;
 }
 
 export default function useFirestoreDataLayer(
@@ -39,16 +45,15 @@ export default function useFirestoreDataLayer(
   options: FirestoreDataLayerOptions
 ) {
   // const [layer, setLayer] = useState(defaultTiles);
-  const records = useFirebaseCollection<GisWgsObject>(
-    options.collectionName,
-    []
-  );
+  const records = useFirebaseCollection<GisWgsObject>({
+    collectionName: options.collectionName,
+    queryConstraints: options.queryConstraints,
+    pathSegments: options.pathSegments,
+  });
   const [layerGroup, setLayerGroup] = useState<L.LayerGroup>();
   const { autoAdd = true, cluster = false } = options;
 
   useEffect(() => {
-    // setLayerGroup(L.layerGroup());
-    console.info(`setting markerclustergroup`);
     setLayerGroup(
       cluster ? (new MarkerClusterGroup() as LayerGroup) : L.layerGroup()
     );
@@ -69,17 +74,22 @@ export default function useFirestoreDataLayer(
       // only add hydranten if we got the map
       const markerIcon =
         typeof options.icon === 'object' ? L.icon(options.icon) : undefined;
-      records.forEach((gisObject: GisWgsObject) => {
-        L.marker([gisObject.lat, gisObject.lng], {
-          icon:
-            typeof options.icon === 'function'
-              ? options.icon(gisObject)
-              : markerIcon,
-          title: options.titleFn(gisObject),
-        })
-          .bindPopup(options.popupFn(gisObject))
-          .addTo(layerGroup);
-      });
+      if (records && records.length > 0) {
+        records
+          .filter((r) => r?.lat && r?.lng)
+          .forEach((gisObject: GisWgsObject) => {
+            L.marker([gisObject.lat, gisObject.lng], {
+              ...(options.markerOptions || {}),
+              icon:
+                typeof options.icon === 'function'
+                  ? options.icon(gisObject)
+                  : markerIcon,
+              title: options.titleFn ? options.titleFn(gisObject) : '',
+            })
+              .bindPopup(options.popupFn ? options.popupFn(gisObject) : '')
+              .addTo(layerGroup);
+          });
+      }
       // }, 2000);
     }
   }, [map, records, layerGroup, options]);

@@ -33,16 +33,6 @@ function MyApp({ Component, pageProps }: AppProps) {
         />
 
         <Component {...pageProps} />
-
-        <footer className={styles.footer}>
-          <a
-            href="https://www.ff-neusiedlamsee.at"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Hydranten Karte der Freiwilligen Feuerwehr Neusiedl am See
-          </a>
-        </footer>
       </div>
     </FirebaseUserProvider>
   );

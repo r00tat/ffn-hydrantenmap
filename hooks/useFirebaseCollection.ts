@@ -3,13 +3,23 @@ import { useEffect, useState } from 'react';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { firestore } from '../components/firebase';
 
+export interface FirebaseCollectionOptions {
+  collectionName: string;
+  queryConstraints?: QueryConstraint[];
+  pathSegments?: string[];
+}
+
 export default function useFirebaseCollection<T>(
-  collectionName: string,
-  queryConstraints: QueryConstraint[] = []
+  options: FirebaseCollectionOptions
 ) {
+  const { collectionName, queryConstraints = [], pathSegments = [] } = options;
+
   const [records, setRecords] = useState<Array<T>>([]);
   const [value, loading, error] = useCollection(
-    query(collection(firestore, collectionName), ...queryConstraints)
+    query(
+      collection(firestore, collectionName, ...pathSegments),
+      ...queryConstraints
+    )
   );
 
   useEffect(() => {
