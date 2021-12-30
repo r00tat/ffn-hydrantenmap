@@ -38,6 +38,10 @@ export interface FirestoreDataLayerOptions {
   cluster?: boolean;
 
   markerOptions?: L.MarkerOptions;
+
+  events?: {
+    [eventname: string]: (event: L.Event, gisObject: GisWgsObject) => Promise<void>;
+  }
 }
 
 export default function useFirestoreDataLayer(
@@ -78,7 +82,7 @@ export default function useFirestoreDataLayer(
         records
           .filter((r) => r?.lat && r?.lng)
           .forEach((gisObject: GisWgsObject) => {
-            L.marker([gisObject.lat, gisObject.lng], {
+            const marker =L.marker([gisObject.lat, gisObject.lng], {
               ...(options.markerOptions || {}),
               icon:
                 typeof options.icon === 'function'
@@ -88,7 +92,9 @@ export default function useFirestoreDataLayer(
             })
               .bindPopup(options.popupFn ? options.popupFn(gisObject) : '')
               .addTo(layerGroup);
-          });
+              Object.entries(options.events|| {}).map(([key, f])=> marker.on(key, (event) => f(event, gisObject)));
+
+     });
       }
       // }, 2000);
     }
