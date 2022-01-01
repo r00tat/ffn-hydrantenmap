@@ -27,7 +27,16 @@ export function useFirecallLayer(map: Map) {
     pathSegments: [firecall?.id || 'unkown', 'item'],
     popupFn: (gisObject: WgsObject) => {
       // console.info(`rendering popup for vehicle: ${JSON.stringify(gisObject)}`);
-      return `${gisObject.name} ${gisObject.fw || ''}`;
+
+      return `${gisObject.name} ${gisObject.fw || ''}${
+        gisObject.besatzung ? '<br />Besatzung: 1:' + gisObject.besatzung : ''
+      } ${gisObject.ats ? `${gisObject.ats} ATS` : ''}
+      ${
+        gisObject.alarmierung ? '<br>Alarmierung: ' + gisObject.alarmierung : ''
+      }
+      ${gisObject.eintreffen ? '<br>Eintreffen: ' + gisObject.eintreffen : ''}
+      ${gisObject.abruecken ? '<br>Abrücken: ' + gisObject.abruecken : ''}
+      `;
     },
 
     markerOptions: {

@@ -5,15 +5,18 @@ import SpeedDialAction from '@mui/material/SpeedDialAction';
 import SpeedDialIcon from '@mui/material/SpeedDialIcon';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import L from 'leaflet';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import useLastFirecall from '../hooks/useFirecall';
 import { firestore } from './firebase';
+import { Fzg } from './firestore';
+import FzgDialog from './FzgDialog';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
 }
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
+  const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
   const firecall = useLastFirecall();
   const addEinsatz = useCallback(async () => {
     await addDoc(collection(firestore, 'call'), {
@@ -21,36 +24,45 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       date: new Date(),
     });
   }, []);
-  const addVehicle = useCallback(async () => {
-    await addDoc(
-      collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
-      {
-        name: 'Test Fzg 1',
-        date: new Date(),
-        lat: map.getCenter().lat,
-        lng: map.getCenter().lng,
-        type: 'vehicle',
+
+  const fzgDialogClose = useCallback(
+    (fzg?: Fzg) => {
+      setFzgDialogIsOpen(false);
+      if (fzg) {
+        addDoc(
+          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
+          {
+            ...fzg,
+            lat: map.getCenter().lat,
+            lng: map.getCenter().lng,
+            type: 'vehicle',
+          }
+        );
       }
-    );
-  }, [firecall?.id, map]);
+    },
+    [firecall?.id, map]
+  );
 
   return (
-    <SpeedDial
-      ariaLabel="Kartenaktionen"
-      sx={{ position: 'absolute', bottom: 16, right: 16 }}
-      icon={<SpeedDialIcon />}
-    >
-      <SpeedDialAction
-        icon={<DirectionsCarIcon />}
-        tooltipTitle="Fahrzeug"
-        onClick={addVehicle}
-      />
+    <>
+      <SpeedDial
+        ariaLabel="Kartenaktionen"
+        sx={{ position: 'absolute', bottom: 16, right: 16 }}
+        icon={<SpeedDialIcon />}
+      >
+        <SpeedDialAction
+          icon={<DirectionsCarIcon />}
+          tooltipTitle="Fahrzeug"
+          onClick={() => setFzgDialogIsOpen(true)}
+        />
 
-      <SpeedDialAction
-        icon={<LocalFireDepartmentIcon />}
-        tooltipTitle="Einsatz"
-        onClick={addEinsatz}
-      />
-    </SpeedDial>
+        <SpeedDialAction
+          icon={<LocalFireDepartmentIcon />}
+          tooltipTitle="Einsatz"
+          onClick={addEinsatz}
+        />
+      </SpeedDial>
+      {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
+    </>
   );
 }
