@@ -21,14 +21,16 @@ export default function useDistanceLayer(map: L.Map) {
   const [legend, setLegend] = useState<L.Control>();
 
   useEffect(() => {
-    setLegend(new L.Control({ position: 'bottomright' }));
-  }, []);
+    if (!legend) {
+      setLegend(new L.Control({ position: 'bottomright' }));
+    }
+  }, [legend]);
 
   useEffect(() => {
     if (map && legend) {
-      console.info(`adding legend`);
+      // console.info(`adding legend`);
       legend.onAdd = () => {
-        console.info(`adding legend onadd`);
+        // console.info(`adding legend onadd`);
         var div = L.DomUtil.create('div', 'info legend');
 
         // loop through our density intervals and generate a label with a colored square for each interval

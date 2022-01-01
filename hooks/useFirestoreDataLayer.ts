@@ -68,7 +68,7 @@ export default function useFirestoreDataLayer(
 
   useEffect(() => {
     if (map && layerGroup && autoAdd) {
-      console.info(`adding firestore data to map`);
+      // console.info(`adding firestore data to map`);
       layerGroup.addTo(map);
     }
   }, [layerGroup, map, autoAdd]);

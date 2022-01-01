@@ -8,15 +8,15 @@ import useFirestoreDataLayer from './useFirestoreDataLayer';
 export function useFirecallLayer(map: Map) {
   const firecall = useFirecall();
 
-  const fzgIcon = L.icon({
-    iconUrl: '/icons/fzg.svg',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, 0],
-  });
-
   const iconFn = (gisObj: WgsObject) => {
-    return fzgIcon;
+    return L.icon({
+      iconUrl: `/api/fzg?name=${encodeURIComponent(
+        gisObj?.name || ''
+      )}&fw=${encodeURIComponent(gisObj?.fw || '')}`,
+      iconSize: [40, 20],
+      iconAnchor: [20, 0],
+      popupAnchor: [0, 0],
+    });
   };
 
   const firecallDataLayer = useFirestoreDataLayer(map, {

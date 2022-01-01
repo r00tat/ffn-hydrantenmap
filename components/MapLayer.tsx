@@ -21,7 +21,7 @@ interface MapLayerOptions {
 }
 
 export default function MapLayer({ map }: MapLayerOptions) {
-  // const [layer, setLayer] = useState(defaultTiles);
+  const [initialized, setInitialized] = useState(false);
   const hydrantenLayer = useHydrantenLayer(map);
   const saugstellenLayer = useSaugstellenLayer(map);
   const distanceLayer = useDistanceLayer(map);
@@ -34,6 +34,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
 
   useEffect(() => {
     if (
+      !initialized &&
       map &&
       hydrantenLayer &&
       saugstellenLayer &&
@@ -57,8 +58,10 @@ export default function MapLayer({ map }: MapLayerOptions) {
       const baseMaps = createLayers(availableLayers);
       baseMaps[defaultTiles].addTo(map);
       L.control.layers(baseMaps, overlayMaps).addTo(map);
+      setInitialized(true);
     }
   }, [
+    initialized,
     distanceLayer,
     hydrantenLayer,
     loeschteichLayer,
