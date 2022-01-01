@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { GisWgsObject } from '../server/gis-objects';
+import { WgsObject } from '../server/gis-objects';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useSaugstellenLayer(map: L.Map) {
@@ -11,7 +11,7 @@ export default function useSaugstellenLayer(map: L.Map) {
       iconAnchor: [13, 15],
       popupAnchor: [0, 0],
     },
-    titleFn: (gisObj: GisWgsObject) => `${gisObj.ortschaft} ${gisObj.name}
+    titleFn: (gisObj: WgsObject) => `${gisObj.ortschaft} ${gisObj.name}
     ${gisObj.wasserentnahme_l_min_} l/min
     Saughöhe: ${gisObj.geod_tische_saugh_he_m_}m
     ${
@@ -20,7 +20,7 @@ export default function useSaugstellenLayer(map: L.Map) {
         ? `Länge Saugleitung: ${gisObj.saugleitungsl_nge_m_}`
         : ''
     }`,
-    popupFn: (gisObj: GisWgsObject) => `<b>${gisObj.ortschaft} ${
+    popupFn: (gisObj: WgsObject) => `<b>${gisObj.ortschaft} ${
       gisObj.name
     }</b><br>
     ${gisObj.wasserentnahme_l_min_} l/min<br>

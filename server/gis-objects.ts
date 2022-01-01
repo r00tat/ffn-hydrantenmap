@@ -6,6 +6,7 @@ export interface GisObject {
 }
 
 export interface WgsObject {
+  id?: string;
   lat: number;
   lng: number;
   name: string;

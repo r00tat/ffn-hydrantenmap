@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { GisWgsObject } from '../server/gis-objects';
+import { WgsObject } from '../server/gis-objects';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useLoeschteicheLayer(map: L.Map) {
@@ -11,11 +11,11 @@ export default function useLoeschteicheLayer(map: L.Map) {
       iconAnchor: [13, 15],
       popupAnchor: [0, 0],
     },
-    titleFn: (gisObj: GisWgsObject) => `${gisObj.ortschaft} ${gisObj.name}
+    titleFn: (gisObj: WgsObject) => `${gisObj.ortschaft} ${gisObj.name}
     Zufluss: ${gisObj.zufluss_l_min_} l/min
     Fassungsvermögen: ${gisObj.fassungsverm_gen_m3_}m3`,
     popupFn: (
-      gisObj: GisWgsObject
+      gisObj: WgsObject
     ) => `<b>${gisObj.ortschaft} ${gisObj.name}</b><br>
     Zufluss: ${gisObj.zufluss_l_min_} l/min<br>
     Fassungsvermögen: ${gisObj.fassungsverm_gen_m3_}m3`,

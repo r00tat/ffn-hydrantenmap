@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { GisWgsObject } from '../server/gis-objects';
+import { WgsObject } from '../server/gis-objects';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useGefahrObjekteLayer(map: L.Map) {
@@ -11,10 +11,10 @@ export default function useGefahrObjekteLayer(map: L.Map) {
       iconAnchor: [15, 15],
       popupAnchor: [0, 0],
     },
-    titleFn: (gisObj: GisWgsObject) => `${gisObj.ortschaft} ${gisObj.name}
+    titleFn: (gisObj: WgsObject) => `${gisObj.ortschaft} ${gisObj.name}
     ${gisObj.adresse}`,
     popupFn: (
-      gisObj: GisWgsObject
+      gisObj: WgsObject
     ) => `<b>${gisObj.ortschaft} ${gisObj.name}</b><br>
     ${gisObj.adresse}`,
   });

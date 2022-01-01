@@ -25,7 +25,11 @@ export default function useFirebaseCollection<T>(
   useEffect(() => {
     if (value) {
       // console.info(`got firstore collection records`);
-      setRecords(value?.docs.map((doc) => doc.data() as T));
+      setRecords(
+        value?.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() } as unknown as T)
+        )
+      );
     } else if (error) {
       setRecords([]);
     }
