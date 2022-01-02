@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { GisWgsObject } from '../server/gis-objects';
+import { WgsObject } from '../server/gis-objects';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useHydrantenLayer(map: L.Map) {
@@ -22,7 +22,7 @@ export default function useHydrantenLayer(map: L.Map) {
     popupAnchor: [0, 0],
   });
 
-  const iconFn = (gisObj: GisWgsObject) => {
+  const iconFn = (gisObj: WgsObject) => {
     if (gisObj.typ !== 'Überflurhydrant') {
       return unterflurHydrantIcon;
     } else if (gisObj.f_llhydrant?.toLowerCase() === 'ja') {
@@ -36,13 +36,13 @@ export default function useHydrantenLayer(map: L.Map) {
     icon: iconFn,
     collectionName: 'hydrant',
     cluster: true,
-    titleFn: (hydrant: GisWgsObject) =>
+    titleFn: (hydrant: WgsObject) =>
       `${hydrant.leistung} l/min (${hydrant.dimension}mm)
     ${hydrant.ortschaft} ${hydrant.name}
     dynamisch: ${hydrant.dynamsicher_druck} bar
     statisch: ${hydrant.statischer_druck} bar
     ${hydrant.f_llhydrant?.toLowerCase() === 'ja' ? 'Füllhydrant' : ''}`.trim(),
-    popupFn: (hydrant: GisWgsObject) => `
+    popupFn: (hydrant: WgsObject) => `
     <b>${hydrant.ortschaft} ${hydrant.name}<br>
     ${hydrant.leistung} l/min (${hydrant.dimension}mm)</b><br>
     dynamisch: ${hydrant.dynamsicher_druck} bar<br>
