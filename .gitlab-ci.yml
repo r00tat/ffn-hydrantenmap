@@ -24,16 +24,29 @@ build_image:
       gcloud builds submit . -t $IMAGE:$CI_COMMIT_SHORT_SHA
   only:
     - "main"
+    - "dev"
 
-deploy_to_cloudrun:
+.deploy_to_cloudrun:
   stage: deploy
   script:
     - |
-      gcloud run deploy hydrantenmap \
+      gcloud run deploy $SERVICE_NAME \
         --allow-unauthenticated \
         --image $IMAGE:$CI_COMMIT_SHORT_SHA \
         --max-instances=2 --region europe-west4 \
         --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
         --update-env-vars=NEXT_PUBLIC_BUILD_ID=$CI_COMMIT_SHORT_SHA
+
+deploy_to_cloudrun_main:
+  extends: .deploy_to_cloudrun
   only:
     - "main"
+  variables:
+    SERVICE_NAME: "hydrantenmap"
+
+deploy_to_cloudrun_dev:
+  extends: .deploy_to_cloudrun
+  only:
+    - "dev"
+  variables:
+    SERVICE_NAME: "hydrantenmap-dev"
