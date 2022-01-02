@@ -13,6 +13,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import MapActionButtons from './MapActionButtons';
 import { useFirecallLayer } from '../hooks/useFirecallLayer';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 const defaultTiles = 'basemap_hdpi';
 
@@ -21,6 +22,7 @@ interface MapLayerOptions {
 }
 
 export default function MapLayer({ map }: MapLayerOptions) {
+  const { isAuthorized } = useFirebaseLogin();
   const [initialized, setInitialized] = useState(false);
   const hydrantenLayer = useHydrantenLayer(map);
   const saugstellenLayer = useSaugstellenLayer(map);
@@ -72,9 +74,5 @@ export default function MapLayer({ map }: MapLayerOptions) {
     firecallLayer,
   ]);
 
-  return (
-    <>
-      <MapActionButtons map={map} />
-    </>
-  );
+  return <>{isAuthorized && <MapActionButtons map={map} />}</>;
 }

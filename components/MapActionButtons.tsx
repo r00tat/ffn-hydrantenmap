@@ -6,6 +6,7 @@ import SpeedDialIcon from '@mui/material/SpeedDialIcon';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import useLastFirecall from '../hooks/useFirecall';
 import { firestore } from './firebase';
 import { Fzg } from './firestore';
@@ -16,6 +17,7 @@ export interface MapActionButtonsOptions {
 }
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
+  const { email } = useFirebaseLogin();
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
   const firecall = useLastFirecall();
   const addEinsatz = useCallback(async () => {
@@ -36,11 +38,13 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
             lat: map.getCenter().lat,
             lng: map.getCenter().lng,
             type: 'vehicle',
+            user: email,
+            created: new Date(),
           }
         );
       }
     },
-    [firecall?.id, map]
+    [email, firecall?.id, map]
   );
 
   return (

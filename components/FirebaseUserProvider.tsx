@@ -5,6 +5,7 @@ import useFirebaseLoginObserver, {
 
 export const FirebaseLoginContext = createContext<LoginStatus>({
   isSignedIn: false,
+  isAuthorized: false,
   signOut: async () => {},
 });
 

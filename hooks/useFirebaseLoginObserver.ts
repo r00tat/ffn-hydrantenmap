@@ -1,9 +1,11 @@
 import { User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { auth } from '../components/firebase';
+import { auth, firestore } from '../components/firebase';
 
 export interface LoginStatus {
   isSignedIn: boolean;
+  isAuthorized: boolean;
   user?: User;
   email?: string;
   displayName?: string;
@@ -18,7 +20,8 @@ function nonNull(value: any) {
 
 export default function useFirebaseLoginObserver() {
   const [loginStatus, setLoginStatus] = useState<LoginStatus>({
-    isSignedIn: true,
+    isSignedIn: false,
+    isAuthorized: false,
     signOut: async () => {},
   }); // Local signed-in state.
 
@@ -36,11 +39,32 @@ export default function useFirebaseLoginObserver() {
           uid: nonNull(u?.uid),
           signOut: auth.signOut,
           photoURL: nonNull(u?.photoURL),
+          isAuthorized: (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0,
         });
       }
     );
     return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
   }, []);
+
+  useEffect(() => {
+    if (
+      loginStatus.isSignedIn &&
+      loginStatus.uid &&
+      !loginStatus.isAuthorized
+    ) {
+      (async () => {
+        if (
+          (await getDoc(doc(firestore, 'user', '' + loginStatus.uid))).data()
+            ?.authorized
+        ) {
+          setLoginStatus({
+            ...loginStatus,
+            isAuthorized: true,
+          });
+        }
+      })();
+    }
+  }, [loginStatus]);
 
   return loginStatus;
 }
