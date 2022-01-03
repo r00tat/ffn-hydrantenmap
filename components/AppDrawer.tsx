@@ -11,6 +11,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 
 export default function AppDrawer({
   isOpen,
@@ -33,7 +34,7 @@ export default function AppDrawer({
     },
     [setIsOpen]
   );
-  const { isSignedIn, email } = useFirebaseLogin();
+  const { isSignedIn, email, isAuthorized } = useFirebaseLogin();
 
   const drawerItems = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
@@ -67,6 +68,17 @@ export default function AppDrawer({
                     <UserIcon />
                   </ListItemIcon>
                   <ListItemText primary="Users" />
+                </ListItem>
+              </Link>
+            )}
+
+            {isAuthorized && (
+              <Link href="/fahrzeuge" passHref>
+                <ListItem button key="fahrzeuge">
+                  <ListItemIcon>
+                    <DirectionsCarIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Fahrzeuge" />
                 </ListItem>
               </Link>
             )}

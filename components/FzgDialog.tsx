@@ -10,14 +10,17 @@ import { Fzg } from './firestore';
 
 export interface FzgDialogOptions {
   onClose: (fzg?: Fzg) => void;
+  vehicle?: Fzg;
 }
 
-export default function FzgDialog({ onClose }: FzgDialogOptions) {
+export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
   const [open, setOpen] = useState(true);
-  const [fzg, setFzg] = useState<Fzg>({
-    alarmierung: new Date().toLocaleString('de-DE'),
-    eintreffen: new Date().toLocaleString('de-DE'),
-  });
+  const [fzg, setFzg] = useState<Fzg>(
+    vehicle || {
+      alarmierung: new Date().toLocaleString('de-DE'),
+      eintreffen: new Date().toLocaleString('de-DE'),
+    }
+  );
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
