@@ -5,11 +5,11 @@ import { useEffect, useState } from 'react';
 import { WgsObject } from '../server/gis-objects';
 import useFirebaseCollection from './useFirebaseCollection';
 
-export interface FirestoreDataLayerOptions {
+export interface FirestoreDataLayerOptions<T = WgsObject> {
   /**
    * icon
    */
-  icon: L.IconOptions | ((gisObject: WgsObject) => L.Icon);
+  icon: L.IconOptions | ((gisObject: T) => L.Icon);
   /**
    * firestore collection name
    */
@@ -20,11 +20,11 @@ export interface FirestoreDataLayerOptions {
   /**
    * render marker title as text
    */
-  titleFn?: (gisObject: WgsObject) => string;
+  titleFn?: (gisObject: T) => string;
   /**
    * render popup html
    */
-  popupFn?: (gisObject: WgsObject) => string;
+  popupFn?: (gisObject: T) => string;
 
   /**
    * automatically add to the map, once data has been loaded
@@ -40,25 +40,25 @@ export interface FirestoreDataLayerOptions {
   markerOptions?: L.MarkerOptions;
 
   events?: {
-    [eventname: string]: (
-      event: LeafletEvent,
-      gisObject: WgsObject
-    ) => Promise<void>;
+    [eventname: string]: (event: LeafletEvent, gisObject: T) => Promise<void>;
   };
+
+  filterFn?: (element: T) => boolean;
 }
 
-export default function useFirestoreDataLayer(
+export default function useFirestoreDataLayer<T = WgsObject>(
   map: L.Map,
-  options: FirestoreDataLayerOptions
+  options: FirestoreDataLayerOptions<T>
 ) {
+  const { autoAdd = true, cluster = false } = options;
   // const [layer, setLayer] = useState(defaultTiles);
-  const records = useFirebaseCollection<WgsObject>({
+  const records = useFirebaseCollection<T>({
     collectionName: options.collectionName,
     queryConstraints: options.queryConstraints,
     pathSegments: options.pathSegments,
+    filterFn: options.filterFn,
   });
   const [layerGroup, setLayerGroup] = useState<L.LayerGroup>();
-  const { autoAdd = true, cluster = false } = options;
 
   useEffect(() => {
     setLayerGroup(
@@ -83,20 +83,20 @@ export default function useFirestoreDataLayer(
         typeof options.icon === 'object' ? L.icon(options.icon) : undefined;
       if (records && records.length > 0) {
         records
-          .filter((r) => r?.lat && r?.lng)
-          .forEach((gisObject: WgsObject) => {
-            const marker = L.marker([gisObject.lat, gisObject.lng], {
+          .filter((r) => (r as any)?.lat && (r as any)?.lng)
+          .forEach((r: T) => {
+            const marker = L.marker([(r as any)?.lat, (r as any).lng], {
               ...(options.markerOptions || {}),
               icon:
                 typeof options.icon === 'function'
-                  ? options.icon(gisObject)
+                  ? options.icon(r)
                   : markerIcon,
-              title: options.titleFn ? options.titleFn(gisObject) : '',
+              title: options.titleFn ? options.titleFn(r) : '',
             })
-              .bindPopup(options.popupFn ? options.popupFn(gisObject) : '')
+              .bindPopup(options.popupFn ? options.popupFn(r) : '')
               .addTo(layerGroup);
             Object.entries(options.events || {}).map(([key, f]) =>
-              marker.on(key, (event) => f(event, gisObject))
+              marker.on(key, (event) => f(event, r))
             );
           });
       }
