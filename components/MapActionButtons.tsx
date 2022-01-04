@@ -7,7 +7,7 @@ import { addDoc, collection } from 'firebase/firestore';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import useLastFirecall from '../hooks/useFirecall';
+import useFirecall from '../hooks/useFirecall';
 import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
 import { Firecall, Fzg } from './firestore';
@@ -21,7 +21,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const { email } = useFirebaseLogin();
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
   const [einsatzDialog, setEinsatzDialog] = useState(false);
-  const firecall = useLastFirecall();
+  const firecall = useFirecall();
 
   const fzgDialogClose = useCallback(
     (fzg?: Fzg) => {

@@ -16,7 +16,7 @@ export const defaultFirecall: Firecall = {
 
 export const FirecallContext = createContext<Firecall>(defaultFirecall);
 
-export function useFirecall() {
+export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>();
 
   useEffect(() => {
@@ -40,8 +40,8 @@ export function useFirecall() {
   return firecall;
 }
 
-const useLastFirecall = (): Firecall => {
+export const useFirecall = (): Firecall => {
   return useContext(FirecallContext);
 };
 
-export default useLastFirecall;
+export default useFirecall;
