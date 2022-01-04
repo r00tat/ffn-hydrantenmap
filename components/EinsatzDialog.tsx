@@ -6,25 +6,28 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
-import { Fzg } from './firestore';
+import { dateToYmd, Firecall } from './firestore';
 
-export interface FzgDialogOptions {
-  onClose: (fzg?: Fzg) => void;
-  vehicle?: Fzg;
+export interface EinsatzDialogOptions {
+  onClose: (einsatz?: Firecall) => void;
+  einsatz?: Firecall;
 }
 
-export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
+export default function EinsatzDialog({
+  onClose,
+  einsatz: einsatzDefault,
+}: EinsatzDialogOptions) {
   const [open, setOpen] = useState(true);
-  const [fzg, setFzg] = useState<Fzg>(
-    vehicle || {
-      alarmierung: new Date().toLocaleString('de-DE'),
-      eintreffen: new Date().toLocaleString('de-DE'),
+  const [einsatz, setEinsatz] = useState<Firecall>(
+    einsatzDefault || {
+      name: '',
+      date: new Date().toISOString(),
     }
   );
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      setFzg((prev) => ({
+      setEinsatz((prev) => ({
         ...prev,
         [field]: event.target.value,
       }));
@@ -32,9 +35,9 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Fahrzeug hinzuf&uuml;gen</DialogTitle>
+      <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
       <DialogContent>
-        <DialogContentText>Neues Fahrzeug</DialogContentText>
+        <DialogContentText>Neuer Einsatz</DialogContentText>
         <TextField
           autoFocus
           margin="dense"
@@ -44,7 +47,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
           fullWidth
           variant="standard"
           onChange={onChange('name')}
-          value={fzg.name}
+          value={einsatz.name}
         />
         <TextField
           margin="dense"
@@ -54,28 +57,29 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
           fullWidth
           variant="standard"
           onChange={onChange('fw')}
-          value={fzg.fw}
+          value={einsatz.fw}
         />
         <TextField
           margin="dense"
-          id="besatzung"
-          label="Besatzung 1:?"
+          id="date"
+          label="Datum YYYY-MM-DD"
           type="text"
           fullWidth
           variant="standard"
-          onChange={onChange('besatzung')}
-          value={fzg.besatzung}
+          onChange={onChange('date')}
+          value={einsatz.date}
         />
         <TextField
           margin="dense"
-          id="ats"
-          label="ATS Träger"
-          type="number"
+          id="description"
+          label="Beschreibung"
+          type="text"
           fullWidth
           variant="standard"
-          onChange={onChange('ats')}
-          value={fzg.ats}
+          onChange={onChange('description')}
+          value={einsatz.description}
         />
+
         <TextField
           margin="dense"
           id="alarmierung"
@@ -84,7 +88,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
           fullWidth
           variant="standard"
           onChange={onChange('alarmierung')}
-          value={fzg.alarmierung}
+          value={einsatz.alarmierung}
         />
         <TextField
           margin="dense"
@@ -94,7 +98,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
           fullWidth
           variant="standard"
           onChange={onChange('eintreffen')}
-          value={fzg.eintreffen}
+          value={einsatz.eintreffen}
         />
         <TextField
           margin="dense"
@@ -104,7 +108,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
           fullWidth
           variant="standard"
           onChange={onChange('abruecken')}
-          value={fzg.abruecken}
+          value={einsatz.abruecken}
         />
       </DialogContent>
       <DialogActions>
@@ -119,10 +123,10 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(fzg);
+            onClose(einsatz);
           }}
         >
-          {fzg.id ? 'Hinzufügen' : 'Aktualisieren'}
+          {einsatz.id ? 'Aktualisieren' : 'Hinzufügen'}
         </Button>
       </DialogActions>
     </Dialog>

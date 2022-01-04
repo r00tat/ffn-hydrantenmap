@@ -3,13 +3,14 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import SpeedDial from '@mui/material/SpeedDial';
 import SpeedDialAction from '@mui/material/SpeedDialAction';
 import SpeedDialIcon from '@mui/material/SpeedDialIcon';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import useLastFirecall from '../hooks/useFirecall';
+import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
-import { Fzg } from './firestore';
+import { Firecall, Fzg } from './firestore';
 import FzgDialog from './FzgDialog';
 
 export interface MapActionButtonsOptions {
@@ -19,13 +20,8 @@ export interface MapActionButtonsOptions {
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const { email } = useFirebaseLogin();
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
+  const [einsatzDialog, setEinsatzDialog] = useState(false);
   const firecall = useLastFirecall();
-  const addEinsatz = useCallback(async () => {
-    await addDoc(collection(firestore, 'call'), {
-      name: 'Testeinsatz',
-      date: new Date(),
-    });
-  }, []);
 
   const fzgDialogClose = useCallback(
     (fzg?: Fzg) => {
@@ -47,6 +43,19 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [email, firecall?.id, map]
   );
 
+  const einsatzDialogClose = useCallback(
+    (einsatz?: Firecall) => {
+      if (einsatz) {
+        addDoc(collection(firestore, 'call'), {
+          ...einsatz,
+          user: email,
+          created: new Date(),
+        });
+      }
+    },
+    [email]
+  );
+
   return (
     <>
       <SpeedDial
@@ -63,10 +72,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         <SpeedDialAction
           icon={<LocalFireDepartmentIcon />}
           tooltipTitle="Einsatz"
-          onClick={addEinsatz}
+          onClick={() => setEinsatzDialog(true)}
         />
       </SpeedDial>
       {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
+
+      {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
     </>
   );
 }

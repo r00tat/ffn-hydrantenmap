@@ -7,16 +7,9 @@ import {
 } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '../components/firebase';
+import { Firecall } from '../components/firestore';
 
-export interface Firecall {
-  id: string;
-  name: string;
-  date?: Date;
-  description?: string;
-  [key: string]: any;
-}
-
-export const defaultFirecall = {
+export const defaultFirecall: Firecall = {
   id: 'unkown',
   name: 'unkown',
 };

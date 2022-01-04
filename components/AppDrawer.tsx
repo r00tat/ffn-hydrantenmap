@@ -1,17 +1,18 @@
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import InfoIcon from '@mui/icons-material/Info';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
+import UserIcon from '@mui/icons-material/Person';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
-import UserIcon from '@mui/icons-material/Person';
 import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 
 export default function AppDrawer({
   isOpen,
@@ -73,14 +74,24 @@ export default function AppDrawer({
             )}
 
             {isAuthorized && (
-              <Link href="/fahrzeuge" passHref>
-                <ListItem button key="fahrzeuge">
-                  <ListItemIcon>
-                    <DirectionsCarIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Fahrzeuge" />
-                </ListItem>
-              </Link>
+              <>
+                <Link href="/fahrzeuge" passHref>
+                  <ListItem button key="fahrzeuge">
+                    <ListItemIcon>
+                      <DirectionsCarIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Fahrzeuge" />
+                  </ListItem>
+                </Link>
+                <Link href="/einsaetze" passHref>
+                  <ListItem button key="einsaetze">
+                    <ListItemIcon>
+                      <LocalFireDepartmentIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Einsätze" />
+                  </ListItem>
+                </Link>
+              </>
             )}
           </List>
         </Box>
