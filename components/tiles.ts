@@ -26,7 +26,7 @@ export const availableLayers: TileConfigs = {
   //     tileSize: 512,
   //     zoomOffset: -1,
   //     accessToken:
-  //       'pk.eyJ1IjoicGF1bGZmbiIsImEiOiJja3g2aGFnZmYweTB0MnhvNXM4OW5tZ2plIn0.hT5GjMNjzL6h_5sKNo3uFQ',
+  //       process.env.NEXT_PUBLIC_MAPBOX_APIKEY,
   //   },
   // },
   basemap_hdpi: {

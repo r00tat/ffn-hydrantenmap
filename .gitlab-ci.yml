@@ -15,6 +15,11 @@ before_script:
     if [[ -f "$GOOGLE_APPLICATION_CREDENTIALS" && -n "$(which gcloud)" ]]; then
       gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
     fi
+    # write env file
+    cat >.env.local <<EOF
+    NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
+    NEXT_PUBLIC_MAPBOX_APIKEY='${NEXT_PUBLIC_MAPBOX_APIKEY}'
+    EOF
 
 build_image:
   stage: build
@@ -35,7 +40,7 @@ build_image:
         --image $IMAGE:$CI_COMMIT_SHORT_SHA \
         --max-instances=2 --region europe-west4 \
         --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
-        --update-env-vars=NEXT_PUBLIC_BUILD_ID=$CI_COMMIT_SHORT_SHA
+        "--update-env-vars=^@^NEXT_PUBLIC_BUILD_ID=${CI_COMMIT_SHORT_SHA}@NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}@NEXT_PUBLIC_MAPBOX_APIKEY=${NEXT_PUBLIC_MAPBOX_APIKEY}"
 
 deploy_to_cloudrun_main:
   extends: .deploy_to_cloudrun
