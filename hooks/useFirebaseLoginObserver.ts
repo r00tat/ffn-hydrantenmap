@@ -6,6 +6,7 @@ import { auth, firestore } from '../components/firebase';
 export interface LoginStatus {
   isSignedIn: boolean;
   isAuthorized: boolean;
+  isAdmin: boolean;
   user?: User;
   email?: string;
   displayName?: string;
@@ -22,6 +23,7 @@ export default function useFirebaseLoginObserver() {
   const [loginStatus, setLoginStatus] = useState<LoginStatus>({
     isSignedIn: false,
     isAuthorized: false,
+    isAdmin: false,
     signOut: async () => {},
   }); // Local signed-in state.
 
@@ -40,6 +42,7 @@ export default function useFirebaseLoginObserver() {
           signOut: auth.signOut,
           photoURL: nonNull(u?.photoURL),
           isAuthorized: (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0,
+          isAdmin: u?.email === 'paul.woelfel@ff-neusiedlamsee.at',
         });
       }
     );
@@ -53,13 +56,14 @@ export default function useFirebaseLoginObserver() {
       !loginStatus.isAuthorized
     ) {
       (async () => {
-        if (
-          (await getDoc(doc(firestore, 'user', '' + loginStatus.uid))).data()
-            ?.authorized
-        ) {
+        const userDoc = await getDoc(
+          doc(firestore, 'user', '' + loginStatus.uid)
+        );
+        if (userDoc.data()?.authorized) {
           setLoginStatus({
             ...loginStatus,
             isAuthorized: true,
+            isAdmin: loginStatus.isAdmin || userDoc.data()?.isAdmin === true,
           });
         }
       })();

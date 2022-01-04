@@ -42,6 +42,7 @@ function EinsatzCard({
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
+  const { isAdmin } = useFirebaseLogin();
 
   const updateFn = useCallback(
     (fzg?: Firecall) => {
@@ -78,13 +79,15 @@ function EinsatzCard({
           <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
             Bearbeiten
           </Button>
-          <Button
-            size="small"
-            onClick={() => setIsConfirmOpen(true)}
-            color="error"
-          >
-            Löschen
-          </Button>
+          {isAdmin && (
+            <Button
+              size="small"
+              onClick={() => setIsConfirmOpen(true)}
+              color="error"
+            >
+              Löschen
+            </Button>
+          )}
         </CardActions>
       </Card>
       {displayUpdateDialog && (
