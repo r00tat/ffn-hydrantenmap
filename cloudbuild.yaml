@@ -1,0 +1,57 @@
+steps:
+  - id: "env"
+    name: "gcr.io/cloud-builders/gcloud"
+    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        # write env file
+        VERSION=$${TAG_NAME:-$$COMMIT_SHA}
+        echo -n "$${VERSION}" >.version
+        cat >.env.local <<EOF
+        NEXT_PUBLIC_FIREBASE_APIKEY='$${NEXT_PUBLIC_FIREBASE_APIKEY}'
+        NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'
+        NEXT_PUBLIC_BUILD_ID='$$VERSION'
+        EOF
+    env:
+      - "COMMIT_SHA=$COMMIT_SHA"
+      - "TAG_NAME=$TAG_NAME"
+      - "PROJECT_ID=$PROJECT_ID"
+  - id: "docker_build"
+    name: "gcr.io/cloud-builders/docker"
+    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        VERSION=$(cat .version)
+        docker build -t $_IMAGE:$$VERSION .
+        docker push $_IMAGE:$VERSION
+
+  - id: "cloudrun_deploy"
+    name: "gcr.io/cloud-builders/gcloud"
+    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        # deploy to cloud run
+        VERSION=$(cat .version)
+        gcloud run deploy $_SERVICE_NAME \
+          --allow-unauthenticated \
+          --image $_IMAGE:$$VERSION \
+          --max-instances=2 --region europe-west4 \
+          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
+          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest"
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
+      env: "NEXT_PUBLIC_FIREBASE_APIKEY"
+    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_MAPBOX_APIKEY/versions/latest
+      env: "NEXT_PUBLIC_MAPBOX_APIKEY"
+
+substitutions:
+  _IMAGE: "eu.gcr.io/ffn-utils/hydrantenmap"
+  _SERVICE_NAME: "hydrantenmap-dev"
