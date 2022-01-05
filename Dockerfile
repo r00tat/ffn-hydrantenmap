@@ -8,10 +8,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # Rebuild the source code only when needed
-FROM node:alpine AS builder
+FROM deps AS builder
 WORKDIR /app
 COPY . .
-COPY --from=deps /app/node_modules ./node_modules
+# COPY --from=deps /app/node_modules ./node_modules
 RUN npm run build && npm ci --production --ignore-scripts --prefer-offline
 
 # Production image, copy all the files and run next
