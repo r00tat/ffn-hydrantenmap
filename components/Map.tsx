@@ -2,7 +2,6 @@ import L from 'leaflet';
 import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import { defaultPosition } from '../hooks/usePosition';
-import FirecallProvider from './FirecallProvider';
 import MapLayer from './MapLayer';
 
 export default function Map() {
@@ -34,11 +33,7 @@ export default function Map() {
 
       <div id="map" style={{ height: '86vh' }}></div>
 
-      {map && (
-        <FirecallProvider>
-          <MapLayer map={map} />
-        </FirecallProvider>
-      )}
+      {map && <MapLayer map={map} />}
     </>
   );
 }

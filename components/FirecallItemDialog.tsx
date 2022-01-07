@@ -6,28 +6,31 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
-import { Rohr } from './firestore';
+import { FirecallItem } from './firestore';
 
-export interface RohrDialogOptions {
-  onClose: (rohr?: Rohr) => void;
-  item?: Rohr;
+export interface FirecallItemDialogOptions {
+  onClose: (rohr?: FirecallItem) => void;
+  item?: FirecallItem;
+  children: React.ReactNode;
+  dialogText: React.ReactNode;
 }
 
-export default function RohrDialog({
+export default function FirecallItemDialog({
   onClose,
   item: rohrDefault,
-}: RohrDialogOptions) {
+  children,
+  dialogText,
+}: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
-  const [rohr, setRohr] = useState<Rohr>(
+  const [rohr, setFirecallItem] = useState<FirecallItem>(
     rohrDefault || {
-      art: 'C',
-      type: 'rohr',
+      name: '',
     }
   );
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      setRohr((prev) => ({
+      setFirecallItem((prev) => ({
         ...prev,
         [field]: event.target.value,
       }));
@@ -35,30 +38,10 @@ export default function RohrDialog({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Rohr hinzuf&uuml;gen</DialogTitle>
+      <DialogTitle>Neues Element hinzuf&uuml;gen</DialogTitle>
       <DialogContent>
-        <DialogContentText>Neues C/B Rohr oder Wasserwerfer</DialogContentText>
-        <TextField
-          autoFocus
-          margin="dense"
-          id="name"
-          label="Art (C/B oder Wasserwerfer)"
-          type="text"
-          fullWidth
-          variant="standard"
-          onChange={onChange('art')}
-          value={rohr.art}
-        />
-        <TextField
-          margin="dense"
-          id="durchfluss"
-          label="Durchfluss (l/min)"
-          type="text"
-          fullWidth
-          variant="standard"
-          onChange={onChange('durchfluss')}
-          value={rohr.durchfluss || ''}
-        />
+        <DialogContentText>{dialogText}</DialogContentText>
+        {children}
       </DialogContent>
       <DialogActions>
         <Button

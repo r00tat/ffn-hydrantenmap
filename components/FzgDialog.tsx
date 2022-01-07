@@ -10,10 +10,13 @@ import { Fzg } from './firestore';
 
 export interface FzgDialogOptions {
   onClose: (fzg?: Fzg) => void;
-  vehicle?: Fzg;
+  item?: Fzg;
 }
 
-export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
+export default function FzgDialog({
+  onClose,
+  item: vehicle,
+}: FzgDialogOptions) {
   const [open, setOpen] = useState(true);
   const [fzg, setFzg] = useState<Fzg>(
     vehicle || {

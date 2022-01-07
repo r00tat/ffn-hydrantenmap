@@ -80,7 +80,7 @@ export default function AppDrawer({
                     <ListItemIcon>
                       <DirectionsCarIcon />
                     </ListItemIcon>
-                    <ListItemText primary="Fahrzeuge" />
+                    <ListItemText primary="Fahrzeuge &amp; Co" />
                   </ListItem>
                 </Link>
                 <Link href="/einsaetze" passHref>
