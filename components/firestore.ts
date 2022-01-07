@@ -30,6 +30,8 @@ export interface Firecall {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  lat?: number;
+  lng?: number;
   [key: string]: any;
 }
 

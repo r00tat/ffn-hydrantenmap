@@ -50,10 +50,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           ...einsatz,
           user: email,
           created: new Date(),
+          lat: map.getCenter().lat,
+          lng: map.getCenter().lng,
         });
       }
     },
-    [email]
+    [email, map]
   );
 
   return (

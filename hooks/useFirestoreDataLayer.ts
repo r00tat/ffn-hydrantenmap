@@ -44,13 +44,15 @@ export interface FirestoreDataLayerOptions<T = WgsObject> {
   };
 
   filterFn?: (element: T) => boolean;
+
+  additionalLayers?: L.Layer[];
 }
 
 export default function useFirestoreDataLayer<T = WgsObject>(
   map: L.Map,
   options: FirestoreDataLayerOptions<T>
 ) {
-  const { autoAdd = true, cluster = false } = options;
+  const { autoAdd = true, cluster = false, additionalLayers = [] } = options;
   // const [layer, setLayer] = useState(defaultTiles);
   const records = useFirebaseCollection<T>({
     collectionName: options.collectionName,
@@ -100,9 +102,13 @@ export default function useFirestoreDataLayer<T = WgsObject>(
             );
           });
       }
+
+      if (additionalLayers.length > 0) {
+        additionalLayers.forEach((layer) => layer.addTo(layerGroup));
+      }
       // }, 2000);
     }
-  }, [map, records, layerGroup, options]);
+  }, [map, records, layerGroup, options, additionalLayers]);
 
   return layerGroup;
 }
