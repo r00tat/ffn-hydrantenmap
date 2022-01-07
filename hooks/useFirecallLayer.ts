@@ -2,7 +2,12 @@ import { doc, setDoc } from 'firebase/firestore';
 import L, { Map } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
 import { firestore } from '../components/firebase';
-import { filterActiveItems, FirecallItem, Fzg } from '../components/firestore';
+import {
+  filterActiveItems,
+  FirecallItem,
+  Fzg,
+  Rohr,
+} from '../components/firestore';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
@@ -18,6 +23,18 @@ export function useFirecallLayer(map: Map) {
         )}&fw=${encodeURIComponent((gisObj as Fzg)?.fw || '')}`,
         iconSize: [45, 20],
         iconAnchor: [20, 0],
+        popupAnchor: [0, 0],
+      });
+    } else if (gisObj.type === 'rohr') {
+      const rohr = gisObj as Rohr;
+      return L.icon({
+        iconUrl: `/icons/rohr${
+          ['b', 'c', 'ww', 'wasserwerfer'].indexOf(rohr.art.toLowerCase()) > 0
+            ? '-' + rohr.art.toLowerCase()
+            : ''
+        }.svg`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
         popupAnchor: [0, 0],
       });
     }
@@ -82,6 +99,11 @@ export function useFirecallLayer(map: Map) {
       ${v.eintreffen ? '<br>Eintreffen: ' + v.eintreffen : ''}
       ${v.abruecken ? '<br>Abrücken: ' + v.abruecken : ''}
       `;
+      } else if (gisObject.type === 'rohr') {
+        const rohr = gisObject as Rohr;
+        return `Rohr: ${rohr.art} ${
+          rohr.durchfluss ? `<br/>Durchfluss: ${rohr.durchfluss} l/min` : ''
+        }`;
       }
 
       return gisObject.name || '';

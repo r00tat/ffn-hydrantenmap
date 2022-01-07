@@ -10,8 +10,10 @@ import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import useFirecall from '../hooks/useFirecall';
 import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
-import { Firecall, Fzg } from './firestore';
+import { Firecall, Fzg, Rohr } from './firestore';
 import FzgDialog from './FzgDialog';
+import RohrIcon from './RohrIcon';
+import RohrDialog from './RohrDialog';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -21,6 +23,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const { email } = useFirebaseLogin();
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
   const [einsatzDialog, setEinsatzDialog] = useState(false);
+  const [rohrDialogIsOpen, setRohrDialogIsOpen] = useState(false);
   const firecall = useFirecall();
 
   const fzgDialogClose = useCallback(
@@ -58,6 +61,26 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [email, map]
   );
 
+  const rohrDialogClose = useCallback(
+    (rohr?: Rohr) => {
+      setRohrDialogIsOpen(false);
+      if (rohr) {
+        addDoc(
+          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
+          {
+            ...rohr,
+            lat: map.getCenter().lat,
+            lng: map.getCenter().lng,
+            type: 'rohr',
+            user: email,
+            created: new Date(),
+          }
+        );
+      }
+    },
+    [email, firecall?.id, map]
+  );
+
   return (
     <>
       <SpeedDial
@@ -70,6 +93,11 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           tooltipTitle="Fahrzeug"
           onClick={() => setFzgDialogIsOpen(true)}
         />
+        <SpeedDialAction
+          icon={<RohrIcon />}
+          tooltipTitle="Rohr"
+          onClick={() => setRohrDialogIsOpen(true)}
+        />
 
         <SpeedDialAction
           icon={<LocalFireDepartmentIcon />}
@@ -80,6 +108,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
 
       {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
+      {rohrDialogIsOpen && <RohrDialog onClose={rohrDialogClose} />}
     </>
   );
 }

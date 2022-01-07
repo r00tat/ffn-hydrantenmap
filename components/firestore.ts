@@ -16,6 +16,13 @@ export interface Fzg extends FirecallItem {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  type: 'vehicle';
+}
+
+export interface Rohr extends FirecallItem {
+  art: 'C' | 'B' | 'Wasserwerfer' | string;
+  durchfluss?: number;
+  type: 'rohr';
 }
 
 export const filterActiveItems = (g: FirecallItem) => g.deleted !== true;

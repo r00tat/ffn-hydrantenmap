@@ -17,6 +17,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
   const [open, setOpen] = useState(true);
   const [fzg, setFzg] = useState<Fzg>(
     vehicle || {
+      type: 'vehicle',
       alarmierung: new Date().toLocaleString('de-DE'),
       eintreffen: new Date().toLocaleString('de-DE'),
     }
@@ -122,7 +123,7 @@ export default function FzgDialog({ onClose, vehicle }: FzgDialogOptions) {
             onClose(fzg);
           }}
         >
-          {fzg.id ? 'Hinzufügen' : 'Aktualisieren'}
+          {fzg.id ? 'Aktualisieren' : 'Hinzufügen'}
         </Button>
       </DialogActions>
     </Dialog>
