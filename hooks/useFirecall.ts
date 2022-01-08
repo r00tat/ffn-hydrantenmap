@@ -1,12 +1,20 @@
 import {
   collection,
+  doc,
   limit,
   onSnapshot,
   orderBy,
   query,
 } from 'firebase/firestore';
-import { createContext, useContext, useEffect, useState } from 'react';
-import { db } from '../components/firebase';
+import {
+  createContext,
+  Dispatch,
+  SetStateAction,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+import { db, firestore } from '../components/firebase';
 import { Firecall } from '../components/firestore';
 
 export const defaultFirecall: Firecall = {
@@ -14,7 +22,14 @@ export const defaultFirecall: Firecall = {
   name: 'unkown',
 };
 
-export const FirecallContext = createContext<Firecall>(defaultFirecall);
+export interface FirecallContextType {
+  firecall: Firecall | undefined;
+  setFirecallId?: Dispatch<SetStateAction<string | undefined>>;
+}
+
+export const FirecallContext = createContext<FirecallContextType>({
+  firecall: defaultFirecall,
+});
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>();
@@ -40,8 +55,72 @@ export function useLastFirecall() {
   return firecall;
 }
 
+export function useFirecallSwitcher(): FirecallContextType {
+  const [firecallId, setFirecallId] = useState<string>();
+  const [firecall, setFirecall] = useState<Firecall>();
+
+  useEffect(() => {
+    if (!firecallId) {
+      setFirecall(undefined);
+    } else {
+      const unsubscribe = onSnapshot(
+        doc(firestore, 'call', firecallId),
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const fc: Firecall = {
+              id: docSnapshot.id,
+              ...docSnapshot.data(),
+            } as Firecall;
+            setFirecall(fc);
+            console.log(
+              `selected firecall ${fc.id} ${fc.name} ${
+                fc.date
+              }: ${JSON.stringify(fc)}`
+            );
+          } else {
+            console.warn(`firecall with id ${firecallId} not found!`);
+          }
+        }
+      );
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [firecallId]);
+
+  return {
+    firecall,
+    setFirecallId,
+  };
+}
+
+export function useLastOrSelectedFirecall(): FirecallContextType {
+  const lastFirecall = useLastFirecall();
+  const { firecall, setFirecallId } = useFirecallSwitcher();
+
+  const [activeFirecall, setActiveFirecall] = useState<Firecall>();
+
+  useEffect(() => {
+    if (firecall) {
+      setActiveFirecall(firecall);
+    } else {
+      setActiveFirecall(lastFirecall);
+    }
+  }, [firecall, lastFirecall]);
+
+  return { firecall: activeFirecall, setFirecallId };
+}
+
+export const useFirecallSelect = ():
+  | Dispatch<SetStateAction<string | undefined>>
+  | undefined => {
+  const { setFirecallId } = useContext(FirecallContext);
+  return setFirecallId;
+};
+
 export const useFirecall = (): Firecall => {
-  return useContext(FirecallContext);
+  const { firecall } = useContext(FirecallContext);
+  return firecall || defaultFirecall;
 };
 
 export default useFirecall;

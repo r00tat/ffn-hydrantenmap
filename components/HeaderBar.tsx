@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import React from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import useFirecall from '../hooks/useFirecall';
 
 function HeaderBar({
   isDrawerOpen,
@@ -18,6 +19,7 @@ function HeaderBar({
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const { isSignedIn, displayName, photoURL } = useFirebaseLogin();
+  const firecall = useFirecall();
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -34,7 +36,7 @@ function HeaderBar({
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Hydrantenkarte
+            Hydrantenkarte {firecall?.name || ''}
           </Typography>
           {!isSignedIn && (
             <Link href="/login" passHref>

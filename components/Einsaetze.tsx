@@ -10,10 +10,11 @@ import { useCallback, useState } from 'react';
 import { filterActiveItems, Firecall } from '../components/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecall } from '../hooks/useFirecall';
+import { useFirecall, useFirecallSelect } from '../hooks/useFirecall';
 import ConfirmDialog from './ConfirmDialog';
 import { firestore } from './firebase';
 import EinsatzDialog from './EinsatzDialog';
+import Tooltip from '@mui/material/Tooltip';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -43,6 +44,7 @@ function EinsatzCard({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
   const { isAdmin } = useFirebaseLogin();
+  const setFirecallId = useFirecallSelect();
 
   const updateFn = useCallback(
     (fzg?: Firecall) => {
@@ -68,7 +70,8 @@ function EinsatzCard({
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
-            {einsatz.name} {einsatz.fw}
+            {einsatz.name} {einsatz.fw}{' '}
+            {firecallId === einsatz.id ? '(aktiv)' : ''}
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {einsatz.date}
@@ -76,6 +79,18 @@ function EinsatzCard({
           <Typography variant="body2">{einsatz.description}</Typography>
         </CardContent>
         <CardActions>
+          <Tooltip title="Als aktiven Einsatz in der Anzeige setzten">
+            <Button
+              size="small"
+              onClick={() => {
+                if (setFirecallId) {
+                  setFirecallId(einsatz.id);
+                }
+              }}
+            >
+              Aktivieren
+            </Button>
+          </Tooltip>
           <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
             Bearbeiten
           </Button>

@@ -1,7 +1,6 @@
 import {
-  defaultFirecall,
   FirecallContext,
-  useLastFirecall,
+  useLastOrSelectedFirecall,
 } from '../hooks/useFirecall';
 
 export default function FirecallProvider({
@@ -9,10 +8,10 @@ export default function FirecallProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const firecall = useLastFirecall();
+  const firecall = useLastOrSelectedFirecall();
   return (
     <>
-      <FirecallContext.Provider value={firecall || defaultFirecall}>
+      <FirecallContext.Provider value={firecall}>
         {children}
       </FirecallContext.Provider>
     </>
