@@ -105,6 +105,29 @@ export const firecallItems: FirecallItemInfoList = {
       });
     },
   } as FirecallItemInfo<Rohr> as FirecallItemInfo<FirecallItem>,
+  marker: {
+    name: 'Marker',
+    title: (item) => `${item.name || ''}`,
+    info: (item) => ``,
+    body: (item) => `${item.beschreibung || ''}`,
+    fields: {
+      name: 'Bezeichnung',
+      beschreibung: 'Beschreibung',
+    },
+    dialogText: (item) => `Markierung`,
+    popupFn: (item: FirecallItem) => {
+      return `<b>${item.name}</b><br/>${item.beschreibung || ''}`;
+    },
+    titleFn: (item: FirecallItem) => `${item.name}\n${item.beschreibung || ''}`,
+    icon: (gisObject: FirecallItem) => {
+      return L.icon({
+        iconUrl: `/icons/marker.svg`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -25],
+      });
+    },
+  },
   fallback: {
     name: 'Firecallitem',
     title: (item) => `${item.name}`,
@@ -118,9 +141,9 @@ export const firecallItems: FirecallItemInfoList = {
     titleFn: (gisObject: FirecallItem) => `${gisObject.name}`,
     icon: (gisObject: FirecallItem) => {
       return L.icon({
-        iconUrl: `/icons/fzg.svg`,
-        iconSize: [45, 20],
-        iconAnchor: [20, 0],
+        iconUrl: `/icons/marker.svg`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
         popupAnchor: [0, 0],
       });
     },

@@ -5,6 +5,7 @@ export interface FirecallItem {
   lng?: number;
   deleted?: boolean;
   type: string;
+  beschreibung?: string;
 }
 
 export interface Fzg extends FirecallItem {

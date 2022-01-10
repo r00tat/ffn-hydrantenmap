@@ -10,10 +10,12 @@ import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import useFirecall from '../hooks/useFirecall';
 import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
-import { Firecall, Fzg, Rohr } from './firestore';
+import { Firecall, FirecallItem, Fzg, Rohr } from './firestore';
 import FzgDialog from './FzgDialog';
 import RohrIcon from './RohrIcon';
 import RohrDialog from './RohrDialog';
+import RoomIcon from '@mui/icons-material/Room';
+import FirecallItemDialog from './FirecallItemDialog';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -25,6 +27,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const [einsatzDialog, setEinsatzDialog] = useState(false);
   const [rohrDialogIsOpen, setRohrDialogIsOpen] = useState(false);
   const firecall = useFirecall();
+  const [markerDialogIsOpen, setMarkerDialogIsOpen] = useState(false);
 
   const fzgDialogClose = useCallback(
     (fzg?: Fzg) => {
@@ -81,6 +84,24 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [email, firecall?.id, map]
   );
 
+  const markerDialogClose = useCallback(
+    (item?: FirecallItem) => {
+      if (item) {
+        addDoc(
+          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
+          {
+            ...item,
+            user: email,
+            created: new Date(),
+            lat: map.getCenter().lat,
+            lng: map.getCenter().lng,
+          }
+        );
+      }
+    },
+    [email, firecall?.id, map]
+  );
+
   return (
     <>
       <SpeedDial
@@ -98,6 +119,11 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           tooltipTitle="Rohr"
           onClick={() => setRohrDialogIsOpen(true)}
         />
+        <SpeedDialAction
+          icon={<RoomIcon />}
+          tooltipTitle="Marker"
+          onClick={() => setMarkerDialogIsOpen(true)}
+        />
 
         <SpeedDialAction
           icon={<LocalFireDepartmentIcon />}
@@ -106,6 +132,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         />
       </SpeedDial>
 
+      {markerDialogIsOpen && (
+        <FirecallItemDialog
+          item={{ type: 'marker' }}
+          onClose={markerDialogClose}
+        />
+      )}
       {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
       {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
       {rohrDialogIsOpen && <RohrDialog onClose={rohrDialogClose} />}

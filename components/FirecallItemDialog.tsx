@@ -4,6 +4,10 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
 import {
@@ -40,11 +44,32 @@ export default function FirecallItemDialog({
       }));
     };
 
+  const handleChange = (event: SelectChangeEvent) => {
+    setFirecallItem((prev) => ({
+      ...prev,
+      ['type']: event.target.value as string,
+    }));
+  };
+
   return (
     <Dialog open={open} onClose={() => onClose()}>
       <DialogTitle>Neues {itemInfo.name} hinzufügen</DialogTitle>
       <DialogContent>
         <DialogContentText>{itemInfo.dialogText(item)}</DialogContentText>
+        <FormControl fullWidth variant="standard">
+          <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
+          <Select
+            labelId="firecall-item-type-label"
+            id="firecall-item-type"
+            value={item.type}
+            label="Art"
+            onChange={handleChange}
+          >
+            <MenuItem value="vehicle">Fahrzeug</MenuItem>
+            <MenuItem value="rohr">Rohr</MenuItem>
+            <MenuItem value="marker">Marker</MenuItem>
+          </Select>
+        </FormControl>
         {Object.entries(itemInfo.fields).map(([key, label]) => (
           <TextField
             margin="dense"
