@@ -2,12 +2,8 @@ import { doc, setDoc } from 'firebase/firestore';
 import L, { Map } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
 import { firestore } from '../components/firebase';
-import {
-  filterActiveItems,
-  FirecallItem,
-  Fzg,
-  Rohr,
-} from '../components/firestore';
+import { firecallItemInfo } from '../components/firecallitems';
+import { filterActiveItems, FirecallItem } from '../components/firestore';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
@@ -16,34 +12,12 @@ export function useFirecallLayer(map: Map) {
   const [additionalLayers, setAdditionalLayers] = useState<L.Layer[]>([]);
 
   const iconFn = useCallback((gisObj: FirecallItem) => {
-    if (gisObj.type === 'vehicle') {
-      return L.icon({
-        iconUrl: `/api/fzg?name=${encodeURIComponent(
-          gisObj?.name || ''
-        )}&fw=${encodeURIComponent((gisObj as Fzg)?.fw || '')}`,
-        iconSize: [45, 20],
-        iconAnchor: [20, 0],
-        popupAnchor: [0, 0],
-      });
-    } else if (gisObj.type === 'rohr') {
-      const rohr = gisObj as Rohr;
-      return L.icon({
-        iconUrl: `/icons/rohr${
-          ['b', 'c', 'ww', 'wasserwerfer'].indexOf(rohr.art.toLowerCase()) > 0
-            ? '-' + rohr.art.toLowerCase()
-            : ''
-        }.svg`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, 0],
-      });
+    const icon = firecallItemInfo(gisObj?.type).icon;
+    if (typeof icon === 'function') {
+      return icon(gisObj);
+    } else {
+      return L.icon(icon);
     }
-    return L.icon({
-      iconUrl: `/icons/fzg.svg`,
-      iconSize: [45, 20],
-      iconAnchor: [20, 0],
-      popupAnchor: [0, 0],
-    });
   }, []);
 
   useEffect(() => {
@@ -87,28 +61,10 @@ export function useFirecallLayer(map: Map) {
     cluster: false,
     pathSegments: [firecall?.id || 'unkown', 'item'],
     filterFn: filterActiveItems,
-    popupFn: (gisObject: FirecallItem) => {
-      // console.info(`rendering popup for vehicle: ${JSON.stringify(gisObject)}`);
-
-      if (gisObject.type === 'vehicle') {
-        const v = gisObject as Fzg;
-        return `${v.name} ${v.fw || ''}${
-          v.besatzung ? '<br />Besatzung: 1:' + v.besatzung : ''
-        } ${v.ats ? `${v.ats} ATS` : ''}
-      ${v.alarmierung ? '<br>Alarmierung: ' + v.alarmierung : ''}
-      ${v.eintreffen ? '<br>Eintreffen: ' + v.eintreffen : ''}
-      ${v.abruecken ? '<br>Abrücken: ' + v.abruecken : ''}
-      `;
-      } else if (gisObject.type === 'rohr') {
-        const rohr = gisObject as Rohr;
-        return `Rohr: ${rohr.art} ${
-          rohr.durchfluss ? `<br/>Durchfluss: ${rohr.durchfluss} l/min` : ''
-        }`;
-      }
-
-      return gisObject.name || '';
-    },
-
+    popupFn: (gisObject: FirecallItem) =>
+      firecallItemInfo(gisObject?.type).popupFn(gisObject),
+    titleFn: (gisObject: FirecallItem) =>
+      firecallItemInfo(gisObject?.type).titleFn(gisObject),
     markerOptions: {
       draggable: true,
     },

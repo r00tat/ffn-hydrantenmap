@@ -105,9 +105,9 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           onClick={() => setEinsatzDialog(true)}
         />
       </SpeedDial>
-      {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
 
       {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
+      {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
       {rohrDialogIsOpen && <RohrDialog onClose={rohrDialogClose} />}
     </>
   );

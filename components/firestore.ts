@@ -1,12 +1,10 @@
-import { Timestamp } from 'firebase/firestore';
-
 export interface FirecallItem {
   id?: string;
   name?: string;
   lat?: number;
   lng?: number;
   deleted?: boolean;
-  type?: string;
+  type: string;
 }
 
 export interface Fzg extends FirecallItem {
@@ -25,7 +23,8 @@ export interface Rohr extends FirecallItem {
   type: 'rohr';
 }
 
-export const filterActiveItems = (g: FirecallItem) => g.deleted !== true;
+export const filterActiveItems = (g: FirecallItem | Firecall) =>
+  g.deleted !== true;
 
 export interface Firecall {
   id?: string;

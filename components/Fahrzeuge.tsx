@@ -6,8 +6,8 @@ import { filterActiveItems, Fzg, Rohr } from '../components/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecall } from '../hooks/useFirecall';
+import FirecallItemCard from './FirecallItemCard';
 import RohrCard from './RohrCard';
-import VehicleCard from './VehicleCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
@@ -38,7 +38,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {vehicles.map((fzg) => (
-          <VehicleCard vehicle={fzg} key={fzg.id} firecallId={firecall?.id} />
+          <FirecallItemCard item={fzg} key={fzg.id} firecallId={firecall?.id} />
         ))}
       </Grid>
       <Typography variant="h3" gutterBottom>
@@ -46,7 +46,11 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {rohre.map((rohr) => (
-          <RohrCard rohr={rohr} key={rohr.id} firecallId={firecall?.id} />
+          <FirecallItemCard
+            item={rohr}
+            key={rohr.id}
+            firecallId={firecall?.id}
+          />
         ))}
       </Grid>
     </Box>

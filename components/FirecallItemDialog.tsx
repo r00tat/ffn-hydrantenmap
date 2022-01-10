@@ -6,27 +6,31 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
+import {
+  firecallItemInfo,
+  FirecallItemInfo,
+  firecallItems,
+} from './firecallitems';
 import { FirecallItem } from './firestore';
 
 export interface FirecallItemDialogOptions {
-  onClose: (rohr?: FirecallItem) => void;
+  onClose: (item?: FirecallItem) => void;
   item?: FirecallItem;
-  children: React.ReactNode;
-  dialogText: React.ReactNode;
 }
 
 export default function FirecallItemDialog({
   onClose,
-  item: rohrDefault,
-  children,
-  dialogText,
+  item: itemDefault,
 }: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
-  const [rohr, setFirecallItem] = useState<FirecallItem>(
-    rohrDefault || {
+  const [item, setFirecallItem] = useState<FirecallItem>(
+    itemDefault || {
       name: '',
+      type: 'unkown',
     }
   );
+
+  const itemInfo: FirecallItemInfo = firecallItemInfo(item.type);
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,10 +42,22 @@ export default function FirecallItemDialog({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Neues Element hinzuf&uuml;gen</DialogTitle>
+      <DialogTitle>Neues {itemInfo.name} hinzufügen</DialogTitle>
       <DialogContent>
-        <DialogContentText>{dialogText}</DialogContentText>
-        {children}
+        <DialogContentText>{itemInfo.dialogText(item)}</DialogContentText>
+        {Object.entries(itemInfo.fields).map(([key, label]) => (
+          <TextField
+            margin="dense"
+            id={key}
+            key={key}
+            label={label}
+            type="text"
+            fullWidth
+            variant="standard"
+            onChange={onChange(key)}
+            value={((item as any)[key] as string) || ''}
+          />
+        ))}
       </DialogContent>
       <DialogActions>
         <Button
@@ -55,10 +71,10 @@ export default function FirecallItemDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(rohr);
+            onClose(item);
           }}
         >
-          {rohr.id ? 'Aktualisieren' : 'Hinzufügen'}
+          {item.id ? 'Aktualisieren' : 'Hinzufügen'}
         </Button>
       </DialogActions>
     </Dialog>
