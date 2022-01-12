@@ -128,6 +128,54 @@ export const firecallItems: FirecallItemInfoList = {
       });
     },
   },
+  el: {
+    name: 'Einsatzleitung',
+    title: (item) => `${item.name || ''}`,
+    info: (item) => ``,
+    body: (item) => `${item.beschreibung || ''}`,
+    fields: {
+      name: 'Bezeichnung',
+      beschreibung: 'Beschreibung',
+    },
+    dialogText: (item) => `Einsatzleitung`,
+    popupFn: (item: FirecallItem) => {
+      return `<b>Einsatzleitung ${item.name}</b><br/>${
+        item.beschreibung || ''
+      }`;
+    },
+    titleFn: (item: FirecallItem) => `${item.name}\n${item.beschreibung || ''}`,
+    icon: (gisObject: FirecallItem) => {
+      return L.icon({
+        iconUrl: `/icons/el.svg`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -25],
+      });
+    },
+  },
+  assp: {
+    name: 'Atemschutzsammelplatz',
+    title: (item) => `${item.name || ''}`,
+    info: (item) => ``,
+    body: (item) => `${item.beschreibung || ''}`,
+    fields: {
+      name: 'Bezeichnung',
+      beschreibung: 'Beschreibung',
+    },
+    dialogText: (item) => `ASSP`,
+    popupFn: (item: FirecallItem) => {
+      return `<b>ASSP ${item.name}</b><br/>${item.beschreibung || ''}`;
+    },
+    titleFn: (item: FirecallItem) => `${item.name}\n${item.beschreibung || ''}`,
+    icon: (gisObject: FirecallItem) => {
+      return L.icon({
+        iconUrl: `/icons/assp.svg`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30],
+        popupAnchor: [0, -25],
+      });
+    },
+  },
   fallback: {
     name: 'Firecallitem',
     title: (item) => `${item.name}`,

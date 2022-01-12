@@ -65,9 +65,11 @@ export default function FirecallItemDialog({
             label="Art"
             onChange={handleChange}
           >
-            <MenuItem value="vehicle">Fahrzeug</MenuItem>
-            <MenuItem value="rohr">Rohr</MenuItem>
-            <MenuItem value="marker">Marker</MenuItem>
+            {Object.entries(firecallItems).map(([key, fcItem]) => (
+              <MenuItem key={key} value={key}>
+                {fcItem.name}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
         {Object.entries(itemInfo.fields).map(([key, label]) => (
