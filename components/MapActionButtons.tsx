@@ -86,6 +86,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
 
   const markerDialogClose = useCallback(
     (item?: FirecallItem) => {
+      setMarkerDialogIsOpen(false);
       if (item) {
         addDoc(
           collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
