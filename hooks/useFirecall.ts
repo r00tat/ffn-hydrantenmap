@@ -19,7 +19,7 @@ import { Firecall } from '../components/firestore';
 
 export const defaultFirecall: Firecall = {
   id: 'unkown',
-  name: 'unkown',
+  name: '',
 };
 
 export interface FirecallContextType {
