@@ -22,7 +22,7 @@ export default function useDistanceLayer(map: L.Map) {
 
   useEffect(() => {
     if (!legend) {
-      setLegend(new L.Control({ position: 'bottomright' }));
+      setLegend(new L.Control({ position: 'bottomleft' }));
     }
   }, [legend]);
 

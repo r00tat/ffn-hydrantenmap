@@ -1,39 +1,53 @@
 import L from 'leaflet';
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../hooks/usePosition';
 import MapLayer from './MapLayer';
 
+function MyMapContainer() {
+  const map = useMap();
+  return <MapLayer map={map} />;
+}
+
 export default function Map() {
-  const [map, setMap] = useState<L.Map>();
+  // const [map, setMap] = useState<L.Map>();
 
-  useEffect(() => {
-    const newMap = L.map('map', {
-      center: defaultPosition,
-      zoom: 17,
-      maxZoom: 30,
-    });
+  // useEffect(() => {
+  //   const newMap = L.map('map', {
+  //     center: defaultPosition,
+  //     zoom: 17,
+  //     maxZoom: 30,
+  //   });
 
-    setMap(newMap);
-    return () => {
-      newMap.remove();
-    };
-  }, []);
+  //   setMap(newMap);
+  //   return () => {
+  //     newMap.remove();
+  //   };
+  // }, []);
 
   return (
     <>
-      <Head>
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-          crossOrigin=""
-        />
-      </Head>
+      {/* <div id="map" style={{ height: '86vh' }}></div>
+       */}
 
-      <div id="map" style={{ height: '86vh' }}></div>
-
-      {map && <MapLayer map={map} />}
+      <MapContainer
+        center={defaultPosition}
+        zoom={17}
+        maxZoom={19}
+        scrollWheelZoom={true}
+      >
+        {/* <TileLayer
+    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  /> */}
+        {/* <Marker position={defaultPosition}>
+          <Popup>
+            A pretty CSS3 popup. <br /> Easily customizable.
+          </Popup>
+        </Marker> */}
+        <MyMapContainer />
+      </MapContainer>
     </>
   );
 }
