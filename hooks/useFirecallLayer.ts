@@ -32,6 +32,7 @@ export function useFirecallLayer(map: Map) {
           }),
           draggable: true,
         })
+          .bindTooltip('Einsatzort')
           .bindPopup('Einsatzort')
           .on('dragend', (event: L.LeafletEvent) => {
             const newPos = (event.target as L.Marker)?.getLatLng();
