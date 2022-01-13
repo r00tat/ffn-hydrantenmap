@@ -1,8 +1,9 @@
 steps:
-  - id: "env"
-    name: "gcr.io/cloud-builders/gcloud"
-    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
-    entrypoint: "bash"
+  - name: gcr.io/cloud-builders/gcloud
+    env:
+      - COMMIT_SHA=$COMMIT_SHA
+      - TAG_NAME=$TAG_NAME
+      - PROJECT_ID=$PROJECT_ID
     args:
       - "-c"
       - |
@@ -14,25 +15,24 @@ steps:
         NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'
         NEXT_PUBLIC_BUILD_ID='$$VERSION'
         EOF
-    env:
-      - "COMMIT_SHA=$COMMIT_SHA"
-      - "TAG_NAME=$TAG_NAME"
-      - "PROJECT_ID=$PROJECT_ID"
-  - id: "docker_build"
-    name: "gcr.io/cloud-builders/docker"
-    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
-    entrypoint: "bash"
+    id: env
+    entrypoint: bash
+    secretEnv:
+      - NEXT_PUBLIC_FIREBASE_APIKEY
+      - NEXT_PUBLIC_MAPBOX_APIKEY
+  - name: gcr.io/cloud-builders/docker
     args:
       - "-c"
       - |
         VERSION=$(cat .version)
         docker build -t $_IMAGE:$$VERSION .
-        docker push $_IMAGE:$VERSION
-
-  - id: "cloudrun_deploy"
-    name: "gcr.io/cloud-builders/gcloud"
-    secretEnv: ["NEXT_PUBLIC_FIREBASE_APIKEY", "NEXT_PUBLIC_MAPBOX_APIKEY"]
-    entrypoint: "bash"
+        docker push $_IMAGE:$$VERSION
+    id: docker_build
+    entrypoint: bash
+    secretEnv:
+      - NEXT_PUBLIC_FIREBASE_APIKEY
+      - NEXT_PUBLIC_MAPBOX_APIKEY
+  - name: gcr.io/cloud-builders/gcloud
     args:
       - "-c"
       - |
@@ -42,16 +42,19 @@ steps:
           --allow-unauthenticated \
           --image $_IMAGE:$$VERSION \
           --max-instances=2 --region europe-west4 \
-          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
+          --service-account=hydrantenmap@$PROJECT_ID.iam.gserviceaccount.com \
           --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest"
-
+    id: cloudrun_deploy
+    entrypoint: bash
+    secretEnv:
+      - NEXT_PUBLIC_FIREBASE_APIKEY
+      - NEXT_PUBLIC_MAPBOX_APIKEY
+substitutions:
+  _SERVICE_NAME: hydrantenmap-dev
+  _IMAGE: eu.gcr.io/ffn-utils/hydrantenmap
 availableSecrets:
   secretManager:
     - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
-      env: "NEXT_PUBLIC_FIREBASE_APIKEY"
+      env: NEXT_PUBLIC_FIREBASE_APIKEY
     - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_MAPBOX_APIKEY/versions/latest
-      env: "NEXT_PUBLIC_MAPBOX_APIKEY"
-
-substitutions:
-  _IMAGE: "eu.gcr.io/ffn-utils/hydrantenmap"
-  _SERVICE_NAME: "hydrantenmap-dev"
+      env: NEXT_PUBLIC_MAPBOX_APIKEY
