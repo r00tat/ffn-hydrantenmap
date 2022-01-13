@@ -66,7 +66,7 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
     const rohr = gisObject as Rohr;
     return L.icon({
       iconUrl: `/icons/rohr${
-        ['b', 'c', 'ww', 'wasserwerfer'].indexOf(rohr.art.toLowerCase()) > 0
+        ['b', 'c', 'ww', 'wasserwerfer'].indexOf(rohr.art.toLowerCase()) >= 0
           ? '-' + rohr.art.toLowerCase()
           : ''
       }.svg`,
