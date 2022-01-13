@@ -1,6 +1,7 @@
 {
   "name": "ffn-map",
-  "private": true,
+  "description": "Hydrantenkarte der Feuerwehr Neusiedl am See",
+  "license": "MPL-2.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
