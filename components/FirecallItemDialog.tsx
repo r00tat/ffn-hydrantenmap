@@ -20,18 +20,19 @@ import { FirecallItem } from './firestore';
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
   item?: FirecallItem;
+  allowTypeChange?: boolean;
+  type?: string;
 }
 
 export default function FirecallItemDialog({
   onClose,
   item: itemDefault,
+  allowTypeChange = true,
+  type: itemType,
 }: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
   const [item, setFirecallItem] = useState<FirecallItem>(
-    itemDefault || {
-      name: '',
-      type: 'unkown',
-    }
+    itemDefault || firecallItemInfo(itemType).factory()
   );
 
   const itemInfo: FirecallItemInfo = firecallItemInfo(item.type);
@@ -56,22 +57,26 @@ export default function FirecallItemDialog({
       <DialogTitle>Neues {itemInfo.name} hinzufügen</DialogTitle>
       <DialogContent>
         <DialogContentText>{itemInfo.dialogText(item)}</DialogContentText>
-        <FormControl fullWidth variant="standard">
-          <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
-          <Select
-            labelId="firecall-item-type-label"
-            id="firecall-item-type"
-            value={item.type}
-            label="Art"
-            onChange={handleChange}
-          >
-            {Object.entries(firecallItems).map(([key, fcItem]) => (
-              <MenuItem key={key} value={key}>
-                {fcItem.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {allowTypeChange && (
+          <FormControl fullWidth variant="standard">
+            <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
+            <Select
+              labelId="firecall-item-type-label"
+              id="firecall-item-type"
+              value={item.type}
+              label="Art"
+              onChange={handleChange}
+            >
+              {Object.entries(firecallItems)
+                .filter(([key, fcItem]) => key !== 'fallback')
+                .map(([key, fcItem]) => (
+                  <MenuItem key={key} value={key}>
+                    {fcItem.name}
+                  </MenuItem>
+                ))}
+            </Select>
+          </FormControl>
+        )}
         {Object.entries(itemInfo.fields).map(([key, label]) => (
           <TextField
             margin="dense"

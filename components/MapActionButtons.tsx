@@ -1,5 +1,7 @@
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import RoomIcon from '@mui/icons-material/Room';
 import SpeedDial from '@mui/material/SpeedDial';
 import SpeedDialAction from '@mui/material/SpeedDialAction';
 import SpeedDialIcon from '@mui/material/SpeedDialIcon';
@@ -10,12 +12,9 @@ import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import useFirecall from '../hooks/useFirecall';
 import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
-import { Firecall, FirecallItem, Fzg, Rohr } from './firestore';
-import FzgDialog from './FzgDialog';
-import RohrIcon from './RohrIcon';
-import RohrDialog from './RohrDialog';
-import RoomIcon from '@mui/icons-material/Room';
 import FirecallItemDialog from './FirecallItemDialog';
+import { Firecall, FirecallItem } from './firestore';
+import RohrIcon from './RohrIcon';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -28,18 +27,17 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const [rohrDialogIsOpen, setRohrDialogIsOpen] = useState(false);
   const firecall = useFirecall();
   const [markerDialogIsOpen, setMarkerDialogIsOpen] = useState(false);
+  const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
 
-  const fzgDialogClose = useCallback(
-    (fzg?: Fzg) => {
-      setFzgDialogIsOpen(false);
-      if (fzg) {
+  const saveItem = useCallback(
+    (item?: FirecallItem) => {
+      if (item) {
         addDoc(
           collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
           {
-            ...fzg,
+            ...item,
             lat: map.getCenter().lat,
             lng: map.getCenter().lng,
-            type: 'vehicle',
             user: email,
             created: new Date(),
           }
@@ -47,6 +45,14 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       }
     },
     [email, firecall?.id, map]
+  );
+
+  const fzgDialogClose = useCallback(
+    (fzg?: FirecallItem) => {
+      setFzgDialogIsOpen(false);
+      saveItem(fzg);
+    },
+    [saveItem]
   );
 
   const einsatzDialogClose = useCallback(
@@ -65,42 +71,35 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   );
 
   const rohrDialogClose = useCallback(
-    (rohr?: Rohr) => {
+    (rohr?: FirecallItem) => {
       setRohrDialogIsOpen(false);
-      if (rohr) {
-        addDoc(
-          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
-          {
-            ...rohr,
-            lat: map.getCenter().lat,
-            lng: map.getCenter().lng,
-            type: 'rohr',
-            user: email,
-            created: new Date(),
-          }
-        );
-      }
+      saveItem(rohr);
     },
-    [email, firecall?.id, map]
+    [saveItem]
   );
 
   const markerDialogClose = useCallback(
     (item?: FirecallItem) => {
       setMarkerDialogIsOpen(false);
+      saveItem(item);
+    },
+    [saveItem]
+  );
+  const diaryClose = useCallback(
+    (item?: FirecallItem) => {
+      setTagebuchDialogIsOpen(false);
       if (item) {
         addDoc(
-          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
+          collection(firestore, 'call', firecall?.id || 'unkown', 'diary'),
           {
             ...item,
             user: email,
             created: new Date(),
-            lat: map.getCenter().lat,
-            lng: map.getCenter().lng,
           }
         );
       }
     },
-    [email, firecall?.id, map]
+    [email, firecall?.id]
   );
 
   return (
@@ -127,6 +126,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         />
 
         <SpeedDialAction
+          icon={<LibraryBooksIcon />}
+          tooltipTitle="Einsatztagebuch"
+          onClick={() => setTagebuchDialogIsOpen(true)}
+        />
+
+        <SpeedDialAction
           icon={<LocalFireDepartmentIcon />}
           tooltipTitle="Einsatz"
           onClick={() => setEinsatzDialog(true)}
@@ -134,14 +139,22 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       </SpeedDial>
 
       {markerDialogIsOpen && (
+        <FirecallItemDialog type="marker" onClose={markerDialogClose} />
+      )}
+      {tagebuchDialogIsOpen && (
         <FirecallItemDialog
-          item={{ type: 'marker' }}
-          onClose={markerDialogClose}
+          type="diary"
+          onClose={diaryClose}
+          allowTypeChange={false}
         />
       )}
       {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
-      {fzgDialogIsOpen && <FzgDialog onClose={fzgDialogClose} />}
-      {rohrDialogIsOpen && <RohrDialog onClose={rohrDialogClose} />}
+      {fzgDialogIsOpen && (
+        <FirecallItemDialog onClose={fzgDialogClose} type="vehicle" />
+      )}
+      {rohrDialogIsOpen && (
+        <FirecallItemDialog onClose={rohrDialogClose} type="rohr" />
+      )}
     </>
   );
 }

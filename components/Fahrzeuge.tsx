@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import {
   filterActiveItems,
@@ -13,12 +12,11 @@ import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecall } from '../hooks/useFirecall';
 import FirecallItemCard from './FirecallItemCard';
-import RohrCard from './RohrCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
   const firecall = useFirecall();
-  console.info(`firecall id ${firecall?.id}`);
+  // console.info(`firecall id ${firecall?.id}`);
   const [vehicles, setVehicles] = useState<Fzg[]>([]);
   const [rohre, setRohre] = useState<Rohr[]>([]);
   const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);

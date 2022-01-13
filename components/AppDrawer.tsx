@@ -1,5 +1,6 @@
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import InfoIcon from '@mui/icons-material/Info';
+import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
@@ -62,17 +63,6 @@ export default function AppDrawer({
               </Link>
             ))}
 
-            {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
-              <Link href="/users" passHref>
-                <ListItem button key="users">
-                  <ListItemIcon>
-                    <UserIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Users" />
-                </ListItem>
-              </Link>
-            )}
-
             {isAuthorized && (
               <>
                 <Link href="/fahrzeuge" passHref>
@@ -83,6 +73,16 @@ export default function AppDrawer({
                     <ListItemText primary="Fahrzeuge &amp; Co" />
                   </ListItem>
                 </Link>
+
+                <Link href="/tagebuch" passHref>
+                  <ListItem button key="teagebuch">
+                    <ListItemIcon>
+                      <LibraryBooksIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Einsatz Tagebuch" />
+                  </ListItem>
+                </Link>
+
                 <Link href="/einsaetze" passHref>
                   <ListItem button key="einsaetze">
                     <ListItemIcon>
@@ -92,6 +92,17 @@ export default function AppDrawer({
                   </ListItem>
                 </Link>
               </>
+            )}
+
+            {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
+              <Link href="/users" passHref>
+                <ListItem button key="users">
+                  <ListItemIcon>
+                    <UserIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Users" />
+                </ListItem>
+              </Link>
             )}
           </List>
         </Box>

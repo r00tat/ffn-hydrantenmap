@@ -24,6 +24,13 @@ export interface Rohr extends FirecallItem {
   type: 'rohr';
 }
 
+export interface Diary extends FirecallItem {
+  datum: string;
+  von: string;
+  an: string;
+  erledigt: string;
+}
+
 export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 
