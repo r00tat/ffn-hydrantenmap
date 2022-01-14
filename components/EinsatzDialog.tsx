@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import { useFirecallSelect } from '../hooks/useFirecall';
 import { defaultPosition } from '../hooks/usePosition';
 import { firestore } from './firebase';
 import { Firecall } from './firestore';
@@ -31,6 +32,7 @@ export default function EinsatzDialog({
     }
   );
   const { email } = useFirebaseLogin();
+  const setFirecallId = useFirecallSelect();
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,10 +60,16 @@ export default function EinsatzDialog({
           lat: position.lat,
           lng: position.lng,
         };
-        await addDoc(collection(firestore, 'call'), firecallData);
+        const newDoc = await addDoc(
+          collection(firestore, 'call'),
+          firecallData
+        );
+        if (setFirecallId) {
+          setFirecallId(newDoc.id);
+        }
       }
     },
-    [email, position.lat, position.lng]
+    [email, position.lat, position.lng, setFirecallId]
   );
 
   return (
