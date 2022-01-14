@@ -55,20 +55,9 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [saveItem]
   );
 
-  const einsatzDialogClose = useCallback(
-    (einsatz?: Firecall) => {
-      if (einsatz) {
-        addDoc(collection(firestore, 'call'), {
-          ...einsatz,
-          user: email,
-          created: new Date(),
-          lat: map.getCenter().lat,
-          lng: map.getCenter().lng,
-        });
-      }
-    },
-    [email, map]
-  );
+  const einsatzDialogClose = useCallback((einsatz?: Firecall) => {
+    setEinsatzDialog(false);
+  }, []);
 
   const rohrDialogClose = useCallback(
     (rohr?: FirecallItem) => {
@@ -148,7 +137,12 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           allowTypeChange={false}
         />
       )}
-      {einsatzDialog && <EinsatzDialog onClose={einsatzDialogClose} />}
+      {einsatzDialog && (
+        <EinsatzDialog
+          onClose={einsatzDialogClose}
+          position={map.getCenter()}
+        />
+      )}
       {fzgDialogIsOpen && (
         <FirecallItemDialog onClose={fzgDialogClose} type="vehicle" />
       )}

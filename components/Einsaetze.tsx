@@ -1,20 +1,22 @@
+import AddIcon from '@mui/icons-material/Add';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
+import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { doc, orderBy, setDoc, Timestamp, where } from 'firebase/firestore';
+import { doc, orderBy, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
 import { filterActiveItems, Firecall } from '../components/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallSelect } from '../hooks/useFirecall';
 import ConfirmDialog from './ConfirmDialog';
-import { firestore } from './firebase';
 import EinsatzDialog from './EinsatzDialog';
-import Tooltip from '@mui/material/Tooltip';
+import { firestore } from './firebase';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -123,6 +125,7 @@ function EinsatzCard({
 
 export default function Einsaetze() {
   const { isAuthorized } = useFirebaseLogin();
+  const [einsatzDialog, setEinsatzDialog] = useState(false);
   // const columns = useGridColumns();
   const firecall = useFirecall();
   const einsaetze = useFirebaseCollection<Firecall>({
@@ -143,19 +146,32 @@ export default function Einsaetze() {
   }
 
   return (
-    <Box sx={{ p: 2, m: 2 }}>
-      <Typography variant="h3" gutterBottom>
-        Einsätze
-      </Typography>
-      <Grid container spacing={2}>
-        {einsaetze.map((einsatz) => (
-          <EinsatzCard
-            einsatz={einsatz}
-            key={einsatz.id}
-            firecallId={firecall?.id}
-          />
-        ))}
-      </Grid>
-    </Box>
+    <>
+      <Box sx={{ p: 2, m: 2 }}>
+        <Typography variant="h3" gutterBottom>
+          Einsätze
+        </Typography>
+        <Grid container spacing={2}>
+          {einsaetze.map((einsatz) => (
+            <EinsatzCard
+              einsatz={einsatz}
+              key={einsatz.id}
+              firecallId={firecall?.id}
+            />
+          ))}
+        </Grid>
+      </Box>
+      <Fab
+        color="primary"
+        aria-label="add"
+        sx={{ position: 'absolute', bottom: 16, right: 16 }}
+        onClick={() => setEinsatzDialog(true)}
+      >
+        <AddIcon />
+      </Fab>
+      {einsatzDialog && (
+        <EinsatzDialog onClose={() => setEinsatzDialog(false)} />
+      )}
+    </>
   );
 }

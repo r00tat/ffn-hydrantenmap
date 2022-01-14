@@ -5,17 +5,23 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
-import { useState } from 'react';
-import { dateToYmd, Firecall } from './firestore';
+import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { useCallback, useState } from 'react';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import { defaultPosition } from '../hooks/usePosition';
+import { firestore } from './firebase';
+import { Firecall } from './firestore';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
   einsatz?: Firecall;
+  position?: L.LatLng;
 }
 
 export default function EinsatzDialog({
   onClose,
   einsatz: einsatzDefault,
+  position = defaultPosition,
 }: EinsatzDialogOptions) {
   const [open, setOpen] = useState(true);
   const [einsatz, setEinsatz] = useState<Firecall>(
@@ -24,6 +30,7 @@ export default function EinsatzDialog({
       date: new Date().toISOString(),
     }
   );
+  const { email } = useFirebaseLogin();
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -32,6 +39,30 @@ export default function EinsatzDialog({
         [field]: event.target.value,
       }));
     };
+
+  const saveEinsatz = useCallback(
+    async (fc: Firecall) => {
+      if (fc.id) {
+        // update
+        await setDoc(
+          doc(firestore, 'call', fc.id),
+          { ...fc, updatedAt: new Date(), updatedBy: email },
+          { merge: true }
+        );
+      } else {
+        //save new
+        const firecallData: Firecall = {
+          ...fc,
+          user: email,
+          created: new Date(),
+          lat: position.lat,
+          lng: position.lng,
+        };
+        await addDoc(collection(firestore, 'call'), firecallData);
+      }
+    },
+    [email, position.lat, position.lng]
+  );
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
@@ -123,6 +154,7 @@ export default function EinsatzDialog({
         <Button
           onClick={() => {
             setOpen(false);
+            saveEinsatz(einsatz);
             onClose(einsatz);
           }}
         >
