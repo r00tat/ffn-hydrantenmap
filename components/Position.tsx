@@ -1,8 +1,6 @@
 import React, { createContext, useContext } from 'react';
-import usePosition, {
-  defaultPosition,
-  PositionInfo,
-} from '../hooks/usePosition';
+import { defaultPosition } from '../hooks/constants';
+import usePosition, { PositionInfo } from '../hooks/usePosition';
 
 const PositionContext = createContext<PositionInfo>([
   defaultPosition,

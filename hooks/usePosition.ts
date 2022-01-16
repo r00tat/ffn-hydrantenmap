@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import L from 'leaflet';
-
-// Feuerwehrhaus Neusiedl am See
-export const defaultPosition: L.LatLng = L.latLng([47.9482913, 16.848222]);
+import { defaultPosition } from './constants';
 
 export type PositionInfo = [L.LatLng, boolean, GeolocationPosition | undefined];
 

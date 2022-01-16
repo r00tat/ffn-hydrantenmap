@@ -46,13 +46,20 @@ export interface FirestoreDataLayerOptions<T = WgsObject> {
   filterFn?: (element: T) => boolean;
 
   additionalLayers?: L.Layer[];
+
+  additionalMarkers?: (layerGroup: L.LayerGroup, elements: T[]) => void;
 }
 
 export default function useFirestoreDataLayer<T = WgsObject>(
   map: L.Map,
   options: FirestoreDataLayerOptions<T>
 ) {
-  const { autoAdd = true, cluster = false, additionalLayers = [] } = options;
+  const {
+    autoAdd = true,
+    cluster = false,
+    additionalLayers = [],
+    additionalMarkers,
+  } = options;
   // const [layer, setLayer] = useState(defaultTiles);
   const records = useFirebaseCollection<T>({
     collectionName: options.collectionName,
@@ -103,12 +110,16 @@ export default function useFirestoreDataLayer<T = WgsObject>(
           });
       }
 
+      if (additionalMarkers) {
+        additionalMarkers(layerGroup, records);
+      }
+
       if (additionalLayers.length > 0) {
         additionalLayers.forEach((layer) => layer.addTo(layerGroup));
       }
       // }, 2000);
     }
-  }, [map, records, layerGroup, options, additionalLayers]);
+  }, [map, records, layerGroup, options, additionalLayers, additionalMarkers]);
 
   return layerGroup;
 }

@@ -1,9 +1,10 @@
 import L from 'leaflet';
 import Head from 'next/head';
 import { useState } from 'react';
-import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
-import { defaultPosition } from '../hooks/usePosition';
+import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { defaultPosition } from '../hooks/constants';
 import MapLayer from './MapLayer';
+import UpdateMapPosition from './UpdateMapPosition';
 
 function MyMapContainer() {
   const map = useMap();
@@ -46,7 +47,15 @@ export default function Map() {
             A pretty CSS3 popup. <br /> Easily customizable.
           </Popup>
         </Marker> */}
+        {/* <Polyline
+          positions={[
+            defaultPosition,
+            [defaultPosition.lat + 0.01, defaultPosition.lng - 0.01],
+          ]}
+          color="green"
+        /> */}
         <MyMapContainer />
+        <UpdateMapPosition />
       </MapContainer>
     </>
   );

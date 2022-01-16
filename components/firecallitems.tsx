@@ -1,5 +1,14 @@
-import { Diary, Firecall, FirecallItem, Fzg, Rohr } from './firestore';
+import {
+  Connection,
+  Diary,
+  Firecall,
+  FirecallItem,
+  Fzg,
+  Rohr,
+} from './firestore';
 import L, { Map } from 'leaflet';
+import { defaultPosition, toLatLng } from '../hooks/constants';
+import { mapPosition } from '../hooks/useMapPosition';
 export interface FirecallItemInfo<T = FirecallItem> {
   name: string;
   title: (item: T) => string;
@@ -164,9 +173,52 @@ export const diaryItemInfo: FirecallItemInfo<Diary> = {
   },
 };
 
+export const connectionInfo: FirecallItemInfo<Connection> = {
+  name: 'Leitung',
+  title: (item) => `Leitung ${item.name}`,
+  info: (item) =>
+    `Länge: ${Math.round(
+      toLatLng(item.lat, item.lng).distanceTo(
+        toLatLng(item.destLat, item.destLng)
+      )
+    )}m`,
+  body: (item) => '',
+  dialogText: (item) => item.name || '',
+  fields: {
+    name: 'Bezeichnung',
+  },
+  factory: () => ({
+    type: 'connection',
+    name: '',
+    destLat: mapPosition.lat,
+    destLng: mapPosition.lng + 0.0001,
+  }),
+  popupFn: (item: Connection) =>
+    `Leitung ${item.name}: ${Math.round(
+      toLatLng(item.lat, item.lng).distanceTo(
+        toLatLng(item.destLat, item.destLng)
+      )
+    )}m`,
+  titleFn: (item: Connection) =>
+    `Leitung ${item.name}: ${Math.round(
+      toLatLng(item.lat, item.lng).distanceTo(
+        toLatLng(item.destLat, item.destLng)
+      )
+    )}m`,
+  icon: (item: Connection) => {
+    return L.icon({
+      iconUrl: `/icons/circle.svg`,
+      iconSize: [11, 11],
+      iconAnchor: [6, 6],
+      popupAnchor: [0, 0],
+    });
+  },
+};
+
 export const firecallItems: FirecallItemInfoList = {
   vehicle: vehicleItemInfo as FirecallItemInfo<FirecallItem>,
   rohr: rohrItemInfo as unknown as FirecallItemInfo<FirecallItem>,
+  connection: connectionInfo as unknown as FirecallItemInfo<FirecallItem>,
   marker: {
     name: 'Marker',
     title: (item) => `${item.name || ''}`,

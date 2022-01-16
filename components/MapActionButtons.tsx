@@ -13,6 +13,7 @@ import useFirecall from '../hooks/useFirecall';
 import EinsatzDialog from './EinsatzDialog';
 import { firestore } from './firebase';
 import FirecallItemDialog from './FirecallItemDialog';
+import { firecallItemInfo } from './firecallitems';
 import { Firecall, FirecallItem } from './firestore';
 import RohrIcon from './RohrIcon';
 
@@ -35,6 +36,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         addDoc(
           collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
           {
+            ...firecallItemInfo(item.type).factory(),
             ...item,
             lat: map.getCenter().lat,
             lng: map.getCenter().lng,

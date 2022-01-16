@@ -1,7 +1,7 @@
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { usePositionContext } from '../components/Position';
-import { defaultPosition } from '../hooks/usePosition';
+import { defaultPosition } from './constants';
 
 export default function useDistanceMarker(map: L.Map) {
   const [position] = usePositionContext();

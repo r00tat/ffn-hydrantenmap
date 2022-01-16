@@ -9,7 +9,7 @@ import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../hooks/useFirecall';
-import { defaultPosition } from '../hooks/usePosition';
+import { defaultPosition } from '../hooks/constants';
 import { firestore } from './firebase';
 import { Firecall } from './firestore';
 

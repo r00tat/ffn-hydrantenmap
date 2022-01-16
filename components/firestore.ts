@@ -31,6 +31,11 @@ export interface Diary extends FirecallItem {
   erledigt: string;
 }
 
+export interface Connection extends FirecallItem {
+  destLat: number;
+  destLng: number;
+}
+
 export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 

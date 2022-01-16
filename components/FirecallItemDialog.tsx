@@ -10,6 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
+import { useMap } from 'react-leaflet';
 import {
   firecallItemInfo,
   FirecallItemInfo,
@@ -54,7 +55,7 @@ export default function FirecallItemDialog({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Neues {itemInfo.name} hinzufügen</DialogTitle>
+      <DialogTitle>Neu: {itemInfo.name} hinzufügen</DialogTitle>
       <DialogContent>
         <DialogContentText>{itemInfo.dialogText(item)}</DialogContentText>
         {allowTypeChange && (
