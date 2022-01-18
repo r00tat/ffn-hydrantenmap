@@ -123,4 +123,9 @@ export const useFirecall = (): Firecall => {
   return firecall || defaultFirecall;
 };
 
+export const useFirecallId = (): string => {
+  const { firecall } = useContext(FirecallContext);
+  return firecall?.id || 'unkown';
+};
+
 export default useFirecall;

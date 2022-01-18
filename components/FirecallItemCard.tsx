@@ -58,18 +58,20 @@ export default function FirecallItemCard({
           </Typography>
           <Typography variant="body2">{itemInfo.body(item)}</Typography>
         </CardContent>
-        <CardActions>
-          <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
-            Bearbeiten
-          </Button>
-          <Button
-            size="small"
-            onClick={() => setIsConfirmOpen(true)}
-            color="error"
-          >
-            Löschen
-          </Button>
-        </CardActions>
+        {item.editable !== false && (
+          <CardActions>
+            <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
+              Bearbeiten
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setIsConfirmOpen(true)}
+              color="error"
+            >
+              Löschen
+            </Button>
+          </CardActions>
+        )}
       </Card>
       {displayUpdateDialog && (
         <FirecallItemDialog onClose={updateFn} item={item} />

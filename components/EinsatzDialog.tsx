@@ -28,7 +28,7 @@ export default function EinsatzDialog({
   const [einsatz, setEinsatz] = useState<Firecall>(
     einsatzDefault || {
       name: '',
-      date: new Date().toISOString(),
+      date: new Date().toLocaleString('de-DE'),
     }
   );
   const { email } = useFirebaseLogin();

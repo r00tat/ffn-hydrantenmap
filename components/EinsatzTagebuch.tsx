@@ -4,43 +4,118 @@ import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { addDoc, collection, orderBy } from 'firebase/firestore';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import useFirecall from '../hooks/useFirecall';
+import { useFirecallId } from '../hooks/useFirecall';
 import { firestore } from './firebase';
 import FirecallItemCard from './FirecallItemCard';
 import FirecallItemDialog from './FirecallItemDialog';
-import { Diary, filterActiveItems, FirecallItem } from './firestore';
+import { Diary, filterActiveItems, FirecallItem, Fzg } from './firestore';
 
 export default function EinsatzTagebuch() {
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { email } = useFirebaseLogin();
-  const firecall = useFirecall();
+  const firecallId = useFirecallId();
+
+  const [diaries, setDiaries] = useState<Diary[]>([]);
 
   const diaryEntries = useFirebaseCollection<Diary>({
     collectionName: 'call',
-    pathSegments: [firecall?.id || 'unkown', 'diary'],
+    pathSegments: [firecallId, 'diary'],
     // queryConstraints: [where('type', '==', 'vehicle')],
     queryConstraints: [orderBy('datum', 'desc')],
     filterFn: filterActiveItems,
   });
 
+  const firecallItems = useFirebaseCollection<FirecallItem>({
+    collectionName: 'call',
+    pathSegments: [firecallId, 'item'],
+    // queryConstraints: [where('type', '==', 'vehicle')],
+    queryConstraints: [],
+    filterFn: filterActiveItems,
+  });
+
+  useEffect(() => {
+    const cars: Fzg[] = firecallItems.filter(
+      (item) => item.type === 'vehicle'
+    ) as Fzg[];
+    const firecallEntries: Diary[] = [
+      cars
+        .filter((item) => item.alarmierung)
+        .map(
+          (item) =>
+            ({
+              id: 'alarmierung' + item.id,
+              datum: item.alarmierung,
+              type: 'diary',
+              name: `${item.name} ${item.fw || ''} alarmiert`,
+              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+                item.ats ? 'ATS ' + item.ats : ''
+              }`,
+              editable: false,
+            } as Diary)
+        ),
+      cars
+        .filter((item) => item.eintreffen)
+        .map(
+          (item) =>
+            ({
+              id: 'eintreffen' + item.id,
+              datum: item.eintreffen,
+              type: 'diary',
+              name: `${item.name} ${item.fw || ''} eingetroffen`,
+              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+                item.ats ? 'ATS ' + item.ats : ''
+              }`,
+              editable: false,
+            } as Diary)
+        ),
+      cars
+        .filter((item) => item.abruecken)
+        .map(
+          (item) =>
+            ({
+              id: 'abruecken' + item.id,
+              datum: item.abruecken,
+              type: 'diary',
+              name: `${item.name} ${item.fw || ''} abgerückt`,
+              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+                item.ats ? 'ATS ' + item.ats : ''
+              }`,
+              editable: false,
+            } as Diary)
+        ),
+      firecallItems
+        .filter((item) => item.type !== 'vehicle' && item.datum)
+        .map(
+          (item) =>
+            ({
+              ...item,
+              type: 'diary',
+              editable: false,
+            } as Diary)
+        ),
+    ].flat();
+    setDiaries(
+      [diaryEntries, firecallEntries]
+        .flat()
+        .sort((a, b) => a.datum.localeCompare(b.datum))
+    );
+  }, [diaryEntries, firecallItems]);
+
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
       if (item) {
-        addDoc(
-          collection(firestore, 'call', firecall?.id || 'unkown', 'diary'),
-          {
-            ...item,
-            user: email,
-            created: new Date(),
-          }
-        );
+        addDoc(collection(firestore, 'call', firecallId, 'diary'), {
+          ...item,
+          user: email,
+          created: new Date(),
+        });
       }
     },
-    [email, firecall?.id]
+    [email, firecallId]
   );
 
   return (
@@ -50,11 +125,11 @@ export default function EinsatzTagebuch() {
           Einsatz Tagebuch
         </Typography>
         <Grid container spacing={2}>
-          {diaryEntries.map((item) => (
+          {diaries.map((item) => (
             <FirecallItemCard
               item={item}
               key={item.id}
-              firecallId={firecall?.id}
+              firecallId={firecallId}
             />
           ))}
         </Grid>

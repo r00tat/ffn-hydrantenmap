@@ -6,6 +6,8 @@ export interface FirecallItem {
   deleted?: boolean;
   type: string;
   beschreibung?: string;
+  datum?: string;
+  editable?: boolean;
 }
 
 export interface Fzg extends FirecallItem {
@@ -26,9 +28,9 @@ export interface Rohr extends FirecallItem {
 
 export interface Diary extends FirecallItem {
   datum: string;
-  von: string;
-  an: string;
-  erledigt: string;
+  von?: string;
+  an?: string;
+  erledigt?: string;
 }
 
 export interface Connection extends FirecallItem {

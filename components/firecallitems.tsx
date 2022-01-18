@@ -100,6 +100,7 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
     fw: 'Feuerwehr',
     besatzung: 'Besatzung 1:?',
     ats: 'ATS Träger',
+    beschreibung: 'Beschreibung',
     alarmierung: 'Alarmierung',
     eintreffen: 'Eintreffen',
     abruecken: 'Abrücken',
@@ -107,6 +108,7 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
   factory: () =>
     ({
       name: '',
+      beschreibung: '',
       fw: '',
       type: 'vehicle',
       alarmierung: new Date().toLocaleString('de-DE'),
@@ -138,7 +140,8 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
 export const diaryItemInfo: FirecallItemInfo<Diary> = {
   name: 'Einsatztagebuch',
   title: (item) => `${item.name || ''}`,
-  info: (item) => `${item.datum} ${item.von} => ${item.an}`,
+  info: (item) =>
+    `${item.datum} ${item.von || item.an ? `${item.von} => ${item.an}` : ''}`,
   body: (item) => `${item.beschreibung || ''}`,
   fields: {
     name: 'Bezeichnung',
@@ -186,10 +189,12 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
   dialogText: (item) => item.name || '',
   fields: {
     name: 'Bezeichnung',
+    beschreibung: 'Beschreibung',
   },
   factory: () => ({
     type: 'connection',
     name: '',
+    beschreibung: '',
     destLat: mapPosition.lat,
     destLng: mapPosition.lng + 0.0001,
   }),
@@ -232,6 +237,7 @@ export const firecallItems: FirecallItemInfoList = {
       type: 'marker',
       name: '',
       beschreibung: '',
+      datum: '',
     }),
     dialogText: (item) => `Markierung`,
     popupFn: (item: FirecallItem) => {
@@ -316,6 +322,7 @@ export const firecallItems: FirecallItemInfoList = {
     dialogText: (item) => item.name || '',
     fields: {
       name: 'Bezeichnung',
+      beschreibung: 'Beschreibung',
     },
     factory: () => ({
       type: 'fallback',
