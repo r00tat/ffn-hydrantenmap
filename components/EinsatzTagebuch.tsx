@@ -97,11 +97,10 @@ export default function EinsatzTagebuch() {
             } as Diary)
         ),
     ].flat();
-    setDiaries(
-      [diaryEntries, firecallEntries]
-        .flat()
-        .sort((a, b) => a.datum.localeCompare(b.datum))
-    );
+    const diaries = [diaryEntries, firecallEntries]
+      .flat()
+      .sort((a, b) => b.datum.localeCompare(a.datum));
+    setDiaries(diaries);
   }, [diaryEntries, firecallItems]);
 
   const diaryClose = useCallback(

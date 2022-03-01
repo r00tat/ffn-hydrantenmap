@@ -1,7 +1,6 @@
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import useDistanceLayer from '../hooks/useDistanceLayer';
-import useDistanceMarker from '../hooks/useDistanceMarker';
 import useGefahrObjekteLayer from '../hooks/useGefahrObjekteLayer';
 import useHydrantenLayer from '../hooks/useHydrantenLayer';
 import useLoeschteicheLayer from '../hooks/useLoeschteicheLayer';
@@ -31,7 +30,6 @@ export default function MapLayer({ map }: MapLayerOptions) {
   const risikoLayer = useRisikoObjekteLayer(map);
   const gefahrLayer = useGefahrObjekteLayer(map);
   const firecallLayer = useFirecallLayer(map);
-  useDistanceMarker(map);
   usePositionMarker(map);
 
   useEffect(() => {
