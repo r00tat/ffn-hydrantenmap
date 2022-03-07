@@ -3,7 +3,8 @@ import Head from 'next/head';
 import { useState } from 'react';
 import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../hooks/constants';
-import DistanceMarker from './DistanceMarker';
+import Clusters from './Clusters';
+import DistanceMarker from './markers/DistanceMarker';
 import MapLayer from './MapLayer';
 import UpdateMapPosition from './UpdateMapPosition';
 
@@ -58,6 +59,7 @@ export default function Map() {
         <MyMapContainer />
         <UpdateMapPosition />
         <DistanceMarker />
+        <Clusters />
       </MapContainer>
     </>
   );

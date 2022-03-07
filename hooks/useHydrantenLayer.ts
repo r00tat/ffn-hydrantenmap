@@ -34,20 +34,27 @@ export default function useHydrantenLayer(map: L.Map) {
 
   const hydrantenLayer = useFirestoreDataLayer(map, {
     icon: iconFn,
-    collectionName: 'hydrant',
+    // collectionName: 'hydranten2',
+    collectionName: 'hydrant2',
     cluster: true,
     titleFn: (hydrant: WgsObject) =>
-      `${hydrant.leistung} l/min (${hydrant.dimension}mm)
+      `${hydrant.leistung ? hydrant.leistung + ' l/min ' : ''} (${
+        hydrant.dimension
+      }mm)
     ${hydrant.ortschaft} ${hydrant.name}
-    dynamisch: ${hydrant.dynamsicher_druck} bar
+    dynamisch: ${hydrant.dynamischer_druck} bar
     statisch: ${hydrant.statischer_druck} bar
-    ${hydrant.f_llhydrant?.toLowerCase() === 'ja' ? 'Füllhydrant' : ''}`.trim(),
+    ${
+      hydrant.fuellhydrant?.toLowerCase() === 'ja' ? 'Füllhydrant' : ''
+    }`.trim(),
     popupFn: (hydrant: WgsObject) => `
     <b>${hydrant.ortschaft} ${hydrant.name}<br>
-    ${hydrant.leistung} l/min (${hydrant.dimension}mm)</b><br>
-    dynamisch: ${hydrant.dynamsicher_druck} bar<br>
+    ${hydrant.leistung ? hydrant.leistung + ' l/min ' : ''} (${
+      hydrant.dimension
+    }mm)</b><br>
+    dynamisch: ${hydrant.dynamischer_druck} bar<br>
     statisch: ${hydrant.statischer_druck} bar
-    ${hydrant.f_llhydrant?.toLowerCase() === 'ja' ? '<br>Füllhydrant' : ''}`,
+    ${hydrant.fuellhydrant?.toLowerCase() === 'ja' ? '<br>Füllhydrant' : ''}`,
   });
 
   return hydrantenLayer;

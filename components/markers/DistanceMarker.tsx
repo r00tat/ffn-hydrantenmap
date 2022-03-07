@@ -1,8 +1,8 @@
 import L from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { Marker, Popup, useMapEvent } from 'react-leaflet';
-import { defaultPosition } from '../hooks/constants';
-import { usePositionContext } from './Position';
+import { defaultPosition } from '../../hooks/constants';
+import { usePositionContext } from '../Position';
 
 export default function DistanceMarker() {
   const [distancePosition, setDistancePosition] =

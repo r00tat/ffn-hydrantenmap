@@ -27,8 +27,16 @@ service cloud.firestore {
     	allow read: if authorizedUser()
     }
 
-    match /call/{doc=*} {
-    	allow write: if authorizedUser()
+    match /call/{doc=**} {
+    	allow read, write: if authorizedUser()
+    }
+    
+    match /clusters/{doc=**} {
+    	allow read: if authorizedUser();
+    }
+
+    match /clusters6/{doc=**} {
+    	allow read: if authorizedUser();
     }
 
 

@@ -9,7 +9,8 @@
     "lint": "next lint",
     "extract": "npx tsc --outDir dist server/harparser && node dist/harparser.js",
     "import": "npx tsc --outDir dist server/firestore-import && node dist/firestore-import.js",
-    "exportImport": "npx tsc --outDir dist server/export-import && node dist/export-import.js"
+    "exportImport": "npx tsc --outDir dist server/export-import && node dist/export-import.js",
+    "cluster": "npx tsc --outDir dist server/hydrant-geohash && node dist/hydrant-geohash.js"
   },
   "dependencies": {
     "@emotion/react": "^11.7.1",
@@ -23,6 +24,7 @@
     "firebase": "^9.6.1",
     "firebase-admin": "^10.0.1",
     "firebaseui": "^6.0.0",
+    "geofire-common": "^5.2.0",
     "leaflet": "^1.7.1",
     "leaflet.markercluster": "^1.5.3",
     "next": "12.0.7",
