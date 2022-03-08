@@ -6,6 +6,7 @@ export interface TileOptions extends TileLayerOptions {
 }
 
 export interface TileConfig {
+  name: string;
   url: string;
   options: TileOptions;
   description?: string;
@@ -30,7 +31,8 @@ export const availableLayers: TileConfigs = {
   //   },
   // },
   basemap_hdpi: {
-    url: 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/{type}/google3857/{z}/{y}/{x}.{format}',
+    name: 'Basemap',
+    url: 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/normal/google3857/{z}/{y}/{x}.jpeg',
     // 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/normal/google3857/{z}/{y}/{x}.jpeg',
     options: {
       maxZoom: 19,
@@ -46,7 +48,8 @@ export const availableLayers: TileConfigs = {
     },
   },
   basemap_ortofoto: {
-    url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/{type}/google3857/{z}/{y}/{x}.{format}',
+    name: 'Orthofoto',
+    url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg',
     options: {
       maxZoom: 19,
       attribution:
@@ -61,6 +64,7 @@ export const availableLayers: TileConfigs = {
     },
   },
   openstreetmap: {
+    name: 'Openstreetmap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     options: {
       maxZoom: 19,
@@ -71,8 +75,9 @@ export const availableLayers: TileConfigs = {
 };
 
 export const overlayLayers: TileConfigs = {
-  Adressen: {
-    url: 'https://maps{s}.wien.gv.at/basemap/bmapoverlay/{type}/google3857/{z}/{y}/{x}.{format}',
+  adressen: {
+    name: 'Adressen',
+    url: 'https://maps{s}.wien.gv.at/basemap/bmapoverlay/normal/google3857/{z}/{y}/{x}.png',
     options: {
       maxZoom: 19,
       attribution:

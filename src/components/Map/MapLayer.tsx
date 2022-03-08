@@ -25,12 +25,12 @@ export default function MapLayer({ map }: MapLayerOptions) {
   const [initialized, setInitialized] = useState(false);
   // const hydrantenLayer = useHydrantenLayer(map);
   // const saugstellenLayer = useSaugstellenLayer(map);
-  const distanceLayer = useDistanceLayer(map);
+  // const distanceLayer = useDistanceLayer(map);
   // const loeschteichLayer = useLoeschteicheLayer(map);
   // const risikoLayer = useRisikoObjekteLayer(map);
   // const gefahrLayer = useGefahrObjekteLayer(map);
   const firecallLayer = useFirecallLayer(map);
-  usePositionMarker(map);
+  // usePositionMarker(map);
 
   useEffect(() => {
     if (
@@ -44,7 +44,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
       firecallLayer
     ) {
       const overlayLayersForMap = createLayers(overlayLayers);
-      distanceLayer.addTo(map);
+      // distanceLayer.addTo(map);
       const overlayMaps = {
         Einsatz: firecallLayer,
         // Hydranten: hydrantenLayer,
@@ -52,7 +52,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
         // Loeschteiche: loeschteichLayer,
         // 'Risiko Objekte': risikoLayer,
         // 'Gefährliche Objekte': gefahrLayer,
-        'Umkreis 50m': distanceLayer,
+        // 'Umkreis 50m': distanceLayer,
         ...overlayLayersForMap,
       };
       const baseMaps = createLayers(availableLayers);
@@ -60,7 +60,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
       L.control.layers(baseMaps, overlayMaps).addTo(map);
       setInitialized(true);
     }
-  }, [initialized, distanceLayer, map, firecallLayer]);
+  }, [initialized, map, firecallLayer]);
 
   return <>{isAuthorized && <MapActionButtons map={map} />}</>;
 }

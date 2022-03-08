@@ -1,14 +1,12 @@
-import { MapContainer, useMap } from 'react-leaflet';
+import { LayersControl, MapContainer, TileLayer } from 'react-leaflet';
 import { defaultPosition } from '../../hooks/constants';
-import DistanceMarker from './markers/DistanceMarker';
 import Clusters from './Clusters';
-import MapLayer from './MapLayer';
+import { DistanceLayer } from './markers/DistanceLayer';
+import DistanceMarker from './markers/DistanceMarker';
+import FirecallLayer from './markers/FirecallLayer';
+import PositionMarker from './markers/PositionMarker';
+import { availableLayers, overlayLayers } from './tiles';
 import UpdateMapPosition from './UpdateMapPosition';
-
-function MyMapContainer() {
-  const map = useMap();
-  return <MapLayer map={map} />;
-}
 
 export default function Map() {
   return (
@@ -19,26 +17,51 @@ export default function Map() {
         maxZoom={19}
         scrollWheelZoom={true}
       >
-        {/* <TileLayer
-    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-  /> */}
-        {/* <Marker position={defaultPosition}>
-          <Popup>
-            A pretty CSS3 popup. <br /> Easily customizable.
-          </Popup>
-        </Marker> */}
-        {/* <Polyline
-          positions={[
-            defaultPosition,
-            [defaultPosition.lat + 0.01, defaultPosition.lng - 0.01],
-          ]}
-          color="green"
-        /> */}
-        <MyMapContainer />
+        <LayersControl position="topright">
+          {Object.entries(availableLayers).map(([key, layer], index) => (
+            <LayersControl.BaseLayer
+              checked={index == 0}
+              name={layer.name}
+              key={key}
+            >
+              <TileLayer
+                attribution={layer.options.attribution}
+                url={layer.url}
+                maxZoom={layer.options.maxZoom}
+                bounds={layer.options.bounds}
+                subdomains={layer.options.subdomains}
+                key={key}
+              />
+            </LayersControl.BaseLayer>
+          ))}
+
+          <LayersControl.Overlay name="Einsatz">
+            <FirecallLayer />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="Entfernung">
+            <DistanceMarker />
+          </LayersControl.Overlay>
+          <Clusters />
+          <LayersControl.Overlay name="Umkreis" checked>
+            <DistanceLayer />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="Position" checked>
+            <PositionMarker />
+          </LayersControl.Overlay>
+          {Object.entries(overlayLayers).map(([key, layer]) => (
+            <LayersControl.Overlay name={layer.name} key={key}>
+              <TileLayer
+                attribution={layer.options.attribution}
+                url={layer.url}
+                maxZoom={layer.options.maxZoom}
+                bounds={layer.options.bounds}
+                subdomains={layer.options.subdomains}
+                key={key}
+              />
+            </LayersControl.Overlay>
+          ))}
+        </LayersControl>
         <UpdateMapPosition />
-        <DistanceMarker />
-        <Clusters />
       </MapContainer>
     </>
   );
