@@ -6,47 +6,13 @@ import {
   query,
   startAt,
 } from 'firebase/firestore';
-import {
-  BITS_PER_CHAR,
-  boundingBoxBits,
-  boundingBoxCoordinates,
-  geohashForLocation,
-  geohashQuery,
-} from 'geofire-common';
+import { geohashQueryBounds } from 'geofire-common';
 import { useEffect, useState } from 'react';
 import { useMap, useMapEvent } from 'react-leaflet';
 import { GeohashCluster, HydrantenRecord } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
 import HydratenLayer from './markers/HydrantenLayer';
-
-export type Geopoint = [number, number];
-export type Geohash = string;
-export type GeohashRange = [Geohash, Geohash];
-
-export function geohashQueryBounds(
-  center: Geopoint,
-  radius: number
-): GeohashRange[] {
-  const queryBits = Math.max(1, boundingBoxBits(center, radius));
-  const geohashPrecision = Math.ceil(queryBits / BITS_PER_CHAR);
-  const coordinates = boundingBoxCoordinates(center, radius);
-  console.info(`bb coordinates: ${JSON.stringify(coordinates)}`);
-  const queries = coordinates.map((coordinate) => {
-    return geohashQuery(
-      geohashForLocation(coordinate, geohashPrecision),
-      queryBits
-    );
-  });
-  // remove duplicates
-  return queries.filter((query, index) => {
-    return !queries.some((other, otherIndex) => {
-      return (
-        index > otherIndex && query[0] === other[0] && query[1] === other[1]
-      );
-    });
-  }) as GeohashRange[];
-}
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
   const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
