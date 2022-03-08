@@ -37,6 +37,6 @@ export interface HydrantenRecord extends GisWgsObject {
 }
 
 export interface GeohashCluster {
-  hydranten: HydrantenRecord[];
+  hydranten?: HydrantenRecord[];
   geohash: string;
 }
