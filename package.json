@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "extract": "npx tsc --outDir dist server/harparser && node dist/harparser.js",
-    "import": "npx tsc --outDir dist server/firestore-import && node dist/firestore-import.js",
-    "exportImport": "npx tsc --outDir dist server/export-import && node dist/export-import.js",
-    "cluster": "npx tsc --outDir dist server/hydrant-geohash && node dist/hydrant-geohash.js"
+    "extract": "npx tsc --outDir dist src/server/harparser && node dist/server/harparser.js",
+    "import": "npx tsc --outDir dist src/server/firestore-import && node dist/server/firestore-import.js",
+    "exportImport": "npx tsc --outDir dist src/server/export-import && node dist/server/export-import.js",
+    "cluster": "npx tsc --outDir dist src/server/hydrant-geohash && node dist/server/hydrant-geohash.js"
   },
   "dependencies": {
     "@emotion/react": "^11.7.1",
