@@ -1,7 +1,7 @@
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { auth, firestore } from '../components/firebase';
+import { auth, firestore } from '../components/firebase/firebase';
 
 export interface LoginStatus {
   isSignedIn: boolean;

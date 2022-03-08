@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import FirecallItemDialog from './FirecallItemDialog';
-import { FirecallItem, Rohr } from './firestore';
+import { FirecallItem, Rohr } from '../firebase/firestore';
 
 export interface RohrDialogOptions {
   onClose: (rohr?: Rohr) => void;

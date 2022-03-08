@@ -7,11 +7,11 @@ import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecallSelect } from '../hooks/useFirecall';
-import { defaultPosition } from '../hooks/constants';
-import { firestore } from './firebase';
-import { Firecall } from './firestore';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallSelect } from '../../hooks/useFirecall';
+import { defaultPosition } from '../../hooks/constants';
+import { firestore } from '../firebase/firebase';
+import { Firecall } from '../firebase/firestore';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;

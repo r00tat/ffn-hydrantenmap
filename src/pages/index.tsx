@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 const DynamicMap = dynamic(
   () => {
-    return import('../components/PositionedMap');
+    return import('../components/Map/PositionedMap');
   },
   { ssr: false }
 );

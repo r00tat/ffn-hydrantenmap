@@ -2,7 +2,7 @@ import { QueryConstraint } from 'firebase/firestore';
 import L, { LayerGroup, LeafletEvent } from 'leaflet';
 import { MarkerClusterGroup } from 'leaflet.markercluster';
 import { useEffect, useState } from 'react';
-import { WgsObject } from '../server/gis-objects';
+import { WgsObject } from '../common/gis-objects';
 import useFirebaseCollection from './useFirebaseCollection';
 
 export interface FirestoreDataLayerOptions<T = WgsObject> {

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { stringify } from 'csv-stringify/sync';
-import { Coordinates, GisObject, WgsObject } from './gis-objects';
-import { gk34ToWgs84 } from './wgs-convert';
+import { Coordinates, GisObject, WgsObject } from '../common/gis-objects';
+import { gk34ToWgs84 } from '../common/wgs-convert';
 
 interface Metadata {
   id_attr: number;

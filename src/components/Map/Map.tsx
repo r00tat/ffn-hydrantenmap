@@ -1,10 +1,7 @@
-import L from 'leaflet';
-import Head from 'next/head';
-import { useState } from 'react';
-import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
-import { defaultPosition } from '../hooks/constants';
-import Clusters from './Clusters';
+import { MapContainer, useMap } from 'react-leaflet';
+import { defaultPosition } from '../../hooks/constants';
 import DistanceMarker from './markers/DistanceMarker';
+import Clusters from './Clusters';
 import MapLayer from './MapLayer';
 import UpdateMapPosition from './UpdateMapPosition';
 
@@ -14,26 +11,8 @@ function MyMapContainer() {
 }
 
 export default function Map() {
-  // const [map, setMap] = useState<L.Map>();
-
-  // useEffect(() => {
-  //   const newMap = L.map('map', {
-  //     center: defaultPosition,
-  //     zoom: 17,
-  //     maxZoom: 30,
-  //   });
-
-  //   setMap(newMap);
-  //   return () => {
-  //     newMap.remove();
-  //   };
-  // }, []);
-
   return (
     <>
-      {/* <div id="map" style={{ height: '86vh' }}></div>
-       */}
-
       <MapContainer
         center={defaultPosition}
         zoom={17}

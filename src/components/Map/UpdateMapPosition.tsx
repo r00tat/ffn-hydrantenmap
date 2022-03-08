@@ -1,6 +1,6 @@
 import { useMapEvent } from 'react-leaflet';
 import L from 'leaflet';
-import { updateMapPosition } from '../hooks/useMapPosition';
+import { updateMapPosition } from '../../hooks/useMapPosition';
 
 export default function UpdateMapPosition() {
   useMapEvent('moveend', (event) => {

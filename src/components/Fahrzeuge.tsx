@@ -7,11 +7,11 @@ import {
   FirecallItem,
   Fzg,
   Rohr,
-} from '../components/firestore';
+} from './firebase/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecall } from '../hooks/useFirecall';
-import FirecallItemCard from './FirecallItemCard';
+import FirecallItemCard from './FirecallItems/FirecallItemCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();

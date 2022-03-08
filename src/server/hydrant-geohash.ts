@@ -6,9 +6,9 @@ import {
   HydrantenRecord,
   GeohashCluster,
   GEOHASH_PRECISION,
-} from './gis-objects';
+} from '../common/gis-objects';
 import { writeCsvFile } from './utils';
-import { gk34ToWgs84 } from './wgs-convert';
+import { gk34ToWgs84 } from '../common/wgs-convert';
 
 const readCsvFile = (inputCsv: string) => {
   if (!fs.existsSync(inputCsv)) {
@@ -114,7 +114,10 @@ const firestoreImport = async (collectionName: string, inputCsv: string) => {
         geohash: hash,
       };
     }
-    geohashes[hash].hydranten.push(record);
+    if (!geohashes[hash].hydranten) {
+      geohashes[hash].hydranten = [];
+    }
+    geohashes[hash].hydranten?.push(record);
   });
 
   writeCsvFile(

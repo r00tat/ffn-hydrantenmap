@@ -1,4 +1,4 @@
-import { HydrantenRecord } from '../../server/gis-objects';
+import { HydrantenRecord } from '../../../common/gis-objects';
 import MarkerClusterLayer from './MarkerClusterLayer';
 import HydrantMarker from './HydrantMarker';
 

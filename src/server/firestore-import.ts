@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import firebaseAdmin from './firebase/admin';
 import { parse } from 'csv-parse/sync';
-import { GisWgsObject } from './gis-objects';
+import { GisWgsObject } from '../common/gis-objects';
 
 interface GisWgsImportObject extends GisWgsObject {
   ortschaft: string;

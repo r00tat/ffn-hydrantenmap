@@ -1,7 +1,7 @@
 import { collection, query, QueryConstraint } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { useCollection } from 'react-firebase-hooks/firestore';
-import { firestore } from '../components/firebase';
+import { firestore } from '../components/firebase/firebase';
 
 export interface FirebaseCollectionOptions<T> {
   collectionName: string;

@@ -16,7 +16,7 @@ import {
   FirecallItemInfo,
   firecallItems,
 } from './firecallitems';
-import { FirecallItem } from './firestore';
+import { FirecallItem } from '../firebase/firestore';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;

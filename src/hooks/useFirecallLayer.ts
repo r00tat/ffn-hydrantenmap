@@ -1,14 +1,17 @@
 import { doc, setDoc } from 'firebase/firestore';
 import L, { Map } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
-import { firestore } from '../components/firebase';
-import { connectionInfo, firecallItemInfo } from '../components/firecallitems';
+import { firestore } from '../components/firebase/firebase';
+import {
+  connectionInfo,
+  firecallItemInfo,
+} from '../components/FirecallItems/firecallitems';
 import {
   Connection,
   filterActiveItems,
   Firecall,
   FirecallItem,
-} from '../components/firestore';
+} from '../components/firebase/firestore';
 import { defaultPosition } from './constants';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';

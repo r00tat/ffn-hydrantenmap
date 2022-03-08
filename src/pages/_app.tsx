@@ -3,7 +3,7 @@ import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import React from 'react';
 import AppDrawer from '../components/AppDrawer';
-import FirebaseUserProvider from '../components/FirebaseUserProvider';
+import FirebaseUserProvider from '../components/firebase/FirebaseUserProvider';
 import FirecallProvider from '../components/FirecallProvider';
 import HeaderBar from '../components/HeaderBar';
 import '../styles/globals.css';

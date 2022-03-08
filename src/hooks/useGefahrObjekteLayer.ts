@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { WgsObject } from '../server/gis-objects';
+import { WgsObject } from '../common/gis-objects';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useGefahrObjekteLayer(map: L.Map) {

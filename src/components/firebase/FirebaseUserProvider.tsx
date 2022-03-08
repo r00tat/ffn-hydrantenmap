@@ -1,7 +1,7 @@
 import React, { createContext } from 'react';
 import useFirebaseLoginObserver, {
   LoginStatus,
-} from '../hooks/useFirebaseLoginObserver';
+} from '../../hooks/useFirebaseLoginObserver';
 
 export const FirebaseLoginContext = createContext<LoginStatus>({
   isSignedIn: false,

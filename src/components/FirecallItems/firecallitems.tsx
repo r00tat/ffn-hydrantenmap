@@ -1,14 +1,13 @@
+import L from 'leaflet';
+import { toLatLng } from '../../hooks/constants';
+import { mapPosition } from '../../hooks/useMapPosition';
 import {
   Connection,
   Diary,
-  Firecall,
   FirecallItem,
   Fzg,
   Rohr,
-} from './firestore';
-import L, { Map } from 'leaflet';
-import { defaultPosition, toLatLng } from '../hooks/constants';
-import { mapPosition } from '../hooks/useMapPosition';
+} from '../firebase/firestore';
 export interface FirecallItemInfo<T = FirecallItem> {
   name: string;
   title: (item: T) => string;

@@ -1,7 +1,7 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
 import firebaseAdmin from '../../server/firebase/admin';
-import { GisWgsObject } from '../../server/gis-objects';
+import { GisWgsObject } from '../../common/gis-objects';
 
 export interface Hydrant extends GisWgsObject {
   dimension: string;

@@ -14,8 +14,8 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { db, firestore } from '../components/firebase';
-import { Firecall } from '../components/firestore';
+import { db, firestore } from '../components/firebase/firebase';
+import { Firecall } from '../components/firebase/firestore';
 
 export const defaultFirecall: Firecall = {
   id: 'unkown',

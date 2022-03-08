@@ -1,11 +1,7 @@
 import {
-  EventedProps,
   createLayerComponent,
   LeafletContextInterface,
 } from '@react-leaflet/core';
-import { LayerGroup as LeafletLayerGroup, LayerOptions } from 'leaflet';
-import { ReactNode } from 'react';
-
 import { MarkerClusterGroup } from 'leaflet.markercluster';
 import { LayerGroupProps } from 'react-leaflet';
 

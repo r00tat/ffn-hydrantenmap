@@ -1,7 +1,7 @@
 import L from 'leaflet';
 import { ReactNode } from 'react';
 import { Marker, Popup } from 'react-leaflet';
-import { HydrantenRecord } from '../../server/gis-objects';
+import { HydrantenRecord } from '../../../common/gis-objects';
 
 export interface HydrantenMarkerProps {
   hydrant: HydrantenRecord;

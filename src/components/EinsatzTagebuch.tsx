@@ -8,10 +8,15 @@ import React, { useCallback, useEffect, useState } from 'react';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecallId } from '../hooks/useFirecall';
-import { firestore } from './firebase';
-import FirecallItemCard from './FirecallItemCard';
-import FirecallItemDialog from './FirecallItemDialog';
-import { Diary, filterActiveItems, FirecallItem, Fzg } from './firestore';
+import { firestore } from './firebase/firebase';
+import FirecallItemCard from './FirecallItems/FirecallItemCard';
+import FirecallItemDialog from './FirecallItems/FirecallItemDialog';
+import {
+  Diary,
+  filterActiveItems,
+  FirecallItem,
+  Fzg,
+} from './firebase/firestore';
 
 export default function EinsatzTagebuch() {
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);

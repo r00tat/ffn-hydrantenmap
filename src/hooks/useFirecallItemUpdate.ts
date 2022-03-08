@@ -1,7 +1,7 @@
 import { doc, setDoc } from 'firebase/firestore';
 import { useCallback } from 'react';
-import { firestore } from '../components/firebase';
-import { FirecallItem } from '../components/firestore';
+import { firestore } from '../components/firebase/firebase';
+import { FirecallItem } from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export default function useFirecallItemUpdate(firecallId: string = 'unknown') {

@@ -8,14 +8,14 @@ import SpeedDialIcon from '@mui/material/SpeedDialIcon';
 import { addDoc, collection } from 'firebase/firestore';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import useFirecall from '../hooks/useFirecall';
-import EinsatzDialog from './EinsatzDialog';
-import { firestore } from './firebase';
-import FirecallItemDialog from './FirecallItemDialog';
-import { firecallItemInfo } from './firecallitems';
-import { Firecall, FirecallItem } from './firestore';
-import RohrIcon from './RohrIcon';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useFirecall from '../../hooks/useFirecall';
+import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import { firestore } from '../firebase/firebase';
+import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
+import { firecallItemInfo } from '../FirecallItems/firecallitems';
+import { Firecall, FirecallItem } from '../firebase/firestore';
+import RohrIcon from '../FirecallItems/RohrIcon';
 
 export interface MapActionButtonsOptions {
   map: L.Map;

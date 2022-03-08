@@ -5,39 +5,39 @@ import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
-import { Fzg } from '../components/firestore';
-import useFirecallItemUpdate from '../hooks/useFirecallItemUpdate';
-import ConfirmDialog from './ConfirmDialog';
-import FzgDialog from './FzgDialog';
+import { Rohr } from '../firebase/firestore';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import ConfirmDialog from '../ConfirmDialog';
+import RohrDialog from './RohrDialog';
 
-export default function VehicleCard({
-  vehicle,
+export default function RohrCard({
+  rohr: rohr,
   firecallId,
 }: {
-  vehicle: Fzg;
+  rohr: Rohr;
   firecallId?: string;
 }) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const updateVehicle = useFirecallItemUpdate(firecallId);
+  const updateItem = useFirecallItemUpdate(firecallId);
 
   const updateFn = useCallback(
-    (fzg?: Fzg) => {
+    (fzg?: Rohr) => {
       setDisplayUpdateDialog(false);
       if (fzg) {
-        updateVehicle(fzg);
+        updateItem(fzg);
       }
     },
-    [updateVehicle]
+    [updateItem]
   );
   const deleteFn = useCallback(
     (result: boolean) => {
       setIsConfirmOpen(false);
       if (result) {
-        updateVehicle({ ...vehicle, deleted: true });
+        updateItem({ ...rohr, deleted: true });
       }
     },
-    [updateVehicle, vehicle]
+    [updateItem, rohr]
   );
 
   return (
@@ -45,15 +45,10 @@ export default function VehicleCard({
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
-            {vehicle.name} {vehicle.fw}
+            {rohr.art} Rohr
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
-            1:{vehicle.besatzung || 0} ATS: {vehicle.ats || 0}
-          </Typography>
-          <Typography variant="body2">
-            {vehicle.alarmierung ? 'Alarmierung: ' + vehicle.alarmierung : ''}
-            {vehicle.eintreffen ? ' Eintreffen: ' + vehicle.eintreffen : ''}
-            {vehicle.abruecken ? ' Abrücken: ' + vehicle.abruecken : ''}
+            {rohr.durchfluss ? rohr.durchfluss + ' l/min' : ''}
           </Typography>
         </CardContent>
         <CardActions>
@@ -69,13 +64,11 @@ export default function VehicleCard({
           </Button>
         </CardActions>
       </Card>
-      {displayUpdateDialog && <FzgDialog onClose={updateFn} item={vehicle} />}
+      {displayUpdateDialog && <RohrDialog onClose={updateFn} item={rohr} />}
       {isConfirmOpen && (
         <ConfirmDialog
-          title={`Fahrzeug ${vehicle.name} ${vehicle.fw || ''} löschen`}
-          text={`Fahrzeug ${vehicle.name} ${
-            vehicle.fw || ''
-          } wirklich löschen?`}
+          title={`Rohr ${rohr.art} löschen`}
+          text={`Rohr ${rohr.art} wirklich löschen?`}
           onConfirm={deleteFn}
         />
       )}

@@ -10,13 +10,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
-import { filterActiveItems, Firecall } from '../components/firestore';
+import { filterActiveItems, Firecall } from '../components/firebase/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecall, useFirecallSelect } from '../hooks/useFirecall';
 import ConfirmDialog from './ConfirmDialog';
-import EinsatzDialog from './EinsatzDialog';
-import { firestore } from './firebase';
+import EinsatzDialog from './FirecallItems/EinsatzDialog';
+import { firestore } from './firebase/firebase';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();

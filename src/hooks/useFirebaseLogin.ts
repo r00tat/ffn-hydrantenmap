@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { FirebaseLoginContext } from '../components/FirebaseUserProvider';
+import { FirebaseLoginContext } from '../components/firebase/FirebaseUserProvider';
 import { LoginStatus } from './useFirebaseLoginObserver';
 
 const useFirebaseLogin = (): LoginStatus => {

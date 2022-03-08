@@ -15,12 +15,10 @@ import {
 } from 'geofire-common';
 import { useEffect, useState } from 'react';
 import { useMap, useMapEvent } from 'react-leaflet';
-import { db } from '../components/firebase';
-import { defaultPosition } from '../hooks/constants';
-import { GeohashCluster, HydrantenRecord } from '../server/gis-objects';
-import MarkerClusterLayer from './markers/MarkerClusterLayer';
+import { GeohashCluster, HydrantenRecord } from '../../common/gis-objects';
+import { defaultPosition } from '../../hooks/constants';
+import { db } from '../firebase/firebase';
 import HydratenLayer from './markers/HydrantenLayer';
-import HydrantMarker from './markers/HydrantMarker';
 
 export type Geopoint = [number, number];
 export type Geohash = string;
