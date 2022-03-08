@@ -44,7 +44,7 @@ export default function HydrantMarker({
   return (
     <Marker
       position={[hydrant.lat, hydrant.lng]}
-      title="hydrant.name"
+      title={hydrant.name}
       key={hydrant.name}
       icon={iconFn(hydrant)}
     >

@@ -4,7 +4,7 @@ import useFirestoreDataLayer from './useFirestoreDataLayer';
 
 export default function useRisikoObjekteLayer(map: L.Map) {
   const layer = useFirestoreDataLayer(map, {
-    collectionName: 'risikoobjekt',
+    collectionName: 'risikoobjekt2',
     icon: {
       iconUrl: '/icons/risiko.svg',
       iconSize: [30, 30],

@@ -1,39 +1,19 @@
-import { parse } from 'csv-parse/sync';
 import * as fs from 'fs';
 import { geohashForLocation } from 'geofire-common';
-import firebaseAdmin from './firebase/admin';
 import {
-  HydrantenRecord,
   GeohashCluster,
   GEOHASH_PRECISION,
+  HydrantenRecord,
 } from '../common/gis-objects';
-import { writeCsvFile } from './utils';
 import { gk34ToWgs84 } from '../common/wgs-convert';
+import { readCsvFile } from './csv';
+import { writeBatches } from './firebase/import';
+import { writeCsvFile } from './utils';
 
-const readCsvFile = (inputCsv: string) => {
-  if (!fs.existsSync(inputCsv)) {
-    console.error(`file ${inputCsv} does not exist`);
-    process.exit(2);
-  }
-
-  console.info(`reading csv ${inputCsv}`);
-
-  const csvData = fs.readFileSync(inputCsv, { encoding: 'utf8' });
-
-  const records: HydrantenRecord[] = parse(csvData, {
-    columns: (header: string[]) =>
-      header.map((column: string) =>
-        column.toLowerCase().replace(/[^a-z0-9]+/g, '_')
-      ),
-    skip_empty_lines: true,
-  });
-
-  console.info(`parsed ${records.length} records`);
-
-  return records;
-};
-
-const convertRecord = (record: HydrantenRecord): HydrantenRecord => {
+const convertRecord = <T = HydrantenRecord>(
+  record: T,
+  projection = 'EPSG:31256'
+): T => {
   // convert numbers
   const data: any = {};
   Object.entries(record)
@@ -44,7 +24,7 @@ const convertRecord = (record: HydrantenRecord): HydrantenRecord => {
     });
 
   // convert wgs coordinates
-  const wgs = gk34ToWgs84(data.c_x, data.c_y, 'EPSG:31256');
+  const wgs = gk34ToWgs84(data.c_x, data.c_y, projection);
   return {
     ...data,
     lat: wgs.y,
@@ -54,41 +34,11 @@ const convertRecord = (record: HydrantenRecord): HydrantenRecord => {
 };
 
 const convertEntries = (records: HydrantenRecord[]) => {
-  return records.map(convertRecord);
-};
-
-const writeBatches = async (
-  collectionName: string,
-  records: { [key: string]: any }
-) => {
-  console.info(`writing ${Object.keys(records).length} to ${collectionName}`);
-  const firestore = firebaseAdmin.firestore();
-  const batches = [];
-  let batch = firestore.batch();
-
-  const collection = firestore.collection(collectionName);
-  Object.entries(records).forEach(([hash, record], index) => {
-    batch.set(collection.doc(hash), record);
-    if (index % 400 == 0) {
-      batches.push(batch);
-      batch = firestore.batch();
-    }
-  });
-
-  if (Object.keys(records).length % 400 !== 0) {
-    batches.push(batch);
-  }
-
-  console.info(`${batches.length} batches to commit for ${collectionName}`);
-  for (const b of batches) {
-    console.info(`commiting batch.`);
-    await b.commit();
-  }
-  console.info(`all batches for ${collectionName} written.`);
+  return records.map((r) => convertRecord(r));
 };
 
 const firestoreImport = async (collectionName: string, inputCsv: string) => {
-  const recordsRaw = readCsvFile(inputCsv);
+  const recordsRaw = readCsvFile<HydrantenRecord>(inputCsv);
   const records = convertEntries(recordsRaw);
   console.info(`converted ${records.length} records`);
 
@@ -162,7 +112,7 @@ if (require.main === module) {
 
   (async () => {
     try {
-      firestoreImport(process.argv[2], process.argv[3]);
+      await firestoreImport(process.argv[2], process.argv[3]);
     } catch (err: any) {
       console.error(`Import failed ${err.message}\n${err.stack}`);
     }

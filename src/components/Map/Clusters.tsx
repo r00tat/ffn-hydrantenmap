@@ -9,10 +9,21 @@ import {
 import { geohashQueryBounds } from 'geofire-common';
 import { useEffect, useState } from 'react';
 import { useMap, useMapEvent } from 'react-leaflet';
-import { GeohashCluster, HydrantenRecord } from '../../common/gis-objects';
+import {
+  GefahrObjekt,
+  GeohashCluster,
+  HydrantenRecord,
+  Loeschteich,
+  RisikoObjekt,
+  Saugstelle,
+} from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
+import GefahrObjekteLayer from './markers/GefahrObjekteLayer';
 import HydratenLayer from './markers/HydrantenLayer';
+import LoeschteicheLayer from './markers/LoeschteichLayer';
+import RisikoObjekteLayer from './markers/RisikoObjekteLayer';
+import SaugstellenLayer from './markers/SaugstellenLayer';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
   const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
@@ -46,36 +57,99 @@ export async function queryClusters(center: L.LatLng, radiusInM: number) {
   return clusters;
 }
 
-export function useClusters(center: L.LatLng, radiusInM: number) {
-  const [clusters, setClusters] = useState<GeohashCluster[]>([]);
-  const [hydranten, setHydranten] = useState<HydrantenRecord[]>([]);
+function filterRecords<T>(
+  matchingDocs: GeohashCluster[],
+  clusterField: string,
+  center: L.LatLng,
+  radiusInM: number
+): T[] {
+  return Object.values(
+    matchingDocs
+      .map((doc) => doc[clusterField] || [])
+      .flat()
+      .filter(
+        (hydrant) =>
+          center.distanceTo([hydrant.lat || 0, hydrant.lng || 0]) <= radiusInM
+      )
+      .reduce((p, c) => {
+        p[c.name] = c;
+        return p;
+      }, {} as { [name: string]: T })
+  );
+}
+
+interface ClusterData {
+  clusters: GeohashCluster[];
+  hydranten: HydrantenRecord[];
+  risikoobjekte: RisikoObjekt[];
+  gefahrObjekte: GefahrObjekt[];
+  loeschteiche: Loeschteich[];
+  saugstellen: Saugstelle[];
+}
+
+export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
+  const [clusterData, setClusterData] = useState<ClusterData>({
+    clusters: [],
+    hydranten: [],
+    risikoobjekte: [],
+    gefahrObjekte: [],
+    loeschteiche: [],
+    saugstellen: [],
+  });
 
   useEffect(() => {
     if (radiusInM > 0) {
       (async () => {
         const matchingDocs = await queryClusters(center, radiusInM);
-        setClusters(matchingDocs);
-        const matchingHydranten = Object.values(
-          matchingDocs
-            .map((doc) => doc.hydranten || [])
-            .flat()
-            .filter(
-              (hydrant) =>
-                center.distanceTo([hydrant.lat || 0, hydrant.lng || 0]) <=
-                radiusInM
-            )
-            .reduce((p, c) => {
-              p[c.name] = c;
-              return p;
-            }, {} as { [name: string]: HydrantenRecord })
+        console.info(matchingDocs);
+        const matchingHydranten = filterRecords<HydrantenRecord>(
+          matchingDocs,
+          'hydranten',
+          center,
+          radiusInM
         );
         console.info(`cluster hydranten: ${matchingHydranten.length}`);
-        setHydranten(matchingHydranten);
+
+        const matchingRisiko = filterRecords<RisikoObjekt>(
+          matchingDocs,
+          'risikoobjekt',
+          center,
+          radiusInM
+        );
+        console.info(`cluster risikoobjekt: ${matchingRisiko.length}`);
+
+        const gefahr = filterRecords<GefahrObjekt>(
+          matchingDocs,
+          'gefahrobjekt',
+          center,
+          radiusInM
+        );
+        const loeschteiche = filterRecords<Loeschteich>(
+          matchingDocs,
+          'loeschteich',
+          center,
+          radiusInM
+        );
+        const saugstellen = filterRecords<Saugstelle>(
+          matchingDocs,
+          'saugstelle',
+          center,
+          radiusInM
+        );
+
+        setClusterData({
+          clusters: matchingDocs,
+          hydranten: matchingHydranten,
+          risikoobjekte: matchingRisiko,
+          gefahrObjekte: gefahr,
+          loeschteiche: loeschteiche,
+          saugstellen: saugstellen,
+        });
       })();
     }
   }, [center, radiusInM]);
 
-  return { clusters, hydranten };
+  return clusterData;
 }
 
 export default function Clusters() {
@@ -114,6 +188,15 @@ export default function Clusters() {
     }
   });
 
-  const { hydranten } = useClusters(center, radius * 2);
-  return <HydratenLayer hydranten={hydranten} />;
+  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen } =
+    useClusters(center, radius * 2);
+  return (
+    <>
+      <HydratenLayer hydranten={hydranten} />
+      <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
+      <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
+      <LoeschteicheLayer loeschteiche={loeschteiche} />
+      <SaugstellenLayer saugstellen={saugstellen} />
+    </>
+  );
 }

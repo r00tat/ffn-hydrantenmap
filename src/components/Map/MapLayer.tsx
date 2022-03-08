@@ -23,12 +23,12 @@ interface MapLayerOptions {
 export default function MapLayer({ map }: MapLayerOptions) {
   const { isAuthorized } = useFirebaseLogin();
   const [initialized, setInitialized] = useState(false);
-  const hydrantenLayer = useHydrantenLayer(map);
-  const saugstellenLayer = useSaugstellenLayer(map);
+  // const hydrantenLayer = useHydrantenLayer(map);
+  // const saugstellenLayer = useSaugstellenLayer(map);
   const distanceLayer = useDistanceLayer(map);
-  const loeschteichLayer = useLoeschteicheLayer(map);
-  const risikoLayer = useRisikoObjekteLayer(map);
-  const gefahrLayer = useGefahrObjekteLayer(map);
+  // const loeschteichLayer = useLoeschteicheLayer(map);
+  // const risikoLayer = useRisikoObjekteLayer(map);
+  // const gefahrLayer = useGefahrObjekteLayer(map);
   const firecallLayer = useFirecallLayer(map);
   usePositionMarker(map);
 
@@ -36,22 +36,22 @@ export default function MapLayer({ map }: MapLayerOptions) {
     if (
       !initialized &&
       map &&
-      hydrantenLayer &&
-      saugstellenLayer &&
-      loeschteichLayer &&
-      risikoLayer &&
-      gefahrLayer &&
+      // hydrantenLayer &&
+      // saugstellenLayer &&
+      // loeschteichLayer &&
+      // risikoLayer &&
+      // gefahrLayer &&
       firecallLayer
     ) {
       const overlayLayersForMap = createLayers(overlayLayers);
       distanceLayer.addTo(map);
       const overlayMaps = {
         Einsatz: firecallLayer,
-        Hydranten: hydrantenLayer,
-        Saugstellen: saugstellenLayer,
-        Loeschteiche: loeschteichLayer,
-        'Risiko Objekte': risikoLayer,
-        'Gefährliche Objekte': gefahrLayer,
+        // Hydranten: hydrantenLayer,
+        // Saugstellen: saugstellenLayer,
+        // Loeschteiche: loeschteichLayer,
+        // 'Risiko Objekte': risikoLayer,
+        // 'Gefährliche Objekte': gefahrLayer,
         'Umkreis 50m': distanceLayer,
         ...overlayLayersForMap,
       };
@@ -60,17 +60,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
       L.control.layers(baseMaps, overlayMaps).addTo(map);
       setInitialized(true);
     }
-  }, [
-    initialized,
-    distanceLayer,
-    hydrantenLayer,
-    loeschteichLayer,
-    map,
-    risikoLayer,
-    saugstellenLayer,
-    gefahrLayer,
-    firecallLayer,
-  ]);
+  }, [initialized, distanceLayer, map, firecallLayer]);
 
   return <>{isAuthorized && <MapActionButtons map={map} />}</>;
 }
