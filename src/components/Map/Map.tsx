@@ -17,6 +17,7 @@ function ActionButtons() {
 }
 
 export default function Map() {
+  const { isAuthorized } = useFirebaseLogin();
   return (
     <MapContainer
       center={defaultPosition}
@@ -42,13 +43,15 @@ export default function Map() {
           </LayersControl.BaseLayer>
         ))}
 
-        <LayersControl.Overlay name="Einsatz" checked>
-          <FirecallLayer />
-        </LayersControl.Overlay>
+        {isAuthorized && (
+          <LayersControl.Overlay name="Einsatz" checked>
+            <FirecallLayer />
+          </LayersControl.Overlay>
+        )}
         <LayersControl.Overlay name="Entfernung">
           <DistanceMarker />
         </LayersControl.Overlay>
-        <Clusters />
+        {isAuthorized && <Clusters />}
         <LayersControl.Overlay name="Umkreis" checked>
           <DistanceLayer />
         </LayersControl.Overlay>

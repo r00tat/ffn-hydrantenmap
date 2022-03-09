@@ -18,7 +18,8 @@ function HeaderBar({
   isDrawerOpen: boolean;
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const { isSignedIn, displayName, photoURL } = useFirebaseLogin();
+  const { isSignedIn, displayName, photoURL, isAuthorized } =
+    useFirebaseLogin();
   const firecall = useFirecall();
 
   return (
@@ -37,6 +38,8 @@ function HeaderBar({
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Hydrantenkarte {firecall?.name || ''}
+            {!isSignedIn && 'Anmeldung erforderlich'}
+            {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
           </Typography>
           {!isSignedIn && (
             <Link href="/login" passHref>

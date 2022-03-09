@@ -27,7 +27,7 @@ import SaugstellenLayer from './markers/SaugstellenLayer';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
   const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
-  console.info(`bounds: ${JSON.stringify(bounds)}`);
+  // console.info(`bounds: ${JSON.stringify(bounds)}`);
 
   const snapshots = await Promise.all(
     bounds.map((b) =>
@@ -101,14 +101,14 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
     if (radiusInM > 0) {
       (async () => {
         const matchingDocs = await queryClusters(center, radiusInM);
-        console.info(matchingDocs);
+        // console.info(matchingDocs);
         const matchingHydranten = filterRecords<HydrantenRecord>(
           matchingDocs,
           'hydranten',
           center,
           radiusInM
         );
-        console.info(`cluster hydranten: ${matchingHydranten.length}`);
+        // console.info(`cluster hydranten: ${matchingHydranten.length}`);
 
         const matchingRisiko = filterRecords<RisikoObjekt>(
           matchingDocs,
@@ -116,7 +116,7 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           center,
           radiusInM
         );
-        console.info(`cluster risikoobjekt: ${matchingRisiko.length}`);
+        // console.info(`cluster risikoobjekt: ${matchingRisiko.length}`);
 
         const gefahr = filterRecords<GefahrObjekt>(
           matchingDocs,
