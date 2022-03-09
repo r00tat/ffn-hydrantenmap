@@ -16,7 +16,7 @@ import { defaultPosition } from './constants';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
 
-const updateDestPos = async (
+export const updateDestPos = async (
   firecall: Firecall,
   c: Connection,
   newPos: L.LatLng
@@ -48,41 +48,6 @@ export function useFirecallLayer(map: Map) {
       return L.icon(icon);
     }
   }, []);
-
-  useEffect(() => {
-    if (firecall.lat && firecall.lng) {
-      setAdditionalLayers([
-        L.marker([firecall.lat, firecall.lng], {
-          icon: L.icon({
-            iconUrl: '/icons/fire.svg',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-            popupAnchor: [0, 0],
-          }),
-          draggable: true,
-        })
-          .bindTooltip('Einsatzort')
-          .bindPopup('Einsatzort')
-          .on('dragend', (event: L.LeafletEvent) => {
-            const newPos = (event.target as L.Marker)?.getLatLng();
-            // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
-            if (newPos) {
-              setDoc(
-                doc(firestore, 'call', firecall?.id || 'unkown'),
-                {
-                  lat: newPos.lat,
-                  lng: newPos.lng,
-                },
-                {
-                  merge: true,
-                }
-              );
-            }
-          }),
-      ]);
-    }
-    return () => {};
-  }, [firecall?.id, firecall?.lat, firecall?.lng]);
 
   const additionalMarkers = useCallback(
     (layerGroup: L.LayerGroup, elements: FirecallItem[]) => {
