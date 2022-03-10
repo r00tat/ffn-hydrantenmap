@@ -6,6 +6,7 @@ import AppDrawer from '../components/AppDrawer';
 import FirebaseUserProvider from '../components/firebase/FirebaseUserProvider';
 import FirecallProvider from '../components/FirecallProvider';
 import HeaderBar from '../components/HeaderBar';
+import SingedOutOneTapLogin from '../components/SingedOutOneTapLogin';
 import '../styles/globals.css';
 import styles from '../styles/Home.module.css';
 
@@ -36,6 +37,8 @@ function MyApp({ Component, pageProps }: AppProps) {
             isDrawerOpen={isDrawerOpen}
             setIsDrawerOpen={setIsDrawerOpen}
           />
+
+          <SingedOutOneTapLogin />
 
           <Component {...pageProps} />
         </div>
