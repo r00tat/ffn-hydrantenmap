@@ -5,9 +5,9 @@ import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
-import { FirecallItem } from '../components/firestore';
-import useFirecallItemUpdate from '../hooks/useFirecallItemUpdate';
-import ConfirmDialog from './ConfirmDialog';
+import { FirecallItem } from '../firebase/firestore';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import ConfirmDialog from '../ConfirmDialog';
 import FirecallItemDialog from './FirecallItemDialog';
 import { FirecallItemInfo, firecallItems } from './firecallitems';
 
