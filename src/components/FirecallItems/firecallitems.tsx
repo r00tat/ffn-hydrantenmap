@@ -1,4 +1,5 @@
 import L from 'leaflet';
+import { ReactNode } from 'react';
 import { toLatLng } from '../../hooks/constants';
 import { mapPosition } from '../../hooks/useMapPosition';
 import {
@@ -8,6 +9,13 @@ import {
   Fzg,
   Rohr,
 } from '../firebase/firestore';
+import {
+  asspIcon,
+  connectionIcon,
+  elIcon,
+  fallbackIcon,
+  markerIcon,
+} from './icons';
 export interface FirecallItemInfo<T = FirecallItem> {
   name: string;
   title: (item: T) => string;
@@ -20,7 +28,7 @@ export interface FirecallItemInfo<T = FirecallItem> {
   /**
    * render popup html
    */
-  popupFn: (gisObject: T) => string;
+  popupFn: (gisObject: T) => string | ReactNode;
 
   /**
    * render marker title as text
@@ -62,9 +70,19 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
   dialogText: (item) => `C/B Rohr oder Wasserwerfer`,
   popupFn: (gisObject: FirecallItem) => {
     const rohr = gisObject as Rohr;
-    return `<b>${rohr.name} ${rohr.art} Rohr</b>${
-      rohr.durchfluss ? `<br/>Durchfluss: ${rohr.durchfluss} l/min` : ''
-    }`;
+    return (
+      <>
+        <b>
+          {rohr.name} {rohr.art} Rohr
+        </b>
+        {rohr.durchfluss && (
+          <>
+            <br />
+            Durchfluss: {rohr.durchfluss} l/min
+          </>
+        )}
+      </>
+    );
   },
   titleFn: (v: FirecallItem) =>
     `${v.name} ${(v as Rohr).art || ''}${
@@ -125,13 +143,38 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
     }),
   popupFn: (gisObject: FirecallItem) => {
     const v = gisObject as Fzg;
-    return `<b>${v.name} ${v.fw || ''}</b>${
-      v.besatzung ? '<br />Besatzung: 1:' + v.besatzung : ''
-    } ${v.ats ? `${v.ats} ATS` : ''}
-    ${v.alarmierung ? '<br>Alarmierung: ' + v.alarmierung : ''}
-    ${v.eintreffen ? '<br>Eintreffen: ' + v.eintreffen : ''}
-    ${v.abruecken ? '<br>Abrücken: ' + v.abruecken : ''}
-    `;
+    return (
+      <>
+        <b>
+          {v.name} {v.fw || ''}
+        </b>
+        {v.besatzung && (
+          <>
+            <br />
+            Besatzung: 1: {v.besatzung}
+          </>
+        )}
+        {v.ats && <>{v.ats} ATS</>}
+        {v.alarmierung && (
+          <>
+            <br />
+            Alarmierung: {v.alarmierung}
+          </>
+        )}
+        {v.eintreffen && (
+          <>
+            <br />
+            Eintreffen: {v.eintreffen}
+          </>
+        )}
+        {v.abruecken && (
+          <>
+            <br />
+            Abrücken: {v.abruecken}{' '}
+          </>
+        )}
+      </>
+    );
   },
   titleFn: (v: FirecallItem) => `${v.name} ${(v as Fzg).fw || ''}`,
 };
@@ -161,17 +204,18 @@ export const diaryItemInfo: FirecallItemInfo<Diary> = {
   }),
   dialogText: (item) => `Eintrag ${item.name || ''}`,
   popupFn: (item: FirecallItem) => {
-    return `<b>Eintrag ${item.name}</b><br/>${item.beschreibung || ''}`;
+    return (
+      <>
+        <b>Eintrag {item.name}</b>
+        <br />
+        {item.beschreibung || ''}
+      </>
+    );
   },
   titleFn: (item: FirecallItem) =>
     `Eintrag ${item.name}\n${item.beschreibung || ''}`,
   icon: (gisObject: FirecallItem) => {
-    return L.icon({
-      iconUrl: `/icons/marker.svg`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 30],
-      popupAnchor: [0, -25],
-    });
+    return markerIcon;
   },
 };
 
@@ -197,12 +241,24 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
     destLat: mapPosition.lat,
     destLng: mapPosition.lng + 0.0001,
   }),
-  popupFn: (item: Connection) =>
-    `Leitung ${item.name}: ${Math.round(
-      toLatLng(item.lat, item.lng).distanceTo(
-        toLatLng(item.destLat, item.destLng)
-      )
-    )}m`,
+  popupFn: (item: Connection) => (
+    <>
+      <b>Leitung {item.name}</b>
+      <br />
+      {Math.round(
+        toLatLng(item.lat, item.lng).distanceTo(
+          toLatLng(item.destLat, item.destLng)
+        )
+      )}
+      m, min{' '}
+      {Math.ceil(
+        toLatLng(item.lat, item.lng).distanceTo(
+          toLatLng(item.destLat, item.destLng)
+        ) / 20
+      )}{' '}
+      B Schläuche
+    </>
+  ),
   titleFn: (item: Connection) =>
     `Leitung ${item.name}: ${Math.round(
       toLatLng(item.lat, item.lng).distanceTo(
@@ -210,12 +266,7 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
       )
     )}m`,
   icon: (item: Connection) => {
-    return L.icon({
-      iconUrl: `/icons/circle.svg`,
-      iconSize: [11, 11],
-      iconAnchor: [6, 6],
-      popupAnchor: [0, 0],
-    });
+    return connectionIcon;
   },
 };
 
@@ -240,16 +291,17 @@ export const firecallItems: FirecallItemInfoList = {
     }),
     dialogText: (item) => `Markierung`,
     popupFn: (item: FirecallItem) => {
-      return `<b>${item.name}</b><br/>${item.beschreibung || ''}`;
+      return (
+        <>
+          <b>{item.name}</b>
+          <br />
+          {item.beschreibung || ''}
+        </>
+      );
     },
     titleFn: (item: FirecallItem) => `${item.name}\n${item.beschreibung || ''}`,
     icon: (gisObject: FirecallItem) => {
-      return L.icon({
-        iconUrl: `/icons/marker.svg`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-        popupAnchor: [0, -25],
-      });
+      return markerIcon;
     },
   },
   el: {
@@ -268,19 +320,18 @@ export const firecallItems: FirecallItemInfoList = {
     }),
     dialogText: (item) => `Einsatzleitung`,
     popupFn: (item: FirecallItem) => {
-      return `<b>Einsatzleitung ${item.name}</b><br/>${
-        item.beschreibung || ''
-      }`;
+      return (
+        <>
+          <b>Einsatzleitung {item.name}</b>
+          <br />
+          {item.beschreibung || ''}
+        </>
+      );
     },
     titleFn: (item: FirecallItem) =>
       `ELung ${item.name}\n${item.beschreibung || ''}`,
     icon: (gisObject: FirecallItem) => {
-      return L.icon({
-        iconUrl: `/icons/el.svg`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-        popupAnchor: [0, -25],
-      });
+      return elIcon;
     },
   },
   assp: {
@@ -299,17 +350,18 @@ export const firecallItems: FirecallItemInfoList = {
     }),
     dialogText: (item) => `ASSP`,
     popupFn: (item: FirecallItem) => {
-      return `<b>ASSP ${item.name}</b><br/>${item.beschreibung || ''}`;
+      return (
+        <>
+          <b>ASSP {item.name}</b>
+          <br />
+          {item.beschreibung || ''}
+        </>
+      );
     },
     titleFn: (item: FirecallItem) =>
       `ASSP ${item.name}\n${item.beschreibung || ''}`,
     icon: (gisObject: FirecallItem) => {
-      return L.icon({
-        iconUrl: `/icons/assp.svg`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-        popupAnchor: [0, -25],
-      });
+      return asspIcon;
     },
   },
   diary: diaryItemInfo as unknown as FirecallItemInfo<FirecallItem>,
@@ -330,12 +382,7 @@ export const firecallItems: FirecallItemInfoList = {
     popupFn: (gisObject: FirecallItem) => `${gisObject.name}`,
     titleFn: (gisObject: FirecallItem) => `${gisObject.name}`,
     icon: (gisObject: FirecallItem) => {
-      return L.icon({
-        iconUrl: `/icons/marker.svg`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, 0],
-      });
+      return fallbackIcon;
     },
   },
 };

@@ -6,7 +6,7 @@ export interface HydrantenLayerProps {
   hydranten: HydrantenRecord[];
 }
 
-export default function HydratenLayer({ hydranten }: HydrantenLayerProps) {
+export default function HydrantenLayer({ hydranten }: HydrantenLayerProps) {
   return (
     <MarkerClusterLayer>
       {hydranten.map((hydrant) => (

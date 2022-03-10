@@ -69,7 +69,7 @@ export function useFirecallLayer(map: Map) {
               popupAnchor: [0, 0],
             }),
           })
-            .bindPopup(connectionInfo.popupFn(c))
+            .bindPopup(connectionInfo.popupFn(c) as string)
             .on('dragend', (event: L.DragEndEvent) => {
               const newPos = (event.target as L.Marker)?.getLatLng();
               updateDestPos(firecall, c, newPos);
@@ -79,7 +79,7 @@ export function useFirecallLayer(map: Map) {
           L.polyline([start, dest], {
             color: '#0000ff',
           })
-            .bindPopup(connectionInfo.popupFn(c))
+            .bindPopup(connectionInfo.popupFn(c) as string)
             .addTo(layerGroup);
         });
     },
@@ -93,8 +93,8 @@ export function useFirecallLayer(map: Map) {
     cluster: false,
     pathSegments: [firecall?.id || 'unkown', 'item'],
     filterFn: filterActiveItems,
-    popupFn: (gisObject: FirecallItem) =>
-      firecallItemInfo(gisObject?.type).popupFn(gisObject),
+    popupFn: (gisObject: FirecallItem) => '',
+    // firecallItemInfo(gisObject?.type).popupFn(gisObject),
     titleFn: (gisObject: FirecallItem) =>
       firecallItemInfo(gisObject?.type).titleFn(gisObject),
     markerOptions: {

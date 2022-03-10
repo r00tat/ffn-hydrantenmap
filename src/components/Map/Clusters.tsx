@@ -20,7 +20,7 @@ import {
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
 import GefahrObjekteLayer from './markers/GefahrObjekteLayer';
-import HydratenLayer from './markers/HydrantenLayer';
+import HydrantenLayer from './markers/HydrantenLayer';
 import LoeschteicheLayer from './markers/LoeschteichLayer';
 import RisikoObjekteLayer from './markers/RisikoObjekteLayer';
 import SaugstellenLayer from './markers/SaugstellenLayer';
@@ -193,7 +193,7 @@ export default function Clusters() {
   return (
     <>
       <LayersControl.Overlay name="Hydranten" checked>
-        <HydratenLayer hydranten={hydranten} />
+        <HydrantenLayer hydranten={hydranten} />
       </LayersControl.Overlay>
       <LayersControl.Overlay name="Risiko Objekte" checked>
         <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
