@@ -8,7 +8,7 @@ export default function FirecallItems() {
   const records = useFirebaseCollection<FirecallItem>({
     collectionName: 'call',
     // queryConstraints: options.queryConstraints,
-    pathSegments: [firecall?.id || 'unkown', 'item'],
+    pathSegments: [firecall?.id || 'unknown', 'item'],
     filterFn: filterActiveItems,
   });
 

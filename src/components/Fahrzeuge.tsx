@@ -2,28 +2,28 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
+import useFirebaseCollection from '../hooks/useFirebaseCollection';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import { useFirecallId } from '../hooks/useFirecall';
 import {
   filterActiveItems,
   FirecallItem,
   Fzg,
   Rohr,
 } from './firebase/firestore';
-import useFirebaseCollection from '../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecall } from '../hooks/useFirecall';
 import FirecallItemCard from './FirecallItems/FirecallItemCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
-  const firecall = useFirecall();
-  // console.info(`firecall id ${firecall?.id}`);
+  const firecallId = useFirecallId();
+  // console.info(`firecall id ${firecallId}`);
   const [vehicles, setVehicles] = useState<Fzg[]>([]);
   const [rohre, setRohre] = useState<Rohr[]>([]);
   const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: 'call',
-    pathSegments: [firecall?.id || 'unkown', 'item'],
+    pathSegments: [firecallId, 'item'],
     // queryConstraints: [where('type', '==', 'vehicle')],
     filterFn: filterActiveItems,
   });
@@ -53,7 +53,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {vehicles.map((fzg) => (
-          <FirecallItemCard item={fzg} key={fzg.id} firecallId={firecall?.id} />
+          <FirecallItemCard item={fzg} key={fzg.id} firecallId={firecallId} />
         ))}
       </Grid>
       <Typography variant="h3" gutterBottom>
@@ -61,11 +61,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {rohre.map((rohr) => (
-          <FirecallItemCard
-            item={rohr}
-            key={rohr.id}
-            firecallId={firecall?.id}
-          />
+          <FirecallItemCard item={rohr} key={rohr.id} firecallId={firecallId} />
         ))}
       </Grid>
       <Typography variant="h3" gutterBottom>
@@ -73,11 +69,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {otherItems.map((item) => (
-          <FirecallItemCard
-            item={item}
-            key={item.id}
-            firecallId={firecall?.id}
-          />
+          <FirecallItemCard item={item} key={item.id} firecallId={firecallId} />
         ))}
       </Grid>
     </Box>

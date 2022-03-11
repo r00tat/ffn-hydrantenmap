@@ -13,10 +13,10 @@ import { useCallback, useState } from 'react';
 import { filterActiveItems, Firecall } from '../components/firebase/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecall, useFirecallSelect } from '../hooks/useFirecall';
+import { useFirecallId, useFirecallSelect } from '../hooks/useFirecall';
 import ConfirmDialog from './ConfirmDialog';
-import EinsatzDialog from './FirecallItems/EinsatzDialog';
 import { firestore } from './firebase/firebase';
+import EinsatzDialog from './FirecallItems/EinsatzDialog';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -127,10 +127,10 @@ export default function Einsaetze() {
   const { isAuthorized } = useFirebaseLogin();
   const [einsatzDialog, setEinsatzDialog] = useState(false);
   // const columns = useGridColumns();
-  const firecall = useFirecall();
+  const firecallId = useFirecallId();
   const einsaetze = useFirebaseCollection<Firecall>({
     collectionName: 'call',
-    // pathSegments: [firecall?.id || 'unkown', 'item'],
+    // pathSegments: [firecallId || 'unknown', 'item'],
     queryConstraints: [
       orderBy('date', 'desc'),
       // where('type', '==', 'einsatz'),
@@ -156,7 +156,7 @@ export default function Einsaetze() {
             <EinsatzCard
               einsatz={einsatz}
               key={einsatz.id}
-              firecallId={firecall?.id}
+              firecallId={firecallId}
             />
           ))}
         </Grid>

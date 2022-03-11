@@ -16,9 +16,10 @@ import {
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
 import { Firecall } from '../components/firebase/firestore';
+import useFirebaseLogin from './useFirebaseLogin';
 
 export const defaultFirecall: Firecall = {
-  id: 'unkown',
+  id: 'unknown',
   name: '',
 };
 
@@ -33,24 +34,33 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>();
+  const { isAuthorized } = useFirebaseLogin();
 
   useEffect(() => {
-    const q = query(collection(db, 'call'), orderBy('date', 'desc'), limit(1));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      if (!querySnapshot.empty) {
-        const firstDoc = querySnapshot.docs[0];
-        const fc: Firecall = {
-          id: firstDoc.id,
-          ...firstDoc.data(),
-        } as Firecall;
-        setFirecall(fc);
-        console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`);
-      }
-    });
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    if (isAuthorized) {
+      const q = query(
+        collection(db, 'call'),
+        orderBy('date', 'desc'),
+        limit(1)
+      );
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        if (!querySnapshot.empty) {
+          const firstDoc = querySnapshot.docs[0];
+          const fc: Firecall = {
+            id: firstDoc.id,
+            ...firstDoc.data(),
+          } as Firecall;
+          setFirecall(fc);
+          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`);
+        }
+      });
+      return () => {
+        unsubscribe();
+      };
+    } else {
+      setFirecall(defaultFirecall);
+    }
+  }, [isAuthorized]);
 
   return firecall;
 }
@@ -125,7 +135,7 @@ export const useFirecall = (): Firecall => {
 
 export const useFirecallId = (): string => {
   const { firecall } = useContext(FirecallContext);
-  return firecall?.id || 'unkown';
+  return firecall?.id || 'unknown';
 };
 
 export default useFirecall;

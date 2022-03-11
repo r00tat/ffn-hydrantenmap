@@ -24,7 +24,7 @@ export const updateDestPos = async (
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
   if (c.id && newPos) {
     await setDoc(
-      doc(firestore, 'call', firecall?.id || 'unkown', 'item', c.id),
+      doc(firestore, 'call', firecall?.id || 'unknown', 'item', c.id),
       {
         destLat: newPos.lat,
         destLng: newPos.lng,
@@ -91,7 +91,7 @@ export function useFirecallLayer(map: Map) {
     icon: iconFn,
     autoAdd: true,
     cluster: false,
-    pathSegments: [firecall?.id || 'unkown', 'item'],
+    pathSegments: [firecall?.id || 'unknown', 'item'],
     filterFn: filterActiveItems,
     popupFn: (gisObject: FirecallItem) => '',
     // firecallItemInfo(gisObject?.type).popupFn(gisObject),
@@ -111,7 +111,7 @@ export function useFirecallLayer(map: Map) {
             doc(
               firestore,
               'call',
-              firecall?.id || 'unkown',
+              firecall?.id || 'unknown',
               'item',
               gisObject.id
             ),

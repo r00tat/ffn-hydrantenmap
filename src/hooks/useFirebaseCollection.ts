@@ -28,12 +28,20 @@ export default function useFirebaseCollection<T>(
     )
   );
 
+  // useEffect(() => {
+  //   console.info(
+  //     `firestore query: ${[collectionName, ...pathSegments].join('/')}`
+  //   );
+  // }, [collectionName, pathSegments]);
+
   useEffect(() => {
     if (value) {
-      // console.info(`got firstore collection records`);
       const records = value?.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as unknown as T)
       );
+      // console.info(
+      //   `got firstore collection records ${value.docs.length} filtered: ${records.length}`
+      // );
       setRecords(filterFn ? records.filter(filterFn) : records);
     } else if (error) {
       setRecords([]);

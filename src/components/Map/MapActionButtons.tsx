@@ -7,14 +7,14 @@ import SpeedDialAction from '@mui/material/SpeedDialAction';
 import SpeedDialIcon from '@mui/material/SpeedDialIcon';
 import { addDoc, collection } from 'firebase/firestore';
 import L from 'leaflet';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import useFirecall from '../../hooks/useFirecall';
-import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import { useFirecallId } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
+import { Firecall, FirecallItem } from '../firebase/firestore';
+import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { firecallItemInfo } from '../FirecallItems/firecallitems';
-import { Firecall, FirecallItem } from '../firebase/firestore';
 import RohrIcon from '../FirecallItems/RohrIcon';
 
 export interface MapActionButtonsOptions {
@@ -26,27 +26,24 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
   const [einsatzDialog, setEinsatzDialog] = useState(false);
   const [rohrDialogIsOpen, setRohrDialogIsOpen] = useState(false);
-  const firecall = useFirecall();
+  const firecallId = useFirecallId();
   const [markerDialogIsOpen, setMarkerDialogIsOpen] = useState(false);
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
       if (item) {
-        addDoc(
-          collection(firestore, 'call', firecall?.id || 'unkown', 'item'),
-          {
-            ...firecallItemInfo(item.type).factory(),
-            ...item,
-            lat: map.getCenter().lat,
-            lng: map.getCenter().lng,
-            user: email,
-            created: new Date(),
-          }
-        );
+        addDoc(collection(firestore, 'call', firecallId, 'item'), {
+          ...firecallItemInfo(item.type).factory(),
+          ...item,
+          lat: map.getCenter().lat,
+          lng: map.getCenter().lng,
+          user: email,
+          created: new Date(),
+        });
       }
     },
-    [email, firecall?.id, map]
+    [email, firecallId, map]
   );
 
   const fzgDialogClose = useCallback(
@@ -80,17 +77,14 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
       if (item) {
-        addDoc(
-          collection(firestore, 'call', firecall?.id || 'unkown', 'diary'),
-          {
-            ...item,
-            user: email,
-            created: new Date(),
-          }
-        );
+        addDoc(collection(firestore, 'call', firecallId, 'diary'), {
+          ...item,
+          user: email,
+          created: new Date(),
+        });
       }
     },
-    [email, firecall?.id]
+    [email, firecallId]
   );
 
   return (
