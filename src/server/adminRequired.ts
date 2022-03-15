@@ -24,8 +24,9 @@ const adminRequired = async (
       return false;
     }
     return decodedToken;
-  } catch (err) {
-    console.warn(`invalid token received`);
+  } catch (err: any) {
+    console.warn(`invalid token received: ${err} ${err.stack}`);
+    res.status(403).json({ error: 'invalid token' });
     return false;
   }
 };

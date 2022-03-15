@@ -2,13 +2,10 @@
 import { UserRecord } from 'firebase-admin/lib/auth/user-record';
 import { DocumentData } from 'firebase/firestore';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { UserRecordExtended } from '../../common/users';
 import adminRequired from '../../server/adminRequired';
 import firebaseAdmin from '../../server/firebase/admin';
-
-export interface UserRecordExtended extends UserRecord {
-  authorized?: boolean;
-  test?: string;
-}
+import { ErrorResponse } from './responses';
 
 const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
@@ -19,7 +16,8 @@ const listUsers = async (): Promise<UserRecordExtended[]> => {
   const userDocsMap: { [uid: string]: DocumentData } = {};
   userDocs.forEach((doc) => (userDocsMap[doc.id] = doc.data()));
   users.forEach((u) => {
-    u.authorized = userDocsMap[u.uid]?.authorized || false;
+    // u.authorized = userDocsMap[u.uid]?.authorized || false;
+    Object.assign(u, userDocsMap[u.uid]);
   });
   return users;
 };
@@ -30,11 +28,17 @@ export interface UsersResponse {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<UsersResponse>
+  res: NextApiResponse<UsersResponse | ErrorResponse>
 ) {
-  if (!(await adminRequired(req, res))) {
-    return;
+  try {
+    if (!(await adminRequired(req, res))) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const users = await listUsers();
+    res.status(200).json({ users });
+  } catch (err: any) {
+    console.error(`/api/users failed: ${err}\n${err.stack}`);
+    res.status(500).json({ error: err.message });
   }
-  const users = await listUsers();
-  res.status(200).json({ users });
 }
