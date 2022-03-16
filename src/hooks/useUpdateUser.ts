@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { UserRecordExtended } from '../pages/api/users';
+import { UserRecordExtended } from '../common/users';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export default function useUpdateUser() {

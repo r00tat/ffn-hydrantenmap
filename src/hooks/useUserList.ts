@@ -1,6 +1,5 @@
-import { UserRecord } from 'firebase-admin/lib/auth/user-record';
-import { useEffect, useState, useCallback } from 'react';
-import { UserRecordExtended } from '../pages/api/users';
+import { useCallback, useEffect, useState } from 'react';
+import { UserRecordExtended } from '../common/users';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export default function useUserList(): [
