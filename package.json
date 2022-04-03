@@ -37,7 +37,8 @@
     "react-firebase-hooks": "^4.0.1",
     "react-firebaseui": "^6.0.0",
     "react-google-one-tap-login": "^0.1.1",
-    "react-leaflet": "^3.2.4"
+    "react-leaflet": "^3.2.4",
+    "react-leaflet-fullscreen": "^2.0.2"
   },
   "devDependencies": {
     "@types/leaflet": "^1.7.8",

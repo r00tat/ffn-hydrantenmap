@@ -1,4 +1,6 @@
 import { LayersControl, MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { FullscreenControl } from 'react-leaflet-fullscreen';
+import 'react-leaflet-fullscreen/dist/styles.css';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import Clusters from './Clusters';
@@ -71,6 +73,7 @@ export default function Map() {
           </LayersControl.Overlay>
         ))}
       </LayersControl>
+      <FullscreenControl />
       <UpdateMapPosition />
       <ActionButtons />
     </MapContainer>
