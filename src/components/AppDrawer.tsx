@@ -5,6 +5,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import UserIcon from '@mui/icons-material/Person';
+import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
@@ -89,6 +90,14 @@ export default function AppDrawer({
                       <LocalFireDepartmentIcon />
                     </ListItemIcon>
                     <ListItemText primary="Einsätze" />
+                  </ListItem>
+                </Link>
+                <Link href="/print" passHref>
+                  <ListItem button key="print">
+                    <ListItemIcon>
+                      <PrintIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Drucken" />
                   </ListItem>
                 </Link>
               </>
