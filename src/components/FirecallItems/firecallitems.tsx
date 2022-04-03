@@ -57,7 +57,7 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
   name: 'Rohr',
   title: (item) => `${item.art} Rohr ${item.name}`,
   info: (rohr) => `${rohr.durchfluss ? rohr.durchfluss + ' l/min' : ''}`,
-  body: (rohr) => ``,
+  body: (rohr) => `Position: ${rohr.lat} ${rohr.lng}`,
   fields: {
     art: 'Art (C/B oder Wasserwerfer)',
     name: 'Bezeichnung',
@@ -116,7 +116,8 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
     vehicle.alarmierung ? 'Alarmierung: ' + vehicle.alarmierung : ''
   }
   ${vehicle.eintreffen ? ' Eintreffen: ' + vehicle.eintreffen : ''}
-  ${vehicle.abruecken ? ' Abrücken: ' + vehicle.abruecken : ''}`,
+  ${vehicle.abruecken ? ' Abrücken: ' + vehicle.abruecken : ''}
+  Position ${vehicle.lat} ${vehicle.lng}`,
   fields: {
     name: 'Bezeichnung',
     fw: 'Feuerwehr',
@@ -235,7 +236,7 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
         toLatLng(item.destLat, item.destLng)
       )
     )}m`,
-  body: (item) => '',
+  body: (item) => `${item.lat},${item.lng} => ${item.destLat},${item.destLng}`,
   dialogText: (item) => item.name || '',
   fields: {
     name: 'Bezeichnung',
@@ -286,7 +287,8 @@ export const firecallItems: FirecallItemInfoList = {
     name: 'Marker',
     title: (item) => `${item.name || ''}`,
     info: (item) => ``,
-    body: (item) => `${item.beschreibung || ''}`,
+    body: (item) => `${item.beschreibung || ''}
+    Position: ${item.lat},${item.lng}`,
     fields: {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
@@ -317,7 +319,8 @@ export const firecallItems: FirecallItemInfoList = {
     name: 'Einsatzleitung',
     title: (item) => `Einsatzleitung ${item.name || ''}`,
     info: (item) => ``,
-    body: (item) => `${item.beschreibung || ''}`,
+    body: (item) => `${item.beschreibung || ''}
+    Position: ${item.lat},${item.lng}`,
     fields: {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
@@ -348,7 +351,8 @@ export const firecallItems: FirecallItemInfoList = {
     name: 'Atemschutzsammelplatz',
     title: (item) => `ASSP ${item.name || ''}`,
     info: (item) => ``,
-    body: (item) => `${item.beschreibung || ''}`,
+    body: (item) => `${item.beschreibung || ''}
+    Position: ${item.lat},${item.lng}`,
     fields: {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
@@ -380,7 +384,8 @@ export const firecallItems: FirecallItemInfoList = {
     name: 'Firecallitem',
     title: (item) => `${item.name}`,
     info: (item) => '',
-    body: (item) => '',
+    body: (item) => `${item.beschreibung || ''}
+    Position: ${item.lat},${item.lng}`,
     dialogText: (item) => item.name || '',
     fields: {
       name: 'Bezeichnung',
