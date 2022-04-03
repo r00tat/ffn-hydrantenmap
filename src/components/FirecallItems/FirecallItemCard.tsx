@@ -74,12 +74,12 @@ export default function FirecallItemCard({
         )}
       </Card>
       {displayUpdateDialog && (
-        <FirecallItemDialog onClose={updateFn} item={item} />
+        <FirecallItemDialog onClose={updateFn} item={item.original || item} />
       )}
       {isConfirmOpen && (
         <ConfirmDialog
           title={`${itemInfo.name} ${itemInfo.title(item)} löschen`}
-          text={`Fahrzeug ${itemInfo.name} ${itemInfo.title(
+          text={`Element ${itemInfo.name} ${itemInfo.title(
             item
           )} wirklich löschen?`}
           onConfirm={deleteFn}

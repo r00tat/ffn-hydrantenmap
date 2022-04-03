@@ -1,6 +1,6 @@
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import useFirecall from '../../../hooks/useFirecall';
-import { filterActiveItems, FirecallItem } from '../../firebase/firestore';
+import { filterDisplayableItems, FirecallItem } from '../../firebase/firestore';
 import FirecallItemMarker from './FirecallItemMarker';
 
 export default function FirecallItems() {
@@ -9,7 +9,7 @@ export default function FirecallItems() {
     collectionName: 'call',
     // queryConstraints: options.queryConstraints,
     pathSegments: [firecall?.id || 'unknown', 'item'],
-    filterFn: filterActiveItems,
+    filterFn: filterDisplayableItems,
   });
 
   return (

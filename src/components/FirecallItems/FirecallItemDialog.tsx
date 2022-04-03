@@ -10,13 +10,12 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import { useState } from 'react';
-import { useMap } from 'react-leaflet';
+import { FirecallItem } from '../firebase/firestore';
 import {
   firecallItemInfo,
   FirecallItemInfo,
   firecallItems,
 } from './firecallitems';
-import { FirecallItem } from '../firebase/firestore';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;

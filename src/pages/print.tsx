@@ -26,7 +26,7 @@ export default function PrintPage() {
     <>
       <DynamicMap />
       <DynamicFahrzeuge />
-      <EinsatzTagebuch />
+      <EinsatzTagebuch boxHeight="1200px" />
     </>
   );
 }

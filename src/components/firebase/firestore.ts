@@ -8,6 +8,7 @@ export interface FirecallItem {
   beschreibung?: string;
   datum?: string;
   editable?: boolean;
+  original?: FirecallItem;
 }
 
 export interface Fzg extends FirecallItem {
@@ -40,6 +41,10 @@ export interface Connection extends FirecallItem {
 
 export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
+
+export const filterDisplayableItems = (g: FirecallItem) => {
+  return g.deleted !== true && g.type !== 'diary';
+};
 
 export interface Firecall {
   id?: string;

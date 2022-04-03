@@ -1,5 +1,6 @@
 import L from 'leaflet';
 import { ReactNode } from 'react';
+import { createTimestamp } from '../../common/time-format';
 import { toLatLng } from '../../hooks/constants';
 import { mapPosition } from '../../hooks/useMapPosition';
 import {
@@ -25,6 +26,8 @@ export interface FirecallItemInfo<T = FirecallItem> {
   fields: {
     [fieldName: string]: string;
   };
+
+  dateFields: string[];
   /**
    * render popup html
    */
@@ -60,12 +63,14 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
     name: 'Bezeichnung',
     durchfluss: 'Durchfluss (l/min)',
   },
+  dateFields: ['datum'],
   factory: () =>
     ({
       art: 'C',
       name: '',
       durchfluss: 100,
       type: 'rohr',
+      datum: createTimestamp(),
     } as Rohr),
   dialogText: (item) => `C/B Rohr oder Wasserwerfer`,
   popupFn: (gisObject: FirecallItem) => {
@@ -122,14 +127,15 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
     eintreffen: 'Eintreffen',
     abruecken: 'Abrücken',
   },
+  dateFields: ['alarmierung', 'eintreffen', 'abruecken'],
   factory: () =>
     ({
       name: '',
       beschreibung: '',
       fw: '',
       type: 'vehicle',
-      alarmierung: new Date().toLocaleString('de-DE'),
-      eintreffen: new Date().toLocaleString('de-DE'),
+      alarmierung: createTimestamp(),
+      eintreffen: createTimestamp(),
     } as Fzg),
   dialogText: (item) => `Einsatzfahrzeug`,
   icon: (gisObj: FirecallItem) =>
@@ -193,13 +199,14 @@ export const diaryItemInfo: FirecallItemInfo<Diary> = {
     datum: 'Zeitstempel',
     erledigt: 'erledigt',
   },
+  dateFields: ['datum'],
   factory: () => ({
     type: 'diary',
     name: '',
     beschreibung: '',
     von: '',
     an: '',
-    datum: new Date().toLocaleString('de-DE'),
+    datum: createTimestamp(),
     erledigt: '',
   }),
   dialogText: (item) => `Eintrag ${item.name || ''}`,
@@ -234,6 +241,7 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
     name: 'Bezeichnung',
     beschreibung: 'Beschreibung',
   },
+  dateFields: [],
   factory: () => ({
     type: 'connection',
     name: '',
@@ -283,6 +291,7 @@ export const firecallItems: FirecallItemInfoList = {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
     },
+    dateFields: [],
     factory: () => ({
       type: 'marker',
       name: '',
@@ -313,6 +322,7 @@ export const firecallItems: FirecallItemInfoList = {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
     },
+    dateFields: [],
     factory: () => ({
       type: 'el',
       name: '',
@@ -343,6 +353,7 @@ export const firecallItems: FirecallItemInfoList = {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
     },
+    dateFields: [],
     factory: () => ({
       type: 'assp',
       name: '',
@@ -375,6 +386,7 @@ export const firecallItems: FirecallItemInfoList = {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
     },
+    dateFields: [],
     factory: () => ({
       type: 'fallback',
       name: '',

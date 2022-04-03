@@ -77,7 +77,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
       if (item) {
-        addDoc(collection(firestore, 'call', firecallId, 'diary'), {
+        addDoc(collection(firestore, 'call', firecallId, 'item'), {
           ...item,
           user: email,
           created: new Date(),

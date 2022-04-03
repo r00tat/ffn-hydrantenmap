@@ -1,37 +1,36 @@
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { addDoc, collection, orderBy } from 'firebase/firestore';
-import React, { useCallback, useEffect, useState } from 'react';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { addDoc, collection } from 'firebase/firestore';
+import moment from 'moment';
+import { useCallback, useEffect, useState } from 'react';
+import { dateTimeFormat, parseTimestamp } from '../common/time-format';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import { useFirecallId } from '../hooks/useFirecall';
 import { firestore } from './firebase/firebase';
-import FirecallItemCard from './FirecallItems/FirecallItemCard';
-import FirecallItemDialog from './FirecallItems/FirecallItemDialog';
 import {
   Diary,
   filterActiveItems,
   FirecallItem,
   Fzg,
 } from './firebase/firestore';
+import DeleteFirecallItemDialog from './FirecallItems/DeleteFirecallItemDialog';
+import FirecallItemCard from './FirecallItems/FirecallItemCard';
+import FirecallItemDialog from './FirecallItems/FirecallItemDialog';
+import FirecallItemUpdateDialog from './FirecallItems/FirecallItemUpdateDialog';
 
-export default function EinsatzTagebuch() {
-  const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
-  const { email } = useFirebaseLogin();
+export function useDiaries() {
   const firecallId = useFirecallId();
 
   const [diaries, setDiaries] = useState<Diary[]>([]);
-
-  const diaryEntries = useFirebaseCollection<Diary>({
-    collectionName: 'call',
-    pathSegments: [firecallId, 'diary'],
-    // queryConstraints: [where('type', '==', 'vehicle')],
-    queryConstraints: [orderBy('datum', 'desc')],
-    filterFn: filterActiveItems,
-  });
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: 'call',
@@ -59,6 +58,7 @@ export default function EinsatzTagebuch() {
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
+              original: item,
             } as Diary)
         ),
       cars
@@ -74,6 +74,7 @@ export default function EinsatzTagebuch() {
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
+              original: item,
             } as Diary)
         ),
       cars
@@ -89,30 +90,133 @@ export default function EinsatzTagebuch() {
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
+              original: item,
             } as Diary)
         ),
       firecallItems
-        .filter((item) => item.type !== 'vehicle' && item.datum)
+        .filter(
+          (item) => ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
+        )
         .map(
           (item) =>
             ({
               ...item,
               type: 'diary',
-              editable: false,
+              editable: true,
+              original: item,
             } as Diary)
         ),
+      firecallItems
+        .filter((item) => item.type === 'diary')
+        .map((item) => ({ ...item, original: item, editable: true } as Diary)),
     ].flat();
-    const diaries = [diaryEntries, firecallEntries]
-      .flat()
-      .sort((a, b) => b.datum.localeCompare(a.datum));
+    const diaries = firecallEntries
+      .map((a) => {
+        const m = parseTimestamp(a.datum);
+        if (m) {
+          a.datum = m.format();
+        } else {
+          a.datum = new Date().toISOString();
+        }
+        return a;
+      })
+      .sort((a, b) => b.datum.localeCompare(a.datum))
+      .map((a) => ({
+        ...a,
+        datum: moment(a.datum).format(dateTimeFormat),
+      }));
     setDiaries(diaries);
-  }, [diaryEntries, firecallItems]);
+  }, [firecallItems]);
+  return diaries;
+}
+
+function DiaryButtons({ diary }: { diary: Diary }) {
+  const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
+
+  return (
+    <>
+      {diary.editable && (
+        <>
+          <Tooltip title={`${diary.name} bearbeiten`}>
+            <IconButton
+              onClick={(e) => {
+                e.stopPropagation();
+                setDisplayUpdateDialog(true);
+              }}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={`${diary.name} löschen`}>
+            <IconButton
+              color="warning"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteDialog(true);
+              }}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+          {displayUpdateDialog && (
+            <FirecallItemUpdateDialog
+              item={diary}
+              callback={() => {
+                setDisplayUpdateDialog(false);
+              }}
+            />
+          )}
+
+          {deleteDialog && (
+            <DeleteFirecallItemDialog
+              item={diary.original || diary}
+              callback={() => {
+                setDeleteDialog(false);
+              }}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function useGridColumns() {
+  const [columns, setColumns] = useState<GridColDef[]>();
+  useEffect(() => {
+    setColumns([
+      { field: 'name', headerName: 'Name', minWidth: 150, flex: 0.3 },
+      { field: 'datum', headerName: 'Datum', flex: 0.3 },
+      { field: 'beschreibung', headerName: 'Beschreibung', flex: 0.4 },
+      {
+        field: 'buttons',
+        headerName: 'Aktionen',
+        flex: 0.1,
+        renderCell: (params) => <DiaryButtons diary={params.row as Diary} />,
+      },
+    ]);
+  }, []);
+  return columns;
+}
+
+export interface EinsatzTagebuchOptions {
+  boxHeight?: string;
+}
+export default function EinsatzTagebuch({
+  boxHeight = '600px',
+}: EinsatzTagebuchOptions) {
+  const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
+  const { email } = useFirebaseLogin();
+  const firecallId = useFirecallId();
+  const diaries = useDiaries();
+  const columns = useGridColumns();
 
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
       if (item) {
-        addDoc(collection(firestore, 'call', firecallId, 'diary'), {
+        addDoc(collection(firestore, 'call', firecallId, 'item'), {
           ...item,
           user: email,
           created: new Date(),
@@ -124,20 +228,35 @@ export default function EinsatzTagebuch() {
 
   return (
     <>
-      <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h3" gutterBottom>
-          Einsatz Tagebuch
-        </Typography>
-        <Grid container spacing={2}>
-          {diaries.map((item) => (
-            <FirecallItemCard
-              item={item}
-              key={item.id}
-              firecallId={firecallId}
-            />
-          ))}
-        </Grid>
-      </Box>
+      {false && (
+        <Box sx={{ p: 2, m: 2 }}>
+          <Typography variant="h3" gutterBottom>
+            Einsatz Tagebuch
+          </Typography>
+          <Grid container spacing={2}>
+            {diaries.map((item) => (
+              <FirecallItemCard
+                item={item}
+                key={item.id}
+                firecallId={firecallId}
+              />
+            ))}
+          </Grid>
+        </Box>
+      )}
+
+      {columns && (
+        <Box sx={{ p: 2, m: 2, height: boxHeight }}>
+          <Typography variant="h3" gutterBottom>
+            Einsatz Tagebuch
+          </Typography>
+          <DataGrid
+            rows={diaries}
+            columns={columns}
+            getRowId={(row) => row.id}
+          />
+        </Box>
+      )}
 
       <Fab
         color="primary"
