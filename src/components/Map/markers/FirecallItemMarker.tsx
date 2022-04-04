@@ -1,3 +1,4 @@
+import { IconButton } from '@mui/material';
 import { doc, setDoc } from 'firebase/firestore';
 import L, { IconOptions } from 'leaflet';
 import { useState } from 'react';
@@ -7,9 +8,11 @@ import { useFirecallId } from '../../../hooks/useFirecall';
 import { firestore } from '../../firebase/firebase';
 import { Connection, FirecallItem } from '../../firebase/firestore';
 import { firecallItemInfo } from '../../FirecallItems/firecallitems';
+import EditIcon from '@mui/icons-material/Edit';
 
 export interface FirecallItemMarkerProps {
   record: FirecallItem;
+  selectItem: (item: FirecallItem) => void;
 }
 
 async function updateFircallItemPos(
@@ -43,6 +46,7 @@ async function updateFircallItemPos(
 
 export default function FirecallItemMarker({
   record,
+  selectItem,
 }: FirecallItemMarkerProps) {
   const itemInfo = firecallItemInfo(record.type);
   const icon = (
@@ -77,7 +81,15 @@ export default function FirecallItemMarker({
           },
         }}
       >
-        <Popup>{itemInfo.popupFn(record)}</Popup>
+        <Popup>
+          <IconButton
+            sx={{ marginLeft: 'auto', float: 'right' }}
+            onClick={() => selectItem(record)}
+          >
+            <EditIcon />
+          </IconButton>
+          {itemInfo.popupFn(record)}
+        </Popup>
       </Marker>
       {record.type === 'connection' && (
         <>

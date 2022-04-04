@@ -10,15 +10,20 @@ import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../ConfirmDialog';
 import FirecallItemDialog from './FirecallItemDialog';
 import { FirecallItemInfo, firecallItems } from './firecallitems';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import Container from '@mui/material/Container';
 
 export interface FirecallItemCardOptions {
   item: FirecallItem;
   firecallId?: string;
+  close?: () => void;
 }
 
 export default function FirecallItemCard({
   item,
   firecallId,
+  close,
 }: FirecallItemCardOptions) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -50,8 +55,16 @@ export default function FirecallItemCard({
     <Grid item xs={12} md={6} lg={4}>
       <Card>
         <CardContent>
-          <Typography variant="h5" component="div">
-            {itemInfo.title(item)}
+          <Typography variant="h5" component="div" flex={1}>
+            {itemInfo.title(item)}{' '}
+            {close && (
+              <IconButton
+                onClick={close}
+                sx={{ right: 4, marginLeft: 'auto', float: 'right' }}
+              >
+                <CloseIcon color="warning" />
+              </IconButton>
+            )}
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {itemInfo.info(item)}
