@@ -59,7 +59,14 @@ export default function HydrantMarker({
         dynamisch: {hydrant.dynamischer_druck} bar
         <br />
         statisch: {hydrant.statischer_druck} bar
-        {hydrant.fuellhydrant?.toLowerCase() === 'ja' ? '<br/>Füllhydrant' : ''}
+        {hydrant.fuellhydrant?.toLowerCase() === 'ja' ? (
+          <>
+            <br />
+            Füllhydrant
+          </>
+        ) : (
+          ''
+        )}
       </Popup>
       {children}
     </Marker>
