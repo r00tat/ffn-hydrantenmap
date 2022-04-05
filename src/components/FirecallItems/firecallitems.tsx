@@ -158,10 +158,10 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
         {v.besatzung && (
           <>
             <br />
-            Besatzung: 1: {v.besatzung}
+            Besatzung: 1:{v.besatzung}
           </>
         )}
-        {v.ats && <>{v.ats} ATS</>}
+        {v.ats && <> ({v.ats} ATS)</>}
         {v.alarmierung && (
           <>
             <br />

@@ -1,18 +1,17 @@
+import CloseIcon from '@mui/icons-material/Close';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
-import { FirecallItem } from '../firebase/firestore';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../ConfirmDialog';
+import { FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from './FirecallItemDialog';
 import { FirecallItemInfo, firecallItems } from './firecallitems';
-import IconButton from '@mui/material/IconButton';
-import CloseIcon from '@mui/icons-material/Close';
-import Container from '@mui/material/Container';
 
 export interface FirecallItemCardOptions {
   item: FirecallItem;

@@ -1,25 +1,32 @@
-import Container from '@mui/material/Container';
+import { useCallback } from 'react';
+import { useFirecallId } from '../../../hooks/useFirecall';
+import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import { FirecallItem } from '../../firebase/firestore';
-import FirecallItemCard from '../../FirecallItems/FirecallItemCard';
+import FirecallItemDialog from '../../FirecallItems/FirecallItemDialog';
 
 export interface ItemOverlayOptions {
   item: FirecallItem;
   close: () => void;
 }
+
 export default function ItemOverlay({ item, close }: ItemOverlayOptions) {
+  const firecallId = useFirecallId();
+  const updateItem = useFirecallItemUpdate(firecallId);
+
+  const onClose = useCallback(
+    (item?: FirecallItem) => {
+      if (item) {
+        updateItem(item);
+      }
+      close();
+    },
+    [close, updateItem]
+  );
+
   return (
-    <Container
-      sx={{
-        minWidth: 200,
-        height: '40%',
-        zIndex: 'modal',
-        position: 'absolute',
-        top: '55%',
-        left: '5%',
-        width: '90%',
-      }}
-    >
-      <FirecallItemCard item={item} close={close} />
-    </Container>
+    <>
+      <FirecallItemDialog onClose={onClose} item={item.original || item} />
+      {/* <FirecallItemCard item={item} close={close} /> */}
+    </>
   );
 }

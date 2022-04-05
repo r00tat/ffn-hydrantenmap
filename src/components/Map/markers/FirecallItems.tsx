@@ -15,12 +15,6 @@ export default function FirecallItems() {
     filterFn: filterDisplayableItems,
   });
 
-  useEffect(() => {
-    if (records && records.length > 0) {
-      setFirecallItem(records[0]);
-    }
-  }, [records]);
-
   return (
     <>
       {records.map((record) => (
