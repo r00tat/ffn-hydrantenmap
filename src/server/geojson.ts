@@ -97,7 +97,7 @@ export default async function exportGeoJson(
               }`,
               iconSize: [26, 31],
               iconAnchor: [13, 28],
-              popupAnchor: [0, 0],
+              popupAnchor: [1, -22],
             },
           },
         } as Feature<Point, GeoProperties>)

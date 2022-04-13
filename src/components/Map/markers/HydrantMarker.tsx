@@ -12,19 +12,19 @@ export const hydrantIcon = L.icon({
   iconUrl: '/icons/hydrant.png',
   iconSize: [26, 31],
   iconAnchor: [13, 28],
-  popupAnchor: [0, 0],
+  popupAnchor: [1, -22],
 });
 export const unterflurHydrantIcon = L.icon({
   iconUrl: '/icons/unterflur-hydrant-icon.png',
   iconSize: [26, 31],
   iconAnchor: [13, 28],
-  popupAnchor: [0, 0],
+  popupAnchor: [1, -22],
 });
 export const fuellHydrantIcon = L.icon({
   iconUrl: '/icons/hydrant-icon-fuellen.png',
   iconSize: [26, 31],
   iconAnchor: [13, 28],
-  popupAnchor: [0, 0],
+  popupAnchor: [1, -22],
 });
 
 const iconFn = (gisObj: HydrantenRecord) => {
