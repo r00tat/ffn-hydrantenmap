@@ -159,6 +159,7 @@ export default function Clusters() {
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
     const b = map.getBounds();
+    console.info(`map bounds: ${JSON.stringify(b)}`);
 
     const newRadius = Math.min(
       Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),

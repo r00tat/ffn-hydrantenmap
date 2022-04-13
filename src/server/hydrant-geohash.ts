@@ -16,7 +16,7 @@ const convertRecord = <T = HydrantenRecord>(
 ): T => {
   // convert numbers
   const data: any = {};
-  Object.entries(record)
+  Object.entries(record as unknown as any)
     .filter(([key, value]) => key)
     .forEach(([key, value]: [string, any]) => {
       const n = Number.parseFloat(value);

@@ -34,6 +34,7 @@ export interface HydrantenRecord extends WgsObject {
   druckmessung_datum: string;
   meereshoehe: number;
   geohash: string;
+  leistung?: string;
 }
 
 export interface RisikoObjekt extends WgsObject {
@@ -72,6 +73,10 @@ export interface Saugstelle extends WgsObject {
 export interface GeohashCluster {
   hydranten?: HydrantenRecord[];
   geohash: string;
-  risikoobjekt?: WgsObject[];
+  risikoobjekt?: RisikoObjekt[];
+  gefahrobjekt?: GefahrObjekt[];
+  loeschteich?: Loeschteich[];
+  saugstelle?: Saugstelle[];
+
   [hash: string]: any;
 }

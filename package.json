@@ -19,6 +19,7 @@
     "@mui/icons-material": "^5.2.4",
     "@mui/material": "^5.2.4",
     "@mui/x-data-grid": "^5.2.1",
+    "@types/geojson": "^7946.0.8",
     "csv-parse": "^5.0.3",
     "csv-stringify": "^6.0.4",
     "epsg": "^0.5.0",
