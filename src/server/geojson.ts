@@ -74,11 +74,12 @@ export default async function exportGeoJson(
           },
           properties: {
             title: h.name,
-            description: `${h.ortschaft} ${h.hydranten_nummer} ${h.typ} ${
-              h.leistung ? h.leistung + 'l/min' : ''
-            } Druck: statisch ${h.statischer_druck} bar dynamisch ${
-              h.dynamischer_druck
-            } bar`,
+            description: `<b>${h.typ} ${h.ortschaft} ${
+              h.hydranten_nummer
+            }</b><br />
+             ${h.leistung ? h.leistung + 'l/min<br/>' : ''} statisch ${
+              h.statischer_druck
+            } bar<br/>dynamisch ${h.dynamischer_druck} bar`,
             dynamischerDruck: h.dynamischer_druck,
             statischerDruck: h.statischer_druck,
             leistung: h.leistung,
@@ -115,14 +116,14 @@ export default async function exportGeoJson(
             geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
             properties: {
               title: r.name,
-              description: `${r.ortschaft} ${r.name} ${r.risikogruppe} ${r.adresse}`,
+              description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
               ortschaft: r.ortschaft,
               risikogruppe: r.risikogruppe,
               adresse: r.adresse,
               einsatzplanummer: r.einsatzplanummer,
               typ: 'Risikoobjekt',
               icon: {
-                iconUrl: '/icons/risiko.svg',
+                iconUrl: 'https://hydranten.ffnd.at/icons/risiko.svg',
                 iconSize: [30, 30],
                 iconAnchor: [15, 15],
                 popupAnchor: [0, 0],
@@ -143,7 +144,7 @@ export default async function exportGeoJson(
             geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
             properties: {
               title: r.name,
-              description: `${r.ortschaft} ${r.name} ${r.risikogruppe} ${r.adresse}`,
+              description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
               ortschaft: r.ortschaft,
               risikogruppe: r.risikogruppe,
               adresse: r.adresse,
@@ -171,7 +172,7 @@ export default async function exportGeoJson(
             geometry: { coordinates: [l.lng, l.lat], type: 'Point' },
             properties: {
               title: l.name,
-              description: `${l.ortschaft} ${l.bezeichnung_adresse} ${l.fassungsverm_gen_m3_} ${l.zufluss_l_min_}`,
+              description: `<b>Löschteich ${l.ortschaft} ${l.bezeichnung_adresse}</b><br/>Fassungsvermögen: ${l.fassungsverm_gen_m3_}<br />Zufluss: ${l.zufluss_l_min_}`,
               ortschaft: l.ortschaft,
               adresse: l.bezeichnung_adresse,
               fassungsvermoegen: l.fassungsverm_gen_m3_,
@@ -198,13 +199,15 @@ export default async function exportGeoJson(
             geometry: { coordinates: [s.lng, s.lat], type: 'Point' },
             properties: {
               title: s.name,
-              description: `${s.ortschaft} ${s.bezeichnung_adresse} ${
+              description: `<b>Saugstelle ${s.ortschaft} ${
+                s.bezeichnung_adresse
+              }</b><br /> ${s.wasserentnahme_l_min_} l/min<br />${
                 s.geod_tische_saugh_he_m_
-                  ? s.geod_tische_saugh_he_m_ + 'm Saughöhe'
+                  ? s.geod_tische_saugh_he_m_ + 'm Saughöhe <br />'
                   : ''
-              } ${s.wasserentnahme_l_min_} l/min ${
+              } ${
                 s.saugleitungsl_nge_m_
-                  ? s.saugleitungsl_nge_m_ + 'm Saugleitung'
+                  ? s.saugleitungsl_nge_m_ + 'm Saugleitung <br />'
                   : ''
               }`,
               ortschaft: s.ortschaft,
