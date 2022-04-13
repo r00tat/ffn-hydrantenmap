@@ -76,10 +76,11 @@ export default async function exportGeoJson(
             title: h.name,
             description: `<b>${h.typ} ${h.ortschaft} ${
               h.hydranten_nummer
-            }</b><br />
-             ${h.leistung ? h.leistung + 'l/min<br/>' : ''} statisch ${
-              h.statischer_druck
-            } bar<br/>dynamisch ${h.dynamischer_druck} bar`,
+            }</b><br />${
+              h.leistung ? h.leistung + 'l/min<br/>' : ''
+            } statisch ${h.statischer_druck} bar<br/>dynamisch ${
+              h.dynamischer_druck
+            } bar`,
             dynamischerDruck: h.dynamischer_druck,
             statischerDruck: h.statischer_druck,
             leistung: h.leistung,
