@@ -25,14 +25,16 @@ export default async function handler(
   let radius = asNumber(req.query.radius);
   if (req.query.bbox) {
     try {
-      let bbox: GeoJSON.BBox =
+      let bbox: GeoJSON.BBox = (
         req.query.bbox instanceof Array
-          ? req.query.bbox.map((s) => asNumber(s))
-          : JSON.parse(`${req.query.bbox}`);
+          ? req.query.bbox
+          : `${req.query.bbox}`.replace(/[^0-9,.]+/g, '').split(',')
+      ).map((s) => asNumber(s)) as GeoJSON.BBox;
 
       // console.info(`bbox: ${JSON.stringify(bbox)}`);
       if (
         !(bbox instanceof Array) ||
+        !(bbox.length == 4 || bbox.length == 6) ||
         bbox.filter((s) => Number.isNaN(Number.parseFloat(`${s}`))).length > 0
       ) {
         res
@@ -44,7 +46,8 @@ export default async function handler(
       // bbox is southwest x and y then northeast x and y
       // x = lng
       // y = lat
-      const [swX, swY, neX, neY] = bbox;
+      const [swX, swY, neX, neY] =
+        bbox.length == 6 ? [bbox[0], bbox[1], bbox[3], bbox[4]] : bbox;
       // bbox should be valid
       radius = (distanceBetween([swY, swX], [neY, neX]) * 1000) / 2;
       // quick hack
