@@ -4,7 +4,7 @@ import { GeohashCluster } from '../common/gis-objects';
 import firebaseAdmin from './firebase/admin';
 
 export interface GeoProperties {
-  title: string;
+  id: string;
   description?: string;
   icon?: {
     // see L.IconOptions
@@ -73,7 +73,7 @@ export default async function exportGeoJson(
             type: 'Point',
           },
           properties: {
-            title: h.name,
+            id: h.name,
             description: `<b>${h.typ} ${h.ortschaft} ${
               h.hydranten_nummer
             }</b><br />${
@@ -116,7 +116,7 @@ export default async function exportGeoJson(
             type: 'Feature',
             geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
             properties: {
-              title: r.name,
+              id: r.name,
               description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
               ortschaft: r.ortschaft,
               risikogruppe: r.risikogruppe,
@@ -144,7 +144,7 @@ export default async function exportGeoJson(
             type: 'Feature',
             geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
             properties: {
-              title: r.name,
+              id: r.name,
               description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
               ortschaft: r.ortschaft,
               risikogruppe: r.risikogruppe,
@@ -172,7 +172,7 @@ export default async function exportGeoJson(
             type: 'Feature',
             geometry: { coordinates: [l.lng, l.lat], type: 'Point' },
             properties: {
-              title: l.name,
+              id: l.name,
               description: `<b>Löschteich ${l.ortschaft} ${l.bezeichnung_adresse}</b><br/>Fassungsvermögen: ${l.fassungsverm_gen_m3_}<br />Zufluss: ${l.zufluss_l_min_}`,
               ortschaft: l.ortschaft,
               adresse: l.bezeichnung_adresse,
@@ -199,7 +199,7 @@ export default async function exportGeoJson(
             type: 'Feature',
             geometry: { coordinates: [s.lng, s.lat], type: 'Point' },
             properties: {
-              title: s.name,
+              id: s.name,
               description: `<b>Saugstelle ${s.ortschaft} ${
                 s.bezeichnung_adresse
               }</b><br /> ${s.wasserentnahme_l_min_} l/min<br />${
