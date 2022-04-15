@@ -1,7 +1,10 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import { distanceBetween } from 'geofire-common';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import exportGeoJson, { GeoJsonFeatureColleaction } from '../../server/geojson';
+import exportGeoJson, {
+  BBox4,
+  GeoJsonFeatureColleaction,
+} from '../../server/geojson';
 import tokenRequired from '../../server/tokenRequired';
 
 const asNumber = (value: string | string[]) => {
@@ -23,9 +26,10 @@ export default async function handler(
   }
   let pos = [asNumber(req.query.lat), asNumber(req.query.lng)];
   let radius = asNumber(req.query.radius);
+  let bbox: GeoJSON.BBox | undefined;
   if (req.query.bbox) {
     try {
-      let bbox: GeoJSON.BBox = (
+      bbox = (
         req.query.bbox instanceof Array
           ? req.query.bbox
           : `${req.query.bbox}`.replace(/[^0-9,.]+/g, '').split(',')
@@ -46,19 +50,28 @@ export default async function handler(
       // bbox is southwest x and y then northeast x and y
       // x = lng
       // y = lat
-      const [swX, swY, neX, neY] =
-        bbox.length == 6 ? [bbox[0], bbox[1], bbox[3], bbox[4]] : bbox;
+      bbox = bbox.length == 6 ? [bbox[0], bbox[1], bbox[3], bbox[4]] : bbox;
+      const [swX, swY, neX, neY] = bbox;
       // bbox should be valid
       radius = (distanceBetween([swY, swX], [neY, neX]) * 1000) / 2;
       // quick hack
-      pos = [(neY + swY) / 2, (neX + neX) / 2];
+      pos = [(neY + swY) / 2, (swX + neX) / 2];
     } catch (err) {
       res.status(400).json({ error: `Bounding Box is invalid` });
       console.warn(`invalid bbox supplied: ${err} ${(err as Error).stack}`);
       return;
     }
   }
-  // console.info(`loading geojson for ${pos} with radius ${radius}`);
-  const featureCollection = await exportGeoJson(pos, radius);
+  console.info(
+    `loading geojson for ${pos} with radius ${radius} (bbox: ${JSON.stringify(
+      bbox
+    )})`
+  );
+  const featureCollection = await exportGeoJson(
+    pos,
+    radius,
+    bbox,
+    req.query.debug === 'true'
+  );
   res.status(200).json(featureCollection);
 }

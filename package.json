@@ -19,7 +19,11 @@
     "@mui/icons-material": "^5.2.4",
     "@mui/material": "^5.2.4",
     "@mui/x-data-grid": "^5.2.1",
+    "@turf/bbox-polygon": "^6.5.0",
+    "@turf/boolean-within": "^6.5.0",
+    "@turf/helpers": "^6.5.0",
     "@types/geojson": "^7946.0.8",
+    "circle-to-polygon": "^2.2.0",
     "csv-parse": "^5.0.3",
     "csv-stringify": "^6.0.4",
     "epsg": "^0.5.0",
@@ -43,6 +47,7 @@
     "react-leaflet-fullscreen": "^2.0.2"
   },
   "devDependencies": {
+    "@types/circle-to-polygon": "^2.2.0",
     "@types/leaflet": "^1.7.8",
     "@types/node": "16.11.13",
     "@types/react": "17.0.37",
