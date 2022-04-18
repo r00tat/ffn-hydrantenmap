@@ -12,8 +12,9 @@ import firebaseAdmin from './firebase/admin';
 import circleToPolygon from 'circle-to-polygon';
 import within from '@turf/boolean-within';
 import turfBbox from '@turf/bbox';
-import { lineString, point } from '@turf/helpers';
+import { lineString, point, points } from '@turf/helpers';
 import bboxPolygon from '@turf/bbox-polygon';
+import center from '@turf/center';
 
 export interface GeoProperties {
   id: string;
@@ -34,6 +35,120 @@ export type GeoJsonFeatureColleaction = FeatureCollection<
   Geometry,
   GeoProperties
 >;
+
+export interface GeoPositionObject {
+  lat: number;
+  lng: number;
+}
+
+export interface GeoFilterProperties {
+  bbox?: GeoJSON.BBox;
+  center: GeoJSON.Position;
+  radius: number;
+}
+
+export interface ErrorMessage {
+  error: string;
+}
+
+const asNumber = (value?: string | string[]) => {
+  if (!value) {
+    return 0;
+  }
+  const x = Number.parseFloat(value instanceof Array ? value[0] : value);
+  return Number.isNaN(x) ? 0 : x;
+};
+
+export function createFilterProps(query: {
+  lat?: string | string[];
+  lng?: string | string[];
+  radius?: string | string[];
+  bbox?: string | string[];
+}): GeoFilterProperties {
+  if (query.lat && query.lng) {
+    return {
+      center: [asNumber(query.lng), asNumber(query.lat)],
+      radius: asNumber(query.radius),
+    };
+  }
+
+  if (query.bbox) {
+    try {
+      const bbox: GeoJSON.BBox = (
+        query.bbox instanceof Array
+          ? query.bbox
+          : `${query.bbox}`.replace(/[^0-9,.]+/g, '').split(',')
+      ).map((s) => asNumber(s)) as GeoJSON.BBox;
+
+      // console.info(`bbox: ${JSON.stringify(bbox)}`);
+      if (
+        !(bbox instanceof Array) ||
+        !(bbox.length == 4 || bbox.length == 6) ||
+        bbox.filter((s) => Number.isNaN(Number.parseFloat(`${s}`))).length > 0
+      ) {
+        throw { error: 'Bounding box array items must be of type number' };
+      }
+
+      // bbox is southwest x and y then northeast x and y
+      // x = lng
+      // y = lat
+      const [swX, swY, neX, neY] =
+        bbox.length == 6 ? [bbox[0], bbox[1], bbox[3], bbox[4]] : bbox;
+      // bbox should be valid
+      // radius = (distanceBetween([swY, swX], [neY, neX]) * 1000) / 2;
+      // quick hack
+      // pos = [(neY + swY) / 2, (swX + neX) / 2];
+
+      const centerPos = center(
+        points([
+          [swX, swY],
+          [neX, neY],
+        ])
+      );
+      return {
+        bbox: [swX, swY, neX, neY],
+        radius: (distanceBetween([swY, swX], [neY, neX]) * 1000) / 2,
+        center: centerPos.geometry.coordinates,
+      };
+    } catch (err) {
+      console.warn(`invalid bbox supplied: ${err} ${(err as Error).stack}`);
+      throw { error: `Bounding Box is invalid` };
+    }
+  }
+
+  throw { error: 'bbox or lat,lng and radius need to be specified' };
+}
+
+export function geoFilterFactory(filter?: {
+  bbox?: GeoJSON.BBox;
+  center?: GeoJSON.Position;
+  radius?: number;
+}) {
+  const { bbox, center, radius } = filter || {};
+  let filterFunc: (o: GeoPositionObject) => boolean = (h: GeoPositionObject) =>
+    true;
+  if (bbox) {
+    const bboxFeature = bboxPolygon(
+      turfBbox(
+        lineString([
+          [bbox[0], bbox[1]],
+          [bbox[2], bbox[3]],
+        ])
+      )
+    );
+
+    // console.info(`bbox polygon: ${JSON.stringify(bboxFeature)}`);
+
+    filterFunc = (h: GeoPositionObject) =>
+      within(point([h.lng, h.lat]), bboxFeature);
+  }
+  if (center && radius) {
+    filterFunc = (h: GeoPositionObject) =>
+      distanceBetween([center[1], center[0]], [h.lat, h.lng]) * 1000 < radius;
+  }
+
+  return filterFunc;
+}
 
 export async function getClusters(
   center: Position,
@@ -60,23 +175,9 @@ export async function getClusters(
     .flat()
     .map((doc) => ({ id: doc.id, ...doc.data() } as unknown as GeohashCluster));
 
-  let bboxFeature =
-    bbox &&
-    bboxPolygon(
-      turfBbox(
-        lineString([
-          [bbox[0], bbox[1]],
-          [bbox[2], bbox[3]],
-        ])
-      )
-    );
-
   // console.info(`bbox polygon: ${JSON.stringify(bboxFeature)}`);
 
-  const filterFunc = (h: WgsObject) =>
-    bbox && bboxFeature
-      ? within(point([h.lng, h.lat]), bboxFeature)
-      : distanceBetween(center, [h.lat, h.lng]) * 1000 < radiusInM;
+  const filterFunc = geoFilterFactory({ bbox, center, radius: radiusInM });
 
   return {
     geohash: '',

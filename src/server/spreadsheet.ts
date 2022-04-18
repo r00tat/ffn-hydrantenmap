@@ -1,6 +1,12 @@
+import bboxPolygon from '@turf/bbox-polygon';
+import { lineString } from '@turf/helpers';
 import { Feature, Point } from 'geojson';
 import { google } from 'googleapis';
-import { GeoJsonFeatureColleaction, GeoProperties } from './geojson';
+import {
+  geoFilterFactory,
+  GeoJsonFeatureColleaction,
+  GeoProperties,
+} from './geojson';
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 
@@ -72,9 +78,18 @@ export async function getSpreadsheetObjects<T = SpreadsheetGeoObject>(
 
 export async function exportSpreadsheetGeoJson(
   spreadsheetId: string,
-  range: string
+  range: string,
+  filter?: {
+    bbox?: GeoJSON.BBox;
+    center?: GeoJSON.Position;
+    range?: number;
+  }
 ) {
-  const objekte = await getSpreadsheetObjects(spreadsheetId, range);
+  const filterFn = geoFilterFactory(filter || {});
+
+  const objekte = (await getSpreadsheetObjects(spreadsheetId, range))
+    .filter((o) => o.id)
+    .filter(filterFn);
 
   const collection: GeoJsonFeatureColleaction = {
     type: 'FeatureCollection',
