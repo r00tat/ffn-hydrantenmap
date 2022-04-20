@@ -1,20 +1,14 @@
-import { distanceBetween, geohashQueryBounds } from 'geofire-common';
-import {
-  BBox,
-  Feature,
-  FeatureCollection,
-  Geometry,
-  Point,
-  Position,
-} from 'geojson';
-import { GeohashCluster, WgsObject } from '../common/gis-objects';
-import firebaseAdmin from './firebase/admin';
-import circleToPolygon from 'circle-to-polygon';
-import within from '@turf/boolean-within';
 import turfBbox from '@turf/bbox';
-import { lineString, point, points } from '@turf/helpers';
 import bboxPolygon from '@turf/bbox-polygon';
+import within from '@turf/boolean-within';
 import center from '@turf/center';
+import { lineString, point, points } from '@turf/helpers';
+import circleToPolygon from 'circle-to-polygon';
+import { distanceBetween, geohashQueryBounds } from 'geofire-common';
+import { Feature, FeatureCollection, Geometry, Point } from 'geojson';
+import { GeoPosition, GeoPositionObject } from '../common/geo';
+import { GeohashCluster } from '../common/gis-objects';
+import firebaseAdmin from './firebase/admin';
 
 export interface GeoProperties {
   id: string;
@@ -36,14 +30,9 @@ export type GeoJsonFeatureColleaction = FeatureCollection<
   GeoProperties
 >;
 
-export interface GeoPositionObject {
-  lat: number;
-  lng: number;
-}
-
 export interface GeoFilterProperties {
   bbox?: GeoJSON.BBox;
-  center: GeoJSON.Position;
+  center: GeoPosition;
   radius: number;
 }
 
@@ -66,10 +55,14 @@ export function createFilterProps(query: {
   bbox?: string | string[];
 }): GeoFilterProperties {
   if (query.lat && query.lng) {
-    return {
-      center: [asNumber(query.lng), asNumber(query.lat)],
+    const filterProps: GeoFilterProperties = {
+      center: new GeoPosition(asNumber(query.lat), asNumber(query.lng)),
       radius: asNumber(query.radius),
     };
+    console.info(
+      `filter props(lat,lng,radius): ${JSON.stringify(filterProps)}`
+    );
+    return filterProps;
   }
 
   if (query.bbox) {
@@ -105,11 +98,13 @@ export function createFilterProps(query: {
           [neX, neY],
         ])
       );
-      return {
+      const filterProps: GeoFilterProperties = {
         bbox: [swX, swY, neX, neY],
         radius: (distanceBetween([swY, swX], [neY, neX]) * 1000) / 2,
-        center: centerPos.geometry.coordinates,
+        center: GeoPosition.fromGeoJsonPosition(centerPos.geometry.coordinates),
       };
+      console.info(`filter props(bbox): ${JSON.stringify(filterProps)}`);
+      return filterProps;
     } catch (err) {
       console.warn(`invalid bbox supplied: ${err} ${(err as Error).stack}`);
       throw { error: `Bounding Box is invalid` };
@@ -121,13 +116,14 @@ export function createFilterProps(query: {
 
 export function geoFilterFactory(filter?: {
   bbox?: GeoJSON.BBox;
-  center?: GeoJSON.Position;
+  center?: GeoPosition;
   radius?: number;
 }) {
   const { bbox, center, radius } = filter || {};
   let filterFunc: (o: GeoPositionObject) => boolean = (h: GeoPositionObject) =>
     true;
   if (bbox) {
+    console.info(`filtering for bbox`);
     const bboxFeature = bboxPolygon(
       turfBbox(
         lineString([
@@ -141,21 +137,21 @@ export function geoFilterFactory(filter?: {
 
     filterFunc = (h: GeoPositionObject) =>
       within(point([h.lng, h.lat]), bboxFeature);
-  }
-  if (center && radius) {
+  } else if (center && radius) {
     filterFunc = (h: GeoPositionObject) =>
-      distanceBetween([center[1], center[0]], [h.lat, h.lng]) * 1000 < radius;
+      distanceBetween(center.toLatLngPosition(), [h.lat, h.lng]) * 1000 <
+      radius;
   }
 
   return filterFunc;
 }
 
 export async function getClusters(
-  center: Position,
+  center: GeoPosition,
   radiusInM: number,
   bbox?: GeoJSON.BBox
 ): Promise<GeohashCluster> {
-  const bounds = geohashQueryBounds(center, radiusInM);
+  const bounds = geohashQueryBounds(center.toLatLngPosition(), radiusInM);
   // console.info(`bounds: ${JSON.stringify(bounds)}`);
   const firestore = firebaseAdmin.firestore();
 
@@ -174,6 +170,8 @@ export async function getClusters(
     .map((snap) => snap.docs || [])
     .flat()
     .map((doc) => ({ id: doc.id, ...doc.data() } as unknown as GeohashCluster));
+
+  console.info(`got ${docs.length} geoclusters`);
 
   // console.info(`bbox polygon: ${JSON.stringify(bboxFeature)}`);
 
@@ -207,13 +205,17 @@ export async function getClusters(
 export type BBox4 = [number, number, number, number];
 
 export default async function exportGeoJson(
-  center: Position,
+  center: GeoPosition,
   radiusInM: number,
   bbox?: GeoJSON.BBox,
   debug = false
 ): Promise<GeoJsonFeatureColleaction> {
   const radius = Math.max(200, Math.min(radiusInM, 10000)); // limit to 200 m to 10k radius
-  console.info(`generating geojson for ${center} with radius ${radius}`);
+  console.info(
+    `generating geojson for ${center} with radius ${radius} bbox: ${JSON.stringify(
+      bbox
+    )}`
+  );
   const {
     hydranten = [],
     risikoobjekt = [],
@@ -384,7 +386,7 @@ export default async function exportGeoJson(
     )
   );
   if (debug) {
-    const geoCenter = [center[1], center[0]];
+    const geoCenter = center.toGeoJson();
 
     // add some markers
     const points = (collection as FeatureCollection<Point, GeoProperties>)

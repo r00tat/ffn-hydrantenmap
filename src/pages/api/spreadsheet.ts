@@ -8,11 +8,6 @@ import {
 import { exportSpreadsheetGeoJson } from '../../server/spreadsheet';
 import tokenRequired from '../../server/tokenRequired';
 
-const asNumber = (value: string | string[]) => {
-  const x = Number.parseFloat(value instanceof Array ? value[0] : value);
-  return Number.isNaN(x) ? 0 : x;
-};
-
 export interface ErrorMessage {
   error: string;
 }

@@ -1,9 +1,8 @@
-import bboxPolygon from '@turf/bbox-polygon';
-import { lineString } from '@turf/helpers';
 import { Feature, Point } from 'geojson';
 import { google } from 'googleapis';
 import {
   geoFilterFactory,
+  GeoFilterProperties,
   GeoJsonFeatureColleaction,
   GeoProperties,
 } from './geojson';
@@ -79,11 +78,7 @@ export async function getSpreadsheetObjects<T = SpreadsheetGeoObject>(
 export async function exportSpreadsheetGeoJson(
   spreadsheetId: string,
   range: string,
-  filter?: {
-    bbox?: GeoJSON.BBox;
-    center?: GeoJSON.Position;
-    range?: number;
-  }
+  filter?: GeoFilterProperties
 ) {
   const filterFn = geoFilterFactory(filter || {});
 
