@@ -17,105 +17,113 @@ import React, { useCallback } from 'react';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 export default function AppDrawer({
-  isOpen,
-  setIsOpen,
+    isOpen,
+    setIsOpen,
 }: {
-  isOpen: boolean;
-  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isOpen: boolean;
+    setIsOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const toggleDrawer = useCallback(
-    (event: React.KeyboardEvent | React.MouseEvent) => {
-      if (
-        event.type === 'keydown' &&
-        ((event as React.KeyboardEvent).key === 'Tab' ||
-          (event as React.KeyboardEvent).key === 'Shift')
-      ) {
-        return;
-      }
+    const toggleDrawer = useCallback(
+        (event: React.KeyboardEvent | React.MouseEvent) => {
+            if (
+                event.type === 'keydown' &&
+                ((event as React.KeyboardEvent).key === 'Tab' ||
+                    (event as React.KeyboardEvent).key === 'Shift')
+            ) {
+                return;
+            }
 
-      setIsOpen((prev) => !prev);
-    },
-    [setIsOpen]
-  );
-  const { isSignedIn, email, isAuthorized } = useFirebaseLogin();
+            setIsOpen((prev) => !prev);
+        },
+        [setIsOpen]
+    );
+    const { isSignedIn, email, isAuthorized } = useFirebaseLogin();
 
-  const drawerItems = [
-    { text: 'Karte', icon: <MapIcon />, href: '/' },
-    { text: 'Login', icon: <LoginIcon />, href: '/login' },
-    { text: 'About', icon: <InfoIcon />, href: '/about' },
-  ];
+    const drawerItems = [
+        { text: 'Karte', icon: <MapIcon />, href: '/' },
+        { text: 'Login', icon: <LoginIcon />, href: '/login' },
+        { text: 'About', icon: <InfoIcon />, href: '/about' },
+    ];
 
-  return (
-    <div>
-      <Drawer anchor="left" open={isOpen} onClose={toggleDrawer}>
-        <Box
-          sx={{ width: 250 }}
-          role="presentation"
-          onClick={toggleDrawer}
-          onKeyDown={toggleDrawer}
-        >
-          <List>
-            {drawerItems.map(({ text, icon, href }, index) => (
-              <Link href={href} passHref key={text}>
-                <ListItem button key={text}>
-                  <ListItemIcon>{icon}</ListItemIcon>
-                  <ListItemText primary={text} />
-                </ListItem>
-              </Link>
-            ))}
+    return (
+        <div>
+            <Drawer anchor="left" open={isOpen} onClose={toggleDrawer}>
+                <Box
+                    sx={{ width: 250 }}
+                    role="presentation"
+                    onClick={toggleDrawer}
+                    onKeyDown={toggleDrawer}
+                >
+                    <List>
+                        {drawerItems.map(({ text, icon, href }, index) => (
+                            <Link href={href} passHref key={text}>
+                                <ListItem button key={text}>
+                                    <ListItemIcon>{icon}</ListItemIcon>
+                                    <ListItemText primary={text} />
+                                </ListItem>
+                            </Link>
+                        ))}
 
-            {isAuthorized && (
-              <>
-                <Link href="/fahrzeuge" passHref>
-                  <ListItem button key="fahrzeuge">
-                    <ListItemIcon>
-                      <DirectionsCarIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Fahrzeuge &amp; Co" />
-                  </ListItem>
-                </Link>
+                        {isAuthorized && (
+                            <>
+                                <Link href="/fahrzeuge" passHref>
+                                    <ListItem button key="fahrzeuge">
+                                        <ListItemIcon>
+                                            <DirectionsCarIcon />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Fahrzeuge &amp; Co" />
+                                    </ListItem>
+                                </Link>
 
-                <Link href="/tagebuch" passHref>
-                  <ListItem button key="teagebuch">
-                    <ListItemIcon>
-                      <LibraryBooksIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Einsatz Tagebuch" />
-                  </ListItem>
-                </Link>
+                                <Link href="/tagebuch" passHref>
+                                    <ListItem button key="teagebuch">
+                                        <ListItemIcon>
+                                            <LibraryBooksIcon />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Einsatz Tagebuch" />
+                                    </ListItem>
+                                </Link>
 
-                <Link href="/einsaetze" passHref>
-                  <ListItem button key="einsaetze">
-                    <ListItemIcon>
-                      <LocalFireDepartmentIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Einsätze" />
-                  </ListItem>
-                </Link>
-                <Link href="/print" passHref>
-                  <ListItem button key="print">
-                    <ListItemIcon>
-                      <PrintIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Drucken" />
-                  </ListItem>
-                </Link>
-              </>
-            )}
+                                <Link href="/einsaetze" passHref>
+                                    <ListItem button key="einsaetze">
+                                        <ListItemIcon>
+                                            <LocalFireDepartmentIcon />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Einsätze" />
+                                    </ListItem>
+                                </Link>
+                                <Link href="/print" passHref>
+                                    <ListItem button key="print">
+                                        <ListItemIcon>
+                                            <PrintIcon />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Drucken" />
+                                    </ListItem>
+                                </Link>
+                                <Link href="/tokens" passHref>
+                                    <ListItem button key="tokens">
+                                        <ListItemIcon>
+                                            <PrintIcon />
+                                        </ListItemIcon>
+                                        <ListItemText primary="Tokens" />
+                                    </ListItem>
+                                </Link>
+                            </>
+                        )}
 
-            {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
-              <Link href="/users" passHref>
-                <ListItem button key="users">
-                  <ListItemIcon>
-                    <UserIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Users" />
-                </ListItem>
-              </Link>
-            )}
-          </List>
-        </Box>
-      </Drawer>
-    </div>
-  );
+                        {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
+                            <Link href="/users" passHref>
+                                <ListItem button key="users">
+                                    <ListItemIcon>
+                                        <UserIcon />
+                                    </ListItemIcon>
+                                    <ListItemText primary="Users" />
+                                </ListItem>
+                            </Link>
+                        )}
+                    </List>
+                </Box>
+            </Drawer>
+        </div>
+    );
 }
