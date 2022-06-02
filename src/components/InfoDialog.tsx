@@ -6,23 +6,23 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 
-export interface AlertDialogOptions {
+export interface InfoDialogOptions {
   title: string;
-  text: string;
-  yes?: string;
-  no?: string;
+  text?: string;
+  ok?: string;
   open?: boolean;
   onConfirm: (confirmed: boolean) => void;
+  children?: React.ReactNode;
 }
 
-export default function ConfirmDialog({
+export default function InfoDialog({
   title,
   text,
-  yes = 'ja',
-  no = 'nein',
+  ok = 'OK',
   open: openDefault = true,
   onConfirm,
-}: AlertDialogOptions) {
+  children,
+}: InfoDialogOptions) {
   const [open, setOpen] = React.useState(openDefault);
 
   const handleClose = (result: boolean) => {
@@ -40,14 +40,25 @@ export default function ConfirmDialog({
     >
       <DialogTitle id="alert-dialog-title">{title}</DialogTitle>
       <DialogContent>
-        <DialogContentText id="alert-dialog-description">
-          {text}
-        </DialogContentText>
+        {text && (
+          <DialogContentText id="alert-dialog-description">
+            {text}
+          </DialogContentText>
+        )}
+        {children && (
+          <DialogContentText id="alert-dialog-children">
+            {children}
+          </DialogContentText>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => handleClose(false)}>{no}</Button>
-        <Button onClick={() => handleClose(true)} autoFocus variant="contained">
-          {yes}
+        <Button
+          onClick={() => handleClose(true)}
+          autoFocus
+          color="primary"
+          variant="contained"
+        >
+          {ok}
         </Button>
       </DialogActions>
     </Dialog>

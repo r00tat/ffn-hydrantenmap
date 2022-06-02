@@ -173,3 +173,4 @@ dist
 
 *.har
 /output
+.firebaserc
