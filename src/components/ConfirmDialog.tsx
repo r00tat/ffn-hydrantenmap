@@ -46,7 +46,7 @@ export default function ConfirmDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={() => handleClose(false)}>{no}</Button>
-        <Button onClick={() => handleClose(true)} autoFocus>
+        <Button onClick={() => handleClose(true)} autoFocus variant="contained">
           {yes}
         </Button>
       </DialogActions>

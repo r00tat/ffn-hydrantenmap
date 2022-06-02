@@ -5,38 +5,30 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
 
-export interface AlertDialogOptions {
+export interface InfoDialogOptions {
   title: string;
   text?: string;
   ok?: string;
-  label?: string;
-  cancel?: string;
   open?: boolean;
-  defaultValue?: string;
-  onClose: (value?: string) => void;
+  onConfirm: (confirmed: boolean) => void;
   children?: React.ReactNode;
 }
 
-export default function InputDialog({
+export default function InfoDialog({
   title,
   text,
-  ok = 'Ok',
-  cancel = 'Abbrechen',
-  label = 'Eingabe',
+  ok = 'OK',
   open: openDefault = true,
-  defaultValue = '',
-  onClose,
+  onConfirm,
   children,
-}: AlertDialogOptions) {
+}: InfoDialogOptions) {
   const [open, setOpen] = React.useState(openDefault);
-  const [value, setValue] = React.useState(defaultValue);
 
   const handleClose = (result: boolean) => {
     setOpen(false);
 
-    onClose(result ? value : undefined);
+    onConfirm(result);
   };
 
   return (
@@ -58,29 +50,12 @@ export default function InputDialog({
             {children}
           </DialogContentText>
         )}
-        <TextField
-          autoFocus
-          margin="dense"
-          id="input"
-          label={label}
-          type="text"
-          fullWidth
-          variant="standard"
-          inputProps={{ tabIndex: 1 }}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-            setValue(event.target.value);
-          }}
-          value={value}
-        />
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => handleClose(false)} tabIndex={3}>
-          {cancel}
-        </Button>
         <Button
           onClick={() => handleClose(true)}
+          autoFocus
           color="primary"
-          tabIndex={2}
           variant="contained"
         >
           {ok}

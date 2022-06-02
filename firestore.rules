@@ -41,6 +41,7 @@ service cloud.firestore {
 
     match /tokens/{doc=**} {
         allow read: if authorizedUser() && request.auth.uid == resource.data.owner;
+        allow delete: if authorizedUser() && request.auth.uid == resource.data.owner;
         allow write: if authorizedUser() && request.auth.uid == request.resource.data.owner;
     }
 
