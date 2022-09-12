@@ -10,8 +10,8 @@
     "extract": "npx tsc --outDir dist src/server/harparser && node dist/server/harparser.js",
     "import": "npx tsc --outDir dist src/server/firestore-import && node dist/server/firestore-import.js",
     "exportImport": "npx tsc --outDir dist src/server/export-import && node dist/server/export-import.js",
-    "cluster": "npx tsc --outDir dist src/server/hydrant-geohash && node dist/server/hydrant-geohash.js",
-    "geohashImport": "npx tsc --outDir dist src/server/cluster-import && node dist/server/cluster-import.js"
+    "clusterHydrants": "npx tsc --outDir dist src/server/hydrant-geohash && node dist/server/hydrant-geohash.js",
+    "updateClusters": "npx tsc --outDir dist src/server/cluster-import && node dist/server/cluster-import.js"
   },
   "dependencies": {
     "@emotion/react": "^11.7.1",
