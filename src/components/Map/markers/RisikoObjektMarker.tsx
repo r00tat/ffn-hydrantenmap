@@ -34,6 +34,14 @@ export default function RisikoObjektMarker({
         {r.risikogruppe}
         <br />
         {r.adresse}
+        {r.link && (
+          <>
+            <br />
+            <a href={r.link} target="_blank" rel="noreferrer">
+              Einsatzunterlagen
+            </a>
+          </>
+        )}
       </Popup>
       {children}
     </Marker>

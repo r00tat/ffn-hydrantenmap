@@ -44,6 +44,7 @@ export interface RisikoObjekt extends WgsObject {
   erfassungsdatum: string;
   ortschaft: string;
   risikogruppe: string;
+  link?: string;
 }
 
 export interface GefahrObjekt extends WgsObject {

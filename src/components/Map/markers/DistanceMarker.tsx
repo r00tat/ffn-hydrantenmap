@@ -13,7 +13,7 @@ export default function DistanceMarker() {
 
   useMapEvent('click', (event: L.LeafletMouseEvent) => {
     const pos = event.latlng as L.LatLng;
-    console.info(`clicked on ${pos}`);
+    // console.info(`clicked on ${pos}`);
     setInitialPositionSet(true);
     setDistancePosition(pos);
   });

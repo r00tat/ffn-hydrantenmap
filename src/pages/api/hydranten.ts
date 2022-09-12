@@ -5,10 +5,11 @@ import { GisWgsObject } from '../../common/gis-objects';
 
 export interface Hydrant extends GisWgsObject {
   dimension: string;
-  dynamsicher_druck?: number; // there's a typo in the API "Dynamsicher Druck"
+  dynamischer_druck?: number; // there's a typo in the API "Dynamsicher Druck"
   statischer_druck?: number;
   leistung?: number;
   ortschaft: string;
+  leitungsart?: string;
 }
 
 export interface HydrantenResponse {

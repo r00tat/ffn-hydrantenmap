@@ -1,11 +1,20 @@
-import * as fs from 'fs';
-import firebaseAdmin from './firebase/admin';
 import { parse } from 'csv-parse/sync';
-import { GisWgsObject } from '../common/gis-objects';
+import * as fs from 'fs';
+import { GisWgsObject, WgsObject } from '../common/gis-objects';
+import { writeBatches } from './firebase/import';
 
 interface GisWgsImportObject extends GisWgsObject {
   ortschaft: string;
 }
+
+const convertValuesToNumber = (record: WgsObject) => {
+  const data: any = {};
+  Object.entries(record).forEach(([key, value]: [string, any]) => {
+    const n = Number.parseFloat(value);
+    data[key] = Number.isNaN(n) ? value : n;
+  });
+  return data;
+};
 
 const firestoreImport = async (collectionName: string, inputCsv: string) => {
   if (!fs.existsSync(inputCsv)) {
@@ -29,27 +38,16 @@ const firestoreImport = async (collectionName: string, inputCsv: string) => {
 
   console.info(`parsed ${records.length} records`);
 
-  const firestore = firebaseAdmin.firestore();
-  const batch = firestore.batch();
+  const recordMap = records.map(convertValuesToNumber).reduce((p, c) => {
+    p[
+      c.name.startsWith(c.ortschaft.toLowerCase())
+        ? c.name.toLowerCase()
+        : `${c.ortschaft}${c.name}`.toLowerCase().replace(/[^a-z0-9_-]+/g, '_')
+    ] = c;
+    return p;
+  }, {});
 
-  const collection = firestore.collection(collectionName);
-  records.forEach((record: GisWgsImportObject) => {
-    const data: any = {};
-    Object.entries(record).forEach(([key, value]: [string, any]) => {
-      const n = Number.parseFloat(value);
-      data[key] = Number.isNaN(n) ? value : n;
-    });
-    batch.set(
-      collection.doc(
-        `${record.ortschaft}${record.name}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_-]+/g, '_')
-      ),
-      data
-    );
-  });
-
-  batch.commit();
+  await writeBatches(collectionName, recordMap);
 
   console.info(`${records.length} imported to ${collectionName}`);
 };
