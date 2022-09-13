@@ -284,12 +284,21 @@ export default async function exportGeoJson(
           geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
           properties: {
             id: r.name,
-            description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
+            description: `<b>${r.ortschaft} ${r.name}</b><br />${
+              r.risikogruppe
+            }<br />${r.adresse}${
+              r.link
+                ? `<br/><a href="${encodeURI(
+                    r.link
+                  )}" target="_blank">Einsatzunterlagen</a>`
+                : ''
+            }`,
             ortschaft: r.ortschaft,
             risikogruppe: r.risikogruppe,
             adresse: r.adresse,
             einsatzplanummer: r.einsatzplanummer,
             typ: 'Risikoobjekt',
+            link: r.link,
             icon: {
               iconUrl: 'https://hydranten.ffnd.at/icons/risiko.svg',
               iconSize: [30, 30],
@@ -309,12 +318,21 @@ export default async function exportGeoJson(
           geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
           properties: {
             id: r.name,
-            description: `<b>${r.ortschaft} ${r.name}</b><br />${r.risikogruppe}<br />${r.adresse}`,
+            description: `<b>${r.ortschaft} ${r.name}</b><br />${
+              r.risikogruppe
+            }<br />${r.adresse}${
+              r.link
+                ? `<br/><a href="${encodeURI(
+                    r.link
+                  )}" target="_blank">Einsatzunterlagen</a>`
+                : ''
+            }`,
             ortschaft: r.ortschaft,
             risikogruppe: r.risikogruppe,
             adresse: r.adresse,
             einsatzplanummer: r.einsatzplanummer,
             typ: 'Gefaehrdetes Objekt',
+            link: r.link,
             icon: {
               iconUrl: 'https://hydranten.ffnd.at/icons/gefahr.svg',
               iconSize: [30, 30],

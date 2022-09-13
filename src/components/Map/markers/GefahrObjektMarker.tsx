@@ -32,6 +32,14 @@ export default function GefahrObjektMarker({
         </b>
         <br />
         {o.adresse}
+        {o.link && (
+          <>
+            <br />
+            <a href={o.link} target="_blank" rel="noreferrer">
+              Einsatzunterlagen
+            </a>
+          </>
+        )}
       </Popup>
       {children}
     </Marker>

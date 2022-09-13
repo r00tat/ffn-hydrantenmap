@@ -53,6 +53,7 @@ export interface GefahrObjekt extends WgsObject {
   einsatzplanummer: string;
   erfassungsdatum: string;
   ortschaft: string;
+  link?: string;
 }
 
 export interface Loeschteich extends WgsObject {
