@@ -7,7 +7,7 @@ import { defaultPosition } from '../../../hooks/constants';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import { firestore } from '../../firebase/firebase';
 import { Connection, FirecallItem } from '../../firebase/firestore';
-import { firecallItemInfo } from '../../FirecallItems/firecallitems';
+import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
 import EditIcon from '@mui/icons-material/Edit';
 
 export interface FirecallItemMarkerProps {

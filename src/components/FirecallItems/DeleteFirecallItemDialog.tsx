@@ -3,7 +3,8 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
-import { FirecallItemInfo, firecallItems } from './firecallitems';
+import { firecallItems } from './infos/firecallitems';
+import { FirecallItemInfo } from './infos/types';
 
 export interface DeleteFirecallItemDialogOptions {
   item: FirecallItem;

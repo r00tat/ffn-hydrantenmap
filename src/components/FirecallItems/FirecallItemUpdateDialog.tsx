@@ -4,7 +4,8 @@ import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from './FirecallItemDialog';
-import { FirecallItemInfo, firecallItems } from './firecallitems';
+import { firecallItems } from './infos/firecallitems';
+import { FirecallItemInfo } from './infos/types';
 
 export interface FirecallItemUpdateDialogOptions {
   item: FirecallItem;

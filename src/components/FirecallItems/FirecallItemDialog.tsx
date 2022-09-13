@@ -12,11 +12,8 @@ import TextField from '@mui/material/TextField';
 import { useState } from 'react';
 import ConfirmDialog from '../ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
-import {
-  firecallItemInfo,
-  FirecallItemInfo,
-  firecallItems,
-} from './firecallitems';
+import { firecallItemInfo, firecallItems } from './infos/firecallitems';
+import { FirecallItemInfo } from './infos/types';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;

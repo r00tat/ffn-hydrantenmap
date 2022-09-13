@@ -11,6 +11,10 @@ export interface FirecallItem {
   original?: FirecallItem;
 }
 
+export interface FirecallItemMarker extends FirecallItem {
+  type: 'marker';
+}
+
 export interface Fzg extends FirecallItem {
   fw?: string;
   besatzung?: string;

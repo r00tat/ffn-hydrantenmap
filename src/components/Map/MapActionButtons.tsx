@@ -14,7 +14,7 @@ import { firestore } from '../firebase/firebase';
 import { Firecall, FirecallItem } from '../firebase/firestore';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
-import { firecallItemInfo } from '../FirecallItems/firecallitems';
+import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
 import RohrIcon from '../FirecallItems/RohrIcon';
 
 export interface MapActionButtonsOptions {

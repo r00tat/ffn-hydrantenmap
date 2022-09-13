@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMap } from 'react-leaflet';
 import FirecallItemDialog from './FirecallItemDialog';
-import { vehicleItemInfo } from './firecallitems';
 import { FirecallItem, Fzg } from '../firebase/firestore';
+import { vehicleItemInfo } from './infos/vehicle';
 
 export interface FzgDialogOptions {
   onClose: (fzg?: Fzg) => void;

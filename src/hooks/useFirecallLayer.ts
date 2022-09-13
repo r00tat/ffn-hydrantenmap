@@ -2,10 +2,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import L, { Map } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
 import { firestore } from '../components/firebase/firebase';
-import {
-  connectionInfo,
-  firecallItemInfo,
-} from '../components/FirecallItems/firecallitems';
+import { firecallItemInfo } from '../components/FirecallItems/infos/firecallitems';
 import {
   Connection,
   filterActiveItems,
@@ -15,6 +12,7 @@ import {
 import { defaultPosition } from './constants';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
+import { connectionInfo } from '../components/FirecallItems/infos/connection';
 
 export const updateDestPos = async (
   firecall: Firecall,
