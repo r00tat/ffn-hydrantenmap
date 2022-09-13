@@ -318,9 +318,7 @@ export default async function exportGeoJson(
           geometry: { coordinates: [r.lng, r.lat], type: 'Point' },
           properties: {
             id: r.name,
-            description: `<b>${r.ortschaft} ${r.name}</b><br />${
-              r.risikogruppe
-            }<br />${r.adresse}${
+            description: `<b>${r.ortschaft} ${r.name}</b><br />${r.adresse}${
               r.link
                 ? `<br/><a href="${encodeURI(
                     r.link
@@ -328,7 +326,6 @@ export default async function exportGeoJson(
                 : ''
             }`,
             ortschaft: r.ortschaft,
-            risikogruppe: r.risikogruppe,
             adresse: r.adresse,
             einsatzplanummer: r.einsatzplanummer,
             typ: 'Gefaehrdetes Objekt',
