@@ -2,6 +2,7 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import RoomIcon from '@mui/icons-material/Room';
+import RouteIcon from '@mui/icons-material/Route';
 import SpeedDial from '@mui/material/SpeedDial';
 import SpeedDialAction from '@mui/material/SpeedDialAction';
 import SpeedDialIcon from '@mui/material/SpeedDialIcon';
@@ -11,11 +12,12 @@ import { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
-import { Firecall, FirecallItem } from '../firebase/firestore';
+import { Connection, Firecall, FirecallItem } from '../firebase/firestore';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
 import RohrIcon from '../FirecallItems/RohrIcon';
+import { useLeitungen } from './Leitungen/context';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -29,6 +31,8 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const firecallId = useFirecallId();
   const [markerDialogIsOpen, setMarkerDialogIsOpen] = useState(false);
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
+  const [connectionDialogIsOpen, setConnectionDialogIsOpen] = useState(false);
+  const leitungen = useLeitungen();
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
@@ -87,6 +91,16 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [email, firecallId]
   );
 
+  const connectionDialogClose = useCallback(
+    (item?: FirecallItem) => {
+      setConnectionDialogIsOpen(false);
+      leitungen.setIsDrawing(true);
+      leitungen.setFirecallItem(item as Connection);
+      console.info(`connection dialog close ${item?.name}`);
+    },
+    [leitungen]
+  );
+
   return (
     <>
       <SpeedDial
@@ -103,6 +117,11 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           icon={<RohrIcon />}
           tooltipTitle="Rohr"
           onClick={() => setRohrDialogIsOpen(true)}
+        />
+        <SpeedDialAction
+          icon={<RouteIcon />}
+          tooltipTitle="Leitung"
+          onClick={() => setConnectionDialogIsOpen(true)}
         />
         <SpeedDialAction
           icon={<RoomIcon />}
@@ -144,6 +163,14 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       )}
       {rohrDialogIsOpen && (
         <FirecallItemDialog onClose={rohrDialogClose} type="rohr" />
+      )}
+
+      {connectionDialogIsOpen && (
+        <FirecallItemDialog
+          onClose={connectionDialogClose}
+          type="connection"
+          allowTypeChange={false}
+        />
       )}
     </>
   );

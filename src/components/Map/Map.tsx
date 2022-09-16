@@ -4,6 +4,8 @@ import 'react-leaflet-fullscreen/dist/styles.css';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import Clusters from './Clusters';
+import { LeitungsProvider } from './Leitungen/context';
+import Leitungen from './Leitungen/Draw';
 import MapActionButtons from './MapActionButtons';
 import { DistanceLayer } from './markers/DistanceLayer';
 import DistanceMarker from './markers/DistanceMarker';
@@ -75,7 +77,10 @@ export default function Map() {
       </LayersControl>
       <FullscreenControl />
       <UpdateMapPosition />
-      <ActionButtons />
+      <LeitungsProvider>
+        <ActionButtons />
+        <Leitungen />
+      </LeitungsProvider>
     </MapContainer>
   );
 }

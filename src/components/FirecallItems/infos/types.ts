@@ -6,7 +6,7 @@ export interface FirecallItemInfo<T = FirecallItem> {
   title: (item: T) => string;
   info: (item: T) => string;
   body: (item: T) => string;
-  dialogText: (item: T) => string;
+  dialogText: (item: T) => string | ReactNode;
   fields: {
     [fieldName: string]: string;
   };

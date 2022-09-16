@@ -41,6 +41,10 @@ export interface Diary extends FirecallItem {
 export interface Connection extends FirecallItem {
   destLat: number;
   destLng: number;
+  /** stringified LatLngPosition[] */
+  positions?: string;
+  distance?: number;
+  color?: string;
 }
 
 export const filterActiveItems = (g: FirecallItem | Firecall) =>

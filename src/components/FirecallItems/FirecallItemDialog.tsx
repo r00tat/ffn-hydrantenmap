@@ -106,14 +106,16 @@ export default function FirecallItemDialog({
           >
             Abbrechen
           </Button>
-          <Button
-            onClick={() => {
-              setConfirmDelete(true);
-            }}
-            color="error"
-          >
-            Löschen
-          </Button>
+          {item.id && (
+            <Button
+              onClick={() => {
+                setConfirmDelete(true);
+              }}
+              color="error"
+            >
+              Löschen
+            </Button>
+          )}
           <Button
             color="primary"
             onClick={() => {
