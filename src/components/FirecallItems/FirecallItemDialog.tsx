@@ -9,8 +9,10 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
-import { useState } from 'react';
+import moment from 'moment';
+import React, { useState } from 'react';
 import ConfirmDialog from '../ConfirmDialog';
+import MyDateTimePicker from '../DateTimePicker';
 import { FirecallItem } from '../firebase/firestore';
 import { firecallItemInfo, firecallItems } from './infos/firecallitems';
 import { FirecallItemInfo } from './infos/types';
@@ -36,19 +38,20 @@ export default function FirecallItemDialog({
 
   const itemInfo: FirecallItemInfo = firecallItemInfo(item.type);
 
+  const setItemField = (field: string, value: any) => {
+    setFirecallItem((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      setFirecallItem((prev) => ({
-        ...prev,
-        [field]: event.target.value,
-      }));
+      setItemField(field, event.target.value);
     };
 
   const handleChange = (event: SelectChangeEvent) => {
-    setFirecallItem((prev) => ({
-      ...prev,
-      ['type']: event.target.value as string,
-    }));
+    setItemField('type', event.target.value);
   };
 
   return (
@@ -84,17 +87,34 @@ export default function FirecallItemDialog({
             </FormControl>
           )}
           {Object.entries(itemInfo.fields).map(([key, label]) => (
-            <TextField
-              margin="dense"
-              id={key}
-              key={key}
-              label={label}
-              type="text"
-              fullWidth
-              variant="standard"
-              onChange={onChange(key)}
-              value={((item as any)[key] as string) || ''}
-            />
+            <React.Fragment key={key}>
+              {itemInfo.dateFields.includes(key) && (
+                <MyDateTimePicker
+                  label={label}
+                  value={
+                    (((item as any)[key] as string) &&
+                      moment((item as any)[key] as string)) ||
+                    null
+                  }
+                  setValue={(newValue) => {
+                    setItemField(key, newValue?.toISOString());
+                  }}
+                />
+              )}
+              {!itemInfo.dateFields.includes(key) && (
+                <TextField
+                  margin="dense"
+                  id={key}
+                  key={key}
+                  label={label}
+                  type="text"
+                  fullWidth
+                  variant="standard"
+                  onChange={onChange(key)}
+                  value={((item as any)[key] as string) || ''}
+                />
+              )}
+            </React.Fragment>
           ))}
         </DialogContent>
         <DialogActions>

@@ -12,6 +12,8 @@ import { useFirecallSelect } from '../../hooks/useFirecall';
 import { defaultPosition } from '../../hooks/constants';
 import { firestore } from '../firebase/firebase';
 import { Firecall } from '../firebase/firestore';
+import MyDateTimePicker from '../DateTimePicker';
+import moment from 'moment';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -29,6 +31,7 @@ export default function EinsatzDialog({
     einsatzDefault || {
       name: '',
       date: new Date().toLocaleString('de-DE'),
+      deleted: false,
     }
   );
   const { email } = useFirebaseLogin();
@@ -98,16 +101,13 @@ export default function EinsatzDialog({
           onChange={onChange('fw')}
           value={einsatz.fw}
         />
-        <TextField
-          margin="dense"
-          id="date"
-          label="Datum YYYY-MM-DD"
-          type="text"
-          fullWidth
-          variant="standard"
-          onChange={onChange('date')}
-          value={einsatz.date}
-        />
+        <MyDateTimePicker
+          label="Einsatzdatum"
+          value={moment(einsatz.date)}
+          setValue={(newValue) => {
+            setEinsatz({ ...einsatz, date: newValue?.toISOString() });
+          }}
+        ></MyDateTimePicker>
         <TextField
           margin="dense"
           id="description"

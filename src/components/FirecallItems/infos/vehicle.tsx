@@ -1,5 +1,6 @@
 import L from 'leaflet';
-import { createTimestamp } from '../../../common/time-format';
+import moment from 'moment';
+import { formatTimestamp } from '../../../common/time-format';
 import { FirecallItem, Fzg } from '../../firebase/firestore';
 import { FirecallItemInfo } from './types';
 
@@ -30,8 +31,8 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
       beschreibung: '',
       fw: '',
       type: 'vehicle',
-      alarmierung: createTimestamp(),
-      eintreffen: createTimestamp(),
+      alarmierung: moment().toISOString(),
+      eintreffen: moment().toISOString(),
     } as Fzg),
   dialogText: (item) => `Einsatzfahrzeug`,
   icon: (gisObj: FirecallItem) =>
@@ -60,19 +61,19 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
         {v.alarmierung && (
           <>
             <br />
-            Alarmierung: {v.alarmierung}
+            Alarmierung: {formatTimestamp(v.alarmierung)}
           </>
         )}
         {v.eintreffen && (
           <>
             <br />
-            Eintreffen: {v.eintreffen}
+            Eintreffen: {formatTimestamp(v.eintreffen)}
           </>
         )}
         {v.abruecken && (
           <>
             <br />
-            Abrücken: {v.abruecken}{' '}
+            Abrücken: {formatTimestamp(v.abruecken)}
           </>
         )}
       </>

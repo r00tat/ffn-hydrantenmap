@@ -1,25 +1,7 @@
-import L from 'leaflet';
-import { ReactNode } from 'react';
-import { createTimestamp } from '../../../common/time-format';
-import { toLatLng } from '../../../hooks/constants';
-import { mapPosition } from '../../../hooks/useMapPosition';
-import {
-  Connection,
-  Diary,
-  FirecallItem,
-  Fzg,
-  Rohr,
-} from '../../firebase/firestore';
-import {
-  asspIcon,
-  connectionIcon,
-  elIcon,
-  fallbackIcon,
-  markerIcon,
-} from '../icons';
-import { rohrItemInfo } from './rohr';
-import { FirecallItemInfo, FirecallItemInfoList } from './types';
-import { vehicleItemInfo } from './vehicle';
+import moment from 'moment';
+import { Diary, FirecallItem } from '../../firebase/firestore';
+import { markerIcon } from '../icons';
+import { FirecallItemInfo } from './types';
 
 export const diaryItemInfo: FirecallItemInfo<Diary> = {
   name: 'Einsatztagebuch',
@@ -42,7 +24,7 @@ export const diaryItemInfo: FirecallItemInfo<Diary> = {
     beschreibung: '',
     von: '',
     an: '',
-    datum: createTimestamp(),
+    datum: moment().toISOString(),
     erledigt: '',
   }),
   dialogText: (item) => `Eintrag ${item.name || ''}`,

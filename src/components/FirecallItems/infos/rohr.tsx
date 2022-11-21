@@ -1,6 +1,5 @@
 import L from 'leaflet';
-import { ReactNode } from 'react';
-import { createTimestamp } from '../../../common/time-format';
+import moment from 'moment';
 import { FirecallItem, Rohr } from '../../firebase/firestore';
 import { FirecallItemInfo } from './types';
 export const rohrItemInfo: FirecallItemInfo<Rohr> = {
@@ -20,7 +19,7 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
       name: '',
       durchfluss: 100,
       type: 'rohr',
-      datum: createTimestamp(),
+      datum: moment().toISOString(),
     } as Rohr),
   dialogText: (item) => `C/B Rohr oder Wasserwerfer`,
   popupFn: (gisObject: FirecallItem) => {

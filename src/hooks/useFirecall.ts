@@ -5,6 +5,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
 } from 'firebase/firestore';
 import {
   createContext,
@@ -40,6 +41,7 @@ export function useLastFirecall() {
     if (isAuthorized) {
       const q = query(
         collection(db, 'call'),
+        where('deleted', '==', false),
         orderBy('date', 'desc'),
         limit(1)
       );

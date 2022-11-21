@@ -10,6 +10,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
+import { formatTimestamp } from '../common/time-format';
 import { filterActiveItems, Firecall } from '../components/firebase/firestore';
 import useFirebaseCollection from '../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
@@ -76,7 +77,7 @@ function EinsatzCard({
             {firecallId === einsatz.id ? '(aktiv)' : ''}
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
-            {einsatz.date}
+            {formatTimestamp(einsatz.date)}
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
         </CardContent>
