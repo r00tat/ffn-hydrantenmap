@@ -2,7 +2,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import { IconButton } from '@mui/material';
 import { doc, setDoc } from 'firebase/firestore';
 import L, { IconOptions } from 'leaflet';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { useFirecallId } from '../../../hooks/useFirecall';
@@ -22,7 +22,7 @@ async function updateFircallItemPos(
   fcItem: FirecallItem
 ) {
   const newPos = (event.target as L.Marker)?.getLatLng();
-  // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
+  // console.info(`drag end on ${JSON.stringify(fcItem)}: ${newPos}`);
   if (fcItem.id && newPos) {
     const updatePos = {
       lat: newPos.lat,
@@ -46,10 +46,7 @@ export default function FirecallItemMarker({
   return record.type === 'connection' ? (
     <ConnectionMarker record={record as Connection} selectItem={selectItem} />
   ) : (
-    <FirecallItemMarkerDefault
-      record={record as Connection}
-      selectItem={selectItem}
-    />
+    <FirecallItemMarkerDefault record={record} selectItem={selectItem} />
   );
 }
 
@@ -70,6 +67,12 @@ export function FirecallItemMarkerDefault({
       record.lng || defaultPosition.lng
     )
   );
+
+  useEffect(() => {
+    if (record.lat && record.lng) {
+      setStartPos(L.latLng(record.lat, record.lng));
+    }
+  }, [record.lat, record.lng]);
 
   return (
     <>
