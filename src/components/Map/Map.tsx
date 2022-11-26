@@ -11,6 +11,7 @@ import { DistanceLayer } from './markers/DistanceLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import FirecallLayer from './markers/FirecallLayer';
 import PositionMarker from './markers/PositionMarker';
+import PositionAction from './PositionAction';
 import { availableLayers, overlayLayers } from './tiles';
 import UpdateMapPosition from './UpdateMapPosition';
 
@@ -81,6 +82,7 @@ export default function Map() {
         <ActionButtons />
         <Leitungen />
       </LeitungsProvider>
+      <PositionAction />
     </MapContainer>
   );
 }

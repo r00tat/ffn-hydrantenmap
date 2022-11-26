@@ -11,7 +11,7 @@ export default function PositionMarker() {
     if (!initialPositionSet && gotPosition) {
       console.info(`initial position, zooming to ${position}`);
       setInitialPositionSet(true);
-      map.setView(position);
+      // map.setView(position);
     }
   }, [initialPositionSet, gotPosition, map, position]);
 
