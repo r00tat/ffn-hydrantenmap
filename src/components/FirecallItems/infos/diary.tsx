@@ -17,7 +17,7 @@ export const diaryItemInfo: FirecallItemInfo<Diary> = {
     datum: 'Zeitstempel',
     erledigt: 'erledigt',
   },
-  dateFields: ['datum'],
+  dateFields: ['datum', 'erledigt'],
   factory: () => ({
     type: 'diary',
     name: '',

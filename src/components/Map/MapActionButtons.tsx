@@ -1,22 +1,15 @@
-import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
-import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import RoomIcon from '@mui/icons-material/Room';
-import RouteIcon from '@mui/icons-material/Route';
-import SpeedDial from '@mui/material/SpeedDial';
-import SpeedDialAction from '@mui/material/SpeedDialAction';
-import SpeedDialIcon from '@mui/material/SpeedDialIcon';
+import AddIcon from '@mui/icons-material/Add';
+import Box from '@mui/material/Box';
+import Fab from '@mui/material/Fab';
 import { addDoc, collection } from 'firebase/firestore';
 import L from 'leaflet';
 import { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
-import { Connection, Firecall, FirecallItem } from '../firebase/firestore';
-import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import { Connection, FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
-import RohrIcon from '../FirecallItems/RohrIcon';
 import { useLeitungen } from './Leitungen/context';
 
 export interface MapActionButtonsOptions {
@@ -26,12 +19,7 @@ export interface MapActionButtonsOptions {
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const { email } = useFirebaseLogin();
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
-  const [einsatzDialog, setEinsatzDialog] = useState(false);
-  const [rohrDialogIsOpen, setRohrDialogIsOpen] = useState(false);
   const firecallId = useFirecallId();
-  const [markerDialogIsOpen, setMarkerDialogIsOpen] = useState(false);
-  const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
-  const [connectionDialogIsOpen, setConnectionDialogIsOpen] = useState(false);
   const leitungen = useLeitungen();
 
   const saveItem = useCallback(
@@ -53,124 +41,41 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setFzgDialogIsOpen(false);
-      saveItem(fzg);
-    },
-    [saveItem]
-  );
-
-  const einsatzDialogClose = useCallback((einsatz?: Firecall) => {
-    setEinsatzDialog(false);
-  }, []);
-
-  const rohrDialogClose = useCallback(
-    (rohr?: FirecallItem) => {
-      setRohrDialogIsOpen(false);
-      saveItem(rohr);
-    },
-    [saveItem]
-  );
-
-  const markerDialogClose = useCallback(
-    (item?: FirecallItem) => {
-      setMarkerDialogIsOpen(false);
-      saveItem(item);
-    },
-    [saveItem]
-  );
-  const diaryClose = useCallback(
-    (item?: FirecallItem) => {
-      setTagebuchDialogIsOpen(false);
-      if (item) {
-        addDoc(collection(firestore, 'call', firecallId, 'item'), {
-          ...item,
-          user: email,
-          created: new Date(),
-        });
+      if (fzg?.type === 'connection') {
+        leitungen.setIsDrawing(true);
+        leitungen.setFirecallItem(fzg as Connection);
+      } else {
+        saveItem(fzg);
       }
     },
-    [email, firecallId]
-  );
-
-  const connectionDialogClose = useCallback(
-    (item?: FirecallItem) => {
-      setConnectionDialogIsOpen(false);
-      leitungen.setIsDrawing(true);
-      leitungen.setFirecallItem(item as Connection);
-      console.info(`connection dialog close ${item?.name}`);
-    },
-    [leitungen]
+    [leitungen, saveItem]
   );
 
   return (
     <>
-      <SpeedDial
-        ariaLabel="Kartenaktionen"
-        sx={{ position: 'absolute', bottom: 16, right: 16 }}
-        icon={<SpeedDialIcon />}
+      <Box
+        sx={{
+          // '& > :not(style)': { m: 1 },
+          position: 'absolute',
+          bottom: 16,
+          right: 16,
+        }}
       >
-        <SpeedDialAction
-          icon={<DirectionsCarIcon />}
-          tooltipTitle="Fahrzeug"
-          onClick={() => setFzgDialogIsOpen(true)}
-        />
-        <SpeedDialAction
-          icon={<RohrIcon />}
-          tooltipTitle="Rohr"
-          onClick={() => setRohrDialogIsOpen(true)}
-        />
-        <SpeedDialAction
-          icon={<RouteIcon />}
-          tooltipTitle="Leitung"
-          onClick={() => setConnectionDialogIsOpen(true)}
-        />
-        <SpeedDialAction
-          icon={<RoomIcon />}
-          tooltipTitle="Marker"
-          onClick={() => setMarkerDialogIsOpen(true)}
-        />
+        <Fab
+          color="primary"
+          aria-label="add"
+          size="medium"
+          onClick={(event) => {
+            event.preventDefault();
+            setFzgDialogIsOpen(true);
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      </Box>
 
-        <SpeedDialAction
-          icon={<LibraryBooksIcon />}
-          tooltipTitle="Einsatztagebuch"
-          onClick={() => setTagebuchDialogIsOpen(true)}
-        />
-
-        <SpeedDialAction
-          icon={<LocalFireDepartmentIcon />}
-          tooltipTitle="Einsatz"
-          onClick={() => setEinsatzDialog(true)}
-        />
-      </SpeedDial>
-
-      {markerDialogIsOpen && (
-        <FirecallItemDialog type="marker" onClose={markerDialogClose} />
-      )}
-      {tagebuchDialogIsOpen && (
-        <FirecallItemDialog
-          type="diary"
-          onClose={diaryClose}
-          allowTypeChange={false}
-        />
-      )}
-      {einsatzDialog && (
-        <EinsatzDialog
-          onClose={einsatzDialogClose}
-          position={map.getCenter()}
-        />
-      )}
       {fzgDialogIsOpen && (
         <FirecallItemDialog onClose={fzgDialogClose} type="vehicle" />
-      )}
-      {rohrDialogIsOpen && (
-        <FirecallItemDialog onClose={rohrDialogClose} type="rohr" />
-      )}
-
-      {connectionDialogIsOpen && (
-        <FirecallItemDialog
-          onClose={connectionDialogClose}
-          type="connection"
-          allowTypeChange={false}
-        />
       )}
     </>
   );
