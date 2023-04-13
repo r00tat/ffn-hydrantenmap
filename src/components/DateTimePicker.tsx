@@ -22,9 +22,7 @@ export default function MyDateTimePicker({
   return (
     <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale="de-DE">
       <DateTimePicker
-        renderInput={(props) => (
-          <TextField {...props} fullWidth margin="dense" />
-        )}
+        slotProps={{ textField: { fullWidth: true, margin: 'dense' } }}
         label={label}
         value={value}
         onChange={(newValue) => {
