@@ -1,23 +1,9 @@
 import { Button, Typography } from '@mui/material';
-import { EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
 import Link from 'next/link';
-// import 'firebaseui/dist/firebaseui.css';
-import StyledFirebaseAuth from 'react-firebaseui/StyledFirebaseAuth';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { auth } from './firebase/firebase';
 import OneTapLogin from './OneTapLogin';
-
-const uiConfig = {
-  signInOptions: [
-    GoogleAuthProvider.PROVIDER_ID,
-    EmailAuthProvider.PROVIDER_ID,
-  ],
-  signInFlow: 'popup',
-  // autoUpgradeAnonymousUsers: true,
-  callbacks: {
-    signInSuccessWithAuthResult: () => false,
-  },
-};
+import StyledLoginButton from './firebase/StyledLogin';
+import { auth } from './firebase/firebase';
 
 export default function Login() {
   const { isSignedIn, isAuthorized } = useFirebaseLogin();
@@ -30,7 +16,7 @@ export default function Login() {
             Für die Nutzung der Hydrantenkarte ist eine Anmeldung und manuelle
             Freischaltung erforderlich. Bitte registriere dich hier.
           </Typography>
-          <StyledFirebaseAuth uiConfig={uiConfig} firebaseAuth={auth} />
+          <StyledLoginButton firebaseAuth={auth} />
           <OneTapLogin />
         </>
       )}
