@@ -68,6 +68,7 @@ export const availableLayers: TileConfigs = {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     options: {
       maxZoom: 19,
+      subdomains: ['a', 'b', 'c'],
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     },
