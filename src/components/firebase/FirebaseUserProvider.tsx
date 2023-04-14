@@ -15,9 +15,9 @@ export default function FirebaseUserProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const positionInfo = useFirebaseLoginObserver();
+  const authInfo = useFirebaseLoginObserver();
   return (
-    <FirebaseLoginContext.Provider value={positionInfo}>
+    <FirebaseLoginContext.Provider value={authInfo}>
       {children}
     </FirebaseLoginContext.Provider>
   );

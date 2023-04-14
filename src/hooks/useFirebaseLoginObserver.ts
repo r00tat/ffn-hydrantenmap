@@ -32,6 +32,7 @@ export default function useFirebaseLoginObserver() {
     const unregisterAuthObserver = auth.onAuthStateChanged(
       (user: User | null) => {
         let u: User | undefined = user != null ? user : undefined;
+        console.info(`login status changed:`, u);
 
         setLoginStatus({
           isSignedIn: !!user,
@@ -68,7 +69,12 @@ export default function useFirebaseLoginObserver() {
         }
       })();
     }
-  }, [loginStatus]);
+  }, [
+    loginStatus,
+    loginStatus.isAuthorized,
+    loginStatus.isSignedIn,
+    loginStatus.uid,
+  ]);
 
   return loginStatus;
 }
