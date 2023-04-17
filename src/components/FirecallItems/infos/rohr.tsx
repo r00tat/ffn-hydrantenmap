@@ -11,8 +11,10 @@ export const rohrItemInfo: FirecallItemInfo<Rohr> = {
     art: 'Art (C/B oder Wasserwerfer)',
     name: 'Bezeichnung',
     durchfluss: 'Durchfluss (l/min)',
+    rotation: 'Drehung in Grad',
   },
   dateFields: ['datum'],
+  fieldTypes: { rotation: 'number', durchfluss: 'number' },
   factory: () =>
     ({
       art: 'C',

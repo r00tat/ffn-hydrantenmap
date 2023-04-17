@@ -35,6 +35,7 @@
     "geofire-common": "^6.0.0",
     "googleapis": "^117.0.0",
     "leaflet": "^1.7.1",
+    "leaflet-rotatedmarker": "^0.2.0",
     "leaflet.markercluster": "^1.5.3",
     "moment": "^2.29.1",
     "moment-timezone": "^0.5.34",
