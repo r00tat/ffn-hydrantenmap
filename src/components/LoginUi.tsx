@@ -50,9 +50,13 @@ export default function Login() {
             </Typography>
           )}
           <Typography>
-            Login details: {displayName} {email}
-            {auth.currentUser?.providerId}
+            Login details: <br />
+            {displayName} {email}
+            <br />
+            Authenticated via {auth.currentUser?.providerId}
+            <br />
             isSignedIn: {isSignedIn ? 'Y' : 'N'}
+            <br />
             isAuthorized: {isAuthorized ? 'Y' : 'N'}
           </Typography>
         </div>
