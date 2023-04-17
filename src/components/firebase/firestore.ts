@@ -9,6 +9,7 @@ export interface FirecallItem {
   datum?: string;
   editable?: boolean;
   original?: FirecallItem;
+  rotation?: string;
 }
 
 export interface FirecallItemMarker extends FirecallItem {

@@ -12,6 +12,8 @@ export interface FirecallItemInfo<T = FirecallItem> {
   };
 
   dateFields: string[];
+
+  fieldTypes?: { [fieldName: string]: string };
   /**
    * render popup html
    */

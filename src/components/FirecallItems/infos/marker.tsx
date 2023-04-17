@@ -1,6 +1,7 @@
 import { FirecallItem, FirecallItemMarker } from '../../firebase/firestore';
 import { markerIcon } from '../icons';
 import { FirecallItemInfo } from './types';
+import L from 'leaflet';
 
 export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
   name: 'Marker',
@@ -11,6 +12,7 @@ export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
   fields: {
     name: 'Bezeichnung',
     beschreibung: 'Beschreibung',
+    icon: 'Icon URL',
   },
   dateFields: [],
   factory: () => ({
@@ -19,6 +21,7 @@ export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
     beschreibung: '',
     datum: '',
   }),
+  // fieldTypes: { beschreibung: 'multiline' },
   dialogText: (item) => `Markierung`,
   popupFn: (item: FirecallItem) => {
     return (
@@ -30,7 +33,13 @@ export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
     );
   },
   titleFn: (item: FirecallItem) => `${item.name}\n${item.beschreibung || ''}`,
-  icon: (gisObject: FirecallItem) => {
+  icon: (m: FirecallItem) => {
+    if ((m as any)?.icon) {
+      return L.icon({
+        iconUrl: (m as any)?.icon,
+        iconSize: [24, 24],
+      });
+    }
     return markerIcon;
   },
 };

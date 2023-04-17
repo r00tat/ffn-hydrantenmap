@@ -107,7 +107,9 @@ export default function FirecallItemDialog({
                   id={key}
                   key={key}
                   label={label}
-                  type="text"
+                  type={
+                    (itemInfo.fieldTypes && itemInfo.fieldTypes[key]) || 'text'
+                  }
                   fullWidth
                   variant="standard"
                   onChange={onChange(key)}

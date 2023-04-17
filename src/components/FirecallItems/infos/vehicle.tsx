@@ -23,8 +23,10 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
     alarmierung: 'Alarmierung',
     eintreffen: 'Eintreffen',
     abruecken: 'Abrücken',
+    rotation: 'Drehung in Grad',
   },
   dateFields: ['alarmierung', 'eintreffen', 'abruecken'],
+  fieldTypes: { rotation: 'number', ats: 'number' },
   factory: () =>
     ({
       name: '',
@@ -33,6 +35,8 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
       type: 'vehicle',
       alarmierung: moment().toISOString(),
       eintreffen: moment().toISOString(),
+      ats: 0,
+      rotation: '0',
     } as Fzg),
   dialogText: (item) => `Einsatzfahrzeug`,
   icon: (gisObj: FirecallItem) =>

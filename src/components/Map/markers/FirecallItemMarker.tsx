@@ -10,6 +10,7 @@ import { firestore } from '../../firebase/firebase';
 import { Connection, FirecallItem } from '../../firebase/firestore';
 import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
 import ConnectionMarker from './ConnectionMarker';
+import { RotatedMarker } from './RotatedMarker';
 
 export interface FirecallItemMarkerProps {
   record: FirecallItem;
@@ -76,7 +77,7 @@ export function FirecallItemMarkerDefault({
 
   return (
     <>
-      <Marker
+      <RotatedMarker
         position={startPos}
         title={itemInfo.titleFn(record)}
         icon={icon}
@@ -88,6 +89,13 @@ export function FirecallItemMarkerDefault({
             updateFircallItemPos(firecallId, event, record);
           },
         }}
+        rotationAngle={
+          record?.rotation &&
+          !Number.isNaN(Number.parseInt(record?.rotation, 10))
+            ? Number.parseInt(record?.rotation, 10) % 360
+            : 0
+        }
+        rotationOrigin="center"
       >
         <Popup>
           <IconButton
@@ -98,7 +106,7 @@ export function FirecallItemMarkerDefault({
           </IconButton>
           {itemInfo.popupFn(record)}
         </Popup>
-      </Marker>
+      </RotatedMarker>
     </>
   );
 }
