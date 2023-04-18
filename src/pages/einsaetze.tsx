@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 const DynamicFahrzeuge = dynamic(
   () => {
-    return import('../components/Einsaetze');
+    return import('../components/pages/Einsaetze');
   },
   { ssr: false }
 );

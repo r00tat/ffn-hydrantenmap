@@ -15,7 +15,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 
 export default function AppDrawer({
   isOpen,

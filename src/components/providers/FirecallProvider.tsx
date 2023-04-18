@@ -1,7 +1,7 @@
 import {
   FirecallContext,
   useLastOrSelectedFirecall,
-} from '../hooks/useFirecall';
+} from '../../hooks/useFirecall';
 
 export default function FirecallProvider({
   children,

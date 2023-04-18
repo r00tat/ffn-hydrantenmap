@@ -7,7 +7,7 @@ import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
 import { Rohr } from '../firebase/firestore';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
-import ConfirmDialog from '../ConfirmDialog';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import RohrDialog from './RohrDialog';
 
 export default function RohrCard({

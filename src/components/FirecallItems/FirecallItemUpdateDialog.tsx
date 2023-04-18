@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
-import ConfirmDialog from '../ConfirmDialog';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from './FirecallItemDialog';
 import { firecallItems } from './infos/firecallitems';

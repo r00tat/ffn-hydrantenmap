@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 
 const EinsatzTagebuch = dynamic(
   () => {
-    return import('../components/EinsatzTagebuch');
+    return import('../components/pages/EinsatzTagebuch');
   },
   { ssr: false }
 );

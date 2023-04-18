@@ -3,7 +3,7 @@ import * as firebaseui from 'firebaseui';
 import 'firebaseui/dist/firebaseui.css';
 import { useEffect } from 'react';
 
-const uiConfig = {
+const uiConfig: firebaseui.auth.Config = {
   signInOptions: [
     GoogleAuthProvider.PROVIDER_ID,
     EmailAuthProvider.PROVIDER_ID,
@@ -11,7 +11,10 @@ const uiConfig = {
   signInFlow: 'popup',
   // autoUpgradeAnonymousUsers: true,
   callbacks: {
-    signInSuccessWithAuthResult: () => false,
+    signInSuccessWithAuthResult: (authResult) => {
+      console.info(`firebaseui login success`, authResult);
+      return false;
+    },
   },
 };
 

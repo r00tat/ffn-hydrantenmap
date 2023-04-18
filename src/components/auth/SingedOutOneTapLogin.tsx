@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 
 const DynamicOneTapLogin = dynamic(
   () => {

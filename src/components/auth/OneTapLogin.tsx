@@ -4,7 +4,6 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import { useGoogleOneTapLogin } from 'react-google-one-tap-login';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
 export default function OneTapLogin() {
   const auth = getAuth();
 

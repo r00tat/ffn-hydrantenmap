@@ -1,9 +1,9 @@
 import { Button, Typography } from '@mui/material';
 import Link from 'next/link';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import OneTapLogin from './OneTapLogin';
-import StyledLoginButton from './firebase/StyledLogin';
-import { auth } from './firebase/firebase';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import OneTapLogin from '../auth/OneTapLogin';
+import StyledLoginButton from '../firebase/StyledLogin';
+import { auth } from '../firebase/firebase';
 
 export default function Login() {
   const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
