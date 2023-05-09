@@ -4,7 +4,7 @@ import React from 'react';
 
 const DynamicLogin = dynamic(
   () => {
-    return import('../components/LoginUi');
+    return import('../components/pages/LoginUi');
   },
   { ssr: false }
 );

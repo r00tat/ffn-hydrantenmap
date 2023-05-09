@@ -15,13 +15,13 @@ import {
   where,
 } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
-import { Token } from '../common/token';
-import useFirebaseCollection from '../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import ConfirmDialog from './ConfirmDialog';
-import { firestore } from './firebase/firebase';
-import InfoDialog from './InfoDialog';
-import InputDialog from './InputDialog';
+import { Token } from '../../common/token';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
+import { firestore } from '../firebase/firebase';
+import InfoDialog from '../dialogs/InfoDialog';
+import InputDialog from '../dialogs/InputDialog';
 
 export function useTokens() {
   const user = useFirebaseLogin();

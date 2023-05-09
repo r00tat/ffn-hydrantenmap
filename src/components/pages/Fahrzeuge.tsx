@@ -2,16 +2,16 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
-import useFirebaseCollection from '../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecallId } from '../hooks/useFirecall';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallId } from '../../hooks/useFirecall';
 import {
   filterActiveItems,
   FirecallItem,
   Fzg,
   Rohr,
-} from './firebase/firestore';
-import FirecallItemCard from './FirecallItems/FirecallItemCard';
+} from '../firebase/firestore';
+import FirecallItemCard from '../FirecallItems/FirecallItemCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();

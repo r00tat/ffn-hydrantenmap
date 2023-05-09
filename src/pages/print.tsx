@@ -9,14 +9,14 @@ const DynamicMap = dynamic(
 
 const DynamicFahrzeuge = dynamic(
   () => {
-    return import('../components/Fahrzeuge');
+    return import('../components/pages/Fahrzeuge');
   },
   { ssr: false }
 );
 
 const EinsatzTagebuch = dynamic(
   () => {
-    return import('../components/EinsatzTagebuch');
+    return import('../components/pages/EinsatzTagebuch');
   },
   { ssr: false }
 );
