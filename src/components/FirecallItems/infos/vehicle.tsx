@@ -55,13 +55,18 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
         <b>
           {v.name} {v.fw || ''}
         </b>
-        {v.besatzung && (
+        {v.besatzung && Number.parseInt(v.besatzung) > 0 && (
           <>
             <br />
             Besatzung: 1:{v.besatzung}
           </>
         )}
-        {v.ats && <> ({v.ats} ATS)</>}
+        {v.ats !== undefined && v.ats > 0 && (
+          <>
+            {!(v.besatzung && Number.parseInt(v.besatzung) > 0) && <br />} (
+            {v.ats} ATS)
+          </>
+        )}
         {v.alarmierung && (
           <>
             <br />
