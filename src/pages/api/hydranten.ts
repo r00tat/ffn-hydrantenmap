@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import firebaseAdmin from '../../server/firebase/admin';
 import { GisWgsObject } from '../../common/gis-objects';
+import userRequired from '../../server/auth/userRequired';
 
 export interface Hydrant extends GisWgsObject {
   dimension: string;
@@ -39,6 +40,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<HydrantenResponse>
 ) {
+  if (!(await userRequired(req, res))) {
+    return;
+  }
   const records = await getRecords();
   res.status(200).json({ hydranten: records });
 }

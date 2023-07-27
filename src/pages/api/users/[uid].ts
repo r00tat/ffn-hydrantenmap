@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { feuerwehren } from '../../../common/feuerwehren';
 import { UserRecordExtended } from '../../../common/users';
-import adminRequired from '../../../server/adminRequired';
+import adminRequired from '../../../server/auth/adminRequired';
 import firebaseAdmin from '../../../server/firebase/admin';
 
 export interface UsersResponse {

@@ -3,7 +3,7 @@ import { UserRecord } from 'firebase-admin/lib/auth/user-record';
 import { DocumentData } from 'firebase/firestore';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { UserRecordExtended } from '../../common/users';
-import adminRequired from '../../server/adminRequired';
+import adminRequired from '../../server/auth/adminRequired';
 import firebaseAdmin from '../../server/firebase/admin';
 import { ErrorResponse } from './responses';
 
