@@ -101,7 +101,7 @@ export default function SchadstoffPage() {
                     Schutzanzug Parameter
                   </Typography>
                   <Typography variant="body2">
-                    Temperatur Resistenz: Klasse {r.resistanceTemperature}
+                    Resistenzgrad: Klasse {r.resistanceTemperature}
                     <br />
                     Zeitliche Resistenz: {r.resistanceTime}
                     <br />

@@ -1,6 +1,6 @@
 import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
@@ -11,21 +11,21 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { addDoc, collection } from 'firebase/firestore';
 import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
-import { dateTimeFormat, parseTimestamp } from '../common/time-format';
-import useFirebaseCollection from '../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../hooks/useFirebaseLogin';
-import { useFirecallId } from '../hooks/useFirecall';
-import { firestore } from './firebase/firebase';
+import { dateTimeFormat, parseTimestamp } from '../../common/time-format';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallId } from '../../hooks/useFirecall';
+import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
+import FirecallItemCard from '../FirecallItems/FirecallItemCard';
+import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
+import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
+import { firestore } from '../firebase/firebase';
 import {
   Diary,
-  filterActiveItems,
   FirecallItem,
   Fzg,
-} from './firebase/firestore';
-import DeleteFirecallItemDialog from './FirecallItems/DeleteFirecallItemDialog';
-import FirecallItemCard from './FirecallItems/FirecallItemCard';
-import FirecallItemDialog from './FirecallItems/FirecallItemDialog';
-import FirecallItemUpdateDialog from './FirecallItems/FirecallItemUpdateDialog';
+  filterActiveItems,
+} from '../firebase/firestore';
 
 export function useDiaries() {
   const firecallId = useFirecallId();
@@ -42,7 +42,7 @@ export function useDiaries() {
 
   useEffect(() => {
     const cars: Fzg[] = firecallItems.filter(
-      (item) => item.type === 'vehicle'
+      (item: FirecallItem) => item.type === 'vehicle'
     ) as Fzg[];
     const firecallEntries: Diary[] = [
       cars
@@ -95,10 +95,11 @@ export function useDiaries() {
         ),
       firecallItems
         .filter(
-          (item) => ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
+          (item: FirecallItem) =>
+            ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
         )
         .map(
-          (item) =>
+          (item: FirecallItem) =>
             ({
               ...item,
               type: 'diary',
@@ -107,8 +108,11 @@ export function useDiaries() {
             } as Diary)
         ),
       firecallItems
-        .filter((item) => item.type === 'diary')
-        .map((item) => ({ ...item, original: item, editable: true } as Diary)),
+        .filter((item: FirecallItem) => item.type === 'diary')
+        .map(
+          (item: FirecallItem) =>
+            ({ ...item, original: item, editable: true } as Diary)
+        ),
     ].flat();
     const diaries = firecallEntries
       .map((a) => {
