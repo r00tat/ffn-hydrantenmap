@@ -6,7 +6,7 @@ import {
   GeoJsonFeatureColleaction,
 } from '../../server/geojson';
 import { exportSpreadsheetGeoJson } from '../../server/spreadsheet';
-import tokenRequired from '../../server/tokenRequired';
+import tokenRequired from '../../server/auth/tokenRequired';
 
 export interface ErrorMessage {
   error: string;

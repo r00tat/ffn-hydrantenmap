@@ -6,7 +6,7 @@ import exportGeoJson, {
   GeoFilterProperties,
   GeoJsonFeatureColleaction,
 } from '../../server/geojson';
-import tokenRequired from '../../server/tokenRequired';
+import tokenRequired from '../../server/auth/tokenRequired';
 
 export default async function handler(
   req: NextApiRequest,

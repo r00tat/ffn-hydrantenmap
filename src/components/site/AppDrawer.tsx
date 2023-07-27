@@ -1,3 +1,5 @@
+import { mdiBiohazard } from '@mdi/js';
+import Icon from '@mdi/react';
 import ApiIcon from '@mui/icons-material/Api';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import InfoIcon from '@mui/icons-material/Info';
@@ -91,6 +93,14 @@ export default function AppDrawer({
                       <LocalFireDepartmentIcon />
                     </ListItemIcon>
                     <ListItemText primary="Einsätze" />
+                  </ListItem>
+                </Link>
+                <Link href="/schadstoff" passHref>
+                  <ListItem button key="schadstoff">
+                    <ListItemIcon>
+                      <Icon path={mdiBiohazard} size={1} />
+                    </ListItemIcon>
+                    <ListItemText primary="Schadstoff" />
                   </ListItem>
                 </Link>
                 <Link href="/print" passHref>
