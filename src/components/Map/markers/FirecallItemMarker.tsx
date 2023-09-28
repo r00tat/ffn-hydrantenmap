@@ -13,6 +13,7 @@ import ConnectionMarker from './ConnectionMarker';
 import { RotatedMarker } from './RotatedMarker';
 import LineMarker from './LineMarker';
 import CircleMarker from './CircleMarker';
+import AreaMarker from './AreaMarker';
 
 export interface FirecallItemMarkerProps {
   record: FirecallItem;
@@ -39,34 +40,6 @@ async function updateFircallItemPos(
         merge: true,
       }
     );
-  }
-}
-
-export default function FirecallItemMarker({
-  record,
-  selectItem,
-}: FirecallItemMarkerProps) {
-  switch (record.type) {
-    case 'connection':
-      return (
-        <ConnectionMarker
-          record={record as Connection}
-          selectItem={selectItem}
-        />
-      );
-
-    case 'line':
-      return (
-        <LineMarker record={record as Connection} selectItem={selectItem} />
-      );
-    case 'circle':
-      return (
-        <CircleMarker record={record as Connection} selectItem={selectItem} />
-      );
-    default:
-      return (
-        <FirecallItemMarkerDefault record={record} selectItem={selectItem} />
-      );
   }
 }
 
@@ -128,4 +101,36 @@ export function FirecallItemMarkerDefault({
       </RotatedMarker>
     </>
   );
+}
+
+export default function FirecallItemMarker({
+  record,
+  selectItem,
+}: FirecallItemMarkerProps) {
+  switch (record.type) {
+    case 'connection':
+      return (
+        <ConnectionMarker
+          record={record as Connection}
+          selectItem={selectItem}
+        />
+      );
+
+    case 'line':
+      return (
+        <LineMarker record={record as Connection} selectItem={selectItem} />
+      );
+    case 'circle':
+      return (
+        <CircleMarker record={record as Connection} selectItem={selectItem} />
+      );
+    case 'area':
+      return (
+        <AreaMarker record={record as Connection} selectItem={selectItem} />
+      );
+    default:
+      return (
+        <FirecallItemMarkerDefault record={record} selectItem={selectItem} />
+      );
+  }
 }

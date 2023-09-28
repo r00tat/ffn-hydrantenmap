@@ -1,4 +1,5 @@
 import { FirecallItem } from '../../firebase/firestore';
+import { areaInfo } from './area';
 import { asspInfo } from './assp';
 import { circleInfo } from './circle';
 import { connectionInfo } from './connection';
@@ -22,6 +23,7 @@ export const firecallItems: FirecallItemInfoList = {
   fallback: fallbackInfo,
   line: lineInfo as unknown as FirecallItemInfo<FirecallItem>,
   circle: circleInfo as unknown as FirecallItemInfo<FirecallItem>,
+  area: areaInfo as unknown as FirecallItemInfo<FirecallItem>,
 };
 
 export const firecallItemInfo = (type: string = 'fallback') =>

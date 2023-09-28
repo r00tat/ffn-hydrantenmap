@@ -48,6 +48,15 @@ export interface Connection extends FirecallItem {
   color?: string;
 }
 
+export interface Area extends FirecallItem {
+  destLat: number;
+  destLng: number;
+  /** stringified LatLngPosition[] */
+  positions?: string;
+  distance?: number;
+  color?: string;
+}
+
 export interface Line extends Connection {
   opacity?: number;
 }
