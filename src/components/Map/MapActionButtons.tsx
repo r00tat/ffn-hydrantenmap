@@ -41,7 +41,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setFzgDialogIsOpen(false);
-      if (fzg?.type === 'connection') {
+      if (fzg?.type === 'connection' || fzg?.type === 'line') {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
       } else {

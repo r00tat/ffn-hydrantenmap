@@ -11,7 +11,6 @@ import { firestore } from '../../firebase/firebase';
 import { Connection, FirecallItem } from '../../firebase/firestore';
 import {
   calculateDistance,
-  connectionInfo,
   getConnectionPositions,
 } from '../../FirecallItems/infos/connection';
 import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
@@ -134,13 +133,16 @@ export default function ConnectionMarker({
             >
               <DeleteIcon />
             </IconButton>
-            {connectionInfo.popupFn(record)}
+            {itemInfo.popupFn(record)}
           </Popup>
         </Marker>
       ))}
       <Polyline
         positions={positions}
-        pathOptions={{ color: record.color || '#0000ff' }}
+        pathOptions={{
+          color: record.color || '#0000ff',
+          opacity: ((record as any)?.opacity || 100.0) / 100,
+        }}
       ></Polyline>
     </>
   );

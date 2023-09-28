@@ -3,14 +3,16 @@ import { IconButton } from '@mui/material';
 import { doc, setDoc } from 'firebase/firestore';
 import L, { IconOptions } from 'leaflet';
 import { useEffect, useState } from 'react';
-import { Marker, Popup } from 'react-leaflet';
+import { Popup } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { useFirecallId } from '../../../hooks/useFirecall';
+import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
 import { firestore } from '../../firebase/firebase';
 import { Connection, FirecallItem } from '../../firebase/firestore';
-import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
 import ConnectionMarker from './ConnectionMarker';
 import { RotatedMarker } from './RotatedMarker';
+import LineMarker from './LineMarker';
+import CircleMarker from './CircleMarker';
 
 export interface FirecallItemMarkerProps {
   record: FirecallItem;
@@ -44,11 +46,28 @@ export default function FirecallItemMarker({
   record,
   selectItem,
 }: FirecallItemMarkerProps) {
-  return record.type === 'connection' ? (
-    <ConnectionMarker record={record as Connection} selectItem={selectItem} />
-  ) : (
-    <FirecallItemMarkerDefault record={record} selectItem={selectItem} />
-  );
+  switch (record.type) {
+    case 'connection':
+      return (
+        <ConnectionMarker
+          record={record as Connection}
+          selectItem={selectItem}
+        />
+      );
+
+    case 'line':
+      return (
+        <LineMarker record={record as Connection} selectItem={selectItem} />
+      );
+    case 'circle':
+      return (
+        <CircleMarker record={record as Connection} selectItem={selectItem} />
+      );
+    default:
+      return (
+        <FirecallItemMarkerDefault record={record} selectItem={selectItem} />
+      );
+  }
 }
 
 export function FirecallItemMarkerDefault({

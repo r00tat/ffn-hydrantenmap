@@ -1,9 +1,11 @@
 import { FirecallItem } from '../../firebase/firestore';
 import { asspInfo } from './assp';
+import { circleInfo } from './circle';
 import { connectionInfo } from './connection';
 import { diaryItemInfo } from './diary';
 import { elInfo } from './el';
 import { fallbackInfo } from './fallback';
+import { lineInfo } from './line';
 import { markerInfo } from './marker';
 import { rohrItemInfo } from './rohr';
 import { FirecallItemInfo, FirecallItemInfoList } from './types';
@@ -18,6 +20,8 @@ export const firecallItems: FirecallItemInfoList = {
   assp: asspInfo,
   diary: diaryItemInfo as unknown as FirecallItemInfo<FirecallItem>,
   fallback: fallbackInfo,
+  line: lineInfo as unknown as FirecallItemInfo<FirecallItem>,
+  circle: circleInfo as unknown as FirecallItemInfo<FirecallItem>,
 };
 
 export const firecallItemInfo = (type: string = 'fallback') =>
