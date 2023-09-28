@@ -48,6 +48,25 @@ export interface Connection extends FirecallItem {
   color?: string;
 }
 
+export interface Area extends FirecallItem {
+  destLat: number;
+  destLng: number;
+  /** stringified LatLngPosition[] */
+  positions?: string;
+  distance?: number;
+  color?: string;
+}
+
+export interface Line extends Connection {
+  opacity?: number;
+}
+
+export interface Circle extends FirecallItem {
+  radius: number;
+  color?: string;
+  opacity?: number;
+}
+
 export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 

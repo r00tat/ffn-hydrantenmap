@@ -4,11 +4,11 @@ import { IconButton } from '@mui/material';
 import { doc, setDoc } from 'firebase/firestore';
 import L, { IconOptions } from 'leaflet';
 import { useMemo } from 'react';
-import { Marker, Polyline, Popup } from 'react-leaflet';
+import { Marker, Polygon, Polyline, Popup } from 'react-leaflet';
 import { latLngPosition, LatLngPosition } from '../../../common/geo';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import { firestore } from '../../firebase/firebase';
-import { Connection, FirecallItem } from '../../firebase/firestore';
+import { Area, FirecallItem } from '../../firebase/firestore';
 import {
   calculateDistance,
   getConnectionPositions,
@@ -18,7 +18,7 @@ import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
 export async function updateFirecallPositions(
   firecallId: string,
   newPos: L.LatLng,
-  fcItem: Connection,
+  fcItem: Area,
   index: number
 ) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
@@ -31,7 +31,7 @@ export async function updateFirecallPositions(
 
 export async function deleteFirecallPosition(
   firecallId: string,
-  fcItem: Connection,
+  fcItem: Area,
   index: number
 ) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
@@ -44,7 +44,7 @@ export async function deleteFirecallPosition(
 
 const updateConnectionInFirestore = async (
   firecallId: string,
-  fcItem: Connection,
+  fcItem: Area,
   positions: LatLngPosition[]
 ) => {
   if (fcItem.id)
@@ -60,15 +60,12 @@ const updateConnectionInFirestore = async (
     );
 };
 
-export interface ConnectionMarkerProps {
-  record: Connection;
+export interface AreaMarkerProps {
+  record: Area;
   selectItem: (item: FirecallItem) => void;
 }
 
-export default function ConnectionMarker({
-  record,
-  selectItem,
-}: ConnectionMarkerProps) {
+export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
   const itemInfo = firecallItemInfo(record.type);
   const icon = (
     typeof itemInfo.icon == 'function'
@@ -137,13 +134,23 @@ export default function ConnectionMarker({
           </Popup>
         </Marker>
       ))}
-      <Polyline
+      <Polygon
         positions={positions}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,
         }}
-      ></Polyline>
+      >
+        <Popup>
+          <IconButton
+            sx={{ marginLeft: 'auto', float: 'right' }}
+            onClick={() => selectItem(record)}
+          >
+            <EditIcon />
+          </IconButton>
+          {itemInfo.popupFn(record)}
+        </Popup>
+      </Polygon>
     </>
   );
 }

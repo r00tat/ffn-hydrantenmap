@@ -2,9 +2,9 @@ import { addDoc, collection } from 'firebase/firestore';
 import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
-import { firestore } from '../../firebase/firebase';
-import { Connection, FirecallItem } from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/infos/connection';
+import { firestore } from '../../firebase/firebase';
+import { Connection } from '../../firebase/firestore';
 
 interface Leitungen {
   isDrawing: boolean;
