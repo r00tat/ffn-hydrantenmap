@@ -19,7 +19,7 @@ export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
     type: 'marker',
     name: '',
     beschreibung: '',
-    datum: '',
+    datum: new Date().toISOString(),
   }),
   // fieldTypes: { beschreibung: 'multiline' },
   dialogText: (item) => `Markierung`,

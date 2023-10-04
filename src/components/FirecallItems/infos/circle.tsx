@@ -28,6 +28,7 @@ export const circleInfo: FirecallItemInfo<Circle> = {
     beschreibung: '',
     color: 'green',
     radius: 50,
+    datum: new Date().toISOString(),
   }),
   popupFn: (item: Circle) => (
     <>

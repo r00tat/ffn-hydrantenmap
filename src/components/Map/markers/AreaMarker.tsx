@@ -138,7 +138,8 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
         positions={positions}
         pathOptions={{
           color: record.color || '#0000ff',
-          opacity: ((record as any)?.opacity || 100.0) / 100,
+          opacity: ((record as any)?.opacity || 50.0) / 100,
+          fillOpacity: ((record as any)?.opacity || 50.0) / 100,
         }}
       >
         <Popup>

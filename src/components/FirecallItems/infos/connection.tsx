@@ -64,6 +64,7 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
     destLng: mapPosition.lng + 0.0001,
     positions: JSON.stringify([]),
     color: 'blue',
+    datum: new Date().toISOString(),
   }),
   popupFn: (item: Connection) => (
     <>

@@ -26,6 +26,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     (item?: FirecallItem) => {
       if (item) {
         addDoc(collection(firestore, 'call', firecallId, 'item'), {
+          datum: new Date().toISOString(),
           ...firecallItemInfo(item.type).factory(),
           ...item,
           lat: map.getCenter().lat,

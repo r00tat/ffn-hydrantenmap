@@ -19,6 +19,7 @@ export const areaInfo: FirecallItemInfo<Connection> = {
     name: 'Bezeichnung',
     beschreibung: 'Beschreibung',
     color: 'Farbe (HTML bzw. Englisch)',
+    opacity: 'Deckkraft (in Prozent)',
   },
   dateFields: [],
   factory: () => ({
@@ -29,6 +30,8 @@ export const areaInfo: FirecallItemInfo<Connection> = {
     destLng: mapPosition.lng + 0.0001,
     positions: JSON.stringify([]),
     color: 'blue',
+    opacity: 50,
+    datum: new Date().toISOString(),
   }),
   popupFn: (item: Connection) => (
     <>
