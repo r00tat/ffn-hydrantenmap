@@ -1,6 +1,7 @@
 import { doc, setDoc } from 'firebase/firestore';
 import L, { LeafletEventHandlerFnMap } from 'leaflet';
-import { Marker, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import { Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { firestore } from '../../firebase/firebase';
 import { Firecall } from '../../firebase/firestore';
@@ -36,6 +37,15 @@ function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
 }
 
 export default function FirecallMarker({ firecall }: FirecallMarkerProps) {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView([
+      firecall.lat || defaultPosition.lat,
+      firecall.lng || defaultPosition.lng,
+    ]);
+  }, [firecall.lat, firecall.lng, map]);
+
   return (
     <Marker
       position={[

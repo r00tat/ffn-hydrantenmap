@@ -1,46 +1,15 @@
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { useEffect, useState } from 'react';
-import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
-import {
-  filterActiveItems,
-  FirecallItem,
-  Fzg,
-  Rohr,
-} from '../firebase/firestore';
+import useVehicles from '../../hooks/useVehicles';
 import FirecallItemCard from '../FirecallItems/FirecallItemCard';
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
   const firecallId = useFirecallId();
-  // console.info(`firecall id ${firecallId}`);
-  const [vehicles, setVehicles] = useState<Fzg[]>([]);
-  const [rohre, setRohre] = useState<Rohr[]>([]);
-  const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);
-
-  const firecallItems = useFirebaseCollection<FirecallItem>({
-    collectionName: 'call',
-    pathSegments: [firecallId, 'item'],
-    // queryConstraints: [where('type', '==', 'vehicle')],
-    filterFn: filterActiveItems,
-  });
-
-  useEffect(() => {
-    if (firecallItems) {
-      setVehicles(
-        firecallItems.filter((item) => item?.type === 'vehicle') as Fzg[]
-      );
-      setRohre(firecallItems.filter((item) => item?.type === 'rohr') as Rohr[]);
-      setOtherItems(
-        firecallItems.filter(
-          (item) => item?.type !== 'rohr' && item.type !== 'vehicle'
-        )
-      );
-    }
-  }, [firecallItems]);
+  const { vehicles, rohre, otherItems } = useVehicles();
 
   if (!isAuthorized) {
     return <></>;

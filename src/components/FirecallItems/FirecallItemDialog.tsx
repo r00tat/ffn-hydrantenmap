@@ -52,6 +52,10 @@ export default function FirecallItemDialog({
 
   const handleChange = (event: SelectChangeEvent) => {
     setItemField('type', event.target.value);
+    setFirecallItem((prev) => ({
+      ...firecallItemInfo(event.target.value).factory(),
+      ...prev,
+    }));
   };
 
   return (

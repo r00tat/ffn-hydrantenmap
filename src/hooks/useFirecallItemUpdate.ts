@@ -13,7 +13,12 @@ export default function useFirecallItemUpdate(firecallId: string = 'unknown') {
       );
       await setDoc(
         doc(firestore, 'call', firecallId, 'item', '' + item.id),
-        { ...item, updatedAt: new Date(), updatedBy: email },
+        {
+          datum: new Date().toISOString(),
+          ...item,
+          updatedAt: new Date(),
+          updatedBy: email,
+        },
         { merge: true }
       );
     },

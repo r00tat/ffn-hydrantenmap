@@ -31,6 +31,7 @@ export const lineInfo: FirecallItemInfo<Line> = {
     positions: JSON.stringify([]),
     color: 'green',
     opacity: 100,
+    datum: new Date().toISOString(),
   }),
   popupFn: (item: Line) => (
     <>

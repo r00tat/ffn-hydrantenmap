@@ -9,10 +9,16 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
   title: (item) => `${item.name} ${item.fw}`,
   info: (vehicle) => `1:${vehicle.besatzung || 0} ATS: ${vehicle.ats || 0}`,
   body: (vehicle) => `${
-    vehicle.alarmierung ? 'Alarmierung: ' + vehicle.alarmierung : ''
+    vehicle.alarmierung
+      ? 'Alarmierung: ' + formatTimestamp(vehicle.alarmierung)
+      : ''
   }
-  ${vehicle.eintreffen ? ' Eintreffen: ' + vehicle.eintreffen : ''}
-  ${vehicle.abruecken ? ' Abrücken: ' + vehicle.abruecken : ''}
+  ${
+    vehicle.eintreffen
+      ? ' Eintreffen: ' + formatTimestamp(vehicle.eintreffen)
+      : ''
+  }
+  ${vehicle.abruecken ? ' Abrücken: ' + formatTimestamp(vehicle.abruecken) : ''}
   Position ${vehicle.lat} ${vehicle.lng}`,
   fields: {
     name: 'Bezeichnung',
@@ -33,10 +39,13 @@ export const vehicleItemInfo: FirecallItemInfo<Fzg> = {
       beschreibung: '',
       fw: '',
       type: 'vehicle',
-      alarmierung: moment().toISOString(),
-      eintreffen: moment().toISOString(),
+      // alarmierung: moment().toISOString(),
+      // eintreffen: moment().toISOString(),
+      alarmierung: '',
+      eintreffen: '',
       ats: 0,
       rotation: '0',
+      datum: new Date().toISOString(),
     } as Fzg),
   dialogText: (item) => `Einsatzfahrzeug`,
   icon: (gisObj: FirecallItem) =>
