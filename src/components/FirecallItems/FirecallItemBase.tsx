@@ -5,14 +5,14 @@ import { ReactNode } from 'react';
 import { defaultPosition } from '../../hooks/constants';
 import { fallbackIcon } from './icons';
 
-export class FirecallItemBase<T = FirecallItem> {
+export class FirecallItemBase {
     constructor(firecallItem?: FirecallItem) {
         // empty initializer
         this.name = firecallItem?.name || '';
         this.beschreibung = firecallItem?.beschreibung || '';
-        this.lat = defaultPosition.lat;
-        this.lng = defaultPosition.lng;
-        this.type = 'fallback'
+        this.lat = firecallItem?.lat || defaultPosition.lat;
+        this.lng = firecallItem?.lng || defaultPosition.lng;
+        this.type = firecallItem?.type || 'fallback'
     }
 
     
@@ -21,6 +21,21 @@ export class FirecallItemBase<T = FirecallItem> {
     lat: number;
     lng: number; 
     type: string;
+
+    /**
+     * prepare serialization
+     * @returns serializable data to save in firestore
+     */
+    public data(): {[key: string]: any} {
+        return {
+            
+            lat: this.lat,
+            lng: this.lng,
+            name: this.name,
+            beschreibung: this.beschreibung,
+            type: this.type,
+        }
+    }
 
     public title(): string {
         return this.name;
@@ -63,8 +78,8 @@ export class FirecallItemBase<T = FirecallItem> {
         return fallbackIcon;
     }
 
-    public static factory<T = FirecallItem>(): FirecallItemBase<T> {
-        return new FirecallItemBase<T>();
+    public static factory(): FirecallItemBase {
+        return new FirecallItemBase();
     }
 
 }
