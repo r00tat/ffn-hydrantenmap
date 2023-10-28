@@ -12,15 +12,24 @@ export class FirecallItemBase {
         this.beschreibung = firecallItem?.beschreibung || '';
         this.lat = firecallItem?.lat || defaultPosition.lat;
         this.lng = firecallItem?.lng || defaultPosition.lng;
-        this.type = firecallItem?.type || 'fallback'
+        this.type = firecallItem?.type || 'fallback';
+        this.id = firecallItem?.id;
+        this.original = firecallItem;
     }
 
-    
+    id?: string;
     name: string;
     beschreibung?: string;
     lat: number;
     lng: number; 
     type: string;
+
+    deleted?: boolean;
+    datum?: string;
+    editable?: boolean;
+    original?: FirecallItem;
+    rotation?: string;
+  
 
     /**
      * prepare serialization
@@ -80,6 +89,10 @@ export class FirecallItemBase {
 
     public static factory(): FirecallItemBase {
         return new FirecallItemBase();
+    }
+
+    public renderPopup(): ReactNode {
+        return <></>;
     }
 
 }
