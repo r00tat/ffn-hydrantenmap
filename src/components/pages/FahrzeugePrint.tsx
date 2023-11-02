@@ -24,37 +24,41 @@ export default function FahrzeugePrint() {
         {vehicles.length} Fahrzeuge im Einsatz
       </Typography>
       <table>
-        <tr>
-          <th>Feuerwehr</th>
-          <th>Fahrzeug</th>
-          <th>Besatzung (ATS)</th>
-          <th>Beschreibung</th>
-          <th>Alarmierung</th>
-          <th>Eintreffen</th>
-          <th>abruecken</th>
-          <th>GPS Position</th>
-        </tr>
-        {vehicles
-          .sort(
-            ({ fw: a = '', name: aa = '' }, { fw: b = '', name: bb = '' }) =>
-              a.localeCompare(b) - aa.localeCompare(bb) / 10
-          )
-          .map((fzg) => (
-            <tr key={fzg.id}>
-              <td>{fzg.fw}</td>
-              <td>{fzg.name}</td>
-              <td>
-                1:{fzg.besatzung || 0} ({fzg.ats})
-              </td>
-              <td>{fzg.beschreibung}</td>
-              <td>{fzg.alarmierung && formatTimestamp(fzg.alarmierung)}</td>
-              <td>{fzg.eintreffen && formatTimestamp(fzg.eintreffen)}</td>
-              <td>{fzg.abruecken && formatTimestamp(fzg.abruecken)}</td>
-              <td>
-                {fzg.lat} {fzg.lng}
-              </td>
-            </tr>
-          ))}
+        <thead>
+          <tr>
+            <th>Feuerwehr</th>
+            <th>Fahrzeug</th>
+            <th>Besatzung (ATS)</th>
+            <th>Beschreibung</th>
+            <th>Alarmierung</th>
+            <th>Eintreffen</th>
+            <th>abruecken</th>
+            <th>GPS Position</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vehicles
+            .sort(
+              ({ fw: a = '', name: aa = '' }, { fw: b = '', name: bb = '' }) =>
+                a.localeCompare(b) - aa.localeCompare(bb) / 10
+            )
+            .map((fzg) => (
+              <tr key={fzg.id}>
+                <td>{fzg.fw}</td>
+                <td>{fzg.name}</td>
+                <td>
+                  1:{fzg.besatzung || 0} ({fzg.ats})
+                </td>
+                <td>{fzg.beschreibung}</td>
+                <td>{fzg.alarmierung && formatTimestamp(fzg.alarmierung)}</td>
+                <td>{fzg.eintreffen && formatTimestamp(fzg.eintreffen)}</td>
+                <td>{fzg.abruecken && formatTimestamp(fzg.abruecken)}</td>
+                <td>
+                  {fzg.lat} {fzg.lng}
+                </td>
+              </tr>
+            ))}
+        </tbody>
       </table>
 
       <Typography variant="h3" gutterBottom>
