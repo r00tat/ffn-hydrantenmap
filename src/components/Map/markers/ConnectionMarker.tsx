@@ -1,19 +1,22 @@
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { IconButton } from '@mui/material';
+import { IconButton, Tooltip } from '@mui/material';
 import { doc, setDoc } from 'firebase/firestore';
 import L, { IconOptions } from 'leaflet';
-import { useMemo } from 'react';
+import GeometryUtil from 'leaflet-geometryutil';
+import { useMemo, useState } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
-import { latLngPosition, LatLngPosition } from '../../../common/geo';
+import { LatLngPosition, latLngPosition } from '../../../common/geo';
 import { useFirecallId } from '../../../hooks/useFirecall';
-import { firestore } from '../../firebase/firebase';
-import { Connection, FirecallItem } from '../../firebase/firestore';
 import {
   calculateDistance,
   getConnectionPositions,
 } from '../../FirecallItems/infos/connection';
 import { firecallItemInfo } from '../../FirecallItems/infos/firecallitems';
+import { firestore } from '../../firebase/firebase';
+import { Connection, FirecallItem } from '../../firebase/firestore';
+import { defaultPosition } from '../../../hooks/constants';
 
 export async function updateFirecallPositions(
   firecallId: string,
@@ -25,6 +28,19 @@ export async function updateFirecallPositions(
   if (fcItem.id && newPos && fcItem.positions) {
     const positions: LatLngPosition[] = getConnectionPositions(fcItem);
     positions.splice(index, 1, [newPos.lat, newPos.lng]);
+    await updateConnectionInFirestore(firecallId, fcItem, positions);
+  }
+}
+export async function addFirecallPosition(
+  firecallId: string,
+  newPos: L.LatLng,
+  fcItem: Connection,
+  index: number
+) {
+  // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
+  if (fcItem.id && newPos && fcItem.positions) {
+    const positions: LatLngPosition[] = getConnectionPositions(fcItem);
+    positions.splice(index, 0, [newPos.lat, newPos.lng]);
     await updateConnectionInFirestore(firecallId, fcItem, positions);
   }
 }
@@ -40,6 +56,29 @@ export async function deleteFirecallPosition(
     positions.splice(index, 1);
     await updateConnectionInFirestore(firecallId, fcItem, positions);
   }
+}
+
+export function findSectionOnPolyline(
+  positions: LatLngPosition[],
+  point: L.LatLng
+) {
+  for (let i = 1; i < positions.length; i++) {
+    const belongsToSection = GeometryUtil.belongsSegment(
+      point,
+      new L.LatLng(positions[i - 1][0], positions[i - 1][1]),
+      new L.LatLng(positions[i][0], positions[i][1])
+    );
+    if (belongsToSection) {
+      console.info(
+        `click point ${point} belongs to section ${positions[i - 1]}-${
+          positions[i]
+        } ${i - 1}-${i}`
+      );
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 const updateConnectionInFirestore = async (
@@ -76,6 +115,8 @@ export default function ConnectionMarker({
       : L.icon(itemInfo.icon as IconOptions)
   ) as L.Icon;
   const firecallId = useFirecallId();
+  const [point, setPoint] = useState(defaultPosition);
+  const [pointIndex, setPointIndex] = useState(-1);
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -121,19 +162,27 @@ export default function ConnectionMarker({
           }}
         >
           <Popup>
-            <IconButton
-              sx={{ marginLeft: 'auto', float: 'right' }}
-              onClick={() => selectItem(record)}
-            >
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              sx={{ marginLeft: 'auto', float: 'right' }}
-              onClick={() => deleteFirecallPosition(firecallId, record, index)}
-            >
-              <DeleteIcon />
-            </IconButton>
+            <Tooltip title="Linie bearbeiten">
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                onClick={() => selectItem(record)}
+              >
+                <EditIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Punkt entfernen">
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                onClick={() =>
+                  deleteFirecallPosition(firecallId, record, index)
+                }
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
             {itemInfo.popupFn(record)}
+            <br />
+            Punkt {index} von {positions.length}
           </Popup>
         </Marker>
       ))}
@@ -143,7 +192,41 @@ export default function ConnectionMarker({
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,
         }}
-      ></Polyline>
+        eventHandlers={{
+          click: (event) => {
+            const index = findSectionOnPolyline(positions, event.latlng);
+            // console.info(
+            //   `clicked on polyline ${event.latlng} index in points: ${index}`
+            // );
+            setPoint(event.latlng);
+            setPointIndex(index);
+          },
+        }}
+      >
+        <Popup>
+          {pointIndex >= 0 && (
+            <Tooltip title="Einen Punkt hinzufügen">
+              <IconButton
+                color="primary"
+                aria-label="add a point on the line"
+                onClick={() =>
+                  addFirecallPosition(firecallId, point, record, pointIndex)
+                }
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+          <IconButton
+            sx={{ marginLeft: 'auto', float: 'right' }}
+            onClick={() => selectItem(record)}
+          >
+            <EditIcon />
+          </IconButton>
+
+          {itemInfo.popupFn(record)}
+        </Popup>
+      </Polyline>
     </>
   );
 }

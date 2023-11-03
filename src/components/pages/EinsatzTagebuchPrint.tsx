@@ -182,18 +182,22 @@ export default function EinsatzTagebuchPrint({
             pageSizeOptions={[100, 500, 1000, 10000]}
           /> */}
           <table>
-            <tr>
-              <th>Name</th>
-              <th>Datum</th>
-              <th>Beschreibung</th>
-            </tr>
-            {diaries.map((item) => (
-              <tr key={item.id}>
-                <td>{item.name}</td>
-                <td>{item.datum}</td>
-                <td>{item.beschreibung}</td>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Datum</th>
+                <th>Beschreibung</th>
               </tr>
-            ))}
+            </thead>
+            <tbody>
+              {diaries.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.name}</td>
+                  <td>{item.datum}</td>
+                  <td>{item.beschreibung}</td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </Box>
       )}
