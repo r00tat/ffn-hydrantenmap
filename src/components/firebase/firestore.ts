@@ -55,6 +55,7 @@ export interface Area extends FirecallItem {
   positions?: string;
   distance?: number;
   color?: string;
+  opacity?: number;
 }
 
 export interface Line extends Connection {
