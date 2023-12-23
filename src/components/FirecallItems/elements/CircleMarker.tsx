@@ -9,12 +9,14 @@ export class CircleMarker extends FirecallItemBase {
   color: string;
   radius: number;
   opacity: number;
+  fill: string;
 
   public constructor(firecallItem?: Circle) {
     super(firecallItem);
     this.color = firecallItem?.color || 'green';
     this.radius = firecallItem?.radius || 50;
     this.opacity = firecallItem?.opacity || 100;
+    this.fill = firecallItem?.fill === undefined ? 'true' : firecallItem.fill;
   }
 
   public data(): FirecallItem {
@@ -23,11 +25,16 @@ export class CircleMarker extends FirecallItemBase {
       color: this.color,
       radius: this.radius,
       opacity: this.opacity,
+      fill: this.fill,
     } as Circle;
   }
 
+  public markerName(): string {
+    return `Kreis`;
+  }
+
   public title(): string {
-    return `Kreis ${this.name}`;
+    return `${this.markerName()} ${this.name}`;
   }
   public info(): string {
     return `Radius: ${this.radius || 0}m`;
@@ -40,8 +47,7 @@ export class CircleMarker extends FirecallItemBase {
   public dialogText(): ReactNode {
     return (
       <>
-        Um die Kreis zu zeichnen, auf die gewünschten Positionen klicken. Zum
-        Abschluss auf einen belibigen Punkt klicken. <br />
+        Um die Kreis zu zeichnen, auf die gewünschten Positionen klicken. <br />
         {this.name || ''}
       </>
     );
@@ -52,6 +58,7 @@ export class CircleMarker extends FirecallItemBase {
       ...super.fields(),
       radius: 'Radius (m)',
       color: 'Farbe (HTML bzw. Englisch)',
+      fill: 'Kreis ausfüllen',
       opacity: 'Deckkraft (in Prozent)',
     };
   }
@@ -60,8 +67,10 @@ export class CircleMarker extends FirecallItemBase {
     return [];
   }
 
-  public fieldTypes(): { [fieldName: string]: string } | undefined {
-    return {};
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      fill: 'boolean',
+    };
   }
   public popupFn(): ReactNode {
     return (
@@ -88,11 +97,12 @@ export class CircleMarker extends FirecallItemBase {
       <>
         {super.renderMarker(selectItem)}
         <LeafletCircle
+          key={'circle' + this.id}
           color={this.color}
           radius={this.radius}
           center={L.latLng(this.lat, this.lng)}
           opacity={this.opacity / 100}
-          fill={false}
+          fill={this.fill === 'true'}
         >
           {this.renderPopup(selectItem)}
         </LeafletCircle>

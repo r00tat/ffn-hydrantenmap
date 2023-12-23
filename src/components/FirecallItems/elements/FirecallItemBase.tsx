@@ -6,7 +6,7 @@ import { Popup } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { FirecallItem } from '../../firebase/firestore';
 import { fallbackIcon } from '../icons';
-import { FirecallItemMarkerDefault } from './FirecallItemDefault';
+import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -42,6 +42,7 @@ export class FirecallItemBase {
     this.id = firecallItem?.id;
     this.original = firecallItem;
     this.datum = firecallItem?.datum || new Date().toISOString();
+    this.rotation = firecallItem?.rotation || '0';
   }
 
   id?: string;
@@ -104,10 +105,10 @@ export class FirecallItemBase {
   }
 
   public dateFields(): string[] {
-    return [];
+    return ['datum'];
   }
 
-  public fieldTypes(): { [fieldName: string]: string } | undefined {
+  public fieldTypes(): { [fieldName: string]: string } {
     return {};
   }
   public popupFn(): ReactNode {
@@ -133,6 +134,12 @@ export class FirecallItemBase {
   }
 
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
-    return <FirecallItemMarkerDefault record={this} selectItem={selectItem} />;
+    return (
+      <FirecallItemMarkerDefault
+        record={this}
+        selectItem={selectItem}
+        key={this.id}
+      />
+    );
   }
 }

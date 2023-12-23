@@ -12,10 +12,14 @@ import TextField from '@mui/material/TextField';
 import moment from 'moment';
 import React, { useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import MyDateTimePicker from '../inputs/DateTimePicker';
 import { FirecallItem } from '../firebase/firestore';
-import { firecallItemInfo, firecallItems } from './infos/firecallitems';
-import { FirecallItemInfo } from './infos/types';
+import MyDateTimePicker from '../inputs/DateTimePicker';
+import { fcItemClasses, fcItemNames, getItemClass } from './elements';
+import { FirecallItemBase } from './elements/FirecallItemBase';
+import { CheckBox } from '@mui/icons-material';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -31,18 +35,13 @@ export default function FirecallItemDialog({
   type: itemType,
 }: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
-  const [item, setFirecallItem] = useState<FirecallItem>(
-    itemDefault || firecallItemInfo(itemType).factory()
+  const [item, setFirecallItem] = useState<FirecallItemBase>(
+    getItemClass(itemDefault || ({ type: itemType } as FirecallItem))
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const itemInfo: FirecallItemInfo = firecallItemInfo(item.type);
-
   const setItemField = (field: string, value: any) => {
-    setFirecallItem((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFirecallItem((prev) => getItemClass({ ...prev.data(), [field]: value }));
   };
 
   const onChange =
@@ -52,10 +51,10 @@ export default function FirecallItemDialog({
 
   const handleChange = (event: SelectChangeEvent) => {
     setItemField('type', event.target.value);
-    setFirecallItem((prev) => ({
-      ...firecallItemInfo(event.target.value).factory(),
-      ...prev,
-    }));
+    // setFirecallItem((prev) => ({
+    //   ...firecallItemInfo(event.target.value).factory(),
+    //   ...prev,
+    // }));
   };
 
   return (
@@ -63,13 +62,13 @@ export default function FirecallItemDialog({
       <Dialog open={open} onClose={() => onClose()}>
         <DialogTitle>
           {item.id ? (
-            <>{itemInfo.name} bearbeiten</>
+            <>{item.markerName()} bearbeiten</>
           ) : (
-            <>Neu: {itemInfo.name} hinzufügen</>
+            <>Neu: {item.markerName()} hinzufügen</>
           )}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>{itemInfo.dialogText(item)}</DialogContentText>
+          <DialogContentText>{item.dialogText()}</DialogContentText>
           {allowTypeChange && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
@@ -80,19 +79,19 @@ export default function FirecallItemDialog({
                 label="Art"
                 onChange={handleChange}
               >
-                {Object.entries(firecallItems)
-                  .filter(([key, fcItem]) => key !== 'fallback')
-                  .map(([key, fcItem]) => (
+                {Object.entries(fcItemNames)
+                  .filter(([key, name]) => key !== 'fallback')
+                  .map(([key, name]) => (
                     <MenuItem key={key} value={key}>
-                      {fcItem.name}
+                      {name}
                     </MenuItem>
                   ))}
               </Select>
             </FormControl>
           )}
-          {Object.entries(itemInfo.fields).map(([key, label]) => (
+          {Object.entries(item.fields()).map(([key, label]) => (
             <React.Fragment key={key}>
-              {itemInfo.dateFields.includes(key) && (
+              {item.dateFields().includes(key) && (
                 <MyDateTimePicker
                   label={label}
                   value={
@@ -105,21 +104,38 @@ export default function FirecallItemDialog({
                   }}
                 />
               )}
-              {!itemInfo.dateFields.includes(key) && (
-                <TextField
-                  margin="dense"
-                  id={key}
-                  key={key}
-                  label={label}
-                  type={
-                    (itemInfo.fieldTypes && itemInfo.fieldTypes[key]) || 'text'
-                  }
-                  fullWidth
-                  variant="standard"
-                  onChange={onChange(key)}
-                  value={((item as any)[key] as string) || ''}
-                />
+              {item.fieldTypes()[key] === 'boolean' && (
+                <FormGroup>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={
+                          (item as any)[key] === 'true' ||
+                          (item as any)[key] === true
+                        }
+                        onChange={(event, checked) => {
+                          setItemField(key, checked ? 'true' : 'false');
+                        }}
+                      />
+                    }
+                    label={label}
+                  />
+                </FormGroup>
               )}
+              {!item.dateFields().includes(key) &&
+                item.fieldTypes()[key] !== 'boolean' && (
+                  <TextField
+                    margin="dense"
+                    id={key}
+                    key={key}
+                    label={label}
+                    type={item.fieldTypes()[key] || 'text'}
+                    fullWidth
+                    variant="standard"
+                    onChange={onChange(key)}
+                    value={((item as any)[key] as string) || ''}
+                  />
+                )}
             </React.Fragment>
           ))}
         </DialogContent>
@@ -155,10 +171,8 @@ export default function FirecallItemDialog({
       </Dialog>
       {confirmDelete && (
         <ConfirmDialog
-          title={`${itemInfo.name} ${itemInfo.title(item)} löschen`}
-          text={`Element ${itemInfo.name} ${itemInfo.title(
-            item
-          )} wirklich löschen?`}
+          title={`${item.title()} löschen`}
+          text={`${item.title()} wirklich löschen?`}
           onConfirm={(result) => {
             setConfirmDelete(false);
             if (result) {

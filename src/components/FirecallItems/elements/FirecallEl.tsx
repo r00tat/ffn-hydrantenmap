@@ -1,13 +1,13 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
-import { markerIcon } from '../icons';
+import { asspIcon, elIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
-export class FirecallItemMarker extends FirecallItemBase {
+export class FirecallEinsatzleitung extends FirecallItemBase {
   public constructor(firecallItem?: FirecallItem) {
     super(firecallItem);
-    this.type = 'marker';
+    this.type = 'el';
   }
 
   public data(): FirecallItem {
@@ -17,7 +17,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   }
 
   public markerName() {
-    return 'Marker';
+    return 'Einsatzleitung';
   }
 
   // public title(): string {
@@ -35,7 +35,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   // }
 
   public dialogText(): ReactNode {
-    return <>Markierung {this.name}</>;
+    return <>Einsatzleitung {this.name}</>;
   }
 
   // public fields(): { [fieldName: string]: string } {
@@ -48,29 +48,30 @@ export class FirecallItemMarker extends FirecallItemBase {
   //   return [];
   // }
 
+  public titleFn(): string {
+    return `ELung ${this.name}\n${this.beschreibung || ''}`;
+  }
+  public icon(): Icon<IconOptions> {
+    return elIcon;
+  }
+
   public fieldTypes(): { [fieldName: string]: string } {
     return {};
   }
+
+  public static factory(): FirecallItemBase {
+    return new FirecallEinsatzleitung();
+  }
+
   public popupFn(): ReactNode {
     return (
       <>
-        <b>{this.name}</b>
+        <b>Einsatzleitung {this.name}</b>
         <br />
         {this.beschreibung || ''}
       </>
     );
   }
-  public titleFn(): string {
-    return `${this.name}\n${this.beschreibung || ''}`;
-  }
-  public icon(): Icon<IconOptions> {
-    return markerIcon;
-  }
-
-  public static factory(): FirecallItemBase {
-    return new FirecallItemMarker();
-  }
-
   // public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
   //   return (
 

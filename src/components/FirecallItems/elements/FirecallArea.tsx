@@ -4,6 +4,7 @@ import { defaultPosition } from '../../../hooks/constants';
 import { Area, FirecallItem } from '../../firebase/firestore';
 import { circleIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
+import AreaMarker from './area/AreaComponent';
 
 export class FirecallArea extends FirecallItemBase {
   distance: number = 0;
@@ -24,7 +25,7 @@ export class FirecallArea extends FirecallItemBase {
     this.opacity = firecallItem?.opacity || 50;
   }
 
-  public data(): FirecallItem {
+  public data(): Area {
     return {
       ...super.data(),
     } as Area;
@@ -67,9 +68,11 @@ export class FirecallArea extends FirecallItemBase {
   //   return [];
   // }
 
-  // public fieldTypes(): { [fieldName: string]: string } | undefined {
-  //   return {};
-  // }
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      opacity: 'number',
+    };
+  }
   public popupFn(): ReactNode {
     return (
       <>
@@ -88,9 +91,7 @@ export class FirecallArea extends FirecallItemBase {
     return new FirecallArea();
   }
 
-  // public renderMarker(selectItem: (this: FirecallItem) => void) {
-  //   return (
-
-  //   );
-  // }
+  public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
+    return <AreaMarker record={this} selectItem={selectItem} key={this.id} />;
+  }
 }

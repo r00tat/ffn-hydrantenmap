@@ -1,13 +1,13 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
-import { markerIcon } from '../icons';
+import { asspIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
-export class FirecallItemMarker extends FirecallItemBase {
+export class FirecallAssp extends FirecallItemBase {
   public constructor(firecallItem?: FirecallItem) {
     super(firecallItem);
-    this.type = 'marker';
+    this.type = 'assp';
   }
 
   public data(): FirecallItem {
@@ -17,7 +17,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   }
 
   public markerName() {
-    return 'Marker';
+    return 'Atemschutzsammelplatz';
   }
 
   // public title(): string {
@@ -35,7 +35,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   // }
 
   public dialogText(): ReactNode {
-    return <>Markierung {this.name}</>;
+    return <>ASSP {this.name}</>;
   }
 
   // public fields(): { [fieldName: string]: string } {
@@ -61,14 +61,14 @@ export class FirecallItemMarker extends FirecallItemBase {
     );
   }
   public titleFn(): string {
-    return `${this.name}\n${this.beschreibung || ''}`;
+    return `ASSP ${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): Icon<IconOptions> {
-    return markerIcon;
+    return asspIcon;
   }
 
   public static factory(): FirecallItemBase {
-    return new FirecallItemMarker();
+    return new FirecallAssp();
   }
 
   // public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
