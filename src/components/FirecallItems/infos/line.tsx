@@ -1,6 +1,6 @@
 import { mapPosition } from '../../../hooks/useMapPosition';
 import { Line } from '../../firebase/firestore';
-import { connectionIcon } from '../icons';
+import { circleIcon } from '../icons';
 import { FirecallItemInfo } from './types';
 
 export const lineInfo: FirecallItemInfo<Line> = {
@@ -42,6 +42,6 @@ export const lineInfo: FirecallItemInfo<Line> = {
   ),
   titleFn: (item: Line) => `Linie ${item.name}: ${item.distance || 0}m`,
   icon: (item: Line) => {
-    return connectionIcon;
+    return circleIcon;
   },
 };

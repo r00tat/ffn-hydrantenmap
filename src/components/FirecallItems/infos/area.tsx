@@ -1,9 +1,9 @@
 import { mapPosition } from '../../../hooks/useMapPosition';
-import { Connection } from '../../firebase/firestore';
-import { connectionIcon } from '../icons';
+import { Area } from '../../firebase/firestore';
+import { circleIcon } from '../icons';
 import { FirecallItemInfo } from './types';
 
-export const areaInfo: FirecallItemInfo<Connection> = {
+export const areaInfo: FirecallItemInfo<Area> = {
   name: 'Fläche',
   title: (item) => `Fläche ${item.name}`,
   info: (item) => `Länge: ${item.distance || 0}m`,
@@ -23,7 +23,7 @@ export const areaInfo: FirecallItemInfo<Connection> = {
   },
   dateFields: [],
   factory: () => ({
-    type: 'connection',
+    type: 'area',
     name: '',
     beschreibung: '',
     destLat: mapPosition.lat,
@@ -33,13 +33,13 @@ export const areaInfo: FirecallItemInfo<Connection> = {
     opacity: 50,
     datum: new Date().toISOString(),
   }),
-  popupFn: (item: Connection) => (
+  popupFn: (item: Area) => (
     <>
       <b>Fläche {item.name}</b>
     </>
   ),
-  titleFn: (item: Connection) => `Fläche ${item.name}`,
-  icon: (item: Connection) => {
-    return connectionIcon;
+  titleFn: (item: Area) => `Fläche ${item.name}`,
+  icon: (item: Area) => {
+    return circleIcon;
   },
 };

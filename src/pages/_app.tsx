@@ -9,40 +9,76 @@ import HeaderBar from '../components/site/HeaderBar';
 import SingedOutOneTapLogin from '../components/auth/SingedOutOneTapLogin';
 import '../styles/globals.css';
 import styles from '../styles/Home.module.css';
+import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
-function MyApp({ Component, pageProps }: AppProps) {
+import dynamic from 'next/dynamic';
+import About from './about';
+
+const DynamicLogin = dynamic(
+  () => {
+    return import('../components/pages/LoginUi');
+  },
+  { ssr: false }
+);
+
+function LogedinApp({ Component, pageProps }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  return (
+    <FirecallProvider>
+      <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
+      <HeaderBar
+        isDrawerOpen={isDrawerOpen}
+        setIsDrawerOpen={setIsDrawerOpen}
+      />
+
+      <Component {...pageProps} />
+    </FirecallProvider>
+  );
+}
+
+function AuthorizationApp({ Component, pageProps, router }: AppProps) {
+  const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
+  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  if (isAuthorized) {
+    return (
+      <LogedinApp Component={Component} pageProps={pageProps} router={router} />
+    );
+  }
+  return (
+    <>
+      <HeaderBar
+        isDrawerOpen={isDrawerOpen}
+        setIsDrawerOpen={setIsDrawerOpen}
+      />
+      <DynamicLogin />;
+      <About />
+    </>
+  );
+}
+
+function MyApp({ Component, pageProps, router }: AppProps) {
   return (
     <FirebaseUserProvider>
-      <FirecallProvider>
-        <div className={styles.container}>
-          <Head>
-            <title>Hydrantenkarte</title>
-            <meta
-              name="description"
-              content="Hydrantenkarte der Freiwilligen Feuerwehr Neusiedl am See"
-            />
-            <link rel="icon" href="/favicon.ico" />
-            <meta
-              name="viewport"
-              content="width=device-width, initial-scale=1"
-            />
-          </Head>
-          <CssBaseline enableColorScheme />
+      <Head>
+        <title>Hydrantenkarte</title>
+        <meta
+          name="description"
+          content="Hydrantenkarte der Freiwilligen Feuerwehr Neusiedl am See"
+        />
+        <link rel="icon" href="/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+      <div className={styles.container}>
+        <CssBaseline enableColorScheme />
+        <SingedOutOneTapLogin />
 
-          <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
-
-          <HeaderBar
-            isDrawerOpen={isDrawerOpen}
-            setIsDrawerOpen={setIsDrawerOpen}
-          />
-
-          <SingedOutOneTapLogin />
-
-          <Component {...pageProps} />
-        </div>
-      </FirecallProvider>
+        <AuthorizationApp
+          Component={Component}
+          pageProps={pageProps}
+          router={router}
+        />
+      </div>
     </FirebaseUserProvider>
   );
 }

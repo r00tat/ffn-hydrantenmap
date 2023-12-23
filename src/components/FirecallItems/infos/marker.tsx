@@ -1,9 +1,9 @@
-import { FirecallItem, FirecallItemMarker } from '../../firebase/firestore';
+import { FirecallItem, FcMarker } from '../../firebase/firestore';
 import { markerIcon } from '../icons';
 import { FirecallItemInfo } from './types';
 import L from 'leaflet';
 
-export const markerInfo: FirecallItemInfo<FirecallItemMarker> = {
+export const markerInfo: FirecallItemInfo<FcMarker> = {
   name: 'Marker',
   title: (item) => `${item.name || ''}`,
   info: (item) => ``,

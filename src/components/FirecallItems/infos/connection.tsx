@@ -2,7 +2,7 @@ import { latLngPosition, LatLngPosition } from '../../../common/geo';
 import { toLatLng } from '../../../hooks/constants';
 import { mapPosition } from '../../../hooks/useMapPosition';
 import { Connection } from '../../firebase/firestore';
-import { connectionIcon } from '../icons';
+import { circleIcon } from '../icons';
 import { FirecallItemInfo } from './types';
 
 export const getConnectionPositions = (
@@ -76,6 +76,6 @@ export const connectionInfo: FirecallItemInfo<Connection> = {
   ),
   titleFn: (item: Connection) => `Leitung ${item.name}: ${item.distance || 0}m`,
   icon: (item: Connection) => {
-    return connectionIcon;
+    return circleIcon;
   },
 };

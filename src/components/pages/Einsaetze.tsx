@@ -18,6 +18,7 @@ import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import { useRouter } from 'next/router';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -48,6 +49,7 @@ function EinsatzCard({
   const updateFirecall = useFirecallUpdate();
   const { isAdmin } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
+  const router = useRouter();
 
   const updateFn = useCallback(
     (fzg?: Firecall) => {
@@ -89,6 +91,7 @@ function EinsatzCard({
                 if (setFirecallId) {
                   setFirecallId(einsatz.id);
                 }
+                router.push(`/einsatz/${einsatz.id}`);
               }}
             >
               Aktivieren

@@ -28,7 +28,7 @@ export const markerIcon = L.icon({
   popupAnchor: [0, -25],
 });
 
-export const connectionIcon = L.icon({
+export const circleIcon = L.icon({
   iconUrl: `/icons/circle.svg`,
   iconSize: [11, 11],
   iconAnchor: [6, 6],

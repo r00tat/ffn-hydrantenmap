@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import useFirecall from '../../../hooks/useFirecall';
 import { filterDisplayableItems, FirecallItem } from '../../firebase/firestore';
+import { getItemClass } from '../../FirecallItems/elements';
 import ItemOverlay from './ItemOverlay';
-import FirecallItemMarker from './FirecallItemMarker';
-import { useEffect, useState } from 'react';
+import React from 'react';
 
 export default function FirecallItems() {
   const firecall = useFirecall();
@@ -17,13 +18,18 @@ export default function FirecallItems() {
 
   return (
     <>
-      {records.map((record) => (
-        <FirecallItemMarker
-          record={record}
-          key={record.id}
-          selectItem={setFirecallItem}
-        />
-      ))}
+      {records.map(
+        (record) => (
+          <React.Fragment key={record.id}>
+            {getItemClass(record).renderMarker(setFirecallItem)}
+          </React.Fragment>
+        )
+        // <FirecallItemMarker
+        //   record={record}
+        //   key={record.id}
+        //   selectItem={setFirecallItem}
+        // />
+      )}
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}

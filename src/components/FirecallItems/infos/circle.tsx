@@ -1,5 +1,5 @@
 import { Circle } from '../../firebase/firestore';
-import { connectionIcon } from '../icons';
+import { circleIcon } from '../icons';
 import { FirecallItemInfo } from './types';
 
 export const circleInfo: FirecallItemInfo<Circle> = {
@@ -39,6 +39,6 @@ export const circleInfo: FirecallItemInfo<Circle> = {
   ),
   titleFn: (item: Circle) => `Kreis ${item.name}: Radius ${item.radius || 0}m`,
   icon: (item: Circle) => {
-    return connectionIcon;
+    return circleIcon;
   },
 };

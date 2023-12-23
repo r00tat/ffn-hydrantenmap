@@ -1,23 +1,25 @@
-import { Button, Typography } from '@mui/material';
+import { Button, Paper, Typography } from '@mui/material';
 import Link from 'next/link';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
 
-export default function Login() {
+export default function LoginUi() {
   const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
 
   return (
     <>
       {!isSignedIn && (
         <>
-          <Typography>
-            Für die Nutzung der Hydrantenkarte ist eine Anmeldung und manuelle
-            Freischaltung erforderlich. Bitte registriere dich hier.
-          </Typography>
-          <StyledLoginButton firebaseAuth={auth} />
-          <OneTapLogin />
+          <Paper sx={{ p: 2, m: 2 }}>
+            <Typography>
+              Für die Nutzung der Hydrantenkarte ist eine Anmeldung und manuelle
+              Freischaltung erforderlich. Bitte registriere dich hier.
+            </Typography>
+            <StyledLoginButton firebaseAuth={auth} />
+            <OneTapLogin />
+          </Paper>
         </>
       )}
 

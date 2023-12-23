@@ -12,8 +12,9 @@ export interface FirecallItem {
   rotation?: string;
 }
 
-export interface FirecallItemMarker extends FirecallItem {
+export interface FcMarker extends FirecallItem {
   type: 'marker';
+  iconUrl?: string;
 }
 
 export interface Fzg extends FirecallItem {
@@ -48,13 +49,8 @@ export interface Connection extends FirecallItem {
   color?: string;
 }
 
-export interface Area extends FirecallItem {
-  destLat: number;
-  destLng: number;
-  /** stringified LatLngPosition[] */
-  positions?: string;
-  distance?: number;
-  color?: string;
+export interface Area extends Connection {
+  opacity?: number;
 }
 
 export interface Line extends Connection {
@@ -65,6 +61,7 @@ export interface Circle extends FirecallItem {
   radius: number;
   color?: string;
   opacity?: number;
+  fill?: string;
 }
 
 export const filterActiveItems = (g: FirecallItem | Firecall) =>

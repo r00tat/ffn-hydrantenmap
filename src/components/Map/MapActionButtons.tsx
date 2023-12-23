@@ -11,6 +11,7 @@ import { Connection, FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
 import { useLeitungen } from './Leitungen/context';
+import { fcItemClasses } from '../FirecallItems/elements';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -42,7 +43,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setFzgDialogIsOpen(false);
-      if (['connection', 'line', 'area'].includes(fzg?.type || '')) {
+      if (fcItemClasses[fzg?.type || ''].isPolyline()) {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
       } else {
