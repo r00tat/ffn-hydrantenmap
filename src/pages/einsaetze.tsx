@@ -1,7 +1,7 @@
 import type { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 
-const DynamicFahrzeuge = dynamic(
+const DynamicEinsatz = dynamic(
   () => {
     return import('../components/pages/Einsaetze');
   },
@@ -9,7 +9,7 @@ const DynamicFahrzeuge = dynamic(
 );
 
 const Home: NextPage = () => {
-  return <DynamicFahrzeuge />;
+  return <DynamicEinsatz />;
 };
 
 export default Home;
