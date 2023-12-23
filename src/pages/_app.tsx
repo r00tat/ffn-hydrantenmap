@@ -12,6 +12,7 @@ import styles from '../styles/Home.module.css';
 import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 import dynamic from 'next/dynamic';
+import About from './about';
 
 const DynamicLogin = dynamic(
   () => {
@@ -30,7 +31,6 @@ function LogedinApp({ Component, pageProps }: AppProps) {
         isDrawerOpen={isDrawerOpen}
         setIsDrawerOpen={setIsDrawerOpen}
       />
-      <SingedOutOneTapLogin />
 
       <Component {...pageProps} />
     </FirecallProvider>
@@ -52,6 +52,7 @@ function AuthorizationApp({ Component, pageProps, router }: AppProps) {
         setIsDrawerOpen={setIsDrawerOpen}
       />
       <DynamicLogin />;
+      <About />
     </>
   );
 }
@@ -70,6 +71,7 @@ function MyApp({ Component, pageProps, router }: AppProps) {
       </Head>
       <div className={styles.container}>
         <CssBaseline enableColorScheme />
+        <SingedOutOneTapLogin />
 
         <AuthorizationApp
           Component={Component}
