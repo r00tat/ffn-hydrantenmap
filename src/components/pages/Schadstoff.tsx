@@ -7,11 +7,12 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
 import useHazmatDb from '../../hooks/useHazmatDb';
+import CircularProgress from '@mui/material/CircularProgress';
 
 export default function SchadstoffPage() {
   const [unNumber, setUnNumber] = useState('');
   const [materialName, setMaterialName] = useState('');
-  const hazmatRecords = useHazmatDb(unNumber, materialName);
+  const [hazmatRecords, isInProgress] = useHazmatDb(unNumber, materialName);
 
   const openEricards = useCallback((num: string, nam: string) => {
     let form = document.createElement('form');
@@ -71,6 +72,7 @@ export default function SchadstoffPage() {
           }}
           value={materialName}
         />
+        {isInProgress && <CircularProgress />}
         <Button
           variant="contained"
           color="primary"

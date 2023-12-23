@@ -3,12 +3,17 @@ import { HazmatMaterial } from '../common/hazmat';
 import useFirebaseLogin from './useFirebaseLogin';
 import useDebounce from './useDebounce';
 
-export default function useHazmatDb(unNumber?: string, name?: string) {
+export default function useHazmatDb(
+  unNumber?: string,
+  name?: string
+): [HazmatMaterial[], boolean] {
   const [hazmatRecords, setHazmatRecords] = useState<HazmatMaterial[]>([]);
   const { user, isSignedIn } = useFirebaseLogin();
+  const [isInProgress, setIsInProgress] = useState(false);
 
   const fetchHazmat = useCallback(
     async (unNumberArg?: string, unName?: string) => {
+      setIsInProgress(true);
       console.info(`searching for hazmat ${unNumberArg} ${unName}`);
       if (!(isSignedIn && user && (unNumberArg || unName))) return;
       const token = await user?.getIdToken();
@@ -28,6 +33,7 @@ export default function useHazmatDb(unNumber?: string, name?: string) {
         )
       ).json();
       setHazmatRecords(response);
+      setIsInProgress(false);
     },
     [isSignedIn, user]
   );
@@ -42,5 +48,5 @@ export default function useHazmatDb(unNumber?: string, name?: string) {
     debouncedFetch();
   }, [debouncedFetch, unNumber, name]);
 
-  return hazmatRecords;
+  return [hazmatRecords, isInProgress];
 }
