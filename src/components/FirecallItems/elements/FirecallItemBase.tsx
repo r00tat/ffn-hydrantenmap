@@ -148,4 +148,8 @@ export class FirecallItemBase {
       />
     );
   }
+
+  public static isPolyline(): boolean {
+    return false;
+  }
 }

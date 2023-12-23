@@ -94,4 +94,8 @@ export class FirecallArea extends FirecallItemBase {
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
     return <AreaMarker record={this} selectItem={selectItem} key={this.id} />;
   }
+
+  public static isPolyline(): boolean {
+    return true;
+  }
 }

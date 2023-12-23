@@ -109,4 +109,8 @@ export class FirecallConnection extends FirecallItemBase {
       <ConnectionMarker record={this} selectItem={selectItem} key={this.id} />
     );
   }
+
+  public static isPolyline(): boolean {
+    return true;
+  }
 }
