@@ -75,6 +75,12 @@ export class FirecallItemBase {
     };
   }
 
+  public filteredData(): FirecallItem {
+    return Object.fromEntries(
+      Object.entries(this.data()).filter(([key, value]) => value)
+    ) as FirecallItem;
+  }
+
   public markerName() {
     return 'Firecallitem';
   }

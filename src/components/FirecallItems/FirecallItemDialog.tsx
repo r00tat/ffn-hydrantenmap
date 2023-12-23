@@ -162,7 +162,7 @@ export default function FirecallItemDialog({
             color="primary"
             onClick={() => {
               setOpen(false);
-              onClose(item);
+              onClose(item.filteredData());
             }}
           >
             {item.id ? 'Aktualisieren' : 'Hinzufügen'}

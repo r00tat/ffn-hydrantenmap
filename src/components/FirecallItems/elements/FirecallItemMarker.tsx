@@ -1,52 +1,38 @@
-import { Icon, IconOptions } from 'leaflet';
+import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import { ReactNode } from 'react';
-import { FirecallItem } from '../../firebase/firestore';
+import { FcMarker } from '../../firebase/firestore';
 import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallItemMarker extends FirecallItemBase {
-  public constructor(firecallItem?: FirecallItem) {
+  iconUrl: string;
+  public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
     this.type = 'marker';
+    this.iconUrl = firecallItem?.iconUrl || '';
   }
 
-  public data(): FirecallItem {
+  public data(): FcMarker {
     return {
       ...super.data(),
-    } as FirecallItem;
+      iconUrl: this.iconUrl,
+    } as FcMarker;
   }
 
   public markerName() {
     return 'Marker';
   }
 
-  // public title(): string {
-  //   return `Marker ${this.name}`;
-  // }
-
-  // public info(): string {
-  //   return `${this.beschreibung || ''}`;
-  // }
-
-  // public body(): string {
-  //   return `${this.markerName()} ${this.name}
-  //       ${this.beschreibung}
-  //       position: ${this.lat},${this.lng}`;
-  // }
-
   public dialogText(): ReactNode {
     return <>Markierung {this.name}</>;
   }
 
-  // public fields(): { [fieldName: string]: string } {
-  //   return {
-  //     ...super.fields(),
-  //   };
-  // }
-
-  // public dateFields(): string[] {
-  //   return [];
-  // }
+  public fields(): { [fieldName: string]: string } {
+    return {
+      ...super.fields(),
+      iconUrl: 'Icon URL',
+    };
+  }
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {};
@@ -63,7 +49,14 @@ export class FirecallItemMarker extends FirecallItemBase {
   public titleFn(): string {
     return `${this.name}\n${this.beschreibung || ''}`;
   }
-  public icon(): Icon<IconOptions> {
+  public icon(): LeafletIcon<IconOptions> {
+    if (this.iconUrl) {
+      return L.icon({
+        iconUrl: this.iconUrl,
+        iconSize: [24, 24],
+      });
+    }
+
     return markerIcon;
   }
 

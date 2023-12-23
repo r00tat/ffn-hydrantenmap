@@ -12,8 +12,9 @@ export interface FirecallItem {
   rotation?: string;
 }
 
-export interface FirecallItemMarker extends FirecallItem {
+export interface FcMarker extends FirecallItem {
   type: 'marker';
+  iconUrl?: string;
 }
 
 export interface Fzg extends FirecallItem {

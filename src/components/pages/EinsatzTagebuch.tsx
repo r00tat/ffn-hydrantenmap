@@ -93,20 +93,20 @@ export function useDiaries() {
               original: item,
             } as Diary)
         ),
-      firecallItems
-        .filter(
-          (item: FirecallItem) =>
-            ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
-        )
-        .map(
-          (item: FirecallItem) =>
-            ({
-              ...item,
-              type: 'diary',
-              editable: true,
-              original: item,
-            } as Diary)
-        ),
+      // firecallItems
+      //   .filter(
+      //     (item: FirecallItem) =>
+      //       ['vehicle', 'diary'].indexOf(item.type) < 0 && item.datum
+      //   )
+      //   .map(
+      //     (item: FirecallItem) =>
+      //       ({
+      //         ...item,
+      //         type: 'diary',
+      //         editable: true,
+      //         original: item,
+      //       } as Diary)
+      //   ),
       firecallItems
         .filter((item: FirecallItem) => item.type === 'diary')
         .map(
