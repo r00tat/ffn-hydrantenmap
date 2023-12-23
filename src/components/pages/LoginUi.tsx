@@ -5,7 +5,7 @@ import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
 
-export default function Login() {
+export default function LoginUi() {
   const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
 
   return (
