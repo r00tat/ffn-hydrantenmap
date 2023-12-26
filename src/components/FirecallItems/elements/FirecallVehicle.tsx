@@ -33,7 +33,7 @@ export class FirecallVehicle extends FirecallItemBase {
 
   public fields(): { [fieldName: string]: string } {
     return {
-      ...super.fields(),
+      name: 'Bezeichnung',
       fw: 'Feuerwehr',
       besatzung: 'Besatzung 1:?',
       ats: 'ATS Träger',

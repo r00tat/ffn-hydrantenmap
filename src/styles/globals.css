@@ -41,10 +41,10 @@ a {
 }
 
 #map {
-  height: 90vh;
+  height: 88vh;
 }
 
 div.leaflet-container {
-  height: 90vh;
+  height: 88vh;
   width: 100%;
 }
