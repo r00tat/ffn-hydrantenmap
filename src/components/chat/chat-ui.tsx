@@ -9,9 +9,11 @@ export default function ChatUi() {
     const [result, setResult] = useState<UserRecordExtended>()
 
     const registerMessaging = useRegisterMessaging()
+    const message = useMessaging();
     return <>
         <Typography variant="h3">Chat</Typography>
         <Button onClick={async () => { setResult(await registerMessaging()) }}>Register</Button>
         <Typography>{JSON.stringify(result)}</Typography>
+        <Typography>{JSON.stringify(message)}</Typography>
     </>;
 }

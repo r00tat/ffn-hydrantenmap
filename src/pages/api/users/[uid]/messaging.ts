@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import userRequired from '../../../../server/auth/userRequired';
 import firebaseAdmin from '../../../../server/firebase/admin';
+import {getMessaging} from 'firebase-admin/messaging'
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -40,9 +41,10 @@ const authData = await userRequired(req, res);
   const doc = firestore.collection('user').doc(`${uid}`)
 
   const oldData = (await doc.get()).data();
+  const tokens = [...(oldData?.messaging), token];
 
   const newData= {
-    messaging: [...(oldData?.messaging), token]
+    messaging: tokens
   };
 
   console.info(`updating ${uid}: ${JSON.stringify(newData)}`);
@@ -50,5 +52,9 @@ const authData = await userRequired(req, res);
   await doc.set(newData, {
     merge: true,
   });
+
+  const messaging = getMessaging();
+  messaging.subscribeToTopic(tokens, 'chat')
+  
   res.status(200).json({ ...oldData, ...newData });
 }
