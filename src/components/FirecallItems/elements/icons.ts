@@ -22,6 +22,17 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Fuehrungsstelle/BefehlsFuehrungsLeitstelle.png',
     },
   },
+  Formation_von_Kräften: {
+    Trupp: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Trupp.png',
+    },
+    Gruppe: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Gruppe.png',
+    },
+    Zug: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Zug.png',
+    },
+  },
   Gefahren: {
     Ansteckungsgefahr: {
       url: '/icons/taktische_zeichen/Gefahren/Ansteckungsgefahr.png',
