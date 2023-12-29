@@ -174,7 +174,19 @@ export default function FirecallItemDialog({
                   />
                   {(item as any)[key] &&
                     ((item as any)[key] as string[]).map((url) => (
-                      <FileDisplay key={url} url={url} />
+                      <FileDisplay
+                        key={url}
+                        url={url}
+                        edit
+                        onDeleteCallback={() => {
+                          setItemField(
+                            key,
+                            ((item as any)[key] as string[]).filter(
+                              (u) => u !== url
+                            )
+                          );
+                        }}
+                      />
                     ))}
                 </>
               )}
