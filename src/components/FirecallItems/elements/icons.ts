@@ -1,5 +1,7 @@
 export interface TaktischesZeichenIcon {
   url: string;
+  width?: number;
+  height?: number;
 }
 
 export interface TaktischeZeichen {

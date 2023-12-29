@@ -58,9 +58,10 @@ export class FirecallItemMarker extends FirecallItemBase {
   }
   public icon(): LeafletIcon<IconOptions> {
     if (this.zeichen && iconKeys[this.zeichen]?.url) {
+      const customIcon = iconKeys[this.zeichen];
       return L.icon({
-        iconUrl: iconKeys[this.zeichen]?.url,
-        iconSize: [24, 24],
+        iconUrl: customIcon.url,
+        iconSize: [customIcon.width || 24, customIcon.height || 24],
       });
     }
 
