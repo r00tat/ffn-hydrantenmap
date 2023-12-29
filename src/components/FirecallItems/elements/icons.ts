@@ -17,9 +17,9 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Einrichtungen/Vorübergehende_anlassbezogene_Einrichtung.png',
     },
   },
-  Führungsstelle: {
+  Führungsstelle: {
     Befehls_Führungs_Leitstelle: {
-      url: '/icons/taktische_zeichen/Führungsstelle/BefehlsFührungsLeitstelle.png',
+      url: '/icons/taktische_zeichen/Fuehrungsstelle/BefehlsFuehrungsLeitstelle.png',
     },
   },
   Gefahren: {
