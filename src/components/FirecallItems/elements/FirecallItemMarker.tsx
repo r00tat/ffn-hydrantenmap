@@ -4,15 +4,21 @@ import { FcMarker } from '../../firebase/firestore';
 import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys, icons } from './icons';
+import { FileDisplay } from '../../firebase/storage';
 
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
   zeichen: string;
+  attachments: string[];
+
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
     this.type = 'marker';
-    this.iconUrl = firecallItem?.iconUrl || '';
-    this.zeichen = firecallItem?.zeichen || '';
+    ({
+      iconUrl: this.iconUrl = '',
+      zeichen: this.zeichen = '',
+      attachments: this.attachments = [],
+    } = firecallItem || {});
   }
 
   public data(): FcMarker {
@@ -20,6 +26,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       ...super.data(),
       iconUrl: this.iconUrl,
       zeichen: this.zeichen,
+      attachments: this.attachments,
     } as FcMarker;
   }
 
@@ -36,12 +43,14 @@ export class FirecallItemMarker extends FirecallItemBase {
       ...super.fields(),
       zeichen: 'Taktisches Zeichen',
       iconUrl: 'Icon URL',
+      attachments: 'Anhänge',
     };
   }
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
       zeichen: 'TaktischesZeichen',
+      attachments: 'attachment',
     };
   }
   public popupFn(): ReactNode {
@@ -52,6 +61,10 @@ export class FirecallItemMarker extends FirecallItemBase {
         </b>
         <br />
         {this.beschreibung || ''}
+        {this.attachments &&
+          this.attachments.map((a) => (
+            <FileDisplay key={a} url={a} showTitleIfImage={false} />
+          ))}
       </>
     );
   }

@@ -10,7 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import moment from 'moment';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
@@ -22,6 +22,8 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import { ListSubheader, Typography } from '@mui/material';
 import { icons } from './elements/icons';
+import FileUploader, { FileDisplay } from '../firebase/storage';
+import { StorageReference } from 'firebase/storage';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -58,6 +60,15 @@ export default function FirecallItemDialog({
     //   ...prev,
     // }));
   };
+
+  const fileUploadComplete = useCallback(
+    (key: string, refs: StorageReference[]) => {
+      console.info(`file upload complete for ${key}: ${refs.toString()}`);
+      const oldValue = (item as any)[key] || [];
+      setItemField(key, [...oldValue, ...refs.map((r) => r.toString())]);
+    },
+    [item]
+  );
 
   return (
     <>
@@ -156,10 +167,24 @@ export default function FirecallItemDialog({
                   </FormControl>
                 </>
               )}
+              {item.fieldTypes()[key] === 'attachment' && (
+                <>
+                  <FileUploader
+                    onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
+                  />
+                  {(item as any)[key] &&
+                    ((item as any)[key] as string[]).map((url) => (
+                      <FileDisplay key={url} url={url} />
+                    ))}
+                </>
+              )}
               {!item.dateFields().includes(key) &&
-                !['boolean', 'date', 'TaktischesZeichen'].includes(
-                  item.fieldTypes()[key]
-                ) && (
+                ![
+                  'boolean',
+                  'date',
+                  'TaktischesZeichen',
+                  'attachment',
+                ].includes(item.fieldTypes()[key]) && (
                   <TextField
                     margin="dense"
                     id={key}
