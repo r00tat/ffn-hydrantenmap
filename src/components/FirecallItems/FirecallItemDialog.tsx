@@ -155,7 +155,9 @@ export default function FirecallItemDialog({
                 </>
               )}
               {!item.dateFields().includes(key) &&
-                item.fieldTypes()[key] === undefined && (
+                !['boolean', 'date', 'TaktischesZeichen'].includes(
+                  item.fieldTypes()[key]
+                ) && (
                   <TextField
                     margin="dense"
                     id={key}
