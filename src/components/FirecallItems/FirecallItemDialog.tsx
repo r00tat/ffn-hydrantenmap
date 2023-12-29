@@ -133,7 +133,7 @@ export default function FirecallItemDialog({
                     <Select
                       defaultValue=""
                       id={`${key}-select`}
-                      label="Grouping"
+                      label="Taktisches Zeichen"
                       value={(item as any)[key] || ''}
                       onChange={(event): void => {
                         setItemField(key, event.target.value as string);
@@ -143,7 +143,9 @@ export default function FirecallItemDialog({
                         <em>Kein taktisches Zeichen</em>
                       </MenuItem>
                       {Object.entries(icons).map(([group, groupEntries]) => [
-                        <ListSubheader key={group}>{group}</ListSubheader>,
+                        <ListSubheader key={group}>
+                          {group.replace(/_/g, ' ')}
+                        </ListSubheader>,
                         ...Object.entries(groupEntries).map(([name, icon]) => (
                           <MenuItem value={name} key={name}>
                             {name.replace(/_/g, ' ')}
@@ -155,7 +157,9 @@ export default function FirecallItemDialog({
                 </>
               )}
               {!item.dateFields().includes(key) &&
-                item.fieldTypes()[key] === undefined && (
+                !['boolean', 'date', 'TaktischesZeichen'].includes(
+                  item.fieldTypes()[key]
+                ) && (
                   <TextField
                     margin="dense"
                     id={key}

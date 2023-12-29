@@ -47,7 +47,9 @@ export class FirecallItemMarker extends FirecallItemBase {
   public popupFn(): ReactNode {
     return (
       <>
-        <b>{this.name}</b>
+        <b>
+          {this.zeichen?.replace(/_/g, ' ')} {this.name}
+        </b>
         <br />
         {this.beschreibung || ''}
       </>
