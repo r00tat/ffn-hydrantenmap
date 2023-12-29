@@ -3,19 +3,23 @@ import { ReactNode } from 'react';
 import { FcMarker } from '../../firebase/firestore';
 import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
+import { iconKeys, icons } from './icons';
 
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
+  zeichen: string;
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
     this.type = 'marker';
     this.iconUrl = firecallItem?.iconUrl || '';
+    this.zeichen = firecallItem?.zeichen || '';
   }
 
   public data(): FcMarker {
     return {
       ...super.data(),
       iconUrl: this.iconUrl,
+      zeichen: this.zeichen,
     } as FcMarker;
   }
 
@@ -30,12 +34,15 @@ export class FirecallItemMarker extends FirecallItemBase {
   public fields(): { [fieldName: string]: string } {
     return {
       ...super.fields(),
+      zeichen: 'Taktisches Zeichen',
       iconUrl: 'Icon URL',
     };
   }
 
   public fieldTypes(): { [fieldName: string]: string } {
-    return {};
+    return {
+      zeichen: 'TaktischesZeichen',
+    };
   }
   public popupFn(): ReactNode {
     return (
@@ -50,6 +57,14 @@ export class FirecallItemMarker extends FirecallItemBase {
     return `${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): LeafletIcon<IconOptions> {
+    if (this.zeichen && iconKeys[this.zeichen]?.url) {
+      const customIcon = iconKeys[this.zeichen];
+      return L.icon({
+        iconUrl: customIcon.url,
+        iconSize: [customIcon.width || 24, customIcon.height || 24],
+      });
+    }
+
     if (this.iconUrl) {
       return L.icon({
         iconUrl: this.iconUrl,
