@@ -1,10 +1,10 @@
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import { ReactNode } from 'react';
 import { FcMarker } from '../../firebase/firestore';
+import FileDisplay from '../../inputs/FileDisplay';
 import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
-import { iconKeys, icons } from './icons';
-import { FileDisplay } from '../../firebase/storage';
+import { iconKeys } from './icons';
 
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
