@@ -50,6 +50,7 @@
     "react-firebase-hooks": "^5.1.1",
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^4.2.1",
+    "sharp": "^0.33.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
