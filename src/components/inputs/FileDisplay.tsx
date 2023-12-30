@@ -68,6 +68,7 @@ export default function FileDisplay({
             alt={url}
             width={80}
             height={80}
+            sizes="(min-width: 60em) 5vw, (min-width: 30em) 10vw, 20vw"
           />
         )}
       </Link>
