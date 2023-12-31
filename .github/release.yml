@@ -16,6 +16,7 @@ changelog:
     - title: 🪲 Bugfixes
       labels:
         - "bugfix"
+        - "bug"
     - title: 👒 Dependencies
       labels:
         - dependencies
@@ -26,5 +27,6 @@ changelog:
         labels:
           - dependencies
           - "bugfix"
+          - "bug"
           - "feature"
           - "enhancement"
