@@ -1,4 +1,7 @@
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import PublishIcon from '@mui/icons-material/Publish';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -6,19 +9,22 @@ import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, setDoc } from 'firebase/firestore';
+import { useRouter } from 'next/router';
 import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
-import { filterActiveItems, Firecall } from '../firebase/firestore';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
-import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { firestore } from '../firebase/firebase';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
-import { useRouter } from 'next/router';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
+import FirecallExport from '../firebase/FirecallExport';
+import { firestore } from '../firebase/firebase';
+import { Firecall, filterActiveItems } from '../firebase/firestore';
+import FirecallImport from '../firebase/FirecallImport';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -97,17 +103,26 @@ function EinsatzCard({
               Aktivieren
             </Button>
           </Tooltip>
-          <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
-            Bearbeiten
-          </Button>
-          {isAdmin && (
-            <Button
+          {einsatz.id && <FirecallExport firecallId={einsatz.id} />}
+
+          <Tooltip title="Bearbeiten">
+            <IconButton
               size="small"
-              onClick={() => setIsConfirmOpen(true)}
-              color="error"
+              onClick={() => setDisplayUpdateDialog(true)}
             >
-              Löschen
-            </Button>
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          {isAdmin && (
+            <Tooltip title="Löschen">
+              <IconButton
+                size="small"
+                onClick={() => setIsConfirmOpen(true)}
+                color="error"
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           )}
         </CardActions>
       </Card>
@@ -156,6 +171,9 @@ export default function Einsaetze() {
           Einsätze
         </Typography>
         <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <FirecallImport />
+          </Grid>
           {einsaetze.map((einsatz) => (
             <EinsatzCard
               einsatz={einsatz}
