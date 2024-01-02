@@ -2,7 +2,7 @@ import moment from 'moment';
 
 export const dateTimeFormat = 'DD.MM.YYYY HH:mm:ss';
 
-export function formatTimestamp(timestamp?: string) {
+export function formatTimestamp(timestamp?: string | Date) {
   return moment(timestamp).locale('de').format(dateTimeFormat);
 }
 export const timeFormats = [

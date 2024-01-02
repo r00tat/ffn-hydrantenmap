@@ -1,6 +1,6 @@
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import { ReactNode } from 'react';
-import { FcMarker } from '../../firebase/firestore';
+import { FcItemAttachment, FcMarker } from '../../firebase/firestore';
 import FileDisplay from '../../inputs/FileDisplay';
 import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
@@ -9,7 +9,7 @@ import { iconKeys } from './icons';
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
   zeichen: string;
-  attachments: string[];
+  attachments: FcItemAttachment[];
 
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
@@ -62,9 +62,15 @@ export class FirecallItemMarker extends FirecallItemBase {
         <br />
         {this.beschreibung || ''}
         {this.attachments &&
-          this.attachments.map((a) => (
-            <FileDisplay key={a} url={a} showTitleIfImage={false} />
-          ))}
+          this.attachments
+            .filter((a) => typeof a === 'string')
+            .map((a) => (
+              <FileDisplay
+                key={a as string}
+                url={a as string}
+                showTitleIfImage={false}
+              />
+            ))}
       </>
     );
   }
