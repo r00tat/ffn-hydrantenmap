@@ -30,7 +30,7 @@ export default function EinsatzDialog({
   const [einsatz, setEinsatz] = useState<Firecall>(
     einsatzDefault || {
       name: '',
-      date: new Date().toLocaleString('de-DE'),
+      date: new Date().toISOString(),
       deleted: false,
     }
   );

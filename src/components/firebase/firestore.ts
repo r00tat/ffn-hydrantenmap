@@ -12,11 +12,19 @@ export interface FirecallItem {
   rotation?: string;
 }
 
+export interface FcAttachment {
+  name: string;
+  mimeType?: string;
+  data: string;
+}
+
+export type FcItemAttachment = string | FcAttachment;
+
 export interface FcMarker extends FirecallItem {
   type: 'marker';
   iconUrl?: string;
   zeichen?: string;
-  attachments?: string[];
+  attachments?: FcItemAttachment[];
 }
 
 export interface Fzg extends FirecallItem {

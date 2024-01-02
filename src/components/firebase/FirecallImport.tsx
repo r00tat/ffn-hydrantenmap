@@ -55,7 +55,7 @@ export default function FirecallImport() {
           console.log(`uploading ${file.name}`);
           const firecallData = await readFileAsJson(file);
 
-          console.log(`importing firecall ${JSON.stringify(firecallData)}`);
+          console.log(`importing firecall ${firecallData.name}`);
           const ref = await importFirecall({
             ...firecallData,
             name: `${firecallData.name} Kopie ${formatTimestamp(new Date())}`,
