@@ -3,7 +3,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
   
     function authorizedUser() {
-  	  return request.auth != null && ( request.auth.token.email.matches(".*@ff-neusiedlamsee.at") || get(/databases/$(database)/documents/user/$(request.auth.uid)).data.authorized == true);
+  	  return request.auth != null && ( 
+      	
+        request.auth.token.email.matches(".*@ff-neusiedlamsee.at") || 
+        get(/databases/$(database)/documents/user/$(request.auth.uid)).data.authorized in [true, 'on', 'yes', 'y']
+        );
     }
     
     function adminUser() {

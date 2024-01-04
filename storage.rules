@@ -1,0 +1,25 @@
+rules_version = '2';
+
+function authorizedUser() {
+  return request.auth != null && ( 
+
+    request.auth.token.email.matches(".*@ff-neusiedlamsee.at") || 
+    get(/databases/default/documents/user/$(request.auth.uid)).data.authorized in [true, 'on', 'yes', 'y']
+    );
+}
+
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+  	match /firecall/{firecallId}/files/{fileName} {
+    	allow read, write: if authorizedUser();
+    }
+  
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

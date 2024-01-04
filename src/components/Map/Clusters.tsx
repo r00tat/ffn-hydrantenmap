@@ -44,11 +44,11 @@ export async function queryClusters(center: L.LatLng, radiusInM: number) {
 
   // Collect all the query results together into a single list
 
-  console.info(
-    `got ${snapshots
-      .map((snap) => snap.docs.length)
-      .reduce((p, c) => p + c, 0)} clusters`
-  );
+  // console.info(
+  //   `got ${snapshots
+  //     .map((snap) => snap.docs.length)
+  //     .reduce((p, c) => p + c, 0)} clusters`
+  // );
 
   const clusters: GeohashCluster[] = snapshots
     .map((snap) => snap.docs)
@@ -159,18 +159,18 @@ export default function Clusters() {
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
     const b = map.getBounds();
-    console.info(`map bounds: ${JSON.stringify(b)}`);
+    // console.info(`map bounds: ${JSON.stringify(b)}`);
 
     const newRadius = Math.min(
       Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),
       2500
     );
     if (Math.abs(radius - newRadius) > 50) {
-      console.info(
-        `new radius: ${newRadius} (raw: ${
-          b.getNorthWest().distanceTo(b.getSouthEast()) / 2
-        })`
-      );
+      // console.info(
+      //   `new radius: ${newRadius} (raw: ${
+      //     b.getNorthWest().distanceTo(b.getSouthEast()) / 2
+      //   })`
+      // );
       setRadius(newRadius);
     }
 

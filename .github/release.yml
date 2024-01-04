@@ -1,0 +1,32 @@
+# .github/release.yml
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    # authors:
+    #   - octocat
+  categories:
+    - title: 🏕 Features
+      labels:
+        - "feature"
+    - title: 🛠️ Enhancements
+      labels:
+        - "enhancement"
+    - title: 🪲 Bugfixes
+      labels:
+        - "bugfix"
+        - "bug"
+    - title: 👒 Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - "*"
+      exclude:
+        labels:
+          - dependencies
+          - "bugfix"
+          - "bug"
+          - "feature"
+          - "enhancement"

@@ -28,6 +28,12 @@ export class FirecallArea extends FirecallItemBase {
   public data(): Area {
     return {
       ...super.data(),
+      distance: this.distance,
+      destLat: this.destLat,
+      destLng: this.destLng,
+      positions: this.positions,
+      color: this.color,
+      opacity: this.opacity,
     } as Area;
   }
 

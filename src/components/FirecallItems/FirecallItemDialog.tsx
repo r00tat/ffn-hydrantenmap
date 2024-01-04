@@ -1,25 +1,29 @@
+import { ListSubheader } from '@mui/material';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
+import { StorageReference } from 'firebase/storage';
 import moment from 'moment';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
-import { fcItemClasses, fcItemNames, getItemClass } from './elements';
+import FileDisplay from '../inputs/FileDisplay';
+import FileUploader from '../inputs/FileUploader';
+import { fcItemNames, getItemClass } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
-import { CheckBox } from '@mui/icons-material';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
+import { icons } from './elements/icons';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -56,6 +60,15 @@ export default function FirecallItemDialog({
     //   ...prev,
     // }));
   };
+
+  const fileUploadComplete = useCallback(
+    (key: string, refs: StorageReference[]) => {
+      console.info(`file upload complete for ${key}: ${refs.toString()}`);
+      const oldValue = (item as any)[key] || [];
+      setItemField(key, [...oldValue, ...refs.map((r) => r.toString())]);
+    },
+    [item]
+  );
 
   return (
     <>
@@ -122,8 +135,68 @@ export default function FirecallItemDialog({
                   />
                 </FormGroup>
               )}
+              {item.fieldTypes()[key] === 'TaktischesZeichen' && (
+                <>
+                  <FormControl fullWidth>
+                    <InputLabel htmlFor={`${key}-select`}>
+                      Taktisches Zeichen
+                    </InputLabel>
+                    <Select
+                      defaultValue=""
+                      id={`${key}-select`}
+                      label="Taktisches Zeichen"
+                      value={(item as any)[key] || ''}
+                      onChange={(event): void => {
+                        setItemField(key, event.target.value as string);
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>Kein taktisches Zeichen</em>
+                      </MenuItem>
+                      {Object.entries(icons).map(([group, groupEntries]) => [
+                        <ListSubheader key={group}>
+                          {group.replace(/_/g, ' ')}
+                        </ListSubheader>,
+                        ...Object.entries(groupEntries).map(([name, icon]) => (
+                          <MenuItem value={name} key={name}>
+                            {name.replace(/_/g, ' ')}
+                          </MenuItem>
+                        )),
+                      ])}
+                    </Select>
+                  </FormControl>
+                </>
+              )}
+              {item.fieldTypes()[key] === 'attachment' && (
+                <>
+                  <FileUploader
+                    onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
+                  />
+                  {(item as any)[key] &&
+                    ((item as any)[key] as string[]).map((url) => (
+                      <FileDisplay
+                        key={url}
+                        url={url}
+                        edit
+                        onDeleteCallback={() => {
+                          setItemField(
+                            key,
+                            ((item as any)[key] as string[]).filter(
+                              (u) => u !== url
+                            )
+                          );
+                        }}
+                      />
+                    ))}
+                </>
+              )}
               {!item.dateFields().includes(key) &&
-                item.fieldTypes()[key] !== 'boolean' && (
+                ![
+                  'boolean',
+                  'date',
+                  'TaktischesZeichen',
+                  'attachment',
+                ].includes(item.fieldTypes()[key]) && (
                   <TextField
                     margin="dense"
                     id={key}

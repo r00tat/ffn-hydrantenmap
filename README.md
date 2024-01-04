@@ -4,11 +4,9 @@ Dieses Repository ermöglicht es Hydranten auf einer Karte darzustellen. Ziel is
 
 Für eingeloggte Benutzer bietet es darüber hinaus die Möglichkeit einer Lageführung und eines Einsatztagebuchs.
 
-Die Web App ist für Mobilgeräte optimiert um dies möglicht leicht im Einsatz verwenden zu können. 
+Die Web App ist für Mobilgeräte optimiert um dies möglicht leicht im Einsatz verwenden zu können.
 
 Die Applikation ist [Open Source](LICENSE) und kann auch von anderen Feuerwehren auf GCP deployed werden.
-
-
 
 ## Development
 
@@ -34,6 +32,8 @@ IMAGE_TAG=$(date +%Y%m%d-%H%M%S)
 gcloud builds submit . -t eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG
 gcloud run deploy hydrantenmap --allow-unauthenticated --image eu.gcr.io/ffn-utils/hydrantenmap:$IMAGE_TAG --max-instances=2 --region europe-west4
 ```
+
+To store attachments on firebase storage, you need to configure the default storage bucket and set the [CORS policy](https://firebase.google.com/docs/storage/web/download-files?hl=en#download_data_directly_from_the_sdk) on the bucket. (`gsutil cors set cors.json gs://<PROJECT-ID>.appspot.com/`)
 
 ## Importing data
 
