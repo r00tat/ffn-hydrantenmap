@@ -43,19 +43,41 @@ addEventListener('message', (event) => {
     `[${scope}] Message from navigator received: ${JSON.stringify(event.data)}`
   );
 
-  if (event.data === 'messaging loaded') {
-    console.info(`[${scope}] showing hello world!`);
-    self.registration.showNotification('Einsatz Chat', {
-      body: 'Started!',
-      icon: '/app-icon.png',
-      actions: [
-        {
-          action: 'chat',
-          title: 'Open Chat',
-        },
-      ],
-    });
-  }
+  //   if (event.data === 'messaging loaded') {
+  //     console.info(`[${scope}] showing hello world!`);
+  //     self.registration.showNotification('Einsatz Chat', {
+  //       body: 'Started!',
+  //       icon: '/app-icon.png',
+  //       actions: [
+  //         {
+  //           action: 'chat',
+  //           title: 'Open Chat',
+  //         },
+  //       ],
+  //     });
+  //   }
+});
+
+addEventListener('notificationclick', (ev) => {
+  const event = ev as NotificationEvent;
+  console.log('On notification click: ', event.action);
+  event.notification.close();
+
+  // This looks to see if the current is already open and
+  // focuses if it is
+  event.waitUntil(
+    self.clients
+      .matchAll({
+        type: 'window',
+      })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url === '/chat' && 'focus' in client)
+            return client.focus();
+        }
+        if (self.clients.openWindow) return self.clients.openWindow('/chat');
+      })
+  );
 });
 
 // if (scope.includes('firebase-cloud-messaging-push-scope')) {
