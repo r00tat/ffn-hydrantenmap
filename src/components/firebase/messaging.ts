@@ -12,7 +12,7 @@ export async function requestPermission(): Promise<boolean> {
   return false;
 }
 
-export async function registerMessaging(): Promise<string | undefined> {
+export async function getMessagingToken(): Promise<string | undefined> {
   // Get registration token. Initially this makes a network call, once retrieved
   // subsequent calls to getToken will return from cache.
   const messaging: Messaging = getMessaging(app);

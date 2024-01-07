@@ -1,7 +1,7 @@
 import { isSupported } from 'firebase/messaging';
 import { useCallback, useEffect, useState } from 'react';
 import { UserRecordExtended } from '../common/users';
-import { registerMessaging } from '../components/firebase/messaging';
+import { getMessagingToken } from '../components/firebase/messaging';
 import useApiRequest from './useApiRequest';
 import useFirebaseLogin from './useFirebaseLogin';
 
@@ -10,7 +10,7 @@ export function useFirebaseMessagingToken() {
 
   useEffect(() => {
     (async () => {
-      const messagingToken = await registerMessaging();
+      const messagingToken = await getMessagingToken();
       setToken(messagingToken);
     })();
   }, []);
@@ -52,7 +52,7 @@ export function useUnRegisterMessaging() {
     if (!isSignedIn || !user || !(await isSupported())) {
       return undefined;
     }
-    const messagingToken = await registerMessaging();
+    const messagingToken = await getMessagingToken();
 
     if (messagingToken || !messagingTokens) {
       const unregisterResponse = await apiRequest(

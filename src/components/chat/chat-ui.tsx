@@ -47,6 +47,12 @@ export default function ChatUi() {
     );
   }, [messagingToken, messagingTokens]);
 
+  useEffect(() => {
+    if (Notification.permission === 'default') {
+      registerMessaging();
+    }
+  }, [registerMessaging]);
+
   return (
     <>
       <Typography variant="h3">Chat</Typography>
@@ -56,10 +62,11 @@ export default function ChatUi() {
             control={
               <Switch
                 checked={notificationsEnabled}
-                onChange={(ev) => {
-                  notificationsEnabled
+                onChange={async (ev) => {
+                  await (notificationsEnabled
                     ? unregisterMessaging()
-                    : registerMessaging();
+                    : registerMessaging());
+                  setNotificationsEnabled((prev) => !prev);
                 }}
               />
             }
