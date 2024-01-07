@@ -157,4 +157,4 @@ export const iconKeys: { [name: string]: TaktischesZeichenIcon } =
       .map(([group, groupIcons]) => Object.entries(groupIcons))
       .flat()
   );
-console.info(`iconKeys: ${JSON.stringify(iconKeys)}`);
+// console.info(`iconKeys: ${JSON.stringify(iconKeys)}`);

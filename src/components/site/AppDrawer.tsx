@@ -18,6 +18,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import ChatIcon from '@mui/icons-material/Chat';
 
 export default function AppDrawer({
   isOpen,
@@ -44,6 +45,17 @@ export default function AppDrawer({
 
   const drawerItems = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
+    { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
+    { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
+    { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
+    { text: 'Einsätze', icon: <LocalFireDepartmentIcon />, href: '/einsaetze' },
+    {
+      text: 'Schadstoff',
+      icon: <Icon path={mdiBiohazard} size={1} />,
+      href: '/schadstoff',
+    },
+    { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
+    { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
     { text: 'Login', icon: <LoginIcon />, href: '/login' },
     { text: 'About', icon: <InfoIcon />, href: '/about' },
   ];
@@ -66,61 +78,6 @@ export default function AppDrawer({
                 </ListItem>
               </Link>
             ))}
-
-            {isAuthorized && (
-              <>
-                <Link href="/fahrzeuge" passHref>
-                  <ListItem button key="fahrzeuge">
-                    <ListItemIcon>
-                      <DirectionsCarIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Fahrzeuge &amp; Co" />
-                  </ListItem>
-                </Link>
-
-                <Link href="/tagebuch" passHref>
-                  <ListItem button key="teagebuch">
-                    <ListItemIcon>
-                      <LibraryBooksIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Einsatz Tagebuch" />
-                  </ListItem>
-                </Link>
-
-                <Link href="/einsaetze" passHref>
-                  <ListItem button key="einsaetze">
-                    <ListItemIcon>
-                      <LocalFireDepartmentIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Einsätze" />
-                  </ListItem>
-                </Link>
-                <Link href="/schadstoff" passHref>
-                  <ListItem button key="schadstoff">
-                    <ListItemIcon>
-                      <Icon path={mdiBiohazard} size={1} />
-                    </ListItemIcon>
-                    <ListItemText primary="Schadstoff" />
-                  </ListItem>
-                </Link>
-                <Link href="/print" passHref>
-                  <ListItem button key="print">
-                    <ListItemIcon>
-                      <PrintIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Drucken" />
-                  </ListItem>
-                </Link>
-                <Link href="/tokens" passHref>
-                  <ListItem button key="tokens">
-                    <ListItemIcon>
-                      <ApiIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Tokens" />
-                  </ListItem>
-                </Link>
-              </>
-            )}
 
             {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
               <Link href="/users" passHref>
