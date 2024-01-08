@@ -129,7 +129,9 @@ export function useDiaries() {
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
-        erledigt: moment(a.erledigt).format(dateTimeFormat),
+        erledigt: a.erledigt
+          ? moment(a.erledigt).format(dateTimeFormat)
+          : undefined,
       }));
     setDiaries(diaries);
     setDiaryCounter(
@@ -139,7 +141,7 @@ export function useDiaries() {
   return { diaries, diaryCounter };
 }
 
-function DiaryButtons({ diary }: { diary: Diary }) {
+export function DiaryButtons({ diary }: { diary: Diary }) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
 
@@ -191,7 +193,7 @@ function DiaryButtons({ diary }: { diary: Diary }) {
   );
 }
 
-function useGridColumns() {
+export function useGridColumns() {
   const [columns, setColumns] = useState<GridColDef[]>();
   useEffect(() => {
     setColumns([
