@@ -1,10 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
-import { firecallItems } from './infos/firecallitems';
-import { FirecallItemInfo } from './infos/types';
+import { getItemClass } from './elements';
 
 export interface DeleteFirecallItemDialogOptions {
   item: FirecallItem;
@@ -18,27 +17,24 @@ export default function DeleteFirecallItemDialog({
   const firecallId = useFirecallId();
   const updateItem = useFirecallItemUpdate(firecallId);
 
-  const itemInfo: FirecallItemInfo =
-    firecallItems[item.type] || firecallItems.fallback;
+  const fcItem = useMemo(() => getItemClass(item), [item]);
 
   const deleteFn = useCallback(
     (result: boolean) => {
       if (result) {
-        updateItem({ ...item, deleted: true });
+        updateItem({ ...fcItem.filteredData(), deleted: true });
       }
       if (callback) {
         callback(result);
       }
     },
-    [callback, updateItem, item]
+    [callback, updateItem, fcItem]
   );
 
   return (
     <ConfirmDialog
-      title={`${itemInfo.name} ${itemInfo.title(item)} löschen`}
-      text={`Element ${itemInfo.name} ${itemInfo.title(
-        item
-      )} wirklich löschen?`}
+      title={`${fcItem.title()} löschen`}
+      text={`Element ${fcItem.title()} wirklich löschen?`}
       onConfirm={deleteFn}
     />
   );

@@ -15,6 +15,10 @@ export class FirecallRohr extends FirecallItemBase {
     }
   }
 
+  public copy(): FirecallRohr {
+    return Object.assign(new FirecallRohr(this.data()), this);
+  }
+
   public markerName() {
     return 'Rohr';
   }
@@ -34,12 +38,12 @@ export class FirecallRohr extends FirecallItemBase {
     };
   }
 
-  public data(): FirecallItem {
+  public data(): Rohr {
     return {
       ...super.data(),
       durchfluss: this.durchfluss,
       art: this.art,
-    } as FirecallItem;
+    } as Rohr;
   }
 
   public title(): string {

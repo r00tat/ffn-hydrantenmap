@@ -1,13 +1,17 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
-import { asspIcon, elIcon } from '../icons';
+import { elIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallEinsatzleitung extends FirecallItemBase {
   public constructor(firecallItem?: FirecallItem) {
     super(firecallItem);
     this.type = 'el';
+  }
+
+  public copy(): FirecallEinsatzleitung {
+    return Object.assign(new FirecallEinsatzleitung(this.data()), this);
   }
 
   public data(): FirecallItem {

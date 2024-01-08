@@ -28,6 +28,10 @@ export class FirecallConnection extends FirecallItemBase {
     }
   }
 
+  public copy(): FirecallConnection {
+    return Object.assign(new FirecallConnection(this.data()), this);
+  }
+
   public markerName() {
     return 'Leitung';
   }

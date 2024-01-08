@@ -25,6 +25,10 @@ export class FirecallArea extends FirecallItemBase {
     this.opacity = firecallItem?.opacity || 50;
   }
 
+  public copy(): FirecallArea {
+    return Object.assign(new FirecallArea(this.data()), this);
+  }
+
   public data(): Area {
     return {
       ...super.data(),

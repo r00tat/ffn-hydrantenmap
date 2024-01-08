@@ -21,6 +21,10 @@ export class FirecallItemMarker extends FirecallItemBase {
     } = firecallItem || {});
   }
 
+  public copy(): FirecallItemBase {
+    return Object.assign(new FirecallItemMarker(this.data()), this);
+  }
+
   public data(): FcMarker {
     return {
       ...super.data(),

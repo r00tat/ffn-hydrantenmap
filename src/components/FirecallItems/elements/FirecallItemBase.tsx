@@ -58,6 +58,14 @@ export class FirecallItemBase {
   original?: FirecallItem;
   rotation?: string;
 
+  public copy(): FirecallItemBase {
+    return Object.assign(new FirecallItemBase(this.data()), this);
+  }
+
+  public set(name: string, value: any): FirecallItemBase {
+    return Object.assign(this, { [name]: value });
+  }
+
   /**
    * prepare serialization
    * @returns serializable data to save in firestore

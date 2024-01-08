@@ -65,32 +65,36 @@ export default function FahrzeugePrint() {
         {otherItems.length} weitere Einsatzmarker
       </Typography>
       <table>
-        <tr>
-          <th>Typ</th>
-          <th>Name</th>
-          <th>Beschreibung</th>
-          <th>Datum</th>
-          <th>Koordinaten</th>
-        </tr>
-        {otherItems.map((item) => (
-          <tr key={item.id}>
-            <td>{item.type}</td>
-            <td>{item.name}</td>
-            <td>
-              {firecallItemInfo(item.type).popupFn(item)}
-              {item.beschreibung && (
-                <>
-                  <br />
-                  {item.beschreibung}
-                </>
-              )}
-            </td>
-            <td>{item.datum && formatTimestamp(item.datum)}</td>
-            <td>
-              {item.lat} {item.lng}
-            </td>
+        <thead>
+          <tr>
+            <th>Typ</th>
+            <th>Name</th>
+            <th>Beschreibung</th>
+            <th>Datum</th>
+            <th>Koordinaten</th>
           </tr>
-        ))}
+        </thead>
+        <tbody>
+          {otherItems.map((item) => (
+            <tr key={item.id}>
+              <td>{item.type}</td>
+              <td>{item.name}</td>
+              <td>
+                {firecallItemInfo(item.type).popupFn(item)}
+                {item.beschreibung && (
+                  <>
+                    <br />
+                    {item.beschreibung}
+                  </>
+                )}
+              </td>
+              <td>{item.datum && formatTimestamp(item.datum)}</td>
+              <td>
+                {item.lat} {item.lng}
+              </td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     </Box>
   );
