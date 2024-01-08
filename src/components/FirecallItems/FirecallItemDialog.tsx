@@ -250,7 +250,7 @@ export default function FirecallItemDialog({
             setConfirmDelete(false);
             if (result) {
               setOpen(false);
-              onClose({ ...item, deleted: true });
+              onClose({ ...item.filteredData(), deleted: true });
             }
           }}
         />
