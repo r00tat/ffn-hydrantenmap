@@ -10,6 +10,10 @@ export class FirecallAssp extends FirecallItemBase {
     this.type = 'assp';
   }
 
+  public copy(): FirecallAssp {
+    return Object.assign(new FirecallAssp(this.data()), this);
+  }
+
   public data(): FirecallItem {
     return {
       ...super.data(),

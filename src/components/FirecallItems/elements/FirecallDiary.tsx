@@ -24,6 +24,10 @@ export class FirecallDiary extends FirecallItemBase {
     } as Diary;
   }
 
+  public copy(): FirecallDiary {
+    return Object.assign(new FirecallDiary(this.data()), this);
+  }
+
   public markerName() {
     return 'Einsatztagebuch';
   }

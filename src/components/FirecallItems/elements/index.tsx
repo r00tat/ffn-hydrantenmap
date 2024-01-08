@@ -41,7 +41,7 @@ Object.entries(fcItemClasses).forEach(([k, FcClass]) => {
   fcItemNames[k] = new FcClass().markerName();
 });
 
-export function getItemClass(record?: FirecallItem) {
+export function getItemClass(record?: FirecallItem): FirecallItemBase {
   switch (record?.type) {
     case 'marker':
       return new FirecallItemMarker(record as FcMarker);

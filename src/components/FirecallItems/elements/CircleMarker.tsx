@@ -19,7 +19,11 @@ export class CircleMarker extends FirecallItemBase {
     this.fill = firecallItem?.fill === undefined ? 'true' : firecallItem.fill;
   }
 
-  public data(): FirecallItem {
+  public copy(): CircleMarker {
+    return Object.assign(new CircleMarker(this.data()), this);
+  }
+
+  public data(): Circle {
     return {
       ...super.data(),
       color: this.color,

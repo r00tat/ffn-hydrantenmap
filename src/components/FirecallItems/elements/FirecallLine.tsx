@@ -14,6 +14,10 @@ export class FirecallLine extends FirecallConnection {
     this.color = firecallItem?.color || 'green';
   }
 
+  public copy(): FirecallLine {
+    return Object.assign(new FirecallLine(this.data()), this);
+  }
+
   public markerName() {
     return 'Linie';
   }
