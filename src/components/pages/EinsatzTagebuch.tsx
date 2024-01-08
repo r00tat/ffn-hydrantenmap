@@ -31,6 +31,7 @@ export function useDiaries() {
   const firecallId = useFirecallId();
 
   const [diaries, setDiaries] = useState<Diary[]>([]);
+  const [diaryCounter, setDiaryCounter] = useState(1);
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: 'call',
@@ -128,10 +129,14 @@ export function useDiaries() {
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
+        erledigt: moment(a.erledigt).format(dateTimeFormat),
       }));
     setDiaries(diaries);
+    setDiaryCounter(
+      firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
+    );
   }, [firecallItems]);
-  return diaries;
+  return { diaries, diaryCounter };
 }
 
 function DiaryButtons({ diary }: { diary: Diary }) {
@@ -190,9 +195,13 @@ function useGridColumns() {
   const [columns, setColumns] = useState<GridColDef[]>();
   useEffect(() => {
     setColumns([
-      { field: 'name', headerName: 'Name', minWidth: 150, flex: 0.3 },
-      { field: 'datum', headerName: 'Datum', flex: 0.3 },
-      { field: 'beschreibung', headerName: 'Beschreibung', flex: 0.4 },
+      { field: 'nummer', headerName: 'Nummer', minWidth: 40, flex: 0.05 },
+      { field: 'datum', headerName: 'Datum', flex: 0.15, minWidth: 50 },
+      { field: 'von', headerName: 'Von', minWidth: 50, flex: 0.1 },
+      { field: 'an', headerName: 'An', minWidth: 50, flex: 0.1 },
+      { field: 'name', headerName: 'Information', minWidth: 100, flex: 0.2 },
+      { field: 'beschreibung', headerName: 'Anmerkung', flex: 0.2 },
+      { field: 'erledigt', headerName: 'Erledigt', flex: 0.15 },
       {
         field: 'buttons',
         headerName: 'Aktionen',
@@ -213,7 +222,7 @@ export default function EinsatzTagebuch({
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { email } = useFirebaseLogin();
   const firecallId = useFirecallId();
-  const diaries = useDiaries();
+  const { diaries, diaryCounter } = useDiaries();
   const columns = useGridColumns();
 
   const diaryClose = useCallback(
@@ -274,6 +283,7 @@ export default function EinsatzTagebuch({
       {tagebuchDialogIsOpen && (
         <FirecallItemDialog
           type="diary"
+          item={{ type: 'diary', nummer: diaryCounter } as Diary}
           onClose={diaryClose}
           allowTypeChange={false}
         />

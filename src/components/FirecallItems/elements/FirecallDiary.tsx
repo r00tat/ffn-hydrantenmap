@@ -3,6 +3,7 @@ import { Diary, FirecallItem } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallDiary extends FirecallItemBase {
+  nummer: number;
   von: string;
   an: string;
   erledigt: string;
@@ -13,6 +14,7 @@ export class FirecallDiary extends FirecallItemBase {
     this.von = firecallItem?.von ?? '';
     this.an = firecallItem?.an ?? '';
     this.erledigt = firecallItem?.erledigt ?? '';
+    this.nummer = firecallItem?.nummer ?? 1;
   }
 
   public data(): Diary {
@@ -21,6 +23,7 @@ export class FirecallDiary extends FirecallItemBase {
       von: this.von,
       an: this.an,
       erledigt: this.erledigt,
+      nummer: this.nummer,
     } as Diary;
   }
 
@@ -38,15 +41,21 @@ export class FirecallDiary extends FirecallItemBase {
 
   public fields(): { [fieldName: string]: string } {
     return {
-      ...super.fields(),
+      nummer: 'Nummer',
+      datum: 'Datum',
       von: 'Meldung von',
       an: 'Meldung an',
+      name: 'Information',
+      beschreibung: 'Anmerkung',
       erledigt: 'Erledigt',
     };
   }
 
   public fieldTypes(): { [fieldName: string]: string } {
-    return {};
+    return {
+      name: 'textarea',
+      beschreibung: 'textarea',
+    };
   }
 
   public dateFields(): string[] {

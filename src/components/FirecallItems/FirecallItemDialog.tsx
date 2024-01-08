@@ -202,6 +202,7 @@ export default function FirecallItemDialog({
                     key={key}
                     label={label}
                     type={item.fieldTypes()[key] || 'text'}
+                    multiline={item.fieldTypes()[key] === 'textarea'}
                     fullWidth
                     variant="standard"
                     onChange={onChange(key)}
