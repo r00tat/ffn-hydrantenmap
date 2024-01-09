@@ -205,6 +205,7 @@ export function useGridColumns() {
       { field: 'datum', headerName: 'Datum', flex: 0.15, minWidth: 50 },
       { field: 'von', headerName: 'Von', minWidth: 50, flex: 0.1 },
       { field: 'an', headerName: 'An', minWidth: 50, flex: 0.1 },
+      { field: 'art', headerName: 'Art', minWidth: 50, flex: 0.1 },
       { field: 'name', headerName: 'Information', minWidth: 100, flex: 0.2 },
       { field: 'beschreibung', headerName: 'Anmerkung', flex: 0.2 },
       { field: 'erledigt', headerName: 'Erledigt', flex: 0.15 },

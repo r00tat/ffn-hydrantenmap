@@ -1,20 +1,25 @@
 import { ReactNode } from 'react';
 import { Diary, FirecallItem } from '../../firebase/firestore';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
+import { SimpleMap } from '../../../common/types';
 
 export class FirecallDiary extends FirecallItemBase {
   nummer: number;
   von: string;
   an: string;
   erledigt: string;
+  art: string;
 
   public constructor(firecallItem?: Diary) {
     super(firecallItem);
     this.type = 'diary';
-    this.von = firecallItem?.von ?? '';
-    this.an = firecallItem?.an ?? '';
-    this.erledigt = firecallItem?.erledigt ?? '';
-    this.nummer = firecallItem?.nummer ?? 1;
+    ({
+      nummer: this.nummer = 1,
+      von: this.von = '',
+      an: this.an = '',
+      erledigt: this.erledigt = '',
+      art: this.art = 'M',
+    } = firecallItem || {});
   }
 
   public data(): Diary {
@@ -24,6 +29,7 @@ export class FirecallDiary extends FirecallItemBase {
       an: this.an,
       erledigt: this.erledigt,
       nummer: this.nummer,
+      art: this.art,
     } as Diary;
   }
 
@@ -45,6 +51,7 @@ export class FirecallDiary extends FirecallItemBase {
       datum: 'Datum',
       von: 'Meldung von',
       an: 'Meldung an',
+      art: 'Art der Meldung',
       name: 'Information',
       beschreibung: 'Anmerkung',
       erledigt: 'Erledigt',
@@ -55,6 +62,17 @@ export class FirecallDiary extends FirecallItemBase {
     return {
       name: 'textarea',
       beschreibung: 'textarea',
+      art: 'select',
+    };
+  }
+
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      art: {
+        M: 'Meldung',
+        F: 'Frage',
+        B: 'Befehl',
+      },
     };
   }
 

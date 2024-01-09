@@ -44,6 +44,8 @@ export interface Rohr extends FirecallItem {
 }
 
 export interface Diary extends FirecallItem {
+  type: 'diary';
+  art?: 'M' | 'B' | 'F';
   nummer?: number;
   datum: string;
   von?: string;

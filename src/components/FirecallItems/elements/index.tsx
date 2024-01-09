@@ -35,6 +35,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   assp: FirecallAssp,
   el: FirecallEinsatzleitung,
   vehicle: FirecallVehicle,
+  gb: FirecallGb,
 };
 
 export const fcItemNames: { [key: string]: string } = {};
