@@ -21,6 +21,12 @@ const EinsatzTagebuch = dynamic(
   },
   { ssr: false }
 );
+const Geschaeftsbuch = dynamic(
+  () => {
+    return import('../components/pages/GeschaeftsbuchPrint');
+  },
+  { ssr: false }
+);
 
 export default function PrintPage() {
   return (
@@ -37,7 +43,8 @@ export default function PrintPage() {
         </Grid>
       </Grid>
       <DynamicFahrzeuge />
-      <EinsatzTagebuch boxHeight="1200px" />
+      <EinsatzTagebuch />
+      <Geschaeftsbuch />
     </>
   );
 }

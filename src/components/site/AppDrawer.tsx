@@ -1,12 +1,14 @@
 import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
 import ApiIcon from '@mui/icons-material/Api';
+import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import InfoIcon from '@mui/icons-material/Info';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
@@ -18,7 +20,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import ChatIcon from '@mui/icons-material/Chat';
 
 export default function AppDrawer({
   isOpen,
@@ -48,13 +49,14 @@ export default function AppDrawer({
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
     { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
+    { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
+    { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
     { text: 'Einsätze', icon: <LocalFireDepartmentIcon />, href: '/einsaetze' },
     {
       text: 'Schadstoff',
       icon: <Icon path={mdiBiohazard} size={1} />,
       href: '/schadstoff',
     },
-    { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
     { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
     { text: 'Login', icon: <LoginIcon />, href: '/login' },
     { text: 'About', icon: <InfoIcon />, href: '/about' },

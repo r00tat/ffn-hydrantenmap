@@ -166,6 +166,30 @@ export default function FirecallItemDialog({
                   </FormControl>
                 </>
               )}
+              {item.fieldTypes()[key] === 'select' && (
+                <FormControl fullWidth variant="standard">
+                  <InputLabel id={`firecall-item-${key}-label`}>
+                    {label}
+                  </InputLabel>
+                  <Select
+                    labelId={`firecall-item-${key}-label`}
+                    id={`firecall-item-${key}`}
+                    value={item.get<string>(key) || ''}
+                    label={label}
+                    onChange={(event): void => {
+                      setItemField(key, event.target.value as string);
+                    }}
+                  >
+                    {Object.entries(item.selectValues()[key] || {}).map(
+                      ([k, l]) => (
+                        <MenuItem key={k} value={k}>
+                          {l}
+                        </MenuItem>
+                      )
+                    )}
+                  </Select>
+                </FormControl>
+              )}
               {item.fieldTypes()[key] === 'attachment' && (
                 <>
                   <FileUploader
@@ -195,6 +219,7 @@ export default function FirecallItemDialog({
                   'date',
                   'TaktischesZeichen',
                   'attachment',
+                  'select',
                 ].includes(item.fieldTypes()[key]) && (
                   <TextField
                     margin="dense"
