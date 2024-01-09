@@ -2,7 +2,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import { IconButton } from '@mui/material';
 import L from 'leaflet';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Marker, Polygon, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { useFirecallId } from '../../../../hooks/useFirecall';
@@ -20,6 +20,7 @@ export interface AreaMarkerProps {
 
 export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
   const firecallId = useFirecallId();
+  const [showMarkers, setShowMarkers] = useState(false);
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -45,50 +46,59 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
 
   return (
     <>
-      {positions.map((p, index) => (
-        <Marker
-          key={index}
-          position={p}
-          title={record.titleFn()}
-          icon={record.icon()}
-          draggable
-          autoPan={false}
-          eventHandlers={{
-            dragend: (event) => {
-              updateFirecallPositions(
-                firecallId,
-                (event.target as L.Marker)?.getLatLng(),
-                record.data(),
-                index
-              );
-            },
-          }}
-        >
-          <Popup>
-            <IconButton
-              sx={{ marginLeft: 'auto', float: 'right' }}
-              onClick={() => selectItem(record)}
-            >
-              <EditIcon />
-            </IconButton>
-            <IconButton
-              sx={{ marginLeft: 'auto', float: 'right' }}
-              onClick={() =>
-                deleteFirecallPosition(firecallId, record.data(), index)
-              }
-            >
-              <DeleteIcon />
-            </IconButton>
-            {record.popupFn()}
-          </Popup>
-        </Marker>
-      ))}
+      {showMarkers &&
+        positions.map((p, index) => (
+          <Marker
+            key={index}
+            position={p}
+            title={record.titleFn()}
+            icon={record.icon()}
+            draggable
+            autoPan={false}
+            eventHandlers={{
+              dragend: (event) => {
+                updateFirecallPositions(
+                  firecallId,
+                  (event.target as L.Marker)?.getLatLng(),
+                  record.data(),
+                  index
+                );
+              },
+            }}
+          >
+            <Popup>
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                onClick={() => selectItem(record)}
+              >
+                <EditIcon />
+              </IconButton>
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                onClick={() =>
+                  deleteFirecallPosition(firecallId, record.data(), index)
+                }
+              >
+                <DeleteIcon />
+              </IconButton>
+              {record.popupFn()}
+            </Popup>
+          </Marker>
+        ))}
       <Polygon
         positions={positions}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: 0.8,
           fillOpacity: ((record as any)?.opacity || 50.0) / 100,
+        }}
+        eventHandlers={{
+          popupopen: (event) => {
+            setShowMarkers(true);
+          },
+          popupclose: (event) => {
+            setShowMarkers(false);
+          },
         }}
       >
         <Popup>
