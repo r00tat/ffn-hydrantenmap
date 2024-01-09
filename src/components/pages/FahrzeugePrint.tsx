@@ -1,27 +1,23 @@
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
+import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
-import FirecallItemCard from '../FirecallItems/FirecallItemCard';
-import { formatTimestamp } from '../../common/time-format';
 import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
 
 export default function FahrzeugePrint() {
-  const { isAuthorized } = useFirebaseLogin();
-  const firecallId = useFirecallId();
   const { vehicles, rohre, otherItems: others } = useVehicles();
   const otherItems = [...rohre, ...others];
-
-  if (!isAuthorized) {
-    return <></>;
-  }
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
       <Typography variant="h3" gutterBottom>
-        {vehicles.length} Fahrzeuge im Einsatz
+        {vehicles.length} Fahrzeuge im Einsatz mit{' '}
+        {vehicles
+          .map((v) => (v.besatzung ? Number.parseInt(v.besatzung, 10) : 1) + 1)
+          .reduce((p, c) => p + c, 0)}{' '}
+        Besatzung
       </Typography>
       <table>
         <thead>

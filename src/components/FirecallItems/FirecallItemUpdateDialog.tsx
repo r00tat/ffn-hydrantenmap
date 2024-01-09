@@ -10,11 +10,13 @@ import { FirecallItemInfo } from './infos/types';
 export interface FirecallItemUpdateDialogOptions {
   item: FirecallItem;
   callback?: (item?: FirecallItem) => void;
+  allowTypeChange?: boolean;
 }
 
 export default function FirecallItemUpdateDialog({
   item,
   callback,
+  allowTypeChange,
 }: FirecallItemUpdateDialogOptions) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const firecallId = useFirecallId();
@@ -46,7 +48,11 @@ export default function FirecallItemUpdateDialog({
 
   return (
     <>
-      <FirecallItemDialog onClose={updateFn} item={item.original || item} />
+      <FirecallItemDialog
+        onClose={updateFn}
+        item={item.original || item}
+        allowTypeChange={allowTypeChange}
+      />
 
       {isConfirmOpen && (
         <ConfirmDialog

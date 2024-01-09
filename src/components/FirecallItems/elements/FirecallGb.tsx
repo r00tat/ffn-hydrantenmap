@@ -1,60 +1,57 @@
 import { ReactNode } from 'react';
-import { Diary, FirecallItem } from '../../firebase/firestore';
-import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
-import { SimpleMap } from '../../../common/types';
+import { FirecallItem, GeschaeftsbuchEintrag } from '../../firebase/firestore';
+import { FirecallItemBase } from './FirecallItemBase';
 
-export class FirecallDiary extends FirecallItemBase {
+export class FirecallGb extends FirecallItemBase {
   nummer: number;
   von: string;
   an: string;
-  erledigt: string;
-  art: string;
+  ausgehend: boolean;
 
-  public constructor(firecallItem?: Diary) {
+  public constructor(firecallItem?: GeschaeftsbuchEintrag) {
     super(firecallItem);
-    this.type = 'diary';
-    ({
-      nummer: this.nummer = 1,
-      von: this.von = '',
-      an: this.an = '',
-      erledigt: this.erledigt = '',
-      art: this.art = 'M',
-    } = firecallItem || {});
+    this.type = 'gb';
+    this.von = firecallItem?.von ?? '';
+    this.an = firecallItem?.an ?? '';
+    this.nummer = firecallItem?.nummer ?? 1;
+    this.ausgehend = firecallItem?.ausgehend ?? false;
   }
 
-  public data(): Diary {
+  public data(): GeschaeftsbuchEintrag {
     return {
       ...super.data(),
       von: this.von,
       an: this.an,
-      erledigt: this.erledigt,
+      ausgehend: this.ausgehend,
       nummer: this.nummer,
-      art: this.art,
-    } as Diary;
+    } as GeschaeftsbuchEintrag;
   }
 
-  public copy(): FirecallDiary {
-    return Object.assign(new FirecallDiary(this.data()), this);
+  public copy(): FirecallGb {
+    return Object.assign(new FirecallGb(this.data()), this);
   }
 
   public markerName() {
-    return 'Einsatztagebuch';
+    return 'Geschäftsbuch';
   }
 
   public dialogText(): ReactNode {
-    return <>Einsatztagebuch {this.name}</>;
+    return (
+      <>
+        Geschäftsbuch {this.nummer} {this.name}
+      </>
+    );
   }
 
   public fields(): { [fieldName: string]: string } {
     return {
       nummer: 'Nummer',
       datum: 'Datum',
+      ausgehend: 'Ausgehende Meldung',
       von: 'Meldung von',
       an: 'Meldung an',
-      art: 'Art der Meldung',
       name: 'Information',
       beschreibung: 'Anmerkung',
-      erledigt: 'Erledigt',
     };
   }
 
@@ -62,22 +59,12 @@ export class FirecallDiary extends FirecallItemBase {
     return {
       name: 'textarea',
       beschreibung: 'textarea',
-      art: 'select',
-    };
-  }
-
-  public selectValues(): SimpleMap<SelectOptions> {
-    return {
-      art: {
-        M: 'Meldung',
-        F: 'Frage',
-        B: 'Befehl',
-      },
+      ausgehend: 'boolean',
     };
   }
 
   public dateFields(): string[] {
-    return ['datum', 'erledigt'];
+    return ['datum'];
   }
 
   public popupFn(): ReactNode {
@@ -94,7 +81,7 @@ export class FirecallDiary extends FirecallItemBase {
   }
 
   public static factory(): FirecallItemBase {
-    return new FirecallDiary();
+    return new FirecallGb();
   }
 
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {

@@ -44,11 +44,21 @@ export interface Rohr extends FirecallItem {
 }
 
 export interface Diary extends FirecallItem {
+  type: 'diary';
+  art?: 'M' | 'B' | 'F';
   nummer?: number;
   datum: string;
   von?: string;
   an?: string;
   erledigt?: string;
+}
+export interface GeschaeftsbuchEintrag extends FirecallItem {
+  type: 'gb';
+  nummer?: number;
+  ausgehend?: boolean;
+  datum: string;
+  von?: string;
+  an?: string;
 }
 
 export interface Connection extends FirecallItem {

@@ -8,6 +8,7 @@ import {
   Line,
   Rohr,
   FcMarker,
+  GeschaeftsbuchEintrag,
 } from '../../firebase/firestore';
 import { CircleMarker } from './CircleMarker';
 import { FirecallArea } from './FirecallArea';
@@ -15,6 +16,7 @@ import { FirecallAssp } from './FirecallAssp';
 import { FirecallConnection } from './FirecallConnection';
 import { FirecallDiary } from './FirecallDiary';
 import { FirecallEinsatzleitung } from './FirecallEl';
+import { FirecallGb } from './FirecallGb';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallItemMarker } from './FirecallItemMarker';
 import { FirecallLine } from './FirecallLine';
@@ -33,6 +35,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   assp: FirecallAssp,
   el: FirecallEinsatzleitung,
   vehicle: FirecallVehicle,
+  gb: FirecallGb,
 };
 
 export const fcItemNames: { [key: string]: string } = {};
@@ -63,6 +66,8 @@ export function getItemClass(record?: FirecallItem): FirecallItemBase {
       return new FirecallAssp(record);
     case 'el':
       return new FirecallEinsatzleitung(record);
+    case 'gb':
+      return new FirecallGb(record as GeschaeftsbuchEintrag);
     default:
       return new FirecallItemBase(record);
   }

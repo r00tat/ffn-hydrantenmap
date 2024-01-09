@@ -7,6 +7,7 @@ import { defaultPosition } from '../../../hooks/constants';
 import { FirecallItem } from '../../firebase/firestore';
 import { fallbackIcon } from '../icons';
 import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
+import { SimpleMap } from '../../../common/types';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -26,6 +27,8 @@ export function FirecallItemPopup({
     </Popup>
   );
 }
+
+export interface SelectOptions extends SimpleMap<string> {}
 
 /**
  * base class for all firecall items
@@ -111,7 +114,7 @@ export class FirecallItemBase {
     return this.name || '';
   }
 
-  public fields(): { [fieldName: string]: string } {
+  public fields(): SimpleMap<string> {
     return {
       name: 'Bezeichnung',
       beschreibung: 'Beschreibung',
@@ -122,9 +125,14 @@ export class FirecallItemBase {
     return ['datum'];
   }
 
-  public fieldTypes(): { [fieldName: string]: string } {
+  public fieldTypes(): SimpleMap<string> {
     return {};
   }
+
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {};
+  }
+
   public popupFn(): ReactNode {
     return this.name;
   }
@@ -155,6 +163,10 @@ export class FirecallItemBase {
         key={this.id}
       />
     );
+  }
+
+  public get<T = any>(key: string): T {
+    return (this as any)[key] as T;
   }
 
   public static isPolyline(): boolean {
