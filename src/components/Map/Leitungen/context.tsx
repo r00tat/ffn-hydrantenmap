@@ -38,7 +38,7 @@ export const useLeitungsProvider = (): Leitungen => {
           lat: positions[0].lat,
           lng: positions[0].lng,
           user: email,
-          created: new Date(),
+          created: new Date().toISOString(),
           positions: JSON.stringify(positions.map((p) => [p.lat, p.lng])),
           distance: Math.round(
             calculateDistance(positions.map((p) => [p.lat, p.lng]))

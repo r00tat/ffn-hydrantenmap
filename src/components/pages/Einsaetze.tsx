@@ -34,7 +34,7 @@ function useFirecallUpdate() {
       );
       await setDoc(
         doc(firestore, 'call', '' + einsatz.id),
-        { ...einsatz, updatedAt: new Date(), updatedBy: email },
+        { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }
       );
     },

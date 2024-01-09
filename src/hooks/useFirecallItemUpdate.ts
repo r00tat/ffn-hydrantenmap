@@ -16,7 +16,7 @@ export default function useFirecallItemUpdate(firecallId: string = 'unknown') {
             p[k] = v;
             return p;
           }, {} as any),
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
         updatedBy: email,
       };
       console.info(

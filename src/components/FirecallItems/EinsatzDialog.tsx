@@ -51,7 +51,7 @@ export default function EinsatzDialog({
         // update
         await setDoc(
           doc(firestore, 'call', fc.id),
-          { ...fc, updatedAt: new Date(), updatedBy: email },
+          { ...fc, updatedAt: new Date().toISOString(), updatedBy: email },
           { merge: true }
         );
       } else {
@@ -59,7 +59,7 @@ export default function EinsatzDialog({
         const firecallData: Firecall = {
           ...fc,
           user: email,
-          created: new Date(),
+          created: new Date().toISOString(),
           lat: position.lat,
           lng: position.lng,
         };
