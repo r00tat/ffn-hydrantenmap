@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { ChatMessage } from '../../common/chat';
 import { useMessaging } from '../../hooks/useMessaging';
+import ChatIcon from '@mui/icons-material/Chat';
 
 export function MessageSnack({
   msg,
@@ -36,6 +37,7 @@ export function MessageSnack({
         }}
         severity="info"
         sx={{ width: '100%' }}
+        icon={<ChatIcon />}
       >
         {msg.name}: {msg.message}
       </Alert>
@@ -45,7 +47,7 @@ export function MessageSnack({
 
 export default function ChatMessageDisplay() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const router = useRouter();
+  // const router = useRouter();
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages((old) => {
@@ -78,14 +80,9 @@ export default function ChatMessageDisplay() {
 
   return (
     <>
-      {router.pathname !== '/chat' &&
-        messages.map((m) => (
-          <MessageSnack
-            msg={m}
-            key={m.id}
-            onClose={() => removeMessage(m.id)}
-          />
-        ))}
+      {messages.map((m) => (
+        <MessageSnack msg={m} key={m.id} onClose={() => removeMessage(m.id)} />
+      ))}
     </>
   );
 }

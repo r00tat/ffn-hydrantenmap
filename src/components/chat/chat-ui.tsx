@@ -73,7 +73,7 @@ export default function ChatUi() {
             label="Chat Benachrichtigungen"
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid item xs={11}>
           <FormControl sx={{ m: 2 }} variant="outlined" fullWidth>
             <InputLabel htmlFor="outlined-adornment-password">
               Chat Message
