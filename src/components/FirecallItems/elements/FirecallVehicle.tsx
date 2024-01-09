@@ -27,6 +27,10 @@ export class FirecallVehicle extends FirecallItemBase {
     }
   }
 
+  public copy(): FirecallVehicle {
+    return Object.assign(new FirecallVehicle(this.data()), this);
+  }
+
   public markerName() {
     return 'Fahrzeug';
   }
@@ -52,7 +56,7 @@ export class FirecallVehicle extends FirecallItemBase {
     };
   }
 
-  public data(): FirecallItem {
+  public data(): Fzg {
     return {
       ...super.data(),
       fw: this.fw,
@@ -61,7 +65,7 @@ export class FirecallVehicle extends FirecallItemBase {
       alarmierung: this.alarmierung,
       eintreffen: this.eintreffen,
       abruecken: this.abruecken,
-    } as FirecallItem;
+    } as Fzg;
   }
 
   public title(): string {

@@ -45,7 +45,7 @@ export default function FirecallItemDialog({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const setItemField = (field: string, value: any) => {
-    setFirecallItem((prev) => getItemClass({ ...prev.data(), [field]: value }));
+    setFirecallItem((prev) => prev.copy().set(field, value));
   };
 
   const onChange =
@@ -54,11 +54,10 @@ export default function FirecallItemDialog({
     };
 
   const handleChange = (event: SelectChangeEvent) => {
-    setItemField('type', event.target.value);
-    // setFirecallItem((prev) => ({
-    //   ...firecallItemInfo(event.target.value).factory(),
-    //   ...prev,
-    // }));
+    // setItemField('type', event.target.value);
+    setFirecallItem((prev) =>
+      getItemClass({ ...prev.data(), type: event.target.value })
+    );
   };
 
   const fileUploadComplete = useCallback(
@@ -203,6 +202,7 @@ export default function FirecallItemDialog({
                     key={key}
                     label={label}
                     type={item.fieldTypes()[key] || 'text'}
+                    multiline={item.fieldTypes()[key] === 'textarea'}
                     fullWidth
                     variant="standard"
                     onChange={onChange(key)}
@@ -250,7 +250,7 @@ export default function FirecallItemDialog({
             setConfirmDelete(false);
             if (result) {
               setOpen(false);
-              onClose({ ...item, deleted: true });
+              onClose({ ...item.filteredData(), deleted: true });
             }
           }}
         />
