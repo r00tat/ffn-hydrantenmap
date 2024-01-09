@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useFirecallId } from '../../hooks/useFirecall';
-import { useDiaries, useGridColumns } from './EinsatzTagebuch';
+import { useDiaries } from './EinsatzTagebuch';
 
 export interface EinsatzTagebuchOptions {
   boxHeight?: string;
