@@ -2,7 +2,11 @@ import app from './firebase';
 import { Messaging, getMessaging, getToken } from 'firebase/messaging';
 
 export async function requestPermission(): Promise<boolean> {
-  console.log('Requesting permission...');
+  if (Notification.permission === 'granted') {
+    return true;
+  }
+
+  console.log('Requesting notification permission...');
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     console.log('Notification permission granted.');
