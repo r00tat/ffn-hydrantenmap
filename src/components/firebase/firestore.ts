@@ -50,6 +50,14 @@ export interface Diary extends FirecallItem {
   an?: string;
   erledigt?: string;
 }
+export interface GeschaeftsbuchEintrag extends FirecallItem {
+  type: 'gb';
+  nummer?: number;
+  ausgehend?: boolean;
+  datum: string;
+  von?: string;
+  an?: string;
+}
 
 export interface Connection extends FirecallItem {
   destLat: number;
