@@ -1,8 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { formatTimestamp } from '../../common/time-format';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { useFirecallId } from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
 import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
 

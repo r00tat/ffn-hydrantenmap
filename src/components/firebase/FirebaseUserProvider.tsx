@@ -8,6 +8,7 @@ export const FirebaseLoginContext = createContext<LoginStatus>({
   isAuthorized: false,
   isAdmin: false,
   signOut: async () => {},
+  refresh: async () => {},
 });
 
 export default function FirebaseUserProvider({

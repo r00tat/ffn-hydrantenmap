@@ -13,6 +13,7 @@ import useFirebaseLogin from '../hooks/useFirebaseLogin';
 
 import dynamic from 'next/dynamic';
 import About from './about';
+import ChatMessageDisplay from '../components/chat/chat-message';
 
 const DynamicLogin = dynamic(
   () => {
@@ -31,6 +32,8 @@ function LogedinApp({ Component, pageProps }: AppProps) {
         isDrawerOpen={isDrawerOpen}
         setIsDrawerOpen={setIsDrawerOpen}
       />
+
+      <ChatMessageDisplay />
 
       <Component {...pageProps} />
     </FirecallProvider>

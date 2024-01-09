@@ -162,7 +162,7 @@ export default function Geschaeftsbuch({
         addDoc(collection(firestore, 'call', firecallId, 'item'), {
           ...item,
           user: email,
-          created: new Date(),
+          created: new Date().toISOString(),
         });
       }
     },

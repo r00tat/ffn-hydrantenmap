@@ -18,9 +18,11 @@ import {
   FirecallItem,
 } from '../components/firebase/firestore';
 import { uploadFile } from '../components/inputs/FileUploader';
+import { ChatMessage } from '../common/chat';
 
 export interface FirecallExport extends Firecall {
   items: FirecallItem[];
+  chat: ChatMessage[];
 }
 
 const storage = getStorage(app);
@@ -85,6 +87,7 @@ export async function exportFirecall(
   const firecall = (await getDoc(firecallDoc)).data() as Firecall;
 
   const items = (await getDocs(query(collection(firecallDoc, 'item')))).docs;
+  const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs;
 
   const exportItems = await Promise.all(
     items
@@ -111,6 +114,7 @@ export async function exportFirecall(
   return {
     ...firecall,
     items: exportItems,
+    chat: chat.map((c) => c.data() as ChatMessage),
   };
 }
 
@@ -124,9 +128,10 @@ const blobFromBase64String = (base64String: string, mimeType?: string) => {
 };
 
 export async function importFirecall(firecall: FirecallExport) {
-  const { items, ...firecallData } = firecall;
+  const { items, chat, ...firecallData } = firecall;
   const firecallDoc = await addDoc(collection(firestore, 'call'), firecallData);
   const itemCol = collection(firecallDoc, 'item');
+  const chatCol = collection(firecallDoc, 'chat');
 
   // upload files for items
 
@@ -160,5 +165,11 @@ export async function importFirecall(firecall: FirecallExport) {
   });
 
   batch.commit();
+
+  const chatBatch = writeBatch(firestore);
+  chat.forEach((c) => {
+    batch.set(doc(chatCol, uuid()), c);
+  });
+  chatBatch.commit();
   return firecallDoc;
 }

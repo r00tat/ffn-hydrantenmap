@@ -33,7 +33,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           lat: map.getCenter().lat,
           lng: map.getCenter().lng,
           user: email,
-          created: new Date(),
+          created: new Date().toISOString(),
         });
       }
     },

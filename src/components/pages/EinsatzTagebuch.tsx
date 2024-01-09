@@ -239,7 +239,7 @@ export default function EinsatzTagebuch({
         addDoc(collection(firestore, 'call', firecallId, 'item'), {
           ...item,
           user: email,
-          created: new Date(),
+          created: new Date().toISOString(),
         });
       }
     },

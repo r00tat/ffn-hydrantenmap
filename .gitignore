@@ -174,3 +174,6 @@ dist
 *.har
 /output
 .firebaserc
+
+/public/*.js
+/public/*.js.map
