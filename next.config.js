@@ -1,14 +1,16 @@
 /** @type {import('next').NextConfig} */
 // const { InjectManifest } = require('workbox-webpack-plugin');
 
-const withPWA = require('next-pwa')({
+const nextPWA = require('next-pwa');
+
+const withPWA = nextPWA({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
+  // disable: false,
   // register: true,
   // scope: '/app',
   sw: 'firebase-messaging-sw.js',
-  skipWaiting: false,
-  //...
+  skipWaiting: true,
 });
 
 module.exports = withPWA({

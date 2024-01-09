@@ -1,7 +1,11 @@
-import { MessagePayload, getMessaging } from 'firebase/messaging/sw';
-import { onBackgroundMessage } from 'firebase/messaging/sw';
 import { initializeApp } from 'firebase/app';
+import {
+  MessagePayload,
+  getMessaging,
+  onBackgroundMessage,
+} from 'firebase/messaging/sw';
 import { ChatMessage } from '../common/chat';
+import { workboxSetup } from './wb';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -14,23 +18,26 @@ const firebaseConfig = JSON.parse(
   process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}'
 );
 
+const scope = 'sw:' + self.registration.scope.replace(/^.*\//, '');
+
 console.info(
-  `starting background service worker with scope ${self.registration.scope}!`
+  `[${scope}] starting background service worker with scope ${self.registration.scope}!`
 );
 
-self.registration.showNotification('Einsatz Chat', {
-  body: 'hello world!',
-  icon: '/app-icon.png',
-  actions: [
-    {
-      action: 'chat',
-      title: 'Open Chat',
-    },
-  ],
-});
+workboxSetup();
 
-const scope = 'sw:' + self.registration.scope.replace(/^.*\//, '');
-console.info(`[${scope}] self.reg`, self.registration);
+// self.registration.showNotification('Einsatz Chat', {
+//   body: 'hello world!',
+//   icon: '/app-icon.png',
+//   actions: [
+//     {
+//       action: 'chat',
+//       title: 'Open Chat',
+//     },
+//   ],
+// });
+
+// console.info(`[${scope}] self.reg`, self.registration);
 
 self.registration.addEventListener('updatefound', (ev) => {
   console.info(`[${scope}] update found! `, ev);
