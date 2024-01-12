@@ -10,7 +10,11 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { addDoc, collection, where } from 'firebase/firestore';
 import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
-import { dateTimeFormat, parseTimestamp } from '../../common/time-format';
+import {
+  dateTimeFormat,
+  formatTimestamp,
+  parseTimestamp,
+} from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -23,6 +27,9 @@ import {
   GeschaeftsbuchEintrag,
   filterActiveItems,
 } from '../firebase/firestore';
+
+import { downloadRowsAsCsv } from '../firebase/download';
+import { DownloadButton } from '../inputs/DownloadButton';
 
 interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
@@ -143,6 +150,33 @@ export function useGridColumns() {
   return columns;
 }
 
+async function downloadGb(eintraege: GbDisplay[]) {
+  const rows: any[][] = [
+    [
+      'Nummer',
+      'Datum',
+      'Von',
+      'An',
+      'Art',
+      'Information',
+      'Anmerkung',
+      'erledigt',
+    ],
+    ...eintraege.map((d) => [
+      d.nummer,
+      formatTimestamp(d.datum),
+      d.einaus,
+      d.von,
+      d.an,
+      // d.art,
+      d.name,
+      d.beschreibung,
+      // d.erledigt ? formatTimestamp(d.erledigt) : '',
+    ]),
+  ];
+  downloadRowsAsCsv(rows, 'Geschaeftsbuch.csv');
+}
+
 export interface GeschaeftsbuchOptions {
   boxHeight?: string;
 }
@@ -174,7 +208,11 @@ export default function Geschaeftsbuch({
       {columns && (
         <Box sx={{ p: 2, m: 2, height: boxHeight }}>
           <Typography variant="h3" gutterBottom>
-            Geschäftsbuch
+            Geschäftsbuch{' '}
+            <DownloadButton
+              onClick={() => downloadGb(eintraege)}
+              tooltip="Geschäftsbuch als CSV herunterladen"
+            />
           </Typography>
           <DataGrid
             rows={eintraege}
