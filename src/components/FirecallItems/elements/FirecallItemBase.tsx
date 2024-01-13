@@ -8,6 +8,7 @@ import { FirecallItem } from '../../firebase/firestore';
 import { fallbackIcon } from '../icons';
 import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
 import { SimpleMap } from '../../../common/types';
+import { formatTimestamp } from '../../../common/time-format';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -44,7 +45,7 @@ export class FirecallItemBase {
     this.type = firecallItem?.type || 'fallback';
     this.id = firecallItem?.id;
     this.original = firecallItem;
-    this.datum = firecallItem?.datum || new Date().toISOString();
+    this.datum = firecallItem?.datum || '';
     this.rotation = firecallItem?.rotation || '0';
   }
 
@@ -104,10 +105,25 @@ export class FirecallItemBase {
     return `${this.beschreibung || ''}`;
   }
 
-  public body(): string {
-    return `${this.markerName()} ${this.name}
-        ${this.beschreibung}
-        position: ${this.lat},${this.lng}`;
+  public body(): ReactNode {
+    return (
+      <>
+        {this.beschreibung && (
+          <>
+            {this.beschreibung}
+            <br />
+          </>
+        )}
+        Position: {this.lat},{this.lng}
+        <br />
+        {this.datum && (
+          <>
+            Zeitstempel: {formatTimestamp(this.datum)}
+            <br />
+          </>
+        )}
+      </>
+    );
   }
 
   public dialogText(): ReactNode {

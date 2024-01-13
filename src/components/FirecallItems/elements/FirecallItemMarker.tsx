@@ -79,7 +79,7 @@ export class FirecallItemMarker extends FirecallItemBase {
     );
   }
   public titleFn(): string {
-    return `${this.name}\n${this.beschreibung || ''}`;
+    return `${this.zeichen?.replace(/_/g, ' ')} ${this.name}`;
   }
   public icon(): LeafletIcon<IconOptions> {
     if (this.zeichen && iconKeys[this.zeichen]?.url) {
@@ -104,9 +104,21 @@ export class FirecallItemMarker extends FirecallItemBase {
     return new FirecallItemMarker();
   }
 
-  // public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
-  //   return (
-
-  //   );
-  // }
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+        {this.attachments &&
+          this.attachments
+            .filter((a) => typeof a === 'string')
+            .map((a) => (
+              <FileDisplay
+                key={a as string}
+                url={a as string}
+                showTitleIfImage={false}
+              />
+            ))}
+      </>
+    );
+  }
 }

@@ -22,6 +22,10 @@ export class FirecallLine extends FirecallConnection {
     return 'Linie';
   }
 
+  public info(): string {
+    return `Länge: ${this.distance || 0}m`;
+  }
+
   public static factory(): FirecallItemBase {
     return new FirecallLine();
   }

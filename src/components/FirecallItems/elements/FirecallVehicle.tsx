@@ -1,7 +1,7 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { formatTimestamp } from '../../../common/time-format';
-import { FirecallItem, Fzg } from '../../firebase/firestore';
+import { Fzg } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallVehicle extends FirecallItemBase {
@@ -76,15 +76,30 @@ export class FirecallVehicle extends FirecallItemBase {
     return `1:${this.besatzung || 0} ATS: ${this.ats || 0}`;
   }
 
-  public body(): string {
-    return `${
-      this.alarmierung
-        ? 'Alarmierung: ' + formatTimestamp(this.alarmierung)
-        : ''
-    }
-    ${this.eintreffen ? ' Eintreffen: ' + formatTimestamp(this.eintreffen) : ''}
-    ${this.abruecken ? ' Abrücken: ' + formatTimestamp(this.abruecken) : ''}
-    Position ${this.lat} ${this.lng}`;
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+
+        {this.alarmierung && (
+          <>
+            Alarmierung: {formatTimestamp(this.alarmierung)}
+            <br />
+          </>
+        )}
+        {this.eintreffen && (
+          <>
+            Eintreffen: {formatTimestamp(this.eintreffen)}
+            <br />
+          </>
+        )}
+        {this.abruecken && (
+          <>
+            Abrücken: {formatTimestamp(this.abruecken)} <br />
+          </>
+        )}
+      </>
+    );
   }
 
   public dialogText(): ReactNode {

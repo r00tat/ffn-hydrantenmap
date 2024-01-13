@@ -4,6 +4,7 @@ import { Circle as LeafletCircle } from 'react-leaflet';
 import { Circle, FirecallItem } from '../../firebase/firestore';
 import { circleIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
+import { formatTimestamp } from '../../../common/time-format';
 
 export class CircleMarker extends FirecallItemBase {
   color: string;
@@ -44,8 +45,14 @@ export class CircleMarker extends FirecallItemBase {
     return `Radius: ${this.radius || 0}m`;
   }
 
-  public body(): string {
-    return `${this.lat},${this.lng}\nUmkreis:  ${this.radius || 0}m`;
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+        Umkreis: {this.radius || 0}m<br />
+        Farbe: {this.color} {this.fill && '(ausgefüllt)'}
+      </>
+    );
   }
 
   public dialogText(): ReactNode {
@@ -86,7 +93,7 @@ export class CircleMarker extends FirecallItemBase {
     );
   }
   public titleFn(): string {
-    return `Kreis ${this.name}: Radius ${this.radius || 0}m`;
+    return `Kreis ${this.name}`;
   }
   public icon(): Icon<IconOptions> {
     return circleIcon;

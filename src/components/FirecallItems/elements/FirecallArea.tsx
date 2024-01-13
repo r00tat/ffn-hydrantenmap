@@ -14,6 +14,7 @@ export class FirecallArea extends FirecallItemBase {
   positions?: string;
   color?: string;
   opacity?: number;
+  alwaysShowMarker?: boolean;
 
   public constructor(firecallItem?: Area) {
     super(firecallItem);
@@ -23,6 +24,7 @@ export class FirecallArea extends FirecallItemBase {
     this.positions = firecallItem?.positions || JSON.stringify([]);
     this.color = firecallItem?.color || 'blue';
     this.opacity = firecallItem?.opacity || 50;
+    this.alwaysShowMarker = firecallItem?.alwaysShowMarker ?? false;
   }
 
   public copy(): FirecallArea {
@@ -38,6 +40,7 @@ export class FirecallArea extends FirecallItemBase {
       positions: this.positions,
       color: this.color,
       opacity: this.opacity,
+      alwaysShowMarker: this.alwaysShowMarker,
     } as Area;
   }
 
@@ -52,8 +55,13 @@ export class FirecallArea extends FirecallItemBase {
   //   return `Länge ${this.distance}m`;
   // }
 
-  public body(): string {
-    return `${this.lat},${this.lng} => ${this.destLat},${this.destLng}`;
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+        {this.lat},{this.lng} =&gt; {this.destLat},{this.destLng}
+      </>
+    );
   }
 
   public dialogText(): ReactNode {
@@ -71,6 +79,7 @@ export class FirecallArea extends FirecallItemBase {
       ...super.fields(),
       color: 'Farbe (HTML bzw. Englisch)',
       opacity: 'Deckkraft (in Prozent)',
+      alwaysShowMarker: 'Punkte immer anzeigen',
     };
   }
 
@@ -81,6 +90,7 @@ export class FirecallArea extends FirecallItemBase {
   public fieldTypes(): { [fieldName: string]: string } {
     return {
       opacity: 'number',
+      alwaysShowMarker: 'boolean',
     };
   }
   public popupFn(): ReactNode {

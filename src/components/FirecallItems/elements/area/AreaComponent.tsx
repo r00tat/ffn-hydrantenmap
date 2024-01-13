@@ -1,15 +1,19 @@
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import { IconButton } from '@mui/material';
+import { IconButton, Tooltip } from '@mui/material';
 import L from 'leaflet';
 import { useMemo, useState } from 'react';
 import { Marker, Polygon, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
+import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import { FirecallItem } from '../../../firebase/firestore';
 import { FirecallArea } from '../FirecallArea';
 import {
+  addFirecallPosition,
   deleteFirecallPosition,
+  findSectionOnPolyline,
   updateFirecallPositions,
 } from '../connection/positions';
 
@@ -21,6 +25,8 @@ export interface AreaMarkerProps {
 export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
   const firecallId = useFirecallId();
   const [showMarkers, setShowMarkers] = useState(false);
+  const [point, setPoint] = useState(defaultPosition);
+  const [pointIndex, setPointIndex] = useState(-1);
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -46,7 +52,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
 
   return (
     <>
-      {showMarkers &&
+      {(record.alwaysShowMarker === true || showMarkers) &&
         positions.map((p, index) => (
           <Marker
             key={index}
@@ -93,15 +99,34 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
           fillOpacity: ((record as any)?.opacity || 50.0) / 100,
         }}
         eventHandlers={{
-          popupopen: (event) => {
-            setShowMarkers(true);
+          click: (event) => {
+            const index = findSectionOnPolyline(positions, event.latlng);
+            // console.info(
+            //   `clicked on polyline ${event.latlng} index in points: ${index}`
+            // );
+            setPoint(event.latlng);
+            setPointIndex(index);
           },
-          popupclose: (event) => {
-            setShowMarkers(false);
-          },
+          // mouseover: () => setShowMarkers(true),
+          // mouseout: () => setShowMarkers(false),
+          popupopen: () => setShowMarkers(true),
+          popupclose: () => setShowMarkers(false),
         }}
       >
         <Popup>
+          {pointIndex >= 0 && (
+            <Tooltip title="Einen Punkt hinzufügen">
+              <IconButton
+                color="primary"
+                aria-label="add a point on the line"
+                onClick={() =>
+                  addFirecallPosition(firecallId, point, record, pointIndex)
+                }
+              >
+                <AddIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           <IconButton
             sx={{ marginLeft: 'auto', float: 'right' }}
             onClick={() => selectItem(record)}
