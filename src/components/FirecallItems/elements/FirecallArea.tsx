@@ -24,7 +24,9 @@ export class FirecallArea extends FirecallItemBase {
     this.positions = firecallItem?.positions || JSON.stringify([]);
     this.color = firecallItem?.color || 'blue';
     this.opacity = firecallItem?.opacity || 50;
-    this.alwaysShowMarker = firecallItem?.alwaysShowMarker ?? false;
+    this.alwaysShowMarker =
+      //firecallItem?.alwaysShowMarker === true ?? false;
+      (firecallItem?.alwaysShowMarker as unknown as string) === 'true' ?? false;
   }
 
   public copy(): FirecallArea {

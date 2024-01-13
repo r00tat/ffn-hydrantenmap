@@ -25,8 +25,10 @@ export class FirecallConnection extends FirecallItemBase {
         positions: this.positions,
         distance: this.distance,
         color: this.color,
-        alwaysShowMarker: this.alwaysShowMarker,
       } = firecallItem);
+      this.alwaysShowMarker =
+        (firecallItem?.alwaysShowMarker as unknown as string) === 'true' ??
+        false;
     }
   }
 
