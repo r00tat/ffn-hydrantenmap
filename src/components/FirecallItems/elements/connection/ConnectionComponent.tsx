@@ -55,7 +55,7 @@ export default function ConnectionMarker({
 
   return (
     <>
-      {showMarkers &&
+      {(record.alwaysShowMarker === true || showMarkers) &&
         positions.map((p, index) => (
           <Marker
             key={index}
@@ -115,6 +115,8 @@ export default function ConnectionMarker({
             setPoint(event.latlng);
             setPointIndex(index);
           },
+          // mouseover: () => setShowMarkers(true),
+          // mouseout: () => setShowMarkers(false),
           popupopen: () => setShowMarkers(true),
           popupclose: () => setShowMarkers(false),
         }}

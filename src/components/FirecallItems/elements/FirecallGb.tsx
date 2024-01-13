@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { FirecallItem, GeschaeftsbuchEintrag } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
+import { formatTimestamp } from '../../../common/time-format';
 
 export class FirecallGb extends FirecallItemBase {
   nummer: number;
@@ -86,5 +87,31 @@ export class FirecallGb extends FirecallItemBase {
 
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
     return <></>;
+  }
+
+  public body(): ReactNode {
+    return (
+      <>
+        <>
+          #{this.nummer} {formatTimestamp(this.datum)}
+          <br />
+          {this.von && (
+            <>
+              Von: {this.von}
+              <br />
+            </>
+          )}
+          {this.an && (
+            <>
+              An: {this.an}
+              <br />
+            </>
+          )}
+          {this.ausgehend ? 'Ausgehend' : 'Eingehend'}: {this.name}
+          <br />
+          Anmerkung: {this.beschreibung}
+        </>
+      </>
+    );
   }
 }

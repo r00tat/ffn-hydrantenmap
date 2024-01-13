@@ -40,7 +40,11 @@ export default function FirecallItemDialog({
 }: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
-    getItemClass(itemDefault || ({ type: itemType } as FirecallItem))
+    getItemClass({
+      type: itemType,
+      ...itemDefault,
+      datum: itemDefault?.datum || new Date().toISOString(),
+    } as FirecallItem)
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
 

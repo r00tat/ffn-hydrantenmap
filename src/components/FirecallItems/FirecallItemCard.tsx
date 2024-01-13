@@ -6,13 +6,15 @@ import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemDialog from './FirecallItemDialog';
 import { firecallItems } from './infos/firecallitems';
 import { FirecallItemInfo } from './infos/types';
+import { getItemClass } from './elements';
+import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 
 export interface FirecallItemCardOptions {
   item: FirecallItem;
@@ -21,7 +23,7 @@ export interface FirecallItemCardOptions {
 }
 
 export default function FirecallItemCard({
-  item,
+  item: itemData,
   firecallId,
   close,
 }: FirecallItemCardOptions) {
@@ -29,34 +31,14 @@ export default function FirecallItemCard({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateItem = useFirecallItemUpdate(firecallId);
 
-  const itemInfo: FirecallItemInfo =
-    firecallItems[item.type] || firecallItems.fallback;
-
-  const updateFn = useCallback(
-    (fcItem?: FirecallItem) => {
-      setDisplayUpdateDialog(false);
-      if (fcItem) {
-        updateItem(fcItem);
-      }
-    },
-    [updateItem]
-  );
-  const deleteFn = useCallback(
-    (result: boolean) => {
-      setIsConfirmOpen(false);
-      if (result) {
-        updateItem({ ...item, deleted: true });
-      }
-    },
-    [updateItem, item]
-  );
+  const item = useMemo(() => getItemClass(itemData), [itemData]);
 
   return (
     <Grid item xs={12} md={6} lg={4}>
       <Card>
         <CardContent>
           <Typography variant="h5" component="div" flex={1}>
-            {itemInfo.title(item)}{' '}
+            {item.titleFn()}{' '}
             {close && (
               <IconButton
                 onClick={close}
@@ -67,9 +49,9 @@ export default function FirecallItemCard({
             )}
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
-            {itemInfo.info(item)}
+            {item.info()}
           </Typography>
-          <Typography variant="body2">{itemInfo.body(item)}</Typography>
+          <Typography variant="body2">{item.body()}</Typography>
         </CardContent>
         {item.editable !== false && (
           <CardActions>
@@ -87,15 +69,11 @@ export default function FirecallItemCard({
         )}
       </Card>
       {displayUpdateDialog && (
-        <FirecallItemDialog onClose={updateFn} item={item.original || item} />
-      )}
-      {isConfirmOpen && (
-        <ConfirmDialog
-          title={`${itemInfo.name} ${itemInfo.title(item)} löschen`}
-          text={`Element ${itemInfo.name} ${itemInfo.title(
-            item
-          )} wirklich löschen?`}
-          onConfirm={deleteFn}
+        <FirecallItemUpdateDialog
+          item={item.original || item}
+          callback={() => {
+            setDisplayUpdateDialog(false);
+          }}
         />
       )}
     </Grid>

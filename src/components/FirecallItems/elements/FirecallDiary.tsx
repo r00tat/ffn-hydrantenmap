@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Diary, FirecallItem } from '../../firebase/firestore';
 import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 import { SimpleMap } from '../../../common/types';
+import { formatTimestamp } from '../../../common/time-format';
 
 export class FirecallDiary extends FirecallItemBase {
   nummer: number;
@@ -99,5 +100,31 @@ export class FirecallDiary extends FirecallItemBase {
 
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
     return <></>;
+  }
+
+  public body(): ReactNode {
+    return (
+      <>
+        <>
+          #{this.nummer} {formatTimestamp(this.datum)}
+          <br />
+          {this.von && (
+            <>
+              Von: {this.von}
+              <br />
+            </>
+          )}
+          {this.an && (
+            <>
+              An: {this.an}
+              <br />
+            </>
+          )}
+          {this.art}: {this.name}
+          <br />
+          Anmerkung: {this.beschreibung}
+        </>
+      </>
+    );
   }
 }

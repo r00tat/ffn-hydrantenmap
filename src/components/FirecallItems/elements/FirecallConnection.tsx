@@ -1,5 +1,5 @@
-import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
+import { Icon, IconOptions } from 'leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { Connection, FirecallItem } from '../../firebase/firestore';
 import { circleIcon } from '../icons';
@@ -13,6 +13,7 @@ export class FirecallConnection extends FirecallItemBase {
   positions?: string;
   distance?: number;
   color?: string;
+  alwaysShowMarker?: boolean;
 
   public constructor(firecallItem?: Connection) {
     super(firecallItem);
@@ -24,6 +25,7 @@ export class FirecallConnection extends FirecallItemBase {
         positions: this.positions,
         distance: this.distance,
         color: this.color,
+        alwaysShowMarker: this.alwaysShowMarker,
       } = firecallItem);
     }
   }
@@ -40,13 +42,15 @@ export class FirecallConnection extends FirecallItemBase {
     return {
       ...super.fields(),
       color: 'Farbe (HTML bzw. Englisch)',
+      alwaysShowMarker: 'Punkte immer anzeigen',
     };
   }
 
-  // public fieldTypes(): { [fieldName: string]: string } {
-  //   return {
-  //   };
-  // }
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      alwaysShowMarker: 'boolean',
+    };
+  }
 
   public data(): Connection {
     return {
@@ -56,6 +60,7 @@ export class FirecallConnection extends FirecallItemBase {
       positions: this.positions,
       distance: this.distance,
       color: this.color,
+      alwaysShowMarker: this.alwaysShowMarker,
     } as Connection;
   }
 
@@ -64,11 +69,21 @@ export class FirecallConnection extends FirecallItemBase {
   // }
 
   public info(): string {
-    return `Länge: ${this.distance || 0}m`;
+    return `Länge: ${this.distance || 0}m ${Math.ceil(
+      (this.distance || 0) / 20
+    )} B-Längen`;
   }
 
-  public body(): string {
-    return `${this.lat},${this.lng} => ${this.destLat},${this.destLng}`;
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+        {this.lat},{this.lng} =&gt; {this.destLat},{this.destLng}
+        <br />
+        Länge: {this.distance}m<br />
+        Farbe: {this.color}
+      </>
+    );
   }
 
   public dialogText(): ReactNode {
@@ -86,7 +101,7 @@ export class FirecallConnection extends FirecallItemBase {
   // }
 
   public titleFn(): string {
-    return `${this.markerName()} ${this.name}: ${this.distance || 0}m`;
+    return `${this.markerName()} ${this.name}`;
   }
   public icon(): Icon<IconOptions> {
     return circleIcon;

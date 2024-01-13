@@ -1,17 +1,18 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem, Rohr } from '../../firebase/firestore';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
+import { SimpleMap } from '../../../common/types';
 
 export class FirecallRohr extends FirecallItemBase {
-  art: 'C' | 'B' | 'Wasserwerfer' | string = 'C';
+  art: 'C' | 'B' | 'D' | 'Wasserwerfer' | string = 'C';
   durchfluss?: number;
 
   public constructor(firecallItem?: Rohr) {
     super(firecallItem);
     this.type = 'rohr';
     if (firecallItem) {
-      ({ durchfluss: this.durchfluss, art: this.art } = firecallItem);
+      ({ durchfluss: this.durchfluss, art: this.art = 'C' } = firecallItem);
     }
   }
 
@@ -26,6 +27,7 @@ export class FirecallRohr extends FirecallItemBase {
   public fields(): { [fieldName: string]: string } {
     return {
       ...super.fields(),
+      art: 'Rohr Art',
       durchfluss: 'Durchfluss (l/min)',
       rotation: 'Drehung in Grad',
     };
@@ -35,6 +37,18 @@ export class FirecallRohr extends FirecallItemBase {
     return {
       rotation: 'number',
       durchfluss: 'number',
+      art: 'select',
+    };
+  }
+
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      art: {
+        C: 'C-Rohr',
+        B: 'B-Rohr',
+        D: 'D-Rohr',
+        Wasserwerfer: 'Wasserwerfer',
+      },
     };
   }
 
@@ -110,4 +124,14 @@ export class FirecallRohr extends FirecallItemBase {
 
   //   );
   // }
+
+  public body(): ReactNode {
+    return (
+      <>
+        {this.art?.toLocaleUpperCase()} Rohr{' '}
+        {this.durchfluss && <>{this.durchfluss}l/min</>}
+        {super.body()}
+      </>
+    );
+  }
 }

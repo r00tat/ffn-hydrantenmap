@@ -128,7 +128,7 @@ const blobFromBase64String = (base64String: string, mimeType?: string) => {
 };
 
 export async function importFirecall(firecall: FirecallExport) {
-  const { items, chat, ...firecallData } = firecall;
+  const { items, chat, id, ...firecallData } = firecall;
   const firecallDoc = await addDoc(collection(firestore, 'call'), firecallData);
   const itemCol = collection(firecallDoc, 'item');
   const chatCol = collection(firecallDoc, 'chat');
