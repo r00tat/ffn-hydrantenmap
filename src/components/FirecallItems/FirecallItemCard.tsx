@@ -6,23 +6,31 @@ import CardContent from '@mui/material/CardContent';
 import Grid, { RegularBreakpoints } from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import { useCallback, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useMemo, useState } from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 
 export interface FirecallItemCardOptions extends RegularBreakpoints {
   item: FirecallItem;
   close?: () => void;
   subItems?: FirecallItem[];
+  allowTypeChange?: boolean;
+  children?: ReactNode;
+  draggable?: boolean;
 }
 
 export default function FirecallItemCard({
   item: itemData,
   close,
   subItems,
+  allowTypeChange,
+  children,
+  draggable = false,
   ...breakpoints
 }: FirecallItemCardOptions) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
@@ -40,9 +48,18 @@ export default function FirecallItemCard({
     [updateItem, item]
   );
 
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: '' + item.id,
+    disabled: !draggable,
+  });
+  const style = {
+    // Outputs `translate3d(x, y, 0)`
+    transform: CSS.Translate.toString(transform),
+  };
+
   return (
     <Grid item xs={12} md={6} lg={4} {...breakpoints}>
-      <Card>
+      <Card ref={setNodeRef} style={style} {...listeners} {...attributes}>
         <CardContent>
           <Typography variant="h5" component="div" flex={1}>
             {item.titleFn()} {item.deleted && <b>gelöscht</b>}
@@ -68,10 +85,12 @@ export default function FirecallItemCard({
                   key={si.id}
                   xs={12}
                   md={12}
-                  lg={12}
+                  lg={6}
+                  draggable
                 />
               ))}
           </Grid>
+          {children}
         </CardContent>
         {item.editable !== false && (
           <CardActions>
@@ -91,6 +110,7 @@ export default function FirecallItemCard({
       {displayUpdateDialog && (
         <FirecallItemUpdateDialog
           item={item.original || item}
+          allowTypeChange={allowTypeChange}
           callback={() => {
             setDisplayUpdateDialog(false);
           }}

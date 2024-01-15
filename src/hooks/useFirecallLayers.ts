@@ -6,6 +6,7 @@ import {
 } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
 import { useFirecallId } from './useFirecall';
+import { orderBy } from 'firebase/firestore';
 
 export type FirecallLayers = SimpleMap<FirecallLayer>;
 
@@ -22,6 +23,7 @@ export function useFirecallLayersFromFirstore(): FirecallLayers {
     collectionName: 'call',
     pathSegments: [firecallId, 'layer'],
     filterFn: filterActiveItems,
+    queryConstraints: [orderBy('name', 'asc')],
   });
 
   return { layers: Object.fromEntries(layers.map((l) => [l.id, l])) };
