@@ -1,15 +1,4 @@
-import {
-  Area,
-  Circle,
-  Connection,
-  Diary,
-  FirecallItem,
-  Fzg,
-  Line,
-  Rohr,
-  FcMarker,
-  GeschaeftsbuchEintrag,
-} from '../../firebase/firestore';
+import { FirecallItem } from '../../firebase/firestore';
 import { CircleMarker } from './CircleMarker';
 import { FirecallArea } from './FirecallArea';
 import { FirecallAssp } from './FirecallAssp';
@@ -18,6 +7,7 @@ import { FirecallDiary } from './FirecallDiary';
 import { FirecallEinsatzleitung } from './FirecallEl';
 import { FirecallGb } from './FirecallGb';
 import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemLayer } from './FirecallItemLayer';
 import { FirecallItemMarker } from './FirecallItemMarker';
 import { FirecallLine } from './FirecallLine';
 import { FirecallRohr } from './FirecallRohr';
@@ -36,6 +26,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   el: FirecallEinsatzleitung,
   vehicle: FirecallVehicle,
   gb: FirecallGb,
+  layer: FirecallItemLayer,
 };
 
 export const fcItemNames: { [key: string]: string } = {};
@@ -44,31 +35,11 @@ Object.entries(fcItemClasses).forEach(([k, FcClass]) => {
   fcItemNames[k] = new FcClass().markerName();
 });
 
-export function getItemClass(record?: FirecallItem): FirecallItemBase {
-  switch (record?.type) {
-    case 'marker':
-      return new FirecallItemMarker(record as FcMarker);
-    case 'rohr':
-      return new FirecallRohr(record as Rohr);
-    case 'connection':
-      return new FirecallConnection(record as Connection);
-    case 'diary':
-      return new FirecallDiary(record as Diary);
-    case 'line':
-      return new FirecallLine(record as Line);
-    case 'circle':
-      return new CircleMarker(record as Circle);
-    case 'area':
-      return new FirecallArea(record as Area);
-    case 'vehicle':
-      return new FirecallVehicle(record as Fzg);
-    case 'assp':
-      return new FirecallAssp(record);
-    case 'el':
-      return new FirecallEinsatzleitung(record);
-    case 'gb':
-      return new FirecallGb(record as GeschaeftsbuchEintrag);
-    default:
-      return new FirecallItemBase(record);
-  }
+export function getItemClass(type: string = 'fallback') {
+  return fcItemClasses[type] ?? FirecallItemBase;
+}
+
+export function getItemInstance(record?: FirecallItem): FirecallItemBase {
+  const cls = getItemClass(record?.type);
+  return new cls(record);
 }

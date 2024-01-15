@@ -14,6 +14,7 @@ import useFirebaseLogin from '../hooks/useFirebaseLogin';
 import dynamic from 'next/dynamic';
 import About from './about';
 import ChatMessageDisplay from '../components/chat/chat-message';
+import FirecallLayerProvider from '../components/providers/FirecallLayerProvider';
 
 const DynamicLogin = dynamic(
   () => {
@@ -26,16 +27,18 @@ function LogedinApp({ Component, pageProps }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
     <FirecallProvider>
-      <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+      <FirecallLayerProvider>
+        <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-      <HeaderBar
-        isDrawerOpen={isDrawerOpen}
-        setIsDrawerOpen={setIsDrawerOpen}
-      />
+        <HeaderBar
+          isDrawerOpen={isDrawerOpen}
+          setIsDrawerOpen={setIsDrawerOpen}
+        />
 
-      <ChatMessageDisplay />
+        <ChatMessageDisplay />
 
-      <Component {...pageProps} />
+        <Component {...pageProps} />
+      </FirecallLayerProvider>
     </FirecallProvider>
   );
 }

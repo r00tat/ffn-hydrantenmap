@@ -1,6 +1,6 @@
 export interface FirecallItem {
   id?: string;
-  name?: string;
+  name: string;
   lat?: number;
   lng?: number;
   deleted?: boolean;
@@ -10,6 +10,21 @@ export interface FirecallItem {
   editable?: boolean;
   original?: FirecallItem;
   rotation?: string;
+  /**
+   * reference to FirecallLayer
+   */
+  layer?: string;
+
+  updatedBy?: string;
+  updatedAt?: string;
+  creator?: string;
+  created?: string;
+}
+
+export interface FirecallLayer {
+  id?: string;
+  name: string;
+  beschreibung?: string;
 }
 
 export interface FcAttachment {
@@ -91,7 +106,7 @@ export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 
 export const filterDisplayableItems = (g: FirecallItem) => {
-  return g.deleted !== true && g.type !== 'diary';
+  return g.deleted !== true && ['diary', 'gb'].indexOf(g.type) < 0;
 };
 
 export interface Firecall {

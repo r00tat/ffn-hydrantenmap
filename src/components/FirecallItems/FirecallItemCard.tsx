@@ -3,42 +3,49 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
-import Grid from '@mui/material/Grid';
+import Grid, { RegularBreakpoints } from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { useCallback, useMemo, useState } from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
-import FirecallItemDialog from './FirecallItemDialog';
-import { firecallItems } from './infos/firecallitems';
-import { FirecallItemInfo } from './infos/types';
-import { getItemClass } from './elements';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
+import { getItemInstance } from './elements';
 
-export interface FirecallItemCardOptions {
+export interface FirecallItemCardOptions extends RegularBreakpoints {
   item: FirecallItem;
-  firecallId?: string;
   close?: () => void;
+  subItems?: FirecallItem[];
 }
 
 export default function FirecallItemCard({
   item: itemData,
-  firecallId,
   close,
+  subItems,
+  ...breakpoints
 }: FirecallItemCardOptions) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const updateItem = useFirecallItemUpdate(firecallId);
+  const updateItem = useFirecallItemUpdate();
 
-  const item = useMemo(() => getItemClass(itemData), [itemData]);
+  const item = useMemo(() => getItemInstance(itemData), [itemData]);
+  const deleteFn = useCallback(
+    (result: boolean) => {
+      setIsConfirmOpen(false);
+      if (result) {
+        updateItem({ ...item.filteredData(), deleted: true });
+      }
+    },
+    [updateItem, item]
+  );
 
   return (
-    <Grid item xs={12} md={6} lg={4}>
+    <Grid item xs={12} md={6} lg={4} {...breakpoints}>
       <Card>
         <CardContent>
           <Typography variant="h5" component="div" flex={1}>
-            {item.titleFn()}{' '}
+            {item.titleFn()} {item.deleted && <b>gelöscht</b>}
             {close && (
               <IconButton
                 onClick={close}
@@ -52,6 +59,19 @@ export default function FirecallItemCard({
             {item.info()}
           </Typography>
           <Typography variant="body2">{item.body()}</Typography>
+
+          <Grid container spacing={2}>
+            {subItems &&
+              subItems.map((si) => (
+                <FirecallItemCard
+                  item={si}
+                  key={si.id}
+                  xs={12}
+                  md={12}
+                  lg={12}
+                />
+              ))}
+          </Grid>
         </CardContent>
         {item.editable !== false && (
           <CardActions>
@@ -74,6 +94,13 @@ export default function FirecallItemCard({
           callback={() => {
             setDisplayUpdateDialog(false);
           }}
+        />
+      )}
+      {isConfirmOpen && (
+        <ConfirmDialog
+          title={`${item.title()} löschen`}
+          text={`${item.markerName()} ${item.name} wirklich löschen?`}
+          onConfirm={deleteFn}
         />
       )}
     </Grid>

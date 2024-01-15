@@ -1,4 +1,4 @@
-import { doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
@@ -6,7 +6,7 @@ import { FirecallItem } from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
-export default function useFirecallItemUpdate() {
+export default function useFirecallItemAdd() {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   return useCallback(
@@ -19,26 +19,24 @@ export default function useFirecallItemUpdate() {
             p[k] = v;
             return p;
           }, {} as any),
-        updatedAt: new Date().toISOString(),
-        updatedBy: email,
+        created: new Date().toISOString(),
+        creator: email,
       };
       const itemClass = getItemClass(item?.type);
       console.info(
-        `update of firecall ${itemClass.firebaseCollectionName()} ${
-          item.id
-        }: ${JSON.stringify(item)}`
+        `add firecall ${itemClass.firebaseCollectionName()}: ${JSON.stringify(
+          item
+        )}`
       );
 
-      return await setDoc(
-        doc(
+      return await addDoc(
+        collection(
           firestore,
           'call',
           firecallId,
-          itemClass.firebaseCollectionName(),
-          '' + item.id
+          itemClass.firebaseCollectionName()
         ),
-        newData,
-        { merge: false }
+        newData
       );
     },
     [email, firecallId]

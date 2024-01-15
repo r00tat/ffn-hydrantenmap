@@ -16,12 +16,13 @@ import TextField from '@mui/material/TextField';
 import { StorageReference } from 'firebase/storage';
 import moment from 'moment';
 import React, { useCallback, useState } from 'react';
+import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
-import { fcItemNames, getItemClass } from './elements';
+import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
 
@@ -40,12 +41,13 @@ export default function FirecallItemDialog({
 }: FirecallItemDialogOptions) {
   const [open, setOpen] = useState(true);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
-    getItemClass({
+    getItemInstance({
       type: itemType,
       ...itemDefault,
       datum: itemDefault?.datum || new Date().toISOString(),
     } as FirecallItem)
   );
+  const layers = useFirecallLayers();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const setItemField = (field: string, value: any) => {
@@ -60,7 +62,7 @@ export default function FirecallItemDialog({
   const handleChange = (event: SelectChangeEvent) => {
     // setItemField('type', event.target.value);
     setFirecallItem((prev) =>
-      getItemClass({ ...prev.data(), type: event.target.value })
+      getItemInstance({ ...prev.data(), type: event.target.value })
     );
   };
 
@@ -240,6 +242,30 @@ export default function FirecallItemDialog({
                 )}
             </React.Fragment>
           ))}
+
+          {item.type !== 'layer' && (
+            <FormControl fullWidth variant="standard">
+              <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
+              <Select
+                labelId="firecall-item-layer-label"
+                id="firecall-item-layer"
+                value={item.layer || ''}
+                label="Ebene"
+                onChange={(event): void => {
+                  setItemField('layer', event.target.value as string);
+                }}
+              >
+                <MenuItem key="">Einsatz</MenuItem>
+                {Object.entries(layers)
+                  .filter(([key]) => key !== 'fallback')
+                  .map(([key, layer]) => (
+                    <MenuItem key={key} value={key}>
+                      {layer.name}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
           <Button

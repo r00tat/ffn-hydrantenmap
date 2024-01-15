@@ -1,18 +1,17 @@
 import { doc, setDoc } from 'firebase/firestore';
 import L, { Map } from 'leaflet';
-import { useCallback, useEffect, useState } from 'react';
-import { firestore } from '../components/firebase/firebase';
+import { useCallback, useState } from 'react';
 import { firecallItemInfo } from '../components/FirecallItems/infos/firecallitems';
+import { firestore } from '../components/firebase/firebase';
 import {
   Connection,
-  filterActiveItems,
   Firecall,
   FirecallItem,
+  filterActiveItems,
 } from '../components/firebase/firestore';
 import { defaultPosition } from './constants';
 import useFirecall from './useFirecall';
 import useFirestoreDataLayer from './useFirestoreDataLayer';
-import { connectionInfo } from '../components/FirecallItems/infos/connection';
 
 export const updateDestPos = async (
   firecall: Firecall,
@@ -53,6 +52,7 @@ export function useFirecallLayer(map: Map) {
         .filter((item) => item.type === 'connection')
         .map((item) => {
           const c = item as Connection;
+          // const connection = new FirecallConnection(c);
           const start = L.latLng(
             c.lat || defaultPosition.lat,
             c.lng || defaultPosition.lng
@@ -67,7 +67,7 @@ export function useFirecallLayer(map: Map) {
               popupAnchor: [0, 0],
             }),
           })
-            .bindPopup(connectionInfo.popupFn(c) as string)
+            // .bindPopup(connection.popupFn() as string)
             .on('dragend', (event: L.DragEndEvent) => {
               const newPos = (event.target as L.Marker)?.getLatLng();
               updateDestPos(firecall, c, newPos);
@@ -77,7 +77,7 @@ export function useFirecallLayer(map: Map) {
           L.polyline([start, dest], {
             color: '#0000ff',
           })
-            .bindPopup(connectionInfo.popupFn(c) as string)
+            // .bindPopup(connection.popupFn() as string)
             .addTo(layerGroup);
         });
     },

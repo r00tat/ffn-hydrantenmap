@@ -5,6 +5,7 @@ import { Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { firestore } from '../../firebase/firebase';
 import { Firecall } from '../../firebase/firestore';
+import useFirecall from '../../../hooks/useFirecall';
 
 export const firecallIcon = L.icon({
   iconUrl: '/icons/fire.svg',
@@ -36,8 +37,9 @@ function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
   }
 }
 
-export default function FirecallMarker({ firecall }: FirecallMarkerProps) {
+export default function FirecallMarker() {
   const map = useMap();
+  const firecall = useFirecall();
 
   useEffect(() => {
     map.setView([

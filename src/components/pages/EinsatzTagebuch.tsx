@@ -7,7 +7,6 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { addDoc, collection } from 'firebase/firestore';
 import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,13 +15,12 @@ import {
   parseTimestamp,
 } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
-import { firestore } from '../firebase/firebase';
 import {
   Diary,
   FirecallItem,
@@ -257,23 +255,18 @@ export default function EinsatzTagebuch({
   boxHeight = '1000px',
 }: EinsatzTagebuchOptions) {
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
-  const { email } = useFirebaseLogin();
-  const firecallId = useFirecallId();
   const { diaries, diaryCounter } = useDiaries();
   const columns = useGridColumns();
+  const addEinsatzTagebuch = useFirecallItemAdd();
 
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
       if (item) {
-        addDoc(collection(firestore, 'call', firecallId, 'item'), {
-          ...item,
-          user: email,
-          created: new Date().toISOString(),
-        });
+        addEinsatzTagebuch(item);
       }
     },
-    [email, firecallId]
+    [addEinsatzTagebuch]
   );
 
   return (

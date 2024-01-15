@@ -47,15 +47,15 @@ export default function Map() {
         ))}
 
         {isAuthorized && (
-          <LayersControl.Overlay name="Einsatz" checked>
-            <FirecallLayer />
-          </LayersControl.Overlay>
+          // <LayersControl.Overlay name="Einsatz" checked>
+          <FirecallLayer />
+          // </LayersControl.Overlay>
         )}
         <LayersControl.Overlay name="Entfernung">
           <DistanceMarker />
         </LayersControl.Overlay>
         {isAuthorized && <Clusters />}
-        <LayersControl.Overlay name="Umkreis" checked>
+        <LayersControl.Overlay name="Umkreis">
           <DistanceLayer />
         </LayersControl.Overlay>
         <LayersControl.Overlay name="Position" checked>

@@ -1,20 +1,13 @@
 import L from 'leaflet';
-import { useEffect, useState } from 'react';
-import useDistanceLayer from '../../hooks/useDistanceLayer';
-import useGefahrObjekteLayer from '../../hooks/useGefahrObjekteLayer';
-import useHydrantenLayer from '../../hooks/useHydrantenLayer';
-import useLoeschteicheLayer from '../../hooks/useLoeschteicheLayer';
-import usePositionMarker from '../../hooks/usePositionMarker';
-import useRisikoObjekteLayer from '../../hooks/useRisikoObjekteLayer';
-import useSaugstellenLayer from '../../hooks/useSaugstellenLayer';
-import { availableLayers, createLayers, overlayLayers } from './tiles';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import MapActionButtons from './MapActionButtons';
-import { useFirecallLayer } from '../../hooks/useFirecallLayer';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import { useEffect, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallLayer } from '../../hooks/useFirecallLayer';
+import MapActionButtons from './MapActionButtons';
+import { availableLayers, createLayers, overlayLayers } from './tiles';
 
-const defaultTiles = 'basemap_hdpi';
+const defaultTiles = 'basemap_ortofoto';
 
 interface MapLayerOptions {
   map: L.Map;
@@ -56,7 +49,7 @@ export default function MapLayer({ map }: MapLayerOptions) {
         ...overlayLayersForMap,
       };
       const baseMaps = createLayers(availableLayers);
-      baseMaps[defaultTiles].addTo(map);
+      // baseMaps[defaultTiles].addTo(map);
       L.control.layers(baseMaps, overlayMaps).addTo(map);
       setInitialized(true);
     }
