@@ -7,7 +7,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { addDoc, collection, where } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,18 +16,17 @@ import {
   parseTimestamp,
 } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
-import { firestore } from '../firebase/firebase';
 import {
   FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
 } from '../firebase/firestore';
 
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 
@@ -184,23 +183,18 @@ export default function Geschaeftsbuch({
   boxHeight = '1000px',
 }: GeschaeftsbuchOptions) {
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
-  const { email } = useFirebaseLogin();
-  const firecallId = useFirecallId();
   const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege();
   const columns = useGridColumns();
+  const addFirecallGb = useFirecallItemAdd();
 
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setDialogIsOpen(false);
       if (item) {
-        addDoc(collection(firestore, 'call', firecallId, 'item'), {
-          ...item,
-          user: email,
-          created: new Date().toISOString(),
-        });
+        addFirecallGb(item);
       }
     },
-    [email, firecallId]
+    [addFirecallGb]
   );
 
   return (

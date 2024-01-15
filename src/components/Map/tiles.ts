@@ -30,6 +30,23 @@ export const availableLayers: TileConfigs = {
   //       process.env.NEXT_PUBLIC_MAPBOX_APIKEY,
   //   },
   // },
+  basemap_ortofoto: {
+    name: 'Orthofoto',
+    url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg',
+    options: {
+      maxZoom: 19,
+      attribution:
+        'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
+      subdomains: ['', '1', '2', '3', '4'],
+      type: 'normal',
+      format: 'jpeg',
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+
   basemap_hdpi: {
     name: 'Basemap',
     url: 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/normal/google3857/{z}/{y}/{x}.jpeg',
@@ -47,22 +64,7 @@ export const availableLayers: TileConfigs = {
       ],
     },
   },
-  basemap_ortofoto: {
-    name: 'Orthofoto',
-    url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg',
-    options: {
-      maxZoom: 19,
-      attribution:
-        'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
-      subdomains: ['', '1', '2', '3', '4'],
-      type: 'normal',
-      format: 'jpeg',
-      bounds: [
-        [46.35877, 8.782379],
-        [49.037872, 17.189532],
-      ],
-    },
-  },
+
   openstreetmap: {
     name: 'Openstreetmap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',

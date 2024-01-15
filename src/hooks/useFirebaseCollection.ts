@@ -37,7 +37,7 @@ export default function useFirebaseCollection<T>(
   useEffect(() => {
     if (value) {
       const records = value?.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as unknown as T)
+        (doc) => ({ ...doc.data(), id: doc.id } as unknown as T)
       );
       // console.info(
       //   `got firstore collection records ${value.docs.length} filtered: ${records.length}`

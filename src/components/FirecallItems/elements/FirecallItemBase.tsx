@@ -38,29 +38,42 @@ export interface SelectOptions extends SimpleMap<string> {}
 export class FirecallItemBase {
   constructor(firecallItem?: FirecallItem) {
     // empty initializer
-    this.name = firecallItem?.name || '';
-    this.beschreibung = firecallItem?.beschreibung || '';
-    this.lat = firecallItem?.lat || defaultPosition.lat;
-    this.lng = firecallItem?.lng || defaultPosition.lng;
-    this.type = firecallItem?.type || 'fallback';
-    this.id = firecallItem?.id;
-    this.original = firecallItem;
-    this.datum = firecallItem?.datum || '';
-    this.rotation = firecallItem?.rotation || '0';
+    ({
+      id: this.id = '',
+      name: this.name = '',
+      beschreibung: this.beschreibung = '',
+      lat: this.lat = defaultPosition.lat,
+      lng: this.lng = defaultPosition.lng,
+      type: this.type = 'fallback',
+      original: this.original,
+      datum: this.datum = '',
+      rotation: this.rotation = '0',
+      layer: this.layer = '',
+      deleted: this.deleted = false,
+      updatedAt: this.updatedAt,
+      updatedBy: this.updatedBy,
+      creator: this.creator,
+      created: this.created,
+    } = firecallItem || {});
   }
 
   id?: string;
   name: string;
-  beschreibung?: string;
+  beschreibung: string;
   lat: number;
   lng: number;
   type: string;
+  updatedAt?: string;
+  updatedBy?: string;
 
   deleted?: boolean;
-  datum?: string;
+  datum: string;
   editable?: boolean;
   original?: FirecallItem;
-  rotation?: string;
+  rotation: string;
+  layer: string;
+  creator?: string;
+  created?: string;
 
   public copy(): FirecallItemBase {
     return Object.assign(new FirecallItemBase(this.data()), this);
@@ -84,6 +97,11 @@ export class FirecallItemBase {
       type: this.type,
       datum: this.datum,
       rotation: this.rotation,
+      layer: this.layer,
+      creator: this.creator,
+      created: this.created,
+      updatedAt: this.updatedAt,
+      updatedBy: this.updatedBy,
     };
   }
 
@@ -114,8 +132,15 @@ export class FirecallItemBase {
             <br />
           </>
         )}
-        Position: {this.lat},{this.lng}
-        <br />
+        {this.lat &&
+          this.lng &&
+          this.lat !== defaultPosition.lat &&
+          this.lng !== defaultPosition.lng && (
+            <>
+              Position: {this.lat},{this.lng}
+              <br />
+            </>
+          )}
         {this.datum && (
           <>
             Zeitstempel: {formatTimestamp(this.datum)}
@@ -187,5 +212,9 @@ export class FirecallItemBase {
 
   public static isPolyline(): boolean {
     return false;
+  }
+
+  public static firebaseCollectionName(): string {
+    return 'item';
   }
 }

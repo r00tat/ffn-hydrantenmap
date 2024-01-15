@@ -3,7 +3,6 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { useFirecallId } from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
 import FirecallItemCard from '../FirecallItems/FirecallItemCard';
 import { downloadRowsAsCsv } from '../firebase/download';
@@ -40,7 +39,6 @@ function downloadVehicles(vehicles: Fzg[]) {
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
-  const firecallId = useFirecallId();
   const { vehicles, rohre, otherItems } = useVehicles();
 
   if (!isAuthorized) {
@@ -58,7 +56,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {vehicles.map((fzg) => (
-          <FirecallItemCard item={fzg} key={fzg.id} firecallId={firecallId} />
+          <FirecallItemCard item={fzg} key={fzg.id} />
         ))}
       </Grid>
       <Typography variant="h3" gutterBottom>
@@ -66,7 +64,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {rohre.map((rohr) => (
-          <FirecallItemCard item={rohr} key={rohr.id} firecallId={firecallId} />
+          <FirecallItemCard item={rohr} key={rohr.id} />
         ))}
       </Grid>
       <Typography variant="h3" gutterBottom>
@@ -74,7 +72,7 @@ export default function Fahrzeuge() {
       </Typography>
       <Grid container spacing={2}>
         {otherItems.map((item) => (
-          <FirecallItemCard item={item} key={item.id} firecallId={firecallId} />
+          <FirecallItemCard item={item} key={item.id} />
         ))}
       </Grid>
     </Box>

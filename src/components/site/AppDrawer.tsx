@@ -20,6 +20,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import LayersIcon from '@mui/icons-material/Layers';
 
 export default function AppDrawer({
   isOpen,
@@ -42,10 +43,11 @@ export default function AppDrawer({
     },
     [setIsOpen]
   );
-  const { isSignedIn, email, isAuthorized } = useFirebaseLogin();
+  const { isAdmin } = useFirebaseLogin();
 
   const drawerItems = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
+    { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
     { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
@@ -81,7 +83,7 @@ export default function AppDrawer({
               </Link>
             ))}
 
-            {isSignedIn && email === 'paul.woelfel@ff-neusiedlamsee.at' && (
+            {isAdmin && (
               <Link href="/users" passHref>
                 <ListItem button key="users">
                   <ListItemIcon>

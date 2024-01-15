@@ -3,7 +3,7 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
-import { getItemClass } from './elements';
+import { getItemInstance } from './elements';
 
 export interface DeleteFirecallItemDialogOptions {
   item: FirecallItem;
@@ -14,10 +14,9 @@ export default function DeleteFirecallItemDialog({
   item,
   callback,
 }: DeleteFirecallItemDialogOptions) {
-  const firecallId = useFirecallId();
-  const updateItem = useFirecallItemUpdate(firecallId);
+  const updateItem = useFirecallItemUpdate();
 
-  const fcItem = useMemo(() => getItemClass(item), [item]);
+  const fcItem = useMemo(() => getItemInstance(item), [item]);
 
   const deleteFn = useCallback(
     (result: boolean) => {
