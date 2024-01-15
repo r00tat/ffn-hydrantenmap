@@ -10,8 +10,7 @@ export interface ItemOverlayOptions {
 }
 
 export default function ItemOverlay({ item, close }: ItemOverlayOptions) {
-  const firecallId = useFirecallId();
-  const updateItem = useFirecallItemUpdate(firecallId);
+  const updateItem = useFirecallItemUpdate();
 
   const onClose = useCallback(
     (item?: FirecallItem) => {

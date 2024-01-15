@@ -14,8 +14,7 @@ export default function DeleteFirecallItemDialog({
   item,
   callback,
 }: DeleteFirecallItemDialogOptions) {
-  const firecallId = useFirecallId();
-  const updateItem = useFirecallItemUpdate(firecallId);
+  const updateItem = useFirecallItemUpdate();
 
   const fcItem = useMemo(() => getItemInstance(item), [item]);
 
