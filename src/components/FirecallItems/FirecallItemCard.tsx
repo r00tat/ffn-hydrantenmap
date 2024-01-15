@@ -86,6 +86,7 @@ export default function FirecallItemCard({
                   xs={12}
                   md={12}
                   lg={6}
+                  xl={4}
                   draggable
                 />
               ))}

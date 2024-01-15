@@ -23,7 +23,11 @@ export default function FirecallLayer() {
 
       {firecallId !== 'unknown' &&
         Object.entries(layers).map(([layerId, layer]) => (
-          <LayersControl.Overlay name={layer.name} checked key={layerId}>
+          <LayersControl.Overlay
+            name={`Einsatz ${layer.name}`}
+            checked
+            key={layerId}
+          >
             <LayerGroup>
               <FirecallItems layer={layer} />
             </LayerGroup>

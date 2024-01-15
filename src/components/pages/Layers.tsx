@@ -99,9 +99,9 @@ export default function LayersPage() {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      console.info(`drag end`, event);
       const layerId = event.over?.id;
       const activeId = event.active.id;
+      console.info(`FirecallItem drag end ${activeId} on to ${layerId}`);
       const item = items.find((i) => i.id === activeId);
       if (layerId && activeId && item) {
         updateFirecallItem({ ...item, layer: '' + layerId });
@@ -122,8 +122,8 @@ export default function LayersPage() {
             Ebenen
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={6} md={6} lg={6}>
-              layers
+            <Grid item xs={6} md={6} lg={6} xl={8}>
+              <Typography variant="h5">Erstellte Ebenen</Typography>
               <Grid container spacing={2}>
                 {Object.values(layers).map((item) => (
                   <DroppableFirecallCard
@@ -134,8 +134,8 @@ export default function LayersPage() {
                 ))}
               </Grid>
             </Grid>
-            <Grid item xs={6} md={6} lg={6}>
-              FirecallItems
+            <Grid item xs={6} md={6} lg={6} xl={4}>
+              <Typography variant="h5">Elemente nicht zugeordnet</Typography>
               <Grid container spacing={2}>
                 {layerItems['default'].map((item) => (
                   <FirecallItemCard item={item} key={item.id} draggable />
