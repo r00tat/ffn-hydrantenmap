@@ -1,6 +1,6 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
-import firebaseAdmin from '../firebase/admin';
+import firebaseAdmin, { firestore } from '../firebase/admin';
 
 const userRequired = async (req: NextApiRequest, res: NextApiResponse<any>) => {
   const { authorization } = req.headers;
@@ -28,7 +28,6 @@ const userRequired = async (req: NextApiRequest, res: NextApiResponse<any>) => {
       return decodedToken;
     }
     // fetch the user and check if this is an active user
-    const firestore = firebaseAdmin.firestore();
     const userDoc = await firestore
       .collection('user')
       .doc(decodedToken.sub)

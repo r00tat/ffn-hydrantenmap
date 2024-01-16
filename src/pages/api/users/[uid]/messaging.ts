@@ -1,8 +1,8 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
+import { getMessaging } from 'firebase-admin/messaging';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import userRequired from '../../../../server/auth/userRequired';
-import firebaseAdmin from '../../../../server/firebase/admin';
-import { getMessaging } from 'firebase-admin/messaging';
+import { firestore } from '../../../../server/firebase/admin';
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -13,7 +13,6 @@ export interface RegisterBody {
 }
 
 async function handleRegister(uid: string, token: string) {
-  const firestore = firebaseAdmin.firestore();
   const doc = firestore.collection('user').doc(`${uid}`);
 
   const oldData = (await doc.get()).data();
@@ -69,7 +68,6 @@ async function POST(req: NextApiRequest, res: NextApiResponse<UsersResponse>) {
 }
 
 async function handleUnRegister(uid: string, token: string) {
-  const firestore = firebaseAdmin.firestore();
   const doc = firestore.collection('user').doc(`${uid}`);
 
   const oldData = (await doc.get()).data();

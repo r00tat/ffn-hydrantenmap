@@ -16,6 +16,8 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export default app;
 export { app as firebaseApp };
 // export const analytics: Analytics = getAnalytics(app);
-export const firestore: Firestore = getFirestore(app);
+export const firestore: Firestore = process.env.NEXT_PUBLIC_FIRESTORE_DB
+  ? getFirestore(app, process.env.NEXT_PUBLIC_FIRESTORE_DB)
+  : getFirestore(app);
 export const db = firestore;
 export const auth: Auth = getAuth(app);

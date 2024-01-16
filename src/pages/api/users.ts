@@ -1,17 +1,15 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import { UserRecord } from 'firebase-admin/lib/auth/user-record';
 import { DocumentData } from 'firebase/firestore';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { UserRecordExtended } from '../../common/users';
 import adminRequired from '../../server/auth/adminRequired';
-import firebaseAdmin from '../../server/firebase/admin';
+import firebaseAdmin, { firestore } from '../../server/firebase/admin';
 import { ErrorResponse } from './responses';
 
 const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
     await firebaseAdmin.auth().listUsers(1000)
   ).users.map((u) => u.toJSON() as UserRecordExtended);
-  const firestore = firebaseAdmin.firestore();
   const userDocs = (await firestore.collection('user').get()).docs;
   const userDocsMap: { [uid: string]: DocumentData } = {};
   userDocs.forEach((doc) => (userDocsMap[doc.id] = doc.data()));

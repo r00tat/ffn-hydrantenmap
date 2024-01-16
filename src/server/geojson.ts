@@ -8,7 +8,7 @@ import { distanceBetween, geohashQueryBounds } from 'geofire-common';
 import { Feature, FeatureCollection, Geometry, Point } from 'geojson';
 import { GeoPosition, GeoPositionObject } from '../common/geo';
 import { GeohashCluster } from '../common/gis-objects';
-import firebaseAdmin from './firebase/admin';
+import { firestore } from './firebase/admin';
 
 export interface GeoProperties {
   id: string;
@@ -153,7 +153,6 @@ export async function getClusters(
 ): Promise<GeohashCluster> {
   const bounds = geohashQueryBounds(center.toLatLngPosition(), radiusInM);
   // console.info(`bounds: ${JSON.stringify(bounds)}`);
-  const firestore = firebaseAdmin.firestore();
 
   const docs: GeohashCluster[] = (
     await Promise.all(
