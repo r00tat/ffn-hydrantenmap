@@ -1,24 +1,23 @@
+import { kml as toGeoJSON } from '@mapbox/togeojson';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { CircularProgress, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
-import { useCallback, useState } from 'react';
-import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
-import readFileAsText from '../upload/readFile';
-import { kml as toGeoJSON } from '@mapbox/togeojson';
 import {
-  Feature,
   FeatureCollection,
   Geometry,
   LineString,
   Point,
   Polygon,
 } from 'geojson';
+import { useCallback, useState } from 'react';
+import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
+import readFileAsText from '../upload/readFile';
 
-import { FirecallItem, FirecallLayer, Line } from './firestore';
 import { GeoPosition } from '../../common/geo';
-import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
-import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { formatTimestamp } from '../../common/time-format';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
+import { FcMarker, FirecallItem, Line } from './firestore';
 
 export interface KmlGeoProperties {
   name: string;
@@ -39,7 +38,17 @@ export type GeoJsonFeatureColleaction = FeatureCollection<
 
 function kmlToGeoJson(kml: string) {
   var dom = new DOMParser().parseFromString(kml, 'text/xml');
-  return toGeoJSON(dom);
+  // console.info('dom', dom);
+  const geoJson: GeoJsonFeatureColleaction = toGeoJSON(dom);
+  geoJson.features.map((f) => {
+    if (f.geometry.type === 'Point' && f.properties.styleUrl) {
+      const styleElement = dom.querySelector(f.properties.styleUrl);
+      f.properties.fill =
+        styleElement?.querySelector('color')?.textContent ?? '#0000ff';
+    }
+    return f;
+  });
+  return geoJson;
 }
 
 function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
@@ -57,7 +66,9 @@ function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
       alt: latlng.alt,
     };
 
-    if (f.geometry.type === 'LineString') {
+    if (f.geometry.type === 'Point') {
+      (item as FcMarker).color = f.properties.fill;
+    } else if (f.geometry.type === 'LineString') {
       // line
       item.type = 'line';
       const lineString = f.geometry as LineString;

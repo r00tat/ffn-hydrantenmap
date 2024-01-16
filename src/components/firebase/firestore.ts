@@ -41,6 +41,7 @@ export interface FcMarker extends FirecallItem {
   iconUrl?: string;
   zeichen?: string;
   attachments?: FcItemAttachment[];
+  color?: string;
 }
 
 export interface Fzg extends FirecallItem {

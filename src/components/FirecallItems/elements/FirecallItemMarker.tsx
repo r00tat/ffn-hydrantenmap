@@ -10,6 +10,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
   zeichen: string;
   attachments: FcItemAttachment[];
+  color?: string;
 
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
@@ -18,6 +19,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       iconUrl: this.iconUrl = '',
       zeichen: this.zeichen = '',
       attachments: this.attachments = [],
+      color: this.color = '#0000ff',
     } = firecallItem || {});
   }
 
@@ -31,6 +33,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       iconUrl: this.iconUrl,
       zeichen: this.zeichen,
       attachments: this.attachments,
+      color: this.color,
     } as FcMarker;
   }
 
@@ -48,6 +51,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       zeichen: 'Taktisches Zeichen',
       iconUrl: 'Icon URL',
       attachments: 'Anhänge',
+      color: 'Farbe (HTML bzw. Englisch)',
     };
   }
 
@@ -97,7 +101,12 @@ export class FirecallItemMarker extends FirecallItemBase {
       });
     }
 
-    return markerIcon;
+    return L.icon({
+      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + this.color)}`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+      popupAnchor: [0, -25],
+    });
   }
 
   public static factory(): FirecallItemBase {

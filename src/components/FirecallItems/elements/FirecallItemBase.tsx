@@ -141,7 +141,7 @@ export class FirecallItemBase {
           this.lng !== defaultPosition.lng && (
             <>
               Position: {this.lat},{this.lng}
-              {this.alt && ` ${this.alt}m`}
+              {this.alt && ` ${Math.round(this.alt)}m`}
               <br />
             </>
           )}
