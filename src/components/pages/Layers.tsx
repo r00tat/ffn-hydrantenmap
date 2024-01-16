@@ -17,6 +17,7 @@ import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { FirecallItem, filterDisplayableItems } from '../firebase/firestore';
 import { DndContext, DragEndEvent, useDroppable } from '@dnd-kit/core';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import KmlImport from '../firebase/KmlImport';
 
 export function DroppableFirecallCard({
   item,
@@ -119,7 +120,7 @@ export default function LayersPage() {
       <DndContext onDragEnd={handleDragEnd}>
         <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
-            Ebenen
+            Ebenen <KmlImport />
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={6} md={6} lg={6} xl={8}>

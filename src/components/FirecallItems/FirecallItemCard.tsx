@@ -1,3 +1,5 @@
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import CloseIcon from '@mui/icons-material/Close';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -6,14 +8,15 @@ import CardContent from '@mui/material/CardContent';
 import Grid, { RegularBreakpoints } from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
+import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import { firestore } from '../firebase/firebase';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
-import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 export interface FirecallItemCardOptions extends RegularBreakpoints {
   item: FirecallItem;
@@ -36,16 +39,36 @@ export default function FirecallItemCard({
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateItem = useFirecallItemUpdate();
+  const firecallId = useFirecallId();
 
   const item = useMemo(() => getItemInstance(itemData), [itemData]);
   const deleteFn = useCallback(
-    (result: boolean) => {
+    async (result: boolean) => {
       setIsConfirmOpen(false);
       if (result) {
         updateItem({ ...item.filteredData(), deleted: true });
+        if (item.type === 'layer') {
+          // delete all elements in this layer
+          const docs = await getDocs(
+            query(
+              collection(firestore, 'call', firecallId, 'item'),
+              where('layer', '==', item.id)
+            )
+          );
+
+          Promise.allSettled(
+            docs.docs.map((doc) =>
+              updateItem({
+                ...doc.data(),
+                id: doc.id,
+                deleted: true,
+              } as FirecallItem)
+            )
+          );
+        }
       }
     },
-    [updateItem, item]
+    [updateItem, item, firecallId]
   );
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({

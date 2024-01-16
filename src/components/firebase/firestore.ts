@@ -3,6 +3,7 @@ export interface FirecallItem {
   name: string;
   lat?: number;
   lng?: number;
+  alt?: number;
   deleted?: boolean;
   type: string;
   beschreibung?: string;
