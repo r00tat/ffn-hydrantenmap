@@ -1,7 +1,7 @@
 import { FirecallItem, FirecallLayer } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
 
-interface FirecallItemLayerInt extends FirecallItem, FirecallLayer {}
+export interface FirecallItemLayerInt extends FirecallItem, FirecallLayer {}
 
 export class FirecallItemLayer extends FirecallItemBase {
   public constructor(firecallItem?: FirecallItemLayerInt) {

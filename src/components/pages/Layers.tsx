@@ -3,7 +3,13 @@ import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { CSSProperties, useCallback, useMemo, useState } from 'react';
+import {
+  CSSProperties,
+  ReactNode,
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
 import { SimpleMap } from '../../common/types';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -15,15 +21,28 @@ import FirecallItemCard, {
 } from '../FirecallItems/FirecallItemCard';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { FirecallItem, filterDisplayableItems } from '../firebase/firestore';
-import { DndContext, DragEndEvent, useDroppable } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  MouseSensor,
+  PointerSensor,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import KmlImport from '../firebase/KmlImport';
 
-export function DroppableFirecallCard({
-  item,
-  ...options
-}: FirecallItemCardOptions) {
+interface DropBoxProps {
+  id: string;
+  children?: ReactNode;
+}
+
+function DropBox({ id, children }: DropBoxProps) {
   const { isOver, setNodeRef, active } = useDroppable({
-    id: '' + item.id,
+    id,
   });
   const style: CSSProperties = {
     color: isOver ? 'green' : undefined,
@@ -34,6 +53,17 @@ export function DroppableFirecallCard({
     margin: active ? 16 : 0,
   };
   return (
+    <Box ref={setNodeRef} style={style}>
+      {active && (children || 'Zu dieser Ebene hinzufügen')}
+    </Box>
+  );
+}
+
+export function DroppableFirecallCard({
+  item,
+  ...options
+}: FirecallItemCardOptions) {
+  return (
     <FirecallItemCard
       item={item}
       allowTypeChange={false}
@@ -42,9 +72,7 @@ export function DroppableFirecallCard({
       lg={12}
       {...options}
     >
-      <Box ref={setNodeRef} style={style}>
-        {active && 'Zu dieser Ebene hinzufügen'}
-      </Box>
+      <DropBox id={'' + item.id} />
     </FirecallItemCard>
   );
 }
@@ -104,10 +132,29 @@ export default function LayersPage() {
       console.info(`FirecallItem drag end ${activeId} on to ${layerId}`);
       const item = items.find((i) => i.id === activeId);
       if (layerId && activeId && item) {
-        updateFirecallItem({ ...item, layer: '' + layerId });
+        updateFirecallItem({
+          ...item,
+          layer: layerId === 'default' ? undefined : '' + layerId,
+        });
       }
     },
     [items, updateFirecallItem]
+  );
+
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 0.01,
+    },
+  });
+  const mouseSensor = useSensor(MouseSensor);
+  const touchSensor = useSensor(TouchSensor);
+  const keyboardSensor = useSensor(KeyboardSensor);
+
+  const sensors = useSensors(
+    mouseSensor,
+    touchSensor,
+    keyboardSensor,
+    pointerSensor
   );
 
   if (!isAuthorized) {
@@ -116,10 +163,10 @@ export default function LayersPage() {
 
   return (
     <>
-      <DndContext onDragEnd={handleDragEnd}>
+      <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
         <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
-            Ebenen
+            Ebenen <KmlImport />
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={6} md={6} lg={6} xl={8}>
@@ -136,6 +183,7 @@ export default function LayersPage() {
             </Grid>
             <Grid item xs={6} md={6} lg={6} xl={4}>
               <Typography variant="h5">Elemente nicht zugeordnet</Typography>
+              <DropBox id="default">keiner Ebene zuoordnen</DropBox>
               <Grid container spacing={2}>
                 {layerItems['default'].map((item) => (
                   <FirecallItemCard item={item} key={item.id} draggable />

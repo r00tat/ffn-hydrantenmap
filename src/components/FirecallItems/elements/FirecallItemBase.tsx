@@ -54,6 +54,7 @@ export class FirecallItemBase {
       updatedBy: this.updatedBy,
       creator: this.creator,
       created: this.created,
+      alt: this.alt,
     } = firecallItem || {});
   }
 
@@ -62,6 +63,7 @@ export class FirecallItemBase {
   beschreibung: string;
   lat: number;
   lng: number;
+  alt?: number;
   type: string;
   updatedAt?: string;
   updatedBy?: string;
@@ -92,6 +94,7 @@ export class FirecallItemBase {
       id: this.id,
       lat: this.lat,
       lng: this.lng,
+      alt: this.alt,
       name: this.name,
       beschreibung: this.beschreibung,
       type: this.type,
@@ -138,6 +141,7 @@ export class FirecallItemBase {
           this.lng !== defaultPosition.lng && (
             <>
               Position: {this.lat},{this.lng}
+              {this.alt && ` ${Math.round(this.alt)}m`}
               <br />
             </>
           )}

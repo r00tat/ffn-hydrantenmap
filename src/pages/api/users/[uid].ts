@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { feuerwehren } from '../../../common/feuerwehren';
 import { UserRecordExtended } from '../../../common/users';
 import adminRequired from '../../../server/auth/adminRequired';
-import firebaseAdmin from '../../../server/firebase/admin';
+import { firestore } from '../../../server/firebase/admin';
 
 export interface UsersResponse {
   user: UserRecordExtended;
@@ -28,7 +28,6 @@ export default async function handler(
 
   console.info(`updating ${uid}: ${JSON.stringify(newData)}`);
 
-  const firestore = firebaseAdmin.firestore();
   await firestore.collection('user').doc(`${uid}`).set(newData, {
     merge: true,
   });

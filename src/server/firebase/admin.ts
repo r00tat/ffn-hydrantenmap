@@ -1,4 +1,5 @@
 import * as firebaseAdmin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // let serviceAccount: process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
@@ -10,3 +11,7 @@ if (firebaseAdmin.apps?.length == 0) {
 }
 
 export default firebaseAdmin;
+
+export const firestore = process.env.NEXT_PUBLIC_FIRESTORE_DB
+  ? getFirestore(firebaseAdmin.app(), process.env.NEXT_PUBLIC_FIRESTORE_DB)
+  : firebaseAdmin.firestore();

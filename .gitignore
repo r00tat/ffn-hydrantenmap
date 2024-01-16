@@ -177,3 +177,4 @@ dist
 
 /public/*.js
 /public/*.js.map
+/firebase-tools

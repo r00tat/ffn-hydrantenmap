@@ -4,7 +4,7 @@ import { DataMessagePayload } from 'firebase-admin/messaging';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { ChatMessage } from '../../common/chat';
 import userRequired from '../../server/auth/userRequired';
-import firebaseAdmin from '../../server/firebase/admin';
+import firebaseAdmin, { firestore } from '../../server/firebase/admin';
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -28,8 +28,6 @@ async function newChatMessage(
     message,
     timestamp: new Date().toISOString(),
   };
-
-  const firestore = firebaseAdmin.firestore();
 
   const chatCollection = firestore
     .collection('call')

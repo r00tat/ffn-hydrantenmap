@@ -1,12 +1,11 @@
+import * as fs from 'fs';
 import { geohashForLocation } from 'geofire-common';
 import {
-  GeohashCluster,
   GEOHASH_PRECISION,
-  GisObject,
+  GeohashCluster,
   WgsObject,
 } from '../common/gis-objects';
-import firebaseAdmin from './firebase/admin';
-import * as fs from 'fs';
+import { firestore } from './firebase/admin';
 import { writeBatches } from './firebase/import';
 
 type GeohashMap = Record<string, GeohashCluster>;
@@ -25,11 +24,10 @@ const removeDuplicates = (geohashes: GeohashMap, collectionName: string) => {
 
 async function clusterImport() {
   const clusterCollectionName = `clusters${GEOHASH_PRECISION}`;
-  const db = firebaseAdmin.firestore();
 
   console.info(`fetching existing clusters`);
   const geohashes: GeohashMap = (
-    await db.collection(clusterCollectionName).get()
+    await firestore.collection(clusterCollectionName).get()
   ).docs
     .map((doc) => doc.data() as unknown as GeohashCluster)
     .reduce((p, c) => {
@@ -56,7 +54,7 @@ async function clusterImport() {
     removeDuplicates(geohashes, collectionName);
     console.info(`searching for ${collectionName} records`);
     const objects: WgsObject[] = (
-      await db.collection(collectionName).get()
+      await firestore.collection(collectionName).get()
     ).docs.map(
       (doc) => ({ id: doc.id, ...doc.data() } as unknown as WgsObject)
     );

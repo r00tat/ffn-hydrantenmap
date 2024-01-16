@@ -19,6 +19,7 @@ import {
 } from '../components/firebase/firestore';
 import { uploadFile } from '../components/inputs/FileUploader';
 import { ChatMessage } from '../common/chat';
+import { allSettled } from '../common/promise';
 
 export interface FirecallExport extends Firecall {
   items: FirecallItem[];
@@ -26,18 +27,6 @@ export interface FirecallExport extends Firecall {
 }
 
 const storage = getStorage(app);
-
-async function allSettled<T>(promises: Promise<T>[]) {
-  const results = await Promise.allSettled(promises);
-  results
-    .filter((p) => p.status === 'rejected')
-    .map((p) => (p as PromiseRejectedResult).reason)
-    .forEach(console.warn);
-
-  return results
-    .filter((p) => p.status === 'fulfilled')
-    .map((p) => (p as PromiseFulfilledResult<T>).value);
-}
 
 function removeBase64Prefix(b64String: string) {
   return b64String.substring(b64String.indexOf(',') + 1);

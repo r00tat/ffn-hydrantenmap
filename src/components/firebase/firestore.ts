@@ -3,6 +3,7 @@ export interface FirecallItem {
   name: string;
   lat?: number;
   lng?: number;
+  alt?: number;
   deleted?: boolean;
   type: string;
   beschreibung?: string;
@@ -40,6 +41,7 @@ export interface FcMarker extends FirecallItem {
   iconUrl?: string;
   zeichen?: string;
   attachments?: FcItemAttachment[];
+  color?: string;
 }
 
 export interface Fzg extends FirecallItem {

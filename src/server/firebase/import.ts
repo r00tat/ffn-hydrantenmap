@@ -1,11 +1,10 @@
-import firebaseAdmin from './admin';
+import { firestore } from './admin';
 
 export async function writeBatches(
   collectionName: string,
   records: { [key: string]: any }
 ) {
   console.info(`writing ${Object.keys(records).length} to ${collectionName}`);
-  const firestore = firebaseAdmin.firestore();
   const batches = [];
   let batch = firestore.batch();
 

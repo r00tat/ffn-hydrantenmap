@@ -1,8 +1,8 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
-import firebaseAdmin from '../../server/firebase/admin';
 import { GisWgsObject } from '../../common/gis-objects';
 import userRequired from '../../server/auth/userRequired';
+import { firestore } from '../../server/firebase/admin';
 
 export interface Hydrant extends GisWgsObject {
   dimension: string;
@@ -21,8 +21,6 @@ let records: Hydrant[];
 
 const getRecords = async () => {
   if (!records) {
-    const firestore = firebaseAdmin.firestore();
-
     records =
       (
         await firestore

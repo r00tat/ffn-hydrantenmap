@@ -5,38 +5,11 @@ import { styled } from '@mui/material/styles';
 import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallExport, importFirecall } from '../../hooks/useExport';
-
-const VisuallyHiddenInput = styled('input')({
-  clip: 'rect(0 0 0 0)',
-  clipPath: 'inset(50%)',
-  height: 1,
-  overflow: 'hidden',
-  position: 'absolute',
-  bottom: 0,
-  left: 0,
-  whiteSpace: 'nowrap',
-  width: 1,
-});
+import readFileAsText from '../upload/readFile';
+import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 
 async function readFileAsJson(file: File): Promise<FirecallExport> {
-  const result = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('loadend', (ev) => {
-      if (!reader.result) {
-        console.warn('failed to read file, reader empty');
-        reject('failed to read file, reader empty');
-      } else {
-        resolve(reader.result?.toString());
-      }
-    });
-    reader.addEventListener('error', (ev) => {
-      reject('load error');
-    });
-    console.log(`reading as text`);
-    reader.readAsText(file, 'utf8');
-    console.log(`text read`);
-  });
-  console.log(`json parsing`);
+  const result = await readFileAsText(file);
   const firecallData = JSON.parse(result);
   return firecallData;
 }

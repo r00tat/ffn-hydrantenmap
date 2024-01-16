@@ -1,6 +1,6 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
-import firebaseAdmin from '../firebase/admin';
+import { firestore } from '../firebase/admin';
 
 const tokenRequired = async (
   req: NextApiRequest,
@@ -22,7 +22,6 @@ const tokenRequired = async (
     return false;
   }
 
-  const firestore = firebaseAdmin.firestore();
   const tokenDoc = await firestore.collection('tokens').doc(token).get();
   if (!tokenDoc.exists) {
     res.status(403).json({ error: 'token invalid' });
