@@ -7,7 +7,7 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
-import ItemOverlay from './ItemOverlay';
+import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import React from 'react';
 import { where } from 'firebase/firestore';
 
@@ -15,7 +15,7 @@ export interface FirecallLayerOptions {
   layer?: FirecallLayer;
 }
 
-export default function FirecallItems({ layer }: FirecallLayerOptions) {
+export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const firecall = useFirecall();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const queryConstraints = useMemo(

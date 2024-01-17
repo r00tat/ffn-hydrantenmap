@@ -2,7 +2,30 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { formatTimestamp } from '../../common/time-format';
 import useVehicles from '../../hooks/useVehicles';
-import { firecallItemInfo } from '../FirecallItems/infos/firecallitems';
+import { getItemInstance } from '../FirecallItems/elements';
+import { useMemo } from 'react';
+import { FirecallItem } from '../firebase/firestore';
+
+interface FcItemRowProps {
+  item: FirecallItem;
+}
+function FcItemRow({ item }: FcItemRowProps) {
+  const itemDetails = useMemo(() => getItemInstance(item), [item]);
+  return (
+    <tr key={item.id}>
+      <td>{itemDetails.markerName()}</td>
+      <td>{itemDetails.title()}</td>
+      <td>
+        {itemDetails.popupFn()}
+        {itemDetails.body()}
+      </td>
+      <td>{item.datum && formatTimestamp(item.datum)}</td>
+      <td>
+        {item.lat} {item.lng}
+      </td>
+    </tr>
+  );
+}
 
 export default function FahrzeugePrint() {
   const { vehicles, rohre, otherItems: others } = useVehicles();
@@ -70,23 +93,7 @@ export default function FahrzeugePrint() {
         </thead>
         <tbody>
           {otherItems.map((item) => (
-            <tr key={item.id}>
-              <td>{item.type}</td>
-              <td>{item.name}</td>
-              <td>
-                {firecallItemInfo(item.type).popupFn(item)}
-                {item.beschreibung && (
-                  <>
-                    <br />
-                    {item.beschreibung}
-                  </>
-                )}
-              </td>
-              <td>{item.datum && formatTimestamp(item.datum)}</td>
-              <td>
-                {item.lat} {item.lng}
-              </td>
-            </tr>
+            <FcItemRow key={item.id} item={item} />
           ))}
         </tbody>
       </table>

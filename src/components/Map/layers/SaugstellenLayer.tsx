@@ -1,6 +1,6 @@
 import { LayerGroup } from 'react-leaflet';
 import { Saugstelle } from '../../../common/gis-objects';
-import SaugstelleMarker from './SaugstelleMarker';
+import SaugstelleMarker from '../markers/SaugstelleMarker';
 
 export interface SaugstellenLayerProps {
   saugstellen: Saugstelle[];

@@ -1,26 +1,23 @@
 import { LayersControl, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../hooks/constants';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import Clusters from './Clusters';
-import { LeitungsProvider } from './Leitungen/context';
 import Leitungen from './Leitungen/Draw';
+import { LeitungsProvider } from './Leitungen/context';
 import MapActionButtons from './MapActionButtons';
-import { DistanceLayer } from './markers/DistanceLayer';
-import DistanceMarker from './markers/DistanceMarker';
-import FirecallLayer from './markers/FirecallLayer';
-import PositionMarker from './markers/PositionMarker';
 import PositionAction from './PositionAction';
-import { availableLayers, overlayLayers } from './tiles';
 import UpdateMapPosition from './UpdateMapPosition';
+import { DistanceLayer } from './layers/DistanceLayer';
+import FirecallLayer from './layers/FirecallLayer';
+import DistanceMarker from './markers/DistanceMarker';
+import PositionMarker from './markers/PositionMarker';
+import { availableLayers, overlayLayers } from './tiles';
 
 function ActionButtons() {
-  const { isAuthorized } = useFirebaseLogin();
   const map = useMap();
-  return <>{isAuthorized && <MapActionButtons map={map} />}</>;
+  return <MapActionButtons map={map} />;
 }
 
 export default function Map() {
-  const { isAuthorized } = useFirebaseLogin();
   return (
     <MapContainer
       center={defaultPosition}
@@ -46,15 +43,12 @@ export default function Map() {
           </LayersControl.BaseLayer>
         ))}
 
-        {isAuthorized && (
-          // <LayersControl.Overlay name="Einsatz" checked>
-          <FirecallLayer />
-          // </LayersControl.Overlay>
-        )}
+        <FirecallLayer />
+
         <LayersControl.Overlay name="Entfernung">
           <DistanceMarker />
         </LayersControl.Overlay>
-        {isAuthorized && <Clusters />}
+        <Clusters />
         <LayersControl.Overlay name="Umkreis">
           <DistanceLayer />
         </LayersControl.Overlay>

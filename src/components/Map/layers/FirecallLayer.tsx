@@ -1,7 +1,7 @@
 import { LayerGroup, LayersControl } from 'react-leaflet';
 import { useFirecallId } from '../../../hooks/useFirecall';
-import FirecallItems from './FirecallItems';
-import FirecallMarker from './FirecallMarker';
+import FirecallItemsLayer from './FirecallItemsLayer';
+import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayers } from '../../../hooks/useFirecallLayers';
 
 export default function FirecallLayer() {
@@ -15,7 +15,7 @@ export default function FirecallLayer() {
           {firecallId !== 'unknown' && (
             <>
               <FirecallMarker />
-              <FirecallItems />
+              <FirecallItemsLayer />
             </>
           )}
         </LayerGroup>
@@ -29,7 +29,7 @@ export default function FirecallLayer() {
             key={layerId}
           >
             <LayerGroup>
-              <FirecallItems layer={layer} />
+              <FirecallItemsLayer layer={layer} />
             </LayerGroup>
           </LayersControl.Overlay>
         ))}

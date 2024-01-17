@@ -1,6 +1,6 @@
 import { LayerGroup } from 'react-leaflet';
 import { Loeschteich } from '../../../common/gis-objects';
-import LoeschteichMarker from './LoeschteichMarker';
+import LoeschteichMarker from '../markers/LoeschteichMarker';
 
 export interface LoeschteicheLayerProps {
   loeschteiche: Loeschteich[];
