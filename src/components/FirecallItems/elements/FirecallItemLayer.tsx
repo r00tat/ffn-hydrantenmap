@@ -1,15 +1,17 @@
-import { FirecallItem, FirecallLayer } from '../../firebase/firestore';
+import { SimpleMap } from '../../../common/types';
+import { FirecallLayer } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
 
-export interface FirecallItemLayerInt extends FirecallItem, FirecallLayer {}
-
 export class FirecallItemLayer extends FirecallItemBase {
-  public constructor(firecallItem?: FirecallItemLayerInt) {
+  grouped?: string;
+
+  public constructor(firecallItem?: FirecallLayer) {
     super({
       ...(firecallItem || { name: '' }),
       type: 'layer',
     } as FirecallItemLayer);
     this.type = 'layer';
+    ({ grouped: this.grouped = '' } = firecallItem || {});
   }
 
   public static firebaseCollectionName(): string {
@@ -22,5 +24,26 @@ export class FirecallItemLayer extends FirecallItemBase {
 
   public copy(): FirecallItemBase {
     return Object.assign(new FirecallItemLayer(this.data()), this);
+  }
+
+  public fields(): SimpleMap<string> {
+    return {
+      ...super.fields(),
+      grouped: 'Elemente gruppieren',
+    };
+  }
+
+  public fieldTypes(): SimpleMap<string> {
+    return {
+      ...super.fieldTypes(),
+      grouped: 'boolean',
+    };
+  }
+
+  public data(): FirecallLayer {
+    return {
+      ...super.data(),
+      grouped: this.grouped,
+    };
   }
 }

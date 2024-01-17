@@ -172,11 +172,11 @@ export default function LayersPage() {
             <Grid item xs={6} md={6} lg={6} xl={8}>
               <Typography variant="h5">Erstellte Ebenen</Typography>
               <Grid container spacing={2}>
-                {Object.values(layers).map((item) => (
+                {Object.entries(layers).map(([layerId, item]) => (
                   <DroppableFirecallCard
                     item={item}
-                    key={item.id}
-                    subItems={layerItems[item.id]}
+                    key={layerId}
+                    subItems={layerItems[layerId]}
                   />
                 ))}
               </Grid>

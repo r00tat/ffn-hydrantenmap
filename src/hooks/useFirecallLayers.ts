@@ -13,7 +13,7 @@ export type FirecallLayers = SimpleMap<FirecallLayer>;
 export const FirecallLayersContext = React.createContext<FirecallLayers>({});
 
 export const useFirecallLayers = () => {
-  const { layers } = useContext(FirecallLayersContext);
+  const layers = useContext(FirecallLayersContext);
   return layers;
 };
 
@@ -26,5 +26,5 @@ export function useFirecallLayersFromFirstore(): FirecallLayers {
     queryConstraints: [orderBy('name', 'asc')],
   });
 
-  return { layers: Object.fromEntries(layers.map((l) => [l.id, l])) };
+  return Object.fromEntries(layers.map((l) => [l.id, l]));
 }

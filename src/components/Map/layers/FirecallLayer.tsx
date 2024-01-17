@@ -3,6 +3,7 @@ import { useFirecallId } from '../../../hooks/useFirecall';
 import FirecallItemsLayer from './FirecallItemsLayer';
 import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayers } from '../../../hooks/useFirecallLayers';
+import MarkerClusterLayer from './MarkerClusterLayer';
 
 export default function FirecallLayer() {
   const firecallId = useFirecallId();
@@ -28,9 +29,16 @@ export default function FirecallLayer() {
             checked
             key={layerId}
           >
-            <LayerGroup>
-              <FirecallItemsLayer layer={layer} />
-            </LayerGroup>
+            {layer.grouped === 'true' && (
+              <MarkerClusterLayer>
+                <FirecallItemsLayer layer={layer} />
+              </MarkerClusterLayer>
+            )}
+            {layer.grouped !== 'true' && (
+              <LayerGroup>
+                <FirecallItemsLayer layer={layer} />
+              </LayerGroup>
+            )}
           </LayersControl.Overlay>
         ))}
     </>
