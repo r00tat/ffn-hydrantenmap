@@ -85,7 +85,7 @@ export default function FirecallItemCard({
       <Card ref={setNodeRef} style={style} {...listeners} {...attributes}>
         <CardContent>
           <Typography variant="h5" component="div" flex={1}>
-            {item.titleFn()} {item.deleted && <b>gelöscht</b>}
+            {item.title()} {item.deleted && <b>gelöscht</b>}
             {close && (
               <IconButton
                 onClick={close}
