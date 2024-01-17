@@ -1,6 +1,6 @@
 import { HydrantenRecord } from '../../../common/gis-objects';
 import MarkerClusterLayer from './MarkerClusterLayer';
-import HydrantMarker from './HydrantMarker';
+import HydrantMarker from '../markers/HydrantMarker';
 
 export interface HydrantenLayerProps {
   hydranten: HydrantenRecord[];

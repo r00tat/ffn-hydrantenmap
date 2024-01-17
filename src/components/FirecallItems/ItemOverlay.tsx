@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { useFirecallId } from '../../../hooks/useFirecall';
-import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
-import { FirecallItem } from '../../firebase/firestore';
-import FirecallItemDialog from '../../FirecallItems/FirecallItemDialog';
+import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import { FirecallItem } from '../firebase/firestore';
+import FirecallItemDialog from './FirecallItemDialog';
 
 export interface ItemOverlayOptions {
   item: FirecallItem;

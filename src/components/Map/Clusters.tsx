@@ -19,11 +19,11 @@ import {
 } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
-import GefahrObjekteLayer from './markers/GefahrObjekteLayer';
-import HydrantenLayer from './markers/HydrantenLayer';
-import LoeschteicheLayer from './markers/LoeschteichLayer';
-import RisikoObjekteLayer from './markers/RisikoObjekteLayer';
-import SaugstellenLayer from './markers/SaugstellenLayer';
+import GefahrObjekteLayer from './layers/GefahrObjekteLayer';
+import HydrantenLayer from './layers/HydrantenLayer';
+import LoeschteicheLayer from './layers/LoeschteichLayer';
+import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
+import SaugstellenLayer from './layers/SaugstellenLayer';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
   const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);

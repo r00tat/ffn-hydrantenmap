@@ -1,6 +1,6 @@
 import { LayerGroup } from 'react-leaflet';
 import { RisikoObjekt } from '../../../common/gis-objects';
-import RisikoObjektMarker from './RisikoObjektMarker';
+import RisikoObjektMarker from '../markers/RisikoObjektMarker';
 
 export interface RisikoObjekteLayerProps {
   risikoObjekte: RisikoObjekt[];

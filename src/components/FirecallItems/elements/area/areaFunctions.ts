@@ -1,12 +1,13 @@
 import { doc, setDoc } from 'firebase/firestore';
 import L from 'leaflet';
 import { LatLngPosition } from '../../../../common/geo';
+
+import { firestore } from '../../../firebase/firebase';
+import { Area } from '../../../firebase/firestore';
 import {
   calculateDistance,
   getConnectionPositions,
-} from '../../../FirecallItems/infos/connection';
-import { firestore } from '../../../firebase/firebase';
-import { Area } from '../../../firebase/firestore';
+} from '../connection/distance';
 
 export async function updateFirecallPositions(
   firecallId: string,
