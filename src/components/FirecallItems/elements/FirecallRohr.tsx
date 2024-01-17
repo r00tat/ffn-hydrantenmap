@@ -35,6 +35,7 @@ export class FirecallRohr extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       rotation: 'number',
       durchfluss: 'number',
       art: 'select',

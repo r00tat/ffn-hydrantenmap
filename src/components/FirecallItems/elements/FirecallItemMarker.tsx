@@ -57,6 +57,7 @@ export class FirecallItemMarker extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       zeichen: 'TaktischesZeichen',
       attachments: 'attachment',
     };
@@ -129,5 +130,8 @@ export class FirecallItemMarker extends FirecallItemBase {
             ))}
       </>
     );
+  }
+  public info(): string {
+    return ``;
   }
 }

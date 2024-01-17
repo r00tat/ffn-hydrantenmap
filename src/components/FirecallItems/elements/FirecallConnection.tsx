@@ -50,6 +50,7 @@ export class FirecallConnection extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       alwaysShowMarker: 'boolean',
     };
   }

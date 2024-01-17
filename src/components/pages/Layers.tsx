@@ -143,7 +143,7 @@ export default function LayersPage() {
 
   const pointerSensor = useSensor(PointerSensor, {
     activationConstraint: {
-      distance: 0.01,
+      distance: 0.1,
     },
   });
   const mouseSensor = useSensor(MouseSensor);

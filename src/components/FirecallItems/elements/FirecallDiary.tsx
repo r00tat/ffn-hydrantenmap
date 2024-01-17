@@ -61,6 +61,7 @@ export class FirecallDiary extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       name: 'textarea',
       beschreibung: 'textarea',
       art: 'select',

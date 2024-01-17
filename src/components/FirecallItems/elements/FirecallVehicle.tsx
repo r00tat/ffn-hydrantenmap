@@ -51,6 +51,7 @@ export class FirecallVehicle extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       rotation: 'number',
       ats: 'number',
     };

@@ -59,10 +59,6 @@ export class FirecallEinsatzleitung extends FirecallItemBase {
     return elIcon;
   }
 
-  public fieldTypes(): { [fieldName: string]: string } {
-    return {};
-  }
-
   public static factory(): FirecallItemBase {
     return new FirecallEinsatzleitung();
   }

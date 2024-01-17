@@ -91,6 +91,7 @@ export class FirecallArea extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       opacity: 'number',
       alwaysShowMarker: 'boolean',
     };

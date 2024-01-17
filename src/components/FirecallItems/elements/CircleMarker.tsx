@@ -80,6 +80,7 @@ export class CircleMarker extends FirecallItemBase {
 
   public fieldTypes(): { [fieldName: string]: string } {
     return {
+      ...super.fieldTypes(),
       fill: 'boolean',
     };
   }
