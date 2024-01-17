@@ -22,10 +22,8 @@ export interface FirecallItem {
   created?: string;
 }
 
-export interface FirecallLayer {
-  id?: string;
-  name: string;
-  beschreibung?: string;
+export interface FirecallLayer extends FirecallItem {
+  grouped?: string;
 }
 
 export interface FcAttachment {

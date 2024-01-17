@@ -145,7 +145,7 @@ export default function FirecallItemCard({
             )}
           </CardActions>
         )}
-        <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Collapse in={expanded} timeout={1000} unmountOnExit>
           <CardContent>
             <Grid container spacing={2}>
               {subItems &&
