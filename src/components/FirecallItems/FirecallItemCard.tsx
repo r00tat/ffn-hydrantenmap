@@ -1,13 +1,16 @@
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
+import Collapse from '@mui/material/Collapse';
 import Grid, { RegularBreakpoints } from '@mui/material/Grid';
-import IconButton from '@mui/material/IconButton';
+import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import { styled } from '@mui/material/styles';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -17,6 +20,21 @@ import { firestore } from '../firebase/firebase';
 import { FirecallItem } from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
+
+interface ExpandMoreProps extends IconButtonProps {
+  expand: boolean;
+}
+
+const ExpandMore = styled((props: ExpandMoreProps) => {
+  const { expand, ...other } = props;
+  return <IconButton {...other} />;
+})(({ theme, expand }) => ({
+  transform: !expand ? 'rotate(0deg)' : 'rotate(180deg)',
+  marginLeft: 'auto',
+  transition: theme.transitions.create('transform', {
+    duration: theme.transitions.duration.shortest,
+  }),
+}));
 
 export interface FirecallItemCardOptions extends RegularBreakpoints {
   item: FirecallItem;
@@ -40,6 +58,7 @@ export default function FirecallItemCard({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateItem = useFirecallItemUpdate();
   const firecallId = useFirecallId();
+  const [expanded, setExpanded] = useState(false);
 
   const item = useMemo(() => getItemInstance(itemData), [itemData]);
   const deleteFn = useCallback(
@@ -100,20 +119,6 @@ export default function FirecallItemCard({
           </Typography>
           <Typography variant="body2">{item.body()}</Typography>
 
-          <Grid container spacing={2}>
-            {subItems &&
-              subItems.map((si) => (
-                <FirecallItemCard
-                  item={si}
-                  key={si.id}
-                  xs={12}
-                  md={12}
-                  lg={6}
-                  xl={4}
-                  draggable
-                />
-              ))}
-          </Grid>
           {children}
         </CardContent>
         {item.editable !== false && (
@@ -128,8 +133,36 @@ export default function FirecallItemCard({
             >
               Löschen
             </Button>
+            {subItems && subItems.length > 0 && (
+              <ExpandMore
+                expand={expanded}
+                onClick={() => setExpanded((prev) => !prev)}
+                aria-expanded={expanded}
+                aria-label="show more"
+              >
+                <ExpandMoreIcon />
+              </ExpandMore>
+            )}
           </CardActions>
         )}
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <CardContent>
+            <Grid container spacing={2}>
+              {subItems &&
+                subItems.map((si) => (
+                  <FirecallItemCard
+                    item={si}
+                    key={si.id}
+                    xs={12}
+                    md={12}
+                    lg={6}
+                    xl={4}
+                    draggable
+                  />
+                ))}
+            </Grid>
+          </CardContent>
+        </Collapse>
       </Card>
       {displayUpdateDialog && (
         <FirecallItemUpdateDialog
