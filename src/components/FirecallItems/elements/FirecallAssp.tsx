@@ -24,37 +24,10 @@ export class FirecallAssp extends FirecallItemBase {
     return 'Atemschutzsammelplatz';
   }
 
-  // public title(): string {
-  //   return `Marker ${this.name}`;
-  // }
-
-  // public info(): string {
-  //   return `${this.beschreibung || ''}`;
-  // }
-
-  // public body(): string {
-  //   return `${this.markerName()} ${this.name}
-  //       ${this.beschreibung}
-  //       position: ${this.lat},${this.lng}`;
-  // }
-
   public dialogText(): ReactNode {
     return <>ASSP {this.name}</>;
   }
 
-  // public fields(): { [fieldName: string]: string } {
-  //   return {
-  //     ...super.fields(),
-  //   };
-  // }
-
-  // public dateFields(): string[] {
-  //   return [];
-  // }
-
-  public fieldTypes(): { [fieldName: string]: string } {
-    return {};
-  }
   public popupFn(): ReactNode {
     return (
       <>

@@ -131,8 +131,12 @@ export class FirecallItemBase {
       <>
         {this.beschreibung && (
           <>
-            {this.beschreibung}
-            <br />
+            {this.beschreibung.split('\n').map((s) => (
+              <>
+                {s}
+                <br />
+              </>
+            ))}
           </>
         )}
         {this.lat &&
@@ -140,7 +144,8 @@ export class FirecallItemBase {
           this.lat !== defaultPosition.lat &&
           this.lng !== defaultPosition.lng && (
             <>
-              Position: {this.lat},{this.lng}
+              Position: {Number.parseFloat('' + this.lat).toFixed(4)},
+              {Number.parseFloat('' + this.lng).toFixed(4)}
               {this.alt && ` ${Math.round(this.alt)}m`}
               <br />
             </>
@@ -171,7 +176,9 @@ export class FirecallItemBase {
   }
 
   public fieldTypes(): SimpleMap<string> {
-    return {};
+    return {
+      beschreibung: 'textarea',
+    };
   }
 
   public selectValues(): SimpleMap<SelectOptions> {

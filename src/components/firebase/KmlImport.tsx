@@ -29,6 +29,7 @@ export interface KmlGeoProperties {
   fill?: string;
   'fill-opacity'?: number;
   visibility?: string;
+  [key: string]: any;
 }
 
 export type GeoJsonFeatureColleaction = FeatureCollection<
@@ -48,6 +49,7 @@ function kmlToGeoJson(kml: string) {
     }
     return f;
   });
+  // console.info(`geojson\n${JSON.stringify(geoJson)}`);
   return geoJson;
 }
 
@@ -61,9 +63,21 @@ function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
     const item: FirecallItem = {
       type: 'marker',
       name: `${f.properties.name}`,
+      datum: new Date(
+        f.properties['Time Stamp'] ??
+          f.properties['timestamp'] ??
+          new Date().toISOString()
+      ).toISOString(),
       lat: latlng.lat,
       lng: latlng.lng,
       alt: latlng.alt,
+      beschreibung: Object.entries(f.properties)
+        .filter(
+          ([k, v]) =>
+            ['styleurl', 'stylehash', 'name'].indexOf(k.toLowerCase()) < 0
+        )
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n'),
     };
 
     if (f.geometry.type === 'Point') {
@@ -136,7 +150,7 @@ export default function KmlImport() {
 
               const fcItems = parseGeoJson(geoJson);
 
-              console.log(`importing Kml \n${JSON.stringify(fcItems)}`);
+              // console.log(`importing Kml \n${JSON.stringify(fcItems)}`);
 
               const layer = await addFirecallItem({
                 name: `KML Import ${formatTimestamp(new Date())}`,
@@ -148,12 +162,7 @@ export default function KmlImport() {
                   .map(addFirecallItem)
               );
 
-              // const ref = await importFirecall({
-              //   ...firecallData,
-              //   name: `${firecallData.name} Kopie ${formatTimestamp(new Date())}`,
-              // });
-
-              // console.debug(`import finished with ID: ${ref.id}`);
+              // console.debug(`import finished with IDs: ${ref.id}`);
               // return ref;
             } catch (err) {
               console.error('failed to parse geojson', err);
