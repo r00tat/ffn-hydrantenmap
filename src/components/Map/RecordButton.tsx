@@ -66,6 +66,7 @@ export default function RecordButton() {
           positions: JSON.stringify([[pos.lat, pos.lng]]),
           destLat: pos.lat,
           destLng: pos.lng,
+          color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
         };
         setPositions([[pos.lat, pos.lng]]);
         const ref = await addFirecallItem(newRecord);
@@ -108,7 +109,7 @@ export default function RecordButton() {
       // more than 5m and > 1 sec or > 30 seconds
 
       const timeSinceLastPos = (+currentTime - +timestamp) / 1000;
-      if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 30) {
+      if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 15) {
         // console.info(`updating pos`);
         map.setView(position);
         setTimestamp(new Date());
