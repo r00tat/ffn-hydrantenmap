@@ -101,7 +101,7 @@ export default function RecordButton() {
   });
 
   useEffect(() => {
-    if (isRecording && isPositionSet && recordItem && positions.length > 0) {
+    if (isRecording && isPositionSet && recordItem) {
       const lastPos = positions[positions.length - 1];
       const distance = position.distanceTo(toLatLng(lastPos[0], lastPos[1]));
 
@@ -111,7 +111,7 @@ export default function RecordButton() {
       if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 30) {
         map.setView(position);
         setTimestamp(new Date());
-        addPos([lastPos[0], lastPos[1]], recordItem);
+        addPos([position.lat, position.lng], recordItem);
       }
     }
   }, [
