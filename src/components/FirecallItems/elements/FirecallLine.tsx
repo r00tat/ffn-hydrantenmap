@@ -3,6 +3,7 @@ import { Line } from '../../firebase/firestore';
 import { FirecallConnection } from './FirecallConnection';
 import { FirecallItemBase } from './FirecallItemBase';
 import { LatLngPosition } from '../../../common/geo';
+import React from 'react';
 
 export class FirecallLine extends FirecallConnection {
   opacity?: number;
@@ -53,12 +54,14 @@ export class FirecallLine extends FirecallConnection {
         <br />
         Positionen:
         <br />
-        {(JSON.parse(this.positions || '[]') as LatLngPosition[]).map((p) => (
-          <>
-            {p[0].toFixed(4)},{p[1].toFixed(4)}
-            <br />
-          </>
-        ))}
+        {(JSON.parse(this.positions || '[]') as LatLngPosition[]).map(
+          (p, i) => (
+            <React.Fragment key={`pos-${this.id}-${i}`}>
+              {p[0].toFixed(4)},{p[1].toFixed(4)}
+              <br />
+            </React.Fragment>
+          )
+        )}
       </>
     );
   }
