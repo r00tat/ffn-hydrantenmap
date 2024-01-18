@@ -89,6 +89,7 @@ export default function RecordButton() {
       // more than 5m or 30 seconds
       if (distance > 5 || (+new Date() - +timestamp) / 1000 > 30) {
         map.setView(position);
+        setTimestamp(new Date());
         addPos([lastPos[0], lastPos[1]], recordItem);
       }
     }
