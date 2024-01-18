@@ -43,6 +43,7 @@ export interface FirecallItemCardOptions extends RegularBreakpoints {
   allowTypeChange?: boolean;
   children?: ReactNode;
   draggable?: boolean;
+  subItemsDraggable?: boolean;
 }
 
 export default function FirecallItemCard({
@@ -52,6 +53,7 @@ export default function FirecallItemCard({
   allowTypeChange,
   children,
   draggable = false,
+  subItemsDraggable = false,
   ...breakpoints
 }: FirecallItemCardOptions) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
@@ -157,7 +159,7 @@ export default function FirecallItemCard({
                     md={12}
                     lg={6}
                     xl={4}
-                    draggable
+                    draggable={subItemsDraggable}
                   />
                 ))}
             </Grid>

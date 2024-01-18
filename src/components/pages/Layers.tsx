@@ -34,6 +34,10 @@ import {
 } from '@dnd-kit/core';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import KmlImport from '../firebase/KmlImport';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Switch from '@mui/material/Switch';
 
 interface DropBoxProps {
   id: string;
@@ -80,6 +84,7 @@ export function DroppableFirecallCard({
 export default function LayersPage() {
   const { isAuthorized } = useFirebaseLogin();
   const [addDialog, setAddDialog] = useState(false);
+  const [dragEnabled, setDragEnabled] = useState(false);
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
@@ -145,11 +150,15 @@ export default function LayersPage() {
 
   const pointerSensor = useSensor(PointerSensor, {
     activationConstraint: {
-      distance: 0.1,
+      distance: 1,
     },
   });
   const mouseSensor = useSensor(MouseSensor);
-  const touchSensor = useSensor(TouchSensor);
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      distance: 1,
+    },
+  });
   const keyboardSensor = useSensor(KeyboardSensor);
 
   const sensors = useSensors(
@@ -172,13 +181,27 @@ export default function LayersPage() {
           </Typography>
           <Grid container spacing={2}>
             <Grid item xs={6} md={6} lg={6} xl={8}>
-              <Typography variant="h5">Erstellte Ebenen</Typography>
+              <Typography variant="h5">
+                Erstellte Ebenen
+                <FormGroup>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={dragEnabled}
+                        onChange={() => setDragEnabled((old) => !old)}
+                      />
+                    }
+                    label={'Elemente verschieben'}
+                  />
+                </FormGroup>
+              </Typography>
               <Grid container spacing={2}>
                 {Object.entries(layers).map(([layerId, item]) => (
                   <DroppableFirecallCard
                     item={item}
                     key={layerId}
                     subItems={layerItems[layerId]}
+                    subItemsDraggable={dragEnabled}
                   />
                 ))}
               </Grid>
@@ -188,7 +211,11 @@ export default function LayersPage() {
               <DropBox id="default">keiner Ebene zuoordnen</DropBox>
               <Grid container spacing={2}>
                 {layerItems['default'].map((item) => (
-                  <FirecallItemCard item={item} key={item.id} draggable />
+                  <FirecallItemCard
+                    item={item}
+                    key={item.id}
+                    draggable={false}
+                  />
                 ))}
               </Grid>
             </Grid>

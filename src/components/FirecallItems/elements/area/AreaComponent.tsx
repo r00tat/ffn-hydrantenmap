@@ -52,7 +52,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
 
   return (
     <>
-      {(record.alwaysShowMarker === true || showMarkers) &&
+      {(record.alwaysShowMarker === 'true' || showMarkers) &&
         positions.map((p, index) => (
           <Marker
             key={index}

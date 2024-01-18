@@ -7,7 +7,7 @@ import { usePositionContext } from './Position';
 
 export default function PositionAction() {
   const map = useMap();
-  const [position] = usePositionContext();
+  const [position, isPositionSet] = usePositionContext();
 
   const setPos = useCallback(() => {
     if (position) {
@@ -24,17 +24,19 @@ export default function PositionAction() {
         left: 16,
       }}
     >
-      <Fab
-        color="primary"
-        aria-label="add"
-        size="small"
-        onClick={(event) => {
-          event.preventDefault();
-          setPos();
-        }}
-      >
-        <LocationSearchingIcon />
-      </Fab>
+      {isPositionSet && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          size="small"
+          onClick={(event) => {
+            event.preventDefault();
+            setPos();
+          }}
+        >
+          <LocationSearchingIcon />
+        </Fab>
+      )}
     </Box>
   );
 }

@@ -13,7 +13,7 @@ export class FirecallConnection extends FirecallItemBase {
   positions?: string;
   distance?: number;
   color?: string;
-  alwaysShowMarker?: boolean;
+  alwaysShowMarker?: string;
 
   public constructor(firecallItem?: Connection) {
     super(firecallItem);
@@ -25,10 +25,8 @@ export class FirecallConnection extends FirecallItemBase {
         positions: this.positions,
         distance: this.distance,
         color: this.color,
+        alwaysShowMarker: this.alwaysShowMarker = 'false',
       } = firecallItem);
-      this.alwaysShowMarker =
-        (firecallItem?.alwaysShowMarker as unknown as string) === 'true' ??
-        false;
     }
   }
 
@@ -72,7 +70,7 @@ export class FirecallConnection extends FirecallItemBase {
   // }
 
   public info(): string {
-    return `Länge: ${this.distance || 0}m ${Math.ceil(
+    return `Länge: ${Math.round(this.distance || 0)}m ${Math.ceil(
       (this.distance || 0) / 20
     )} B-Längen`;
   }
@@ -83,8 +81,12 @@ export class FirecallConnection extends FirecallItemBase {
         {super.body()}
         {this.lat},{this.lng} =&gt; {this.destLat},{this.destLng}
         <br />
-        Länge: {this.distance}m<br />
-        Farbe: {this.color}
+        {this.distance && (
+          <>
+            Länge: {Math.round(this.distance)}m<br />
+          </>
+        )}
+        {this.color && <>Farbe: {this.color}</>}
       </>
     );
   }
@@ -121,7 +123,7 @@ export class FirecallConnection extends FirecallItemBase {
           {this.markerName()} {this.name}
         </b>
         <br />
-        {this.distance || 0}
+        {Math.round(this.distance || 0)}
         m, {Math.ceil((this.distance || 0) / 20)} B Schläuche
       </>
     );
