@@ -4,6 +4,7 @@ import { FirecallConnection } from './FirecallConnection';
 import { FirecallItemBase } from './FirecallItemBase';
 import { LatLngPosition } from '../../../common/geo';
 import React from 'react';
+import { Collapse } from '@mui/material';
 
 export class FirecallLine extends FirecallConnection {
   opacity?: number;
@@ -26,7 +27,7 @@ export class FirecallLine extends FirecallConnection {
   }
 
   public info(): string {
-    return `Länge: ${this.distance || 0}m`;
+    return `Länge: ${Math.round(this.distance || 0)}m`;
   }
 
   public static factory(): FirecallItemBase {

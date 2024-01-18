@@ -28,11 +28,11 @@ export default function RecordButton() {
 
   const addPos = useCallback(
     async (newPos: LatLngPosition, record: Line) => {
+      // we need an id to update the item
       if (recordItem?.id) {
         console.info(
           `adding new position to track ${recordItem.id}: ${newPos}`
         );
-        // we need an id to update the item
         const allPos: LatLngPosition[] = [
           ...JSON.parse(record.positions || '[]'),
           newPos,
@@ -81,7 +81,7 @@ export default function RecordButton() {
   const stopRecording = useCallback(
     async (pos: LatLng) => {
       if (recordItem) {
-        addPos([pos.lat, pos.lng], recordItem);
+        await addPos([pos.lat, pos.lng], recordItem);
       }
       setPositions([]);
       setRecordItem(undefined);
@@ -93,7 +93,7 @@ export default function RecordButton() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 3000);
+    }, 2000);
 
     return () => {
       clearInterval(interval);
@@ -109,10 +109,15 @@ export default function RecordButton() {
 
       const timeSinceLastPos = (+currentTime - +timestamp) / 1000;
       if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 30) {
+        // console.info(`updating pos`);
         map.setView(position);
         setTimestamp(new Date());
         addPos([position.lat, position.lng], recordItem);
+      } else {
+        // console.info(`distance or time to small`);
       }
+    } else {
+      // console.warn('not recording');
     }
   }, [
     addPos,
