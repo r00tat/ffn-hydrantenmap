@@ -19,6 +19,7 @@ export default function RecordButton() {
   const [recordItem, setRecordItem] = useState<Line>();
   const [positions, setPositions] = useState<LatLngPosition[]>([]);
   const [timestamp, setTimestamp] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const [position, isPositionSet] = usePositionContext();
   const map = useMap();
@@ -28,6 +29,9 @@ export default function RecordButton() {
   const addPos = useCallback(
     async (newPos: LatLngPosition, record: Line) => {
       if (recordItem?.id) {
+        console.info(
+          `adding new position to track ${recordItem.id}: ${newPos}`
+        );
         // we need an id to update the item
         const allPos: LatLngPosition[] = [
           ...JSON.parse(record.positions || '[]'),
@@ -42,6 +46,8 @@ export default function RecordButton() {
           distance: calculateDistance(allPos),
         };
         await updateFirecallItem(newRecord);
+      } else {
+        console.warn(`tracking not possible, record id undefined`);
       }
     },
     [recordItem, updateFirecallItem]
@@ -65,6 +71,7 @@ export default function RecordButton() {
         newRecord.id = ref.id;
         setRecordItem(newRecord);
         setIsRecording(true);
+        console.info(`starting track ${newRecord.name} ${newRecord.id} ${pos}`);
       }
     },
     [addFirecallItem, isPositionSet, map, position]
@@ -83,12 +90,22 @@ export default function RecordButton() {
   );
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  });
+
+  useEffect(() => {
     if (isRecording && isPositionSet && recordItem && positions.length > 0) {
       const lastPos = positions[positions.length - 1];
       const distance = position.distanceTo(toLatLng(lastPos[0], lastPos[1]));
 
       // more than 5m or 30 seconds
-      if (distance > 5 || (+new Date() - +timestamp) / 1000 > 30) {
+      if (distance > 5 || (+currentTime - +timestamp) / 1000 > 30) {
         map.setView(position);
         setTimestamp(new Date());
         addPos([lastPos[0], lastPos[1]], recordItem);
@@ -96,6 +113,7 @@ export default function RecordButton() {
     }
   }, [
     addPos,
+    currentTime,
     isPositionSet,
     isRecording,
     map,
