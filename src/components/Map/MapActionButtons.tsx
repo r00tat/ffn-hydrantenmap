@@ -8,6 +8,7 @@ import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { fcItemClasses } from '../FirecallItems/elements';
 import { Connection, FirecallItem } from '../firebase/firestore';
 import { useLeitungen } from './Leitungen/context';
+import RecordButton from './RecordButton';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -67,6 +68,8 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           <AddIcon />
         </Fab>
       </Box>
+
+      <RecordButton />
 
       {fzgDialogIsOpen && (
         <FirecallItemDialog onClose={fzgDialogClose} type="vehicle" />
