@@ -101,14 +101,16 @@ export default function LayersPage() {
       Object.fromEntries(
         Object.keys(layers).map((key) => [
           key,
-          items.filter((i) => i.layer === key),
+          items
+            .filter((i) => i.layer === key)
+            .sort((a, b) => a.datum?.localeCompare(b.datum || '') || 0),
         ])
       )
     );
 
-    elements['default'] = items.filter(
-      (i) => i.layer === '' || i.layer === undefined
-    );
+    elements['default'] = items
+      .filter((i) => i.layer === '' || i.layer === undefined)
+      .sort((a, b) => a.datum?.localeCompare(b.datum || '') || 0);
 
     return elements;
   }, [items, layers]);
