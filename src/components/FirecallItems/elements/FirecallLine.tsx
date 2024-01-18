@@ -48,6 +48,18 @@ export class FirecallLine extends FirecallConnection {
     };
   }
 
+  public popupFn(): ReactNode {
+    return (
+      <>
+        <b>
+          {this.markerName()} {this.name}
+        </b>
+        <br />
+        {Math.round(this.distance || 0)}m
+      </>
+    );
+  }
+
   public body(): ReactNode {
     return (
       <>
