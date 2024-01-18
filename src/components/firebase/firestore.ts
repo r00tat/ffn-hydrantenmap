@@ -83,12 +83,12 @@ export interface Connection extends FirecallItem {
   positions?: string;
   distance?: number;
   color?: string;
-  alwaysShowMarker?: boolean;
+  alwaysShowMarker?: string;
 }
 
 export interface Area extends Connection {
   opacity?: number;
-  alwaysShowMarker?: boolean;
+  alwaysShowMarker?: string;
 }
 
 export interface Line extends Connection {

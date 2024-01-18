@@ -55,7 +55,7 @@ export default function ConnectionMarker({
 
   return (
     <>
-      {(record.alwaysShowMarker === true || showMarkers) &&
+      {(record.alwaysShowMarker === 'true' || showMarkers) &&
         positions.map((p, index) => (
           <Marker
             key={index}

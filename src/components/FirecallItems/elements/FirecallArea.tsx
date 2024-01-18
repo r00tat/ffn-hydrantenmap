@@ -14,19 +14,19 @@ export class FirecallArea extends FirecallItemBase {
   positions?: string;
   color?: string;
   opacity?: number;
-  alwaysShowMarker?: boolean;
+  alwaysShowMarker?: string;
 
   public constructor(firecallItem?: Area) {
     super(firecallItem);
-    this.distance = firecallItem?.distance || 0;
-    this.destLat = firecallItem?.destLat || defaultPosition.lat;
-    this.destLng = firecallItem?.destLng || defaultPosition.lng + 0.0001;
-    this.positions = firecallItem?.positions || JSON.stringify([]);
-    this.color = firecallItem?.color || 'blue';
-    this.opacity = firecallItem?.opacity || 50;
-    this.alwaysShowMarker =
-      //firecallItem?.alwaysShowMarker === true ?? false;
-      (firecallItem?.alwaysShowMarker as unknown as string) === 'true' ?? false;
+    ({
+      distance: this.distance = 0,
+      destLat: this.destLat = defaultPosition.lat,
+      destLng: this.destLng = defaultPosition.lng + 0.0001,
+      positions: this.positions = JSON.stringify([]),
+      color: this.color = 'blue',
+      opacity: this.opacity = 50,
+      alwaysShowMarker: this.alwaysShowMarker,
+    } = firecallItem || {});
   }
 
   public copy(): FirecallArea {

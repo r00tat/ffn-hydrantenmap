@@ -13,7 +13,7 @@ export class FirecallConnection extends FirecallItemBase {
   positions?: string;
   distance?: number;
   color?: string;
-  alwaysShowMarker?: boolean;
+  alwaysShowMarker?: string;
 
   public constructor(firecallItem?: Connection) {
     super(firecallItem);
@@ -25,10 +25,8 @@ export class FirecallConnection extends FirecallItemBase {
         positions: this.positions,
         distance: this.distance,
         color: this.color,
+        alwaysShowMarker: this.alwaysShowMarker = 'false',
       } = firecallItem);
-      this.alwaysShowMarker =
-        (firecallItem?.alwaysShowMarker as unknown as string) === 'true' ??
-        false;
     }
   }
 
