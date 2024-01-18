@@ -61,8 +61,9 @@ export default function RecordButton() {
           destLng: pos.lng,
         };
         setPositions([[pos.lat, pos.lng]]);
+        const ref = await addFirecallItem(newRecord);
+        newRecord.id = ref.id;
         setRecordItem(newRecord);
-        addFirecallItem(newRecord);
         setIsRecording(true);
       }
     },
