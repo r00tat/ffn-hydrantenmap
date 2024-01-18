@@ -46,6 +46,7 @@ export default function RecordButton() {
           distance: calculateDistance(allPos),
         };
         await updateFirecallItem(newRecord);
+        setRecordItem(newRecord);
       } else {
         console.warn(`tracking not possible, record id undefined`);
       }
@@ -104,8 +105,10 @@ export default function RecordButton() {
       const lastPos = positions[positions.length - 1];
       const distance = position.distanceTo(toLatLng(lastPos[0], lastPos[1]));
 
-      // more than 5m or 30 seconds
-      if (distance > 5 || (+currentTime - +timestamp) / 1000 > 30) {
+      // more than 5m and > 1 sec or > 30 seconds
+
+      const timeSinceLastPos = (+currentTime - +timestamp) / 1000;
+      if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 30) {
         map.setView(position);
         setTimestamp(new Date());
         addPos([lastPos[0], lastPos[1]], recordItem);

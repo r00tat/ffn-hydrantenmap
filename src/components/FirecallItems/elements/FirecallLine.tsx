@@ -1,6 +1,8 @@
+import { ReactNode } from 'react';
 import { Line } from '../../firebase/firestore';
 import { FirecallConnection } from './FirecallConnection';
 import { FirecallItemBase } from './FirecallItemBase';
+import { LatLngPosition } from '../../../common/geo';
 
 export class FirecallLine extends FirecallConnection {
   opacity?: number;
@@ -42,5 +44,22 @@ export class FirecallLine extends FirecallConnection {
       ...super.data(),
       opacity: this.opacity,
     };
+  }
+
+  public body(): ReactNode {
+    return (
+      <>
+        {super.body()}
+        <br />
+        Positionen:
+        <br />
+        {(JSON.parse(this.positions || '[]') as LatLngPosition[]).map((p) => (
+          <>
+            {p[0].toFixed(4)},{p[1].toFixed(4)}
+            <br />
+          </>
+        ))}
+      </>
+    );
   }
 }
