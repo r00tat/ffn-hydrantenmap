@@ -1,19 +1,19 @@
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
-import { Tooltip } from '@mui/material';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Tooltip from '@mui/material/Tooltip';
+import { LatLng } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
+import { useMap } from 'react-leaflet';
 import { LatLngPosition } from '../../common/geo';
 import { formatTimestamp } from '../../common/time-format';
 import { toLatLng } from '../../hooks/constants';
+import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { calculateDistance } from '../FirecallItems/elements/connection/distance';
 import { Line } from '../firebase/firestore';
 import { usePositionContext } from './Position';
-import { LatLng } from 'leaflet';
-import { useMap } from 'react-leaflet';
-import { useDebugLogging } from '../../hooks/useDebugging';
 
 export default function RecordButton() {
   const [isRecording, setIsRecording] = useState(false);

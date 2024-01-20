@@ -1,9 +1,10 @@
-import { Alert, Snackbar } from '@mui/material';
+import ChatIcon from '@mui/icons-material/Chat';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { ChatMessage } from '../../common/chat';
 import { useMessaging } from '../../hooks/useMessaging';
-import ChatIcon from '@mui/icons-material/Chat';
 
 export function MessageSnack({
   msg,

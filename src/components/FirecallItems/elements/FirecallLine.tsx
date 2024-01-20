@@ -1,10 +1,8 @@
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
+import { LatLngPosition } from '../../../common/geo';
 import { Line } from '../../firebase/firestore';
 import { FirecallConnection } from './FirecallConnection';
 import { FirecallItemBase } from './FirecallItemBase';
-import { LatLngPosition } from '../../../common/geo';
-import React from 'react';
-import { Collapse } from '@mui/material';
 
 export class FirecallLine extends FirecallConnection {
   opacity?: number;

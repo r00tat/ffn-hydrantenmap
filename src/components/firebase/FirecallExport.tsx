@@ -1,5 +1,5 @@
 import DownloadIcon from '@mui/icons-material/Download';
-import { IconButton } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
 import { exportFirecall } from '../../hooks/useExport';
 import { downloadBlob } from './download';
 
