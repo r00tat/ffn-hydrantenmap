@@ -1,18 +1,19 @@
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
-import { Tooltip } from '@mui/material';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Tooltip from '@mui/material/Tooltip';
+import { LatLng } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
+import { useMap } from 'react-leaflet';
 import { LatLngPosition } from '../../common/geo';
 import { formatTimestamp } from '../../common/time-format';
 import { toLatLng } from '../../hooks/constants';
+import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { calculateDistance } from '../FirecallItems/elements/connection/distance';
 import { Line } from '../firebase/firestore';
 import { usePositionContext } from './Position';
-import { LatLng } from 'leaflet';
-import { useMap } from 'react-leaflet';
 
 export default function RecordButton() {
   const [isRecording, setIsRecording] = useState(false);
@@ -25,14 +26,16 @@ export default function RecordButton() {
   const map = useMap();
   const updateFirecallItem = useFirecallItemUpdate();
   const addFirecallItem = useFirecallItemAdd();
+  const { info, warn } = useDebugLogging();
 
   const addPos = useCallback(
     async (newPos: LatLngPosition, record: Line) => {
       // we need an id to update the item
       if (recordItem?.id) {
-        console.info(
-          `adding new position to track ${recordItem.id}: ${newPos}`
-        );
+        info(`[TRACK] adding new position to track`, {
+          track: recordItem.id,
+          pos: newPos,
+        });
         const allPos: LatLngPosition[] = [
           ...JSON.parse(record.positions || '[]'),
           newPos,
@@ -48,10 +51,10 @@ export default function RecordButton() {
         await updateFirecallItem(newRecord);
         setRecordItem(newRecord);
       } else {
-        console.warn(`tracking not possible, record id undefined`);
+        warn(`[TRACK] tracking not possible, record id undefined`);
       }
     },
-    [recordItem, updateFirecallItem]
+    [recordItem, updateFirecallItem, info, warn]
   );
 
   const startRecording = useCallback(
@@ -73,10 +76,14 @@ export default function RecordButton() {
         newRecord.id = ref.id;
         setRecordItem(newRecord);
         setIsRecording(true);
-        console.info(`starting track ${newRecord.name} ${newRecord.id} ${pos}`);
+        info(`[TRACK] starting track`, {
+          trackTitle: newRecord.name,
+          track: newRecord.id,
+          pos,
+        });
       }
     },
-    [addFirecallItem, isPositionSet, map, position]
+    [addFirecallItem, isPositionSet, map, position, info]
   );
 
   const stopRecording = useCallback(
@@ -110,12 +117,22 @@ export default function RecordButton() {
 
       const timeSinceLastPos = (+currentTime - +timestamp) / 1000;
       if ((distance > 5 && timeSinceLastPos > 1) || timeSinceLastPos > 15) {
-        // console.info(`updating pos`);
+        info(`[TRACK] updating pos`, {
+          track: recordItem.id,
+          pos: position.toString(),
+        });
         map.setView(position);
         setTimestamp(new Date());
         addPos([position.lat, position.lng], recordItem);
       } else {
-        // console.info(`distance or time to small`);
+        if (timeSinceLastPos > 10) {
+          info(`[TRACK] distance or time to small`, {
+            track: recordItem.id,
+            pos: position.toString(),
+            lastPos: lastPos,
+            timeSinceLastPos,
+          });
+        }
       }
     } else {
       // console.warn('not recording');
@@ -130,6 +147,7 @@ export default function RecordButton() {
     positions,
     recordItem,
     timestamp,
+    info,
   ]);
 
   return (

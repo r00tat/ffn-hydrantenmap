@@ -1,12 +1,13 @@
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { CircularProgress, Typography } from '@mui/material';
+
 import Button from '@mui/material/Button';
-import { styled } from '@mui/material/styles';
+import CircularProgress from '@mui/material/CircularProgress';
+import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallExport, importFirecall } from '../../hooks/useExport';
-import readFileAsText from '../upload/readFile';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
+import readFileAsText from '../upload/readFile';
 
 async function readFileAsJson(file: File): Promise<FirecallExport> {
   const result = await readFileAsText(file);

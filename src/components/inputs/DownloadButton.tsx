@@ -1,5 +1,6 @@
 import DownloadIcon from '@mui/icons-material/Download';
-import { IconButton, IconButtonProps, Tooltip } from '@mui/material';
+import IconButton, { IconButtonProps } from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 
 export interface DownloadButtonProps extends IconButtonProps {
   tooltip: string;

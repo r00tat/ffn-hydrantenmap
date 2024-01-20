@@ -1,4 +1,6 @@
-import { Typography } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 import {
   FullMetadata,
   deleteObject,
@@ -9,12 +11,9 @@ import {
 } from 'firebase/storage';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import app from '../firebase/firebase';
-import IconButton from '@mui/material/IconButton';
-import Stack from '@mui/material/Stack';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import app from '../firebase/firebase';
 
 // Initialize Cloud Storage and get a reference to the service
 const storage = getStorage(app);

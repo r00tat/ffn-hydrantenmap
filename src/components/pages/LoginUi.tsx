@@ -1,5 +1,12 @@
-import { Button, Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
+import Paper from '@mui/material/Paper';
+import Switch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
 import Link from 'next/link';
+import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
@@ -7,6 +14,7 @@ import { auth } from '../firebase/firebase';
 
 export default function LoginUi() {
   const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
+  const { displayMessages, setDisplayMessages } = useDebugLogging();
 
   return (
     <>
@@ -24,7 +32,7 @@ export default function LoginUi() {
       )}
 
       {isSignedIn && (
-        <div>
+        <Box>
           <Typography>Willkommen {auth.currentUser?.displayName}!</Typography>
           <Button onClick={() => auth.signOut()} variant="contained">
             Logout
@@ -61,7 +69,22 @@ export default function LoginUi() {
             <br />
             isAuthorized: {isAuthorized ? 'Y' : 'N'}
           </Typography>
-        </div>
+
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={displayMessages}
+                  onChange={(event) =>
+                    setDisplayMessages &&
+                    setDisplayMessages(event.target.checked)
+                  }
+                />
+              }
+              label={'Debug Informationen anzeigen'}
+            />
+          </FormGroup>
+        </Box>
       )}
     </>
   );

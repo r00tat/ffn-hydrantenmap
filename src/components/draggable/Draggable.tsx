@@ -1,7 +1,7 @@
-import React, { ReactNode } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Card } from '@mui/material';
+import Card from '@mui/material/Card';
+import { ReactNode } from 'react';
 
 export interface DraggableCardProps {
   children: ReactNode;

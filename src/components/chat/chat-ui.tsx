@@ -1,25 +1,22 @@
 import SendIcon from '@mui/icons-material/Send';
-import {
-  Button,
-  FormControl,
-  FormControlLabel,
-  Grid,
-  IconButton,
-  InputAdornment,
-  InputLabel,
-  OutlinedInput,
-  Switch,
-  Typography,
-} from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
 
-import ChatMessages from './messages';
-import useSendMessage from '../../hooks/useSendMessage';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import InputLabel from '@mui/material/InputLabel';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import Switch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useRegisterMessaging, {
   useFirebaseMessagingToken,
   useUnRegisterMessaging,
 } from '../../hooks/useRegisterMessaging';
+import useSendMessage from '../../hooks/useSendMessage';
+import ChatMessages from './messages';
 
 export default function ChatUi() {
   // const [result, setResult] = useState<UserRecordExtended>();

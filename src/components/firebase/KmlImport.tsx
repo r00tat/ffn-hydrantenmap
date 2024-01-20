@@ -1,7 +1,8 @@
 import { kml as toGeoJSON } from '@mapbox/togeojson';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { CircularProgress, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import Typography from '@mui/material/Typography';
 import {
   FeatureCollection,
   Geometry,
@@ -10,13 +11,12 @@ import {
   Polygon,
 } from 'geojson';
 import { useCallback, useState } from 'react';
-import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
-import readFileAsText from '../upload/readFile';
-
 import { GeoPosition } from '../../common/geo';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
+import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
+import readFileAsText from '../upload/readFile';
 import { FcMarker, FirecallItem, Line } from './firestore';
 
 export interface KmlGeoProperties {

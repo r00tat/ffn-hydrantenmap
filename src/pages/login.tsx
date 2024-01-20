@@ -1,6 +1,6 @@
-import { Box, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import dynamic from 'next/dynamic';
-import React from 'react';
 
 const DynamicLogin = dynamic(
   () => {
