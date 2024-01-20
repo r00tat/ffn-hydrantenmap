@@ -1,12 +1,21 @@
-import { Button, Paper, Typography } from '@mui/material';
+import {
+  Button,
+  FormControlLabel,
+  FormGroup,
+  Paper,
+  Switch,
+  Typography,
+} from '@mui/material';
 import Link from 'next/link';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
+import { useDebugLogging } from '../../hooks/useDebugging';
 
 export default function LoginUi() {
   const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
+  const { displayMessages, setDisplayMessages } = useDebugLogging();
 
   return (
     <>
@@ -61,6 +70,21 @@ export default function LoginUi() {
             <br />
             isAuthorized: {isAuthorized ? 'Y' : 'N'}
           </Typography>
+
+          <FormGroup>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={displayMessages}
+                  onChange={(event) =>
+                    setDisplayMessages &&
+                    setDisplayMessages(event.target.checked)
+                  }
+                />
+              }
+              label={'Debug Informationen anzeigen'}
+            />
+          </FormGroup>
         </div>
       )}
     </>
