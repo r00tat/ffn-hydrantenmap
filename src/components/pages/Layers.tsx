@@ -214,7 +214,7 @@ export default function LayersPage() {
                   <FirecallItemCard
                     item={item}
                     key={item.id}
-                    draggable={false}
+                    draggable={dragEnabled}
                   />
                 ))}
               </Grid>
