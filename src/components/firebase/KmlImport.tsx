@@ -82,6 +82,7 @@ function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
 
     if (f.geometry.type === 'Point') {
       (item as FcMarker).color = f.properties.fill;
+      (item as FcMarker).iconUrl = f.properties.icon;
     } else if (f.geometry.type === 'LineString') {
       // line
       item.type = 'line';

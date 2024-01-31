@@ -16,6 +16,7 @@ import {
   FcMarker,
   Firecall,
   FirecallItem,
+  FirecallLayer,
 } from '../components/firebase/firestore';
 import { uploadFile } from '../components/inputs/FileUploader';
 import { ChatMessage } from '../common/chat';
@@ -24,6 +25,7 @@ import { allSettled } from '../common/promise';
 export interface FirecallExport extends Firecall {
   items: FirecallItem[];
   chat: ChatMessage[];
+  layers: FirecallLayer[];
 }
 
 const storage = getStorage(app);
@@ -75,12 +77,18 @@ export async function exportFirecall(
   const firecallDoc = doc(firestore, 'call', firecallId);
   const firecall = (await getDoc(firecallDoc)).data() as Firecall;
 
-  const items = (await getDocs(query(collection(firecallDoc, 'item')))).docs;
-  const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs;
+  const items = (
+    await getDocs(query(collection(firecallDoc, 'item')))
+  ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallItem));
+  const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs.map(
+    (d) => ({ ...d.data(), id: d.id } as ChatMessage)
+  );
+  const layers = (
+    await getDocs(query(collection(firecallDoc, 'layer')))
+  ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallLayer));
 
   const exportItems = await Promise.all(
     items
-      .map((i) => i.data() as FirecallItem)
       // .filter((i) => i.type === 'marker')
       // .map((item) => item as FcMarker)
       .map(async (item) => {
@@ -103,11 +111,15 @@ export async function exportFirecall(
   return {
     ...firecall,
     items: exportItems,
-    chat: chat.map((c) => c.data() as ChatMessage),
+    chat: chat,
+    layers: layers,
   };
 }
 
-const blobFromBase64String = (base64String: string, mimeType?: string) => {
+export const blobFromBase64String = (
+  base64String: string,
+  mimeType?: string
+) => {
   const byteArray = Uint8Array.from(
     atob(base64String)
       .split('')
@@ -117,10 +129,11 @@ const blobFromBase64String = (base64String: string, mimeType?: string) => {
 };
 
 export async function importFirecall(firecall: FirecallExport) {
-  const { items, chat, id, ...firecallData } = firecall;
+  const { items, chat, layers, id, ...firecallData } = firecall;
   const firecallDoc = await addDoc(collection(firestore, 'call'), firecallData);
   const itemCol = collection(firecallDoc, 'item');
   const chatCol = collection(firecallDoc, 'chat');
+  const layerCol = collection(firecallDoc, 'layer');
 
   // upload files for items
 
@@ -150,15 +163,22 @@ export async function importFirecall(firecall: FirecallExport) {
   );
   const batch = writeBatch(firestore);
   importItems.forEach((item) => {
-    batch.set(doc(itemCol, uuid()), item);
+    batch.set(doc(itemCol, item.id || uuid()), item);
   });
 
-  batch.commit();
+  await batch.commit();
 
   const chatBatch = writeBatch(firestore);
   chat.forEach((c) => {
-    batch.set(doc(chatCol, uuid()), c);
+    chatBatch.set(doc(chatCol, c.id || uuid()), c);
   });
-  chatBatch.commit();
+  await chatBatch.commit();
+
+  const layerBatch = writeBatch(firestore);
+  layers.forEach((l) => {
+    // keep the layer id, as this is referenced
+    layerBatch.set(doc(layerCol, l.id || uuid()), l);
+  });
+  await layerBatch.commit();
   return firecallDoc;
 }
