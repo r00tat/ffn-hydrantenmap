@@ -1,6 +1,9 @@
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -13,6 +16,7 @@ import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, useCallback, useMemo, useState } from 'react';
+import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
@@ -125,11 +129,23 @@ export default function FirecallItemCard({
         </CardContent>
         {item.editable !== false && (
           <CardActions>
-            <Button size="small" onClick={() => setDisplayUpdateDialog(true)}>
+            <Button
+              size="small"
+              startIcon={<EditIcon />}
+              onClick={() => setDisplayUpdateDialog(true)}
+            >
               Bearbeiten
             </Button>
             <Button
               size="small"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => copyAndSaveFirecallItems(firecallId, item)}
+            >
+              Kopieren
+            </Button>
+            <Button
+              size="small"
+              startIcon={<DeleteIcon />}
               onClick={() => setIsConfirmOpen(true)}
               color="error"
             >

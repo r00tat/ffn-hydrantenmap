@@ -1,7 +1,21 @@
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  MouseSensor,
+  PointerSensor,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import AddIcon from '@mui/icons-material/Add';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import FormGroup from '@mui/material/FormGroup';
 import Grid from '@mui/material/Grid';
+import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import {
   CSSProperties,
@@ -15,29 +29,14 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import FirecallItemCard, {
   FirecallItemCardOptions,
 } from '../FirecallItems/FirecallItemCard';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
-import { FirecallItem, filterDisplayableItems } from '../firebase/firestore';
-import {
-  DndContext,
-  DragEndEvent,
-  KeyboardSensor,
-  MouseSensor,
-  PointerSensor,
-  TouchSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import KmlImport from '../firebase/KmlImport';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Switch from '@mui/material/Switch';
+import { FirecallItem, filterDisplayableItems } from '../firebase/firestore';
 
 interface DropBoxProps {
   id: string;
@@ -114,7 +113,9 @@ export default function LayersPage() {
     );
 
     elements['default'] = items
-      .filter((i) => i.layer === '' || i.layer === undefined)
+      .filter(
+        (i) => i.type !== 'layer' && (i.layer === '' || i.layer === undefined)
+      )
       .sort((a, b) => a.datum?.localeCompare(b.datum || '') || 0);
 
     return elements;
