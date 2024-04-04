@@ -65,7 +65,7 @@
     "@types/uuid": "^9.0.7",
     "eslint": "^8.38.0",
     "eslint-config-next": "^14.0.4",
-    "ts-node": "^10.4.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.4",
     "workbox-core": "^7.0.0",
     "workbox-webpack-plugin": "^7.0.0"
