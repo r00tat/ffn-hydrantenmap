@@ -32,19 +32,23 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }); // Local signed-in state.
 
   const refresh = useCallback(async () => {
-    const userDoc = await getDoc(doc(firestore, 'user', '' + loginStatus.uid));
-    const userData = userDoc.data();
-    console.info(`refresh user data: ${JSON.stringify(userData)}`);
-    if (userData?.authorized) {
-      setLoginStatus((prev) => ({
-        ...prev,
-        isAuthorized: true,
-        isAdmin: prev.isAdmin || userData?.isAdmin === true,
-        messagingTokens: userData.messaging,
-        chatNotifications: userData.chatNotifications,
-      }));
+    if (loginStatus.isSignedIn) {
+      const userDoc = await getDoc(
+        doc(firestore, 'user', '' + loginStatus.uid)
+      );
+      const userData = userDoc.data();
+      console.info(`refresh user data: ${JSON.stringify(userData)}`);
+      if (userData?.authorized) {
+        setLoginStatus((prev) => ({
+          ...prev,
+          isAuthorized: true,
+          isAdmin: prev.isAdmin || userData?.isAdmin === true,
+          messagingTokens: userData.messaging,
+          chatNotifications: userData.chatNotifications,
+        }));
+      }
     }
-  }, [loginStatus.uid]);
+  }, [loginStatus.isSignedIn, loginStatus.uid]);
 
   // Listen to the Firebase Auth state and set the local state.
   useEffect(() => {
