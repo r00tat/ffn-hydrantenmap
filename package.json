@@ -37,7 +37,7 @@
     "firebase-admin": "^12.1.0",
     "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
-    "googleapis": "^136.0.0",
+    "googleapis": "^137.1.0",
     "leaflet": "^1.9.4",
     "leaflet-geometryutil": "^0.10.3",
     "leaflet-rotatedmarker": "^0.2.0",
