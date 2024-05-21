@@ -70,6 +70,8 @@ export class GeoPosition {
   }
 }
 
+export const defaultGeoPosition = GeoPosition.fromLatLng(defaultLatLngPosition);
+
 export function GeoJsonToLatLng(position: GeoJSON.Position) {
   return GeoPosition.fromGeoJsonPosition(position).toLatLngPosition();
 }

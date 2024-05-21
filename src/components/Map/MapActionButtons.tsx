@@ -1,14 +1,15 @@
-import AddIcon from '@mui/icons-material/Add';
-import Box from '@mui/material/Box';
-import Fab from '@mui/material/Fab';
-import L from 'leaflet';
-import { useCallback, useState } from 'react';
-import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
-import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
-import { fcItemClasses } from '../FirecallItems/elements';
-import { Connection, FirecallItem } from '../firebase/firestore';
-import { useLeitungen } from './Leitungen/context';
-import RecordButton from './RecordButton';
+import AddIcon from "@mui/icons-material/Add";
+import Box from "@mui/material/Box";
+import Fab from "@mui/material/Fab";
+import L from "leaflet";
+import { useCallback, useState } from "react";
+import useFirecallItemAdd from "../../hooks/useFirecallItemAdd";
+import FirecallItemDialog from "../FirecallItems/FirecallItemDialog";
+import { fcItemClasses } from "../FirecallItems/elements";
+import { Connection, FirecallItem } from "../firebase/firestore";
+import { useLeitungen } from "./Leitungen/context";
+import RecordButton from "./RecordButton";
+import SearchButton from "./SearchButton";
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -36,7 +37,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setFzgDialogIsOpen(false);
-      if (fcItemClasses[fzg?.type || '']?.isPolyline()) {
+      if (fcItemClasses[fzg?.type || ""]?.isPolyline()) {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
       } else {
@@ -51,7 +52,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       <Box
         sx={{
           // '& > :not(style)': { m: 1 },
-          position: 'absolute',
+          position: "absolute",
           bottom: 24,
           right: 16,
         }}
@@ -70,9 +71,10 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       </Box>
 
       <RecordButton />
+      <SearchButton />
 
       {fzgDialogIsOpen && (
-        <FirecallItemDialog onClose={fzgDialogClose} type="vehicle" />
+        <FirecallItemDialog onClose={fzgDialogClose} type="marker" />
       )}
     </>
   );
