@@ -11,8 +11,25 @@ import { defaultGeoPosition } from "../../common/geo";
 import { useMap } from "react-leaflet";
 // import { searchPlace } from "../actions/maps/places";
 
+interface OSMPlace {
+  place_id: number;
+  licence: string;
+  osm_type: string;
+  osm_id: number;
+  lat: string;
+  lon: string;
+  category?: string;
+  type?: string;
+  place_rank: number;
+  importance: number;
+  addresstype?: string;
+  name: string;
+  display_name: string;
+  boundingbox: [number, number, number, number];
+}
+
 interface PlacesResponse {
-  places?: places_v1.Schema$GoogleMapsPlacesV1Place[];
+  places?: OSMPlace[];
 }
 
 function useSearchPlace() {
@@ -44,14 +61,13 @@ function useAddPlace() {
   const addFirecallItem = useFirecallItemAdd();
   const map = useMap();
   return useCallback(
-    async (query: string, place: places_v1.Schema$GoogleMapsPlacesV1Place) => {
+    async (query: string, place: OSMPlace) => {
       const m = new FirecallItemMarker({
-        name: place.displayName?.text || query,
+        name: place.name || place.display_name || query,
         type: "marker",
-        color: place.iconBackgroundColor || "blue",
-        lat: place.location?.latitude || defaultGeoPosition.lat,
-        lng: place.location?.longitude || defaultGeoPosition.lng,
-        beschreibung: `${place.formattedAddress}\n${place.googleMapsUri}`,
+        lat: Number.parseFloat(place.lat) || defaultGeoPosition.lat,
+        lng: Number.parseFloat(place.lon) || defaultGeoPosition.lng,
+        beschreibung: `${place.name}\n${place.display_name}\n${place.licence}`,
       });
 
       const item = await addFirecallItem(m.data());
