@@ -1,12 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { ErrorResponse } from "./responses";
-import userRequired from "../../server/auth/userRequired";
+import { defaultGeoPosition, GeoPosition } from "../../common/geo";
+import { PlacesResponse } from "../../common/osm";
 import { searchPlace } from "../../components/actions/maps/places";
-import { places_v1 } from "googleapis/build/src/apis/places/v1";
-
-type PlacesResponse = {
-  places?: places_v1.Schema$GoogleMapsPlacesV1Place[];
-};
+import userRequired from "../../server/auth/userRequired";
+import { ErrorResponse } from "./responses";
 
 async function POST(
   req: NextApiRequest,
@@ -19,7 +16,14 @@ async function POST(
   if (!req.body.query) {
     return res.status(400).json({ error: "Missing parameter query" });
   }
-  const places = await searchPlace(req.body.query);
+  const pos = GeoPosition.fromLatLng([
+    req.body?.position?.lat || defaultGeoPosition.lat,
+    req.body?.position?.lng || defaultGeoPosition.lng,
+  ]);
+  const places = await searchPlace(req.body.query, {
+    position: pos,
+    maxResults: req.body?.maxResults || 3,
+  });
   return res.json({ places });
 }
 
