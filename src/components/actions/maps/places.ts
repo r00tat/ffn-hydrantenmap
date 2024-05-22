@@ -1,42 +1,48 @@
-import { google } from "googleapis";
+import haversine from "haversine-distance";
 import { defaultGeoPosition, GeoPosition } from "../../../common/geo";
+import { OSMPlace } from "../../../common/osm";
 
 export async function searchPlace(
   query: string,
   {
     position,
+    maxResults = 3,
   }: {
     position?: GeoPosition;
+    maxResults?: number;
   } = {}
 ) {
-  const auth = new google.auth.GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  const uri = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
+    {
+      q: `${query}, Österreich`,
+      format: "jsonv2",
+      limit: "10",
+    }
+  )}`;
+  // console.info(`uri: ${uri}`);
+  const result = await fetch(uri, {
+    headers: {
+      "User-Agent": "Hydrantenkarte https://hydrant.ffnd.at",
+      Accept: "application/json",
+    },
   });
 
-  const places = google.places({ version: "v1", auth });
+  const bodyText = await result.text();
+  if (result.status !== 200) {
+    throw new Error(`Geocoding failed ${result.status} ${bodyText}`);
+  }
 
-  const result = (
-    await places.places.searchText({
-      fields:
-        // "places(id,formattedAddress,internationalPhoneNumber,location,googleMapsUri,iconBackgroundColor,displayName(text))",
-        "*",
+  console.info(`geocoding result: ${result.status} ${bodyText}`);
+  const results: OSMPlace[] = JSON.parse(bodyText);
 
-      requestBody: {
-        maxResultCount: 3,
-        languageCode: "de",
-        textQuery: query,
-        locationBias: {
-          circle: {
-            center: {
-              latitude: (position || defaultGeoPosition).lat,
-              longitude: (position || defaultGeoPosition).lng,
-            },
-            radius: 30000,
-          },
-        },
-      },
-    })
-  ).data.places;
+  results.forEach(
+    (p) =>
+      (p.distance = haversine(
+        { lat: Number.parseFloat(p.lat), lon: Number.parseFloat(p.lon) },
+        (position || defaultGeoPosition)?.toGeoObject()
+      ))
+  );
+  results.sort((a, b) => (a.distance || 0) - (b.distance || 0));
 
-  return result;
+  return results.slice(0, maxResults);
 }

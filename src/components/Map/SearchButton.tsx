@@ -1,19 +1,14 @@
+import SearchIcon from "@mui/icons-material/Search";
 import Box from "@mui/material/Box";
 import Fab from "@mui/material/Fab";
-import SearchIcon from "@mui/icons-material/Search";
-import InputDialog from "../dialogs/InputDialog";
 import { useCallback, useState } from "react";
-import useFirebaseLogin from "../../hooks/useFirebaseLogin";
-import { places_v1 } from "googleapis/build/src/apis/places/v1";
-import { FirecallItemMarker } from "../FirecallItems/elements/FirecallItemMarker";
-import useFirecallItemAdd from "../../hooks/useFirecallItemAdd";
-import { defaultGeoPosition } from "../../common/geo";
 import { useMap } from "react-leaflet";
-// import { searchPlace } from "../actions/maps/places";
-
-interface PlacesResponse {
-  places?: places_v1.Schema$GoogleMapsPlacesV1Place[];
-}
+import { defaultGeoPosition } from "../../common/geo";
+import { OSMPlace, PlacesResponse } from "../../common/osm";
+import useFirebaseLogin from "../../hooks/useFirebaseLogin";
+import useFirecallItemAdd from "../../hooks/useFirecallItemAdd";
+import InputDialog from "../dialogs/InputDialog";
+import { FirecallItemMarker } from "../FirecallItems/elements/FirecallItemMarker";
 
 function useSearchPlace() {
   const { isSignedIn, user } = useFirebaseLogin();
@@ -44,14 +39,13 @@ function useAddPlace() {
   const addFirecallItem = useFirecallItemAdd();
   const map = useMap();
   return useCallback(
-    async (query: string, place: places_v1.Schema$GoogleMapsPlacesV1Place) => {
+    async (query: string, place: OSMPlace) => {
       const m = new FirecallItemMarker({
-        name: place.displayName?.text || query,
+        name: place.name || place.display_name || query,
         type: "marker",
-        color: place.iconBackgroundColor || "blue",
-        lat: place.location?.latitude || defaultGeoPosition.lat,
-        lng: place.location?.longitude || defaultGeoPosition.lng,
-        beschreibung: `${place.formattedAddress}\n${place.googleMapsUri}`,
+        lat: Number.parseFloat(place.lat) || defaultGeoPosition.lat,
+        lng: Number.parseFloat(place.lon) || defaultGeoPosition.lng,
+        beschreibung: `${place.name}\n${place.display_name}\n${place.licence}`,
       });
 
       const item = await addFirecallItem(m.data());
