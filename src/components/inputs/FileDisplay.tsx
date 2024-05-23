@@ -9,7 +9,7 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
-import Image from 'next/image';
+import Image from 'next/legacy/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
