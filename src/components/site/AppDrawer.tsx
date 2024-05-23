@@ -75,7 +75,7 @@ export default function AppDrawer({
         >
           <List>
             {drawerItems.map(({ text, icon, href }, index) => (
-              <Link href={href} passHref key={text}>
+              <Link href={href} passHref key={text} legacyBehavior>
                 <ListItem button key={text}>
                   <ListItemIcon>{icon}</ListItemIcon>
                   <ListItemText primary={text} />
@@ -84,7 +84,7 @@ export default function AppDrawer({
             ))}
 
             {isAdmin && (
-              <Link href="/users" passHref>
+              <Link href="/users" passHref legacyBehavior>
                 <ListItem button key="users">
                   <ListItemIcon>
                     <UserIcon />
