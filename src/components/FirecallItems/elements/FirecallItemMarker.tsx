@@ -2,7 +2,6 @@ import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import { ReactNode } from 'react';
 import { FcItemAttachment, FcMarker } from '../../firebase/firestore';
 import FileDisplay from '../../inputs/FileDisplay';
-import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
 
