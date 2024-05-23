@@ -20,6 +20,9 @@ export interface FirecallItem {
   updatedAt?: string;
   creator?: string;
   created?: string;
+
+  // L.LeafletEventHandlerFnMap
+  eventHandlers?: L.LeafletEventHandlerFnMap;
 }
 
 export interface FirecallLayer extends FirecallItem {
@@ -35,7 +38,7 @@ export interface FcAttachment {
 export type FcItemAttachment = string | FcAttachment;
 
 export interface FcMarker extends FirecallItem {
-  type: 'marker';
+  type: "marker";
   iconUrl?: string;
   zeichen?: string;
   attachments?: FcItemAttachment[];
@@ -49,18 +52,18 @@ export interface Fzg extends FirecallItem {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
-  type: 'vehicle';
+  type: "vehicle";
 }
 
 export interface Rohr extends FirecallItem {
-  art: 'C' | 'B' | 'Wasserwerfer' | string;
+  art: "C" | "B" | "Wasserwerfer" | string;
   durchfluss?: number;
-  type: 'rohr';
+  type: "rohr";
 }
 
 export interface Diary extends FirecallItem {
-  type: 'diary';
-  art?: 'M' | 'B' | 'F';
+  type: "diary";
+  art?: "M" | "B" | "F";
   nummer?: number;
   datum: string;
   von?: string;
@@ -68,7 +71,7 @@ export interface Diary extends FirecallItem {
   erledigt?: string;
 }
 export interface GeschaeftsbuchEintrag extends FirecallItem {
-  type: 'gb';
+  type: "gb";
   nummer?: number;
   ausgehend?: boolean;
   datum: string;
@@ -106,7 +109,7 @@ export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 
 export const filterDisplayableItems = (g: FirecallItem) => {
-  return g.deleted !== true && ['diary', 'gb'].indexOf(g.type) < 0;
+  return g.deleted !== true && ["diary", "gb"].indexOf(g.type) < 0;
 };
 
 export interface Firecall {
@@ -126,6 +129,6 @@ export interface Firecall {
 
 export function dateToYmd(date: Date) {
   return `${date.getFullYear()}-${
-    date.getMonth() < 10 ? '0' : ''
-  }${date.getMonth()}-${date.getDay() < 10 ? '0' : ''}${date.getDay()}`;
+    date.getMonth() < 10 ? "0" : ""
+  }${date.getMonth()}-${date.getDay() < 10 ? "0" : ""}${date.getDay()}`;
 }
