@@ -1,13 +1,8 @@
+'use client';
+
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import dynamic from 'next/dynamic';
-
-const DynamicLogin = dynamic(
-  () => {
-    return import('../components/pages/LoginUi');
-  },
-  { ssr: false }
-);
+import DynamicLogin from '../../components/pages/LoginUi';
 
 export default function Login() {
   return (

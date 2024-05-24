@@ -1,3 +1,5 @@
+'use client';
+
 import Map from './Map';
 import Position from './Position';
 

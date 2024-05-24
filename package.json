@@ -35,7 +35,6 @@
     "epsg": "^0.5.0",
     "firebase": "^10.12.0",
     "firebase-admin": "^12.1.0",
-    "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
     "googleapis": "^137.1.0",
     "haversine-distance": "^1.2.1",

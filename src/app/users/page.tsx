@@ -1,3 +1,5 @@
+'use client';
+
 import BlockIcon from '@mui/icons-material/Block';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
@@ -8,11 +10,11 @@ import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
-import { feuerwehren } from '../common/feuerwehren';
-import { UserRecordExtended } from '../common/users';
-import UserRecordExtendedDialog from '../components/users/UserDialog';
-import useUpdateUser from '../hooks/useUpdateUser';
-import useUserList from '../hooks/useUserList';
+import { feuerwehren } from '../../common/feuerwehren';
+import { UserRecordExtended } from '../../common/users';
+import UserRecordExtendedDialog from '../../components/users/UserDialog';
+import useUpdateUser from '../../hooks/useUpdateUser';
+import useUserList from '../../hooks/useUserList';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;

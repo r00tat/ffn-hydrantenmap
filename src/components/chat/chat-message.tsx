@@ -1,7 +1,9 @@
+'use client';
+
 import ChatIcon from '@mui/icons-material/Chat';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ChatMessage } from '../../common/chat';
 import { useMessaging } from '../../hooks/useMessaging';

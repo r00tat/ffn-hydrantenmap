@@ -1,3 +1,5 @@
+'use client';
+
 import React, { createContext, useContext } from 'react';
 import { defaultPosition } from '../../hooks/constants';
 import usePosition, { PositionInfo } from '../../hooks/usePosition';
