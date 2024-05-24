@@ -1,11 +1,13 @@
-import { initializeApp } from "firebase/app";
+'use client';
+
+import { initializeApp } from 'firebase/app';
 import {
   MessagePayload,
   getMessaging,
   onBackgroundMessage,
-} from "firebase/messaging/sw";
-import { ChatMessage } from "../common/chat";
-import { workboxSetup } from "./wb";
+} from 'firebase/messaging/sw';
+import { ChatMessage } from '../common/chat';
+import { workboxSetup } from './wb';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -15,10 +17,10 @@ declare let self: ServiceWorkerGlobalScope;
 self.__WB_DISABLE_DEV_LOGS = true;
 
 const firebaseConfig = JSON.parse(
-  process.env.NEXT_PUBLIC_FIREBASE_APIKEY || "{}"
+  process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}'
 );
 
-const scope = "sw:" + self.registration.scope.replace(/^.*\//, "");
+const scope = 'sw:' + self.registration.scope.replace(/^.*\//, '');
 
 console.info(
   `[${scope}] starting background service worker with scope ${self.registration.scope}!`
@@ -39,13 +41,13 @@ workboxSetup();
 
 // console.info(`[${scope}] self.reg`, self.registration);
 
-self.registration.addEventListener("updatefound", (ev) => {
+self.registration.addEventListener('updatefound', (ev) => {
   console.info(`[${scope}] update found! `, ev);
 });
 
 // self.registration.update();
 
-addEventListener("message", (event) => {
+addEventListener('message', (event) => {
   console.log(
     `[${scope}] Message from navigator received: ${JSON.stringify(event.data)}`
   );
@@ -65,9 +67,9 @@ addEventListener("message", (event) => {
   //   }
 });
 
-addEventListener("notificationclick", (ev) => {
+addEventListener('notificationclick', (ev) => {
   const event = ev as NotificationEvent;
-  console.log("On notification click: ", event.action);
+  console.log('On notification click: ', event.action);
   event.notification.close();
 
   // This looks to see if the current is already open and
@@ -75,14 +77,14 @@ addEventListener("notificationclick", (ev) => {
   event.waitUntil(
     self.clients
       .matchAll({
-        type: "window",
+        type: 'window',
       })
       .then((clientList) => {
         for (const client of clientList) {
-          if (client.url === "/chat" && "focus" in client)
+          if (client.url === '/chat' && 'focus' in client)
             return client.focus();
         }
-        if (self.clients.openWindow) return self.clients.openWindow("/chat");
+        if (self.clients.openWindow) return self.clients.openWindow('/chat');
       })
   );
 });
@@ -114,11 +116,11 @@ onBackgroundMessage(messaging, function (payload: MessagePayload) {
     const notificationTitle = `Einsatz Chat: ${message.name || message.email}`;
     const notificationOptions: NotificationOptionsWithActions = {
       body: message.message,
-      icon: "/app-icon.png",
+      icon: '/app-icon.png',
       actions: [
         {
-          action: "chat",
-          title: "Open Chat",
+          action: 'chat',
+          title: 'Open Chat',
         },
       ],
     };
