@@ -1,16 +1,15 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest, NextResponse } from 'next/server';
 
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<string>
-) {
-  const { name = '', fw = '', rotate = '0' } = req.query;
+export async function GET(req: NextRequest) {
+  const searchParams = req.nextUrl.searchParams;
+  const name = searchParams.get('name') || '';
+  const rotate = searchParams.get('rotate') || '0';
   const rotateInt = !Number.isNaN(Number.parseInt('' + rotate, 10))
     ? Number.parseInt('' + rotate, 10) % 360
     : 0;
-  res.setHeader(`Content-Type`, 'image/svg+xml').send(`
-  <svg xmlns="http://www.w3.org/2000/svg" width="45px" height="20" fill="#ff0000">
+  const fw = searchParams.get('fw');
+  return new NextResponse(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="45px" height="20" fill="#ff0000">
   <rect width="45" height="20" x="0" y="0" style="fill:#ff0000" transform="rotate(${rotateInt})"></rect>
   <circle cx="4" cy="6" r="1.5" fill="blue" />
   <circle cx="4" cy="14" r="1.5" fill="blue" />
@@ -20,5 +19,11 @@ export default function handler(
     <tspan x="12" y="17">${fw}</tspan>
   </text>
 </svg>
-`);
+`,
+    {
+      headers: {
+        'Content-Type': 'image/svg+xml',
+      },
+    }
+  );
 }

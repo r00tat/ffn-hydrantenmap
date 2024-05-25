@@ -1,4 +1,4 @@
-import { Hydrant } from '../pages/api/hydranten';
+import { Hydrant } from '../app/api/hydranten/route';
 import useFirebaseCollection from './useFirebaseCollection';
 
 export default function useHydranten(): Hydrant[] {

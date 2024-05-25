@@ -1,10 +1,8 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import { DocumentData } from 'firebase/firestore';
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { UserRecordExtended } from '../../common/users';
-import adminRequired from '../../server/auth/adminRequired';
-import firebaseAdmin, { firestore } from '../../server/firebase/admin';
-import { ErrorResponse } from './responses';
+import { NextRequest, NextResponse } from 'next/server';
+import { UserRecordExtended } from '../../../common/users';
+import adminRequired from '../../../server/auth/adminRequired';
+import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
 
 const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
@@ -24,19 +22,16 @@ export interface UsersResponse {
   users: UserRecordExtended[];
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<UsersResponse | ErrorResponse>
-) {
+export async function GET(req: NextRequest) {
   try {
-    if (!(await adminRequired(req, res))) {
-      res.status(403).json({ error: 'Forbidden' });
-      return;
-    }
+    await adminRequired(req);
     const users = await listUsers();
-    res.status(200).json({ users });
+    return NextResponse.json({ users });
   } catch (err: any) {
     console.error(`/api/users failed: ${err}\n${err.stack}`);
-    res.status(500).json({ error: err.message });
+    return NextResponse.json(
+      { error: err.message },
+      { status: err.status || 500 }
+    );
   }
 }

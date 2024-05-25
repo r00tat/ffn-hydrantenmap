@@ -1,8 +1,8 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { GisWgsObject } from '../../common/gis-objects';
-import userRequired from '../../server/auth/userRequired';
-import { firestore } from '../../server/firebase/admin';
+import { GisWgsObject } from '../../../common/gis-objects';
+import userRequired from '../../../server/auth/userRequired';
+import { firestore } from '../../../server/firebase/admin';
+import { NextRequest, NextResponse } from 'next/server';
 
 export interface Hydrant extends GisWgsObject {
   dimension: string;
@@ -34,13 +34,16 @@ const getRecords = async () => {
   return records;
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<HydrantenResponse>
-) {
-  if (!(await userRequired(req, res))) {
-    return;
+export async function POST(req: NextRequest) {
+  try {
+    await userRequired(req);
+    const records = await getRecords();
+    return NextResponse.json({ hydranten: records });
+  } catch (err: any) {
+    console.error(`failed get hydranten`, err);
+    return NextResponse.json(
+      { error: err.message },
+      { status: err.status || 500 }
+    );
   }
-  const records = await getRecords();
-  res.status(200).json({ hydranten: records });
 }
