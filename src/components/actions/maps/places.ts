@@ -1,6 +1,6 @@
-import haversine from "haversine-distance";
-import { defaultGeoPosition, GeoPosition } from "../../../common/geo";
-import { OSMPlace } from "../../../common/osm";
+import haversine from 'haversine-distance';
+import { defaultGeoPosition, GeoPosition } from '../../../common/geo';
+import { OSMPlace } from '../../../common/osm';
 
 export async function searchPlace(
   query: string,
@@ -15,15 +15,15 @@ export async function searchPlace(
   const uri = `https://nominatim.openstreetmap.org/search?${new URLSearchParams(
     {
       q: `${query}, Österreich`,
-      format: "jsonv2",
-      limit: "10",
+      format: 'jsonv2',
+      limit: '10',
     }
   )}`;
   // console.info(`uri: ${uri}`);
   const result = await fetch(uri, {
     headers: {
-      "User-Agent": "Hydrantenkarte https://hydrant.ffnd.at",
-      Accept: "application/json",
+      'User-Agent': 'Hydrantenkarte https://hydrant.ffnd.at',
+      Accept: 'application/json',
     },
   });
 
@@ -32,7 +32,7 @@ export async function searchPlace(
     throw new Error(`Geocoding failed ${result.status} ${bodyText}`);
   }
 
-  console.info(`geocoding result: ${result.status} ${bodyText}`);
+  // console.info(`geocoding result: ${result.status} ${bodyText}`);
   const results: OSMPlace[] = JSON.parse(bodyText);
 
   results.forEach(

@@ -11,6 +11,7 @@ import FirecallLayer from './layers/FirecallLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
+import UnwetterLayer from './layers/UnwetterLayer';
 
 function ActionButtons() {
   const map = useMap();
@@ -44,6 +45,9 @@ export default function Map() {
         ))}
 
         <FirecallLayer />
+        <LayersControl.Overlay name="Unwetter" checked>
+          <UnwetterLayer />
+        </LayersControl.Overlay>
 
         <LayersControl.Overlay name="Entfernung">
           <DistanceMarker />

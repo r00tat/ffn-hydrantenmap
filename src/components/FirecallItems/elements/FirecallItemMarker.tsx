@@ -68,7 +68,12 @@ export class FirecallItemMarker extends FirecallItemBase {
           {this.zeichen?.replace(/_/g, ' ')} {this.name}
         </b>
         <br />
-        {this.beschreibung || ''}
+        {this.beschreibung?.split('\n').map((b) => (
+          <>
+            {b}
+            <br />
+          </>
+        )) || ''}
         {this.attachments &&
           this.attachments
             .filter((a) => typeof a === 'string')
