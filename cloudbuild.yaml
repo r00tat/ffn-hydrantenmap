@@ -44,13 +44,16 @@ steps:
       - |
         # deploy to cloud run
         VERSION=$(cat .version)
-        gcloud run deploy $_SERVICE_NAME \
-          --allow-unauthenticated \
-          --image $_IMAGE:$$VERSION \
-          --execution-environment gen2 \
-          --max-instances=2 --region europe-west4 \
-          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
-          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest"
+        # only deploy on main branch and tags
+        if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
+          gcloud run deploy $_SERVICE_NAME \
+            --allow-unauthenticated \
+            --image $_IMAGE:$$VERSION \
+            --execution-environment gen2 \
+            --max-instances=2 --region europe-west4 \
+            --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
+            --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest"
+        fi
     id: cloudrun_deploy
     entrypoint: bash
     secretEnv:
@@ -71,7 +74,3 @@ availableSecrets:
       env: NEXT_PUBLIC_OAUTH_CLIENT_ID
     - versionName: projects/ffn-utils/secrets/AUTH_SECRET/versions/latest
       env: AUTH_SECRET
-    - versionName: projects/ffn-utils/secrets/EINSATZMAPPE_SHEET_ID/versions/latest
-      env: EINSATZMAPPE_SHEET_ID
-    - versionName: projects/ffn-utils/secrets/EINSATZMAPPE_SHEET_RANGE/versions/latest
-      env: EINSATZMAPPE_SHEET_RANGE
