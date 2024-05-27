@@ -2,7 +2,6 @@ import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import { ReactNode } from 'react';
 import { FcItemAttachment, FcMarker } from '../../firebase/firestore';
 import FileDisplay from '../../inputs/FileDisplay';
-import { markerIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
 
@@ -69,7 +68,12 @@ export class FirecallItemMarker extends FirecallItemBase {
           {this.zeichen?.replace(/_/g, ' ')} {this.name}
         </b>
         <br />
-        {this.beschreibung || ''}
+        {this.beschreibung?.split('\n').map((b) => (
+          <>
+            {b}
+            <br />
+          </>
+        )) || ''}
         {this.attachments &&
           this.attachments
             .filter((a) => typeof a === 'string')

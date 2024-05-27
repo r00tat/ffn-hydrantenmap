@@ -1,16 +1,15 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
+import { NextRequest } from 'next/server';
+import { ApiException } from '../../app/api/errors';
 import firebaseAdmin, { firestore } from '../firebase/admin';
 
-const userRequired = async (req: NextApiRequest, res: NextApiResponse<any>) => {
-  const { authorization } = req.headers;
+const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
+  const authorization = req.headers.get('authorization');
   if (!authorization) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return false;
+    throw new ApiException('Unauthorized', { status: 401 });
   }
   if (authorization.indexOf(`Bearer `) < 0) {
-    res.status(403).json({ error: 'Bearer token required' });
-    return false;
+    throw new ApiException('Bearer token required', { status: 403 });
   }
   const token = authorization.replace('Bearer ', '');
   try {
@@ -33,14 +32,12 @@ const userRequired = async (req: NextApiRequest, res: NextApiResponse<any>) => {
       .doc(decodedToken.sub)
       .get();
     if (!(userDoc.exists && userDoc.data()?.authorized === true)) {
-      res.status(403).json({ error: 'your user is not authorized' });
-      return false;
+      throw new ApiException('your user is not authorized', { status: 403 });
     }
     return decodedToken;
   } catch (err: any) {
     console.warn(`invalid token received: ${err} ${err.stack}`);
-    res.status(403).json({ error: 'invalid token' });
-    return false;
+    throw new ApiException('invalid token');
   }
 };
 

@@ -1,3 +1,5 @@
+'use client';
+
 import SendIcon from '@mui/icons-material/Send';
 import { useCallback, useEffect, useState } from 'react';
 

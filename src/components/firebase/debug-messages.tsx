@@ -1,3 +1,5 @@
+'use client';
+
 import ChatIcon from '@mui/icons-material/Chat';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';

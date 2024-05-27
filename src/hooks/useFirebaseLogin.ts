@@ -1,3 +1,5 @@
+'use client';
+
 import { useContext } from 'react';
 import { FirebaseLoginContext } from '../components/firebase/FirebaseUserProvider';
 import { LoginStatus } from './useFirebaseLoginObserver';

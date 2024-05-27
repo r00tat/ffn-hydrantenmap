@@ -1,3 +1,5 @@
+'use client';
+
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -43,7 +45,7 @@ export default function LoginUi() {
                 Dein Benutzer ist freigeschalten und kann verwendet werden!
               </Typography>
               <Typography>
-                <Link href="/" passHref>
+                <Link href="/" passHref legacyBehavior>
                   <Button variant="outlined">Weiter zur Hydrantenkarte</Button>
                 </Link>
               </Typography>

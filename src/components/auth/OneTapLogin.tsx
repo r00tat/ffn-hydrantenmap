@@ -1,11 +1,15 @@
+'use client';
+
 import {
   getAuth,
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 import { useGoogleOneTapLogin } from 'react-google-one-tap-login';
 import { IGoogleOneTapLoginProps } from 'react-google-one-tap-login/dist/types/types';
-export default function OneTapLogin() {
+
+export function OneTapLoginOnClient() {
   const auth = getAuth();
 
   useGoogleOneTapLogin({
@@ -27,5 +31,19 @@ export default function OneTapLogin() {
       auto_select: true,
     } as unknown as IGoogleOneTapLoginProps,
   });
+  return <></>;
+}
+
+export default function OneTapLogin() {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
+  {
+    isLoaded && <OneTapLoginOnClient />;
+  }
+
   return <></>;
 }

@@ -1,11 +1,11 @@
-import * as React from "react";
-import Button from "@mui/material/Button";
-import Dialog from "@mui/material/Dialog";
-import DialogActions from "@mui/material/DialogActions";
-import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
-import DialogTitle from "@mui/material/DialogTitle";
-import TextField from "@mui/material/TextField";
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
+import React from 'react';
 
 export interface AlertDialogOptions {
   title: string;
@@ -22,11 +22,11 @@ export interface AlertDialogOptions {
 export default function InputDialog({
   title,
   text,
-  ok = "Ok",
-  cancel = "Abbrechen",
-  label = "Eingabe",
+  ok = 'Ok',
+  cancel = 'Abbrechen',
+  label = 'Eingabe',
   open: openDefault = true,
-  defaultValue = "",
+  defaultValue = '',
   onClose,
   children,
 }: AlertDialogOptions) {
@@ -71,7 +71,7 @@ export default function InputDialog({
             setValue(event.target.value);
           }}
           onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-            if (e.key === "Enter") {
+            if (e.key === 'Enter') {
               e.preventDefault();
               handleClose(true);
             }

@@ -42,12 +42,12 @@ function HeaderBar({
             {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
           </Typography>
           {!isSignedIn && (
-            <Link href="/login" passHref>
+            <Link href="/login" passHref legacyBehavior>
               <Button color="inherit">Login</Button>
             </Link>
           )}
           {isSignedIn && (
-            <Link href="/login" passHref>
+            <Link href="/login" passHref legacyBehavior>
               <Avatar alt={displayName} src={photoURL} />
             </Link>
           )}

@@ -1,10 +1,10 @@
+'use client';
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Circle as LeafletCircle } from 'react-leaflet';
 import { Circle, FirecallItem } from '../../firebase/firestore';
 import { circleIcon } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
-import { formatTimestamp } from '../../../common/time-format';
 
 export class CircleMarker extends FirecallItemBase {
   color: string;

@@ -149,6 +149,27 @@ export default function EinsatzDialog({
           onChange={onChange('abruecken')}
           value={einsatz.abruecken}
         />
+
+        <TextField
+          margin="dense"
+          id="sheetId"
+          label="Einsatzmappe Google Sheet ID"
+          type="text"
+          fullWidth
+          variant="standard"
+          onChange={onChange('sheetId')}
+          value={einsatz.sheetId}
+        />
+        <TextField
+          margin="dense"
+          id="sheetRange"
+          label="Einsatzmappe Google Sheet Daten Bereich"
+          type="text"
+          fullWidth
+          variant="standard"
+          onChange={onChange('sheetRange')}
+          value={einsatz.sheetRange}
+        />
       </DialogContent>
       <DialogActions>
         <Button

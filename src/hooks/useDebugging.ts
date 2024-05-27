@@ -1,8 +1,9 @@
+'use client';
+
 import {
   Dispatch,
   SetStateAction,
   createContext,
-  useCallback,
   useContext,
   useMemo,
   useState,
@@ -10,8 +11,8 @@ import {
 import { SimpleMap } from '../common/types';
 
 import { getAnalytics, logEvent } from 'firebase/analytics';
-import app from '../components/firebase/firebase';
 import { v4 as uuid } from 'uuid';
+import app from '../components/firebase/firebase';
 
 export interface DebugLogging {
   info: (message: string, properties?: SimpleMap<any>) => Promise<void>;

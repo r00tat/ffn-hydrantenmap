@@ -1,33 +1,30 @@
-// Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest } from 'next/server';
+import { ApiException } from '../../app/api/errors';
 import { firestore } from '../firebase/admin';
 
-const tokenRequired = async (
-  req: NextApiRequest,
-  res: NextApiResponse<any>
-) => {
-  let token = `${req.query.token}`;
-  if (!token) {
-    const { authorization } = req.headers;
-    if (!authorization) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return false;
-    }
-    if (authorization.indexOf(`Bearer `) > 0) {
-      token = authorization.replace('Bearer ', '');
-    }
+const tokenRequired = async (req: NextRequest) => {
+  const authorization = req.headers.get('authorization');
+  if (!authorization) {
+    throw new ApiException('Unauthorized', { status: 401 });
   }
+  if (authorization.indexOf(`Bearer `) < 0) {
+    throw new ApiException('Bearer token required', { status: 403 });
+  }
+  const token = authorization.replace('Bearer ', '');
   if (!token) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return false;
+    throw new ApiException('Unauthorized', { status: 401 });
   }
 
-  const tokenDoc = await firestore.collection('tokens').doc(token).get();
-  if (!tokenDoc.exists) {
-    res.status(403).json({ error: 'token invalid' });
-    return false;
+  try {
+    const tokenDoc = await firestore.collection('tokens').doc(token).get();
+    if (!tokenDoc.exists) {
+      throw new ApiException('token invalid', { status: 403 });
+    }
+    return tokenDoc.data();
+  } catch (err) {
+    console.error(`failed to query firestore ${err}`);
+    throw new ApiException('token invalid', { status: 403 });
   }
-  return tokenDoc.data();
 };
 
 export default tokenRequired;

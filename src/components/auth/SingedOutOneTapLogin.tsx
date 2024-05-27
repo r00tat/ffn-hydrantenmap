@@ -1,12 +1,7 @@
-import dynamic from 'next/dynamic';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+'use client';
 
-const DynamicOneTapLogin = dynamic(
-  () => {
-    return import('./OneTapLogin');
-  },
-  { ssr: false }
-);
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import DynamicOneTapLogin from './OneTapLogin';
 
 export default function SingedOutOneTapLogin() {
   const { isSignedIn } = useFirebaseLogin();

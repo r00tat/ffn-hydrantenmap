@@ -56,18 +56,23 @@ export default function FileDisplay({
 
   return (
     <>
-      <Link href={imageUrl || url} target="_blank">
+      <Link href={imageUrl || url} target="_blank" legacyBehavior>
         {(!isImage || showTitleIfImage) && (
           <Typography>{fileRef.name.substring(37)}</Typography>
         )}
         {isImage && imageUrl && (
           <Image
             src={imageUrl}
-            style={{ maxWidth: 80, maxHeight: 80, margin: 2 }}
             alt={url}
             width={80}
             height={80}
             sizes="(min-width: 60em) 5vw, (min-width: 30em) 10vw, 20vw"
+            style={{
+              maxWidth: 80,
+              maxHeight: 80,
+              margin: 2,
+              height: 'auto',
+            }}
           />
         )}
       </Link>
