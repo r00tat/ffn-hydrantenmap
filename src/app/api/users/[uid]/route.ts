@@ -25,9 +25,17 @@ export async function POST(
 
     console.info(`updating ${uid}: ${JSON.stringify(newData)}`);
 
-    await firestore.collection('user').doc(`${uid}`).set(newData, {
-      merge: true,
-    });
+    await firestore
+      .collection('user')
+      .doc(`${uid}`)
+      .set(
+        Object.fromEntries(
+          Object.entries(newData).filter(([key, value]) => key && value)
+        ),
+        {
+          merge: true,
+        }
+      );
     return NextResponse.json({ user });
   } catch (err: any) {
     console.error(`failed update user`, err);
