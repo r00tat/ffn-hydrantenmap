@@ -4,6 +4,7 @@ import { FcItemAttachment, FcMarker } from '../../firebase/firestore';
 import FileDisplay from '../../inputs/FileDisplay';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
+import React from 'react';
 
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
@@ -68,12 +69,15 @@ export class FirecallItemMarker extends FirecallItemBase {
           {this.zeichen?.replace(/_/g, ' ')} {this.name}
         </b>
         <br />
-        {this.beschreibung?.split('\n').map((b) => (
-          <>
-            {b}
-            <br />
-          </>
-        )) || ''}
+        {this.beschreibung
+          ?.split('\n')
+          .filter((b) => b.trim())
+          .map((b) => (
+            <React.Fragment key={b}>
+              {b}
+              <br />
+            </React.Fragment>
+          )) || ''}
         {this.attachments &&
           this.attachments
             .filter((a) => typeof a === 'string')
