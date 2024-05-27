@@ -13,9 +13,9 @@ export default function useHazmatDb(
 
   const fetchHazmat = useCallback(
     async (unNumberArg?: string, unName?: string) => {
-      setIsInProgress(true);
       console.info(`searching for hazmat ${unNumberArg} ${unName}`);
       if (!(isSignedIn && user && (unNumberArg || unName))) return;
+      setIsInProgress(true);
       const token = await user?.getIdToken();
       const response: HazmatMaterial[] = await (
         await fetch(
