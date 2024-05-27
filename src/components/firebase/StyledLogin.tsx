@@ -115,6 +115,7 @@ export default function StyledLoginButton({
             variant="standard"
             type="email"
             value={email}
+            autoComplete="username"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setEmail(event.target.value);
             }}

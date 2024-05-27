@@ -1,15 +1,16 @@
-import EditIcon from "@mui/icons-material/Edit";
-import IconButton from "@mui/material/IconButton";
-import { Icon, IconOptions } from "leaflet";
-import { ReactNode } from "react";
-import { Popup } from "react-leaflet";
-import { formatTimestamp } from "../../../common/time-format";
-import { SimpleMap } from "../../../common/types";
-import { defaultPosition } from "../../../hooks/constants";
-import { FirecallItem } from "../../firebase/firestore";
-import { fallbackIcon } from "../icons";
-import { FirecallItemMarkerDefault } from "./marker/FirecallItemDefault";
-import L from "leaflet";
+'use client';
+import EditIcon from '@mui/icons-material/Edit';
+import IconButton from '@mui/material/IconButton';
+import { Icon, IconOptions } from 'leaflet';
+import { ReactNode } from 'react';
+import { Popup } from 'react-leaflet';
+import { formatTimestamp } from '../../../common/time-format';
+import { SimpleMap } from '../../../common/types';
+import { defaultPosition } from '../../../hooks/constants';
+import { FirecallItem } from '../../firebase/firestore';
+import { fallbackIcon } from '../icons';
+import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
+import L from 'leaflet';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -22,7 +23,7 @@ export function FirecallItemPopup({
 }: FirecallItemPopupProps) {
   return (
     <Popup>
-      <IconButton sx={{ marginLeft: "auto", float: "right" }} onClick={onClick}>
+      <IconButton sx={{ marginLeft: 'auto', float: 'right' }} onClick={onClick}>
         <EditIcon />
       </IconButton>
       {children}
@@ -40,16 +41,16 @@ export class FirecallItemBase {
   constructor(firecallItem?: FirecallItem) {
     // empty initializer
     ({
-      id: this.id = "",
-      name: this.name = "",
-      beschreibung: this.beschreibung = "",
+      id: this.id = '',
+      name: this.name = '',
+      beschreibung: this.beschreibung = '',
       lat: this.lat = defaultPosition.lat,
       lng: this.lng = defaultPosition.lng,
-      type: this.type = "fallback",
+      type: this.type = 'fallback',
       original: this.original,
-      datum: this.datum = "",
-      rotation: this.rotation = "0",
-      layer: this.layer = "",
+      datum: this.datum = '',
+      rotation: this.rotation = '0',
+      layer: this.layer = '',
       deleted: this.deleted = false,
       updatedAt: this.updatedAt,
       updatedBy: this.updatedBy,
@@ -119,7 +120,7 @@ export class FirecallItemBase {
   }
 
   public markerName() {
-    return "Firecallitem";
+    return 'Firecallitem';
   }
 
   public title(): string {
@@ -127,7 +128,7 @@ export class FirecallItemBase {
   }
 
   public info(): string {
-    return `${this.beschreibung || ""}`;
+    return `${this.beschreibung || ''}`;
   }
 
   public body(): ReactNode {
@@ -135,7 +136,7 @@ export class FirecallItemBase {
       <>
         {this.beschreibung && (
           <>
-            {this.beschreibung.split("\n").map((s) => (
+            {this.beschreibung.split('\n').map((s) => (
               <>
                 {s}
                 <br />
@@ -148,8 +149,8 @@ export class FirecallItemBase {
           this.lat !== defaultPosition.lat &&
           this.lng !== defaultPosition.lng && (
             <>
-              Position: {Number.parseFloat("" + this.lat).toFixed(4)},
-              {Number.parseFloat("" + this.lng).toFixed(4)}
+              Position: {Number.parseFloat('' + this.lat).toFixed(4)},
+              {Number.parseFloat('' + this.lng).toFixed(4)}
               {this.alt && ` ${Math.round(this.alt)}m`}
               <br />
             </>
@@ -165,23 +166,23 @@ export class FirecallItemBase {
   }
 
   public dialogText(): ReactNode {
-    return this.name || "";
+    return this.name || '';
   }
 
   public fields(): SimpleMap<string> {
     return {
-      name: "Bezeichnung",
-      beschreibung: "Beschreibung",
+      name: 'Bezeichnung',
+      beschreibung: 'Beschreibung',
     };
   }
 
   public dateFields(): string[] {
-    return ["datum"];
+    return ['datum'];
   }
 
   public fieldTypes(): SimpleMap<string> {
     return {
-      beschreibung: "textarea",
+      beschreibung: 'textarea',
     };
   }
 
@@ -230,7 +231,7 @@ export class FirecallItemBase {
   }
 
   public static firebaseCollectionName(): string {
-    return "item";
+    return 'item';
   }
   public addEventHandlers(handlers: L.LeafletEventHandlerFnMap) {
     this.eventHandlers = { ...this.eventHandlers, ...handlers };

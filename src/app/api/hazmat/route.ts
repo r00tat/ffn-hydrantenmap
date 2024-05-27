@@ -7,7 +7,7 @@ export interface ErrorMessage {
   error: string;
 }
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     await userRequired(req);
 

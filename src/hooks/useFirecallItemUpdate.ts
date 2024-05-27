@@ -1,3 +1,4 @@
+'use client';
 import { doc, setDoc } from 'firebase/firestore';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';

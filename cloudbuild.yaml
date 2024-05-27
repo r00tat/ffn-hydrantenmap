@@ -5,7 +5,7 @@ steps:
       - TAG_NAME=$TAG_NAME
       - PROJECT_ID=$PROJECT_ID
     args:
-      - "-c"
+      - '-c'
       - |
         # write env file
         VERSION=$${TAG_NAME:-$$COMMIT_SHA}
@@ -14,15 +14,20 @@ steps:
         NEXT_PUBLIC_FIREBASE_APIKEY='$${NEXT_PUBLIC_FIREBASE_APIKEY}'
         NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'
         NEXT_PUBLIC_BUILD_ID='$$VERSION'
+        NEXT_PUBLIC_OAUTH_CLIENT_ID='$${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
+        NEXT_PUBLIC_FIRESTORE_DB="ffndev"
+        AUTH_SECRET='$${AUTH_SECRET}'
         EOF
     id: env
     entrypoint: bash
     secretEnv:
       - NEXT_PUBLIC_FIREBASE_APIKEY
       - NEXT_PUBLIC_MAPBOX_APIKEY
+      - NEXT_PUBLIC_OAUTH_CLIENT_ID
+      - AUTH_SECRET
   - name: gcr.io/cloud-builders/docker
     args:
-      - "-c"
+      - '-c'
       - |
         VERSION=$(cat .version)
         docker build -t $_IMAGE:$$VERSION .
@@ -32,29 +37,37 @@ steps:
     secretEnv:
       - NEXT_PUBLIC_FIREBASE_APIKEY
       - NEXT_PUBLIC_MAPBOX_APIKEY
+      - NEXT_PUBLIC_OAUTH_CLIENT_ID
   - name: gcr.io/cloud-builders/gcloud
     args:
-      - "-c"
+      - '-c'
       - |
         # deploy to cloud run
         VERSION=$(cat .version)
         gcloud run deploy $_SERVICE_NAME \
           --allow-unauthenticated \
           --image $_IMAGE:$$VERSION \
+          --execution-environment gen2 \
           --max-instances=2 --region europe-west4 \
-          --service-account=hydrantenmap@$PROJECT_ID.iam.gserviceaccount.com \
-          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest"
+          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
+          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest"
     id: cloudrun_deploy
     entrypoint: bash
     secretEnv:
       - NEXT_PUBLIC_FIREBASE_APIKEY
       - NEXT_PUBLIC_MAPBOX_APIKEY
+      - NEXT_PUBLIC_OAUTH_CLIENT_ID
+timeout: 1200s
 substitutions:
   _SERVICE_NAME: hydrantenmap-dev
-  _IMAGE: eu.gcr.io/ffn-utils/hydrantenmap
+  _IMAGE: europe-west3-docker.pkg.dev/ffn-utils/hydrantenkarte/hydrantenmap/dev
 availableSecrets:
   secretManager:
     - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
       env: NEXT_PUBLIC_FIREBASE_APIKEY
     - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_MAPBOX_APIKEY/versions/latest
       env: NEXT_PUBLIC_MAPBOX_APIKEY
+    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_OAUTH_CLIENT_ID/versions/latest
+      env: NEXT_PUBLIC_OAUTH_CLIENT_ID
+    - versionName: projects/ffn-utils/secrets/AUTH_SECRET/versions/latest
+      env: AUTH_SECRET

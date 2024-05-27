@@ -1,3 +1,4 @@
+'use client';
 import { FirecallItem } from '../../firebase/firestore';
 import { CircleMarker } from './CircleMarker';
 import { FirecallArea } from './FirecallArea';

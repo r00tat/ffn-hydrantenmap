@@ -4,6 +4,7 @@ import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { auth, firestore } from '../components/firebase/firebase';
+import { authJsLogout, firebaseTokenLogin } from '../app/firebaseAuth';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -55,9 +56,15 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   // Listen to the Firebase Auth state and set the local state.
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
-      (user: User | null) => {
+      async (user: User | null) => {
         let u: User | undefined = user != null ? user : undefined;
         console.info(`login status changed:`, u);
+
+        const token = await user?.getIdToken();
+        if (token) {
+          const loginResult = await firebaseTokenLogin(token);
+          console.info(`server side login result: `, loginResult);
+        }
 
         setLoginStatus({
           isSignedIn: !!user,
@@ -78,5 +85,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     refresh();
   }, [refresh]);
 
-  return { ...loginStatus, refresh, signOut: auth.signOut };
+  const fbSignOut = useCallback(async () => {
+    await auth.signOut();
+    await authJsLogout();
+  }, []);
+
+  return { ...loginStatus, refresh, signOut: fbSignOut };
 }
