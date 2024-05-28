@@ -1,9 +1,12 @@
 'use client';
+import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
-
 import { useEffect } from 'react';
 import { useFirecallSelect } from '../../../hooks/useFirecall';
-import Map from '../../../components/Map/PositionedMap';
+
+const Map = dynamic(() => import('../../../components/Map/PositionedMap'), {
+  ssr: false,
+});
 
 export default function EinsatzPage() {
   const searchParams = useSearchParams();
