@@ -30,8 +30,10 @@ steps:
       - '-c'
       - |
         VERSION=$(cat .version)
-        docker build -t $_IMAGE:$$VERSION .
+        docker build -t $_IMAGE:$$VERSION --cache-from=$_IMAGE:latest .
+        docker tag $_IMAGE:$$VERSION $_IMAGE:latest
         docker push $_IMAGE:$$VERSION
+        docker push $_IMAGE:latest
     id: docker_build
     entrypoint: bash
     secretEnv:
