@@ -1,8 +1,6 @@
 import { getMessaging } from 'firebase-admin/messaging';
-import type { NextApiRequest, NextApiResponse } from 'next';
-import adminRequired from '../../../server/auth/adminRequired';
 import { NextRequest, NextResponse } from 'next/server';
-import { ApiException } from '../errors';
+import adminRequired from '../../../server/auth/adminRequired';
 
 export interface NotificationsBody {
   tokens: string[];
@@ -10,13 +8,11 @@ export interface NotificationsBody {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!(await adminRequired(req))) {
-      throw new ApiException('Forbidden', { status: 403 });
-    }
+    await adminRequired(req);
 
     const { tokens }: NotificationsBody = await req.json();
     const messaging = getMessaging();
-    messaging.subscribeToTopic(tokens, 'admin');
+    await messaging.subscribeToTopic(tokens, 'admin');
     return NextResponse.json({ status: 'OK' });
   } catch (err: any) {
     console.error(`/api/users failed: ${err}\n${err.stack}`);
