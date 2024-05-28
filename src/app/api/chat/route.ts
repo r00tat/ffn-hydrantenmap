@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ChatMessage } from '../../../common/chat';
 import userRequired from '../../../server/auth/userRequired';
 import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
+import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -68,6 +69,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: any) {
+    if (isDynamicServerError(err)) {
+      throw err;
+    }
     console.error(`failed to save chat message ${err}`, err);
     return NextResponse.json(
       { error: `failed to save chat message ${err}` },

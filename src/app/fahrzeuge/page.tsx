@@ -1,7 +1,11 @@
 'use client';
 import type { NextPage } from 'next';
-import { useEffect, useState } from 'react';
-import Fahrzeuge from '../../components/pages/Fahrzeuge';
+import dynamic from 'next/dynamic';
+import { Suspense, useEffect, useState } from 'react';
+
+const Fahrzeuge = dynamic(() => import('../../components/pages/Fahrzeuge'), {
+  ssr: false,
+});
 
 const Home: NextPage = () => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -10,7 +14,13 @@ const Home: NextPage = () => {
     setIsLoaded(true);
   }, []);
 
-  return <>{isLoaded && <Fahrzeuge />}</>;
+  return (
+    <>
+      <Suspense fallback={<>Loading...</>}>
+        {isLoaded && <Fahrzeuge />}
+      </Suspense>
+    </>
+  );
 };
 
 export default Home;

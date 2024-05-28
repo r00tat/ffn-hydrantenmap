@@ -6,6 +6,7 @@ import {
 } from '../../../server/geojson';
 import { exportSpreadsheetGeoJson } from '../../../server/spreadsheet';
 import { ApiException } from '../errors';
+import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 
 export interface ErrorMessage {
   error: string;
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(featureCollection);
   } catch (err: any) {
+    if (isDynamicServerError(err)) {
+      throw err;
+    }
     console.error(`failed get hydranten`, err);
     return NextResponse.json(
       { error: err.message },
