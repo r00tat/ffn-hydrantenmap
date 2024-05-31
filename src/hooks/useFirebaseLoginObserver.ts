@@ -80,8 +80,8 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           isAdmin: u?.email === 'paul.woelfel@ff-neusiedlamsee.at',
           expiration: tokenResult?.expirationTime,
         };
-        if (window && window.localStorage) {
-          window.localStorage.setItem('fbAuth', JSON.stringify(authData));
+        if (window && window.sessionStorage) {
+          window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
         }
 
         setLoginStatus(authData);
@@ -95,8 +95,8 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, [refresh]);
 
   useEffect(() => {
-    if (window && window.localStorage) {
-      const authText = window.localStorage.getItem('fbAuth');
+    if (window && window.sessionStorage) {
+      const authText = window.sessionStorage.getItem('fbAuth');
       if (authText) {
         const auth: LoginData = JSON.parse(authText);
         if (auth.expiration && new Date(auth.expiration) > new Date()) {
