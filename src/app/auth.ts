@@ -44,6 +44,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  session: {
+    maxAge: 60 * 60,
+  },
   // adapter: FirestoreAdapter(),
   // callbacks: {
   //   authorized: async (params) => {
