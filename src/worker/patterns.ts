@@ -39,7 +39,7 @@ export const cachePatterns: RuntimeCaching[] = [
   },
 
   {
-    matcher: /https:\/\/maps[1-9].wien.gv.at\/basemap\/.*/i,
+    matcher: /https:\/\/mapsneu.wien.gv.at\/basemap\/.*/i,
     handler: new CacheFirst({
       cacheName: 'basemap',
       plugins: [oneDayCachePlugin],
