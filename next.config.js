@@ -1,52 +1,30 @@
 // @ts-check
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  /* config options here */
-  dest: 'public',
-  // disable: process.env.NODE_ENV === 'development',
-  // disable: false,
-  // register: true,
-  // scope: '/app',
-  sw: 'firebase-messaging-sw.js',
-  skipWaiting: true,
+const {
+  PHASE_DEVELOPMENT_SERVER,
+  PHASE_PRODUCTION_BUILD,
+} = require('next/constants');
+
+/** @type {(phase: string, defaultConfig: import("next").NextConfig) => Promise<import("next").NextConfig>} */
+module.exports = async (phase) => {
+  /** @type {import("next").NextConfig} */
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    /* config options here */
+    // dest: 'public',
+    // skipWaiting: true,
+  };
+
+  if (phase === PHASE_DEVELOPMENT_SERVER || phase === PHASE_PRODUCTION_BUILD) {
+    const withSerwist = (await import('@serwist/next')).default({
+      // Note: This is only an example. If you use Pages Router,
+      // use something else that works, such as "service-worker/index.ts".
+      swSrc: 'src/worker/index.ts',
+      swDest: 'public/firebase-messaging-sw.js',
+      swUrl: 'firebase-messaging-sw.js',
+    });
+    return withSerwist(nextConfig);
+  }
+
+  return nextConfig;
 };
-
-// const { InjectManifest } = require('workbox-webpack-plugin');
-
-// const nextPWA = require('next-pwa');
-
-// const withPWA = nextPWA({
-//   dest: 'public',
-//   disable: process.env.NODE_ENV === 'development',
-//   // disable: false,
-//   // register: true,
-//   // scope: '/app',
-//   sw: 'firebase-messaging-sw.js',
-//   skipWaiting: true,
-// });
-
-// module.exports = withPWA({
-//   reactStrictMode: true,
-//   images: {
-//     remotePatterns: [
-//       {
-//         protocol: 'https',
-//         hostname: 'firebasestorage.googleapis.com',
-//       },
-//     ],
-//   },
-//   // webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
-//   //   if (!isServer) {
-//   //     config.plugins.push(
-//   //       new InjectManifest({
-//   //         swSrc: './src/service-workers/firebase-messaging-sw.ts',
-//   //         swDest: '../public/firebase-messaging-sw.js',
-//   //         include: [],
-//   //       })
-//   //     );
-//   //   }
-
-//   //   return config;
-//   // },
-// });

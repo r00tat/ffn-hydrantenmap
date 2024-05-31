@@ -1,13 +1,12 @@
 'use client';
 
-import { ExpirationPlugin } from 'workbox-expiration';
-import { registerRoute } from 'workbox-routing';
-import { CacheFirst, NetworkOnly } from 'workbox-strategies';
+import { CacheFirst, ExpirationPlugin, NetworkOnly } from 'serwist';
+import { registerRoute } from 'serwist/legacy';
 
 const scope = 'sw';
 
 export function workboxSetup() {
-  console.info(`[${scope}] starting workbox setup`);
+  console.info(`[${scope}] starting cache setup`);
   self.skipWaiting();
 
   // fix cache for firestore.googleapis.com

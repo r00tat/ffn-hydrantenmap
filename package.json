@@ -24,6 +24,7 @@
     "@mui/material": "^5.15.18",
     "@mui/x-data-grid": "^7.5.1",
     "@mui/x-date-pickers": "^7.5.1",
+    "@serwist/next": "^9.0.2",
     "@turf/bbox-polygon": "^6.5.0",
     "@turf/boolean-within": "^6.5.0",
     "@turf/center": "^6.5.0",
@@ -47,7 +48,6 @@
     "moment-timezone": "^0.5.45",
     "next": "^14.2.3",
     "next-auth": "^5.0.0-beta.18",
-    "next-pwa": "^5.6.0",
     "proj4": "^2.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -66,9 +66,8 @@
     "@types/uuid": "^9.0.8",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.2.3",
+    "serwist": "^9.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "workbox-core": "^7.1.0",
-    "workbox-webpack-plugin": "^7.1.0"
+    "typescript": "^5.4.5"
   }
 }
