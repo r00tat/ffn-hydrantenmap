@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import React from 'react';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
+import 'leaflet/dist/leaflet.css';
 
 const APP_NAME = 'Hydrantenkarte FFN';
 const APP_DEFAULT_TITLE = 'Hydrantenkarte FFN';
@@ -76,13 +77,6 @@ export default function RootLayout({
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/icon?family=Material+Icons"
-        />
-
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
-          integrity="sha512-mD70nAW2ThLsWH0zif8JPbfraZ8hbCtjQ+5RU1m4+ztZq6/MymyZeB55pWsi4YAX+73yvcaJyk61mzfYMvtm9w=="
-          crossOrigin=""
         />
       </head>
       <body>
