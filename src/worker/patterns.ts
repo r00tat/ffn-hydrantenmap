@@ -1,6 +1,11 @@
 'use client';
 
-import { CacheFirst, ExpirationPlugin, RuntimeCaching } from 'serwist';
+import {
+  CacheFirst,
+  ExpirationPlugin,
+  NetworkOnly,
+  RuntimeCaching,
+} from 'serwist';
 
 const oneDayCachePlugin = new ExpirationPlugin({
   maxEntries: 64,
@@ -10,28 +15,28 @@ const oneDayCachePlugin = new ExpirationPlugin({
 
 export const cachePatterns: RuntimeCaching[] = [
   // fix cache for firestore.googleapis.com
-  // {
-  //   matcher: /https:\/\/.*.googleapis.com\/.*/i,
-  //   handler: new NetworkOnly({
-  //     networkTimeoutSeconds: 10,
-  //     // plugins: [
-  //     //   new ExpirationPlugin({
-  //     //     maxEntries: 16,
-  //     //     maxAgeSeconds: 60 * 60,
-  //     //     purgeOnQuotaError: !0,
-  //     //   }),
-  //     // ],
-  //   }),
-  //   // method: 'GET'
-  // },
+  {
+    matcher: /https:\/\/.*.googleapis.com\/.*/i,
+    handler: new NetworkOnly({
+      networkTimeoutSeconds: 10,
+      // plugins: [
+      //   new ExpirationPlugin({
+      //     maxEntries: 16,
+      //     maxAgeSeconds: 60 * 60,
+      //     purgeOnQuotaError: !0,
+      //   }),
+      // ],
+    }),
+    // method: 'GET'
+  },
 
-  // {
-  //   matcher: /icons\/.*/i,
-  //   handler: new CacheFirst({
-  //     cacheName: 'icons',
-  //     plugins: [oneDayCachePlugin],
-  //   }),
-  // },
+  {
+    matcher: /icons\/.*/i,
+    handler: new CacheFirst({
+      cacheName: 'icons',
+      plugins: [oneDayCachePlugin],
+    }),
+  },
 
   {
     matcher: /https:\/\/maps[1-9].wien.gv.at\/basemap\/.*/i,

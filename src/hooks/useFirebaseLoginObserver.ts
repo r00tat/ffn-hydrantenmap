@@ -62,10 +62,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         console.info(`login status changed:`, u);
 
         const token = await user?.getIdToken();
-        // if (token) {
-        //   const loginResult = await firebaseTokenLogin(token);
-        //   console.info(`server side login result: `, loginResult);
-        // }
+        if (token) {
+          const loginResult = await firebaseTokenLogin(token);
+          console.info(`server side login result: `, loginResult);
+        }
 
         const tokenResult = await user?.getIdTokenResult();
 

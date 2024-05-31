@@ -49,6 +49,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   // adapter: FirestoreAdapter(),
   // callbacks: {
+  // redirect: async ({ url, baseUrl }) => {
+  //   console.info(`redirect ${baseUrl} ${url}`);
+  //   return '/map';
+  // },
   //   authorized: async (params) => {
   //     console.info(`authorized with params: ${JSON.stringify(params)}`);
   //     return true;
