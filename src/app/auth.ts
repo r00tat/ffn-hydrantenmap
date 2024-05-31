@@ -44,8 +44,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  session: {
+    maxAge: 60 * 60,
+  },
   // adapter: FirestoreAdapter(),
   // callbacks: {
+  // redirect: async ({ url, baseUrl }) => {
+  //   console.info(`redirect ${baseUrl} ${url}`);
+  //   return '/map';
+  // },
   //   authorized: async (params) => {
   //     console.info(`authorized with params: ${JSON.stringify(params)}`);
   //     return true;

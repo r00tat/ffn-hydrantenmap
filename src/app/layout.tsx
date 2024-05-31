@@ -1,7 +1,52 @@
+import type { Metadata, Viewport } from 'next';
 import React from 'react';
-import '../styles/globals.css';
-
 import AppProviders from '../components/providers/AppProviders';
+import '../styles/globals.css';
+import 'leaflet/dist/leaflet.css';
+
+const APP_NAME = 'Hydrantenkarte FFN';
+const APP_DEFAULT_TITLE = 'Hydrantenkarte FFN';
+const APP_TITLE_TEMPLATE = '%s - PWA App';
+const APP_DESCRIPTION = 'Hydraten und Einsatzkarte der FF Neusiedl am See';
+
+export const metadata: Metadata = {
+  applicationName: APP_NAME,
+  title: {
+    default: APP_DEFAULT_TITLE,
+    template: APP_TITLE_TEMPLATE,
+  },
+  description: APP_DESCRIPTION,
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: APP_DEFAULT_TITLE,
+    // startUpImage: [],
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    siteName: APP_NAME,
+    title: {
+      default: APP_DEFAULT_TITLE,
+      template: APP_TITLE_TEMPLATE,
+    },
+    description: APP_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary',
+    title: {
+      default: APP_DEFAULT_TITLE,
+      template: APP_TITLE_TEMPLATE,
+    },
+    description: APP_DESCRIPTION,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#1976d2',
+};
 
 export default function RootLayout({
   // Layouts must accept a children prop.
@@ -32,13 +77,6 @@ export default function RootLayout({
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/icon?family=Material+Icons"
-        />
-
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-          crossOrigin=""
         />
       </head>
       <body>

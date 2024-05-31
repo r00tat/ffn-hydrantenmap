@@ -11,6 +11,7 @@ export interface FirecallItem {
   editable?: boolean;
   original?: FirecallItem;
   rotation?: string;
+  draggable?: boolean;
   /**
    * reference to FirecallLayer
    */

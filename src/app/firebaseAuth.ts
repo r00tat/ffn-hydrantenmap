@@ -1,13 +1,28 @@
 'use server';
+import { isRedirectError } from 'next/dist/client/components/redirect';
 import { ApiException } from './api/errors';
-import { signIn, signOut, auth } from './auth';
+import { auth, signIn, signOut } from './auth';
 
 export async function firebaseTokenLogin(token: string) {
-  return signIn('credentials', { firebaseToken: token });
+  try {
+    const result = await signIn('credentials', {
+      firebaseToken: token,
+      redirect: false,
+    });
+    console.info(`login result: ${JSON.stringify(result)}`);
+    return result;
+  } catch (err) {
+    console.error(`signin failed: ${err} ${(err as unknown as any)?.stack}`);
+
+    if (isRedirectError(err)) {
+      throw err;
+    }
+    return { error: `${err}` };
+  }
 }
 
 export async function authJsLogout() {
-  return signOut();
+  return signOut({ redirect: false });
 }
 
 export async function checkAuth() {

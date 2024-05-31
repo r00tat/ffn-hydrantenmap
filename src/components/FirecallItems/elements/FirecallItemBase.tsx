@@ -57,6 +57,7 @@ export class FirecallItemBase {
       creator: this.creator,
       created: this.created,
       alt: this.alt,
+      draggable: this.draggable = true,
       eventHandlers: this.eventHandlers = {},
     } = firecallItem || {});
   }
@@ -79,6 +80,7 @@ export class FirecallItemBase {
   layer: string;
   creator?: string;
   created?: string;
+  draggable: boolean;
 
   eventHandlers: L.LeafletEventHandlerFnMap = {};
 

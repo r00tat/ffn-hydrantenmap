@@ -32,9 +32,6 @@ export default function UnwetterLayer() {
     firecall?.sheetRange
   );
 
-  useEffect(() => {
-    console.log('UnwetterLayer', unwetterData);
-  }, [unwetterData]);
   return (
     <LayerGroup>
       {unwetterData.map((item) => (
@@ -45,6 +42,7 @@ export default function UnwetterLayer() {
               type: 'marker',
               color: 'red',
               beschreibung: item.description,
+              draggable: false,
             } as FcMarker
           }
           selectItem={() => {}}

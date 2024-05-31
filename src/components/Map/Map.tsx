@@ -1,3 +1,5 @@
+'use client';
+
 import { LayersControl, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../hooks/constants';
 import Clusters from './Clusters';
@@ -12,6 +14,8 @@ import DistanceMarker from './markers/DistanceMarker';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
 import UnwetterLayer from './layers/UnwetterLayer';
+import { useEffect } from 'react';
+import L from 'leaflet';
 
 function ActionButtons() {
   const map = useMap();
@@ -19,6 +23,15 @@ function ActionButtons() {
 }
 
 export default function Map() {
+  useEffect(() => {
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: '/icons/leaflet/marker-icon-2x.png',
+      iconUrl: '/icons/leaflet/marker-icon.png',
+      shadowUrl: '/icons/leaflet/marker-shadow.png',
+    });
+  }, []);
   return (
     <MapContainer
       center={defaultPosition}

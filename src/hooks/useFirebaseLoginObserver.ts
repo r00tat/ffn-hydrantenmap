@@ -16,6 +16,7 @@ export interface LoginData {
   uid?: string;
   photoURL?: string;
   messagingTokens?: string[];
+  expiration?: string;
 }
 
 export interface LoginStatus extends LoginData {
@@ -66,7 +67,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           console.info(`server side login result: `, loginResult);
         }
 
-        setLoginStatus({
+        const tokenResult = await user?.getIdTokenResult();
+
+        const authData: LoginData = {
           isSignedIn: !!user,
           user: user !== null ? user : undefined,
           email: nonNull(u?.email),
@@ -75,7 +78,13 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           photoURL: nonNull(u?.photoURL),
           isAuthorized: (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0,
           isAdmin: u?.email === 'paul.woelfel@ff-neusiedlamsee.at',
-        });
+          expiration: tokenResult?.expirationTime,
+        };
+        if (window && window.sessionStorage) {
+          window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
+        }
+
+        setLoginStatus(authData);
       }
     );
     return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
@@ -84,6 +93,20 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (window && window.sessionStorage) {
+      const authText = window.sessionStorage.getItem('fbAuth');
+      if (authText) {
+        const auth: LoginData = JSON.parse(authText);
+        if (auth.expiration && new Date(auth.expiration) > new Date()) {
+          // token valid, use credentials for login status
+          console.info(`using cached login status:`, auth);
+          setLoginStatus(auth);
+        }
+      }
+    }
+  }, []);
 
   const fbSignOut = useCallback(async () => {
     await auth.signOut();

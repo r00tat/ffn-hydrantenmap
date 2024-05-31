@@ -1,15 +1,38 @@
 'use client';
 
+import { defaultCache } from '@serwist/next/worker';
 import { initializeApp } from 'firebase/app';
 import {
   MessagePayload,
   getMessaging,
   onBackgroundMessage,
 } from 'firebase/messaging/sw';
+import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
+import { Serwist } from 'serwist';
 import { ChatMessage } from '../common/chat';
-import { workboxSetup } from './wb';
+import { cachePatterns } from './patterns';
 
-declare let self: ServiceWorkerGlobalScope;
+// This declares the value of `injectionPoint` to TypeScript.
+// `injectionPoint` is the string that will be replaced by the
+// actual precache manifest. By default, this string is set to
+// `"self.__SW_MANIFEST"`.
+declare global {
+  interface WorkerGlobalScope extends SerwistGlobalConfig {
+    __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
+  }
+}
+
+declare const self: ServiceWorkerGlobalScope;
+
+const serwist = new Serwist({
+  precacheEntries: self.__SW_MANIFEST,
+  skipWaiting: true,
+  clientsClaim: true,
+  navigationPreload: true,
+  runtimeCaching: [...cachePatterns, ...defaultCache],
+});
+
+serwist.addEventListeners();
 
 // To disable all workbox logging during development, you can set self.__WB_DISABLE_DEV_LOGS to true
 // https://developers.google.com/web/tools/workbox/guides/configure-workbox#disable_logging
@@ -25,8 +48,6 @@ const scope = 'sw:' + self.registration.scope.replace(/^.*\//, '');
 console.info(
   `[${scope}] starting background service worker with scope ${self.registration.scope}!`
 );
-
-workboxSetup();
 
 // self.registration.showNotification('Einsatz Chat', {
 //   body: 'hello world!',
@@ -82,7 +103,7 @@ addEventListener('notificationclick', (ev) => {
       .then((clientList) => {
         for (const client of clientList) {
           if (client.url === '/chat' && 'focus' in client)
-            return client.focus();
+            return (client as any)?.focus();
         }
         if (self.clients.openWindow) return self.clients.openWindow('/chat');
       })
