@@ -1,8 +1,7 @@
-import React from 'react';
-import '../styles/globals.css';
 import type { Metadata, Viewport } from 'next';
-
+import React from 'react';
 import AppProviders from '../components/providers/AppProviders';
+import '../styles/globals.css';
 
 const APP_NAME = 'Hydrantenkarte FFN';
 const APP_DEFAULT_TITLE = 'Hydrantenkarte FFN';
@@ -81,8 +80,8 @@ export default function RootLayout({
 
         <link
           rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-          integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+          href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+          integrity="sha512-mD70nAW2ThLsWH0zif8JPbfraZ8hbCtjQ+5RU1m4+ztZq6/MymyZeB55pWsi4YAX+73yvcaJyk61mzfYMvtm9w=="
           crossOrigin=""
         />
       </head>
