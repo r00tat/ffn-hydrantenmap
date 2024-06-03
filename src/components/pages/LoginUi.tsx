@@ -15,7 +15,8 @@ import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
 
 export default function LoginUi() {
-  const { isSignedIn, isAuthorized, displayName, email } = useFirebaseLogin();
+  const { isSignedIn, isAuthorized, displayName, email, signOut } =
+    useFirebaseLogin();
   const { displayMessages, setDisplayMessages } = useDebugLogging();
 
   return (
@@ -36,7 +37,7 @@ export default function LoginUi() {
       {isSignedIn && (
         <Box>
           <Typography>Willkommen {auth.currentUser?.displayName}!</Typography>
-          <Button onClick={() => auth.signOut()} variant="contained">
+          <Button onClick={() => signOut()} variant="contained">
             Logout
           </Button>
           {isAuthorized && (
