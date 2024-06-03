@@ -6,13 +6,18 @@ import FirecallElement from '../../FirecallItems/elements/FirecallElement';
 import { FcMarker } from '../../firebase/firestore';
 import useFirecall from '../../../hooks/useFirecall';
 
-function useUnwetterSheetData(sheetId?: string, range?: string) {
+function useUnwetterSheetData() {
   const [unwetterData, setUnwetterData] = useState<UnwetterData[]>([]);
+  const firecall = useFirecall();
 
   const refreshData = useCallback(async () => {
-    const unwetterData = await fetchUnwetterData(sheetId, range);
+    const unwetterData = await fetchUnwetterData(
+      firecall.sheetId,
+      firecall.range
+    );
+    console.info(`unwetter data`, unwetterData);
     setUnwetterData(unwetterData);
-  }, [sheetId, range]);
+  }, [firecall]);
 
   useEffect(() => {
     refreshData();
@@ -25,12 +30,15 @@ function useUnwetterSheetData(sheetId?: string, range?: string) {
   return unwetterData;
 }
 
+const statusColors: { [key: string]: string } = {
+  erledigt: 'green',
+  'in arbeit': 'blue',
+  offen: 'yellow',
+  'einsatz notwendig': 'red',
+};
+
 export default function UnwetterLayer() {
-  const firecall = useFirecall();
-  const unwetterData = useUnwetterSheetData(
-    firecall?.sheetId,
-    firecall?.sheetRange
-  );
+  const unwetterData = useUnwetterSheetData();
 
   return (
     <LayerGroup>
@@ -40,7 +48,7 @@ export default function UnwetterLayer() {
             {
               ...item,
               type: 'marker',
-              color: 'red',
+              color: statusColors[item.status?.toLowerCase() || ''] ?? 'red',
               beschreibung: item.description,
               draggable: false,
             } as FcMarker
