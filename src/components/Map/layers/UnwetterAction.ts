@@ -4,6 +4,7 @@ import { checkAuth } from '../../../app/auth';
 import { defaultGeoPosition } from '../../../common/geo';
 import { getSpreadsheetData } from '../../../server/spreadsheet';
 import { searchPlace } from '../../actions/maps/places';
+import { unstable_cache } from 'next/cache';
 
 export interface UnwetterData {
   id: string;
@@ -30,12 +31,7 @@ function parseLatLng(text: string) {
   ];
 }
 
-export async function fetchUnwetterData(
-  sheetId: string = process.env.EINSATZMAPPE_SHEET_ID || '',
-  range: string = process.env.EINSATZMAPPE_SHEET_RANGE || ''
-): Promise<UnwetterData[]> {
-  await checkAuth();
-
+const fetchUWD = async (sheetId: string, range: string) => {
   console.info(`fetching unwetter data of ${sheetId} ${range}`);
   const values = await getSpreadsheetData(
     sheetId || process.env.EINSATZMAPPE_SHEET_ID || '',
@@ -93,4 +89,20 @@ export async function fetchUnwetterData(
   ).filter(({ lat, lng }) => lat && lng);
 
   return markers;
+};
+
+export const fetchUnwetterCachedData = unstable_cache(
+  async (sheetId: string, range: string) => fetchUWD(sheetId, range),
+  ['unwetter-sheet-data'],
+  { revalidate: 10 }
+);
+
+export async function fetchUnwetterData(
+  sheetId: string = process.env.EINSATZMAPPE_SHEET_ID || '',
+  range: string = process.env.EINSATZMAPPE_SHEET_RANGE || ''
+): Promise<UnwetterData[]> {
+  await checkAuth();
+
+  console.info(`requested unwetter data for ${sheetId} ${range}`);
+  return fetchUnwetterCachedData(sheetId, range);
 }
