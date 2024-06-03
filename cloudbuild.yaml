@@ -15,7 +15,7 @@ steps:
         NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'
         NEXT_PUBLIC_BUILD_ID='$$VERSION'
         NEXT_PUBLIC_OAUTH_CLIENT_ID='$${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
-        NEXT_PUBLIC_FIRESTORE_DB="ffndev"
+        NEXT_PUBLIC_FIRESTORE_DB="$${_NEXT_PUBLIC_FIRESTORE_DB}"
         AUTH_SECRET='$${AUTH_SECRET}'
         EOF
     id: env
@@ -66,6 +66,7 @@ timeout: 1200s
 substitutions:
   _SERVICE_NAME: hydrantenmap-dev
   _IMAGE: europe-west3-docker.pkg.dev/ffn-utils/hydrantenkarte/hydrantenmap/dev
+  _NEXT_PUBLIC_FIRESTORE_DB: 'ffndev'
 availableSecrets:
   secretManager:
     - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
