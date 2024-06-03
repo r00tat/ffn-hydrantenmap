@@ -44,6 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  trustHost: true,
   session: {
     maxAge: 60 * 60,
   },
