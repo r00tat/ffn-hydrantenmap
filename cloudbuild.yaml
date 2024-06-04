@@ -84,3 +84,5 @@ availableSecrets:
       env: NEXT_PUBLIC_OAUTH_CLIENT_ID
     - versionName: projects/ffn-utils/secrets/AUTH_SECRET/versions/latest
       env: AUTH_SECRET
+options:
+  logging: CLOUD_LOGGING_ONLY
