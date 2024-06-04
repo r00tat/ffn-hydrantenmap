@@ -47,17 +47,24 @@ steps:
         # deploy to cloud run
         VERSION=$(cat .version)
         # only deploy on main branch and tags
-        if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
-          gcloud run deploy $_SERVICE_NAME \
-            --allow-unauthenticated \
-            --image $_IMAGE:$$VERSION \
-            --execution-environment gen2 \
-            --max-instances=2 --region europe-west4 \
-            --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
-            --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest"
-        fi
+        # if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
+        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'
+        VERSION_TAG=$${VERSION_TAG:0:20}
+
+        gcloud run deploy $_SERVICE_NAME \
+          --allow-unauthenticated \
+          --image $_IMAGE:$$VERSION \
+          --execution-environment gen2 \
+          --max-instances=2 --region europe-west4 \
+          --tag=$${VERSION_TAG} \
+          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
+          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest"
+        # fi
     id: cloudrun_deploy
     entrypoint: bash
+    env:
+      - TAG_NAME=$TAG_NAME
+      - BRANCH_NAME=$BRANCH_NAME
     secretEnv:
       - NEXT_PUBLIC_FIREBASE_APIKEY
       - NEXT_PUBLIC_MAPBOX_APIKEY
