@@ -1,6 +1,6 @@
 'use server';
 
-import { checkAuth } from '../../../app/auth';
+import { auth, checkAuth } from '../../../app/auth';
 import { defaultGeoPosition } from '../../../common/geo';
 import { getSpreadsheetData } from '../../../server/spreadsheet';
 import { searchPlace } from '../../actions/maps/places';
@@ -101,7 +101,12 @@ export async function fetchUnwetterData(
   sheetId: string = process.env.EINSATZMAPPE_SHEET_ID || '',
   range: string = process.env.EINSATZMAPPE_SHEET_RANGE || ''
 ): Promise<UnwetterData[]> {
-  await checkAuth();
+  const session = await auth();
+  if (!session?.user) {
+    // unauthorized
+    console.warn('unauthorized to access unwetter data');
+    return [];
+  }
 
   console.info(`requested unwetter data for ${sheetId} ${range}`);
   return fetchUnwetterCachedData(sheetId, range);
