@@ -2,9 +2,10 @@
 
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import { signOut as signOutJsClient } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
+import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { auth, firestore } from '../components/firebase/firebase';
-import { authJsLogout, firebaseTokenLogin } from '../app/firebaseAuth';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -109,8 +110,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, []);
 
   const fbSignOut = useCallback(async () => {
+    console.info(`authjs client logout`);
+    await signOutJsClient();
+    console.info(`firebase logout`);
     await auth.signOut();
-    await authJsLogout();
   }, []);
 
   return { ...loginStatus, refresh, signOut: fbSignOut };

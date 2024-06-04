@@ -1,8 +1,10 @@
 'use server';
 
+import { checkAuth } from '../../../app/auth';
 import { defaultGeoPosition } from '../../../common/geo';
 import { getSpreadsheetData } from '../../../server/spreadsheet';
 import { searchPlace } from '../../actions/maps/places';
+import { unstable_cache } from 'next/cache';
 
 export interface UnwetterData {
   id: string;
@@ -13,11 +15,13 @@ export interface UnwetterData {
   description: string;
   lat?: number;
   lng?: number;
+  status?: string;
 }
 
 function parseLatLng(text: string) {
   const latStr = text.match(/^\d+\.\d+/)?.[0];
   const lngStr = text.match(/\d+\.\d+$/)?.[0];
+
   const lat = Number.parseFloat(latStr || '');
   const lng = Number.parseFloat(lngStr || '');
 
@@ -27,11 +31,12 @@ function parseLatLng(text: string) {
   ];
 }
 
-export async function fetchUnwetterData(
-  sheetId: string = process.env.EINSATZMAPPE_SHEET_ID || '',
-  range: string = process.env.EINSATZMAPPE_SHEET_RANGE || ''
-): Promise<UnwetterData[]> {
-  const values = await getSpreadsheetData(sheetId, range);
+const fetchUWD = async (sheetId: string, range: string) => {
+  console.info(`fetching unwetter data of ${sheetId} ${range}`);
+  const values = await getSpreadsheetData(
+    sheetId || process.env.EINSATZMAPPE_SHEET_ID || '',
+    range || process.env.EINSATZMAPPE_SHEET_RANGE || ''
+  );
   const markers = (
     await Promise.all(
       values.map(
@@ -68,7 +73,7 @@ export async function fetchUnwetterData(
             done && '-'
           }${done}\n${info}`.trim();
           return {
-            id: `${searchString} ${desc}`.trim(),
+            id: `${name} ${lat} ${lng}`.trim(),
             street,
             number,
             city: city,
@@ -76,11 +81,28 @@ export async function fetchUnwetterData(
             description: desc,
             lat,
             lng,
-          };
+            status,
+          } as UnwetterData;
         }
       )
     )
   ).filter(({ lat, lng }) => lat && lng);
 
   return markers;
+};
+
+export const fetchUnwetterCachedData = unstable_cache(
+  async (sheetId: string, range: string) => fetchUWD(sheetId, range),
+  ['unwetter-sheet-data'],
+  { revalidate: 10 }
+);
+
+export async function fetchUnwetterData(
+  sheetId: string = process.env.EINSATZMAPPE_SHEET_ID || '',
+  range: string = process.env.EINSATZMAPPE_SHEET_RANGE || ''
+): Promise<UnwetterData[]> {
+  await checkAuth();
+
+  console.info(`requested unwetter data for ${sheetId} ${range}`);
+  return fetchUnwetterCachedData(sheetId, range);
 }
