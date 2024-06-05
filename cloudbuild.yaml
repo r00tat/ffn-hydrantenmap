@@ -10,8 +10,8 @@ steps:
         # write env file
         VERSION=$${TAG_NAME:-sha$$COMMIT_SHA}
         echo "VERSION=$${VERSION}" >.version
-        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'})
-        VERSION_TAG=$${VERSION_TAG:0:20}
+        VERSION_TAG=$$(echo $${TAG_NAME:-$BRANCH_NAME} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9_-]+@-@g' )
+        VERSION_TAG=$$(echo -n $${VERSION_TAG:0:20} | sed 's@-$@@')
         echo "VERSION_TAG=$${VERSION_TAG}" >>.version
 
         echo "Versions: $$(cat .version)"
