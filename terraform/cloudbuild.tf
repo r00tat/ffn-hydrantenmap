@@ -1,1 +1,64 @@
+locals {
+  substitutions = {
+    _RUN_SERVICE_ACCOUNT = google_service_account.run_sa.email
+  }
+}
 
+resource "google_cloudbuild_trigger" "feature_branch" {
+  location = "global"
+  name     = "push-to-feature-branch"
+  filename = "cloudbuild.yaml"
+
+  github {
+    owner = "r00tat"
+    name  = "ffn-hydrantenmap"
+    push {
+      branch = "^(feature|bugfix|enhancement)/.*$"
+    }
+  }
+
+  include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
+  service_account    = "projects/${var.project}/serviceAccounts/${var.build_service_account}"
+
+  substitutions = local.substitutions
+}
+
+
+resource "google_cloudbuild_trigger" "build_main_branch" {
+  location = "global"
+  name     = "build-main-branch"
+  filename = "cloudbuild.yaml"
+
+  github {
+    owner = "r00tat"
+    name  = "ffn-hydrantenmap"
+    push {
+      branch = "^main$"
+    }
+  }
+
+  include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
+  service_account    = "projects/${var.project}/serviceAccounts/${var.build_service_account}"
+  substitutions      = local.substitutions
+}
+resource "google_cloudbuild_trigger" "deploy_prod_on_tag" {
+  location = "global"
+  name     = "deploy-prod-on-tag"
+  filename = "cloudbuild.yaml"
+
+  github {
+    owner = "r00tat"
+    name  = "ffn-hydrantenmap"
+    push {
+      tag = ".*"
+    }
+  }
+
+  include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
+  service_account    = "projects/${var.project}/serviceAccounts/${var.build_service_account}"
+
+  substitutions = merge(local.substitutions, {
+    _NEXT_PUBLIC_FIRESTORE_DB = ""
+    _SERVICE_NAME             = "hydrantenmap"
+  })
+}

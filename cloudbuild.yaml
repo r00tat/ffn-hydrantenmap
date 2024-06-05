@@ -48,7 +48,7 @@ steps:
         VERSION=$(cat .version)
         # only deploy on main branch and tags
         # if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
-        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'
+        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'}
         VERSION_TAG=$${VERSION_TAG:0:20}
 
         gcloud run deploy $_SERVICE_NAME \
@@ -57,8 +57,9 @@ steps:
           --execution-environment gen2 \
           --max-instances=2 --region europe-west4 \
           --tag=$${VERSION_TAG} \
-          --service-account=hydrantenmap@ffn-utils.iam.gserviceaccount.com \
-          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest"
+          --service-account=$_RUN_SERVICE_ACCOUNT \
+          --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest" \
+          ${_RUN_ARGS}
         # fi
     id: cloudrun_deploy
     entrypoint: bash
@@ -72,17 +73,20 @@ steps:
 timeout: 1200s
 substitutions:
   _SERVICE_NAME: hydrantenmap-dev
-  _IMAGE: europe-west3-docker.pkg.dev/ffn-utils/hydrantenkarte/hydrantenmap/dev
+  _IMAGE: europe-west3-docker.pkg.dev/$PROJECT_ID/hydrantenkarte/hydrantenmap/dev
   _NEXT_PUBLIC_FIRESTORE_DB: 'ffndev'
+  _RUN_ARGS: ''
+  _RUN_SERVICE_ACCOUNT: 'hydrantenmap@$PROJECT_ID.iam.gserviceaccount.com'
 availableSecrets:
   secretManager:
-    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest
       env: NEXT_PUBLIC_FIREBASE_APIKEY
-    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_MAPBOX_APIKEY/versions/latest
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_MAPBOX_APIKEY/versions/latest
       env: NEXT_PUBLIC_MAPBOX_APIKEY
-    - versionName: projects/ffn-utils/secrets/NEXT_PUBLIC_OAUTH_CLIENT_ID/versions/latest
+    - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_OAUTH_CLIENT_ID/versions/latest
       env: NEXT_PUBLIC_OAUTH_CLIENT_ID
-    - versionName: projects/ffn-utils/secrets/AUTH_SECRET/versions/latest
+    - versionName: projects/$PROJECT_ID/secrets/AUTH_SECRET/versions/latest
       env: AUTH_SECRET
 options:
   logging: CLOUD_LOGGING_ONLY
+  substitutionOption: ALLOW_LOOSE
