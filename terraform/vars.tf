@@ -25,3 +25,9 @@ variable "region" {
   type        = string
   default     = "europe-west3"
 }
+
+variable "name" {
+  description = "service name"
+  type        = string
+  default     = "hydrantenmap"
+}

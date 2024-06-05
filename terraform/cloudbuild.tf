@@ -1,6 +1,8 @@
 locals {
+  artifact_registry = "${google_artifact_registry_repository.run_docker.location}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.run_docker.repository_id}"
   substitutions = {
     _RUN_SERVICE_ACCOUNT = google_service_account.run_sa.email
+    _IMAGE               = "${local.artifact_registry}/${var.name}/dev"
   }
 }
 
@@ -17,7 +19,7 @@ resource "google_project_iam_member" "deloy_iam" {
     "roles/run.admin",
     "roles/secretmanager.admin",
     "roles/storage.admin",
-    "roles/logging.logWriter"
+    "roles/logging.logWriter",
   ])
   member  = google_service_account.deploy_sa.member
   role    = each.value
@@ -79,6 +81,7 @@ resource "google_cloudbuild_trigger" "deploy_prod_on_tag" {
 
   substitutions = merge(local.substitutions, {
     _NEXT_PUBLIC_FIRESTORE_DB = ""
-    _SERVICE_NAME             = "hydrantenmap"
+    _SERVICE_NAME             = var.name
+    _IMAGE                    = "${local.artifact_registry}/${var.name}/tag"
   })
 }

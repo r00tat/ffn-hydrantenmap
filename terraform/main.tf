@@ -59,7 +59,7 @@ resource "google_project_service" "apis" {
 }
 
 resource "google_service_account" "run_sa" {
-  display_name = "hydrantenmap"
+  display_name = var.name
   account_id   = var.run_sa
   project      = var.project
 }
