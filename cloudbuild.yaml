@@ -12,7 +12,7 @@ steps:
         echo "VERSION=$${VERSION}" >.version
         VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'})
         VERSION_TAG=$${VERSION_TAG:0:20}
-        echo "VERSION_TAG=$${{VERSION_TAG}}" >>.version
+        echo "VERSION_TAG=$${VERSION_TAG}" >>.version
 
         cat >.env.local <<EOF
         NEXT_PUBLIC_FIREBASE_APIKEY='$${NEXT_PUBLIC_FIREBASE_APIKEY}'
