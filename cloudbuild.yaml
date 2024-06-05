@@ -14,6 +14,8 @@ steps:
         VERSION_TAG=$${VERSION_TAG:0:20}
         echo "VERSION_TAG=$${VERSION_TAG}" >>.version
 
+        echo "Versions: $$(cat .version)"
+
         cat >.env.local <<EOF
         NEXT_PUBLIC_FIREBASE_APIKEY='$${NEXT_PUBLIC_FIREBASE_APIKEY}'
         NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'

@@ -26,6 +26,12 @@ resource "google_project_iam_member" "deloy_iam" {
   project = var.project
 }
 
+resource "google_service_account_iam_member" "cloudbuild_run_sa" {
+  member             = google_service_account.deploy_sa.member
+  role               = "roles/iam.serviceAccountUser"
+  service_account_id = google_service_account.run_sa.id
+}
+
 resource "google_cloudbuild_trigger" "feature_branch" {
   location = "global"
   name     = "push-to-feature-branch"
