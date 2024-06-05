@@ -36,7 +36,7 @@ steps:
         source .version
         docker pull $_IMAGE:latest || echo "no latest image"
         docker pull $_IMAGE:$$VERSION_TAG || echo "no $$VERSION_TAG image"
-        docker build -t $_IMAGE:$$VERSION --cache-from=$_IMAGE:latest .
+        docker build -t $_IMAGE:$$VERSION --cache-from=$_IMAGE:latest --cache-from=$_IMAGE:$$VERSION_TAG .
         docker tag $_IMAGE:$$VERSION $_IMAGE:latest
         docker tag $_IMAGE:$$VERSION $_IMAGE:$$VERSION_TAG
         docker push $_IMAGE:$$VERSION
