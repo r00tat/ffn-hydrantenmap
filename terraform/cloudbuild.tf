@@ -4,6 +4,26 @@ locals {
   }
 }
 
+resource "google_service_account" "deploy_sa" {
+  display_name = "cloudbuild"
+  description  = "SA for CICD"
+  account_id   = var.deploy_sa
+  project      = var.project
+}
+
+resource "google_project_iam_member" "deloy_iam" {
+  for_each = toset([
+    "roles/artifactregistry.admin",
+    "roles/run.admin",
+    "roles/secretmanager.admin",
+    "roles/storage.admin",
+    "roles/logging.logWriter"
+  ])
+  member  = google_service_account.deploy_sa.member
+  role    = each.value
+  project = var.project
+}
+
 resource "google_cloudbuild_trigger" "feature_branch" {
   location = "global"
   name     = "push-to-feature-branch"

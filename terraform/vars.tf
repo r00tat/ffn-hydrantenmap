@@ -14,6 +14,12 @@ variable "run_sa" {
   default     = "hydrantenmap"
 }
 
+variable "deploy_sa" {
+  description = "Cloud build SA"
+  type        = string
+  default     = "cloudbuild"
+}
+
 variable "region" {
   description = "GCP default region"
   type        = string
