@@ -8,8 +8,12 @@ steps:
       - '-c'
       - |
         # write env file
-        VERSION=$${TAG_NAME:-$$COMMIT_SHA}
-        echo -n "$${VERSION}" >.version
+        VERSION=$${TAG_NAME:-sha$$COMMIT_SHA}
+        echo "VERSION=$${VERSION}" >.version
+        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'})
+        VERSION_TAG=$${VERSION_TAG:0:20}
+        echo "VERSION_TAG=$${{VERSION_TAG}}" >>.version
+
         cat >.env.local <<EOF
         NEXT_PUBLIC_FIREBASE_APIKEY='$${NEXT_PUBLIC_FIREBASE_APIKEY}'
         NEXT_PUBLIC_MAPBOX_APIKEY='$${NEXT_PUBLIC_MAPBOX_APIKEY}'
@@ -29,11 +33,15 @@ steps:
     args:
       - '-c'
       - |
-        VERSION=$(cat .version)
+        source .version
+        docker pull $_IMAGE:latest || echo "no latest image"
+        docker pull $_IMAGE:$$VERSION_TAG || echo "no $$VERSION_TAG image"
         docker build -t $_IMAGE:$$VERSION --cache-from=$_IMAGE:latest .
         docker tag $_IMAGE:$$VERSION $_IMAGE:latest
+        docker tag $_IMAGE:$$VERSION $_IMAGE:$$VERSION_TAG
         docker push $_IMAGE:$$VERSION
         docker push $_IMAGE:latest
+        docker push $_IMAGE:$$VERSION_TAG
     id: docker_build
     entrypoint: bash
     secretEnv:
@@ -45,11 +53,9 @@ steps:
       - '-c'
       - |
         # deploy to cloud run
-        VERSION=$(cat .version)
+        source .version
         # only deploy on main branch and tags
         # if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
-        VERSION_TAG=$$(echo $${TAG_NAME:-BRANCH_NAME} | tr '[:upper:]' '[:lower:]'}
-        VERSION_TAG=$${VERSION_TAG:0:20}
 
         gcloud run deploy $_SERVICE_NAME \
           --allow-unauthenticated \
