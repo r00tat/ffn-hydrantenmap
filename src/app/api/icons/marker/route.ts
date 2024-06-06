@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,6 +18,9 @@ export async function GET(req: NextRequest) {
       }
     );
   } catch (err: any) {
+    if (isDynamicServerError(err)) {
+      throw err;
+    }
     console.error(`failed to render marker icon`, err);
     return NextResponse.json(
       { error: err.message },
