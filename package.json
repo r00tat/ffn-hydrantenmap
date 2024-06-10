@@ -55,7 +55,7 @@
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^4.2.1",
     "sharp": "^0.33.4",
-    "uuid": "^9.0.1"
+    "uuid": "^10.0.0"
   },
   "devDependencies": {
     "@types/circle-to-polygon": "^2.2.3",
