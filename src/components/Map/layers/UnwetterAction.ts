@@ -45,63 +45,68 @@ function parseTime(time: string | number) {
 
 const fetchUWD = async (sheetId: string, range: string) => {
   console.info(`fetching unwetter data of ${sheetId} ${range}`);
-  const values = await getSpreadsheetData(
+  const [headers, ...values] = await getSpreadsheetData(
     sheetId || process.env.EINSATZMAPPE_SHEET_ID || '',
     range || process.env.EINSATZMAPPE_SHEET_RANGE || ''
   );
   const markers = (
     await Promise.all(
-      values.map(
-        async ([
-          name = '',
-          street = '',
-          number = '',
-          city = 'Neusiedl am See',
-          status = '',
-          fzg = '',
-          description = '',
-          alarmTime = '',
-          start = '',
-          done = '',
-          info = '',
-          latLng = '',
-          title = '',
-        ]) => {
-          let [lat, lng] = parseLatLng(latLng || '');
-          const searchString = `${city} ${street} ${number}`;
-          if ((!lat || !lng) && street) {
-            const [place] = await searchPlace(searchString, {
-              position: defaultGeoPosition,
-              maxResults: 3,
-            });
-
+      values
+        .map((row) => Object.fromEntries(row.map((v, i) => [headers[i], v])))
+        .map(
+          async (
+            {
+              Name: name = '',
+              Straße: street = '',
+              Nummer: number = '',
+              Ort: city = 'Neusiedl am See',
+              'Status kurz': status = '',
+              Fzg: fzg = '',
+              'Status lang': description = '',
+              Alarmzeit: alarmTime = '',
+              Start: start = '',
+              'Erledigt um': done = '',
+              'Info/Alarm': info = '',
+              GPS: latLng = '',
+              Bezeichnung: title = '',
+            },
+            idx
+          ) => {
+            let [lat, lng] = parseLatLng(latLng || '');
+            const searchString = `${city} ${street} ${number}`;
+            // if ((!lat || !lng) && street) {
+            // const [place] = await searchPlace(searchString, {
+            //   position: defaultGeoPosition,
+            //   maxResults: 3,
+            // });
             // console.info(`place: ${searchString}: ${JSON.stringify(place)}`);
-            if (place) {
-              lat = Number.parseFloat(place.lat);
-              lng = Number.parseFloat(place.lon);
-            }
+            // if (place) {
+            //   lat = Number.parseFloat(place.lat);
+            //   lng = Number.parseFloat(place.lon);
+            // }
+            // }
+            const desc =
+              `${searchString}\nStatus: ${status} ${fzg}\n${description}\n${
+                alarmTime && '\nalarmiert: ' + parseTime(alarmTime)
+              }\n${start && 'begonnen: ' + parseTime(start)}${
+                done && '\nabgeschlossen: ' + parseTime(done)
+              }\n${info}`
+                .replace(/\n{2,}/g, '\n')
+                .trim();
+            return {
+              id: `${idx} ${name} ${street} ${number}`.trim(),
+              street,
+              number,
+              city: city,
+              name: title,
+              description: desc,
+              lat,
+              lng,
+              status,
+              idx,
+            } as UnwetterData;
           }
-          const desc =
-            `${searchString}\nStatus: ${status} ${fzg}\n${description}\n${
-              alarmTime && '\nalarmiert: ' + parseTime(alarmTime)
-            }\n${start && 'begonnen: ' + parseTime(start)}${
-              done && '\nabgeschlossen: ' + parseTime(done)
-            }\n${info}`
-              .replace(/\n{2,}/g, '\n')
-              .trim();
-          return {
-            id: `${name} ${lat} ${lng}`.trim(),
-            street,
-            number,
-            city: city,
-            name: title,
-            description: desc,
-            lat,
-            lng,
-            status,
-          } as UnwetterData;
-        }
-      )
+        )
     )
   ).filter(({ lat, lng }) => lat && lng);
 
