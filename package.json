@@ -25,7 +25,7 @@
     "@mui/x-data-grid": "^7.6.2",
     "@mui/x-date-pickers": "^7.6.2",
     "@serwist/next": "^9.0.2",
-    "@turf/bbox-polygon": "^6.5.0",
+    "@turf/bbox-polygon": "^7.0.0",
     "@turf/boolean-within": "^6.5.0",
     "@turf/center": "^7.0.0",
     "@turf/helpers": "^7.0.0",
