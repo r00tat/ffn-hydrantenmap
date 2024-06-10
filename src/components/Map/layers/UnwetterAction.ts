@@ -31,6 +31,18 @@ function parseLatLng(text: string) {
   ];
 }
 
+function parseTime(time: string | number) {
+  if (typeof time === 'string') {
+    return time;
+  }
+  const minutes = time * 24 * 60;
+  return `${Math.floor(minutes / 60)
+    .toString()
+    .padStart(2, '0')}:${Math.floor(minutes % 60)
+    .toString()
+    .padStart(2, '0')}`;
+}
+
 const fetchUWD = async (sheetId: string, range: string) => {
   console.info(`fetching unwetter data of ${sheetId} ${range}`);
   const values = await getSpreadsheetData(
@@ -69,11 +81,14 @@ const fetchUWD = async (sheetId: string, range: string) => {
               lng = Number.parseFloat(place.lon);
             }
           }
-          const desc = `${searchString}\n${status}${
-            fzg && ' von '
-          }${fzg}\n${description}\n${start || alarmTime}${
-            done && '-'
-          }${done}\n${info}`.trim();
+          const desc =
+            `${searchString}\nStatus: ${status} ${fzg}\n${description}\n${
+              alarmTime && '\nalarmiert: ' + parseTime(alarmTime)
+            }\n${start && 'begonnen: ' + parseTime(start)}${
+              done && '\nabgeschlossen: ' + parseTime(done)
+            }\n${info}`
+              .replace(/\n{2,}/g, '\n')
+              .trim();
           return {
             id: `${name} ${lat} ${lng}`.trim(),
             street,
@@ -110,6 +125,13 @@ export async function fetchUnwetterData(
     return [];
   }
 
-  console.info(`requested unwetter data for ${sheetId} ${range}`);
-  return fetchUnwetterCachedData(sheetId, range);
+  console.info(
+    `requested unwetter data for ${
+      sheetId || process.env.EINSATZMAPPE_SHEET_ID
+    } ${range}`
+  );
+  return fetchUnwetterCachedData(
+    sheetId || process.env.EINSATZMAPPE_SHEET_ID || '',
+    range
+  );
 }
