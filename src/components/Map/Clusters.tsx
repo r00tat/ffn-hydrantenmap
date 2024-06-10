@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { geohashQueryBounds } from 'geofire-common';
 import { useEffect, useState } from 'react';
-import { LayersControl, useMap, useMapEvent } from 'react-leaflet';
+import { LayerGroup, LayersControl, useMap, useMapEvent } from 'react-leaflet';
 import {
   GefahrObjekt,
   GeohashCluster,
@@ -196,17 +196,17 @@ export default function Clusters() {
       <LayersControl.Overlay name="Hydranten" checked>
         <HydrantenLayer hydranten={hydranten} />
       </LayersControl.Overlay>
-      <LayersControl.Overlay name="Risiko Objekte" checked>
-        <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
-      </LayersControl.Overlay>
-      <LayersControl.Overlay name="Gef. Objekte" checked>
-        <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
-      </LayersControl.Overlay>
-      <LayersControl.Overlay name="Loeschteiche" checked>
-        <LoeschteicheLayer loeschteiche={loeschteiche} />
-      </LayersControl.Overlay>
       <LayersControl.Overlay name="Saugstellen" checked>
-        <SaugstellenLayer saugstellen={saugstellen} />
+        <LayerGroup>
+          <LoeschteicheLayer loeschteiche={loeschteiche} />
+          <SaugstellenLayer saugstellen={saugstellen} />
+        </LayerGroup>
+      </LayersControl.Overlay>
+      <LayersControl.Overlay name="Risiko Objekte" checked>
+        <LayerGroup>
+          <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
+          <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
+        </LayerGroup>
       </LayersControl.Overlay>
     </>
   );
