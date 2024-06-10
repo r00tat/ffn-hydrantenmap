@@ -11,12 +11,14 @@ function useUnwetterSheetData() {
   const firecall = useFirecall();
 
   const refreshData = useCallback(async () => {
-    const unwetterData = await fetchUnwetterData(
-      firecall.sheetId,
-      firecall.range
-    );
-    console.info(`unwetter data`, unwetterData);
-    setUnwetterData(unwetterData);
+    if (firecall.id && firecall.id !== 'unknown') {
+      const unwetterData = await fetchUnwetterData(
+        firecall.sheetId,
+        firecall.range
+      );
+      console.info(`unwetter data`, unwetterData);
+      setUnwetterData(unwetterData);
+    }
   }, [firecall]);
 
   useEffect(() => {
