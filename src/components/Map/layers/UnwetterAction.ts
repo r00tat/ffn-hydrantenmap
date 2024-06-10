@@ -48,10 +48,12 @@ const fetchUWD = async (sheetId: string, range: string) => {
           status = '',
           fzg = '',
           description = '',
+          alarmTime = '',
           start = '',
           done = '',
           info = '',
           latLng = '',
+          title = '',
         ]) => {
           let [lat, lng] = parseLatLng(latLng || '');
           const searchString = `${city} ${street} ${number}`;
@@ -69,7 +71,7 @@ const fetchUWD = async (sheetId: string, range: string) => {
           }
           const desc = `${searchString}\n${status}${
             fzg && ' von '
-          }${fzg}\n${description}\n${start}${
+          }${fzg}\n${description}\n${start || alarmTime}${
             done && '-'
           }${done}\n${info}`.trim();
           return {
@@ -77,7 +79,7 @@ const fetchUWD = async (sheetId: string, range: string) => {
             street,
             number,
             city: city,
-            name,
+            name: title,
             description: desc,
             lat,
             lng,
