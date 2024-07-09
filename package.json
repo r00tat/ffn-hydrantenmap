@@ -63,7 +63,7 @@
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
-    "@types/uuid": "^9.0.8",
+    "@types/uuid": "^10.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.2.4",
     "serwist": "^9.0.2",
