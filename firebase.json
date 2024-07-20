@@ -7,8 +7,8 @@
     },
     {
       "database": "ffndev",
-      "rules": "firestore.rules",
-      "indexes": "firestore.indexes.json"
+      "rules": "firestore.dev.rules",
+      "indexes": "firestore.indexes.dev.json"
     }
   ]
 }
