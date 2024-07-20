@@ -1,8 +1,9 @@
 locals {
   artifact_registry = "${google_artifact_registry_repository.run_docker.location}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.run_docker.repository_id}"
   substitutions = {
-    _RUN_SERVICE_ACCOUNT = google_service_account.run_sa.email
-    _IMAGE               = "${local.artifact_registry}/${var.name}/dev"
+    _RUN_SERVICE_ACCOUNT      = google_service_account.run_sa.email
+    _IMAGE                    = "${local.artifact_registry}/${var.name}/dev"
+    _NEXT_PUBLIC_FIRESTORE_DB = "ffndev"
   }
 }
 
