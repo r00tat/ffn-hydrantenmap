@@ -24,6 +24,9 @@ steps:
         NEXT_PUBLIC_FIRESTORE_DB="$${_NEXT_PUBLIC_FIRESTORE_DB}"
         AUTH_SECRET='$${AUTH_SECRET}'
         EOF
+
+        echo "Environment:"
+        cat .env.local
     id: env
     entrypoint: bash
     secretEnv:
