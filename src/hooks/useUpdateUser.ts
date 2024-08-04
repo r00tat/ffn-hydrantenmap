@@ -3,7 +3,7 @@ import { UserRecordExtended } from '../common/users';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export default function useUpdateUser() {
-  const { isSignedIn, user } = useFirebaseLogin();
+  const { isSignedIn, user, idToken: token } = useFirebaseLogin();
 
   return useCallback(
     async (
@@ -13,7 +13,6 @@ export default function useUpdateUser() {
         return undefined;
       }
       // console.info(`fetching users`);
-      const token = await user.getIdToken();
       const response = await fetch(`/api/users/${userData.uid}`, {
         method: 'POST',
         headers: {
@@ -26,6 +25,6 @@ export default function useUpdateUser() {
       // console.info(`users: ${JSON.stringify(usersResponse.users)}`);
       return usersResponse;
     },
-    [isSignedIn, user]
+    [isSignedIn, token, user]
   );
 }

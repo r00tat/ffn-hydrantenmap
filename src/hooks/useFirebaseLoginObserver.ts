@@ -18,6 +18,8 @@ export interface LoginData {
   photoURL?: string;
   messagingTokens?: string[];
   expiration?: string;
+  idToken?: string;
+  groups?: string[];
 }
 
 export interface LoginStatus extends LoginData {
@@ -50,6 +52,12 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           isAdmin: prev.isAdmin || userData?.isAdmin === true,
           messagingTokens: userData.messaging,
           chatNotifications: userData.chatNotifications,
+          groups: [
+            ...(userData.email?.indexOf('@ff-neusiedlamsee.at') > 0
+              ? ['ffnd']
+              : []),
+            ...(userData.groups || []),
+          ],
         }));
       }
     }
@@ -69,6 +77,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         }
 
         const tokenResult = await user?.getIdTokenResult();
+        const idToken = await user?.getIdToken();
 
         const authData: LoginData = {
           isSignedIn: !!user,
@@ -78,8 +87,13 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           uid: nonNull(u?.uid),
           photoURL: nonNull(u?.photoURL),
           isAuthorized: (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0,
-          isAdmin: u?.email === 'paul.woelfel@ff-neusiedlamsee.at',
+          isAdmin: false,
           expiration: tokenResult?.expirationTime,
+          idToken,
+          groups:
+            (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0
+              ? ['ffnd']
+              : [],
         };
         if (window && window.sessionStorage) {
           window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));

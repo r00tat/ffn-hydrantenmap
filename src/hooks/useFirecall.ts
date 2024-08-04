@@ -52,6 +52,7 @@ export function useLastFirecall() {
           const firstDoc = querySnapshot.docs[0];
           const fc: Firecall = {
             id: firstDoc.id,
+            group: 'ffnd',
             ...firstDoc.data(),
           } as Firecall;
           setFirecall(fc);

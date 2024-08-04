@@ -9,12 +9,14 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { feuerwehren } from '../../common/feuerwehren';
 import { UserRecordExtended } from '../../common/users';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { Group } from '../groups/GroupAction';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -54,7 +56,8 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
 
 function useGridColumns(
   authorizeAction: (user: UserRecordExtended) => Promise<void>,
-  editAction: (user: UserRecordExtended) => void
+  editAction: (user: UserRecordExtended) => void,
+  groups: { [key: string]: string }
 ) {
   const [columns, setColumns] = useState<GridColDef[]>([]);
 
@@ -69,6 +72,16 @@ function useGridColumns(
         minWidth: 100,
         flex: 0.5,
         renderCell: (params) => feuerwehren[params.row.feuerwehr]?.name || '',
+      },
+      {
+        field: 'groups',
+        headerName: 'Gruppen',
+        minWidth: 100,
+        renderCell: (params) =>
+          (params.row.groups || [])
+            .map((key: string) => groups[key])
+            .filter((v: string) => v)
+            .join(', '),
       },
       { field: 'disabled', headerName: 'disabled', minWidth: 100 },
       // { field: 'authorized', headerName: 'authorized', minWidth: 100 },
@@ -85,7 +98,7 @@ function useGridColumns(
         ),
       },
     ]);
-  }, [authorizeAction, editAction]);
+  }, [authorizeAction, editAction, groups]);
   return columns;
 }
 
@@ -94,6 +107,22 @@ export default function Users() {
   const [editUser, setEditUser] = useState<UserRecordExtended>();
   const [users, fetchUsers] = useUserList();
   const updateApiCall = useUpdateUser();
+
+  const groupsArray = useFirebaseCollection<Group>({
+    collectionName: 'groups',
+    // pathSegments: [firecallId, 'group'],
+    // queryConstraints: [orderBy('timestamp', order)],
+  });
+
+  const groups: { [key: string]: string } = useMemo(
+    () =>
+      Object.fromEntries(
+        groupsArray
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((g) => [g.id, g.name])
+      ),
+    [groupsArray]
+  );
 
   const updateUser = useCallback(
     async (user: UserRecordExtended) => {
@@ -116,7 +145,7 @@ export default function Users() {
     console.info(`edit user: ${JSON.stringify(user)}`);
     setShowEditUserDialog(true);
   }, []);
-  const columns = useGridColumns(authorizeAction, editAction);
+  const columns = useGridColumns(authorizeAction, editAction, groups);
   return (
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
@@ -128,6 +157,7 @@ export default function Users() {
       {showEditUserDialog && editUser && (
         <UserRecordExtendedDialog
           user={editUser}
+          groups={groups}
           onClose={(user) => {
             setShowEditUserDialog(false);
             if (user) {

@@ -63,14 +63,8 @@ export default function LoginUi() {
             </Typography>
           )}
           <Typography>
-            Login details: <br />
+            Logeddin as:&nbsp;
             {displayName} {email}
-            <br />
-            Authenticated via {auth.currentUser?.providerId}
-            <br />
-            isSignedIn: {isSignedIn ? 'Y' : 'N'}
-            <br />
-            isAuthorized: {isAuthorized ? 'Y' : 'N'}
           </Typography>
 
           <FormGroup>
@@ -87,6 +81,18 @@ export default function LoginUi() {
               label={'Debug Informationen anzeigen'}
             />
           </FormGroup>
+
+          {displayMessages && (
+            <Typography>
+              Authenticated via {auth.currentUser?.providerId}
+              <br />
+              isSignedIn: {isSignedIn ? 'Y' : 'N'}
+              <br />
+              isAuthorized: {isAuthorized ? 'Y' : 'N'}
+              <br />
+              Database: {process.env.NEXT_PUBLIC_FIRESTORE_DB}
+            </Typography>
+          )}
         </Box>
       )}
     </>

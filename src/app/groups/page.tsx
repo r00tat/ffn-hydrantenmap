@@ -1,14 +1,16 @@
 'use client';
 
+import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
+import Fab from '@mui/material/Fab';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
-import { getGroupsFromServer, Group, updateGroup } from './UserAction';
 import GroupDialog from './GroupDialog';
+import { getGroupsFromServer, Group, updateGroup } from './GroupAction';
 
 interface UserRowButtonParams {
   row: Group;
@@ -74,29 +76,29 @@ function useGroupList(): [Group[], () => Promise<Group[]>] {
 }
 
 export default function Users() {
-  const [showEditUserDialog, setShowEditUserDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();
   const [groups, getGroups] = useGroupList();
 
   const editAction = useCallback(async (user: Group) => {
     setEditGroup(user);
-    console.info(`edit user: ${JSON.stringify(user)}`);
-    setShowEditUserDialog(true);
+    console.info(`edit group: ${JSON.stringify(user)}`);
+    setShowEditDialog(true);
   }, []);
   const columns = useGridColumns(editAction);
   return (
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
-          Users
+          Groups
         </Typography>
         <DataGrid rows={groups} columns={columns} getRowId={(row) => row.id} />
       </Box>
-      {showEditUserDialog && editGroup && (
+      {showEditDialog && editGroup && (
         <GroupDialog
           group={editGroup}
           onClose={async (group) => {
-            setShowEditUserDialog(false);
+            setShowEditDialog(false);
             if (group) {
               await updateGroup(group);
               await getGroups();
@@ -104,6 +106,21 @@ export default function Users() {
           }}
         />
       )}
+
+      <Fab
+        color="primary"
+        aria-label="add"
+        sx={{ position: 'fixed', bottom: 16, right: 16 }}
+        onClick={() => {
+          setShowEditDialog(true);
+          setEditGroup({
+            name: '',
+            description: '',
+          });
+        }}
+      >
+        <AddIcon />
+      </Fab>
     </>
   );
 }

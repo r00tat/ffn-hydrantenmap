@@ -7,7 +7,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import React, { useState } from 'react';
-import { Group } from './UserAction';
+import { Group } from './GroupAction';
 
 export interface GroupDialoggOptions {
   onClose: (item?: Group) => void;
@@ -43,7 +43,7 @@ export default function GroupDialogg({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Benutzer {group.name} bearbeiten</DialogTitle>
+      <DialogTitle>Gruppe {group.name} bearbeiten</DialogTitle>
       <DialogContent>
         <DialogContentText>ID: {group.id}</DialogContentText>
         {Object.entries(groupTextFields).map(([key, label]) => (

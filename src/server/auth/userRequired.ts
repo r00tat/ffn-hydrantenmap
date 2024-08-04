@@ -15,10 +15,6 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   try {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
     // console.log(`decoded token: ${JSON.stringify(decodedToken)}`);
-    // if (decodedToken.email !== 'paul.woelfel@ff-neusiedlamsee.at') {
-    //   res.status(403).json({ error: 'Forbidden' });
-    //   return false;
-    // }
     if (
       decodedToken.email &&
       decodedToken.email.indexOf('@ff-neusiedlamsee.at') > 0

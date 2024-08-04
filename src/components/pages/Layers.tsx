@@ -175,6 +175,8 @@ export default function LayersPage() {
     return <></>;
   }
 
+  const hasUnassignedItems = layerItems['default'].length > 0;
+
   return (
     <>
       <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
@@ -183,7 +185,11 @@ export default function LayersPage() {
             Ebenen <KmlImport />
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={6} md={6} lg={6} xl={8}>
+            <Grid
+              item
+              xs={hasUnassignedItems ? 6 : 10}
+              xl={hasUnassignedItems ? 8 : 10}
+            >
               <Typography variant="h5">
                 Erstellte Ebenen
                 <FormGroup>
@@ -209,7 +215,11 @@ export default function LayersPage() {
                 ))}
               </Grid>
             </Grid>
-            <Grid item xs={6} md={6} lg={6} xl={4}>
+            <Grid
+              item
+              xs={hasUnassignedItems ? 6 : 2}
+              xl={hasUnassignedItems ? 4 : 2}
+            >
               <Typography variant="h5">Elemente nicht zugeordnet</Typography>
               <DropBox id="default">keiner Ebene zuoordnen</DropBox>
               <Grid container spacing={2}>

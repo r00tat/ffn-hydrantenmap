@@ -127,6 +127,7 @@ export interface Firecall {
   lng?: number;
   sheetId?: string;
   sheetRange?: string;
+  group?: string;
   [key: string]: any;
 }
 

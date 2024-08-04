@@ -3,7 +3,9 @@ import Icon from '@mdi/react';
 import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import GroupIcon from '@mui/icons-material/Group';
 import InfoIcon from '@mui/icons-material/Info';
+import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
@@ -20,7 +22,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import LayersIcon from '@mui/icons-material/Layers';
 
 export default function AppDrawer({
   isOpen,
@@ -84,14 +85,24 @@ export default function AppDrawer({
             ))}
 
             {isAdmin && (
-              <Link href="/users" passHref legacyBehavior>
-                <ListItem button key="users">
-                  <ListItemIcon>
-                    <UserIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Users" />
-                </ListItem>
-              </Link>
+              <>
+                <Link href="/users" passHref legacyBehavior>
+                  <ListItem button key="users">
+                    <ListItemIcon>
+                      <UserIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Users" />
+                  </ListItem>
+                </Link>
+                <Link href="/groups" passHref legacyBehavior>
+                  <ListItem button key="groups">
+                    <ListItemIcon>
+                      <GroupIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="Groups" />
+                  </ListItem>
+                </Link>
+              </>
             )}
           </List>
         </Box>

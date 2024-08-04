@@ -21,6 +21,7 @@ export async function POST(
       authorized: user.authorized,
       feuerwehr: user.feuerwehr || 'neusiedl',
       abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
+      groups: user.groups || [],
     };
 
     console.info(`updating ${uid}: ${JSON.stringify(newData)}`);

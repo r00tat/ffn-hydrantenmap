@@ -2,11 +2,10 @@ import { useCallback } from 'react';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export default function useApiRequest() {
-  const { isSignedIn, user } = useFirebaseLogin();
+  const { isSignedIn, user, idToken: token } = useFirebaseLogin();
   return useCallback(
     async (url: string, body: any, method = 'POST') => {
       if (isSignedIn && user) {
-        const token = await user.getIdToken();
         const response = await fetch(`/api/${url.replace(/^\//, '')}`, {
           method,
           headers: {
@@ -21,6 +20,6 @@ export default function useApiRequest() {
         throw new Error('user is not loggedin, missing ID token');
       }
     },
-    [isSignedIn, user]
+    [isSignedIn, token, user]
   );
 }
