@@ -1,6 +1,7 @@
 'use client';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import DebugLoggingSwitch from '../../components/logging/DebugLoggingSwitch';
 
 export default function About() {
   return (
@@ -50,6 +51,8 @@ export default function About() {
 
       <Typography variant="h5">Version</Typography>
       <Typography>Build id: {process.env.NEXT_PUBLIC_BUILD_ID}</Typography>
+
+      <DebugLoggingSwitch />
     </Paper>
   );
 }
