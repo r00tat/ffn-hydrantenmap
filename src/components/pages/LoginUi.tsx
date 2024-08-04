@@ -2,10 +2,7 @@
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import FormGroup from '@mui/material/FormGroup';
 import Paper from '@mui/material/Paper';
-import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import { useDebugLogging } from '../../hooks/useDebugging';
@@ -13,6 +10,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
+import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 
 export default function LoginUi() {
   const { isSignedIn, isAuthorized, displayName, email, signOut } =
@@ -43,7 +41,9 @@ export default function LoginUi() {
           {isAuthorized && (
             <>
               <Typography>
-                Dein Benutzer ist freigeschalten und kann verwendet werden!
+                Dein Benutzer ist freigeschalten und kann verwendet werden!{' '}
+                <br />
+                Angemeldet als: {displayName} {email}
               </Typography>
               <Typography>
                 <Link href="/" passHref legacyBehavior>
@@ -62,37 +62,8 @@ export default function LoginUi() {
               für die Freischaltung
             </Typography>
           )}
-          <Typography>
-            Logeddin as:&nbsp;
-            {displayName} {email}
-          </Typography>
 
-          <FormGroup>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={displayMessages}
-                  onChange={(event) =>
-                    setDisplayMessages &&
-                    setDisplayMessages(event.target.checked)
-                  }
-                />
-              }
-              label={'Debug Informationen anzeigen'}
-            />
-          </FormGroup>
-
-          {displayMessages && (
-            <Typography>
-              Authenticated via {auth.currentUser?.providerId}
-              <br />
-              isSignedIn: {isSignedIn ? 'Y' : 'N'}
-              <br />
-              isAuthorized: {isAuthorized ? 'Y' : 'N'}
-              <br />
-              Database: {process.env.NEXT_PUBLIC_FIRESTORE_DB}
-            </Typography>
-          )}
+          <DebugLoggingSwitch />
         </Box>
       )}
     </>
