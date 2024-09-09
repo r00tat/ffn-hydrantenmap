@@ -37,7 +37,7 @@
     "firebase": "^10.13.1",
     "firebase-admin": "^12.4.0",
     "geofire-common": "^6.0.0",
-    "googleapis": "^142.0.0",
+    "googleapis": "^144.0.0",
     "haversine-distance": "^1.2.3",
     "leaflet": "^1.9.4",
     "leaflet-geometryutil": "^0.10.3",
