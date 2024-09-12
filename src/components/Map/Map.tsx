@@ -1,6 +1,12 @@
 'use client';
 
-import { LayersControl, MapContainer, TileLayer, useMap } from 'react-leaflet';
+import {
+  LayersControl,
+  MapContainer,
+  TileLayer,
+  useMap,
+  WMSTileLayer,
+} from 'react-leaflet';
 import { defaultPosition } from '../../hooks/constants';
 import Clusters from './Clusters';
 import Leitungen from './Leitungen/Draw';
@@ -72,18 +78,39 @@ export default function Map() {
         <LayersControl.Overlay name="Position" checked>
           <PositionMarker />
         </LayersControl.Overlay>
-        {Object.entries(overlayLayers).map(([key, layer]) => (
-          <LayersControl.Overlay name={layer.name} key={key}>
-            <TileLayer
-              attribution={layer.options.attribution}
-              url={layer.url}
-              maxZoom={layer.options.maxZoom}
-              bounds={layer.options.bounds}
-              subdomains={layer.options.subdomains}
-              key={key}
-            />
-          </LayersControl.Overlay>
-        ))}
+        {Object.entries(overlayLayers)
+          .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')
+          .map(([key, layer]) => (
+            <LayersControl.Overlay name={layer.name} key={key}>
+              <TileLayer
+                attribution={layer.options.attribution}
+                url={layer.url}
+                maxZoom={layer.options.maxZoom}
+                bounds={layer.options.bounds}
+                subdomains={layer.options.subdomains}
+                key={key}
+              />
+            </LayersControl.Overlay>
+          ))}
+        {Object.entries(overlayLayers)
+          .filter(([key, layer]) => layer.type == 'WMS')
+          .map(([key, layer]) => (
+            <LayersControl.Overlay name={layer.name} key={key}>
+              <WMSTileLayer
+                layers={layer.options.layers}
+                attribution={layer.options.attribution}
+                url={layer.url}
+                maxZoom={layer.options.maxZoom}
+                bounds={layer.options.bounds}
+                subdomains={layer.options.subdomains}
+                key={key}
+                format={layer.options.format}
+                transparent={layer.options.transparent}
+                tileSize={512}
+                uppercase={layer.options.uppercase}
+              />
+            </LayersControl.Overlay>
+          ))}
       </LayersControl>
       {/* <FullscreenControl /> */}
       <UpdateMapPosition />
