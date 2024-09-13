@@ -1,5 +1,5 @@
 import { latLngPosition, LatLngPosition } from '../../../../common/geo';
-import { toLatLng } from '../../../../hooks/constants';
+import { toLatLng } from '../../../../hooks/leafletFunctions';
 import { Connection } from '../../../firebase/firestore';
 
 export const getConnectionPositions = (

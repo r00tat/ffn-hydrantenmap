@@ -2,12 +2,12 @@ import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
-import { LatLng } from 'leaflet';
+import L, { LatLng } from 'leaflet';
 import { useCallback, useEffect, useState } from 'react';
 import { useMap } from 'react-leaflet';
 import { LatLngPosition } from '../../common/geo';
 import { formatTimestamp } from '../../common/time-format';
-import { toLatLng } from '../../hooks/constants';
+import { toLatLng } from '../../hooks/leafletFunctions';
 import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
@@ -111,7 +111,9 @@ export default function RecordButton() {
   useEffect(() => {
     if (isRecording && isPositionSet && recordItem) {
       const lastPos = positions[positions.length - 1];
-      const distance = position.distanceTo(toLatLng(lastPos[0], lastPos[1]));
+      const distance = L.latLng(position).distanceTo(
+        toLatLng(lastPos[0], lastPos[1])
+      );
 
       // more than 5m and > 1 sec or > 30 seconds
 
@@ -168,9 +170,9 @@ export default function RecordButton() {
             onClick={(event) => {
               event.preventDefault();
               if (isRecording) {
-                stopRecording(position);
+                stopRecording(L.latLng(position));
               } else {
-                startRecording(position);
+                startRecording(L.latLng(position));
               }
             }}
           >

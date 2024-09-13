@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import L from 'leaflet';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { GeoPositionObject } from '../common/geo';
 import { defaultPosition } from './constants';
 
-export type PositionInfo = [L.LatLng, boolean, GeolocationPosition | undefined];
+export type PositionInfo = [
+  GeoPositionObject,
+  boolean,
+  GeolocationPosition | undefined
+];
 
 export default function usePosition(): PositionInfo {
-  const [position, setPosition] = useState<L.LatLng>(defaultPosition);
+  const [position, setPosition] = useState<GeoPositionObject>(defaultPosition);
   const [isSet, setIsSet] = useState(false);
   const [watchId, setWatchId] = useState<number>();
   const [location, setLocation] = useState<GeolocationPosition>();
@@ -13,13 +19,11 @@ export default function usePosition(): PositionInfo {
   useEffect(() => {
     if (navigator.geolocation) {
       const id = navigator.geolocation.watchPosition((geolocation) => {
-        setPosition(
-          L.latLng([
-            geolocation.coords.latitude,
-            geolocation.coords.longitude,
-            geolocation.coords.altitude || 0,
-          ])
-        );
+        setPosition({
+          lat: geolocation.coords.latitude,
+          lng: geolocation.coords.longitude,
+          alt: geolocation.coords.altitude || 0,
+        });
         setLocation(geolocation);
         setIsSet(true);
       });

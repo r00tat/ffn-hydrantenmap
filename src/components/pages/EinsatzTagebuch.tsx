@@ -131,7 +131,8 @@ export function useDiaries() {
       })
       .sort(
         (a, b) =>
-          (a.nummer ?? 0) - (b.nummer ?? 0) ?? a.datum.localeCompare(b.datum)
+          (a.nummer && b.nummer && (a.nummer ?? 0) - (b.nummer ?? 0)) ??
+          a.datum.localeCompare(b.datum)
       )
       .map((a) => ({
         ...a,

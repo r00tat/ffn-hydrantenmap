@@ -24,6 +24,7 @@ import HydrantenLayer from './layers/HydrantenLayer';
 import LoeschteicheLayer from './layers/LoeschteichLayer';
 import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
 import SaugstellenLayer from './layers/SaugstellenLayer';
+import L from 'leaflet';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
   const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
@@ -154,7 +155,7 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
 
 export default function Clusters() {
   const map = useMap();
-  const [center, setCenter] = useState(defaultPosition);
+  const [center, setCenter] = useState(L.latLng(defaultPosition));
   const [radius, setRadius] = useState(1000);
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {

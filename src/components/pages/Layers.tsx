@@ -171,6 +171,10 @@ export default function LayersPage() {
     pointerSensor
   );
 
+  if (typeof window === 'undefined') {
+    return '<div>Loading</div>';
+  }
+
   if (!isAuthorized) {
     return <></>;
   }

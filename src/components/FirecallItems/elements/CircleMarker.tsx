@@ -3,7 +3,7 @@ import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Circle as LeafletCircle } from 'react-leaflet';
 import { Circle, FirecallItem } from '../../firebase/firestore';
-import { circleIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class CircleMarker extends FirecallItemBase {
@@ -97,7 +97,7 @@ export class CircleMarker extends FirecallItemBase {
     return `Kreis ${this.name}`;
   }
   public icon(): Icon<IconOptions> {
-    return circleIcon;
+    return leafletIcons().circle;
   }
 
   public static factory(): FirecallItemBase {
