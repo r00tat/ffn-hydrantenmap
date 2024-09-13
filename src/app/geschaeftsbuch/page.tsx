@@ -1,8 +1,8 @@
 import type { NextPage } from 'next';
-import Geschaeftsbuch from '../../components/pages/Geschaeftsbuch';
+import Geschaeftsbuch from '../../components/pages/GeschaeftsbuchWrapper';
 
-const Home: NextPage = () => {
+const GeschaeftsbuchPage: NextPage = () => {
   return <Geschaeftsbuch />;
 };
 
-export default Home;
+export default GeschaeftsbuchPage;

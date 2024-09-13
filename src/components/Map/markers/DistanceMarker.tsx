@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Marker, Popup, useMapEvent } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { usePositionContext } from '../Position';
+import { GeoPositionObject } from '../../../common/geo';
 
 export default function DistanceMarker() {
   const [distancePosition, setDistancePosition] =
-    useState<L.LatLng>(defaultPosition);
+    useState<GeoPositionObject>(defaultPosition);
   const [initialPositionSet, setInitialPositionSet] = useState(false);
   const [position] = usePositionContext();
   const markerRef = useRef<L.Marker<any>>(null);
@@ -31,7 +32,7 @@ export default function DistanceMarker() {
       <Popup autoPan={false}>
         Entfernung zum aktuellen Standort:
         <br />
-        {Math.round(distancePosition.distanceTo(position))}m
+        {Math.round(L.latLng(distancePosition).distanceTo(position))}m
       </Popup>
     </Marker>
   );

@@ -6,7 +6,7 @@ steps:
       - PROJECT_ID=$PROJECT_ID
       - NEXT_PUBLIC_FIRESTORE_DB=$_NEXT_PUBLIC_FIRESTORE_DB
     args:
-      - '-c'
+      - "-c"
       - |
         # write env file
         VERSION=$${TAG_NAME:-sha$$COMMIT_SHA}
@@ -37,7 +37,7 @@ steps:
       - AUTH_SECRET
   - name: gcr.io/cloud-builders/docker
     args:
-      - '-c'
+      - "-c"
       - |
         source .version
         docker pull $_IMAGE:latest || echo "no latest image"
@@ -56,7 +56,7 @@ steps:
       - NEXT_PUBLIC_OAUTH_CLIENT_ID
   - name: gcr.io/cloud-builders/gcloud
     args:
-      - '-c'
+      - "-c"
       - |
         # deploy to cloud run
         source .version
@@ -82,13 +82,13 @@ steps:
       - NEXT_PUBLIC_FIREBASE_APIKEY
       - NEXT_PUBLIC_MAPBOX_APIKEY
       - NEXT_PUBLIC_OAUTH_CLIENT_ID
-timeout: 1200s
+timeout: 1800s
 substitutions:
   _SERVICE_NAME: hydrantenmap-dev
   _IMAGE: europe-west3-docker.pkg.dev/$PROJECT_ID/hydrantenkarte/hydrantenmap/dev
-  _NEXT_PUBLIC_FIRESTORE_DB: 'ffndev'
-  _RUN_ARGS: ''
-  _RUN_SERVICE_ACCOUNT: 'hydrantenmap@$PROJECT_ID.iam.gserviceaccount.com'
+  _NEXT_PUBLIC_FIRESTORE_DB: "ffndev"
+  _RUN_ARGS: ""
+  _RUN_SERVICE_ACCOUNT: "hydrantenmap@$PROJECT_ID.iam.gserviceaccount.com"
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_FIREBASE_APIKEY/versions/latest

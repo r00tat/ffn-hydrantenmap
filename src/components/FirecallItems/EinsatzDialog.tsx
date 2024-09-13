@@ -14,11 +14,12 @@ import { firestore } from '../firebase/firebase';
 import { Firecall } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import moment from 'moment';
+import { GeoPositionObject } from '../../common/geo';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
   einsatz?: Firecall;
-  position?: L.LatLng;
+  position?: GeoPositionObject;
 }
 
 export default function EinsatzDialog({

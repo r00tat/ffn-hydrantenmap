@@ -32,9 +32,11 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
 
 export const fcItemNames: { [key: string]: string } = {};
 
-Object.entries(fcItemClasses).forEach(([k, FcClass]) => {
-  fcItemNames[k] = new FcClass().markerName();
-});
+if (typeof 'window' !== undefined) {
+  Object.entries(fcItemClasses).forEach(([k, FcClass]) => {
+    fcItemNames[k] = new FcClass().markerName();
+  });
+}
 
 export function getItemClass(type: string = 'fallback') {
   return fcItemClasses[type] ?? FirecallItemBase;

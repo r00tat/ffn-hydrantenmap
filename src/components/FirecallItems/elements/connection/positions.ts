@@ -1,14 +1,14 @@
 import { doc, setDoc } from 'firebase/firestore';
 import L from 'leaflet';
 import GeometryUtil from 'leaflet-geometryutil';
-import { LatLngPosition } from '../../../../common/geo';
+import { GeoPositionObject, LatLngPosition } from '../../../../common/geo';
 import { firestore } from '../../../firebase/firebase';
 import { Connection } from '../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from './distance';
 
 export async function updateFirecallPositions(
   firecallId: string,
-  newPos: L.LatLng,
+  newPos: GeoPositionObject,
   fcItem: Connection,
   index: number
 ) {
@@ -21,7 +21,7 @@ export async function updateFirecallPositions(
 }
 export async function addFirecallPosition(
   firecallId: string,
-  newPos: L.LatLng,
+  newPos: GeoPositionObject,
   fcItem: Connection,
   index: number
 ) {

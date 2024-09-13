@@ -1,7 +1,7 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
-import { elIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallEinsatzleitung extends FirecallItemBase {
@@ -56,7 +56,7 @@ export class FirecallEinsatzleitung extends FirecallItemBase {
     return `ELung ${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): Icon<IconOptions> {
-    return elIcon;
+    return leafletIcons().el;
   }
 
   public static factory(): FirecallItemBase {

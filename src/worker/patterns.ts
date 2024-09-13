@@ -46,6 +46,13 @@ export const cachePatterns: RuntimeCaching[] = [
     }),
   },
   {
+    matcher: /https:\/\/tiles.lfrz.gv.at\/.*/i,
+    handler: new CacheFirst({
+      cacheName: 'wisa',
+      plugins: [oneDayCachePlugin],
+    }),
+  },
+  {
     matcher: /https:\/\/[a-z].tile.openstreetmap.org\/.*/i,
     handler: new CacheFirst({
       cacheName: 'osm',

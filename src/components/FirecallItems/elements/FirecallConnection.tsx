@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Icon, IconOptions } from 'leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { Connection, FirecallItem } from '../../firebase/firestore';
-import { circleIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import ConnectionMarker from './connection/ConnectionComponent';
 
@@ -109,7 +109,7 @@ export class FirecallConnection extends FirecallItemBase {
     return `${this.markerName()} ${this.name}`;
   }
   public icon(): Icon<IconOptions> {
-    return circleIcon;
+    return leafletIcons().circle;
   }
 
   public static factory(): FirecallItemBase {

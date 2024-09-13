@@ -8,7 +8,7 @@ import { formatTimestamp } from '../../../common/time-format';
 import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
 import { FirecallItem } from '../../firebase/firestore';
-import { fallbackIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
 import L from 'leaflet';
 
@@ -199,7 +199,7 @@ export class FirecallItemBase {
     return this.name;
   }
   public icon(): Icon<IconOptions> {
-    return fallbackIcon;
+    return leafletIcons().fallback;
   }
 
   public static factory(): FirecallItemBase {

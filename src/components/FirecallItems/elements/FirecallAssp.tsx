@@ -1,7 +1,7 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
-import { asspIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallAssp extends FirecallItemBase {
@@ -41,7 +41,7 @@ export class FirecallAssp extends FirecallItemBase {
     return `ASSP ${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): Icon<IconOptions> {
-    return asspIcon;
+    return leafletIcons().assp;
   }
 
   public static factory(): FirecallItemBase {
