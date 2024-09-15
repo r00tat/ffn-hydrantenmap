@@ -25,6 +25,7 @@ import FileUploader from '../inputs/FileUploader';
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
+import { Typography } from '@mui/material';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -106,6 +107,11 @@ export default function FirecallItemDialog({
                   ))}
               </Select>
             </FormControl>
+          )}
+          {item.lat && item.lng && (
+            <Typography style={{ paddingTop: 8, paddingBottom: 8 }}>
+              Position: {item.lat},{item.lng}
+            </Typography>
           )}
           {Object.entries(item.fields()).map(([key, label]) => (
             <React.Fragment key={key}>
@@ -242,7 +248,6 @@ export default function FirecallItemDialog({
                 )}
             </React.Fragment>
           ))}
-
           {item.type !== 'layer' && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
