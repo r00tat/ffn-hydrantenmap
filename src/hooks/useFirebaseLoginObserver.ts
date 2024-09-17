@@ -117,7 +117,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, []);
 
   useEffect(() => {
-    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 20);
+    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 50);
 
     return () => {
       clearInterval(clearServerInterval);
