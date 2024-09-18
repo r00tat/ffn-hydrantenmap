@@ -26,6 +26,7 @@ import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
 import { Typography } from '@mui/material';
+import { parseTimestamp } from '../../common/time-format';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -120,7 +121,7 @@ export default function FirecallItemDialog({
                   label={label}
                   value={
                     (((item as any)[key] as string) &&
-                      moment((item as any)[key] as string)) ||
+                      parseTimestamp((item as any)[key] as string)) ||
                     null
                   }
                   setValue={(newValue) => {
