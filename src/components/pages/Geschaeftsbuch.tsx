@@ -63,7 +63,7 @@ export function useGeschaeftsbuchEintraege() {
         }
         return a;
       })
-      .sort((a, b) => (a.nummer ?? 0) - (b.nummer ?? 0))
+      .sort((a, b) => (b.nummer ?? 0) - (a.nummer ?? 0))
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
@@ -158,16 +158,16 @@ async function downloadGb(eintraege: GbDisplay[]) {
     [
       'Nummer',
       'Datum',
+      'Ein/Aus',
       'Von',
       'An',
       'Art',
       'Information',
       'Anmerkung',
-      'erledigt',
     ],
     ...eintraege.map((d) => [
       d.nummer,
-      formatTimestamp(d.datum),
+      formatTimestamp(parseTimestamp(d.datum)?.toDate()),
       d.einaus,
       d.von,
       d.an,
