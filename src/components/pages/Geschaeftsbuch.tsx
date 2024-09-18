@@ -63,7 +63,7 @@ export function useGeschaeftsbuchEintraege() {
         }
         return a;
       })
-      .sort((a, b) => (a.nummer ?? 0) - (b.nummer ?? 0))
+      .sort((a, b) => (b.nummer ?? 0) - (a.nummer ?? 0))
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
