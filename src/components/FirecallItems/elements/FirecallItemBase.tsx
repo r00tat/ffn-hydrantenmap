@@ -215,13 +215,18 @@ export class FirecallItemBase {
   }
 
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
-    return (
-      <FirecallItemMarkerDefault
-        record={this}
-        selectItem={selectItem}
-        key={this.id}
-      />
-    );
+    try {
+      return (
+        <FirecallItemMarkerDefault
+          record={this}
+          selectItem={selectItem}
+          key={this.id}
+        />
+      );
+    } catch (err) {
+      console.error('failed to render marker', err, this.data());
+      return <></>;
+    }
   }
 
   public get<T = any>(key: string): T {

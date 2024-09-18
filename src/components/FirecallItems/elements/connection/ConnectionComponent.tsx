@@ -56,58 +56,60 @@ export default function ConnectionMarker({
 
   return (
     <>
-      {positions.map(
-        (p, index) =>
-          (record.alwaysShowMarker === 'true' ||
-            showMarkers ||
-            index === 0 ||
-            index === positions.length - 1) && (
-            <Marker
-              key={index}
-              position={p}
-              title={record.titleFn()}
-              icon={record.icon()}
-              draggable
-              autoPan={false}
-              eventHandlers={{
-                dragend: (event) => {
-                  updateFirecallPositions(
-                    firecallId,
-                    (event.target as L.Marker)?.getLatLng(),
-                    record.data(),
-                    index
-                  );
-                },
-              }}
-            >
-              <Popup>
-                <Tooltip title="Linie bearbeiten">
-                  <IconButton
-                    sx={{ marginLeft: 'auto', float: 'right' }}
-                    onClick={() => selectItem(record)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Punkt entfernen">
-                  <IconButton
-                    sx={{ marginLeft: 'auto', float: 'right' }}
-                    onClick={() =>
-                      deleteFirecallPosition(firecallId, record, index)
-                    }
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-                {record.popupFn()}
-                <br />
-                Punkt {index + 1} von {positions.length}
-              </Popup>
-            </Marker>
-          )
-      )}
+      {positions
+        .filter(([pLat, pLng]) => pLat && pLng)
+        .map(
+          (p, index) =>
+            (record.alwaysShowMarker === 'true' ||
+              showMarkers ||
+              index === 0 ||
+              index === positions.length - 1) && (
+              <Marker
+                key={index}
+                position={p}
+                title={record.titleFn()}
+                icon={record.icon()}
+                draggable
+                autoPan={false}
+                eventHandlers={{
+                  dragend: (event) => {
+                    updateFirecallPositions(
+                      firecallId,
+                      (event.target as L.Marker)?.getLatLng(),
+                      record.data(),
+                      index
+                    );
+                  },
+                }}
+              >
+                <Popup>
+                  <Tooltip title="Linie bearbeiten">
+                    <IconButton
+                      sx={{ marginLeft: 'auto', float: 'right' }}
+                      onClick={() => selectItem(record)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Punkt entfernen">
+                    <IconButton
+                      sx={{ marginLeft: 'auto', float: 'right' }}
+                      onClick={() =>
+                        deleteFirecallPosition(firecallId, record, index)
+                      }
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                  {record.popupFn()}
+                  <br />
+                  Punkt {index + 1} von {positions.length}
+                </Popup>
+              </Marker>
+            )
+        )}
       <Polyline
-        positions={positions}
+        positions={positions.filter(([pLat, pLng]) => pLat && pLng)}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,

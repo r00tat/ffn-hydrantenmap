@@ -129,9 +129,14 @@ export class FirecallConnection extends FirecallItemBase {
     );
   }
   public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
-    return (
-      <ConnectionMarker record={this} selectItem={selectItem} key={this.id} />
-    );
+    try {
+      return (
+        <ConnectionMarker record={this} selectItem={selectItem} key={this.id} />
+      );
+    } catch (err) {
+      console.error('failed to render marker', err, this.data());
+      return <></>;
+    }
   }
 
   public static isPolyline(): boolean {
