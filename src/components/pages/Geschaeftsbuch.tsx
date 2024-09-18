@@ -158,16 +158,16 @@ async function downloadGb(eintraege: GbDisplay[]) {
     [
       'Nummer',
       'Datum',
+      'Ein/Aus',
       'Von',
       'An',
       'Art',
       'Information',
       'Anmerkung',
-      'erledigt',
     ],
     ...eintraege.map((d) => [
       d.nummer,
-      formatTimestamp(d.datum),
+      formatTimestamp(parseTimestamp(d.datum)?.toDate()),
       d.einaus,
       d.von,
       d.an,
