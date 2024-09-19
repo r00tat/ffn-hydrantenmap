@@ -1,8 +1,9 @@
 'use server';
 
 import { UserRecordExtended } from '../../common/users';
-import { updateUser } from '../api/users/[uid]/route';
-import { listUsers } from '../api/users/route';
+import { updateUser } from '../api/users/[uid]/updateUser';
+import { listUsers } from '../api/users/listUsers';
+
 import { actionAdminRequired } from '../auth';
 
 export async function getUsers() {
