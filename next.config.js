@@ -13,6 +13,7 @@ module.exports = async (phase) => {
     /* config options here */
     // dest: 'public',
     // skipWaiting: true,
+    transpilePackages: ['mui-color-input'],
   };
 
   // add phase === PHASE_DEVELOPMENT_SERVER || for dev serwist

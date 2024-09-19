@@ -27,6 +27,7 @@ import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
 import { Typography } from '@mui/material';
 import { parseTimestamp } from '../../common/time-format';
+import { MuiColorInput } from 'mui-color-input';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -226,6 +227,22 @@ export default function FirecallItemDialog({
                     ))}
                 </>
               )}
+              {item.fieldTypes()[key] === 'color' && (
+                <>
+                  <MuiColorInput
+                    value={(item as any)[key] || '#0000ff'}
+                    fallbackValue="#0000ff"
+                    format="hex8"
+                    onChange={(newValue, colors) => setItemField(key, newValue)}
+                    isAlphaHidden={false}
+                    fullWidth
+                    id={key}
+                    key={key}
+                    label={label}
+                    style={{ marginTop: 12 }}
+                  />
+                </>
+              )}
               {!item.dateFields().includes(key) &&
                 ![
                   'boolean',
@@ -233,6 +250,7 @@ export default function FirecallItemDialog({
                   'TaktischesZeichen',
                   'attachment',
                   'select',
+                  'color',
                 ].includes(item.fieldTypes()[key]) && (
                   <TextField
                     margin="dense"
