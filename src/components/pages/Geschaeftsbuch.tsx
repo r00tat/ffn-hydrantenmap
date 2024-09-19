@@ -268,10 +268,22 @@ export default function Geschaeftsbuch({
                   {e.einaus} {e.von} -&gt; {e.an}
                 </Grid>
                 <Grid item xs={12} md={5} lg={3}>
-                  <b>{e.name}</b>
+                  <b>
+                    {e.name?.split(`\n`).map((line) => (
+                      <>
+                        {line}
+                        <br />
+                      </>
+                    ))}
+                  </b>
                 </Grid>
                 <Grid item xs={12} md={5} lg={3}>
-                  {e.beschreibung}
+                  {e.beschreibung?.split('\n').map((line) => (
+                    <>
+                      {line}
+                      <br />
+                    </>
+                  ))}
                 </Grid>
                 <Grid item xs={12} md={2} lg={1}>
                   <DiaryButtons diary={e}></DiaryButtons>
