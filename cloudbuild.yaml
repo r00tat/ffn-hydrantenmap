@@ -39,6 +39,7 @@ steps:
     args:
       - "-c"
       - |
+        set -eo pipefail
         source .version
         docker pull $_IMAGE:latest || echo "no latest image"
         docker pull $_IMAGE:$$VERSION_TAG || echo "no $$VERSION_TAG image"
@@ -59,6 +60,7 @@ steps:
       - "-c"
       - |
         # deploy to cloud run
+        set -eo pipefail
         source .version
         # only deploy on main branch and tags
         # if [[ "$BRANCH_NAME" == "main" || -n "$TAG_NAME" ]]; then
