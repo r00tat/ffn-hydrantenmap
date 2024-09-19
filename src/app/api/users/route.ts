@@ -5,7 +5,7 @@ import adminRequired from '../../../server/auth/adminRequired';
 import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 
-const listUsers = async (): Promise<UserRecordExtended[]> => {
+export const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
     await firebaseAdmin.auth().listUsers(1000)
   ).users.map((u) => u.toJSON() as UserRecordExtended);

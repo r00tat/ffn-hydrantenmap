@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { UserRecordExtended } from '../common/users';
 import useFirebaseLogin from './useFirebaseLogin';
+import { getUsers } from '../app/users/action';
 
 export default function useUserList(): [
   UserRecordExtended[],
@@ -11,15 +12,16 @@ export default function useUserList(): [
 
   const fetchUsers = useCallback(async () => {
     if (isSignedIn && user) {
-      const token = await user.getIdToken();
-      const response = await fetch('/api/users', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const usersResponse = await response.json();
+      // const token = await user.getIdToken();
+      // const response = await fetch('/api/users', {
+      //   headers: {
+      //     Authorization: `Bearer ${token}`,
+      //   },
+      // });
+      // const usersResponse = await response.json();
+      const usersResponse = await getUsers();
       // console.info(`users: ${JSON.stringify(usersResponse.users)}`);
-      setUsers(usersResponse?.users || []);
+      setUsers(usersResponse || []);
     }
   }, [isSignedIn, user]);
 
