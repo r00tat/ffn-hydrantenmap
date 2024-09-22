@@ -14,20 +14,18 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import { StorageReference } from 'firebase/storage';
-import moment from 'moment';
+import { MuiColorInput } from 'mui-color-input';
 import React, { useCallback, useState } from 'react';
+import { parseTimestamp } from '../../common/time-format';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { FirecallItem } from '../firebase/firestore';
+import { FirecallItem, NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
-import { Typography } from '@mui/material';
-import { parseTimestamp } from '../../common/time-format';
-import { MuiColorInput } from 'mui-color-input';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -110,10 +108,27 @@ export default function FirecallItemDialog({
               </Select>
             </FormControl>
           )}
-          {item.lat && item.lng && (
-            <Typography style={{ paddingTop: 8, paddingBottom: 8 }}>
-              Position: {item.lat},{item.lng}
-            </Typography>
+          {NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && item.id && (
+            <>
+              <TextField
+                margin="dense"
+                id="lat"
+                key="lat"
+                label={'Latitude'}
+                variant="standard"
+                onChange={onChange('lat')}
+                value={item.lat || ''}
+              />
+              <TextField
+                margin="dense"
+                id="lng"
+                key="lng"
+                label={'Longitutde'}
+                variant="standard"
+                onChange={onChange('lng')}
+                value={item.lng || ''}
+              />
+            </>
           )}
           {Object.entries(item.fields()).map(([key, label]) => (
             <React.Fragment key={key}>
@@ -267,7 +282,7 @@ export default function FirecallItemDialog({
                 )}
             </React.Fragment>
           ))}
-          {item.type !== 'layer' && (
+          {NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
               <Select

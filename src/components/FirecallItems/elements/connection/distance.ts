@@ -1,9 +1,9 @@
 import { latLngPosition, LatLngPosition } from '../../../../common/geo';
 import { toLatLng } from '../../../../hooks/leafletFunctions';
-import { Connection } from '../../../firebase/firestore';
+import { Connection, MultiPointItem } from '../../../firebase/firestore';
 
 export const getConnectionPositions = (
-  record: Connection
+  record: MultiPointItem
 ): LatLngPosition[] => {
   let p: LatLngPosition[] = [
     latLngPosition(record.lat, record.lng),

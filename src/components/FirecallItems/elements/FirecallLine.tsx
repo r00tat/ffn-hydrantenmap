@@ -1,14 +1,14 @@
 import React, { ReactNode } from 'react';
 import { LatLngPosition } from '../../../common/geo';
-import { Line } from '../../firebase/firestore';
-import { FirecallConnection } from './FirecallConnection';
+import { Connection, Line } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallMultiPoint } from './FirecallMultiPoint';
 
-export class FirecallLine extends FirecallConnection {
+export class FirecallLine extends FirecallMultiPoint {
   opacity?: number;
 
   public constructor(firecallItem?: Line) {
-    super(firecallItem);
+    super(firecallItem as unknown as Connection);
     this.type = 'line';
     if (firecallItem) {
       ({ opacity: this.opacity } = firecallItem);
@@ -42,8 +42,9 @@ export class FirecallLine extends FirecallConnection {
   public data(): Line {
     return {
       ...super.data(),
+      type: 'line',
       opacity: this.opacity,
-    };
+    } as unknown as Line;
   }
 
   public popupFn(): ReactNode {
