@@ -30,10 +30,12 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import Grid from '@mui/material/Grid';
+import React from 'react';
+import { randomUUID } from 'crypto';
 
-export function useDiaries() {
+export function useDiaries(sortAscending: boolean) {
   const firecallId = useFirecallId();
-
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
 
@@ -129,10 +131,10 @@ export function useDiaries() {
         }
         return a;
       })
-      .sort(
-        (a, b) =>
-          (a.nummer && b.nummer && (a.nummer ?? 0) - (b.nummer ?? 0)) ??
-          a.datum.localeCompare(b.datum)
+      .sort((a, b) =>
+        sortAscending
+          ? a.datum.localeCompare(b.datum)
+          : b.datum.localeCompare(a.datum)
       )
       .map((a) => ({
         ...a,
@@ -252,13 +254,15 @@ export function useGridColumns() {
 }
 
 export interface EinsatzTagebuchOptions {
-  boxHeight?: string;
+  showEditButton?: boolean;
+  sortAscending?: boolean;
 }
 export default function EinsatzTagebuch({
-  boxHeight = '1000px',
+  showEditButton = true,
+  sortAscending = false,
 }: EinsatzTagebuchOptions) {
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
-  const { diaries, diaryCounter } = useDiaries();
+  const { diaries, diaryCounter } = useDiaries(sortAscending);
   const columns = useGridColumns();
   const addEinsatzTagebuch = useFirecallItemAdd();
 
@@ -275,7 +279,7 @@ export default function EinsatzTagebuch({
   return (
     <>
       {columns && (
-        <Box sx={{ p: 2, m: 2, height: boxHeight }}>
+        <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
             Einsatz Tagebuch{' '}
             <DownloadButton
@@ -283,23 +287,79 @@ export default function EinsatzTagebuch({
               tooltip="Einsatz Tagebuch als CSV herunterladen"
             />
           </Typography>
-          <DataGrid
+          <Grid container>
+            <Grid item xs={3} md={2} lg={1}>
+              <b>Nummer</b>
+            </Grid>
+            <Grid item xs={6} md={5} lg={2}>
+              <b>Datum</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={2}>
+              <b>typ von -&gt; an</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={3}>
+              <b>Eintrag</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={3}>
+              <b>Beschreibung</b>
+            </Grid>
+            <Grid item xs={12} md={2} lg={1}></Grid>
+            {diaries.map((e) => (
+              <React.Fragment
+                key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
+              >
+                <Grid item xs={3} md={2} lg={1}>
+                  {e.nummer}
+                </Grid>
+                <Grid item xs={6} md={5} lg={2}>
+                  {e.datum}
+                </Grid>
+                <Grid item xs={12} md={5} lg={2}>
+                  {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
+                </Grid>
+                <Grid item xs={12} md={5} lg={3}>
+                  <b>
+                    {e.name?.split(`\n`).map((line, index) => (
+                      <React.Fragment key={`title-${e.id}-${index}`}>
+                        {line}
+                        <br />
+                      </React.Fragment>
+                    ))}
+                  </b>
+                </Grid>
+                <Grid item xs={12} md={5} lg={3}>
+                  {e.beschreibung?.split('\n').map((line, index) => (
+                    <React.Fragment key={`beschreibung-${e.id}-${index}`}>
+                      {line}
+                      <br />
+                    </React.Fragment>
+                  ))}
+                </Grid>
+                <Grid item xs={12} md={2} lg={1}>
+                  {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
+                </Grid>
+              </React.Fragment>
+            ))}
+          </Grid>
+          {/* <DataGrid
             rows={diaries}
             columns={columns}
             getRowId={(row) => row.id}
             autoHeight
-          />
+          /> */}
         </Box>
       )}
 
-      <Fab
-        color="primary"
-        aria-label="add"
-        sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => setTagebuchDialogIsOpen(true)}
-      >
-        <AddIcon />
-      </Fab>
+      {showEditButton && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setTagebuchDialogIsOpen(true)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
 
       {tagebuchDialogIsOpen && (
         <FirecallItemDialog
