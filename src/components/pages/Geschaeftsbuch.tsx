@@ -38,7 +38,7 @@ interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
 }
 
-export function useGeschaeftsbuchEintraege() {
+export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
   const firecallId = useFirecallId();
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
@@ -63,7 +63,11 @@ export function useGeschaeftsbuchEintraege() {
         }
         return a;
       })
-      .sort((a, b) => (b.nummer ?? 0) - (a.nummer ?? 0))
+      .sort((a, b) =>
+        sortAscending
+          ? a.datum.localeCompare(b.datum)
+          : b.datum.localeCompare(a.datum)
+      )
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
@@ -206,13 +210,15 @@ function GeschaeftsbuchAdd() {
 }
 
 export interface GeschaeftsbuchOptions {
-  boxHeight?: string;
+  showEditButton?: boolean;
+  sortAscending?: boolean;
 }
 export default function Geschaeftsbuch({
-  boxHeight = '1000px',
+  showEditButton = true,
+  sortAscending = false,
 }: GeschaeftsbuchOptions) {
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
-  const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege();
+  const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
   const columns = useGridColumns();
   const addFirecallGb = useFirecallItemAdd();
 
@@ -229,7 +235,7 @@ export default function Geschaeftsbuch({
   return (
     <>
       {columns && (
-        <Box sx={{ p: 2, m: 2, height: boxHeight }}>
+        <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
             Geschäftsbuch{' '}
             <DownloadButton
@@ -269,24 +275,24 @@ export default function Geschaeftsbuch({
                 </Grid>
                 <Grid item xs={12} md={5} lg={3}>
                   <b>
-                    {e.name?.split(`\n`).map((line) => (
-                      <>
+                    {e.name?.split(`\n`).map((line, index) => (
+                      <React.Fragment key={`title-${e.id}-${index}`}>
                         {line}
                         <br />
-                      </>
+                      </React.Fragment>
                     ))}
                   </b>
                 </Grid>
                 <Grid item xs={12} md={5} lg={3}>
-                  {e.beschreibung?.split('\n').map((line) => (
-                    <>
+                  {e.beschreibung?.split('\n').map((line, index) => (
+                    <React.Fragment key={`beschreibung-${e.id}-${index}`}>
                       {line}
                       <br />
-                    </>
+                    </React.Fragment>
                   ))}
                 </Grid>
                 <Grid item xs={12} md={2} lg={1}>
-                  <DiaryButtons diary={e}></DiaryButtons>
+                  {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
                 </Grid>
               </React.Fragment>
             ))}
@@ -299,14 +305,16 @@ export default function Geschaeftsbuch({
         </Box>
       )}
 
-      <Fab
-        color="primary"
-        aria-label="add"
-        sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => setDialogIsOpen(true)}
-      >
-        <AddIcon />
-      </Fab>
+      {showEditButton && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setDialogIsOpen(true)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
 
       {dialogIsOpen && (
         <FirecallItemDialog

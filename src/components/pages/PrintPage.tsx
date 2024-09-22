@@ -1,8 +1,8 @@
 import Grid from '@mui/material/Grid';
 import DynamicMap from '../Map/PositionedMap';
-import EinsatzTagebuch from '../pages/EinsatzTagebuchPrint';
+import EinsatzTagebuch from '../pages/EinsatzTagebuch';
 import DynamicFahrzeuge from '../pages/FahrzeugePrint';
-import Geschaeftsbuch from '../pages/GeschaeftsbuchPrint';
+import Geschaeftsbuch from '../pages/Geschaeftsbuch';
 
 export default function PrintPage() {
   return (
@@ -18,9 +18,12 @@ export default function PrintPage() {
           &nbsp;
         </Grid>
       </Grid>
+      <hr></hr>
       <DynamicFahrzeuge />
-      <EinsatzTagebuch />
-      <Geschaeftsbuch />
+      <hr></hr>
+      <EinsatzTagebuch showEditButton={false} sortAscending />
+      <hr></hr>
+      <Geschaeftsbuch showEditButton={false} sortAscending />
     </>
   );
 }
