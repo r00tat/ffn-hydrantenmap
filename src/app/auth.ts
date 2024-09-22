@@ -40,7 +40,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials: any) => {
         // console.info(`running auth.js authorize`);
         const tokenInfo = await checkFirebaseToken(credentials.firebaseToken);
-        console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
+        // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
         return {
           // not displayed, using image as workaround
           id: tokenInfo.sub,
