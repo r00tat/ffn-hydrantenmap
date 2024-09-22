@@ -9,7 +9,7 @@ import { Marker, Polyline, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
-import { FirecallItem } from '../../../firebase/firestore';
+import { Connection, FirecallItem } from '../../../firebase/firestore';
 import { FirecallConnection } from '../FirecallConnection';
 import {
   addFirecallPosition,
@@ -95,7 +95,11 @@ export default function ConnectionMarker({
                     <IconButton
                       sx={{ marginLeft: 'auto', float: 'right' }}
                       onClick={() =>
-                        deleteFirecallPosition(firecallId, record, index)
+                        deleteFirecallPosition(
+                          firecallId,
+                          record as Connection,
+                          index
+                        )
                       }
                     >
                       <DeleteIcon />
@@ -136,7 +140,12 @@ export default function ConnectionMarker({
                 color="primary"
                 aria-label="add a point on the line"
                 onClick={() =>
-                  addFirecallPosition(firecallId, point, record, pointIndex)
+                  addFirecallPosition(
+                    firecallId,
+                    point,
+                    record as Connection,
+                    pointIndex
+                  )
                 }
               >
                 <AddIcon />

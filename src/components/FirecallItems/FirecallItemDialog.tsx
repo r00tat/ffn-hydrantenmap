@@ -18,7 +18,7 @@ import moment from 'moment';
 import React, { useCallback, useState } from 'react';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { FirecallItem } from '../firebase/firestore';
+import { FirecallItem, NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
@@ -267,7 +267,7 @@ export default function FirecallItemDialog({
                 )}
             </React.Fragment>
           ))}
-          {item.type !== 'layer' && (
+          {NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
               <Select

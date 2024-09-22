@@ -3,13 +3,13 @@ import L from 'leaflet';
 import GeometryUtil from 'leaflet-geometryutil';
 import { GeoPositionObject, LatLngPosition } from '../../../../common/geo';
 import { firestore } from '../../../firebase/firebase';
-import { Connection } from '../../../firebase/firestore';
+import { Connection, MultiPointItem } from '../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from './distance';
 
 export async function updateFirecallPositions(
   firecallId: string,
   newPos: GeoPositionObject,
-  fcItem: Connection,
+  fcItem: MultiPointItem,
   index: number
 ) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
@@ -22,7 +22,7 @@ export async function updateFirecallPositions(
 export async function addFirecallPosition(
   firecallId: string,
   newPos: GeoPositionObject,
-  fcItem: Connection,
+  fcItem: MultiPointItem,
   index: number
 ) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
@@ -35,7 +35,7 @@ export async function addFirecallPosition(
 
 export async function deleteFirecallPosition(
   firecallId: string,
-  fcItem: Connection,
+  fcItem: MultiPointItem,
   index: number
 ) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
@@ -71,7 +71,7 @@ export function findSectionOnPolyline(
 
 const updateConnectionInFirestore = async (
   firecallId: string,
-  fcItem: Connection,
+  fcItem: MultiPointItem,
   positions: LatLngPosition[]
 ) => {
   if (fcItem.id)

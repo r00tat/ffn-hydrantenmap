@@ -94,6 +94,7 @@ export class FirecallArea extends FirecallItemBase {
       ...super.fieldTypes(),
       opacity: 'number',
       alwaysShowMarker: 'boolean',
+      color: 'color',
     };
   }
   public popupFn(): ReactNode {

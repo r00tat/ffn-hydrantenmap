@@ -82,6 +82,7 @@ export class CircleMarker extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       fill: 'boolean',
+      color: 'color',
     };
   }
   public popupFn(): ReactNode {
