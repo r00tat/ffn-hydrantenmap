@@ -8,7 +8,7 @@ import Fab from '@mui/material/Fab';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { GridColDef } from '@mui/x-data-grid';
 import { where } from 'firebase/firestore';
 import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
@@ -28,6 +28,8 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 
+import Grid from '@mui/material/Grid';
+import React from 'react';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
@@ -36,7 +38,7 @@ interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
 }
 
-export function useGeschaeftsbuchEintraege() {
+export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
   const firecallId = useFirecallId();
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
@@ -61,7 +63,11 @@ export function useGeschaeftsbuchEintraege() {
         }
         return a;
       })
-      .sort((a, b) => (a.nummer ?? 0) - (b.nummer ?? 0))
+      .sort((a, b) =>
+        sortAscending
+          ? a.datum.localeCompare(b.datum)
+          : b.datum.localeCompare(a.datum)
+      )
       .map((a) => ({
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
@@ -156,16 +162,16 @@ async function downloadGb(eintraege: GbDisplay[]) {
     [
       'Nummer',
       'Datum',
+      'Ein/Aus',
       'Von',
       'An',
       'Art',
       'Information',
       'Anmerkung',
-      'erledigt',
     ],
     ...eintraege.map((d) => [
       d.nummer,
-      formatTimestamp(d.datum),
+      formatTimestamp(parseTimestamp(d.datum)?.toDate()),
       d.einaus,
       d.von,
       d.an,
@@ -178,14 +184,41 @@ async function downloadGb(eintraege: GbDisplay[]) {
   downloadRowsAsCsv(rows, 'Geschaeftsbuch.csv');
 }
 
+function GeschaeftsbuchAdd() {
+  // TODO
+  return (
+    <>
+      <Grid container>
+        <Grid item xs={3} lg={1}>
+          <b>Nummer</b>
+        </Grid>
+        <Grid item xs={6} lg={2}>
+          <b>Datum</b>
+        </Grid>
+        <Grid item xs={12} lg={2}>
+          <b>von -&gt; an</b>
+        </Grid>
+        <Grid item xs={12} lg={3}>
+          <b>Name</b>
+        </Grid>
+        <Grid item xs={12} lg={3}>
+          <b>Beschreibung</b>
+        </Grid>
+      </Grid>
+    </>
+  );
+}
+
 export interface GeschaeftsbuchOptions {
-  boxHeight?: string;
+  showEditButton?: boolean;
+  sortAscending?: boolean;
 }
 export default function Geschaeftsbuch({
-  boxHeight = '1000px',
+  showEditButton = true,
+  sortAscending = false,
 }: GeschaeftsbuchOptions) {
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
-  const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege();
+  const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
   const columns = useGridColumns();
   const addFirecallGb = useFirecallItemAdd();
 
@@ -202,7 +235,7 @@ export default function Geschaeftsbuch({
   return (
     <>
       {columns && (
-        <Box sx={{ p: 2, m: 2, height: boxHeight }}>
+        <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
             Geschäftsbuch{' '}
             <DownloadButton
@@ -210,22 +243,78 @@ export default function Geschaeftsbuch({
               tooltip="Geschäftsbuch als CSV herunterladen"
             />
           </Typography>
-          <DataGrid
+          {/* <GeschaeftsbuchAdd /> */}
+
+          <Grid container>
+            <Grid item xs={3} md={2} lg={1}>
+              <b>Nummer</b>
+            </Grid>
+            <Grid item xs={6} md={5} lg={2}>
+              <b>Datum</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={2}>
+              <b>von -&gt; an</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={3}>
+              <b>Name</b>
+            </Grid>
+            <Grid item xs={12} md={5} lg={3}>
+              <b>Beschreibung</b>
+            </Grid>
+            <Grid item xs={12} md={2} lg={1}></Grid>
+            {eintraege.map((e) => (
+              <React.Fragment key={'gb-' + e.id}>
+                <Grid item xs={3} md={2} lg={1}>
+                  {e.nummer}
+                </Grid>
+                <Grid item xs={6} md={5} lg={2}>
+                  {e.datum}
+                </Grid>
+                <Grid item xs={12} md={5} lg={2}>
+                  {e.einaus} {e.von} -&gt; {e.an}
+                </Grid>
+                <Grid item xs={12} md={5} lg={3}>
+                  <b>
+                    {e.name?.split(`\n`).map((line, index) => (
+                      <React.Fragment key={`title-${e.id}-${index}`}>
+                        {line}
+                        <br />
+                      </React.Fragment>
+                    ))}
+                  </b>
+                </Grid>
+                <Grid item xs={12} md={5} lg={3}>
+                  {e.beschreibung?.split('\n').map((line, index) => (
+                    <React.Fragment key={`beschreibung-${e.id}-${index}`}>
+                      {line}
+                      <br />
+                    </React.Fragment>
+                  ))}
+                </Grid>
+                <Grid item xs={12} md={2} lg={1}>
+                  {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
+                </Grid>
+              </React.Fragment>
+            ))}
+          </Grid>
+          {/* <DataGrid
             rows={eintraege}
             columns={columns}
             getRowId={(row) => row.id}
-          />
+          /> */}
         </Box>
       )}
 
-      <Fab
-        color="primary"
-        aria-label="add"
-        sx={{ position: 'fixed', bottom: 16, right: 16 }}
-        onClick={() => setDialogIsOpen(true)}
-      >
-        <AddIcon />
-      </Fab>
+      {showEditButton && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setDialogIsOpen(true)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
 
       {dialogIsOpen && (
         <FirecallItemDialog

@@ -10,6 +10,7 @@ export interface TileConfig {
   url: string;
   options: TileOptions;
   description?: string;
+  type?: 'WMTS' | 'WMS';
 }
 
 export interface TileConfigs {
@@ -65,6 +66,23 @@ export const availableLayers: TileConfigs = {
     },
   },
 
+  basemap_grey: {
+    name: 'Basemap grau',
+    url: 'https://maps{s}.wien.gv.at/basemap/bmapgrau/normal/google3857/{z}/{y}/{x}.png',
+    options: {
+      maxZoom: 19,
+      attribution:
+        'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
+      subdomains: ['neu'],
+      type: 'normal',
+      format: 'png',
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+
   openstreetmap: {
     name: 'Openstreetmap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -88,6 +106,96 @@ export const overlayLayers: TileConfigs = {
       subdomains: ['neu'],
       type: 'normal',
       format: 'png',
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+
+  oberflaechenwasser: {
+    name: 'Hochwasser Oberflächenwasser',
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=ofa_maxd&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1876070.7619702,6099063.7000818,1877293.7544226,6100286.6925342&WIDTH=512&HEIGHT=512
+    url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
+    type: 'WMS',
+    options: {
+      maxZoom: 19,
+      attribution:
+        '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
+      subdomains: ['neu'],
+      type: 'normal',
+      format: 'image/png',
+      layers: 'ofa_maxd',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+  riskareas: {
+    name: 'Hochwasser Risikogebiete',
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_risikobewertung&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1876070.7619702,6099063.7000818,1877293.7544226,6100286.6925342&WIDTH=512&HEIGHT=512
+    url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
+    type: 'WMS',
+    options: {
+      maxZoom: 19,
+      attribution:
+        '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
+      subdomains: ['neu'],
+      type: 'normal',
+      format: 'image/png',
+      layers: 'hwrisiko_risikobewertung',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+  floodarea: {
+    name: 'Hochwasser Überflutungsgebiete',
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_gefahren_ueff&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_vgd&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_apsfr&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
+    type: 'WMS',
+    options: {
+      maxZoom: 19,
+      attribution:
+        '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
+      subdomains: ['neu'],
+      type: 'normal',
+      format: 'image/png',
+      layers: 'hwrisiko_gefahren_ueff',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.35877, 8.782379],
+        [49.037872, 17.189532],
+      ],
+    },
+  },
+
+  floodarea_river: {
+    name: 'Hochwasser Überflutung Flüsse',
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_gefahren_ueff&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_vgd&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=hwrisiko_apsfr&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1877293.7544226,6097840.7076294,1878516.746875,6099063.7000818&WIDTH=512&HEIGHT=512
+    url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
+    type: 'WMS',
+    options: {
+      maxZoom: 19,
+      attribution:
+        '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
+      subdomains: ['neu'],
+      type: 'normal',
+      format: 'image/png',
+      layers: 'hwrisiko_apsfr',
+      transparent: true,
+      uppercase: true,
       bounds: [
         [46.35877, 8.782379],
         [49.037872, 17.189532],

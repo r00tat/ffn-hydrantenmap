@@ -1,16 +1,18 @@
-import AddIcon from "@mui/icons-material/Add";
-import Box from "@mui/material/Box";
-import Fab from "@mui/material/Fab";
-import L from "leaflet";
-import React, { useCallback, useState } from "react";
-import { useMapEvent } from "react-leaflet";
-import useFirecallItemAdd from "../../hooks/useFirecallItemAdd";
-import FirecallItemDialog from "../FirecallItems/FirecallItemDialog";
-import { fcItemClasses, getItemInstance } from "../FirecallItems/elements";
-import { Connection, FirecallItem } from "../firebase/firestore";
-import { useLeitungen } from "./Leitungen/context";
-import RecordButton from "./RecordButton";
-import SearchButton from "./SearchButton";
+'use client';
+
+import AddIcon from '@mui/icons-material/Add';
+import Box from '@mui/material/Box';
+import Fab from '@mui/material/Fab';
+import L from 'leaflet';
+import React, { useCallback, useState } from 'react';
+import { useMapEvent } from 'react-leaflet';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
+import { fcItemClasses, getItemInstance } from '../FirecallItems/elements';
+import { Connection, FirecallItem } from '../firebase/firestore';
+import { useLeitungen } from './Leitungen/context';
+import RecordButton from './RecordButton';
+import SearchButton from './SearchButton';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -38,7 +40,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     [addFirecallItem, map]
   );
 
-  useMapEvent("mousemove", (e) => {
+  useMapEvent('mousemove', (e) => {
     if (fzgDrawing) {
       // console.info(`moving marker to ${e.latlng.lat}, ${e.latlng.lng}`);
       setFzgDrawing({
@@ -49,7 +51,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     }
   });
 
-  useMapEvent("click", (e) => {
+  useMapEvent('click', (e) => {
     if (fzgDrawing) {
       console.info(`dropping marker to ${e.latlng.lat}, ${e.latlng.lng}`);
 
@@ -66,7 +68,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setFzgDialogIsOpen(false);
-      if (fcItemClasses[fzg?.type || ""]?.isPolyline()) {
+      if (fcItemClasses[fzg?.type || '']?.isPolyline()) {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
       } else {
@@ -96,7 +98,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       <Box
         sx={{
           // '& > :not(style)': { m: 1 },
-          position: "absolute",
+          position: 'absolute',
           bottom: 24,
           right: 16,
         }}

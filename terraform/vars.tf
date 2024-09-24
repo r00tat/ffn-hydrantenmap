@@ -31,3 +31,8 @@ variable "name" {
   type        = string
   default     = "hydrantenmap"
 }
+
+variable "github_org" {
+  description = "Github Organization"
+  type        = string
+}

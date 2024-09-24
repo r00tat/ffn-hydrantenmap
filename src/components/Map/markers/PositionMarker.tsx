@@ -19,7 +19,13 @@ export default function PositionMarker() {
     <>
       {gotPosition && (
         <Marker position={position} key={position.toString()}>
-          <Popup>aktuelle Position</Popup>
+          <Popup>
+            aktuelle Position
+            <br />
+            {Number.parseFloat('' + position.lat).toFixed(6)},
+            {Number.parseFloat('' + position.lng).toFixed(6)}
+            {position.alt && ` ${Math.round(position.alt)}m`}
+          </Popup>
         </Marker>
       )}
     </>

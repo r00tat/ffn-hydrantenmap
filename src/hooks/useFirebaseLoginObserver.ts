@@ -63,6 +63,14 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     }
   }, [loginStatus.isSignedIn, loginStatus.uid]);
 
+  const serverLogin = useCallback(async () => {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) {
+      const loginResult = await firebaseTokenLogin(token);
+      console.info(`server side login result: `, loginResult);
+    }
+  }, []);
+
   // Listen to the Firebase Auth state and set the local state.
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
@@ -72,8 +80,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
         const token = await user?.getIdToken();
         if (token) {
-          const loginResult = await firebaseTokenLogin(token);
-          console.info(`server side login result: `, loginResult);
+          await serverLogin();
         }
 
         const tokenResult = await user?.getIdTokenResult();
@@ -103,7 +110,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       }
     );
     return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
-  }, []);
+  }, [serverLogin]);
 
   useEffect(() => {
     refresh();
@@ -122,6 +129,14 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 50);
+
+    return () => {
+      clearInterval(clearServerInterval);
+    };
+  });
 
   const fbSignOut = useCallback(async () => {
     console.info(`authjs client logout`);

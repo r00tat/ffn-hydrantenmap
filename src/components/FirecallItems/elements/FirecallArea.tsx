@@ -2,7 +2,7 @@ import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import { Area, FirecallItem } from '../../firebase/firestore';
-import { circleIcon } from '../icons';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import AreaMarker from './area/AreaComponent';
 
@@ -94,6 +94,7 @@ export class FirecallArea extends FirecallItemBase {
       ...super.fieldTypes(),
       opacity: 'number',
       alwaysShowMarker: 'boolean',
+      color: 'color',
     };
   }
   public popupFn(): ReactNode {
@@ -107,7 +108,7 @@ export class FirecallArea extends FirecallItemBase {
     return `${this.markerName()} ${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): Icon<IconOptions> {
-    return circleIcon;
+    return leafletIcons().circle;
   }
 
   public static factory(): FirecallItemBase {

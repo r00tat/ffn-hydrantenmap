@@ -34,7 +34,8 @@ function useUnwetterSheetData() {
 
 const statusColors: { [key: string]: string } = {
   erledigt: 'green',
-  'in arbeit': 'blue',
+  'kein einsatz': 'green',
+  'in arbeit': 'orange',
   offen: 'yellow',
   'einsatz notwendig': 'red',
 };

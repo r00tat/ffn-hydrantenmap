@@ -60,6 +60,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       ...super.fieldTypes(),
       zeichen: 'TaktischesZeichen',
       attachments: 'attachment',
+      color: 'color',
     };
   }
   public popupFn(): ReactNode {
@@ -88,6 +89,10 @@ export class FirecallItemMarker extends FirecallItemBase {
                 showTitleIfImage={false}
               />
             ))}
+        <br />
+        Position: {Number.parseFloat('' + this.lat).toFixed(6)},
+        {Number.parseFloat('' + this.lng).toFixed(6)}
+        {this.alt && ` ${Math.round(this.alt)}m`}
       </>
     );
   }

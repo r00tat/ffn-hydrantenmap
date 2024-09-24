@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import useFirecall from '../../../hooks/useFirecall';
 import {
@@ -13,6 +13,18 @@ import { where } from 'firebase/firestore';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
+}
+
+function renderMarker(
+  record: FirecallItem,
+  setFirecallItem: (item: FirecallItem) => void
+) {
+  try {
+    return getItemInstance(record).renderMarker(setFirecallItem);
+  } catch (err) {
+    console.error('Failed to render item ', record, err);
+  }
+  return <></>;
 }
 
 export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
@@ -43,7 +55,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
       {records.map(
         (record) => (
           <React.Fragment key={record.id}>
-            {getItemInstance(record).renderMarker(setFirecallItem)}
+            <>{renderMarker(record, setFirecallItem)}</>
           </React.Fragment>
         )
         // <FirecallItemMarker

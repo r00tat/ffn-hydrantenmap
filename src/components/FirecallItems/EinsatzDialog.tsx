@@ -14,11 +14,13 @@ import { firestore } from '../firebase/firebase';
 import { Firecall } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import moment from 'moment';
+import { GeoPositionObject } from '../../common/geo';
+import { parseTimestamp } from '../../common/time-format';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
   einsatz?: Firecall;
-  position?: L.LatLng;
+  position?: GeoPositionObject;
 }
 
 export default function EinsatzDialog({
@@ -103,7 +105,7 @@ export default function EinsatzDialog({
         />
         <MyDateTimePicker
           label="Einsatzdatum"
-          value={moment(einsatz.date)}
+          value={parseTimestamp(einsatz.date) || null}
           setValue={(newValue) => {
             setEinsatz({ ...einsatz, date: newValue?.toISOString() });
           }}
@@ -119,35 +121,26 @@ export default function EinsatzDialog({
           value={einsatz.description}
         />
 
-        <TextField
-          margin="dense"
-          id="alarmierung"
+        <MyDateTimePicker
           label="Alarmierung"
-          type="datetime"
-          fullWidth
-          variant="standard"
-          onChange={onChange('alarmierung')}
-          value={einsatz.alarmierung}
+          value={parseTimestamp(einsatz.alarmierung) || null}
+          setValue={(newValue) => {
+            setEinsatz({ ...einsatz, alarmierung: newValue?.toISOString() });
+          }}
         />
-        <TextField
-          margin="dense"
-          id="eintreffen"
+        <MyDateTimePicker
           label="Eintreffen"
-          type="datetime"
-          fullWidth
-          variant="standard"
-          onChange={onChange('eintreffen')}
-          value={einsatz.eintreffen}
+          setValue={(newValue) => {
+            setEinsatz({ ...einsatz, eintreffen: newValue?.toISOString() });
+          }}
+          value={parseTimestamp(einsatz.eintreffen) || null}
         />
-        <TextField
-          margin="dense"
-          id="abruecken"
+        <MyDateTimePicker
           label="Abrücken"
-          type="datetime"
-          fullWidth
-          variant="standard"
-          onChange={onChange('abruecken')}
-          value={einsatz.abruecken}
+          setValue={(newValue) => {
+            setEinsatz({ ...einsatz, abruecken: newValue?.toISOString() });
+          }}
+          value={parseTimestamp(einsatz.abruecken) || null}
         />
 
         <TextField

@@ -1,8 +1,8 @@
 import type { NextPage } from 'next';
-import EinsatzTagebuch from '../../components/pages/EinsatzTagebuch';
+import EinsatzTagebuch from '../../components/pages/EinsatzTagebuchWrapper';
 
-const Home: NextPage = () => {
+const EinsatzTagebuchPage: NextPage = () => {
   return <EinsatzTagebuch />;
 };
 
-export default Home;
+export default EinsatzTagebuchPage;

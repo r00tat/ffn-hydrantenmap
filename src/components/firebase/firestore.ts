@@ -26,6 +26,8 @@ export interface FirecallItem {
   eventHandlers?: L.LeafletEventHandlerFnMap;
 }
 
+export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer'];
+
 export interface FirecallLayer extends FirecallItem {
   grouped?: string;
 }
@@ -80,7 +82,7 @@ export interface GeschaeftsbuchEintrag extends FirecallItem {
   an?: string;
 }
 
-export interface Connection extends FirecallItem {
+export interface MultiPointItem extends FirecallItem {
   destLat: number;
   destLng: number;
   /** stringified LatLngPosition[] */
@@ -90,16 +92,23 @@ export interface Connection extends FirecallItem {
   alwaysShowMarker?: string;
 }
 
-export interface Area extends Connection {
+export interface Connection extends MultiPointItem {
+  type: 'connection';
+}
+
+export interface Area extends MultiPointItem {
+  type: 'area';
   opacity?: number;
   alwaysShowMarker?: string;
 }
 
-export interface Line extends Connection {
+export interface Line extends MultiPointItem {
+  type: 'line';
   opacity?: number;
 }
 
 export interface Circle extends FirecallItem {
+  type: 'circle';
   radius: number;
   color?: string;
   opacity?: number;
@@ -110,7 +119,7 @@ export const filterActiveItems = (g: FirecallItem | Firecall) =>
   g.deleted !== true;
 
 export const filterDisplayableItems = (g: FirecallItem) => {
-  return g.deleted !== true && ['diary', 'gb'].indexOf(g.type) < 0;
+  return g.deleted !== true && NON_DISPLAYABLE_ITEMS.indexOf(g.type) < 0;
 };
 
 export interface Firecall {

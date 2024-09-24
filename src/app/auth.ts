@@ -40,7 +40,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials: any) => {
         // console.info(`running auth.js authorize`);
         const tokenInfo = await checkFirebaseToken(credentials.firebaseToken);
-        return tokenInfo;
+        // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
+        return {
+          // not displayed, using image as workaround
+          id: tokenInfo.sub,
+          // image: tokenInfo.picture,
+          image: tokenInfo.sub,
+          email: tokenInfo.email,
+          name: tokenInfo.name,
+        };
       },
     }),
   ],
@@ -86,4 +94,27 @@ export async function checkAuth() {
   if (!session?.user) {
     throw new ApiException('User not authorized', { status: 403 });
   }
+  return session;
+}
+
+export async function actionUserRequired() {
+  return checkAuth();
+}
+
+export async function actionAdminRequired() {
+  const session = await actionUserRequired();
+  // console.info(`session: ${JSON.stringify(session)}`);
+
+  if (!session.user?.image) {
+    throw new ApiException('User not authorized, no id set', { status: 403 });
+  }
+  const userDoc = await firestore
+    .collection('user')
+    .doc(session.user?.image)
+    .get();
+  if (!userDoc.data()?.isAdmin) {
+    throw new ApiException('Admin require, not authorized', { status: 403 });
+  }
+
+  return session;
 }

@@ -1,10 +1,8 @@
 'use server';
 
-import { auth, checkAuth } from '../../../app/auth';
-import { defaultGeoPosition } from '../../../common/geo';
-import { getSpreadsheetData } from '../../../server/spreadsheet';
-import { searchPlace } from '../../actions/maps/places';
 import { unstable_cache } from 'next/cache';
+import { auth } from '../../../app/auth';
+import { getSpreadsheetData } from '../../../server/spreadsheet';
 
 export interface UnwetterData {
   id: string;

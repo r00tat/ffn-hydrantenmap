@@ -1,7 +1,7 @@
 import { LatLng, LeafletMouseEvent, LeafletMouseEventHandlerFn } from 'leaflet';
 import { useCallback, useState } from 'react';
 import { Marker, Polyline, useMap, useMapEvent } from 'react-leaflet';
-import { circleIcon } from '../../FirecallItems/icons';
+import { leafletIcons } from '../../FirecallItems/icons';
 import { useLeitungen } from './context';
 
 // const itemInfo = firecallItemInfo('marker');
@@ -34,7 +34,7 @@ const LeitungenDraw = () => {
           key={p.toString()}
           position={p}
           title={`p ${p}`}
-          icon={circleIcon}
+          icon={leafletIcons().circle}
           draggable
           autoPan={false}
           eventHandlers={{

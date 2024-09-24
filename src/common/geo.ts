@@ -1,6 +1,7 @@
 export interface GeoPositionObject {
   lat: number;
   lng: number;
+  alt?: number;
 }
 
 export type LatLngPosition = [number, number];

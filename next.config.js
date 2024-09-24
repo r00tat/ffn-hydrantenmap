@@ -13,9 +13,11 @@ module.exports = async (phase) => {
     /* config options here */
     // dest: 'public',
     // skipWaiting: true,
+    transpilePackages: ['mui-color-input'],
   };
 
-  if (phase === PHASE_DEVELOPMENT_SERVER || phase === PHASE_PRODUCTION_BUILD) {
+  // add phase === PHASE_DEVELOPMENT_SERVER || for dev serwist
+  if (phase === PHASE_PRODUCTION_BUILD) {
     const withSerwist = (await import('@serwist/next')).default({
       // Note: This is only an example. If you use Pages Router,
       // use something else that works, such as "service-worker/index.ts".

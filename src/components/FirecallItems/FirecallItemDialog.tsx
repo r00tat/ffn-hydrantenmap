@@ -14,11 +14,12 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import { StorageReference } from 'firebase/storage';
-import moment from 'moment';
+import { MuiColorInput } from 'mui-color-input';
 import React, { useCallback, useState } from 'react';
+import { parseTimestamp } from '../../common/time-format';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { FirecallItem } from '../firebase/firestore';
+import { FirecallItem, NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
@@ -107,6 +108,28 @@ export default function FirecallItemDialog({
               </Select>
             </FormControl>
           )}
+          {NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && item.id && (
+            <>
+              <TextField
+                margin="dense"
+                id="lat"
+                key="lat"
+                label={'Latitude'}
+                variant="standard"
+                onChange={onChange('lat')}
+                value={item.lat || ''}
+              />
+              <TextField
+                margin="dense"
+                id="lng"
+                key="lng"
+                label={'Longitutde'}
+                variant="standard"
+                onChange={onChange('lng')}
+                value={item.lng || ''}
+              />
+            </>
+          )}
           {Object.entries(item.fields()).map(([key, label]) => (
             <React.Fragment key={key}>
               {item.dateFields().includes(key) && (
@@ -114,7 +137,7 @@ export default function FirecallItemDialog({
                   label={label}
                   value={
                     (((item as any)[key] as string) &&
-                      moment((item as any)[key] as string)) ||
+                      parseTimestamp((item as any)[key] as string)) ||
                     null
                   }
                   setValue={(newValue) => {
@@ -219,6 +242,22 @@ export default function FirecallItemDialog({
                     ))}
                 </>
               )}
+              {item.fieldTypes()[key] === 'color' && (
+                <>
+                  <MuiColorInput
+                    value={(item as any)[key] || '#0000ff'}
+                    fallbackValue="#0000ff"
+                    format="hex8"
+                    onChange={(newValue, colors) => setItemField(key, newValue)}
+                    isAlphaHidden={false}
+                    fullWidth
+                    id={key}
+                    key={key}
+                    label={label}
+                    style={{ marginTop: 12 }}
+                  />
+                </>
+              )}
               {!item.dateFields().includes(key) &&
                 ![
                   'boolean',
@@ -226,6 +265,7 @@ export default function FirecallItemDialog({
                   'TaktischesZeichen',
                   'attachment',
                   'select',
+                  'color',
                 ].includes(item.fieldTypes()[key]) && (
                   <TextField
                     margin="dense"
@@ -242,8 +282,7 @@ export default function FirecallItemDialog({
                 )}
             </React.Fragment>
           ))}
-
-          {item.type !== 'layer' && (
+          {NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
               <Select

@@ -1,3 +1,5 @@
+'use client';
+
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { usePositionContext } from '../components/Map/Position';
