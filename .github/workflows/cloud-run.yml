@@ -67,6 +67,7 @@ jobs:
         id: env
         run: |
           # write env file
+          set -eo pipefail
           VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
           echo "VERSION=${VERSION}" >.version
           VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9_-]+@-@g' )
@@ -124,13 +125,13 @@ jobs:
       - id: image
         name: Build image
         run: |
+          set -eo pipefail
           gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
           docker build . --tag ${{steps.env.outputs.IMAGE_TAG}}
           docker push ${{steps.env.outputs.IMAGE_TAG}}
       - id: deploy
         name: deploy to Cloud Run
         run: |
-
           set -eo pipefail
           source .version
 
