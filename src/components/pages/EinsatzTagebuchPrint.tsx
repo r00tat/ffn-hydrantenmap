@@ -6,7 +6,7 @@ import { useDiaries } from './EinsatzTagebuch';
 import { useMemo } from 'react';
 
 export default function EinsatzTagebuchPrint() {
-  const { diaries } = useDiaries();
+  const { diaries } = useDiaries(true);
 
   const diariesSorted = useMemo(
     () => diaries.sort((a, b) => (a.nummer || 0) - (b.nummer || 0)),

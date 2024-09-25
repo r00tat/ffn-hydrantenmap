@@ -34,7 +34,7 @@ import Grid from '@mui/material/Grid';
 import React from 'react';
 import { randomUUID } from 'crypto';
 
-export function useDiaries(sortAscending: boolean) {
+export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);

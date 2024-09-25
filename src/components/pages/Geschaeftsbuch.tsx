@@ -38,7 +38,7 @@ interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
 }
 
-export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
+export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
