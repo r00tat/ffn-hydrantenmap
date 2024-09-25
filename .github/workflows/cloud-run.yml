@@ -1,0 +1,146 @@
+name: 'Cloud Run'
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+  repository_dispatch:
+    types:
+      - deploy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cloudrun:
+    name: 'Cloud Run'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    permissions:
+      id-token: write # This is required for requesting the JWT
+      contents: read # This is required for actions/checkout
+      pull-requests: write # Write contents to the PR
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      NEXT_PUBLIC_FIREBASE_APIKEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_APIKEY }}
+      NEXT_PUBLIC_MAPBOX_APIKEY: ${{ secrets.NEXT_PUBLIC_MAPBOX_APIKEY }}
+      NEXT_PUBLIC_OAUTH_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_OAUTH_CLIENT_ID }}
+      NEXT_PUBLIC_FIRESTORE_DB: ${{ vars.NEXT_PUBLIC_FIRESTORE_DB }}
+      GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+      AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+      RUN_SERVICE: ${{ vars.RUN_SERVICE}}
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      RUN_SERVICE_ACCOUNT: ${{ secrets.RUN_SERVICE_ACCOUNT}}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      CLOUDSDK_COMPUTE_REGION: ${{ vars.CLOUDSDK_COMPUTE_REGION }}
+      IMAGE: ${{ vars.IMAGE }}
+
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # this is the output provider_name from the TF module
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} # this is a SA email configured
+          export_environment_variables: 'true'
+
+      - name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup env
+        shell: bash
+        id: env
+        run: |
+          # write env file
+          set -eo pipefail
+          VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          echo "VERSION=${VERSION}" >.version
+          VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9_-]+@-@g' )
+          VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
+          echo "VERSION_TAG=${VERSION_TAG}" >>.version
+
+          # if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+          #   # prod version
+          # else
+          #   SERVICE="${SERVICE}-dev"
+          # fi
+
+          if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
+            # set to empty string
+            export NEXT_PUBLIC_FIRESTORE_DB=""
+          fi
+          echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>.version
+          echo "RUN_SERVICE='${RUN_SERVICE}'" >>.version
+          echo "RUN_REGION='${RUN_REGION}'" >>.version
+
+          echo "IMAGE='${IMAGE}'" >>.version
+          echo "IMAGE_TAG='${IMAGE}:${VERSION_TAG}'" >>.version
+
+          echo "Versions: $(cat .version)"
+
+          cat .version >>$GITHUB_OUTPUT
+
+          cat >.env.local <<EOF
+          NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
+          NEXT_PUBLIC_MAPBOX_APIKEY='${NEXT_PUBLIC_MAPBOX_APIKEY}'
+          NEXT_PUBLIC_BUILD_ID='$VERSION'
+          NEXT_PUBLIC_OAUTH_CLIENT_ID='${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
+          NEXT_PUBLIC_FIRESTORE_DB="${NEXT_PUBLIC_FIRESTORE_DB}"
+          AUTH_SECRET='${AUTH_SECRET}'
+          EOF
+
+          # echo "Environment:"
+          # cat .env.local
+      # - id: 'deploy'
+      #   uses: 'google-github-actions/deploy-cloudrun@v2'
+      #   with:
+      #     service: ${{vars.RUN_SERVICE}}
+      #     image: ${{ steps.env.outputs.IMAGE_TAG}}
+      #     region: ${{vars.RUN_REGION}}
+      #     project_id: ${{vars.CLOUDSDK_CORE_PROJECT}}
+      #     tag: ${{steps.env.outputs.VERSION_TAG}}
+      #     # service account is not available
+      #     # service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT}}
+      #     secrets: |-
+      #       NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest
+      #       NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest
+      #       AUTH_SECRET=AUTH_SECRET:latest
+      #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
+
+      - id: image
+        name: Build image
+        run: |
+          set -eo pipefail
+          gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
+          docker build . --tag ${{steps.env.outputs.IMAGE_TAG}}
+          docker push ${{steps.env.outputs.IMAGE_TAG}}
+      - id: deploy
+        name: deploy to Cloud Run
+        run: |
+          set -eo pipefail
+          source .version
+
+          gcloud run deploy $RUN_SERVICE \
+            --allow-unauthenticated \
+            --image $IMAGE_TAG \
+            --execution-environment gen2 \
+            --max-instances=2 --region $RUN_REGION \
+            --tag=${VERSION_TAG} \
+            --service-account=$RUN_SERVICE_ACCOUNT \
+            --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest" \
+          ${RUN_ARGS}

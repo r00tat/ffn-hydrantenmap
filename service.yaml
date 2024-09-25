@@ -1,0 +1,84 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  labels:
+    cloud.googleapis.com/location: europe-west4
+  name: hydrantenmap-dev
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "2"
+      labels:
+        run.googleapis.com/startupProbeType: Default
+      name: hydrantenmap-dev-00191-ruf
+    spec:
+      containerConcurrency: 80
+      containers:
+        - env:
+            - name: NEXT_PUBLIC_FIREBASE_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: NEXT_PUBLIC_FIREBASE_APIKEY
+            - name: NEXT_PUBLIC_MAPBOX_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: NEXT_PUBLIC_MAPBOX_APIKEY
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: AUTH_SECRET
+            - name: EINSATZMAPPE_SHEET_ID
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: EINSATZMAPPE_SHEET_ID
+            - name: EINSATZMAPPE_SHEET_RANGE
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: EINSATZMAPPE_SHEET_RANGE
+          image: $IMAGE_TAG
+          ports:
+            - containerPort: 8080
+              name: http1
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          startupProbe:
+            failureThreshold: 1
+            periodSeconds: 240
+            tcpSocket:
+              port: 8080
+            timeoutSeconds: 240
+      serviceAccountName: $RUN_SERVICE_ACCOUNT
+      timeoutSeconds: 300
+  traffic:
+    - revisionName: hydrantenmap-dev-00091-haw
+      tag: feature-csv-export
+    - revisionName: hydrantenmap-dev-00095-xer
+      tag: feature-layers
+    - revisionName: hydrantenmap-dev-00097-qec
+      tag: feature-kml-import
+    - latestRevision: true
+      percent: 100
+    - revisionName: hydrantenmap-dev-00137-qez
+      tag: enhancement-build-and-unwetter
+    - revisionName: hydrantenmap-dev-00146-keq
+      tag: enhancement-unwetter-display
+    - revisionName: hydrantenmap-dev-00148-rap
+      tag: enhancement-sheet-parsing
+    - revisionName: hydrantenmap-dev-00166-lel
+      tag: bugfix-use-dev-db-on-builds
+    - revisionName: hydrantenmap-dev-00168-rik
+      tag: feature-groups
+    - revisionName: hydrantenmap-dev-00178-loj
+      tag: feature-flood-data
+    - revisionName: hydrantenmap-dev-00189-mub
+      tag: bugfix-api-routes-exports
+    - revisionName: hydrantenmap-dev-00191-ruf
+      tag: main

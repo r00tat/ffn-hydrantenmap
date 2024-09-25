@@ -6,7 +6,7 @@ import { useGeschaeftsbuchEintraege } from './Geschaeftsbuch';
 import { useMemo } from 'react';
 
 export default function GeschaeftsbuchPrint() {
-  const { eintraege } = useGeschaeftsbuchEintraege();
+  const { eintraege } = useGeschaeftsbuchEintraege(true);
 
   const eintraegeSorted = useMemo(
     () => eintraege.sort((a, b) => (a.nummer || 0) - (b.nummer || 0)),

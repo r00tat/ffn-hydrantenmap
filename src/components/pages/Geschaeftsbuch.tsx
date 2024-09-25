@@ -38,7 +38,7 @@ interface GbDisplay extends GeschaeftsbuchEintrag {
   einaus: string;
 }
 
-export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
+export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
@@ -76,7 +76,7 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
       }));
     setGeschaeftsbuchEintraege(diaries);
     setDiaryCounter(diaries.length + 1);
-  }, [firecallItems]);
+  }, [firecallItems, sortAscending]);
   return { eintraege, diaryCounter };
 }
 

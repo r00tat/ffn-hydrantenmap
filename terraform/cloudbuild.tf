@@ -1,5 +1,5 @@
 locals {
-  artifact_registry = "${google_artifact_registry_repository.run_docker.location}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.run_docker.repository_id}"
+  artifact_registry = "${google_artifact_registry_repository.run_docker2.location}-docker.pkg.dev/${var.project}/${google_artifact_registry_repository.run_docker.repository_id}"
   substitutions = {
     _RUN_SERVICE_ACCOUNT      = google_service_account.run_sa.email
     _IMAGE                    = "${local.artifact_registry}/${var.name}/dev"
@@ -50,6 +50,7 @@ resource "google_cloudbuild_trigger" "feature_branch" {
   service_account    = "projects/${var.project}/serviceAccounts/${var.build_service_account}"
 
   substitutions = local.substitutions
+  disabled      = var.cloudbuild_disabled
 }
 
 
@@ -69,6 +70,7 @@ resource "google_cloudbuild_trigger" "build_main_branch" {
   include_build_logs = "INCLUDE_BUILD_LOGS_WITH_STATUS"
   service_account    = "projects/${var.project}/serviceAccounts/${var.build_service_account}"
   substitutions      = local.substitutions
+  disabled           = var.cloudbuild_disabled
 }
 resource "google_cloudbuild_trigger" "deploy_prod_on_tag" {
   location = "global"
@@ -91,4 +93,5 @@ resource "google_cloudbuild_trigger" "deploy_prod_on_tag" {
     _SERVICE_NAME             = var.name
     _IMAGE                    = "${local.artifact_registry}/${var.name}/tag"
   })
+  disabled = var.cloudbuild_disabled
 }
