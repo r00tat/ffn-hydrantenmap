@@ -76,7 +76,7 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean) {
       }));
     setGeschaeftsbuchEintraege(diaries);
     setDiaryCounter(diaries.length + 1);
-  }, [firecallItems]);
+  }, [firecallItems, sortAscending]);
   return { eintraege, diaryCounter };
 }
 

@@ -1,0 +1,63 @@
+name: 'Cloud Run'
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/package.json'
+      - '**/package.lock.json'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+  repository_dispatch:
+    types:
+      - deploy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    permissions:
+      id-token: write # This is required for requesting the JWT
+      contents: read # This is required for actions/checkout
+      pull-requests: write # Write contents to the PR
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      # Checkout the repository to the GitHub Actions runner
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: 'projects/ffn-utils/locations/global/workloadIdentityPools/github/providers/github' # this is the output provider_name from the TF module
+          service_account: 'cloudbuild@ffn-utils.iam.gserviceaccount.com' # this is a SA email configured
+          export_environment_variables: 'true'
+
+      - name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch

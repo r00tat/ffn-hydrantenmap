@@ -147,7 +147,7 @@ export function useDiaries(sortAscending: boolean) {
     setDiaryCounter(
       firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
     );
-  }, [firecallItems]);
+  }, [firecallItems, sortAscending]);
   return { diaries, diaryCounter };
 }
 
