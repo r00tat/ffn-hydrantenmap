@@ -13,7 +13,7 @@ import { auth } from '../firebase/firebase';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 
 export default function LoginUi() {
-  const { isSignedIn, isAuthorized, displayName, email, signOut } =
+  const { isSignedIn, isAuthorized, displayName, email, signOut, uid } =
     useFirebaseLogin();
   const { displayMessages, setDisplayMessages } = useDebugLogging();
 
@@ -43,7 +43,7 @@ export default function LoginUi() {
               <Typography>
                 Dein Benutzer ist freigeschalten und kann verwendet werden!{' '}
                 <br />
-                Angemeldet als: {displayName} {email}
+                Angemeldet als: {displayName} {email} (user id: {uid})
               </Typography>
               <Typography>
                 <Link href="/" passHref legacyBehavior>

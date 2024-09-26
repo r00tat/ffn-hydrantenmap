@@ -17,6 +17,9 @@ import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { Group } from '../groups/GroupAction';
+import Grid from '@mui/material/Grid';
+import React from 'react';
+import { Refresh } from '@mui/icons-material';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -40,7 +43,7 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
           )}
         </IconButton>
       </Tooltip>
-      <Tooltip title={`Edit ${row.displayName}`}>
+      <Tooltip title={`Edit ${row.displayName || row.email} ${row.uid}`}>
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -150,9 +153,62 @@ export default function Users() {
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
-          Users
+          Users{' '}
+          <IconButton onClick={() => fetchUsers()}>
+            <Refresh />
+          </IconButton>
         </Typography>
-        <DataGrid rows={users} columns={columns} getRowId={(row) => row.uid} />
+        <Grid container>
+          <Grid item xs={2} md={2} lg={2}></Grid>
+          <Grid item xs={5} md={6} lg={2}>
+            <b>Name</b>
+          </Grid>
+          <Grid item xs={5} md={6} lg={2}>
+            <b>Email</b>
+          </Grid>
+
+          <Grid item xs={6} md={4} lg={2}>
+            <b>Feuerwehr</b>
+          </Grid>
+          <Grid item xs={6} md={4} lg={3}>
+            <b>Gruppen</b>
+          </Grid>
+          <Grid item xs={12}>
+            <hr />
+          </Grid>
+          {users.map((user) => (
+            <React.Fragment key={`user-entry-${user.uid}`}>
+              <Grid item xs={2} md={2} lg={2}>
+                <UserRowButtons
+                  row={user}
+                  authorizeFn={authorizeAction}
+                  editFn={editAction}
+                />
+              </Grid>
+              <Grid item xs={5} md={6} lg={2}>
+                {user.displayName || ''}
+              </Grid>
+              <Grid item xs={5} md={6} lg={2}>
+                {user.email}
+              </Grid>
+
+              <Grid item xs={6} md={4} lg={2}>
+                {user.feuerwehr} {user.description}
+              </Grid>
+              <Grid item xs={6} md={4} lg={3}>
+                {(user.groups || [])
+                  .map((key: string) => groups[key])
+                  .filter((v: string) => v)
+                  .join(', ')}
+              </Grid>
+              <Grid item xs={12}>
+                <hr />
+              </Grid>
+            </React.Fragment>
+          ))}
+        </Grid>
+
+        {/* <DataGrid rows={users} columns={columns} getRowId={(row) => row.uid} /> */}
       </Box>
       {showEditUserDialog && editUser && (
         <UserRecordExtendedDialog

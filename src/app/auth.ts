@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
+import { isTruthy } from '../common/boolish';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
@@ -19,7 +20,13 @@ export async function checkFirebaseToken(token: string) {
       .collection('user')
       .doc(decodedToken.sub)
       .get();
-    if (!(userDoc.exists && userDoc.data()?.authorized === true)) {
+
+    console.info(
+      `user ${userDoc.id} ${userDoc.data()?.email} authorized:${
+        userDoc.data()?.authorized
+      }`
+    );
+    if (!(userDoc.exists && isTruthy(userDoc.data()?.authorized))) {
       throw new ApiException('your user is not authorized', {
         status: 403,
       });
@@ -88,17 +95,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   //   },
   // },
 });
-export async function checkAuth() {
+
+export async function actionUserRequired() {
   const session = await auth();
   // console.info(`session info: ${JSON.stringify(session)}`);
   if (!session?.user) {
     throw new ApiException('User not authorized', { status: 403 });
   }
   return session;
-}
-
-export async function actionUserRequired() {
-  return checkAuth();
 }
 
 export async function actionAdminRequired() {

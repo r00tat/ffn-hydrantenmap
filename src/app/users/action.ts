@@ -11,11 +11,10 @@ export async function getUsers() {
   const users = await listUsers();
   console.info(`listed ${users.length} users with server side action`);
 
-  return users.sort(
-    (a, b) =>
-      a.displayName?.localeCompare(b.displayName || '') ||
-      a.email?.localeCompare(b.email || '') ||
-      0
+  return users.sort((a, b) =>
+    `${a.displayName || ''} ${a.email}`?.localeCompare(
+      `${b.displayName || ''} ${b.email}`
+    )
   );
 }
 

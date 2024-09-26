@@ -1,3 +1,5 @@
+'use server';
+import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { UserRecordExtended } from '../../../../common/users';
 import { firestore } from '../../../../server/firebase/admin';
@@ -10,7 +12,7 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
   const newData = {
     displayName: user.displayName,
     email: user.email,
-    authorized: user.authorized,
+    authorized: isTruthy(user.authorized),
     feuerwehr: user.feuerwehr || 'neusiedl',
     abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
     groups: user.groups || [],

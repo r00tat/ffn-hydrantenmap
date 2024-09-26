@@ -6,7 +6,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../../hooks/useFirecall';
 import { defaultPosition } from '../../hooks/constants';
@@ -16,6 +16,11 @@ import MyDateTimePicker from '../inputs/DateTimePicker';
 import moment from 'moment';
 import { GeoPositionObject } from '../../common/geo';
 import { parseTimestamp } from '../../common/time-format';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select, { SelectChangeEvent } from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import { getMyGroupsFromServer, Group } from '../../app/groups/GroupAction';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -38,6 +43,14 @@ export default function EinsatzDialog({
   );
   const { email } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const groups = await getMyGroupsFromServer();
+      setMyGroups(groups);
+    })();
+  }, []);
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,6 +90,11 @@ export default function EinsatzDialog({
     [email, position.lat, position.lng, setFirecallId]
   );
 
+  const handleChange = (event: SelectChangeEvent) => {
+    // setItemField('type', event.target.value);
+    setEinsatz((prev) => ({ ...prev, group: event.target.value }));
+  };
+
   return (
     <Dialog open={open} onClose={() => onClose()}>
       <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
@@ -93,6 +111,22 @@ export default function EinsatzDialog({
           onChange={onChange('name')}
           value={einsatz.name}
         />
+        <FormControl fullWidth variant="standard">
+          <InputLabel id="firecall-group-label">Gruppe</InputLabel>
+          <Select
+            labelId="firecall-group-label"
+            id="firecall-item-type"
+            value={einsatz.group}
+            label="Art"
+            onChange={handleChange}
+          >
+            {myGroups.map((group) => (
+              <MenuItem key={`group-${group.id}`} value={group.id}>
+                {group.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <TextField
           margin="dense"
           id="fw"
