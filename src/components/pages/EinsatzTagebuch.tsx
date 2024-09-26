@@ -34,7 +34,7 @@ import Grid from '@mui/material/Grid';
 import React from 'react';
 import { randomUUID } from 'crypto';
 
-export function useDiaries(sortAscending: boolean) {
+export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
@@ -147,7 +147,7 @@ export function useDiaries(sortAscending: boolean) {
     setDiaryCounter(
       firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
     );
-  }, [firecallItems]);
+  }, [firecallItems, sortAscending]);
   return { diaries, diaryCounter };
 }
 

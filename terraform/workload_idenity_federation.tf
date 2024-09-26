@@ -29,3 +29,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 
   attribute_condition = "assertion.repository_owner=='${var.github_org}'"
 }
+
+output "workload_identity_provider" {
+  description = "Workload identity provider id"
+  value       = google_iam_workload_identity_pool_provider.github.name
+}

@@ -110,3 +110,40 @@ resource "google_artifact_registry_repository" "run_docker" {
   #   }
   # }
 }
+resource "google_artifact_registry_repository" "run_docker2" {
+  project       = var.project
+  location      = var.run_region
+  repository_id = "hydrantenkarte"
+  description   = "Docker registry for cloud run service hydrantenmap"
+  format        = "DOCKER"
+
+  docker_config {
+    immutable_tags = false
+  }
+
+  cleanup_policies {
+    id     = "keep-releases"
+    action = "KEEP"
+    condition {
+      tag_state             = "TAGGED"
+      version_name_prefixes = ["v"]
+    }
+  }
+  cleanup_policies {
+    id     = "delete—untagged—30d"
+    action = "DELETE"
+    condition {
+      tag_state  = "UNTAGGED"
+      older_than = "${30 * 24 * 60 * 60}s"
+    }
+  }
+  # cleanup_policies {
+  #   id     = "delete—tagged—30d"
+  #   action = "DELETE"
+  #   condition {
+  #     tag_state  = "TAGGED"
+  #     older_than = "30d"
+
+  #   }
+  # }
+}
