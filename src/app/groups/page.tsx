@@ -10,7 +10,11 @@ import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useCallback, useEffect, useState } from 'react';
 import GroupDialog from './GroupDialog';
-import { getGroupsFromServer, Group, updateGroup } from './GroupAction';
+import {
+  getGroupsFromServer,
+  Group,
+  updateGroupFromServer,
+} from './GroupAction';
 
 interface UserRowButtonParams {
   row: Group;
@@ -100,7 +104,7 @@ export default function Users() {
           onClose={async (group) => {
             setShowEditDialog(false);
             if (group) {
-              await updateGroup(group);
+              await updateGroupFromServer(group);
               await getGroups();
             }
           }}

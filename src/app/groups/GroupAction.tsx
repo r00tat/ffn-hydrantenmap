@@ -26,7 +26,7 @@ export async function getGroupsFromServer(): Promise<Group[]> {
   return await getGroups();
 }
 
-export async function updateGroup(group: Group) {
+async function updateGroup(group: Group) {
   if (group.id) {
     const doc = firestore.collection(GROUP_COLLECTION_ID).doc(group.id);
     await doc.set(group, { merge: true });
@@ -44,7 +44,7 @@ export async function updateGroupFromServer(group: Group) {
   return await updateGroup(group);
 }
 
-export async function getMyGroups(userId: string): Promise<Group[]> {
+async function getMyGroups(userId: string): Promise<Group[]> {
   const allGropus = await getGroups();
   const myGroupIds =
     (
