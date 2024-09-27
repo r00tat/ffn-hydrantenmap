@@ -57,7 +57,7 @@ export function useLastFirecall() {
             ...firstDoc.data(),
           } as Firecall;
           setFirecall(fc);
-          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`);
+          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`, fc);
         } else {
           console.info(`no firecalls received`);
         }
