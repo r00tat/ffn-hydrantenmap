@@ -15,8 +15,9 @@ export interface Group {
 }
 
 async function getGroups(): Promise<Group[]> {
-  const groupDocs = (await firestore.collection(GROUP_COLLECTION_ID).get())
-    .docs;
+  const groupDocs = (
+    await firestore.collection(GROUP_COLLECTION_ID).orderBy('name', 'asc').get()
+  ).docs;
   return groupDocs.map(
     (g) => ({ ...g.data(), name: g.data().name || '', id: g.id } as Group)
   );
@@ -63,4 +64,13 @@ export async function getMyGroupsFromServer(): Promise<Group[]> {
   const userInfo = await actionUserRequired();
 
   return userInfo?.user?.image ? getMyGroups(userInfo.user?.image) : [];
+}
+
+export async function deleteGroupAction(groupId: string) {
+  await actionAdminRequired();
+
+  const doc = firestore.collection(GROUP_COLLECTION_ID).doc(groupId);
+  await doc.delete();
+
+  return doc.id;
 }
