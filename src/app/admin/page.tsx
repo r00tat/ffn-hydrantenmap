@@ -2,7 +2,7 @@
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
-import { setAuthorizedToBool } from './adminActions';
+import { setAuthorizedToBool, setEmptyFirecallGroup } from './adminActions';
 import Box from '@mui/material/Box';
 
 export default function AdminPage() {
@@ -16,6 +16,14 @@ export default function AdminPage() {
         .join(', ')})`
     );
   }, []);
+  const setFirecallGroup = useCallback(async () => {
+    const calls = await setEmptyFirecallGroup();
+    setStatus(
+      `${calls.length} calls corrected. (${calls
+        .map((call) => call.name)
+        .join(', ')})`
+    );
+  }, []);
 
   return (
     <Box margin={2}>
@@ -23,7 +31,15 @@ export default function AdminPage() {
       <Typography>{status}</Typography>
       <Typography>
         Set authorized from on to true{' '}
-        <Button onClick={updateAuthorized}>Fix users authorized</Button>
+        <Button onClick={updateAuthorized} variant="contained">
+          Fix users authorized
+        </Button>
+      </Typography>
+      <Typography>
+        Set ffnd as default group on firecalls{' '}
+        <Button onClick={setFirecallGroup} variant="contained">
+          Fix empty firecall group
+        </Button>
       </Typography>
     </Box>
   );

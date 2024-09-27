@@ -10,7 +10,8 @@ service cloud.firestore {
     }
     
     function adminUser() {
-      return request.auth != null && get(/databases/$(database)/documents/user/$(request.auth.uid).data.isAdmin);
+      return request.auth != null && 
+         get(/databases/$(database)/documents/user/$(request.auth.uid)).data.isAdmin == true;
     }
     
     match /hydrant/{doc=*} {
