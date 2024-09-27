@@ -4,6 +4,7 @@ import { ChatMessage } from '../../common/chat';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import MessageBox from './message-box';
+import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 export interface ChatMessagesProps {
   order?: 'asc' | 'desc';
 }
@@ -11,7 +12,7 @@ export default function ChatMessages({ order = 'desc' }: ChatMessagesProps) {
   const firecallId = useFirecallId();
 
   const messages = useFirebaseCollection<ChatMessage>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [firecallId, 'chat'],
     queryConstraints: [orderBy('timestamp', order)],
   });

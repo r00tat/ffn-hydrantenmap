@@ -2,6 +2,7 @@
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { UserRecordExtended } from '../../../../common/users';
+import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firestore } from '../../../../server/firebase/admin';
 
 export interface UsersResponse {
@@ -21,7 +22,7 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
   console.info(`updating ${uid}: ${JSON.stringify(newData)}`);
 
   await firestore
-    .collection('user')
+    .collection(USER_COLLECTION_ID)
     .doc(`${uid}`)
     .set(
       Object.fromEntries(

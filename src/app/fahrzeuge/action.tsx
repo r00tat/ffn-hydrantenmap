@@ -1,5 +1,6 @@
 'use server';
 
+import { FIRECALL_COLLECTION_ID } from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
 import { checkAuth } from '../firebaseAuth';
 
@@ -11,7 +12,7 @@ export async function sayHello(text: string) {
     `loggedin user on serverside action: ${JSON.stringify(userInfo)}`
   );
   const docs = await firestore
-    .collection('call')
+    .collection(FIRECALL_COLLECTION_ID)
     .where('deleted', '==', false)
     .orderBy('date', 'desc')
     .limit(1)

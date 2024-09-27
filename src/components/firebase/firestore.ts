@@ -1,3 +1,21 @@
+/**
+ * common firestore types and functions
+ * can be used on server and client side
+ *
+ */
+
+/**
+ * collection names
+ */
+export const FIRECALL_COLLECTION_ID = 'call';
+export const FIRECALL_ITEMS_COLLECTION_ID = 'item';
+export const USER_COLLECTION_ID = 'user';
+export const GROUP_COLLECTION_ID = 'groups';
+export const CLUSTER_COLLECTION_ID = 'clusters6';
+
+/**
+ * base item for all entries in a firecall
+ */
 export interface FirecallItem {
   id?: string;
   name: string;

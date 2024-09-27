@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
 import { isTruthy } from '../common/boolish';
+import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
@@ -17,7 +18,7 @@ export async function checkFirebaseToken(token: string) {
     // allow all internal users
     // fetch the user and check if this is an active user
     const userDoc = await firestore
-      .collection('user')
+      .collection(USER_COLLECTION_ID)
       .doc(decodedToken.sub)
       .get();
 
@@ -113,7 +114,7 @@ export async function actionAdminRequired() {
     throw new ApiException('User not authorized, no id set', { status: 403 });
   }
   const userDoc = await firestore
-    .collection('user')
+    .collection(USER_COLLECTION_ID)
     .doc(session.user?.image)
     .get();
   if (!userDoc.data()?.isAdmin) {

@@ -11,7 +11,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../../hooks/useFirecall';
 import { defaultPosition } from '../../hooks/constants';
 import { firestore } from '../firebase/firebase';
-import { Firecall } from '../firebase/firestore';
+import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import moment from 'moment';
 import { GeoPositionObject } from '../../common/geo';
@@ -65,7 +65,7 @@ export default function EinsatzDialog({
       if (fc.id) {
         // update
         await setDoc(
-          doc(firestore, 'call', fc.id),
+          doc(firestore, FIRECALL_COLLECTION_ID, fc.id),
           { ...fc, updatedAt: new Date().toISOString(), updatedBy: email },
           { merge: true }
         );
@@ -79,7 +79,7 @@ export default function EinsatzDialog({
           lng: position.lng,
         };
         const newDoc = await addDoc(
-          collection(firestore, 'call'),
+          collection(firestore, FIRECALL_COLLECTION_ID),
           firecallData
         );
         if (setFirecallId) {

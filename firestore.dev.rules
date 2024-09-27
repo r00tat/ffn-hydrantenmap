@@ -34,7 +34,6 @@ service cloud.firestore {
     match /call/{doc=**} {
       allow read, write: if authorizedUser() 
             && resource.data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
-
     }
     
     match /clusters/{doc=**} {
@@ -43,6 +42,7 @@ service cloud.firestore {
 
     match /clusters6/{doc=**} {
       allow read: if authorizedUser();
+      allow write: if adminUser();
     }
 
     match /tokens/{doc=**} {
@@ -51,13 +51,8 @@ service cloud.firestore {
         allow write: if authorizedUser() && request.auth.uid == request.resource.data.owner;
     }
 
-
     match /user/{doc=*} {
       allow read: if request.auth != null && request.auth.uid == doc
-    }
-      match /clusters6/{doc=**} {
-      allow read: if authorizedUser();
-      allow write: if adminUser();
     }
 
     match /{document=**} {

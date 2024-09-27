@@ -18,7 +18,10 @@ import {
   useState,
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
-import { Firecall } from '../components/firebase/firestore';
+import {
+  Firecall,
+  FIRECALL_COLLECTION_ID,
+} from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export const defaultFirecall: Firecall = {
@@ -42,7 +45,7 @@ export function useLastFirecall() {
   useEffect(() => {
     if (isAuthorized) {
       const q = query(
-        collection(db, 'call'),
+        collection(db, FIRECALL_COLLECTION_ID),
         where('deleted', '==', false),
         where('group', 'in', groups),
         orderBy('date', 'desc'),
@@ -82,7 +85,7 @@ export function useFirecallSwitcher(): FirecallContextType {
       setFirecall(undefined);
     } else {
       const unsubscribe = onSnapshot(
-        doc(firestore, 'call', firecallId),
+        doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
         (docSnapshot) => {
           if (docSnapshot.exists()) {
             const fc: Firecall = {

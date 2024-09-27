@@ -4,6 +4,7 @@ import userRequired from '../../../../../server/auth/userRequired';
 import { firestore } from '../../../../../server/firebase/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiException } from '../../../errors';
+import { USER_COLLECTION_ID } from '../../../../../components/firebase/firestore';
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -14,7 +15,7 @@ export interface RegisterBody {
 }
 
 async function handleRegister(uid: string, token: string) {
-  const doc = firestore.collection('user').doc(`${uid}`);
+  const doc = firestore.collection(USER_COLLECTION_ID).doc(`${uid}`);
 
   const oldData = (await doc.get()).data();
   const tokens = Array.from(
@@ -67,7 +68,7 @@ export async function POST(
 }
 
 async function handleUnRegister(uid: string, token: string) {
-  const doc = firestore.collection('user').doc(`${uid}`);
+  const doc = firestore.collection(USER_COLLECTION_ID).doc(`${uid}`);
 
   const oldData = (await doc.get()).data();
   const tokens = Array.from(

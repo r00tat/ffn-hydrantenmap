@@ -1,6 +1,10 @@
 'use server';
 
 import { UserRecordExtended } from '../../common/users';
+import {
+  GROUP_COLLECTION_ID,
+  USER_COLLECTION_ID,
+} from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
 import { actionAdminRequired, actionUserRequired } from '../auth';
 
@@ -9,8 +13,6 @@ export interface Group {
   name: string;
   description?: string;
 }
-
-const GROUP_COLLECTION_ID = 'groups';
 
 async function getGroups(): Promise<Group[]> {
   const groupDocs = (await firestore.collection(GROUP_COLLECTION_ID).get())
@@ -49,7 +51,7 @@ async function getMyGroups(userId: string): Promise<Group[]> {
   const myGroupIds =
     (
       (
-        await firestore.collection('user').doc(userId).get()
+        await firestore.collection(USER_COLLECTION_ID).doc(userId).get()
       ).data() as UserRecordExtended
     ).groups || [];
   return allGropus

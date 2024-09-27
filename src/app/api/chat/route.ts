@@ -5,6 +5,7 @@ import { ChatMessage } from '../../../common/chat';
 import userRequired from '../../../server/auth/userRequired';
 import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
+import { FIRECALL_COLLECTION_ID } from '../../../components/firebase/firestore';
 
 export interface UsersResponse {
   // user: UserRecordExtended;
@@ -30,7 +31,7 @@ async function newChatMessage(
   };
 
   const chatCollection = firestore
-    .collection('call')
+    .collection(FIRECALL_COLLECTION_ID)
     .doc(firecallId)
     .collection('chat');
 

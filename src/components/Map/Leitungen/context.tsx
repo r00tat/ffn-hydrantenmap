@@ -33,17 +33,20 @@ export const useLeitungsProvider = (): Leitungen => {
       if (firecallItem) {
         firecallItem.destLat = positions[positions.length - 1].lat;
         firecallItem.destLng = positions[positions.length - 1].lng;
-        addDoc(collection(firestore, 'call', firecallId, 'item'), {
-          ...firecallItem,
-          lat: positions[0].lat,
-          lng: positions[0].lng,
-          user: email,
-          created: new Date().toISOString(),
-          positions: JSON.stringify(positions.map((p) => [p.lat, p.lng])),
-          distance: Math.round(
-            calculateDistance(positions.map((p) => [p.lat, p.lng]))
-          ),
-        });
+        addDoc(
+          collection(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item'),
+          {
+            ...firecallItem,
+            lat: positions[0].lat,
+            lng: positions[0].lng,
+            user: email,
+            created: new Date().toISOString(),
+            positions: JSON.stringify(positions.map((p) => [p.lat, p.lng])),
+            distance: Math.round(
+              calculateDistance(positions.map((p) => [p.lat, p.lng]))
+            ),
+          }
+        );
       }
     },
     [email, firecallId, firecallItem]

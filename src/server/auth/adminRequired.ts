@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';
 import firebaseAdmin, { firestore } from '../firebase/admin';
+import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 
 const adminRequired = async (req: NextRequest) => {
   const authorization = req.headers.get('authorization');
@@ -15,7 +16,7 @@ const adminRequired = async (req: NextRequest) => {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
 
     const userDoc = await firestore
-      .collection('user')
+      .collection(USER_COLLECTION_ID)
       .doc(decodedToken.sub)
       .get();
     if (!(userDoc.exists && userDoc.data()?.isAdmin === true)) {

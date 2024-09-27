@@ -91,7 +91,7 @@ export default function LayersPage() {
   const layers = useFirecallLayers();
 
   const items = useFirebaseCollection<FirecallItem>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     // queryConstraints,
     pathSegments: [firecallId, 'item'],
     filterFn: filterDisplayableItems,

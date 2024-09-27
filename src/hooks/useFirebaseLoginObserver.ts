@@ -6,6 +6,7 @@ import { signOut as signOutJsClient } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { auth, firestore } from '../components/firebase/firebase';
+import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -42,7 +43,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const refresh = useCallback(async () => {
     if (loginStatus.isSignedIn && loginStatus.uid) {
       try {
-        const userDoc = await getDoc(doc(firestore, 'user', loginStatus.uid));
+        const userDoc = await getDoc(
+          doc(firestore, USER_COLLECTION_ID, loginStatus.uid)
+        );
         const userData = userDoc.data();
         console.info(`refresh user data: ${JSON.stringify(userData)}`);
         if (userData?.authorized) {

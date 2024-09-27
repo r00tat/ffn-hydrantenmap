@@ -25,7 +25,11 @@ import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
-import { Firecall, filterActiveItems } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  Firecall,
+  filterActiveItems,
+} from '../firebase/firestore';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -35,7 +39,7 @@ function useFirecallUpdate() {
         `update of einsatz ${einsatz.id}: ${JSON.stringify(einsatz)}`
       );
       await setDoc(
-        doc(firestore, 'call', '' + einsatz.id),
+        doc(firestore, FIRECALL_COLLECTION_ID, '' + einsatz.id),
         { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }
       );
@@ -150,7 +154,7 @@ export default function Einsaetze() {
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const einsaetze = useFirebaseCollection<Firecall>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     // pathSegments: [firecallId || 'unknown', 'item'],
     queryConstraints: [
       where('deleted', '==', false),
