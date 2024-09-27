@@ -13,9 +13,9 @@ import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { doc, orderBy, setDoc } from 'firebase/firestore';
+import { doc, orderBy, setDoc, where } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -144,14 +144,18 @@ function EinsatzCard({
 }
 
 export default function Einsaetze() {
-  const { isAuthorized } = useFirebaseLogin();
+  const { isAuthorized, groups } = useFirebaseLogin();
   const [einsatzDialog, setEinsatzDialog] = useState(false);
+
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const einsaetze = useFirebaseCollection<Firecall>({
     collectionName: 'call',
     // pathSegments: [firecallId || 'unknown', 'item'],
     queryConstraints: [
+      where('deleted', '==', false),
+      where('group', 'in', groups),
+      // where('group', '==', 'ffnd'),
       orderBy('date', 'desc'),
       // where('type', '==', 'einsatz'),
       // orderBy('fw'),

@@ -20,6 +20,7 @@ export interface LoginData {
   expiration?: string;
   idToken?: string;
   groups?: string[];
+  isRefreshing?: boolean;
 }
 
 export interface LoginStatus extends LoginData {
@@ -39,26 +40,30 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }); // Local signed-in state.
 
   const refresh = useCallback(async () => {
-    if (loginStatus.isSignedIn) {
-      const userDoc = await getDoc(
-        doc(firestore, 'user', '' + loginStatus.uid)
-      );
-      const userData = userDoc.data();
-      console.info(`refresh user data: ${JSON.stringify(userData)}`);
-      if (userData?.authorized) {
-        setLoginStatus((prev) => ({
-          ...prev,
-          isAuthorized: true,
-          isAdmin: prev.isAdmin || userData?.isAdmin === true,
-          messagingTokens: userData.messaging,
-          chatNotifications: userData.chatNotifications,
-          groups: [
-            ...(userData.email?.indexOf('@ff-neusiedlamsee.at') > 0
-              ? ['ffnd']
-              : []),
-            ...(userData.groups || []),
-          ],
-        }));
+    if (loginStatus.isSignedIn && loginStatus.uid) {
+      try {
+        const userDoc = await getDoc(doc(firestore, 'user', loginStatus.uid));
+        const userData = userDoc.data();
+        console.info(`refresh user data: ${JSON.stringify(userData)}`);
+        if (userData?.authorized) {
+          setLoginStatus((prev) => ({
+            ...prev,
+            isAuthorized: true,
+            isAdmin: prev.isAdmin || userData?.isAdmin === true,
+            messagingTokens: userData.messaging,
+            chatNotifications: userData.chatNotifications,
+            groups: userData.groups || [],
+            isRefreshing: false,
+          }));
+        } else {
+          console.log(`user is not authorized:`, userData);
+          setLoginStatus((prev) => ({
+            ...prev,
+            isRefreshing: false,
+          }));
+        }
+      } catch (err) {
+        console.error(`failed to fetch user doc`, err);
       }
     }
   }, [loginStatus.isSignedIn, loginStatus.uid]);
@@ -93,24 +98,23 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           displayName: nonNull(u?.displayName),
           uid: nonNull(u?.uid),
           photoURL: nonNull(u?.photoURL),
-          isAuthorized: (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0,
+          isAuthorized: false,
           isAdmin: false,
           expiration: tokenResult?.expirationTime,
           idToken,
-          groups:
-            (u?.email?.indexOf('@ff-neusiedlamsee.at') || 0) > 0
-              ? ['ffnd']
-              : [],
+          groups: [],
+          isRefreshing: true,
         };
         if (window && window.sessionStorage) {
           window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
         }
 
         setLoginStatus(authData);
+        await refresh();
       }
     );
     return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
-  }, [serverLogin]);
+  }, [refresh, serverLogin]);
 
   useEffect(() => {
     refresh();
@@ -124,7 +128,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         if (auth.expiration && new Date(auth.expiration) > new Date()) {
           // token valid, use credentials for login status
           console.info(`using cached login status:`, auth);
-          setLoginStatus(auth);
+          setLoginStatus({ ...auth, isRefreshing: true });
         }
       }
     }

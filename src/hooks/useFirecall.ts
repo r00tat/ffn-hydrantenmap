@@ -37,13 +37,14 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>();
-  const { isAuthorized } = useFirebaseLogin();
+  const { isAuthorized, groups } = useFirebaseLogin();
 
   useEffect(() => {
     if (isAuthorized) {
       const q = query(
         collection(db, 'call'),
         where('deleted', '==', false),
+        where('group', 'in', groups),
         orderBy('date', 'desc'),
         limit(1)
       );
@@ -57,6 +58,8 @@ export function useLastFirecall() {
           } as Firecall;
           setFirecall(fc);
           console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`);
+        } else {
+          console.info(`no firecalls received`);
         }
       });
       return () => {
@@ -65,7 +68,7 @@ export function useLastFirecall() {
     } else {
       setFirecall(defaultFirecall);
     }
-  }, [isAuthorized]);
+  }, [groups, isAuthorized]);
 
   return firecall;
 }

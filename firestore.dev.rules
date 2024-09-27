@@ -32,9 +32,10 @@ service cloud.firestore {
     }
 
     match /call/{doc=**} {
-      allow read, write: if authorizedUser() && 
+      allow read, write: if authorizedUser() 
+      && 
         (
-        ! ('group' in get(/databases/$(database)/documents/call/$(doc)).data.group) ||
+          get(/databases/$(database)/documents/call/$(doc)).data.group == undefined ||
         	get(/databases/$(database)/documents/call/$(doc)).data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
         )
 
