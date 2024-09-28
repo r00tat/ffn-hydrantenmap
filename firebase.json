@@ -2,13 +2,13 @@
   "firestore": [
     {
       "database": "(default)",
-      "rules": "firestore.rules",
-      "indexes": "firestore.indexes.json"
+      "rules": "firebase/prod/firestore.rules",
+      "indexes": "firebase/prod/firestore.indexes.json"
     },
     {
       "database": "ffndev",
-      "rules": "firestore.dev.rules",
-      "indexes": "firestore.indexes.dev.json"
+      "rules": "firebase/dev/firestore.rules",
+      "indexes": "firebase/dev/firestore.indexes.json"
     }
   ]
 }
