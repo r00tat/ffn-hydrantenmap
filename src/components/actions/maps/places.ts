@@ -22,7 +22,7 @@ export async function searchPlace(
   // console.info(`uri: ${uri}`);
   const result = await fetch(uri, {
     headers: {
-      'User-Agent': 'Hydrantenkarte https://hydrant.ffnd.at',
+      'User-Agent': 'Einsatzkarte https://hydrant.ffnd.at',
       Accept: 'application/json',
     },
   });

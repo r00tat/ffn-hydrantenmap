@@ -4,8 +4,8 @@ import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
 import 'leaflet/dist/leaflet.css';
 
-const APP_NAME = 'Hydrantenkarte FFN';
-const APP_DEFAULT_TITLE = 'Hydrantenkarte FFN';
+const APP_NAME = 'Einsatzkarte FFN';
+const APP_DEFAULT_TITLE = 'Einsatzkarte FFN';
 const APP_TITLE_TEMPLATE = '%s - PWA App';
 const APP_DESCRIPTION = 'Hydraten und Einsatzkarte der FF Neusiedl am See';
 
@@ -60,10 +60,10 @@ export default function RootLayout({
   return (
     <html lang="de">
       <head>
-        <title>Hydrantenkarte</title>
+        <title>Einsatzkarte</title>
         <meta
           name="description"
-          content="Hydrantenkarte der Freiwilligen Feuerwehr Neusiedl am See"
+          content="Einsatzkarte der Freiwilligen Feuerwehr Neusiedl am See"
         />
         <link rel="icon" href="/favicon.ico" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -1,4 +1,4 @@
-# Hydrantenkarte der Freiwilligen Feuerwehr Neusiedl am See
+# Einsatzkarte der Freiwilligen Feuerwehr Neusiedl am See
 
 Dieses Repository ermöglicht es Hydranten auf einer Karte darzustellen. Ziel ist es möglichst leicht im Einsatzfall Hydranten lokalisieren zu können.
 
