@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { firestore } from '../../firebase/firebase';
-import { Firecall } from '../../firebase/firestore';
+import { Firecall, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
 import useFirecall from '../../../hooks/useFirecall';
 
 export const firecallIcon = L.icon({

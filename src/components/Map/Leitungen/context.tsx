@@ -3,7 +3,7 @@ import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import { firestore } from '../../firebase/firebase';
-import { Connection } from '../../firebase/firestore';
+import { Connection, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
 
 interface Leitungen {

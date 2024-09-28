@@ -85,13 +85,16 @@ export default function Users() {
     setIsConfirmOpen(true);
   }, []);
 
-  const deleteAction = useCallback(async (group: Group) => {
-    console.info(`delete group: ${JSON.stringify(group)}`);
-    if (group.id) {
-      await deleteGroupAction(group.id);
-      await getGroups();
-    }
-  }, []);
+  const deleteAction = useCallback(
+    async (group: Group) => {
+      console.info(`delete group: ${JSON.stringify(group)}`);
+      if (group.id) {
+        await deleteGroupAction(group.id);
+        await getGroups();
+      }
+    },
+    [getGroups]
+  );
 
   return (
     <>

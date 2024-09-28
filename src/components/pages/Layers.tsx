@@ -38,7 +38,11 @@ import FirecallItemCard, {
 } from '../FirecallItems/FirecallItemCard';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import KmlImport from '../firebase/KmlImport';
-import { FirecallItem, filterDisplayableItems } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FirecallItem,
+  filterDisplayableItems,
+} from '../firebase/firestore';
 
 interface DropBoxProps {
   id: string;
