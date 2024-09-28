@@ -78,7 +78,7 @@ jobs:
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             export NEXT_PUBLIC_FIRESTORE_DB=""
-            SERVICE=$(echo -n "${SERVICE}-dev" | sed 's@/-dev$//')
+            export RUN_SERVICE=$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')
           fi
 
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
