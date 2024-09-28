@@ -76,11 +76,10 @@ jobs:
           VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
           echo "VERSION_TAG=${VERSION_TAG}" >>.version
 
-          # if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-          #   # prod version
-          # else
-          #   SERVICE="${SERVICE}-dev"
-          # fi
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            export NEXT_PUBLIC_FIRESTORE_DB=""
+            SERVICE=$(echo -n "${SERVICE}-dev" | sed 's@/-dev$//')
+          fi
 
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
             # set to empty string
