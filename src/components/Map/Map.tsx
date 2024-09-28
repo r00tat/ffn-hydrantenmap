@@ -81,7 +81,11 @@ export default function Map() {
         {Object.entries(overlayLayers)
           .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')
           .map(([key, layer]) => (
-            <LayersControl.Overlay name={layer.name} key={key}>
+            <LayersControl.Overlay
+              name={layer.name}
+              key={key}
+              checked={layer.enabled}
+            >
               <TileLayer
                 attribution={layer.options.attribution}
                 url={layer.url}

@@ -29,7 +29,7 @@ export default function LoginUi() {
         <>
           <Paper sx={{ p: 2, m: 2 }}>
             <Typography>
-              Für die Nutzung der Hydrantenkarte ist eine Anmeldung und manuelle
+              Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle
               Freischaltung erforderlich. Bitte registriere dich hier.
             </Typography>
             <StyledLoginButton firebaseAuth={auth} />
@@ -61,7 +61,7 @@ export default function LoginUi() {
               </Typography>
               <Typography>
                 <Link href="/" passHref legacyBehavior>
-                  <Button variant="outlined">Weiter zur Hydrantenkarte</Button>
+                  <Button variant="outlined">Weiter zur Einsatzkarte</Button>
                 </Link>
               </Typography>
             </>
@@ -70,7 +70,7 @@ export default function LoginUi() {
             <Typography>
               Dein Benutzer wurde erfolgreich angemeldet, ist aber noch nicht
               freigeschalten. Bitte wende dich an{' '}
-              <a href="mailto:hydrantenmap@ff-neusiedlamsee.at&amp;subject=Hydrantenkarte Freischaltung">
+              <a href="mailto:hydrantenmap@ff-neusiedlamsee.at&amp;subject=Einsatzkarte Freischaltung">
                 hydrantenmap@ff-neusiedlamsee.at
               </a>{' '}
               für die Freischaltung

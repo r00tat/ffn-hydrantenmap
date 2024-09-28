@@ -37,7 +37,7 @@ function HeaderBar({
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Hydrantenkarte {firecall?.name || ''}
+            Einsatzkarte {firecall?.name || ''}
             {!isSignedIn && 'Anmeldung erforderlich'}
             {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
           </Typography>
