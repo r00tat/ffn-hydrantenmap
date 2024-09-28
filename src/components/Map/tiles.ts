@@ -11,6 +11,7 @@ export interface TileConfig {
   options: TileOptions;
   description?: string;
   type?: 'WMTS' | 'WMS';
+  enabled?: boolean;
 }
 
 export interface TileConfigs {
@@ -111,6 +112,7 @@ export const overlayLayers: TileConfigs = {
         [49.037872, 17.189532],
       ],
     },
+    enabled: true,
   },
 
   oberflaechenwasser: {
