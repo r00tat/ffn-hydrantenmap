@@ -3,6 +3,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
@@ -10,12 +11,14 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import React, { useCallback, useEffect, useState } from 'react';
+import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
+import { getUsers } from '../users/action';
 import {
   deleteGroupAction,
-  getGroupsFromServer,
+  getGroupsAction,
   Group,
-  updateGroupFromServer,
+  updateGroupAction,
 } from './GroupAction';
 import GroupDialog from './GroupDialog';
 
@@ -53,11 +56,18 @@ function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
   );
 }
 
-function useGroupList(): [Group[], () => Promise<Group[]>] {
+function useGroupList(): [
+  Group[],
+  () => Promise<Group[]>,
+  UserRecordExtended[]
+] {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [users, setUsers] = useState<UserRecordExtended[]>([]);
   const getGroups = useCallback(async () => {
-    const newGroups = await getGroupsFromServer();
+    const newGroups = await getGroupsAction();
+    const users = await getUsers();
     setGroups(newGroups);
+    setUsers(users);
     return newGroups;
   }, []);
 
@@ -65,14 +75,14 @@ function useGroupList(): [Group[], () => Promise<Group[]>] {
     getGroups();
   }, [getGroups]);
 
-  return [groups, getGroups];
+  return [groups, getGroups, users];
 }
 
-export default function Users() {
+export default function Groups() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();
-  const [groups, getGroups] = useGroupList();
+  const [groups, getGroups, users] = useGroupList();
 
   const editAction = useCallback(async (group: Group) => {
     setEditGroup(group);
@@ -101,6 +111,9 @@ export default function Users() {
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
           Groups
+          <IconButton onClick={() => getGroups()}>
+            <RefreshIcon />
+          </IconButton>
         </Typography>
         <Grid container>
           <Grid item xs={2} md={2} lg={2}></Grid>
@@ -149,12 +162,13 @@ export default function Users() {
       {showEditDialog && editGroup && (
         <GroupDialog
           group={editGroup}
-          onClose={async (group) => {
+          users={users}
+          onClose={async (group, assigendUsers) => {
             setShowEditDialog(false);
-            if (group) {
-              await updateGroupFromServer(group);
-              await getGroups();
+            if (group && assigendUsers) {
+              await updateGroupAction(group, assigendUsers);
             }
+            await getGroups();
           }}
         />
       )}

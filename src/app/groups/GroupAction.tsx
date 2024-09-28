@@ -23,28 +23,73 @@ async function getGroups(): Promise<Group[]> {
   );
 }
 
-export async function getGroupsFromServer(): Promise<Group[]> {
+export async function getGroupsAction(): Promise<Group[]> {
   await actionUserRequired();
 
   return await getGroups();
 }
 
-async function updateGroup(group: Group) {
+export async function updateGroupAction(group: Group, assigendUsers: string[]) {
+  await actionAdminRequired();
+
+  console.info(
+    `${group.id ? 'Updating' : 'Adding'} group ${group.name} ${group.id || ''}`
+  );
+
+  let groupId: string;
+
   if (group.id) {
     const doc = firestore.collection(GROUP_COLLECTION_ID).doc(group.id);
     await doc.set(group, { merge: true });
-    return doc.id;
+
+    groupId = group.id;
   } else {
     // new doc
     const result = await firestore.collection(GROUP_COLLECTION_ID).add(group);
-    return result.id;
+    groupId = result.id;
   }
-}
 
-export async function updateGroupFromServer(group: Group) {
-  await actionAdminRequired();
+  const userCollection = firestore.collection(USER_COLLECTION_ID);
+  const users = (await userCollection.get()).docs || [];
+  // update assigned users
+  const batch = firestore.batch();
 
-  return await updateGroup(group);
+  // users to remove
+  const removeUsers = users.filter(
+    (user) =>
+      (user.data().groups || []).includes(groupId) &&
+      !assigendUsers.includes(user.id)
+  );
+  console.info(
+    `removing ${removeUsers.length} from group ${group.name}: ${removeUsers.map(
+      (u) => u.data().displayName || u.data().email
+    )}`
+  );
+  removeUsers.forEach((user) =>
+    batch.update(userCollection.doc(user.id), {
+      groups: (user.data().groups as string[]).filter((id) => id !== groupId),
+    })
+  );
+
+  // users to add
+  const addUsers = users.filter(
+    (user) =>
+      !(user.data().groups || []).includes(groupId) &&
+      assigendUsers.includes(user.id)
+  );
+  console.info(
+    `adding ${addUsers.length} to group ${group.name}: ${addUsers.map(
+      (u) => u.data().displayName || u.data().email
+    )}`
+  );
+  addUsers.forEach((user) =>
+    batch.update(userCollection.doc(user.id), {
+      groups: [...((user.data().groups as string[]) || []), groupId],
+    })
+  );
+
+  await batch.commit();
+  return groupId;
 }
 
 async function getMyGroups(userId: string): Promise<Group[]> {

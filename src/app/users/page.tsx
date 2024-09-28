@@ -3,23 +3,22 @@
 import BlockIcon from '@mui/icons-material/Block';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { GridColDef } from '@mui/x-data-grid';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { feuerwehren } from '../../common/feuerwehren';
 import { UserRecordExtended } from '../../common/users';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
-import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { Group } from '../groups/GroupAction';
-import Grid from '@mui/material/Grid';
-import React from 'react';
-import { Refresh } from '@mui/icons-material';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -155,7 +154,7 @@ export default function Users() {
         <Typography variant="h3" gutterBottom>
           Users{' '}
           <IconButton onClick={() => fetchUsers()}>
-            <Refresh />
+            <RefreshIcon />
           </IconButton>
         </Typography>
         <Grid container>
