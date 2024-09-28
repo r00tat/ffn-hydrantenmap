@@ -85,6 +85,11 @@ jobs:
             # set to empty string
             export NEXT_PUBLIC_FIRESTORE_DB=""
           fi
+
+          echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>$GITHUB_ENV
+          echo "RUN_SERVICE='${RUN_SERVICE}'" >>$GITHUB_ENV
+
+          echo "RUN_REGION='${RUN_REGION}'" >>.version
           echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>.version
           echo "RUN_SERVICE='${RUN_SERVICE}'" >>.version
           echo "RUN_REGION='${RUN_REGION}'" >>.version
