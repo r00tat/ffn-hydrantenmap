@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
 import { firestore } from '../../firebase/firebase';
-import { Firecall } from '../../firebase/firestore';
+import { Firecall, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
 import useFirecall from '../../../hooks/useFirecall';
 
 export const firecallIcon = L.icon({
@@ -25,7 +25,7 @@ function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
   // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
   if (newPos) {
     setDoc(
-      doc(firestore, 'call', firecall?.id || 'unknown'),
+      doc(firestore, FIRECALL_COLLECTION_ID, firecall?.id || 'unknown'),
       {
         lat: newPos.lat,
         lng: newPos.lng,

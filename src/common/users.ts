@@ -5,6 +5,7 @@ export interface UserRecordExtended extends UserRecord {
   feuerwehr?: string;
   description?: string;
   messaging?: string[];
+  groups?: string[];
 }
 
 export const userTextFields: { [key: string]: string } = {

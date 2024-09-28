@@ -1,12 +1,13 @@
 import { DocumentData } from 'firebase/firestore';
 import { UserRecordExtended } from '../../../common/users';
 import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
+import { USER_COLLECTION_ID } from '../../../components/firebase/firestore';
 
 export const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
     await firebaseAdmin.auth().listUsers(1000)
   ).users.map((u) => u.toJSON() as UserRecordExtended);
-  const userDocs = (await firestore.collection('user').get()).docs;
+  const userDocs = (await firestore.collection(USER_COLLECTION_ID).get()).docs;
   const userDocsMap: { [uid: string]: DocumentData } = {};
   userDocs.forEach((doc) => (userDocsMap[doc.id] = doc.data()));
   users.forEach((u) => {

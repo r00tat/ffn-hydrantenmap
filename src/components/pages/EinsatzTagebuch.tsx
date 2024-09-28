@@ -25,6 +25,7 @@ import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog'
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   Diary,
+  FIRECALL_COLLECTION_ID,
   FirecallItem,
   Fzg,
   filterActiveItems,
@@ -40,7 +41,7 @@ export function useDiaries(sortAscending: boolean = false) {
   const [diaryCounter, setDiaryCounter] = useState(1);
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [firecallId, 'item'],
     // queryConstraints: [where('type', '==', 'vehicle')],
     queryConstraints: [],

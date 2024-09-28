@@ -1,28 +1,27 @@
-import SearchIcon from "@mui/icons-material/Search";
-import Box from "@mui/material/Box";
-import Fab from "@mui/material/Fab";
-import { useCallback, useState } from "react";
-import { useMap } from "react-leaflet";
-import { defaultGeoPosition } from "../../common/geo";
-import { OSMPlace, PlacesResponse } from "../../common/osm";
-import useFirebaseLogin from "../../hooks/useFirebaseLogin";
-import useFirecallItemAdd from "../../hooks/useFirecallItemAdd";
-import InputDialog from "../dialogs/InputDialog";
-import { FirecallItemMarker } from "../FirecallItems/elements/FirecallItemMarker";
+import SearchIcon from '@mui/icons-material/Search';
+import Box from '@mui/material/Box';
+import Fab from '@mui/material/Fab';
+import { useCallback, useState } from 'react';
+import { useMap } from 'react-leaflet';
+import { defaultGeoPosition } from '../../common/geo';
+import { OSMPlace, PlacesResponse } from '../../common/osm';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import InputDialog from '../dialogs/InputDialog';
+import { FirecallItemMarker } from '../FirecallItems/elements/FirecallItemMarker';
 
 function useSearchPlace() {
-  const { isSignedIn, user } = useFirebaseLogin();
+  const { isSignedIn, user, idToken: token } = useFirebaseLogin();
   return useCallback(
     async (query: string) => {
       if (!isSignedIn || !user) {
         return undefined;
       }
-      const token = await user.getIdToken();
       const response = await fetch(`/api/places`, {
-        method: "POST",
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query,
@@ -31,7 +30,7 @@ function useSearchPlace() {
       const searchResult = await response.json();
       return searchResult;
     },
-    [isSignedIn, user]
+    [isSignedIn, token, user]
   );
 }
 
@@ -42,7 +41,7 @@ function useAddPlace() {
     async (query: string, place: OSMPlace) => {
       const m = new FirecallItemMarker({
         name: place.name || place.display_name || query,
-        type: "marker",
+        type: 'marker',
         lat: Number.parseFloat(place.lat) || defaultGeoPosition.lat,
         lng: Number.parseFloat(place.lon) || defaultGeoPosition.lng,
         beschreibung: `${place.name}\n${place.display_name}\n${place.licence}`,
@@ -65,11 +64,11 @@ export default function SearchButton() {
 
   const handleClose = useCallback(
     async (value?: string) => {
-      console.info("Close dialog", value);
+      console.info('Close dialog', value);
       setIsDialogOpen(false);
       if (value) {
         const result: PlacesResponse = await searchPlace(value);
-        console.info("Result", result);
+        console.info('Result', result);
         if (result.places?.[0]) {
           addPlace(value, result.places?.[0]);
         }
@@ -90,7 +89,7 @@ export default function SearchButton() {
       <Box
         sx={{
           // '& > :not(style)': { m: 1 },
-          position: "absolute",
+          position: 'absolute',
           bottom: 96,
           right: 16,
         }}
@@ -101,7 +100,7 @@ export default function SearchButton() {
           size="small"
           onClick={(event) => {
             event.preventDefault();
-            console.info("Search for an address");
+            console.info('Search for an address');
             setIsDialogOpen(true);
           }}
         >

@@ -3,7 +3,9 @@ import Icon from '@mdi/react';
 import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import GroupIcon from '@mui/icons-material/Group';
 import InfoIcon from '@mui/icons-material/Info';
+import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
@@ -20,7 +22,14 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import LayersIcon from '@mui/icons-material/Layers';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+
+interface DrawerItem {
+  text: string;
+  icon: React.ReactNode;
+  href: string;
+  admin?: boolean;
+}
 
 export default function AppDrawer({
   isOpen,
@@ -45,7 +54,7 @@ export default function AppDrawer({
   );
   const { isAdmin } = useFirebaseLogin();
 
-  const drawerItems = [
+  const drawerItems: DrawerItem[] = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
     { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
@@ -62,6 +71,14 @@ export default function AppDrawer({
     { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
     { text: 'Login', icon: <LoginIcon />, href: '/login' },
     { text: 'About', icon: <InfoIcon />, href: '/about' },
+    { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
+    { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
+    {
+      text: 'Admin',
+      icon: <AdminPanelSettingsIcon />,
+      href: '/admin',
+      admin: true,
+    },
   ];
 
   return (
@@ -74,25 +91,16 @@ export default function AppDrawer({
           onKeyDown={toggleDrawer}
         >
           <List>
-            {drawerItems.map(({ text, icon, href }, index) => (
-              <Link href={href} passHref key={text} legacyBehavior>
-                <ListItem button key={text}>
-                  <ListItemIcon>{icon}</ListItemIcon>
-                  <ListItemText primary={text} />
-                </ListItem>
-              </Link>
-            ))}
-
-            {isAdmin && (
-              <Link href="/users" passHref legacyBehavior>
-                <ListItem button key="users">
-                  <ListItemIcon>
-                    <UserIcon />
-                  </ListItemIcon>
-                  <ListItemText primary="Users" />
-                </ListItem>
-              </Link>
-            )}
+            {drawerItems
+              .filter((item) => isAdmin || !item.admin)
+              .map(({ text, icon, href }, index) => (
+                <Link href={href} passHref key={text} legacyBehavior>
+                  <ListItem button key={text}>
+                    <ListItemIcon>{icon}</ListItemIcon>
+                    <ListItemText primary={text} />
+                  </ListItem>
+                </Link>
+              ))}
           </List>
         </Box>
       </Drawer>

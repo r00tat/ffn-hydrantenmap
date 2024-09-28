@@ -3,7 +3,11 @@ import L from 'leaflet';
 import GeometryUtil from 'leaflet-geometryutil';
 import { GeoPositionObject, LatLngPosition } from '../../../../common/geo';
 import { firestore } from '../../../firebase/firebase';
-import { Connection, MultiPointItem } from '../../../firebase/firestore';
+import {
+  Connection,
+  FIRECALL_COLLECTION_ID,
+  MultiPointItem,
+} from '../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from './distance';
 
 export async function updateFirecallPositions(
@@ -76,7 +80,7 @@ const updateConnectionInFirestore = async (
 ) => {
   if (fcItem.id)
     return await setDoc(
-      doc(firestore, 'call', firecallId, 'item', fcItem.id),
+      doc(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item', fcItem.id),
       {
         positions: JSON.stringify(positions),
         distance: Math.round(calculateDistance(positions)),

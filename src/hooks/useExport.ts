@@ -15,6 +15,7 @@ import {
   FcItemAttachment,
   FcMarker,
   Firecall,
+  FIRECALL_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../components/firebase/firestore';
@@ -74,7 +75,7 @@ export async function downloadAttachmentBase64(
 export async function exportFirecall(
   firecallId: string
 ): Promise<FirecallExport> {
-  const firecallDoc = doc(firestore, 'call', firecallId);
+  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
   const firecall = (await getDoc(firecallDoc)).data() as Firecall;
 
   const items = (
@@ -130,7 +131,10 @@ export const blobFromBase64String = (
 
 export async function importFirecall(firecall: FirecallExport) {
   const { items, chat, layers, id, ...firecallData } = firecall;
-  const firecallDoc = await addDoc(collection(firestore, 'call'), firecallData);
+  const firecallDoc = await addDoc(
+    collection(firestore, FIRECALL_COLLECTION_ID),
+    firecallData
+  );
   const itemCol = collection(firecallDoc, 'item');
   const chatCol = collection(firecallDoc, 'chat');
   const layerCol = collection(firecallDoc, 'layer');

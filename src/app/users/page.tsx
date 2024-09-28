@@ -3,18 +3,22 @@
 import BlockIcon from '@mui/icons-material/Block';
 import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useCallback, useEffect, useState } from 'react';
+import { GridColDef } from '@mui/x-data-grid';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { feuerwehren } from '../../common/feuerwehren';
 import { UserRecordExtended } from '../../common/users';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
+import { Group } from '../groups/GroupAction';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -38,7 +42,7 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
           )}
         </IconButton>
       </Tooltip>
-      <Tooltip title={`Edit ${row.displayName}`}>
+      <Tooltip title={`Edit ${row.displayName || row.email} ${row.uid}`}>
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -54,7 +58,8 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
 
 function useGridColumns(
   authorizeAction: (user: UserRecordExtended) => Promise<void>,
-  editAction: (user: UserRecordExtended) => void
+  editAction: (user: UserRecordExtended) => void,
+  groups: { [key: string]: string }
 ) {
   const [columns, setColumns] = useState<GridColDef[]>([]);
 
@@ -69,6 +74,16 @@ function useGridColumns(
         minWidth: 100,
         flex: 0.5,
         renderCell: (params) => feuerwehren[params.row.feuerwehr]?.name || '',
+      },
+      {
+        field: 'groups',
+        headerName: 'Gruppen',
+        minWidth: 100,
+        renderCell: (params) =>
+          (params.row.groups || [])
+            .map((key: string) => groups[key])
+            .filter((v: string) => v)
+            .join(', '),
       },
       { field: 'disabled', headerName: 'disabled', minWidth: 100 },
       // { field: 'authorized', headerName: 'authorized', minWidth: 100 },
@@ -85,7 +100,7 @@ function useGridColumns(
         ),
       },
     ]);
-  }, [authorizeAction, editAction]);
+  }, [authorizeAction, editAction, groups]);
   return columns;
 }
 
@@ -94,6 +109,22 @@ export default function Users() {
   const [editUser, setEditUser] = useState<UserRecordExtended>();
   const [users, fetchUsers] = useUserList();
   const updateApiCall = useUpdateUser();
+
+  const groupsArray = useFirebaseCollection<Group>({
+    collectionName: 'groups',
+    // pathSegments: [firecallId, 'group'],
+    // queryConstraints: [orderBy('timestamp', order)],
+  });
+
+  const groups: { [key: string]: string } = useMemo(
+    () =>
+      Object.fromEntries(
+        groupsArray
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((g) => [g.id, g.name])
+      ),
+    [groupsArray]
+  );
 
   const updateUser = useCallback(
     async (user: UserRecordExtended) => {
@@ -116,18 +147,72 @@ export default function Users() {
     console.info(`edit user: ${JSON.stringify(user)}`);
     setShowEditUserDialog(true);
   }, []);
-  const columns = useGridColumns(authorizeAction, editAction);
+  const columns = useGridColumns(authorizeAction, editAction, groups);
   return (
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
-          Users
+          Users{' '}
+          <IconButton onClick={() => fetchUsers()}>
+            <RefreshIcon />
+          </IconButton>
         </Typography>
-        <DataGrid rows={users} columns={columns} getRowId={(row) => row.uid} />
+        <Grid container>
+          <Grid item xs={2} md={2} lg={2}></Grid>
+          <Grid item xs={5} md={6} lg={2}>
+            <b>Name</b>
+          </Grid>
+          <Grid item xs={5} md={6} lg={2}>
+            <b>Email</b>
+          </Grid>
+
+          <Grid item xs={6} md={4} lg={2}>
+            <b>Feuerwehr</b>
+          </Grid>
+          <Grid item xs={6} md={4} lg={3}>
+            <b>Gruppen</b>
+          </Grid>
+          <Grid item xs={12}>
+            <hr />
+          </Grid>
+          {users.map((user) => (
+            <React.Fragment key={`user-entry-${user.uid}`}>
+              <Grid item xs={2} md={2} lg={2}>
+                <UserRowButtons
+                  row={user}
+                  authorizeFn={authorizeAction}
+                  editFn={editAction}
+                />
+              </Grid>
+              <Grid item xs={5} md={6} lg={2}>
+                {user.displayName || ''}
+              </Grid>
+              <Grid item xs={5} md={6} lg={2}>
+                {user.email}
+              </Grid>
+
+              <Grid item xs={6} md={4} lg={2}>
+                {user.feuerwehr} {user.description}
+              </Grid>
+              <Grid item xs={6} md={4} lg={3}>
+                {(user.groups || [])
+                  .map((key: string) => groups[key])
+                  .filter((v: string) => v)
+                  .join(', ')}
+              </Grid>
+              <Grid item xs={12}>
+                <hr />
+              </Grid>
+            </React.Fragment>
+          ))}
+        </Grid>
+
+        {/* <DataGrid rows={users} columns={columns} getRowId={(row) => row.uid} /> */}
       </Box>
       {showEditUserDialog && editUser && (
         <UserRecordExtendedDialog
           user={editUser}
+          groups={groups}
           onClose={(user) => {
             setShowEditUserDialog(false);
             if (user) {

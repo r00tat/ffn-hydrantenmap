@@ -18,7 +18,10 @@ import {
   useState,
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
-import { Firecall } from '../components/firebase/firestore';
+import {
+  Firecall,
+  FIRECALL_COLLECTION_ID,
+} from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export const defaultFirecall: Firecall = {
@@ -37,13 +40,14 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>();
-  const { isAuthorized } = useFirebaseLogin();
+  const { isAuthorized, groups } = useFirebaseLogin();
 
   useEffect(() => {
     if (isAuthorized) {
       const q = query(
-        collection(db, 'call'),
+        collection(db, FIRECALL_COLLECTION_ID),
         where('deleted', '==', false),
+        where('group', 'in', groups),
         orderBy('date', 'desc'),
         limit(1)
       );
@@ -52,10 +56,13 @@ export function useLastFirecall() {
           const firstDoc = querySnapshot.docs[0];
           const fc: Firecall = {
             id: firstDoc.id,
+            group: 'ffnd',
             ...firstDoc.data(),
           } as Firecall;
           setFirecall(fc);
-          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`);
+          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`, fc);
+        } else {
+          console.info(`no firecalls received`);
         }
       });
       return () => {
@@ -64,7 +71,7 @@ export function useLastFirecall() {
     } else {
       setFirecall(defaultFirecall);
     }
-  }, [isAuthorized]);
+  }, [groups, isAuthorized]);
 
   return firecall;
 }
@@ -78,7 +85,7 @@ export function useFirecallSwitcher(): FirecallContextType {
       setFirecall(undefined);
     } else {
       const unsubscribe = onSnapshot(
-        doc(firestore, 'call', firecallId),
+        doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
         (docSnapshot) => {
           if (docSnapshot.exists()) {
             const fc: Firecall = {

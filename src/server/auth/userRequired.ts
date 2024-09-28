@@ -2,6 +2,7 @@ import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
 import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';
 import firebaseAdmin, { firestore } from '../firebase/admin';
+import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 
 const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   const authorization = req.headers.get('authorization');
@@ -15,10 +16,6 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   try {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
     // console.log(`decoded token: ${JSON.stringify(decodedToken)}`);
-    // if (decodedToken.email !== 'paul.woelfel@ff-neusiedlamsee.at') {
-    //   res.status(403).json({ error: 'Forbidden' });
-    //   return false;
-    // }
     if (
       decodedToken.email &&
       decodedToken.email.indexOf('@ff-neusiedlamsee.at') > 0
@@ -28,7 +25,7 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
     }
     // fetch the user and check if this is an active user
     const userDoc = await firestore
-      .collection('user')
+      .collection(USER_COLLECTION_ID)
       .doc(decodedToken.sub)
       .get();
     if (!(userDoc.exists && userDoc.data()?.authorized === true)) {

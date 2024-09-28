@@ -23,6 +23,7 @@ import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog'
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import {
+  FIRECALL_COLLECTION_ID,
   FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
@@ -45,7 +46,7 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   const [diaryCounter, setDiaryCounter] = useState(1);
 
   const firecallItems = useFirebaseCollection<GeschaeftsbuchEintrag>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [firecallId, 'item'],
     queryConstraints: [where('type', '==', 'gb')],
     // queryConstraints: [],

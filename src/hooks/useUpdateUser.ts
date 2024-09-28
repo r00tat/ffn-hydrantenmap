@@ -4,7 +4,7 @@ import useFirebaseLogin from './useFirebaseLogin';
 import { updateUserAction } from '../app/users/action';
 
 export default function useUpdateUser() {
-  const { isSignedIn, user } = useFirebaseLogin();
+  const { isSignedIn, user, idToken: token } = useFirebaseLogin();
 
   return useCallback(
     async (

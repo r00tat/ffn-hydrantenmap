@@ -2,10 +2,10 @@
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
-import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
@@ -13,9 +13,15 @@ import { auth } from '../firebase/firebase';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 
 export default function LoginUi() {
-  const { isSignedIn, isAuthorized, displayName, email, signOut } =
-    useFirebaseLogin();
-  const { displayMessages, setDisplayMessages } = useDebugLogging();
+  const {
+    isSignedIn,
+    isAuthorized,
+    displayName,
+    email,
+    signOut,
+    uid,
+    isRefreshing,
+  } = useFirebaseLogin();
 
   return (
     <>
@@ -34,7 +40,15 @@ export default function LoginUi() {
 
       {isSignedIn && (
         <Box>
-          <Typography>Willkommen {auth.currentUser?.displayName}!</Typography>
+          <Typography>
+            Willkommen {auth.currentUser?.displayName}!
+            {isRefreshing && (
+              <>
+                Lade Benutzerinformationen...
+                <CircularProgress />
+              </>
+            )}
+          </Typography>
           <Button onClick={() => signOut()} variant="contained">
             Logout
           </Button>
@@ -43,7 +57,7 @@ export default function LoginUi() {
               <Typography>
                 Dein Benutzer ist freigeschalten und kann verwendet werden!{' '}
                 <br />
-                Angemeldet als: {displayName} {email}
+                Angemeldet als: {displayName} {email} (user id: {uid})
               </Typography>
               <Typography>
                 <Link href="/" passHref legacyBehavior>

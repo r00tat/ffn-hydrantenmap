@@ -2,7 +2,10 @@ import { addDoc, collection } from 'firebase/firestore';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
-import { FirecallItem } from '../components/firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FirecallItem,
+} from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
@@ -32,7 +35,7 @@ export default function useFirecallItemAdd() {
       return await addDoc(
         collection(
           firestore,
-          'call',
+          FIRECALL_COLLECTION_ID,
           firecallId,
           itemClass.firebaseCollectionName()
         ),

@@ -5,7 +5,10 @@ import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
-import { FirecallItem } from '../../../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FirecallItem,
+} from '../../../firebase/firestore';
 import { FirecallItemBase } from '../FirecallItemBase';
 
 export interface FirecallItemMarkerProps {
@@ -27,7 +30,7 @@ async function updateFircallItemPos(
     };
 
     await setDoc(
-      doc(firestore, 'call', firecallId, 'item', fcItem.id),
+      doc(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item', fcItem.id),
       updatePos,
       {
         merge: true,

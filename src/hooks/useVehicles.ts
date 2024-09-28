@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  FIRECALL_COLLECTION_ID,
   FirecallItem,
   Fzg,
   NON_DISPLAYABLE_ITEMS,
@@ -18,7 +19,7 @@ export default function useVehicles() {
   const [displayItems, setDisplayItems] = useState<FirecallItem[]>([]);
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
-    collectionName: 'call',
+    collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: [firecallId, 'item'],
     // queryConstraints: [where('type', '==', 'vehicle')],
     filterFn: filterActiveItems,
@@ -51,5 +52,6 @@ export default function useVehicles() {
     vehicles,
     rohre,
     otherItems,
+    displayItems,
   };
 }

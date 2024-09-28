@@ -7,7 +7,7 @@ export default function useUserList(): [
   UserRecordExtended[],
   () => Promise<void>
 ] {
-  const { isSignedIn, user } = useFirebaseLogin();
+  const { isSignedIn, user, idToken: token } = useFirebaseLogin();
   const [users, setUsers] = useState<UserRecordExtended[]>([]);
 
   const fetchUsers = useCallback(async () => {
