@@ -1,8 +1,8 @@
+import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';
 import React from 'react';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
-import 'leaflet/dist/leaflet.css';
 
 const APP_NAME = 'Einsatzkarte FFN';
 const APP_DEFAULT_TITLE = 'Einsatzkarte FFN';
