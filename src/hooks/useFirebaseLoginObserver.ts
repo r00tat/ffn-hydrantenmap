@@ -55,7 +55,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
             isAdmin: prev.isAdmin || userData?.isAdmin === true,
             messagingTokens: userData.messaging,
             chatNotifications: userData.chatNotifications,
-            groups: userData.groups || [],
+            groups: [...(userData.groups || []), 'allUsers'],
             isRefreshing: false,
           }));
         } else {
