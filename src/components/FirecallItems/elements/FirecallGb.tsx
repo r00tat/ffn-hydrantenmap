@@ -8,6 +8,7 @@ export class FirecallGb extends FirecallItemBase {
   von: string;
   an: string;
   ausgehend: boolean;
+  weiterleitung: string;
 
   public constructor(firecallItem?: GeschaeftsbuchEintrag) {
     super(firecallItem);
@@ -16,6 +17,7 @@ export class FirecallGb extends FirecallItemBase {
     this.an = firecallItem?.an ?? '';
     this.nummer = firecallItem?.nummer ?? 1;
     this.ausgehend = firecallItem?.ausgehend ?? false;
+    this.weiterleitung = firecallItem?.weiterleitung ?? '';
   }
 
   public data(): GeschaeftsbuchEintrag {
@@ -25,6 +27,7 @@ export class FirecallGb extends FirecallItemBase {
       an: this.an,
       ausgehend: this.ausgehend,
       nummer: this.nummer,
+      weiterleitung: this.weiterleitung,
     } as GeschaeftsbuchEintrag;
   }
 
@@ -53,6 +56,7 @@ export class FirecallGb extends FirecallItemBase {
       an: 'Meldung an',
       name: 'Information',
       beschreibung: 'Anmerkung',
+      weiterleitung: 'Weiterleiten an (S1, S2, ...)',
     };
   }
 
@@ -108,6 +112,7 @@ export class FirecallGb extends FirecallItemBase {
             </>
           )}
           {this.ausgehend ? 'Ausgehend' : 'Eingehend'}: {this.name}
+          Weiterleitung: {this.weiterleitung} <br />
           <br />
           Anmerkung: {this.beschreibung}
         </>
