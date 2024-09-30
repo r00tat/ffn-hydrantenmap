@@ -22,7 +22,9 @@ export default function usePositionMarker(map: L.Map | undefined) {
 
   useEffect(() => {
     if (!initialPositionSet && gotPosition && map) {
-      console.info(`initial position, zooming to ${position}`);
+      console.info(
+        `PosMarkerHook: initial position, zooming to ${position.lat},${position.lng}`
+      );
       setInitialPositionSet(true);
       map.setView(position);
       positionMarker.addTo(map);

@@ -7,7 +7,7 @@ import '../styles/globals.css';
 const APP_NAME = 'Einsatzkarte FFN';
 const APP_DEFAULT_TITLE = 'Einsatzkarte FFN';
 const APP_TITLE_TEMPLATE = '%s - PWA App';
-const APP_DESCRIPTION = 'Hydraten und Einsatzkarte der FF Neusiedl am See';
+const APP_DESCRIPTION = 'Hydranten und Einsatzkarte der FF Neusiedl am See';
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
