@@ -9,7 +9,7 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Fab from '@mui/material/Fab';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -82,7 +82,7 @@ function EinsatzCard({
   );
 
   return (
-    <Grid item xs={12} md={6} lg={4}>
+    <Grid size={{ xs: 12, md: 6, lg: 4 }}>
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
@@ -180,7 +180,7 @@ export default function Einsaetze() {
           Einsätze
         </Typography>
         <Grid container spacing={2}>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <FirecallImport />
           </Grid>
           {einsaetze.map((einsatz) => (

@@ -6,7 +6,7 @@ import type {} from '@mui/x-date-pickers/themeAugmentation';
 import { Moment } from 'moment';
 import 'moment/locale/de';
 import TimeIcon from '@mui/icons-material/AccessTime';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import Tooltip from '@mui/material/Tooltip';
 import moment from 'moment';
 
@@ -24,7 +24,7 @@ export default function MyDateTimePicker({
   // const [value, setValue] = React.useState<Moment | null>(moment());
   return (
     <Grid container>
-      <Grid item xs={11}>
+      <Grid size={{ xs: 11 }}>
         <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale="de-DE">
           <DateTimePicker
             slotProps={{
@@ -40,7 +40,7 @@ export default function MyDateTimePicker({
           />
         </LocalizationProvider>
       </Grid>
-      <Grid item xs={1}>
+      <Grid size={{ xs: 1 }}>
         <Tooltip title="Auf aktuelle Uhrzeit setzten">
           <IconButton onClick={() => setValue(moment())}>
             <TimeIcon />

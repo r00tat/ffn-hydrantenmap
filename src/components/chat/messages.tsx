@@ -1,4 +1,4 @@
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import { orderBy } from 'firebase/firestore';
 import { ChatMessage } from '../../common/chat';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -21,7 +21,7 @@ export default function ChatMessages({ order = 'desc' }: ChatMessagesProps) {
     <>
       <Grid container>
         {messages.map((m) => (
-          <Grid item xs={12} key={m.id}>
+          <Grid size={{ xs: 12 }} key={m.id}>
             <MessageBox msg={m} />
           </Grid>
         ))}

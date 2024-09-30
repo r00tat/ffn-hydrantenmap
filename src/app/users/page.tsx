@@ -5,7 +5,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -158,49 +158,47 @@ export default function Users() {
           </IconButton>
         </Typography>
         <Grid container>
-          <Grid item xs={2} md={2} lg={2}></Grid>
-          <Grid item xs={5} md={6} lg={2}>
+          <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>
+          <Grid size={{ xs: 5, md: 6, lg: 2 }}>
             <b>Name</b>
           </Grid>
-          <Grid item xs={5} md={6} lg={2}>
+          <Grid size={{ xs: 5, md: 6, lg: 2 }}>
             <b>Email</b>
           </Grid>
 
-          <Grid item xs={6} md={4} lg={2}>
+          <Grid size={{ xs: 6, md: 4, lg: 2 }}>
             <b>Feuerwehr</b>
           </Grid>
-          <Grid item xs={6} md={4} lg={3}>
+          <Grid size={{ xs: 6, md: 4, lg: 3 }}>
             <b>Gruppen</b>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <hr />
           </Grid>
           {users.map((user) => (
             <React.Fragment key={`user-entry-${user.uid}`}>
-              <Grid item xs={2} md={2} lg={2}>
+              <Grid size={{ xs: 2, md: 2, lg: 2 }}>
                 <UserRowButtons
                   row={user}
                   authorizeFn={authorizeAction}
                   editFn={editAction}
                 />
               </Grid>
-              <Grid item xs={5} md={6} lg={2}>
+              <Grid size={{ xs: 5, md: 6, lg: 2 }}>
                 {user.displayName || ''}
               </Grid>
-              <Grid item xs={5} md={6} lg={2}>
-                {user.email}
-              </Grid>
+              <Grid size={{ xs: 5, md: 6, lg: 2 }}>{user.email}</Grid>
 
-              <Grid item xs={6} md={4} lg={2}>
+              <Grid size={{ xs: 6, md: 4, lg: 2 }}>
                 {user.feuerwehr} {user.description}
               </Grid>
-              <Grid item xs={6} md={4} lg={3}>
+              <Grid size={{ xs: 6, md: 4, lg: 3 }}>
                 {(user.groups || [])
                   .map((key: string) => groups[key])
                   .filter((v: string) => v)
                   .join(', ')}
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <hr />
               </Grid>
             </React.Fragment>

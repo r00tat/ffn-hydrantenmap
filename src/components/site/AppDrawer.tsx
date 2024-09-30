@@ -23,6 +23,7 @@ import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ListItemButton from '@mui/material/ListItemButton';
 
 interface DrawerItem {
   text: string;
@@ -95,10 +96,10 @@ export default function AppDrawer({
               .filter((item) => isAdmin || !item.admin)
               .map(({ text, icon, href }, index) => (
                 <Link href={href} passHref key={text} legacyBehavior>
-                  <ListItem button key={text}>
+                  <ListItemButton key={text}>
                     <ListItemIcon>{icon}</ListItemIcon>
                     <ListItemText primary={text} />
-                  </ListItem>
+                  </ListItemButton>
                 </Link>
               ))}
           </List>

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
@@ -56,7 +56,7 @@ export default function ChatUi() {
     <>
       <Typography variant="h3">Chat</Typography>
       <Grid container>
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <FormControlLabel
             control={
               <Switch
@@ -72,7 +72,7 @@ export default function ChatUi() {
             label="Chat Benachrichtigungen"
           />
         </Grid>
-        <Grid item xs={11}>
+        <Grid size={{ xs: 11 }}>
           <FormControl sx={{ m: 2 }} variant="outlined" fullWidth>
             <InputLabel htmlFor="outlined-adornment-password">
               Chat Message
@@ -105,11 +105,11 @@ export default function ChatUi() {
           </FormControl>
         </Grid>
 
-        {/* <Grid item xs={12}>
+        {/* <Grid size={{xs:12}}>
           <Typography>Register: {JSON.stringify(result)}</Typography>
         </Grid> */}
 
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <ChatMessages />
         </Grid>
       </Grid>
