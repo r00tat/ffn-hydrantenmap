@@ -5,7 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Fab from '@mui/material/Fab';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import {
@@ -154,7 +154,7 @@ export default function Tokens() {
   return (
     <>
       <Grid container spacing={2} padding={2}>
-        <Grid item xs={12}>
+        <Grid size={{ xs: 12 }}>
           <Typography variant="h4">API Token</Typography>
           <Typography>
             Ein Token kann für den API Zugriff auf Geojson (z.B.{' '}
@@ -172,7 +172,7 @@ export default function Tokens() {
           </Typography>
         </Grid>
         {tokens.map((token) => (
-          <Grid item xs={12} key={token.id}>
+          <Grid size={{ xs: 12 }} key={token.id}>
             <TokenDisplay token={token} key={token.id} />
           </Grid>
         ))}

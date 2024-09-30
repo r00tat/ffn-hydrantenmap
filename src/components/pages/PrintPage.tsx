@@ -1,4 +1,4 @@
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import DynamicMap from '../Map/PositionedMap';
 import EinsatzTagebuch from '../pages/EinsatzTagebuch';
 import DynamicFahrzeuge from '../pages/FahrzeugePrint';
@@ -8,15 +8,11 @@ export default function PrintPage() {
   return (
     <>
       <Grid container>
-        <Grid item xs={1}>
-          &nbsp;
-        </Grid>
-        <Grid item xs={10}>
+        <Grid size={{ xs: 1 }}>&nbsp;</Grid>
+        <Grid size={{ xs: 10 }}>
           <DynamicMap />
         </Grid>
-        <Grid item xs={1}>
-          &nbsp;
-        </Grid>
+        <Grid size={{ xs: 1 }}>&nbsp;</Grid>
       </Grid>
       <hr></hr>
       <DynamicFahrzeuge />

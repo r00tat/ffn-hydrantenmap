@@ -6,7 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -116,41 +116,35 @@ export default function Groups() {
           </IconButton>
         </Typography>
         <Grid container>
-          <Grid item xs={2} md={2} lg={2}></Grid>
-          <Grid item xs={5} md={3} lg={3}>
+          <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>
+          <Grid size={{ xs: 5, md: 3, lg: 3 }}>
             <b>ID</b>
           </Grid>
-          <Grid item xs={5} md={3} lg={3}>
+          <Grid size={{ xs: 5, md: 3, lg: 3 }}>
             <b>Name</b>
           </Grid>
 
-          <Grid item xs={12} md={4} lg={4}>
+          <Grid size={{ xs: 12, md: 4, lg: 4 }}>
             <b>Description</b>
           </Grid>
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <hr />
           </Grid>
 
           {groups.map((group) => (
             <React.Fragment key={`group-${group.id}`}>
-              <Grid item xs={2} md={2} lg={2}>
+              <Grid size={{ xs: 2, md: 2, lg: 2 }}>
                 <GroupRowButtons
                   row={group}
                   editFn={editAction}
                   deleteFn={showDeleteConfirm}
                 />
               </Grid>
-              <Grid item xs={5} md={3} lg={3}>
-                {group.id}
-              </Grid>
-              <Grid item xs={5} md={3} lg={3}>
-                {group.name}
-              </Grid>
+              <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.id}</Grid>
+              <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.name}</Grid>
 
-              <Grid item xs={12} md={4} lg={4}>
-                {group.description}
-              </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12, md: 4, lg: 4 }}>{group.description}</Grid>
+              <Grid size={{ xs: 12 }}>
                 <hr />
               </Grid>
             </React.Fragment>

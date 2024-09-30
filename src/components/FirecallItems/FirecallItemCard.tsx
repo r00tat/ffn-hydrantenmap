@@ -11,7 +11,7 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Collapse from '@mui/material/Collapse';
-import Grid, { RegularBreakpoints } from '@mui/material/Grid';
+import Grid, { GridBaseProps } from '@mui/material/Grid2';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
@@ -41,7 +41,7 @@ const ExpandMore = styled((props: ExpandMoreProps) => {
   }),
 }));
 
-export interface FirecallItemCardOptions extends RegularBreakpoints {
+export interface FirecallItemCardOptions extends GridBaseProps {
   item: FirecallItem;
   close?: () => void;
   subItems?: FirecallItem[];
@@ -107,7 +107,7 @@ export default function FirecallItemCard({
   };
 
   return (
-    <Grid item xs={12} md={6} lg={4} {...breakpoints}>
+    <Grid size={{ xs: 12, md: 6, lg: 4 }} {...breakpoints}>
       <Card ref={setNodeRef} style={style} {...listeners} {...attributes}>
         <CardContent>
           <Typography variant="h5" component="div" flex={1}>
@@ -172,10 +172,7 @@ export default function FirecallItemCard({
                   <FirecallItemCard
                     item={si}
                     key={si.id}
-                    xs={12}
-                    md={12}
-                    lg={6}
-                    xl={4}
+                    size={{ xs: 12, md: 12, lg: 6, xl: 4 }}
                     draggable={subItemsDraggable}
                   />
                 ))}

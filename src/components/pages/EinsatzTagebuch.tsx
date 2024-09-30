@@ -31,7 +31,7 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import React from 'react';
 import { randomUUID } from 'crypto';
 
@@ -289,36 +289,32 @@ export default function EinsatzTagebuch({
             />
           </Typography>
           <Grid container>
-            <Grid item xs={3} md={2} lg={1}>
+            <Grid size={{ xs: 3, md: 2, lg: 1 }}>
               <b>Nummer</b>
             </Grid>
-            <Grid item xs={6} md={5} lg={2}>
+            <Grid size={{ xs: 6, md: 5, lg: 2 }}>
               <b>Datum</b>
             </Grid>
-            <Grid item xs={12} md={5} lg={2}>
+            <Grid size={{ xs: 12, md: 5, lg: 2 }}>
               <b>typ von -&gt; an</b>
             </Grid>
-            <Grid item xs={12} md={5} lg={3}>
+            <Grid size={{ xs: 12, md: 5, lg: 3 }}>
               <b>Eintrag</b>
             </Grid>
-            <Grid item xs={12} md={5} lg={3}>
+            <Grid size={{ xs: 12, md: 5, lg: 3 }}>
               <b>Beschreibung</b>
             </Grid>
-            <Grid item xs={12} md={2} lg={1}></Grid>
+            <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
             {diaries.map((e) => (
               <React.Fragment
                 key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
               >
-                <Grid item xs={3} md={2} lg={1}>
-                  {e.nummer}
-                </Grid>
-                <Grid item xs={6} md={5} lg={2}>
-                  {e.datum}
-                </Grid>
-                <Grid item xs={12} md={5} lg={2}>
+                <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
+                <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
+                <Grid size={{ xs: 12, md: 5, lg: 2 }}>
                   {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
                 </Grid>
-                <Grid item xs={12} md={5} lg={3}>
+                <Grid size={{ xs: 12, md: 5, lg: 3 }}>
                   <b>
                     {e.name?.split(`\n`).map((line, index) => (
                       <React.Fragment key={`title-${e.id}-${index}`}>
@@ -328,7 +324,7 @@ export default function EinsatzTagebuch({
                     ))}
                   </b>
                 </Grid>
-                <Grid item xs={12} md={5} lg={3}>
+                <Grid size={{ xs: 12, md: 5, lg: 3 }}>
                   {e.beschreibung?.split('\n').map((line, index) => (
                     <React.Fragment key={`beschreibung-${e.id}-${index}`}>
                       {line}
@@ -336,7 +332,7 @@ export default function EinsatzTagebuch({
                     </React.Fragment>
                   ))}
                 </Grid>
-                <Grid item xs={12} md={2} lg={1}>
+                <Grid size={{ xs: 12, md: 2, lg: 1 }}>
                   {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
                 </Grid>
               </React.Fragment>

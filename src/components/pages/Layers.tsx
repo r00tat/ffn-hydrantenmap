@@ -16,7 +16,7 @@ import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
-import Grid from '@mui/material/Grid';
+import Grid from '@mui/material/Grid2';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import {
@@ -76,9 +76,7 @@ export function DroppableFirecallCard({
     <FirecallItemCard
       item={item}
       allowTypeChange={false}
-      xs={12}
-      md={12}
-      lg={12}
+      size={{ xs: 12, md: 12, lg: 12 }}
       {...options}
     >
       <DropBox id={'' + item.id} />
@@ -194,9 +192,7 @@ export default function LayersPage() {
           </Typography>
           <Grid container spacing={2}>
             <Grid
-              item
-              xs={hasUnassignedItems ? 6 : 10}
-              xl={hasUnassignedItems ? 8 : 10}
+              size={hasUnassignedItems ? { xs: 6, xl: 8 } : { xs: 10, xl: 10 }}
             >
               <Typography variant="h5">
                 Erstellte Ebenen
@@ -224,9 +220,7 @@ export default function LayersPage() {
               </Grid>
             </Grid>
             <Grid
-              item
-              xs={hasUnassignedItems ? 6 : 2}
-              xl={hasUnassignedItems ? 4 : 2}
+              size={hasUnassignedItems ? { xs: 6, xl: 2 } : { xs: 4, xl: 2 }}
             >
               <Typography variant="h5">Elemente nicht zugeordnet</Typography>
               <DropBox id="default">keiner Ebene zuoordnen</DropBox>
