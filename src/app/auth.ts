@@ -1,9 +1,10 @@
-import NextAuth from 'next-auth';
+import NextAuth, { DefaultSession } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import { isTruthy } from '../common/boolish';
+import { FirebaseUserInfo } from '../common/users';
+import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
-import { isTruthy } from '../common/boolish';
-import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
@@ -37,6 +38,29 @@ export async function checkFirebaseToken(token: string) {
   return decodedToken;
 }
 
+declare module 'next-auth' {
+  /**
+   * Returned by `auth`, `useSession`, `getSession` and received as a prop on the `SessionProvider` React Context
+   */
+  interface Session {
+    user: {
+      /**
+       * the users firebase id
+       */
+      id: string;
+      isAuthorized: boolean;
+      isAdmin: boolean;
+      groups: string[];
+      /**
+       * By default, TypeScript merges new interface properties and overwrites existing ones.
+       * In this case, the default session user properties will be overwritten,
+       * with the new ones defined above. To keep the default session user properties,
+       * you need to add them back into the newly declared interface.
+       */
+    } & DefaultSession['user'];
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
@@ -50,10 +74,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const tokenInfo = await checkFirebaseToken(credentials.firebaseToken);
         // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
         return {
-          // not displayed, using image as workaround
           id: tokenInfo.sub,
-          // image: tokenInfo.picture,
-          image: tokenInfo.sub,
+          image: tokenInfo.picture,
           email: tokenInfo.email,
           name: tokenInfo.name,
         };
@@ -65,36 +87,56 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     maxAge: 60 * 60,
   },
   // adapter: FirestoreAdapter(),
-  // callbacks: {
-  // redirect: async ({ url, baseUrl }) => {
-  //   console.info(`redirect ${baseUrl} ${url}`);
-  //   return '/map';
-  // },
-  //   authorized: async (params) => {
-  //     console.info(`authorized with params: ${JSON.stringify(params)}`);
-  //     return true;
-  //   },
-  //   signIn: async (params) => {
-  //     console.info(`sign in with params: ${JSON.stringify(params)}`);
-  //     return true;
-  //   },
-  //   session: async ({ session, token, user }) => {
-  //     console.info(
-  //       `session with params: ${JSON.stringify(session)} ${JSON.stringify(
-  //         user
-  //       )}`
-  //     );
-  //     return session;
-  //   },
-  //   jwt: async ({ token, user, account }) => {
-  //     console.info(
-  //       `jwt token: ${JSON.stringify(token)}\nuser: ${JSON.stringify(
-  //         user
-  //       )}\n${JSON.stringify(account)}`
-  //     );
-  //     return token;
-  //   },
-  // },
+  callbacks: {
+    // redirect: async ({ url, baseUrl }) => {
+    //   console.info(`redirect ${baseUrl} ${url}`);
+    //   // return '';
+    //   // Allows relative callback URLs
+    //   if (url.startsWith('/')) return `${baseUrl}${url}`;
+    //   // Allows callback URLs on the same origin
+    //   if (new URL(url).origin === baseUrl) return url;
+    //   return baseUrl;
+    // },
+    // authorized: async (params) => {
+    //   console.info(`authorized with params: ${JSON.stringify(params)}`);
+    //   return true;
+    // },
+    // signIn: async (params) => {
+    //   console.info(`sign in with params: ${JSON.stringify(params)}`);
+    //   return true;
+    // },
+    session: async ({ session, token, user }) => {
+      session.user.id = token.id as string;
+
+      if (session.user.id) {
+        const userInfo = await firestore
+          .collection(USER_COLLECTION_ID)
+          .doc(session.user.id)
+          .get();
+        // console.info(`firebase user info: ${JSON.stringify(userInfo.data())}`);
+        if (userInfo.exists) {
+          const userData = userInfo.data() as FirebaseUserInfo;
+          session.user.isAuthorized = !!userData.authorized;
+          session.user.isAdmin = !!userData.isAdmin;
+          session.user.groups = ['allUsers', ...(userData.groups || [])];
+        }
+      }
+      console.info(
+        `session with params: ${JSON.stringify(session)} ${JSON.stringify(
+          user
+        )}`
+      );
+
+      return session;
+    },
+    jwt: ({ token, user }) => {
+      if (user) {
+        // User is available during sign-in
+        token.id = user.id;
+      }
+      return token;
+    },
+  },
 });
 
 export async function actionUserRequired() {
@@ -110,15 +152,15 @@ export async function actionAdminRequired() {
   const session = await actionUserRequired();
   // console.info(`session: ${JSON.stringify(session)}`);
 
-  if (!session.user?.image) {
+  if (!session.user?.id) {
     throw new ApiException('User not authorized, no id set', { status: 403 });
   }
-  const userDoc = await firestore
-    .collection(USER_COLLECTION_ID)
-    .doc(session.user?.image)
-    .get();
-  if (!userDoc.data()?.isAdmin) {
-    throw new ApiException('Admin require, not authorized', { status: 403 });
+  // const userDoc = await firestore
+  //   .collection(USER_COLLECTION_ID)
+  //   .doc(session.user?.id)
+  //   .get();
+  if (!session.user.isAdmin) {
+    throw new ApiException('Admin required, not authorized', { status: 403 });
   }
 
   return session;

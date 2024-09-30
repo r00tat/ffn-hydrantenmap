@@ -39,24 +39,28 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     isAuthorized: false,
     isAdmin: false,
   }); // Local signed-in state.
+  const [uid, setUid] = useState<string>();
 
   const refresh = useCallback(async () => {
-    if (loginStatus.isSignedIn && loginStatus.uid) {
+    console.info(`refreshing user data for ${uid}`);
+    if (uid) {
       try {
-        const userDoc = await getDoc(
-          doc(firestore, USER_COLLECTION_ID, loginStatus.uid)
-        );
+        const userDoc = await getDoc(doc(firestore, USER_COLLECTION_ID, uid));
         const userData = userDoc.data();
-        console.info(`refresh user data: ${JSON.stringify(userData)}`);
+        console.info(`refreshed user data: `, userData);
         if (userData?.authorized) {
-          setLoginStatus((prev) => ({
-            ...prev,
+          // console.info(`user is authorized`);
+          const newData = {
             isAuthorized: true,
-            isAdmin: prev.isAdmin || userData?.isAdmin === true,
             messagingTokens: userData.messaging,
             chatNotifications: userData.chatNotifications,
             groups: [...(userData.groups || []), 'allUsers'],
             isRefreshing: false,
+          };
+          setLoginStatus((prev) => ({
+            ...prev,
+            ...newData,
+            isAdmin: prev.isAdmin || userData?.isAdmin === true,
           }));
         } else {
           console.log(`user is not authorized:`, userData);
@@ -69,13 +73,17 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         console.error(`failed to fetch user doc`, err);
       }
     }
-  }, [loginStatus.isSignedIn, loginStatus.uid]);
+  }, [uid]);
 
   const serverLogin = useCallback(async () => {
+    console.info(`starting server login`);
     const token = await auth.currentUser?.getIdToken();
+    // console.info(`got token`, token);
     if (token) {
       const loginResult = await firebaseTokenLogin(token);
       console.info(`server side login result: `, loginResult);
+    } else {
+      console.info(`no token received in server side login`);
     }
   }, []);
 
@@ -85,6 +93,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       async (user: User | null) => {
         let u: User | undefined = user != null ? user : undefined;
         console.info(`login status changed:`, u);
+        setUid(u?.uid);
 
         const token = await user?.getIdToken();
         if (token) {
@@ -94,25 +103,25 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         const tokenResult = await user?.getIdTokenResult();
         const idToken = await user?.getIdToken();
 
-        const authData: LoginData = {
+        const authData: any = {
           isSignedIn: !!user,
           user: user !== null ? user : undefined,
           email: nonNull(u?.email),
           displayName: nonNull(u?.displayName),
           uid: nonNull(u?.uid),
           photoURL: nonNull(u?.photoURL),
-          isAuthorized: false,
-          isAdmin: false,
+          // isAuthorized: false,
+          // isAdmin: false,
           expiration: tokenResult?.expirationTime,
           idToken,
-          groups: [],
+          // groups: ['allUsers'],
           isRefreshing: true,
         };
-        if (window && window.sessionStorage) {
-          window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
-        }
+        // if (window && window.sessionStorage) {
+        //   window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
+        // }
 
-        setLoginStatus(authData);
+        setLoginStatus((prev) => ({ ...prev, ...authData }));
         await refresh();
       }
     );
@@ -138,7 +147,21 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, []);
 
   useEffect(() => {
-    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 50);
+    if (
+      window &&
+      window.sessionStorage &&
+      loginStatus.isAuthorized &&
+      !loginStatus.isRefreshing &&
+      loginStatus.expiration &&
+      new Date(loginStatus.expiration) > new Date()
+    ) {
+      window.sessionStorage.setItem('fbAuth', JSON.stringify(loginStatus));
+    }
+  }, [loginStatus]);
+
+  useEffect(() => {
+    // refresh all 30 minutes
+    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 30);
 
     return () => {
       clearInterval(clearServerInterval);

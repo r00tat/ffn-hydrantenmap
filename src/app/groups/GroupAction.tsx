@@ -108,7 +108,7 @@ async function getMyGroups(userId: string): Promise<Group[]> {
 export async function getMyGroupsFromServer(): Promise<Group[]> {
   const userInfo = await actionUserRequired();
 
-  return userInfo?.user?.image ? getMyGroups(userInfo.user?.image) : [];
+  return userInfo?.user?.id ? getMyGroups(userInfo.user?.id) : [];
 }
 
 export async function deleteGroupAction(groupId: string) {

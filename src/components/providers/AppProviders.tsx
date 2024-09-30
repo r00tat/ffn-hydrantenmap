@@ -1,6 +1,7 @@
 'use client';
 
 import CssBaseline from '@mui/material/CssBaseline';
+import { SessionProvider } from 'next-auth/react';
 import React from 'react';
 import About from '../../app/about/page';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -60,13 +61,15 @@ function AuthorizationApp({ children }: AppProps) {
 
 export default function AppProviders({ children }: AppProps) {
   return (
-    <FirebaseUserProvider>
-      <div className={styles.container}>
-        <CssBaseline enableColorScheme />
-        <SingedOutOneTapLogin />
+    <SessionProvider>
+      <FirebaseUserProvider>
+        <div className={styles.container}>
+          <CssBaseline enableColorScheme />
+          <SingedOutOneTapLogin />
 
-        <AuthorizationApp>{children}</AuthorizationApp>
-      </div>
-    </FirebaseUserProvider>
+          <AuthorizationApp>{children}</AuthorizationApp>
+        </div>
+      </FirebaseUserProvider>
+    </SessionProvider>
   );
 }
