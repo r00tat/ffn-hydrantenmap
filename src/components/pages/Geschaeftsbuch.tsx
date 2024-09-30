@@ -3,14 +3,19 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import TabContext from '@mui/lab/TabContext';
+import TabList from '@mui/lab/TabList';
+import TabPanel from '@mui/lab/TabPanel';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
+import Tab from '@mui/material/Tab';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { where } from 'firebase/firestore';
 import moment from 'moment';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   dateTimeFormat,
   formatTimestamp,
@@ -18,24 +23,17 @@ import {
 } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
+import { downloadRowsAsCsv } from '../firebase/download';
 import {
   FIRECALL_COLLECTION_ID,
   FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
 } from '../firebase/firestore';
-
-import TabContext from '@mui/lab/TabContext';
-import TabList from '@mui/lab/TabList';
-import TabPanel from '@mui/lab/TabPanel';
-import Grid from '@mui/material/Grid';
-import Tab from '@mui/material/Tab';
-import React from 'react';
-import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
-import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 
 interface GbDisplay extends GeschaeftsbuchEintrag {
@@ -175,34 +173,30 @@ function GbEntries({
 }) {
   return (
     <Grid container>
-      <Grid item xs={3} md={2} lg={1}>
+      <Grid size={{ xs: 3, md: 2, lg: 1 }}>
         <b>Nummer</b>
       </Grid>
-      <Grid item xs={6} md={5} lg={2}>
+      <Grid size={{ xs: 6, md: 5, lg: 2 }}>
         <b>Datum</b>
       </Grid>
-      <Grid item xs={12} md={5} lg={2}>
+      <Grid size={{ xs: 12, md: 5, lg: 2 }}>
         <b>von -&gt; an</b>
       </Grid>
-      <Grid item xs={12} md={5} lg={3}>
+      <Grid size={{ xs: 12, md: 5, lg: 3 }}>
         <b>Name</b>
       </Grid>
-      <Grid item xs={12} md={5} lg={3}>
+      <Grid size={{ xs: 12, md: 5, lg: 3 }}>
         <b>Beschreibung</b>
       </Grid>
-      <Grid item xs={12} md={2} lg={1}></Grid>
+      <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
       {eintraege.map((e) => (
         <React.Fragment key={'gb-' + e.id}>
-          <Grid item xs={3} md={2} lg={1}>
-            {e.nummer}
-          </Grid>
-          <Grid item xs={6} md={5} lg={2}>
-            {e.datum}
-          </Grid>
-          <Grid item xs={12} md={5} lg={2}>
+          <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
+          <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
+          <Grid size={{ xs: 12, md: 5, lg: 2 }}>
             {e.einaus} {e.von} -&gt; {e.an} ({e.weiterleitung})
           </Grid>
-          <Grid item xs={12} md={5} lg={3}>
+          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
             <b>
               {e.name?.split(`\n`).map((line, index) => (
                 <React.Fragment key={`title-${e.id}-${index}`}>
@@ -212,7 +206,7 @@ function GbEntries({
               ))}
             </b>
           </Grid>
-          <Grid item xs={12} md={5} lg={3}>
+          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
             {e.beschreibung?.split('\n').map((line, index) => (
               <React.Fragment key={`beschreibung-${e.id}-${index}`}>
                 {line}
@@ -220,7 +214,7 @@ function GbEntries({
               </React.Fragment>
             ))}
           </Grid>
-          <Grid item xs={12} md={2} lg={1}>
+          <Grid size={{ xs: 12, md: 2, lg: 1 }}>
             {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
           </Grid>
         </React.Fragment>
