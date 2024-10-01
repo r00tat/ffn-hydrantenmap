@@ -9,7 +9,11 @@ import { useMapEvent } from 'react-leaflet';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { fcItemClasses, getItemInstance } from '../FirecallItems/elements';
-import { Connection, FirecallItem } from '../firebase/firestore';
+import {
+  Connection,
+  FirecallItem,
+  NON_DISPLAYABLE_ITEMS,
+} from '../firebase/firestore';
 import { useLeitungen } from './Leitungen/context';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
@@ -73,19 +77,23 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         leitungen.setFirecallItem(fzg as Connection);
       } else {
         if (fzg) {
-          console.info(`set fzg is drawing`);
-          setFzgDrawing({
-            ...fzg,
-            lat: map.getCenter().lat,
-            lng: map.getCenter().lng,
-            eventHandlers: {
-              click: (e) => {
-                console.info(`clicked on ${e.latlng.lat}, ${e.latlng.lng}`);
-                saveItem({ ...fzg, lat: e.latlng.lat, lng: e.latlng.lng });
-                setFzgDrawing(undefined);
-              },
-            },
-          });
+          console.info(`firecall dialog close for ${fzg.type} ${fzg.name}`);
+          if (NON_DISPLAYABLE_ITEMS.includes(fzg.type)) {
+            saveItem({
+              ...fzg,
+              lat: map.getCenter().lat,
+              lng: map.getCenter().lng,
+            });
+          } else {
+            console.info(
+              `waiting for mouse click to set new object ${fzg.type} ${fzg.name}`
+            );
+            setFzgDrawing({
+              ...fzg,
+              lat: map.getCenter().lat,
+              lng: map.getCenter().lng,
+            });
+          }
         }
         // saveItem(fzg);
       }
