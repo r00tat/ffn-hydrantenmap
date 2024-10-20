@@ -41,16 +41,8 @@ export default function EinsatzDialog({
       deleted: false,
     }
   );
-  const { email } = useFirebaseLogin();
+  const { email, myGroups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const groups = await getMyGroupsFromServer();
-      setMyGroups(groups);
-    })();
-  }, []);
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {

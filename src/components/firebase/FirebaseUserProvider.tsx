@@ -11,6 +11,7 @@ export const FirebaseLoginContext = createContext<LoginStatus>({
   isAdmin: false,
   signOut: async () => {},
   refresh: async () => {},
+  myGroups: [],
 });
 
 export default function FirebaseUserProvider({

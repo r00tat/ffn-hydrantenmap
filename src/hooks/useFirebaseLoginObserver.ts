@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
+import { getMyGroupsFromServer, Group } from '../app/groups/GroupAction';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -22,6 +23,7 @@ export interface LoginData {
   idToken?: string;
   groups?: string[];
   isRefreshing?: boolean;
+  myGroups: Group[];
 }
 
 export interface LoginStatus extends LoginData {
@@ -38,8 +40,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     isSignedIn: false,
     isAuthorized: false,
     isAdmin: false,
+    myGroups: [],
   }); // Local signed-in state.
   const [uid, setUid] = useState<string>();
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
 
   const refresh = useCallback(async () => {
     console.info(`refreshing user data for ${uid}`);
@@ -168,6 +172,15 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     };
   });
 
+  useEffect(() => {
+    (async () => {
+      if (loginStatus.isSignedIn) {
+        const myGs = await getMyGroupsFromServer();
+        setMyGroups(myGs);
+      }
+    })();
+  }, [loginStatus.isSignedIn]);
+
   const fbSignOut = useCallback(async () => {
     console.info(`authjs client logout`);
     await signOutJsClient();
@@ -175,5 +188,5 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     await auth.signOut();
   }, []);
 
-  return { ...loginStatus, refresh, signOut: fbSignOut };
+  return { ...loginStatus, myGroups, refresh, signOut: fbSignOut };
 }

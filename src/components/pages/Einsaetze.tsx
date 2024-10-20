@@ -9,13 +9,17 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Fab from '@mui/material/Fab';
+import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, setDoc, where } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -25,11 +29,7 @@ import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
-import {
-  FIRECALL_COLLECTION_ID,
-  Firecall,
-  filterActiveItems,
-} from '../firebase/firestore';
+import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -58,7 +58,7 @@ function EinsatzCard({
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
-  const { isAdmin } = useFirebaseLogin();
+  const { isAdmin, groups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
 
@@ -148,8 +148,15 @@ function EinsatzCard({
 }
 
 export default function Einsaetze() {
-  const { isAuthorized, groups } = useFirebaseLogin();
+  const { isAuthorized, groups, myGroups } = useFirebaseLogin();
   const [einsatzDialog, setEinsatzDialog] = useState(false);
+  const [groupFilter, setGroupFilter] = useState<string>('all');
+
+  const filterFn = useCallback(
+    (g: Firecall) =>
+      g.deleted === false && (groupFilter === 'all' || g.group === groupFilter),
+    [groupFilter]
+  );
 
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
@@ -166,7 +173,7 @@ export default function Einsaetze() {
       // orderBy('name'),
       // where('deleted', '!=', false),
     ],
-    filterFn: filterActiveItems,
+    filterFn,
   });
 
   if (!isAuthorized) {
@@ -180,8 +187,29 @@ export default function Einsaetze() {
           Einsätze
         </Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 6 }}>
             <FirecallImport />
+          </Grid>
+          <Grid size={{ xs: 6 }}>
+            <FormControl fullWidth variant="standard">
+              <InputLabel id="firecall-group-label-choose">
+                Gruppenfilter
+              </InputLabel>
+              <Select
+                labelId="firecall-group-label-choose"
+                id="firecall-item-type-choose"
+                value={groupFilter}
+                label="Art"
+                onChange={(e) => setGroupFilter(e.target.value)}
+              >
+                <MenuItem value={'all'}>Alle Gruppen</MenuItem>
+                {myGroups.map((group) => (
+                  <MenuItem key={`group-${group.id}`} value={group.id}>
+                    {group.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
           {einsaetze.map((einsatz) => (
             <EinsatzCard

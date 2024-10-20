@@ -2,7 +2,11 @@
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
-import { setAuthorizedToBool, setEmptyFirecallGroup } from './adminActions';
+import {
+  setAuthorizedToBool,
+  setCustomClaimsForAllUsers,
+  setEmptyFirecallGroup,
+} from './adminActions';
 import Box from '@mui/material/Box';
 
 export default function AdminPage() {
@@ -25,6 +29,15 @@ export default function AdminPage() {
     );
   }, []);
 
+  const setCustomClaimsForAllUsersCb = useCallback(async () => {
+    const users = await setCustomClaimsForAllUsers();
+    setStatus(
+      `${users.length} users corrected. (${users
+        .map((user) => user.email)
+        .join(', ')})`
+    );
+  }, []);
+
   return (
     <Box margin={2}>
       <Typography variant="h3">Admin Actions</Typography>
@@ -39,6 +52,12 @@ export default function AdminPage() {
         Set ffnd as default group on firecalls{' '}
         <Button onClick={setFirecallGroup} variant="contained">
           Fix empty firecall group
+        </Button>
+      </Typography>
+      <Typography>
+        Set claims for users{' '}
+        <Button onClick={setCustomClaimsForAllUsersCb} variant="contained">
+          Set custom claims
         </Button>
       </Typography>
     </Box>
