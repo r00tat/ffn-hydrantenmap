@@ -1,11 +1,16 @@
 'use server';
 
+import { uniqueArray } from '../../common/arrayUtils';
 import { UserRecordExtended } from '../../common/users';
 import {
   GROUP_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
+import {
+  CustomClaims,
+  setCustomClaimsForUser,
+} from '../api/users/[uid]/updateUser';
 import { actionAdminRequired, actionUserRequired } from '../auth';
 
 export interface Group {
@@ -89,6 +94,30 @@ export async function updateGroupAction(group: Group, assigendUsers: string[]) {
   );
 
   await batch.commit();
+
+  // update claims for users
+  await Promise.all(
+    [
+      ...addUsers.map((user) => ({
+        id: user.id,
+        ...user.data(),
+        groups: uniqueArray([
+          ...(user.data().groups || []),
+          'allUsers',
+          groupId,
+        ]),
+      })),
+      ...removeUsers.map((user) => ({
+        id: user.id,
+        ...user.data(),
+        groups: uniqueArray([...(user.data().groups || []), 'allUsers']).filter(
+          (g) => g !== groupId
+        ),
+      })),
+    ].map((user) =>
+      setCustomClaimsForUser(user.id, user as unknown as CustomClaims)
+    )
+  );
   return groupId;
 }
 

@@ -38,18 +38,33 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
       merge: true,
     });
 
-  const customClaims = {
+  setCustomClaimsForUser(uid, {
+    ...user,
     groups: newData.groups,
     // extend with isAdmin
     isAdmin: !!user.isAdmin,
     authorized: !!user.authorized,
+  } as CustomClaims);
+
+  return { ...newData, ...user };
+}
+
+export interface CustomClaims {
+  groups: string[];
+  isAdmin: boolean;
+  authorized: boolean;
+}
+
+export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {
+  const customClaims: CustomClaims = {
+    groups: uniqueArray([...(user.groups || []), 'allUsers']),
+    isAdmin: !!user.isAdmin,
+    authorized: !!user.authorized,
   };
   console.info(
-    `setting custom claims for ${uid} ${user.email}: ${JSON.stringify(
-      customClaims
-    )}`
+    `setting custom claims for ${uid}: ${JSON.stringify(customClaims)}`
   );
   await firebaseAuth.setCustomUserClaims(uid, customClaims);
 
-  return { ...newData, ...user };
+  return customClaims;
 }

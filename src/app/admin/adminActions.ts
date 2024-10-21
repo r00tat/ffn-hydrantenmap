@@ -8,6 +8,7 @@ import {
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../server/firebase/admin';
+import { setCustomClaimsForUser } from '../api/users/[uid]/updateUser';
 import { actionAdminRequired } from '../auth';
 
 export async function setAuthorizedToBool(): Promise<UserRecordExtended[]> {
@@ -59,24 +60,17 @@ export async function setCustomClaimsForAllUsers() {
 
   console.info(`BULK ACTION: setCustomClaimsForAllUsers`);
 
-  // TODO
   const authorizedUsers = await firestore
     .collection(USER_COLLECTION_ID)
     .where('authorized', '==', true)
     .get();
   await Promise.all(
     authorizedUsers.docs.map(async (user) => {
-      const newClaims = {
+      return setCustomClaimsForUser(user.id, {
         authorized: true,
         isAdmin: user.data().isAdmin,
-        groups: uniqueArray([...(user.data().groups || []), 'allUsers']),
-      };
-      console.info(
-        `setting claims for user ${user.id} ${
-          user.data().email
-        }: ${JSON.stringify(newClaims)}`
-      );
-      return firebaseAuth.setCustomUserClaims(user.id, newClaims);
+        groups: user.data().groups || [],
+      });
     })
   );
   console.info(`BULK ACTION COMPLETE: setCustomClaimsForAllUsers`);
