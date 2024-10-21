@@ -21,6 +21,7 @@ export default function LoginUi() {
     signOut,
     uid,
     isRefreshing,
+    needsReLogin,
   } = useFirebaseLogin();
 
   return (
@@ -59,11 +60,13 @@ export default function LoginUi() {
                 <br />
                 Angemeldet als: {displayName} {email} (user id: {uid})
               </Typography>
-              <Typography>
-                <Link href="/" passHref legacyBehavior>
-                  <Button variant="outlined">Weiter zur Einsatzkarte</Button>
-                </Link>
-              </Typography>
+              {!needsReLogin && (
+                <Typography>
+                  <Link href="/" passHref legacyBehavior>
+                    <Button variant="outlined">Weiter zur Einsatzkarte</Button>
+                  </Link>
+                </Typography>
+              )}
             </>
           )}
           {!isAuthorized && (
@@ -74,6 +77,17 @@ export default function LoginUi() {
                 hydrantenmap@ff-neusiedlamsee.at
               </a>{' '}
               für die Freischaltung
+            </Typography>
+          )}
+
+          {needsReLogin && (
+            <Typography color="error" borderColor="red">
+              Deine Autorisierung hat sich geändert. Um die neuen Rechte nutzten
+              zu können, musst du dich aus und neu einloggen.
+              <br />
+              <Button onClick={() => signOut()} variant="contained">
+                Logout
+              </Button>
             </Typography>
           )}
 

@@ -1,5 +1,6 @@
 'use server';
 
+import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
 import { UserRecordExtended } from '../../../../common/users';
@@ -17,22 +18,25 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     authorized: isTruthy(user.authorized),
     feuerwehr: user.feuerwehr || 'neusiedl',
     abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
-    groups: [...(user.groups || []), 'allUsers'],
+    groups: uniqueArray([...(user.groups || []), 'allUsers']),
   };
 
-  console.info(`updating ${uid}: ${JSON.stringify(newData)}`);
+  const filteredData = Object.fromEntries(
+    Object.entries(newData).filter(([key, value]) => key && value !== undefined)
+  );
+
+  console.info(
+    `updating user ${uid} (auth: ${user.authorized ? 'Y' : 'N'} ${
+      filteredData.authorized ? 'Y' : 'N'
+    }): ${JSON.stringify(filteredData)}`
+  );
 
   await firestore
     .collection(USER_COLLECTION_ID)
     .doc(`${uid}`)
-    .set(
-      Object.fromEntries(
-        Object.entries(newData).filter(([key, value]) => key && value)
-      ),
-      {
-        merge: true,
-      }
-    );
+    .set(filteredData, {
+      merge: true,
+    });
 
   const customClaims = {
     groups: newData.groups,

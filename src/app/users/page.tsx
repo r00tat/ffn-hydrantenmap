@@ -137,8 +137,10 @@ export default function Users() {
 
   const authorizeAction = useCallback(
     async (user: UserRecordExtended) => {
-      user.authorized = !user.authorized;
-      updateUser(user);
+      updateUser({
+        ...user,
+        authorized: !user.authorized,
+      } as UserRecordExtended);
     },
     [updateUser]
   );

@@ -53,7 +53,7 @@ function AuthorizationApp({ children }: AppProps) {
         isDrawerOpen={isDrawerOpen}
         setIsDrawerOpen={setIsDrawerOpen}
       />
-      <DynamicLogin />;
+      <DynamicLogin />
       <About />
     </>
   );

@@ -1,5 +1,6 @@
 'use server';
 
+import { uniqueArray } from '../../common/arrayUtils';
 import { UserRecordExtended } from '../../common/users';
 import {
   Firecall,
@@ -68,7 +69,7 @@ export async function setCustomClaimsForAllUsers() {
       const newClaims = {
         authorized: true,
         isAdmin: user.data().isAdmin,
-        groups: [...(user.data().groups || []), 'allUsers'],
+        groups: uniqueArray([...(user.data().groups || []), 'allUsers']),
       };
       console.info(
         `setting claims for user ${user.id} ${

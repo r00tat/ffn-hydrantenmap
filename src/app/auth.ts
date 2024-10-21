@@ -5,6 +5,7 @@ import { FirebaseUserInfo } from '../common/users';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
+import { uniqueArray } from '../common/arrayUtils';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
@@ -118,7 +119,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const userData = userInfo.data() as FirebaseUserInfo;
           session.user.isAuthorized = !!userData.authorized;
           session.user.isAdmin = !!userData.isAdmin;
-          session.user.groups = ['allUsers', ...(userData.groups || [])];
+          session.user.groups = uniqueArray([
+            'allUsers',
+            ...(userData.groups || []),
+          ]);
         }
       }
       console.info(
