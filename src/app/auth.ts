@@ -5,6 +5,7 @@ import { FirebaseUserInfo } from '../common/users';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
+import { uniqueArray } from '../common/arrayUtils';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
@@ -88,15 +89,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   // adapter: FirestoreAdapter(),
   callbacks: {
-    // redirect: async ({ url, baseUrl }) => {
-    //   console.info(`redirect ${baseUrl} ${url}`);
-    //   // return '';
-    //   // Allows relative callback URLs
-    //   if (url.startsWith('/')) return `${baseUrl}${url}`;
-    //   // Allows callback URLs on the same origin
-    //   if (new URL(url).origin === baseUrl) return url;
-    //   return baseUrl;
-    // },
+    redirect: async ({ url, baseUrl }) => {
+      console.info(`redirect ${baseUrl} ${url}`);
+      // return '';
+      // Allows relative callback URLs
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
     // authorized: async (params) => {
     //   console.info(`authorized with params: ${JSON.stringify(params)}`);
     //   return true;
@@ -118,7 +119,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const userData = userInfo.data() as FirebaseUserInfo;
           session.user.isAuthorized = !!userData.authorized;
           session.user.isAdmin = !!userData.isAdmin;
-          session.user.groups = ['allUsers', ...(userData.groups || [])];
+          session.user.groups = uniqueArray([
+            'allUsers',
+            ...(userData.groups || []),
+          ]);
         }
       }
       console.info(

@@ -25,6 +25,7 @@ export default function useUpdateUser() {
       // });
       // const usersResponse = await response.json();
       // console.info(`users: ${JSON.stringify(usersResponse.users)}`);
+      console.info(`before user action `, userData);
       const updateResult = await updateUserAction(userData);
       return updateResult as unknown as any;
     },

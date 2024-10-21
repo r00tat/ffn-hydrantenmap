@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
+import { getMyGroupsFromServer, Group } from '../app/groups/GroupAction';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -22,6 +23,8 @@ export interface LoginData {
   idToken?: string;
   groups?: string[];
   isRefreshing?: boolean;
+  myGroups: Group[];
+  needsReLogin?: boolean;
 }
 
 export interface LoginStatus extends LoginData {
@@ -33,13 +36,18 @@ function nonNull(value: any) {
   return value !== null ? value : undefined;
 }
 
+const SESSION_STORAGE_AUTH_KEY = 'fbAuth';
+
 export default function useFirebaseLoginObserver(): LoginStatus {
   const [loginStatus, setLoginStatus] = useState<LoginData>({
     isSignedIn: false,
     isAuthorized: false,
     isAdmin: false,
+    myGroups: [],
   }); // Local signed-in state.
   const [uid, setUid] = useState<string>();
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [needsReLogin, setNeedsReLogin] = useState(false);
 
   const refresh = useCallback(async () => {
     console.info(`refreshing user data for ${uid}`);
@@ -48,6 +56,27 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         const userDoc = await getDoc(doc(firestore, USER_COLLECTION_ID, uid));
         const userData = userDoc.data();
         console.info(`refreshed user data: `, userData);
+
+        if (auth.currentUser && userData) {
+          const tokenClaims = (await auth.currentUser.getIdTokenResult())
+            .claims;
+          if (
+            userData.authorized !== tokenClaims.authorized ||
+            userData.groups?.join(',') !==
+              (tokenClaims.groups as string[])?.join(',')
+          ) {
+            // need to login again
+            console.warn(
+              `token claims differ from firebase data, relogin required.`,
+              tokenClaims,
+              userData
+            );
+            setNeedsReLogin(true);
+          } else {
+            setNeedsReLogin(false);
+          }
+        }
+
         if (userData?.authorized) {
           // console.info(`user is authorized`);
           const newData = {
@@ -102,6 +131,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
         const tokenResult = await user?.getIdTokenResult();
         const idToken = await user?.getIdToken();
+        console.info(`user token result`, tokenResult);
 
         const authData: any = {
           isSignedIn: !!user,
@@ -114,11 +144,13 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           // isAdmin: false,
           expiration: tokenResult?.expirationTime,
           idToken,
-          // groups: ['allUsers'],
+          groups: tokenResult?.claims?.groups || [],
+          isAdmin: tokenResult?.claims?.isAdmin || false,
+          isAuthorized: tokenResult?.claims?.authorized || false,
           isRefreshing: true,
         };
         // if (window && window.sessionStorage) {
-        //   window.sessionStorage.setItem('fbAuth', JSON.stringify(authData));
+        //   window.sessionStorage.setItem(SESSION_STORAGE_AUTH_KEY, JSON.stringify(authData));
         // }
 
         setLoginStatus((prev) => ({ ...prev, ...authData }));
@@ -134,7 +166,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
   useEffect(() => {
     if (window && window.sessionStorage) {
-      const authText = window.sessionStorage.getItem('fbAuth');
+      const authText = window.sessionStorage.getItem(SESSION_STORAGE_AUTH_KEY);
       if (authText) {
         const auth: LoginData = JSON.parse(authText);
         if (auth.expiration && new Date(auth.expiration) > new Date()) {
@@ -155,7 +187,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       loginStatus.expiration &&
       new Date(loginStatus.expiration) > new Date()
     ) {
-      window.sessionStorage.setItem('fbAuth', JSON.stringify(loginStatus));
+      window.sessionStorage.setItem(
+        SESSION_STORAGE_AUTH_KEY,
+        JSON.stringify(loginStatus)
+      );
     }
   }, [loginStatus]);
 
@@ -168,12 +203,31 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     };
   });
 
+  useEffect(() => {
+    (async () => {
+      if (loginStatus.isSignedIn && loginStatus.isAuthorized) {
+        const myGs = await getMyGroupsFromServer();
+        setMyGroups(myGs);
+      }
+    })();
+  }, [loginStatus.isAuthorized, loginStatus.isSignedIn]);
+
   const fbSignOut = useCallback(async () => {
+    if (window && window.sessionStorage) {
+      window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
+    }
+
     console.info(`authjs client logout`);
     await signOutJsClient();
     console.info(`firebase logout`);
     await auth.signOut();
   }, []);
 
-  return { ...loginStatus, refresh, signOut: fbSignOut };
+  return {
+    ...loginStatus,
+    myGroups,
+    refresh,
+    signOut: fbSignOut,
+    needsReLogin,
+  };
 }

@@ -56,54 +56,6 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
   );
 }
 
-function useGridColumns(
-  authorizeAction: (user: UserRecordExtended) => Promise<void>,
-  editAction: (user: UserRecordExtended) => void,
-  groups: { [key: string]: string }
-) {
-  const [columns, setColumns] = useState<GridColDef[]>([]);
-
-  useEffect(() => {
-    setColumns([
-      // { field: 'uid', headerName: 'UID', minWidth: 150, flex: 0.3 },
-      { field: 'displayName', headerName: 'Name', minWidth: 150, flex: 1 },
-      { field: 'email', headerName: 'Email', minWidth: 200, flex: 1 },
-      {
-        field: 'feuerwehr',
-        headerName: 'Feuerwehr',
-        minWidth: 100,
-        flex: 0.5,
-        renderCell: (params) => feuerwehren[params.row.feuerwehr]?.name || '',
-      },
-      {
-        field: 'groups',
-        headerName: 'Gruppen',
-        minWidth: 100,
-        renderCell: (params) =>
-          (params.row.groups || [])
-            .map((key: string) => groups[key])
-            .filter((v: string) => v)
-            .join(', '),
-      },
-      { field: 'disabled', headerName: 'disabled', minWidth: 100 },
-      // { field: 'authorized', headerName: 'authorized', minWidth: 100 },
-      {
-        field: 'action',
-        headerName: 'Action',
-        sortable: false,
-        renderCell: (params) => (
-          <UserRowButtons
-            row={params.row}
-            authorizeFn={authorizeAction}
-            editFn={editAction}
-          />
-        ),
-      },
-    ]);
-  }, [authorizeAction, editAction, groups]);
-  return columns;
-}
-
 export default function Users() {
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [editUser, setEditUser] = useState<UserRecordExtended>();
@@ -137,8 +89,10 @@ export default function Users() {
 
   const authorizeAction = useCallback(
     async (user: UserRecordExtended) => {
-      user.authorized = !user.authorized;
-      updateUser(user);
+      updateUser({
+        ...user,
+        authorized: !user.authorized,
+      } as UserRecordExtended);
     },
     [updateUser]
   );
@@ -147,7 +101,6 @@ export default function Users() {
     console.info(`edit user: ${JSON.stringify(user)}`);
     setShowEditUserDialog(true);
   }, []);
-  const columns = useGridColumns(authorizeAction, editAction, groups);
   return (
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
@@ -204,8 +157,6 @@ export default function Users() {
             </React.Fragment>
           ))}
         </Grid>
-
-        {/* <DataGrid rows={users} columns={columns} getRowId={(row) => row.uid} /> */}
       </Box>
       {showEditUserDialog && editUser && (
         <UserRecordExtendedDialog
