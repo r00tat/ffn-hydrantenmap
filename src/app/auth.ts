@@ -89,15 +89,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   // adapter: FirestoreAdapter(),
   callbacks: {
-    // redirect: async ({ url, baseUrl }) => {
-    //   console.info(`redirect ${baseUrl} ${url}`);
-    //   // return '';
-    //   // Allows relative callback URLs
-    //   if (url.startsWith('/')) return `${baseUrl}${url}`;
-    //   // Allows callback URLs on the same origin
-    //   if (new URL(url).origin === baseUrl) return url;
-    //   return baseUrl;
-    // },
+    redirect: async ({ url, baseUrl }) => {
+      console.info(`redirect ${baseUrl} ${url}`);
+      // return '';
+      // Allows relative callback URLs
+      if (url.startsWith('/')) return `${baseUrl}${url}`;
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
     // authorized: async (params) => {
     //   console.info(`authorized with params: ${JSON.stringify(params)}`);
     //   return true;

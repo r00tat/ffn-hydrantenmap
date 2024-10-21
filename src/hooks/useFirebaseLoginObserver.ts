@@ -213,14 +213,14 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, [loginStatus.isAuthorized, loginStatus.isSignedIn]);
 
   const fbSignOut = useCallback(async () => {
+    if (window && window.sessionStorage) {
+      window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
+    }
+
     console.info(`authjs client logout`);
     await signOutJsClient();
     console.info(`firebase logout`);
     await auth.signOut();
-
-    if (window && window.sessionStorage) {
-      window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
-    }
   }, []);
 
   return {
