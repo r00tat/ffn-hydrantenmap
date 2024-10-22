@@ -11,6 +11,7 @@ import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
+import { useEffect, useState } from 'react';
 
 export default function LoginUi() {
   const {
@@ -22,7 +23,26 @@ export default function LoginUi() {
     uid,
     isRefreshing,
     needsReLogin,
+    myGroups,
   } = useFirebaseLogin();
+
+  const [groupClaims, setGroupClaims] = useState('');
+  useEffect(() => {
+    if (isAuthorized && auth.currentUser) {
+      (async () => {
+        if (auth.currentUser) {
+          const tokenClaims = (await auth.currentUser.getIdTokenResult())
+            .claims;
+          setGroupClaims(
+            ((tokenClaims.groups as string[]) || [])
+              .map((g) => myGroups.find((myG) => myG.id === g)?.name || g)
+              .sort()
+              .join(', ')
+          );
+        }
+      })();
+    }
+  }, [isAuthorized, myGroups]);
 
   return (
     <>
@@ -84,6 +104,14 @@ export default function LoginUi() {
             <Typography color="error" borderColor="red">
               Deine Autorisierung hat sich geändert. Um die neuen Rechte nutzten
               zu können, musst du dich aus und neu einloggen.
+              <br />
+              Deine aktuellen Gruppen laut Datenbank:{' '}
+              {myGroups
+                .map((g) => g.name)
+                .sort()
+                .join(', ')}
+              <br />
+              Deine Gruppen laut Login: {groupClaims}
               <br />
               <Button onClick={() => signOut()} variant="contained">
                 Logout
