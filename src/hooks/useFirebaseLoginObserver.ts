@@ -8,6 +8,7 @@ import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import { getMyGroupsFromServer, Group } from '../app/groups/GroupAction';
+import { uniqueArray } from '../common/arrayUtils';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -60,14 +61,25 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         if (auth.currentUser && userData) {
           const tokenClaims = (await auth.currentUser.getIdTokenResult())
             .claims;
+          const userDataGroups = uniqueArray(userData.groups || [])
+            ?.sort()
+            .join(',');
+          const tokenGroups = uniqueArray(
+            (tokenClaims.groups as string[]) || []
+          )
+            ?.sort()
+            .join(',');
           if (
             userData.authorized !== tokenClaims.authorized ||
-            userData.groups?.join(',') !==
-              (tokenClaims.groups as string[])?.join(',')
+            userDataGroups !== tokenGroups
           ) {
             // need to login again
             console.warn(
-              `token claims differ from firebase data, relogin required.`,
+              `token claims differ from firebase data, relogin required.
+              authorized: ${userData.authorized ? 'Y' : 'N'} ${
+                tokenClaims.authorized ? 'Y' : 'N'
+              } 
+              groups: ${userDataGroups} ${tokenGroups}`,
               tokenClaims,
               userData
             );
