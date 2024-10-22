@@ -1,5 +1,3 @@
-'use server';
-
 import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';

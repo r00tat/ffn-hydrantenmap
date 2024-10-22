@@ -17,10 +17,10 @@ import { getUsers } from '../users/action';
 import {
   deleteGroupAction,
   getGroupsAction,
-  Group,
   updateGroupAction,
 } from './GroupAction';
 import GroupDialog from './GroupDialog';
+import { Group } from './groupHelpers';
 
 interface UserRowButtonParams {
   row: Group;

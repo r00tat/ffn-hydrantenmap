@@ -5,9 +5,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signOut as signOutJsClient } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
+import { getMyGroupsFromServer } from '../app/groups/GroupAction';
+import { Group } from '../app/groups/groupHelpers';
+import { uniqueArray } from '../common/arrayUtils';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
-import { getMyGroupsFromServer, Group } from '../app/groups/GroupAction';
 
 export interface LoginData {
   isSignedIn: boolean;
@@ -60,14 +62,25 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         if (auth.currentUser && userData) {
           const tokenClaims = (await auth.currentUser.getIdTokenResult())
             .claims;
+          const userDataGroups = uniqueArray(userData.groups || [])
+            ?.sort()
+            .join(',');
+          const tokenGroups = uniqueArray(
+            (tokenClaims.groups as string[]) || []
+          )
+            ?.sort()
+            .join(',');
           if (
             userData.authorized !== tokenClaims.authorized ||
-            userData.groups?.join(',') !==
-              (tokenClaims.groups as string[])?.join(',')
+            userDataGroups !== tokenGroups
           ) {
             // need to login again
             console.warn(
-              `token claims differ from firebase data, relogin required.`,
+              `token claims differ from firebase data, relogin required.
+              authorized: ${userData.authorized ? 'Y' : 'N'} ${
+                tokenClaims.authorized ? 'Y' : 'N'
+              } 
+              groups: ${userDataGroups} ${tokenGroups}`,
               tokenClaims,
               userData
             );

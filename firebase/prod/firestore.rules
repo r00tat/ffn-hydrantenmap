@@ -33,10 +33,19 @@ service cloud.firestore {
       allow read: if authorizedUser()
     }
 
-    match /call/{doc=**} {
+    match /call/{doc} {
       allow read, write: if authorizedUser() 
             // && resource.data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
-            && resource.data.group in request.auth.token.groups 
+            && resource.data.group in request.auth.token.groups;
+
+      function callAuthorized() {
+        return authorizedUser() && get(/databases/$(database)/documents/call/$(doc)).data.group  in request.auth.token.groups 
+      }
+
+      match /{subitem=**} {
+        allow read, write: if callAuthorized()
+      }
+      
     }
     
     match /clusters/{doc=**} {

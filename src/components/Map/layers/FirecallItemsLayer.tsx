@@ -1,6 +1,7 @@
-import { Suspense, useMemo, useState } from 'react';
+import { where } from 'firebase/firestore';
+import React, { useMemo, useState } from 'react';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
-import useFirecall from '../../../hooks/useFirecall';
+import { useFirecallId } from '../../../hooks/useFirecall';
 import {
   filterDisplayableItems,
   FIRECALL_COLLECTION_ID,
@@ -9,8 +10,6 @@ import {
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
-import React from 'react';
-import { where } from 'firebase/firestore';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
@@ -29,7 +28,7 @@ function renderMarker(
 }
 
 export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
-  const firecall = useFirecall();
+  const firecallId = useFirecallId();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const queryConstraints = useMemo(
     () => (layer?.id ? [where('layer', '==', layer.id)] : []),
@@ -47,7 +46,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const records = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     queryConstraints,
-    pathSegments: [firecall?.id || 'unknown', 'item'],
+    pathSegments: [firecallId, 'item'],
     filterFn,
   });
 

@@ -1,13 +1,12 @@
 'use server';
 
-import { uniqueArray } from '../../common/arrayUtils';
 import { UserRecordExtended } from '../../common/users';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
-import { firebaseAuth, firestore } from '../../server/firebase/admin';
+import { firestore } from '../../server/firebase/admin';
 import { setCustomClaimsForUser } from '../api/users/[uid]/updateUser';
 import { actionAdminRequired } from '../auth';
 
