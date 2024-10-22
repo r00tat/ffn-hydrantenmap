@@ -111,7 +111,7 @@ const fetchUWD = async (sheetId: string, range: string) => {
   return markers;
 };
 
-export const fetchUnwetterCachedData = unstable_cache(
+const fetchUnwetterCachedData = unstable_cache(
   async (sheetId: string, range: string) => fetchUWD(sheetId, range),
   ['unwetter-sheet-data'],
   { revalidate: 10 }

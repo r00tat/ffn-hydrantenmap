@@ -5,10 +5,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signOut as signOutJsClient } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
+import { getMyGroupsFromServer } from '../app/groups/GroupAction';
+import { Group } from '../app/groups/groupHelpers';
+import { uniqueArray } from '../common/arrayUtils';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
-import { getMyGroupsFromServer, Group } from '../app/groups/GroupAction';
-import { uniqueArray } from '../common/arrayUtils';
 
 export interface LoginData {
   isSignedIn: boolean;

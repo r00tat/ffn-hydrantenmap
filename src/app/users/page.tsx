@@ -10,15 +10,13 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
-import { GridColDef } from '@mui/x-data-grid';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { feuerwehren } from '../../common/feuerwehren';
+import React, { useCallback, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
-import { Group } from '../groups/GroupAction';
+import { Group } from '../groups/groupHelpers';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
