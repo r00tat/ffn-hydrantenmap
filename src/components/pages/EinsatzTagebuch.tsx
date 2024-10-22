@@ -5,12 +5,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { randomUUID } from 'crypto';
 import moment from 'moment';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   dateTimeFormat,
   formatTimestamp,
@@ -31,9 +32,6 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
-import Grid from '@mui/material/Grid2';
-import React from 'react';
-import { randomUUID } from 'crypto';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -231,40 +229,16 @@ export function DiaryButtons({ diary }: { diary: Diary }) {
   );
 }
 
-export function useGridColumns() {
-  const [columns, setColumns] = useState<GridColDef[]>();
-  useEffect(() => {
-    setColumns([
-      { field: 'nummer', headerName: 'Nummer', minWidth: 40, flex: 0.05 },
-      { field: 'datum', headerName: 'Datum', flex: 0.15, minWidth: 50 },
-      { field: 'von', headerName: 'Von', minWidth: 50, flex: 0.1 },
-      { field: 'an', headerName: 'An', minWidth: 50, flex: 0.1 },
-      { field: 'art', headerName: 'Art', minWidth: 50, flex: 0.1 },
-      { field: 'name', headerName: 'Information', minWidth: 100, flex: 0.2 },
-      { field: 'beschreibung', headerName: 'Anmerkung', flex: 0.2 },
-      { field: 'erledigt', headerName: 'Erledigt', flex: 0.15 },
-      {
-        field: 'buttons',
-        headerName: 'Aktionen',
-        flex: 0.1,
-        renderCell: (params) => <DiaryButtons diary={params.row as Diary} />,
-      },
-    ]);
-  }, []);
-  return columns;
-}
-
 export interface EinsatzTagebuchOptions {
   showEditButton?: boolean;
   sortAscending?: boolean;
 }
-export default function EinsatzTagebuch({
+export function EinsatzTagebuch({
   showEditButton = true,
   sortAscending = false,
 }: EinsatzTagebuchOptions) {
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
-  const columns = useGridColumns();
   const addEinsatzTagebuch = useFirecallItemAdd();
 
   const diaryClose = useCallback(
@@ -279,73 +253,65 @@ export default function EinsatzTagebuch({
 
   return (
     <>
-      {columns && (
-        <Box sx={{ p: 2, m: 2 }}>
-          <Typography variant="h3" gutterBottom>
-            Einsatz Tagebuch{' '}
-            <DownloadButton
-              onClick={() => downloadDiaries(diaries)}
-              tooltip="Einsatz Tagebuch als CSV herunterladen"
-            />
-          </Typography>
-          <Grid container>
-            <Grid size={{ xs: 3, md: 2, lg: 1 }}>
-              <b>Nummer</b>
-            </Grid>
-            <Grid size={{ xs: 6, md: 5, lg: 2 }}>
-              <b>Datum</b>
-            </Grid>
-            <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-              <b>typ von -&gt; an</b>
-            </Grid>
-            <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-              <b>Eintrag</b>
-            </Grid>
-            <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-              <b>Beschreibung</b>
-            </Grid>
-            <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
-            {diaries.map((e) => (
-              <React.Fragment
-                key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
-              >
-                <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
-                <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
-                <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-                  {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
-                </Grid>
-                <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-                  <b>
-                    {e.name?.split(`\n`).map((line, index) => (
-                      <React.Fragment key={`title-${e.id}-${index}`}>
-                        {line}
-                        <br />
-                      </React.Fragment>
-                    ))}
-                  </b>
-                </Grid>
-                <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-                  {e.beschreibung?.split('\n').map((line, index) => (
-                    <React.Fragment key={`beschreibung-${e.id}-${index}`}>
+      <Box sx={{ p: 2, m: 2 }}>
+        <Typography variant="h3" gutterBottom>
+          Einsatz Tagebuch{' '}
+          <DownloadButton
+            onClick={() => downloadDiaries(diaries)}
+            tooltip="Einsatz Tagebuch als CSV herunterladen"
+          />
+        </Typography>
+        <Grid container>
+          <Grid size={{ xs: 3, md: 2, lg: 1 }}>
+            <b>Nummer</b>
+          </Grid>
+          <Grid size={{ xs: 6, md: 5, lg: 2 }}>
+            <b>Datum</b>
+          </Grid>
+          <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+            <b>typ von -&gt; an</b>
+          </Grid>
+          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+            <b>Eintrag</b>
+          </Grid>
+          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+            <b>Beschreibung</b>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
+          {diaries.map((e) => (
+            <React.Fragment
+              key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
+            >
+              <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
+              <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
+              <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+                {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
+              </Grid>
+              <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+                <b>
+                  {e.name?.split(`\n`).map((line, index) => (
+                    <React.Fragment key={`title-${e.id}-${index}`}>
                       {line}
                       <br />
                     </React.Fragment>
                   ))}
-                </Grid>
-                <Grid size={{ xs: 12, md: 2, lg: 1 }}>
-                  {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
-                </Grid>
-              </React.Fragment>
-            ))}
-          </Grid>
-          {/* <DataGrid
-            rows={diaries}
-            columns={columns}
-            getRowId={(row) => row.id}
-            autoHeight
-          /> */}
-        </Box>
-      )}
+                </b>
+              </Grid>
+              <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+                {e.beschreibung?.split('\n').map((line, index) => (
+                  <React.Fragment key={`beschreibung-${e.id}-${index}`}>
+                    {line}
+                    <br />
+                  </React.Fragment>
+                ))}
+              </Grid>
+              <Grid size={{ xs: 12, md: 2, lg: 1 }}>
+                {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
+              </Grid>
+            </React.Fragment>
+          ))}
+        </Grid>
+      </Box>
 
       {showEditButton && (
         <Fab
@@ -367,5 +333,27 @@ export default function EinsatzTagebuch({
         />
       )}
     </>
+  );
+}
+
+export default function Tagebuch({
+  showEditButton = true,
+  sortAscending = false,
+}: EinsatzTagebuchOptions) {
+  const firecallId = useFirecallId();
+
+  if (firecallId === 'unknown') {
+    return (
+      <Typography variant="h3" gutterBottom>
+        Einsatz Tagebuch
+      </Typography>
+    );
+  }
+
+  return (
+    <EinsatzTagebuch
+      showEditButton={showEditButton}
+      sortAscending={sortAscending}
+    />
   );
 }
