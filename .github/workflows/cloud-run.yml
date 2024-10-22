@@ -87,7 +87,7 @@ jobs:
           fi
 
           echo "Environment:"
-          cat <<EOF | tee -a $GITHUB_ENV
+          cat <<EOF | tee -a $GITHUB_ENV | tee -a $GITHUB_OUTPUT
           VERSION=${VERSION}
           VERSION_TAG=${VERSION_TAG}
           RUN_SERVICE=${RUN_SERVICE}
@@ -132,8 +132,8 @@ jobs:
         run: |
           set -eo pipefail
           gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
-          docker build . --tag ${{steps.env.outputs.IMAGE_TAG}}
-          docker push ${{steps.env.outputs.IMAGE_TAG}}
+          docker build . --tag ${IMAGE_TAG}
+          docker push ${IMAGE_TAG}
       - id: deploy
         name: deploy to Cloud Run
         run: |
