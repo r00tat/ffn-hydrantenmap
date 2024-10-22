@@ -90,12 +90,12 @@ jobs:
           cat <<EOF | tee -a $GITHUB_ENV
           VERSION=${VERSION}
           VERSION_TAG=${VERSION_TAG}
-          RUN_SERVICE='${RUN_SERVICE}'
-          RUN_REGION='${RUN_REGION}'
-          NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'
-          IMAGE='${IMAGE}'
-          IMAGE_TAG='${IMAGE}:${VERSION_TAG}'
-          NEXTAUTH_URL='${NEXTAUTH_URL}'
+          RUN_SERVICE=${RUN_SERVICE}
+          RUN_REGION=${RUN_REGION}
+          NEXT_PUBLIC_FIRESTORE_DB=${NEXT_PUBLIC_FIRESTORE_DB}
+          IMAGE=${IMAGE}
+          IMAGE_TAG=${IMAGE}:${VERSION_TAG}
+          NEXTAUTH_URL=${NEXTAUTH_URL}
           NEXTAUTH_URL_INTERNAL=http://localhost:8080
 
           EOF
