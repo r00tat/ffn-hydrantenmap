@@ -71,14 +71,14 @@ jobs:
           # write env file
           set -eo pipefail
           VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          echo "VERSION=${VERSION}" >.version
           VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9_-]+@-@g' )
           VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
-          echo "VERSION_TAG=${VERSION_TAG}" >>.version
+          export NEXTAUTH_URL="https://hydrantenmap-dev-xrhhpxsnva-ez.a.run.app/"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             export NEXT_PUBLIC_FIRESTORE_DB=""
             export RUN_SERVICE=$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')
+            export NEXTAUTH_URL="https://hydrant.ffnd.at"
           fi
 
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
@@ -86,20 +86,19 @@ jobs:
             export NEXT_PUBLIC_FIRESTORE_DB=""
           fi
 
-          echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>$GITHUB_ENV
-          echo "RUN_SERVICE='${RUN_SERVICE}'" >>$GITHUB_ENV
+          echo "Environment:"
+          cat <<EOF | tee -a $GITHUB_ENV | tee -a $GITHUB_OUTPUT
+          VERSION=${VERSION}
+          VERSION_TAG=${VERSION_TAG}
+          RUN_SERVICE=${RUN_SERVICE}
+          RUN_REGION=${RUN_REGION}
+          NEXT_PUBLIC_FIRESTORE_DB=${NEXT_PUBLIC_FIRESTORE_DB}
+          IMAGE=${IMAGE}
+          IMAGE_TAG=${IMAGE}:${VERSION_TAG}
+          NEXTAUTH_URL=${NEXTAUTH_URL}
+          NEXTAUTH_URL_INTERNAL=http://localhost:8080
 
-          echo "RUN_REGION='${RUN_REGION}'" >>.version
-          echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>.version
-          echo "RUN_SERVICE='${RUN_SERVICE}'" >>.version
-          echo "RUN_REGION='${RUN_REGION}'" >>.version
-
-          echo "IMAGE='${IMAGE}'" >>.version
-          echo "IMAGE_TAG='${IMAGE}:${VERSION_TAG}'" >>.version
-
-          echo "Versions: $(cat .version)"
-
-          cat .version >>$GITHUB_OUTPUT
+          EOF
 
           cat >.env.local <<EOF
           NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
@@ -108,10 +107,10 @@ jobs:
           NEXT_PUBLIC_OAUTH_CLIENT_ID='${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
           NEXT_PUBLIC_FIRESTORE_DB="${NEXT_PUBLIC_FIRESTORE_DB}"
           AUTH_SECRET='${AUTH_SECRET}'
+          NEXTAUTH_URL='${NEXTAUTH_URL}'
+          NEXTAUTH_URL_INTERNAL=http://localhost:8080
           EOF
 
-          # echo "Environment:"
-          # cat .env.local
       # - id: 'deploy'
       #   uses: 'google-github-actions/deploy-cloudrun@v2'
       #   with:
@@ -133,13 +132,12 @@ jobs:
         run: |
           set -eo pipefail
           gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
-          docker build . --tag ${{steps.env.outputs.IMAGE_TAG}}
-          docker push ${{steps.env.outputs.IMAGE_TAG}}
+          docker build . --tag ${IMAGE_TAG}
+          docker push ${IMAGE_TAG}
       - id: deploy
         name: deploy to Cloud Run
         run: |
           set -eo pipefail
-          source .version
 
           gcloud run deploy $RUN_SERVICE \
             --allow-unauthenticated \
@@ -149,4 +147,5 @@ jobs:
             --tag=${VERSION_TAG} \
             --service-account=$RUN_SERVICE_ACCOUNT \
             --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest" \
-          ${RUN_ARGS}
+           --update-env-vars="NEXTAUTH_URL=${NEXTAUTH_URL},NEXTAUTH_URL_INTERNAL=http://localhost:8080" \
+            ${RUN_ARGS}
