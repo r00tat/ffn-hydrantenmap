@@ -79,11 +79,13 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             export NEXT_PUBLIC_FIRESTORE_DB=""
             export RUN_SERVICE=$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')
+            export NEXTAUTH_URL="https://hydrant.ffnd.at"
           fi
 
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
             # set to empty string
             export NEXT_PUBLIC_FIRESTORE_DB=""
+            export NEXTAUTH_URL="https://hydrantenmap-dev-xrhhpxsnva-ez.a.run.app/"
           fi
 
           echo "NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'" >>$GITHUB_ENV
@@ -108,6 +110,8 @@ jobs:
           NEXT_PUBLIC_OAUTH_CLIENT_ID='${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
           NEXT_PUBLIC_FIRESTORE_DB="${NEXT_PUBLIC_FIRESTORE_DB}"
           AUTH_SECRET='${AUTH_SECRET}'
+          NEXTAUTH_URL='${NEXTAUTH_URL}'
+          NEXTAUTH_URL_INTERNAL=http://localhost:8080
           EOF
 
           # echo "Environment:"
@@ -149,4 +153,4 @@ jobs:
             --tag=${VERSION_TAG} \
             --service-account=$RUN_SERVICE_ACCOUNT \
             --update-secrets="NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest,NEXT_PUBLIC_MAPBOX_APIKEY=NEXT_PUBLIC_MAPBOX_APIKEY:latest,AUTH_SECRET=AUTH_SECRET:latest,EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest" \
-          ${RUN_ARGS}
+            ${RUN_ARGS}
