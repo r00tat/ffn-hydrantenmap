@@ -79,7 +79,14 @@ export default function LoginUi() {
                 Dein Benutzer ist freigeschalten und kann verwendet werden!{' '}
                 <br />
                 Angemeldet als: {displayName} {email} (user id: {uid})
+                <br />
+                Deine Gruppen:{' '}
               </Typography>
+              <ul>
+                {myGroups.map((g) => (
+                  <li key={g.id}>{g.name}</li>
+                ))}
+              </ul>
               {!needsReLogin && (
                 <Typography>
                   <Link href="/" passHref legacyBehavior>
