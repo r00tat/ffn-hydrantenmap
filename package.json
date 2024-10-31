@@ -36,7 +36,7 @@
     "csv-parse": "^5.5.6",
     "csv-stringify": "^6.5.1",
     "epsg": "^0.5.0",
-    "firebase": "^10.14.1",
+    "firebase": "^11.0.1",
     "firebase-admin": "^12.7.0",
     "geofire-common": "^6.0.0",
     "googleapis": "^144.0.0",
