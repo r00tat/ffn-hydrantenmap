@@ -7,6 +7,8 @@ import useVehicles from '../../hooks/useVehicles';
 import { getItemInstance } from '../FirecallItems/elements';
 import { useMemo } from 'react';
 import { FirecallItem } from '../firebase/firestore';
+import { useFirecallLayers } from '../../hooks/useFirecallLayers';
+import React from 'react';
 
 interface FcItemRowProps {
   item: FirecallItem;
@@ -31,6 +33,7 @@ function FcItemRow({ item }: FcItemRowProps) {
 
 export default function FahrzeugePrint() {
   const { vehicles, rohre, otherItems: others } = useVehicles();
+  const layers = useFirecallLayers();
   const otherItems = [...rohre, ...others];
 
   return (
@@ -94,8 +97,23 @@ export default function FahrzeugePrint() {
           </tr>
         </thead>
         <tbody>
-          {otherItems.map((item) => (
-            <FcItemRow key={item.id} item={item} />
+          {otherItems
+            .filter((item) => item.layer === undefined)
+            .map((item) => (
+              <FcItemRow key={item.id} item={item} />
+            ))}
+          {Object.values(layers).map((l) => (
+            <React.Fragment key={l.id || 'default-layer'}>
+              <tr>
+                <th> </th>
+                <th>{l.name}</th>
+              </tr>
+              {otherItems
+                .filter((item) => item.layer === l.id)
+                .map((item) => (
+                  <FcItemRow key={item.id} item={item} />
+                ))}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
