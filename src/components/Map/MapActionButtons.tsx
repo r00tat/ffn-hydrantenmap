@@ -78,7 +78,11 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       } else {
         if (fzg) {
           console.info(`firecall dialog close for ${fzg.type} ${fzg.name}`);
-          if (NON_DISPLAYABLE_ITEMS.includes(fzg.type)) {
+          if (
+            NON_DISPLAYABLE_ITEMS.includes(fzg.type) ||
+            // on a touch device it is better to drop the marker and move it afterwards
+            navigator.maxTouchPoints > 0
+          ) {
             saveItem({
               ...fzg,
               lat: map.getCenter().lat,
