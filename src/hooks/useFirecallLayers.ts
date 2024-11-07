@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { SimpleMap } from '../common/types';
 import {
   FIRECALL_COLLECTION_ID,
@@ -29,5 +29,8 @@ export function useFirecallLayersFromFirstore(): FirecallLayers {
     queryConstraints: [orderBy('name', 'asc')],
   });
 
-  return Object.fromEntries(layers.map((l) => [l.id, l]));
+  return useMemo(
+    () => Object.fromEntries(layers.map((l) => [l.id, l])),
+    [layers]
+  );
 }
