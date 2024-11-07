@@ -59,6 +59,13 @@ export const cachePatterns: RuntimeCaching[] = [
       plugins: [oneDayCachePlugin],
     }),
   },
+  {
+    matcher: /https:\/\/[a-z].tile.opentopomap.org\/.*/i,
+    handler: new CacheFirst({
+      cacheName: 'opentopomap',
+      plugins: [oneDayCachePlugin],
+    }),
+  },
 
   {
     matcher: /https:\/\/.*.gstatic.com\/.*/i,
