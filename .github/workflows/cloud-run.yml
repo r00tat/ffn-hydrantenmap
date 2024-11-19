@@ -46,6 +46,7 @@ jobs:
       CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       CLOUDSDK_COMPUTE_REGION: ${{ vars.CLOUDSDK_COMPUTE_REGION }}
       IMAGE: ${{ vars.IMAGE }}
+      workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
       # Checkout the repository to the GitHub Actions runner
@@ -53,16 +54,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
-      - name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # this is the output provider_name from the TF module
-          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} # this is a SA email configured
-          export_environment_variables: 'true'
-
-      - name: 'Set up Cloud SDK'
-        uses: google-github-actions/setup-gcloud@v2
 
       - name: Setup env
         shell: bash
@@ -127,15 +118,31 @@ jobs:
       #       AUTH_SECRET=AUTH_SECRET:latest
       #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
 
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        if: ${{ env.workload_identity_provider != '' }}
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # this is the output provider_name from the TF module
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} # this is a SA email configured
+          export_environment_variables: 'true'
+
+      - name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+
       - id: image
         name: Build image
         run: |
           set -eo pipefail
-          gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
           docker build . --tag ${IMAGE_TAG}
-          docker push ${IMAGE_TAG}
+          if [[ -n "${workload_identity_provider}" ]]; then
+            gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
+            docker push ${IMAGE_TAG}
+          else
+            echo "Skipping push to Cloud run as there are no credentials"
+          fi
       - id: deploy
         name: deploy to Cloud Run
+        if: ${{ env.workload_identity_provider != '' }}
         run: |
           set -eo pipefail
 
