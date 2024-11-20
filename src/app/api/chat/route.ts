@@ -40,10 +40,11 @@ async function newChatMessage(
   newMessage.id = newDoc.id;
 
   const messaging = firebaseAdmin.messaging();
-  const resp = await messaging.sendToTopic('chat', {
+  const resp = await messaging.send({
+    topic: 'chat',
     data: newMessage as unknown as DataMessagePayload,
   });
-  console.info(`posted message to topic chat: ${resp.messageId}`);
+  console.info(`posted message to topic chat: ${resp}`);
 
   return { ...newMessage, id: newDoc.id };
 }

@@ -62,7 +62,7 @@ jobs:
           # write env file
           set -eo pipefail
           VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9_-]+@-@g' )
+          VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9-]+@-@g' )
           VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
           export NEXTAUTH_URL="https://hydrantenmap-dev-xrhhpxsnva-ez.a.run.app/"
 
