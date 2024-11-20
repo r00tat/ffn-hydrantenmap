@@ -68,7 +68,7 @@
     "@types/react": "^18.3.12",
     "@types/uuid": "^10.0.0",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.15",
+    "eslint-config-next": "^15.0.3",
     "serwist": "^9.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
