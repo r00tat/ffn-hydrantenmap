@@ -19,6 +19,8 @@ import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
+import useDrivePicker from '../../app/sheet/DrivePicker/useDrivePicker';
+import DrivePickerComponent from '../../app/sheet/DrivePicker/DrivePicker';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -78,6 +80,17 @@ export default function EinsatzDialog({
       }
     },
     [email, position.lat, position.lng, setFirecallId]
+  );
+
+  const onDrivePickerClose = useCallback(
+    (doc?: google.picker.DocumentObject) => {
+      console.info(`drive picker close`, doc);
+      if (doc) {
+        setEinsatz((prev) => ({ ...prev, sheetId: doc.id }));
+      }
+      setOpen(true);
+    },
+    []
   );
 
   const handleChange = (event: SelectChangeEvent) => {
@@ -186,6 +199,10 @@ export default function EinsatzDialog({
           variant="standard"
           onChange={onChange('sheetRange')}
           value={einsatz.sheetRange}
+        />
+        <DrivePickerComponent
+          onClose={onDrivePickerClose}
+          onOpen={() => setOpen(false)}
         />
       </DialogContent>
       <DialogActions>

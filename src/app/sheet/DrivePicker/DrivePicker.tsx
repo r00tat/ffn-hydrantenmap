@@ -1,13 +1,20 @@
 import { Button } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useState } from 'react';
-import { useFirecallUpdateSheet } from '../../../hooks/useFirecall';
 import useDrivePicker from './useDrivePicker';
 
-export default function DrivePickerComponent() {
+export interface DrivePickerProps {
+  onClose: (doc?: google.picker.DocumentObject) => void;
+  onOpen?: () => void;
+}
+
+export default function DrivePickerComponent({
+  onClose,
+  onOpen,
+}: DrivePickerProps) {
   const [openPicker] = useDrivePicker();
-  const updateFirecallSheet = useFirecallUpdateSheet();
   const [apiKey, setApiKey] = useState<string>();
+
   useEffect(() => {
     try {
       if (process.env.NEXT_PUBLIC_FIREBASE_APIKEY) {
@@ -25,10 +32,6 @@ export default function DrivePickerComponent() {
 
   // const customViewsArray = [new google.picker.DocsView()]; // custom view
   const handleOpenPicker = useCallback(() => {
-    console.info(`fb api key: `, process.env.NEXT_PUBLIC_FIREBASE_APIKEY);
-    console.info(`api key: ${apiKey}`);
-    console.info(`client id:`, process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID);
-
     if (apiKey && process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID) {
       openPicker({
         clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || '',
@@ -46,27 +49,29 @@ export default function DrivePickerComponent() {
           console.log(data);
           if (data.action === 'cancel') {
             console.log('User clicked cancel/close button');
-          } else {
+            onClose();
+          } else if (data.action === 'picked') {
             console.info(`picked ${data.docs && data.docs[0]?.id}`);
             if (data.docs && data.docs[0]?.id) {
-              console.info(`upadte firecallsheet`);
-              updateFirecallSheet(data.docs[0].id);
+              onClose(data.docs[0]);
+            } else {
+              onClose();
             }
           }
         },
+        onOpen: onOpen,
       });
     }
-  }, [apiKey, openPicker, updateFirecallSheet]);
+  }, [apiKey, onClose, onOpen, openPicker]);
 
   return (
     <>
-      <Typography>Driver Picker</Typography>
       <Button
         variant="contained"
         color="primary"
         onClick={() => handleOpenPicker()}
       >
-        Open Picker
+        Datei in Google Drive auswählen
       </Button>
     </>
   );

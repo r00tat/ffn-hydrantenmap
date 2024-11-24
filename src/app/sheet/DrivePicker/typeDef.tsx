@@ -70,6 +70,7 @@ export type PickerConfiguration = {
   locale?: google.picker.Locales;
   customScopes?: string[];
   callbackFunction: (data: google.picker.ResponseObject) => any;
+  onOpen?: () => void;
 };
 
 export const defaultConfiguration: PickerConfiguration = {

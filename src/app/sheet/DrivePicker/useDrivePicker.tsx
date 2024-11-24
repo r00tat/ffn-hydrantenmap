@@ -56,6 +56,7 @@ export default function useDrivePicker(): [
       callbackFunction,
       supportsSharedDrives = true,
       addMyDrive = false,
+      onOpen,
     }: PickerConfiguration) => {
       if (disabled) return false;
 
@@ -123,6 +124,7 @@ export default function useDrivePicker(): [
       // }
 
       picker.build().setVisible(true);
+      if (onOpen) onOpen();
       return true;
     },
     []
