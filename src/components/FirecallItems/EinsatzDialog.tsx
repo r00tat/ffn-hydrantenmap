@@ -21,6 +21,7 @@ import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import useDrivePicker from '../../app/sheet/DrivePicker/useDrivePicker';
 import DrivePickerComponent from '../../app/sheet/DrivePicker/DrivePicker';
+import { copyFirecallSheet } from './EinsatzAction';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -54,6 +55,10 @@ export default function EinsatzDialog({
 
   const saveEinsatz = useCallback(
     async (fc: Firecall) => {
+      if (!fc.sheetId) {
+        fc.sheetId = await copyFirecallSheet(fc);
+      }
+
       if (fc.id) {
         // update
         await setDoc(
@@ -204,6 +209,17 @@ export default function EinsatzDialog({
           onClose={onDrivePickerClose}
           onOpen={() => setOpen(false)}
         />
+        <Button
+          onClick={async () => {
+            const fileId = await copyFirecallSheet(einsatz);
+            setEinsatz((prev) => ({
+              ...prev,
+              sheetId: fileId,
+            }));
+          }}
+        >
+          Vorlage kopieren
+        </Button>
       </DialogContent>
       <DialogActions>
         <Button
