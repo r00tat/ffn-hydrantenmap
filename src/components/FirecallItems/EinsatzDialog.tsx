@@ -1,4 +1,5 @@
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -11,6 +12,7 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
+import DrivePickerComponent from '../../app/sheet/DrivePicker/DrivePicker';
 import { GeoPositionObject } from '../../common/geo';
 import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
@@ -19,6 +21,7 @@ import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
+import { copyFirecallSheet } from './EinsatzAction';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -32,6 +35,7 @@ export default function EinsatzDialog({
   position = defaultPosition,
 }: EinsatzDialogOptions) {
   const [open, setOpen] = useState(true);
+  const [isStateCopy, setIsStateCopy] = useState(false);
   const [einsatz, setEinsatz] = useState<Firecall>(
     einsatzDefault || {
       name: '',
@@ -52,6 +56,10 @@ export default function EinsatzDialog({
 
   const saveEinsatz = useCallback(
     async (fc: Firecall) => {
+      if (!fc.sheetId) {
+        fc.sheetId = await copyFirecallSheet(fc);
+      }
+
       if (fc.id) {
         // update
         await setDoc(
@@ -78,6 +86,17 @@ export default function EinsatzDialog({
       }
     },
     [email, position.lat, position.lng, setFirecallId]
+  );
+
+  const onDrivePickerClose = useCallback(
+    (doc?: google.picker.DocumentObject) => {
+      console.info(`drive picker close`, doc);
+      if (doc) {
+        setEinsatz((prev) => ({ ...prev, sheetId: doc.id }));
+      }
+      setOpen(true);
+    },
+    []
   );
 
   const handleChange = (event: SelectChangeEvent) => {
@@ -175,7 +194,7 @@ export default function EinsatzDialog({
           fullWidth
           variant="standard"
           onChange={onChange('sheetId')}
-          value={einsatz.sheetId}
+          value={einsatz.sheetId || ''}
         />
         <TextField
           margin="dense"
@@ -185,8 +204,27 @@ export default function EinsatzDialog({
           fullWidth
           variant="standard"
           onChange={onChange('sheetRange')}
-          value={einsatz.sheetRange}
+          value={einsatz.sheetRange || ''}
         />
+        <DrivePickerComponent
+          onClose={onDrivePickerClose}
+          onOpen={() => setOpen(false)}
+        />
+        <Button
+          disabled={isStateCopy}
+          onClick={async () => {
+            setIsStateCopy(true);
+            const fileId = await copyFirecallSheet(einsatz);
+            setEinsatz((prev) => ({
+              ...prev,
+              sheetId: fileId,
+            }));
+            setIsStateCopy(false);
+          }}
+        >
+          Vorlage kopieren
+          {isStateCopy && <CircularProgress />}
+        </Button>
       </DialogContent>
       <DialogActions>
         <Button

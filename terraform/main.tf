@@ -48,6 +48,7 @@ locals {
     "storage.googleapis.com",
     "testing.googleapis.com",
     "texttospeech.googleapis.com",
+    "picker.googleapis.com",
   ]
 }
 resource "google_project_service" "apis" {

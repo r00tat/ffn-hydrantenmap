@@ -1,5 +1,6 @@
 import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -7,6 +8,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import InfoIcon from '@mui/icons-material/Info';
 import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
+import ListAltIcon from '@mui/icons-material/ListAlt';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
@@ -16,14 +18,12 @@ import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import ListItemButton from '@mui/material/ListItemButton';
 
 interface DrawerItem {
   text: string;
@@ -60,6 +60,7 @@ export default function AppDrawer({
     { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
     { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
+    { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
     { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
