@@ -1,6 +1,7 @@
 'use server';
 
 import { google } from 'googleapis';
+import { GoogleAuth, JWT } from 'googleapis-common';
 import moment from 'moment';
 import { parseTimestamp } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
@@ -16,9 +17,25 @@ export async function copyFirecallSheet(firecall: Firecall): Promise<string> {
     `copying firecall sheet template for ${firecall.id} ${firecall.name}`
   );
 
-  const auth = new google.auth.GoogleAuth({
+  let auth: GoogleAuth | JWT = new google.auth.GoogleAuth({
     scopes: SCOPES,
   });
+
+  if (
+    process.env.GOOGLE_SERVICE_ACCOUNT &&
+    process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT
+  ) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+    auth = new google.auth.JWT({
+      email: serviceAccount.client_email,
+      key: serviceAccount.private_key,
+      keyId: serviceAccount.private_key_id,
+      projectId: serviceAccount.project_id,
+      clientId: serviceAccount.client_id,
+      scopes: SCOPES,
+      subject: process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT,
+    });
+  }
 
   const tmstp = moment(parseTimestamp(firecall.alarmierung));
 
@@ -67,7 +84,7 @@ export async function copyFirecallSheet(firecall: Firecall): Promise<string> {
   ).data;
 
   console.info(
-    `copied firecall sheet template for ${firecall.id} ${firecall.name}: ${newFile.name} ${newFile.webViewLink}`
+    `copied firecall sheet template for ${firecall.id} ${firecall.name}: ${newFile.name} ${newFile.id}`
   );
   return newFile.id || 'this should be a valid id for a new file';
 }
