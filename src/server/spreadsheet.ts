@@ -1,5 +1,6 @@
 import { Feature, Point } from 'geojson';
 import { google } from 'googleapis';
+import { createWorkspaceAuth } from './auth/workspace';
 import {
   geoFilterFactory,
   GeoFilterProperties,
@@ -18,17 +19,7 @@ interface SpreadsheetGeoObject {
 }
 
 export async function getSpreadsheetData(spreadsheetId: string, range: string) {
-  const auth = new google.auth.GoogleAuth({
-    scopes: SCOPES,
-  });
-
-  // const auth = new google.auth.JWT({
-  //   email: this.config.serviceAccount.client_email,
-  //   key: this.config.serviceAccount.private_key,
-  //   keyId: this.config.serviceAccount.private_key_id,
-  //   scopes: SCOPES,
-  //   // subject: this.user,
-  // });
+  const auth = createWorkspaceAuth(SCOPES);
 
   const sheets = google.sheets({
     version: 'v4',

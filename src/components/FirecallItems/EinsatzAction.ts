@@ -3,6 +3,7 @@
 import { google } from 'googleapis';
 import moment from 'moment';
 import { parseTimestamp } from '../../common/time-format';
+import { createWorkspaceAuth } from '../../server/auth/workspace';
 import { Firecall } from '../firebase/firestore';
 
 /**
@@ -16,12 +17,9 @@ export async function copyFirecallSheet(firecall: Firecall): Promise<string> {
     `copying firecall sheet template for ${firecall.id} ${firecall.name}`
   );
 
-  const auth = new google.auth.GoogleAuth({
-    scopes: SCOPES,
-  });
-
   const tmstp = moment(parseTimestamp(firecall.alarmierung));
 
+  const auth = createWorkspaceAuth(SCOPES);
   const drive = google.drive({ version: 'v3', auth });
 
   const parentFolder = process.env.EINSATZMAPPE_SHEET_FOLDER || '';
@@ -67,7 +65,7 @@ export async function copyFirecallSheet(firecall: Firecall): Promise<string> {
   ).data;
 
   console.info(
-    `copied firecall sheet template for ${firecall.id} ${firecall.name}: ${newFile.name} ${newFile.webViewLink}`
+    `copied firecall sheet template for ${firecall.id} ${firecall.name}: ${newFile.name} ${newFile.id}`
   );
   return newFile.id || 'this should be a valid id for a new file';
 }
