@@ -18,6 +18,7 @@ import {
   signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
+import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -29,10 +30,13 @@ export default function StyledLoginButton({
   firebaseAuth: Auth;
 }) {
   const [email, setEmail] = useState('');
+  const [info, setInfo] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [registerVisible, setRegisterVisible] = useState(false);
   const [registerDisabled, setRegisterDisabled] = useState(false);
   const [name, setName] = useState('');
+  const [isWaitingForMagicLink, setIsWaitingForMagicLink] = useState(false);
+  const [magicLink, setMagicLink] = useState('');
 
   const googleSignIn = useCallback(async () => {
     setError(undefined);
@@ -53,21 +57,41 @@ export default function StyledLoginButton({
 
   const emailSignIn = useCallback(async () => {
     try {
-      const result2 = await sendSignInLinkToEmail(auth, email, {
-        url: `${window.location.protocol}//${
-          window.location.host
-        }/login?emailsignin=true&url=${encodeURIComponent(
-          window.location.href
-        )}`,
-        handleCodeInApp: true,
-      });
-      console.info(`sending sign in link to ${email}`, result2);
-      window.localStorage.setItem('emailForSignIn', email);
+      if (email && magicLink) {
+        try {
+          const result = await signInWithEmailLink(auth, email, magicLink);
+          window.localStorage.removeItem('emailForSignIn');
+          console.info(`login result with email: ${email}`, result);
+          const url = new URL(magicLink);
+          const callbackUrl = url.searchParams.get('url');
+          if (callbackUrl) {
+            window.location.href = callbackUrl;
+          }
+        } catch (err) {
+          console.error(`email signin failed`, err);
+          setError(
+            `Email Login fehlgeschlagen: ${(err as any).message || '' + err}`
+          );
+        }
+      } else {
+        const result2 = await sendSignInLinkToEmail(auth, email, {
+          url: `${window.location.protocol}//${
+            window.location.host
+          }/login?emailsignin=true&url=${encodeURIComponent(
+            window.location.href
+          )}`,
+          handleCodeInApp: true,
+        });
+        setIsWaitingForMagicLink(true);
+        console.info(`sending sign in link to ${email}`, result2);
+        setInfo('Email für den Login versandt. Bitte prüfen Sie Ihre Email.');
+        window.localStorage.setItem('emailForSignIn', email);
+      }
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
     }
-  }, [auth, email]);
+  }, [auth, email, magicLink]);
   const signUp = useCallback(async () => {
     try {
       console.info(`creating user ${email}`);
@@ -114,6 +138,11 @@ export default function StyledLoginButton({
             );
             window.localStorage.removeItem('emailForSignIn');
             console.info(`login result with email: ${email}`, result);
+
+            const callbackUrl = params.get('url');
+            if (callbackUrl) {
+              window.location.href = callbackUrl;
+            }
           } catch (err) {
             console.error(`email signin failed`, err);
             setError((err as any).message || `${err}`);
@@ -129,6 +158,12 @@ export default function StyledLoginButton({
         <Alert severity="error">
           <AlertTitle>Login fehlgeschlagen</AlertTitle>
           {error}
+        </Alert>
+      )}
+      {info && (
+        <Alert severity="info">
+          <AlertTitle>Login Info</AlertTitle>
+          {info}
         </Alert>
       )}
 
@@ -150,6 +185,19 @@ export default function StyledLoginButton({
               setEmail(event.target.value);
             }}
           />
+          {isWaitingForMagicLink && (
+            <TextField
+              id="magicLink"
+              label="Login Link aus dem Email"
+              variant="standard"
+              type="magicLink"
+              value={magicLink}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setMagicLink(event.target.value);
+              }}
+            />
+          )}
+
           {registerVisible && (
             <TextField
               id="name"
