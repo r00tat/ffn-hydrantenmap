@@ -12,11 +12,10 @@ import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
   GoogleAuthProvider,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  sendSignInLinkToEmail,
   sendEmailVerification,
+  sendSignInLinkToEmail,
   signInWithEmailLink,
+  signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
 import { useCallback, useEffect, useState } from 'react';
@@ -24,28 +23,12 @@ import { v4 as uuidv4 } from 'uuid';
 
 const googleProvider = new GoogleAuthProvider();
 
-// const uiConfig: firebaseui.auth.Config = {
-//   signInOptions: [
-//     GoogleAuthProvider.PROVIDER_ID,
-//     EmailAuthProvider.PROVIDER_ID,
-//   ],
-//   signInFlow: 'popup',
-//   // autoUpgradeAnonymousUsers: true,
-//   callbacks: {
-//     signInSuccessWithAuthResult: (authResult) => {
-//       console.info(`firebaseui login success`, authResult);
-//       return false;
-//     },
-//   },
-// };
-
 export default function StyledLoginButton({
   firebaseAuth: auth,
 }: {
   firebaseAuth: Auth;
 }) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [registerVisible, setRegisterVisible] = useState(false);
   const [registerDisabled, setRegisterDisabled] = useState(false);
@@ -80,15 +63,6 @@ export default function StyledLoginButton({
       });
       console.info(`sending sign in link to ${email}`, result2);
       window.localStorage.setItem('emailForSignIn', email);
-
-      // const userCredential = await signInWithEmailAndPassword(
-      //   auth,
-      //   email,
-      //   password
-      // );
-      // // Signed in
-      // const user = userCredential.user;
-      // console.info(`sign in with password`, user);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
@@ -101,7 +75,7 @@ export default function StyledLoginButton({
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password || uuidv4()
+        uuidv4()
       );
 
       console.info(`update profile`);
@@ -123,7 +97,7 @@ export default function StyledLoginButton({
       setError((err as any).message || `${err}`);
     }
     setRegisterDisabled(false);
-  }, [auth, email, name, password]);
+  }, [auth, email, name]);
 
   useEffect(() => {
     (async () => {
@@ -162,9 +136,7 @@ export default function StyledLoginButton({
         Google Login
       </Button>
 
-      <Typography style={{ marginTop: 20 }}>
-        Login mit Email und Passwort
-      </Typography>
+      <Typography style={{ marginTop: 20 }}>Login mit Email</Typography>
       <form>
         <FormControl sx={{ width: '25ch' }}>
           <TextField
@@ -178,17 +150,6 @@ export default function StyledLoginButton({
               setEmail(event.target.value);
             }}
           />
-          {/* <TextField
-            id="password"
-            label="Password"
-            variant="standard"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              setPassword(event.target.value);
-            }}
-          /> */}
           {registerVisible && (
             <TextField
               id="name"
