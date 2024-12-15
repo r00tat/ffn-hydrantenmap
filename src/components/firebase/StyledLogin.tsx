@@ -14,8 +14,13 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendSignInLinkToEmail,
+  sendEmailVerification,
+  signInWithEmailLink,
+  updateProfile,
 } from 'firebase/auth';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -42,6 +47,9 @@ export default function StyledLoginButton({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
+  const [registerVisible, setRegisterVisible] = useState(false);
+  const [registerDisabled, setRegisterDisabled] = useState(false);
+  const [name, setName] = useState('');
 
   const googleSignIn = useCallback(async () => {
     setError(undefined);
@@ -62,34 +70,84 @@ export default function StyledLoginButton({
 
   const emailSignIn = useCallback(async () => {
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      // Signed in
-      const user = userCredential.user;
-      console.info(`sign in with password`, user);
+      const result2 = await sendSignInLinkToEmail(auth, email, {
+        url: `${window.location.protocol}//${
+          window.location.host
+        }/login?emailsignin=true&url=${encodeURIComponent(
+          window.location.href
+        )}`,
+        handleCodeInApp: true,
+      });
+      console.info(`sending sign in link to ${email}`, result2);
+      window.localStorage.setItem('emailForSignIn', email);
+
+      // const userCredential = await signInWithEmailAndPassword(
+      //   auth,
+      //   email,
+      //   password
+      // );
+      // // Signed in
+      // const user = userCredential.user;
+      // console.info(`sign in with password`, user);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
     }
-  }, [auth, email, password]);
+  }, [auth, email]);
   const signUp = useCallback(async () => {
     try {
+      console.info(`creating user ${email}`);
+      setRegisterDisabled(true);
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password || uuidv4()
       );
+
+      console.info(`update profile`);
+      await updateProfile(userCredential.user, {
+        displayName: name,
+      });
       // Signed in
+      console.info(`sending email verification`);
+      sendEmailVerification(userCredential.user);
+
       const user = userCredential.user;
+      setError(
+        'Der Benutzer wurde erfolgreich erstellt. Zur Verifikation der Email Adresse wurde ein Email versandt.'
+      );
+
       console.info(`sign in with password`, user);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
     }
-  }, [auth, email, password]);
+    setRegisterDisabled(false);
+  }, [auth, email, name, password]);
+
+  useEffect(() => {
+    (async () => {
+      const params = new URL(document.location.toString()).searchParams;
+      if (params.get('emailsignin') === 'true') {
+        // try to sigin in
+        const email = window.localStorage.getItem('emailForSignIn');
+        if (email) {
+          try {
+            const result = await signInWithEmailLink(
+              auth,
+              email,
+              window.location.href
+            );
+            window.localStorage.removeItem('emailForSignIn');
+            console.info(`login result with email: ${email}`, result);
+          } catch (err) {
+            console.error(`email signin failed`, err);
+            setError((err as any).message || `${err}`);
+          }
+        }
+      }
+    })();
+  }, [auth]);
 
   return (
     <Box padding={4}>
@@ -120,7 +178,7 @@ export default function StyledLoginButton({
               setEmail(event.target.value);
             }}
           />
-          <TextField
+          {/* <TextField
             id="password"
             label="Password"
             variant="standard"
@@ -130,22 +188,42 @@ export default function StyledLoginButton({
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setPassword(event.target.value);
             }}
-          />
-          <Button
-            color="primary"
-            variant="contained"
-            onClick={emailSignIn}
-            style={{ marginTop: 20 }}
-          >
-            Login
-          </Button>
+          /> */}
+          {registerVisible && (
+            <TextField
+              id="name"
+              label="Name"
+              variant="standard"
+              type="name"
+              autoComplete="current-name"
+              value={name}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                setName(event.target.value);
+              }}
+            />
+          )}
+          {!registerVisible && (
+            <Button
+              color="primary"
+              variant="contained"
+              onClick={emailSignIn}
+              style={{ marginTop: 20 }}
+            >
+              Login
+            </Button>
+          )}
           <Button
             color="secondary"
             variant="contained"
-            onClick={signUp}
+            disabled={registerDisabled}
+            onClick={() =>
+              registerVisible ? signUp() : setRegisterVisible(true)
+            }
             style={{ marginTop: 20 }}
           >
-            Neu registrieren
+            {!registerVisible
+              ? 'Neu registrieren'
+              : 'Mit diesem Namen und Email registrieren'}
           </Button>
         </FormControl>
       </form>

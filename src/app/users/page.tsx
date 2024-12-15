@@ -138,7 +138,12 @@ export default function Users() {
               <Grid size={{ xs: 5, md: 6, lg: 2 }}>
                 {user.displayName || ''}
               </Grid>
-              <Grid size={{ xs: 5, md: 6, lg: 2 }}>{user.email}</Grid>
+              <Grid size={{ xs: 5, md: 6, lg: 2 }}>
+                {user.email}{' '}
+                <Typography color="error">
+                  {!user.emailVerified && 'unverified'}
+                </Typography>
+              </Grid>
 
               <Grid size={{ xs: 6, md: 4, lg: 2 }}>
                 {user.feuerwehr} {user.description}
