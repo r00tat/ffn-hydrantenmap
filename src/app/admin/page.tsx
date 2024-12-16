@@ -42,23 +42,23 @@ export default function AdminPage() {
     <Box margin={2}>
       <Typography variant="h3">Admin Actions</Typography>
       <Typography>{status}</Typography>
-      <Typography>
-        Set authorized from on to true{' '}
+      <Typography margin={2}>
         <Button onClick={updateAuthorized} variant="contained">
           Fix users authorized
-        </Button>
+        </Button>{' '}
+        Set authorized from on to true
       </Typography>
-      <Typography>
-        Set ffnd as default group on firecalls{' '}
+      <Typography margin={2}>
         <Button onClick={setFirecallGroup} variant="contained">
           Fix empty firecall group
-        </Button>
+        </Button>{' '}
+        Set ffnd as default group on firecalls
       </Typography>
-      <Typography>
-        Set claims for users{' '}
+      <Typography margin={2}>
         <Button onClick={setCustomClaimsForAllUsersCb} variant="contained">
           Set custom claims
-        </Button>
+        </Button>{' '}
+        Set claims for users
       </Typography>
     </Box>
   );
