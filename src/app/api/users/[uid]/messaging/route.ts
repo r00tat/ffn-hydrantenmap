@@ -38,10 +38,13 @@ async function handleRegister(uid: string, token: string) {
   return { ...oldData, ...newData };
 }
 
-export async function POST(
-  req: NextRequest,
-  { params: { uid } }: { params: { uid: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ uid: string }> }) {
+  const params = await props.params;
+
+  const {
+    uid
+  } = params;
+
   try {
     const authData = await userRequired(req);
 
@@ -93,11 +96,13 @@ async function handleUnRegister(uid: string, token: string) {
   return { ...oldData, ...newData };
 }
 
-export async function DELETE(
-  req: NextRequest,
-  // res: NextApiResponse<UsersResponse>
-  { params: { uid } }: { params: { uid: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ uid: string }> }) {
+  const params = await props.params;
+
+  const {
+    uid
+  } = params;
+
   try {
     const authData = await userRequired(req);
 

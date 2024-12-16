@@ -7,7 +7,7 @@ export interface RotatedMarkerProps extends MarkerProps {
 }
 export const RotatedMarker = forwardRef<L.Marker, RotatedMarkerProps>(
   ({ children, rotationAngle, rotationOrigin, ...props }, forwardRef) => {
-    const markerRef = useRef<L.Marker>();
+    const markerRef = useRef<L.Marker>(undefined);
 
     useEffect(() => {
       const marker = markerRef.current;

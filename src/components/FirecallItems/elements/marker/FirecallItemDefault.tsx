@@ -11,9 +11,15 @@ import {
 } from '../../../firebase/firestore';
 import { FirecallItemBase } from '../FirecallItemBase';
 
+export interface MarkerRenderOptions {
+  /* do not show the popup */
+  hidePopup?: boolean;
+}
+
 export interface FirecallItemMarkerProps {
   record: FirecallItemBase;
   selectItem: (item: FirecallItem) => void;
+  options?: MarkerRenderOptions;
 }
 
 async function updateFircallItemPos(
@@ -42,6 +48,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
+  options: { hidePopup } = {},
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
   const firecallId = useFirecallId();
@@ -81,7 +88,7 @@ export function FirecallItemMarkerDefault({
         }
         rotationOrigin="center"
       >
-        {record.renderPopup(selectItem)}
+        {!hidePopup && record.renderPopup(selectItem)}
       </RotatedMarker>
     </>
   );

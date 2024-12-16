@@ -1,5 +1,5 @@
 'use server';
-import { isRedirectError } from 'next/dist/client/components/redirect';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { ApiException } from './api/errors';
 import { auth, signIn, signOut } from './auth';
 
