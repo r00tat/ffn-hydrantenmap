@@ -137,7 +137,9 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
 
       {fzgDrawing && (
         <React.Fragment>
-          {getItemInstance(fzgDrawing).renderMarker(() => {})}
+          {getItemInstance(fzgDrawing).renderMarker(() => {}, {
+            hidePopup: true,
+          })}
         </React.Fragment>
       )}
     </>

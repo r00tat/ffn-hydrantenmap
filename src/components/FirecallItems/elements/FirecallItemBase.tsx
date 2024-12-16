@@ -9,7 +9,10 @@ import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
 import { FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
-import { FirecallItemMarkerDefault } from './marker/FirecallItemDefault';
+import {
+  FirecallItemMarkerDefault,
+  MarkerRenderOptions,
+} from './marker/FirecallItemDefault';
 import L from 'leaflet';
 
 export interface FirecallItemPopupProps {
@@ -214,13 +217,17 @@ export class FirecallItemBase {
     );
   }
 
-  public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    options: MarkerRenderOptions = {}
+  ): ReactNode {
     try {
       return (
         <FirecallItemMarkerDefault
           record={this}
           selectItem={selectItem}
           key={this.id}
+          options={options}
         />
       );
     } catch (err) {
