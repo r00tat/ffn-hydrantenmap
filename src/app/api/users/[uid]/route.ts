@@ -7,10 +7,13 @@ export interface UsersResponse {
   user: UserRecordExtended;
 }
 
-export async function POST(
-  req: NextRequest,
-  { params: { uid } }: { params: { uid: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ uid: string }> }) {
+  const params = await props.params;
+
+  const {
+    uid
+  } = params;
+
   try {
     await adminRequired(req);
     const user: UserRecordExtended = await req.json();
