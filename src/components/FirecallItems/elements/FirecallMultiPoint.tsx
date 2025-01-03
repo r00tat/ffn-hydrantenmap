@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
 import { Icon, IconOptions } from 'leaflet';
+import { ReactNode } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import {
   Connection,
@@ -128,8 +128,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
           {this.markerName()} {this.name}
         </b>
         <br />
-        {Math.round(this.distance || 0)}
-        m, {Math.ceil((this.distance || 0) / 20)} B Schläuche
+        {Math.round(this.distance || 0)}m
       </>
     );
   }

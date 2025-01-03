@@ -59,27 +59,46 @@ export default function FahrzeugePrint() {
           </tr>
         </thead>
         <tbody>
-          {vehicles
-            .sort(
-              ({ fw: a = '', name: aa = '' }, { fw: b = '', name: bb = '' }) =>
-                a.localeCompare(b) - aa.localeCompare(bb) / 10
-            )
-            .map((fzg) => (
-              <tr key={fzg.id}>
-                <td>{fzg.fw}</td>
-                <td>{fzg.name}</td>
-                <td>
-                  1:{fzg.besatzung || 0} ({fzg.ats})
-                </td>
-                <td>{fzg.beschreibung}</td>
-                <td>{fzg.alarmierung && formatTimestamp(fzg.alarmierung)}</td>
-                <td>{fzg.eintreffen && formatTimestamp(fzg.eintreffen)}</td>
-                <td>{fzg.abruecken && formatTimestamp(fzg.abruecken)}</td>
-                <td>
-                  {fzg.lat} {fzg.lng}
-                </td>
+          {[
+            {
+              id: undefined,
+              name: 'nicht zugeordnet',
+            },
+            ...Object.values(layers),
+          ].map((layer) => (
+            <React.Fragment key={`fzg-layers-${layer.id}`}>
+              <tr>
+                <th> </th>
+                <th>{layer.name}</th>
               </tr>
-            ))}
+              {vehicles
+                .filter((v) => v.layer === layer.id)
+                .sort(
+                  (
+                    { fw: a = '', name: aa = '' },
+                    { fw: b = '', name: bb = '' }
+                  ) => a.localeCompare(b) - aa.localeCompare(bb) / 10
+                )
+                .map((fzg) => (
+                  <tr key={fzg.id}>
+                    <td>{fzg.fw}</td>
+                    <td>{fzg.name}</td>
+                    <td>
+                      1:{fzg.besatzung || 0} ({fzg.ats})
+                    </td>
+                    <td>{fzg.beschreibung}</td>
+                    <td>
+                      {fzg.alarmierung && formatTimestamp(fzg.alarmierung)}
+                    </td>
+                    <td>{fzg.eintreffen && formatTimestamp(fzg.eintreffen)}</td>
+                    <td>{fzg.abruecken && formatTimestamp(fzg.abruecken)}</td>
+                    <td>
+                      {fzg.lat} {fzg.lng}
+                    </td>
+                  </tr>
+                ))}
+            </React.Fragment>
+          ))}
         </tbody>
       </table>
 

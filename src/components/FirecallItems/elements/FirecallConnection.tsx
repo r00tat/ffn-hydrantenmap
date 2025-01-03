@@ -1,24 +1,17 @@
 import { ReactNode } from 'react';
-import { Icon, IconOptions } from 'leaflet';
-import { defaultPosition } from '../../../hooks/constants';
-import { Connection, FirecallItem } from '../../firebase/firestore';
-import { leafletIcons } from '../icons';
+import { Connection } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
-import ConnectionMarker from './connection/ConnectionComponent';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
 export class FirecallConnection extends FirecallMultiPoint {
-  destLat: number = defaultPosition.lat;
-  destLng: number = defaultPosition.lng;
-  /** stringified LatLngPosition[] */
-  positions?: string;
-  distance?: number;
-  color?: string;
-  alwaysShowMarker?: string;
+  dimension: string;
+  oneHozeLength: number;
 
   public constructor(firecallItem?: Connection) {
     super(firecallItem);
     this.type = 'connection';
+    this.dimension = firecallItem?.dimension || 'B';
+    this.oneHozeLength = firecallItem?.oneHozeLength || 20;
   }
 
   public copy(): FirecallConnection {
@@ -34,8 +27,45 @@ export class FirecallConnection extends FirecallMultiPoint {
 
   public info(): string {
     return `Länge: ${Math.round(this.distance || 0)}m ${Math.ceil(
-      (this.distance || 0) / 20
-    )} B-Längen`;
+      (this.distance || 0) / this.oneHozeLength
+    )} ${this.dimension}-Längen`;
+  }
+
+  public popupFn(): ReactNode {
+    return (
+      <>
+        <b>
+          {this.markerName()} {this.name}
+        </b>
+        <br />
+        {Math.round(this.distance || 0)}
+        m, {Math.ceil((this.distance || 0) / this.oneHozeLength)}{' '}
+        {this.dimension} Schläuche
+      </>
+    );
+  }
+
+  public data(): Connection {
+    return {
+      ...super.data(),
+      dimension: this.dimension || 'B',
+      oneHozeLength: this.oneHozeLength || 20,
+    } as Connection;
+  }
+
+  public fields(): { [fieldName: string]: string } {
+    return {
+      ...super.fields(),
+      dimension: 'Dimension (B, C etc)',
+      oneHozeLength: 'Länge eines Schlauches (Standard 20m)',
+    };
+  }
+
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      ...super.fieldTypes(),
+      oneHozeLength: 'number',
+    };
   }
 
   public static factory(): FirecallItemBase {

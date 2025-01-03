@@ -10,7 +10,7 @@ import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
-import { FirecallConnection } from '../FirecallConnection';
+import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
@@ -19,7 +19,7 @@ import {
 } from './positions';
 
 export interface ConnectionMarkerProps {
-  record: FirecallConnection;
+  record: FirecallMultiPoint;
   selectItem: (item: FirecallItem) => void;
 }
 
