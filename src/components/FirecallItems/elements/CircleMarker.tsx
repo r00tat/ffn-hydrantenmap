@@ -5,6 +5,7 @@ import { Circle as LeafletCircle } from 'react-leaflet';
 import { Circle, FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
+import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class CircleMarker extends FirecallItemBase {
   color: string;
@@ -105,10 +106,13 @@ export class CircleMarker extends FirecallItemBase {
     return new CircleMarker();
   }
 
-  public renderMarker(selectItem: (item: FirecallItem) => void) {
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    { hidePopup = false }: MarkerRenderOptions = {}
+  ) {
     return (
       <>
-        {super.renderMarker(selectItem)}
+        {!hidePopup && super.renderMarker(selectItem)}
         <LeafletCircle
           key={'circle' + this.id}
           color={this.color}
@@ -117,7 +121,7 @@ export class CircleMarker extends FirecallItemBase {
           opacity={this.opacity / 100}
           fill={this.fill === 'true'}
         >
-          {this.renderPopup(selectItem)}
+          {!hidePopup && this.renderPopup(selectItem)}
         </LeafletCircle>
       </>
     );
