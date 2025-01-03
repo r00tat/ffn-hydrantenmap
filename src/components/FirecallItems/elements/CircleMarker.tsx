@@ -91,7 +91,7 @@ export class CircleMarker extends FirecallItemBase {
       <>
         <b>Kreis {this.name}</b>
         <br />
-        {this.radius || 0}m
+        {this.radius || 0}m {this.color} {this.fill && '(ausgefüllt)'}
       </>
     );
   }
@@ -115,11 +115,14 @@ export class CircleMarker extends FirecallItemBase {
         {!hidePopup && super.renderMarker(selectItem)}
         <LeafletCircle
           key={'circle' + this.id}
-          color={this.color}
           radius={this.radius}
           center={L.latLng(this.lat, this.lng)}
-          opacity={this.opacity / 100}
-          fill={this.fill === 'true'}
+          pathOptions={{
+            color: this.color,
+            fill: this.fill === 'true',
+            opacity: this.opacity / 100,
+            fillOpacity: this.opacity / 100 / 3,
+          }}
         >
           {!hidePopup && this.renderPopup(selectItem)}
         </LeafletCircle>
