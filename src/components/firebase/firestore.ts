@@ -113,6 +113,8 @@ export interface MultiPointItem extends FirecallItem {
 
 export interface Connection extends MultiPointItem {
   type: 'connection';
+  dimension?: string;
+  oneHozeLength?: number;
 }
 
 export interface Area extends MultiPointItem {
