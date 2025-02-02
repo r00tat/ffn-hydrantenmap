@@ -1,6 +1,7 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import TabContext from '@mui/lab/TabContext';
@@ -24,6 +25,7 @@ import {
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
@@ -82,14 +84,54 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   return { eintraege, diaryCounter };
 }
 
-export function DiaryButtons({ diary }: { diary: GeschaeftsbuchEintrag }) {
+export function DiaryButtons({
+  diary,
+  funktion,
+}: {
+  diary: GeschaeftsbuchEintrag;
+  funktion?: string;
+}) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
+  const updateItem = useFirecallItemUpdate();
+  const isGelesen =
+    funktion !== undefined &&
+    (diary.gelesen || '')
+      .toLowerCase()
+      .split(/ *, */)
+      .includes(funktion?.toLowerCase());
 
   return (
     <>
       {diary.editable && (
         <>
+          {funktion && (
+            <>
+              {isGelesen && (
+                <Tooltip title="gelesen">
+                  <CheckBoxIcon color="success" />
+                </Tooltip>
+              )}
+
+              {!isGelesen && (
+                <Tooltip title="Als gelesen markieren">
+                  <IconButton
+                    onClick={() => {
+                      updateItem({
+                        ...diary,
+                        gelesen: [
+                          ...(diary.gelesen || '').split(/ *, */),
+                          funktion,
+                        ].join(','),
+                      } as GeschaeftsbuchEintrag);
+                    }}
+                  >
+                    <CheckBoxIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </>
+          )}
           <Tooltip title={`${diary.name} bearbeiten`}>
             <IconButton
               onClick={(e) => {
@@ -167,9 +209,11 @@ async function downloadGb(eintraege: GbDisplay[]) {
 function GbEntries({
   eintraege,
   showEditButton,
+  funktion,
 }: {
   eintraege: GbDisplay[];
   showEditButton?: boolean;
+  funktion?: string;
 }) {
   return (
     <Grid container>
@@ -196,7 +240,7 @@ function GbEntries({
           <Grid size={{ xs: 12, md: 5, lg: 2 }}>
             {e.einaus} {e.von} -&gt; {e.an} ({e.weiterleitung})
           </Grid>
-          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+          <Grid size={{ xs: 12, md: 5, lg: 2 }}>
             <b>
               {e.name?.split(`\n`).map((line, index) => (
                 <React.Fragment key={`title-${e.id}-${index}`}>
@@ -214,8 +258,10 @@ function GbEntries({
               </React.Fragment>
             ))}
           </Grid>
-          <Grid size={{ xs: 12, md: 2, lg: 1 }}>
-            {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
+          <Grid size={{ xs: 12, md: 2, lg: 2 }}>
+            {showEditButton && (
+              <DiaryButtons diary={e} funktion={funktion}></DiaryButtons>
+            )}
           </Grid>
         </React.Fragment>
       ))}
@@ -306,6 +352,7 @@ export default function Geschaeftsbuch({
                       .indexOf(key.toLowerCase()) > -1
                 )}
                 showEditButton={showEditButton}
+                funktion={key}
               />
             </TabPanel>
           ))}
