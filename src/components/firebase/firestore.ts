@@ -99,6 +99,7 @@ export interface GeschaeftsbuchEintrag extends FirecallItem {
   von?: string;
   an?: string;
   weiterleitung?: string;
+  gelesen?: string;
 }
 
 export interface MultiPointItem extends FirecallItem {
