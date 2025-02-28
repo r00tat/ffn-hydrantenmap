@@ -18,9 +18,9 @@ import {
   signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
-import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import FacebookLoginButton from '../auth/FacebookLogin';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -170,6 +170,8 @@ export default function StyledLoginButton({
       <Button color="primary" variant="contained" onClick={googleSignIn}>
         Google Login
       </Button>
+
+      <FacebookLoginButton />
 
       <Typography style={{ marginTop: 20 }}>Login mit Email</Typography>
       <form>
