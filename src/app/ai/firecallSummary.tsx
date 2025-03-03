@@ -14,12 +14,12 @@ const firecallItemTextFormatters: {
   vehicle: (item: FirecallItem) => {
     const v = item as Fzg;
     return `Fahrzeug ${v.name} ${v.fw || ''} ${
-      v.beschreibung?.replace('\n', ' ') || ''
+      v.beschreibung ? v.beschreibung?.replace('\n', ' ') : ''
     } ${v.besatzung ? 'Besatzung 1:' + v.besatzung : ''} ${
       v.ats ? 'Atemschutzträger ' + v.ats : ''
-    }  ${v.eintreffen ? 'eintreffen ' + formatTimestamp(v.eintreffen) : ''} ${
-      v.eintreffen ? 'eintreffen ' + formatTimestamp(v.eintreffen) : ''
-    } ${
+    }  ${
+      v.alarmierung ? 'alarmierung ' + formatTimestamp(v.alarmierung) : ''
+    } ${v.eintreffen ? 'eintreffen ' + formatTimestamp(v.eintreffen) : ''} ${
       v.abruecken ? 'abruecken ' + formatTimestamp(v.abruecken) : ''
     } Position ${v.lat},${v.lng}`;
   },
@@ -46,7 +46,7 @@ export default function useFirecallSummary() {
       firecall.alarmierung || firecall.datum
     )}
     
-    ${firecall.beschreibung}}
+    ${firecall.beschreibung || ''}}
 
     ${firecallItems
       .filter((i) => i.deleted !== true)
