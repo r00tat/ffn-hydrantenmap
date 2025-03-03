@@ -13,6 +13,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
@@ -64,6 +65,7 @@ export default function AppDrawer({
     { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
+    { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
     { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
     {
       text: 'Schadstoff',
