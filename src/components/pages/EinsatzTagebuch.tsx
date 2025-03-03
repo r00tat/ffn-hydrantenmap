@@ -18,7 +18,7 @@ import {
   parseTimestamp,
 } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
@@ -32,6 +32,8 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import { askGemini } from '../firebase/vertexai';
+import { marked } from 'marked';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -65,6 +67,21 @@ export function useDiaries(sortAscending: boolean = false) {
               }`,
               editable: false,
               original: item,
+              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
+                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
+                item.alarmierung
+                  ? 'alarmiert ' + formatTimestamp(item.alarmierung)
+                  : ''
+              } ${
+                item.eintreffen
+                  ? 'eintreffen ' + formatTimestamp(item.eintreffen)
+                  : ''
+              } ${
+                item.abruecken
+                  ? 'abruecken ' + formatTimestamp(item.abruecken)
+                  : ''
+              } Position ${item.lat},${item.lng}`,
             } as Diary)
         ),
       cars
@@ -81,6 +98,13 @@ export function useDiaries(sortAscending: boolean = false) {
               }`,
               editable: false,
               original: item,
+              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
+                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''}  ${
+                item.eintreffen
+                  ? 'eintreffen ' + formatTimestamp(item.eintreffen)
+                  : ''
+              } Position ${item.lat},${item.lng}`,
             } as Diary)
         ),
       cars
@@ -97,6 +121,13 @@ export function useDiaries(sortAscending: boolean = false) {
               }`,
               editable: false,
               original: item,
+              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
+                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
+                item.abruecken
+                  ? 'abruecken ' + formatTimestamp(item.abruecken)
+                  : ''
+              } Position ${item.lat},${item.lng}`,
             } as Diary)
         ),
       // firecallItems
@@ -115,9 +146,27 @@ export function useDiaries(sortAscending: boolean = false) {
       //   ),
       firecallItems
         .filter((item: FirecallItem) => item.type === 'diary')
+        .map((item: FirecallItem) => item as Diary)
         .map(
-          (item: FirecallItem) =>
-            ({ ...item, original: item, editable: true } as Diary)
+          (item: Diary) =>
+            ({
+              ...item,
+              original: item,
+              editable: true,
+              textRepresenation: `${formatTimestamp(item.datum)} ${
+                item.art === 'B'
+                  ? 'Befehl'
+                  : item.art === 'F'
+                  ? 'Frage'
+                  : 'Meldung'
+              } ${item.von ? 'von ' + item.von : ''} ${
+                item.an ? 'an ' + item.an : ''
+              }: ${item.name} ${item.beschreibung} ${
+                item.erledigt
+                  ? 'erledigt ' + formatTimestamp(item.erledigt)
+                  : ''
+              }`,
+            } as Diary)
         ),
     ].flat();
     const diaries = firecallEntries
@@ -237,9 +286,30 @@ export function EinsatzTagebuch({
   showEditButton = true,
   sortAscending = false,
 }: EinsatzTagebuchOptions) {
+  const firecall = useFirecall();
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
   const addEinsatzTagebuch = useFirecallItemAdd();
+
+  const [diarySummary, setDiarySummary] = useState<string>('');
+
+  useEffect(() => {
+    if (diaries.length > 0) {
+      (async () => {
+        const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
+          firecall.name
+        } am ${formatTimestamp(
+          firecall.alarmierung || firecall.date
+        )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
+          .filter((d) => d.textRepresenation)
+          .map((d) => d.textRepresenation)
+          .join(`\n`)}`;
+        const resultText = await askGemini(prompt);
+        const htmlText = await marked(resultText);
+        setDiarySummary(htmlText);
+      })();
+    }
+  }, [diaries, firecall.alarmierung, firecall.date, firecall.name]);
 
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
@@ -261,6 +331,7 @@ export function EinsatzTagebuch({
             tooltip="Einsatz Tagebuch als CSV herunterladen"
           />
         </Typography>
+
         <Grid container>
           <Grid size={{ xs: 3, md: 2, lg: 1 }}>
             <b>Nummer</b>
@@ -311,6 +382,12 @@ export function EinsatzTagebuch({
             </React.Fragment>
           ))}
         </Grid>
+
+        {diarySummary && (
+          <Typography>
+            <span dangerouslySetInnerHTML={{ __html: diarySummary }}></span>
+          </Typography>
+        )}
       </Box>
 
       {showEditButton && (
