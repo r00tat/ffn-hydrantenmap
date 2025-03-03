@@ -298,7 +298,7 @@ export function EinsatzTagebuch({
       (async () => {
         const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
           firecall.name
-        } am ${formatTimestamp(
+        } ${firecall.description || ''} am ${formatTimestamp(
           firecall.alarmierung || firecall.date
         )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
           .filter((d) => d.textRepresenation)
@@ -309,7 +309,13 @@ export function EinsatzTagebuch({
         setDiarySummary(htmlText);
       })();
     }
-  }, [diaries, firecall.alarmierung, firecall.date, firecall.name]);
+  }, [
+    diaries,
+    firecall.alarmierung,
+    firecall.date,
+    firecall.description,
+    firecall.name,
+  ]);
 
   const diaryClose = useCallback(
     (item?: FirecallItem) => {

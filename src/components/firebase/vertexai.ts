@@ -1,12 +1,13 @@
+import { useCallback, useState } from 'react';
 import firebaseApp from './firebase';
 
 import {
-  getVertexAI,
   getGenerativeModel,
-  HarmCategory,
-  HarmSeverity,
+  getVertexAI,
   HarmBlockThreshold,
+  HarmCategory,
 } from 'firebase/vertexai';
+import { marked } from 'marked';
 
 // Initialize the Vertex AI service
 export const vertexAI = getVertexAI(firebaseApp);
@@ -71,4 +72,30 @@ export async function askGemini(prompt: string) {
   const text = response.text();
   console.info(`gemini response: ${text}`);
   return text;
+}
+
+export function useAiQueryHook() {
+  const [resultText, setResultText] = useState('');
+  const [resultHtml, setResultHtml] = useState('');
+  const [isQuerying, setIsQuerying] = useState(false);
+
+  const query = useCallback(async (prompt: string) => {
+    setResultText('');
+    setResultHtml('');
+    setIsQuerying(true);
+    let text = '';
+    const result = await geminiModel.generateContentStream(prompt);
+
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      console.log(chunkText);
+      text += chunkText;
+      setResultText(text);
+      setResultHtml(await marked(text));
+    }
+    setIsQuerying(false);
+    return text;
+  }, []);
+
+  return { resultText, resultHtml, query, isQuerying };
 }

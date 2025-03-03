@@ -1,27 +1,22 @@
 'use client';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { marked } from 'marked';
 import { useCallback, useState } from 'react';
-import firecallAIQuery from './aiQuery';
-import useFirecallSummary from './firecallSummary';
-import CircularProgress from '@mui/material/CircularProgress';
+import { useFirecallAIQueryStream } from './aiQuery';
 
 export default function AiAssistantPage() {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const summary = useFirecallSummary();
+  const {
+    resultHtml: answer,
+    query,
+    isQuerying: isLoading,
+  } = useFirecallAIQueryStream();
   const askQuestion = useCallback(async () => {
-    setAnswer('');
-    setIsLoading(true);
-    const answer = await firecallAIQuery(question, summary);
-    const htmlText = await marked(answer);
-    setAnswer(htmlText);
-    setIsLoading(false);
-  }, [question, summary]);
+    await query(question);
+  }, [query, question]);
 
   return (
     <Paper sx={{ p: 2, m: 2 }}>
