@@ -24,7 +24,6 @@
     "@mui/icons-material": "^6.4.6",
     "@mui/lab": "^6.0.0-beta.27",
     "@mui/material": "^6.1.1",
-    "@mui/x-data-grid": "^7.27.2",
     "@mui/x-date-pickers": "^7.27.1",
     "@react-leaflet/core": "^3.0.0",
     "@serwist/next": "^9.0.12",
