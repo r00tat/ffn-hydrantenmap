@@ -4,6 +4,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
@@ -12,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import { randomUUID } from 'crypto';
 import moment from 'moment';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
 import {
   dateTimeFormat,
   formatTimestamp,
@@ -32,8 +35,6 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
-import { askGemini } from '../firebase/vertexai';
-import { marked } from 'marked';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -290,31 +291,25 @@ export function EinsatzTagebuch({
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
   const addEinsatzTagebuch = useFirecallItemAdd();
+  const { query, resultHtml, isQuerying } = useFirecallAIQueryStream();
 
-  const [diarySummary, setDiarySummary] = useState<string>('');
-
-  useEffect(() => {
-    if (diaries.length > 0) {
-      (async () => {
-        const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
-          firecall.name
-        } ${firecall.description || ''} am ${formatTimestamp(
-          firecall.alarmierung || firecall.date
-        )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
-          .filter((d) => d.textRepresenation)
-          .map((d) => d.textRepresenation)
-          .join(`\n`)}`;
-        const resultText = await askGemini(prompt);
-        const htmlText = await marked(resultText);
-        setDiarySummary(htmlText);
-      })();
-    }
+  const updateDescription = useCallback(async () => {
+    const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
+      firecall.name
+    } ${firecall.description || ''} am ${formatTimestamp(
+      firecall.alarmierung || firecall.date
+    )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
+      .filter((d) => d.textRepresenation)
+      .map((d) => d.textRepresenation)
+      .join(`\n`)}`;
+    query(prompt);
   }, [
     diaries,
     firecall.alarmierung,
     firecall.date,
     firecall.description,
     firecall.name,
+    query,
   ]);
 
   const diaryClose = useCallback(
@@ -336,7 +331,21 @@ export function EinsatzTagebuch({
             onClick={() => downloadDiaries(diaries)}
             tooltip="Einsatz Tagebuch als CSV herunterladen"
           />
+          <Button
+            onClick={updateDescription}
+            variant="outlined"
+            disabled={isQuerying}
+          >
+            Zusammenfassung{' '}
+            {isQuerying && <CircularProgress color="primary" size={20} />}
+          </Button>
         </Typography>
+
+        {resultHtml && (
+          <Typography>
+            <span dangerouslySetInnerHTML={{ __html: resultHtml }}></span>
+          </Typography>
+        )}
 
         <Grid container>
           <Grid size={{ xs: 3, md: 2, lg: 1 }}>
@@ -388,12 +397,6 @@ export function EinsatzTagebuch({
             </React.Fragment>
           ))}
         </Grid>
-
-        {diarySummary && (
-          <Typography>
-            <span dangerouslySetInnerHTML={{ __html: diarySummary }}></span>
-          </Typography>
-        )}
       </Box>
 
       {showEditButton && (
