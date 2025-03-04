@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import firebaseApp from './firebase';
 
 import {
+  GenerateContentRequest,
   getGenerativeModel,
   getVertexAI,
   HarmBlockThreshold,
@@ -63,10 +64,24 @@ export const geminiModel = getGenerativeModel(vertexAI, {
   ],
 });
 
-export async function askGemini(prompt: string) {
+export async function askGemini(prompt: string, systemInstruction?: string) {
   // To generate text output, call generateContent with the text input
   console.info(`gemini query: ${prompt}`);
-  const result = await geminiModel.generateContent(prompt);
+  const request: GenerateContentRequest = {
+    systemInstruction,
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ],
+  };
+
+  const result = await geminiModel.generateContent(request);
 
   const response = result.response;
   const text = response.text();
@@ -79,23 +94,43 @@ export function useAiQueryHook() {
   const [resultHtml, setResultHtml] = useState('');
   const [isQuerying, setIsQuerying] = useState(false);
 
-  const query = useCallback(async (prompt: string) => {
-    setResultText('');
-    setResultHtml('');
-    setIsQuerying(true);
-    let text = '';
-    const result = await geminiModel.generateContentStream(prompt);
+  const query = useCallback(
+    async (prompt: string, systemInstruction?: string) => {
+      console.info(
+        `gemini query: ${prompt} \ninstructions: ${systemInstruction}`
+      );
+      setResultText('');
+      setResultHtml('');
+      setIsQuerying(true);
+      let text = '';
+      const request: GenerateContentRequest = {
+        systemInstruction,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      };
+      const result = await geminiModel.generateContentStream(request);
 
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      console.log(chunkText);
-      text += chunkText;
-      setResultText(text);
-      setResultHtml(await marked(text));
-    }
-    setIsQuerying(false);
-    return text;
-  }, []);
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        console.log(chunkText);
+        text += chunkText;
+        setResultText(text);
+        setResultHtml(await marked(text));
+      }
+      setIsQuerying(false);
+      console.info(`final gemini result: ${text}`);
+      return text;
+    },
+    []
+  );
 
   return { resultText, resultHtml, query, isQuerying };
 }

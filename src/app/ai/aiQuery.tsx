@@ -1,14 +1,17 @@
-import { useCallback, useState } from 'react';
-import {
-  askGemini,
-  geminiModel,
-  useAiQueryHook,
-} from '../../components/firebase/vertexai';
+import { useCallback } from 'react';
+import { askGemini, useAiQueryHook } from '../../components/firebase/vertexai';
 import useFirecallSummary from './firecallSummary';
-import { marked } from 'marked';
 
-function createPrompt(query: string, summary: string) {
-  return `Der Nutzer stellt eine Frage zu einem Einsatz. Beantwortet die Frage kurz, prägnant und wahrheitsgetreut. Erläutere danach woher die Informationen stammen und liste diese auf. Nachfolgend sind Infos zu dem Einsatz aufgelistet. 
+function createPrompt(
+  query: string,
+  summary: string,
+  systemInstruction?: string
+) {
+  return `Der Nutzer stellt eine Frage zu einem Einsatz. ${
+    systemInstruction
+      ? ''
+      : ' Beantwortet die Frage kurz, prägnant und wahrheitsgetreut. Erläutere danach woher die Informationen stammen und liste diese auf. Nachfolgend sind Informationen zu dem Einsatz aufgelistet.'
+  } 
 
     Frage: ${query}
 
@@ -27,9 +30,9 @@ export function useFirecallAIQueryStream() {
   const { query: aiQuery, ...rest } = useAiQueryHook();
 
   const query = useCallback(
-    async (question: string) => {
-      const prompt = createPrompt(question, summary);
-      return await aiQuery(prompt);
+    async (question: string, systemInstruction?: string) => {
+      const prompt = createPrompt(question, summary, systemInstruction);
+      return await aiQuery(prompt, systemInstruction);
     },
     [aiQuery, summary]
   );
