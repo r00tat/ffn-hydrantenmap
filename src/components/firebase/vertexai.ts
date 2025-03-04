@@ -11,7 +11,9 @@ import {
 import { marked } from 'marked';
 
 // Initialize the Vertex AI service
-export const vertexAI = getVertexAI(firebaseApp);
+export const vertexAI = getVertexAI(firebaseApp, {
+  location: 'europe-west3',
+});
 
 // Initialize the generative model with a model that supports your use case
 export const geminiModel = getGenerativeModel(vertexAI, {
