@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
-import { Diary, FirecallItem, Fzg } from '../../components/firebase/firestore';
+import {
+  Diary,
+  FirecallItem,
+  Fzg,
+  GeschaeftsbuchEintrag,
+} from '../../components/firebase/firestore';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
 import useFirecall from '../../hooks/useFirecall';
+import { useSpreadsheetDiaries } from '../../hooks/diaries';
 
 const firecallItemTextFormatters: {
   [key: string]: <T extends FirecallItem>(item: T) => string;
@@ -33,13 +39,23 @@ const firecallItemTextFormatters: {
       item.erledigt ? 'erledigt ' + formatTimestamp(item.erledigt) : ''
     }`;
   },
-  // TODO extend to more items
+  gb: (i: FirecallItem) => {
+    const item = i as GeschaeftsbuchEintrag;
+    return `Geschäftsbucheintrag: ${item.nummer || ''} ${formatTimestamp(
+      item.datum
+    )} ${item.ausgehend ? 'ausgehend' : 'eingehend'} ${
+      item.von ? 'von ' + item.von : ''
+    } ${item.an ? 'an ' + item.an : ''}: ${item.name} ${
+      item.beschreibung?.replace('\n', ' ') || ''
+    } ${item.weiterleitung ? 'weiterleitung an' + item.weiterleitung : ''}`;
+  },
 };
 
 export default function useFirecallSummary() {
   const firecall = useFirecall();
   const firecallItems = useFirecallItems();
   const [summary, setSummary] = useState('');
+  const spreadsheetDiaries = useSpreadsheetDiaries();
 
   useEffect(() => {
     const sum = `Einsatz ${firecall.name} am ${formatTimestamp(
@@ -57,6 +73,10 @@ export default function useFirecallSummary() {
         return formatter(i);
       })
       .join('\n')}
+
+      ${spreadsheetDiaries
+        .map((i) => firecallItemTextFormatters.diary(i))
+        .join('\n')}
     `;
     setSummary(sum);
   }, [firecall, firecallItems]);

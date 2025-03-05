@@ -20,6 +20,7 @@ import {
   formatTimestamp,
   parseTimestamp,
 } from '../../common/time-format';
+import { useSpreadsheetDiaries } from '../../hooks/diaries';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
@@ -35,21 +36,6 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
-import { listSheetTagebuchEntriesAction } from '../actions/tagebuch/tagebuchAction';
-
-export function useSpreadsheetDiaries() {
-  const firecallId = useFirecallId();
-  const [diaries, setDiaries] = useState<Diary[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const sheetEntries = await listSheetTagebuchEntriesAction(firecallId);
-      setDiaries(sheetEntries);
-    })();
-  }, [firecallId]);
-
-  return diaries;
-}
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
