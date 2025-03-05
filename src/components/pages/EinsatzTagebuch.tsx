@@ -35,11 +35,27 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import { listSheetTagebuchEntriesAction } from '../actions/tagebuch/tagebuchAction';
+
+export function useSpreadsheetDiaries() {
+  const firecallId = useFirecallId();
+  const [diaries, setDiaries] = useState<Diary[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const sheetEntries = await listSheetTagebuchEntriesAction(firecallId);
+      setDiaries(sheetEntries);
+    })();
+  }, [firecallId]);
+
+  return diaries;
+}
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
+  const spreadsheetDiaries = useSpreadsheetDiaries();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -169,6 +185,7 @@ export function useDiaries(sortAscending: boolean = false) {
               }`,
             } as Diary)
         ),
+      spreadsheetDiaries,
     ].flat();
     const diaries = firecallEntries
       .map((a) => {
@@ -196,7 +213,7 @@ export function useDiaries(sortAscending: boolean = false) {
     setDiaryCounter(
       firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
     );
-  }, [firecallItems, sortAscending]);
+  }, [firecallItems, sortAscending, spreadsheetDiaries]);
   return { diaries, diaryCounter };
 }
 
