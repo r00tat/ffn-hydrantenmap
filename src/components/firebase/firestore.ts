@@ -90,6 +90,7 @@ export interface Diary extends FirecallItem {
   von?: string;
   an?: string;
   erledigt?: string;
+  textRepresenation?: string;
 }
 export interface GeschaeftsbuchEintrag extends FirecallItem {
   type: 'gb';

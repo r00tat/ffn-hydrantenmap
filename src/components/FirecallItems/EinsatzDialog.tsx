@@ -56,9 +56,9 @@ export default function EinsatzDialog({
 
   const saveEinsatz = useCallback(
     async (fc: Firecall) => {
-      if (!fc.sheetId) {
-        fc.sheetId = await copyFirecallSheet(fc);
-      }
+      // if (!fc.sheetId) {
+      //   fc.sheetId = await copyFirecallSheet(fc);
+      // }
 
       if (fc.id) {
         // update

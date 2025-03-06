@@ -1,5 +1,5 @@
 import { Feature, Point } from 'geojson';
-import { google } from 'googleapis';
+import { google, sheets_v4 } from 'googleapis';
 import { createWorkspaceAuth } from './auth/workspace';
 import {
   geoFilterFactory,
@@ -18,8 +18,16 @@ interface SpreadsheetGeoObject {
   [key: string]: any;
 }
 
-export async function getSpreadsheetData(spreadsheetId: string, range: string) {
+export async function getSpreadsheetData(
+  spreadsheetId: string,
+  range: string,
+  options: {
+    valueRenderOption?: 'UNFORMATTED_VALUE' | 'FORMATTED_VALUE' | 'FORMULA';
+  } = {}
+) {
   const auth = createWorkspaceAuth(SCOPES);
+
+  const { valueRenderOption = 'UNFORMATTED_VALUE' } = options;
 
   const sheets = google.sheets({
     version: 'v4',
@@ -31,7 +39,7 @@ export async function getSpreadsheetData(spreadsheetId: string, range: string) {
       await sheets.spreadsheets.values.get({
         spreadsheetId,
         range,
-        valueRenderOption: 'UNFORMATTED_VALUE',
+        valueRenderOption,
       })
     ).data.values || [];
 
