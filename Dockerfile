@@ -6,14 +6,14 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --force
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM deps AS builder
 WORKDIR /app
 COPY . .
 # COPY --from=deps /app/node_modules ./node_modules
-RUN npm run build && npm ci --omit=dev --ignore-scripts --prefer-offline --force
+RUN npm run build && npm ci --omit=dev --ignore-scripts --prefer-offline
 
 # Production image, copy all the files and run next
 FROM base AS runner
