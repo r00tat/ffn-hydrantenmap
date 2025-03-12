@@ -5,6 +5,7 @@ import moment from 'moment';
 import { parseTimestamp } from '../../common/time-format';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
 import { Firecall } from '../firebase/firestore';
+import { actionUserRequired } from '../../app/auth';
 
 /**
  * duplicate Firecall sheet on creation of a new firecall
@@ -13,6 +14,7 @@ import { Firecall } from '../firebase/firestore';
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
 export async function copyFirecallSheet(firecall: Firecall): Promise<string> {
+  await actionUserRequired();
   console.info(
     `copying firecall sheet template for ${firecall.id} ${firecall.name}`
   );

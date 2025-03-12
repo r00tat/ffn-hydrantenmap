@@ -13,6 +13,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
@@ -57,22 +58,21 @@ export default function AppDrawer({
 
   const drawerItems: DrawerItem[] = [
     { text: 'Karte', icon: <MapIcon />, href: '/' },
+    { text: 'Einsätze', icon: <LocalFireDepartmentIcon />, href: '/einsaetze' },
     { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
     { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
     { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
+    { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
     { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
-    { text: 'Einsätze', icon: <LocalFireDepartmentIcon />, href: '/einsaetze' },
     {
       text: 'Schadstoff',
       icon: <Icon path={mdiBiohazard} size={1} />,
       href: '/schadstoff',
     },
     { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
-    { text: 'Login', icon: <LoginIcon />, href: '/login' },
-    { text: 'About', icon: <InfoIcon />, href: '/about' },
     { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
     { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
     {
@@ -81,6 +81,8 @@ export default function AppDrawer({
       href: '/admin',
       admin: true,
     },
+    { text: 'Login', icon: <LoginIcon />, href: '/login' },
+    { text: 'About', icon: <InfoIcon />, href: '/about' },
   ];
 
   return (

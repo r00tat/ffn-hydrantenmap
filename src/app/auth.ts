@@ -1,8 +1,12 @@
-import NextAuth, { DefaultSession } from 'next-auth';
+import NextAuth, { DefaultSession, Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { isTruthy } from '../common/boolish';
 import { FirebaseUserInfo } from '../common/users';
-import { USER_COLLECTION_ID } from '../components/firebase/firestore';
+import {
+  Firecall,
+  FIRECALL_COLLECTION_ID,
+  USER_COLLECTION_ID,
+} from '../components/firebase/firestore';
 import firebaseAdmin, { firestore } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
 import { uniqueArray } from '../common/arrayUtils';
@@ -168,4 +172,30 @@ export async function actionAdminRequired() {
   }
 
   return session;
+}
+
+export async function userAuthorized(session: Session, firecallId: string) {
+  const firecall = await firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .get();
+  if (!firecall.exists) {
+    throw new Error(`firecall ${firecallId} does not exist`);
+  }
+  const firecallData = firecall.data() as Firecall;
+  if (!firecallData || !firecallData.group) {
+    throw new Error(`firecall ${firecallId} has no data`);
+  }
+
+  if (session.user.groups.indexOf(firecallData.group) < 0) {
+    throw new Error(
+      `user ${session.user.id} is not in group ${firecallData.group}`
+    );
+  }
+  return firecallData;
+}
+
+export async function actionUserAuthorizedForFirecall(firecallId: string) {
+  const session = await actionUserRequired();
+  return userAuthorized(session, firecallId);
 }

@@ -49,6 +49,7 @@ locals {
     "testing.googleapis.com",
     "texttospeech.googleapis.com",
     "picker.googleapis.com",
+    "firebasevertexai.googleapis.com",
   ]
 }
 resource "google_project_service" "apis" {
