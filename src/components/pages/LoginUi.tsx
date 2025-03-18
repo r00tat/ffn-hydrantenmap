@@ -6,12 +6,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import OneTapLogin from '../auth/OneTapLogin';
 import StyledLoginButton from '../firebase/StyledLogin';
 import { auth } from '../firebase/firebase';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
-import { useEffect, useState } from 'react';
 
 export default function LoginUi() {
   const {
