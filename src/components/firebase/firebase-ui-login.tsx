@@ -40,6 +40,7 @@ export default function FirebaseUiLogin() {
         {
           provider: GoogleAuthProvider.PROVIDER_ID,
           // scopes: ['https://www.googleapis.com/auth/contacts.readonly'],
+          clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID,
         },
         {
           provider: EmailAuthProvider.PROVIDER_ID,
@@ -65,6 +66,8 @@ export default function FirebaseUiLogin() {
         // URL to your privacy policy
         window.location.assign('https://www.einsatz.ffnd.at');
       },
+      // Required to enable one-tap sign-up credential helper.
+      credentialHelper: firebaseui.auth.CredentialHelper.GOOGLE_YOLO,
     });
   }, []);
 
