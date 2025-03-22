@@ -1,19 +1,19 @@
 'use client';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
-import { Icon, IconOptions } from 'leaflet';
+import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Popup } from 'react-leaflet';
 import { formatTimestamp } from '../../../common/time-format';
 import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
+import { useMapEditable } from '../../../hooks/useMapEditor';
 import { FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import {
   FirecallItemMarkerDefault,
   MarkerRenderOptions,
 } from './marker/FirecallItemDefault';
-import L from 'leaflet';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -24,11 +24,17 @@ export function FirecallItemPopup({
   children,
   onClick,
 }: FirecallItemPopupProps) {
+  const editable = useMapEditable();
   return (
     <Popup>
-      <IconButton sx={{ marginLeft: 'auto', float: 'right' }} onClick={onClick}>
-        <EditIcon />
-      </IconButton>
+      {editable && (
+        <IconButton
+          sx={{ marginLeft: 'auto', float: 'right' }}
+          onClick={onClick}
+        >
+          <EditIcon />
+        </IconButton>
+      )}
       {children}
     </Popup>
   );

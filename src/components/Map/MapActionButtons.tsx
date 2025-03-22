@@ -1,12 +1,15 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
 import { useMapEvent } from 'react-leaflet';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useMapEditor from '../../hooks/useMapEditor';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { fcItemClasses, getItemInstance } from '../FirecallItems/elements';
 import {
@@ -27,6 +30,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const leitungen = useLeitungen();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
+  const { editable, setEditable } = useMapEditor();
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
@@ -115,21 +119,40 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           right: 16,
         }}
       >
+        {editable && (
+          <Fab
+            color="primary"
+            aria-label="add"
+            size="medium"
+            onClick={(event) => {
+              event.preventDefault();
+              setFzgDialogIsOpen(true);
+            }}
+          >
+            <AddIcon />
+          </Fab>
+        )}
+
         <Fab
-          color="primary"
-          aria-label="add"
-          size="medium"
+          color={editable ? 'default' : 'primary'}
+          aria-label="edit"
+          size="small"
           onClick={(event) => {
             event.preventDefault();
-            setFzgDialogIsOpen(true);
+            setEditable((prev) => !prev);
           }}
         >
-          <AddIcon />
+          {!editable && <EditIcon />}
+          {editable && <VisibilityIcon />}
         </Fab>
       </Box>
 
-      <RecordButton />
-      <SearchButton />
+      {editable && (
+        <>
+          <RecordButton />
+          <SearchButton />
+        </>
+      )}
 
       {fzgDialogIsOpen && (
         <FirecallItemDialog onClose={fzgDialogClose} type="marker" />

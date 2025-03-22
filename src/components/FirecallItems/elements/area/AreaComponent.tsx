@@ -11,6 +11,7 @@ import { Marker, Polygon, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import { FirecallArea } from '../FirecallArea';
 import {
@@ -30,6 +31,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
   const [showMarkers, setShowMarkers] = useState(false);
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
+  const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -62,7 +64,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
             position={p}
             title={record.titleFn()}
             icon={record.icon()}
-            draggable
+            draggable={editable}
             autoPan={false}
             eventHandlers={{
               dragend: (event) => {
@@ -76,20 +78,24 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
             }}
           >
             <Popup>
-              <IconButton
-                sx={{ marginLeft: 'auto', float: 'right' }}
-                onClick={() => selectItem(record)}
-              >
-                <EditIcon />
-              </IconButton>
-              <IconButton
-                sx={{ marginLeft: 'auto', float: 'right' }}
-                onClick={() =>
-                  deleteFirecallPosition(firecallId, record.data(), index)
-                }
-              >
-                <DeleteIcon />
-              </IconButton>
+              {editable && (
+                <>
+                  <IconButton
+                    sx={{ marginLeft: 'auto', float: 'right' }}
+                    onClick={() => selectItem(record)}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    sx={{ marginLeft: 'auto', float: 'right' }}
+                    onClick={() =>
+                      deleteFirecallPosition(firecallId, record.data(), index)
+                    }
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </>
+              )}
               {record.popupFn()}
             </Popup>
           </Marker>
@@ -117,7 +123,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
         }}
       >
         <Popup>
-          {pointIndex >= 0 && (
+          {editable && pointIndex >= 0 && (
             <Tooltip title="Einen Punkt hinzufügen">
               <IconButton
                 color="primary"
@@ -130,12 +136,14 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
               </IconButton>
             </Tooltip>
           )}
-          <IconButton
-            sx={{ marginLeft: 'auto', float: 'right' }}
-            onClick={() => selectItem(record)}
-          >
-            <EditIcon />
-          </IconButton>
+          {editable && (
+            <IconButton
+              sx={{ marginLeft: 'auto', float: 'right' }}
+              onClick={() => selectItem(record)}
+            >
+              <EditIcon />
+            </IconButton>
+          )}
           {record.popupFn()}
         </Popup>
       </Polygon>

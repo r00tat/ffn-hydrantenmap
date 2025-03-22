@@ -9,6 +9,7 @@ import { Marker, Polyline, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import {
@@ -31,6 +32,7 @@ export default function ConnectionMarker({
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
   const [showMarkers, setShowMarkers] = useState(false);
+  const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
     let p: LatLngPosition[] = [
@@ -69,7 +71,7 @@ export default function ConnectionMarker({
                 position={p}
                 title={record.titleFn()}
                 icon={record.icon()}
-                draggable
+                draggable={editable}
                 autoPan={false}
                 eventHandlers={{
                   dragend: (event) => {
@@ -83,28 +85,32 @@ export default function ConnectionMarker({
                 }}
               >
                 <Popup>
-                  <Tooltip title="Linie bearbeiten">
-                    <IconButton
-                      sx={{ marginLeft: 'auto', float: 'right' }}
-                      onClick={() => selectItem(record)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Punkt entfernen">
-                    <IconButton
-                      sx={{ marginLeft: 'auto', float: 'right' }}
-                      onClick={() =>
-                        deleteFirecallPosition(
-                          firecallId,
-                          record as Connection,
-                          index
-                        )
-                      }
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
+                  {editable && (
+                    <>
+                      <Tooltip title="Linie bearbeiten">
+                        <IconButton
+                          sx={{ marginLeft: 'auto', float: 'right' }}
+                          onClick={() => selectItem(record)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Punkt entfernen">
+                        <IconButton
+                          sx={{ marginLeft: 'auto', float: 'right' }}
+                          onClick={() =>
+                            deleteFirecallPosition(
+                              firecallId,
+                              record as Connection,
+                              index
+                            )
+                          }
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
                   {record.popupFn()}
                   <br />
                   Punkt {index + 1} von {positions.length}
@@ -134,7 +140,7 @@ export default function ConnectionMarker({
         }}
       >
         <Popup>
-          {pointIndex >= 0 && (
+          {editable && pointIndex >= 0 && (
             <Tooltip title="Einen Punkt hinzufügen">
               <IconButton
                 color="primary"
@@ -152,13 +158,14 @@ export default function ConnectionMarker({
               </IconButton>
             </Tooltip>
           )}
-          <IconButton
-            sx={{ marginLeft: 'auto', float: 'right' }}
-            onClick={() => selectItem(record)}
-          >
-            <EditIcon />
-          </IconButton>
-
+          {editable && (
+            <IconButton
+              sx={{ marginLeft: 'auto', float: 'right' }}
+              onClick={() => selectItem(record)}
+            >
+              <EditIcon />
+            </IconButton>
+          )}
           {record.popupFn()}
         </Popup>
       </Polyline>
