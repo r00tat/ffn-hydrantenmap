@@ -13,9 +13,13 @@ import FirebaseUserProvider from '../firebase/FirebaseUserProvider';
 import DynamicLogin from '../pages/LoginUi';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
-import DebugLoggingProvider from './DebugLoggingProvider';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
+import dynamic from 'next/dynamic';
+
+const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
+  ssr: false,
+});
 
 interface AppProps {
   children: React.ReactNode;
