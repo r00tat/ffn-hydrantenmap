@@ -19,9 +19,17 @@ export default function DebugLoggingSwitch() {
           control={
             <Switch
               checked={displayMessages}
-              onChange={(event) =>
-                setDisplayMessages && setDisplayMessages(event.target.checked)
-              }
+              onChange={(event) => {
+                console.info(
+                  `set display messages ${
+                    !displayMessages ? 'Y' : 'N'
+                  } ${setDisplayMessages}`
+                );
+                if (setDisplayMessages) {
+                  console.info(`change`);
+                  setDisplayMessages(!displayMessages);
+                }
+              }}
             />
           }
           label={'Debug Informationen anzeigen'}
@@ -30,7 +38,8 @@ export default function DebugLoggingSwitch() {
       {displayMessages && (
         <Typography>
           Logeddin as:&nbsp;
-          {displayName} {email} <br />
+          {displayName} {email}
+          <br />
           Authenticated via {auth.currentUser?.providerId}
           <br />
           isSignedIn: {isSignedIn ? 'Y' : 'N'}
