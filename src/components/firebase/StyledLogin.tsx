@@ -5,6 +5,7 @@ import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import FormControl from '@mui/material/FormControl';
+import Grid from '@mui/material/Grid2';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
@@ -14,6 +15,7 @@ import {
   GoogleAuthProvider,
   sendEmailVerification,
   sendSignInLinkToEmail,
+  signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
   updateProfile,
@@ -35,8 +37,10 @@ export default function StyledLoginButton({
   const [registerVisible, setRegisterVisible] = useState(false);
   const [registerDisabled, setRegisterDisabled] = useState(false);
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [isWaitingForMagicLink, setIsWaitingForMagicLink] = useState(false);
   const [magicLink, setMagicLink] = useState('');
+  const [isEmailLogin, setIsEmailLogin] = useState(false);
 
   const googleSignIn = useCallback(async () => {
     setError(undefined);
@@ -55,7 +59,7 @@ export default function StyledLoginButton({
     }
   }, [auth]);
 
-  const emailSignIn = useCallback(async () => {
+  const emailSignInWithLink = useCallback(async () => {
     try {
       if (email && magicLink) {
         try {
@@ -92,6 +96,23 @@ export default function StyledLoginButton({
       setError((err as any).message || `${err}`);
     }
   }, [auth, email, magicLink]);
+
+  const emailSignIn = useCallback(async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      // Signed in
+      const user = userCredential.user;
+      console.info(`sign in with password`, user);
+    } catch (err) {
+      console.error(`login failed`, err);
+      setError((err as any).message || `${err}`);
+    }
+  }, [auth, email, password]);
+
   const signUp = useCallback(async () => {
     try {
       console.info(`creating user ${email}`);
@@ -153,89 +174,203 @@ export default function StyledLoginButton({
   }, [auth]);
 
   return (
-    <Box padding={4}>
+    <Grid container padding={4}>
       {error && (
-        <Alert severity="error">
-          <AlertTitle>Login fehlgeschlagen</AlertTitle>
-          {error}
-        </Alert>
+        <Grid size={12}>
+          <Alert severity="error">
+            <AlertTitle>Login fehlgeschlagen</AlertTitle>
+            {error}
+          </Alert>
+        </Grid>
       )}
       {info && (
-        <Alert severity="info">
-          <AlertTitle>Login Info</AlertTitle>
-          {info}
-        </Alert>
+        <Grid size={12}>
+          <Alert severity="info">
+            <AlertTitle>Login Info</AlertTitle>
+            {info}
+          </Alert>
+        </Grid>
       )}
 
-      <Button color="primary" variant="contained" onClick={googleSignIn}>
-        Google Login
-      </Button>
+      {!registerVisible && (
+        <>
+          <Grid size={{ xs: 12 }}>
+            <form>
+              <FormControl>
+                <TextField
+                  id="email"
+                  label="Email"
+                  variant="standard"
+                  type="email"
+                  value={email}
+                  autoComplete="username"
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                    setEmail(event.target.value);
+                  }}
+                />
+                {!isEmailLogin && (
+                  <Button
+                    color="primary"
+                    variant="contained"
+                    onClick={() => setIsEmailLogin(true)}
+                    style={{ marginTop: 20 }}
+                    disabled={email === '' || email.includes('@') === false}
+                  >
+                    Login mit Email
+                  </Button>
+                )}
 
-      <Typography style={{ marginTop: 20 }}>Login mit Email</Typography>
-      <form>
-        <FormControl sx={{ width: '25ch' }}>
-          <TextField
-            id="email"
-            label="Email"
-            variant="standard"
-            type="email"
-            value={email}
-            autoComplete="username"
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              setEmail(event.target.value);
-            }}
-          />
-          {isWaitingForMagicLink && (
-            <TextField
-              id="magicLink"
-              label="Login Link aus dem Email"
-              variant="standard"
-              type="magicLink"
-              value={magicLink}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                setMagicLink(event.target.value);
-              }}
-            />
-          )}
+                {isEmailLogin && (
+                  <>
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      onClick={emailSignInWithLink}
+                      style={{ marginTop: 20 }}
+                      disabled={email === '' || email.includes('@') === false}
+                    >
+                      Login mit Email Link
+                    </Button>
 
-          {registerVisible && (
-            <TextField
-              id="name"
-              label="Name"
-              variant="standard"
-              type="name"
-              autoComplete="current-name"
-              value={name}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                setName(event.target.value);
-              }}
-            />
-          )}
-          {!registerVisible && (
+                    <TextField
+                      id="password"
+                      label="Password"
+                      variant="standard"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>
+                      ) => {
+                        setPassword(event.target.value);
+                      }}
+                    />
+
+                    {isWaitingForMagicLink && (
+                      <TextField
+                        id="magicLink"
+                        label="Login Link aus dem Email"
+                        variant="standard"
+                        type="magicLink"
+                        value={magicLink}
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ) => {
+                          setMagicLink(event.target.value);
+                        }}
+                      />
+                    )}
+
+                    <Button
+                      color="primary"
+                      variant="contained"
+                      onClick={emailSignIn}
+                      style={{ marginTop: 20 }}
+                      disabled={email === '' || password === ''}
+                    >
+                      Login mit Email &amp; Passwort
+                    </Button>
+                  </>
+                )}
+                <Typography>Passwort vergessen?</Typography>
+              </FormControl>
+            </form>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
             <Button
               color="primary"
               variant="contained"
-              onClick={emailSignIn}
+              onClick={googleSignIn}
               style={{ marginTop: 20 }}
             >
-              Login
+              Mit Google einloggen
             </Button>
-          )}
-          <Button
-            color="secondary"
-            variant="contained"
-            disabled={registerDisabled}
-            onClick={() =>
-              registerVisible ? signUp() : setRegisterVisible(true)
-            }
-            style={{ marginTop: 20 }}
-          >
-            {!registerVisible
-              ? 'Neu registrieren'
-              : 'Mit diesem Namen und Email registrieren'}
-          </Button>
-        </FormControl>
-      </form>
-    </Box>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Button
+              color="secondary"
+              variant="contained"
+              disabled={registerDisabled}
+              onClick={() =>
+                registerVisible ? signUp() : setRegisterVisible(true)
+              }
+              style={{ marginTop: 20 }}
+            >
+              Als neuer Benutzer registrieren
+            </Button>
+          </Grid>
+        </>
+      )}
+
+      {registerVisible && (
+        <>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Typography style={{ marginTop: 20 }} variant="h4">
+              Neu Registrieren
+            </Typography>
+            <form>
+              <FormControl>
+                <TextField
+                  id="email"
+                  label="Email"
+                  variant="standard"
+                  type="email"
+                  value={email}
+                  autoComplete="username"
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                    setEmail(event.target.value);
+                  }}
+                />
+
+                <TextField
+                  id="password"
+                  label="Password"
+                  variant="standard"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                    setPassword(event.target.value);
+                  }}
+                />
+
+                <TextField
+                  id="name"
+                  label="Name"
+                  variant="standard"
+                  type="name"
+                  autoComplete="current-name"
+                  value={name}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                    setName(event.target.value);
+                  }}
+                />
+                <Button
+                  color="secondary"
+                  variant="contained"
+                  disabled={registerDisabled}
+                  onClick={() =>
+                    registerVisible ? signUp() : setRegisterVisible(true)
+                  }
+                  style={{ marginTop: 20 }}
+                >
+                  Mit diesem Namen und Email registrieren
+                </Button>
+
+                <Button
+                  color="warning"
+                  variant="outlined"
+                  onClick={() => setRegisterVisible(false)}
+                  style={{ marginTop: 20 }}
+                >
+                  Abbrechen
+                </Button>
+              </FormControl>
+            </form>
+          </Grid>
+        </>
+      )}
+    </Grid>
   );
 }
