@@ -60,7 +60,7 @@ export const useFirebaseDebugging = (): DebugLogging => {
   const [messages, setMessages] = useState<DebugMessage[]>([]);
   const [displayMessages, setDisplayMessages] = useState(false);
 
-  const funcs = useMemo((): DebugLogging => {
+  return useMemo((): DebugLogging => {
     const analytics = getAnalytics(app);
 
     const addMessage = (message: string, properties?: SimpleMap<any>) => {
@@ -91,11 +91,9 @@ export const useFirebaseDebugging = (): DebugLogging => {
       removeMessage: (id) => {
         setMessages((old) => old.filter((m) => m.id !== id));
       },
-      displayMessages: false,
+      displayMessages,
       setDisplayMessages,
-      messages: [],
+      messages,
     };
-  }, []);
-
-  return { ...funcs, messages, displayMessages, setDisplayMessages };
+  }, [displayMessages, messages]);
 };

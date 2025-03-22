@@ -63,12 +63,14 @@ export default function AppProviders({ children }: AppProps) {
   return (
     <SessionProvider>
       <FirebaseUserProvider>
-        <div className={styles.container}>
-          <CssBaseline enableColorScheme />
-          <SingedOutOneTapLogin />
+        <DebugLoggingProvider>
+          <div className={styles.container}>
+            <CssBaseline enableColorScheme />
+            <SingedOutOneTapLogin />
 
-          <AuthorizationApp>{children}</AuthorizationApp>
-        </div>
+            <AuthorizationApp>{children}</AuthorizationApp>
+          </div>
+        </DebugLoggingProvider>
       </FirebaseUserProvider>
     </SessionProvider>
   );

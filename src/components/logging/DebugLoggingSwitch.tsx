@@ -19,17 +19,7 @@ export default function DebugLoggingSwitch() {
           control={
             <Switch
               checked={displayMessages}
-              onChange={(event) => {
-                console.info(
-                  `set display messages ${
-                    !displayMessages ? 'Y' : 'N'
-                  } ${setDisplayMessages}`
-                );
-                if (setDisplayMessages) {
-                  console.info(`change`);
-                  setDisplayMessages(!displayMessages);
-                }
-              }}
+              onChange={(event) => setDisplayMessages((old) => !old)}
             />
           }
           label={'Debug Informationen anzeigen'}
