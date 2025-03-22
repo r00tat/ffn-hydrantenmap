@@ -22,7 +22,7 @@ export interface DebugLogging {
   addMessage: (message: string, properties?: SimpleMap<any>) => DebugMessage;
   removeMessage: (id: string) => void;
   displayMessages: boolean;
-  setDisplayMessages?: Dispatch<SetStateAction<boolean>>;
+  setDisplayMessages: Dispatch<SetStateAction<boolean>>;
 }
 
 export interface DebugMessage {
@@ -39,6 +39,7 @@ export const DebugLoggingContext = createContext<DebugLogging>({
   addMessage: (message, properties) => ({ id: '1', message, properties }),
   removeMessage: () => {},
   displayMessages: false,
+  setDisplayMessages: () => {},
 });
 
 export const useDebugLogging = () => {
@@ -59,7 +60,7 @@ export const useFirebaseDebugging = (): DebugLogging => {
   const [messages, setMessages] = useState<DebugMessage[]>([]);
   const [displayMessages, setDisplayMessages] = useState(false);
 
-  const funcs = useMemo((): DebugLogging => {
+  return useMemo((): DebugLogging => {
     const analytics = getAnalytics(app);
 
     const addMessage = (message: string, properties?: SimpleMap<any>) => {
@@ -90,10 +91,9 @@ export const useFirebaseDebugging = (): DebugLogging => {
       removeMessage: (id) => {
         setMessages((old) => old.filter((m) => m.id !== id));
       },
-      messages: [],
-      displayMessages: false,
+      displayMessages,
+      setDisplayMessages,
+      messages,
     };
-  }, []);
-
-  return { ...funcs, messages, displayMessages, setDisplayMessages };
+  }, [displayMessages, messages]);
 };
