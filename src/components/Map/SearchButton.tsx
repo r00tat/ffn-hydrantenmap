@@ -1,6 +1,7 @@
 import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Tooltip from '@mui/material/Tooltip';
 import { useCallback, useState } from 'react';
 import { useMap } from 'react-leaflet';
 import { defaultGeoPosition } from '../../common/geo';
@@ -94,18 +95,20 @@ export default function SearchButton() {
           right: 16,
         }}
       >
-        <Fab
-          color="default"
-          aria-label="search"
-          size="small"
-          onClick={(event) => {
-            event.preventDefault();
-            console.info('Search for an address');
-            setIsDialogOpen(true);
-          }}
-        >
-          <SearchIcon />
-        </Fab>
+        <Tooltip title="Nach einer Adresse suchen">
+          <Fab
+            color="default"
+            aria-label="search"
+            size="small"
+            onClick={(event) => {
+              event.preventDefault();
+              console.info('Search for an address');
+              setIsDialogOpen(true);
+            }}
+          >
+            <SearchIcon />
+          </Fab>
+        </Tooltip>
       </Box>
     </>
   );

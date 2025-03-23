@@ -5,6 +5,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import React, { useCallback, useState } from 'react';
 import { useMapEvent } from 'react-leaflet';
@@ -120,31 +121,40 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         }}
       >
         {editable && (
-          <Fab
-            color="primary"
-            aria-label="add"
-            size="medium"
-            onClick={(event) => {
-              event.preventDefault();
-              setFzgDialogIsOpen(true);
-            }}
-          >
-            <AddIcon />
-          </Fab>
+          <Tooltip title="Neues Element hinzufügen">
+            <Fab
+              color="primary"
+              aria-label="add"
+              size="medium"
+              onClick={(event) => {
+                event.preventDefault();
+                setFzgDialogIsOpen(true);
+              }}
+            >
+              <AddIcon />
+            </Fab>
+          </Tooltip>
         )}
 
-        <Fab
-          color={editable ? 'default' : 'primary'}
-          aria-label="edit"
-          size="small"
-          onClick={(event) => {
-            event.preventDefault();
-            setEditable((prev) => !prev);
-          }}
+        <Tooltip
+          title={
+            editable ? 'Bearbeiten deaktiveren' : 'Einsatzkarte bearbeiten'
+          }
         >
-          {!editable && <EditIcon />}
-          {editable && <VisibilityIcon />}
-        </Fab>
+          <Fab
+            color={editable ? 'default' : 'primary'}
+            aria-label="edit"
+            size="medium"
+            style={{ marginLeft: 8 }}
+            onClick={(event) => {
+              event.preventDefault();
+              setEditable((prev) => !prev);
+            }}
+          >
+            {!editable && <EditIcon />}
+            {editable && <VisibilityIcon />}
+          </Fab>
+        </Tooltip>
       </Box>
 
       {editable && (
