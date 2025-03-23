@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import useMapEditor from '../../../../hooks/useMapEditor';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
 import {
@@ -58,6 +59,7 @@ export function FirecallItemMarkerDefault({
       record.lng || defaultPosition.lng
     )
   );
+  const { editable } = useMapEditor();
 
   useEffect(() => {
     if (record.lat && record.lng) {
@@ -71,7 +73,7 @@ export function FirecallItemMarkerDefault({
         position={startPos}
         title={record.titleFn()}
         icon={icon}
-        draggable={record.draggable}
+        draggable={editable && record.draggable}
         autoPan={false}
         eventHandlers={{
           ...record.eventHandlers,

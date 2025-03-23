@@ -3,9 +3,10 @@ import L, { LeafletEventHandlerFnMap } from 'leaflet';
 import { useEffect } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
+import useFirecall from '../../../hooks/useFirecall';
+import { useMapEditable } from '../../../hooks/useMapEditor';
 import { firestore } from '../../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
-import useFirecall from '../../../hooks/useFirecall';
 
 export const firecallIcon = L.icon({
   iconUrl: '/icons/fire.svg',
@@ -40,6 +41,7 @@ function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
 export default function FirecallMarker() {
   const map = useMap();
   const firecall = useFirecall();
+  const editable = useMapEditable();
 
   useEffect(() => {
     map.setView([
@@ -56,7 +58,7 @@ export default function FirecallMarker() {
       ]}
       title="Einsatzort"
       icon={firecallIcon}
-      draggable
+      draggable={editable}
       eventHandlers={{
         dragend: (event: L.DragEndEvent) => onDragEnd(firecall, event),
       }}

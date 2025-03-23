@@ -67,7 +67,8 @@ export default function FirebaseUiLogin() {
         window.location.assign('https://www.einsatz.ffnd.at');
       },
       // Required to enable one-tap sign-up credential helper.
-      credentialHelper: firebaseui.auth.CredentialHelper.GOOGLE_YOLO,
+      // currently broken
+      // credentialHelper: firebaseui.auth.CredentialHelper.GOOGLE_YOLO,
     });
   }, []);
 
