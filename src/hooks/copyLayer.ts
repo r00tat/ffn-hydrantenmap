@@ -12,6 +12,7 @@ import { firestore } from '../components/firebase/firebase';
 import {
   FcMarker,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../components/firebase/firestore';
@@ -75,7 +76,12 @@ export async function copyLayer(
   const markers = (
     await getDocs(
       query(
-        collection(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item'),
+        collection(
+          firestore,
+          FIRECALL_COLLECTION_ID,
+          firecallId,
+          FIRECALL_ITEMS_COLLECTION_ID
+        ),
         where('layer', '==', layer.id)
       )
     )
@@ -103,7 +109,7 @@ export default async function copyAndSaveFirecallItems(
     firecallId
   );
 
-  const itemCol = collection(firecallDoc, 'item');
+  const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
   const layerCol = collection(firecallDoc, 'layer');
 
   const batch = writeBatch(firestore);

@@ -22,7 +22,11 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
-import { FIRECALL_COLLECTION_ID, FirecallItem } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+  FirecallItem,
+} from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
 
@@ -77,7 +81,12 @@ export default function FirecallItemCard({
           // delete all elements in this layer
           const docs = await getDocs(
             query(
-              collection(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item'),
+              collection(
+                firestore,
+                FIRECALL_COLLECTION_ID,
+                firecallId,
+                FIRECALL_ITEMS_COLLECTION_ID
+              ),
               where('layer', '==', item.id)
             )
           );

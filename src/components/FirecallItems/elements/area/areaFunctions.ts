@@ -3,7 +3,11 @@ import L from 'leaflet';
 import { LatLngPosition } from '../../../../common/geo';
 
 import { firestore } from '../../../firebase/firebase';
-import { Area, FIRECALL_COLLECTION_ID } from '../../../firebase/firestore';
+import {
+  Area,
+  FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+} from '../../../firebase/firestore';
 import {
   calculateDistance,
   getConnectionPositions,
@@ -43,7 +47,13 @@ const updateConnectionInFirestore = async (
 ) => {
   if (fcItem.id)
     return await setDoc(
-      doc(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item', fcItem.id),
+      doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_ITEMS_COLLECTION_ID,
+        fcItem.id
+      ),
       {
         positions: JSON.stringify(positions),
         distance: Math.round(calculateDistance(positions)),

@@ -8,7 +8,10 @@ import { formatTimestamp } from '../../../common/time-format';
 import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
 import { useMapEditable } from '../../../hooks/useMapEditor';
-import { FirecallItem } from '../../firebase/firestore';
+import {
+  FIRECALL_ITEMS_COLLECTION_ID,
+  FirecallItem,
+} from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import {
   FirecallItemMarkerDefault,
@@ -251,7 +254,7 @@ export class FirecallItemBase {
   }
 
   public static firebaseCollectionName(): string {
-    return 'item';
+    return FIRECALL_ITEMS_COLLECTION_ID;
   }
   public addEventHandlers(handlers: L.LeafletEventHandlerFnMap) {
     this.eventHandlers = { ...this.eventHandlers, ...handlers };

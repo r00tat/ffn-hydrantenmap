@@ -40,6 +40,7 @@ import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import KmlImport from '../firebase/KmlImport';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   filterDisplayableItems,
 } from '../firebase/firestore';
@@ -95,7 +96,7 @@ export default function LayersPage() {
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     // queryConstraints,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
     filterFn: filterDisplayableItems,
   });
 

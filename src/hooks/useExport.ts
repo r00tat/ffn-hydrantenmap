@@ -16,6 +16,7 @@ import {
   FcMarker,
   Firecall,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../components/firebase/firestore';
@@ -79,7 +80,7 @@ export async function exportFirecall(
   const firecall = (await getDoc(firecallDoc)).data() as Firecall;
 
   const items = (
-    await getDocs(query(collection(firecallDoc, 'item')))
+    await getDocs(query(collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID)))
   ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallItem));
   const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs.map(
     (d) => ({ ...d.data(), id: d.id } as ChatMessage)
@@ -135,7 +136,7 @@ export async function importFirecall(firecall: FirecallExport) {
     collection(firestore, FIRECALL_COLLECTION_ID),
     firecallData
   );
-  const itemCol = collection(firecallDoc, 'item');
+  const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
   const chatCol = collection(firecallDoc, 'chat');
   const layerCol = collection(firecallDoc, 'layer');
 

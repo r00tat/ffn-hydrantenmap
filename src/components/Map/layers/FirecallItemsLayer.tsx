@@ -5,6 +5,7 @@ import { useFirecallId } from '../../../hooks/useFirecall';
 import {
   filterDisplayableItems,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../../firebase/firestore';
@@ -46,7 +47,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const records = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     queryConstraints,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
     filterFn,
   });
 

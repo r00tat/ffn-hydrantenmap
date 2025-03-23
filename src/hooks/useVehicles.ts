@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   Fzg,
   NON_DISPLAYABLE_ITEMS,
@@ -20,7 +21,7 @@ export default function useVehicles() {
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
     // queryConstraints: [where('type', '==', 'vehicle')],
     filterFn: filterActiveItems,
   });

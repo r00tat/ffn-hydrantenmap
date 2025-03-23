@@ -32,6 +32,7 @@ import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog'
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
@@ -50,7 +51,7 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
 
   const firecallItems = useFirebaseCollection<GeschaeftsbuchEintrag>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
     queryConstraints: [where('type', '==', 'gb')],
     // queryConstraints: [],
     filterFn: filterActiveItems,

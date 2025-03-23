@@ -162,7 +162,7 @@ export default function Einsaetze() {
   const firecallId = useFirecallId();
   const einsaetze = useFirebaseCollection<Firecall>({
     collectionName: FIRECALL_COLLECTION_ID,
-    // pathSegments: [firecallId || 'unknown', 'item'],
+    // pathSegments: [firecallId || 'unknown', FIRECALL_ITEMS_COLLECTION_ID],
     queryConstraints: [
       where('deleted', '==', false),
       where('group', 'in', groups),
