@@ -10,6 +10,9 @@ import Link from 'next/link';
 import React from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall from '../../hooks/useFirecall';
+import useMapEditor from '../../hooks/useMapEditor';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
 function HeaderBar({
   isDrawerOpen,
@@ -21,6 +24,7 @@ function HeaderBar({
   const { isSignedIn, displayName, photoURL, isAuthorized } =
     useFirebaseLogin();
   const firecall = useFirecall();
+  const { history } = useMapEditor();
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -41,6 +45,15 @@ function HeaderBar({
             {!isSignedIn && 'Anmeldung erforderlich'}
             {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
           </Typography>
+          {history.length > 0 && (
+            <Select labelId="bar-history-select" color="info">
+              {history.map((item) => (
+                <MenuItem value={item.id} key={item.id}>
+                  {item.description}
+                </MenuItem>
+              ))}
+            </Select>
+          )}
           {!isSignedIn && (
             <Link href="/login" passHref legacyBehavior>
               <Button color="inherit">Login</Button>

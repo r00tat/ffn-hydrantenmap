@@ -17,6 +17,7 @@ import {
   Firecall,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
+  FIRECALL_LAYERS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../components/firebase/firestore';
@@ -86,7 +87,7 @@ export async function exportFirecall(
     (d) => ({ ...d.data(), id: d.id } as ChatMessage)
   );
   const layers = (
-    await getDocs(query(collection(firecallDoc, 'layer')))
+    await getDocs(query(collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID)))
   ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallLayer));
 
   const exportItems = await Promise.all(
@@ -138,7 +139,7 @@ export async function importFirecall(firecall: FirecallExport) {
   );
   const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
   const chatCol = collection(firecallDoc, 'chat');
-  const layerCol = collection(firecallDoc, 'layer');
+  const layerCol = collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID);
 
   // upload files for items
 

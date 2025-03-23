@@ -9,6 +9,8 @@
  */
 export const FIRECALL_COLLECTION_ID = 'call';
 export const FIRECALL_ITEMS_COLLECTION_ID = 'item';
+export const FIRECALL_HISTORY_COLLECTION_ID = 'history';
+export const FIRECALL_LAYERS_COLLECTION_ID = 'layer';
 export const USER_COLLECTION_ID = 'user';
 export const GROUP_COLLECTION_ID = 'groups';
 export const CLUSTER_COLLECTION_ID = 'clusters6';
@@ -167,4 +169,10 @@ export function dateToYmd(date: Date) {
   return `${date.getFullYear()}-${
     date.getMonth() < 10 ? '0' : ''
   }${date.getMonth()}-${date.getDay() < 10 ? '0' : ''}${date.getDay()}`;
+}
+
+export interface FirecallHistory {
+  id?: string;
+  description: string;
+  createdAt: string;
 }

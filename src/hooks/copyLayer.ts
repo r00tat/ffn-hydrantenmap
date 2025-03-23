@@ -13,6 +13,7 @@ import {
   FcMarker,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
+  FIRECALL_LAYERS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../components/firebase/firestore';
@@ -110,7 +111,7 @@ export default async function copyAndSaveFirecallItems(
   );
 
   const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
-  const layerCol = collection(firecallDoc, 'layer');
+  const layerCol = collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID);
 
   const batch = writeBatch(firestore);
 

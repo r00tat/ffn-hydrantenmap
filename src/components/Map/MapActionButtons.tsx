@@ -2,6 +2,7 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
@@ -21,6 +22,8 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -31,7 +34,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const leitungen = useLeitungen();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
-  const { editable, setEditable } = useMapEditor();
+  const { editable, setEditable, saveHistory, saveInProgress } = useMapEditor();
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
@@ -134,6 +137,29 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
               <AddIcon />
             </Fab>
           </Tooltip>
+        )}
+        {editable && (
+          <>
+            <Tooltip
+              title={
+                saveInProgress
+                  ? 'Akutellen Einsatzstatus sichern'
+                  : 'wird gesichert...'
+              }
+            >
+              <Fab
+                aria-label="save"
+                size="medium"
+                style={{ marginLeft: 8 }}
+                onClick={() => !saveInProgress && saveHistory()}
+                // disabled={saveInProgress}
+                color={saveInProgress ? 'default' : 'primary'}
+              >
+                {!saveInProgress && <SaveIcon />}
+                {saveInProgress && <CircularProgress />}
+              </Fab>
+            </Tooltip>
+          </>
         )}
 
         <Tooltip

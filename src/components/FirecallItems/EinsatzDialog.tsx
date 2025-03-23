@@ -119,15 +119,17 @@ export default function EinsatzDialog({
           variant="standard"
           onChange={onChange('name')}
           value={einsatz.name}
+          required
         />
         <FormControl fullWidth variant="standard">
           <InputLabel id="firecall-group-label">Gruppe</InputLabel>
           <Select
             labelId="firecall-group-label"
             id="firecall-item-type"
-            value={einsatz.group}
+            value={einsatz.group || ''}
             label="Art"
             onChange={handleChange}
+            required
           >
             {myGroups.map((group) => (
               <MenuItem key={`group-${group.id}`} value={group.id}>
@@ -228,6 +230,7 @@ export default function EinsatzDialog({
       </DialogContent>
       <DialogActions>
         <Button
+          color="warning"
           onClick={() => {
             setOpen(false);
             onClose();
@@ -236,6 +239,7 @@ export default function EinsatzDialog({
           Abbrechen
         </Button>
         <Button
+          disabled={!einsatz.name || !einsatz.group}
           onClick={() => {
             setOpen(false);
             saveEinsatz(einsatz);

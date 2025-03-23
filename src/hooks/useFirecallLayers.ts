@@ -4,6 +4,7 @@ import React, { useContext, useMemo } from 'react';
 import { SimpleMap } from '../common/types';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_LAYERS_COLLECTION_ID,
   FirecallLayer,
   filterActiveItems,
 } from '../components/firebase/firestore';
@@ -24,7 +25,7 @@ export function useFirecallLayersFromFirstore(): FirecallLayers {
   const firecallId = useFirecallId();
   const layers = useFirebaseCollection<FirecallLayer>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'layer'],
+    pathSegments: [firecallId, FIRECALL_LAYERS_COLLECTION_ID],
     filterFn: filterActiveItems,
     queryConstraints: [orderBy('name', 'asc')],
   });
