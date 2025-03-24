@@ -24,6 +24,8 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
+import InputDialog from '../dialogs/InputDialog';
+import { formatTimestamp } from '../../common/time-format';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -31,6 +33,7 @@ export interface MapActionButtonsOptions {
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const leitungen = useLeitungen();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
@@ -158,7 +161,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
                 aria-label="save"
                 size="medium"
                 style={{ marginLeft: 8 }}
-                onClick={() => !saveInProgress && saveHistory()}
+                onClick={() => !saveInProgress && setIsSaveDialogOpen(true)}
                 // disabled={saveInProgress}
                 color={saveInProgress ? 'default' : 'primary'}
               >
@@ -205,24 +208,33 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           </Tooltip>
         )}
       </Box>
-
       {editable && (
         <>
           <RecordButton />
           <SearchButton />
         </>
       )}
-
       {fzgDialogIsOpen && (
         <FirecallItemDialog onClose={fzgDialogClose} type="marker" />
       )}
-
       {fzgDrawing && (
         <React.Fragment>
           {getItemInstance(fzgDrawing).renderMarker(() => {}, {
             hidePopup: true,
           })}
         </React.Fragment>
+      )}
+      {isSaveDialogOpen && (
+        <InputDialog
+          title="Sicherung des Einsatzes ablegen"
+          defaultValue={`Einsatzstatus ${formatTimestamp()}`}
+          onClose={(result) => {
+            setIsSaveDialogOpen(false);
+            if (result) {
+              saveHistory(result);
+            }
+          }}
+        />
       )}
     </>
   );
