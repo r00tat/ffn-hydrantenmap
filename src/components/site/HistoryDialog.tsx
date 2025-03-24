@@ -20,7 +20,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
   const { history, historyId } = useMapEditor();
   const [selectedHistory, setSelectedHistory] = useState<
     FirecallHistory | undefined
-  >(undefined);
+  >(historyId ? history.find((h) => h.id === historyId) : undefined);
   const { saveHistory } = useSaveHistory();
 
   const handleChange = (event: SelectChangeEvent<string>) => {

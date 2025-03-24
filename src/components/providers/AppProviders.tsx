@@ -31,8 +31,8 @@ function LogedinApp({ children }: AppProps) {
   return (
     <FirecallProvider>
       <DebugLoggingProvider>
-        <FirecallLayerProvider>
-          <MapEditorProvider>
+        <MapEditorProvider>
+          <FirecallLayerProvider>
             <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
             <HeaderBar
@@ -41,8 +41,8 @@ function LogedinApp({ children }: AppProps) {
             />
             <ChatMessageDisplay />
             {children}
-          </MapEditorProvider>
-        </FirecallLayerProvider>
+          </FirecallLayerProvider>
+        </MapEditorProvider>
       </DebugLoggingProvider>
     </FirecallProvider>
   );
