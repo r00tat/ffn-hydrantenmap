@@ -31,21 +31,31 @@ import { downloadRowsAsCsv } from '../firebase/download';
 import {
   Diary,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   Fzg,
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../hooks/useMapEditor';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
+  const historyPathSegments = useHistoryPathSegments();
   const spreadsheetDiaries = useSpreadsheetDiaries();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     // queryConstraints: [where('type', '==', 'vehicle')],
     queryConstraints: [],
     filterFn: filterActiveItems,
@@ -430,6 +440,7 @@ export default function Tagebuch({
   sortAscending = false,
 }: EinsatzTagebuchOptions) {
   const firecallId = useFirecallId();
+  const canEdit = useMapEditorCanEdit();
 
   if (firecallId === 'unknown') {
     return (
@@ -441,7 +452,7 @@ export default function Tagebuch({
 
   return (
     <EinsatzTagebuch
-      showEditButton={showEditButton}
+      showEditButton={showEditButton && canEdit}
       sortAscending={sortAscending}
     />
   );

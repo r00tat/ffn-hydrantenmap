@@ -16,6 +16,7 @@ import HeaderBar from '../site/HeaderBar';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import dynamic from 'next/dynamic';
+import MapEditorProvider from './MapEditorProvider';
 
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
@@ -31,14 +32,16 @@ function LogedinApp({ children }: AppProps) {
     <FirecallProvider>
       <DebugLoggingProvider>
         <FirecallLayerProvider>
-          <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+          <MapEditorProvider>
+            <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-          <HeaderBar
-            isDrawerOpen={isDrawerOpen}
-            setIsDrawerOpen={setIsDrawerOpen}
-          />
-          <ChatMessageDisplay />
-          {children}
+            <HeaderBar
+              isDrawerOpen={isDrawerOpen}
+              setIsDrawerOpen={setIsDrawerOpen}
+            />
+            <ChatMessageDisplay />
+            {children}
+          </MapEditorProvider>
         </FirecallLayerProvider>
       </DebugLoggingProvider>
     </FirecallProvider>

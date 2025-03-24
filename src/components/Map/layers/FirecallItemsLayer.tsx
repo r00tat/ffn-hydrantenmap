@@ -1,15 +1,17 @@
 import { where } from 'firebase/firestore';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
   filterDisplayableItems,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
+import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
@@ -30,6 +32,7 @@ function renderMarker(
 export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const firecallId = useFirecallId();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
+  const historyPathSegments = useHistoryPathSegments();
   const queryConstraints = useMemo(
     () => (layer?.id ? [where('layer', '==', layer.id)] : []),
     [layer?.id]
@@ -43,10 +46,15 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
             filterDisplayableItems(e),
     [layer?.id]
   );
+
   const records = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     queryConstraints,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     filterFn,
   });
 

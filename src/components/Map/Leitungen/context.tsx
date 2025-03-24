@@ -3,7 +3,11 @@ import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import { firestore } from '../../firebase/firebase';
-import { Connection, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
+import {
+  Connection,
+  FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+} from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
 
 interface Leitungen {
@@ -34,7 +38,12 @@ export const useLeitungsProvider = (): Leitungen => {
         firecallItem.destLat = positions[positions.length - 1].lat;
         firecallItem.destLng = positions[positions.length - 1].lng;
         addDoc(
-          collection(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item'),
+          collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            FIRECALL_ITEMS_COLLECTION_ID
+          ),
           {
             ...firecallItem,
             lat: positions[0].lat,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   Fzg,
   NON_DISPLAYABLE_ITEMS,
@@ -9,6 +10,7 @@ import {
 } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
 import { useFirecallId } from './useFirecall';
+import { useHistoryPathSegments } from './useMapEditor';
 
 export default function useVehicles() {
   const firecallId = useFirecallId();
@@ -17,10 +19,15 @@ export default function useVehicles() {
   const [rohre, setRohre] = useState<Rohr[]>([]);
   const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);
   const [displayItems, setDisplayItems] = useState<FirecallItem[]>([]);
+  const historyPathSegments = useHistoryPathSegments();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     // queryConstraints: [where('type', '==', 'vehicle')],
     filterFn: filterActiveItems,
   });

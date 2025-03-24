@@ -6,6 +6,7 @@ import { firestore } from '../../../firebase/firebase';
 import {
   Connection,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   MultiPointItem,
 } from '../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from './distance';
@@ -80,7 +81,13 @@ const updateConnectionInFirestore = async (
 ) => {
   if (fcItem.id)
     return await setDoc(
-      doc(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item', fcItem.id),
+      doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_ITEMS_COLLECTION_ID,
+        fcItem.id
+      ),
       {
         positions: JSON.stringify(positions),
         distance: Math.round(calculateDistance(positions)),

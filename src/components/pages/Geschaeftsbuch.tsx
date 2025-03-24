@@ -26,12 +26,17 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../hooks/useMapEditor';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { downloadRowsAsCsv } from '../firebase/download';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   GeschaeftsbuchEintrag,
   filterActiveItems,
@@ -47,10 +52,15 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
+  const historyPathSegments = useHistoryPathSegments();
 
   const firecallItems = useFirebaseCollection<GeschaeftsbuchEintrag>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, 'item'],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     queryConstraints: [where('type', '==', 'gb')],
     // queryConstraints: [],
     filterFn: filterActiveItems,
@@ -288,6 +298,7 @@ export default function Geschaeftsbuch({
 }: GeschaeftsbuchOptions) {
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
   const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
+  const canEdit = useMapEditorCanEdit();
 
   const addFirecallGb = useFirecallItemAdd();
 
@@ -338,7 +349,10 @@ export default function Geschaeftsbuch({
           </Box>
 
           <TabPanel value="all">
-            <GbEntries eintraege={eintraege} showEditButton={showEditButton} />
+            <GbEntries
+              eintraege={eintraege}
+              showEditButton={showEditButton && canEdit}
+            />
           </TabPanel>
           {Object.entries(sFunktionen).map(([key, title]) => (
             <TabPanel value={key} key={key}>
@@ -351,7 +365,7 @@ export default function Geschaeftsbuch({
                       .split(/ *, */)
                       .indexOf(key.toLowerCase()) > -1
                 )}
-                showEditButton={showEditButton}
+                showEditButton={showEditButton && canEdit}
                 funktion={key}
               />
             </TabPanel>
@@ -359,7 +373,7 @@ export default function Geschaeftsbuch({
         </TabContext>
       </Box>
 
-      {showEditButton && (
+      {showEditButton && canEdit && (
         <Fab
           color="primary"
           aria-label="add"

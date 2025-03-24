@@ -8,6 +8,7 @@ import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../../../firebase/firestore';
 import { FirecallItemBase } from '../FirecallItemBase';
@@ -37,7 +38,13 @@ async function updateFircallItemPos(
     };
 
     await setDoc(
-      doc(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item', fcItem.id),
+      doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_ITEMS_COLLECTION_ID,
+        fcItem.id
+      ),
       updatePos,
       {
         merge: true,

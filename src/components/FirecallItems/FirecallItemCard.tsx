@@ -22,9 +22,14 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
-import { FIRECALL_COLLECTION_ID, FirecallItem } from '../firebase/firestore';
+import {
+  FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+  FirecallItem,
+} from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
+import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 
 interface ExpandMoreProps extends IconButtonProps {
   expand: boolean;
@@ -66,6 +71,7 @@ export default function FirecallItemCard({
   const updateItem = useFirecallItemUpdate();
   const firecallId = useFirecallId();
   const [expanded, setExpanded] = useState(false);
+  const canEdit = useMapEditorCanEdit();
 
   const item = useMemo(() => getItemInstance(itemData), [itemData]);
   const deleteFn = useCallback(
@@ -77,7 +83,12 @@ export default function FirecallItemCard({
           // delete all elements in this layer
           const docs = await getDocs(
             query(
-              collection(firestore, FIRECALL_COLLECTION_ID, firecallId, 'item'),
+              collection(
+                firestore,
+                FIRECALL_COLLECTION_ID,
+                firecallId,
+                FIRECALL_ITEMS_COLLECTION_ID
+              ),
               where('layer', '==', item.id)
             )
           );
@@ -128,7 +139,7 @@ export default function FirecallItemCard({
 
           {children}
         </CardContent>
-        {item.editable !== false && (
+        {item.editable !== false && canEdit && (
           <CardActions>
             <Button
               size="small"

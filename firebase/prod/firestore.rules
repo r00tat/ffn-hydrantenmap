@@ -27,9 +27,11 @@ service cloud.firestore {
     }
     match /risikoobjekt/{doc=*} {
       allow read: if authorizedUser()
-    }
-    
+    }    
     match /gefahrobjekt/{doc=*} {
+      allow read: if authorizedUser()
+    }
+    match /assistants/{doc=*} {
       allow read: if authorizedUser()
     }
 
