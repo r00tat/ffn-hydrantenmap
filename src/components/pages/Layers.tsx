@@ -44,6 +44,7 @@ import {
   FirecallItem,
   filterDisplayableItems,
 } from '../firebase/firestore';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 interface DropBoxProps {
   id: string;
@@ -92,11 +93,16 @@ export default function LayersPage() {
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
+  const historyPathSegments = useHistoryPathSegments();
 
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     // queryConstraints,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     filterFn: filterDisplayableItems,
   });
 

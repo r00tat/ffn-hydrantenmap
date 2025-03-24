@@ -37,16 +37,22 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
+  const historyPathSegments = useHistoryPathSegments();
   const spreadsheetDiaries = useSpreadsheetDiaries();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     // queryConstraints: [where('type', '==', 'vehicle')],
     queryConstraints: [],
     filterFn: filterActiveItems,

@@ -2,9 +2,11 @@
 
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
+import HistoryIcon from '@mui/icons-material/History';
 import SaveIcon from '@mui/icons-material/Save';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
@@ -22,8 +24,6 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
-import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -34,7 +34,14 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const leitungen = useLeitungen();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
-  const { editable, setEditable, saveHistory, saveInProgress } = useMapEditor();
+  const {
+    editable,
+    setEditable,
+    saveHistory,
+    saveInProgress,
+    historyId,
+    selectHistory,
+  } = useMapEditor();
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
@@ -162,25 +169,41 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           </>
         )}
 
-        <Tooltip
-          title={
-            editable ? 'Bearbeiten deaktiveren' : 'Einsatzkarte bearbeiten'
-          }
-        >
-          <Fab
-            color={editable ? 'default' : 'primary'}
-            aria-label="edit"
-            size="medium"
-            style={{ marginLeft: 8 }}
-            onClick={(event) => {
-              event.preventDefault();
-              setEditable((prev) => !prev);
-            }}
+        {historyId === undefined && (
+          <Tooltip
+            title={
+              editable ? 'Bearbeiten deaktiveren' : 'Einsatzkarte bearbeiten'
+            }
           >
-            {!editable && <EditIcon />}
-            {editable && <VisibilityIcon />}
-          </Fab>
-        </Tooltip>
+            <Fab
+              color={editable ? 'default' : 'primary'}
+              aria-label="edit"
+              size="medium"
+              style={{ marginLeft: 8 }}
+              onClick={(event) => {
+                event.preventDefault();
+                setEditable((prev) => !prev);
+              }}
+            >
+              {!editable && <EditIcon />}
+              {editable && <VisibilityIcon />}
+            </Fab>
+          </Tooltip>
+        )}
+
+        {historyId && (
+          <Tooltip title="Historie geladen, kein Bearbeiten möglich">
+            <Fab
+              color="warning"
+              aria-label="edit"
+              size="medium"
+              style={{ marginLeft: 8 }}
+              onClick={() => selectHistory()}
+            >
+              <HistoryIcon />
+            </Fab>
+          </Tooltip>
+        )}
       </Box>
 
       {editable && (

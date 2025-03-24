@@ -26,6 +26,7 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
@@ -48,10 +49,15 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
+  const historyPathSegments = useHistoryPathSegments();
 
   const firecallItems = useFirebaseCollection<GeschaeftsbuchEintrag>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     queryConstraints: [where('type', '==', 'gb')],
     // queryConstraints: [],
     filterFn: filterActiveItems,

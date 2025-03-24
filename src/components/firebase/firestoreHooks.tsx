@@ -7,6 +7,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from './firestore';
+import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 export function useFirecallItems({
   queryConstraints = [],
@@ -14,9 +15,14 @@ export function useFirecallItems({
   queryConstraints?: QueryConstraint[];
 } = {}) {
   const firecallId = useFirecallId();
+  const historyPathSegments = useHistoryPathSegments();
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     queryConstraints,
     filterFn: filterActiveItems,
   });

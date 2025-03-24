@@ -10,6 +10,7 @@ import {
 } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
 import { useFirecallId } from './useFirecall';
+import { useHistoryPathSegments } from './useMapEditor';
 
 export default function useVehicles() {
   const firecallId = useFirecallId();
@@ -18,10 +19,15 @@ export default function useVehicles() {
   const [rohre, setRohre] = useState<Rohr[]>([]);
   const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);
   const [displayItems, setDisplayItems] = useState<FirecallItem[]>([]);
+  const historyPathSegments = useHistoryPathSegments();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     // queryConstraints: [where('type', '==', 'vehicle')],
     filterFn: filterActiveItems,
   });

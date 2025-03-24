@@ -11,6 +11,7 @@ import {
 import useFirebaseCollection from './useFirebaseCollection';
 import { useFirecallId } from './useFirecall';
 import { orderBy } from 'firebase/firestore';
+import { useHistoryPathSegments } from './useMapEditor';
 
 export type FirecallLayers = SimpleMap<FirecallLayer>;
 
@@ -23,9 +24,14 @@ export const useFirecallLayers = () => {
 
 export function useFirecallLayersFromFirstore(): FirecallLayers {
   const firecallId = useFirecallId();
+  const historyPathSegments = useHistoryPathSegments();
   const layers = useFirebaseCollection<FirecallLayer>({
     collectionName: FIRECALL_COLLECTION_ID,
-    pathSegments: [firecallId, FIRECALL_LAYERS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_LAYERS_COLLECTION_ID,
+    ],
     filterFn: filterActiveItems,
     queryConstraints: [orderBy('name', 'asc')],
   });

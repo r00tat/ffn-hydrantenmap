@@ -9,6 +9,10 @@ export interface MapEditorOptions {
   saveHistory: (description?: string) => void;
   saveInProgress: boolean;
   history: FirecallHistory[];
+  historyId?: string;
+  selectHistory: (history?: string) => void;
+  historyPathSegments: string[];
+  selectedHistory?: FirecallHistory;
 }
 
 export const MapEditorContext = createContext<MapEditorOptions>({
@@ -17,6 +21,8 @@ export const MapEditorContext = createContext<MapEditorOptions>({
   saveHistory: () => {},
   saveInProgress: false,
   history: [],
+  selectHistory: () => {},
+  historyPathSegments: [],
 });
 
 export default function useMapEditor() {
@@ -26,4 +32,9 @@ export default function useMapEditor() {
 export function useMapEditable() {
   const { editable } = useMapEditor();
   return editable;
+}
+
+export function useHistoryPathSegments() {
+  const { historyPathSegments } = useMapEditor();
+  return historyPathSegments;
 }
