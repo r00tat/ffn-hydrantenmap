@@ -65,6 +65,7 @@ function useMapEditorProvider() {
     selectHistory,
     historyId,
     selectedHistory,
+    historyModeActive: !!historyId,
   };
 
   return options;

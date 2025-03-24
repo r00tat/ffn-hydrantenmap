@@ -37,7 +37,10 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
-import { useHistoryPathSegments } from '../../hooks/useMapEditor';
+import {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../hooks/useMapEditor';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -437,6 +440,7 @@ export default function Tagebuch({
   sortAscending = false,
 }: EinsatzTagebuchOptions) {
   const firecallId = useFirecallId();
+  const canEdit = useMapEditorCanEdit();
 
   if (firecallId === 'unknown') {
     return (
@@ -448,7 +452,7 @@ export default function Tagebuch({
 
   return (
     <EinsatzTagebuch
-      showEditButton={showEditButton}
+      showEditButton={showEditButton && canEdit}
       sortAscending={sortAscending}
     />
   );

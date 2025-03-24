@@ -26,7 +26,10 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
-import { useHistoryPathSegments } from '../../hooks/useMapEditor';
+import {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../hooks/useMapEditor';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
@@ -295,6 +298,7 @@ export default function Geschaeftsbuch({
 }: GeschaeftsbuchOptions) {
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
   const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
+  const canEdit = useMapEditorCanEdit();
 
   const addFirecallGb = useFirecallItemAdd();
 
@@ -345,7 +349,10 @@ export default function Geschaeftsbuch({
           </Box>
 
           <TabPanel value="all">
-            <GbEntries eintraege={eintraege} showEditButton={showEditButton} />
+            <GbEntries
+              eintraege={eintraege}
+              showEditButton={showEditButton && canEdit}
+            />
           </TabPanel>
           {Object.entries(sFunktionen).map(([key, title]) => (
             <TabPanel value={key} key={key}>
@@ -358,7 +365,7 @@ export default function Geschaeftsbuch({
                       .split(/ *, */)
                       .indexOf(key.toLowerCase()) > -1
                 )}
-                showEditButton={showEditButton}
+                showEditButton={showEditButton && canEdit}
                 funktion={key}
               />
             </TabPanel>
@@ -366,7 +373,7 @@ export default function Geschaeftsbuch({
         </TabContext>
       </Box>
 
-      {showEditButton && (
+      {showEditButton && canEdit && (
         <Fab
           color="primary"
           aria-label="add"

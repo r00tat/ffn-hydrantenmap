@@ -44,7 +44,7 @@ import {
   FirecallItem,
   filterDisplayableItems,
 } from '../firebase/firestore';
-import { useHistoryPathSegments } from '../../hooks/useMapEditor';
+import useMapEditor, { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 interface DropBoxProps {
   id: string;
@@ -93,7 +93,7 @@ export default function LayersPage() {
   // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
-  const historyPathSegments = useHistoryPathSegments();
+  const { historyPathSegments, historyModeActive } = useMapEditor();
 
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -195,7 +195,7 @@ export default function LayersPage() {
       <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
         <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h3" gutterBottom>
-            Ebenen <KmlImport />
+            Ebenen {!historyModeActive && <KmlImport />}
           </Typography>
           <Grid container spacing={2}>
             <Grid
@@ -203,17 +203,19 @@ export default function LayersPage() {
             >
               <Typography variant="h5">
                 Erstellte Ebenen
-                <FormGroup>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={dragEnabled}
-                        onChange={() => setDragEnabled((old) => !old)}
-                      />
-                    }
-                    label={'Elemente verschieben'}
-                  />
-                </FormGroup>
+                {!historyModeActive && (
+                  <FormGroup>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={dragEnabled}
+                          onChange={() => setDragEnabled((old) => !old)}
+                        />
+                      }
+                      label={'Elemente verschieben'}
+                    />
+                  </FormGroup>
+                )}
               </Typography>
               <Grid container spacing={2}>
                 {Object.entries(layers).map(([layerId, item]) => (
@@ -243,14 +245,16 @@ export default function LayersPage() {
             </Grid>
           </Grid>
         </Box>
-        <Fab
-          color="primary"
-          aria-label="add"
-          sx={{ position: 'fixed', bottom: 16, right: 16 }}
-          onClick={() => setAddDialog(true)}
-        >
-          <AddIcon />
-        </Fab>
+        {!historyModeActive && (
+          <Fab
+            color="primary"
+            aria-label="add"
+            sx={{ position: 'fixed', bottom: 16, right: 16 }}
+            onClick={() => setAddDialog(true)}
+          >
+            <AddIcon />
+          </Fab>
+        )}
         {addDialog && (
           <FirecallItemDialog
             type="layer"

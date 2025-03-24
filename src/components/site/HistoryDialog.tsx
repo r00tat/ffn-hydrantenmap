@@ -9,6 +9,7 @@ import { useState } from 'react';
 import useMapEditor from '../../hooks/useMapEditor';
 import { FirecallHistory } from '../firebase/firestore';
 import Typography from '@mui/material/Typography';
+import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 
 interface HistoryDialogOptions {
   onClose: (history?: FirecallHistory) => void;
@@ -20,6 +21,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
   const [selectedHistory, setSelectedHistory] = useState<
     FirecallHistory | undefined
   >(undefined);
+  const { saveHistory } = useSaveHistory();
 
   const handleChange = (event: SelectChangeEvent<string>) => {
     const selected = history.find((h) => h.id === event.target.value);
@@ -53,6 +55,14 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
       <DialogActions>
         <Button color="secondary" onClick={() => onClose()}>
           Zurück zum Live Modus
+        </Button>
+        <Button
+          onClick={async () => {
+            await saveHistory();
+            onClose();
+          }}
+        >
+          Zeitpunkt speichern
         </Button>
         <Button
           color="warning"

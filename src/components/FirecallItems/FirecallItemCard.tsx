@@ -29,6 +29,7 @@ import {
 } from '../firebase/firestore';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
+import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 
 interface ExpandMoreProps extends IconButtonProps {
   expand: boolean;
@@ -70,6 +71,7 @@ export default function FirecallItemCard({
   const updateItem = useFirecallItemUpdate();
   const firecallId = useFirecallId();
   const [expanded, setExpanded] = useState(false);
+  const canEdit = useMapEditorCanEdit();
 
   const item = useMemo(() => getItemInstance(itemData), [itemData]);
   const deleteFn = useCallback(
@@ -137,7 +139,7 @@ export default function FirecallItemCard({
 
           {children}
         </CardContent>
-        {item.editable !== false && (
+        {item.editable !== false && canEdit && (
           <CardActions>
             <Button
               size="small"
