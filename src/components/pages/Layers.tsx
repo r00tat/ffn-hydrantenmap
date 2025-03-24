@@ -33,6 +33,7 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
+import useMapEditor from '../../hooks/useMapEditor';
 import FirecallItemCard, {
   FirecallItemCardOptions,
 } from '../FirecallItems/FirecallItemCard';
@@ -44,7 +45,6 @@ import {
   FirecallItem,
   filterDisplayableItems,
 } from '../firebase/firestore';
-import useMapEditor, { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 interface DropBoxProps {
   id: string;
