@@ -53,7 +53,7 @@ function useMapEditorProvider() {
         setSelectedHistory(undefined);
       }
     })();
-  }, [historyId]);
+  }, [firecallId, historyId]);
 
   const options: MapEditorOptions = {
     editable: historyId ? false : editable,

@@ -33,8 +33,8 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
       <DialogTitle>Historie</DialogTitle>
       <DialogContent>
         <Typography>
-          Wähle den gewünschten Stand aus der Historie. Wird "letzten Stand
-          laden" ausgewählt, so befindet man sich wieder im live Modus.
+          Wähle den gewünschten Stand aus der Historie. Wird &quot;letzten Stand
+          laden&quot; ausgewählt, so befindet man sich wieder im live Modus.
         </Typography>
         <Select
           labelId="history-select-label"

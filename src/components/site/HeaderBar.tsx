@@ -30,10 +30,13 @@ function HeaderBar({
   const firecall = useFirecall();
   const { history, selectHistory, historyId, selectedHistory } = useMapEditor();
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const historyDialogClose = useCallback((history?: FirecallHistory) => {
-    setIsHistoryDialogOpen(false);
-    selectHistory(history?.id);
-  }, []);
+  const historyDialogClose = useCallback(
+    (history?: FirecallHistory) => {
+      setIsHistoryDialogOpen(false);
+      selectHistory(history?.id);
+    },
+    [selectHistory]
+  );
 
   return (
     <>

@@ -7,8 +7,8 @@ import {
   GeschaeftsbuchEintrag,
 } from '../../components/firebase/firestore';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
-import useFirecall from '../../hooks/useFirecall';
 import { useSpreadsheetDiaries } from '../../hooks/diaries';
+import useFirecall from '../../hooks/useFirecall';
 
 const firecallItemTextFormatters: {
   [key: string]: <T extends FirecallItem>(item: T) => string;
@@ -79,7 +79,7 @@ export default function useFirecallSummary() {
         .join('\n')}
     `;
     setSummary(sum);
-  }, [firecall, firecallItems]);
+  }, [firecall, firecallItems, spreadsheetDiaries]);
 
   return summary;
 }
