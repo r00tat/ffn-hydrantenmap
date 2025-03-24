@@ -150,8 +150,8 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
             <Tooltip
               title={
                 saveInProgress
-                  ? 'Akutellen Einsatzstatus sichern'
-                  : 'wird gesichert...'
+                  ? 'wird gesichert...'
+                  : 'Akutellen Einsatzstatus sichern'
               }
             >
               <Fab
@@ -194,7 +194,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         {historyId && (
           <Tooltip title="Historie geladen, kein Bearbeiten möglich">
             <Fab
-              color="warning"
+              color="error"
               aria-label="edit"
               size="medium"
               style={{ marginLeft: 8 }}

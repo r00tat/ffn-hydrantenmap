@@ -28,7 +28,8 @@ function HeaderBar({
   const { isSignedIn, displayName, photoURL, isAuthorized } =
     useFirebaseLogin();
   const firecall = useFirecall();
-  const { history, selectHistory, historyId, selectedHistory } = useMapEditor();
+  const { history, selectHistory, selectedHistory, historyModeActive } =
+    useMapEditor();
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const historyDialogClose = useCallback(
     (history?: FirecallHistory) => {
@@ -66,7 +67,7 @@ function HeaderBar({
             {history.length > 0 && (
               <Tooltip title="Historie aufrufen">
                 <Button
-                  color="info"
+                  color={historyModeActive ? 'error' : 'info'}
                   style={{
                     backgroundColor: '#fff',
                     marginLeft: 8,
