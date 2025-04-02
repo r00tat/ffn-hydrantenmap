@@ -1,4 +1,4 @@
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import DynamicMap from '../Map/PositionedMap';
 import EinsatzTagebuch from '../pages/EinsatzTagebuch';
 import DynamicFahrzeuge from '../pages/FahrzeugePrint';

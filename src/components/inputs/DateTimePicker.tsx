@@ -6,7 +6,7 @@ import type {} from '@mui/x-date-pickers/themeAugmentation';
 import { Moment } from 'moment';
 import 'moment/locale/de';
 import TimeIcon from '@mui/icons-material/AccessTime';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import Tooltip from '@mui/material/Tooltip';
 import moment from 'moment';
 
