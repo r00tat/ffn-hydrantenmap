@@ -11,7 +11,7 @@ import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import Collapse from '@mui/material/Collapse';
-import Grid, { GridBaseProps } from '@mui/material/Grid2';
+import Grid, { GridBaseProps } from '@mui/material/Grid';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';

@@ -1,4 +1,4 @@
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import { orderBy } from 'firebase/firestore';
 import { ChatMessage } from '../../common/chat';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';

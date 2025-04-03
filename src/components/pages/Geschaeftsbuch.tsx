@@ -9,7 +9,7 @@ import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
-import Grid from '@mui/material/Grid2';
+import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tab from '@mui/material/Tab';
 import Tooltip from '@mui/material/Tooltip';
@@ -372,7 +372,6 @@ export default function Geschaeftsbuch({
           ))}
         </TabContext>
       </Box>
-
       {showEditButton && canEdit && (
         <Fab
           color="primary"
@@ -383,7 +382,6 @@ export default function Geschaeftsbuch({
           <AddIcon />
         </Fab>
       )}
-
       {dialogIsOpen && (
         <FirecallItemDialog
           type="gb"
