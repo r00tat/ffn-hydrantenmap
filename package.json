@@ -24,9 +24,9 @@
     "@mui/icons-material": "^7.0.1",
     "@mui/lab": "^7.0.0-beta.10",
     "@mui/material": "7.0.1",
-    "@mui/x-date-pickers": "^7.28.2",
+    "@mui/x-date-pickers": "^7.28.3",
     "@react-leaflet/core": "^3.0.0",
-    "@serwist/next": "^9.0.12",
+    "@serwist/next": "^9.0.13",
     "@turf/bbox-polygon": "^7.2.0",
     "@turf/boolean-within": "^7.2.0",
     "@turf/center": "^7.2.0",
@@ -59,7 +59,7 @@
     "react-firebase-hooks": "^5.1.1",
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^5.0.0",
-    "sharp": "^0.33.5",
+    "sharp": "^0.34.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
@@ -73,7 +73,7 @@
     "eslint-config-next": "^15.2.4",
     "serwist": "^9.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.3"
   },
   "overrides": {
     "@types/react": "19.0.1",
