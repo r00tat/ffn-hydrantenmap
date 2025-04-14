@@ -22,7 +22,7 @@
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
     "@mui/icons-material": "^7.0.1",
-    "@mui/lab": "^7.0.0-beta.10",
+    "@mui/lab": "^7.0.0-beta.11",
     "@mui/material": "7.0.1",
     "@mui/x-date-pickers": "^7.28.3",
     "@react-leaflet/core": "^3.0.0",
