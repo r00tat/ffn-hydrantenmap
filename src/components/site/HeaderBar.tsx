@@ -82,12 +82,12 @@ function HeaderBar({
               </Tooltip>
             )}
             {!isSignedIn && (
-              <Link href="/login" passHref legacyBehavior>
+              <Link href="/login" passHref>
                 <Button color="inherit">Login</Button>
               </Link>
             )}
             {isSignedIn && (
-              <Link href="/login" passHref legacyBehavior>
+              <Link href="/login" passHref>
                 <Avatar alt={displayName} src={photoURL} />
               </Link>
             )}

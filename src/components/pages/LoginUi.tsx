@@ -96,7 +96,7 @@ export default function LoginUi() {
               </ul>
               {!needsReLogin && (
                 <Typography>
-                  <Link href="/" passHref legacyBehavior>
+                  <Link href="/" passHref>
                     <Button variant="outlined">Weiter zur Einsatzkarte</Button>
                   </Link>
                 </Typography>

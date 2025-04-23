@@ -98,7 +98,7 @@ export default function AppDrawer({
             {drawerItems
               .filter((item) => isAdmin || !item.admin)
               .map(({ text, icon, href }, index) => (
-                <Link href={href} passHref key={text} legacyBehavior>
+                <Link href={href} passHref key={text}>
                   <ListItemButton key={text}>
                     <ListItemIcon>{icon}</ListItemIcon>
                     <ListItemText primary={text} />
