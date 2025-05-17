@@ -52,7 +52,7 @@
     "moment-timezone": "^0.5.48",
     "mui-color-input": "^7.0.0",
     "next": "^15.3.2",
-    "next-auth": "^5.0.0-beta.27",
+    "next-auth": "^5.0.0-beta.28",
     "proj4": "^2.16.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
