@@ -40,7 +40,7 @@
     "firebase-admin": "^13.4.0",
     "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
-    "googleapis": "^148.0.0",
+    "googleapis": "^149.0.0",
     "haversine-distance": "^1.2.3",
     "leaflet": "^1.9.4",
     "leaflet-geometryutil": "^0.10.3",
