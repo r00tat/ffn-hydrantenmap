@@ -33,7 +33,7 @@
     "@turf/helpers": "^7.0.0",
     "@types/geojson": "^7946.0.16",
     "circle-to-polygon": "^2.2.0",
-    "csv-parse": "^5.6.0",
+    "csv-parse": "^6.1.0",
     "csv-stringify": "^6.6.0",
     "epsg": "^0.5.0",
     "firebase": "11.4.0",
