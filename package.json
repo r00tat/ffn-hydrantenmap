@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "npx eslint",
     "extract": "npx tsc --outDir dist src/server/harparser && node dist/server/harparser.js",
     "import": "npx tsc --outDir dist src/server/firestore-import && node dist/server/firestore-import.js",
     "exportImport": "npx tsc --outDir dist src/server/export-import && node dist/server/export-import.js",
