@@ -1,6 +1,6 @@
 import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
 
-export function middleware(req: NextRequest, ev: NextFetchEvent) {
+export function proxy(req: NextRequest, ev: NextFetchEvent) {
   let res = NextResponse.next();
 
   if (req.nextUrl.pathname.startsWith('/api')) {

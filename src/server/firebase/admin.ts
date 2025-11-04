@@ -1,19 +1,21 @@
-import * as firebaseAdmin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getApp, getApps, initializeApp } from 'firebase-admin/app';
 
 // let serviceAccount: process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-if (firebaseAdmin.apps?.length == 0) {
+const apps = getApps();
+
+if (apps?.length == 0) {
   // make sure we initialize only once
-  firebaseAdmin.initializeApp({
+  initializeApp({
     // credential: admin.credential.cert(serviceAccount),
   });
 }
 
-export default firebaseAdmin;
+export const firebaseApp = getApp();
 
 export const firestore = process.env.NEXT_PUBLIC_FIRESTORE_DB
-  ? getFirestore(firebaseAdmin.app(), process.env.NEXT_PUBLIC_FIRESTORE_DB)
-  : firebaseAdmin.firestore();
-export const firebaseAuth = getAuth(firebaseAdmin.app());
+  ? getFirestore(firebaseApp, process.env.NEXT_PUBLIC_FIRESTORE_DB)
+  : getFirestore(firebaseApp);
+export const firebaseAuth = getAuth(firebaseApp);

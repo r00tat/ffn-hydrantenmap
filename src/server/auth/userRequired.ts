@@ -1,7 +1,7 @@
 import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
 import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';
-import firebaseAdmin, { firestore } from '../firebase/admin';
+import { firestore, firebaseAuth } from '../firebase/admin';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 
 const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
@@ -14,7 +14,7 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   }
   const token = authorization.replace('Bearer ', '');
   try {
-    const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+    const decodedToken = await firebaseAuth.verifyIdToken(token);
     // console.log(`decoded token: ${JSON.stringify(decodedToken)}`);
     if (
       decodedToken.email &&
