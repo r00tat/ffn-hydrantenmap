@@ -2,7 +2,7 @@ import { DocumentData } from 'firebase/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { UserRecordExtended } from '../../../common/users';
 import adminRequired from '../../../server/auth/adminRequired';
-import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
+import { firestore } from '../../../server/firebase/admin';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import { listUsers } from './listUsers';
 

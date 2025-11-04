@@ -7,13 +7,13 @@ import {
   FIRECALL_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../components/firebase/firestore';
-import firebaseAdmin, { firestore } from '../server/firebase/admin';
+import { firestore, firebaseAuth } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
 import { uniqueArray } from '../common/arrayUtils';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
-  const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
+  const decodedToken = await firebaseAuth.verifyIdToken(token);
 
   if (
     !(

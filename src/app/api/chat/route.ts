@@ -1,9 +1,9 @@
 import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
-import { DataMessagePayload } from 'firebase-admin/messaging';
+import { DataMessagePayload, getMessaging } from 'firebase-admin/messaging';
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatMessage } from '../../../common/chat';
 import userRequired from '../../../server/auth/userRequired';
-import firebaseAdmin, { firestore } from '../../../server/firebase/admin';
+import { firestore } from '../../../server/firebase/admin';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import { FIRECALL_COLLECTION_ID } from '../../../components/firebase/firestore';
 
@@ -39,7 +39,7 @@ async function newChatMessage(
 
   newMessage.id = newDoc.id;
 
-  const messaging = firebaseAdmin.messaging();
+  const messaging = getMessaging();
   const resp = await messaging.send({
     topic: 'chat',
     data: newMessage as unknown as DataMessagePayload,
