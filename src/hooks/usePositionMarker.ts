@@ -20,16 +20,15 @@ export default function usePositionMarker(map: L.Map | undefined) {
     }
   }, [positionMarker, gotPosition, position]);
 
-  useEffect(() => {
-    if (!initialPositionSet && gotPosition && map) {
-      console.info(
-        `PosMarkerHook: initial position, zooming to ${position.lat},${position.lng}`
-      );
-      setInitialPositionSet(true);
-      map.setView(position);
-      positionMarker.addTo(map);
-    }
-  }, [initialPositionSet, gotPosition, map, positionMarker, position]);
+  if (!initialPositionSet && gotPosition && map) {
+    console.info(
+      `PosMarkerHook: initial position, zooming to ${position.lat},${position.lng}`
+    );
+    setInitialPositionSet(true);
+    map.setView(position);
+    positionMarker.addTo(map);
+  }
+  // }, [initialPositionSet, gotPosition, map, positionMarker, position]);
 
   return positionMarker;
 }
