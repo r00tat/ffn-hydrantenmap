@@ -205,10 +205,12 @@ export function useDiaries(sortAscending: boolean = false) {
           ? moment(a.erledigt).format(dateTimeFormat)
           : undefined,
       }));
-    setDiaries(diaries);
-    setDiaryCounter(
-      firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
-    );
+    (async () => {
+      setDiaries(diaries);
+      setDiaryCounter(
+        firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
+      );
+    })();
   }, [firecallItems, sortAscending, spreadsheetDiaries]);
   return { diaries, diaryCounter };
 }

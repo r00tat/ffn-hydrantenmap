@@ -31,15 +31,16 @@ export default function useFirebaseCollection<T>(
   );
 
   useEffect(() => {
-    if (value) {
-      const records = value?.docs.map(
-        (doc) => ({ ...doc.data(), id: doc.id } as unknown as T)
-      );
-
-      setRecords(filterFn ? records.filter(filterFn) : records);
-    } else if (error) {
-      setRecords([]);
-    }
+    (async () => {
+      if (value) {
+        const records = value?.docs.map(
+          (doc) => ({ ...doc.data(), id: doc.id } as unknown as T)
+        );
+        setRecords(filterFn ? records.filter(filterFn) : records);
+      } else if (error) {
+        setRecords([]);
+      }
+    })();
   }, [error, filterFn, value]);
   return records;
 }

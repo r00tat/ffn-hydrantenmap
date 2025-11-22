@@ -70,7 +70,9 @@ export function FirecallItemMarkerDefault({
 
   useEffect(() => {
     if (record.lat && record.lng) {
-      setStartPos(L.latLng(record.lat, record.lng));
+      (async () => {
+        setStartPos(L.latLng(record.lat, record.lng));
+      })();
     }
   }, [record.lat, record.lng]);
 

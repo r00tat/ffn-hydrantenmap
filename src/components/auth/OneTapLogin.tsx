@@ -38,7 +38,9 @@ export default function OneTapLogin() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setIsLoaded(true);
+    (async () => {
+      setIsLoaded(true);
+    })();
   }, []);
 
   {

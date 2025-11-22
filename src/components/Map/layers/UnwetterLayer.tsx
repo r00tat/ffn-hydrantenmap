@@ -22,7 +22,9 @@ function useUnwetterSheetData() {
   }, [firecall]);
 
   useEffect(() => {
-    refreshData();
+    (async () => {
+      refreshData();
+    })();
     const interval = setInterval(refreshData, 120000);
     return () => {
       clearInterval(interval);

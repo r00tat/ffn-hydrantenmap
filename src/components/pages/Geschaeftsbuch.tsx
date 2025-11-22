@@ -88,8 +88,10 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
         editable: true,
         einaus: a.ausgehend ? 'ausgehend' : 'eingehend',
       }));
-    setGeschaeftsbuchEintraege(diaries);
-    setDiaryCounter(diaries.length + 1);
+    (async () => {
+      setGeschaeftsbuchEintraege(diaries);
+      setDiaryCounter(diaries.length + 1);
+    })();
   }, [firecallItems, sortAscending]);
   return { eintraege, diaryCounter };
 }

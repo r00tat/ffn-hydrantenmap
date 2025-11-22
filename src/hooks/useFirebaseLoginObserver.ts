@@ -129,66 +129,76 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     }
   }, []);
 
+  const authStateChangedHandler = useCallback(
+    async (user: User | null) => {
+      let u: User | undefined = user != null ? user : undefined;
+      console.info(`login status changed:`, u);
+      setUid(u?.uid);
+
+      const token = await user?.getIdToken();
+      if (token) {
+        await serverLogin();
+      }
+
+      const tokenResult = await user?.getIdTokenResult();
+      const idToken = await user?.getIdToken();
+      console.info(`user token result`, tokenResult);
+
+      const authData: any = {
+        isSignedIn: !!user,
+        user: user !== null ? user : undefined,
+        email: nonNull(u?.email),
+        displayName: nonNull(u?.displayName),
+        uid: nonNull(u?.uid),
+        photoURL: nonNull(u?.photoURL),
+        // isAuthorized: false,
+        // isAdmin: false,
+        expiration: tokenResult?.expirationTime,
+        idToken,
+        groups: tokenResult?.claims?.groups || [],
+        isAdmin: tokenResult?.claims?.isAdmin || false,
+        isAuthorized: tokenResult?.claims?.authorized || false,
+        isRefreshing: true,
+      };
+      // if (window && window.sessionStorage) {
+      //   window.sessionStorage.setItem(SESSION_STORAGE_AUTH_KEY, JSON.stringify(authData));
+      // }
+
+      setLoginStatus((prev) => ({ ...prev, ...authData }));
+      await refresh();
+    },
+    [refresh, serverLogin]
+  );
   // Listen to the Firebase Auth state and set the local state.
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
-      async (user: User | null) => {
-        let u: User | undefined = user != null ? user : undefined;
-        console.info(`login status changed:`, u);
-        setUid(u?.uid);
-
-        const token = await user?.getIdToken();
-        if (token) {
-          await serverLogin();
-        }
-
-        const tokenResult = await user?.getIdTokenResult();
-        const idToken = await user?.getIdToken();
-        console.info(`user token result`, tokenResult);
-
-        const authData: any = {
-          isSignedIn: !!user,
-          user: user !== null ? user : undefined,
-          email: nonNull(u?.email),
-          displayName: nonNull(u?.displayName),
-          uid: nonNull(u?.uid),
-          photoURL: nonNull(u?.photoURL),
-          // isAuthorized: false,
-          // isAdmin: false,
-          expiration: tokenResult?.expirationTime,
-          idToken,
-          groups: tokenResult?.claims?.groups || [],
-          isAdmin: tokenResult?.claims?.isAdmin || false,
-          isAuthorized: tokenResult?.claims?.authorized || false,
-          isRefreshing: true,
-        };
-        // if (window && window.sessionStorage) {
-        //   window.sessionStorage.setItem(SESSION_STORAGE_AUTH_KEY, JSON.stringify(authData));
-        // }
-
-        setLoginStatus((prev) => ({ ...prev, ...authData }));
-        await refresh();
-      }
+      authStateChangedHandler
     );
     return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
-  }, [refresh, serverLogin]);
+  }, [authStateChangedHandler]);
 
   useEffect(() => {
-    refresh();
+    (async () => {
+      refresh();
+    })();
   }, [refresh]);
 
   useEffect(() => {
-    if (window && window.sessionStorage) {
-      const authText = window.sessionStorage.getItem(SESSION_STORAGE_AUTH_KEY);
-      if (authText) {
-        const auth: LoginData = JSON.parse(authText);
-        if (auth.expiration && new Date(auth.expiration) > new Date()) {
-          // token valid, use credentials for login status
-          console.info(`using cached login status:`, auth);
-          setLoginStatus({ ...auth, isRefreshing: true });
+    (async () => {
+      if (window && window.sessionStorage) {
+        const authText = window.sessionStorage.getItem(
+          SESSION_STORAGE_AUTH_KEY
+        );
+        if (authText) {
+          const auth: LoginData = JSON.parse(authText);
+          if (auth.expiration && new Date(auth.expiration) > new Date()) {
+            // token valid, use credentials for login status
+            console.info(`using cached login status:`, auth);
+            setLoginStatus({ ...auth, isRefreshing: true });
+          }
         }
       }
-    }
+    })();
   }, []);
 
   useEffect(() => {

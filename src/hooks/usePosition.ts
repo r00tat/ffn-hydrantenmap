@@ -27,7 +27,9 @@ export default function usePosition(): PositionInfo {
         setLocation(geolocation);
         setIsSet(true);
       });
-      setWatchId(id);
+      (async () => {
+        setWatchId(id);
+      })();
     } else {
       console.info(`geolocation not supported`);
     }

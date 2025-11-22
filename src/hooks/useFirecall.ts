@@ -46,7 +46,7 @@ export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>(defaultFirecall);
   const { isAuthorized, groups } = useFirebaseLogin();
 
-  let unsubscribe: CallableFunction = useMemo(() => {
+  useEffect(() => {
     if (isAuthorized) {
       const q = query(
         collection(db, FIRECALL_COLLECTION_ID),
@@ -55,7 +55,7 @@ export function useLastFirecall() {
         orderBy('date', 'desc'),
         limit(1)
       );
-      const unsub = onSnapshot(q, (querySnapshot) => {
+      const unsub = onSnapshot(q, async (querySnapshot) => {
         if (!querySnapshot.empty) {
           const firstDoc = querySnapshot.docs[0];
           const fc: Firecall = {
@@ -77,10 +77,6 @@ export function useLastFirecall() {
     }
   }, [groups, isAuthorized]);
 
-  useEffect(() => {
-    return () => unsubscribe();
-  }, [unsubscribe]);
-
   return firecall;
 }
 
@@ -90,7 +86,10 @@ export function useFirecallSwitcher(): FirecallContextType {
 
   useEffect(() => {
     if (!firecallId) {
-      setFirecall(undefined);
+      const unsetFirecall = async () => {
+        setFirecall(undefined);
+      };
+      unsetFirecall();
     } else {
       const unsubscribe = onSnapshot(
         doc(firestore, FIRECALL_COLLECTION_ID, firecallId),

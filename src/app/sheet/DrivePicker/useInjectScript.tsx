@@ -33,19 +33,23 @@ export default function useInjectScript(url: string): [boolean, boolean] {
     }
     // check if the script is already cached
     if (injectorState.injectorMap[url] === 'loaded') {
-      setState({
-        loaded: true,
-        error: false,
-      });
+      (async () => {
+        setState({
+          loaded: true,
+          error: false,
+        });
+      })();
       return;
     }
 
     // check if the script already errored
     if (injectorState.injectorMap[url] === 'error') {
-      setState({
-        loaded: true,
-        error: true,
-      });
+      (async () => {
+        setState({
+          loaded: true,
+          error: true,
+        });
+      })();
       return;
     }
 

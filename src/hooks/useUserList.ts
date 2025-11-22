@@ -29,7 +29,9 @@ export default function useUserList(): [
     // fetch users
     if (isSignedIn && user) {
       // only fetch users, if signedin
-      fetchUsers();
+      (async () => {
+        fetchUsers();
+      })();
     }
     return () => {};
   }, [fetchUsers, isSignedIn, user]);

@@ -35,8 +35,6 @@ export const useLeitungsProvider = (): Leitungen => {
   const complete = useCallback(
     (positions: L.LatLng[]) => {
       if (firecallItem) {
-        firecallItem.destLat = positions[positions.length - 1].lat;
-        firecallItem.destLng = positions[positions.length - 1].lng;
         addDoc(
           collection(
             firestore,
@@ -54,6 +52,8 @@ export const useLeitungsProvider = (): Leitungen => {
             distance: Math.round(
               calculateDistance(positions.map((p) => [p.lat, p.lng]))
             ),
+            destLat: positions[positions.length - 1].lat,
+            destLng: positions[positions.length - 1].lng,
           }
         );
       }

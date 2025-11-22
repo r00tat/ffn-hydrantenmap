@@ -17,10 +17,12 @@ export default function DrivePickerComponent({
   useEffect(() => {
     try {
       if (process.env.NEXT_PUBLIC_FIREBASE_APIKEY) {
-        const newApiKey = JSON.parse(
-          process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}'
-        );
-        setApiKey(newApiKey.apiKey);
+        (async () => {
+          const newApiKey = JSON.parse(
+            process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}'
+          );
+          setApiKey(newApiKey.apiKey);
+        })();
       } else {
         console.warn(`NEXT_PUBLIC_FIREBASE_APIKEY empty!`);
       }
