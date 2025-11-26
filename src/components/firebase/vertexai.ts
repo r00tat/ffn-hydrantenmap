@@ -17,7 +17,7 @@ export const vertexAI = getVertexAI(firebaseApp, {
 
 // Initialize the generative model with a model that supports your use case
 export const geminiModel = getGenerativeModel(vertexAI, {
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.5-flash',
   systemInstruction: `**Systemanweisungen:**
 
 * **Rolle:**

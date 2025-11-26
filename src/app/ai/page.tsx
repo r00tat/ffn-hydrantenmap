@@ -11,8 +11,9 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import { MenuItem } from '@mui/material';
 import { instructionSet } from './assistantInstructions';
+import { useFirecallId } from '../../hooks/useFirecall';
 
-export default function AiAssistantPage() {
+export function AiAssistantPageQuery() {
   const [question, setQuestion] = useState('');
   const [assistant, setAssistant] = useState('Standard');
   const {
@@ -25,11 +26,7 @@ export default function AiAssistantPage() {
   }, [assistant, query, question]);
 
   return (
-    <Paper sx={{ p: 2, m: 2 }}>
-      <Typography variant="h3" gutterBottom>
-        AI Assistant
-      </Typography>
-
+    <>
       <FormControl fullWidth>
         <TextField
           id="outlined"
@@ -77,6 +74,20 @@ export default function AiAssistantPage() {
       <Typography>
         <span dangerouslySetInnerHTML={{ __html: answer }}></span>
       </Typography>
+    </>
+  );
+}
+
+export default function AiAssistantPage() {
+  const firecallId = useFirecallId();
+
+  return (
+    <Paper sx={{ p: 2, m: 2 }}>
+      <Typography variant="h3" gutterBottom>
+        AI Assistant
+      </Typography>
+
+      {firecallId != 'unknown' && <AiAssistantPageQuery />}
     </Paper>
   );
 }
