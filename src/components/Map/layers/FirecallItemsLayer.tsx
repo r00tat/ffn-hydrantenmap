@@ -35,7 +35,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const historyPathSegments = useHistoryPathSegments();
   const queryConstraints = useMemo(
     () => (layer?.id ? [where('layer', '==', layer.id)] : []),
-    [layer?.id]
+    [layer]
   );
   const filterFn = useMemo(
     () =>
