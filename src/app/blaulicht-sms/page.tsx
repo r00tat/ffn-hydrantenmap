@@ -12,6 +12,7 @@ import {
   Chip,
 } from '@mui/material';
 import { getBlaulichtSmsAlarms, BlaulichtSmsAlarm } from './actions';
+import AlarmMap from './Map';
 
 const BlaulichtSmsPage = () => {
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
@@ -91,41 +92,47 @@ const BlaulichtSmsPage = () => {
             Zusagen
           </Typography>
           <Box>
-            {alarm.recipients
-              .filter((r) => r.participation === 'yes')
-              .map((recipient) => (
-                <Box
-                  key={recipient.id}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    py: 1,
-                    borderBottom: '1px solid #eee',
-                  }}
-                >
-                  <Typography variant="body2">{recipient.name}</Typography>
-                  <Box>
-                    {recipient.functions.map((func) => (
-                      <Chip
-                        key={func.functionId}
-                        label={func.shortForm}
-                        size="small"
-                        sx={{
-                          ml: 1,
-                          backgroundColor: func.backgroundHexColorCode,
-                          color: func.foregroundHexColorCode,
-                        }}
+                      {alarm.recipients
+                        .filter((r) => r.participation === 'yes')
+                        .map((recipient) => (
+                          <Box
+                            key={recipient.id}
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              py: 1,
+                              borderBottom: '1px solid #eee',
+                            }}
+                          >
+                            <Typography variant="body2">{recipient.name}</Typography>
+                            <Box>
+                              {recipient.functions.map((func) => (
+                                <Chip
+                                  key={func.functionId}
+                                  label={func.shortForm}
+                                  size="small"
+                                  sx={{
+                                    ml: 1,
+                                    backgroundColor: func.backgroundHexColorCode,
+                                    color: func.foregroundHexColorCode,
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        ))}
+                    </Box>
+                    {alarm.geolocation?.coordinates && (
+                      <AlarmMap
+                        lat={alarm.geolocation.coordinates.lat}
+                        lon={alarm.geolocation.coordinates.lon}
+                        alarmText={alarm.alarmText}
                       />
-                    ))}
-                  </Box>
-                </Box>
-              ))}
-          </Box>
-        </CardContent>
-      </Card>
-    );
-  };
+                    )}
+                  </CardContent>
+                </Card>
+              );  };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
