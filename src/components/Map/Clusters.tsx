@@ -153,9 +153,13 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
   return clusterData;
 }
 
-export default function Clusters() {
+export default function Clusters({
+  clustered = true,
+}: {
+  clustered?: boolean;
+}) {
   const map = useMap();
-  const [center, setCenter] = useState(L.latLng(defaultPosition));
+  const [center, setCenter] = useState(map.getCenter() || defaultPosition);
   const [radius, setRadius] = useState(1000);
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
@@ -197,7 +201,7 @@ export default function Clusters() {
   return (
     <>
       <LayersControl.Overlay name="Hydranten" checked>
-        <HydrantenLayer hydranten={hydranten} />
+        <HydrantenLayer hydranten={hydranten} clustered={clustered} />
       </LayersControl.Overlay>
       <LayersControl.Overlay name="Saugstellen" checked>
         <LayerGroup>
