@@ -24,19 +24,21 @@ export async function listSheetTagebuchEntriesAction(
     'YYYY-MM-DD'
   );
 
-  const diaries = sheetData.map(
-    ([time, von, an, art, name, complete, erledigt]) =>
-      ({
-        id: `${day}T${time}`,
-        datum: `${day}T${time}`,
-        von,
-        an,
-        art,
-        name,
-        erledigt,
-        editable: false,
-      } as Diary)
-  );
+  const diaries = sheetData
+    .filter(([time, von, an, art, name, complete, erledigt]) => time && name)
+    .map(
+      ([time, von, an, art, name, complete, erledigt]) =>
+        ({
+          id: `${day}T${time}`,
+          datum: `${day}T${time}`,
+          von,
+          an,
+          art,
+          name,
+          erledigt,
+          editable: false,
+        } as Diary)
+    );
 
   return diaries;
 }
