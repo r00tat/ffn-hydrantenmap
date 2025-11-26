@@ -1,6 +1,5 @@
 'use server';
-import { log } from 'console';
-import { actionAdminRequired } from '../auth';
+import { actionUserRequired } from '../auth';
 
 export interface BlaulichtSmsAlarm {
   productType: string;
@@ -48,7 +47,12 @@ export interface BlaulichtSmsAlarm {
 }
 
 export async function getBlaulichtSmsAlarms(): Promise<BlaulichtSmsAlarm[]> {
-  await actionAdminRequired();
+  const session = await actionUserRequired();
+  const requiredGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP || 'ffnd';
+
+  if (!session.user.groups.includes(requiredGroup)) {
+    return [];
+  }
   const username = process.env.BLAULICHTSMS_USERNAME;
   const password = process.env.BLAULICHTSMS_PASSWORD;
   const customerId = process.env.BLAULICHTSMS_CUSTOMER_ID;
@@ -109,7 +113,7 @@ export async function getBlaulichtSmsAlarms(): Promise<BlaulichtSmsAlarm[]> {
   const dashboardData: BlaulichtSmsAlarm[] = (await dashboardResponse.json())
     .alarms;
 
-  console.info(`active alarms: ${JSON.stringify(dashboardData)}`);
+  // console.info(`active alarms: ${JSON.stringify(dashboardData)}`);
 
   return dashboardData;
 }

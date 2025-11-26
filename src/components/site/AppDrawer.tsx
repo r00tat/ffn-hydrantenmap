@@ -68,7 +68,6 @@ export default function AppDrawer({
       text: 'Blaulicht-SMS',
       icon: <SmsIcon />,
       href: '/blaulicht-sms',
-      admin: true,
     },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
