@@ -14,6 +14,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SmsIcon from '@mui/icons-material/Sms';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
 import Box from '@mui/material/Box';
@@ -63,6 +64,12 @@ export default function AppDrawer({
     { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
     { text: 'Einsatz Tagebuch', icon: <LibraryBooksIcon />, href: '/tagebuch' },
     { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
+    {
+      text: 'Blaulicht-SMS',
+      icon: <SmsIcon />,
+      href: '/blaulicht-sms',
+      admin: true,
+    },
     { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'Geschäftsbuch', icon: <MenuBookIcon />, href: '/geschaeftsbuch' },
     { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
