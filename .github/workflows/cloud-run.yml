@@ -1,11 +1,11 @@
-name: 'Cloud Run'
+name: "Cloud Run"
 
 on:
   push:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
@@ -20,10 +20,8 @@ concurrency:
 
 jobs:
   cloudrun:
-    name: 'Cloud Run'
+    name: "Cloud Run"
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read # This is required for actions/checkout
@@ -122,15 +120,15 @@ jobs:
       #       AUTH_SECRET=AUTH_SECRET:latest
       #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
 
-      - name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
+      - name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
         if: ${{ env.workload_identity_provider != '' }}
         with:
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # this is the output provider_name from the TF module
           service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }} # this is a SA email configured
-          export_environment_variables: 'true'
+          export_environment_variables: "true"
 
-      - name: 'Set up Cloud SDK'
+      - name: "Set up Cloud SDK"
         uses: google-github-actions/setup-gcloud@v2
 
       - id: image
@@ -157,7 +155,7 @@ jobs:
             --max-instances=2 --region $RUN_REGION \
             --tag=${VERSION_TAG} \
             --service-account=$RUN_SERVICE_ACCOUNT \
-            --update-secrets="AUTH_SECRET=AUTH_SECRET:latest,GOOGLE_SERVICE_ACCOUNT=GOOGLE_SERVICE_ACCOUNT:latest" \
+            --update-secrets="AUTH_SECRET=AUTH_SECRET:latest,GOOGLE_SERVICE_ACCOUNT=GOOGLE_SERVICE_ACCOUNT:latest,BLAULICHTSMS_USERNAME=BLAULICHTSMS_USERNAME:latest,BLAULICHTSMS_PASSWORD=BLAULICHTSMS_PASSWORD:latest,BLAULICHTSMS_CUSTOMER_ID=BLAULICHTSMS_CUSTOMER_ID:latest" \
             --remove-secrets="NEXT_PUBLIC_FIREBASE_APIKEY,NEXT_PUBLIC_MAPBOX_APIKEY,EINSATZMAPPE_SHEET_ID,EINSATZMAPPE_SHEET_RANGE,EINSATZMAPPE_SHEET_FOLDER,EINSATZMAPPE_IMPERSONATION_ACCOUNT" \
            --update-env-vars="^@@^NEXTAUTH_URL=${NEXTAUTH_URL}@@NEXTAUTH_URL_INTERNAL=http://localhost:8080@@NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}@@NEXT_PUBLIC_MAPBOX_APIKEY=${NEXT_PUBLIC_MAPBOX_APIKEY}@@EINSATZMAPPE_SHEET_ID=${EINSATZMAPPE_SHEET_ID}@@EINSATZMAPPE_SHEET_RANGE=${EINSATZMAPPE_SHEET_RANGE}@@EINSATZMAPPE_SHEET_FOLDER=${EINSATZMAPPE_SHEET_FOLDER}@@EINSATZMAPPE_IMPERSONATION_ACCOUNT=${EINSATZMAPPE_IMPERSONATION_ACCOUNT}" \
             ${RUN_ARGS}
