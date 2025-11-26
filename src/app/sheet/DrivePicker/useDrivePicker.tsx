@@ -175,7 +175,9 @@ export default function useDrivePicker(): [
       pickerApiLoaded
     ) {
       createPicker(config);
-      setOpenAfterAuth(false);
+      (async () => {
+        setOpenAfterAuth(false);
+      })();
     }
   }, [
     openAfterAuth,

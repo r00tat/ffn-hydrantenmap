@@ -159,35 +159,37 @@ export default function Clusters() {
   const [radius, setRadius] = useState(1000);
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
-    const b = map.getBounds();
-    // console.info(`map bounds: ${JSON.stringify(b)}`);
+    (async () => {
+      const b = map.getBounds();
+      // console.info(`map bounds: ${JSON.stringify(b)}`);
 
-    const newRadius = Math.min(
-      Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),
-      2500
-    );
-    if (Math.abs(radius - newRadius) > 50) {
-      // console.info(
-      //   `new radius: ${newRadius} (raw: ${
-      //     b.getNorthWest().distanceTo(b.getSouthEast()) / 2
-      //   })`
-      // );
-      setRadius(newRadius);
-    }
-
-    if (
-      map.getCenter().lat &&
-      map.getCenter().lng &&
-      center &&
-      center.distanceTo(map.getCenter()) > radius
-    ) {
-      console.info(
-        `center changed, new center: ${map.getCenter()}, distance to last center: ${
-          center.distanceTo(map.getCenter()) > radius
-        }`
+      const newRadius = Math.min(
+        Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),
+        2500
       );
-      setCenter(map.getCenter());
-    }
+      if (Math.abs(radius - newRadius) > 50) {
+        // console.info(
+        //   `new radius: ${newRadius} (raw: ${
+        //     b.getNorthWest().distanceTo(b.getSouthEast()) / 2
+        //   })`
+        // );
+        setRadius(newRadius);
+      }
+
+      if (
+        map.getCenter().lat &&
+        map.getCenter().lng &&
+        center &&
+        center.distanceTo(map.getCenter()) > radius
+      ) {
+        console.info(
+          `center changed, new center: ${map.getCenter()}, distance to last center: ${
+            center.distanceTo(map.getCenter()) > radius
+          }`
+        );
+        setCenter(map.getCenter());
+      }
+    })();
   });
 
   const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen } =

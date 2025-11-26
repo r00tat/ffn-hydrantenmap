@@ -1,20 +1,18 @@
 import debounce from 'lodash.debounce';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 
 const useDebounce = (callback: () => void, time = 500) => {
-  const ref = useRef<() => void>(undefined);
+  const debouncedCallback = useMemo(
+    () => debounce(callback, time),
+    [callback, time]
+  );
 
   useEffect(() => {
-    ref.current = callback;
-  }, [callback]);
-
-  const debouncedCallback = useMemo(() => {
-    const func = () => {
-      ref.current?.();
+    // cleanup
+    return () => {
+      debouncedCallback.cancel();
     };
-
-    return debounce(func, time);
-  }, [time]);
+  }, [debouncedCallback]);
 
   return debouncedCallback;
 };

@@ -67,7 +67,9 @@ export default function ChatMessageDisplay() {
   useEffect(() => {
     if (message && message.data) {
       console.info(`received a message: ${JSON.stringify(message)}`);
-      addMessage(message.data as unknown as ChatMessage);
+      (async () => {
+        addMessage(message.data as unknown as ChatMessage);
+      })();
     }
   }, [addMessage, message]);
 

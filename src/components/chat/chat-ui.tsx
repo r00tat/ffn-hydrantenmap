@@ -41,9 +41,11 @@ export default function ChatUi() {
   );
 
   useEffect(() => {
-    setNotificationsEnabled(
-      (messagingTokens || []).indexOf('' + messagingToken) >= 0
-    );
+    (async () => {
+      setNotificationsEnabled(
+        (messagingTokens || []).indexOf('' + messagingToken) >= 0
+      );
+    })();
   }, [messagingToken, messagingTokens]);
 
   useEffect(() => {

@@ -12,7 +12,7 @@ import MenuItem from '@mui/material/MenuItem';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import { Group } from './groupHelpers';
 
@@ -45,19 +45,20 @@ export default function GroupDialogg({
 }: GroupDialoggOptions) {
   const [open, setOpen] = useState(true);
   const [group, setGroup] = useState<Group>(groupDefault);
-  const [assigendUsers, setAssigendUsers] = useState<string[]>([]);
 
   const userMap = Object.fromEntries(users.map((user) => [user.uid, user]));
 
-  useEffect(() => {
-    setAssigendUsers(
+  const initialUsers = useMemo(
+    () =>
       users
         .filter(
           (user) => group.id && user.groups && user.groups.includes(group.id)
         )
-        .map((user) => user.uid)
-    );
-  }, [group.id, users]);
+        .map((user) => user.uid),
+
+    [group.id, users]
+  );
+  const [assigendUsers, setAssigendUsers] = useState<string[]>(initialUsers);
 
   const onChange =
     (field: string) =>

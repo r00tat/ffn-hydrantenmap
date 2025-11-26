@@ -17,6 +17,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
@@ -42,7 +43,7 @@ export const FirecallContext = createContext<FirecallContextType>({
 });
 
 export function useLastFirecall() {
-  const [firecall, setFirecall] = useState<Firecall>();
+  const [firecall, setFirecall] = useState<Firecall>(defaultFirecall);
   const { isAuthorized, groups } = useFirebaseLogin();
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export function useLastFirecall() {
         orderBy('date', 'desc'),
         limit(1)
       );
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const unsub = onSnapshot(q, async (querySnapshot) => {
         if (!querySnapshot.empty) {
           const firstDoc = querySnapshot.docs[0];
           const fc: Firecall = {
@@ -69,10 +70,10 @@ export function useLastFirecall() {
         }
       });
       return () => {
-        unsubscribe();
+        unsub();
       };
     } else {
-      setFirecall(defaultFirecall);
+      return () => {};
     }
   }, [groups, isAuthorized]);
 
@@ -85,7 +86,10 @@ export function useFirecallSwitcher(): FirecallContextType {
 
   useEffect(() => {
     if (!firecallId) {
-      setFirecall(undefined);
+      const unsetFirecall = async () => {
+        setFirecall(undefined);
+      };
+      unsetFirecall();
     } else {
       const unsubscribe = onSnapshot(
         doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
@@ -141,18 +145,9 @@ export function useLastOrSelectedFirecall(): FirecallContextType {
   const lastFirecall = useLastFirecall();
   const { firecall, setFirecallId } = useFirecallSwitcher();
 
-  const [activeFirecall, setActiveFirecall] = useState<Firecall>();
-  const setSheet = useUpdateSpreadsheet(activeFirecall?.id);
+  const setSheet = useUpdateSpreadsheet((firecall || lastFirecall)?.id);
 
-  useEffect(() => {
-    if (firecall) {
-      setActiveFirecall(firecall);
-    } else {
-      setActiveFirecall(lastFirecall);
-    }
-  }, [firecall, lastFirecall]);
-
-  return { firecall: activeFirecall, setFirecallId, setSheet };
+  return { firecall: firecall || lastFirecall, setFirecallId, setSheet };
 }
 
 export const useFirecallSelect = ():

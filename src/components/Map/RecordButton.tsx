@@ -124,8 +124,10 @@ export default function RecordButton() {
           pos: position.toString(),
         });
         map.setView(position);
-        setTimestamp(new Date());
-        addPos([position.lat, position.lng], recordItem);
+        (async () => {
+          setTimestamp(new Date());
+          addPos([position.lat, position.lng], recordItem);
+        })();
       } else {
         if (timeSinceLastPos > 10) {
           info(`[TRACK] distance or time to small`, {

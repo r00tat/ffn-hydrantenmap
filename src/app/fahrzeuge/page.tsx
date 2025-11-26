@@ -11,6 +11,7 @@ const Home: NextPage = () => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line
     setIsLoaded(true);
   }, []);
 

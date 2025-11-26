@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
@@ -15,10 +15,6 @@ import { useHistoryPathSegments } from './useMapEditor';
 export default function useVehicles() {
   const firecallId = useFirecallId();
   // console.info(`firecall id ${firecallId}`);
-  const [vehicles, setVehicles] = useState<Fzg[]>([]);
-  const [rohre, setRohre] = useState<Rohr[]>([]);
-  const [otherItems, setOtherItems] = useState<FirecallItem[]>([]);
-  const [displayItems, setDisplayItems] = useState<FirecallItem[]>([]);
   const historyPathSegments = useHistoryPathSegments();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
@@ -32,28 +28,37 @@ export default function useVehicles() {
     filterFn: filterActiveItems,
   });
 
-  useEffect(() => {
-    if (firecallItems) {
-      setVehicles(
-        firecallItems.filter((item) => item?.type === 'vehicle') as Fzg[]
-      );
-      setRohre(firecallItems.filter((item) => item?.type === 'rohr') as Rohr[]);
-      setOtherItems(
-        firecallItems.filter(
-          (item) =>
-            NON_DISPLAYABLE_ITEMS.indexOf(item?.type || 'fallback') < 0 &&
-            item?.type !== 'rohr' &&
-            item.type !== 'vehicle' &&
-            item.type !== 'diary'
-        )
-      );
-      setDisplayItems(
-        firecallItems.filter(
-          (item) => NON_DISPLAYABLE_ITEMS.indexOf(item?.type || 'fallback') < 0
-        )
-      );
-    }
-  }, [firecallItems]);
+  const vehicles = useMemo(
+    () =>
+      (firecallItems?.filter((item) => item?.type === 'vehicle') ||
+        []) as Fzg[],
+    [firecallItems]
+  );
+
+  const rohre = useMemo(
+    () =>
+      (firecallItems.filter((item) => item?.type === 'rohr') || []) as Rohr[],
+    [firecallItems]
+  );
+  const otherItems = useMemo(
+    () =>
+      firecallItems?.filter(
+        (item) =>
+          NON_DISPLAYABLE_ITEMS.indexOf(item?.type || 'fallback') < 0 &&
+          item?.type !== 'rohr' &&
+          item.type !== 'vehicle' &&
+          item.type !== 'diary'
+      ) || [],
+    [firecallItems]
+  );
+
+  const displayItems = useMemo(
+    () =>
+      firecallItems?.filter(
+        (item) => NON_DISPLAYABLE_ITEMS.indexOf(item?.type || 'fallback') < 0
+      ) || [],
+    [firecallItems]
+  );
 
   return {
     vehicles,

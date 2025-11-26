@@ -72,7 +72,9 @@ function useGroupList(): [
   }, []);
 
   useEffect(() => {
-    getGroups();
+    (async () => {
+      getGroups();
+    })();
   }, [getGroups]);
 
   return [groups, getGroups, users];
