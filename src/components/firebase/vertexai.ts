@@ -98,7 +98,11 @@ export function useAiQueryHook() {
   const [isQuerying, setIsQuerying] = useState(false);
 
   const query = useCallback(
-    async (prompt: string, systemInstruction?: string) => {
+    async (
+      prompt: string,
+      systemInstruction?: string,
+      options: Partial<GenerateContentRequest> = {}
+    ) => {
       console.info(
         `gemini query: ${prompt} \ninstructions: ${systemInstruction}`
       );
@@ -107,6 +111,7 @@ export function useAiQueryHook() {
       setIsQuerying(true);
       let text = '';
       const request: GenerateContentRequest = {
+        ...options,
         systemInstruction,
         contents: [
           {

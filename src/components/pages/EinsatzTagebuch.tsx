@@ -14,7 +14,6 @@ import Typography from '@mui/material/Typography';
 import { randomUUID } from 'crypto';
 import moment from 'moment';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
 import {
   dateTimeFormat,
   formatTimestamp,
@@ -24,6 +23,11 @@ import { useSpreadsheetDiaries } from '../../hooks/diaries';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../hooks/useMapEditor';
+import { useSpeechToText } from '../../hooks/useSpeechToText';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
@@ -36,11 +40,8 @@ import {
   Fzg,
   filterActiveItems,
 } from '../firebase/firestore';
+import { useAiQueryHook } from '../firebase/vertexai';
 import { DownloadButton } from '../inputs/DownloadButton';
-import {
-  useHistoryPathSegments,
-  useMapEditorCanEdit,
-} from '../../hooks/useMapEditor';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -306,7 +307,62 @@ export function EinsatzTagebuch({
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
   const addEinsatzTagebuch = useFirecallItemAdd();
-  const { query, resultHtml, isQuerying } = useFirecallAIQueryStream();
+  const { query, resultHtml, isQuerying } = useAiQueryHook();
+  const [diaryItemToEdit, setDiaryItemToEdit] = useState<Diary>();
+  const {
+    transcribedText,
+    isTranscribing,
+    startTranscription,
+    error: speechError,
+    clear: clearSpeechToText,
+  } = useSpeechToText();
+
+  useEffect(() => {
+    if (transcribedText) {
+      const processTranscription = async () => {
+        const prompt = `Du bist eine KI die im Feuerwehreinsatz die Funksprüche entgegen nimmt.
+Kategorisiere den Text in M für Meldung, B für Befehl oder F für Frage und lege das Ergebnis im Feld 'art' ab.
+Analysiere den Text um "von" und "an" zu extrahieren. Wenn dies im Text nicht vorhanden ist, lasse die felder leer.
+Formuliere einen Titel mit max 10 Wörtern aus dem Text im feld 'name'.
+liefere den gesagten Text als 'beschreibung'.
+
+Liefere die antwort als JSON Objekt ohne Markdown.
+Liefere keinen einleitenden Text.
+
+Der Text: "${transcribedText}"`;
+
+        clearSpeechToText();
+        const jsonString = await query(prompt);
+        try {
+          // Clean the string in case it's wrapped in markdown
+          const cleanedJsonString = jsonString.replace(/```json\n|```/g, '');
+          const parsed = JSON.parse(cleanedJsonString);
+          const newDiaryEntry: Diary = {
+            type: 'diary',
+            art: parsed.art,
+            von: parsed.von,
+            an: parsed.an,
+            name: parsed.name,
+            beschreibung: parsed.beschreibung,
+            nummer: diaryCounter,
+            datum: new Date().toISOString(),
+          };
+          // Now open the dialog with this item
+          addEinsatzTagebuch(newDiaryEntry);
+        } catch (e) {
+          console.error('Failed to parse AI response:', e);
+          // Maybe set an error state to show in the UI
+        }
+      };
+      processTranscription();
+    }
+  }, [
+    transcribedText,
+    query,
+    diaryCounter,
+    addEinsatzTagebuch,
+    clearSpeechToText,
+  ]);
 
   const updateDescription = useCallback(async () => {
     const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
@@ -330,6 +386,7 @@ export function EinsatzTagebuch({
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setTagebuchDialogIsOpen(false);
+      setDiaryItemToEdit(undefined);
       if (item) {
         addEinsatzTagebuch(item);
       }
@@ -354,12 +411,27 @@ export function EinsatzTagebuch({
             Zusammenfassung{' '}
             {isQuerying && <CircularProgress color="primary" size={20} />}
           </Button>
+          <Button
+            onClick={startTranscription}
+            variant="outlined"
+            disabled={isTranscribing || isQuerying}
+            sx={{ ml: 1 }}
+          >
+            Spracheingabe{' '}
+            {(isTranscribing || isQuerying) && (
+              <CircularProgress color="primary" size={20} />
+            )}
+          </Button>
         </Typography>
 
         {resultHtml && (
           <Typography>
             <span dangerouslySetInnerHTML={{ __html: resultHtml }}></span>
           </Typography>
+        )}
+        {speechError && <Typography color="error">{speechError}</Typography>}
+        {transcribedText && (
+          <Typography>Erkannter Text: {transcribedText}</Typography>
         )}
 
         <Grid container>
@@ -419,7 +491,10 @@ export function EinsatzTagebuch({
           color="primary"
           aria-label="add"
           sx={{ position: 'fixed', bottom: 16, right: 16 }}
-          onClick={() => setTagebuchDialogIsOpen(true)}
+          onClick={() => {
+            setDiaryItemToEdit(undefined);
+            setTagebuchDialogIsOpen(true);
+          }}
         >
           <AddIcon />
         </Fab>
@@ -428,7 +503,10 @@ export function EinsatzTagebuch({
       {tagebuchDialogIsOpen && (
         <FirecallItemDialog
           type="diary"
-          item={{ type: 'diary', nummer: diaryCounter } as Diary}
+          item={
+            diaryItemToEdit ||
+            ({ type: 'diary', nummer: diaryCounter } as Diary)
+          }
           onClose={diaryClose}
           allowTypeChange={false}
         />
