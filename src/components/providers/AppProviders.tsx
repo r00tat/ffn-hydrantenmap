@@ -5,7 +5,6 @@ import { SessionProvider } from 'next-auth/react';
 import React from 'react';
 import About from '../../app/about/page';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import '../../styles/globals.css';
 import styles from '../../styles/Home.module.css';
 import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
 import ChatMessageDisplay from '../chat/chat-message';
@@ -17,6 +16,7 @@ import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import dynamic from 'next/dynamic';
 import MapEditorProvider from './MapEditorProvider';
+import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
@@ -67,6 +67,8 @@ function AuthorizationApp({ children }: AppProps) {
 }
 
 export default function AppProviders({ children }: AppProps) {
+  useFirebaseAppCheck();
+
   return (
     <SessionProvider>
       <FirebaseUserProvider>
