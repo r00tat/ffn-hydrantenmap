@@ -42,6 +42,7 @@ import {
 } from '../firebase/firestore';
 import { useAiQueryHook } from '../firebase/vertexai';
 import { DownloadButton } from '../inputs/DownloadButton';
+import { useLiveStreaming } from '../../hooks/useLiveStreaming';
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
@@ -295,6 +296,15 @@ export function DiaryButtons({ diary }: { diary: Diary }) {
   );
 }
 
+const baseSystemInstruction = `Du bist eine KI die im Feuerwehreinsatz die Funksprüche entgegen nimmt.
+Kategorisiere den Text in M für Meldung, B für Befehl oder F für Frage und lege das Ergebnis im Feld 'art' ab.
+Analysiere den Text um "von" und "an" zu extrahieren. Wenn dies im Text nicht vorhanden ist, lasse die felder leer.
+Formuliere einen Titel mit max 10 Wörtern aus dem Text im feld 'name'.
+liefere den gesagten Text als 'beschreibung'.
+
+Liefere die antwort als JSON Objekt ohne Markdown.
+Liefere keinen einleitenden Text.`;
+
 export interface EinsatzTagebuchOptions {
   showEditButton?: boolean;
   sortAscending?: boolean;
@@ -316,18 +326,13 @@ export function EinsatzTagebuch({
     error: speechError,
     clear: clearSpeechToText,
   } = useSpeechToText();
+  const { responseText, startLiveChat, stopLiveChat, isConnected } =
+    useLiveStreaming();
 
   useEffect(() => {
     if (transcribedText) {
       const processTranscription = async () => {
-        const prompt = `Du bist eine KI die im Feuerwehreinsatz die Funksprüche entgegen nimmt.
-Kategorisiere den Text in M für Meldung, B für Befehl oder F für Frage und lege das Ergebnis im Feld 'art' ab.
-Analysiere den Text um "von" und "an" zu extrahieren. Wenn dies im Text nicht vorhanden ist, lasse die felder leer.
-Formuliere einen Titel mit max 10 Wörtern aus dem Text im feld 'name'.
-liefere den gesagten Text als 'beschreibung'.
-
-Liefere die antwort als JSON Objekt ohne Markdown.
-Liefere keinen einleitenden Text.
+        const prompt = `${baseSystemInstruction}
 
 Der Text: "${transcribedText}"`;
 
@@ -422,6 +427,14 @@ Der Text: "${transcribedText}"`;
               <CircularProgress color="primary" size={20} />
             )}
           </Button>
+          <Button
+            sx={{ ml: 1 }}
+            onClick={() => {
+              isConnected ? stopLiveChat() : startLiveChat();
+            }}
+          >
+            Live Stream
+          </Button>
         </Typography>
 
         {resultHtml && (
@@ -429,6 +442,7 @@ Der Text: "${transcribedText}"`;
             <span dangerouslySetInnerHTML={{ __html: resultHtml }}></span>
           </Typography>
         )}
+        {responseText && <Typography>{responseText}</Typography>}
         {speechError && <Typography color="error">{speechError}</Typography>}
         {transcribedText && (
           <Typography>Erkannter Text: {transcribedText}</Typography>
