@@ -14,7 +14,7 @@ import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useCallback, useState } from 'react';
 import DrivePickerComponent from '../../app/sheet/DrivePicker/DrivePicker';
 import { GeoPositionObject } from '../../common/geo';
-import { parseTimestamp } from '../../common/time-format';
+import { formatTimestamp, parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../../hooks/useFirecall';
@@ -38,8 +38,13 @@ export default function EinsatzDialog({
   const [isStateCopy, setIsStateCopy] = useState(false);
   const [einsatz, setEinsatz] = useState<Firecall>(
     einsatzDefault || {
-      name: '',
+      name: `Einsatz am ${formatTimestamp(new Date())}`,
+      group: 'ffnd',
+      fw: 'Neusiedl am See',
+      description: '',
       date: new Date().toISOString(),
+      alarmierung: new Date().toISOString(),
+      eintreffen: new Date().toISOString(),
       deleted: false,
     }
   );
