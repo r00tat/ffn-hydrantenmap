@@ -36,7 +36,7 @@
     "csv-parse": "^6.1.0",
     "csv-stringify": "^6.6.0",
     "epsg": "^0.5.0",
-    "firebase": "11.4.0",
+    "firebase": "12.6.0",
     "firebase-admin": "^13.6.0",
     "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
@@ -69,6 +69,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "19.2.2",
     "@types/uuid": "^11.0.0",
+    "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9.39.1",
     "eslint-config-next": "16.0.7",
     "serwist": "^9.0.2",
@@ -76,7 +77,7 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "firebase": "11.4.0",
+    "firebase": "12.6.0",
     "@types/react": "19.2.2"
   }
 }

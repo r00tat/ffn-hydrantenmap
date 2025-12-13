@@ -3,16 +3,17 @@ import firebaseApp from './firebase';
 
 import {
   GenerateContentRequest,
+  getAI,
   getGenerativeModel,
-  getVertexAI,
   HarmBlockThreshold,
   HarmCategory,
-} from 'firebase/vertexai';
+  VertexAIBackend,
+} from 'firebase/ai';
 import { marked } from 'marked';
 
 // Initialize the Vertex AI service
-export const vertexAI = getVertexAI(firebaseApp, {
-  location: 'europe-west1',
+export const vertexAI = getAI(firebaseApp, {
+  backend: new VertexAIBackend('europe-west1'),
 });
 
 // Initialize the generative model with a model that supports your use case
