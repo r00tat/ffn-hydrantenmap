@@ -36,7 +36,8 @@ export const availableLayers: TileConfigs = {
     name: 'Orthofoto',
     url: 'https://maps{s}.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
       subdomains: ['neu'],
@@ -54,7 +55,8 @@ export const availableLayers: TileConfigs = {
     url: 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/normal/google3857/{z}/{y}/{x}.jpeg',
     // 'https://maps{s}.wien.gv.at/basemap/bmaphidpi/normal/google3857/{z}/{y}/{x}.jpeg',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
       subdomains: ['neu'],
@@ -71,7 +73,8 @@ export const availableLayers: TileConfigs = {
     name: 'Basemap grau',
     url: 'https://maps{s}.wien.gv.at/basemap/bmapgrau/normal/google3857/{z}/{y}/{x}.png',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
       subdomains: ['neu'],
@@ -88,7 +91,8 @@ export const availableLayers: TileConfigs = {
     name: 'Openstreetmap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       subdomains: ['a', 'b', 'c'],
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -99,7 +103,8 @@ export const availableLayers: TileConfigs = {
     name: 'Opentopomap',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       subdomains: ['a', 'b', 'c'],
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | &copy; <a href="http://opentopomap.org/">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
@@ -112,7 +117,8 @@ export const overlayLayers: TileConfigs = {
     name: 'Adressen',
     url: 'https://maps{s}.wien.gv.at/basemap/bmapoverlay/normal/google3857/{z}/{y}/{x}.png',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         'Datenquelle: <a href="https://www.basemap.at">basemap.at</a>',
       subdomains: ['neu'],
@@ -132,7 +138,8 @@ export const overlayLayers: TileConfigs = {
     url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
     type: 'WMS',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
       subdomains: ['neu'],
@@ -153,7 +160,8 @@ export const overlayLayers: TileConfigs = {
     url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
     type: 'WMS',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
       subdomains: ['neu'],
@@ -176,7 +184,8 @@ export const overlayLayers: TileConfigs = {
     url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
     type: 'WMS',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
       subdomains: ['neu'],
@@ -200,7 +209,8 @@ export const overlayLayers: TileConfigs = {
     url: 'https://tiles.lfrz.gv.at/wisa_hw_risiko?',
     type: 'WMS',
     options: {
-      maxZoom: 19,
+      maxNativeZoom: 19,
+      maxZoom: 24,
       attribution:
         '<a href="https://maps.wisa.bml.gv.at/gefahren-und-risikokarten-zweiter-zyklus?">Wasser Informationssystem AUSTRIA</a>',
       subdomains: ['neu'],
