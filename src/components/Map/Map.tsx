@@ -42,7 +42,7 @@ export default function Map() {
     <MapContainer
       center={defaultPosition}
       zoom={17}
-      maxZoom={19}
+      maxZoom={24}
       scrollWheelZoom={true}
     >
       <LayersControl position="topright">
@@ -56,6 +56,7 @@ export default function Map() {
               attribution={layer.options.attribution}
               url={layer.url}
               maxZoom={layer.options.maxZoom}
+              maxNativeZoom={layer.options.maxNativeZoom}
               bounds={layer.options.bounds}
               subdomains={layer.options.subdomains}
               key={key}
