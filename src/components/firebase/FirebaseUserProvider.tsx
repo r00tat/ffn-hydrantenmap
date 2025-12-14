@@ -4,6 +4,7 @@ import React, { createContext } from 'react';
 import useFirebaseLoginObserver, {
   LoginStatus,
 } from '../../hooks/useFirebaseLoginObserver';
+import { useFirebaseCustomTokenLogin } from '../../hooks/useFirebaseCustomTokenLogin';
 
 export const FirebaseLoginContext = createContext<LoginStatus>({
   isSignedIn: false,
@@ -19,6 +20,7 @@ export default function FirebaseUserProvider({
 }: {
   children: React.ReactNode;
 }) {
+  useFirebaseCustomTokenLogin();
   const authInfo = useFirebaseLoginObserver();
   return (
     <FirebaseLoginContext.Provider value={authInfo}>

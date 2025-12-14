@@ -14,6 +14,9 @@ export type UseFirestoreQueryResult<T> = {
   loading: boolean;
   /** An Error object if an error occurred, otherwise undefined. */
   error: Error | undefined;
+
+  /** array of elements returned by snapshot and filtered by optional filter function. */
+  records: Array<T>;
 };
 
 /**
@@ -26,11 +29,13 @@ export type UseFirestoreQueryResult<T> = {
  * @returns {UseFirestoreQueryResult<T>} An object containing the query snapshot, loading state, and any error.
  */
 export const useFirestoreQuery = <T>(
-  query: Query<T> | null
+  query: Query<T> | null,
+  filterFn?: (element: T) => boolean
 ): UseFirestoreQueryResult<T> => {
   const [value, setValue] = useState<QuerySnapshot<T> | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | undefined>(undefined);
+  const [records, setRecords] = useState<Array<T>>([]);
 
   useEffect(() => {
     if (!query) {
@@ -49,6 +54,12 @@ export const useFirestoreQuery = <T>(
       query,
       (snapshot) => {
         setValue(snapshot as QuerySnapshot<T>);
+
+        const newRecords = snapshot.docs.map(
+          (doc) =>
+            ({ ...doc.data({ serverTimestamps: 'estimate' }), id: doc.id } as T)
+        );
+        setRecords(filterFn ? newRecords.filter(filterFn) : newRecords);
         setLoading(false);
       },
       (err: Error) => {
@@ -59,7 +70,7 @@ export const useFirestoreQuery = <T>(
     );
 
     return () => unsubscribe();
-  }, [query]);
+  }, [filterFn, query]);
 
-  return { value, loading, error };
+  return { value, loading, error, records };
 };

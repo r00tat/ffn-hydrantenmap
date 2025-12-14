@@ -56,6 +56,7 @@ declare module 'next-auth' {
       isAuthorized: boolean;
       isAdmin: boolean;
       groups: string[];
+      firecall?: string;
       /**
        * By default, TypeScript merges new interface properties and overwrites existing ones.
        * In this case, the default session user properties will be overwritten,
@@ -127,6 +128,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             'allUsers',
             ...(userData.groups || []),
           ]);
+          session.user.firecall = userData.firecall;
         }
       }
       console.info(
@@ -187,7 +189,10 @@ export async function userAuthorized(session: Session, firecallId: string) {
     throw new Error(`firecall ${firecallId} has no data`);
   }
 
-  if (session.user.groups.indexOf(firecallData.group) < 0) {
+  if (
+    session.user.groups.indexOf(firecallData.group) < 0 &&
+    session.user.firecall !== firecallId
+  ) {
     throw new Error(
       `user ${session.user.id} is not in group ${firecallData.group}`
     );

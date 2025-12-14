@@ -3,6 +3,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -18,8 +19,10 @@ import Select from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, setDoc, where } from 'firebase/firestore';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import { createCustomFirebaseTokenForFirecall } from '../../app/actions/auth';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -61,6 +64,8 @@ function EinsatzCard({
   const { isAdmin, groups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
+  const [tokenLink, setTokenLink] = useState<string>();
+  const [error, setError] = useState<string>();
 
   const updateFn = useCallback(
     (fzg?: Firecall) => {
@@ -81,6 +86,23 @@ function EinsatzCard({
     [updateFirecall, einsatz]
   );
 
+  const createLink = useCallback(async (firefallId: string) => {
+    setError('');
+    const token = await createCustomFirebaseTokenForFirecall(firefallId);
+    console.info('created new token for link:', token);
+    if (token.token) {
+      const tokenLink = `${window.location.origin}/einsatz/${firefallId}?token=${token.token}`;
+      setTokenLink(tokenLink);
+      if (navigator.clipboard?.writeText) {
+        // we do not know if it was successfull so we do not show an info
+        navigator.clipboard.writeText(tokenLink);
+      }
+    } else {
+      setError(`Token konnte nicht erstellt werden: ${token.error}`);
+      console.warn(`unable to create token: ${token.error}\n${token.details}`);
+    }
+  }, []);
+
   return (
     <Grid size={{ xs: 12, md: 6, lg: 4 }}>
       <Card>
@@ -93,6 +115,8 @@ function EinsatzCard({
             {formatTimestamp(einsatz.date)}
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
+          {tokenLink && <Link href={tokenLink}>{tokenLink}</Link>}
+          {error && <Typography color="error">{error}</Typography>}
         </CardContent>
         <CardActions>
           <Tooltip title="Als aktiven Einsatz in der Anzeige setzten">
@@ -129,6 +153,18 @@ function EinsatzCard({
               </IconButton>
             </Tooltip>
           )}
+          <Tooltip title="Link für anonymen Zugriff erstellen">
+            <IconButton
+              size="small"
+              onClick={() => {
+                if (einsatz.id) {
+                  createLink(einsatz.id);
+                }
+              }}
+            >
+              <ShareIcon />
+            </IconButton>
+          </Tooltip>
         </CardActions>
       </Card>
       {displayUpdateDialog && (

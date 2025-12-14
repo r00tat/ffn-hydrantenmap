@@ -44,38 +44,66 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>(defaultFirecall);
-  const { isAuthorized, groups } = useFirebaseLogin();
+  const { isAuthorized, groups, firecall: firecallClaim } = useFirebaseLogin();
 
   useEffect(() => {
     if (isAuthorized) {
-      const q = query(
-        collection(db, FIRECALL_COLLECTION_ID),
-        where('deleted', '==', false),
-        where('group', 'in', groups),
-        orderBy('date', 'desc'),
-        limit(1)
-      );
-      const unsub = onSnapshot(q, async (querySnapshot) => {
-        if (!querySnapshot.empty) {
-          const firstDoc = querySnapshot.docs[0];
-          const fc: Firecall = {
-            id: firstDoc.id,
-            group: 'ffnd',
-            ...firstDoc.data(),
-          } as Firecall;
-          setFirecall(fc);
-          console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`, fc);
-        } else {
-          console.info(`no firecalls received`);
-        }
-      });
-      return () => {
-        unsub();
-      };
+      if (!firecallClaim) {
+        const q = query(
+          collection(db, FIRECALL_COLLECTION_ID),
+          where('deleted', '==', false),
+          where('group', 'in', groups),
+          orderBy('date', 'desc'),
+          limit(1)
+        );
+        const unsub = onSnapshot(q, async (querySnapshot) => {
+          if (!querySnapshot.empty) {
+            const firstDoc = querySnapshot.docs[0];
+            const fc: Firecall = {
+              id: firstDoc.id,
+              group: 'ffnd',
+              ...firstDoc.data(),
+            } as Firecall;
+            setFirecall(fc);
+            console.log(`Current firecall ${fc.id} ${fc.name} ${fc.date}`, fc);
+          } else {
+            console.info(`no firecalls received`);
+          }
+        });
+        return () => {
+          unsub();
+        };
+      } else {
+        // we can only query the one and only firecall
+
+        const unsub = onSnapshot(
+          doc(firestore, FIRECALL_COLLECTION_ID, firecallClaim),
+          (doc) => {
+            if (doc.exists()) {
+              const fc: Firecall = {
+                id: doc.id,
+                ...doc.data(),
+              } as Firecall;
+              setFirecall(fc);
+              console.log(
+                `Current firecall ${fc.id} ${fc.name} ${fc.date}`,
+                fc
+              );
+            } else {
+              console.warn(
+                `firecall from claim with id ${firecallClaim} not found!`
+              );
+            }
+          }
+        );
+        return () => {
+          unsub();
+        };
+      }
     } else {
       return () => {};
     }
-  }, [groups, isAuthorized]);
+  }, [firecallClaim, groups, isAuthorized]);
 
   return firecall;
 }

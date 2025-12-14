@@ -33,18 +33,10 @@ export interface MapActionButtonsOptions {
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const [fzgDialogIsOpen, setFzgDialogIsOpen] = useState(false);
-  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const leitungen = useLeitungen();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
-  const {
-    editable,
-    setEditable,
-    saveHistory,
-    saveInProgress,
-    historyId,
-    selectHistory,
-  } = useMapEditor();
+  const { editable, setEditable, historyId, selectHistory } = useMapEditor();
 
   const saveItem = useCallback(
     (item?: FirecallItem) => {
@@ -148,29 +140,6 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
             </Fab>
           </Tooltip>
         )}
-        {editable && (
-          <>
-            <Tooltip
-              title={
-                saveInProgress
-                  ? 'wird gesichert...'
-                  : 'Akutellen Einsatzstatus sichern'
-              }
-            >
-              <Fab
-                aria-label="save"
-                size="medium"
-                style={{ marginLeft: 8 }}
-                onClick={() => !saveInProgress && setIsSaveDialogOpen(true)}
-                // disabled={saveInProgress}
-                color={saveInProgress ? 'default' : 'primary'}
-              >
-                {!saveInProgress && <SaveIcon />}
-                {saveInProgress && <CircularProgress />}
-              </Fab>
-            </Tooltip>
-          </>
-        )}
 
         {historyId === undefined && (
           <Tooltip
@@ -223,18 +192,6 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
             hidePopup: true,
           })}
         </React.Fragment>
-      )}
-      {isSaveDialogOpen && (
-        <InputDialog
-          title="Sicherung des Einsatzes ablegen"
-          defaultValue={`Einsatzstatus ${formatTimestamp()}`}
-          onClose={(result) => {
-            setIsSaveDialogOpen(false);
-            if (result) {
-              saveHistory(result);
-            }
-          }}
-        />
       )}
     </>
   );
