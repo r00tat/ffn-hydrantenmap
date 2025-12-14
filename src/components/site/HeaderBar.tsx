@@ -1,22 +1,22 @@
 import HistoryIcon from '@mui/icons-material/History';
+import LocalFireDepartmentTwoToneIcon from '@mui/icons-material/LocalFireDepartmentTwoTone';
 import MenuIcon from '@mui/icons-material/Menu';
 import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
 import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall from '../../hooks/useFirecall';
 import useMapEditor from '../../hooks/useMapEditor';
-import Tooltip from '@mui/material/Tooltip';
-import HistoryDialog from './HistoryDialog';
 import { FirecallHistory } from '../firebase/firestore';
+import EinsatzDialog from '../FirecallItems/EinsatzDialog';
+import HistoryDialog from './HistoryDialog';
 
 function HeaderBar({
   isDrawerOpen,
@@ -38,6 +38,7 @@ function HeaderBar({
     },
     [selectHistory]
   );
+  const [einsatzDialog, setEinsatzDialog] = useState(false);
 
   return (
     <>
@@ -63,6 +64,22 @@ function HeaderBar({
             {selectedHistory && (
               <Typography>{selectedHistory?.description}</Typography>
             )}
+
+            <Tooltip title="Neuer Einsatz">
+              <Button
+                color={'info'}
+                style={{
+                  backgroundColor: '#fff',
+                  marginLeft: 8,
+                  marginRight: 8,
+                }}
+                onClick={() => {
+                  setEinsatzDialog(true);
+                }}
+              >
+                <LocalFireDepartmentTwoToneIcon />
+              </Button>
+            </Tooltip>
 
             {history.length > 0 && (
               <Tooltip title="Historie aufrufen">
@@ -95,6 +112,9 @@ function HeaderBar({
         </AppBar>
       </Box>
       {isHistoryDialogOpen && <HistoryDialog onClose={historyDialogClose} />}
+      {einsatzDialog && (
+        <EinsatzDialog onClose={() => setEinsatzDialog(false)} />
+      )}
     </>
   );
 }
