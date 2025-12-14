@@ -81,23 +81,21 @@ function HeaderBar({
               </Button>
             </Tooltip>
 
-            {history.length > 0 && (
-              <Tooltip title="Historie aufrufen">
-                <Button
-                  color={historyModeActive ? 'error' : 'info'}
-                  style={{
-                    backgroundColor: '#fff',
-                    marginLeft: 8,
-                    marginRight: 8,
-                  }}
-                  onClick={() => {
-                    setIsHistoryDialogOpen(true);
-                  }}
-                >
-                  <HistoryIcon />
-                </Button>
-              </Tooltip>
-            )}
+            <Tooltip title="Historie aufrufen">
+              <Button
+                color={historyModeActive ? 'error' : 'info'}
+                style={{
+                  backgroundColor: '#fff',
+                  marginLeft: 8,
+                  marginRight: 8,
+                }}
+                onClick={() => {
+                  setIsHistoryDialogOpen(true);
+                }}
+              >
+                <HistoryIcon />
+              </Button>
+            </Tooltip>
             {!isSignedIn && (
               <Link href="/login" passHref>
                 <Button color="inherit">Login</Button>

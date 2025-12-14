@@ -27,6 +27,7 @@ export interface LoginData {
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;
+  firecall?: string;
 }
 
 export interface LoginStatus extends LoginData {
@@ -144,7 +145,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       const idToken = await user?.getIdToken();
       console.info(`user token result`, tokenResult);
 
-      const authData: any = {
+      const authData: Partial<LoginData> = {
         isSignedIn: !!user,
         user: user !== null ? user : undefined,
         email: nonNull(u?.email),
@@ -155,10 +156,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         // isAdmin: false,
         expiration: tokenResult?.expirationTime,
         idToken,
-        groups: tokenResult?.claims?.groups || [],
-        isAdmin: tokenResult?.claims?.isAdmin || false,
-        isAuthorized: tokenResult?.claims?.authorized || false,
+        groups: (tokenResult?.claims?.groups as string[]) || [],
+        isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
+        isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
         isRefreshing: true,
+        firecall: tokenResult?.claims?.firecall as string | undefined,
       };
       // if (window && window.sessionStorage) {
       //   window.sessionStorage.setItem(SESSION_STORAGE_AUTH_KEY, JSON.stringify(authData));

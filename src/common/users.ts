@@ -7,6 +7,7 @@ export interface FirebaseUserInfo {
   messaging?: string[];
   groups?: string[];
   isAdmin?: boolean;
+  firecall?: string;
 }
 
 export interface UserRecordExtended extends UserRecord, FirebaseUserInfo {

@@ -10,6 +10,8 @@ import useMapEditor from '../../hooks/useMapEditor';
 import { FirecallHistory } from '../firebase/firestore';
 import Typography from '@mui/material/Typography';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
+import TextField from '@mui/material/TextField';
+import { formatTimestamp } from '../../common/time-format';
 
 interface HistoryDialogOptions {
   onClose: (history?: FirecallHistory) => void;
@@ -27,6 +29,9 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
     const selected = history.find((h) => h.id === event.target.value);
     setSelectedHistory(selected);
   };
+  const [historyTitle, setHistoryTitle] = useState(
+    `Einsatzstatus ${formatTimestamp()}`
+  );
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
@@ -51,19 +56,37 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
             </MenuItem>
           ))}
         </Select>
-      </DialogContent>
-      <DialogActions>
-        <Button color="secondary" onClick={() => onClose()}>
-          Zurück zum Live Modus
-        </Button>
+        <hr />
+        <Typography marginTop={4}>
+          Speichere den aktuellen Einsatzstatus in der Historie, so dass dieser
+          später wieder aufgerufen werden kann.
+        </Typography>
+        <TextField
+          margin="dense"
+          id="history-name"
+          label="Bezeichnung des neuen Zeitstempels"
+          type="text"
+          fullWidth
+          variant="standard"
+          onChange={(event) => {
+            setHistoryTitle(event.target.value);
+          }}
+          value={historyTitle}
+        />
         <Button
           onClick={async () => {
-            await saveHistory();
+            await saveHistory(historyTitle);
             onClose();
           }}
         >
           Zeitpunkt speichern
         </Button>
+      </DialogContent>
+      <DialogActions>
+        <Button color="secondary" onClick={() => onClose()}>
+          Zurück zum Live Modus
+        </Button>
+
         <Button
           color="warning"
           onClick={() => {

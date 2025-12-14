@@ -51,6 +51,7 @@ export interface CustomClaims {
   groups: string[];
   isAdmin: boolean;
   authorized: boolean;
+  firecall?: string;
 }
 
 export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {

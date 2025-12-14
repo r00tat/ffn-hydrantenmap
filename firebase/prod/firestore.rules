@@ -38,12 +38,18 @@ service cloud.firestore {
     match /call/{doc} {
       allow read, write: if authorizedUser() 
             // && resource.data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
-            && resource.data.group in request.auth.token.groups;
+            && (
+            	doc == request.auth.token.firecall ||
+              resource.data.group in request.auth.token.groups
+            );
       allow create: if authorizedUser() 
           && request.resource.data.group in request.auth.token.groups;
 
       function callAuthorized() {
-        return authorizedUser() && get(/databases/$(database)/documents/call/$(doc)).data.group  in request.auth.token.groups 
+        return authorizedUser() && (
+          doc == request.auth.token.firecall ||
+          get(/databases/$(database)/documents/call/$(doc)).data.group in request.auth.token.groups
+        )
       }
 
       match /{subitem=**} {

@@ -13,7 +13,7 @@ import { MenuItem } from '@mui/material';
 import { instructionSet } from './assistantInstructions';
 import { useFirecallId } from '../../hooks/useFirecall';
 
-export function AiAssistantPageQuery() {
+function AiAssistantPageQuery() {
   const [question, setQuestion] = useState('');
   const [assistant, setAssistant] = useState('Standard');
   const {
