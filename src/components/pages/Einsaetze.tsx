@@ -115,7 +115,11 @@ function EinsatzCard({
             {formatTimestamp(einsatz.date)}
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
-          {tokenLink && <Link href={tokenLink}>{tokenLink}</Link>}
+          {tokenLink && (
+            <Link href={tokenLink} target="_blank">
+              {tokenLink.substring(0, 100)}...
+            </Link>
+          )}
           {error && <Typography color="error">{error}</Typography>}
         </CardContent>
         <CardActions>
