@@ -24,7 +24,7 @@ export function useFirebaseCustomTokenLogin() {
           console.info('no user, so starting login with token');
           setLoading(true);
           setError(null);
-          try {
+          const runLogin = async () => {
             const { token: firebaseToken, error } =
               await exchangeCustomJwtForFirebaseToken(token);
             if (!firebaseToken) {
@@ -34,6 +34,12 @@ export function useFirebaseCustomTokenLogin() {
             console.info(
               `signedin with custom token: ${result.user.uid} ${result.user.displayName}`
             );
+          };
+          try {
+            await runLogin();
+
+            // as the token will expire after one hour, we need to make sure we login again every 45 min
+            setInterval(runLogin, 1000 * 60 * 45);
           } catch (err) {
             setError(err as Error);
             console.error(`token auth failed: ${err}`);
