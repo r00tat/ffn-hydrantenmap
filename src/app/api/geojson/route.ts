@@ -5,7 +5,7 @@ import exportGeoJson, {
   GeoFilterProperties,
 } from '../../../server/geojson';
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     await tokenRequired(req);
 
