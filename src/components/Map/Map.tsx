@@ -91,6 +91,7 @@ export default function Map() {
                 attribution={layer.options.attribution}
                 url={layer.url}
                 maxZoom={layer.options.maxZoom}
+                maxNativeZoom={layer.options.maxNativeZoom}
                 bounds={layer.options.bounds}
                 subdomains={layer.options.subdomains}
                 key={key}
@@ -106,6 +107,7 @@ export default function Map() {
                 attribution={layer.options.attribution}
                 url={layer.url}
                 maxZoom={layer.options.maxZoom}
+                maxNativeZoom={layer.options.maxNativeZoom}
                 bounds={layer.options.bounds}
                 subdomains={layer.options.subdomains}
                 key={key}

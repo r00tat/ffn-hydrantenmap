@@ -55,15 +55,54 @@ function HeaderBar({
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Einsatzkarte {firecall?.name || ''}
-              {!isSignedIn && 'Anmeldung erforderlich'}
-              {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
-            </Typography>
+            <Box
+              sx={{
+                flexGrow: 1,
+                display: 'flex',
+                alignItems: 'baseline',
+                minWidth: 0,
+              }}
+            >
+              <Typography
+                variant="h6"
+                component="div"
+                noWrap
+                sx={(theme) => ({
+                  display: 'none',
+                  [theme.breakpoints.up('sm')]: {
+                    display: 'inline',
+                  },
+                })}
+              >
+                Einsatzkarte{' '}
+              </Typography>
+              <Typography
+                variant="h6"
+                component="div"
+                noWrap
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {firecall?.name || ''}
+                {!isSignedIn && 'Anmeldung erforderlich'}
+                {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
+              </Typography>
 
-            {selectedHistory && (
-              <Typography>{selectedHistory?.description}</Typography>
-            )}
+              {selectedHistory && (
+                <Typography
+                  noWrap
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    pl: 2,
+                  }}
+                >
+                  {selectedHistory?.description}
+                </Typography>
+              )}
+            </Box>
 
             <Tooltip title="Neuer Einsatz">
               <Button
