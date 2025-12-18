@@ -379,16 +379,40 @@ export function EinsatzTagebuch({
             <b>Beschreibung</b>
           </Grid>
           <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
-          {diaries.map((e) => (
+          {diaries.map((e, index) => (
             <React.Fragment
               key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
             >
-              <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
-              <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
-              <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+              <Grid
+                size={{ xs: 3, md: 2, lg: 1 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
+                {e.nummer}
+              </Grid>
+              <Grid
+                size={{ xs: 6, md: 5, lg: 2 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
+                {e.datum}
+              </Grid>
+              <Grid
+                size={{ xs: 12, md: 5, lg: 2 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
                 {e.art} {e.von} {(e.von || e.an) && '->'} {e.an}
               </Grid>
-              <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+              <Grid
+                size={{ xs: 12, md: 5, lg: 3 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
                 <b>
                   {e.name?.split(`\n`).map((line, index) => (
                     <React.Fragment key={`title-${e.id}-${index}`}>
@@ -398,7 +422,12 @@ export function EinsatzTagebuch({
                   ))}
                 </b>
               </Grid>
-              <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+              <Grid
+                size={{ xs: 12, md: 5, lg: 3 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
                 {e.beschreibung?.split('\n').map((line, index) => (
                   <React.Fragment key={`beschreibung-${e.id}-${index}`}>
                     {line}
@@ -406,7 +435,12 @@ export function EinsatzTagebuch({
                   </React.Fragment>
                 ))}
               </Grid>
-              <Grid size={{ xs: 12, md: 2, lg: 1 }}>
+              <Grid
+                size={{ xs: 12, md: 2, lg: 1 }}
+                sx={(theme) => ({
+                  backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+                })}
+              >
                 {showEditButton && <DiaryButtons diary={e}></DiaryButtons>}
               </Grid>
             </React.Fragment>

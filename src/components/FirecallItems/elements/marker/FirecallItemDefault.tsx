@@ -22,6 +22,7 @@ export interface FirecallItemMarkerProps {
   record: FirecallItemBase;
   selectItem: (item: FirecallItem) => void;
   options?: MarkerRenderOptions;
+  children?: React.ReactNode;
 }
 
 async function updateFircallItemPos(
@@ -57,6 +58,7 @@ export function FirecallItemMarkerDefault({
   record,
   selectItem,
   options: { hidePopup } = {},
+  children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
   const firecallId = useFirecallId();
@@ -100,6 +102,7 @@ export function FirecallItemMarkerDefault({
         rotationOrigin="center"
       >
         {!hidePopup && record.renderPopup(selectItem)}
+        {children}
       </RotatedMarker>
     </>
   );

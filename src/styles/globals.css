@@ -48,3 +48,8 @@ div.leaflet-container {
   height: 88vh;
   width: 100%;
 }
+
+.nopadding {
+  padding-top: 0px;
+  padding-bottom: 0px;
+}

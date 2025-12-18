@@ -9,6 +9,7 @@ export class FirecallGb extends FirecallItemBase {
   an: string;
   ausgehend: boolean;
   weiterleitung: string;
+  erledigt: string;
 
   public constructor(firecallItem?: GeschaeftsbuchEintrag) {
     super(firecallItem);
@@ -18,6 +19,7 @@ export class FirecallGb extends FirecallItemBase {
     this.nummer = firecallItem?.nummer ?? 1;
     this.ausgehend = firecallItem?.ausgehend ?? false;
     this.weiterleitung = firecallItem?.weiterleitung ?? '';
+    this.erledigt = firecallItem?.erledigt ?? '';
   }
 
   public data(): GeschaeftsbuchEintrag {
@@ -28,6 +30,7 @@ export class FirecallGb extends FirecallItemBase {
       ausgehend: this.ausgehend,
       nummer: this.nummer,
       weiterleitung: this.weiterleitung,
+      erledigt: this.erledigt,
     } as GeschaeftsbuchEintrag;
   }
 
@@ -56,7 +59,8 @@ export class FirecallGb extends FirecallItemBase {
       an: 'Meldung an',
       name: 'Information',
       beschreibung: 'Anmerkung',
-      weiterleitung: 'Weiterleiten an (S1, S2, ...)',
+      weiterleitung: 'Auszeichnung (S1/S2,S3 ...)',
+      erledigt: 'Erledigt',
     };
   }
 
@@ -69,7 +73,7 @@ export class FirecallGb extends FirecallItemBase {
   }
 
   public dateFields(): string[] {
-    return ['datum'];
+    return ['datum', 'erledigt'];
   }
 
   public popupFn(): ReactNode {
