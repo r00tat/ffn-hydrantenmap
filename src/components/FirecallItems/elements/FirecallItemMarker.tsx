@@ -1,16 +1,26 @@
+import Typography from '@mui/material/Typography';
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
-import { ReactNode } from 'react';
-import { FcItemAttachment, FcMarker } from '../../firebase/firestore';
+import React, { ReactNode } from 'react';
+import { Tooltip } from 'react-leaflet';
+import {
+  FcItemAttachment,
+  FcMarker,
+  FirecallItem,
+} from '../../firebase/firestore';
 import FileDisplay from '../../inputs/FileDisplay';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
-import React from 'react';
+import {
+  FirecallItemMarkerDefault,
+  MarkerRenderOptions,
+} from './marker/FirecallItemDefault';
 
 export class FirecallItemMarker extends FirecallItemBase {
   iconUrl: string;
   zeichen: string;
   attachments: FcItemAttachment[];
   color?: string;
+  showLabel: boolean = false;
 
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
@@ -21,6 +31,10 @@ export class FirecallItemMarker extends FirecallItemBase {
       attachments: this.attachments = [],
       color: this.color = '#0000ff',
     } = firecallItem || {});
+    this.showLabel =
+      firecallItem?.showLabel === true ||
+      (firecallItem?.showLabel as unknown as string) === 'true' ||
+      firecallItem?.showLabel === undefined;
   }
 
   public copy(): FirecallItemBase {
@@ -34,6 +48,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       zeichen: this.zeichen,
       attachments: this.attachments,
       color: this.color,
+      showLabel: this.showLabel,
     } as FcMarker;
   }
 
@@ -52,6 +67,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       iconUrl: 'Icon URL',
       attachments: 'Anhänge',
       color: 'Farbe (HTML bzw. Englisch)',
+      showLabel: 'Label anzeigen',
     };
   }
 
@@ -61,6 +77,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       zeichen: 'TaktischesZeichen',
       attachments: 'attachment',
       color: 'color',
+      showLabel: 'boolean',
     };
   }
   public popupFn(): ReactNode {
@@ -146,5 +163,36 @@ export class FirecallItemMarker extends FirecallItemBase {
   }
   public info(): string {
     return ``;
+  }
+
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    options: MarkerRenderOptions = {}
+  ): ReactNode {
+    try {
+      return (
+        <FirecallItemMarkerDefault
+          record={this}
+          selectItem={selectItem}
+          key={this.id}
+          options={options}
+        >
+          {this.showLabel && (
+            <Tooltip
+              direction="bottom"
+              permanent
+              offset={[0, 10]}
+              opacity={0.8}
+              className="nopadding"
+            >
+              <Typography variant="caption">{this.name}</Typography>
+            </Tooltip>
+          )}
+        </FirecallItemMarkerDefault>
+      );
+    } catch (err) {
+      console.error('failed to render marker', err, this.data());
+      return <></>;
+    }
   }
 }
