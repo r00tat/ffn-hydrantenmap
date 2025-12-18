@@ -26,6 +26,7 @@ import FileUploader from '../inputs/FileUploader';
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import { icons } from './elements/icons';
+import Image from 'next/image';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -187,6 +188,13 @@ export default function FirecallItemDialog({
                         </ListSubheader>,
                         ...Object.entries(groupEntries).map(([name, icon]) => (
                           <MenuItem value={name} key={name}>
+                            <Image
+                              src={icon.url}
+                              alt={name}
+                              width={24}
+                              height={24}
+                              style={{ marginRight: 12 }}
+                            />
                             {name.replace(/_/g, ' ')}
                           </MenuItem>
                         )),
