@@ -73,6 +73,9 @@ function HeaderBar({
                     display: 'inline',
                   },
                 })}
+                style={{
+                  paddingRight: 4,
+                }}
               >
                 Einsatzkarte{' '}
               </Typography>
