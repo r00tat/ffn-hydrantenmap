@@ -23,6 +23,9 @@ export const icons: TaktischeZeichen = {
     },
   },
   Formation_von_Kräften: {
+    Einheit: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Einheit.png',
+    },
     Trupp: {
       url: '/icons/taktische_zeichen/Formation_von_Kraeften/Trupp.png',
     },
@@ -31,6 +34,21 @@ export const icons: TaktischeZeichen = {
     },
     Zug: {
       url: '/icons/taktische_zeichen/Formation_von_Kraeften/Zug.png',
+    },
+    Bereitschaft: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Bereitschaft.png',
+    },
+    Abschnitt: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Abschnitt.png',
+    },
+    Bezirk: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/Bezirk.png',
+    },
+    LFV: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/LFV.png',
+    },
+    ÖBFV: {
+      url: '/icons/taktische_zeichen/Formation_von_Kraeften/OEBFV.png',
     },
   },
   Gefahren: {
@@ -99,7 +117,7 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Schäden/Chemieaustritt.png',
     },
     'Entstehungsbrand,_Schwelbrand': {
-      url: '/icons/taktische_zeichen/Schäden/Entstehungsbrand,_Schwelbrand.png',
+      url: '/icons/taktische_zeichen/Schäden/Entstehungsbrand_Schwelbrand.png',
     },
     Entwickelter_Brand: {
       url: '/icons/taktische_zeichen/Schäden/Entwickelter_Brand.png',
@@ -108,7 +126,7 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Schäden/Gasaustritt.png',
     },
     'Lawine,_Mure,_Felssturz': {
-      url: '/icons/taktische_zeichen/Schäden/Lawine,_Mure,_Felssturz.png',
+      url: '/icons/taktische_zeichen/Schäden/Lawine_Mure_Felssturz.png',
     },
     Schaden_allgemein: {
       url: '/icons/taktische_zeichen/Schäden/Schaden_allgemein.png',
@@ -123,7 +141,7 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Schäden/Überflutung.png',
     },
     'Unterbrochen,_blockiert,_gesperrt': {
-      url: '/icons/taktische_zeichen/Schäden/Unterbrochen,_blockiert,_gesperrt.png',
+      url: '/icons/taktische_zeichen/Schäden/unterbrochen_blockiert_gesperrt.png',
     },
     Verseuchung: {
       url: '/icons/taktische_zeichen/Schäden/Verseuchung.png',
@@ -137,16 +155,16 @@ export const icons: TaktischeZeichen = {
   },
   'Schiene,Wasser,Luft': {
     Flächenflugzeug: {
-      url: '/icons/taktische_zeichen/Schiene,Wasser,Luft/Flächenflugzeug.png',
+      url: '/icons/taktische_zeichen/Schiene_Wasser_Luft/Flaechenflugzeug.png',
     },
     Hubschrauber: {
-      url: '/icons/taktische_zeichen/Schiene,Wasser,Luft/Hubschrauber.png',
+      url: '/icons/taktische_zeichen/Schiene_Wasser_Luft/Hubschrauber.png',
     },
     Schienenfahrzeug: {
-      url: '/icons/taktische_zeichen/Schiene,Wasser,Luft/Schienenfahrzeug.png',
+      url: '/icons/taktische_zeichen/Schiene_Wasser_Luft/Schienenfahrzeug.png',
     },
     Wasserfahrzeug: {
-      url: '/icons/taktische_zeichen/Schiene,Wasser,Luft/Wasserfahrzeug.png',
+      url: '/icons/taktische_zeichen/Schiene_Wasser_Luft/Wasserfahrzeug.png',
     },
   },
 };
