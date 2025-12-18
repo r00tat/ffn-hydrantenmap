@@ -200,7 +200,8 @@ async function downloadGb(eintraege: GbDisplay[]) {
       'Art',
       'Information',
       'Anmerkung',
-      'Weiterleitung',
+      'Auszeichnung',
+      'Erledigt',
     ],
     ...eintraege.map((d) => [
       d.nummer,
@@ -213,6 +214,9 @@ async function downloadGb(eintraege: GbDisplay[]) {
       d.beschreibung,
       // d.erledigt ? formatTimestamp(d.erledigt) : '',
       d.weiterleitung || '',
+      d.erledigt != ''
+        ? formatTimestamp(parseTimestamp(d.datum)?.toDate())
+        : '',
     ]),
   ];
   downloadRowsAsCsv(rows, 'Geschaeftsbuch.csv');
@@ -232,27 +236,54 @@ function GbEntries({
       <Grid size={{ xs: 3, md: 2, lg: 1 }}>
         <b>Nummer</b>
       </Grid>
-      <Grid size={{ xs: 6, md: 5, lg: 2 }}>
+      <Grid size={{ xs: 6, md: 4, lg: 2 }}>
         <b>Datum</b>
       </Grid>
-      <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+      <Grid size={{ xs: 12, md: 4, lg: 2 }}>
         <b>von -&gt; an</b>
       </Grid>
-      <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+      <Grid size={{ xs: 12, md: 5, lg: 2 }}>
         <b>Name</b>
       </Grid>
       <Grid size={{ xs: 12, md: 5, lg: 3 }}>
         <b>Beschreibung</b>
       </Grid>
+      <Grid size={{ xs: 12, md: 2, lg: 1 }}>
+        <b>Erledigt</b>
+      </Grid>
       <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
-      {eintraege.map((e) => (
+      {eintraege.map((e, index) => (
         <React.Fragment key={'gb-' + e.id}>
-          <Grid size={{ xs: 3, md: 2, lg: 1 }}>{e.nummer}</Grid>
-          <Grid size={{ xs: 6, md: 5, lg: 2 }}>{e.datum}</Grid>
-          <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+          <Grid
+            size={{ xs: 3, md: 2, lg: 1 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
+            {e.nummer}
+          </Grid>
+          <Grid
+            size={{ xs: 6, md: 4, lg: 2 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
+            {e.datum}
+          </Grid>
+          <Grid
+            size={{ xs: 12, md: 4, lg: 2 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
             {e.einaus} {e.von} -&gt; {e.an} ({e.weiterleitung})
           </Grid>
-          <Grid size={{ xs: 12, md: 5, lg: 2 }}>
+          <Grid
+            size={{ xs: 12, md: 5, lg: 2 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
             <b>
               {e.name?.split(`\n`).map((line, index) => (
                 <React.Fragment key={`title-${e.id}-${index}`}>
@@ -262,7 +293,12 @@ function GbEntries({
               ))}
             </b>
           </Grid>
-          <Grid size={{ xs: 12, md: 5, lg: 3 }}>
+          <Grid
+            size={{ xs: 12, md: 5, lg: 3 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
             {e.beschreibung?.split('\n').map((line, index) => (
               <React.Fragment key={`beschreibung-${e.id}-${index}`}>
                 {line}
@@ -270,7 +306,21 @@ function GbEntries({
               </React.Fragment>
             ))}
           </Grid>
-          <Grid size={{ xs: 12, md: 2, lg: 2 }}>
+          <Grid
+            size={{ xs: 12, md: 2, lg: 1 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
+            {e.erledigt && formatTimestamp(e.erledigt)}
+          </Grid>
+
+          <Grid
+            size={{ xs: 12, md: 2, lg: 1 }}
+            sx={(theme) => ({
+              backgroundColor: index % 2 === 1 ? '#eee' : undefined,
+            })}
+          >
             {showEditButton && (
               <DiaryButtons diary={e} funktion={funktion}></DiaryButtons>
             )}
