@@ -4,6 +4,8 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
     Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  height: 100%;
+  overflow: hidden;
 }
 
 a {
@@ -41,12 +43,19 @@ a {
 }
 
 #map {
-  height: 88vh;
+  height: 100%;
 }
 
 div.leaflet-container {
-  height: 88vh;
-  width: 100%;
+  height: 100%;
+}
+
+div.desktop-map {
+  width: 80%;
+}
+
+div.mobile-map {
+  width: 100%
 }
 
 .nopadding {

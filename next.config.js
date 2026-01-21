@@ -14,6 +14,19 @@ module.exports = async (phase) => {
     // dest: 'public',
     // skipWaiting: true,
     transpilePackages: ['mui-color-input'],
+    images: {
+      localPatterns: [
+        {
+          pathname: '/api/icons/**',
+        },
+        {
+          pathname: '/api/fzg',
+        },
+        {
+          pathname: '/icons/**',
+        },
+      ],
+    },
   };
 
   // add phase === PHASE_DEVELOPMENT_SERVER || for dev serwist

@@ -16,6 +16,8 @@ import { FirecallItemBase } from '../FirecallItemBase';
 export interface MarkerRenderOptions {
   /* do not show the popup */
   hidePopup?: boolean;
+  /* disable click handler (used for preview markers during placement) */
+  disableClick?: boolean;
 }
 
 export interface FirecallItemMarkerProps {
@@ -57,7 +59,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup } = {},
+  options: { hidePopup, disableClick } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
@@ -68,7 +70,7 @@ export function FirecallItemMarkerDefault({
       record.lng || defaultPosition.lng
     )
   );
-  const { editable } = useMapEditor();
+  const { editable, selectFirecallItem } = useMapEditor();
 
   useEffect(() => {
     if (record.lat && record.lng) {
@@ -92,6 +94,13 @@ export function FirecallItemMarkerDefault({
             setStartPos((event.target as L.Marker)?.getLatLng());
             updateFircallItemPos(firecallId, event, record);
           },
+          ...(disableClick
+            ? {}
+            : {
+                click: () => {
+                  selectFirecallItem(record);
+                },
+              }),
         }}
         rotationAngle={
           record?.rotation &&

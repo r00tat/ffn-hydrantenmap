@@ -7,6 +7,7 @@ import { FirecallConnection } from './FirecallConnection';
 import { FirecallDiary } from './FirecallDiary';
 import { FirecallEinsatzleitung } from './FirecallEl';
 import { FirecallGb } from './FirecallGb';
+import { FirecallHydrant } from './FirecallHydrant';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallItemLayer } from './FirecallItemLayer';
 import { FirecallItemMarker } from './FirecallItemMarker';
@@ -28,6 +29,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   vehicle: FirecallVehicle,
   gb: FirecallGb,
   layer: FirecallItemLayer,
+  hydrant: FirecallHydrant,
 };
 
 export const fcItemNames: { [key: string]: string } = {};

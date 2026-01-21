@@ -1,7 +1,7 @@
 'use client';
 
 import { doc, getDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useFirecallHistory from '../../hooks/firecallHistory/useFirecallHistory';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import useSelectHistory from '../../hooks/firecallHistory/useSelectHistory';
@@ -12,6 +12,7 @@ import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_HISTORY_COLLECTION_ID,
   FirecallHistory,
+  FirecallItem,
 } from '../firebase/firestore';
 
 interface MapEditorProviderProps {
@@ -26,6 +27,10 @@ function useMapEditorProvider() {
   const [selectedHistory, setSelectedHistory] = useState<
     FirecallHistory | undefined
   >();
+  const [selectedFirecallItem, setSelectedFirecallItem] =
+    useState<FirecallItem>();
+  const [editFirecallItemIsOpen, setEditFirecallItemIsOpen] = useState(false);
+  const [editFirecallItem, setEditFirecallItem] = useState<FirecallItem>();
   const firecallId = useFirecallId();
 
   useEffect(() => {
@@ -55,6 +60,15 @@ function useMapEditorProvider() {
     })();
   }, [firecallId, historyId]);
 
+  const selectFirecallItem = useCallback((item?: FirecallItem) => {
+    setSelectedFirecallItem(item);
+  }, []);
+
+  const openFirecallItemDialog = useCallback((item?: FirecallItem) => {
+    setEditFirecallItemIsOpen(true);
+    setEditFirecallItem(item);
+  }, []);
+
   const options: MapEditorOptions = {
     editable: historyId ? false : editable,
     setEditable,
@@ -66,6 +80,12 @@ function useMapEditorProvider() {
     historyId,
     selectedHistory,
     historyModeActive: !!historyId,
+    selectFirecallItem,
+    selectedFirecallItem,
+    editFirecallItemIsOpen,
+    setEditFirecallItemIsOpen,
+    editFirecallItem,
+    openFirecallItemDialog,
   };
 
   return options;

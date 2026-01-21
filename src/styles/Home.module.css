@@ -1,3 +1,10 @@
+.container {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .main {
   min-height: 100vh;
   padding: 4rem 0;
