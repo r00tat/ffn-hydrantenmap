@@ -206,11 +206,9 @@ export async function POST(request: NextRequest) {
       send({ step: 1, status: 'completed', count: wgsObjects.length });
 
       // Step 3: Preview - pause for user review
+      // Send all data to client (preview slice is for display only)
       const preview = wgsObjects.slice(0, 20);
-      send({ step: 2, status: 'paused', preview, total: wgsObjects.length });
-
-      // Store data for continue action (in real implementation, use session/cache)
-      // For now, client will send the full data back
+      send({ step: 2, status: 'paused', preview, data: wgsObjects, total: wgsObjects.length });
     } catch (err) {
       send({ step: 0, status: 'error', error: err instanceof Error ? err.message : 'Unknown error' });
     } finally {

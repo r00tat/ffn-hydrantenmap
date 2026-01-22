@@ -24,6 +24,7 @@ interface ProgressEvent {
   message?: string;
   count?: number;
   preview?: ParsedRecord[];
+  data?: ParsedRecord[];
   total?: number;
   error?: string;
 }
@@ -50,6 +51,7 @@ export default function GisDataPipeline() {
   const [status, setStatus] = useState<StepStatus>('pending');
   const [error, setError] = useState<string | undefined>();
   const [previewData, setPreviewData] = useState<ParsedRecord[]>([]);
+  const [fullData, setFullData] = useState<ParsedRecord[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [importedCount, setImportedCount] = useState<number | null>(null);
@@ -59,6 +61,7 @@ export default function GisDataPipeline() {
     setStatus('pending');
     setError(undefined);
     setPreviewData([]);
+    setFullData([]);
     setTotalRecords(0);
     setIsRunning(false);
     setImportedCount(null);
@@ -119,6 +122,7 @@ export default function GisDataPipeline() {
             if (event.status === 'paused' && event.preview) {
               setStatus('pending');
               setPreviewData(event.preview);
+              setFullData(event.data || event.preview);
               setTotalRecords(event.total || event.preview.length);
               return; // Wait for user to continue
             }
@@ -157,7 +161,7 @@ export default function GisDataPipeline() {
         body: JSON.stringify({
           action: 'continue',
           collectionName,
-          data: previewData,
+          data: fullData,
         }),
       });
 
@@ -205,7 +209,7 @@ export default function GisDataPipeline() {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setIsRunning(false);
     }
-  }, [collectionName, previewData]);
+  }, [collectionName, fullData]);
 
   const canStart = harFile && ortschaft && collectionName && !isRunning;
   const showPreview = activeStep === 2 && previewData.length > 0 && status === 'pending';
