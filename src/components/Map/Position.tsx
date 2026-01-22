@@ -8,6 +8,7 @@ const PositionContext = createContext<PositionInfo>([
   defaultPosition,
   false,
   undefined,
+  () => {},
 ]);
 
 export default function Position({ children }: { children: React.ReactNode }) {

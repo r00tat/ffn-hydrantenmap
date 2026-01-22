@@ -1,47 +1,54 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GeoPositionObject } from '../common/geo';
 import { defaultPosition } from './constants';
 
 export type PositionInfo = [
   GeoPositionObject,
   boolean,
-  GeolocationPosition | undefined
+  GeolocationPosition | undefined,
+  () => void
 ];
 
 export default function usePosition(): PositionInfo {
   const [position, setPosition] = useState<GeoPositionObject>(defaultPosition);
   const [isSet, setIsSet] = useState(false);
-  const [watchId, setWatchId] = useState<number>();
   const [location, setLocation] = useState<GeolocationPosition>();
+  const watchIdRef = useRef<number | undefined>(undefined);
+  const enabledRef = useRef(false);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      const id = navigator.geolocation.watchPosition((geolocation) => {
-        setPosition({
-          lat: geolocation.coords.latitude,
-          lng: geolocation.coords.longitude,
-          alt: geolocation.coords.altitude || 0,
-        });
-        setLocation(geolocation);
-        setIsSet(true);
-      });
-      (async () => {
-        setWatchId(id);
-      })();
-    } else {
-      console.info(`geolocation not supported`);
+  const startWatching = useCallback(() => {
+    if (!navigator.geolocation || watchIdRef.current !== undefined) {
+      return;
     }
+    const id = navigator.geolocation.watchPosition((geolocation) => {
+      setPosition({
+        lat: geolocation.coords.latitude,
+        lng: geolocation.coords.longitude,
+        alt: geolocation.coords.altitude || 0,
+      });
+      setLocation(geolocation);
+      setIsSet(true);
+    });
+    watchIdRef.current = id;
   }, []);
 
-  useEffect(() => {
-    if (watchId) {
-      return () => {
-        navigator.geolocation.clearWatch(watchId);
-      };
+  const enableTracking = useCallback(() => {
+    if (!enabledRef.current) {
+      enabledRef.current = true;
+      startWatching();
     }
-  }, [watchId]);
+  }, [startWatching]);
 
-  return [position, isSet, location];
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== undefined) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  return [position, isSet, location, enableTracking];
 }
