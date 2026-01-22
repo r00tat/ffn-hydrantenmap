@@ -43,7 +43,7 @@ function LogedinApp({ children }: AppProps) {
               setIsDrawerOpen={setIsDrawerOpen}
             />
             <ChatMessageDisplay />
-            <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {children}
             </Box>
           </FirecallLayerProvider>
