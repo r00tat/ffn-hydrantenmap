@@ -10,21 +10,21 @@ function useUnwetterSheetData() {
   const [unwetterData, setUnwetterData] = useState<UnwetterData[]>([]);
   const firecall = useFirecall();
 
+  // Extract specific values to avoid re-fetching when unrelated firecall properties change
+  const firecallId = firecall.id;
+  const sheetId = firecall.sheetId;
+  const range = firecall.range;
+
   const refreshData = useCallback(async () => {
-    if (firecall.id && firecall.id !== 'unknown') {
-      const unwetterData = await fetchUnwetterData(
-        firecall.sheetId,
-        firecall.range
-      );
-      console.info(`unwetter data`, unwetterData);
-      setUnwetterData(unwetterData);
+    if (firecallId && firecallId !== 'unknown') {
+      const data = await fetchUnwetterData(sheetId, range);
+      console.info(`unwetter data`, data);
+      setUnwetterData(data);
     }
-  }, [firecall]);
+  }, [firecallId, sheetId, range]);
 
   useEffect(() => {
-    (async () => {
-      refreshData();
-    })();
+    refreshData();
     const interval = setInterval(refreshData, 120000);
     return () => {
       clearInterval(interval);
