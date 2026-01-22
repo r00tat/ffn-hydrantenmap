@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LayerGroup } from 'react-leaflet';
 import { fetchUnwetterData, UnwetterData } from './UnwetterAction';
 import FirecallElement from '../../FirecallItems/elements/FirecallElement';
@@ -15,21 +15,26 @@ function useUnwetterSheetData() {
   const sheetId = firecall.sheetId;
   const range = firecall.range;
 
-  const refreshData = useCallback(async () => {
-    if (firecallId && firecallId !== 'unknown') {
-      const data = await fetchUnwetterData(sheetId, range);
-      console.info(`unwetter data`, data);
-      setUnwetterData(data);
-    }
-  }, [firecallId, sheetId, range]);
-
   useEffect(() => {
-    refreshData();
-    const interval = setInterval(refreshData, 120000);
+    let ignore = false;
+
+    const fetchData = async () => {
+      if (firecallId && firecallId !== 'unknown') {
+        const data = await fetchUnwetterData(sheetId, range);
+        if (!ignore) {
+          setUnwetterData(data);
+        }
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 120000);
+
     return () => {
+      ignore = true;
       clearInterval(interval);
     };
-  }, [refreshData]);
+  }, [firecallId, sheetId, range]);
 
   return unwetterData;
 }
