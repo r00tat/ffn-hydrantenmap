@@ -5,11 +5,10 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
 } from 'firebase/auth';
-import { useEffect, useState } from 'react';
 import { useGoogleOneTapLogin } from 'react-google-one-tap-login';
 import { IGoogleOneTapLoginProps } from 'react-google-one-tap-login/dist/types/types';
 
-export function OneTapLoginOnClient() {
+export default function OneTapLogin() {
   const auth = getAuth();
 
   useGoogleOneTapLogin({
@@ -19,33 +18,16 @@ export function OneTapLoginOnClient() {
       client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'err',
       use_fedcm_for_prompt: true,
       callback: async (data: any) => {
-        // console.info(`login callback`, data);
-        console.info('onetap login succesfull');
-        const credentials = await signInWithCredential(
+        console.info('onetap login successful');
+        await signInWithCredential(
           auth,
           GoogleAuthProvider.credential(data.credential)
         );
-        console.info(`firebase auth completed`);
+        console.info('firebase auth completed');
       },
-
       auto_select: true,
     } as unknown as IGoogleOneTapLoginProps,
   });
-  return <></>;
-}
 
-export default function OneTapLogin() {
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      setIsLoaded(true);
-    })();
-  }, []);
-
-  {
-    isLoaded && <OneTapLoginOnClient />;
-  }
-
-  return <></>;
+  return null;
 }

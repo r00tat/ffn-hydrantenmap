@@ -2,7 +2,7 @@
 
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { signOut as signOutJsClient } from 'next-auth/react';
+import { signOut as signOutJsClient, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { getMyGroupsFromServer } from '../app/groups/GroupAction';
@@ -42,6 +42,9 @@ function nonNull(value: any) {
 const SESSION_STORAGE_AUTH_KEY = 'fbAuth';
 
 export default function useFirebaseLoginObserver(): LoginStatus {
+  // Use NextAuth session for initial auth state (faster than Firestore fetch)
+  const { data: session, status: sessionStatus } = useSession();
+
   const [loginStatus, setLoginStatus] = useState<LoginData>({
     isSignedIn: false,
     isAuthorized: false,
@@ -52,79 +55,138 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [needsReLogin, setNeedsReLogin] = useState(false);
 
+  // Derive auth state from session when available (faster initial load)
+  // Session data takes precedence over loginStatus for these fields
+  const hasSessionAuth = sessionStatus === 'authenticated' && session?.user;
+  const derivedIsAuthorized = hasSessionAuth
+    ? (session.user.isAuthorized ?? loginStatus.isAuthorized)
+    : loginStatus.isAuthorized;
+  const derivedIsAdmin = hasSessionAuth
+    ? (session.user.isAdmin ?? loginStatus.isAdmin)
+    : loginStatus.isAdmin;
+  const derivedGroups = hasSessionAuth
+    ? (session.user.groups ?? loginStatus.groups)
+    : loginStatus.groups;
+  const derivedFirecall = hasSessionAuth
+    ? (session.user.firecall ?? loginStatus.firecall)
+    : loginStatus.firecall;
+
   const refresh = useCallback(async () => {
-    console.info(`refreshing user data for ${uid}`);
+    console.info(`refreshing user data`);
     if (uid) {
       try {
-        const userDoc = await getDoc(doc(firestore, USER_COLLECTION_ID, uid));
-        const userData = userDoc.data();
-        console.info(`refreshed user data: `, userData);
+        // If we have session data, use it instead of fetching from Firestore
+        const hasSessionData = session?.user?.isAuthorized !== undefined;
 
-        if (auth.currentUser && userData) {
-          const tokenClaims = (await auth.currentUser.getIdTokenResult())
-            .claims;
-          const userDataGroups = uniqueArray(userData.groups || [])
-            ?.sort()
-            .join(',');
-          const tokenGroups = uniqueArray(
-            (tokenClaims.groups as string[]) || []
-          )
-            ?.sort()
-            .join(',');
-          if (
-            userData.authorized !== tokenClaims.authorized ||
-            userDataGroups !== tokenGroups
-          ) {
-            // need to login again
-            console.warn(
-              `token claims differ from firebase data, relogin required.
-              authorized: ${userData.authorized ? 'Y' : 'N'} ${
-                tokenClaims.authorized ? 'Y' : 'N'
-              } 
-              groups: ${userDataGroups} ${tokenGroups}`,
-              tokenClaims,
-              userData
-            );
-            setNeedsReLogin(true);
-          } else {
-            setNeedsReLogin(false);
+        // Fetch groups (for display names) - this is still needed
+        const groups = await getMyGroupsFromServer().catch(() => [] as Group[]);
+        setMyGroups(groups);
+
+        if (hasSessionData) {
+          // Use session data - much faster than Firestore fetch
+          console.info('Using session data, skipping Firestore user doc fetch');
+
+          // Check if token claims match session (for needsReLogin detection)
+          if (auth.currentUser) {
+            const tokenClaims = (await auth.currentUser.getIdTokenResult())
+              .claims;
+            const sessionGroups = uniqueArray(session.user.groups || [])
+              ?.sort()
+              .join(',');
+            const tokenGroups = uniqueArray(
+              (tokenClaims.groups as string[]) || []
+            )
+              ?.sort()
+              .join(',');
+            if (
+              session.user.isAuthorized !== tokenClaims.authorized ||
+              sessionGroups !== tokenGroups
+            ) {
+              console.warn(
+                `token claims differ from session data, relogin required.`
+              );
+              setNeedsReLogin(true);
+            } else {
+              setNeedsReLogin(false);
+            }
           }
-        }
 
-        if (userData?.authorized) {
-          // console.info(`user is authorized`);
-          const newData = {
-            isAuthorized: true,
-            messagingTokens: userData.messaging,
-            chatNotifications: userData.chatNotifications,
-            groups: [...(userData.groups || []), 'allUsers'],
-            isRefreshing: false,
-          };
           setLoginStatus((prev) => ({
             ...prev,
-            ...newData,
-            isAdmin: prev.isAdmin || userData?.isAdmin === true,
+            isAuthorized: session.user.isAuthorized,
+            isAdmin: session.user.isAdmin,
+            groups: session.user.groups,
+            firecall: session.user.firecall,
+            isRefreshing: false,
           }));
         } else {
-          console.log(`user is not authorized:`, userData);
-          setLoginStatus((prev) => ({
-            ...prev,
-            isRefreshing: false,
-          }));
+          // Fallback: fetch from Firestore if no session
+          const userDoc = await getDoc(doc(firestore, USER_COLLECTION_ID, uid));
+          const userData = userDoc.data();
+          console.info(`refreshed user data from Firestore`);
+
+          if (auth.currentUser && userData) {
+            const tokenClaims = (await auth.currentUser.getIdTokenResult())
+              .claims;
+            const userDataGroups = uniqueArray(userData.groups || [])
+              ?.sort()
+              .join(',');
+            const tokenGroups = uniqueArray(
+              (tokenClaims.groups as string[]) || []
+            )
+              ?.sort()
+              .join(',');
+            if (
+              userData.authorized !== tokenClaims.authorized ||
+              userDataGroups !== tokenGroups
+            ) {
+              console.warn(
+                `token claims differ from firebase data, relogin required.`
+              );
+              setNeedsReLogin(true);
+            } else {
+              setNeedsReLogin(false);
+            }
+          }
+
+          if (userData?.authorized) {
+            const newData = {
+              isAuthorized: true,
+              messagingTokens: userData.messaging,
+              chatNotifications: userData.chatNotifications,
+              groups: [...(userData.groups || []), 'allUsers'],
+              isRefreshing: false,
+            };
+            setLoginStatus((prev) => ({
+              ...prev,
+              ...newData,
+              isAdmin: prev.isAdmin || userData?.isAdmin === true,
+            }));
+          } else {
+            console.log(`user is not authorized`);
+            setLoginStatus((prev) => ({
+              ...prev,
+              isRefreshing: false,
+            }));
+          }
         }
       } catch (err) {
-        console.error(`failed to fetch user doc`, err);
+        console.error(`failed to refresh user data`, err);
+        setLoginStatus((prev) => ({
+          ...prev,
+          isRefreshing: false,
+        }));
       }
     }
-  }, [uid]);
+  }, [uid, session]);
 
   const serverLogin = useCallback(async () => {
     console.info(`starting server login`);
     const token = await auth.currentUser?.getIdToken();
     // console.info(`got token`, token);
     if (token) {
-      const loginResult = await firebaseTokenLogin(token);
-      console.info(`server side login result: `, loginResult);
+      await firebaseTokenLogin(token);
+      console.info(`server side login completed`);
     } else {
       console.info(`no token received in server side login`);
     }
@@ -133,7 +195,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const authStateChangedHandler = useCallback(
     async (user: User | null) => {
       let u: User | undefined = user != null ? user : undefined;
-      console.info(`login status changed:`, u);
+      console.info(`login status changed: ${u ? 'signed in' : 'signed out'}`);
       setUid(u?.uid);
 
       const token = await user?.getIdToken();
@@ -143,7 +205,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
       const tokenResult = await user?.getIdTokenResult();
       const idToken = await user?.getIdToken();
-      console.info(`user token result`, tokenResult);
+      console.info(`user token result received`);
 
       const authData: Partial<LoginData> = {
         isSignedIn: !!user,
@@ -181,12 +243,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
   useEffect(() => {
     (async () => {
-      refresh();
-    })();
-  }, [refresh]);
-
-  useEffect(() => {
-    (async () => {
       if (window && window.sessionStorage) {
         const authText = window.sessionStorage.getItem(
           SESSION_STORAGE_AUTH_KEY
@@ -195,7 +251,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           const auth: LoginData = JSON.parse(authText);
           if (auth.expiration && new Date(auth.expiration) > new Date()) {
             // token valid, use credentials for login status
-            console.info(`using cached login status:`, auth);
+            console.info(`using cached login status`);
             setLoginStatus({ ...auth, isRefreshing: true });
           }
         }
@@ -228,15 +284,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     };
   }, [serverLogin]);
 
-  useEffect(() => {
-    (async () => {
-      if (loginStatus.isSignedIn && loginStatus.isAuthorized) {
-        const myGs = await getMyGroupsFromServer();
-        setMyGroups(myGs);
-      }
-    })();
-  }, [loginStatus.isAuthorized, loginStatus.isSignedIn]);
-
   const fbSignOut = useCallback(async () => {
     if (window && window.sessionStorage) {
       window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
@@ -250,6 +297,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
   return {
     ...loginStatus,
+    // Override with session-derived values for faster initial load
+    isAuthorized: derivedIsAuthorized,
+    isAdmin: derivedIsAdmin,
+    groups: derivedGroups,
+    firecall: derivedFirecall,
     myGroups,
     refresh,
     signOut: fbSignOut,
