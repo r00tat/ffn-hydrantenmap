@@ -1,9 +1,9 @@
 'use client';
 
 import { User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { signOut as signOutJsClient, useSession } from 'next-auth/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { getMyGroupsFromServer } from '../app/groups/GroupAction';
 import { Group } from '../app/groups/groupHelpers';
@@ -33,6 +33,8 @@ export interface LoginData {
 export interface LoginStatus extends LoginData {
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  credentialsRefreshed: boolean;
+  clearCredentialsRefreshed: () => void;
 }
 
 function nonNull(value: any) {
@@ -54,6 +56,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const [uid, setUid] = useState<string>();
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [needsReLogin, setNeedsReLogin] = useState(false);
+  const [credentialsRefreshed, setCredentialsRefreshed] = useState(false);
+  const lastKnownAuthRef = useRef<{
+    authorized?: boolean;
+    groups?: string[];
+  } | null>(null);
 
   // Derive auth state from session when available (faster initial load)
   // Session data takes precedence over loginStatus for these fields
@@ -287,6 +294,71 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     console.info(`logout completed`);
   }, []);
 
+  const clearCredentialsRefreshed = useCallback(() => {
+    setCredentialsRefreshed(false);
+  }, []);
+
+  // Real-time listener for user document changes (authorization updates by admin)
+  useEffect(() => {
+    if (!uid) {
+      lastKnownAuthRef.current = null;
+      return;
+    }
+
+    const userDocRef = doc(firestore, USER_COLLECTION_ID, uid);
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      async (snapshot) => {
+        const userData = snapshot.data();
+        if (!userData) return;
+
+        const currentAuth = {
+          authorized: !!userData.authorized,
+          groups: [...(userData.groups || [])].sort(),
+        };
+
+        // On first snapshot, just store the initial state
+        if (lastKnownAuthRef.current === null) {
+          lastKnownAuthRef.current = currentAuth;
+          return;
+        }
+
+        // Check if authorization fields changed
+        const prevAuth = lastKnownAuthRef.current;
+        const authChanged =
+          currentAuth.authorized !== prevAuth.authorized ||
+          JSON.stringify(currentAuth.groups) !==
+            JSON.stringify(prevAuth.groups?.sort());
+
+        if (authChanged && auth.currentUser) {
+          console.info(
+            `credentials changed by admin, refreshing token and session`
+          );
+          lastKnownAuthRef.current = currentAuth;
+
+          try {
+            // Force Firebase to get fresh ID token with new custom claims
+            await auth.currentUser.getIdToken(true);
+            // Re-authenticate with NextAuth to update session
+            await serverLogin();
+            // Refresh local state
+            await refresh();
+            // Signal that credentials were refreshed
+            setCredentialsRefreshed(true);
+            setNeedsReLogin(false);
+          } catch (err) {
+            console.error(`failed to refresh credentials after admin update`, err);
+          }
+        }
+      },
+      (error) => {
+        console.error(`user document listener error`, error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [uid, serverLogin, refresh]);
+
   return {
     ...loginStatus,
     // Override with session-derived values for faster initial load
@@ -298,5 +370,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     refresh,
     signOut: fbSignOut,
     needsReLogin,
+    credentialsRefreshed,
+    clearCredentialsRefreshed,
   };
 }

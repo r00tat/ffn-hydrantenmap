@@ -1,5 +1,7 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
 import React, { createContext } from 'react';
 import useFirebaseLoginObserver, {
   LoginStatus,
@@ -13,6 +15,8 @@ export const FirebaseLoginContext = createContext<LoginStatus>({
   signOut: async () => {},
   refresh: async () => {},
   myGroups: [],
+  credentialsRefreshed: false,
+  clearCredentialsRefreshed: () => {},
 });
 
 export default function FirebaseUserProvider({
@@ -25,6 +29,20 @@ export default function FirebaseUserProvider({
   return (
     <FirebaseLoginContext.Provider value={authInfo}>
       {children}
+      <Snackbar
+        open={authInfo.credentialsRefreshed}
+        autoHideDuration={6000}
+        onClose={authInfo.clearCredentialsRefreshed}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={authInfo.clearCredentialsRefreshed}
+          severity="success"
+          variant="filled"
+        >
+          Ihre Berechtigungen wurden aktualisiert.
+        </Alert>
+      </Snackbar>
     </FirebaseLoginContext.Provider>
   );
 }
