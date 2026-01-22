@@ -10,3 +10,8 @@ export type {
 
 export { default as DataPreview } from './DataPreview';
 export type { DataPreviewProps, DataPreviewColumn } from './DataPreview';
+
+export { default as AdminActions } from './AdminActions';
+export { default as AdminTabs } from './AdminTabs';
+export { default as GisDataPipeline } from './GisDataPipeline';
+export { default as HydrantClusters } from './HydrantClusters';
