@@ -192,55 +192,57 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     }
   }, []);
 
-  const authStateChangedHandler = useCallback(
-    async (user: User | null) => {
-      let u: User | undefined = user != null ? user : undefined;
-      setUid(u?.uid);
+  // Use refs to avoid recreating authStateChangedHandler when dependencies change
+  const refreshRef = useRef(refresh);
+  const serverLoginRef = useRef(serverLogin);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+  useEffect(() => {
+    serverLoginRef.current = serverLogin;
+  }, [serverLogin]);
 
-      const token = await user?.getIdToken();
-      if (token) {
-        await serverLogin();
-      }
-
-      const tokenResult = await user?.getIdTokenResult();
-      const idToken = await user?.getIdToken();
-
-      const authData: Partial<LoginData> = {
-        isSignedIn: !!user,
-        user: user !== null ? user : undefined,
-        email: nonNull(u?.email),
-        displayName: nonNull(u?.displayName),
-        uid: nonNull(u?.uid),
-        photoURL: nonNull(u?.photoURL),
-        // isAuthorized: false,
-        // isAdmin: false,
-        expiration: tokenResult?.expirationTime,
-        idToken,
-        groups: (tokenResult?.claims?.groups as string[]) || [],
-        isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
-        isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
-        isRefreshing: true,
-        firecall: tokenResult?.claims?.firecall as string | undefined,
-      };
-      // if (window && window.sessionStorage) {
-      //   window.sessionStorage.setItem(SESSION_STORAGE_AUTH_KEY, JSON.stringify(authData));
-      // }
-
-      setLoginStatus((prev) => ({ ...prev, ...authData }));
-      await refresh();
-      if (user) {
-        console.info(`login completed for ${user.email}`);
-      }
-    },
-    [refresh, serverLogin]
-  );
   // Listen to the Firebase Auth state and set the local state.
+  // Using refs ensures the observer is only registered once
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
-      authStateChangedHandler
+      async (user: User | null) => {
+        let u: User | undefined = user != null ? user : undefined;
+        setUid(u?.uid);
+
+        const token = await user?.getIdToken();
+        if (token) {
+          await serverLoginRef.current();
+        }
+
+        const tokenResult = await user?.getIdTokenResult();
+        const idToken = await user?.getIdToken();
+
+        const authData: Partial<LoginData> = {
+          isSignedIn: !!user,
+          user: user !== null ? user : undefined,
+          email: nonNull(u?.email),
+          displayName: nonNull(u?.displayName),
+          uid: nonNull(u?.uid),
+          photoURL: nonNull(u?.photoURL),
+          expiration: tokenResult?.expirationTime,
+          idToken,
+          groups: (tokenResult?.claims?.groups as string[]) || [],
+          isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
+          isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
+          isRefreshing: true,
+          firecall: tokenResult?.claims?.firecall as string | undefined,
+        };
+
+        setLoginStatus((prev) => ({ ...prev, ...authData }));
+        await refreshRef.current();
+        if (user) {
+          console.info(`login completed for ${user.email}`);
+        }
+      }
     );
-    return () => unregisterAuthObserver(); // Make sure we un-register Firebase observers when the component unmounts.
-  }, [authStateChangedHandler]);
+    return () => unregisterAuthObserver();
+  }, []);
 
   useEffect(() => {
     (async () => {
