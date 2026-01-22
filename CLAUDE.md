@@ -24,6 +24,14 @@ npm run clusterHydrants               # Generate geohashed clusters
 npm run updateClusters                # Update cluster data in Firestore
 ```
 
+## Git Workflow
+
+Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching:
+
+```bash
+git checkout -- next-env.d.ts
+```
+
 ## Tech Stack
 
 - **Next.js 16** with App Router (not Pages Router)
