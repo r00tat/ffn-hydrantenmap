@@ -226,7 +226,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     return () => {
       clearInterval(clearServerInterval);
     };
-  });
+  }, [serverLogin]);
 
   useEffect(() => {
     (async () => {
