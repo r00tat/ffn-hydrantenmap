@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
+import { DecodedIdToken } from 'firebase-admin/auth';
 import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';
 import { firestore, firebaseAuth } from '../firebase/admin';

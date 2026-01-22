@@ -1,4 +1,4 @@
-import { UserRecord } from 'firebase-admin/lib/auth/user-record';
+import { UserRecord } from 'firebase-admin/auth';
 
 export interface FirebaseUserInfo {
   authorized?: boolean;
