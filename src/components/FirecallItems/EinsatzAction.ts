@@ -1,4 +1,5 @@
 'use server';
+import 'server-only';
 
 import { google } from 'googleapis';
 import moment from 'moment';

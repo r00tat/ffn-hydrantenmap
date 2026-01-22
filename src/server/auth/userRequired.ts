@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { DecodedIdToken } from 'firebase-admin/lib/auth/token-verifier';
 import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';

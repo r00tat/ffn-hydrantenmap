@@ -1,4 +1,5 @@
 'use server';
+import 'server-only';
 
 import { firebaseAuth, firestore } from '../../server/firebase/admin';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';

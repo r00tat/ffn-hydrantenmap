@@ -1,4 +1,5 @@
 'use server';
+import 'server-only';
 
 import moment from 'moment';
 import { actionUserAuthorizedForFirecall } from '../../../app/auth';

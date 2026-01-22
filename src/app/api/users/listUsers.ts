@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { DocumentData } from 'firebase/firestore';
 import { UserRecordExtended } from '../../../common/users';
 import { firestore, firebaseAuth } from '../../../server/firebase/admin';

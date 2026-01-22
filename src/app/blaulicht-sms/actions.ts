@@ -1,4 +1,6 @@
 'use server';
+import 'server-only';
+
 import { actionUserRequired } from '../auth';
 
 export interface BlaulichtSmsAlarm {
