@@ -12,8 +12,8 @@ export default function OneTapLogin() {
   const auth = getAuth();
 
   useGoogleOneTapLogin({
-    onError: (error) => console.log(error),
-    onSuccess: (response) => console.log(response),
+    onError: () => console.log('onetap error'),
+    onSuccess: () => console.log('onetap success'),
     googleAccountConfigs: {
       client_id: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || 'err',
       use_fedcm_for_prompt: true,

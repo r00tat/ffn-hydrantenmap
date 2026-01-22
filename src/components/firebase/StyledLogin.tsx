@@ -52,7 +52,7 @@ export default function StyledLoginButton({
 
       const userInfo = getAdditionalUserInfo(result);
 
-      console.info(`signin success`, user, userInfo);
+      console.info(`signin success`);
     } catch (err) {
       console.error(`google login failed`, err);
       setError((err as any).message || `${err}`);
@@ -65,7 +65,7 @@ export default function StyledLoginButton({
         try {
           const result = await signInWithEmailLink(auth, email, magicLink);
           window.localStorage.removeItem('emailForSignIn');
-          console.info(`login result with email: ${email}`, result);
+          console.info(`login result with email link`);
           const url = new URL(magicLink);
           const callbackUrl = url.searchParams.get('url');
           if (callbackUrl) {
@@ -87,7 +87,7 @@ export default function StyledLoginButton({
           handleCodeInApp: true,
         });
         setIsWaitingForMagicLink(true);
-        console.info(`sending sign in link to ${email}`, result2);
+        console.info(`sending sign in link`);
         setInfo('Email für den Login versandt. Bitte prüfen Sie Ihre Email.');
         window.localStorage.setItem('emailForSignIn', email);
       }
@@ -106,7 +106,7 @@ export default function StyledLoginButton({
       );
       // Signed in
       const user = userCredential.user;
-      console.info(`sign in with password`, user);
+      console.info(`sign in with password success`);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
@@ -115,7 +115,7 @@ export default function StyledLoginButton({
 
   const signUp = useCallback(async () => {
     try {
-      console.info(`creating user ${email}`);
+      console.info(`creating user`);
       setRegisterDisabled(true);
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -136,7 +136,7 @@ export default function StyledLoginButton({
         'Der Benutzer wurde erfolgreich erstellt. Zur Verifikation der Email Adresse wurde ein Email versandt.'
       );
 
-      console.info(`sign in with password`, user);
+      console.info(`sign in with password success`);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
@@ -158,7 +158,7 @@ export default function StyledLoginButton({
               window.location.href
             );
             window.localStorage.removeItem('emailForSignIn');
-            console.info(`login result with email: ${email}`, result);
+            console.info(`login result with email link`);
 
             const callbackUrl = params.get('url');
             if (callbackUrl) {

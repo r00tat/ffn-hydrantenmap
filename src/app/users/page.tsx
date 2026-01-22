@@ -78,7 +78,7 @@ export default function Users() {
 
   const updateUser = useCallback(
     async (user: UserRecordExtended) => {
-      console.info(`update user: ${JSON.stringify(user)}`);
+      console.info(`update user`);
       await updateApiCall(user);
       await fetchUsers();
     },
@@ -96,7 +96,7 @@ export default function Users() {
   );
   const editAction = useCallback(async (user: UserRecordExtended) => {
     setEditUser(user);
-    console.info(`edit user: ${JSON.stringify(user)}`);
+    console.info(`edit user`);
     setShowEditUserDialog(true);
   }, []);
   return (

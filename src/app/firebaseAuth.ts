@@ -11,7 +11,7 @@ export async function firebaseTokenLogin(token: string) {
       firebaseToken: token,
       redirect: false,
     });
-    console.info(`login result: ${JSON.stringify(result)}`);
+    console.info(`login completed`);
     return result;
   } catch (err) {
     console.error(`signin failed: ${err} ${(err as unknown as any)?.stack}`);
@@ -29,7 +29,7 @@ export async function authJsLogout() {
 
 export async function checkAuth() {
   const session = await auth();
-  console.info(`checkAuth: '${JSON.stringify(session)}'`);
+  console.info(`checkAuth: ${session ? 'session present' : 'no session'}`);
   if (!session) throw new ApiException('authorization failed', { status: 403 });
   return session;
 }

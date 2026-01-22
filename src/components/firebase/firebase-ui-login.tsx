@@ -19,7 +19,7 @@ export default function FirebaseUiLogin() {
       callbacks: {
         signInSuccessWithAuthResult: (authResult, redirectUrl) => {
           // Action if the user is authenticated successfully
-          console.info(`signInSuccess`, authResult, redirectUrl);
+          console.info(`signInSuccess`);
           if (authResult.additionalUserInfo?.isNewUser) {
             console.info(`register successfull!`);
             sendEmailVerification(auth.currentUser!);
