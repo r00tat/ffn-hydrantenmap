@@ -35,7 +35,7 @@ function downloadVehicles(vehicles: Fzg[]) {
         v.abruecken ? formatTimestamp(v.abruecken) : '',
       ]),
     ],
-    'Fahrzeuge.csv'
+    'Fahrzeuge.csv',
   );
 }
 
