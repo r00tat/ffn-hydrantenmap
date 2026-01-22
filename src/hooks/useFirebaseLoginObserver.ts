@@ -72,7 +72,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     : loginStatus.firecall;
 
   const refresh = useCallback(async () => {
-    console.info(`refreshing user data`);
     if (uid) {
       try {
         // If we have session data, use it instead of fetching from Firestore
@@ -84,7 +83,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
         if (hasSessionData) {
           // Use session data - much faster than Firestore fetch
-          console.info('Using session data, skipping Firestore user doc fetch');
 
           // Check if token claims match session (for needsReLogin detection)
           if (auth.currentUser) {
@@ -123,7 +121,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           // Fallback: fetch from Firestore if no session
           const userDoc = await getDoc(doc(firestore, USER_COLLECTION_ID, uid));
           const userData = userDoc.data();
-          console.info(`refreshed user data from Firestore`);
 
           if (auth.currentUser && userData) {
             const tokenClaims = (await auth.currentUser.getIdTokenResult())
@@ -163,7 +160,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
               isAdmin: prev.isAdmin || userData?.isAdmin === true,
             }));
           } else {
-            console.log(`user is not authorized`);
             setLoginStatus((prev) => ({
               ...prev,
               isRefreshing: false,
@@ -181,21 +177,17 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   }, [uid, session]);
 
   const serverLogin = useCallback(async () => {
-    console.info(`starting server login`);
     const token = await auth.currentUser?.getIdToken();
-    // console.info(`got token`, token);
     if (token) {
       await firebaseTokenLogin(token);
-      console.info(`server side login completed`);
     } else {
-      console.info(`no token received in server side login`);
+      console.warn(`server login: no token available`);
     }
   }, []);
 
   const authStateChangedHandler = useCallback(
     async (user: User | null) => {
       let u: User | undefined = user != null ? user : undefined;
-      console.info(`login status changed: ${u ? 'signed in' : 'signed out'}`);
       setUid(u?.uid);
 
       const token = await user?.getIdToken();
@@ -205,7 +197,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
       const tokenResult = await user?.getIdTokenResult();
       const idToken = await user?.getIdToken();
-      console.info(`user token result received`);
 
       const authData: Partial<LoginData> = {
         isSignedIn: !!user,
@@ -230,6 +221,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
       setLoginStatus((prev) => ({ ...prev, ...authData }));
       await refresh();
+      if (user) {
+        console.info(`login completed for ${user.email}`);
+      }
     },
     [refresh, serverLogin]
   );
@@ -251,7 +245,6 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           const auth: LoginData = JSON.parse(authText);
           if (auth.expiration && new Date(auth.expiration) > new Date()) {
             // token valid, use credentials for login status
-            console.info(`using cached login status`);
             setLoginStatus({ ...auth, isRefreshing: true });
           }
         }
@@ -289,10 +282,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
       window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
     }
 
-    console.info(`authjs client logout`);
     await signOutJsClient();
-    console.info(`firebase logout`);
     await auth.signOut();
+    console.info(`logout completed`);
   }, []);
 
   return {
