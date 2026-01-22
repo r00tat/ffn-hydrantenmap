@@ -2,6 +2,8 @@ import L from 'leaflet';
 import { ReactNode } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import { HydrantenRecord } from '../../../common/gis-objects';
+import useMapEditor from '../../../hooks/useMapEditor';
+import { HydrantenItem } from '../../firebase/firestore';
 
 export interface HydrantenMarkerProps {
   hydrant: HydrantenRecord;
@@ -27,7 +29,7 @@ export const fuellHydrantIcon = L.icon({
   popupAnchor: [1, -22],
 });
 
-const iconFn = (gisObj: HydrantenRecord) => {
+export const hydrantIconFn = (gisObj: HydrantenRecord) => {
   if (gisObj.typ !== 'Überflurhydrant') {
     return unterflurHydrantIcon;
   } else if (gisObj.fuellhydrant?.toLowerCase() === 'ja') {
@@ -41,12 +43,22 @@ export default function HydrantMarker({
   hydrant,
   children,
 }: HydrantenMarkerProps) {
+  const { selectFirecallItem } = useMapEditor();
   return (
     <Marker
       position={[hydrant.lat, hydrant.lng]}
       title={hydrant.name}
       key={hydrant.name}
-      icon={iconFn(hydrant)}
+      icon={hydrantIconFn(hydrant)}
+      eventHandlers={{
+        click: () => {
+          selectFirecallItem({
+            ...hydrant,
+            editable: false,
+            type: 'hydrant',
+          } as unknown as HydrantenItem);
+        },
+      }}
     >
       <Popup>
         <b>

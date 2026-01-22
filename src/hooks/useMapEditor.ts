@@ -1,7 +1,10 @@
 'use client';
 
 import { Dispatch, SetStateAction, createContext, useContext } from 'react';
-import { FirecallHistory } from '../components/firebase/firestore';
+import {
+  FirecallHistory,
+  FirecallItem,
+} from '../components/firebase/firestore';
 
 export interface MapEditorOptions {
   editable: boolean;
@@ -14,6 +17,12 @@ export interface MapEditorOptions {
   historyPathSegments: string[];
   selectedHistory?: FirecallHistory;
   historyModeActive: boolean;
+  selectFirecallItem: (item?: FirecallItem) => void;
+  selectedFirecallItem?: FirecallItem;
+  openFirecallItemDialog: (item?: FirecallItem) => void;
+  editFirecallItemIsOpen: boolean;
+  setEditFirecallItemIsOpen: Dispatch<SetStateAction<boolean>>;
+  editFirecallItem?: FirecallItem;
 }
 
 export const MapEditorContext = createContext<MapEditorOptions>({
@@ -25,6 +34,10 @@ export const MapEditorContext = createContext<MapEditorOptions>({
   selectHistory: () => {},
   historyPathSegments: [],
   historyModeActive: false,
+  selectFirecallItem: () => {},
+  openFirecallItemDialog: () => {},
+  editFirecallItemIsOpen: false,
+  setEditFirecallItemIsOpen: () => {},
 });
 
 export default function useMapEditor() {

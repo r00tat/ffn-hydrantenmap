@@ -1,5 +1,6 @@
 'use client';
 
+import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import CssBaseline from '@mui/material/CssBaseline';
 import Typography from '@mui/material/Typography';
@@ -42,7 +43,9 @@ function LogedinApp({ children }: AppProps) {
               setIsDrawerOpen={setIsDrawerOpen}
             />
             <ChatMessageDisplay />
-            {children}
+            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+              {children}
+            </Box>
           </FirecallLayerProvider>
         </MapEditorProvider>
       </DebugLoggingProvider>

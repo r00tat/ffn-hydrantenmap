@@ -22,7 +22,7 @@ export interface GisWgsObject extends GisObject, WgsObject {}
 export const GEOHASH_PRECISION = 6;
 
 // Name,ortschaft,Typ,Hydranten Nummer,Fuellhydrant,Dimension,Leitungsart,Statischer Druck,Dynamischer Druck,DRUCKMESSUNG_DATUM,Meereshoehe,c_x,c_y,
-export interface HydrantenRecord extends WgsObject {
+export interface Hydrant {
   ortschaft: string;
   typ: string;
   hydranten_nummer: string;
@@ -36,6 +36,8 @@ export interface HydrantenRecord extends WgsObject {
   geohash: string;
   leistung?: string;
 }
+
+export interface HydrantenRecord extends WgsObject, Hydrant {}
 
 export interface RisikoObjekt extends WgsObject {
   adresse: string;

@@ -9,15 +9,13 @@ export interface TaktischeZeichen {
 }
 
 export const icons: TaktischeZeichen = {
-  Einrichtungen: {
+  'Einrichtungen_und_Führung': {
     Ständige_ortsfeste_Einrichtung: {
       url: '/icons/taktische_zeichen/Einrichtungen/Ständige_ortsfeste_Einrichtung.png',
     },
     Vorübergehende_anlassbezogene_Einrichtung: {
       url: '/icons/taktische_zeichen/Einrichtungen/Vorübergehende_anlassbezogene_Einrichtung.png',
     },
-  },
-  Führungsstelle: {
     Befehls_Führungs_Leitstelle: {
       url: '/icons/taktische_zeichen/Fuehrungsstelle/BefehlsFuehrungsLeitstelle.png',
     },
@@ -49,6 +47,29 @@ export const icons: TaktischeZeichen = {
     },
     ÖBFV: {
       url: '/icons/taktische_zeichen/Formation_von_Kraeften/OEBFV.png',
+    },
+  },
+  Personen: {
+    Person: {
+      url: '/icons/taktische_zeichen/Personen/Person.png',
+    },
+    Person_in_Kommandantenfunktion: {
+      url: '/icons/taktische_zeichen/Personen/Person_in_Kommandantenfunktion.png',
+    },
+    Person_in_Zwangslage: {
+      url: '/icons/taktische_zeichen/Personen/Person_in_Zwangslage.png',
+    },
+    Person_tot: {
+      url: '/icons/taktische_zeichen/Personen/Person_tot.png',
+    },
+    'Person_unter_Atem-_oder_Körperschutz': {
+      url: '/icons/taktische_zeichen/Personen/Person_unter_Atem-_oder_Körperschutz.png',
+    },
+    Person_verletzt: {
+      url: '/icons/taktische_zeichen/Personen/Person_verletzt.png',
+    },
+    Person_vermisst: {
+      url: '/icons/taktische_zeichen/Personen/Person_vermisst.png',
     },
   },
   Gefahren: {
@@ -84,29 +105,6 @@ export const icons: TaktischeZeichen = {
     },
     Überflutungsgefahr: {
       url: '/icons/taktische_zeichen/Gefahren/Überflutungsgefahr.png',
-    },
-  },
-  Personen: {
-    Person: {
-      url: '/icons/taktische_zeichen/Personen/Person.png',
-    },
-    Person_in_Kommandantenfunktion: {
-      url: '/icons/taktische_zeichen/Personen/Person_in_Kommandantenfunktion.png',
-    },
-    Person_in_Zwangslage: {
-      url: '/icons/taktische_zeichen/Personen/Person_in_Zwangslage.png',
-    },
-    Person_tot: {
-      url: '/icons/taktische_zeichen/Personen/Person_tot.png',
-    },
-    'Person_unter_Atem-_oder_Körperschutz': {
-      url: '/icons/taktische_zeichen/Personen/Person_unter_Atem-_oder_Körperschutz.png',
-    },
-    Person_verletzt: {
-      url: '/icons/taktische_zeichen/Personen/Person_verletzt.png',
-    },
-    Person_vermisst: {
-      url: '/icons/taktische_zeichen/Personen/Person_vermisst.png',
     },
   },
   Schäden: {

@@ -4,6 +4,8 @@
  *
  */
 
+import { Hydrant } from '../../common/gis-objects';
+
 /**
  * collection names
  */
@@ -46,7 +48,7 @@ export interface FirecallItem {
   eventHandlers?: L.LeafletEventHandlerFnMap;
 }
 
-export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer'];
+export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback'];
 
 export interface FirecallLayer extends FirecallItem {
   grouped?: string;
@@ -177,4 +179,8 @@ export interface FirecallHistory {
   id?: string;
   description: string;
   createdAt: string;
+}
+
+export interface HydrantenItem extends FirecallItem, Hydrant {
+  type: 'hydrant';
 }
