@@ -1,7 +1,7 @@
 'use client';
 
 import { collection, query, QueryConstraint, Query } from 'firebase/firestore';
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import { useFirestoreQuery } from './useFirestoreQuery';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
@@ -23,44 +23,47 @@ export default function useFirebaseCollection<T>(
     filterFn,
   } = options;
 
-  const [pathQuery, setPathQuery] = useState<{
-    path: string[];
-    queryConstraints: QueryConstraint[];
-  }>({ path: [collectionName, ...pathSegments], queryConstraints });
+  // Serialize path and constraints for stable dependency comparison
+  const pathKey = JSON.stringify([collectionName, ...pathSegments]);
+  const constraintsKey = JSON.stringify(queryConstraints);
 
-  if (
-    JSON.stringify(pathQuery.path) !==
-      JSON.stringify([collectionName, ...pathSegments]) ||
-    JSON.stringify(pathQuery.queryConstraints) !==
-      JSON.stringify(queryConstraints)
-  ) {
-    setPathQuery({ path: [collectionName, ...pathSegments], queryConstraints });
+  // Use refs to cache the actual values, updating only when serialized keys change
+  const pathRef = useRef<string[]>([collectionName, ...pathSegments]);
+  const constraintsRef = useRef<QueryConstraint[]>(queryConstraints);
+  const pathKeyRef = useRef(pathKey);
+  const constraintsKeyRef = useRef(constraintsKey);
+
+  if (pathKeyRef.current !== pathKey) {
+    pathKeyRef.current = pathKey;
+    pathRef.current = [collectionName, ...pathSegments];
+  }
+  if (constraintsKeyRef.current !== constraintsKey) {
+    constraintsKeyRef.current = constraintsKey;
+    constraintsRef.current = queryConstraints;
   }
 
   // Memoize the query to prevent re-subscribing on every render.
-  // This requires that `pathSegments` and `queryConstraints` are stable.
+  // Uses serialized keys for stable dependency tracking.
   const memoizedQuery: Query<T> | null = useMemo(() => {
+    const path = pathRef.current;
     if (
-      pathQuery.path.length === 0 ||
-      !pathQuery.path[0] ||
-      (pathQuery.path[0] == FIRECALL_COLLECTION_ID &&
-        pathQuery.path.length > 1 &&
-        pathQuery.path[1] === 'unknown')
+      path.length === 0 ||
+      !path[0] ||
+      (path[0] === FIRECALL_COLLECTION_ID &&
+        path.length > 1 &&
+        path[1] === 'unknown')
     ) {
       return null;
     }
     try {
-      const coll = collection(
-        firestore,
-        pathQuery.path[0],
-        ...pathQuery.path.slice(1)
-      );
-      return query(coll, ...pathQuery.queryConstraints) as Query<T>;
+      const coll = collection(firestore, path[0], ...path.slice(1));
+      return query(coll, ...constraintsRef.current) as Query<T>;
     } catch (e) {
       console.error(e);
       return null;
     }
-  }, [pathQuery.path, pathQuery.queryConstraints]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathKey, constraintsKey]);
 
   const { value, loading, error, records } = useFirestoreQuery<T>(
     memoizedQuery,

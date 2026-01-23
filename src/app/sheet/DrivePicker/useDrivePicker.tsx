@@ -146,7 +146,7 @@ export default function useDrivePicker(): [
             ]
           ).join(' '),
           callback: (tokenResponse: authResult) => {
-            console.info(`got token response`, tokenResponse);
+            console.info(`got token response`);
             setAuthRes(tokenResponse);
             createPicker({ ...config, token: tokenResponse.access_token });
           },

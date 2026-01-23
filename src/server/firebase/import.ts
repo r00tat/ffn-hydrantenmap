@@ -2,15 +2,23 @@ import { firestore } from './admin';
 
 export async function writeBatches(
   collectionName: string,
-  records: { [key: string]: any }
+  records: { [key: string]: any },
+  options?: { merge?: boolean }
 ) {
-  console.info(`writing ${Object.keys(records).length} to ${collectionName}`);
+  const merge = options?.merge ?? false;
+  console.info(
+    `writing ${Object.keys(records).length} to ${collectionName}${merge ? ' (merge mode)' : ''}`
+  );
   const batches = [];
   let batch = firestore.batch();
 
   const collection = firestore.collection(collectionName);
   Object.entries(records).forEach(([hash, record], index) => {
-    batch.set(collection.doc(hash), record);
+    if (merge) {
+      batch.set(collection.doc(hash), record, { merge: true });
+    } else {
+      batch.set(collection.doc(hash), record);
+    }
     if (index % 400 == 0) {
       batches.push(batch);
       batch = firestore.batch();

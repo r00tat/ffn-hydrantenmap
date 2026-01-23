@@ -7,10 +7,8 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import OneTapLogin from '../auth/OneTapLogin';
-import StyledLoginButton from '../firebase/StyledLogin';
-import { auth } from '../firebase/firebase';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
+import { auth } from '../firebase/firebase';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
@@ -58,8 +56,6 @@ export default function LoginUi() {
               Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle
               Freischaltung erforderlich. Bitte melde dich an.
             </Typography>
-            {/* <StyledLoginButton firebaseAuth={auth} /> */}
-            <OneTapLogin />
             <FirebaseUiLogin />
           </Paper>
         </>
@@ -67,15 +63,31 @@ export default function LoginUi() {
 
       {isSignedIn && (
         <Box margin={4}>
+          {isRefreshing && (
+            <Paper
+              sx={{
+                p: 3,
+                mb: 3,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                backgroundColor: 'action.hover',
+              }}
+            >
+              <CircularProgress size={24} />
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  Anmeldung wird überprüft...
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Willkommen zurück, {auth.currentUser?.displayName}!
+                </Typography>
+              </Box>
+            </Paper>
+          )}
           <Typography>
             Willkommen {auth.currentUser?.displayName} (
             {auth.currentUser?.email})!
-            {isRefreshing && (
-              <>
-                Lade Benutzerinformationen...
-                <CircularProgress />
-              </>
-            )}
           </Typography>
           <Button onClick={() => signOut()} variant="contained">
             Logout

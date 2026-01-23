@@ -8,13 +8,14 @@ import { usePositionContext } from './Position';
 
 export default function PositionAction() {
   const map = useMap();
-  const [position, isPositionSet] = usePositionContext();
+  const [position, isPositionSet, , enableTracking] = usePositionContext();
 
   const setPos = useCallback(() => {
-    if (position) {
+    enableTracking();
+    if (position && isPositionSet) {
       map.setView(position);
     }
-  }, [map, position]);
+  }, [map, position, isPositionSet, enableTracking]);
 
   return (
     <Box
@@ -25,21 +26,25 @@ export default function PositionAction() {
         left: 16,
       }}
     >
-      {isPositionSet && (
-        <Tooltip title="Zur aktuell Position zoomen">
-          <Fab
-            color="primary"
-            aria-label="add"
-            size="small"
-            onClick={(event) => {
-              event.preventDefault();
-              setPos();
-            }}
-          >
-            <LocationSearchingIcon />
-          </Fab>
-        </Tooltip>
-      )}
+      <Tooltip
+        title={
+          isPositionSet
+            ? 'Zur aktuellen Position zoomen'
+            : 'Position aktivieren'
+        }
+      >
+        <Fab
+          color="primary"
+          aria-label="locate"
+          size="small"
+          onClick={(event) => {
+            event.preventDefault();
+            setPos();
+          }}
+        >
+          <LocationSearchingIcon />
+        </Fab>
+      </Tooltip>
     </Box>
   );
 }

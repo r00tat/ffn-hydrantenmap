@@ -15,7 +15,7 @@ export function useFirebaseCustomTokenLogin() {
 
   useEffect(() => {
     const auth = getAuth();
-    console.info(`token: ${token}`);
+    console.info(`token login: ${token ? 'token present' : 'no token'}`);
 
     if (token) {
       (async () => {
@@ -31,9 +31,7 @@ export function useFirebaseCustomTokenLogin() {
               throw new Error(`Invalid token: ${error}`);
             }
             const result = await signInWithCustomToken(auth, firebaseToken);
-            console.info(
-              `signedin with custom token: ${result.user.uid} ${result.user.displayName}`
-            );
+            console.info(`signed in with custom token`);
           };
           try {
             await runLogin();

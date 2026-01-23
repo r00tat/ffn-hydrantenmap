@@ -1,5 +1,3 @@
-'use client';
-
 import { defaultCache } from '@serwist/next/worker';
 import { initializeApp } from 'firebase/app';
 import {

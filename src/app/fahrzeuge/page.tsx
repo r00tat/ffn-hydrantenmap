@@ -1,27 +1,8 @@
-'use client';
 import type { NextPage } from 'next';
-import dynamic from 'next/dynamic';
-import { Suspense, useEffect, useState } from 'react';
-
-const Fahrzeuge = dynamic(() => import('../../components/pages/Fahrzeuge'), {
-  ssr: false,
-});
+import DynamicFahrzeuge from '../../components/pages/DynamicFahrzeuge';
 
 const Home: NextPage = () => {
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line
-    setIsLoaded(true);
-  }, []);
-
-  return (
-    <>
-      <Suspense fallback={<>Loading...</>}>
-        {isLoaded && <Fahrzeuge />}
-      </Suspense>
-    </>
-  );
+  return <DynamicFahrzeuge />;
 };
 
 export default Home;

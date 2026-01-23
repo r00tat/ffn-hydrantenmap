@@ -26,7 +26,7 @@ async function handleRegister(uid: string, token: string) {
     messaging: tokens,
   };
 
-  console.info(`adding messaging token to ${uid}: ${JSON.stringify(newData)}`);
+  console.info(`adding messaging token`);
 
   await doc.set(newData, {
     merge: true,
@@ -82,9 +82,7 @@ async function handleUnRegister(uid: string, token: string) {
     messaging: oldData?.messaging?.filter((t: string) => t !== token) || [],
   };
 
-  console.info(
-    `removing messaging token from ${uid}: ${JSON.stringify(newData)}`
-  );
+  console.info(`removing messaging token`);
 
   await doc.set(newData, {
     merge: true,

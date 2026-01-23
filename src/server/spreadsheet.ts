@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { Feature, Point } from 'geojson';
 import { google, sheets_v4 } from 'googleapis';
 import { createWorkspaceAuth } from './auth/workspace';

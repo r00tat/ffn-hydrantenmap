@@ -28,18 +28,14 @@ export async function checkFirebaseToken(token: string) {
       .doc(decodedToken.sub)
       .get();
 
-    console.info(
-      `user ${userDoc.id} ${userDoc.data()?.email} authorized:${
-        userDoc.data()?.authorized
-      }`
-    );
+    console.info(`user authorization check: ${userDoc.data()?.authorized}`);
     if (!(userDoc.exists && isTruthy(userDoc.data()?.authorized))) {
       throw new ApiException('your user is not authorized', {
         status: 403,
       });
     }
   }
-  console.info(`user ${decodedToken.email} verified`);
+  console.info(`user verified`);
   return decodedToken;
 }
 
@@ -131,11 +127,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.firecall = userData.firecall;
         }
       }
-      console.info(
-        `session with params: ${JSON.stringify(session)} ${JSON.stringify(
-          user
-        )}`
-      );
+      console.info(`session callback completed`);
 
       return session;
     },

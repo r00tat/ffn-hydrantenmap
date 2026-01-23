@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LayerGroup } from 'react-leaflet';
 import { fetchUnwetterData, UnwetterData } from './UnwetterAction';
 import FirecallElement from '../../FirecallItems/elements/FirecallElement';
@@ -10,26 +10,31 @@ function useUnwetterSheetData() {
   const [unwetterData, setUnwetterData] = useState<UnwetterData[]>([]);
   const firecall = useFirecall();
 
-  const refreshData = useCallback(async () => {
-    if (firecall.id && firecall.id !== 'unknown') {
-      const unwetterData = await fetchUnwetterData(
-        firecall.sheetId,
-        firecall.range
-      );
-      console.info(`unwetter data`, unwetterData);
-      setUnwetterData(unwetterData);
-    }
-  }, [firecall]);
+  // Extract specific values to avoid re-fetching when unrelated firecall properties change
+  const firecallId = firecall.id;
+  const sheetId = firecall.sheetId;
+  const range = firecall.range;
 
   useEffect(() => {
-    (async () => {
-      refreshData();
-    })();
-    const interval = setInterval(refreshData, 120000);
+    let ignore = false;
+
+    const fetchData = async () => {
+      if (firecallId && firecallId !== 'unknown') {
+        const data = await fetchUnwetterData(sheetId, range);
+        if (!ignore) {
+          setUnwetterData(data);
+        }
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 120000);
+
     return () => {
+      ignore = true;
       clearInterval(interval);
     };
-  }, [refreshData]);
+  }, [firecallId, sheetId, range]);
 
   return unwetterData;
 }
