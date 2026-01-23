@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type RecordingState = 'idle' | 'recording' | 'processing';
 
@@ -15,6 +15,22 @@ export default function useAudioRecorder(): AudioRecorderResult {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Helper to stop all tracks and clean up stream
+  const cleanupStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupStream();
+    };
+  }, [cleanupStream]);
 
   const startRecording = useCallback(async () => {
     try {
@@ -46,6 +62,9 @@ export default function useAudioRecorder(): AudioRecorderResult {
     return new Promise((resolve) => {
       const mediaRecorder = mediaRecorderRef.current;
       if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        // Clean up stream even on early return
+        cleanupStream();
+        setState('idle');
         resolve(null);
         return;
       }
@@ -54,8 +73,7 @@ export default function useAudioRecorder(): AudioRecorderResult {
         setState('processing');
 
         // Stop all tracks
-        streamRef.current?.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
+        cleanupStream();
 
         // Convert to base64
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
@@ -75,7 +93,7 @@ export default function useAudioRecorder(): AudioRecorderResult {
 
       mediaRecorder.stop();
     });
-  }, []);
+  }, [cleanupStream]);
 
   return { state, startRecording, stopRecording, error };
 }
