@@ -1,7 +1,6 @@
 'use client';
 
-import MicIcon from '@mui/icons-material/Mic';
-import MicOffIcon from '@mui/icons-material/MicOff';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
@@ -124,7 +123,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
       <Box
         sx={{
           position: 'absolute',
-          bottom: 148,
+          bottom: 96,
           left: 16,
         }}
       >
@@ -148,10 +147,8 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
           >
             {isProcessing ? (
               <CircularProgress size={24} color="inherit" />
-            ) : isRecording ? (
-              <MicOffIcon />
             ) : (
-              <MicIcon />
+              <AutoAwesomeIcon />
             )}
           </Fab>
         </Tooltip>
