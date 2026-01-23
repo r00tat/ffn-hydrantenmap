@@ -22,8 +22,18 @@ const tokenRequired = async (req: NextRequest) => {
     if (!tokenDoc.exists) {
       throw new ApiException('token invalid', { status: 403 });
     }
-    return tokenDoc.data();
+    const tokenData = tokenDoc.data();
+    if (tokenData?.expiresAt) {
+      const expirationDate = new Date(tokenData.expiresAt);
+      if (expirationDate < new Date()) {
+        throw new ApiException('token expired', { status: 403 });
+      }
+    }
+    return tokenData;
   } catch (err) {
+    if (err instanceof ApiException) {
+      throw err;
+    }
     console.error(`failed to query firestore ${err}`);
     throw new ApiException('token invalid', { status: 403 });
   }

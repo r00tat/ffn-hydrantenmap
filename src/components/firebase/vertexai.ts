@@ -13,12 +13,12 @@ import { marked } from 'marked';
 
 // Initialize the Vertex AI service
 export const vertexAI = getAI(firebaseApp, {
-  backend: new VertexAIBackend('europe-west1'),
+  backend: new VertexAIBackend('global'),
 });
 
 // Initialize the generative model with a model that supports your use case
 export const geminiModel = getGenerativeModel(vertexAI, {
-  model: 'gemini-2.5-flash',
+  model: 'gemini-3-flash-preview',
   systemInstruction: `**Systemanweisungen:**
 
 * **Rolle:**
@@ -100,7 +100,7 @@ export function useAiQueryHook() {
   const query = useCallback(
     async (prompt: string, systemInstruction?: string) => {
       console.info(
-        `gemini query: ${prompt} \ninstructions: ${systemInstruction}`
+        `gemini query: ${prompt} \ninstructions: ${systemInstruction}`,
       );
       setResultText('');
       setResultHtml('');
@@ -132,8 +132,10 @@ export function useAiQueryHook() {
       console.info(`final gemini result: ${text}`);
       return text;
     },
-    []
+    [],
   );
 
   return { resultText, resultHtml, query, isQuerying };
 }
+
+export type { GenerateContentRequest } from 'firebase/ai';
