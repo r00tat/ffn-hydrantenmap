@@ -137,3 +137,5 @@ export function useAiQueryHook() {
 
   return { resultText, resultHtml, query, isQuerying };
 }
+
+export type { GenerateContentRequest } from 'firebase/ai';
