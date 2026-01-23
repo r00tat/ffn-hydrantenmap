@@ -1,0 +1,165 @@
+'use client';
+
+import MicIcon from '@mui/icons-material/Mic';
+import MicOffIcon from '@mui/icons-material/MicOff';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Fab from '@mui/material/Fab';
+import Tooltip from '@mui/material/Tooltip';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import useAudioRecorder from '../../hooks/useAudioRecorder';
+import useAiAssistant from '../../hooks/useAiAssistant';
+import { FirecallItem } from '../firebase/firestore';
+import AiActionToast, { AiToastState } from './AiActionToast';
+import { speakMessage } from '../../common/speech';
+
+interface AiAssistantButtonProps {
+  firecallItems: FirecallItem[];
+}
+
+const MIN_HOLD_TIME_MS = 500;
+const MAX_RECORDING_TIME_MS = 30000;
+
+export default function AiAssistantButton({ firecallItems }: AiAssistantButtonProps) {
+  const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
+  const { processAudio, undoLastAction } = useAiAssistant(firecallItems);
+
+  const [toast, setToast] = useState<AiToastState>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const holdStartRef = useRef<number>(0);
+  const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Show recorder errors
+  useEffect(() => {
+    if (recorderError) {
+      setToast({
+        open: true,
+        message: recorderError,
+        severity: 'error',
+      });
+      speakMessage(recorderError);
+    }
+  }, [recorderError]);
+
+  const handlePointerDown = useCallback(async () => {
+    holdStartRef.current = Date.now();
+    await startRecording();
+
+    // Auto-stop after max recording time
+    maxRecordingTimerRef.current = setTimeout(async () => {
+      if (recorderState === 'recording') {
+        const audio = await stopRecording();
+        if (audio) {
+          const result = await processAudio(audio);
+          setToast({
+            open: true,
+            message: result.message,
+            severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+            showUndo: result.success && !!result.createdItemId,
+            clarificationOptions: result.clarification?.options,
+          });
+        }
+      }
+    }, MAX_RECORDING_TIME_MS);
+  }, [processAudio, recorderState, startRecording, stopRecording]);
+
+  const handlePointerUp = useCallback(async () => {
+    // Clear max recording timer
+    if (maxRecordingTimerRef.current) {
+      clearTimeout(maxRecordingTimerRef.current);
+      maxRecordingTimerRef.current = null;
+    }
+
+    const holdDuration = Date.now() - holdStartRef.current;
+
+    if (holdDuration < MIN_HOLD_TIME_MS) {
+      // Too short - cancel recording without processing
+      await stopRecording();
+      setToast({
+        open: true,
+        message: 'Halte den Button länger gedrückt zum Sprechen',
+        severity: 'warning',
+      });
+      return;
+    }
+
+    const audio = await stopRecording();
+    if (!audio) return;
+
+    const result = await processAudio(audio);
+    setToast({
+      open: true,
+      message: result.message,
+      severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+      showUndo: result.success && !!result.createdItemId,
+      clarificationOptions: result.clarification?.options,
+    });
+  }, [processAudio, stopRecording]);
+
+  const handleToastClose = useCallback(() => {
+    setToast((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  const handleUndo = useCallback(async () => {
+    const success = await undoLastAction();
+    if (success) {
+      setToast({
+        open: true,
+        message: 'Rückgängig gemacht',
+        severity: 'success',
+      });
+    }
+  }, [undoLastAction]);
+
+  const isRecording = recorderState === 'recording';
+  const isProcessing = recorderState === 'processing';
+
+  return (
+    <>
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 148,
+          left: 16,
+        }}
+      >
+        <Tooltip title="KI-Assistent (halten zum Sprechen)">
+          <Fab
+            color={isRecording ? 'error' : 'default'}
+            aria-label="AI assistant"
+            size="small"
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            disabled={isProcessing}
+            sx={{
+              animation: isRecording ? 'pulse 1s infinite' : 'none',
+              '@keyframes pulse': {
+                '0%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
+                '70%': { boxShadow: '0 0 0 10px rgba(244, 67, 54, 0)' },
+                '100%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' },
+              },
+            }}
+          >
+            {isProcessing ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : isRecording ? (
+              <MicOffIcon />
+            ) : (
+              <MicIcon />
+            )}
+          </Fab>
+        </Tooltip>
+      </Box>
+      <AiActionToast
+        state={toast}
+        onClose={handleToastClose}
+        onUndo={handleUndo}
+      />
+    </>
+  );
+}
