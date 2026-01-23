@@ -33,9 +33,10 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
   const holdStartRef = useRef<number>(0);
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Show recorder errors
+  // Show recorder errors - reacting to external state change from hook
   useEffect(() => {
     if (recorderError) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToast({
         open: true,
         message: recorderError,
