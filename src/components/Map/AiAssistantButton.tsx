@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAiAssistant from '../../hooks/useAiAssistant';
@@ -117,6 +118,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
 
   const isRecording = recorderState === 'recording';
   const isProcessing = recorderState === 'processing';
+  const statusText = isRecording ? 'Aufnahme...' : isProcessing ? 'Verarbeitung...' : null;
 
   return (
     <>
@@ -125,6 +127,9 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
           position: 'absolute',
           bottom: 96,
           left: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
         }}
       >
         <Tooltip title="KI-Assistent (halten zum Sprechen)">
@@ -152,6 +157,21 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
             )}
           </Fab>
         </Tooltip>
+        {statusText && (
+          <Typography
+            variant="caption"
+            sx={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              color: 'white',
+              px: 1,
+              py: 0.5,
+              borderRadius: 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {statusText}
+          </Typography>
+        )}
       </Box>
       <AiActionToast
         state={toast}
