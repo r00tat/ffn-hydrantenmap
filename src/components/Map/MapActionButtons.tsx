@@ -27,6 +27,8 @@ import SearchButton from './SearchButton';
 import InputDialog from '../dialogs/InputDialog';
 import { formatTimestamp } from '../../common/time-format';
 import AddFirecallItem from './AddFirecallItem';
+import AiAssistantButton from './AiAssistantButton';
+import { useFirecallItems } from '../firebase/firestoreHooks';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -40,6 +42,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     selectHistory,
     openFirecallItemDialog,
   } = useMapEditor();
+  const firecallItems = useFirecallItems();
   return (
     <>
       <Box
@@ -109,6 +112,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         </>
       )}
       <AddFirecallItem />
+      {editable && <AiAssistantButton firecallItems={firecallItems} />}
     </>
   );
 }
