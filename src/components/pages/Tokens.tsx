@@ -4,10 +4,20 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import {
   addDoc,
   collection,
@@ -16,6 +26,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
+import moment, { Moment } from 'moment';
+import 'moment/locale/de';
 import { useCallback, useState } from 'react';
 import { Token } from '../../common/token';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -23,7 +35,6 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
 import InfoDialog from '../dialogs/InfoDialog';
-import InputDialog from '../dialogs/InputDialog';
 
 export function useTokens() {
   const user = useFirebaseLogin();
@@ -43,61 +54,146 @@ export function TokenDialog({
   onClose: onDialogClose,
 }: TokenDialogOptions) {
   const user = useFirebaseLogin();
-  const onClose = useCallback(
-    async (value?: string) => {
-      // hit ok or cancel on token dialog
+  const [open, setOpen] = useState(true);
+  const [description, setDescription] = useState(token?.description || '');
+  const [expiresAt, setExpiresAt] = useState<Moment | null>(
+    token?.expiresAt ? moment(token.expiresAt) : null
+  );
+
+  const handleClose = useCallback(
+    async (save: boolean) => {
+      setOpen(false);
       let newToken: Token | undefined = undefined;
-      if (value) {
+      if (save && description) {
+        const expiresAtValue = expiresAt?.toISOString() || null;
         if (token && token.id) {
           // update
-          console.info(`update token ${token.id} ${value}`);
+          console.info(`update token ${token.id} ${description}`);
           await updateDoc(doc(firestore, 'tokens', `${token.id}`), {
-            description: value,
-          });
-          newToken = { ...token, description: value };
-        } else {
-          // add
-          console.info(`add token ${value}`);
-          const docRef = await addDoc(collection(firestore, 'tokens'), {
-            description: value,
-            owner: user.uid,
+            description,
+            expiresAt: expiresAtValue,
           });
           newToken = {
+            ...token,
+            description,
+            expiresAt: expiresAtValue || undefined,
+          };
+        } else {
+          // add
+          console.info(`add token ${description}`);
+          const tokenData: Record<string, unknown> = {
+            description,
+            owner: user.uid,
+          };
+          if (expiresAtValue) {
+            tokenData.expiresAt = expiresAtValue;
+          }
+          const docRef = await addDoc(
+            collection(firestore, 'tokens'),
+            tokenData
+          );
+          newToken = {
             id: docRef.id,
-            description: value,
+            description,
             owner: user.uid || 'bad-uid',
+            expiresAt: expiresAtValue || undefined,
           };
         }
       }
       console.info(`Token Dialog close: ${JSON.stringify(newToken)}`);
       onDialogClose(newToken);
     },
-    [token, user, onDialogClose]
+    [token, user, onDialogClose, description, expiresAt]
   );
+
   return (
-    <InputDialog
-      onClose={onClose}
-      title="Token"
-      defaultValue={token?.description}
+    <Dialog
+      open={open}
+      onClose={() => handleClose(false)}
+      aria-labelledby="token-dialog-title"
     >
-      Token: {token?.id} {token?.description}
-      Ein Token kann für den API Zugriff auf Geojson (z.B.{' '}
-      <a
-        href="https://lagekarte.info"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        lagekarte.info
-      </a>
-      ) verwendet werden. Die Schnittstelle ist unter https://
-      {window?.location?.hostname}/api/geojson erreichbar. Der Token kann als
-      HTTP GET Parameter oder Authorization Bearer Token verwendet werden.
-    </InputDialog>
+      <DialogTitle id="token-dialog-title">Token</DialogTitle>
+      <DialogContent>
+        <DialogContentText>
+          {token?.id && <>Token: {token.id}</>}
+          Ein Token kann für den API Zugriff auf Geojson (z.B.{' '}
+          <a
+            href="https://lagekarte.info"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            lagekarte.info
+          </a>
+          ) verwendet werden. Die Schnittstelle ist unter https://
+          {window?.location?.hostname}/api/geojson erreichbar. Der Token kann
+          als HTTP GET Parameter oder Authorization Bearer Token verwendet
+          werden.
+        </DialogContentText>
+        <TextField
+          autoFocus
+          margin="dense"
+          id="description"
+          label="Beschreibung"
+          type="text"
+          fullWidth
+          variant="standard"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleClose(true);
+            }
+          }}
+        />
+        <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale="de-DE">
+          <DatePicker
+            label="Ablaufdatum (optional)"
+            value={expiresAt}
+            onChange={(newValue) => setExpiresAt(newValue)}
+            slotProps={{
+              textField: { fullWidth: true, margin: 'dense', variant: 'standard' },
+              field: { clearable: true },
+            }}
+          />
+        </LocalizationProvider>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => handleClose(false)}>Abbrechen</Button>
+        <Button
+          onClick={() => handleClose(true)}
+          color="primary"
+          variant="contained"
+          disabled={!description}
+        >
+          Ok
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
 async function deleteToken(id: string) {
   return deleteDoc(doc(firestore, 'tokens', id));
+}
+
+function TokenExpiration({ expiresAt }: { expiresAt?: string }) {
+  if (!expiresAt) {
+    return null;
+  }
+  const expirationDate = moment(expiresAt);
+  const isExpired = expirationDate.isBefore(moment());
+  return (
+    <Typography
+      component="span"
+      variant="body2"
+      sx={{ color: isExpired ? 'error.main' : 'text.secondary', ml: 1 }}
+    >
+      {isExpired
+        ? `(abgelaufen am ${expirationDate.format('DD.MM.YYYY')})`
+        : `(gültig bis ${expirationDate.format('DD.MM.YYYY')})`}
+    </Typography>
+  );
 }
 
 export function TokenDisplay({ token }: { token: Token }) {
@@ -108,7 +204,8 @@ export function TokenDisplay({ token }: { token: Token }) {
   return (
     <>
       <Typography>
-        {token.description}{' '}
+        {token.description}
+        <TokenExpiration expiresAt={token.expiresAt} />{' '}
         <IconButton
           aria-label="show api key"
           onClick={() => setDisplay(!display)}
