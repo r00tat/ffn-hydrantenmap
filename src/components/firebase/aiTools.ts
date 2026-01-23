@@ -191,6 +191,18 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       required: ['question'],
     },
   },
+  {
+    name: 'searchAddress',
+    description: 'Search for an address, create a marker there and pan the map to that location',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        address: { type: SchemaType.STRING, description: 'The address to search for' },
+        createMarker: { type: SchemaType.BOOLEAN, description: 'Whether to create a marker at the location (default: true)' },
+      },
+      required: ['address'],
+    },
+  },
 ];
 
 export const AI_SYSTEM_PROMPT = `Du bist ein Einsatz-Assistent für die Freiwillige Feuerwehr.
@@ -204,6 +216,7 @@ Regeln:
 - Positionen ohne Angabe: verwende mapCenter als position.type
 - "bei mir" / "hier" = userPosition als position.type
 - Referenzen wie "daneben", "neben dem X" = nearItem als position.type mit itemName
+- Für Adresssuche: verwende searchAddress (erstellt Marker und schwenkt Karte dorthin)
 
 Verfügbare Elemente:
 - marker: Taktische Zeichen, allgemeine Marker (createMarker)
@@ -214,6 +227,9 @@ Verfügbare Elemente:
 - circle: Kreise mit Radius (createCircle)
 - el: Einsatzleitung-Marker (createEl)
 - assp: Atemschutzsammelplatz (createAssp)
+
+Aktionen:
+- searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
 Der Kontext enthält existingItems mit allen aktuellen Elementen.`;

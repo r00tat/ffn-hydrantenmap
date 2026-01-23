@@ -20,6 +20,37 @@ interface AiAssistantButtonProps {
 const MIN_HOLD_TIME_MS = 500;
 const MAX_RECORDING_TIME_MS = 30000;
 
+// Audio feedback using Web Audio API
+function playBeep(frequency: number, duration: number, type: OscillatorType = 'sine') {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = type;
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+  } catch (e) {
+    // Audio not supported, fail silently
+  }
+}
+
+function playStartBeep() {
+  playBeep(880, 0.15); // High A note - short beep for start
+}
+
+function playStopBeep() {
+  playBeep(440, 0.1); // Lower A note
+  setTimeout(() => playBeep(660, 0.15), 100); // Then higher - two-tone for stop
+}
+
 export default function AiAssistantButton({ firecallItems }: AiAssistantButtonProps) {
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, undoLastAction } = useAiAssistant(firecallItems);
@@ -29,14 +60,15 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
     message: '',
     severity: 'success',
   });
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const holdStartRef = useRef<number>(0);
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const activePointerRef = useRef<number | null>(null);
 
   // Show recorder errors - reacting to external state change from hook
   useEffect(() => {
     if (recorderError) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setToast({
         open: true,
         message: recorderError,
@@ -46,8 +78,16 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
     }
   }, [recorderError]);
 
-  const handlePointerDown = useCallback(async () => {
+  const handlePointerDown = useCallback(async (event: React.PointerEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    // Capture pointer to prevent spurious pointerleave events
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    activePointerRef.current = event.pointerId;
+
     holdStartRef.current = Date.now();
+    playStartBeep();
     await startRecording();
 
     // Auto-stop after max recording time
@@ -55,20 +95,37 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
       if (recorderState === 'recording') {
         const audio = await stopRecording();
         if (audio) {
-          const result = await processAudio(audio);
-          setToast({
-            open: true,
-            message: result.message,
-            severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-            showUndo: result.success && !!result.createdItemId,
-            clarificationOptions: result.clarification?.options,
-          });
+          setIsAiProcessing(true);
+          try {
+            const result = await processAudio(audio);
+            setToast({
+              open: true,
+              message: result.message,
+              severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+              showUndo: result.success && !!result.createdItemId,
+              clarificationOptions: result.clarification?.options,
+            });
+          } finally {
+            setIsAiProcessing(false);
+          }
         }
       }
     }, MAX_RECORDING_TIME_MS);
   }, [processAudio, recorderState, startRecording, stopRecording]);
 
-  const handlePointerUp = useCallback(async () => {
+  const handlePointerUp = useCallback(async (event: React.PointerEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    // Only handle the pointer that started the recording
+    if (activePointerRef.current !== event.pointerId) {
+      return;
+    }
+
+    // Release pointer capture
+    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    activePointerRef.current = null;
+
     // Clear max recording timer
     if (maxRecordingTimerRef.current) {
       clearTimeout(maxRecordingTimerRef.current);
@@ -88,17 +145,23 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
       return;
     }
 
+    playStopBeep();
     const audio = await stopRecording();
     if (!audio) return;
 
-    const result = await processAudio(audio);
-    setToast({
-      open: true,
-      message: result.message,
-      severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-      showUndo: result.success && !!result.createdItemId,
-      clarificationOptions: result.clarification?.options,
-    });
+    setIsAiProcessing(true);
+    try {
+      const result = await processAudio(audio);
+      setToast({
+        open: true,
+        message: result.message,
+        severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+        showUndo: result.success && !!result.createdItemId,
+        clarificationOptions: result.clarification?.options,
+      });
+    } finally {
+      setIsAiProcessing(false);
+    }
   }, [processAudio, stopRecording]);
 
   const handleToastClose = useCallback(() => {
@@ -117,7 +180,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
   }, [undoLastAction]);
 
   const isRecording = recorderState === 'recording';
-  const isProcessing = recorderState === 'processing';
+  const isProcessing = recorderState === 'processing' || isAiProcessing;
   const statusText = isRecording ? 'Aufnahme...' : isProcessing ? 'Verarbeitung...' : null;
 
   return (
@@ -125,13 +188,33 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
       <Box
         sx={{
           position: 'absolute',
-          bottom: 96,
-          left: 16,
+          bottom: 148,
+          right: 16,
           display: 'flex',
+          flexDirection: 'row',
           alignItems: 'center',
           gap: 1,
+          zIndex: 1000,
         }}
       >
+        {statusText && (
+          <Typography
+            variant="body2"
+            sx={{
+              backgroundColor: isRecording ? 'error.main' : 'primary.main',
+              color: 'white',
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 2,
+              whiteSpace: 'nowrap',
+              fontWeight: 'medium',
+              fontSize: '0.875rem',
+              boxShadow: 2,
+            }}
+          >
+            {statusText}
+          </Typography>
+        )}
         <Tooltip title="KI-Assistent (halten zum Sprechen)">
           <Fab
             color={isRecording ? 'error' : 'default'}
@@ -139,7 +222,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
             size="small"
             onPointerDown={handlePointerDown}
             onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
+            onClick={(e) => e.stopPropagation()}
             disabled={isProcessing}
             sx={{
               animation: isRecording ? 'pulse 1s infinite' : 'none',
@@ -157,21 +240,6 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
             )}
           </Fab>
         </Tooltip>
-        {statusText && (
-          <Typography
-            variant="caption"
-            sx={{
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              color: 'white',
-              px: 1,
-              py: 0.5,
-              borderRadius: 1,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {statusText}
-          </Typography>
-        )}
       </Box>
       <AiActionToast
         state={toast}

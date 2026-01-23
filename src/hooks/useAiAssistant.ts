@@ -285,11 +285,47 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             },
           };
 
+        case 'searchAddress': {
+          const address = args.address as string;
+          const shouldCreateMarker = args.createMarker !== false;
+
+          const center = map.getCenter();
+          const results = await searchPlace(address, {
+            position: new GeoPosition(center.lat, center.lng),
+            maxResults: 1,
+          });
+
+          if (!results[0]) {
+            return { success: false, message: `Adresse "${address}" nicht gefunden` };
+          }
+
+          const place = results[0];
+          const lat = parseFloat(place.lat);
+          const lng = parseFloat(place.lon);
+
+          // Pan map to location
+          map.panTo([lat, lng]);
+
+          if (shouldCreateMarker) {
+            const ref = await addFirecallItem({
+              type: 'marker',
+              name: place.name || place.display_name || address,
+              beschreibung: `${place.display_name}\n${place.licence || ''}`,
+              lat,
+              lng,
+            } as FirecallItem);
+            setLastCreatedItem({ id: ref.id, type: 'marker' });
+            return { success: true, message: `"${place.name || address}" gefunden und Marker erstellt`, createdItemId: ref.id };
+          }
+
+          return { success: true, message: `"${place.name || address}" gefunden` };
+        }
+
         default:
           return { success: false, message: `Unbekannte Aktion: ${call.name}` };
       }
     },
-    [addFirecallItem, existingItems, lastCreatedItem, resolvePosition, updateFirecallItem]
+    [addFirecallItem, existingItems, lastCreatedItem, map, resolvePosition, updateFirecallItem]
   );
 
   const processAudio = useCallback(
