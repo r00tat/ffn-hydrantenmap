@@ -28,6 +28,7 @@ import { FirecallItemBase } from '../FirecallItems/elements/FirecallItemBase';
 import FirecallItemFields from '../FirecallItems/FirecallItemFields';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import SidebarAddItemPanel from './SidebarAddItemPanel';
+import SidebarDiaryPreview from './SidebarDiaryPreview';
 
 const SidebarBox = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isEditable',
@@ -338,6 +339,7 @@ export default function MapSidebar() {
           <FirecallItemDisplay item={selectedFirecallItem} />
         )}
         <SidebarAddItemPanel />
+        <SidebarDiaryPreview />
       </Paper>
     </SidebarBox>
   );
