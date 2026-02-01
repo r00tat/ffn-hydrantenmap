@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import { useState } from 'react';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { formatTimestamp, parseTimestamp } from '../../common/time-format';
@@ -25,6 +26,9 @@ export default function KostenersatzEinsatzTab({
   onDefaultStundenChange,
   disabled = false,
 }: KostenersatzEinsatzTabProps) {
+  // Local state for duration input to allow intermediate editing states (null = not editing)
+  const [durationInput, setDurationInput] = useState<string | null>(null);
+
   // Use override values if set, otherwise fall back to firecall data
   const displayDate = calculation.callDateOverride || firecall.date;
   const displayDescription =
@@ -85,12 +89,19 @@ export default function KostenersatzEinsatzTab({
         <TextField
           label="Einsatzdauer in Stunden"
           type="number"
-          value={calculation.defaultStunden}
+          value={durationInput !== null ? durationInput : calculation.defaultStunden}
           onChange={(e) => {
+            setDurationInput(e.target.value);
             const value = parseInt(e.target.value, 10);
             if (!isNaN(value) && value > 0) {
               onDefaultStundenChange(value);
             }
+          }}
+          onFocus={() => {
+            setDurationInput(String(calculation.defaultStunden));
+          }}
+          onBlur={() => {
+            setDurationInput(null);
           }}
           fullWidth
           disabled={disabled}

@@ -256,12 +256,15 @@ export default function KostenersatzCalculationPage({
           updatedAt: new Date().toISOString(),
         };
 
-        if (existingCalculation?.id) {
+        // Check both existing calculation ID and local state ID (for subsequent saves of new calculations)
+        if (existingCalculation?.id || calculation.id) {
           await updateCalculation(calcToSave);
         } else {
           // Remove id field for new calculations (Firestore rejects undefined values)
           const { id: _id, ...calcWithoutId } = calcToSave;
-          await addCalculation(calcWithoutId);
+          const newId = await addCalculation(calcWithoutId);
+          // Update local state with the new ID so subsequent saves update instead of creating duplicates
+          setCalculation((prev) => ({ ...prev, id: newId }));
         }
         if (redirectAfterSave) {
           router.push(`/einsatz/${firecallId}/kostenersatz`);
