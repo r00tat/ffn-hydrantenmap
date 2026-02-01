@@ -1,12 +1,15 @@
 'use server';
 import 'server-only';
 
+import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { google } from 'googleapis';
 import { actionUserAuthorizedForFirecall } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
-import KostenersatzPdfDocument from './KostenersatzPdfDocument';
+import KostenersatzPdf from './KostenersatzPdf';
+
+const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
 import {
   KostenersatzCalculation,
   KostenersatzRate,
@@ -162,12 +165,11 @@ export async function sendKostenersatzEmailAction(
 
     // Generate PDF
     const pdfBuffer = await renderToBuffer(
-      KostenersatzPdfDocument({
+      KostenersatzPdf({
         calculation,
         rates,
-        firecallName: firecall.name,
-        firecallDate: firecall.date,
-        firecallDescription: firecall.description,
+        firecall,
+        logoPath,
       })
     );
 

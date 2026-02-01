@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import userRequired from '../../../../server/auth/userRequired';
 import { firestore } from '../../../../server/firebase/admin';
-import KostenersatzPdfDocument from '../../../../components/Kostenersatz/KostenersatzPdfDocument';
+import KostenersatzPdf from '../../../../components/Kostenersatz/KostenersatzPdf';
 import {
   KostenersatzCalculation,
   KostenersatzRate,
@@ -12,6 +13,8 @@ import {
 } from '../../../../common/kostenersatz';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../../../../components/firebase/firestore';
 import { getDefaultRatesWithVersion } from '../../../../common/defaultKostenersatzRates';
+
+const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,12 +89,11 @@ export async function GET(request: NextRequest) {
 
     // Generate PDF
     const pdfBuffer = await renderToBuffer(
-      KostenersatzPdfDocument({
+      KostenersatzPdf({
         calculation,
         rates,
-        firecallName: firecall.name,
-        firecallDate: firecall.date,
-        firecallDescription: firecall.description,
+        firecall,
+        logoPath,
       })
     );
 

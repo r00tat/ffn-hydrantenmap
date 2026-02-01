@@ -1,12 +1,9 @@
-'use client';
-
 import {
   Document,
   Page,
   Text,
   View,
   StyleSheet,
-  Font,
   Image,
 } from '@react-pdf/renderer';
 import moment from 'moment';
@@ -18,9 +15,6 @@ import {
 } from '../../common/kostenersatz';
 import { timeFormats } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
-
-// Register fonts (optional - uses default if not registered)
-// Font.register({ family: 'Helvetica', src: '/fonts/Helvetica.ttf' });
 
 // Format date as dd.mm.YYYY
 function formatDate(dateStr?: string): string {
@@ -121,15 +115,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'right',
   },
-  infoBlock: {
-    marginBottom: 10,
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 3,
   },
-  infoLabel: {
-    fontWeight: 'bold',
-    marginBottom: 2,
+  label: {
+    width: '30%',
+    color: '#666',
   },
-  infoValue: {
-    marginBottom: 5,
+  value: {
+    width: '70%',
   },
   footer: {
     position: 'absolute',
@@ -153,16 +148,19 @@ const styles = StyleSheet.create({
   },
 });
 
-interface KostenersatzPdfProps {
+export interface KostenersatzPdfProps {
   calculation: KostenersatzCalculation;
   firecall: Firecall;
   rates: KostenersatzRate[];
+  /** Logo path - defaults to '/FFND_logo.png' for client, pass absolute path for server */
+  logoPath?: string;
 }
 
 export default function KostenersatzPdf({
   calculation,
   firecall,
   rates,
+  logoPath = '/FFND_logo.png',
 }: KostenersatzPdfProps) {
   // Group items by category
   const itemsByCategory = new Map<
@@ -203,7 +201,7 @@ export default function KostenersatzPdf({
         {/* Header */}
         <View style={styles.header}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image doesn't support alt */}
-          <Image style={styles.headerLogo} src="/FFND_logo.png" />
+          <Image style={styles.headerLogo} src={logoPath} />
           <View style={styles.headerText}>
             <Text style={styles.title}>Kostenersatz-Berechnung</Text>
             <Text style={styles.subtitle}>
@@ -215,47 +213,62 @@ export default function KostenersatzPdf({
         {/* Call Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Einsatzdaten</Text>
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoLabel}>Datum:</Text>
-            <Text style={styles.infoValue}>{displayDate}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Einsatz:</Text>
+            <Text style={styles.value}>{firecall.name}</Text>
           </View>
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoLabel}>Beschreibung:</Text>
-            <Text style={styles.infoValue}>{displayDescription}</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Datum:</Text>
+            <Text style={styles.value}>{displayDate}</Text>
           </View>
-          {calculation.comment && (
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Kommentar:</Text>
-              <Text style={styles.infoValue}>{calculation.comment}</Text>
+          {displayDescription && displayDescription !== firecall.name && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Beschreibung:</Text>
+              <Text style={styles.value}>{displayDescription}</Text>
             </View>
           )}
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoLabel}>Einsatzdauer:</Text>
-            <Text style={styles.infoValue}>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Einsatzdauer:</Text>
+            <Text style={styles.value}>
               {calculation.defaultStunden} Stunden
             </Text>
           </View>
+          {calculation.comment && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Kommentar:</Text>
+              <Text style={styles.value}>{calculation.comment}</Text>
+            </View>
+          )}
         </View>
 
         {/* Recipient */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Empfänger</Text>
-          <View style={styles.infoBlock}>
-            <Text style={styles.infoValue}>{calculation.recipient.name}</Text>
-            <Text style={styles.infoValue}>
-              {calculation.recipient.address}
-            </Text>
-            {calculation.recipient.phone && (
-              <Text style={styles.infoValue}>
-                Tel: {calculation.recipient.phone}
-              </Text>
-            )}
-            {calculation.recipient.email && (
-              <Text style={styles.infoValue}>
-                E-Mail: {calculation.recipient.email}
-              </Text>
-            )}
-            <Text style={styles.infoValue}>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Name:</Text>
+            <Text style={styles.value}>{calculation.recipient.name}</Text>
+          </View>
+          {calculation.recipient.address && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Adresse:</Text>
+              <Text style={styles.value}>{calculation.recipient.address}</Text>
+            </View>
+          )}
+          {calculation.recipient.phone && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Telefon:</Text>
+              <Text style={styles.value}>{calculation.recipient.phone}</Text>
+            </View>
+          )}
+          {calculation.recipient.email && (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>E-Mail:</Text>
+              <Text style={styles.value}>{calculation.recipient.email}</Text>
+            </View>
+          )}
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Bezahlung:</Text>
+            <Text style={styles.value}>
               {formatPaymentMethod(calculation.recipient.paymentMethod)}
             </Text>
           </View>
@@ -381,7 +394,7 @@ export default function KostenersatzPdf({
           </Text>
           <Text style={styles.footerText}>
             Freiwillige Feuerwehr Neusiedl/See, A-7100 Neusiedl/See Satzgasse 9,
-            +43 2167 2250, http://www.ff-neusiedlamsee.at
+            +43 2167 2250, https://www.ff-neusiedlamsee.at
           </Text>
         </View>
       </Page>
