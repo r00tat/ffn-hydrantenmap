@@ -7,13 +7,17 @@ import {
   View,
   StyleSheet,
   Font,
+  Image,
 } from '@react-pdf/renderer';
+import path from 'path';
+import moment from 'moment';
 import {
   formatCurrency,
   formatPaymentMethod,
   KostenersatzCalculation,
   KostenersatzRate,
 } from '../../common/kostenersatz';
+import { timeFormats } from '../../common/time-format';
 
 // Register fonts (using default for now)
 Font.register({
@@ -24,6 +28,16 @@ Font.register({
   ],
 });
 
+// Get the logo path for server-side rendering
+const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
+
+// Format date as dd.mm.YYYY
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const m = moment(dateStr, timeFormats, 'de');
+  return m.isValid() ? m.format('DD.MM.YYYY') : dateStr;
+}
+
 const styles = StyleSheet.create({
   page: {
     padding: 40,
@@ -31,10 +45,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
   },
   header: {
+    flexDirection: 'row',
     marginBottom: 20,
     borderBottom: 1,
     borderBottomColor: '#333',
     paddingBottom: 10,
+    alignItems: 'center',
+  },
+  headerLogo: {
+    width: 180,
+    marginRight: 15,
+    objectFit: 'contain',
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
     fontSize: 18,
@@ -89,18 +113,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
   },
   colDescription: {
-    width: '45%',
+    width: '35%',
   },
   colUnit: {
-    width: '15%',
+    width: '12%',
     textAlign: 'center',
   },
+  colPrice: {
+    width: '18%',
+    textAlign: 'right',
+  },
   colHours: {
-    width: '15%',
+    width: '12%',
     textAlign: 'center',
   },
   colSum: {
-    width: '25%',
+    width: '23%',
     textAlign: 'right',
   },
   totalRow: {
@@ -172,10 +200,19 @@ export default function KostenersatzPdfDocument({
     }
   }
 
+  // Add category 12 if there are custom items but no category 12 items yet
+  const hasCustomItems = calculation.customItems.length > 0;
+  if (hasCustomItems && !itemsByCategory.has(12)) {
+    itemsByCategory.set(12, []);
+  }
+
+  // Calculate custom items total for category 12
+  const customItemsTotal = calculation.customItems.reduce((sum, i) => sum + i.sum, 0);
+
   // Get sorted category numbers
   const sortedCategories = Array.from(itemsByCategory.keys()).sort((a, b) => a - b);
 
-  const displayDate = calculation.callDateOverride || firecallDate || '';
+  const displayDate = formatDate(calculation.callDateOverride || firecallDate);
   const displayDescription = calculation.callDescriptionOverride || firecallDescription || firecallName;
 
   return (
@@ -183,8 +220,11 @@ export default function KostenersatzPdfDocument({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Kostenersatz-Berechnung</Text>
-          <Text style={styles.subtitle}>Freiwillige Feuerwehr Neusiedl am See</Text>
+          <Image style={styles.headerLogo} src={logoPath} />
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Kostenersatz-Berechnung</Text>
+            <Text style={styles.subtitle}>Freiwillige Feuerwehr Neusiedl am See</Text>
+          </View>
         </View>
 
         {/* Call Info */}
@@ -256,6 +296,7 @@ export default function KostenersatzPdfDocument({
             <View style={styles.tableHeader}>
               <Text style={styles.colDescription}>Position</Text>
               <Text style={styles.colUnit}>Einheiten</Text>
+              <Text style={styles.colPrice}>Einzelpreis</Text>
               <Text style={styles.colHours}>Stunden</Text>
               <Text style={styles.colSum}>Summe</Text>
             </View>
@@ -263,8 +304,26 @@ export default function KostenersatzPdfDocument({
             {/* Items grouped by category */}
             {sortedCategories.map((categoryNumber) => {
               const categoryItems = itemsByCategory.get(categoryNumber) || [];
-              const categoryName = categoryItems[0]?.rate.categoryName || '';
-              const categorySubtotal = calculation.subtotals[String(categoryNumber)] || 0;
+              const categoryName = categoryNumber === 12
+                ? 'Tarif für Verbrauchsmaterialien'
+                : (categoryItems[0]?.rate.categoryName || '');
+              const baseSubtotal = calculation.subtotals[String(categoryNumber)] || 0;
+              // For category 12, include custom items in the subtotal
+              const categorySubtotal = categoryNumber === 12
+                ? baseSubtotal + customItemsTotal
+                : baseSubtotal;
+
+              // Calculate starting number for custom items in category 12
+              let maxItemNumber = 0;
+              if (categoryNumber === 12) {
+                for (const { rate } of categoryItems) {
+                  // Extract number after "12." from rate.id (e.g., "12.17" -> 17)
+                  const match = rate.id.match(/^12\.(\d+)$/);
+                  if (match) {
+                    maxItemNumber = Math.max(maxItemNumber, parseInt(match[1], 10));
+                  }
+                }
+              }
 
               return (
                 <View key={categoryNumber}>
@@ -274,6 +333,7 @@ export default function KostenersatzPdfDocument({
                       {categoryNumber}. {categoryName}
                     </Text>
                     <Text style={styles.colUnit}></Text>
+                    <Text style={styles.colPrice}></Text>
                     <Text style={styles.colHours}></Text>
                     <Text style={{ ...styles.colSum, fontWeight: 'bold' }}>
                       {formatCurrency(categorySubtotal)}
@@ -287,37 +347,28 @@ export default function KostenersatzPdfDocument({
                         {rate.id} {rate.description}
                       </Text>
                       <Text style={styles.colUnit}>{item.einheiten}</Text>
+                      <Text style={styles.colPrice}>{formatCurrency(rate.price)}</Text>
                       <Text style={styles.colHours}>{item.anzahlStunden}</Text>
                       <Text style={styles.colSum}>{formatCurrency(item.sum)}</Text>
                     </View>
                   ))}
+
+                  {/* Custom Items (only for category 12) */}
+                  {categoryNumber === 12 && calculation.customItems.map((item, index) => {
+                    const customItemNumber = maxItemNumber + index + 1;
+                    return (
+                      <View style={styles.tableRow} key={`custom-${index}`}>
+                        <Text style={styles.colDescription}>12.{customItemNumber} {item.description}</Text>
+                        <Text style={styles.colUnit}>{item.quantity} {item.unit}</Text>
+                        <Text style={styles.colPrice}>{formatCurrency(item.pricePerUnit)}</Text>
+                        <Text style={styles.colHours}>-</Text>
+                        <Text style={styles.colSum}>{formatCurrency(item.sum)}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
               );
             })}
-
-            {/* Custom Items */}
-            {calculation.customItems.length > 0 && (
-              <View>
-                <View style={styles.tableRowHighlight}>
-                  <Text style={{ ...styles.colDescription, fontWeight: 'bold' }}>
-                    12. Sonstige Leistungen
-                  </Text>
-                  <Text style={styles.colUnit}></Text>
-                  <Text style={styles.colHours}></Text>
-                  <Text style={{ ...styles.colSum, fontWeight: 'bold' }}>
-                    {formatCurrency(calculation.customItems.reduce((sum, i) => sum + i.sum, 0))}
-                  </Text>
-                </View>
-                {calculation.customItems.map((item, index) => (
-                  <View style={styles.tableRow} key={index}>
-                    <Text style={styles.colDescription}>{item.description}</Text>
-                    <Text style={styles.colUnit}>{item.quantity} {item.unit}</Text>
-                    <Text style={styles.colHours}>-</Text>
-                    <Text style={styles.colSum}>{formatCurrency(item.sum)}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
 
             {/* Total */}
             <View style={styles.totalRow}>
@@ -334,18 +385,8 @@ export default function KostenersatzPdfDocument({
 
         {/* Footer */}
         <View style={styles.footer}>
-          <View style={styles.footerRow}>
-            <Text>Freiwillige Feuerwehr Neusiedl am See</Text>
-            <Text>Tel: +43 2167 2122</Text>
-          </View>
-          <View style={styles.footerRow}>
-            <Text>Obere Hauptstraße 24, 7100 Neusiedl am See</Text>
-            <Text>office@ff-neusiedlamsee.at</Text>
-          </View>
-          <View style={styles.footerRow}>
-            <Text>IBAN: AT12 3456 7890 1234 5678</Text>
-            <Text>BIC: RLNWATWWXXX</Text>
-          </View>
+          <Text>Stadtfeuerwehr Neusiedl/See  ·  A-7100 Neusiedl/See Satzgasse 9  ·  Tel.: +43 2167 2250</Text>
+          <Text>http://www.ff-neusiedlamsee.at</Text>
         </View>
       </Page>
     </Document>

@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
     const ratesSnapshot = await firestore
       .collection(KOSTENERSATZ_RATES_COLLECTION)
       .where('version', '==', calculation.rateVersion)
-      .orderBy('sortOrder', 'asc')
       .get();
 
     if (ratesSnapshot.empty) {
@@ -81,6 +80,8 @@ export async function GET(request: NextRequest) {
         id: doc.data().id,
         ...doc.data(),
       })) as KostenersatzRate[];
+      // Sort by sortOrder client-side
+      rates.sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
     // Generate PDF

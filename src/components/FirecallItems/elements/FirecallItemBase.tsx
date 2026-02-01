@@ -17,6 +17,7 @@ import {
   FirecallItemMarkerDefault,
   MarkerRenderOptions,
 } from './marker/FirecallItemDefault';
+import React from 'react';
 
 export interface FirecallItemPopupProps {
   children: ReactNode;
@@ -129,7 +130,7 @@ export class FirecallItemBase {
 
   public filteredData(): FirecallItem {
     return Object.fromEntries(
-      Object.entries(this.data()).filter(([key, value]) => value)
+      Object.entries(this.data()).filter(([key, value]) => value),
     ) as FirecallItem;
   }
 
@@ -151,10 +152,10 @@ export class FirecallItemBase {
         {this.beschreibung && (
           <>
             {this.beschreibung.split('\n').map((s) => (
-              <>
+              <React.Fragment key={s}>
                 {s}
                 <br />
-              </>
+              </React.Fragment>
             ))}
           </>
         )}
@@ -228,7 +229,7 @@ export class FirecallItemBase {
 
   public renderMarker(
     selectItem: (item: FirecallItem) => void,
-    options: MarkerRenderOptions = {}
+    options: MarkerRenderOptions = {},
   ): ReactNode {
     try {
       return (

@@ -27,6 +27,21 @@ export interface KostenersatzItemRowProps {
   disabled?: boolean;
 }
 
+/**
+ * Check if a rate uses hourly pricing (with optional pauschal) vs per-unit pricing
+ * Hourly rates have pricePauschal and their unit contains "Std" or "h"
+ * Per-unit rates (like "pro Stück", "pro Sack") don't use hours in calculation
+ */
+function isHourlyRate(rate: KostenersatzRate): boolean {
+  // If it has pricePauschal and hourly rate, it's an hourly rate
+  if (rate.pricePauschal && rate.price > 0) {
+    return true;
+  }
+  // Check unit for hourly indicators
+  const hourlyUnits = ['je Std', 'pro Person & h', '/h'];
+  return hourlyUnits.some((u) => rate.unit.includes(u));
+}
+
 export default function KostenersatzItemRow({
   rate,
   item,
@@ -45,6 +60,7 @@ export default function KostenersatzItemRow({
   const [localStunden, setLocalStunden] = useState<string>(String(stunden));
 
   const hasValue = einheiten > 0;
+  const showHours = isHourlyRate(rate);
 
   const handleEinheitenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -52,12 +68,13 @@ export default function KostenersatzItemRow({
 
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue >= 0) {
-      onItemChange(
-        rate.id,
-        numValue,
-        stundenOverridden ? stunden : defaultStunden,
-        stundenOverridden
-      );
+      // For per-unit items, always use 1 hour (the calculation ignores hours anyway)
+      const effectiveStunden = showHours
+        ? stundenOverridden
+          ? stunden
+          : defaultStunden
+        : 1;
+      onItemChange(rate.id, numValue, effectiveStunden, showHours && stundenOverridden);
     } else if (value === '') {
       onItemChange(rate.id, 0, defaultStunden, false);
     }
@@ -84,11 +101,19 @@ export default function KostenersatzItemRow({
     }
   };
 
+  // Format price display based on whether it's hourly or per-unit
+  const priceDisplay = showHours
+    ? `${formatCurrency(rate.price)}/h${rate.pricePauschal ? ` • ${formatCurrency(rate.pricePauschal)} pauschal` : ''}`
+    : rate.price > 0
+      ? formatCurrency(rate.price)
+      : 'nach Aufwand';
+
   return (
     <Box
       sx={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'stretch', sm: 'center' },
         gap: 1,
         py: 1,
         px: 1,
@@ -103,78 +128,96 @@ export default function KostenersatzItemRow({
       <Box sx={{ flex: 2, minWidth: 0 }}>
         <Typography
           variant="body2"
-          noWrap
-          title={rate.description}
           sx={{ fontWeight: hasValue ? 500 : 400 }}
         >
           {rate.id} {rate.description}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {rate.unit} • {formatCurrency(rate.price)}/h
-          {rate.pricePauschal && ` • ${formatCurrency(rate.pricePauschal)} pauschal`}
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+          {rate.unit} • {priceDisplay}
         </Typography>
       </Box>
 
-      {/* Einheiten input */}
-      <TextField
-        size="small"
-        type="number"
-        value={localEinheiten}
-        onChange={handleEinheitenChange}
-        placeholder="0"
-        disabled={disabled}
-        inputProps={{ min: 0, style: { textAlign: 'right' } }}
-        sx={{ width: 80 }}
-      />
+      {/* Input row - stacks inputs horizontally even on mobile */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 }, justifyContent: { xs: 'flex-end', sm: 'flex-end' }, flexWrap: 'nowrap' }}>
+        {/* Einheiten/Anzahl input */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
+            Anz:
+          </Typography>
+          <TextField
+            size="small"
+            type="number"
+            value={localEinheiten}
+            onChange={handleEinheitenChange}
+            placeholder="0"
+            disabled={disabled}
+            inputProps={{ min: 0, style: { textAlign: 'right' } }}
+            sx={{ width: { xs: 50, sm: 70 } }}
+          />
+        </Box>
 
-      {/* Stunden input with lock toggle */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <TextField
-          size="small"
-          type="number"
-          value={localStunden}
-          onChange={handleStundenChange}
-          disabled={disabled || !hasValue}
-          inputProps={{ min: 1, style: { textAlign: 'right' } }}
-          sx={{
-            width: 60,
-            '& input': {
-              color: stundenOverridden ? 'warning.main' : 'inherit',
-            },
-          }}
-        />
-        <Tooltip
-          title={
-            stundenOverridden
-              ? 'Individuelle Stunden - Klicken zum Zurücksetzen'
-              : 'Standard-Stunden verwenden - Klicken für individuelle Stunden'
-          }
-        >
-          <span>
-            <IconButton
+        {/* Stunden input with lock toggle - only for hourly rates */}
+        {showHours ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
+              h:
+            </Typography>
+            <TextField
               size="small"
-              onClick={handleToggleStundenOverride}
+              type="number"
+              value={localStunden}
+              onChange={handleStundenChange}
               disabled={disabled || !hasValue}
-              color={stundenOverridden ? 'warning' : 'default'}
+              inputProps={{ min: 1, style: { textAlign: 'right' } }}
+              sx={{
+                width: { xs: 45, sm: 55 },
+                '& input': {
+                  color: stundenOverridden ? 'warning.main' : 'inherit',
+                },
+              }}
+            />
+            <Tooltip
+              title={
+                stundenOverridden
+                  ? 'Individuelle Stunden - Klicken zum Zurücksetzen'
+                  : 'Standard-Stunden verwenden - Klicken für individuelle Stunden'
+              }
             >
-              {stundenOverridden ? <LockOpenIcon fontSize="small" /> : <LockIcon fontSize="small" />}
-            </IconButton>
-          </span>
-        </Tooltip>
-      </Box>
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
+                <IconButton
+                  size="small"
+                  onClick={handleToggleStundenOverride}
+                  disabled={disabled || !hasValue}
+                  color={stundenOverridden ? 'warning' : 'default'}
+                >
+                  {stundenOverridden ? (
+                    <LockOpenIcon fontSize="small" />
+                  ) : (
+                    <LockIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Box>
+            </Tooltip>
+          </Box>
+        ) : (
+          // Placeholder for alignment when hours not shown - hidden on mobile
+          <Box sx={{ width: 90, display: { xs: 'none', sm: 'block' } }} />
+        )}
 
-      {/* Sum */}
-      <Typography
-        variant="body2"
-        sx={{
-          width: 100,
-          textAlign: 'right',
-          fontWeight: hasValue ? 600 : 400,
-          color: hasValue ? 'text.primary' : 'text.secondary',
-        }}
-      >
-        {formatCurrency(sum)}
-      </Typography>
+        {/* Sum - always visible with flexShrink: 0 */}
+        <Typography
+          variant="body2"
+          sx={{
+            minWidth: { xs: 65, sm: 80 },
+            flexShrink: 0,
+            textAlign: 'right',
+            fontWeight: hasValue ? 600 : 400,
+            color: hasValue ? 'text.primary' : 'text.secondary',
+          }}
+        >
+          {formatCurrency(sum)}
+        </Typography>
+      </Box>
     </Box>
   );
 }

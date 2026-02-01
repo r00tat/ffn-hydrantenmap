@@ -3,59 +3,54 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Snackbar from '@mui/material/Snackbar';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
-import { Firecall } from '../firebase/firestore';
 import { useFirecallKostenersatz } from '../../hooks/useKostenersatz';
 import {
   useKostenersatzDelete,
   useKostenersatzDuplicate,
 } from '../../hooks/useKostenersatzMutations';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useFirecall from '../../hooks/useFirecall';
 import KostenersatzCard from './KostenersatzCard';
-import KostenersatzDialog from './KostenersatzDialog';
+import KostenersatzEmailDialog from './KostenersatzEmailDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 
 export interface KostenersatzListProps {
-  firecall: Firecall;
   firecallId: string;
 }
 
 export default function KostenersatzList({
-  firecall,
   firecallId,
 }: KostenersatzListProps) {
+  const router = useRouter();
+  const firecall = useFirecall();
   const { calculations, loading, error } = useFirecallKostenersatz(firecallId);
   const deleteCalculation = useKostenersatzDelete(firecallId);
   const duplicateCalculation = useKostenersatzDuplicate(firecallId);
   const { idToken } = useFirebaseLogin();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCalculation, setEditingCalculation] =
-    useState<KostenersatzCalculation | undefined>(undefined);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [calculationToDelete, setCalculationToDelete] =
     useState<KostenersatzCalculation | null>(null);
 
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [calculationToEmail, setCalculationToEmail] =
+    useState<KostenersatzCalculation | null>(null);
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState<string | null>(null);
+
   const handleOpenNew = () => {
-    setEditingCalculation(undefined);
-    setDialogOpen(true);
+    router.push(`/einsatz/${firecallId}/kostenersatz/neu`);
   };
 
   const handleEdit = (calculation: KostenersatzCalculation) => {
-    setEditingCalculation(calculation);
-    setDialogOpen(true);
-  };
-
-  const handleDialogClose = (saved?: boolean) => {
-    setDialogOpen(false);
-    setEditingCalculation(undefined);
-    if (saved) {
-      // Optionally show a success message
-    }
+    router.push(`/einsatz/${firecallId}/kostenersatz/${calculation.id}`);
   };
 
   const handleDuplicate = async (calculation: KostenersatzCalculation) => {
@@ -112,6 +107,21 @@ export default function KostenersatzList({
     setDeleteConfirmOpen(false);
     setCalculationToDelete(null);
   };
+
+  // Email handlers
+  const handleSendEmail = useCallback((calculation: KostenersatzCalculation) => {
+    setCalculationToEmail(calculation);
+    setEmailDialogOpen(true);
+  }, []);
+
+  const handleEmailDialogClose = useCallback(() => {
+    setEmailDialogOpen(false);
+    setCalculationToEmail(null);
+  }, []);
+
+  const handleEmailSuccess = useCallback(() => {
+    setEmailSuccessMessage('E-Mail wurde erfolgreich gesendet');
+  }, []);
 
   if (loading) {
     return (
@@ -193,19 +203,10 @@ export default function KostenersatzList({
               onDuplicate={handleDuplicate}
               onDelete={handleDeleteClick}
               onGeneratePdf={handleGeneratePdf}
+              onSendEmail={handleSendEmail}
             />
           ))}
         </Box>
-      )}
-
-      {dialogOpen && (
-        <KostenersatzDialog
-          open={dialogOpen}
-          onClose={handleDialogClose}
-          firecall={firecall}
-          firecallId={firecallId}
-          existingCalculation={editingCalculation}
-        />
       )}
 
       {deleteConfirmOpen && (
@@ -218,6 +219,26 @@ export default function KostenersatzList({
           no="Abbrechen"
         />
       )}
+
+      {/* Email Dialog */}
+      {calculationToEmail && (
+        <KostenersatzEmailDialog
+          open={emailDialogOpen}
+          onClose={handleEmailDialogClose}
+          onSuccess={handleEmailSuccess}
+          calculation={calculationToEmail}
+          firecall={firecall}
+          firecallId={firecallId}
+        />
+      )}
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={!!emailSuccessMessage}
+        autoHideDuration={4000}
+        onClose={() => setEmailSuccessMessage(null)}
+        message={emailSuccessMessage}
+      />
     </Box>
   );
 }

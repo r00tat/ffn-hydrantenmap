@@ -6,6 +6,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useMemo } from 'react';
 import {
   formatCurrency,
   KostenersatzCalculation,
@@ -26,6 +27,19 @@ export interface KostenersatzCategoryAccordionProps {
   ) => void;
   disabled?: boolean;
   defaultExpanded?: boolean;
+  customItemsTotal?: number;
+  children?: React.ReactNode;
+}
+
+/**
+ * Check if a rate uses hourly pricing
+ */
+function isHourlyRate(rate: KostenersatzRate): boolean {
+  if (rate.pricePauschal && rate.price > 0) {
+    return true;
+  }
+  const hourlyUnits = ['je Std', 'pro Person & h', '/h'];
+  return hourlyUnits.some((u) => rate.unit.includes(u));
 }
 
 export default function KostenersatzCategoryAccordion({
@@ -36,15 +50,24 @@ export default function KostenersatzCategoryAccordion({
   onItemChange,
   disabled = false,
   defaultExpanded = false,
+  customItemsTotal = 0,
+  children,
 }: KostenersatzCategoryAccordionProps) {
-  // Calculate subtotal for this category
-  const subtotal = calculation.subtotals[String(categoryNumber)] || 0;
+  // Calculate subtotal for this category (including custom items if provided)
+  const rateSubtotal = calculation.subtotals[String(categoryNumber)] || 0;
+  const subtotal = rateSubtotal + customItemsTotal;
   const hasItems = subtotal > 0;
 
   // Count items with values in this category
   const itemCount = calculation.items.filter((item) =>
     rates.some((r) => r.id === item.rateId && item.einheiten > 0)
   ).length;
+
+  // Check if any rates in this category use hourly pricing
+  const hasHourlyRates = useMemo(
+    () => rates.some((rate) => isHourlyRate(rate)),
+    [rates]
+  );
 
   return (
     <Accordion
@@ -108,10 +131,10 @@ export default function KostenersatzCategoryAccordion({
             gap: 0.5,
           }}
         >
-          {/* Header row */}
+          {/* Header row - hidden on mobile */}
           <Box
             sx={{
-              display: 'flex',
+              display: { xs: 'none', sm: 'flex' },
               alignItems: 'center',
               gap: 1,
               py: 0.5,
@@ -130,21 +153,23 @@ export default function KostenersatzCategoryAccordion({
             <Typography
               variant="caption"
               color="text.secondary"
+              sx={{ width: 70, textAlign: 'right' }}
+            >
+              Anzahl
+            </Typography>
+            {hasHourlyRates && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ width: 90, textAlign: 'right' }}
+              >
+                Stunden
+              </Typography>
+            )}
+            <Typography
+              variant="caption"
+              color="text.secondary"
               sx={{ width: 80, textAlign: 'right' }}
-            >
-              Einheiten
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ width: 90, textAlign: 'right' }}
-            >
-              Stunden
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ width: 100, textAlign: 'right' }}
             >
               Summe
             </Typography>
@@ -161,6 +186,9 @@ export default function KostenersatzCategoryAccordion({
               disabled={disabled}
             />
           ))}
+
+          {/* Additional content (e.g., custom items for Category 12) */}
+          {children}
         </Box>
       </AccordionDetails>
     </Accordion>

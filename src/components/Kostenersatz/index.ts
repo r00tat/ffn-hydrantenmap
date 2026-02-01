@@ -1,5 +1,6 @@
 // Main components
 export { default as KostenersatzDialog } from './KostenersatzDialog';
+export { default as KostenersatzCalculationPage } from './KostenersatzCalculationPage';
 export { default as KostenersatzList } from './KostenersatzList';
 export { default as KostenersatzCard } from './KostenersatzCard';
 
@@ -19,3 +20,6 @@ export { default as KostenersatzTemplateSelector } from './KostenersatzTemplateS
 
 // Admin components
 export { default as KostenersatzAdminSettings } from './KostenersatzAdminSettings';
+
+// Email components
+export { default as KostenersatzEmailDialog } from './KostenersatzEmailDialog';

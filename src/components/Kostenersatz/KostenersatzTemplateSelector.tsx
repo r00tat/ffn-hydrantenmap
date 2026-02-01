@@ -7,14 +7,22 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import PersonIcon from '@mui/icons-material/Person';
+import { useState } from 'react';
 import { KostenersatzTemplate } from '../../common/kostenersatz';
 import { useKostenersatzTemplates } from '../../hooks/useKostenersatz';
+import { useKostenersatzTemplateDelete } from '../../hooks/useKostenersatzMutations';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
 
 export interface KostenersatzTemplateSelectorProps {
   open: boolean;
@@ -28,10 +36,34 @@ export default function KostenersatzTemplateSelector({
   onSelect,
 }: KostenersatzTemplateSelectorProps) {
   const { sharedTemplates, personalTemplates, loading } = useKostenersatzTemplates();
+  const { email, isAdmin } = useFirebaseLogin();
+  const deleteTemplate = useKostenersatzTemplateDelete();
+
+  const [editingTemplate, setEditingTemplate] = useState<KostenersatzTemplate | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<KostenersatzTemplate | null>(null);
 
   const handleSelect = (template: KostenersatzTemplate) => {
     onSelect(template);
     onClose();
+  };
+
+  const canEditTemplate = (template: KostenersatzTemplate) => {
+    // User can edit their own templates, admin can edit shared templates
+    return template.createdBy === email || (isAdmin && template.isShared);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingTemplate?.id) return;
+    try {
+      await deleteTemplate(deletingTemplate.id);
+      setDeletingTemplate(null);
+    } catch (error) {
+      console.error('Error deleting template:', error);
+    }
+  };
+
+  const handleEditClose = (saved?: boolean) => {
+    setEditingTemplate(null);
   };
 
   return (
@@ -53,18 +85,48 @@ export default function KostenersatzTemplateSelector({
                 </Box>
                 <List dense>
                   {personalTemplates.map((template) => (
-                    <ListItemButton
+                    <ListItem
                       key={template.id}
-                      onClick={() => handleSelect(template)}
+                      disablePadding
+                      secondaryAction={
+                        canEditTemplate(template) && (
+                          <Box>
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTemplate(template);
+                              }}
+                              title="Bearbeiten"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingTemplate(template);
+                              }}
+                              title="Löschen"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        )
+                      }
                     >
-                      <ListItemText
-                        primary={template.name}
-                        secondary={
-                          template.description ||
-                          `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
-                        }
-                      />
-                    </ListItemButton>
+                      <ListItemButton onClick={() => handleSelect(template)}>
+                        <ListItemText
+                          primary={template.name}
+                          secondary={
+                            template.description ||
+                            `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
                 {sharedTemplates.length > 0 && <Divider sx={{ my: 2 }} />}
@@ -82,18 +144,48 @@ export default function KostenersatzTemplateSelector({
                 </Box>
                 <List dense>
                   {sharedTemplates.map((template) => (
-                    <ListItemButton
+                    <ListItem
                       key={template.id}
-                      onClick={() => handleSelect(template)}
+                      disablePadding
+                      secondaryAction={
+                        canEditTemplate(template) && (
+                          <Box>
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTemplate(template);
+                              }}
+                              title="Bearbeiten"
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingTemplate(template);
+                              }}
+                              title="Löschen"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        )
+                      }
                     >
-                      <ListItemText
-                        primary={template.name}
-                        secondary={
-                          template.description ||
-                          `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
-                        }
-                      />
-                    </ListItemButton>
+                      <ListItemButton onClick={() => handleSelect(template)}>
+                        <ListItemText
+                          primary={template.name}
+                          secondary={
+                            template.description ||
+                            `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
               </>
@@ -115,6 +207,32 @@ export default function KostenersatzTemplateSelector({
       <DialogActions>
         <Button onClick={onClose}>Abbrechen</Button>
       </DialogActions>
+
+      {/* Edit Template Dialog */}
+      {editingTemplate && (
+        <KostenersatzTemplateDialog
+          open={!!editingTemplate}
+          onClose={handleEditClose}
+          existingTemplate={editingTemplate}
+          isAdmin={isAdmin}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingTemplate} onClose={() => setDeletingTemplate(null)}>
+        <DialogTitle>Vorlage löschen?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Möchten Sie die Vorlage &quot;{deletingTemplate?.name}&quot; wirklich löschen?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeletingTemplate(null)}>Abbrechen</Button>
+          <Button onClick={handleDelete} color="error" variant="contained">
+            Löschen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

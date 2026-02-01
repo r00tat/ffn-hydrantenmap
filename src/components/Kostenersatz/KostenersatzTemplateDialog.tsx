@@ -9,8 +9,9 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import TextField from '@mui/material/TextField';
-import { useState } from 'react';
-import { KostenersatzTemplate } from '../../common/kostenersatz';
+import Typography from '@mui/material/Typography';
+import { useState, useEffect } from 'react';
+import { KostenersatzTemplate, KostenersatzLineItem } from '../../common/kostenersatz';
 import {
   useKostenersatzTemplateAdd,
   useKostenersatzTemplateUpdate,
@@ -20,6 +21,9 @@ export interface KostenersatzTemplateDialogProps {
   open: boolean;
   onClose: (saved?: boolean) => void;
   existingTemplate?: KostenersatzTemplate;
+  /** For creating a new template from a calculation */
+  calculationItems?: KostenersatzLineItem[];
+  calculationDefaultStunden?: number;
   isAdmin?: boolean;
 }
 
@@ -27,6 +31,8 @@ export default function KostenersatzTemplateDialog({
   open,
   onClose,
   existingTemplate,
+  calculationItems,
+  calculationDefaultStunden,
   isAdmin = false,
 }: KostenersatzTemplateDialogProps) {
   const [name, setName] = useState(existingTemplate?.name || '');
@@ -34,28 +40,49 @@ export default function KostenersatzTemplateDialog({
   const [isShared, setIsShared] = useState(existingTemplate?.isShared || false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setName(existingTemplate?.name || '');
+      setDescription(existingTemplate?.description || '');
+      setIsShared(existingTemplate?.isShared || false);
+    }
+  }, [open, existingTemplate]);
+
   const addTemplate = useKostenersatzTemplateAdd();
   const updateTemplate = useKostenersatzTemplateUpdate();
+
+  // Determine items to save: from calculation or existing template
+  const itemsToSave = calculationItems
+    ? calculationItems.map((item) => ({ rateId: item.rateId, einheiten: item.einheiten }))
+    : existingTemplate?.items || [];
+
+  const defaultStundenToSave = calculationItems
+    ? calculationDefaultStunden
+    : existingTemplate?.defaultStunden;
+
+  const itemCount = itemsToSave.length;
 
   const handleSave = async () => {
     if (!name.trim()) return;
 
     setIsSaving(true);
     try {
+      const trimmedDescription = description.trim();
       if (existingTemplate?.id) {
         await updateTemplate({
           ...existingTemplate,
           name: name.trim(),
-          description: description.trim() || undefined,
+          description: trimmedDescription || '', // Use empty string, not undefined
           isShared,
         });
       } else {
         await addTemplate({
           name: name.trim(),
-          description: description.trim() || undefined,
+          ...(trimmedDescription && { description: trimmedDescription }),
           isShared,
-          items: existingTemplate?.items || [],
-          defaultStunden: existingTemplate?.defaultStunden,
+          items: itemsToSave,
+          defaultStunden: defaultStundenToSave,
         });
       }
       onClose(true);
@@ -73,6 +100,12 @@ export default function KostenersatzTemplateDialog({
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          {calculationItems && (
+            <Typography variant="body2" color="text.secondary">
+              {itemCount} Position{itemCount !== 1 ? 'en' : ''} werden als Vorlage gespeichert
+              {defaultStundenToSave ? ` (${defaultStundenToSave}h Standarddauer)` : ''}.
+            </Typography>
+          )}
           <TextField
             label="Name der Vorlage"
             value={name}

@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import EmailIcon from '@mui/icons-material/Email';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useState, MouseEvent } from 'react';
@@ -29,6 +30,7 @@ export interface KostenersatzCardProps {
   onDuplicate: (calculation: KostenersatzCalculation) => void;
   onDelete: (calculation: KostenersatzCalculation) => void;
   onGeneratePdf?: (calculation: KostenersatzCalculation) => void;
+  onSendEmail?: (calculation: KostenersatzCalculation) => void;
 }
 
 export default function KostenersatzCard({
@@ -37,6 +39,7 @@ export default function KostenersatzCard({
   onDuplicate,
   onDelete,
   onGeneratePdf,
+  onSendEmail,
 }: KostenersatzCardProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(anchorEl);
@@ -70,6 +73,11 @@ export default function KostenersatzCard({
     onGeneratePdf?.(calculation);
   };
 
+  const handleSendEmail = () => {
+    handleMenuClose();
+    onSendEmail?.(calculation);
+  };
+
   const createdDate = parseTimestamp(calculation.createdAt);
   const formattedDate = createdDate
     ? formatTimestamp(createdDate.toDate())
@@ -77,6 +85,20 @@ export default function KostenersatzCard({
 
   return (
     <Card sx={{ position: 'relative' }}>
+      {/* Menu button positioned outside CardActionArea to avoid nested buttons */}
+      <IconButton
+        size="small"
+        onClick={handleMenuClick}
+        sx={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 1,
+        }}
+      >
+        <MoreVertIcon fontSize="small" />
+      </IconButton>
+
       <CardActionArea onClick={() => onEdit(calculation)}>
         <CardContent>
           <Box
@@ -95,19 +117,12 @@ export default function KostenersatzCard({
                 {formattedDate}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 4 }}>
               <Chip
                 label={formatStatus(calculation.status)}
                 size="small"
                 color={getStatusColor(calculation.status)}
               />
-              <IconButton
-                size="small"
-                onClick={handleMenuClick}
-                sx={{ ml: 1 }}
-              >
-                <MoreVertIcon fontSize="small" />
-              </IconButton>
             </Box>
           </Box>
 
@@ -163,6 +178,15 @@ export default function KostenersatzCard({
           <MenuItem onClick={handleGeneratePdf}>
             <PictureAsPdfIcon fontSize="small" sx={{ mr: 1 }} />
             PDF erstellen
+          </MenuItem>
+        )}
+        {onSendEmail && (
+          <MenuItem
+            onClick={handleSendEmail}
+            disabled={!calculation.recipient.email || calculation.status === 'draft'}
+          >
+            <EmailIcon fontSize="small" sx={{ mr: 1 }} />
+            Per E-Mail senden
           </MenuItem>
         )}
         <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>

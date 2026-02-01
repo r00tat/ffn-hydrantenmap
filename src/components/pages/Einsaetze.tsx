@@ -207,7 +207,7 @@ function EinsatzCard({
           <Button onClick={() => setKostenersatzOpen(false)}>Schließen</Button>
         </Box>
         {einsatz.id && (
-          <KostenersatzList firecall={einsatz} firecallId={einsatz.id} />
+          <KostenersatzList firecallId={einsatz.id} />
         )}
       </Drawer>
     </Grid>

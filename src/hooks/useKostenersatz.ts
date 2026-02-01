@@ -110,8 +110,7 @@ export function useKostenersatzRates(versionId?: string) {
 
     const q = query(
       collection(firestore, KOSTENERSATZ_RATES_COLLECTION),
-      where('version', '==', targetVersion),
-      orderBy('sortOrder', 'asc')
+      where('version', '==', targetVersion)
     );
 
     const unsubscribe = onSnapshot(
@@ -129,6 +128,8 @@ export function useKostenersatzRates(versionId?: string) {
         if (rateList.length === 0) {
           setRates(getDefaultRatesWithVersion());
         } else {
+          // Sort by sortOrder client-side
+          rateList.sort((a, b) => a.sortOrder - b.sortOrder);
           setRates(rateList);
         }
         setLoading(false);
