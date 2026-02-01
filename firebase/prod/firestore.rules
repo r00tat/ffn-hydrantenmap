@@ -77,6 +77,26 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == doc
     }
 
+    // Kostenersatz rate versions - read for all authorized, write for admin
+    match /kostenersatzVersions/{doc=**} {
+      allow read: if authorizedUser();
+      allow write: if adminUser();
+    }
+
+    // Kostenersatz rates - read for all authorized, write for admin
+    match /kostenersatzRates/{doc=**} {
+      allow read: if authorizedUser();
+      allow write: if adminUser();
+    }
+
+    // Kostenersatz templates - read for all, create for authorized, update/delete for owner or admin
+    match /kostenersatzTemplates/{templateId} {
+      allow read: if authorizedUser();
+      allow create: if authorizedUser();
+      allow update, delete: if authorizedUser() &&
+        (resource.data.createdBy == request.auth.token.email || adminUser());
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
