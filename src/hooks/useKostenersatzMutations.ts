@@ -95,7 +95,6 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
       };
 
       // Remove id from data (it's in the document path)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { id: _id, ...dataWithoutId } = updatedCalc;
 
       console.info(
@@ -114,7 +113,7 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
         { merge: false }
       );
     },
-    [email, firecallId]
+    [firecallId]
   );
 }
 
@@ -222,7 +221,6 @@ export function useKostenersatzTemplateUpdate() {
       updatedAt: new Date().toISOString(),
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...dataWithoutId } = updatedTemplate;
 
     console.info(`Updating kostenersatz template ${templateId}: ${template.name}`);
@@ -358,7 +356,7 @@ export function useKostenersatzRateUpsert() {
 
       await setDoc(doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId), rate);
     },
-    [email]
+    []
   );
 }
 

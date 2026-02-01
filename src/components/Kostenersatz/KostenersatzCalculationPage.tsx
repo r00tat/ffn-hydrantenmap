@@ -38,6 +38,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import Snackbar from '@mui/material/Snackbar';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { KostenersatzTemplate, calculateItemSum } from '../../common/kostenersatz';
 
 interface TabPanelProps {
@@ -85,6 +86,7 @@ export default function KostenersatzCalculationPage({
   const [templateSaveDialogOpen, setTemplateSaveDialogOpen] = useState(false);
   const [templateLoadDialogOpen, setTemplateLoadDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const { email, isAdmin } = useFirebaseLogin();
   const { activeVersion } = useKostenersatzVersions();
   const { rates, ratesById } = useKostenersatzRates(activeVersion?.id);
@@ -245,7 +247,7 @@ export default function KostenersatzCalculationPage({
 
   // Save handlers
   const handleSave = useCallback(
-    async (status: 'draft' | 'completed') => {
+    async (status: 'draft' | 'completed', redirectAfterSave = true) => {
       setIsSaving(true);
       try {
         const calcToSave = {
@@ -261,7 +263,11 @@ export default function KostenersatzCalculationPage({
           const { id: _id, ...calcWithoutId } = calcToSave;
           await addCalculation(calcWithoutId);
         }
-        router.push(`/einsatz/${firecallId}/kostenersatz`);
+        if (redirectAfterSave) {
+          router.push(`/einsatz/${firecallId}/kostenersatz`);
+        } else {
+          setSuccessMessage('Gespeichert');
+        }
       } catch (error) {
         console.error('Error saving calculation:', error);
         // TODO: Show error notification
@@ -412,15 +418,15 @@ export default function KostenersatzCalculationPage({
             {isEditable && (
               <>
                 <Button
-                  onClick={() => handleSave('draft')}
+                  onClick={() => handleSave('draft', false)}
                   disabled={isSaving}
                   size="small"
                 >
-                  Entwurf
+                  Speichern
                 </Button>
                 <Button
                   variant="contained"
-                  onClick={() => handleSave('completed')}
+                  onClick={() => setConfirmCompleteOpen(true)}
                   disabled={isSaving || !calculation.recipient.name}
                   size="small"
                 >
@@ -470,6 +476,22 @@ export default function KostenersatzCalculationPage({
         onClose={() => setTemplateLoadDialogOpen(false)}
         onSelect={handleTemplateLoad}
       />
+
+      {/* Confirm Complete Dialog */}
+      {confirmCompleteOpen && (
+        <ConfirmDialog
+          title="Berechnung abschließen"
+          text="Nach dem Abschließen sind keine Änderungen mehr möglich. Möchten Sie fortfahren?"
+          yes="Abschließen"
+          no="Abbrechen"
+          onConfirm={(confirmed) => {
+            setConfirmCompleteOpen(false);
+            if (confirmed) {
+              handleSave('completed', false);
+            }
+          }}
+        />
+      )}
 
       {/* Success Snackbar */}
       <Snackbar

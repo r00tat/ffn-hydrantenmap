@@ -24,8 +24,8 @@ import {
   isValidEmail,
   renderEmailTemplates,
   SendEmailRequest,
-  SendEmailResponse,
 } from '../../common/kostenersatzEmail';
+import { sendKostenersatzEmailAction } from './kostenersatzEmailAction';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
 import { Firecall } from '../firebase/firestore';
 
@@ -128,17 +128,9 @@ export default function KostenersatzEmailDialog({
         body,
       };
 
-      const response = await fetch('/api/kostenersatz/email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const result = await sendKostenersatzEmailAction(requestBody);
 
-      const result: SendEmailResponse = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.details || result.error || 'Failed to send email');
       }
 

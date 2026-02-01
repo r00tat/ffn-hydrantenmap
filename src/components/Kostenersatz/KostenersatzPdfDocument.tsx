@@ -1,5 +1,3 @@
-'use client';
-
 import {
   Document,
   Page,
@@ -220,6 +218,7 @@ export default function KostenersatzPdfDocument({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image doesn't support alt */}
           <Image style={styles.headerLogo} src={logoPath} />
           <View style={styles.headerText}>
             <Text style={styles.title}>Kostenersatz-Berechnung</Text>

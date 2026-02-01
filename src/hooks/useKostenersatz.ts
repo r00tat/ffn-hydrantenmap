@@ -93,8 +93,8 @@ export function useKostenersatzVersions() {
  * Falls back to default rates if none exist in Firestore
  */
 export function useKostenersatzRates(versionId?: string) {
-  const [rates, setRates] = useState<KostenersatzRate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [firestoreRates, setFirestoreRates] = useState<KostenersatzRate[]>([]);
+  const [firestoreLoading, setFirestoreLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { activeVersion } = useKostenersatzVersions();
 
@@ -102,11 +102,10 @@ export function useKostenersatzRates(versionId?: string) {
 
   useEffect(() => {
     if (!targetVersion) {
-      // Use default rates while loading
-      setRates(getDefaultRatesWithVersion());
-      setLoading(false);
       return;
     }
+
+    (async () => setFirestoreLoading(true))();
 
     const q = query(
       collection(firestore, KOSTENERSATZ_RATES_COLLECTION),
@@ -124,26 +123,32 @@ export function useKostenersatzRates(versionId?: string) {
           } as KostenersatzRate);
         });
 
-        // If no rates exist for this version, use defaults
-        if (rateList.length === 0) {
-          setRates(getDefaultRatesWithVersion());
-        } else {
-          // Sort by sortOrder client-side
-          rateList.sort((a, b) => a.sortOrder - b.sortOrder);
-          setRates(rateList);
-        }
-        setLoading(false);
+        // Sort by sortOrder client-side
+        rateList.sort((a, b) => a.sortOrder - b.sortOrder);
+        setFirestoreRates(rateList);
+        setFirestoreLoading(false);
       },
       (err) => {
         console.error('Error loading kostenersatz rates:', err);
         setError(err);
-        setRates(getDefaultRatesWithVersion());
-        setLoading(false);
+        setFirestoreRates([]);
+        setFirestoreLoading(false);
       }
     );
 
     return () => unsubscribe();
   }, [targetVersion]);
+
+  // Derive rates - use defaults if no targetVersion or no firestore rates
+  const rates = useMemo(() => {
+    if (!targetVersion || firestoreRates.length === 0) {
+      return getDefaultRatesWithVersion();
+    }
+    return firestoreRates;
+  }, [targetVersion, firestoreRates]);
+
+  // Derive loading state - not loading if no targetVersion
+  const loading = targetVersion ? firestoreLoading : false;
 
   // Group rates by category for easy access
   const ratesByCategory = useMemo(() => groupRatesByCategory(rates), [rates]);
@@ -231,15 +236,17 @@ export function useFirecallKostenersatz(firecallId: string | undefined) {
   const [calculations, setCalculations] = useState<KostenersatzCalculation[]>(
     []
   );
-  const [loading, setLoading] = useState(true);
+  const [firestoreLoading, setFirestoreLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const hasValidFirecallId = !!firecallId && firecallId !== 'unknown';
+
   useEffect(() => {
-    if (!firecallId || firecallId === 'unknown') {
-      setCalculations([]);
-      setLoading(false);
+    if (!hasValidFirecallId) {
       return;
     }
+
+    (async () => setFirestoreLoading(true))();
 
     const q = query(
       collection(
@@ -262,17 +269,20 @@ export function useFirecallKostenersatz(firecallId: string | undefined) {
           } as KostenersatzCalculation);
         });
         setCalculations(calcList);
-        setLoading(false);
+        setFirestoreLoading(false);
       },
       (err) => {
         console.error('Error loading kostenersatz calculations:', err);
         setError(err);
-        setLoading(false);
+        setFirestoreLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [firecallId]);
+  }, [firecallId, hasValidFirecallId]);
+
+  // Derive loading state - not loading if no valid firecallId
+  const loading = hasValidFirecallId ? firestoreLoading : false;
 
   return { calculations, loading, error };
 }
@@ -290,27 +300,28 @@ export function useKostenersatzCalculation(
 ) {
   const [calculation, setCalculation] =
     useState<KostenersatzCalculation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [firestoreLoading, setFirestoreLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const hasValidIds =
+    !!firecallId &&
+    firecallId !== 'unknown' &&
+    !!calculationId &&
+    calculationId !== 'new';
+
   useEffect(() => {
-    if (
-      !firecallId ||
-      firecallId === 'unknown' ||
-      !calculationId ||
-      calculationId === 'new'
-    ) {
-      setCalculation(null);
-      setLoading(false);
+    if (!hasValidIds) {
       return;
     }
+
+    (async () => setFirestoreLoading(true))();
 
     const docRef = doc(
       firestore,
       FIRECALL_COLLECTION_ID,
-      firecallId,
+      firecallId!,
       KOSTENERSATZ_SUBCOLLECTION,
-      calculationId
+      calculationId!
     );
 
     const unsubscribe = onSnapshot(
@@ -324,17 +335,20 @@ export function useKostenersatzCalculation(
         } else {
           setCalculation(null);
         }
-        setLoading(false);
+        setFirestoreLoading(false);
       },
       (err) => {
         console.error('Error loading kostenersatz calculation:', err);
         setError(err);
-        setLoading(false);
+        setFirestoreLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [firecallId, calculationId]);
+  }, [firecallId, calculationId, hasValidIds]);
+
+  // Derive loading state - not loading if no valid IDs
+  const loading = hasValidIds ? firestoreLoading : false;
 
   return { calculation, loading, error };
 }
