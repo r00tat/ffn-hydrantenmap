@@ -15,9 +15,11 @@ import {
   KostenersatzCalculation,
   KostenersatzCustomItem,
   KostenersatzRate,
+  KostenersatzVehicle,
 } from '../../common/kostenersatz';
 import { getCategoryList } from '../../common/defaultKostenersatzRates';
 import KostenersatzCategoryAccordion from './KostenersatzCategoryAccordion';
+import VehicleQuickAddPanel from './VehicleQuickAddPanel';
 
 export interface KostenersatzBerechnungTabProps {
   calculation: KostenersatzCalculation;
@@ -30,6 +32,8 @@ export interface KostenersatzBerechnungTabProps {
     stundenOverridden: boolean
   ) => void;
   onCustomItemChange: (index: number, item: KostenersatzCustomItem | null) => void;
+  onVehicleToggle?: (vehicle: KostenersatzVehicle) => void;
+  selectedVehicleIds?: string[];
   disabled?: boolean;
 }
 
@@ -39,6 +43,8 @@ export default function KostenersatzBerechnungTab({
   ratesById,
   onItemChange,
   onCustomItemChange,
+  onVehicleToggle,
+  selectedVehicleIds = [],
   disabled = false,
 }: KostenersatzBerechnungTabProps) {
   // Get category list for rendering accordions
@@ -100,6 +106,15 @@ export default function KostenersatzBerechnungTab({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      {/* Vehicle Quick-Add Panel */}
+      {onVehicleToggle && (
+        <VehicleQuickAddPanel
+          selectedVehicleIds={selectedVehicleIds}
+          onToggleVehicle={onVehicleToggle}
+          disabled={disabled}
+        />
+      )}
+
       {/* Category accordions */}
       {categories.map((category, idx) => {
         const categoryRates = ratesByCategory.get(category.number) || [];
