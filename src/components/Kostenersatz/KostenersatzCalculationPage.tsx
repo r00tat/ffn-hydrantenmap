@@ -24,6 +24,7 @@ import { useKostenersatzRates, useKostenersatzVersions } from '../../hooks/useKo
 import {
   useKostenersatzAdd,
   useKostenersatzUpdate,
+  useKostenersatzDuplicate,
 } from '../../hooks/useKostenersatzMutations';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import KostenersatzEinsatzTab from './KostenersatzEinsatzTab';
@@ -37,6 +38,7 @@ import KostenersatzTemplateSelector from './KostenersatzTemplateSelector';
 import EmailIcon from '@mui/icons-material/Email';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Snackbar from '@mui/material/Snackbar';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { KostenersatzTemplate, calculateItemSum } from '../../common/kostenersatz';
@@ -92,6 +94,7 @@ export default function KostenersatzCalculationPage({
   const { rates, ratesById } = useKostenersatzRates(activeVersion?.id);
   const addCalculation = useKostenersatzAdd(firecallId);
   const updateCalculation = useKostenersatzUpdate(firecallId);
+  const duplicateCalculation = useKostenersatzDuplicate(firecallId);
 
   // Calculate suggested duration from firecall
   const suggestedDuration = useMemo(() => {
@@ -247,7 +250,7 @@ export default function KostenersatzCalculationPage({
 
   // Save handlers
   const handleSave = useCallback(
-    async (status: 'draft' | 'completed', redirectAfterSave = true) => {
+    async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<boolean> => {
       setIsSaving(true);
       try {
         const calcToSave = {
@@ -259,21 +262,25 @@ export default function KostenersatzCalculationPage({
         // Check both existing calculation ID and local state ID (for subsequent saves of new calculations)
         if (existingCalculation?.id || calculation.id) {
           await updateCalculation(calcToSave);
+          // Update local status
+          setCalculation((prev) => ({ ...prev, status }));
         } else {
           // Remove id field for new calculations (Firestore rejects undefined values)
           const { id: _id, ...calcWithoutId } = calcToSave;
           const newId = await addCalculation(calcWithoutId);
-          // Update local state with the new ID so subsequent saves update instead of creating duplicates
-          setCalculation((prev) => ({ ...prev, id: newId }));
+          // Update local state with the new ID and status so subsequent saves update instead of creating duplicates
+          setCalculation((prev) => ({ ...prev, id: newId, status }));
         }
         if (redirectAfterSave) {
           router.push(`/einsatz/${firecallId}/kostenersatz`);
-        } else {
+        } else if (showSuccessMessage) {
           setSuccessMessage('Gespeichert');
         }
+        return true;
       } catch (error) {
         console.error('Error saving calculation:', error);
         // TODO: Show error notification
+        return false;
       } finally {
         setIsSaving(false);
       }
@@ -281,7 +288,36 @@ export default function KostenersatzCalculationPage({
     [calculation, existingCalculation, addCalculation, updateCalculation, router, firecallId]
   );
 
-  const isEditable = !existingCalculation || existingCalculation.status === 'draft';
+  // Email button handler - completes the calculation first if needed, then opens email dialog
+  const handleEmailClick = useCallback(async () => {
+    const isNewOrDraft = !existingCalculation?.id && !calculation.id || calculation.status === 'draft';
+
+    if (isNewOrDraft) {
+      // Save and complete the calculation first
+      const success = await handleSave('completed', false, false);
+      if (!success) {
+        return; // Save failed, don't open email dialog
+      }
+    }
+
+    setEmailDialogOpen(true);
+  }, [existingCalculation?.id, calculation.id, calculation.status, handleSave]);
+
+  // Copy button handler - creates a draft copy and navigates to it
+  const handleCopy = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const newId = await duplicateCalculation(calculation as KostenersatzCalculation);
+      router.push(`/einsatz/${firecallId}/kostenersatz/${newId}`);
+    } catch (error) {
+      console.error('Error copying calculation:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [calculation, duplicateCalculation, router, firecallId]);
+
+  // Check local state status (which is updated after saves) to determine if editable
+  const isEditable = calculation.status === 'draft';
 
   // Template handlers
   const handleTemplateLoad = useCallback(
@@ -437,28 +473,37 @@ export default function KostenersatzCalculationPage({
                 </Button>
               </>
             )}
-            {existingCalculation && existingCalculation.status !== 'draft' && (
+            {!isEditable && (
               <Button
                 variant="outlined"
-                startIcon={<EmailIcon />}
-                onClick={() => setEmailDialogOpen(true)}
-                disabled={!calculation.recipient.email}
+                startIcon={<ContentCopyIcon />}
+                onClick={handleCopy}
+                disabled={isSaving}
                 size="small"
               >
-                E-Mail
+                Kopieren
               </Button>
             )}
+            <Button
+              variant="outlined"
+              startIcon={<EmailIcon />}
+              onClick={handleEmailClick}
+              disabled={!calculation.recipient.email || isSaving}
+              size="small"
+            >
+              E-Mail
+            </Button>
           </Box>
         </Box>
       </Paper>
 
       {/* Email Dialog */}
-      {existingCalculation && (
+      {(existingCalculation?.id || calculation.id) && (
         <KostenersatzEmailDialog
           open={emailDialogOpen}
           onClose={() => setEmailDialogOpen(false)}
           onSuccess={() => setSuccessMessage('E-Mail wurde erfolgreich gesendet')}
-          calculation={existingCalculation}
+          calculation={calculation as KostenersatzCalculation}
           firecall={firecall}
           firecallId={firecallId}
         />
