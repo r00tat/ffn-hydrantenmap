@@ -166,7 +166,7 @@ export default function KostenersatzCalculationPage({
               return {
                 ...item,
                 anzahlStunden: newStunden,
-                sum: calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal),
+                sum: calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
               };
             }
           }
@@ -184,7 +184,7 @@ export default function KostenersatzCalculationPage({
       if (!rate) return;
 
       const { calculateItemSum } = require('../../common/kostenersatz');
-      const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal);
+      const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours);
 
       setCalculation((prev) => {
         const existingIndex = prev.items.findIndex((i) => i.rateId === rateId);
@@ -332,7 +332,7 @@ export default function KostenersatzCalculationPage({
           anzahlStunden: stunden,
           stundenOverridden: false,
           sum: rate
-            ? calculateItemSum(stunden, templateItem.einheiten, rate.price, rate.pricePauschal)
+            ? calculateItemSum(stunden, templateItem.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
             : 0,
         };
       });
@@ -367,9 +367,9 @@ export default function KostenersatzCalculationPage({
           Zurück
         </Button>
         <Typography variant="h6" sx={{ flex: 1, minWidth: { xs: '100%', sm: 'auto' }, order: { xs: -1, sm: 0 } }}>
-          {existingCalculation ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
+          {existingCalculation || calculation.id ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
         </Typography>
-        {!existingCalculation && isEditable && (
+        {isEditable && (
           <Button
             startIcon={<FolderOpenIcon />}
             onClick={() => setTemplateLoadDialogOpen(true)}

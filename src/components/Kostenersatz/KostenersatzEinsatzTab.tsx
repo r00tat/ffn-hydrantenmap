@@ -92,7 +92,7 @@ export default function KostenersatzEinsatzTab({
           value={durationInput !== null ? durationInput : calculation.defaultStunden}
           onChange={(e) => {
             setDurationInput(e.target.value);
-            const value = parseInt(e.target.value, 10);
+            const value = parseFloat(e.target.value);
             if (!isNaN(value) && value > 0) {
               onDefaultStundenChange(value);
             }
@@ -105,11 +105,11 @@ export default function KostenersatzEinsatzTab({
           }}
           fullWidth
           disabled={disabled}
-          inputProps={{ min: 1 }}
+          inputProps={{ min: 1, step: 0.5 }}
           helperText={
             suggestedDuration > 1
-              ? `Vorgeschlagen basierend auf Alarmierung/Abrücken: ${suggestedDuration} Stunden`
-              : 'Wird als Standard für alle Positionen verwendet'
+              ? `Vorgeschlagen basierend auf Alarmierung/Abrücken: ${suggestedDuration} Stunden. Halbe Stunden erlaubt (z.B. 2.5)`
+              : 'Wird als Standard für alle Positionen verwendet. Halbe Stunden erlaubt (z.B. 2.5)'
           }
         />
       </Box>

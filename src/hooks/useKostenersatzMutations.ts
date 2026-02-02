@@ -5,7 +5,10 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  query,
   setDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 import { useCallback } from 'react';
@@ -361,7 +364,21 @@ export function useKostenersatzRateUpsert() {
 }
 
 /**
+ * Hook to delete a rate
+ */
+export function useKostenersatzRateDelete() {
+  return useCallback(async (versionId: string, rateId: string) => {
+    const docId = `${versionId}_${rateId}`;
+
+    console.info(`Deleting kostenersatz rate ${docId}`);
+
+    await deleteDoc(doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId));
+  }, []);
+}
+
+/**
  * Hook to seed default rates for a version
+ * This will add/update rates from the default list and delete rates that are no longer in the defaults
  */
 export function useKostenersatzSeedDefaultRates() {
   const { email } = useFirebaseLogin();
@@ -369,6 +386,25 @@ export function useKostenersatzSeedDefaultRates() {
   return useCallback(
     async (version: KostenersatzVersion, rates: KostenersatzRate[]) => {
       const batch = writeBatch(firestore);
+
+      // Query existing rates for this version
+      const existingRatesQuery = query(
+        collection(firestore, KOSTENERSATZ_RATES_COLLECTION),
+        where('version', '==', version.id)
+      );
+      const existingRatesSnapshot = await getDocs(existingRatesQuery);
+
+      // Build set of new rate IDs for quick lookup
+      const newRateIds = new Set(rates.map((r) => `${version.id}_${r.id}`));
+
+      // Delete rates that are no longer in the default list
+      let deletedCount = 0;
+      for (const existingDoc of existingRatesSnapshot.docs) {
+        if (!newRateIds.has(existingDoc.id)) {
+          batch.delete(existingDoc.ref);
+          deletedCount++;
+        }
+      }
 
       // Add version
       batch.set(
@@ -380,7 +416,7 @@ export function useKostenersatzSeedDefaultRates() {
         }
       );
 
-      // Add all rates
+      // Add/update all rates
       for (const rate of rates) {
         const docId = `${version.id}_${rate.id}`;
         batch.set(doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId), {
@@ -391,7 +427,7 @@ export function useKostenersatzSeedDefaultRates() {
       }
 
       console.info(
-        `Seeding ${rates.length} default rates for version ${version.id}`
+        `Seeding ${rates.length} default rates for version ${version.id}, deleted ${deletedCount} obsolete rates`
       );
 
       await batch.commit();

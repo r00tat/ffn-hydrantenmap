@@ -5,6 +5,8 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
+import RemoveIcon from '@mui/icons-material/Remove';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { useState } from 'react';
@@ -80,11 +82,38 @@ export default function KostenersatzItemRow({
     }
   };
 
+  const handleEinheitenIncrement = () => {
+    const newValue = einheiten + 1;
+    setLocalEinheiten(String(newValue));
+    const effectiveStunden = showHours
+      ? stundenOverridden
+        ? stunden
+        : defaultStunden
+      : 1;
+    onItemChange(rate.id, newValue, effectiveStunden, showHours && stundenOverridden);
+  };
+
+  const handleEinheitenDecrement = () => {
+    if (einheiten <= 0) return;
+    const newValue = einheiten - 1;
+    setLocalEinheiten(newValue > 0 ? String(newValue) : '');
+    if (newValue === 0) {
+      onItemChange(rate.id, 0, defaultStunden, false);
+    } else {
+      const effectiveStunden = showHours
+        ? stundenOverridden
+          ? stunden
+          : defaultStunden
+        : 1;
+      onItemChange(rate.id, newValue, effectiveStunden, showHours && stundenOverridden);
+    }
+  };
+
   const handleStundenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocalStunden(value);
 
-    const numValue = parseInt(value, 10);
+    const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue > 0) {
       onItemChange(rate.id, einheiten, numValue, numValue !== defaultStunden);
     }
@@ -139,11 +168,19 @@ export default function KostenersatzItemRow({
 
       {/* Input row - stacks inputs horizontally even on mobile */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 }, justifyContent: { xs: 'flex-end', sm: 'flex-end' }, flexWrap: 'nowrap' }}>
-        {/* Einheiten/Anzahl input */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
+        {/* Einheiten/Anzahl input with +/- buttons */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' }, mr: 0.5 }}>
             Anz:
           </Typography>
+          <IconButton
+            size="small"
+            onClick={handleEinheitenDecrement}
+            disabled={disabled || einheiten <= 0}
+            sx={{ p: 0.5 }}
+          >
+            <RemoveIcon fontSize="small" />
+          </IconButton>
           <TextField
             size="small"
             type="number"
@@ -151,9 +188,17 @@ export default function KostenersatzItemRow({
             onChange={handleEinheitenChange}
             placeholder="0"
             disabled={disabled}
-            inputProps={{ min: 0, style: { textAlign: 'right' } }}
-            sx={{ width: { xs: 50, sm: 70 } }}
+            inputProps={{ min: 0, style: { textAlign: 'center' } }}
+            sx={{ width: { xs: 45, sm: 55 }, '& input': { px: 0.5 } }}
           />
+          <IconButton
+            size="small"
+            onClick={handleEinheitenIncrement}
+            disabled={disabled}
+            sx={{ p: 0.5 }}
+          >
+            <AddIcon fontSize="small" />
+          </IconButton>
         </Box>
 
         {/* Stunden input with lock toggle - only for hourly rates */}
@@ -168,9 +213,9 @@ export default function KostenersatzItemRow({
               value={localStunden}
               onChange={handleStundenChange}
               disabled={disabled || !hasValue}
-              inputProps={{ min: 1, style: { textAlign: 'right' } }}
+              inputProps={{ min: 0.5, step: 0.5, style: { textAlign: 'right' } }}
               sx={{
-                width: { xs: 45, sm: 55 },
+                width: { xs: 50, sm: 60 },
                 '& input': {
                   color: stundenOverridden ? 'warning.main' : 'inherit',
                 },
