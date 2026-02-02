@@ -252,7 +252,6 @@ export default function KostenersatzCalculationPage({
   // Vehicle toggle handler
   const handleVehicleToggle = useCallback(
     (vehicle: KostenersatzVehicle) => {
-      const isSelected = selectedVehicleIds.includes(vehicle.id);
       const rate = ratesById.get(vehicle.rateId);
 
       if (!rate) {
@@ -261,6 +260,9 @@ export default function KostenersatzCalculationPage({
       }
 
       setCalculation((prev) => {
+        // Check isSelected inside the callback to avoid stale closure issues
+        const isSelected = (prev.vehicles || []).includes(vehicle.id);
+
         if (isSelected) {
           // Remove vehicle: remove from vehicles array and remove/decrement line item
           const newVehicles = (prev.vehicles || []).filter((id) => id !== vehicle.id);
@@ -273,12 +275,22 @@ export default function KostenersatzCalculationPage({
 
           let newItems: KostenersatzLineItem[];
           if (otherVehiclesWithSameRate.length > 0) {
-            // Decrement the line item
-            newItems = prev.items.map((item) =>
-              item.rateId === vehicle.rateId
-                ? { ...item, einheiten: item.einheiten - 1 }
-                : item
-            );
+            // Decrement the line item and recalculate sum
+            newItems = prev.items.map((item) => {
+              if (item.rateId !== vehicle.rateId) return item;
+              const newEinheiten = item.einheiten - 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(
+                  item.anzahlStunden,
+                  newEinheiten,
+                  rate.price,
+                  rate.pricePauschal,
+                  rate.pauschalHours
+                ),
+              };
+            });
           } else {
             // Remove the line item entirely
             newItems = prev.items.filter((item) => item.rateId !== vehicle.rateId);
@@ -300,12 +312,22 @@ export default function KostenersatzCalculationPage({
 
           let newItems: KostenersatzLineItem[];
           if (existingItemIndex >= 0) {
-            // Increment existing item
-            newItems = prev.items.map((item, idx) =>
-              idx === existingItemIndex
-                ? { ...item, einheiten: item.einheiten + 1 }
-                : item
-            );
+            // Increment existing item and recalculate sum
+            newItems = prev.items.map((item, idx) => {
+              if (idx !== existingItemIndex) return item;
+              const newEinheiten = item.einheiten + 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(
+                  item.anzahlStunden,
+                  newEinheiten,
+                  rate.price,
+                  rate.pricePauschal,
+                  rate.pauschalHours
+                ),
+              };
+            });
           } else {
             // Add new item
             const newItem = createLineItem(
@@ -326,7 +348,7 @@ export default function KostenersatzCalculationPage({
         }
       });
     },
-    [selectedVehicleIds, ratesById, vehiclesById]
+    [ratesById, vehiclesById]
   );
 
   // Empfänger tab handlers
