@@ -207,6 +207,7 @@ export default function KostenersatzTemplateDialog({
                           label="Einheiten"
                         />
                       }
+                      slotProps={{ secondary: { component: 'div' } }}
                     />
                   </ListItem>
                 ))}
