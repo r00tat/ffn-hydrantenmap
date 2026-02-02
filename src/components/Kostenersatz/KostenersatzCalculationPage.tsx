@@ -637,6 +637,7 @@ export default function KostenersatzCalculationPage({
         onClose={handleTemplateSaved}
         calculationItems={calculation.items}
         calculationDefaultStunden={calculation.defaultStunden}
+        calculationVehicles={calculation.vehicles}
         isAdmin={isAdmin}
       />
 
