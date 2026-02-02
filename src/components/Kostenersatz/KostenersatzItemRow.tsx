@@ -113,7 +113,7 @@ export default function KostenersatzItemRow({
     const value = e.target.value;
     setLocalStunden(value);
 
-    const numValue = parseInt(value, 10);
+    const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue > 0) {
       onItemChange(rate.id, einheiten, numValue, numValue !== defaultStunden);
     }
@@ -213,9 +213,9 @@ export default function KostenersatzItemRow({
               value={localStunden}
               onChange={handleStundenChange}
               disabled={disabled || !hasValue}
-              inputProps={{ min: 1, style: { textAlign: 'right' } }}
+              inputProps={{ min: 0.5, step: 0.5, style: { textAlign: 'right' } }}
               sx={{
-                width: { xs: 45, sm: 55 },
+                width: { xs: 50, sm: 60 },
                 '& input': {
                   color: stundenOverridden ? 'warning.main' : 'inherit',
                 },

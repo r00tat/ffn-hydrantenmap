@@ -390,7 +390,8 @@ export default function KostenersatzPdf({
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Die Berechnung erfolgt laut Landesgesetzblatt Nr. 77/2023
+            Die Berechnung erfolgt laut Landesgesetzblatt Nr. 77/2023, siehe
+            https://www.ris.bka.gv.at/eli/lgbl/BU/2023/77/20231107
           </Text>
           <Text style={styles.footerText}>
             Freiwillige Feuerwehr Neusiedl/See, A-7100 Neusiedl/See Satzgasse 9,

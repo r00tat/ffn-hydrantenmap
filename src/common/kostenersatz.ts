@@ -135,9 +135,42 @@ export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
 // ============================================================================
 
 /**
+ * Round hours according to tariff billing rules:
+ * - First hour is always charged in full
+ * - Each additional started hour: up to 30 min (0.5h) = half rate, over 30 min = full rate
+ *
+ * Examples:
+ * - 1.0 → 1.0 (1 full hour)
+ * - 1.3 → 1.5 (1 hour + 0.3 rounds to 0.5)
+ * - 1.5 → 1.5 (1 hour + exactly 0.5)
+ * - 1.7 → 2.0 (1 hour + 0.7 rounds to 1.0)
+ * - 3.3 → 3.5 (3 hours + 0.3 rounds to 0.5)
+ * - 3.7 → 4.0 (3 hours + 0.7 rounds to 1.0)
+ *
+ * @param hours Raw hours input
+ * @returns Billable hours according to tariff rules
+ */
+export function roundHoursForBilling(hours: number): number {
+  if (hours <= 0) return 0;
+
+  const fullHours = Math.floor(hours);
+  const fraction = hours - fullHours;
+
+  // Use small epsilon for floating point comparison
+  if (fraction < 0.001) {
+    return fullHours;
+  } else if (fraction <= 0.5 + 0.001) {
+    return fullHours + 0.5;
+  } else {
+    return fullHours + 1;
+  }
+}
+
+/**
  * Calculate the sum for a single line item based on hours and units
  *
  * Logic:
+ * - Hours are rounded according to tariff rules (see roundHoursForBilling)
  * - For hours 1-4: Use hourly rate (einheiten × stunden × price)
  * - For hours 5+: Use pauschal rate per block (12h or 24h depending on category)
  *   - Category 2,4: 12h blocks (hours 5-12 = 1 block, 13-24 = 2 blocks, etc.)
@@ -167,13 +200,16 @@ export function calculateItemSum(
     return roundCurrency(einheiten * pricePauschal);
   }
 
-  if (anzahlStunden < 5 || !pricePauschal) {
+  // Round hours according to tariff billing rules
+  const billableHours = roundHoursForBilling(anzahlStunden);
+
+  if (billableHours < 5 || !pricePauschal) {
     // Hourly rate for first 4 hours (or if no pauschal defined)
-    return roundCurrency(einheiten * anzahlStunden * price);
+    return roundCurrency(einheiten * billableHours * price);
   } else {
     // Pauschal rate kicks in at hour 5+
     // Each started block (12h or 24h) uses one pauschal
-    const pauschalBlocks = Math.ceil(anzahlStunden / pauschalHours);
+    const pauschalBlocks = Math.ceil(billableHours / pauschalHours);
     return roundCurrency(einheiten * pauschalBlocks * pricePauschal);
   }
 }
