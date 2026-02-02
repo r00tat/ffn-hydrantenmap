@@ -411,10 +411,34 @@ export default function KostenersatzCalculationPage({
   // Template handlers
   const handleTemplateLoad = useCallback(
     (template: KostenersatzTemplate) => {
+      const stunden = template.defaultStunden || calculation.defaultStunden;
+
+      // Get vehicle line items first
+      const vehicleLineItems: KostenersatzLineItem[] = [];
+      const templateVehicles = template.vehicles || [];
+
+      for (const vehicleId of templateVehicles) {
+        const vehicle = vehiclesById.get(vehicleId);
+        if (vehicle) {
+          const rate = ratesById.get(vehicle.rateId);
+          if (rate) {
+            const existingVehicleItem = vehicleLineItems.find(
+              (item) => item.rateId === vehicle.rateId
+            );
+            if (existingVehicleItem) {
+              existingVehicleItem.einheiten += 1;
+            } else {
+              vehicleLineItems.push(
+                createLineItem(vehicle.rateId, 1, stunden, rate, stunden)
+              );
+            }
+          }
+        }
+      }
+
       // Convert template items to calculation items with calculated sums
-      const newItems: KostenersatzLineItem[] = template.items.map((templateItem) => {
+      const templateItems: KostenersatzLineItem[] = template.items.map((templateItem) => {
         const rate = ratesById.get(templateItem.rateId);
-        const stunden = template.defaultStunden || calculation.defaultStunden;
         return {
           rateId: templateItem.rateId,
           einheiten: templateItem.einheiten,
@@ -426,15 +450,22 @@ export default function KostenersatzCalculationPage({
         };
       });
 
+      // Merge: vehicle items first, then non-vehicle template items (avoiding duplicates)
+      const vehicleRateIds = new Set(vehicleLineItems.map((item) => item.rateId));
+      const nonVehicleItems = templateItems.filter(
+        (item) => !vehicleRateIds.has(item.rateId)
+      );
+
       setCalculation((prev) => ({
         ...prev,
-        items: newItems,
+        vehicles: templateVehicles,
+        items: [...vehicleLineItems, ...nonVehicleItems],
         defaultStunden: template.defaultStunden || prev.defaultStunden,
       }));
 
       setSuccessMessage(`Vorlage "${template.name}" geladen`);
     },
-    [ratesById, calculation.defaultStunden]
+    [ratesById, vehiclesById, calculation.defaultStunden]
   );
 
   const handleTemplateSaved = useCallback((saved?: boolean) => {
