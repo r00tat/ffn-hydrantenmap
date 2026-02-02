@@ -286,6 +286,21 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     };
   }, [serverLogin]);
 
+  // Refresh session when tab becomes visible again (handles suspended tabs)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        console.info('tab became visible, refreshing session');
+        await serverLogin();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [serverLogin]);
+
   const fbSignOut = useCallback(async () => {
     if (window && window.sessionStorage) {
       window.sessionStorage.removeItem(SESSION_STORAGE_AUTH_KEY);
