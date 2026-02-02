@@ -7,11 +7,14 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
+import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { randomUUID } from 'crypto';
 import moment from 'moment';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
@@ -308,6 +311,45 @@ export function EinsatzTagebuch({
   const addEinsatzTagebuch = useFirecallItemAdd();
   const { query, resultHtml, isQuerying } = useFirecallAIQueryStream();
 
+  const [inlineArt, setInlineArt] = useState<'M' | 'B' | 'F'>('M');
+  const [inlineVon, setInlineVon] = useState('');
+  const [inlineAn, setInlineAn] = useState('');
+  const [inlineName, setInlineName] = useState('');
+  const [inlineBeschreibung, setInlineBeschreibung] = useState('');
+
+  const resetInlineForm = useCallback(() => {
+    setInlineArt('M');
+    setInlineVon('');
+    setInlineAn('');
+    setInlineName('');
+    setInlineBeschreibung('');
+  }, []);
+
+  const handleInlineAdd = useCallback(() => {
+    if (!inlineName.trim()) return;
+    const newDiary: Diary = {
+      type: 'diary',
+      nummer: diaryCounter,
+      datum: new Date().toISOString(),
+      art: inlineArt,
+      von: inlineVon,
+      an: inlineAn,
+      name: inlineName,
+      beschreibung: inlineBeschreibung,
+    };
+    addEinsatzTagebuch(newDiary);
+    resetInlineForm();
+  }, [
+    inlineArt,
+    inlineVon,
+    inlineAn,
+    inlineName,
+    inlineBeschreibung,
+    diaryCounter,
+    addEinsatzTagebuch,
+    resetInlineForm,
+  ]);
+
   const updateDescription = useCallback(async () => {
     const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
       firecall.name
@@ -379,9 +421,111 @@ export function EinsatzTagebuch({
             <b>Beschreibung</b>
           </Grid>
           <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
+
+          {showEditButton && (
+            <>
+              <Grid
+                size={{ md: 2, lg: 1 }}
+                sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
+              >
+                {diaryCounter}
+              </Grid>
+              <Grid
+                size={{ md: 5, lg: 2 }}
+                sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  jetzt
+                </Typography>
+              </Grid>
+              <Grid
+                size={{ md: 5, lg: 2 }}
+                sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, py: 1 }}
+              >
+                <FormControl size="small" sx={{ minWidth: 60 }}>
+                  <Select
+                    value={inlineArt}
+                    onChange={(e) =>
+                      setInlineArt(e.target.value as 'M' | 'B' | 'F')
+                    }
+                    size="small"
+                  >
+                    <MenuItem value="M">M</MenuItem>
+                    <MenuItem value="B">B</MenuItem>
+                    <MenuItem value="F">F</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  placeholder="von"
+                  value={inlineVon}
+                  onChange={(e) => setInlineVon(e.target.value)}
+                  sx={{ width: 60 }}
+                />
+                <TextField
+                  size="small"
+                  placeholder="an"
+                  value={inlineAn}
+                  onChange={(e) => setInlineAn(e.target.value)}
+                  sx={{ width: 60 }}
+                />
+              </Grid>
+              <Grid
+                size={{ md: 5, lg: 3 }}
+                sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
+              >
+                <TextField
+                  size="small"
+                  placeholder="Information"
+                  value={inlineName}
+                  onChange={(e) => setInlineName(e.target.value)}
+                  fullWidth
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleInlineAdd();
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid
+                size={{ md: 5, lg: 3 }}
+                sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
+              >
+                <TextField
+                  size="small"
+                  placeholder="Anmerkung"
+                  value={inlineBeschreibung}
+                  onChange={(e) => setInlineBeschreibung(e.target.value)}
+                  fullWidth
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleInlineAdd();
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid
+                size={{ md: 2, lg: 1 }}
+                sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
+              >
+                <Tooltip title="Eintrag hinzufügen">
+                  <IconButton
+                    color="primary"
+                    onClick={handleInlineAdd}
+                    disabled={!inlineName.trim()}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                </Tooltip>
+              </Grid>
+            </>
+          )}
+
           {diaries.map((e, index) => (
             <React.Fragment
-              key={`tagebuch-${e.id || randomUUID()}-${e.nummer}`}
+              key={`tagebuch-${e.id || index}-${e.nummer}`}
             >
               <Grid
                 size={{ xs: 3, md: 2, lg: 1 }}

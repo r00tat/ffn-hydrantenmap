@@ -8,6 +8,7 @@ import { useState, SyntheticEvent, ReactNode } from 'react';
 import AdminActions from './AdminActions';
 import GisDataPipeline from './GisDataPipeline';
 import HydrantClusters from './HydrantClusters';
+import KostenersatzAdminSettings from '../Kostenersatz/KostenersatzAdminSettings';
 
 interface TabPanelProps {
   children?: ReactNode;
@@ -48,10 +49,11 @@ export default function AdminTabs() {
         Admin
       </Typography>
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={value} onChange={handleChange} aria-label="admin tabs">
+        <Tabs value={value} onChange={handleChange} aria-label="admin tabs" variant="scrollable" scrollButtons="auto">
           <Tab label="Admin Actions" {...a11yProps(0)} />
           <Tab label="GIS Data Pipeline" {...a11yProps(1)} />
           <Tab label="Hydrant Clusters" {...a11yProps(2)} />
+          <Tab label="Kostenersatz" {...a11yProps(3)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -62,6 +64,9 @@ export default function AdminTabs() {
       </TabPanel>
       <TabPanel value={value} index={2}>
         <HydrantClusters />
+      </TabPanel>
+      <TabPanel value={value} index={3}>
+        <KostenersatzAdminSettings />
       </TabPanel>
     </Box>
   );

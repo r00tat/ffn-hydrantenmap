@@ -1,6 +1,7 @@
 import moment from 'moment';
 
 export const dateTimeFormat = 'DD.MM.YYYY HH:mm:ss';
+export const dateFormat = 'DD.MM.YYYY';
 
 export function formatTimestamp(timestamp?: string | Date) {
   return moment(timestamp).locale('de').format(dateTimeFormat);

@@ -3,12 +3,14 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
+import Drawer from '@mui/material/Drawer';
 import Fab from '@mui/material/Fab';
 import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid';
@@ -33,6 +35,7 @@ import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
+import { KostenersatzList } from '../Kostenersatz';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
@@ -60,6 +63,7 @@ function EinsatzCard({
 }) {
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [kostenersatzOpen, setKostenersatzOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
   const { isAdmin, groups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
@@ -169,6 +173,15 @@ function EinsatzCard({
               <ShareIcon />
             </IconButton>
           </Tooltip>
+          <Tooltip title="Kostenersatz-Berechnungen">
+            <IconButton
+              size="small"
+              onClick={() => setKostenersatzOpen(true)}
+              color="primary"
+            >
+              <ReceiptLongIcon />
+            </IconButton>
+          </Tooltip>
         </CardActions>
       </Card>
       {displayUpdateDialog && (
@@ -183,6 +196,20 @@ function EinsatzCard({
           onConfirm={deleteFn}
         />
       )}
+      <Drawer
+        anchor="right"
+        open={kostenersatzOpen}
+        onClose={() => setKostenersatzOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 500, md: 600 }, p: 2 } }}
+      >
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">{einsatz.name}</Typography>
+          <Button onClick={() => setKostenersatzOpen(false)}>Schließen</Button>
+        </Box>
+        {einsatz.id && (
+          <KostenersatzList firecallId={einsatz.id} />
+        )}
+      </Drawer>
     </Grid>
   );
 }

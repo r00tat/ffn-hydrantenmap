@@ -47,7 +47,7 @@ git checkout -- next-env.d.ts
 ### Directory Structure
 
 - `src/app/` - Next.js App Router pages and API routes
-- `src/components/` - React components organized by feature (Map/, firebase/, providers/, pages/, FirecallItems/)
+- `src/components/` - React components organized by feature (Map/, firebase/, providers/, pages/, FirecallItems/, Kostenersatz/)
 - `src/hooks/` - Custom React hooks (34 hooks for Firebase, map editing, positioning, etc.)
 - `src/common/` - Shared utilities and type definitions
 - `src/server/` - Server-side utilities (Firebase admin, data import/export)
@@ -88,6 +88,7 @@ Key domain terms used throughout the codebase:
 - **Schadstoff** - Hazardous materials
 - **Lageführung** - Situation management
 - **Hydranten** - Fire hydrants
+- **Kostenersatz** - Cost recovery (billing for fire department services per tariff ordinance)
 
 ## Environment Configuration
 

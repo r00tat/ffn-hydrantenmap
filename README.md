@@ -15,6 +15,7 @@ Die Applikation ist [Open Source](LICENSE) und kann auch von anderen Feuerwehren
 - **Einsatztagebuch** - Dokumentation von Einsatzereignissen
 - **Fahrzeugtracking** - Verfolgung von Einsatzfahrzeugen
 - **Schadstoffdatenbank** - Informationen zu Gefahrstoffen
+- **Kostenersatz** - Berechnung und PDF-Generierung für Kostenersatz nach Tarifordnung (LGBl. Nr. 77/2023)
 - **PWA** - Installation als App auf Mobilgeräten möglich
 - **Push-Benachrichtigungen** - via Firebase Cloud Messaging
 
