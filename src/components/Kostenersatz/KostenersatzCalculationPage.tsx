@@ -367,9 +367,9 @@ export default function KostenersatzCalculationPage({
           Zurück
         </Button>
         <Typography variant="h6" sx={{ flex: 1, minWidth: { xs: '100%', sm: 'auto' }, order: { xs: -1, sm: 0 } }}>
-          {existingCalculation ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
+          {existingCalculation || calculation.id ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
         </Typography>
-        {!existingCalculation && isEditable && (
+        {isEditable && (
           <Button
             startIcon={<FolderOpenIcon />}
             onClick={() => setTemplateLoadDialogOpen(true)}
