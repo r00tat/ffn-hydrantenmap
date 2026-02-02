@@ -166,7 +166,7 @@ export default function KostenersatzCalculationPage({
               return {
                 ...item,
                 anzahlStunden: newStunden,
-                sum: calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal),
+                sum: calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
               };
             }
           }
@@ -184,7 +184,7 @@ export default function KostenersatzCalculationPage({
       if (!rate) return;
 
       const { calculateItemSum } = require('../../common/kostenersatz');
-      const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal);
+      const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours);
 
       setCalculation((prev) => {
         const existingIndex = prev.items.findIndex((i) => i.rateId === rateId);
@@ -332,7 +332,7 @@ export default function KostenersatzCalculationPage({
           anzahlStunden: stunden,
           stundenOverridden: false,
           sum: rate
-            ? calculateItemSum(stunden, templateItem.einheiten, rate.price, rate.pricePauschal)
+            ? calculateItemSum(stunden, templateItem.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
             : 0,
         };
       });

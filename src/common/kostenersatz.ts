@@ -30,7 +30,8 @@ export interface KostenersatzRate {
   description: string;
   unit: string;
   price: number; // Hourly/per-unit rate
-  pricePauschal?: number; // Flat rate for 5-12h (optional)
+  pricePauschal?: number; // Flat rate (optional)
+  pauschalHours?: number; // Duration covered by pauschal: 12h for cat 2,4 or 24h for cat 3,8,9
   isExtendable: boolean; // Only Tarif D items can have custom entries
   sortOrder: number;
 }
@@ -137,36 +138,42 @@ export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
  * Calculate the sum for a single line item based on hours and units
  *
  * Logic:
- * - For hours 1-5: Use hourly rate (einheiten × stunden × price)
- * - For hours 6+: Use pauschal rate per 12h block
- *   - Hours 6-12: 1 pauschal block
- *   - Hours 13-24: 2 pauschal blocks
- *   - Hours 25-36: 3 pauschal blocks
- *   - etc.
+ * - For hours 1-4: Use hourly rate (einheiten × stunden × price)
+ * - For hours 5+: Use pauschal rate per block (12h or 24h depending on category)
+ *   - Category 2,4: 12h blocks (hours 5-12 = 1 block, 13-24 = 2 blocks, etc.)
+ *   - Category 3,8,9: 24h blocks (hours 5-24 = 1 block, 25-48 = 2 blocks, etc.)
  *
  * @param anzahlStunden Number of hours
  * @param einheiten Number of units (vehicles, personnel, etc.)
  * @param price Hourly rate
- * @param pricePauschal Flat rate for 12h block (optional)
+ * @param pricePauschal Flat rate for pauschal block (optional)
+ * @param pauschalHours Duration of one pauschal block: 12 (default) or 24 hours
  * @returns Calculated sum
  */
 export function calculateItemSum(
   anzahlStunden: number,
   einheiten: number,
   price: number,
-  pricePauschal?: number
+  pricePauschal?: number,
+  pauschalHours: number = 12
 ): number {
   if (einheiten <= 0 || anzahlStunden <= 0) {
     return 0;
   }
 
-  if (anzahlStunden <= 5 || !pricePauschal) {
-    // Hourly rate for first 5 hours (or if no pauschal defined)
+  // For flat-rate items (price is 0 but pricePauschal exists), use pauschal directly
+  // This applies to Tariff B/10 items like "Aufsperren einer Wohnung" etc.
+  if (price === 0 && pricePauschal) {
+    return roundCurrency(einheiten * pricePauschal);
+  }
+
+  if (anzahlStunden < 5 || !pricePauschal) {
+    // Hourly rate for first 4 hours (or if no pauschal defined)
     return roundCurrency(einheiten * anzahlStunden * price);
   } else {
-    // Pauschal rate kicks in at hour 6+
-    // Each started 12h block uses one pauschal
-    const pauschalBlocks = Math.ceil(anzahlStunden / 12);
+    // Pauschal rate kicks in at hour 5+
+    // Each started block (12h or 24h) uses one pauschal
+    const pauschalBlocks = Math.ceil(anzahlStunden / pauschalHours);
     return roundCurrency(einheiten * pauschalBlocks * pricePauschal);
   }
 }
@@ -237,7 +244,7 @@ export function recalculateLineItem(
   return {
     ...item,
     anzahlStunden: stunden,
-    sum: calculateItemSum(stunden, item.einheiten, rate.price, rate.pricePauschal),
+    sum: calculateItemSum(stunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
   };
 }
 
@@ -288,7 +295,7 @@ export function createLineItem(
     einheiten,
     anzahlStunden,
     stundenOverridden,
-    sum: calculateItemSum(anzahlStunden, einheiten, rate.price, rate.pricePauschal),
+    sum: calculateItemSum(anzahlStunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
   };
 }
 

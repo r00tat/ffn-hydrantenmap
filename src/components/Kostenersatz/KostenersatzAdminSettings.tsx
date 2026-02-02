@@ -45,6 +45,7 @@ import {
   useKostenersatzVersions,
 } from '../../hooks/useKostenersatz';
 import {
+  useKostenersatzRateDelete,
   useKostenersatzRateUpsert,
   useKostenersatzSeedDefaultRates,
   useKostenersatzTemplateDelete,
@@ -64,6 +65,7 @@ export default function KostenersatzAdminSettings() {
   const setVersionActive = useKostenersatzVersionSetActive();
   const deleteTemplate = useKostenersatzTemplateDelete();
   const upsertRate = useKostenersatzRateUpsert();
+  const deleteRate = useKostenersatzRateDelete();
 
   const [seeding, setSeeding] = useState(false);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
@@ -178,6 +180,17 @@ export default function KostenersatzAdminSettings() {
     setEditedPrice(rate.price.toString());
     setEditedPricePauschal(rate.pricePauschal?.toString() || '');
     setRateDialogOpen(true);
+  };
+
+  const handleDeleteRate = async (rate: KostenersatzRate) => {
+    if (confirm(`Tarif "${rate.id} - ${rate.description}" wirklich löschen?`)) {
+      try {
+        await deleteRate(rate.version, rate.id);
+      } catch (error) {
+        console.error('Error deleting rate:', error);
+        alert('Fehler beim Löschen des Tarifs.');
+      }
+    }
   };
 
   const handleCloseRateDialog = () => {
@@ -408,13 +421,21 @@ export default function KostenersatzAdminSettings() {
                         <TableCell align="right">
                           {rate.pricePauschal ? formatCurrency(rate.pricePauschal) : '-'}
                         </TableCell>
-                        <TableCell align="center">
+                        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                           <IconButton
                             size="small"
                             onClick={() => handleEditRate(rate)}
                             title="Tarif bearbeiten"
                           >
                             <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteRate(rate)}
+                            title="Tarif löschen"
+                          >
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </TableCell>
                       </TableRow>
@@ -602,6 +623,7 @@ export default function KostenersatzAdminSettings() {
           }}
           existingTemplate={editingTemplate}
           isAdmin={true}
+          rates={rates}
         />
       )}
 

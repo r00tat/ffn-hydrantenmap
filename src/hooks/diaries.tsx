@@ -8,6 +8,10 @@ export function useSpreadsheetDiaries() {
   const [diaries, setDiaries] = useState<Diary[]>([]);
 
   useEffect(() => {
+    if (firecallId === 'unknown') {
+      setDiaries([]);
+      return;
+    }
     (async () => {
       const sheetEntries = await listSheetTagebuchEntriesAction(firecallId);
       setDiaries(sheetEntries);
