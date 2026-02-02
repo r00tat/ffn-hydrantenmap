@@ -18,12 +18,15 @@ import {
   KostenersatzCalculation,
   KostenersatzRate,
   KostenersatzTemplate,
+  KostenersatzVehicle,
   KostenersatzVersion,
   KOSTENERSATZ_RATES_COLLECTION,
   KOSTENERSATZ_SUBCOLLECTION,
   KOSTENERSATZ_TEMPLATES_COLLECTION,
+  KOSTENERSATZ_VEHICLES_COLLECTION,
   KOSTENERSATZ_VERSIONS_COLLECTION,
 } from '../common/kostenersatz';
+import { getDefaultVehicles } from '../common/defaultKostenersatzRates';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
@@ -434,4 +437,56 @@ export function useKostenersatzSeedDefaultRates() {
     },
     [email]
   );
+}
+
+// ============================================================================
+// Vehicle Mutations (Admin only)
+// ============================================================================
+
+/**
+ * Hook to add or update a vehicle
+ */
+export function useKostenersatzVehicleUpsert() {
+  return useCallback(async (vehicle: KostenersatzVehicle) => {
+    console.info(
+      `Upserting kostenersatz vehicle ${vehicle.id}: ${vehicle.name}`
+    );
+
+    await setDoc(
+      doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicle.id),
+      vehicle
+    );
+  }, []);
+}
+
+/**
+ * Hook to delete a vehicle
+ */
+export function useKostenersatzVehicleDelete() {
+  return useCallback(async (vehicleId: string) => {
+    console.info(`Deleting kostenersatz vehicle ${vehicleId}`);
+
+    await deleteDoc(doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicleId));
+  }, []);
+}
+
+/**
+ * Hook to seed default vehicles
+ */
+export function useKostenersatzSeedDefaultVehicles() {
+  return useCallback(async () => {
+    const batch = writeBatch(firestore);
+    const defaultVehicles = getDefaultVehicles();
+
+    for (const vehicle of defaultVehicles) {
+      batch.set(
+        doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicle.id),
+        vehicle
+      );
+    }
+
+    console.info(`Seeding ${defaultVehicles.length} default vehicles`);
+
+    await batch.commit();
+  }, []);
 }
