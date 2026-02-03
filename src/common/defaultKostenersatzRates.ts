@@ -1229,7 +1229,7 @@ export const DEFAULT_VEHICLES: Omit<KostenersatzVehicle, 'id'>[] = [
   },
   {
     name: 'WLA-Logistik',
-    rateId: '2.17',
+    rateId: '2.16',
     description: 'Logistik Mulde mit Schadstoffausrüstung',
     sortOrder: 12,
   },

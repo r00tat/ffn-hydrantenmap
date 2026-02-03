@@ -144,14 +144,10 @@ export default function KostenersatzVehicleTab({
   const reorderVehicles = useKostenersatzVehicleReorder();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5, // 5px movement required to start dragging
-      },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -167,7 +163,9 @@ export default function KostenersatzVehicleTab({
   const [formRateId, setFormRateId] = useState('');
 
   // Filter rates to categories 2, 4, 8
-  const vehicleRates = rates.filter((r) => [2, 4, 8].includes(r.categoryNumber));
+  const vehicleRates = rates.filter((r) =>
+    [2, 4, 8].includes(r.categoryNumber),
+  );
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);
@@ -354,7 +352,12 @@ export default function KostenersatzVehicleTab({
       </DndContext>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {editingVehicle ? 'Fahrzeug bearbeiten' : 'Fahrzeug hinzufügen'}
         </DialogTitle>
