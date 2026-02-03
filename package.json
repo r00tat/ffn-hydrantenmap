@@ -19,6 +19,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@google-cloud/vertexai": "^1.10.0",
     "@mapbox/togeojson": "^0.16.2",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",

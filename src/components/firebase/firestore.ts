@@ -233,6 +233,10 @@ export interface FirecallLocation {
   updatedAt?: string;
   updatedBy?: string;
   deleted?: boolean;
+
+  // Import tracking
+  /** Order/reference number from dispatch system for deduplication during email import */
+  auftragsNummer?: string;
 }
 
 export const defaultFirecallLocation: Partial<FirecallLocation> = {
