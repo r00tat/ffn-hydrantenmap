@@ -69,6 +69,7 @@ resource "google_service_account" "run_sa" {
 resource "google_project_iam_member" "run_iam" {
   for_each = toset([
     "roles/firebase.admin",
+    "roles/aiplatform.user",
   ])
   member  = google_service_account.run_sa.member
   role    = each.value
