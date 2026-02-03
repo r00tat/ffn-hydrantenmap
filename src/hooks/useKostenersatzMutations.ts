@@ -490,3 +490,22 @@ export function useKostenersatzSeedDefaultVehicles() {
     await batch.commit();
   }, []);
 }
+
+/**
+ * Hook to update vehicle sort orders in batch
+ */
+export function useKostenersatzVehicleReorder() {
+  return useCallback(async (vehicleIds: string[]) => {
+    const batch = writeBatch(firestore);
+
+    vehicleIds.forEach((id, index) => {
+      batch.update(doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, id), {
+        sortOrder: index + 1,
+      });
+    });
+
+    console.info(`Reordering ${vehicleIds.length} vehicles`);
+
+    await batch.commit();
+  }, []);
+}
