@@ -17,6 +17,7 @@ export default function LocationsLayer() {
             item={
               {
                 ...location,
+                name: location.name || `${location.street} ${location.number}`.trim(),
                 type: 'marker',
                 color: LOCATION_STATUS_COLORS[location.status as LocationStatus] || 'red',
                 beschreibung: [
