@@ -144,7 +144,11 @@ export default function KostenersatzVehicleTab({
   const reorderVehicles = useKostenersatzVehicleReorder();
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // 5px movement required to start dragging
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -249,10 +253,10 @@ export default function KostenersatzVehicleTab({
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(vehicles, oldIndex, newIndex);
-        const vehicleIds = newOrder.map((v) => v.id);
 
         try {
-          await reorderVehicles(vehicleIds);
+          // Pass full vehicle objects - this will upsert them if using defaults
+          await reorderVehicles(newOrder);
         } catch (error) {
           console.error('Error reordering vehicles:', error);
           alert('Fehler beim Sortieren der Fahrzeuge.');
@@ -333,7 +337,6 @@ export default function KostenersatzVehicleTab({
                   getRateDescription={getRateDescription}
                   onEdit={handleOpenEdit}
                   onDelete={handleDelete}
-                  disabled={isUsingDefaults}
                 />
               ))}
             </SortableContext>

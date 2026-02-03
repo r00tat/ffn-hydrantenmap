@@ -493,18 +493,20 @@ export function useKostenersatzSeedDefaultVehicles() {
 
 /**
  * Hook to update vehicle sort orders in batch
+ * Accepts full vehicle objects to support upserting when vehicles don't exist yet
  */
 export function useKostenersatzVehicleReorder() {
-  return useCallback(async (vehicleIds: string[]) => {
+  return useCallback(async (vehicles: KostenersatzVehicle[]) => {
     const batch = writeBatch(firestore);
 
-    vehicleIds.forEach((id, index) => {
-      batch.update(doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, id), {
+    vehicles.forEach((vehicle, index) => {
+      batch.set(doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicle.id), {
+        ...vehicle,
         sortOrder: index + 1,
       });
     });
 
-    console.info(`Reordering ${vehicleIds.length} vehicles`);
+    console.info(`Reordering ${vehicles.length} vehicles`);
 
     await batch.commit();
   }, []);
