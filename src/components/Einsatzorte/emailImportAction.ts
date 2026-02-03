@@ -11,6 +11,7 @@ import {
   FIRECALL_LOCATIONS_COLLECTION_ID,
   FirecallLocation,
 } from '../firebase/firestore';
+import { geocodeAddress } from './geocode';
 
 const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -308,6 +309,25 @@ export async function processUnwetterEmails(
         existingAuftragsNummern.add(einsatz.auftragsNummer);
       }
       processedMessageIds.add(messageId);
+    }
+
+    // Geocode locations that have addresses
+    for (const location of locationsToAdd) {
+      if (location.street && location.city) {
+        try {
+          const coords = await geocodeAddress(
+            location.street,
+            location.number || '',
+            location.city
+          );
+          if (coords) {
+            location.lat = coords.lat;
+            location.lng = coords.lng;
+          }
+        } catch (error) {
+          console.error('Geocoding failed for location:', location.street, error);
+        }
+      }
     }
 
     // Write locations to Firestore using batch writes
