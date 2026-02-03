@@ -14,13 +14,16 @@ import {
   calculateSubtotals,
   calculateTotalSum,
   createEmptyCalculation,
+  createLineItem,
   KostenersatzCalculation,
   KostenersatzLineItem,
   KostenersatzCustomItem,
   KostenersatzRecipient,
+  KostenersatzVehicle,
 } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { useKostenersatzRates, useKostenersatzVersions } from '../../hooks/useKostenersatz';
+import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 import {
   useKostenersatzAdd,
   useKostenersatzUpdate,
@@ -92,6 +95,7 @@ export default function KostenersatzCalculationPage({
   const { email, isAdmin } = useFirebaseLogin();
   const { activeVersion } = useKostenersatzVersions();
   const { rates, ratesById } = useKostenersatzRates(activeVersion?.id);
+  const { vehiclesById } = useKostenersatzVehicles();
   const addCalculation = useKostenersatzAdd(firecallId);
   const updateCalculation = useKostenersatzUpdate(firecallId);
   const duplicateCalculation = useKostenersatzDuplicate(firecallId);
@@ -240,6 +244,113 @@ export default function KostenersatzCalculationPage({
     []
   );
 
+  // Derive selected vehicle IDs from calculation
+  const selectedVehicleIds = useMemo(() => {
+    return calculation.vehicles || [];
+  }, [calculation.vehicles]);
+
+  // Vehicle toggle handler
+  const handleVehicleToggle = useCallback(
+    (vehicle: KostenersatzVehicle) => {
+      const rate = ratesById.get(vehicle.rateId);
+
+      if (!rate) {
+        console.warn(`Rate ${vehicle.rateId} not found for vehicle ${vehicle.id}`);
+        return;
+      }
+
+      setCalculation((prev) => {
+        // Check isSelected inside the callback to avoid stale closure issues
+        const isSelected = (prev.vehicles || []).includes(vehicle.id);
+
+        if (isSelected) {
+          // Remove vehicle: remove from vehicles array and remove/decrement line item
+          const newVehicles = (prev.vehicles || []).filter((id) => id !== vehicle.id);
+
+          // Check if other selected vehicles use the same rate
+          const otherVehiclesWithSameRate = newVehicles.filter((vId) => {
+            const v = vehiclesById.get(vId);
+            return v && v.rateId === vehicle.rateId;
+          });
+
+          let newItems: KostenersatzLineItem[];
+          if (otherVehiclesWithSameRate.length > 0) {
+            // Decrement the line item and recalculate sum
+            newItems = prev.items.map((item) => {
+              if (item.rateId !== vehicle.rateId) return item;
+              const newEinheiten = item.einheiten - 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(
+                  item.anzahlStunden,
+                  newEinheiten,
+                  rate.price,
+                  rate.pricePauschal,
+                  rate.pauschalHours
+                ),
+              };
+            });
+          } else {
+            // Remove the line item entirely
+            newItems = prev.items.filter((item) => item.rateId !== vehicle.rateId);
+          }
+
+          return {
+            ...prev,
+            vehicles: newVehicles,
+            items: newItems,
+          };
+        } else {
+          // Add vehicle: add to vehicles array and add/increment line item
+          const newVehicles = [...(prev.vehicles || []), vehicle.id];
+
+          // Check if rate already exists (multiple vehicles can map to same rate)
+          const existingItemIndex = prev.items.findIndex(
+            (item) => item.rateId === vehicle.rateId
+          );
+
+          let newItems: KostenersatzLineItem[];
+          if (existingItemIndex >= 0) {
+            // Increment existing item and recalculate sum
+            newItems = prev.items.map((item, idx) => {
+              if (idx !== existingItemIndex) return item;
+              const newEinheiten = item.einheiten + 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(
+                  item.anzahlStunden,
+                  newEinheiten,
+                  rate.price,
+                  rate.pricePauschal,
+                  rate.pauschalHours
+                ),
+              };
+            });
+          } else {
+            // Add new item
+            const newItem = createLineItem(
+              vehicle.rateId,
+              1, // einheiten
+              prev.defaultStunden,
+              rate,
+              prev.defaultStunden
+            );
+            newItems = [...prev.items, newItem];
+          }
+
+          return {
+            ...prev,
+            vehicles: newVehicles,
+            items: newItems,
+          };
+        }
+      });
+    },
+    [ratesById, vehiclesById]
+  );
+
   // Empfänger tab handlers
   const handleRecipientChange = useCallback((recipient: KostenersatzRecipient) => {
     setCalculation((prev) => ({
@@ -322,10 +433,34 @@ export default function KostenersatzCalculationPage({
   // Template handlers
   const handleTemplateLoad = useCallback(
     (template: KostenersatzTemplate) => {
+      const stunden = template.defaultStunden || calculation.defaultStunden;
+
+      // Get vehicle line items first
+      const vehicleLineItems: KostenersatzLineItem[] = [];
+      const templateVehicles = template.vehicles || [];
+
+      for (const vehicleId of templateVehicles) {
+        const vehicle = vehiclesById.get(vehicleId);
+        if (vehicle) {
+          const rate = ratesById.get(vehicle.rateId);
+          if (rate) {
+            const existingVehicleItem = vehicleLineItems.find(
+              (item) => item.rateId === vehicle.rateId
+            );
+            if (existingVehicleItem) {
+              existingVehicleItem.einheiten += 1;
+            } else {
+              vehicleLineItems.push(
+                createLineItem(vehicle.rateId, 1, stunden, rate, stunden)
+              );
+            }
+          }
+        }
+      }
+
       // Convert template items to calculation items with calculated sums
-      const newItems: KostenersatzLineItem[] = template.items.map((templateItem) => {
+      const templateItems: KostenersatzLineItem[] = template.items.map((templateItem) => {
         const rate = ratesById.get(templateItem.rateId);
-        const stunden = template.defaultStunden || calculation.defaultStunden;
         return {
           rateId: templateItem.rateId,
           einheiten: templateItem.einheiten,
@@ -337,15 +472,22 @@ export default function KostenersatzCalculationPage({
         };
       });
 
+      // Merge: vehicle items first, then non-vehicle template items (avoiding duplicates)
+      const vehicleRateIds = new Set(vehicleLineItems.map((item) => item.rateId));
+      const nonVehicleItems = templateItems.filter(
+        (item) => !vehicleRateIds.has(item.rateId)
+      );
+
       setCalculation((prev) => ({
         ...prev,
-        items: newItems,
+        vehicles: templateVehicles,
+        items: [...vehicleLineItems, ...nonVehicleItems],
         defaultStunden: template.defaultStunden || prev.defaultStunden,
       }));
 
       setSuccessMessage(`Vorlage "${template.name}" geladen`);
     },
-    [ratesById, calculation.defaultStunden]
+    [ratesById, vehiclesById, calculation.defaultStunden]
   );
 
   const handleTemplateSaved = useCallback((saved?: boolean) => {
@@ -407,6 +549,8 @@ export default function KostenersatzCalculationPage({
               ratesById={ratesById}
               onItemChange={handleItemChange}
               onCustomItemChange={handleCustomItemChange}
+              onVehicleToggle={handleVehicleToggle}
+              selectedVehicleIds={selectedVehicleIds}
               disabled={!isEditable}
             />
           </TabPanel>
@@ -515,6 +659,7 @@ export default function KostenersatzCalculationPage({
         onClose={handleTemplateSaved}
         calculationItems={calculation.items}
         calculationDefaultStunden={calculation.defaultStunden}
+        calculationVehicles={calculation.vehicles}
         isAdmin={isAdmin}
       />
 

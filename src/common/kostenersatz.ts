@@ -55,6 +55,7 @@ export interface KostenersatzTemplate {
   updatedAt?: string;
   items: KostenersatzTemplateItem[];
   defaultStunden?: number;
+  vehicles?: string[]; // Array of vehicle IDs included in template
 }
 
 // ============================================================================
@@ -116,6 +117,9 @@ export interface KostenersatzCalculation {
 
   totalSum: number;
 
+  // Selected vehicles
+  vehicles?: string[];
+
   // PDF/Email tracking
   pdfUrl?: string;
   emailSentAt?: string;
@@ -129,6 +133,19 @@ export const KOSTENERSATZ_RATES_COLLECTION = 'kostenersatzRates';
 export const KOSTENERSATZ_VERSIONS_COLLECTION = 'kostenersatzVersions';
 export const KOSTENERSATZ_TEMPLATES_COLLECTION = 'kostenersatzTemplates';
 export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
+export const KOSTENERSATZ_VEHICLES_COLLECTION = 'kostenersatzVehicles';
+
+// ============================================================================
+// Vehicle Types
+// ============================================================================
+
+export interface KostenersatzVehicle {
+  id: string; // e.g., "kdtfa", "rlfa-3000"
+  name: string; // e.g., "KDTFA", "RLFA 3000/100"
+  rateId: string; // e.g., "2.01", "2.05"
+  description?: string; // e.g., "Kommando Neusiedl am See"
+  sortOrder: number; // For consistent display order
+}
 
 // ============================================================================
 // Calculation Logic

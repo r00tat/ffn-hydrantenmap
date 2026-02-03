@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -16,6 +17,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect } from 'react';
+import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 import {
   KostenersatzTemplate,
   KostenersatzLineItem,
@@ -34,6 +36,7 @@ export interface KostenersatzTemplateDialogProps {
   /** For creating a new template from a calculation */
   calculationItems?: KostenersatzLineItem[];
   calculationDefaultStunden?: number;
+  calculationVehicles?: string[];
   isAdmin?: boolean;
   /** Rates for displaying item descriptions when editing */
   rates?: KostenersatzRate[];
@@ -45,14 +48,17 @@ export default function KostenersatzTemplateDialog({
   existingTemplate,
   calculationItems,
   calculationDefaultStunden,
+  calculationVehicles,
   isAdmin = false,
   rates = [],
 }: KostenersatzTemplateDialogProps) {
+  const { vehiclesById } = useKostenersatzVehicles();
   const [name, setName] = useState(existingTemplate?.name || '');
   const [description, setDescription] = useState(existingTemplate?.description || '');
   const [isShared, setIsShared] = useState(existingTemplate?.isShared || false);
   const [isSaving, setIsSaving] = useState(false);
   const [editedItems, setEditedItems] = useState<KostenersatzTemplateItem[]>([]);
+  const [editedVehicles, setEditedVehicles] = useState<string[]>([]);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -70,8 +76,16 @@ export default function KostenersatzTemplateDialog({
       } else {
         setEditedItems([]);
       }
+      // Initialize edited vehicles
+      if (calculationVehicles) {
+        setEditedVehicles([...calculationVehicles]);
+      } else if (existingTemplate?.vehicles) {
+        setEditedVehicles([...existingTemplate.vehicles]);
+      } else {
+        setEditedVehicles([]);
+      }
     }
-  }, [open, existingTemplate, calculationItems]);
+  }, [open, existingTemplate, calculationItems, calculationVehicles]);
 
   // Helper to get rate description
   const getRateDescription = (rateId: string): string => {
@@ -113,6 +127,7 @@ export default function KostenersatzTemplateDialog({
           description: trimmedDescription || '', // Use empty string, not undefined
           isShared,
           items: editedItems,
+          vehicles: editedVehicles.length > 0 ? editedVehicles : undefined,
         });
       } else {
         await addTemplate({
@@ -121,6 +136,7 @@ export default function KostenersatzTemplateDialog({
           isShared,
           items: editedItems,
           defaultStunden: defaultStundenToSave,
+          vehicles: editedVehicles.length > 0 ? editedVehicles : undefined,
         });
       }
       onClose(true);
@@ -170,6 +186,27 @@ export default function KostenersatzTemplateDialog({
               }
               label="Für alle Benutzer freigeben (gemeinsame Vorlage)"
             />
+          )}
+          {/* Show vehicles when saving from calculation */}
+          {editedVehicles.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Fahrzeuge ({editedVehicles.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {editedVehicles.map((vehicleId) => {
+                  const vehicle = vehiclesById.get(vehicleId);
+                  return (
+                    <Chip
+                      key={vehicleId}
+                      label={vehicle?.name || vehicleId}
+                      size="small"
+                      variant="outlined"
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
           )}
           {/* Show items list when editing existing template */}
           {existingTemplate?.id && editedItems.length > 0 && (

@@ -8,7 +8,11 @@
  * reset by admins if needed.
  */
 
-import { KostenersatzRate, KostenersatzVersion } from './kostenersatz';
+import {
+  KostenersatzRate,
+  KostenersatzVehicle,
+  KostenersatzVersion,
+} from './kostenersatz';
 
 export const DEFAULT_VERSION_ID = 'LGBl_77_2023';
 
@@ -288,31 +292,31 @@ export const DEFAULT_RATES: Omit<KostenersatzRate, 'version' | 'validFrom'>[] =
       isExtendable: false,
       sortOrder: 215,
     },
-    // {
-    //   id: '2.16',
-    //   category: 'A',
-    //   categoryNumber: 2,
-    //   categoryName: 'Fahrzeuge und Anhänger',
-    //   description: 'Wechselladeaufbau Atemluft, GSF, KSF, TDF',
-    //   unit: 'je Std / 5-12h pauschal',
-    //   price: 130.6,
-    //   pricePauschal: 653.0,
-    //   isExtendable: false,
-    //   sortOrder: 216,
-    // },
-    // {
-    //   id: '2.17',
-    //   category: 'A',
-    //   categoryNumber: 2,
-    //   categoryName: 'Fahrzeuge und Anhänger',
-    //   description:
-    //     'Wechselladeaufbau Einsatzleitung, Versorgung, Feuerwehrmedizinischer Dienst, Sanitär',
-    //   unit: 'je Std / 5-12h pauschal',
-    //   price: 58.3,
-    //   pricePauschal: 291.5,
-    //   isExtendable: false,
-    //   sortOrder: 217,
-    // },
+    {
+      id: '2.16',
+      category: 'A',
+      categoryNumber: 2,
+      categoryName: 'Fahrzeuge und Anhänger',
+      description: 'Wechselladeaufbau Atemluft, GSF, KSF, TDF',
+      unit: 'je Std / 5-12h pauschal',
+      price: 130.6,
+      pricePauschal: 653.0,
+      isExtendable: false,
+      sortOrder: 216,
+    },
+    {
+      id: '2.17',
+      category: 'A',
+      categoryNumber: 2,
+      categoryName: 'Fahrzeuge und Anhänger',
+      description:
+        'Wechselladeaufbau Einsatzleitung, Versorgung, Feuerwehrmedizinischer Dienst, Sanitär',
+      unit: 'je Std / 5-12h pauschal',
+      price: 58.3,
+      pricePauschal: 291.5,
+      isExtendable: false,
+      sortOrder: 217,
+    },
     {
       id: '2.18',
       category: 'A',
@@ -1150,4 +1154,133 @@ export function getCategoryList(
   }
 
   return categories;
+}
+
+// ============================================================================
+// Default Vehicles
+// ============================================================================
+
+export const DEFAULT_VEHICLES: Omit<KostenersatzVehicle, 'id'>[] = [
+  {
+    name: 'KDTFA',
+    rateId: '2.01',
+    description: 'Kommando Neusiedl am See',
+    sortOrder: 1,
+  },
+  {
+    name: 'RLFA 3000/100',
+    rateId: '2.05',
+    description: 'RüstLösch Neusiedl am See',
+    sortOrder: 2,
+  },
+  {
+    name: 'TLFA 4000',
+    rateId: '2.05',
+    description: 'Tank1 Neusiedl am See',
+    sortOrder: 3,
+  },
+  {
+    name: 'TB 23/12',
+    rateId: '2.06',
+    description: 'Hubsteiger Neusiedl am See',
+    sortOrder: 4,
+  },
+  {
+    name: 'SRF',
+    rateId: '2.10',
+    description: 'Rüst Neusiedl am See',
+    sortOrder: 5,
+  },
+  {
+    name: 'KRF-S',
+    rateId: '2.02',
+    description: 'Kleinrüst Neusiedl am See',
+    sortOrder: 6,
+  },
+  {
+    name: 'MTFA',
+    rateId: '2.01',
+    description: 'MTF Neusiedl am See',
+    sortOrder: 7,
+  },
+  {
+    name: 'VF - Sprinter',
+    rateId: '2.02',
+    description: 'VF Neusiedl am See',
+    sortOrder: 8,
+  },
+  {
+    name: 'VF-KAT',
+    rateId: '2.04',
+    description: 'Kat LKW Neusiedl am See',
+    sortOrder: 9,
+  },
+  {
+    name: 'WLF-K',
+    rateId: '2.10',
+    description: 'Wechselladefahrzeug mit Kran',
+    sortOrder: 10,
+  },
+  {
+    name: 'WLA-Bergung',
+    rateId: '2.18',
+    description: 'Bergemulde',
+    sortOrder: 11,
+  },
+  {
+    name: 'WLA-Logistik',
+    rateId: '2.16',
+    description: 'Logistik Mulde mit Schadstoffausrüstung',
+    sortOrder: 12,
+  },
+  {
+    name: 'Öl Einachsanhänger',
+    rateId: '2.13',
+    sortOrder: 13,
+  },
+  {
+    name: 'ATS Einachsanhänger',
+    rateId: '2.13',
+    sortOrder: 14,
+  },
+  {
+    name: 'Bootsanhänger',
+    rateId: '2.14',
+    sortOrder: 15,
+  },
+  {
+    name: 'Ölsperrenanhänger',
+    rateId: '2.14',
+    description: 'Ölsperranhänger',
+    sortOrder: 16,
+  },
+];
+
+/**
+ * Generate vehicle ID from name (lowercase, replace spaces with hyphens)
+ */
+export function generateVehicleId(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[äöüß]/g, (match) => {
+      const replacements: Record<string, string> = {
+        ä: 'ae',
+        ö: 'oe',
+        ü: 'ue',
+        ß: 'ss',
+      };
+      return replacements[match] || match;
+    })
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Get default vehicles with generated IDs
+ */
+export function getDefaultVehicles(): KostenersatzVehicle[] {
+  return DEFAULT_VEHICLES.map((vehicle) => ({
+    ...vehicle,
+    id: generateVehicleId(vehicle.name),
+  }));
 }

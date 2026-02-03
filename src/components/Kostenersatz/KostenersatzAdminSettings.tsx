@@ -15,11 +15,13 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Tab from '@mui/material/Tab';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
@@ -53,6 +55,7 @@ import {
 } from '../../hooks/useKostenersatzMutations';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
+import KostenersatzVehicleTab from './KostenersatzVehicleTab';
 import Alert from '@mui/material/Alert';
 
 export default function KostenersatzAdminSettings() {
@@ -67,6 +70,7 @@ export default function KostenersatzAdminSettings() {
   const upsertRate = useKostenersatzRateUpsert();
   const deleteRate = useKostenersatzRateDelete();
 
+  const [activeTab, setActiveTab] = useState(0);
   const [seeding, setSeeding] = useState(false);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<KostenersatzTemplate | undefined>();
@@ -324,11 +328,23 @@ export default function KostenersatzAdminSettings() {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h5">Kostenersatz Einstellungen</Typography>
 
-      {/* Versions Section */}
-      <Card>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+          <Tab label="Tarife" />
+          <Tab label="Fahrzeuge" />
+          <Tab label="Vorlagen" />
+          <Tab label="E-Mail" />
+        </Tabs>
+      </Box>
+
+      {/* Tab 0: Tarife (Versions + Rates) */}
+      {activeTab === 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Versions Section */}
+          <Card>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">Tarif-Versionen</Typography>
@@ -457,9 +473,15 @@ export default function KostenersatzAdminSettings() {
           })}
         </CardContent>
       </Card>
+        </Box>
+      )}
 
-      {/* Shared Templates */}
-      <Card>
+      {/* Tab 1: Fahrzeuge */}
+      {activeTab === 1 && <KostenersatzVehicleTab rates={rates} />}
+
+      {/* Tab 2: Vorlagen */}
+      {activeTab === 2 && (
+        <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             Gemeinsame Vorlagen
@@ -507,9 +529,11 @@ export default function KostenersatzAdminSettings() {
           )}
         </CardContent>
       </Card>
+      )}
 
-      {/* Email Settings */}
-      <Card>
+      {/* Tab 3: E-Mail */}
+      {activeTab === 3 && (
+        <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
             E-Mail Einstellungen
@@ -586,6 +610,7 @@ export default function KostenersatzAdminSettings() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Seed Dialog */}
       <Dialog open={seedDialogOpen} onClose={() => setSeedDialogOpen(false)}>
