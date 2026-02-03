@@ -13,6 +13,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import PlaceIcon from '@mui/icons-material/Place';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SmsIcon from '@mui/icons-material/Sms';
@@ -73,6 +74,11 @@ export default function AppDrawer({
         href: '/tagebuch',
       },
       { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
+      {
+        text: 'Einsatzorte',
+        icon: <PlaceIcon />,
+        href: '/einsatzorte',
+      },
       {
         text: 'Blaulicht-SMS',
         icon: <SmsIcon />,
