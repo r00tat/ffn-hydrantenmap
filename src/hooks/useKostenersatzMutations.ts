@@ -30,6 +30,13 @@ import { getDefaultVehicles } from '../common/defaultKostenersatzRates';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
+// Helper to remove undefined values (Firestore doesn't accept undefined)
+function removeUndefined<T extends object>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== undefined)
+  ) as T;
+}
+
 // ============================================================================
 // Calculation Mutations
 // ============================================================================
@@ -67,7 +74,7 @@ export function useKostenersatzAdd(firecallIdOverride?: string) {
           firecallId,
           KOSTENERSATZ_SUBCOLLECTION
         ),
-        newCalc
+        removeUndefined(newCalc)
       );
 
       return docRef.id;
@@ -115,7 +122,7 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
           KOSTENERSATZ_SUBCOLLECTION,
           calcId
         ),
-        dataWithoutId,
+        removeUndefined(dataWithoutId),
         { merge: false }
       );
     },
@@ -203,7 +210,7 @@ export function useKostenersatzTemplateAdd() {
 
       const docRef = await addDoc(
         collection(firestore, KOSTENERSATZ_TEMPLATES_COLLECTION),
-        newTemplate
+        removeUndefined(newTemplate)
       );
 
       return docRef.id;
@@ -233,7 +240,7 @@ export function useKostenersatzTemplateUpdate() {
 
     await setDoc(
       doc(firestore, KOSTENERSATZ_TEMPLATES_COLLECTION, templateId),
-      dataWithoutId,
+      removeUndefined(dataWithoutId),
       { merge: false }
     );
   }, []);
@@ -351,19 +358,17 @@ export function useKostenersatzVersionSetActive() {
  * Hook to add or update a rate
  */
 export function useKostenersatzRateUpsert() {
-  const { email } = useFirebaseLogin();
+  return useCallback(async (rate: KostenersatzRate) => {
+    // Document ID is combination of version and rate ID
+    const docId = `${rate.version}_${rate.id}`;
 
-  return useCallback(
-    async (rate: KostenersatzRate) => {
-      // Document ID is combination of version and rate ID
-      const docId = `${rate.version}_${rate.id}`;
+    console.info(`Upserting kostenersatz rate ${docId}`);
 
-      console.info(`Upserting kostenersatz rate ${docId}`);
-
-      await setDoc(doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId), rate);
-    },
-    []
-  );
+    await setDoc(
+      doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId),
+      removeUndefined(rate)
+    );
+  }, []);
 }
 
 /**
@@ -454,7 +459,7 @@ export function useKostenersatzVehicleUpsert() {
 
     await setDoc(
       doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicle.id),
-      vehicle
+      removeUndefined(vehicle)
     );
   }, []);
 }
