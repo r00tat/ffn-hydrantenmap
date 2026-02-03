@@ -55,64 +55,64 @@ export default function AppDrawer({
 
       setIsOpen((prev) => !prev);
     },
-    [setIsOpen]
+    [setIsOpen],
   );
   const { isAdmin } = useFirebaseLogin();
 
   const drawerItems: DrawerItem[] = [
-      { text: 'Karte', icon: <MapIcon />, href: '/' },
-      {
-        text: 'Einsätze',
-        icon: <LocalFireDepartmentIcon />,
-        href: '/einsaetze',
-      },
-      { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
-      { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
-      {
-        text: 'Einsatz Tagebuch',
-        icon: <LibraryBooksIcon />,
-        href: '/tagebuch',
-      },
-      { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
-      {
-        text: 'Einsatzorte',
-        icon: <PlaceIcon />,
-        href: '/einsatzorte',
-      },
-      {
-        text: 'Blaulicht-SMS',
-        icon: <SmsIcon />,
-        href: '/blaulicht-sms',
-      },
-      { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
-      {
-        text: 'Geschäftsbuch',
-        icon: <MenuBookIcon />,
-        href: '/geschaeftsbuch',
-      },
-      {
-        text: 'Kostenersatz',
-        icon: <ReceiptLongIcon />,
-        href: '/kostenersatz',
-      },
-      { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
-      { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
-      {
-        text: 'Schadstoff',
-        icon: <Icon path={mdiBiohazard} size={1} />,
-        href: '/schadstoff',
-      },
-      { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
-      { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
-      { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
-      {
-        text: 'Admin',
-        icon: <AdminPanelSettingsIcon />,
-        href: '/admin',
-        admin: true,
-      },
-      { text: 'Login', icon: <LoginIcon />, href: '/login' },
-      { text: 'About', icon: <InfoIcon />, href: '/about' },
+    { text: 'Karte', icon: <MapIcon />, href: '/' },
+    {
+      text: 'Einsätze',
+      icon: <LocalFireDepartmentIcon />,
+      href: '/einsaetze',
+    },
+    { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
+    { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
+    {
+      text: 'Einsatz Tagebuch',
+      icon: <LibraryBooksIcon />,
+      href: '/tagebuch',
+    },
+    // { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
+    {
+      text: 'Einsatzorte',
+      icon: <PlaceIcon />,
+      href: '/einsatzorte',
+    },
+    {
+      text: 'Blaulicht-SMS',
+      icon: <SmsIcon />,
+      href: '/blaulicht-sms',
+    },
+    { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
+    {
+      text: 'Geschäftsbuch',
+      icon: <MenuBookIcon />,
+      href: '/geschaeftsbuch',
+    },
+    {
+      text: 'Kostenersatz',
+      icon: <ReceiptLongIcon />,
+      href: '/kostenersatz',
+    },
+    { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
+    { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
+    {
+      text: 'Schadstoff',
+      icon: <Icon path={mdiBiohazard} size={1} />,
+      href: '/schadstoff',
+    },
+    { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
+    { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
+    { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
+    {
+      text: 'Admin',
+      icon: <AdminPanelSettingsIcon />,
+      href: '/admin',
+      admin: true,
+    },
+    { text: 'Login', icon: <LoginIcon />, href: '/login' },
+    { text: 'About', icon: <InfoIcon />, href: '/about' },
   ];
 
   return (
