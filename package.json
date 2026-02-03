@@ -69,6 +69,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@types/circle-to-polygon": "^2.2.3",
     "@types/leaflet": "^1.9.21",
     "@types/lodash.debounce": "^4.0.9",
