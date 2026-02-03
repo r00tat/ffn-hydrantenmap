@@ -181,6 +181,71 @@ export interface FirecallHistory {
   createdAt: string;
 }
 
+export const FIRECALL_LOCATIONS_COLLECTION_ID = 'location';
+
+export type LocationStatus = 'offen' | 'einsatz notwendig' | 'in arbeit' | 'erledigt' | 'kein einsatz';
+
+export const LOCATION_STATUS_OPTIONS: LocationStatus[] = [
+  'offen',
+  'einsatz notwendig',
+  'in arbeit',
+  'erledigt',
+  'kein einsatz',
+];
+
+export const LOCATION_STATUS_COLORS: Record<LocationStatus, string> = {
+  'offen': 'yellow',
+  'einsatz notwendig': 'red',
+  'in arbeit': 'orange',
+  'erledigt': 'green',
+  'kein einsatz': 'green',
+};
+
+export interface FirecallLocation {
+  id?: string;
+
+  // Address
+  street: string;
+  number: string;
+  city: string;
+
+  // Details
+  name: string;
+  description: string;
+  info: string;
+
+  // Status
+  status: LocationStatus;
+  vehicles: string;
+
+  // Times
+  alarmTime?: string;
+  startTime?: string;
+  doneTime?: string;
+
+  // Coordinates
+  lat?: number;
+  lng?: number;
+
+  // Metadata
+  created: string;
+  creator: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  deleted?: boolean;
+}
+
+export const defaultFirecallLocation: Partial<FirecallLocation> = {
+  street: '',
+  number: '',
+  city: 'Neusiedl am See',
+  name: '',
+  description: '',
+  info: '',
+  status: 'offen',
+  vehicles: '',
+};
+
 export interface HydrantenItem extends FirecallItem, Hydrant {
   type: 'hydrant';
 }
