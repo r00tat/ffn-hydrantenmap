@@ -9,12 +9,12 @@ fs.mkdirSync(screenshotDir, { recursive: true });
 
 const pages = [
   { name: 'karte', path: '/', waitFor: '.leaflet-container' },
-  { name: 'einsaetze', path: '/einsaetze', waitFor: 'main' },
-  { name: 'tagebuch', path: '/tagebuch', waitFor: 'main' },
-  { name: 'fahrzeuge', path: '/fahrzeuge', waitFor: 'main' },
-  { name: 'schadstoff', path: '/schadstoff', waitFor: 'main' },
-  { name: 'kostenersatz', path: '/kostenersatz', waitFor: 'main' },
-  { name: 'geschaeftsbuch', path: '/geschaeftsbuch', waitFor: 'main' },
+  { name: 'einsaetze', path: '/einsaetze', waitFor: '.MuiCard-root' },
+  { name: 'tagebuch', path: '/tagebuch', waitFor: '.MuiPaper-root' },
+  { name: 'fahrzeuge', path: '/fahrzeuge', waitFor: '.MuiPaper-root' },
+  { name: 'schadstoff', path: '/schadstoff', waitFor: 'input' },
+  { name: 'kostenersatz', path: '/kostenersatz', waitFor: '.MuiPaper-root' },
+  { name: 'geschaeftsbuch', path: '/geschaeftsbuch', waitFor: '.MuiPaper-root' },
 ];
 
 test.describe('Documentation Screenshots', () => {
@@ -32,7 +32,9 @@ test.describe('Documentation Screenshots', () => {
     await page.goto('/login');
 
     // Wait for Firebase UI to load and click email sign-in
-    await page.waitForSelector('[data-provider-id="password"]', { timeout: 10000 });
+    await page.waitForSelector('[data-provider-id="password"]', {
+      timeout: 10000,
+    });
     await page.click('[data-provider-id="password"]');
 
     // Fill in credentials
@@ -44,11 +46,11 @@ test.describe('Documentation Screenshots', () => {
     await page.fill('input[name="password"]', password);
     await page.click('button[type="submit"]');
 
-    // Wait for redirect after login
-    await page.waitForURL('/', { timeout: 15000 });
+    // Wait for login to complete - look for "Weiter zur Einsatzkarte" button or welcome text
+    await page.waitForSelector('text=Willkommen', { timeout: 20000 });
 
-    // Wait a bit for the app to fully load
-    await page.waitForTimeout(2000);
+    // Wait a bit for authorization check to complete
+    await page.waitForTimeout(3000);
   });
 
   for (const { name, path: pagePath, waitFor } of pages) {
