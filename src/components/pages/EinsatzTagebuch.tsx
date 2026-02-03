@@ -460,14 +460,14 @@ export function EinsatzTagebuch({
                   placeholder="von"
                   value={inlineVon}
                   onChange={(e) => setInlineVon(e.target.value)}
-                  sx={{ width: 60 }}
+                  sx={{ flex: 1, minWidth: 60 }}
                 />
                 <TextField
                   size="small"
                   placeholder="an"
                   value={inlineAn}
                   onChange={(e) => setInlineAn(e.target.value)}
-                  sx={{ width: 60 }}
+                  sx={{ flex: 1, minWidth: 60 }}
                 />
               </Grid>
               <Grid
