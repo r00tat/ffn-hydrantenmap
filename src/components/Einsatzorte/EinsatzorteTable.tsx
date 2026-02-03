@@ -49,10 +49,11 @@ export default function EinsatzorteTable({
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 130 }}>Status</TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }}>Bezeichnung</TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 300 }}>Adresse</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 350 }}>Adresse</TableCell>
+            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>Fahrzeuge</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Beschreibung</TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Alarm</TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Start</TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Erledigt</TableCell>

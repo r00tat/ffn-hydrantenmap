@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
+  setDoc,
   updateDoc,
 } from 'firebase/firestore';
 import { useCallback, useMemo } from 'react';
@@ -36,10 +36,15 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
     [firecallId]
   );
 
+  const filterFn = useCallback(
+    (loc: FirecallLocation) => loc.deleted !== true,
+    []
+  );
+
   const records = useFirebaseCollection<FirecallLocation>({
     collectionName: FIRECALL_COLLECTION_ID,
     pathSegments: collectionPath,
-    filterFn: (loc) => loc.deleted !== true,
+    filterFn,
   });
 
   const locations = useMemo(
@@ -53,23 +58,31 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
 
   const addLocation = useCallback(
     async (location: Partial<FirecallLocation>): Promise<string> => {
+      // Auto-set alarmTime to current time if not provided
+      const now = new Date();
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      // Use provided ID or generate one - this allows the UI to stay on the same element
+      const locationId = location.id || doc(collection(firestore, '_')).id;
+
       const newData: FirecallLocation = {
         ...defaultFirecallLocation,
         ...location,
+        id: locationId,
+        alarmTime: location.alarmTime || currentTime,
         created: new Date().toISOString(),
         creator: email || '',
       } as FirecallLocation;
 
-      const docRef = await addDoc(
-        collection(
-          firestore,
-          FIRECALL_COLLECTION_ID,
-          firecallId,
-          FIRECALL_LOCATIONS_COLLECTION_ID
-        ),
-        newData
+      const docRef = doc(
+        firestore,
+        FIRECALL_COLLECTION_ID,
+        firecallId,
+        FIRECALL_LOCATIONS_COLLECTION_ID,
+        locationId
       );
-      return docRef.id;
+      await setDoc(docRef, newData);
+      return locationId;
     },
     [email, firecallId]
   );

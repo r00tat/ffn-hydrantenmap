@@ -10,7 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FirecallLocation, LocationStatus } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
@@ -31,37 +31,76 @@ export default function EinsatzorteCard({
   onDelete,
   onAdd,
 }: EinsatzorteCardProps) {
-  const [local, setLocal] = useState<Partial<FirecallLocation>>(location);
+  // Generate a stable ID for new cards so the document ID is predetermined
+  const stableId = useMemo(
+    () => (isNew ? crypto.randomUUID() : location.id),
+    [isNew, location.id]
+  );
+
+  const [local, setLocal] = useState<Partial<FirecallLocation>>(() => ({
+    ...location,
+    id: stableId,
+  }));
   const [mapOpen, setMapOpen] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const geocodeRef = useRef<NodeJS.Timeout | null>(null);
   const prevAddressRef = useRef({ street: location.street, number: location.number });
+  const cardRef = useRef<HTMLDivElement>(null);
+  const localRef = useRef(local);
+
+  // Keep localRef in sync for use in blur handler
+  useEffect(() => {
+    localRef.current = local;
+  }, [local]);
 
   useEffect(() => {
-    setLocal(location);
+    setLocal({ ...location, id: stableId });
     prevAddressRef.current = { street: location.street, number: location.number };
-  }, [location]);
+  }, [location, stableId]);
+
+  // Handle card blur - save new card when focus leaves the entire card
+  const handleCardBlur = useCallback(
+    (e: React.FocusEvent) => {
+      // Check if the new focus target is outside this card
+      if (cardRef.current && !cardRef.current.contains(e.relatedTarget as Node)) {
+        if (isNew && (localRef.current.name || localRef.current.street)) {
+          onAdd?.(localRef.current);
+        }
+      }
+    },
+    [isNew, onAdd]
+  );
+
+  // Handle Enter key to add new card
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && isNew && (localRef.current.name || localRef.current.street)) {
+        e.preventDefault();
+        onAdd?.(localRef.current);
+      }
+    },
+    [isNew, onAdd]
+  );
 
   const handleFieldChange = useCallback(
     (field: keyof FirecallLocation, value: string | LocationStatus) => {
       const updated = { ...local, [field]: value };
-      setLocal(updated);
 
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
+      // Auto-set time fields based on status changes
+      if (field === 'status') {
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        if (value === 'in arbeit' && !local.startTime) {
+          updated.startTime = currentTime;
+        } else if ((value === 'erledigt' || value === 'kein einsatz') && !local.doneTime) {
+          updated.doneTime = currentTime;
+        }
       }
 
-      debounceRef.current = setTimeout(() => {
-        if (isNew) {
-          if (updated.name || updated.street) {
-            onAdd?.(updated);
-          }
-        } else {
-          onChange({ [field]: value });
-        }
-      }, 500);
+      setLocal(updated);
 
-      // Geocode on address change
+      // Geocode on address change (for both new and existing cards)
       if (field === 'street' || field === 'number') {
         const newStreet = field === 'street' ? (value as string) : local.street || '';
         const newNumber = field === 'number' ? (value as string) : local.number || '';
@@ -88,8 +127,32 @@ export default function EinsatzorteCard({
           }, 1000);
         }
       }
+
+      // For new cards, don't auto-save - wait for Enter key or blur
+      if (isNew) {
+        return;
+      }
+
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+
+      // For existing cards, debounce auto-save
+      // Include auto-filled time fields when status changes
+      debounceRef.current = setTimeout(() => {
+        const updates: Partial<FirecallLocation> = { [field]: value };
+        if (field === 'status') {
+          if (updated.startTime && updated.startTime !== local.startTime) {
+            updates.startTime = updated.startTime;
+          }
+          if (updated.doneTime && updated.doneTime !== local.doneTime) {
+            updates.doneTime = updated.doneTime;
+          }
+        }
+        onChange(updates);
+      }, 500);
     },
-    [local, isNew, onChange, onAdd]
+    [local, isNew, onChange]
   );
 
   const handleMapConfirm = useCallback(
@@ -104,7 +167,7 @@ export default function EinsatzorteCard({
 
   return (
     <>
-      <Card sx={{ mb: 2, opacity: isNew ? 0.6 : 1 }}>
+      <Card ref={cardRef} onBlur={handleCardBlur} onKeyDown={handleKeyDown} sx={{ mb: 2, opacity: isNew ? 0.6 : 1 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
             <StatusChip

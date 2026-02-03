@@ -2,12 +2,13 @@
 
 import DeleteIcon from '@mui/icons-material/Delete';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
+import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FirecallLocation, LocationStatus } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
@@ -28,40 +29,81 @@ export default function EinsatzorteRow({
   onDelete,
   onAdd,
 }: EinsatzorteRowProps) {
-  const [local, setLocal] = useState<Partial<FirecallLocation>>(location);
+  // Generate a stable ID for new rows so the document ID is predetermined
+  const stableId = useMemo(
+    () => (isNew ? crypto.randomUUID() : location.id),
+    [isNew, location.id]
+  );
+
+  const [local, setLocal] = useState<Partial<FirecallLocation>>(() => ({
+    ...location,
+    id: stableId,
+  }));
   const [mapOpen, setMapOpen] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const geocodeRef = useRef<NodeJS.Timeout | null>(null);
   const prevAddressRef = useRef({ street: location.street, number: location.number });
+  const rowRef = useRef<HTMLTableRowElement>(null);
+  const localRef = useRef(local);
+
+  // Keep localRef in sync for use in blur handler
+  useEffect(() => {
+    localRef.current = local;
+  }, [local]);
 
   // Sync from parent when location changes (e.g., real-time updates)
   useEffect(() => {
-    setLocal(location);
+    setLocal({ ...location, id: stableId });
     prevAddressRef.current = { street: location.street, number: location.number };
-  }, [location]);
+  }, [location, stableId]);
+
+  // Handle row blur - save new row when focus leaves the entire row
+  // Using setTimeout because relatedTarget can be null in certain browsers/situations
+  // even when tabbing between fields within the same row
+  const handleRowBlur = useCallback(() => {
+    if (!isNew) return;
+
+    // Use setTimeout to let the focus settle, then check if focus is still in the row
+    setTimeout(() => {
+      const activeElement = document.activeElement;
+      const focusStillInRow = rowRef.current?.contains(activeElement);
+
+      if (!focusStillInRow && (localRef.current.name || localRef.current.street)) {
+        onAdd?.(localRef.current);
+      }
+    }, 0);
+  }, [isNew, onAdd]);
+
+  // Handle Enter key to add new row
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && isNew && (localRef.current.name || localRef.current.street)) {
+        e.preventDefault();
+        onAdd?.(localRef.current);
+      }
+    },
+    [isNew, onAdd]
+  );
 
   const handleFieldChange = useCallback(
     (field: keyof FirecallLocation, value: string | LocationStatus) => {
       const updated = { ...local, [field]: value };
-      setLocal(updated);
 
-      // Clear existing debounce
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
+      // Auto-set time fields based on status changes
+      if (field === 'status') {
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        if (value === 'in arbeit' && !local.startTime) {
+          updated.startTime = currentTime;
+        } else if ((value === 'erledigt' || value === 'kein einsatz') && !local.doneTime) {
+          updated.doneTime = currentTime;
+        }
       }
 
-      debounceRef.current = setTimeout(() => {
-        if (isNew) {
-          // Check if we have enough data to create
-          if (updated.name || updated.street) {
-            onAdd?.(updated);
-          }
-        } else {
-          onChange({ [field]: value });
-        }
-      }, 500);
+      setLocal(updated);
 
-      // Geocode on address change
+      // Geocode on address change (for both new and existing rows)
       if (field === 'street' || field === 'number') {
         const newStreet = field === 'street' ? (value as string) : local.street || '';
         const newNumber = field === 'number' ? (value as string) : local.number || '';
@@ -88,8 +130,33 @@ export default function EinsatzorteRow({
           }, 1000);
         }
       }
+
+      // For new rows, don't auto-save - wait for Enter key or blur
+      if (isNew) {
+        return;
+      }
+
+      // Clear existing debounce
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+
+      // For existing rows, debounce auto-save
+      // Include auto-filled time fields when status changes
+      debounceRef.current = setTimeout(() => {
+        const updates: Partial<FirecallLocation> = { [field]: value };
+        if (field === 'status') {
+          if (updated.startTime && updated.startTime !== local.startTime) {
+            updates.startTime = updated.startTime;
+          }
+          if (updated.doneTime && updated.doneTime !== local.doneTime) {
+            updates.doneTime = updated.doneTime;
+          }
+        }
+        onChange(updates);
+      }, 500);
     },
-    [local, isNew, onChange, onAdd]
+    [local, isNew, onChange]
   );
 
   const handleMapConfirm = useCallback(
@@ -109,13 +176,7 @@ export default function EinsatzorteRow({
 
   return (
     <>
-      <TableRow sx={{ opacity: isNew ? 0.6 : 1 }}>
-        <TableCell sx={{ minWidth: 130 }}>
-          <StatusChip
-            status={(local.status as LocationStatus) || 'offen'}
-            onChange={(status) => handleFieldChange('status', status)}
-          />
-        </TableCell>
+      <TableRow ref={rowRef} onBlur={handleRowBlur} onKeyDown={handleKeyDown}>
         <TableCell>
           <TextField
             value={local.name || ''}
@@ -126,30 +187,38 @@ export default function EinsatzorteRow({
             variant="standard"
           />
         </TableCell>
+        <TableCell sx={{ minWidth: 350 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <TextField
+              value={local.street || ''}
+              onChange={(e) => handleFieldChange('street', e.target.value)}
+              size="small"
+              placeholder="Straße"
+              variant="standard"
+              sx={{ flex: 2, minWidth: 150, mr: 1 }}
+            />
+            <TextField
+              value={local.number || ''}
+              onChange={(e) => handleFieldChange('number', e.target.value)}
+              size="small"
+              placeholder="Nr."
+              variant="standard"
+              sx={{ width: 50, mr: 1 }}
+            />
+            <TextField
+              value={local.city || ''}
+              onChange={(e) => handleFieldChange('city', e.target.value)}
+              size="small"
+              placeholder="Ort"
+              variant="standard"
+              sx={{ flex: 1, minWidth: 100 }}
+            />
+          </Box>
+        </TableCell>
         <TableCell>
-          <TextField
-            value={local.street || ''}
-            onChange={(e) => handleFieldChange('street', e.target.value)}
-            size="small"
-            placeholder="Straße"
-            variant="standard"
-            sx={{ width: 120, mr: 1 }}
-          />
-          <TextField
-            value={local.number || ''}
-            onChange={(e) => handleFieldChange('number', e.target.value)}
-            size="small"
-            placeholder="Nr."
-            variant="standard"
-            sx={{ width: 50, mr: 1 }}
-          />
-          <TextField
-            value={local.city || ''}
-            onChange={(e) => handleFieldChange('city', e.target.value)}
-            size="small"
-            placeholder="Ort"
-            variant="standard"
-            sx={{ width: 120 }}
+          <StatusChip
+            status={(local.status as LocationStatus) || 'offen'}
+            onChange={(status) => handleFieldChange('status', status)}
           />
         </TableCell>
         <TableCell>
@@ -159,6 +228,18 @@ export default function EinsatzorteRow({
             size="small"
             fullWidth
             placeholder="Fahrzeuge"
+            variant="standard"
+          />
+        </TableCell>
+        <TableCell>
+          <TextField
+            value={local.description || ''}
+            onChange={(e) => handleFieldChange('description', e.target.value)}
+            size="small"
+            fullWidth
+            multiline
+            maxRows={3}
+            placeholder="Beschreibung"
             variant="standard"
           />
         </TableCell>
