@@ -85,7 +85,6 @@ export default function AppDrawer({
       icon: <SmsIcon />,
       href: '/blaulicht-sms',
     },
-    { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     {
       text: 'Geschäftsbuch',
       icon: <MenuBookIcon />,
@@ -96,6 +95,7 @@ export default function AppDrawer({
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',
     },
+    { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
     { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
     { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
     {
