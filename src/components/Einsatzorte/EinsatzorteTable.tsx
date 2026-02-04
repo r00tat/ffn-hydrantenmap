@@ -18,6 +18,7 @@ interface EinsatzorteTableProps {
   onAdd: (location: Partial<FirecallLocation>) => void;
   vehicleSuggestions: string[];
   kostenersatzVehicleNames: Set<string>;
+  vehicleFwMap?: Map<string, string>;
   onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
@@ -28,6 +29,7 @@ export default function EinsatzorteTable({
   onAdd,
   vehicleSuggestions,
   kostenersatzVehicleNames,
+  vehicleFwMap,
   onKostenersatzVehicleAdded,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
@@ -76,6 +78,7 @@ export default function EinsatzorteTable({
               onDelete={handleDelete(location.id!)}
               vehicleSuggestions={vehicleSuggestions}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
+              vehicleFwMap={vehicleFwMap}
               onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
             />
           ))}
@@ -87,6 +90,7 @@ export default function EinsatzorteTable({
             onAdd={onAdd}
             vehicleSuggestions={vehicleSuggestions}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
+            vehicleFwMap={vehicleFwMap}
             onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
           />
         </TableBody>

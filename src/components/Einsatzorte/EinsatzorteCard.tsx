@@ -25,6 +25,7 @@ interface EinsatzorteCardProps {
   onAdd?: (location: Partial<FirecallLocation>) => void;
   vehicleSuggestions: string[];
   kostenersatzVehicleNames: Set<string>;
+  vehicleFwMap?: Map<string, string>;
   onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
@@ -36,12 +37,18 @@ export default function EinsatzorteCard({
   onAdd,
   vehicleSuggestions,
   kostenersatzVehicleNames,
+  vehicleFwMap,
   onKostenersatzVehicleAdded,
 }: EinsatzorteCardProps) {
+  // Track a unique key for resetting the new card after add
+  const [resetKey, setResetKey] = useState(0);
+
   // Generate a stable ID for new cards so the document ID is predetermined
+  // resetKey forces regeneration after a successful add
   const stableId = useMemo(
     () => (isNew ? crypto.randomUUID() : location.id),
-    [isNew, location.id]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isNew, location.id, resetKey]
   );
 
   const [local, setLocal] = useState<Partial<FirecallLocation>>(() => ({
@@ -65,6 +72,14 @@ export default function EinsatzorteCard({
     prevAddressRef.current = { street: location.street, number: location.number };
   }, [location, stableId]);
 
+  // Reset the new card state after a successful add
+  const resetNewCard = useCallback(() => {
+    const newId = crypto.randomUUID();
+    setLocal({ ...location, id: newId });
+    setResetKey((k) => k + 1);
+    prevAddressRef.current = { street: location.street, number: location.number };
+  }, [location]);
+
   // Handle card blur - save new card when focus leaves the entire card
   const handleCardBlur = useCallback(
     (e: React.FocusEvent) => {
@@ -72,10 +87,11 @@ export default function EinsatzorteCard({
       if (cardRef.current && !cardRef.current.contains(e.relatedTarget as Node)) {
         if (isNew && (localRef.current.name || localRef.current.street)) {
           onAdd?.(localRef.current);
+          resetNewCard();
         }
       }
     },
-    [isNew, onAdd]
+    [isNew, onAdd, resetNewCard]
   );
 
   // Handle Enter key to add new card
@@ -84,9 +100,10 @@ export default function EinsatzorteCard({
       if (e.key === 'Enter' && isNew && (localRef.current.name || localRef.current.street)) {
         e.preventDefault();
         onAdd?.(localRef.current);
+        resetNewCard();
       }
     },
-    [isNew, onAdd]
+    [isNew, onAdd, resetNewCard]
   );
 
   const handleFieldChange = useCallback(
@@ -261,6 +278,7 @@ export default function EinsatzorteCard({
               onChange={handleVehiclesChange}
               suggestions={vehicleSuggestions}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
+              vehicleFwMap={vehicleFwMap}
               onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
             />
           </Box>

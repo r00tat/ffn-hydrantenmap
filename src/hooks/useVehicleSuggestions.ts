@@ -9,6 +9,8 @@ export interface UseVehicleSuggestionsResult {
   suggestions: string[];
   /** Set of vehicle names from Kostenersatz (for quick lookup to identify predefined fleet) */
   kostenersatzVehicleNames: Set<string>;
+  /** Map of vehicle name to Feuerwehr (FW) for display in autocomplete */
+  vehicleFwMap: Map<string, string>;
   /** Loading state from Kostenersatz vehicles */
   loading: boolean;
 }
@@ -30,6 +32,18 @@ export function useVehicleSuggestions(
   const kostenersatzVehicleNames = useMemo(() => {
     return new Set(kostenersatzVehicles.map((v) => v.name));
   }, [kostenersatzVehicles]);
+
+  // Build a map of vehicle name to FW (Feuerwehr) for display
+  const vehicleFwMap = useMemo(() => {
+    const map = new Map<string, string>();
+    // Add FW from map vehicles
+    for (const vehicle of mapVehicles) {
+      if (vehicle.name && vehicle.fw) {
+        map.set(vehicle.name.trim(), vehicle.fw);
+      }
+    }
+    return map;
+  }, [mapVehicles]);
 
   // Collect vehicle names from map (Fzg items)
   const mapVehicleNames = useMemo(() => {
@@ -61,6 +75,7 @@ export function useVehicleSuggestions(
   return {
     suggestions,
     kostenersatzVehicleNames,
+    vehicleFwMap,
     loading,
   };
 }

@@ -4,6 +4,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
 
 interface VehicleAutocompleteProps {
@@ -11,6 +12,7 @@ interface VehicleAutocompleteProps {
   onChange: (vehicles: string[]) => void;
   suggestions: string[]; // Combined Kostenersatz + firecall vehicles
   kostenersatzVehicleNames: Set<string>; // To identify Kostenersatz vehicles
+  vehicleFwMap?: Map<string, string>; // Map of vehicle name to Feuerwehr for display
   disabled?: boolean;
   onKostenersatzVehicleAdded?: (vehicleName: string) => void; // Callback when a Kostenersatz vehicle is added
 }
@@ -20,6 +22,7 @@ export default function VehicleAutocomplete({
   onChange,
   suggestions,
   kostenersatzVehicleNames,
+  vehicleFwMap,
   disabled = false,
   onKostenersatzVehicleAdded,
 }: VehicleAutocompleteProps) {
@@ -85,12 +88,33 @@ export default function VehicleAutocomplete({
       <Autocomplete
         freeSolo
         options={availableSuggestions}
+        value={null}
         inputValue={inputValue}
-        onInputChange={(_event, newInputValue) => setInputValue(newInputValue)}
+        onInputChange={(_event, newInputValue, reason) => {
+          // Don't clear input when reason is 'reset' (after selection) - we handle that in handleChange
+          if (reason !== 'reset') {
+            setInputValue(newInputValue);
+          }
+        }}
         onChange={handleChange}
         disabled={disabled}
         clearOnBlur={false}
         blurOnSelect
+        renderOption={(props, option) => {
+          const fw = vehicleFwMap?.get(option);
+          return (
+            <Box component="li" {...props} key={option}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                <span>{option}</span>
+                {fw && (
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    {fw}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          );
+        }}
         renderInput={(params) => (
           <TextField
             {...params}

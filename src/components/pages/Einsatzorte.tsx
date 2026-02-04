@@ -39,7 +39,7 @@ export default function Einsatzorte() {
   const { vehicles: firecallVehicles } = useVehicles();
 
   // Vehicle suggestions from Kostenersatz and map vehicles
-  const { suggestions: vehicleSuggestions, kostenersatzVehicleNames } =
+  const { suggestions: vehicleSuggestions, kostenersatzVehicleNames, vehicleFwMap } =
     useVehicleSuggestions(firecallVehicles);
 
   // Hooks for creating/updating vehicle items
@@ -233,6 +233,7 @@ export default function Einsatzorte() {
               onDelete={() => handleDelete(location.id!)}
               vehicleSuggestions={vehicleSuggestions}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
+              vehicleFwMap={vehicleFwMap}
               onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
             />
           ))}
@@ -244,6 +245,7 @@ export default function Einsatzorte() {
             onAdd={handleAdd}
             vehicleSuggestions={vehicleSuggestions}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
+            vehicleFwMap={vehicleFwMap}
             onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
           />
         </Box>
@@ -255,6 +257,7 @@ export default function Einsatzorte() {
           onAdd={handleAdd}
           vehicleSuggestions={vehicleSuggestions}
           kostenersatzVehicleNames={kostenersatzVehicleNames}
+          vehicleFwMap={vehicleFwMap}
           onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
         />
       )}
