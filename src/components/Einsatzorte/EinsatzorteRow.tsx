@@ -1,17 +1,13 @@
 'use client';
 
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
-import Collapse from '@mui/material/Collapse';
 import IconButton from '@mui/material/IconButton';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FirecallLocation, LocationStatus } from '../firebase/firestore';
 import StatusChip from './StatusChip';
@@ -51,7 +47,6 @@ export default function EinsatzorteRow({
     id: stableId,
   }));
   const [mapOpen, setMapOpen] = useState(false);
-  const [vehiclesExpanded, setVehiclesExpanded] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const geocodeRef = useRef<NodeJS.Timeout | null>(null);
   const prevAddressRef = useRef({ street: location.street, number: location.number });
@@ -261,47 +256,14 @@ export default function EinsatzorteRow({
             onChange={(status) => handleFieldChange('status', status)}
           />
         </TableCell>
-        <TableCell
-          onClick={() => setVehiclesExpanded(!vehiclesExpanded)}
-          sx={{
-            cursor: 'pointer',
-            minWidth: 150,
-            '&:hover': { bgcolor: 'action.hover' },
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {vehiclesArray.length > 0 ? (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, flex: 1 }}>
-                {vehiclesArray.slice(0, 2).map((v) => (
-                  <Chip
-                    key={v}
-                    label={v}
-                    size="small"
-                    color={kostenersatzVehicleNames.has(v) ? 'primary' : 'default'}
-                    variant={kostenersatzVehicleNames.has(v) ? 'filled' : 'outlined'}
-                  />
-                ))}
-                {vehiclesArray.length > 2 && (
-                  <Typography variant="body2" color="text.secondary">
-                    +{vehiclesArray.length - 2}
-                  </Typography>
-                )}
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.disabled">
-                —
-              </Typography>
-            )}
-            <IconButton
-              size="small"
-              sx={{
-                transform: vehiclesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s',
-              }}
-            >
-              <ExpandMoreIcon fontSize="small" />
-            </IconButton>
-          </Box>
+        <TableCell sx={{ minWidth: 200 }}>
+          <VehicleAutocomplete
+            value={vehiclesArray}
+            onChange={handleVehiclesChange}
+            suggestions={vehicleSuggestions}
+            kostenersatzVehicleNames={kostenersatzVehicleNames}
+            onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+          />
         </TableCell>
         <TableCell>
           <TextField
@@ -371,29 +333,6 @@ export default function EinsatzorteRow({
               </IconButton>
             </Tooltip>
           )}
-        </TableCell>
-      </TableRow>
-
-      {/* Expandable row for vehicle autocomplete */}
-      <TableRow>
-        <TableCell
-          colSpan={10}
-          sx={{
-            py: 0,
-            borderBottom: vehiclesExpanded ? undefined : 'none',
-          }}
-        >
-          <Collapse in={vehiclesExpanded} timeout="auto" unmountOnExit>
-            <Box sx={{ py: 2, px: 1 }}>
-              <VehicleAutocomplete
-                value={vehiclesArray}
-                onChange={handleVehiclesChange}
-                suggestions={vehicleSuggestions}
-                kostenersatzVehicleNames={kostenersatzVehicleNames}
-                onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
-              />
-            </Box>
-          </Collapse>
         </TableCell>
       </TableRow>
 
