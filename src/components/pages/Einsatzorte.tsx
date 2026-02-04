@@ -35,12 +35,12 @@ export default function Einsatzorte() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const hasAutoImported = useRef(false);
 
-  // Vehicle suggestions from Kostenersatz and existing firecall locations
-  const { suggestions: vehicleSuggestions, kostenersatzVehicleNames } =
-    useVehicleSuggestions(locations);
-
   // Access existing vehicle items in this firecall
   const { vehicles: firecallVehicles } = useVehicles();
+
+  // Vehicle suggestions from Kostenersatz, map vehicles, and existing firecall locations
+  const { suggestions: vehicleSuggestions, kostenersatzVehicleNames } =
+    useVehicleSuggestions(locations, firecallVehicles);
 
   // Hooks for creating/updating vehicle items
   const addFirecallItem = useFirecallItemAdd();
