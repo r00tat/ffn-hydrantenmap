@@ -11,9 +11,10 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FirecallLocation, LocationStatus } from '../firebase/firestore';
+import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
+import VehicleAutocomplete from './VehicleAutocomplete';
 import { geocodeAddress } from './geocode';
 
 interface EinsatzorteCardProps {
@@ -22,6 +23,9 @@ interface EinsatzorteCardProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
+  mapVehicles: Fzg[];
+  kostenersatzVehicleNames: Set<string>;
+  onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteCard({
@@ -30,11 +34,19 @@ export default function EinsatzorteCard({
   onChange,
   onDelete,
   onAdd,
+  mapVehicles,
+  kostenersatzVehicleNames,
+  onKostenersatzVehicleSelected,
 }: EinsatzorteCardProps) {
+  // Track a unique key for resetting the new card after add
+  const [resetKey, setResetKey] = useState(0);
+
   // Generate a stable ID for new cards so the document ID is predetermined
+  // resetKey forces regeneration after a successful add
   const stableId = useMemo(
     () => (isNew ? crypto.randomUUID() : location.id),
-    [isNew, location.id]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isNew, location.id, resetKey]
   );
 
   const [local, setLocal] = useState<Partial<FirecallLocation>>(() => ({
@@ -58,6 +70,14 @@ export default function EinsatzorteCard({
     prevAddressRef.current = { street: location.street, number: location.number };
   }, [location, stableId]);
 
+  // Reset the new card state after a successful add
+  const resetNewCard = useCallback(() => {
+    const newId = crypto.randomUUID();
+    setLocal({ ...location, id: newId });
+    setResetKey((k) => k + 1);
+    prevAddressRef.current = { street: location.street, number: location.number };
+  }, [location]);
+
   // Handle card blur - save new card when focus leaves the entire card
   const handleCardBlur = useCallback(
     (e: React.FocusEvent) => {
@@ -65,10 +85,11 @@ export default function EinsatzorteCard({
       if (cardRef.current && !cardRef.current.contains(e.relatedTarget as Node)) {
         if (isNew && (localRef.current.name || localRef.current.street)) {
           onAdd?.(localRef.current);
+          resetNewCard();
         }
       }
     },
-    [isNew, onAdd]
+    [isNew, onAdd, resetNewCard]
   );
 
   // Handle Enter key to add new card
@@ -77,13 +98,14 @@ export default function EinsatzorteCard({
       if (e.key === 'Enter' && isNew && (localRef.current.name || localRef.current.street)) {
         e.preventDefault();
         onAdd?.(localRef.current);
+        resetNewCard();
       }
     },
-    [isNew, onAdd]
+    [isNew, onAdd, resetNewCard]
   );
 
   const handleFieldChange = useCallback(
-    (field: keyof FirecallLocation, value: string | LocationStatus) => {
+    (field: keyof FirecallLocation, value: string | Record<string, string> | LocationStatus) => {
       const updated = { ...local, [field]: value };
 
       // Auto-set time fields based on status changes
@@ -165,6 +187,22 @@ export default function EinsatzorteCard({
     [isNew, onChange]
   );
 
+  const handleVehiclesChange = useCallback(
+    (vehicles: Record<string, string>) => {
+      handleFieldChange('vehicles', vehicles);
+    },
+    [handleFieldChange]
+  );
+
+  const handleKostenersatzVehicleSelected = useCallback(
+    (vehicleName: string) => {
+      if (onKostenersatzVehicleSelected && local.id) {
+        onKostenersatzVehicleSelected(vehicleName, local as FirecallLocation);
+      }
+    },
+    [onKostenersatzVehicleSelected, local]
+  );
+
   return (
     <>
       <Card ref={cardRef} onBlur={handleCardBlur} onKeyDown={handleKeyDown} sx={{ mb: 2, opacity: isNew ? 0.6 : 1 }}>
@@ -217,14 +255,18 @@ export default function EinsatzorteCard({
             sx={{ mb: 2 }}
           />
 
-          <TextField
-            value={local.vehicles || ''}
-            onChange={(e) => handleFieldChange('vehicles', e.target.value)}
-            size="small"
-            fullWidth
-            placeholder="Fahrzeuge"
-            sx={{ mb: 2 }}
-          />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+              Fahrzeuge:
+            </Typography>
+            <VehicleAutocomplete
+              value={(local.vehicles as Record<string, string>) || {}}
+              onChange={handleVehiclesChange}
+              mapVehicles={mapVehicles}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+            />
+          </Box>
 
           <Divider sx={{ my: 2 }} />
 

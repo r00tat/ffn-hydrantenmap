@@ -15,7 +15,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import useEmailImport from '../../hooks/useEmailImport';
-import { FirecallLocation, defaultFirecallLocation } from '../firebase/firestore';
+import useVehicles from '../../hooks/useVehicles';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
+import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
+import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteTable from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
 
@@ -29,6 +34,18 @@ export default function Einsatzorte() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const hasAutoImported = useRef(false);
+
+  // Access existing vehicle items in this firecall
+  const { vehicles: firecallVehicles } = useVehicles();
+
+  // Vehicle suggestions from Kostenersatz and map vehicles
+  const { mapVehicles, kostenersatzVehicleNames } =
+    useVehicleSuggestions(firecallVehicles);
+
+  // Hooks for creating/updating vehicle items
+  const addFirecallItem = useFirecallItemAdd();
+  const updateFirecallItem = useFirecallItemUpdate();
+  const { saveHistory } = useSaveHistory();
 
   // Auto-import on mount when firecall.id is available
   useEffect(() => {
@@ -90,6 +107,85 @@ export default function Einsatzorte() {
     [deleteLocation]
   );
 
+  /**
+   * Called when a Kostenersatz vehicle is selected for a location.
+   * Creates or finds the vehicle on the map, then adds its ID to the location.
+   */
+  const handleKostenersatzVehicleSelected = useCallback(
+    async (vehicleName: string, location: FirecallLocation) => {
+      // Determine position: use Einsatzort coordinates, fallback to firecall position
+      const lat = location.lat ?? firecall?.lat;
+      const lng = location.lng ?? firecall?.lng;
+
+      if (lat === undefined || lng === undefined) {
+        console.warn(
+          `Cannot place vehicle "${vehicleName}": no coordinates available for location or firecall`
+        );
+        return;
+      }
+
+      // Check if vehicle already exists in firecall items (by name match)
+      const existingVehicle = firecallVehicles.find(
+        (v) => v.name.toLowerCase() === vehicleName.toLowerCase()
+      );
+
+      try {
+        let vehicleId: string;
+        let vehicleDisplayName: string;
+
+        if (existingVehicle && existingVehicle.id) {
+          // Vehicle exists: update position and use existing ID
+          vehicleId = existingVehicle.id;
+          vehicleDisplayName = existingVehicle.name;
+
+          console.info(
+            `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`
+          );
+
+          await saveHistory(`Fahrzeug ${vehicleName} Positionsupdate`);
+          await updateFirecallItem({
+            ...existingVehicle,
+            lat,
+            lng,
+          });
+
+          setSnackbar(`${vehicleName} Position aktualisiert`);
+        } else {
+          // Vehicle doesn't exist: create new vehicle item
+          console.info(
+            `Creating new vehicle "${vehicleName}" at position ${lat}, ${lng}`
+          );
+
+          const newVehicle: Fzg = {
+            name: vehicleName,
+            type: 'vehicle',
+            fw: 'Neusiedl am See',
+            lat,
+            lng,
+          };
+
+          const docRef = await addFirecallItem(newVehicle);
+          vehicleId = docRef.id;
+          vehicleDisplayName = vehicleName;
+
+          setSnackbar(`${vehicleName} auf Karte hinzugefügt`);
+        }
+
+        // Now add the vehicle reference to the location
+        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        if (!currentVehicles[vehicleId]) {
+          await updateLocation(location.id!, {
+            vehicles: { ...currentVehicles, [vehicleId]: vehicleDisplayName },
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to add/update vehicle "${vehicleName}":`, error);
+        setSnackbar(`Fehler beim Aktualisieren von ${vehicleName}`);
+      }
+    },
+    [firecall, firecallVehicles, addFirecallItem, updateFirecallItem, saveHistory, updateLocation]
+  );
+
   if (!firecall || firecall.id === 'unknown') {
     return (
       <Box sx={{ p: 3 }}>
@@ -149,6 +245,9 @@ export default function Einsatzorte() {
               location={location}
               onChange={(updates) => handleUpdate(location.id!, updates)}
               onDelete={() => handleDelete(location.id!)}
+              mapVehicles={mapVehicles}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
             />
           ))}
           <EinsatzorteCard
@@ -157,6 +256,9 @@ export default function Einsatzorte() {
             isNew
             onChange={() => {}}
             onAdd={handleAdd}
+            mapVehicles={mapVehicles}
+            kostenersatzVehicleNames={kostenersatzVehicleNames}
+            onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
           />
         </Box>
       ) : (
@@ -165,6 +267,9 @@ export default function Einsatzorte() {
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onAdd={handleAdd}
+          mapVehicles={mapVehicles}
+          kostenersatzVehicleNames={kostenersatzVehicleNames}
+          onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
         />
       )}
 

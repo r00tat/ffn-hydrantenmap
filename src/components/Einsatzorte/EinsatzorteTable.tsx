@@ -8,7 +8,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import { useCallback } from 'react';
-import { FirecallLocation, defaultFirecallLocation } from '../firebase/firestore';
+import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteRow from './EinsatzorteRow';
 
 interface EinsatzorteTableProps {
@@ -16,6 +16,9 @@ interface EinsatzorteTableProps {
   onUpdate: (id: string, updates: Partial<FirecallLocation>) => void;
   onDelete: (id: string) => void;
   onAdd: (location: Partial<FirecallLocation>) => void;
+  mapVehicles: Fzg[];
+  kostenersatzVehicleNames: Set<string>;
+  onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteTable({
@@ -23,6 +26,9 @@ export default function EinsatzorteTable({
   onUpdate,
   onDelete,
   onAdd,
+  mapVehicles,
+  kostenersatzVehicleNames,
+  onKostenersatzVehicleSelected,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
     (id: string) => (updates: Partial<FirecallLocation>) => {
@@ -68,6 +74,9 @@ export default function EinsatzorteTable({
               location={location}
               onChange={handleChange(location.id!)}
               onDelete={handleDelete(location.id!)}
+              mapVehicles={mapVehicles}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
             />
           ))}
           <EinsatzorteRow
@@ -76,6 +85,9 @@ export default function EinsatzorteTable({
             isNew
             onChange={() => {}}
             onAdd={onAdd}
+            mapVehicles={mapVehicles}
+            kostenersatzVehicleNames={kostenersatzVehicleNames}
+            onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
           />
         </TableBody>
       </Table>

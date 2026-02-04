@@ -9,9 +9,10 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FirecallLocation, LocationStatus } from '../firebase/firestore';
+import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
+import VehicleAutocomplete from './VehicleAutocomplete';
 import { geocodeAddress } from './geocode';
 
 interface EinsatzorteRowProps {
@@ -20,6 +21,9 @@ interface EinsatzorteRowProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
+  mapVehicles: Fzg[];
+  kostenersatzVehicleNames: Set<string>;
+  onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteRow({
@@ -28,11 +32,19 @@ export default function EinsatzorteRow({
   onChange,
   onDelete,
   onAdd,
+  mapVehicles,
+  kostenersatzVehicleNames,
+  onKostenersatzVehicleSelected,
 }: EinsatzorteRowProps) {
+  // Track a unique key for resetting the new row after add
+  const [resetKey, setResetKey] = useState(0);
+
   // Generate a stable ID for new rows so the document ID is predetermined
+  // resetKey forces regeneration after a successful add
   const stableId = useMemo(
     () => (isNew ? crypto.randomUUID() : location.id),
-    [isNew, location.id]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isNew, location.id, resetKey]
   );
 
   const [local, setLocal] = useState<Partial<FirecallLocation>>(() => ({
@@ -51,11 +63,53 @@ export default function EinsatzorteRow({
     localRef.current = local;
   }, [local]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      if (geocodeRef.current) {
+        clearTimeout(geocodeRef.current);
+      }
+    };
+  }, []);
+
   // Sync from parent when location changes (e.g., real-time updates)
   useEffect(() => {
     setLocal({ ...location, id: stableId });
     prevAddressRef.current = { street: location.street, number: location.number };
   }, [location, stableId]);
+
+  // Geocode on mount if existing row has address but no coordinates
+  // This handles the case where a new row was added before geocoding completed
+  useEffect(() => {
+    if (
+      !isNew &&
+      location.street &&
+      location.number &&
+      location.lat === undefined &&
+      location.lng === undefined
+    ) {
+      geocodeAddress(location.street, location.number, location.city || 'Neusiedl am See').then(
+        (coords) => {
+          if (coords) {
+            onChange({ lat: coords.lat, lng: coords.lng });
+          }
+        }
+      );
+    }
+    // Only run on mount for existing rows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset the new row state after a successful add
+  const resetNewRow = useCallback(() => {
+    const newId = crypto.randomUUID();
+    setLocal({ ...location, id: newId });
+    setResetKey((k) => k + 1);
+    prevAddressRef.current = { street: location.street, number: location.number };
+  }, [location]);
 
   // Handle row blur - save new row when focus leaves the entire row
   // Using setTimeout because relatedTarget can be null in certain browsers/situations
@@ -69,24 +123,36 @@ export default function EinsatzorteRow({
       const focusStillInRow = rowRef.current?.contains(activeElement);
 
       if (!focusStillInRow && (localRef.current.name || localRef.current.street)) {
+        // Clear pending geocode - it will run on the wrong component instance after add
+        if (geocodeRef.current) {
+          clearTimeout(geocodeRef.current);
+          geocodeRef.current = null;
+        }
         onAdd?.(localRef.current);
+        resetNewRow();
       }
     }, 0);
-  }, [isNew, onAdd]);
+  }, [isNew, onAdd, resetNewRow]);
 
   // Handle Enter key to add new row
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && isNew && (localRef.current.name || localRef.current.street)) {
         e.preventDefault();
+        // Clear pending geocode - it will run on the wrong component instance after add
+        if (geocodeRef.current) {
+          clearTimeout(geocodeRef.current);
+          geocodeRef.current = null;
+        }
         onAdd?.(localRef.current);
+        resetNewRow();
       }
     },
-    [isNew, onAdd]
+    [isNew, onAdd, resetNewRow]
   );
 
   const handleFieldChange = useCallback(
-    (field: keyof FirecallLocation, value: string | LocationStatus) => {
+    (field: keyof FirecallLocation, value: string | Record<string, string> | LocationStatus) => {
       const updated = { ...local, [field]: value };
 
       // Auto-set time fields based on status changes
@@ -169,6 +235,22 @@ export default function EinsatzorteRow({
     [isNew, onChange]
   );
 
+  const handleVehiclesChange = useCallback(
+    (vehicles: Record<string, string>) => {
+      handleFieldChange('vehicles', vehicles);
+    },
+    [handleFieldChange]
+  );
+
+  const handleKostenersatzVehicleSelected = useCallback(
+    (vehicleName: string) => {
+      if (onKostenersatzVehicleSelected && local.id) {
+        onKostenersatzVehicleSelected(vehicleName, local as FirecallLocation);
+      }
+    },
+    [onKostenersatzVehicleSelected, local]
+  );
+
   const coordsText =
     local.lat && local.lng
       ? `${local.lat.toFixed(5)}, ${local.lng.toFixed(5)}`
@@ -221,14 +303,13 @@ export default function EinsatzorteRow({
             onChange={(status) => handleFieldChange('status', status)}
           />
         </TableCell>
-        <TableCell>
-          <TextField
-            value={local.vehicles || ''}
-            onChange={(e) => handleFieldChange('vehicles', e.target.value)}
-            size="small"
-            fullWidth
-            placeholder="Fahrzeuge"
-            variant="standard"
+        <TableCell sx={{ minWidth: 200 }}>
+          <VehicleAutocomplete
+            value={(local.vehicles as Record<string, string>) || {}}
+            onChange={handleVehiclesChange}
+            mapVehicles={mapVehicles}
+            kostenersatzVehicleNames={kostenersatzVehicleNames}
+            onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
           />
         </TableCell>
         <TableCell>

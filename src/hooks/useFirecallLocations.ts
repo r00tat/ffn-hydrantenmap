@@ -19,6 +19,41 @@ import useFirebaseCollection from './useFirebaseCollection';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
+/**
+ * Migrate legacy vehicle formats to Record<string, string>.
+ * Legacy Firestore documents may have vehicles as:
+ * - A comma-separated string: "ELF, HLFA1" -> {"ELF": "ELF", "HLFA1": "HLFA1"}
+ * - A string array: ["ELF", "HLFA1"] -> {"ELF": "ELF", "HLFA1": "HLFA1"}
+ * New format passes through: {"id1": "ELF"} -> {"id1": "ELF"}
+ */
+const migrateVehicles = (
+  vehicles: string | string[] | Record<string, string> | undefined
+): Record<string, string> => {
+  if (!vehicles) return {};
+
+  // New format: Record<string, string> - pass through
+  if (typeof vehicles === 'object' && !Array.isArray(vehicles)) {
+    return vehicles;
+  }
+
+  // Legacy array format: convert to Record using name as both key and value
+  if (Array.isArray(vehicles)) {
+    const result: Record<string, string> = {};
+    for (const name of vehicles) {
+      if (name) result[name] = name;
+    }
+    return result;
+  }
+
+  // Legacy string format: split, then convert to Record
+  const result: Record<string, string> = {};
+  const names = vehicles.split(',').map((v) => v.trim()).filter(Boolean);
+  for (const name of names) {
+    result[name] = name;
+  }
+  return result;
+};
+
 export interface UseFirecallLocationsResult {
   locations: FirecallLocation[];
   loading: boolean;
@@ -49,10 +84,16 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
 
   const locations = useMemo(
     () =>
-      [...records].sort(
-        (a, b) =>
-          new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime()
-      ),
+      [...records]
+        .map((loc) => ({
+          ...loc,
+          vehicles: migrateVehicles(loc.vehicles as string | string[] | Record<string, string> | undefined),
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.created || 0).getTime() -
+            new Date(b.created || 0).getTime()
+        ),
     [records]
   );
 
