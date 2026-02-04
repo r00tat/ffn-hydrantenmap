@@ -1,11 +1,9 @@
 'use client';
 
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import IconButton from '@mui/material/IconButton';
-import AddIcon from '@mui/icons-material/Add';
 import { useCallback, useState } from 'react';
 
 interface VehicleAutocompleteProps {
@@ -28,19 +26,27 @@ export default function VehicleAutocomplete({
   const [inputValue, setInputValue] = useState('');
   const selectedSet = new Set(value);
 
-  // Add a vehicle (either from suggestions or custom text)
-  const addVehicle = useCallback(
-    (vehicleName: string) => {
-      const trimmed = vehicleName.trim();
+  // Filter suggestions to show only unselected ones
+  const availableSuggestions = suggestions.filter((s) => !selectedSet.has(s));
+
+  // Handle selection change
+  const handleChange = useCallback(
+    (_event: React.SyntheticEvent, newValue: string | null) => {
+      if (!newValue) return;
+
+      const trimmed = newValue.trim();
       if (!trimmed || selectedSet.has(trimmed)) return;
 
-      const newValue = [...value, trimmed];
-      onChange(newValue);
+      const updatedValue = [...value, trimmed];
+      onChange(updatedValue);
 
       // Check if it's a Kostenersatz vehicle
       if (onKostenersatzVehicleAdded && kostenersatzVehicleNames.has(trimmed)) {
         onKostenersatzVehicleAdded(trimmed);
       }
+
+      // Clear the input
+      setInputValue('');
     },
     [value, onChange, onKostenersatzVehicleAdded, kostenersatzVehicleNames, selectedSet]
   );
@@ -52,28 +58,6 @@ export default function VehicleAutocomplete({
     },
     [value, onChange]
   );
-
-  // Handle text input submission
-  const handleInputKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter' && inputValue.trim()) {
-        e.preventDefault();
-        addVehicle(inputValue);
-        setInputValue('');
-      }
-    },
-    [inputValue, addVehicle]
-  );
-
-  const handleAddClick = useCallback(() => {
-    if (inputValue.trim()) {
-      addVehicle(inputValue);
-      setInputValue('');
-    }
-  }, [inputValue, addVehicle]);
-
-  // Filter suggestions to show only unselected ones
-  const availableSuggestions = suggestions.filter((s) => !selectedSet.has(s));
 
   return (
     <Box>
@@ -97,47 +81,26 @@ export default function VehicleAutocomplete({
         </Box>
       )}
 
-      {/* Text input for custom vehicles */}
-      <TextField
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleInputKeyDown}
-        variant="standard"
-        fullWidth
-        size="small"
-        placeholder="Fahrzeug hinzufügen..."
+      {/* Autocomplete input with suggestions dropdown */}
+      <Autocomplete
+        freeSolo
+        options={availableSuggestions}
+        inputValue={inputValue}
+        onInputChange={(_event, newInputValue) => setInputValue(newInputValue)}
+        onChange={handleChange}
         disabled={disabled}
-        InputProps={{
-          endAdornment: inputValue.trim() ? (
-            <InputAdornment position="end">
-              <IconButton size="small" onClick={handleAddClick} disabled={disabled}>
-                <AddIcon fontSize="small" />
-              </IconButton>
-            </InputAdornment>
-          ) : null,
-        }}
+        clearOnBlur={false}
+        blurOnSelect
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            variant="standard"
+            fullWidth
+            size="small"
+            placeholder="Fahrzeug hinzufügen..."
+          />
+        )}
       />
-
-      {/* Suggestion chips (unselected vehicles) */}
-      {availableSuggestions.length > 0 && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-          {availableSuggestions.map((vehicle) => {
-            const isKostenersatz = kostenersatzVehicleNames.has(vehicle);
-            return (
-              <Chip
-                key={vehicle}
-                label={vehicle}
-                size="small"
-                color={isKostenersatz ? 'primary' : 'default'}
-                variant="outlined"
-                onClick={disabled ? undefined : () => addVehicle(vehicle)}
-                disabled={disabled}
-                sx={{ cursor: disabled ? 'default' : 'pointer' }}
-              />
-            );
-          })}
-        </Box>
-      )}
     </Box>
   );
 }
