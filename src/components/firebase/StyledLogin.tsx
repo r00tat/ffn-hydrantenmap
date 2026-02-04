@@ -14,6 +14,7 @@ import {
   getAdditionalUserInfo,
   GoogleAuthProvider,
   sendEmailVerification,
+  sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
@@ -144,6 +145,23 @@ export default function StyledLoginButton({
     setRegisterDisabled(false);
   }, [auth, email, name]);
 
+  const resetPassword = useCallback(async () => {
+    if (!email || !email.includes('@')) {
+      setError('Bitte geben Sie eine gültige Email Adresse ein.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setInfo(
+        'Eine Email zum Zurücksetzen des Passworts wurde versandt. Bitte prüfen Sie Ihre Email.'
+      );
+      setError(undefined);
+    } catch (err) {
+      console.error(`password reset failed`, err);
+      setError((err as any).message || `${err}`);
+    }
+  }, [auth, email]);
+
   useEffect(() => {
     (async () => {
       const params = new URL(document.location.toString()).searchParams;
@@ -270,9 +288,18 @@ export default function StyledLoginButton({
                     >
                       Login mit Email &amp; Passwort
                     </Button>
+
+                    <Button
+                      color="inherit"
+                      variant="text"
+                      onClick={resetPassword}
+                      style={{ marginTop: 10 }}
+                      disabled={email === '' || !email.includes('@')}
+                    >
+                      Passwort vergessen?
+                    </Button>
                   </>
                 )}
-                <Typography>Passwort vergessen?</Typography>
               </FormControl>
             </form>
           </Grid>
