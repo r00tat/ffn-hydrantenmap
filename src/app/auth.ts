@@ -108,14 +108,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     //   return true;
     // },
     session: async ({ session, token, user }) => {
+      // Guard against undefined token (can happen on initial load)
+      if (!token?.id) {
+        return session;
+      }
+
       session.user.id = token.id as string;
 
-      if (session.user.id) {
+      try {
         const userInfo = await firestore
           .collection(USER_COLLECTION_ID)
           .doc(session.user.id)
           .get();
-        // console.info(`firebase user info: ${JSON.stringify(userInfo.data())}`);
         if (userInfo.exists) {
           const userData = userInfo.data() as FirebaseUserInfo;
           session.user.isAuthorized = !!userData.authorized;
@@ -126,8 +130,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ]);
           session.user.firecall = userData.firecall;
         }
+      } catch (err) {
+        console.error(`session callback: failed to fetch user data`, err);
+        // Return session without user data rather than crashing
       }
-      console.info(`session callback completed`);
 
       return session;
     },

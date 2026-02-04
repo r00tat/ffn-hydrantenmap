@@ -15,6 +15,7 @@ export interface LoginData {
   isSignedIn: boolean;
   isAuthorized: boolean;
   isAdmin: boolean;
+  isAuthLoading: boolean;
   user?: User;
   email?: string;
   displayName?: string;
@@ -51,6 +52,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     isSignedIn: false,
     isAuthorized: false,
     isAdmin: false,
+    isAuthLoading: true,
     myGroups: [],
   }); // Local signed-in state.
   const [uid, setUid] = useState<string>();
@@ -220,6 +222,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
         const authData: Partial<LoginData> = {
           isSignedIn: !!user,
+          isAuthLoading: false,
           user: user !== null ? user : undefined,
           email: nonNull(u?.email),
           displayName: nonNull(u?.displayName),
@@ -254,7 +257,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           const auth: LoginData = JSON.parse(authText);
           if (auth.expiration && new Date(auth.expiration) > new Date()) {
             // token valid, use credentials for login status
-            setLoginStatus({ ...auth, isRefreshing: true });
+            setLoginStatus({ ...auth, isRefreshing: true, isAuthLoading: false });
           }
         }
       }
