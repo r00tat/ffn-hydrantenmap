@@ -15,7 +15,7 @@ export default function EinsaetzeDocsPage() {
         kann mit Fahrzeugen, Mannschaft und anderen Elementen verknüpft werden.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/einsaetze.png" alt="Einsatzübersicht" />
+      <Screenshot src="/docs-assets/screenshots/einsaetze.png" alt="Einsatzübersicht" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen

@@ -15,7 +15,7 @@ export default function SchadstoffDocsPage() {
         und deren Handhabung im Einsatzfall.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/schadstoff.png" alt="Schadstoffdatenbank" />
+      <Screenshot src="/docs-assets/screenshots/schadstoff.png" alt="Schadstoffdatenbank" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen

@@ -15,7 +15,7 @@ export default function KarteDocsPage() {
         Du kannst die Karte verschieben, zoomen und verschiedene Layer aktivieren.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/karte.png" alt="Kartenansicht" />
+      <Screenshot src="/docs-assets/screenshots/karte.png" alt="Kartenansicht" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen

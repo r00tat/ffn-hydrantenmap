@@ -15,7 +15,7 @@ export default function FahrzeugeDocsPage() {
         und Status.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/fahrzeuge.png" alt="Fahrzeugübersicht" />
+      <Screenshot src="/docs-assets/screenshots/fahrzeuge.png" alt="Fahrzeugübersicht" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen

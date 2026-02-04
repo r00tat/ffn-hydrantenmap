@@ -11,6 +11,7 @@ import { usePathname } from 'next/navigation';
 
 const docPages = [
   { label: 'Übersicht', href: '/docs' },
+  { label: 'Schnellstart', href: '/docs/quickstart' },
   { label: 'Karte', href: '/docs/karte' },
   { label: 'Einsätze', href: '/docs/einsaetze' },
   { label: 'Tagebuch', href: '/docs/tagebuch' },

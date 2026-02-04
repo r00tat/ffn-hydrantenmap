@@ -15,7 +15,7 @@ export default function TagebuchDocsPage() {
         Einsatzes in chronologischer Reihenfolge.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/tagebuch.png" alt="Einsatztagebuch" />
+      <Screenshot src="/docs-assets/screenshots/tagebuch.png" alt="Einsatztagebuch" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen

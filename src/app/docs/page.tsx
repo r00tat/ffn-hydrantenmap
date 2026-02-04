@@ -20,6 +20,14 @@ export default function DocsPage() {
       </Typography>
       <List>
         <ListItem>
+          <Link href="/docs/quickstart" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Schnellstart"
+              secondary="In wenigen Schritten einen Einsatz anlegen"
+            />
+          </Link>
+        </ListItem>
+        <ListItem>
           <Link href="/docs/karte" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
             <ListItemText
               primary="Karte"

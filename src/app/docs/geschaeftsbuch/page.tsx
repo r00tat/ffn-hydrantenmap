@@ -15,7 +15,7 @@ export default function GeschaeftsbuchDocsPage() {
         und Protokolle der Feuerwehr.
       </Typography>
 
-      <Screenshot src="/docs/screenshots/geschaeftsbuch.png" alt="Geschäftsbuch" />
+      <Screenshot src="/docs-assets/screenshots/geschaeftsbuch.png" alt="Geschäftsbuch" />
 
       <Typography variant="h5" gutterBottom>
         Funktionen
