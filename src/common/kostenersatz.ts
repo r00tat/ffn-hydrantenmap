@@ -135,6 +135,9 @@ export const KOSTENERSATZ_TEMPLATES_COLLECTION = 'kostenersatzTemplates';
 export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
 export const KOSTENERSATZ_VEHICLES_COLLECTION = 'kostenersatzVehicles';
 
+// Group key for kostenersatz authorization
+export const KOSTENERSATZ_GROUP = 'kostenersatz';
+
 // ============================================================================
 // Vehicle Types
 // ============================================================================

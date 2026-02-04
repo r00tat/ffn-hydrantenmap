@@ -54,7 +54,7 @@ export default function FirebaseUiLogin() {
           provider: EmailAuthProvider.PROVIDER_ID,
           signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD,
           providerName: 'Email Link',
-          fullLabel: 'Singn In with Email Link',
+          fullLabel: 'Sign In with Email Link',
           requireDisplayName: true,
           // disableSignUp: {
           //   status: true,

@@ -12,7 +12,7 @@ import {
   setCustomClaimsForUser,
 } from '../api/users/[uid]/updateUser';
 import { actionAdminRequired, actionUserRequired } from '../auth';
-import { getGroups, getMyGroups, Group } from './groupHelpers';
+import { getGroups, getMyGroups, Group, KNOWN_GROUPS } from './groupHelpers';
 
 export async function getGroupsAction(): Promise<Group[]> {
   await actionUserRequired();
@@ -120,4 +120,27 @@ export async function deleteGroupAction(groupId: string) {
   await doc.delete();
 
   return doc.id;
+}
+
+export async function createKnownGroupsAction(): Promise<string[]> {
+  await actionAdminRequired();
+
+  const existingGroups = await getGroups();
+  const existingIds = new Set(existingGroups.map((g) => g.id));
+
+  const createdGroups: string[] = [];
+
+  for (const knownGroup of KNOWN_GROUPS) {
+    if (knownGroup.id && !existingIds.has(knownGroup.id)) {
+      const doc = firestore.collection(GROUP_COLLECTION_ID).doc(knownGroup.id);
+      await doc.set({
+        name: knownGroup.name,
+        description: knownGroup.description,
+      });
+      createdGroups.push(knownGroup.id);
+      console.info(`Created known group: ${knownGroup.id} (${knownGroup.name})`);
+    }
+  }
+
+  return createdGroups;
 }

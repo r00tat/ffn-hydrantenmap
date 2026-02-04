@@ -1,7 +1,7 @@
 import NextAuth, { DefaultSession, Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { isTruthy } from '../common/boolish';
-import { FirebaseUserInfo } from '../common/users';
+import { isInternalEmail } from '../common/internalDomains';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
@@ -9,18 +9,16 @@ import {
 } from '../components/firebase/firestore';
 import { firestore, firebaseAuth } from '../server/firebase/admin';
 import { ApiException } from './api/errors';
-import { uniqueArray } from '../common/arrayUtils';
+import {
+  ensureUserProvisioned,
+  getUserSessionData,
+} from '../server/auth/autoProvisionUser';
 
 export async function checkFirebaseToken(token: string) {
   // logic to salt and hash password
   const decodedToken = await firebaseAuth.verifyIdToken(token);
 
-  if (
-    !(
-      decodedToken.email &&
-      decodedToken.email.indexOf('@ff-neusiedlamsee.at') > 0
-    )
-  ) {
+  if (!isInternalEmail(decodedToken.email)) {
     // allow all internal users
     // fetch the user and check if this is an active user
     const userDoc = await firestore
@@ -74,6 +72,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials: any) => {
         // console.info(`running auth.js authorize`);
         const tokenInfo = await checkFirebaseToken(credentials.firebaseToken);
+
+        // Auto-provision internal users during sign-in so custom claims
+        // are set BEFORE the client tries to refresh the token
+        await ensureUserProvisioned(
+          tokenInfo.sub,
+          tokenInfo.email,
+          tokenInfo.name
+        );
+
         // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
         return {
           id: tokenInfo.sub,
@@ -116,18 +123,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.id = token.id as string;
 
       try {
-        const userInfo = await firestore
-          .collection(USER_COLLECTION_ID)
-          .doc(session.user.id)
-          .get();
-        if (userInfo.exists) {
-          const userData = userInfo.data() as FirebaseUserInfo;
-          session.user.isAuthorized = !!userData.authorized;
-          session.user.isAdmin = !!userData.isAdmin;
-          session.user.groups = uniqueArray([
-            'allUsers',
-            ...(userData.groups || []),
-          ]);
+        const userData = await getUserSessionData(
+          session.user.id,
+          session.user.email,
+          session.user.name
+        );
+        if (userData) {
+          session.user.isAuthorized = userData.isAuthorized;
+          session.user.isAdmin = userData.isAdmin;
+          session.user.groups = userData.groups;
           session.user.firecall = userData.firecall;
         }
       } catch (err) {

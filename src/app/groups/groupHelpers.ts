@@ -4,12 +4,11 @@ import {
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
+import { Group, KNOWN_GROUPS } from './groupTypes';
 
-export interface Group {
-  id?: string;
-  name: string;
-  description?: string;
-}
+// Re-export for backwards compatibility
+export type { Group };
+export { KNOWN_GROUPS };
 
 export async function getGroups(): Promise<Group[]> {
   const groupDocs = (
