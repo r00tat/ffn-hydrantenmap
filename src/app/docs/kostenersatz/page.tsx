@@ -11,7 +11,7 @@ export default function KostenersatzDocsPage() {
         Kostenersatz
       </Typography>
       <Typography paragraph>
-        Erstellen und verwalten Sie Kostenersatz-Abrechnungen für Einsätze gemäß
+        Erstelle und verwalte Kostenersatz-Abrechnungen für Einsätze gemäß
         der Tarifordnung.
       </Typography>
 
@@ -41,11 +41,11 @@ export default function KostenersatzDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie den Kostenersatz-Bereich</li>
-          <li>Wählen Sie den Einsatz aus oder erstellen Sie eine neue Abrechnung</li>
-          <li>Fügen Sie die Positionen hinzu (Fahrzeuge, Mannstunden, Material)</li>
-          <li>Überprüfen Sie die Summe</li>
-          <li>Exportieren Sie die Abrechnung als PDF</li>
+          <li>Öffne den Kostenersatz-Bereich</li>
+          <li>Wähle den Einsatz aus oder erstelle eine neue Abrechnung</li>
+          <li>Füge die Positionen hinzu (Fahrzeuge, Mannstunden, Material)</li>
+          <li>Überprüfe die Summe</li>
+          <li>Exportiere die Abrechnung als PDF</li>
         </ol>
       </Typography>
     </>

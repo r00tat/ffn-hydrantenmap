@@ -12,7 +12,7 @@ export default function KarteDocsPage() {
       </Typography>
       <Typography paragraph>
         Die Karte zeigt Hydranten und andere wichtige Punkte im Einsatzgebiet an.
-        Sie können die Karte verschieben, zoomen und verschiedene Layer aktivieren.
+        Du kannst die Karte verschieben, zoomen und verschiedene Layer aktivieren.
       </Typography>
 
       <Screenshot src="/docs/screenshots/karte.png" alt="Kartenansicht" />
@@ -44,9 +44,9 @@ export default function KarteDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie die Karte über das Menü oder die Startseite</li>
+          <li>Öffne die Karte über das Menü oder die Startseite</li>
           <li>Hydranten werden als blaue Marker angezeigt</li>
-          <li>Klicken Sie auf einen Hydranten für Details</li>
+          <li>Klicke auf einen Hydranten für Details</li>
         </ol>
       </Typography>
 
@@ -55,9 +55,9 @@ export default function KarteDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Klicken Sie auf das Layer-Symbol rechts oben</li>
-          <li>Wählen Sie den gewünschten Kartenlayer aus</li>
-          <li>Aktivieren oder deaktivieren Sie Overlays nach Bedarf</li>
+          <li>Klicke auf das Layer-Symbol rechts oben</li>
+          <li>Wähle den gewünschten Kartenlayer aus</li>
+          <li>Aktiviere oder deaktiviere Overlays nach Bedarf</li>
         </ol>
       </Typography>
     </>

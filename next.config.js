@@ -25,6 +25,9 @@ module.exports = async (phase) => {
         {
           pathname: '/icons/**',
         },
+        {
+          pathname: '/docs/screenshots/**',
+        },
       ],
     },
   };

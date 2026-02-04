@@ -41,10 +41,10 @@ export default function SchadstoffDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie die Schadstoffdatenbank</li>
-          <li>Geben Sie den Stoffnamen oder die UN-Nummer ein</li>
-          <li>Wählen Sie den Stoff aus der Ergebnisliste</li>
-          <li>Lesen Sie die Gefahrenhinweise und Maßnahmen</li>
+          <li>Öffne die Schadstoffdatenbank</li>
+          <li>Gib den Stoffnamen oder die UN-Nummer ein</li>
+          <li>Wähle den Stoff aus der Ergebnisliste</li>
+          <li>Lies die Gefahrenhinweise und Maßnahmen</li>
         </ol>
       </Typography>
     </>

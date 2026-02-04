@@ -41,11 +41,11 @@ export default function TagebuchDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie das Einsatztagebuch</li>
-          <li>Klicken Sie auf &quot;Neuer Eintrag&quot;</li>
-          <li>Geben Sie die Beschreibung des Ereignisses ein</li>
+          <li>Öffne das Einsatztagebuch</li>
+          <li>Klicke auf &quot;Neuer Eintrag&quot;</li>
+          <li>Gib die Beschreibung des Ereignisses ein</li>
           <li>Der Zeitstempel wird automatisch gesetzt</li>
-          <li>Speichern Sie den Eintrag</li>
+          <li>Speichere den Eintrag</li>
         </ol>
       </Typography>
     </>

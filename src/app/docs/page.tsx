@@ -11,7 +11,7 @@ export default function DocsPage() {
         Dokumentation
       </Typography>
       <Typography paragraph>
-        Willkommen zur Dokumentation der Einsatzkarte. Hier finden Sie Anleitungen
+        Willkommen zur Dokumentation der Einsatzkarte. Hier findest du Anleitungen
         zu allen Funktionen der App.
       </Typography>
 
@@ -19,47 +19,61 @@ export default function DocsPage() {
         Inhalt
       </Typography>
       <List>
-        <ListItem component={Link} href="/docs/karte">
-          <ListItemText
-            primary="Karte"
-            secondary="Hydranten anzeigen, navigieren, Layer verwalten"
-          />
+        <ListItem>
+          <Link href="/docs/karte" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Karte"
+              secondary="Hydranten anzeigen, navigieren, Layer verwalten"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/einsaetze">
-          <ListItemText
-            primary="Einsätze"
-            secondary="Einsätze erstellen, bearbeiten und verwalten"
-          />
+        <ListItem>
+          <Link href="/docs/einsaetze" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Einsätze"
+              secondary="Einsätze erstellen, bearbeiten und verwalten"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/tagebuch">
-          <ListItemText
-            primary="Einsatztagebuch"
-            secondary="Einträge im Einsatztagebuch erstellen und ansehen"
-          />
+        <ListItem>
+          <Link href="/docs/tagebuch" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Einsatztagebuch"
+              secondary="Einträge im Einsatztagebuch erstellen und ansehen"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/fahrzeuge">
-          <ListItemText
-            primary="Fahrzeuge"
-            secondary="Fahrzeugpositionen und Status verwalten"
-          />
+        <ListItem>
+          <Link href="/docs/fahrzeuge" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Fahrzeuge"
+              secondary="Fahrzeugpositionen und Status verwalten"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/schadstoff">
-          <ListItemText
-            primary="Schadstoff"
-            secondary="Gefahrstoffdatenbank durchsuchen"
-          />
+        <ListItem>
+          <Link href="/docs/schadstoff" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Schadstoff"
+              secondary="Gefahrstoffdatenbank durchsuchen"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/kostenersatz">
-          <ListItemText
-            primary="Kostenersatz"
-            secondary="Abrechnungen erstellen und exportieren"
-          />
+        <ListItem>
+          <Link href="/docs/kostenersatz" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Kostenersatz"
+              secondary="Abrechnungen erstellen und exportieren"
+            />
+          </Link>
         </ListItem>
-        <ListItem component={Link} href="/docs/geschaeftsbuch">
-          <ListItemText
-            primary="Geschäftsbuch"
-            secondary="Geschäftsbucheinträge verwalten"
-          />
+        <ListItem>
+          <Link href="/docs/geschaeftsbuch" style={{ textDecoration: 'none', color: 'inherit', width: '100%' }}>
+            <ListItemText
+              primary="Geschäftsbuch"
+              secondary="Geschäftsbucheinträge verwalten"
+            />
+          </Link>
         </ListItem>
       </List>
     </>

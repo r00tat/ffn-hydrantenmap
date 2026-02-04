@@ -11,7 +11,7 @@ export default function EinsaetzeDocsPage() {
         Einsätze
       </Typography>
       <Typography paragraph>
-        Hier können Sie Einsätze erstellen, bearbeiten und verwalten. Jeder Einsatz
+        Hier kannst du Einsätze erstellen, bearbeiten und verwalten. Jeder Einsatz
         kann mit Fahrzeugen, Mannschaft und anderen Elementen verknüpft werden.
       </Typography>
 
@@ -44,9 +44,9 @@ export default function EinsaetzeDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Klicken Sie auf &quot;Neuer Einsatz&quot;</li>
-          <li>Geben Sie die Einsatzdaten ein (Adresse, Art, Zeit)</li>
-          <li>Speichern Sie den Einsatz</li>
+          <li>Klicke auf &quot;Neuer Einsatz&quot;</li>
+          <li>Gib die Einsatzdaten ein (Adresse, Art, Zeit)</li>
+          <li>Speichere den Einsatz</li>
         </ol>
       </Typography>
 
@@ -55,9 +55,9 @@ export default function EinsaetzeDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie einen bestehenden Einsatz</li>
-          <li>Wählen Sie den Elementtyp (Fahrzeug, Person, etc.)</li>
-          <li>Fügen Sie das Element mit den entsprechenden Daten hinzu</li>
+          <li>Öffne einen bestehenden Einsatz</li>
+          <li>Wähle den Elementtyp (Fahrzeug, Person, etc.)</li>
+          <li>Füge das Element mit den entsprechenden Daten hinzu</li>
         </ol>
       </Typography>
     </>

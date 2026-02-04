@@ -41,10 +41,10 @@ export default function GeschaeftsbuchDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffnen Sie das Geschäftsbuch</li>
-          <li>Klicken Sie auf &quot;Neuer Eintrag&quot;</li>
-          <li>Geben Sie die Details des Vorgangs ein</li>
-          <li>Speichern Sie den Eintrag</li>
+          <li>Öffne das Geschäftsbuch</li>
+          <li>Klicke auf &quot;Neuer Eintrag&quot;</li>
+          <li>Gib die Details des Vorgangs ein</li>
+          <li>Speichere den Eintrag</li>
         </ol>
       </Typography>
     </>
