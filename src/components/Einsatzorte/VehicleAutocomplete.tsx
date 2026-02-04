@@ -1,9 +1,12 @@
 'use client';
 
-import Autocomplete from '@mui/material/Autocomplete';
+import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
-import { useCallback, useRef } from 'react';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import AddIcon from '@mui/icons-material/Add';
+import { useCallback, useState } from 'react';
 
 interface VehicleAutocompleteProps {
   value: string[];
@@ -22,66 +25,119 @@ export default function VehicleAutocomplete({
   disabled = false,
   onKostenersatzVehicleAdded,
 }: VehicleAutocompleteProps) {
-  // Track current values to detect newly added vehicles
-  const previousValuesRef = useRef<Set<string>>(new Set(value));
+  const [inputValue, setInputValue] = useState('');
+  const selectedSet = new Set(value);
 
-  const handleChange = useCallback(
-    (_event: React.SyntheticEvent, newValue: string[]) => {
-      // Find newly added vehicles (in newValue but not in previous)
-      const previousSet = previousValuesRef.current;
-      const addedVehicles = newValue.filter((v) => !previousSet.has(v));
+  // Add a vehicle (either from suggestions or custom text)
+  const addVehicle = useCallback(
+    (vehicleName: string) => {
+      const trimmed = vehicleName.trim();
+      if (!trimmed || selectedSet.has(trimmed)) return;
 
-      // Update the ref for next comparison
-      previousValuesRef.current = new Set(newValue);
-
-      // Call onChange with the new value
+      const newValue = [...value, trimmed];
       onChange(newValue);
 
-      // Check if any added vehicle is a Kostenersatz vehicle
-      if (onKostenersatzVehicleAdded) {
-        for (const vehicleName of addedVehicles) {
-          if (kostenersatzVehicleNames.has(vehicleName)) {
-            onKostenersatzVehicleAdded(vehicleName);
-          }
-        }
+      // Check if it's a Kostenersatz vehicle
+      if (onKostenersatzVehicleAdded && kostenersatzVehicleNames.has(trimmed)) {
+        onKostenersatzVehicleAdded(trimmed);
       }
     },
-    [onChange, onKostenersatzVehicleAdded, kostenersatzVehicleNames]
+    [value, onChange, onKostenersatzVehicleAdded, kostenersatzVehicleNames, selectedSet]
   );
 
-  return (
-    <Autocomplete
-      multiple
-      freeSolo
-      options={suggestions}
-      value={value}
-      onChange={handleChange}
-      disabled={disabled}
-      filterSelectedOptions
-      renderTags={(tagValue, getTagProps) =>
-        tagValue.map((option, index) => {
-          const { key, ...chipProps } = getTagProps({ index });
-          const isKostenersatz = kostenersatzVehicleNames.has(option);
-          return (
-            <Chip
-              key={key}
-              label={option}
-              size="small"
-              color={isKostenersatz ? 'primary' : 'default'}
-              variant={isKostenersatz ? 'filled' : 'outlined'}
-              {...chipProps}
-            />
-          );
-        })
+  // Remove a vehicle
+  const removeVehicle = useCallback(
+    (vehicleName: string) => {
+      onChange(value.filter((v) => v !== vehicleName));
+    },
+    [value, onChange]
+  );
+
+  // Handle text input submission
+  const handleInputKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && inputValue.trim()) {
+        e.preventDefault();
+        addVehicle(inputValue);
+        setInputValue('');
       }
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          variant="standard"
-          fullWidth
-          placeholder={value.length === 0 ? 'Fahrzeuge hinzufügen...' : ''}
-        />
+    },
+    [inputValue, addVehicle]
+  );
+
+  const handleAddClick = useCallback(() => {
+    if (inputValue.trim()) {
+      addVehicle(inputValue);
+      setInputValue('');
+    }
+  }, [inputValue, addVehicle]);
+
+  // Filter suggestions to show only unselected ones
+  const availableSuggestions = suggestions.filter((s) => !selectedSet.has(s));
+
+  return (
+    <Box>
+      {/* Selected vehicles as chips */}
+      {value.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+          {value.map((vehicle) => {
+            const isKostenersatz = kostenersatzVehicleNames.has(vehicle);
+            return (
+              <Chip
+                key={vehicle}
+                label={vehicle}
+                size="small"
+                color={isKostenersatz ? 'primary' : 'default'}
+                variant={isKostenersatz ? 'filled' : 'outlined'}
+                onDelete={disabled ? undefined : () => removeVehicle(vehicle)}
+                disabled={disabled}
+              />
+            );
+          })}
+        </Box>
       )}
-    />
+
+      {/* Text input for custom vehicles */}
+      <TextField
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleInputKeyDown}
+        variant="standard"
+        fullWidth
+        size="small"
+        placeholder="Fahrzeug hinzufügen..."
+        disabled={disabled}
+        InputProps={{
+          endAdornment: inputValue.trim() ? (
+            <InputAdornment position="end">
+              <IconButton size="small" onClick={handleAddClick} disabled={disabled}>
+                <AddIcon fontSize="small" />
+              </IconButton>
+            </InputAdornment>
+          ) : null,
+        }}
+      />
+
+      {/* Suggestion chips (unselected vehicles) */}
+      {availableSuggestions.length > 0 && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+          {availableSuggestions.map((vehicle) => {
+            const isKostenersatz = kostenersatzVehicleNames.has(vehicle);
+            return (
+              <Chip
+                key={vehicle}
+                label={vehicle}
+                size="small"
+                color={isKostenersatz ? 'primary' : 'default'}
+                variant="outlined"
+                onClick={disabled ? undefined : () => addVehicle(vehicle)}
+                disabled={disabled}
+                sx={{ cursor: disabled ? 'default' : 'pointer' }}
+              />
+            );
+          })}
+        </Box>
+      )}
+    </Box>
   );
 }
