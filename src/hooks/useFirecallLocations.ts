@@ -19,6 +19,20 @@ import useFirebaseCollection from './useFirebaseCollection';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 
+/**
+ * Migrate legacy string vehicles to string array.
+ * Legacy Firestore documents may have vehicles as a comma-separated string.
+ */
+const migrateVehicles = (vehicles: string | string[] | undefined): string[] => {
+  if (!vehicles) return [];
+  if (Array.isArray(vehicles)) return vehicles;
+  // Legacy string: split by comma, trim, filter empty
+  return vehicles
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+};
+
 export interface UseFirecallLocationsResult {
   locations: FirecallLocation[];
   loading: boolean;
@@ -49,10 +63,16 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
 
   const locations = useMemo(
     () =>
-      [...records].sort(
-        (a, b) =>
-          new Date(a.created || 0).getTime() - new Date(b.created || 0).getTime()
-      ),
+      [...records]
+        .map((loc) => ({
+          ...loc,
+          vehicles: migrateVehicles(loc.vehicles as string | string[] | undefined),
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.created || 0).getTime() -
+            new Date(b.created || 0).getTime()
+        ),
     [records]
   );
 
