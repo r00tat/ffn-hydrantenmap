@@ -9,7 +9,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FirecallLocation, LocationStatus } from '../firebase/firestore';
+import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
 import VehicleAutocomplete from './VehicleAutocomplete';
@@ -21,10 +21,9 @@ interface EinsatzorteRowProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
-  vehicleSuggestions: string[];
+  mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
-  vehicleFwMap?: Map<string, string>;
-  onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
+  onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteRow({
@@ -33,10 +32,9 @@ export default function EinsatzorteRow({
   onChange,
   onDelete,
   onAdd,
-  vehicleSuggestions,
+  mapVehicles,
   kostenersatzVehicleNames,
-  vehicleFwMap,
-  onKostenersatzVehicleAdded,
+  onKostenersatzVehicleSelected,
 }: EinsatzorteRowProps) {
   // Track a unique key for resetting the new row after add
   const [resetKey, setResetKey] = useState(0);
@@ -154,7 +152,7 @@ export default function EinsatzorteRow({
   );
 
   const handleFieldChange = useCallback(
-    (field: keyof FirecallLocation, value: string | string[] | LocationStatus) => {
+    (field: keyof FirecallLocation, value: string | Record<string, string> | LocationStatus) => {
       const updated = { ...local, [field]: value };
 
       // Auto-set time fields based on status changes
@@ -238,32 +236,20 @@ export default function EinsatzorteRow({
   );
 
   const handleVehiclesChange = useCallback(
-    (vehicles: string[]) => {
+    (vehicles: Record<string, string>) => {
       handleFieldChange('vehicles', vehicles);
     },
     [handleFieldChange]
   );
 
-  const handleKostenersatzVehicleAdded = useCallback(
+  const handleKostenersatzVehicleSelected = useCallback(
     (vehicleName: string) => {
-      if (onKostenersatzVehicleAdded && local.id) {
-        // Pass the full location with updated vehicles
-        onKostenersatzVehicleAdded(vehicleName, local as FirecallLocation);
+      if (onKostenersatzVehicleSelected && local.id) {
+        onKostenersatzVehicleSelected(vehicleName, local as FirecallLocation);
       }
     },
-    [onKostenersatzVehicleAdded, local]
+    [onKostenersatzVehicleSelected, local]
   );
-
-  // Get vehicles as array, handling both old string format and new array format
-  const vehiclesArray = useMemo((): string[] => {
-    const v = local.vehicles;
-    if (Array.isArray(v)) return v;
-    // Handle legacy string format (cast needed as type says string[] but old data may be string)
-    if (typeof v === 'string' && (v as string).trim()) {
-      return (v as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    }
-    return [];
-  }, [local.vehicles]);
 
   const coordsText =
     local.lat && local.lng
@@ -319,12 +305,11 @@ export default function EinsatzorteRow({
         </TableCell>
         <TableCell sx={{ minWidth: 200 }}>
           <VehicleAutocomplete
-            value={vehiclesArray}
+            value={(local.vehicles as Record<string, string>) || {}}
             onChange={handleVehiclesChange}
-            suggestions={vehicleSuggestions}
+            mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
-            vehicleFwMap={vehicleFwMap}
-            onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+            onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
           />
         </TableCell>
         <TableCell>

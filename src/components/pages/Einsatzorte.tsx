@@ -39,7 +39,7 @@ export default function Einsatzorte() {
   const { vehicles: firecallVehicles } = useVehicles();
 
   // Vehicle suggestions from Kostenersatz and map vehicles
-  const { suggestions: vehicleSuggestions, kostenersatzVehicleNames, vehicleFwMap } =
+  const { mapVehicles, kostenersatzVehicleNames } =
     useVehicleSuggestions(firecallVehicles);
 
   // Hooks for creating/updating vehicle items
@@ -108,10 +108,10 @@ export default function Einsatzorte() {
   );
 
   /**
-   * Called when a Kostenersatz vehicle is added to a location.
-   * Creates or updates the vehicle item on the map with the Einsatzort's position.
+   * Called when a Kostenersatz vehicle is selected for a location.
+   * Creates or finds the vehicle on the map, then adds its ID to the location.
    */
-  const handleKostenersatzVehicleAdded = useCallback(
+  const handleKostenersatzVehicleSelected = useCallback(
     async (vehicleName: string, location: FirecallLocation) => {
       // Determine position: use Einsatzort coordinates, fallback to firecall position
       const lat = location.lat ?? firecall?.lat;
@@ -130,16 +130,19 @@ export default function Einsatzorte() {
       );
 
       try {
-        if (existingVehicle) {
-          // Vehicle exists: create history checkpoint, then update position
+        let vehicleId: string;
+        let vehicleDisplayName: string;
+
+        if (existingVehicle && existingVehicle.id) {
+          // Vehicle exists: update position and use existing ID
+          vehicleId = existingVehicle.id;
+          vehicleDisplayName = existingVehicle.name;
+
           console.info(
             `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`
           );
 
-          // Save history checkpoint before the move (captures current state)
           await saveHistory(`Fahrzeug ${vehicleName} Positionsupdate`);
-
-          // Update the vehicle's position
           await updateFirecallItem({
             ...existingVehicle,
             lat,
@@ -161,15 +164,26 @@ export default function Einsatzorte() {
             lng,
           };
 
-          await addFirecallItem(newVehicle);
+          const docRef = await addFirecallItem(newVehicle);
+          vehicleId = docRef.id;
+          vehicleDisplayName = vehicleName;
+
           setSnackbar(`${vehicleName} auf Karte hinzugefügt`);
+        }
+
+        // Now add the vehicle reference to the location
+        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        if (!currentVehicles[vehicleId]) {
+          await updateLocation(location.id!, {
+            vehicles: { ...currentVehicles, [vehicleId]: vehicleDisplayName },
+          });
         }
       } catch (error) {
         console.error(`Failed to add/update vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Aktualisieren von ${vehicleName}`);
       }
     },
-    [firecall, firecallVehicles, addFirecallItem, updateFirecallItem, saveHistory]
+    [firecall, firecallVehicles, addFirecallItem, updateFirecallItem, saveHistory, updateLocation]
   );
 
   if (!firecall || firecall.id === 'unknown') {
@@ -231,10 +245,9 @@ export default function Einsatzorte() {
               location={location}
               onChange={(updates) => handleUpdate(location.id!, updates)}
               onDelete={() => handleDelete(location.id!)}
-              vehicleSuggestions={vehicleSuggestions}
+              mapVehicles={mapVehicles}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
-              vehicleFwMap={vehicleFwMap}
-              onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+              onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
             />
           ))}
           <EinsatzorteCard
@@ -243,10 +256,9 @@ export default function Einsatzorte() {
             isNew
             onChange={() => {}}
             onAdd={handleAdd}
-            vehicleSuggestions={vehicleSuggestions}
+            mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
-            vehicleFwMap={vehicleFwMap}
-            onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+            onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
           />
         </Box>
       ) : (
@@ -255,10 +267,9 @@ export default function Einsatzorte() {
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onAdd={handleAdd}
-          vehicleSuggestions={vehicleSuggestions}
+          mapVehicles={mapVehicles}
           kostenersatzVehicleNames={kostenersatzVehicleNames}
-          vehicleFwMap={vehicleFwMap}
-          onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+          onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
         />
       )}
 

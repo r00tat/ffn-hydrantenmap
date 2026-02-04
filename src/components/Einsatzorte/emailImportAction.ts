@@ -121,7 +121,7 @@ function mapEinsatzToLocation(einsatz: Einsatz): Partial<FirecallLocation> {
     alarmTime: extractTime(einsatz.zeitpunkt),
     auftragsNummer: einsatz.auftragsNummer,
     status: 'offen',
-    vehicles: [],
+    vehicles: {},
     info: '',
     created: new Date().toISOString(),
     creator: 'email-import',

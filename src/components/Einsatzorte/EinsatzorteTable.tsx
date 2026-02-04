@@ -8,7 +8,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import { useCallback } from 'react';
-import { FirecallLocation, defaultFirecallLocation } from '../firebase/firestore';
+import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteRow from './EinsatzorteRow';
 
 interface EinsatzorteTableProps {
@@ -16,10 +16,9 @@ interface EinsatzorteTableProps {
   onUpdate: (id: string, updates: Partial<FirecallLocation>) => void;
   onDelete: (id: string) => void;
   onAdd: (location: Partial<FirecallLocation>) => void;
-  vehicleSuggestions: string[];
+  mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
-  vehicleFwMap?: Map<string, string>;
-  onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
+  onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteTable({
@@ -27,10 +26,9 @@ export default function EinsatzorteTable({
   onUpdate,
   onDelete,
   onAdd,
-  vehicleSuggestions,
+  mapVehicles,
   kostenersatzVehicleNames,
-  vehicleFwMap,
-  onKostenersatzVehicleAdded,
+  onKostenersatzVehicleSelected,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
     (id: string) => (updates: Partial<FirecallLocation>) => {
@@ -76,10 +74,9 @@ export default function EinsatzorteTable({
               location={location}
               onChange={handleChange(location.id!)}
               onDelete={handleDelete(location.id!)}
-              vehicleSuggestions={vehicleSuggestions}
+              mapVehicles={mapVehicles}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
-              vehicleFwMap={vehicleFwMap}
-              onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
+              onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
             />
           ))}
           <EinsatzorteRow
@@ -88,10 +85,9 @@ export default function EinsatzorteTable({
             isNew
             onChange={() => {}}
             onAdd={onAdd}
-            vehicleSuggestions={vehicleSuggestions}
+            mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
-            vehicleFwMap={vehicleFwMap}
-            onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
+            onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
           />
         </TableBody>
       </Table>

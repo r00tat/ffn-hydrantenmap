@@ -5,93 +5,139 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { Fzg } from '../firebase/firestore';
 
 interface VehicleAutocompleteProps {
-  value: string[];
-  onChange: (vehicles: string[]) => void;
-  suggestions: string[]; // Combined Kostenersatz + firecall vehicles
-  kostenersatzVehicleNames: Set<string>; // To identify Kostenersatz vehicles
-  vehicleFwMap?: Map<string, string>; // Map of vehicle name to Feuerwehr for display
+  /** Current vehicles as Record<id, name> */
+  value: Record<string, string>;
+  /** Called when vehicles change */
+  onChange: (vehicles: Record<string, string>) => void;
+  /** Map vehicles (Fzg items with IDs) */
+  mapVehicles: Fzg[];
+  /** Kostenersatz vehicle names (not yet on map) */
+  kostenersatzVehicleNames: Set<string>;
   disabled?: boolean;
-  onKostenersatzVehicleAdded?: (vehicleName: string) => void; // Callback when a Kostenersatz vehicle is added
+  /** Called when a Kostenersatz vehicle is selected (needs to be added to map first) */
+  onKostenersatzVehicleSelected?: (vehicleName: string) => void;
 }
+
+type SuggestionOption = {
+  type: 'map';
+  vehicle: Fzg;
+} | {
+  type: 'kostenersatz';
+  name: string;
+};
 
 export default function VehicleAutocomplete({
   value,
   onChange,
-  suggestions,
+  mapVehicles,
   kostenersatzVehicleNames,
-  vehicleFwMap,
   disabled = false,
-  onKostenersatzVehicleAdded,
+  onKostenersatzVehicleSelected,
 }: VehicleAutocompleteProps) {
   const [inputValue, setInputValue] = useState('');
-  const selectedSet = new Set(value);
 
-  // Filter suggestions to show only unselected ones
-  const availableSuggestions = suggestions.filter((s) => !selectedSet.has(s));
+  // Build suggestion options, excluding already-selected vehicles
+  const options = useMemo((): SuggestionOption[] => {
+    const selectedIds = new Set(Object.keys(value));
+    const selectedNames = new Set(Object.values(value).map((n) => n.toLowerCase()));
 
-  // Handle selection change
+    const result: SuggestionOption[] = [];
+
+    // Add map vehicles (not already selected)
+    for (const vehicle of mapVehicles) {
+      if (vehicle.id && !selectedIds.has(vehicle.id)) {
+        result.push({ type: 'map', vehicle });
+      }
+    }
+
+    // Add Kostenersatz vehicles (not already on map and not selected by name)
+    for (const name of kostenersatzVehicleNames) {
+      if (!selectedNames.has(name.toLowerCase())) {
+        result.push({ type: 'kostenersatz', name });
+      }
+    }
+
+    // Sort alphabetically by display name
+    result.sort((a, b) => {
+      const nameA = a.type === 'map' ? a.vehicle.name : a.name;
+      const nameB = b.type === 'map' ? b.vehicle.name : b.name;
+      return nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
+    });
+
+    return result;
+  }, [mapVehicles, kostenersatzVehicleNames, value]);
+
+  // Get display name for an option
+  const getOptionLabel = useCallback((option: SuggestionOption): string => {
+    return option.type === 'map' ? option.vehicle.name : option.name;
+  }, []);
+
+  // Handle selection
   const handleChange = useCallback(
-    (_event: React.SyntheticEvent, newValue: string | null) => {
-      if (!newValue) return;
+    (_event: React.SyntheticEvent, option: SuggestionOption | null) => {
+      if (!option) return;
 
-      const trimmed = newValue.trim();
-      if (!trimmed || selectedSet.has(trimmed)) return;
-
-      const updatedValue = [...value, trimmed];
-      onChange(updatedValue);
-
-      // Check if it's a Kostenersatz vehicle
-      if (onKostenersatzVehicleAdded && kostenersatzVehicleNames.has(trimmed)) {
-        onKostenersatzVehicleAdded(trimmed);
+      if (option.type === 'map') {
+        // Map vehicle: add ID -> name mapping
+        const vehicle = option.vehicle;
+        if (vehicle.id) {
+          onChange({ ...value, [vehicle.id]: vehicle.name });
+        }
+      } else {
+        // Kostenersatz vehicle: trigger callback to add to map first
+        onKostenersatzVehicleSelected?.(option.name);
       }
 
-      // Clear the input
       setInputValue('');
     },
-    [value, onChange, onKostenersatzVehicleAdded, kostenersatzVehicleNames, selectedSet]
+    [value, onChange, onKostenersatzVehicleSelected]
   );
 
-  // Remove a vehicle
+  // Remove a vehicle by ID
   const removeVehicle = useCallback(
-    (vehicleName: string) => {
-      onChange(value.filter((v) => v !== vehicleName));
+    (vehicleId: string) => {
+      const updated = { ...value };
+      delete updated[vehicleId];
+      onChange(updated);
     },
     [value, onChange]
+  );
+
+  // Convert value Record to array for display
+  const selectedVehicles = useMemo(
+    () => Object.entries(value).map(([id, name]) => ({ id, name })),
+    [value]
   );
 
   return (
     <Box>
       {/* Selected vehicles as chips */}
-      {value.length > 0 && (
+      {selectedVehicles.length > 0 && (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-          {value.map((vehicle) => {
-            const isKostenersatz = kostenersatzVehicleNames.has(vehicle);
-            return (
-              <Chip
-                key={vehicle}
-                label={vehicle}
-                size="small"
-                color={isKostenersatz ? 'primary' : 'default'}
-                variant={isKostenersatz ? 'filled' : 'outlined'}
-                onDelete={disabled ? undefined : () => removeVehicle(vehicle)}
-                disabled={disabled}
-              />
-            );
-          })}
+          {selectedVehicles.map(({ id, name }) => (
+            <Chip
+              key={id}
+              label={name}
+              size="small"
+              variant="outlined"
+              onDelete={disabled ? undefined : () => removeVehicle(id)}
+              disabled={disabled}
+            />
+          ))}
         </Box>
       )}
 
-      {/* Autocomplete input with suggestions dropdown */}
+      {/* Autocomplete input */}
       <Autocomplete
-        freeSolo
-        options={availableSuggestions}
+        options={options}
+        getOptionLabel={getOptionLabel}
         value={null}
         inputValue={inputValue}
         onInputChange={(_event, newInputValue, reason) => {
-          // Don't clear input when reason is 'reset' (after selection) - we handle that in handleChange
           if (reason !== 'reset') {
             setInputValue(newInputValue);
           }
@@ -100,17 +146,36 @@ export default function VehicleAutocomplete({
         disabled={disabled}
         clearOnBlur={false}
         blurOnSelect
+        isOptionEqualToValue={(option, val) => {
+          if (option.type === 'map' && val.type === 'map') {
+            return option.vehicle.id === val.vehicle.id;
+          }
+          if (option.type === 'kostenersatz' && val.type === 'kostenersatz') {
+            return option.name === val.name;
+          }
+          return false;
+        }}
         renderOption={(props, option) => {
-          const fw = vehicleFwMap?.get(option);
+          const name = option.type === 'map' ? option.vehicle.name : option.name;
+          const fw = option.type === 'map' ? option.vehicle.fw : undefined;
+          const isKostenersatz = option.type === 'kostenersatz';
+
           return (
-            <Box component="li" {...props} key={option}>
+            <Box component="li" {...props} key={option.type === 'map' ? option.vehicle.id : option.name}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span>{option}</span>
-                {fw && (
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                    {fw}
-                  </Typography>
-                )}
+                <span>{name}</span>
+                <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
+                  {fw && (
+                    <Typography variant="caption" color="text.secondary">
+                      {fw}
+                    </Typography>
+                  )}
+                  {isKostenersatz && (
+                    <Typography variant="caption" color="primary">
+                      + Karte
+                    </Typography>
+                  )}
+                </Box>
               </Box>
             </Box>
           );

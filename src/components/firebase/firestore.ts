@@ -216,7 +216,7 @@ export interface FirecallLocation {
 
   // Status
   status: LocationStatus;
-  vehicles: string[];
+  vehicles: Record<string, string>;
 
   // Times
   alarmTime?: string;
@@ -247,7 +247,7 @@ export const defaultFirecallLocation: Partial<FirecallLocation> = {
   description: '',
   info: '',
   status: 'offen',
-  vehicles: [],
+  vehicles: {},
 };
 
 export interface HydrantenItem extends FirecallItem, Hydrant {
