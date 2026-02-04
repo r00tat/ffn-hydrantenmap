@@ -156,6 +156,7 @@ export default function Einsatzorte() {
           const newVehicle: Fzg = {
             name: vehicleName,
             type: 'vehicle',
+            fw: 'Neusiedl am See',
             lat,
             lng,
           };
