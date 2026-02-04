@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FirecallLocation, LocationStatus } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
+import VehicleAutocomplete from './VehicleAutocomplete';
 import { geocodeAddress } from './geocode';
 
 interface EinsatzorteCardProps {
@@ -22,6 +23,9 @@ interface EinsatzorteCardProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
+  vehicleSuggestions: string[];
+  kostenersatzVehicleNames: Set<string>;
+  onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteCard({
@@ -30,6 +34,9 @@ export default function EinsatzorteCard({
   onChange,
   onDelete,
   onAdd,
+  vehicleSuggestions,
+  kostenersatzVehicleNames,
+  onKostenersatzVehicleAdded,
 }: EinsatzorteCardProps) {
   // Generate a stable ID for new cards so the document ID is predetermined
   const stableId = useMemo(
@@ -83,7 +90,7 @@ export default function EinsatzorteCard({
   );
 
   const handleFieldChange = useCallback(
-    (field: keyof FirecallLocation, value: string | LocationStatus) => {
+    (field: keyof FirecallLocation, value: string | string[] | LocationStatus) => {
       const updated = { ...local, [field]: value };
 
       // Auto-set time fields based on status changes
@@ -165,6 +172,34 @@ export default function EinsatzorteCard({
     [isNew, onChange]
   );
 
+  const handleVehiclesChange = useCallback(
+    (vehicles: string[]) => {
+      handleFieldChange('vehicles', vehicles);
+    },
+    [handleFieldChange]
+  );
+
+  const handleKostenersatzVehicleAdded = useCallback(
+    (vehicleName: string) => {
+      if (onKostenersatzVehicleAdded && local.id) {
+        // Pass the full location with updated vehicles
+        onKostenersatzVehicleAdded(vehicleName, local as FirecallLocation);
+      }
+    },
+    [onKostenersatzVehicleAdded, local]
+  );
+
+  // Get vehicles as array, handling both old string format and new array format
+  const vehiclesArray = useMemo((): string[] => {
+    const v = local.vehicles;
+    if (Array.isArray(v)) return v;
+    // Handle legacy string format (cast needed as type says string[] but old data may be string)
+    if (typeof v === 'string' && (v as string).trim()) {
+      return (v as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+    return [];
+  }, [local.vehicles]);
+
   return (
     <>
       <Card ref={cardRef} onBlur={handleCardBlur} onKeyDown={handleKeyDown} sx={{ mb: 2, opacity: isNew ? 0.6 : 1 }}>
@@ -217,14 +252,18 @@ export default function EinsatzorteCard({
             sx={{ mb: 2 }}
           />
 
-          <TextField
-            value={local.vehicles || ''}
-            onChange={(e) => handleFieldChange('vehicles', e.target.value)}
-            size="small"
-            fullWidth
-            placeholder="Fahrzeuge"
-            sx={{ mb: 2 }}
-          />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+              Fahrzeuge:
+            </Typography>
+            <VehicleAutocomplete
+              value={vehiclesArray}
+              onChange={handleVehiclesChange}
+              suggestions={vehicleSuggestions}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleAdded={handleKostenersatzVehicleAdded}
+            />
+          </Box>
 
           <Divider sx={{ my: 2 }} />
 

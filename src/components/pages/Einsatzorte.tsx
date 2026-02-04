@@ -154,6 +154,8 @@ export default function Einsatzorte() {
               location={location}
               onChange={(updates) => handleUpdate(location.id!, updates)}
               onDelete={() => handleDelete(location.id!)}
+              vehicleSuggestions={EMPTY_VEHICLE_SUGGESTIONS}
+              kostenersatzVehicleNames={EMPTY_KOSTENERSATZ_VEHICLE_NAMES}
             />
           ))}
           <EinsatzorteCard
@@ -162,6 +164,8 @@ export default function Einsatzorte() {
             isNew
             onChange={() => {}}
             onAdd={handleAdd}
+            vehicleSuggestions={EMPTY_VEHICLE_SUGGESTIONS}
+            kostenersatzVehicleNames={EMPTY_KOSTENERSATZ_VEHICLE_NAMES}
           />
         </Box>
       ) : (
