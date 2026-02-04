@@ -180,3 +180,4 @@ dist
 /public/*.js.LICENSE.txt
 /firebase-tools
 .worktrees/
+test-results/
