@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import { useCallback, useState } from 'react';
 import {
+  copyUserAndGroupsToDev,
   setAuthorizedToBool,
   setCustomClaimsForAllUsers,
   setEmptyFirecallGroup,
@@ -40,6 +41,14 @@ export default function AdminActions() {
     );
   }, []);
 
+  const copyToDev = useCallback(async () => {
+    setStatus('Copying users and groups to dev...');
+    const result = await copyUserAndGroupsToDev();
+    setStatus(
+      `Copied ${result.usersCount} users and ${result.groupsCount} groups from prod to dev (ffndev).`
+    );
+  }, []);
+
   return (
     <Box>
       <Typography variant="body1" sx={{ mb: 2 }}>
@@ -68,6 +77,14 @@ export default function AdminActions() {
           </Button>{' '}
           <Typography component="span" variant="body2" color="text.secondary">
             Set claims for users
+          </Typography>
+        </Box>
+        <Box>
+          <Button onClick={copyToDev} variant="contained" color="warning">
+            Copy users & groups to dev
+          </Button>{' '}
+          <Typography component="span" variant="body2" color="text.secondary">
+            Copy user and groups collections from prod to ffndev
           </Typography>
         </Box>
       </Box>

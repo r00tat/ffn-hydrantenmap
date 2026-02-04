@@ -5,9 +5,14 @@ import { UserRecordExtended } from '../../common/users';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
+  GROUP_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
-import { firestore } from '../../server/firebase/admin';
+import {
+  firestore,
+  getDevFirestore,
+  getProdFirestore,
+} from '../../server/firebase/admin';
 import { setCustomClaimsForUser } from '../api/users/[uid]/updateUser';
 import { actionAdminRequired } from '../auth';
 
@@ -82,4 +87,65 @@ export async function setCustomClaimsForAllUsers() {
         uid: user.id,
       } as unknown as UserRecordExtended)
   );
+}
+
+export interface CopyCollectionResult {
+  usersCount: number;
+  groupsCount: number;
+}
+
+export async function copyUserAndGroupsToDev(): Promise<CopyCollectionResult> {
+  await actionAdminRequired();
+
+  console.info(`BULK ACTION: copyUserAndGroupsToDev`);
+
+  const prodDb = getProdFirestore();
+  const devDb = getDevFirestore();
+
+  // Copy users collection
+  const prodUsers = await prodDb.collection(USER_COLLECTION_ID).get();
+  const devUsersRef = devDb.collection(USER_COLLECTION_ID);
+
+  // Delete all existing users in dev
+  const existingDevUsers = await devUsersRef.get();
+  const deleteUserBatch = devDb.batch();
+  existingDevUsers.docs.forEach((doc) => {
+    deleteUserBatch.delete(doc.ref);
+  });
+  await deleteUserBatch.commit();
+
+  // Copy all users from prod to dev
+  const userBatch = devDb.batch();
+  prodUsers.docs.forEach((doc) => {
+    userBatch.set(devUsersRef.doc(doc.id), doc.data());
+  });
+  await userBatch.commit();
+
+  // Copy groups collection
+  const prodGroups = await prodDb.collection(GROUP_COLLECTION_ID).get();
+  const devGroupsRef = devDb.collection(GROUP_COLLECTION_ID);
+
+  // Delete all existing groups in dev
+  const existingDevGroups = await devGroupsRef.get();
+  const deleteGroupBatch = devDb.batch();
+  existingDevGroups.docs.forEach((doc) => {
+    deleteGroupBatch.delete(doc.ref);
+  });
+  await deleteGroupBatch.commit();
+
+  // Copy all groups from prod to dev
+  const groupBatch = devDb.batch();
+  prodGroups.docs.forEach((doc) => {
+    groupBatch.set(devGroupsRef.doc(doc.id), doc.data());
+  });
+  await groupBatch.commit();
+
+  console.info(
+    `BULK ACTION COMPLETE: copyUserAndGroupsToDev - ${prodUsers.size} users, ${prodGroups.size} groups`
+  );
+
+  return {
+    usersCount: prodUsers.size,
+    groupsCount: prodGroups.size,
+  };
 }

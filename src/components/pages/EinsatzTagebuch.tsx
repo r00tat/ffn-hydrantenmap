@@ -23,7 +23,6 @@ import {
   formatTimestamp,
   parseTimestamp,
 } from '../../common/time-format';
-import { useSpreadsheetDiaries } from '../../hooks/diaries';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
@@ -50,7 +49,6 @@ export function useDiaries(sortAscending: boolean = false) {
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
   const historyPathSegments = useHistoryPathSegments();
-  const spreadsheetDiaries = useSpreadsheetDiaries();
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -184,7 +182,6 @@ export function useDiaries(sortAscending: boolean = false) {
               }`,
             } as Diary)
         ),
-      spreadsheetDiaries,
     ].flat();
     const diaries = firecallEntries
       .map((a) => {
@@ -214,7 +211,7 @@ export function useDiaries(sortAscending: boolean = false) {
         firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
       );
     })();
-  }, [firecallItems, sortAscending, spreadsheetDiaries]);
+  }, [firecallItems, sortAscending]);
   return { diaries, diaryCounter };
 }
 

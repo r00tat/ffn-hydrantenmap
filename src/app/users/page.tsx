@@ -7,6 +7,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import TablePagination from '@mui/material/TablePagination';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
@@ -58,6 +59,8 @@ export default function Users() {
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [editUser, setEditUser] = useState<UserRecordExtended>();
   const [users, fetchUsers] = useUserList();
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const updateApiCall = useUpdateUser();
 
   const groupsArray = useFirebaseCollection<Group>({
@@ -99,6 +102,24 @@ export default function Users() {
     console.info(`edit user`);
     setShowEditUserDialog(true);
   }, []);
+
+  const handleChangePage = useCallback((_event: unknown, newPage: number) => {
+    setPage(newPage);
+  }, []);
+
+  const handleChangeRowsPerPage = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setRowsPerPage(parseInt(event.target.value, 10));
+      setPage(0);
+    },
+    []
+  );
+
+  const paginatedUsers = useMemo(
+    () => users.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [users, page, rowsPerPage]
+  );
+
   return (
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
@@ -126,7 +147,7 @@ export default function Users() {
           <Grid size={{ xs: 12 }}>
             <hr />
           </Grid>
-          {users.map((user) => (
+          {paginatedUsers.map((user) => (
             <React.Fragment key={`user-entry-${user.uid}`}>
               <Grid size={{ xs: 2, md: 2, lg: 2 }}>
                 <UserRowButtons
@@ -160,6 +181,15 @@ export default function Users() {
             </React.Fragment>
           ))}
         </Grid>
+        <TablePagination
+          component="div"
+          count={users.length}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+        />
       </Box>
       {showEditUserDialog && editUser && (
         <UserRecordExtendedDialog

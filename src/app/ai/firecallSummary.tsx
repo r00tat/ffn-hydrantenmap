@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import {
   Diary,
@@ -7,7 +7,6 @@ import {
   GeschaeftsbuchEintrag,
 } from '../../components/firebase/firestore';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
-import { useSpreadsheetDiaries } from '../../hooks/diaries';
 import useFirecall from '../../hooks/useFirecall';
 
 const firecallItemTextFormatters: {
@@ -54,13 +53,12 @@ const firecallItemTextFormatters: {
 export default function useFirecallSummary() {
   const firecall = useFirecall();
   const firecallItems = useFirecallItems();
-  const spreadsheetDiaries = useSpreadsheetDiaries();
 
   const summary = useMemo(() => {
     const sum = `Einsatz ${firecall.name} am ${formatTimestamp(
       firecall.alarmierung || firecall.datum
     )}
-    
+
     ${firecall.beschreibung || ''}}
 
     ${firecallItems
@@ -72,13 +70,9 @@ export default function useFirecallSummary() {
         return formatter(i);
       })
       .join('\n')}
-
-      ${spreadsheetDiaries
-        .map((i) => firecallItemTextFormatters.diary(i))
-        .join('\n')}
     `;
     return sum;
-  }, [firecall, firecallItems, spreadsheetDiaries]);
+  }, [firecall, firecallItems]);
 
   return summary;
 }

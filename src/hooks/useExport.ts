@@ -16,19 +16,30 @@ import {
   FcMarker,
   Firecall,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_HISTORY_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FIRECALL_LAYERS_COLLECTION_ID,
+  FIRECALL_LOCATIONS_COLLECTION_ID,
+  FirecallHistory,
   FirecallItem,
   FirecallLayer,
+  FirecallLocation,
 } from '../components/firebase/firestore';
 import { uploadFile } from '../components/inputs/FileUploader';
 import { ChatMessage } from '../common/chat';
+import {
+  KostenersatzCalculation,
+  KOSTENERSATZ_SUBCOLLECTION,
+} from '../common/kostenersatz';
 import { allSettled } from '../common/promise';
 
 export interface FirecallExport extends Firecall {
   items: FirecallItem[];
   chat: ChatMessage[];
   layers: FirecallLayer[];
+  history: FirecallHistory[];
+  locations: FirecallLocation[];
+  kostenersatz: KostenersatzCalculation[];
 }
 
 const storage = getStorage(app);
@@ -89,6 +100,17 @@ export async function exportFirecall(
   const layers = (
     await getDocs(query(collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID)))
   ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallLayer));
+  const history = (
+    await getDocs(query(collection(firecallDoc, FIRECALL_HISTORY_COLLECTION_ID)))
+  ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallHistory));
+  const locations = (
+    await getDocs(
+      query(collection(firecallDoc, FIRECALL_LOCATIONS_COLLECTION_ID))
+    )
+  ).docs.map((d) => ({ ...d.data(), id: d.id } as FirecallLocation));
+  const kostenersatz = (
+    await getDocs(query(collection(firecallDoc, KOSTENERSATZ_SUBCOLLECTION)))
+  ).docs.map((d) => ({ ...d.data(), id: d.id } as KostenersatzCalculation));
 
   const exportItems = await Promise.all(
     items
@@ -116,6 +138,9 @@ export async function exportFirecall(
     items: exportItems,
     chat: chat,
     layers: layers,
+    history: history,
+    locations: locations,
+    kostenersatz: kostenersatz,
   };
 }
 
@@ -132,7 +157,16 @@ export const blobFromBase64String = (
 };
 
 export async function importFirecall(firecall: FirecallExport) {
-  const { items, chat, layers, id, ...firecallData } = firecall;
+  const {
+    items,
+    chat,
+    layers,
+    history,
+    locations,
+    kostenersatz,
+    id,
+    ...firecallData
+  } = firecall;
   const firecallDoc = await addDoc(
     collection(firestore, FIRECALL_COLLECTION_ID),
     firecallData
@@ -140,6 +174,9 @@ export async function importFirecall(firecall: FirecallExport) {
   const itemCol = collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID);
   const chatCol = collection(firecallDoc, 'chat');
   const layerCol = collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID);
+  const historyCol = collection(firecallDoc, FIRECALL_HISTORY_COLLECTION_ID);
+  const locationCol = collection(firecallDoc, FIRECALL_LOCATIONS_COLLECTION_ID);
+  const kostenersatzCol = collection(firecallDoc, KOSTENERSATZ_SUBCOLLECTION);
 
   // upload files for items
 
@@ -186,5 +223,30 @@ export async function importFirecall(firecall: FirecallExport) {
     layerBatch.set(doc(layerCol, l.id || uuid()), l);
   });
   await layerBatch.commit();
+
+  if (history?.length) {
+    const historyBatch = writeBatch(firestore);
+    history.forEach((h) => {
+      historyBatch.set(doc(historyCol, h.id || uuid()), h);
+    });
+    await historyBatch.commit();
+  }
+
+  if (locations?.length) {
+    const locationBatch = writeBatch(firestore);
+    locations.forEach((l) => {
+      locationBatch.set(doc(locationCol, l.id || uuid()), l);
+    });
+    await locationBatch.commit();
+  }
+
+  if (kostenersatz?.length) {
+    const kostenersatzBatch = writeBatch(firestore);
+    kostenersatz.forEach((k) => {
+      kostenersatzBatch.set(doc(kostenersatzCol, k.id || uuid()), k);
+    });
+    await kostenersatzBatch.commit();
+  }
+
   return firecallDoc;
 }

@@ -60,6 +60,17 @@ export default function UserRecordExtendedDialog({
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) =>
       onChange(field)(event);
 
+  const onChangeSwitch =
+    (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setUserRecordExtended(
+        (prev) =>
+          ({
+            ...prev,
+            [field]: event.target.checked,
+          } as unknown as UserRecordExtended)
+      );
+    };
+
   const handleGroupChange = (event: SelectChangeEvent<string[]>) => {
     const {
       target: { value },
@@ -146,7 +157,7 @@ export default function UserRecordExtendedDialog({
             control={
               <Switch
                 checked={user.authorized}
-                onChange={onChange('authorized')}
+                onChange={onChangeSwitch('authorized')}
               />
             }
             label="Authorized"

@@ -7,17 +7,14 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc,
   where,
 } from 'firebase/firestore';
 import {
   createContext,
   Dispatch,
   SetStateAction,
-  useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
@@ -35,7 +32,6 @@ export const defaultFirecall: Firecall = {
 export interface FirecallContextType {
   firecall: Firecall | undefined;
   setFirecallId?: Dispatch<SetStateAction<string | undefined>>;
-  setSheet?: (sheetId: string, range?: string) => void;
 }
 
 export const FirecallContext = createContext<FirecallContextType>({
@@ -150,32 +146,11 @@ export function useFirecallSwitcher(): FirecallContextType {
   };
 }
 
-function useUpdateSpreadsheet(firecallId?: string) {
-  return useCallback(
-    async (sheetId: string, sheetRange?: string) => {
-      if (firecallId) {
-        await setDoc(
-          doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
-          {
-            updatedAt: new Date().toISOString(),
-            sheetId: sheetId || '',
-            sheetRange: sheetRange || '',
-          },
-          { merge: true }
-        );
-      }
-    },
-    [firecallId]
-  );
-}
-
 export function useLastOrSelectedFirecall(): FirecallContextType {
   const lastFirecall = useLastFirecall();
   const { firecall, setFirecallId } = useFirecallSwitcher();
 
-  const setSheet = useUpdateSpreadsheet((firecall || lastFirecall)?.id);
-
-  return { firecall: firecall || lastFirecall, setFirecallId, setSheet };
+  return { firecall: firecall || lastFirecall, setFirecallId };
 }
 
 export const useFirecallSelect = ():
@@ -193,15 +168,6 @@ export const useFirecall = (): Firecall => {
 export const useFirecallId = (): string => {
   const { firecall } = useContext(FirecallContext);
   return firecall?.id || 'unknown';
-};
-
-const updateSheetFallback = async (sheetId: string, shetRange?: string) => {
-  console.warn(`update sheet not implemented in context!`);
-};
-
-export const useFirecallUpdateSheet = () => {
-  const { setSheet } = useContext(FirecallContext);
-  return setSheet || updateSheetFallback;
 };
 
 export default useFirecall;
