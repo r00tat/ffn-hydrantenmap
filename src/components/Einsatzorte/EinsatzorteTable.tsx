@@ -16,6 +16,9 @@ interface EinsatzorteTableProps {
   onUpdate: (id: string, updates: Partial<FirecallLocation>) => void;
   onDelete: (id: string) => void;
   onAdd: (location: Partial<FirecallLocation>) => void;
+  vehicleSuggestions: string[];
+  kostenersatzVehicleNames: Set<string>;
+  onKostenersatzVehicleAdded?: (vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteTable({
@@ -23,6 +26,9 @@ export default function EinsatzorteTable({
   onUpdate,
   onDelete,
   onAdd,
+  vehicleSuggestions,
+  kostenersatzVehicleNames,
+  onKostenersatzVehicleAdded,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
     (id: string) => (updates: Partial<FirecallLocation>) => {
@@ -68,6 +74,9 @@ export default function EinsatzorteTable({
               location={location}
               onChange={handleChange(location.id!)}
               onDelete={handleDelete(location.id!)}
+              vehicleSuggestions={vehicleSuggestions}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
             />
           ))}
           <EinsatzorteRow
@@ -76,6 +85,9 @@ export default function EinsatzorteTable({
             isNew
             onChange={() => {}}
             onAdd={onAdd}
+            vehicleSuggestions={vehicleSuggestions}
+            kostenersatzVehicleNames={kostenersatzVehicleNames}
+            onKostenersatzVehicleAdded={onKostenersatzVehicleAdded}
           />
         </TableBody>
       </Table>

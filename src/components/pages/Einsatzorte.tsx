@@ -19,6 +19,11 @@ import { FirecallLocation, defaultFirecallLocation } from '../firebase/firestore
 import EinsatzorteTable from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
 
+// Placeholder: These should come from a hook that provides vehicle data
+// TODO: Wire up actual vehicle suggestions from Kostenersatz and firecall data
+const EMPTY_VEHICLE_SUGGESTIONS: string[] = [];
+const EMPTY_KOSTENERSATZ_VEHICLE_NAMES = new Set<string>();
+
 export default function Einsatzorte() {
   const firecall = useFirecall();
   const { locations, addLocation, updateLocation, deleteLocation } =
@@ -165,6 +170,8 @@ export default function Einsatzorte() {
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onAdd={handleAdd}
+          vehicleSuggestions={EMPTY_VEHICLE_SUGGESTIONS}
+          kostenersatzVehicleNames={EMPTY_KOSTENERSATZ_VEHICLE_NAMES}
         />
       )}
 
