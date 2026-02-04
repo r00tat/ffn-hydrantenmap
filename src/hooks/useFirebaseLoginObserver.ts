@@ -6,7 +6,7 @@ import { signOut as signOutJsClient, useSession } from 'next-auth/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { firebaseTokenLogin } from '../app/firebaseAuth';
 import { getMyGroupsFromServer } from '../app/groups/GroupAction';
-import { Group } from '../app/groups/groupHelpers';
+import { Group } from '../app/groups/groupTypes';
 import { uniqueArray } from '../common/arrayUtils';
 import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';

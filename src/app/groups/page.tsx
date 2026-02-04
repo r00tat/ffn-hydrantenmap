@@ -3,24 +3,27 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Fab from '@mui/material/Fab';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
 import { getUsers } from '../users/action';
 import {
+  createKnownGroupsAction,
   deleteGroupAction,
   getGroupsAction,
   updateGroupAction,
 } from './GroupAction';
 import GroupDialog from './GroupDialog';
-import { Group } from './groupHelpers';
+import { Group, KNOWN_GROUPS } from './groupTypes';
 
 interface UserRowButtonParams {
   row: Group;
@@ -86,6 +89,19 @@ export default function Groups() {
   const [editGroup, setEditGroup] = useState<Group>();
   const [groups, getGroups, users] = useGroupList();
 
+  const missingKnownGroups = useMemo(() => {
+    const existingIds = new Set(groups.map((g) => g.id));
+    return KNOWN_GROUPS.filter((kg) => kg.id && !existingIds.has(kg.id));
+  }, [groups]);
+
+  const createKnownGroups = useCallback(async () => {
+    const created = await createKnownGroupsAction();
+    if (created.length > 0) {
+      console.info(`Created known groups: ${created.join(', ')}`);
+    }
+    await getGroups();
+  }, [getGroups]);
+
   const editAction = useCallback(async (group: Group) => {
     setEditGroup(group);
     console.info(`edit group: ${JSON.stringify(group)}`);
@@ -116,6 +132,21 @@ export default function Groups() {
           <IconButton onClick={() => getGroups()}>
             <RefreshIcon />
           </IconButton>
+          {missingKnownGroups.length > 0 && (
+            <Tooltip
+              title={`Fehlende Gruppen anlegen: ${missingKnownGroups.map((g) => g.name).join(', ')}`}
+            >
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<PlaylistAddIcon />}
+                onClick={createKnownGroups}
+                sx={{ ml: 2 }}
+              >
+                Standardgruppen anlegen
+              </Button>
+            </Tooltip>
+          )}
         </Typography>
         <Grid container>
           <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>

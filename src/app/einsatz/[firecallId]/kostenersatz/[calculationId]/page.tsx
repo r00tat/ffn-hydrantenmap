@@ -9,11 +9,12 @@ import useFirecall, { useFirecallId } from '../../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../../hooks/useFirebaseLogin';
 import { useKostenersatzCalculation } from '../../../../../hooks/useKostenersatz';
 import KostenersatzCalculationPage from '../../../../../components/Kostenersatz/KostenersatzCalculationPage';
+import { KOSTENERSATZ_GROUP } from '../../../../../common/kostenersatz';
 
 export default function KostenersatzEditPage() {
   const params = useParams();
   const calculationId = params?.calculationId as string;
-  const { isAuthorized } = useFirebaseLogin();
+  const { isAuthorized, groups } = useFirebaseLogin();
   const firecall = useFirecall();
   const firecallId = useFirecallId();
   const { calculation, loading, error } = useKostenersatzCalculation(firecallId, calculationId);
@@ -22,6 +23,21 @@ export default function KostenersatzEditPage() {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography>Bitte melden Sie sich an.</Typography>
+      </Container>
+    );
+  }
+
+  if (!groups?.includes(KOSTENERSATZ_GROUP)) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Typography variant="h5" gutterBottom>
+          Kostenersatz
+        </Typography>
+        <Typography>
+          Sie haben keine Berechtigung für diese Funktion. Bitte kontaktieren
+          Sie einen Administrator, um Zugang zur Gruppe &quot;Kostenersatz&quot;
+          zu erhalten.
+        </Typography>
       </Container>
     );
   }

@@ -14,7 +14,7 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
-import { Group } from './groupHelpers';
+import { Group } from './groupTypes';
 
 export interface GroupDialoggOptions {
   onClose: (item?: Group, assigendUsers?: string[]) => void;

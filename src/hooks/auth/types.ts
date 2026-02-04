@@ -1,5 +1,5 @@
 import { User } from 'firebase/auth';
-import { Group } from '../../app/groups/groupHelpers';
+import { Group } from '../../app/groups/groupTypes';
 
 export interface LoginData {
   isSignedIn: boolean;
