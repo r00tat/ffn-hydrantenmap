@@ -23,7 +23,6 @@ import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
 import LocationsLayer from './layers/LocationsLayer';
-import UnwetterLayer from './layers/UnwetterLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
@@ -94,9 +93,6 @@ export default function Map() {
             </LayersControl.BaseLayer>
           ))}
           <FirecallLayer />
-          <LayersControl.Overlay name="Unwetter" checked>
-            <UnwetterLayer />
-          </LayersControl.Overlay>
           <LayersControl.Overlay name="Einsatzorte" checked>
             <LocationsLayer />
           </LayersControl.Overlay>

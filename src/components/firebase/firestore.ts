@@ -163,8 +163,6 @@ export interface Firecall {
   abruecken?: string;
   lat?: number;
   lng?: number;
-  sheetId?: string;
-  sheetRange?: string;
   group?: string;
   [key: string]: any;
 }
