@@ -38,9 +38,9 @@ export default function Einsatzorte() {
   // Access existing vehicle items in this firecall
   const { vehicles: firecallVehicles } = useVehicles();
 
-  // Vehicle suggestions from Kostenersatz, map vehicles, and existing firecall locations
+  // Vehicle suggestions from Kostenersatz and map vehicles
   const { suggestions: vehicleSuggestions, kostenersatzVehicleNames } =
-    useVehicleSuggestions(locations, firecallVehicles);
+    useVehicleSuggestions(firecallVehicles);
 
   // Hooks for creating/updating vehicle items
   const addFirecallItem = useFirecallItemAdd();
