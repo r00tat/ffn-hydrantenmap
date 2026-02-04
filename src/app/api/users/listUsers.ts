@@ -13,8 +13,15 @@ export const listUsers = async (): Promise<UserRecordExtended[]> => {
   const userDocsMap: { [uid: string]: DocumentData } = {};
   userDocs.forEach((doc) => (userDocsMap[doc.id] = doc.data()));
   users.forEach((u) => {
-    // u.authorized = userDocsMap[u.uid]?.authorized || false;
-    Object.assign(u, userDocsMap[u.uid]);
+    const firestoreData = userDocsMap[u.uid];
+    if (firestoreData) {
+      // Preserve Firebase Auth displayName if Firestore doesn't have one
+      const authDisplayName = u.displayName;
+      Object.assign(u, firestoreData);
+      if (!u.displayName && authDisplayName) {
+        (u as { displayName?: string }).displayName = authDisplayName;
+      }
+    }
   });
   return users;
 };

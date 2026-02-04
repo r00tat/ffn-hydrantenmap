@@ -121,29 +121,32 @@ export default function StyledLoginButton({
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        uuidv4()
+        password || uuidv4()
       );
 
       console.info(`update profile`);
       await updateProfile(userCredential.user, {
         displayName: name,
       });
-      // Signed in
+
+      // Force refresh ID token so the server sees the updated displayName
+      console.info(`refreshing token after profile update`);
+      await userCredential.user.getIdToken(true);
+
       console.info(`sending email verification`);
       sendEmailVerification(userCredential.user);
 
-      const user = userCredential.user;
       setError(
         'Der Benutzer wurde erfolgreich erstellt. Zur Verifikation der Email Adresse wurde ein Email versandt.'
       );
 
-      console.info(`sign in with password success`);
+      console.info(`sign up completed for ${userCredential.user.email}`);
     } catch (err) {
       console.error(`login failed`, err);
       setError((err as any).message || `${err}`);
     }
     setRegisterDisabled(false);
-  }, [auth, email, name]);
+  }, [auth, email, name, password]);
 
   const resetPassword = useCallback(async () => {
     if (!email || !email.includes('@')) {
