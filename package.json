@@ -11,7 +11,8 @@
     "import": "npx tsc --outDir dist src/server/firestore-import && node dist/server/firestore-import.js",
     "exportImport": "npx tsc --outDir dist src/server/export-import && node dist/server/export-import.js",
     "clusterHydrants": "npx tsc --outDir dist src/server/hydrant-geohash && node dist/server/hydrant-geohash.js",
-    "updateClusters": "npx tsc --outDir dist src/server/cluster-import && node dist/server/cluster-import.js"
+    "updateClusters": "npx tsc --outDir dist src/server/cluster-import && node dist/server/cluster-import.js",
+    "docs:screenshots": "playwright test --config=playwright/playwright.config.ts"
   },
   "dependencies": {
     "@auth/core": "^0.41.1",
@@ -69,6 +70,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.1",
     "@types/circle-to-polygon": "^2.2.3",
     "@types/leaflet": "^1.9.21",
     "@types/lodash.debounce": "^4.0.9",

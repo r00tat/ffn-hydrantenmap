@@ -12,6 +12,7 @@ export const FirebaseLoginContext = createContext<LoginStatus>({
   isSignedIn: false,
   isAuthorized: false,
   isAdmin: false,
+  isAuthLoading: true,
   signOut: async () => {},
   refresh: async () => {},
   myGroups: [],
