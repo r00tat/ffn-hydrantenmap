@@ -21,3 +21,12 @@ export const firestore = process.env.NEXT_PUBLIC_FIRESTORE_DB
   ? getFirestore(firebaseApp, process.env.NEXT_PUBLIC_FIRESTORE_DB)
   : getFirestore(firebaseApp);
 export const firebaseAuth = getAuth(firebaseApp);
+
+// Helper functions to get specific database instances
+export function getProdFirestore() {
+  return getFirestore(firebaseApp);
+}
+
+export function getDevFirestore() {
+  return getFirestore(firebaseApp, 'ffndev');
+}
