@@ -33,11 +33,11 @@ import SidebarDiaryPreview from './SidebarDiaryPreview';
 const SidebarBox = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isEditable',
 })<{ isEditable?: boolean }>(({ theme }) => ({
-  [theme.breakpoints.down('sm')]: {
+  [theme.breakpoints.down('md')]: {
     width: '0%',
     display: 'none',
   },
-  [theme.breakpoints.up('sm')]: {
+  [theme.breakpoints.up('md')]: {
     width: '20%',
     minWidth: 280,
   },

@@ -36,10 +36,10 @@ function ActionButtons() {
 const StyledMapContainer = styled(MapContainer, {
   shouldForwardProp: (prop) => prop !== 'isEditable',
 })<{ isEditable?: boolean }>(({ theme, isEditable = false }) => ({
-  [theme.breakpoints.down('sm')]: {
+  [theme.breakpoints.down('md')]: {
     width: '100%',
   },
-  [theme.breakpoints.up('sm')]: {
+  [theme.breakpoints.up('md')]: {
     width: '80%',
   },
 }));
