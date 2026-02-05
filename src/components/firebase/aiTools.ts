@@ -203,14 +203,26 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       required: ['address'],
     },
   },
+  {
+    name: 'answerQuestion',
+    description: 'Answer a question about the firecall data. Use this when the user asks a question rather than giving a command.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        answer: { type: SchemaType.STRING, description: 'The answer to the question in German' },
+      },
+      required: ['answer'],
+    },
+  },
 ];
 
 export const AI_SYSTEM_PROMPT = `Du bist ein Einsatz-Assistent für die Freiwillige Feuerwehr.
-Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte.
+Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte und beantwortest Fragen zum Einsatz.
 
 Regeln:
 - Antworte kurz und präzise
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
+- Bei Fragen über den Einsatz: verwende answerQuestion mit einer kurzen Antwort
 - Bei Unklarheiten: verwende askClarification mit konkreten Optionen
 - Verwende die bereitgestellten Tools für alle Kartenaktionen
 - Positionen ohne Angabe: verwende mapCenter als position.type
@@ -230,6 +242,12 @@ Verfügbare Elemente:
 
 Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
+- answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 
-Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
-Der Kontext enthält existingItems mit allen aktuellen Elementen.`;
+Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
+- Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken
+- Rohre: Name, Art (C/B/Wasserwerfer), Durchfluss in l/min
+- Tagebuch: Inhalt, Art (M=Meldung, B=Befehl, F=Feststellung), Von, An, Datum
+- Geschäftsbuch: Inhalt, Ausgehend/Eingehend, Von, An, Datum
+
+Für Referenzen auf bestehende Elemente nutze itemName oder itemId.`;
