@@ -97,6 +97,18 @@ service cloud.firestore {
         (resource.data.createdBy == request.auth.token.email || adminUser());
     }
 
+    // Kostenersatz config (email settings) - read for all authorized, write for admin
+    match /kostenersatzConfig/{doc=**} {
+      allow read: if authorizedUser();
+      allow write: if adminUser();
+    }
+
+    // Kostenersatz vehicles - read for all authorized, write for admin
+    match /kostenersatzVehicles/{doc=**} {
+      allow read: if authorizedUser();
+      allow write: if adminUser();
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
