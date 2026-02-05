@@ -12,7 +12,6 @@ import { auth, firestore } from '../components/firebase/firebase';
 import { USER_COLLECTION_ID } from '../components/firebase/firestore';
 import { AuthState, LoginData, LoginStatus } from './auth/types';
 import {
-  isInternalEmail,
   refreshTokenUntilClaimsMatch,
   refreshTokenWithRetry,
 } from './auth/tokenRefresh';
@@ -131,12 +130,8 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         if (token) {
           await serverLoginRef.current();
 
-          // For internal users, ensure claims are propagated before continuing
-          if (isInternalEmail(user?.email)) {
-            await refreshTokenUntilClaimsMatch(true, ['allUsers', 'ffnd']);
-          } else {
-            await user?.getIdToken(true);
-          }
+          // Force token refresh to get latest claims
+          await user?.getIdToken(true);
         }
 
         const tokenResult = await user?.getIdTokenResult();

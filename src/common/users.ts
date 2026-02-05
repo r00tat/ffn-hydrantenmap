@@ -15,5 +15,6 @@ export interface UserRecordExtended extends UserRecord, FirebaseUserInfo {
 }
 
 export const userTextFields: { [key: string]: string } = {
+  displayName: 'Name',
   description: 'Zusatzinfo',
 };

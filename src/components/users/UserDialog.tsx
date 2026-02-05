@@ -91,6 +91,8 @@ export default function UserRecordExtendedDialog({
         <DialogContentText>
           UID: {user.uid}
           <br />
+          E-Mail: {user.email}
+          <br />
           Feuerwehr: {user.feuerwehr}
           <br />
           Abschnitt: {feuerwehren[user.feuerwehr || 'fallback']?.abschnitt}
