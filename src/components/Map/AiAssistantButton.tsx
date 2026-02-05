@@ -17,7 +17,6 @@ interface AiAssistantButtonProps {
   firecallItems: FirecallItem[];
 }
 
-const MIN_HOLD_TIME_MS = 500;
 const MAX_RECORDING_TIME_MS = 30000;
 
 // Audio feedback using Web Audio API
@@ -62,9 +61,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
   });
   const [isAiProcessing, setIsAiProcessing] = useState(false);
 
-  const holdStartRef = useRef<number>(0);
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const activePointerRef = useRef<number | null>(null);
 
   // Show recorder errors - reacting to external state change from hook
   useEffect(() => {
@@ -78,21 +75,46 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
     }
   }, [recorderError]);
 
-  const handlePointerDown = useCallback(async (event: React.PointerEvent) => {
+  const handleClick = useCallback(async (event: React.MouseEvent) => {
     event.stopPropagation();
     event.preventDefault();
 
-    // Capture pointer to prevent spurious pointerleave events
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    activePointerRef.current = event.pointerId;
+    if (recorderState === 'recording') {
+      // Stop recording
+      if (maxRecordingTimerRef.current) {
+        clearTimeout(maxRecordingTimerRef.current);
+        maxRecordingTimerRef.current = null;
+      }
 
-    holdStartRef.current = Date.now();
-    playStartBeep();
-    await startRecording();
+      playStopBeep();
+      const audio = await stopRecording();
+      if (!audio) return;
 
-    // Auto-stop after max recording time
-    maxRecordingTimerRef.current = setTimeout(async () => {
-      if (recorderState === 'recording') {
+      setIsAiProcessing(true);
+      try {
+        const result = await processAudio(audio);
+        setToast({
+          open: true,
+          message: result.message,
+          severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+          showUndo: result.success && !!result.createdItemId,
+          clarificationOptions: result.clarification?.options,
+        });
+        // Speak answers from the AI
+        if (result.isAnswer && result.message) {
+          speakMessage(result.message);
+        }
+      } finally {
+        setIsAiProcessing(false);
+      }
+    } else {
+      // Start recording
+      playStartBeep();
+      await startRecording();
+
+      // Auto-stop after max recording time
+      maxRecordingTimerRef.current = setTimeout(async () => {
+        playStopBeep();
         const audio = await stopRecording();
         if (audio) {
           setIsAiProcessing(true);
@@ -105,64 +127,17 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
               showUndo: result.success && !!result.createdItemId,
               clarificationOptions: result.clarification?.options,
             });
+            // Speak answers from the AI
+            if (result.isAnswer && result.message) {
+              speakMessage(result.message);
+            }
           } finally {
             setIsAiProcessing(false);
           }
         }
-      }
-    }, MAX_RECORDING_TIME_MS);
+      }, MAX_RECORDING_TIME_MS);
+    }
   }, [processAudio, recorderState, startRecording, stopRecording]);
-
-  const handlePointerUp = useCallback(async (event: React.PointerEvent) => {
-    event.stopPropagation();
-    event.preventDefault();
-
-    // Only handle the pointer that started the recording
-    if (activePointerRef.current !== event.pointerId) {
-      return;
-    }
-
-    // Release pointer capture
-    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
-    activePointerRef.current = null;
-
-    // Clear max recording timer
-    if (maxRecordingTimerRef.current) {
-      clearTimeout(maxRecordingTimerRef.current);
-      maxRecordingTimerRef.current = null;
-    }
-
-    const holdDuration = Date.now() - holdStartRef.current;
-
-    if (holdDuration < MIN_HOLD_TIME_MS) {
-      // Too short - cancel recording without processing
-      await stopRecording();
-      setToast({
-        open: true,
-        message: 'Halte den Button länger gedrückt zum Sprechen',
-        severity: 'warning',
-      });
-      return;
-    }
-
-    playStopBeep();
-    const audio = await stopRecording();
-    if (!audio) return;
-
-    setIsAiProcessing(true);
-    try {
-      const result = await processAudio(audio);
-      setToast({
-        open: true,
-        message: result.message,
-        severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-        showUndo: result.success && !!result.createdItemId,
-        clarificationOptions: result.clarification?.options,
-      });
-    } finally {
-      setIsAiProcessing(false);
-    }
-  }, [processAudio, stopRecording]);
 
   const handleToastClose = useCallback(() => {
     setToast((prev) => ({ ...prev, open: false }));
@@ -215,14 +190,12 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
             {statusText}
           </Typography>
         )}
-        <Tooltip title="KI-Assistent (halten zum Sprechen)">
+        <Tooltip title={isRecording ? 'Klicken zum Stoppen' : 'KI-Assistent (klicken zum Sprechen)'}>
           <Fab
             color={isRecording ? 'error' : 'default'}
             aria-label="AI assistant"
             size="small"
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onClick={(e) => e.stopPropagation()}
+            onClick={handleClick}
             disabled={isProcessing}
             sx={{
               animation: isRecording ? 'pulse 1s infinite' : 'none',

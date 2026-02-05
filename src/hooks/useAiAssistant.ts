@@ -25,13 +25,42 @@ export interface AiAssistantResult {
     question: string;
     options?: string[];
   };
+  isAnswer?: boolean;
+}
+
+interface AiContextItem {
+  id: string;
+  type: string;
+  name: string;
+  lat?: number;
+  lng?: number;
+  beschreibung?: string;
+  datum?: string;
+  // Vehicle fields
+  fw?: string;
+  besatzung?: string;
+  ats?: number;
+  alarmierung?: string;
+  eintreffen?: string;
+  abruecken?: string;
+  // Rohr fields
+  art?: string;
+  durchfluss?: number;
+  // Diary/Gb fields
+  von?: string;
+  an?: string;
+  ausgehend?: boolean;
+  nummer?: number;
+  // Circle fields
+  radius?: number;
+  color?: string;
 }
 
 interface AiContext {
   mapCenter: { lat: number; lng: number };
   mapBounds: { north: number; south: number; east: number; west: number };
   zoomLevel: number;
-  existingItems: Array<{ id: string; type: string; name: string; lat?: number; lng?: number }>;
+  existingItems: AiContextItem[];
   userPosition: { lat: number; lng: number } | null;
   recentInteractions: AiInteraction[];
 }
@@ -285,6 +314,13 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             },
           };
 
+        case 'answerQuestion':
+          return {
+            success: true,
+            message: args.answer as string,
+            isAnswer: true,
+          };
+
         case 'searchAddress': {
           const address = args.address as string;
           const shouldCreateMarker = args.createMarker !== false;
@@ -335,6 +371,68 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       const bounds = map.getBounds();
       const center = map.getCenter();
 
+      // Build context items with full details based on type
+      const contextItems: AiContextItem[] = existingItems
+        .filter((i) => !i.deleted)
+        .map((i) => {
+          const base: AiContextItem = {
+            id: i.id!,
+            type: i.type,
+            name: i.name,
+            lat: i.lat,
+            lng: i.lng,
+          };
+
+          // Add type-specific fields
+          switch (i.type) {
+            case 'vehicle': {
+              const v = i as any;
+              if (v.fw) base.fw = v.fw;
+              if (v.besatzung) base.besatzung = v.besatzung;
+              if (v.ats) base.ats = v.ats;
+              if (v.alarmierung) base.alarmierung = v.alarmierung;
+              if (v.eintreffen) base.eintreffen = v.eintreffen;
+              if (v.abruecken) base.abruecken = v.abruecken;
+              break;
+            }
+            case 'rohr': {
+              const r = i as any;
+              if (r.art) base.art = r.art;
+              if (r.durchfluss) base.durchfluss = r.durchfluss;
+              break;
+            }
+            case 'diary': {
+              const d = i as any;
+              if (d.art) base.art = d.art;
+              if (d.datum) base.datum = d.datum;
+              if (d.von) base.von = d.von;
+              if (d.an) base.an = d.an;
+              if (d.nummer) base.nummer = d.nummer;
+              break;
+            }
+            case 'gb': {
+              const g = i as any;
+              if (g.ausgehend !== undefined) base.ausgehend = g.ausgehend;
+              if (g.datum) base.datum = g.datum;
+              if (g.von) base.von = g.von;
+              if (g.an) base.an = g.an;
+              if (g.nummer) base.nummer = g.nummer;
+              break;
+            }
+            case 'circle': {
+              const c = i as any;
+              if (c.radius) base.radius = c.radius;
+              if (c.color) base.color = c.color;
+              break;
+            }
+            default:
+              if (i.beschreibung) base.beschreibung = i.beschreibung;
+              if (i.datum) base.datum = i.datum;
+          }
+
+          return base;
+        });
+
       const context: AiContext = {
         mapCenter: { lat: center.lat, lng: center.lng },
         mapBounds: {
@@ -344,9 +442,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           west: bounds.getWest(),
         },
         zoomLevel: map.getZoom(),
-        existingItems: existingItems
-          .filter((i) => !i.deleted)
-          .map((i) => ({ id: i.id!, type: i.type, name: i.name, lat: i.lat, lng: i.lng })),
+        existingItems: contextItems,
         userPosition: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
         recentInteractions: interactionsRef.current,
       };
