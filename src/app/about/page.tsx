@@ -1,14 +1,23 @@
 'use client';
+import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import Image from 'next/image';
 import DebugLoggingSwitch from '../../components/logging/DebugLoggingSwitch';
 
 export default function About() {
   return (
     <Paper sx={{ p: 2, m: 2 }}>
-      <Typography variant="h3" gutterBottom>
-        About
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+        <Image
+          src="/FFND_logo.png"
+          alt="Logo FF Neusiedl am See"
+          width={120}
+          height={120}
+          style={{ objectFit: 'contain' }}
+        />
+        <Typography variant="h3">About</Typography>
+      </Box>
       <Typography>
         Diese Webseite zeigt Hydranten im Raum Neusiedl am See an, um diese im
         Einsatzfall einfach zu lokalisieren.
