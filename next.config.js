@@ -28,6 +28,9 @@ module.exports = async (phase) => {
         {
           pathname: '/docs-assets/screenshots/**',
         },
+        {
+          pathname: '/FFND_logo.png',
+        },
       ],
     },
   };
