@@ -8,13 +8,13 @@ import DebugLoggingSwitch from '../../components/logging/DebugLoggingSwitch';
 export default function About() {
   return (
     <Paper sx={{ p: 2, m: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+      <Box sx={{ mb: 2 }}>
         <Image
           src="/FFND_logo.png"
           alt="Logo FF Neusiedl am See"
-          width={120}
-          height={120}
-          style={{ objectFit: 'contain' }}
+          width={1921}
+          height={378}
+          style={{ width: '100%', maxWidth: 400, height: 'auto' }}
         />
         <Typography variant="h3">About</Typography>
       </Box>
