@@ -5,12 +5,16 @@ on:
     types: [closed]
     branches:
       - main
+  schedule:
+    # Run weekly on Sunday at 03:00 UTC to clean up orphaned images
+    - cron: "0 3 * * 0"
+  workflow_dispatch: {}
 
 jobs:
-  cleanup:
+  cleanup-pr:
     name: "Cleanup PR Artifacts"
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    if: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER != '' }}
     permissions:
       id-token: write
       contents: read
@@ -65,3 +69,60 @@ jobs:
           gcloud artifacts docker images delete "${IMAGE_TAG}" \
             --delete-tags \
             --quiet
+
+  cleanup-orphaned:
+    name: "Cleanup Orphaned Images"
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      IMAGE: ${{ vars.IMAGE }}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+    steps:
+      - name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        if: ${{ env.workload_identity_provider != '' }}
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete untagged images
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo "Cleaning up untagged images from: ${IMAGE}"
+
+          # List all untagged digests (these are orphaned by tag overwrites)
+          UNTAGGED=$(gcloud artifacts docker images list "${IMAGE}" \
+            --include-tags \
+            --filter="NOT tags:*" \
+            --format="get(version)" 2>/dev/null || true)
+
+          if [[ -z "${UNTAGGED}" ]]; then
+            echo "No untagged images found."
+            exit 0
+          fi
+
+          COUNT=0
+          while IFS= read -r DIGEST; do
+            if [[ -n "${DIGEST}" ]]; then
+              echo "Deleting untagged image: ${IMAGE}@${DIGEST}"
+              gcloud artifacts docker images delete "${IMAGE}@${DIGEST}" \
+                --quiet || echo "Failed to delete ${DIGEST}, skipping"
+              COUNT=$((COUNT + 1))
+            fi
+          done <<< "${UNTAGGED}"
+
+          echo "Deleted ${COUNT} untagged image(s)."
