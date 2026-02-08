@@ -1,0 +1,67 @@
+name: "Cleanup Artifacts"
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  cleanup:
+    name: "Cleanup PR Artifacts"
+    runs-on: ubuntu-latest
+    if: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER != '' }}
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      RUN_SERVICE: ${{ vars.RUN_SERVICE }}
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      IMAGE: ${{ vars.IMAGE }}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+    steps:
+      - name: Setup env
+        id: env
+        run: |
+          set -eo pipefail
+          VERSION=${GITHUB_HEAD_REF}
+          VERSION_TAG=$(echo "${VERSION}" | tr '[:upper:]' '[:lower:]' | sed -r 's@[^a-zA-Z0-9-]+@-@g')
+          VERSION_TAG=$(echo -n "${VERSION_TAG:0:30}" | sed 's@-$@@')
+          echo "VERSION_TAG=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_TAG=${IMAGE}:${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Cleaning up artifacts for branch: ${VERSION} (tag: ${VERSION_TAG})"
+
+      - name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        if: ${{ env.workload_identity_provider != '' }}
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Remove Cloud Run revision tag
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          echo "Removing Cloud Run traffic tag: ${{ steps.env.outputs.VERSION_TAG }}"
+          gcloud run services update-traffic "${RUN_SERVICE}" \
+            --region "${RUN_REGION}" \
+            --remove-tags="${{ steps.env.outputs.VERSION_TAG }}"
+
+      - name: Delete container image from Artifact Registry
+        continue-on-error: true
+        run: |
+          set -eo pipefail
+          IMAGE_TAG="${{ steps.env.outputs.IMAGE_TAG }}"
+          echo "Deleting image: ${IMAGE_TAG}"
+          gcloud artifacts docker images delete "${IMAGE_TAG}" \
+            --delete-tags \
+            --quiet
