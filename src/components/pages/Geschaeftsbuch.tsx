@@ -430,19 +430,16 @@ export default function Geschaeftsbuch({
         {/* <GeschaeftsbuchAdd /> */}
 
         {showEditButton && canEdit && (
-          <Grid
-            container
-            sx={{ display: { xs: 'none', md: 'flex' }, py: 1, alignItems: 'center' }}
-          >
-            <Grid size={{ md: 2, lg: 1 }}>{diaryCounter}</Grid>
-            <Grid size={{ md: 4, lg: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                jetzt
-              </Typography>
+          <Grid container sx={{ py: 1, alignItems: 'center' }}>
+            <Grid
+              size={{ xs: 2, md: 2, lg: 1 }}
+              sx={{ py: 1 }}
+            >
+              {diaryCounter}
             </Grid>
             <Grid
-              size={{ md: 4, lg: 2 }}
-              sx={{ display: 'flex', gap: 1 }}
+              size={{ xs: 10, md: 6, lg: 3 }}
+              sx={{ display: 'flex', gap: 1, py: 1 }}
             >
               <FormControl size="small" sx={{ minWidth: 80 }}>
                 <Select
@@ -451,6 +448,12 @@ export default function Geschaeftsbuch({
                     setInlineAusgehend(e.target.value === 'aus')
                   }
                   size="small"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleInlineAdd();
+                    }
+                  }}
                 >
                   <MenuItem value="ein">Ein</MenuItem>
                   <MenuItem value="aus">Aus</MenuItem>
@@ -461,17 +464,32 @@ export default function Geschaeftsbuch({
                 placeholder="von"
                 value={inlineVon}
                 onChange={(e) => setInlineVon(e.target.value)}
-                sx={{ flex: 1, minWidth: 50 }}
+                sx={{ flex: 1, minWidth: 60 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleInlineAdd();
+                  }
+                }}
               />
               <TextField
                 size="small"
                 placeholder="an"
                 value={inlineAn}
                 onChange={(e) => setInlineAn(e.target.value)}
-                sx={{ flex: 1, minWidth: 50 }}
+                sx={{ flex: 1, minWidth: 60 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleInlineAdd();
+                  }
+                }}
               />
             </Grid>
-            <Grid size={{ md: 5, lg: 2 }}>
+            <Grid
+              size={{ xs: 12, md: 4, lg: 2 }}
+              sx={{ py: 1 }}
+            >
               <TextField
                 size="small"
                 placeholder="Information"
@@ -486,7 +504,10 @@ export default function Geschaeftsbuch({
                 }}
               />
             </Grid>
-            <Grid size={{ md: 5, lg: 3 }}>
+            <Grid
+              size={{ xs: 12, md: 5, lg: 3 }}
+              sx={{ py: 1 }}
+            >
               <TextField
                 size="small"
                 placeholder="Anmerkung"
@@ -501,26 +522,28 @@ export default function Geschaeftsbuch({
                 }}
               />
             </Grid>
-            <Grid size={{ md: 2, lg: 1 }}>
-              <FormControl size="small" fullWidth>
-                <Select
-                  value={inlineWeiterleitung}
-                  onChange={(e) =>
-                    setInlineWeiterleitung(e.target.value)
+            <Grid
+              size={{ xs: 8, md: 5, lg: 2 }}
+              sx={{ py: 1 }}
+            >
+              <TextField
+                size="small"
+                placeholder="Auszeichnung"
+                value={inlineWeiterleitung}
+                onChange={(e) => setInlineWeiterleitung(e.target.value)}
+                fullWidth
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleInlineAdd();
                   }
-                  size="small"
-                  displayEmpty
-                >
-                  <MenuItem value="">-</MenuItem>
-                  {Object.keys(sFunktionen).map((key) => (
-                    <MenuItem value={key} key={`inline-wl-${key}`}>
-                      {key}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                }}
+              />
             </Grid>
-            <Grid size={{ md: 2, lg: 1 }}>
+            <Grid
+              size={{ xs: 4, md: 2, lg: 1 }}
+              sx={{ py: 1 }}
+            >
               <Tooltip title="Eintrag hinzufügen">
                 <IconButton
                   color="primary"
