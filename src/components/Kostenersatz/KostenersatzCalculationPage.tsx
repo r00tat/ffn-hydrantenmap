@@ -92,6 +92,8 @@ export default function KostenersatzCalculationPage({
   const [templateLoadDialogOpen, setTemplateLoadDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [confirmBackOpen, setConfirmBackOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const { email, isAdmin } = useFirebaseLogin();
   const { activeVersion } = useKostenersatzVersions();
   const { rates, ratesById } = useKostenersatzRates(activeVersion?.id);
@@ -142,12 +144,17 @@ export default function KostenersatzCalculationPage({
   };
 
   const handleBack = () => {
+    if (hasUnsavedChanges && isEditable) {
+      setConfirmBackOpen(true);
+      return;
+    }
     router.push(`/einsatz/${firecallId}/kostenersatz`);
   };
 
   // Einsatz tab handlers
   const handleEinsatzChange = useCallback(
     (field: string, value: string | number) => {
+      setHasUnsavedChanges(true);
       setCalculation((prev) => ({
         ...prev,
         [field]: value,
@@ -159,6 +166,7 @@ export default function KostenersatzCalculationPage({
   // Update all item hours when defaultStunden changes
   const handleDefaultStundenChange = useCallback(
     (newStunden: number) => {
+      setHasUnsavedChanges(true);
       setCalculation((prev) => ({
         ...prev,
         defaultStunden: newStunden,
@@ -186,6 +194,7 @@ export default function KostenersatzCalculationPage({
     (rateId: string, einheiten: number, stunden: number, stundenOverridden: boolean) => {
       const rate = ratesById.get(rateId);
       if (!rate) return;
+      setHasUnsavedChanges(true);
 
       const { calculateItemSum } = require('../../common/kostenersatz');
       const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours);
@@ -226,6 +235,7 @@ export default function KostenersatzCalculationPage({
 
   const handleCustomItemChange = useCallback(
     (index: number, item: KostenersatzCustomItem | null) => {
+      setHasUnsavedChanges(true);
       setCalculation((prev) => {
         const newCustomItems = [...prev.customItems];
         if (item === null) {
@@ -258,6 +268,7 @@ export default function KostenersatzCalculationPage({
         console.warn(`Rate ${vehicle.rateId} not found for vehicle ${vehicle.id}`);
         return;
       }
+      setHasUnsavedChanges(true);
 
       setCalculation((prev) => {
         // Check isSelected inside the callback to avoid stale closure issues
@@ -353,6 +364,7 @@ export default function KostenersatzCalculationPage({
 
   // Empfänger tab handlers
   const handleRecipientChange = useCallback((recipient: KostenersatzRecipient) => {
+    setHasUnsavedChanges(true);
     setCalculation((prev) => ({
       ...prev,
       recipient,
@@ -382,6 +394,7 @@ export default function KostenersatzCalculationPage({
           // Update local state with the new ID and status so subsequent saves update instead of creating duplicates
           setCalculation((prev) => ({ ...prev, id: newId, status }));
         }
+        setHasUnsavedChanges(false);
         if (redirectAfterSave) {
           router.push(`/einsatz/${firecallId}/kostenersatz`);
         } else if (showSuccessMessage) {
@@ -433,6 +446,7 @@ export default function KostenersatzCalculationPage({
   // Template handlers
   const handleTemplateLoad = useCallback(
     (template: KostenersatzTemplate) => {
+      setHasUnsavedChanges(true);
       const stunden = template.defaultStunden || calculation.defaultStunden;
 
       // Get vehicle line items first
@@ -681,6 +695,24 @@ export default function KostenersatzCalculationPage({
             setConfirmCompleteOpen(false);
             if (confirmed) {
               handleSave('completed', false);
+            }
+          }}
+        />
+      )}
+
+      {/* Unsaved Changes Dialog */}
+      {confirmBackOpen && (
+        <ConfirmDialog
+          title="Ungespeicherte Änderungen"
+          text="Es gibt ungespeicherte Änderungen. Möchten Sie vor dem Verlassen speichern?"
+          yes="Speichern"
+          no="Verwerfen"
+          onConfirm={(confirmed) => {
+            setConfirmBackOpen(false);
+            if (confirmed) {
+              handleSave('draft');
+            } else {
+              router.push(`/einsatz/${firecallId}/kostenersatz`);
             }
           }}
         />
