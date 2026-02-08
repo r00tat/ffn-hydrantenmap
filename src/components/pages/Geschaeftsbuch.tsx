@@ -9,9 +9,13 @@ import TabList from '@mui/lab/TabList';
 import TabPanel from '@mui/lab/TabPanel';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
+import FormControl from '@mui/material/FormControl';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Tab from '@mui/material/Tab';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { where } from 'firebase/firestore';
@@ -354,6 +358,49 @@ export default function Geschaeftsbuch({
 
   const addFirecallGb = useFirecallItemAdd();
 
+  const [inlineAusgehend, setInlineAusgehend] = useState(false);
+  const [inlineVon, setInlineVon] = useState('');
+  const [inlineAn, setInlineAn] = useState('');
+  const [inlineName, setInlineName] = useState('');
+  const [inlineBeschreibung, setInlineBeschreibung] = useState('');
+  const [inlineWeiterleitung, setInlineWeiterleitung] = useState('');
+
+  const resetInlineForm = useCallback(() => {
+    setInlineAusgehend(false);
+    setInlineVon('');
+    setInlineAn('');
+    setInlineName('');
+    setInlineBeschreibung('');
+    setInlineWeiterleitung('');
+  }, []);
+
+  const handleInlineAdd = useCallback(() => {
+    if (!inlineName.trim()) return;
+    const newEntry: GeschaeftsbuchEintrag = {
+      type: 'gb',
+      nummer: diaryCounter,
+      datum: new Date().toISOString(),
+      ausgehend: inlineAusgehend,
+      von: inlineVon,
+      an: inlineAn,
+      name: inlineName,
+      beschreibung: inlineBeschreibung,
+      weiterleitung: inlineWeiterleitung,
+    };
+    addFirecallGb(newEntry);
+    resetInlineForm();
+  }, [
+    inlineAusgehend,
+    inlineVon,
+    inlineAn,
+    inlineName,
+    inlineBeschreibung,
+    inlineWeiterleitung,
+    diaryCounter,
+    addFirecallGb,
+    resetInlineForm,
+  ]);
+
   const diaryClose = useCallback(
     (item?: FirecallItem) => {
       setDialogIsOpen(false);
@@ -381,6 +428,111 @@ export default function Geschaeftsbuch({
           />
         </Typography>
         {/* <GeschaeftsbuchAdd /> */}
+
+        {showEditButton && canEdit && (
+          <Grid
+            container
+            sx={{ display: { xs: 'none', md: 'flex' }, py: 1, alignItems: 'center' }}
+          >
+            <Grid size={{ md: 2, lg: 1 }}>{diaryCounter}</Grid>
+            <Grid size={{ md: 4, lg: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                jetzt
+              </Typography>
+            </Grid>
+            <Grid
+              size={{ md: 4, lg: 2 }}
+              sx={{ display: 'flex', gap: 1 }}
+            >
+              <FormControl size="small" sx={{ minWidth: 80 }}>
+                <Select
+                  value={inlineAusgehend ? 'aus' : 'ein'}
+                  onChange={(e) =>
+                    setInlineAusgehend(e.target.value === 'aus')
+                  }
+                  size="small"
+                >
+                  <MenuItem value="ein">Ein</MenuItem>
+                  <MenuItem value="aus">Aus</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                size="small"
+                placeholder="von"
+                value={inlineVon}
+                onChange={(e) => setInlineVon(e.target.value)}
+                sx={{ flex: 1, minWidth: 50 }}
+              />
+              <TextField
+                size="small"
+                placeholder="an"
+                value={inlineAn}
+                onChange={(e) => setInlineAn(e.target.value)}
+                sx={{ flex: 1, minWidth: 50 }}
+              />
+            </Grid>
+            <Grid size={{ md: 5, lg: 2 }}>
+              <TextField
+                size="small"
+                placeholder="Information"
+                value={inlineName}
+                onChange={(e) => setInlineName(e.target.value)}
+                fullWidth
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleInlineAdd();
+                  }
+                }}
+              />
+            </Grid>
+            <Grid size={{ md: 5, lg: 3 }}>
+              <TextField
+                size="small"
+                placeholder="Anmerkung"
+                value={inlineBeschreibung}
+                onChange={(e) => setInlineBeschreibung(e.target.value)}
+                fullWidth
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleInlineAdd();
+                  }
+                }}
+              />
+            </Grid>
+            <Grid size={{ md: 2, lg: 1 }}>
+              <FormControl size="small" fullWidth>
+                <Select
+                  value={inlineWeiterleitung}
+                  onChange={(e) =>
+                    setInlineWeiterleitung(e.target.value)
+                  }
+                  size="small"
+                  displayEmpty
+                >
+                  <MenuItem value="">-</MenuItem>
+                  {Object.keys(sFunktionen).map((key) => (
+                    <MenuItem value={key} key={`inline-wl-${key}`}>
+                      {key}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ md: 2, lg: 1 }}>
+              <Tooltip title="Eintrag hinzufügen">
+                <IconButton
+                  color="primary"
+                  onClick={handleInlineAdd}
+                  disabled={!inlineName.trim()}
+                >
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            </Grid>
+          </Grid>
+        )}
 
         <TabContext value={tabValue}>
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
