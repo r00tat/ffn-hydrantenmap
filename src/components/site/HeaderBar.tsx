@@ -45,16 +45,18 @@ function HeaderBar({
       <Box sx={{ flexShrink: 0 }}>
         <AppBar position="static">
           <Toolbar>
-            <IconButton
-              size="large"
-              edge="start"
-              color="inherit"
-              aria-label="menu"
-              sx={{ mr: 2 }}
-              onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-            >
-              <MenuIcon />
-            </IconButton>
+            {isSignedIn && (
+              <IconButton
+                size="large"
+                edge="start"
+                color="inherit"
+                aria-label="menu"
+                sx={{ mr: 2 }}
+                onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+              >
+                <MenuIcon />
+              </IconButton>
+            )}
             <Box
               sx={{
                 flexGrow: 1,
@@ -107,37 +109,41 @@ function HeaderBar({
               )}
             </Box>
 
-            <Tooltip title="Neuer Einsatz">
-              <Button
-                color={'info'}
-                style={{
-                  backgroundColor: '#fff',
-                  marginLeft: 8,
-                  marginRight: 8,
-                }}
-                onClick={() => {
-                  setEinsatzDialog(true);
-                }}
-              >
-                <LocalFireDepartmentTwoToneIcon />
-              </Button>
-            </Tooltip>
+            {isSignedIn && (
+              <Tooltip title="Neuer Einsatz">
+                <Button
+                  color={'info'}
+                  style={{
+                    backgroundColor: '#fff',
+                    marginLeft: 8,
+                    marginRight: 8,
+                  }}
+                  onClick={() => {
+                    setEinsatzDialog(true);
+                  }}
+                >
+                  <LocalFireDepartmentTwoToneIcon />
+                </Button>
+              </Tooltip>
+            )}
 
-            <Tooltip title="Historie aufrufen">
-              <Button
-                color={historyModeActive ? 'error' : 'info'}
-                style={{
-                  backgroundColor: '#fff',
-                  marginLeft: 8,
-                  marginRight: 8,
-                }}
-                onClick={() => {
-                  setIsHistoryDialogOpen(true);
-                }}
-              >
-                <HistoryIcon />
-              </Button>
-            </Tooltip>
+            {isSignedIn && (
+              <Tooltip title="Historie aufrufen">
+                <Button
+                  color={historyModeActive ? 'error' : 'info'}
+                  style={{
+                    backgroundColor: '#fff',
+                    marginLeft: 8,
+                    marginRight: 8,
+                  }}
+                  onClick={() => {
+                    setIsHistoryDialogOpen(true);
+                  }}
+                >
+                  <HistoryIcon />
+                </Button>
+              </Tooltip>
+            )}
             {!isSignedIn && (
               <Link href="/login" passHref>
                 <Button color="inherit">Login</Button>
