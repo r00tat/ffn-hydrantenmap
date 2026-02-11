@@ -64,7 +64,7 @@ export default function EinsatzDialog({
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
     const parts = alarm.alarmText.split('/');
     const name = parts.length >= 5
-      ? [parts[2], parts[3], ...parts.slice(4)].join(' ').trim()
+      ? [parts[2], parts[3], parts[4]].join(' ').trim()
       : alarm.alarmText;
     setEinsatz((prev) => ({
       ...prev,
