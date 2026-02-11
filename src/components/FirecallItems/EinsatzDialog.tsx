@@ -1,4 +1,5 @@
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -10,7 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
 import { formatTimestamp, parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
@@ -19,6 +20,10 @@ import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
+import {
+  getBlaulichtSmsAlarms,
+  BlaulichtSmsAlarm,
+} from '../../app/blaulicht-sms/actions';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -44,8 +49,67 @@ export default function EinsatzDialog({
       deleted: false,
     }
   );
-  const { email, myGroups } = useFirebaseLogin();
+  const { email, myGroups, groups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
+
+  const isNewEinsatz = !einsatzDefault;
+  const isInFfnd = groups?.includes('ffnd') ?? false;
+
+  const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
+  const [alarmsLoading, setAlarmsLoading] = useState(
+    isNewEinsatz && isInFfnd
+  );
+  const [selectedAlarmId, setSelectedAlarmId] = useState<string>('');
+
+  const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
+    const parts = alarm.alarmText.split('/');
+    const name = parts.length >= 5
+      ? [parts[2], parts[3], parts[4]].join(' ').trim()
+      : alarm.alarmText;
+    setEinsatz((prev) => ({
+      ...prev,
+      name,
+      date: new Date(alarm.alarmDate).toISOString(),
+      alarmierung: new Date(alarm.alarmDate).toISOString(),
+      description: alarm.alarmText,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (isNewEinsatz && isInFfnd) {
+      getBlaulichtSmsAlarms()
+        .then((fetchedAlarms) => {
+          const sorted = [...fetchedAlarms].sort(
+            (a, b) =>
+              new Date(b.alarmDate).getTime() -
+              new Date(a.alarmDate).getTime()
+          );
+          setAlarms(sorted);
+          if (sorted.length > 0) {
+            setSelectedAlarmId(sorted[0].alarmId);
+            applyAlarm(sorted[0]);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to fetch BlaulichtSMS alarms:', error);
+        })
+        .finally(() => setAlarmsLoading(false));
+    }
+  }, [isNewEinsatz, isInFfnd, applyAlarm]);
+
+  const handleAlarmChange = useCallback(
+    (event: SelectChangeEvent) => {
+      const alarmId = event.target.value;
+      setSelectedAlarmId(alarmId);
+      if (alarmId) {
+        const alarm = alarms.find((a) => a.alarmId === alarmId);
+        if (alarm) {
+          applyAlarm(alarm);
+        }
+      }
+    },
+    [alarms, applyAlarm]
+  );
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,6 +163,36 @@ export default function EinsatzDialog({
       <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
       <DialogContent>
         <DialogContentText>Neuer Einsatz</DialogContentText>
+        {isNewEinsatz && isInFfnd && alarmsLoading && (
+          <DialogContentText
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
+          >
+            <CircularProgress size={20} />
+            Blaulicht-SMS Alarme werden geladen...
+          </DialogContentText>
+        )}
+        {isNewEinsatz && isInFfnd && !alarmsLoading && alarms.length > 0 && (
+          <FormControl fullWidth variant="standard" sx={{ mb: 1 }}>
+            <InputLabel id="alarm-select-label">
+              Blaulicht-SMS Alarm
+            </InputLabel>
+            <Select
+              labelId="alarm-select-label"
+              id="alarm-select"
+              value={selectedAlarmId}
+              label="Blaulicht-SMS Alarm"
+              onChange={handleAlarmChange}
+            >
+              <MenuItem value="">Manuell eingeben</MenuItem>
+              {alarms.map((alarm) => (
+                <MenuItem key={alarm.alarmId} value={alarm.alarmId}>
+                  {alarm.alarmText} (
+                  {new Date(alarm.alarmDate).toLocaleString('de-AT')})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <TextField
           autoFocus
           margin="dense"
