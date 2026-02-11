@@ -62,12 +62,16 @@ export default function EinsatzDialog({
   const [selectedAlarmId, setSelectedAlarmId] = useState<string>('');
 
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
+    const parts = alarm.alarmText.split('/');
+    const name = parts.length >= 5
+      ? [parts[2], parts[3], ...parts.slice(4)].join(' ').trim()
+      : alarm.alarmText;
     setEinsatz((prev) => ({
       ...prev,
-      name: alarm.alarmText,
+      name,
       date: new Date(alarm.alarmDate).toISOString(),
       alarmierung: new Date(alarm.alarmDate).toISOString(),
-      description: alarm.geolocation?.address || prev.description,
+      description: alarm.alarmText,
     }));
   }, []);
 
