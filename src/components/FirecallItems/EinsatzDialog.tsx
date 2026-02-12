@@ -66,12 +66,15 @@ export default function EinsatzDialog({
     const name = parts.length >= 5
       ? [parts[2], parts[3], parts[4]].join(' ').trim()
       : alarm.alarmText;
+    const coords =
+      alarm.geolocation?.coordinates ?? alarm.coordinates ?? null;
     setEinsatz((prev) => ({
       ...prev,
       name,
       date: new Date(alarm.alarmDate).toISOString(),
       alarmierung: new Date(alarm.alarmDate).toISOString(),
       description: alarm.alarmText,
+      ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
     }));
   }, []);
 
@@ -138,8 +141,8 @@ export default function EinsatzDialog({
           ...fc,
           user: email,
           created: new Date().toISOString(),
-          lat: position.lat,
-          lng: position.lng,
+          lat: fc.lat ?? position.lat,
+          lng: fc.lng ?? position.lng,
         };
         const newDoc = await addDoc(
           collection(firestore, FIRECALL_COLLECTION_ID),
