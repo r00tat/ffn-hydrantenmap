@@ -70,7 +70,7 @@ export class FirecallVehicle extends FirecallItemBase {
   }
 
   public title(): string {
-    return `${this.name} ${this.fw}`;
+    return `${this.name} ${this.fw || ''}`.trim();
   }
 
   public info(): string {

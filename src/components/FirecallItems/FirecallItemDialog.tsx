@@ -1,3 +1,8 @@
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
+import SaveIcon from '@mui/icons-material/Save';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -9,6 +14,8 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import React, { useState } from 'react';
+import copyAndSaveFirecallItems from '../../hooks/copyLayer';
+import { useFirecallId } from '../../hooks/useFirecall';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import { fcItemNames, getItemInstance } from './elements';
@@ -28,6 +35,7 @@ export default function FirecallItemDialog({
   allowTypeChange = true,
   type: itemType,
 }: FirecallItemDialogOptions) {
+  const firecallId = useFirecallId();
   const [open, setOpen] = useState(true);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
     getItemInstance({
@@ -88,6 +96,7 @@ export default function FirecallItemDialog({
         </DialogContent>
         <DialogActions>
           <Button
+            startIcon={<CloseIcon />}
             onClick={() => {
               setOpen(false);
               onClose();
@@ -97,6 +106,19 @@ export default function FirecallItemDialog({
           </Button>
           {item.id && (
             <Button
+              startIcon={<ContentCopyIcon />}
+              onClick={async () => {
+                await copyAndSaveFirecallItems(firecallId, item.filteredData());
+                setOpen(false);
+                onClose();
+              }}
+            >
+              Kopieren
+            </Button>
+          )}
+          {item.id && (
+            <Button
+              startIcon={<DeleteIcon />}
               onClick={() => {
                 setConfirmDelete(true);
               }}
@@ -107,6 +129,7 @@ export default function FirecallItemDialog({
           )}
           <Button
             color="primary"
+            startIcon={item.id ? <SaveIcon /> : <AddIcon />}
             onClick={() => {
               setOpen(false);
               onClose(item.filteredData());
