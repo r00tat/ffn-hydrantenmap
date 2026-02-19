@@ -58,7 +58,7 @@ export default function FileDisplay({
     <>
       <Link href={imageUrl || url} target="_blank">
         {(!isImage || showTitleIfImage) && (
-          <Typography>{fileRef.name.substring(37)}</Typography>
+          <Typography component="span">{fileRef.name.substring(37)}</Typography>
         )}
         {isImage && imageUrl && (
           <Image

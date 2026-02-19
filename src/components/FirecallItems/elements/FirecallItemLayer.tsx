@@ -1,3 +1,4 @@
+import L, { Icon, IconOptions } from 'leaflet';
 import { SimpleMap } from '../../../common/types';
 import { FirecallLayer } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
@@ -20,6 +21,15 @@ export class FirecallItemLayer extends FirecallItemBase {
 
   public markerName(): string {
     return 'Ebene';
+  }
+
+  public icon(): Icon<IconOptions> {
+    return L.icon({
+      iconUrl: '/icons/layer.svg',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, 0],
+    });
   }
 
   public copy(): FirecallItemBase {
