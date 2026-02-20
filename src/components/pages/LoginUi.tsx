@@ -20,6 +20,7 @@ export default function LoginUi() {
   const {
     isSignedIn,
     isAuthorized,
+    isAuthLoading,
     displayName,
     email,
     signOut,
@@ -47,10 +48,37 @@ export default function LoginUi() {
     }
   }, [isAuthorized, myGroups]);
 
+  const isAutoLoginInProgress =
+    !isSignedIn && (isAuthLoading || isRefreshing);
+
   return (
     <>
       {!isSignedIn && (
         <>
+          {isAutoLoginInProgress && (
+            <Paper
+              sx={{
+                p: 3,
+                m: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                backgroundColor: 'action.hover',
+              }}
+            >
+              <CircularProgress size={24} />
+              <Box>
+                <Typography variant="body1" fontWeight="medium">
+                  {isAuthLoading && !isRefreshing
+                    ? 'Anmeldung wird überprüft...'
+                    : 'Gespeicherte Anmeldung wird geladen...'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Bitte warten, die automatische Anmeldung läuft.
+                </Typography>
+              </Box>
+            </Paper>
+          )}
           <Paper sx={{ p: 2, m: 2 }}>
             <Typography>
               Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle
@@ -77,10 +105,16 @@ export default function LoginUi() {
               <CircularProgress size={24} />
               <Box>
                 <Typography variant="body1" fontWeight="medium">
-                  Anmeldung wird überprüft...
+                  {isAuthorized
+                    ? 'Berechtigungen werden geladen...'
+                    : 'Anmeldung wird überprüft...'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Willkommen zurück, {auth.currentUser?.displayName}!
+                  Willkommen zurück
+                  {auth.currentUser?.displayName
+                    ? `, ${auth.currentUser.displayName}`
+                    : ''}
+                  !
                 </Typography>
               </Box>
             </Paper>
@@ -115,7 +149,7 @@ export default function LoginUi() {
               )}
             </>
           )}
-          {!isAuthorized && (
+          {!isAuthorized && !isRefreshing && (
             <Typography>
               Dein Benutzer wurde erfolgreich angemeldet, ist aber noch nicht
               freigeschalten. Du hast eine Email zur Adressverifikation
