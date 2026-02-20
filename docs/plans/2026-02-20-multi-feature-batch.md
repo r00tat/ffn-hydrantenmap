@@ -1,4 +1,4 @@
-# Multi-Feature Batch: Einsatzorte History, Column Sorting, Fahrzeuge Redesign, Login UX
+# Multi-Feature Batch: Einsatzorte History & Tagebuch, Column Sorting, Fahrzeuge Redesign, Login UX
 
 **Date:** 2026-02-20
 **Status:** Implementation complete, pending review & commit
@@ -10,9 +10,10 @@
 Implement four independent UI/UX improvements across the Einsatzkarte app in parallel:
 
 1. Automatic history snapshots when vehicles are assigned to Einsatzorte
-2. Clickable column sorting on three table-based pages
-3. Fahrzeuge page redesign with layer grouping and compact cards
-4. Login page progress feedback during auto-login
+2. Automatic Einsatztagebuch entries for Einsatzorte events
+3. Clickable column sorting on three table-based pages
+4. Fahrzeuge page redesign with layer grouping and compact cards
+5. Login page progress feedback during auto-login
 
 ---
 
@@ -21,6 +22,7 @@ Implement four independent UI/UX improvements across the Einsatzkarte app in par
 The Einsatzkarte app is a PWA for Freiwillige Feuerwehr Neusiedl am See. It uses Next.js 16, React 19, MUI, Leaflet, and Firebase. The four features address different usability gaps:
 
 - **History snapshots** ensure traceability of state changes during operations when vehicles get reassigned
+- **Einsatztagebuch entries** automatically document Einsatzorte lifecycle events (creation, status changes, vehicle assignment/unassignment, email imports) in the operational diary
 - **Column sorting** gives users flexibility to find entries quickly in growing data tables
 - **Fahrzeuge redesign** aligns the vehicles page with the recently improved Ebenen (layers) page design, making it more compact and organized by operational layer
 - **Login UX** gives users clear feedback during auto-login so they know whether to wait or sign in manually
@@ -62,7 +64,48 @@ Initial implementation only covered the Kostenersatz path. Assigning an existing
 
 ---
 
-## Feature 2: Column Sorting
+## Feature 2: Einsatztagebuch Entries for Einsatzorte
+
+**Status:** Done
+
+### Summary
+
+Automatically create numbered diary entries in the Einsatztagebuch when Einsatzorte events occur: location created, status changed, vehicle assigned, vehicle unassigned, and email import.
+
+### Events and Diary Entry Format
+
+| Event | Diary Entry (`name`) | `beschreibung` |
+|-------|---------------------|----------------|
+| Location created | `Einsatzort {name} angelegt` | `Status: {status}` (if set) |
+| Status changed | `Einsatzort {name}: {new status}` | - |
+| Vehicle assigned (Kostenersatz) | `{vehicle} zu Einsatzort {name} zugeordnet` | - |
+| Vehicle assigned (map) | `{vehicle} zu Einsatzort {name} zugeordnet` | - |
+| Vehicle unassigned | `{vehicle} von Einsatzort {name} abgezogen` | - |
+| Email import | `{n} Einsatzort(e) per E-Mail importiert` | Comma-separated list of added location names |
+
+All entries are type `M` (Meldung) and receive automatic sequential `nummer` values.
+
+### Implementation
+
+- `addDiaryEntry(name, beschreibung?)` helper in `Einsatzorte.tsx` wraps `useFirecallItemAdd` with auto-numbering
+- `diaryCounter` computed from `firecallItems` (reuses existing `useVehicles()` subscription — no extra Firestore listener)
+- `diaryCounterRef` tracks current counter and auto-increments to prevent number collisions in rapid succession
+- Location display name uses `getLocationDisplayName()`: prefers `name`, falls back to `street number city`, then `Unbekannt`
+- Status change detection: compares `updates.status` against current location state
+- Vehicle unassignment detection: compares old vs new `vehicles` record to find removed entries
+- Email import: `EmailImportResult` extended with `addedNames: string[]` populated from server action
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `src/components/pages/Einsatzorte.tsx` | Added `Diary` import, `getLocationDisplayName()`, `addDiaryEntry()` helper with auto-numbering, diary writes in `handleAdd`, `handleUpdate` (status + vehicle unassignment), `handleKostenersatzVehicleSelected`, `handleMapVehicleSelected`, email import effect |
+| `src/components/Einsatzorte/emailImportAction.ts` | Added `addedNames: string[]` to `EmailImportResult`, populated after batch commit |
+| `src/hooks/useVehicles.ts` | Exposed `firecallItems` in return value (already subscribed, no extra listener) |
+
+---
+
+## Feature 3: Column Sorting
 
 **Status:** Done
 
@@ -100,6 +143,7 @@ Uses custom `SortableHeader` component with `ArrowUpwardIcon`/`ArrowDownwardIcon
 | Column | Sort Field | Type | Default |
 |--------|-----------|------|---------|
 | Bezeichnung | `name` | string | - |
+| Adresse | `address` | city+street+number | - |
 | Status | `status` | string | - |
 | Fahrzeuge | `vehicles` | joined string | - |
 | Alarm | `alarmTime` | date string | - |
@@ -133,7 +177,7 @@ Sort state shared across all S-Funktionen tabs.
 
 ---
 
-## Feature 3: Fahrzeuge Page Redesign
+## Feature 4: Fahrzeuge Page Redesign
 
 **Status:** Done
 
@@ -172,7 +216,7 @@ Expanded:   [icon] Title              [Type Chip] [^]
 
 ---
 
-## Feature 4: Login Page Progress Feedback
+## Feature 5: Login Page Progress Feedback
 
 **Status:** Done
 
@@ -218,17 +262,19 @@ Added progress indicators and status messages during auto-login so users know wh
 
 | File | Features |
 |------|----------|
-| `src/components/pages/Einsatzorte.tsx` | F1 (history), F2 (sorting) |
+| `src/components/pages/Einsatzorte.tsx` | F1 (history), F2 (diary entries), F3 (sorting) |
 | `src/components/Einsatzorte/VehicleAutocomplete.tsx` | F1 (onMapVehicleSelected) |
 | `src/components/Einsatzorte/EinsatzorteCard.tsx` | F1 (onMapVehicleSelected) |
 | `src/components/Einsatzorte/EinsatzorteRow.tsx` | F1 (onMapVehicleSelected) |
-| `src/components/Einsatzorte/EinsatzorteTable.tsx` | F1 (onMapVehicleSelected), F2 (sorting) |
-| `src/components/pages/EinsatzTagebuch.tsx` | F2 (sorting) |
-| `src/components/pages/Geschaeftsbuch.tsx` | F2 (sorting) |
-| `src/components/pages/Fahrzeuge.tsx` | F3 (redesign) |
-| `src/components/pages/LoginUi.tsx` | F4 (login UX) |
+| `src/components/Einsatzorte/EinsatzorteTable.tsx` | F1 (onMapVehicleSelected), F3 (sorting) |
+| `src/components/Einsatzorte/emailImportAction.ts` | F2 (addedNames in result) |
+| `src/hooks/useVehicles.ts` | F2 (expose firecallItems) |
+| `src/components/pages/EinsatzTagebuch.tsx` | F3 (sorting) |
+| `src/components/pages/Geschaeftsbuch.tsx` | F3 (sorting) |
+| `src/components/pages/Fahrzeuge.tsx` | F4 (redesign) |
+| `src/components/pages/LoginUi.tsx` | F5 (login UX) |
 
-**Total: 9 files changed**
+**Total: 11 files changed**
 
 ---
 
@@ -238,6 +284,8 @@ Added progress indicators and status messages during auto-login so users know wh
 |----------|----------|
 | History snapshot timing | Before vehicle assignment (captures state prior to change) |
 | History snapshot scope | Both map vehicle and Kostenersatz vehicle paths |
+| Einsatztagebuch entry approach | Write stored diary entries on events (not synthesized from timestamps) |
+| Einsatztagebuch entry numbering | Auto-numbered using existing diary counter from firecallItems subscription |
 | Sort UI pattern | Clickable column headers with arrow indicators |
 | Unassigned items on Fahrzeuge | Shown in separate "Nicht zugeordnet" collapsible group |
 | Drag-and-drop on Fahrzeuge | Not included (display only) |
