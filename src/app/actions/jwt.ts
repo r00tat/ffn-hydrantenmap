@@ -1,5 +1,3 @@
-'use server';
-
 import 'server-only';
 import { firestore } from '../../server/firebase/admin';
 import { generateKeyPair, exportJWK, JWK, importJWK, SignJWT, jwtVerify, JWTPayload } from 'jose';

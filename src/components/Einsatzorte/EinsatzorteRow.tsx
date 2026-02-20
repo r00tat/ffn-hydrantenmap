@@ -24,6 +24,7 @@ interface EinsatzorteRowProps {
   mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
+  onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteRow({
@@ -35,6 +36,7 @@ export default function EinsatzorteRow({
   mapVehicles,
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
+  onMapVehicleSelected,
 }: EinsatzorteRowProps) {
   // Track a unique key for resetting the new row after add
   const [resetKey, setResetKey] = useState(0);
@@ -251,6 +253,15 @@ export default function EinsatzorteRow({
     [onKostenersatzVehicleSelected, local]
   );
 
+  const handleMapVehicleSelected = useCallback(
+    (vehicleId: string, vehicleName: string) => {
+      if (onMapVehicleSelected && local.id) {
+        onMapVehicleSelected(vehicleId, vehicleName, local as FirecallLocation);
+      }
+    },
+    [onMapVehicleSelected, local]
+  );
+
   const coordsText =
     local.lat && local.lng
       ? `${local.lat.toFixed(5)}, ${local.lng.toFixed(5)}`
@@ -310,6 +321,7 @@ export default function EinsatzorteRow({
             mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
             onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+            onMapVehicleSelected={handleMapVehicleSelected}
           />
         </TableCell>
         <TableCell>

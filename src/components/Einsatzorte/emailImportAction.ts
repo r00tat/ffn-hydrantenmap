@@ -22,6 +22,7 @@ export interface EmailImportResult {
   added: number;
   skipped: number;
   errors: string[];
+  addedNames: string[];
 }
 
 /**
@@ -193,6 +194,7 @@ export async function processUnwetterEmails(
     added: 0,
     skipped: 0,
     errors: [],
+    addedNames: [],
   };
 
   // Validate required environment variables
@@ -348,6 +350,11 @@ export async function processUnwetterEmails(
 
       await batch.commit();
       result.added = locationsToAdd.length;
+      result.addedNames = locationsToAdd.map(
+        (loc) =>
+          loc.name ||
+          [loc.street, loc.number, loc.city].filter(Boolean).join(' ')
+      );
     }
 
     // Unstar processed emails

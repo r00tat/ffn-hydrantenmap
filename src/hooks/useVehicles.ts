@@ -65,5 +65,6 @@ export default function useVehicles() {
     rohre,
     otherItems,
     displayItems,
+    firecallItems,
   };
 }

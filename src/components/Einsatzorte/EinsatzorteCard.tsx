@@ -26,6 +26,7 @@ interface EinsatzorteCardProps {
   mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
+  onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;
 }
 
 export default function EinsatzorteCard({
@@ -37,6 +38,7 @@ export default function EinsatzorteCard({
   mapVehicles,
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
+  onMapVehicleSelected,
 }: EinsatzorteCardProps) {
   // Track a unique key for resetting the new card after add
   const [resetKey, setResetKey] = useState(0);
@@ -203,6 +205,15 @@ export default function EinsatzorteCard({
     [onKostenersatzVehicleSelected, local]
   );
 
+  const handleMapVehicleSelected = useCallback(
+    (vehicleId: string, vehicleName: string) => {
+      if (onMapVehicleSelected && local.id) {
+        onMapVehicleSelected(vehicleId, vehicleName, local as FirecallLocation);
+      }
+    },
+    [onMapVehicleSelected, local]
+  );
+
   return (
     <>
       <Card ref={cardRef} onBlur={handleCardBlur} onKeyDown={handleKeyDown} sx={{ mb: 2, opacity: isNew ? 0.6 : 1 }}>
@@ -265,6 +276,7 @@ export default function EinsatzorteCard({
               mapVehicles={mapVehicles}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
               onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+              onMapVehicleSelected={handleMapVehicleSelected}
             />
           </Box>
 

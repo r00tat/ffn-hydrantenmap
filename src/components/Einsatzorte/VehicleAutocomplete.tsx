@@ -20,6 +20,8 @@ interface VehicleAutocompleteProps {
   disabled?: boolean;
   /** Called when a Kostenersatz vehicle is selected (needs to be added to map first) */
   onKostenersatzVehicleSelected?: (vehicleName: string) => void;
+  /** Called when an existing map vehicle is selected */
+  onMapVehicleSelected?: (vehicleId: string, vehicleName: string) => void;
 }
 
 type SuggestionOption = {
@@ -37,6 +39,7 @@ export default function VehicleAutocomplete({
   kostenersatzVehicleNames,
   disabled = false,
   onKostenersatzVehicleSelected,
+  onMapVehicleSelected,
 }: VehicleAutocompleteProps) {
   const [inputValue, setInputValue] = useState('');
 
@@ -85,7 +88,11 @@ export default function VehicleAutocomplete({
         // Map vehicle: add ID -> name mapping
         const vehicle = option.vehicle;
         if (vehicle.id) {
-          onChange({ ...value, [vehicle.id]: vehicle.name });
+          if (onMapVehicleSelected) {
+            onMapVehicleSelected(vehicle.id, vehicle.name);
+          } else {
+            onChange({ ...value, [vehicle.id]: vehicle.name });
+          }
         }
       } else {
         // Kostenersatz vehicle: trigger callback to add to map first
@@ -94,7 +101,7 @@ export default function VehicleAutocomplete({
 
       setInputValue('');
     },
-    [value, onChange, onKostenersatzVehicleSelected]
+    [value, onChange, onKostenersatzVehicleSelected, onMapVehicleSelected]
   );
 
   // Remove a vehicle by ID
