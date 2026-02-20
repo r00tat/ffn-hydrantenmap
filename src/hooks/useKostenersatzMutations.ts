@@ -29,6 +29,7 @@ import {
 import { getDefaultVehicles } from '../common/defaultKostenersatzRates';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
+import { useAuditLog } from './useAuditLog';
 
 // Helper to remove undefined values (Firestore doesn't accept undefined)
 function removeUndefined<T extends object>(obj: T): T {
@@ -48,6 +49,7 @@ export function useKostenersatzAdd(firecallIdOverride?: string) {
   const contextFirecallId = useFirecallId();
   const firecallId = firecallIdOverride || contextFirecallId;
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
 
   return useCallback(
     async (
@@ -77,9 +79,18 @@ export function useKostenersatzAdd(firecallIdOverride?: string) {
         removeUndefined(newCalc)
       );
 
+      logChange({
+        action: 'create',
+        elementType: 'kostenersatz',
+        elementId: docRef.id,
+        elementName: calculation.comment || 'Kostenersatz',
+        firecallId,
+        newValue: { comment: calculation.comment, status: calculation.status },
+      });
+
       return docRef.id;
     },
-    [email, firecallId]
+    [email, firecallId, logChange]
   );
 }
 
@@ -90,6 +101,7 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
   const contextFirecallId = useFirecallId();
   const firecallId = firecallIdOverride || contextFirecallId;
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
 
   return useCallback(
     async (calculation: KostenersatzCalculation) => {
@@ -125,8 +137,17 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
         removeUndefined(dataWithoutId),
         { merge: false }
       );
+
+      logChange({
+        action: 'update',
+        elementType: 'kostenersatz',
+        elementId: calcId,
+        elementName: calculation.comment || 'Kostenersatz',
+        firecallId,
+        newValue: { comment: calculation.comment, status: calculation.status },
+      });
     },
-    [firecallId]
+    [firecallId, logChange]
   );
 }
 
@@ -136,6 +157,7 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
 export function useKostenersatzDelete(firecallIdOverride?: string) {
   const contextFirecallId = useFirecallId();
   const firecallId = firecallIdOverride || contextFirecallId;
+  const logChange = useAuditLog();
 
   return useCallback(
     async (calculationId: string) => {
@@ -156,8 +178,16 @@ export function useKostenersatzDelete(firecallIdOverride?: string) {
           calculationId
         )
       );
+
+      logChange({
+        action: 'delete',
+        elementType: 'kostenersatz',
+        elementId: calculationId,
+        elementName: 'Kostenersatz',
+        firecallId,
+      });
     },
-    [firecallId]
+    [firecallId, logChange]
   );
 }
 

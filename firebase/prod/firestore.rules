@@ -52,6 +52,14 @@ service cloud.firestore {
         )
       }
 
+      // Audit log: append-only, user field must match authenticated email
+      match /auditlog/{entryId} {
+        allow read: if callAuthorized();
+        allow create: if callAuthorized()
+          && request.resource.data.user == request.auth.token.email;
+        // No update or delete allowed for audit log entries
+      }
+
       match /{subitem=**} {
         allow read, write: if callAuthorized()
       }

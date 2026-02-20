@@ -18,6 +18,7 @@ import {
 import useFirebaseCollection from './useFirebaseCollection';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
+import { useAuditLog } from './useAuditLog';
 
 /**
  * Migrate legacy vehicle formats to Record<string, string>.
@@ -65,6 +66,7 @@ export interface UseFirecallLocationsResult {
 export default function useFirecallLocations(): UseFirecallLocationsResult {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
 
   const collectionPath = useMemo(
     () => [firecallId, FIRECALL_LOCATIONS_COLLECTION_ID],
@@ -123,9 +125,18 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
         locationId
       );
       await setDoc(docRef, newData);
+
+      logChange({
+        action: 'create',
+        elementType: 'location',
+        elementId: locationId,
+        elementName: newData.name || newData.street || '',
+        newValue: newData,
+      });
+
       return locationId;
     },
-    [email, firecallId]
+    [email, firecallId, logChange]
   );
 
   const updateLocation = useCallback(
@@ -146,12 +157,21 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
         ),
         updateData
       );
+
+      logChange({
+        action: 'update',
+        elementType: 'location',
+        elementId: id,
+        elementName: updates.name || id,
+        newValue: updateData,
+      });
     },
-    [email, firecallId]
+    [email, firecallId, logChange]
   );
 
   const deleteLocation = useCallback(
     async (id: string): Promise<void> => {
+      const locationToDelete = locations.find((loc) => loc.id === id);
       await updateDoc(
         doc(
           firestore,
@@ -162,8 +182,16 @@ export default function useFirecallLocations(): UseFirecallLocationsResult {
         ),
         { deleted: true, updatedAt: new Date().toISOString(), updatedBy: email }
       );
+
+      logChange({
+        action: 'delete',
+        elementType: 'location',
+        elementId: id,
+        elementName: locationToDelete?.name || id,
+        previousValue: locationToDelete ? { name: locationToDelete.name, street: locationToDelete.street, status: locationToDelete.status } : undefined,
+      });
     },
-    [email, firecallId]
+    [email, firecallId, logChange, locations]
   );
 
   return {

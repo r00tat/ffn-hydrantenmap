@@ -11,6 +11,7 @@ import { Marker, Polygon, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import { FirecallArea } from '../FirecallArea';
@@ -28,6 +29,7 @@ export interface AreaMarkerProps {
 
 export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
   const firecallId = useFirecallId();
+  const { email } = useFirebaseLogin();
   const [showMarkers, setShowMarkers] = useState(false);
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
@@ -72,7 +74,8 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
                   firecallId,
                   (event.target as L.Marker)?.getLatLng(),
                   record.data(),
-                  index
+                  index,
+                  email
                 );
               },
             }}
@@ -89,7 +92,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
                   <IconButton
                     sx={{ marginLeft: 'auto', float: 'right' }}
                     onClick={() =>
-                      deleteFirecallPosition(firecallId, record.data(), index)
+                      deleteFirecallPosition(firecallId, record.data(), index, email)
                     }
                   >
                     <DeleteIcon />
@@ -129,7 +132,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
                 color="primary"
                 aria-label="add a point on the line"
                 onClick={() =>
-                  addFirecallPosition(firecallId, point, record, pointIndex)
+                  addFirecallPosition(firecallId, point, record, pointIndex, email)
                 }
               >
                 <AddIcon />

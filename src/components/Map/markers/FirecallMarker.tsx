@@ -7,6 +7,8 @@ import useFirecall from '../../../hooks/useFirecall';
 import { useMapEditable } from '../../../hooks/useMapEditor';
 import { firestore } from '../../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
+import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
+import { logAuditChange } from '../../../hooks/useAuditLog';
 
 export const firecallIcon = L.icon({
   iconUrl: '/icons/fire.svg',
@@ -21,9 +23,8 @@ export interface FirecallMarkerProps {
 
 export interface p extends LeafletEventHandlerFnMap {}
 
-function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
+function onDragEnd(firecall: Firecall, event: L.DragEndEvent, email?: string) {
   const newPos = (event.target as L.Marker)?.getLatLng();
-  // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
   if (newPos) {
     setDoc(
       doc(firestore, FIRECALL_COLLECTION_ID, firecall?.id || 'unknown'),
@@ -35,6 +36,17 @@ function onDragEnd(firecall: Firecall, event: L.DragEndEvent) {
         merge: true,
       }
     );
+
+    if (email && firecall.id) {
+      logAuditChange(firecall.id, email, {
+        action: 'update',
+        elementType: 'firecall',
+        elementId: firecall.id,
+        elementName: firecall.name || 'Einsatzort',
+        previousValue: { lat: firecall.lat, lng: firecall.lng },
+        newValue: { lat: newPos.lat, lng: newPos.lng },
+      });
+    }
   }
 }
 
@@ -42,6 +54,7 @@ export default function FirecallMarker() {
   const map = useMap();
   const firecall = useFirecall();
   const editable = useMapEditable();
+  const { email } = useFirebaseLogin();
 
   useEffect(() => {
     map.setView([
@@ -60,7 +73,7 @@ export default function FirecallMarker() {
       icon={firecallIcon}
       draggable={editable}
       eventHandlers={{
-        dragend: (event: L.DragEndEvent) => onDragEnd(firecall, event),
+        dragend: (event: L.DragEndEvent) => onDragEnd(firecall, event, email),
       }}
     >
       <Popup>Einsatzort {firecall.name}</Popup>

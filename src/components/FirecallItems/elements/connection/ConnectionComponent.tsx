@@ -9,6 +9,7 @@ import { Marker, Polyline, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
@@ -29,6 +30,7 @@ export default function ConnectionMarker({
   selectItem,
 }: ConnectionMarkerProps) {
   const firecallId = useFirecallId();
+  const { email } = useFirebaseLogin();
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
   const [showMarkers, setShowMarkers] = useState(false);
@@ -79,7 +81,8 @@ export default function ConnectionMarker({
                       firecallId,
                       (event.target as L.Marker)?.getLatLng(),
                       record.data(),
-                      index
+                      index,
+                      email
                     );
                   },
                 }}
@@ -102,7 +105,8 @@ export default function ConnectionMarker({
                             deleteFirecallPosition(
                               firecallId,
                               record as Connection,
-                              index
+                              index,
+                              email
                             )
                           }
                         >
@@ -150,7 +154,8 @@ export default function ConnectionMarker({
                     firecallId,
                     point,
                     record as Connection,
-                    pointIndex
+                    pointIndex,
+                    email
                   )
                 }
               >

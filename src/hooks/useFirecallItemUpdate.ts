@@ -9,12 +9,14 @@ import {
 } from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
+import { useAuditLog } from './useAuditLog';
 
 export default function useFirecallItemUpdate() {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
   return useCallback(
-    async (item: FirecallItem) => {
+    async (item: FirecallItem, previousItem?: FirecallItem) => {
       const newData: any = {
         datum: new Date().toISOString(),
         ...Object.entries(item)
@@ -33,7 +35,7 @@ export default function useFirecallItemUpdate() {
         }: ${JSON.stringify(item)}`
       );
 
-      return await setDoc(
+      await setDoc(
         doc(
           firestore,
           FIRECALL_COLLECTION_ID,
@@ -44,7 +46,19 @@ export default function useFirecallItemUpdate() {
         newData,
         { merge: false }
       );
+
+      const prev = previousItem || item.original;
+      logChange({
+        action: 'update',
+        elementType: item.type,
+        elementId: item.id || '',
+        elementName: item.name || '',
+        ...(prev
+          ? { previousValue: { ...prev, original: undefined, eventHandlers: undefined } }
+          : {}),
+        newValue: newData,
+      });
     },
-    [email, firecallId]
+    [email, firecallId, logChange]
   );
 }
