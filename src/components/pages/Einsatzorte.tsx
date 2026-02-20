@@ -103,6 +103,12 @@ export default function Einsatzorte() {
         case 'name':
           result = (a.name || '').localeCompare(b.name || '');
           break;
+        case 'address': {
+          const aAddr = [a.city, a.street, a.number].filter(Boolean).join(' ');
+          const bAddr = [b.city, b.street, b.number].filter(Boolean).join(' ');
+          result = aAddr.localeCompare(bAddr);
+          break;
+        }
         case 'status':
           result = (a.status || '').localeCompare(b.status || '');
           break;

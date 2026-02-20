@@ -14,6 +14,7 @@ import EinsatzorteRow from './EinsatzorteRow';
 
 export type EinsatzorteSortField =
   | 'name'
+  | 'address'
   | 'status'
   | 'vehicles'
   | 'alarmTime'
@@ -82,7 +83,15 @@ export default function EinsatzorteTable({
                 Bezeichnung
               </TableSortLabel>
             </TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 350 }}>Adresse</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 350 }}>
+              <TableSortLabel
+                active={sortField === 'address'}
+                direction={sortField === 'address' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('address')}
+              >
+                Adresse
+              </TableSortLabel>
+            </TableCell>
             <TableCell sx={{ fontWeight: 'bold' }}>
               <TableSortLabel
                 active={sortField === 'status'}
