@@ -8,6 +8,7 @@ import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
 } from '../../../firebase/firestore';
+import { logAuditChange } from '../../../../hooks/useAuditLog';
 import {
   calculateDistance,
   getConnectionPositions,
@@ -17,36 +18,41 @@ export async function updateFirecallPositions(
   firecallId: string,
   newPos: L.LatLng,
   fcItem: Area,
-  index: number
+  index: number,
+  email?: string
 ) {
-  // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
   if (fcItem.id && newPos && fcItem.positions) {
     const positions: LatLngPosition[] = getConnectionPositions(fcItem);
     positions.splice(index, 1, [newPos.lat, newPos.lng]);
-    await updateConnectionInFirestore(firecallId, fcItem, positions);
+    await updateConnectionInFirestore(firecallId, fcItem, positions, email);
   }
 }
 
 export async function deleteFirecallPosition(
   firecallId: string,
   fcItem: Area,
-  index: number
+  index: number,
+  email?: string
 ) {
-  // console.info(`drag end on ${JSON.stringify(gisObject)}: ${newPos}`);
   if (fcItem.id && fcItem.positions) {
     const positions: LatLngPosition[] = getConnectionPositions(fcItem);
     positions.splice(index, 1);
-    await updateConnectionInFirestore(firecallId, fcItem, positions);
+    await updateConnectionInFirestore(firecallId, fcItem, positions, email);
   }
 }
 
 const updateConnectionInFirestore = async (
   firecallId: string,
   fcItem: Area,
-  positions: LatLngPosition[]
+  positions: LatLngPosition[],
+  email?: string
 ) => {
-  if (fcItem.id)
-    return await setDoc(
+  if (fcItem.id) {
+    const newValue = {
+      positions: JSON.stringify(positions),
+      distance: Math.round(calculateDistance(positions)),
+    };
+    await setDoc(
       doc(
         firestore,
         FIRECALL_COLLECTION_ID,
@@ -54,12 +60,20 @@ const updateConnectionInFirestore = async (
         FIRECALL_ITEMS_COLLECTION_ID,
         fcItem.id
       ),
-      {
-        positions: JSON.stringify(positions),
-        distance: Math.round(calculateDistance(positions)),
-      },
+      newValue,
       {
         merge: true,
       }
     );
+
+    if (email) {
+      logAuditChange(firecallId, email, {
+        action: 'update',
+        elementType: fcItem.type || 'area',
+        elementId: fcItem.id,
+        elementName: fcItem.name || '',
+        newValue: { distance: newValue.distance },
+      });
+    }
+  }
 };

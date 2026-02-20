@@ -1,5 +1,6 @@
 'use client';
 
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -17,10 +18,12 @@ import {
 } from '@mui/material';
 import moment from 'moment';
 import Link from 'next/link';
-import React, { useState } from 'react';
-import { Diary } from '../firebase/firestore';
+import React, { useCallback, useState } from 'react';
+import { Diary, FirecallItem } from '../firebase/firestore';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
+import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useDiaryEntries } from '../../hooks/useDiaryEntries';
 import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 
@@ -197,10 +200,12 @@ function getInitialAccordionState(): boolean {
 }
 
 export default function SidebarDiaryPreview() {
-  const { entries, totalCount } = useDiaryEntries(DISPLAY_LIMIT);
+  const { entries, totalCount, diaryCounter } = useDiaryEntries(DISPLAY_LIMIT);
   const canEdit = useMapEditorCanEdit();
+  const addFirecallItem = useFirecallItemAdd();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accordionExpanded, setAccordionExpanded] = useState(getInitialAccordionState);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const handleAccordionChange = (_: React.SyntheticEvent, expanded: boolean) => {
     setAccordionExpanded(expanded);
@@ -211,6 +216,16 @@ export default function SidebarDiaryPreview() {
     setExpandedId(expandedId === id ? null : id);
   };
 
+  const handleAddClose = useCallback(
+    (item?: FirecallItem) => {
+      setShowAddDialog(false);
+      if (item) {
+        addFirecallItem(item);
+      }
+    },
+    [addFirecallItem]
+  );
+
   return (
     <Box sx={{ mt: 1.5 }}>
       <Accordion
@@ -220,7 +235,7 @@ export default function SidebarDiaryPreview() {
       >
         <AccordionSummary
           expandIcon={<ExpandMoreIcon />}
-          sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0.75 } }}
+          sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0.75, alignItems: 'center' } }}
         >
           <Badge
             badgeContent={totalCount}
@@ -230,8 +245,42 @@ export default function SidebarDiaryPreview() {
           >
             <Typography variant="subtitle2">Tagebuch</Typography>
           </Badge>
+          {canEdit && (
+            <Tooltip title="Tagebuch Eintrag hinzufügen">
+              <Box
+                component="span"
+                role="button"
+                tabIndex={0}
+                sx={{
+                  ml: 'auto',
+                  mr: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  borderRadius: '50%',
+                  p: 0.25,
+                  color: 'primary.main',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'action.hover' },
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAddDialog(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setShowAddDialog(true);
+                  }
+                }}
+              >
+                <AddIcon fontSize="small" />
+              </Box>
+            </Tooltip>
+          )}
         </AccordionSummary>
         <AccordionDetails sx={{ p: 1, pt: 0 }}>
+
           {entries.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
               Keine Einträge
@@ -262,6 +311,16 @@ export default function SidebarDiaryPreview() {
           </Box>
         </AccordionDetails>
       </Accordion>
+
+      {showAddDialog && (
+        <FirecallItemDialog
+          type="diary"
+          item={{ type: 'diary', nummer: diaryCounter } as Diary}
+          allowTypeChange={false}
+          onClose={handleAddClose}
+          autoFocusField="von"
+        />
+      )}
     </Box>
   );
 }

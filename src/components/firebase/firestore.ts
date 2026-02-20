@@ -16,6 +16,7 @@ export const FIRECALL_LAYERS_COLLECTION_ID = 'layer';
 export const USER_COLLECTION_ID = 'user';
 export const GROUP_COLLECTION_ID = 'groups';
 export const CLUSTER_COLLECTION_ID = 'clusters6';
+export const FIRECALL_AUDITLOG_COLLECTION_ID = 'auditlog';
 
 /**
  * base item for all entries in a firecall
@@ -250,4 +251,16 @@ export const defaultFirecallLocation: Partial<FirecallLocation> = {
 
 export interface HydrantenItem extends FirecallItem, Hydrant {
   type: 'hydrant';
+}
+
+export interface AuditLogEntry {
+  id?: string;
+  timestamp: string;
+  user: string;
+  action: 'create' | 'update' | 'delete';
+  elementType: string;
+  elementId: string;
+  elementName: string;
+  previousValue?: Record<string, any>;
+  newValue?: Record<string, any>;
 }

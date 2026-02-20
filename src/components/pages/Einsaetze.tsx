@@ -36,9 +36,11 @@ import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
 import { KostenersatzList } from '../Kostenersatz';
+import { useAuditLog } from '../../hooks/useAuditLog';
 
 function useFirecallUpdate() {
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
   return useCallback(
     async (einsatz: Firecall) => {
       console.info(
@@ -49,8 +51,17 @@ function useFirecallUpdate() {
         { ...einsatz, updatedAt: new Date().toISOString(), updatedBy: email },
         { merge: true }
       );
+
+      logChange({
+        action: 'update',
+        elementType: 'firecall',
+        elementId: einsatz.id || '',
+        elementName: einsatz.name || '',
+        firecallId: einsatz.id,
+        newValue: { name: einsatz.name, description: einsatz.description, alarmierung: einsatz.alarmierung, eintreffen: einsatz.eintreffen, abruecken: einsatz.abruecken },
+      });
     },
-    [email]
+    [email, logChange]
   );
 }
 

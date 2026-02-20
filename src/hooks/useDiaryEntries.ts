@@ -7,7 +7,7 @@ import { useDiaries } from '../components/pages/EinsatzTagebuch';
  * @returns entries (limited) and totalCount (all manual entries)
  */
 export function useDiaryEntries(limit?: number) {
-  const { diaries } = useDiaries(false); // newest first
+  const { diaries, diaryCounter } = useDiaries(false); // newest first
 
   return useMemo(() => {
     // editable = true means manual diary entry, false means vehicle event
@@ -15,6 +15,7 @@ export function useDiaryEntries(limit?: number) {
     return {
       entries: limit ? diaryOnly.slice(0, limit) : diaryOnly,
       totalCount: diaryOnly.length,
+      diaryCounter,
     };
-  }, [diaries, limit]);
+  }, [diaries, limit, diaryCounter]);
 }

@@ -26,6 +26,7 @@ export interface FirecallItemFieldsProps {
   showLatLng?: boolean;
   showLayerSelect?: boolean;
   autoFocus?: boolean;
+  autoFocusField?: string;
 }
 
 export default function FirecallItemFields({
@@ -34,11 +35,13 @@ export default function FirecallItemFields({
   showLatLng = true,
   showLayerSelect = true,
   autoFocus = false,
+  autoFocusField,
 }: FirecallItemFieldsProps) {
   const layers = useFirecallLayers();
 
   // Find the first text-like field that should receive autoFocus
   const firstTextFieldKey = useMemo(() => {
+    if (autoFocusField) return autoFocusField;
     if (!autoFocus) return null;
     const fields = Object.entries(item.fields());
     const firstTextField = fields.find(([key]) => {
@@ -50,7 +53,17 @@ export default function FirecallItemFields({
       );
     });
     return firstTextField?.[0] ?? null;
-  }, [autoFocus, item]);
+  }, [autoFocus, autoFocusField, item]);
+
+  // Ref callback to focus after MUI Dialog's focus trap settles
+  const autoFocusRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      if (node && firstTextFieldKey) {
+        setTimeout(() => node.focus(), 100);
+      }
+    },
+    [firstTextFieldKey]
+  );
 
   const onChange =
     (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -250,7 +263,7 @@ export default function FirecallItemFields({
                 variant="standard"
                 onChange={onChange(key)}
                 value={((item as any)[key] as string) || ''}
-                autoFocus={key === firstTextFieldKey}
+                inputRef={key === firstTextFieldKey ? autoFocusRef : undefined}
               />
             )}
         </React.Fragment>

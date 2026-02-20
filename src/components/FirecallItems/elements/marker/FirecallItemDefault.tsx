@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { useEffect, useState } from 'react';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
+import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import useMapEditor from '../../../../hooks/useMapEditor';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
@@ -11,6 +12,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../../../firebase/firestore';
+import { logAuditChange } from '../../../../hooks/useAuditLog';
 import { FirecallItemBase } from '../FirecallItemBase';
 
 export interface MarkerRenderOptions {
@@ -30,10 +32,10 @@ export interface FirecallItemMarkerProps {
 async function updateFircallItemPos(
   firecallId: string,
   event: L.DragEndEvent,
-  fcItem: FirecallItem
+  fcItem: FirecallItem,
+  email?: string
 ) {
   const newPos = (event.target as L.Marker)?.getLatLng();
-  // console.info(`drag end on ${JSON.stringify(fcItem)}: ${newPos}`);
   if (fcItem.id && newPos) {
     const updatePos = {
       lat: newPos.lat,
@@ -53,6 +55,17 @@ async function updateFircallItemPos(
         merge: true,
       }
     );
+
+    if (email) {
+      logAuditChange(firecallId, email, {
+        action: 'update',
+        elementType: fcItem.type,
+        elementId: fcItem.id,
+        elementName: fcItem.name || '',
+        previousValue: { lat: fcItem.lat, lng: fcItem.lng },
+        newValue: updatePos,
+      });
+    }
   }
 }
 
@@ -64,6 +77,7 @@ export function FirecallItemMarkerDefault({
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
   const firecallId = useFirecallId();
+  const { email } = useFirebaseLogin();
   const [startPos, setStartPos] = useState<L.LatLng>(
     L.latLng(
       record.lat || defaultPosition.lat,
@@ -92,7 +106,7 @@ export function FirecallItemMarkerDefault({
           ...record.eventHandlers,
           dragend: (event) => {
             setStartPos((event.target as L.Marker)?.getLatLng());
-            updateFircallItemPos(firecallId, event, record);
+            updateFircallItemPos(firecallId, event, record, email);
           },
           ...(disableClick
             ? {}

@@ -8,10 +8,12 @@ import {
 } from '../components/firebase/firestore';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
+import { useAuditLog } from './useAuditLog';
 
 export default function useFirecallItemAdd() {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
+  const logChange = useAuditLog();
   return useCallback(
     async (item: FirecallItem) => {
       const newData: any = {
@@ -32,7 +34,7 @@ export default function useFirecallItemAdd() {
         )}`
       );
 
-      return await addDoc(
+      const docRef = await addDoc(
         collection(
           firestore,
           FIRECALL_COLLECTION_ID,
@@ -41,7 +43,17 @@ export default function useFirecallItemAdd() {
         ),
         newData
       );
+
+      logChange({
+        action: 'create',
+        elementType: item.type,
+        elementId: docRef.id,
+        elementName: item.name || '',
+        newValue: newData,
+      });
+
+      return docRef;
     },
-    [email, firecallId]
+    [email, firecallId, logChange]
   );
 }

@@ -1,6 +1,7 @@
 import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import HistoryIcon from '@mui/icons-material/History';
 import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
@@ -104,6 +105,7 @@ export default function AppDrawer({
       href: '/schadstoff',
     },
     { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
+    { text: 'Audit Log', icon: <HistoryIcon />, href: '/auditlog', admin: true },
     { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
     { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
     {

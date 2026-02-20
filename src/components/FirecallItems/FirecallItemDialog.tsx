@@ -27,6 +27,7 @@ export interface FirecallItemDialogOptions {
   item?: FirecallItem;
   allowTypeChange?: boolean;
   type?: string;
+  autoFocusField?: string;
 }
 
 export default function FirecallItemDialog({
@@ -34,6 +35,7 @@ export default function FirecallItemDialog({
   item: itemDefault,
   allowTypeChange = true,
   type: itemType,
+  autoFocusField,
 }: FirecallItemDialogOptions) {
   const firecallId = useFirecallId();
   const [open, setOpen] = useState(true);
@@ -92,6 +94,7 @@ export default function FirecallItemDialog({
             item={item}
             setItemField={setItemField}
             showLatLng={!!item.id}
+            autoFocusField={autoFocusField}
           />
         </DialogContent>
         <DialogActions>
