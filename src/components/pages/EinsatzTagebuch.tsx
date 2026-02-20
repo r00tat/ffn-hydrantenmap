@@ -1,6 +1,8 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
@@ -16,7 +18,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import moment from 'moment';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
 import {
   dateTimeFormat,
@@ -298,6 +300,74 @@ export interface EinsatzTagebuchOptions {
   showEditButton?: boolean;
   sortAscending?: boolean;
 }
+type DiarySortField = 'nummer' | 'datum' | 'art' | 'name' | 'beschreibung';
+
+function SortableHeader({
+  label,
+  field,
+  activeField,
+  direction,
+  onClick,
+}: {
+  label: string;
+  field: DiarySortField;
+  activeField: DiarySortField;
+  direction: 'asc' | 'desc';
+  onClick: (field: DiarySortField) => void;
+}) {
+  const isActive = field === activeField;
+  return (
+    <Box
+      onClick={() => onClick(field)}
+      sx={{
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.5,
+        userSelect: 'none',
+        '&:hover': { opacity: 0.7 },
+      }}
+    >
+      <b>{label}</b>
+      {isActive &&
+        (direction === 'asc' ? (
+          <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+        ) : (
+          <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+        ))}
+    </Box>
+  );
+}
+
+function compareDiaryField(
+  a: Diary,
+  b: Diary,
+  field: DiarySortField,
+  direction: 'asc' | 'desc'
+): number {
+  let result: number;
+  switch (field) {
+    case 'nummer':
+      result = (a.nummer ?? 0) - (b.nummer ?? 0);
+      break;
+    case 'datum':
+      result = (a.datum || '').localeCompare(b.datum || '');
+      break;
+    case 'art':
+      result = (a.art || '').localeCompare(b.art || '');
+      break;
+    case 'name':
+      result = (a.name || '').localeCompare(b.name || '');
+      break;
+    case 'beschreibung':
+      result = (a.beschreibung || '').localeCompare(b.beschreibung || '');
+      break;
+    default:
+      result = 0;
+  }
+  return direction === 'asc' ? result : -result;
+}
+
 export function EinsatzTagebuch({
   showEditButton = true,
   sortAscending = false,
@@ -306,6 +376,28 @@ export function EinsatzTagebuch({
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
   const addEinsatzTagebuch = useFirecallItemAdd();
+
+  const [sortField, setSortField] = useState<DiarySortField>('datum');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
+    sortAscending ? 'asc' : 'desc'
+  );
+
+  const handleSortClick = useCallback((field: DiarySortField) => {
+    if (field === sortField) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }, [sortField]);
+
+  const sortedDiaries = useMemo(
+    () =>
+      [...diaries].sort((a, b) =>
+        compareDiaryField(a, b, sortField, sortDirection)
+      ),
+    [diaries, sortField, sortDirection]
+  );
   const { query, resultHtml, isQuerying } = useFirecallAIQueryStream();
 
   const [inlineArt, setInlineArt] = useState<'M' | 'B' | 'F'>('M');
@@ -403,19 +495,19 @@ export function EinsatzTagebuch({
 
         <Grid container>
           <Grid size={{ xs: 3, md: 2, lg: 1 }}>
-            <b>Nummer</b>
+            <SortableHeader label="Nummer" field="nummer" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 6, md: 5, lg: 2 }}>
-            <b>Datum</b>
+            <SortableHeader label="Datum" field="datum" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-            <b>typ von -&gt; an</b>
+            <SortableHeader label="typ von -> an" field="art" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-            <b>Eintrag</b>
+            <SortableHeader label="Eintrag" field="name" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-            <b>Beschreibung</b>
+            <SortableHeader label="Beschreibung" field="beschreibung" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
 
@@ -520,7 +612,7 @@ export function EinsatzTagebuch({
             </>
           )}
 
-          {diaries.map((e, index) => (
+          {sortedDiaries.map((e, index) => (
             <React.Fragment
               key={`tagebuch-${e.id || index}-${e.nummer}`}
             >

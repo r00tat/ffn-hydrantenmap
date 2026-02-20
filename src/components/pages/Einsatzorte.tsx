@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import EmailIcon from '@mui/icons-material/Email';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import useEmailImport from '../../hooks/useEmailImport';
@@ -21,7 +21,7 @@ import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
 import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
-import EinsatzorteTable from '../Einsatzorte/EinsatzorteTable';
+import EinsatzorteTable, { type EinsatzorteSortField } from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
 
 export default function Einsatzorte() {
@@ -46,6 +46,55 @@ export default function Einsatzorte() {
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
   const { saveHistory } = useSaveHistory();
+
+  // Sorting state
+  const [sortField, setSortField] = useState<EinsatzorteSortField>('created');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSortClick = useCallback((field: EinsatzorteSortField) => {
+    if (field === sortField) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }, [sortField]);
+
+  const sortedLocations = useMemo(() => {
+    return [...locations].sort((a, b) => {
+      let result: number;
+      switch (sortField) {
+        case 'name':
+          result = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'status':
+          result = (a.status || '').localeCompare(b.status || '');
+          break;
+        case 'vehicles': {
+          const aVeh = Object.values(a.vehicles || {}).join(', ');
+          const bVeh = Object.values(b.vehicles || {}).join(', ');
+          result = aVeh.localeCompare(bVeh);
+          break;
+        }
+        case 'alarmTime':
+          result = (a.alarmTime || '').localeCompare(b.alarmTime || '');
+          break;
+        case 'startTime':
+          result = (a.startTime || '').localeCompare(b.startTime || '');
+          break;
+        case 'doneTime':
+          result = (a.doneTime || '').localeCompare(b.doneTime || '');
+          break;
+        case 'created':
+        default:
+          result =
+            new Date(a.created || 0).getTime() -
+            new Date(b.created || 0).getTime();
+          break;
+      }
+      return sortDirection === 'asc' ? result : -result;
+    });
+  }, [locations, sortField, sortDirection]);
 
   // Auto-import on mount when firecall.id is available
   useEffect(() => {
@@ -130,6 +179,10 @@ export default function Einsatzorte() {
       );
 
       try {
+        // Save history snapshot before any changes
+        const locationDisplayName = location.name || [location.street, location.number, location.city].filter(Boolean).join(' ');
+        await saveHistory(`Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`);
+
         let vehicleId: string;
         let vehicleDisplayName: string;
 
@@ -142,7 +195,6 @@ export default function Einsatzorte() {
             `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`
           );
 
-          await saveHistory(`Fahrzeug ${vehicleName} Positionsupdate`);
           await updateFirecallItem({
             ...existingVehicle,
             lat,
@@ -184,6 +236,26 @@ export default function Einsatzorte() {
       }
     },
     [firecall, firecallVehicles, addFirecallItem, updateFirecallItem, saveHistory, updateLocation]
+  );
+
+  const handleMapVehicleSelected = useCallback(
+    async (vehicleId: string, vehicleName: string, location: FirecallLocation) => {
+      try {
+        const locationDisplayName = location.name || [location.street, location.number, location.city].filter(Boolean).join(' ');
+        await saveHistory(`Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`);
+
+        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        if (!currentVehicles[vehicleId]) {
+          await updateLocation(location.id!, {
+            vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to assign vehicle "${vehicleName}":`, error);
+        setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
+      }
+    },
+    [saveHistory, updateLocation]
   );
 
   if (!firecall || firecall.id === 'unknown') {
@@ -239,7 +311,7 @@ export default function Einsatzorte() {
 
       {isMobile ? (
         <Box>
-          {locations.map((location) => (
+          {sortedLocations.map((location) => (
             <EinsatzorteCard
               key={location.id}
               location={location}
@@ -248,6 +320,7 @@ export default function Einsatzorte() {
               mapVehicles={mapVehicles}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
               onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+              onMapVehicleSelected={handleMapVehicleSelected}
             />
           ))}
           <EinsatzorteCard
@@ -259,17 +332,22 @@ export default function Einsatzorte() {
             mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
             onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+            onMapVehicleSelected={handleMapVehicleSelected}
           />
         </Box>
       ) : (
         <EinsatzorteTable
-          locations={locations}
+          locations={sortedLocations}
           onUpdate={handleUpdate}
           onDelete={handleDelete}
           onAdd={handleAdd}
           mapVehicles={mapVehicles}
           kostenersatzVehicleNames={kostenersatzVehicleNames}
           onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+          onMapVehicleSelected={handleMapVehicleSelected}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSortClick={handleSortClick}
         />
       )}
 

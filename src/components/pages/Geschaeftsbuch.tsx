@@ -1,6 +1,8 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -20,7 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { where } from 'firebase/firestore';
 import moment from 'moment';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   dateTimeFormat,
   formatTimestamp,
@@ -226,37 +228,128 @@ async function downloadGb(eintraege: GbDisplay[]) {
   downloadRowsAsCsv(rows, 'Geschaeftsbuch.csv');
 }
 
+type GbSortField =
+  | 'nummer'
+  | 'datum'
+  | 'einaus'
+  | 'name'
+  | 'beschreibung'
+  | 'erledigt';
+
+function GbSortableHeader({
+  label,
+  field,
+  activeField,
+  direction,
+  onClick,
+}: {
+  label: string;
+  field: GbSortField;
+  activeField: GbSortField;
+  direction: 'asc' | 'desc';
+  onClick: (field: GbSortField) => void;
+}) {
+  const isActive = field === activeField;
+  return (
+    <Box
+      onClick={() => onClick(field)}
+      sx={{
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.5,
+        userSelect: 'none',
+        '&:hover': { opacity: 0.7 },
+      }}
+    >
+      <b>{label}</b>
+      {isActive &&
+        (direction === 'asc' ? (
+          <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+        ) : (
+          <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+        ))}
+    </Box>
+  );
+}
+
+function compareGbField(
+  a: GbDisplay,
+  b: GbDisplay,
+  field: GbSortField,
+  direction: 'asc' | 'desc'
+): number {
+  let result: number;
+  switch (field) {
+    case 'nummer':
+      result = (a.nummer ?? 0) - (b.nummer ?? 0);
+      break;
+    case 'datum':
+      result = (a.datum || '').localeCompare(b.datum || '');
+      break;
+    case 'einaus':
+      result = (a.einaus || '').localeCompare(b.einaus || '');
+      break;
+    case 'name':
+      result = (a.name || '').localeCompare(b.name || '');
+      break;
+    case 'beschreibung':
+      result = (a.beschreibung || '').localeCompare(b.beschreibung || '');
+      break;
+    case 'erledigt':
+      result = (a.erledigt || '').localeCompare(b.erledigt || '');
+      break;
+    default:
+      result = 0;
+  }
+  return direction === 'asc' ? result : -result;
+}
+
 function GbEntries({
   eintraege,
   showEditButton,
   funktion,
+  sortField,
+  sortDirection,
+  onSortClick,
 }: {
   eintraege: GbDisplay[];
   showEditButton?: boolean;
   funktion?: string;
+  sortField: GbSortField;
+  sortDirection: 'asc' | 'desc';
+  onSortClick: (field: GbSortField) => void;
 }) {
+  const sortedEintraege = useMemo(
+    () =>
+      [...eintraege].sort((a, b) =>
+        compareGbField(a, b, sortField, sortDirection)
+      ),
+    [eintraege, sortField, sortDirection]
+  );
+
   return (
     <Grid container>
       <Grid size={{ xs: 3, md: 2, lg: 1 }}>
-        <b>Nummer</b>
+        <GbSortableHeader label="Nummer" field="nummer" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-        <b>Datum</b>
+        <GbSortableHeader label="Datum" field="datum" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 4, lg: 2 }}>
-        <b>von -&gt; an</b>
+        <GbSortableHeader label="von -> an" field="einaus" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-        <b>Name</b>
+        <GbSortableHeader label="Name" field="name" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-        <b>Beschreibung</b>
+        <GbSortableHeader label="Beschreibung" field="beschreibung" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 2, lg: 1 }}>
-        <b>Erledigt</b>
+        <GbSortableHeader label="Erledigt" field="erledigt" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
-      {eintraege.map((e, index) => (
+      {sortedEintraege.map((e, index) => (
         <React.Fragment key={'gb-' + e.id}>
           <Grid
             size={{ xs: 3, md: 2, lg: 1 }}
@@ -410,6 +503,20 @@ export default function Geschaeftsbuch({
     },
     [addFirecallGb]
   );
+
+  const [sortField, setSortField] = useState<GbSortField>('datum');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
+    sortAscending ? 'asc' : 'desc'
+  );
+
+  const handleSortClick = useCallback((field: GbSortField) => {
+    if (field === sortField) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }, [sortField]);
 
   const [tabValue, setTabValue] = React.useState('all');
 
@@ -579,6 +686,9 @@ export default function Geschaeftsbuch({
             <GbEntries
               eintraege={eintraege}
               showEditButton={showEditButton && canEdit}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSortClick={handleSortClick}
             />
           </TabPanel>
           {Object.entries(sFunktionen).map(([key, title]) => (
@@ -594,6 +704,9 @@ export default function Geschaeftsbuch({
                 )}
                 showEditButton={showEditButton && canEdit}
                 funktion={key}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onSortClick={handleSortClick}
               />
             </TabPanel>
           ))}

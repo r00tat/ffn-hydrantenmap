@@ -7,9 +7,19 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import { useCallback } from 'react';
 import { FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
 import EinsatzorteRow from './EinsatzorteRow';
+
+export type EinsatzorteSortField =
+  | 'name'
+  | 'status'
+  | 'vehicles'
+  | 'alarmTime'
+  | 'startTime'
+  | 'doneTime'
+  | 'created';
 
 interface EinsatzorteTableProps {
   locations: FirecallLocation[];
@@ -19,6 +29,10 @@ interface EinsatzorteTableProps {
   mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
+  onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;
+  sortField?: EinsatzorteSortField;
+  sortDirection?: 'asc' | 'desc';
+  onSortClick?: (field: EinsatzorteSortField) => void;
 }
 
 export default function EinsatzorteTable({
@@ -29,6 +43,10 @@ export default function EinsatzorteTable({
   mapVehicles,
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
+  onMapVehicleSelected,
+  sortField = 'created',
+  sortDirection = 'asc',
+  onSortClick,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
     (id: string) => (updates: Partial<FirecallLocation>) => {
@@ -55,14 +73,62 @@ export default function EinsatzorteTable({
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }}>Bezeichnung</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }}>
+              <TableSortLabel
+                active={sortField === 'name'}
+                direction={sortField === 'name' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('name')}
+              >
+                Bezeichnung
+              </TableSortLabel>
+            </TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 350 }}>Adresse</TableCell>
-            <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>Fahrzeuge</TableCell>
+            <TableCell sx={{ fontWeight: 'bold' }}>
+              <TableSortLabel
+                active={sortField === 'status'}
+                direction={sortField === 'status' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('status')}
+              >
+                Status
+              </TableSortLabel>
+            </TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 120 }}>
+              <TableSortLabel
+                active={sortField === 'vehicles'}
+                direction={sortField === 'vehicles' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('vehicles')}
+              >
+                Fahrzeuge
+              </TableSortLabel>
+            </TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Beschreibung</TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Alarm</TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Start</TableCell>
-            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>Erledigt</TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>
+              <TableSortLabel
+                active={sortField === 'alarmTime'}
+                direction={sortField === 'alarmTime' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('alarmTime')}
+              >
+                Alarm
+              </TableSortLabel>
+            </TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>
+              <TableSortLabel
+                active={sortField === 'startTime'}
+                direction={sortField === 'startTime' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('startTime')}
+              >
+                Start
+              </TableSortLabel>
+            </TableCell>
+            <TableCell sx={{ fontWeight: 'bold', minWidth: 80 }}>
+              <TableSortLabel
+                active={sortField === 'doneTime'}
+                direction={sortField === 'doneTime' ? sortDirection : 'asc'}
+                onClick={() => onSortClick?.('doneTime')}
+              >
+                Erledigt
+              </TableSortLabel>
+            </TableCell>
             <TableCell sx={{ fontWeight: 'bold', minWidth: 160 }}>Koordinaten</TableCell>
             <TableCell sx={{ fontWeight: 'bold', width: 50 }}></TableCell>
           </TableRow>
@@ -77,6 +143,7 @@ export default function EinsatzorteTable({
               mapVehicles={mapVehicles}
               kostenersatzVehicleNames={kostenersatzVehicleNames}
               onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
+              onMapVehicleSelected={onMapVehicleSelected}
             />
           ))}
           <EinsatzorteRow
@@ -88,6 +155,7 @@ export default function EinsatzorteTable({
             mapVehicles={mapVehicles}
             kostenersatzVehicleNames={kostenersatzVehicleNames}
             onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
+            onMapVehicleSelected={onMapVehicleSelected}
           />
         </TableBody>
       </Table>
