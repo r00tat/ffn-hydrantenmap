@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -19,17 +19,20 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import MapIcon from '@mui/icons-material/Map';
+import DownloadIcon from '@mui/icons-material/Download';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import UploadIcon from '@mui/icons-material/Upload';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { PegelstandStation } from '../Map/layers/PegelstandLayer';
 import {
   fetchOgcStations,
-  importOgcStations,
+  importAllStations,
   savePegelstandStation,
   deletePegelstandStation,
 } from '../../app/admin/PegelstandAdminAction';
@@ -56,6 +59,35 @@ const emptyForm: StationFormData = {
   detailUrl: '',
 };
 
+/** Parse a single CSV line, handling quoted fields with commas/quotes inside. */
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
 export default function PegelstandStations() {
   const stations = useFirebaseCollection<PegelstandStation>({
     collectionName: 'pegelstand_stations',
@@ -71,6 +103,47 @@ export default function PegelstandStations() {
   const [saving, setSaving] = useState(false);
 
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [mapPickerStation, setMapPickerStation] = useState<PegelstandStation | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  type SortKey = 'id' | 'name' | 'type' | 'hzbnr' | 'lat' | 'lng';
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = useCallback((key: SortKey) => {
+    setSortDir((prev) => (sortKey === key && prev === 'asc' ? 'desc' : 'asc'));
+    setSortKey(key);
+  }, [sortKey]);
+
+  const sortedStations = useMemo(() => {
+    const sorted = [...stations].sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+      switch (sortKey) {
+        case 'lat':
+        case 'lng':
+          aVal = a[sortKey];
+          bVal = b[sortKey];
+          break;
+        case 'id':
+          aVal = a.id;
+          bVal = b.id;
+          break;
+        case 'hzbnr':
+          aVal = a.hzbnr || '';
+          bVal = b.hzbnr || '';
+          break;
+        default:
+          aVal = a[sortKey] || '';
+          bVal = b[sortKey] || '';
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [stations, sortKey, sortDir]);
 
   const handleImport = useCallback(async () => {
     setImporting(true);
@@ -90,10 +163,20 @@ export default function PegelstandStations() {
         detailUrl: entry.detailUrl,
       }));
 
-      const importCount = await importOgcStations(ogcStations, scrapedSlugs);
-      setImportMessage(
-        `${importCount} Stationen importiert (von ${ogcStations.length} OGC Stationen)`
-      );
+      const result = await importAllStations(ogcStations, scrapedSlugs);
+      const parts = [
+        `${result.total} Stationen importiert`,
+        `${result.withCoordinates} mit Koordinaten`,
+      ];
+      if (result.fromDetailPages > 0) {
+        parts.push(
+          `davon ${result.fromDetailPages} von Detailseiten`
+        );
+      }
+      if (result.withoutCoordinates > 0) {
+        parts.push(`${result.withoutCoordinates} ohne Koordinaten`);
+      }
+      setImportMessage(parts.join(', '));
     } catch (error) {
       console.error('Import failed:', error);
       setImportError(
@@ -178,6 +261,129 @@ export default function PegelstandStations() {
     }));
   }, []);
 
+  const handleInlineMapConfirm = useCallback(
+    async (lat: number, lng: number) => {
+      if (!mapPickerStation) return;
+      try {
+        await savePegelstandStation(mapPickerStation.id, {
+          name: mapPickerStation.name,
+          type: mapPickerStation.type,
+          hzbnr: mapPickerStation.hzbnr || undefined,
+          lat,
+          lng,
+          detailUrl: mapPickerStation.detailUrl || '',
+        });
+      } catch (error) {
+        console.error('Save failed:', error);
+        alert(
+          `Speichern fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      setMapPickerStation(null);
+    },
+    [mapPickerStation]
+  );
+
+  const handleExportCsv = useCallback(() => {
+    const header = 'slug,name,type,hzbnr,lat,lng,detailUrl';
+    const rows = stations.map((s) => {
+      const escape = (v: string) =>
+        v.includes(',') || v.includes('"') || v.includes('\n')
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      return [
+        escape(s.id),
+        escape(s.name),
+        s.type,
+        escape(s.hzbnr || ''),
+        String(s.lat),
+        String(s.lng),
+        escape(s.detailUrl || ''),
+      ].join(',');
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pegelstand_stations.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [stations]);
+
+  const handleImportCsv = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      // Reset input so the same file can be re-selected
+      e.target.value = '';
+
+      setCsvImporting(true);
+      setImportMessage(null);
+      setImportError(null);
+
+      try {
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) {
+          setImportError('CSV ist leer oder enthält nur die Kopfzeile.');
+          return;
+        }
+
+        // Parse header to find column indices
+        const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+        const idx = {
+          slug: header.indexOf('slug'),
+          name: header.indexOf('name'),
+          type: header.indexOf('type'),
+          hzbnr: header.indexOf('hzbnr'),
+          lat: header.indexOf('lat'),
+          lng: header.indexOf('lng'),
+          detailUrl: header.indexOf('detailurl'),
+        };
+
+        if (idx.slug === -1 || idx.name === -1) {
+          setImportError(
+            'CSV muss mindestens die Spalten "slug" und "name" enthalten.'
+          );
+          return;
+        }
+
+        let count = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCsvLine(lines[i]);
+          const slug = cols[idx.slug]?.trim();
+          const name = cols[idx.name]?.trim();
+          if (!slug || !name) continue;
+
+          await savePegelstandStation(slug, {
+            name,
+            type:
+              idx.type !== -1 && cols[idx.type]?.trim() === 'lake'
+                ? 'lake'
+                : 'river',
+            hzbnr:
+              idx.hzbnr !== -1 ? cols[idx.hzbnr]?.trim() || undefined : undefined,
+            lat: idx.lat !== -1 ? parseFloat(cols[idx.lat]) || 0 : 0,
+            lng: idx.lng !== -1 ? parseFloat(cols[idx.lng]) || 0 : 0,
+            detailUrl: idx.detailUrl !== -1 ? cols[idx.detailUrl]?.trim() || '' : '',
+          });
+          count++;
+        }
+
+        setImportMessage(`${count} Stationen aus CSV importiert.`);
+      } catch (error) {
+        console.error('CSV import failed:', error);
+        setImportError(
+          `CSV Import fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`
+        );
+      } finally {
+        setCsvImporting(false);
+      }
+    },
+    []
+  );
+
   const isFormValid =
     (editingSlug || formData.slug.trim()) &&
     formData.name.trim() &&
@@ -197,7 +403,7 @@ export default function PegelstandStations() {
         }}
       >
         <Typography variant="h5">Pegelstand Stationen</Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             startIcon={
@@ -208,6 +414,31 @@ export default function PegelstandStations() {
           >
             Import von OGC API
           </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleExportCsv}
+            disabled={stations.length === 0}
+          >
+            CSV Export
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              csvImporting ? <CircularProgress size={20} /> : <FileUploadIcon />
+            }
+            onClick={() => fileInputRef.current?.click()}
+            disabled={csvImporting}
+          >
+            CSV Import
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            hidden
+            onChange={handleImportCsv}
+          />
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -233,17 +464,29 @@ export default function PegelstandStations() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Slug</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Typ</TableCell>
-              <TableCell>HZBNR</TableCell>
-              <TableCell>Lat</TableCell>
-              <TableCell>Lng</TableCell>
+              {([
+                ['id', 'Slug'],
+                ['name', 'Name'],
+                ['type', 'Typ'],
+                ['hzbnr', 'HZBNR'],
+                ['lat', 'Lat'],
+                ['lng', 'Lng'],
+              ] as [SortKey, string][]).map(([key, label]) => (
+                <TableCell key={key} sortDirection={sortKey === key ? sortDir : false}>
+                  <TableSortLabel
+                    active={sortKey === key}
+                    direction={sortKey === key ? sortDir : 'asc'}
+                    onClick={() => handleSort(key)}
+                  >
+                    {label}
+                  </TableSortLabel>
+                </TableCell>
+              ))}
               <TableCell>Aktionen</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {stations.length === 0 ? (
+            {sortedStations.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" sx={{ py: 2 }}>
@@ -253,7 +496,7 @@ export default function PegelstandStations() {
                 </TableCell>
               </TableRow>
             ) : (
-              stations.map((station) => (
+              sortedStations.map((station) => (
                 <TableRow key={station.id}>
                   <TableCell>{station.id}</TableCell>
                   <TableCell>{station.name}</TableCell>
@@ -270,6 +513,13 @@ export default function PegelstandStations() {
                       title="Bearbeiten"
                     >
                       <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => setMapPickerStation(station)}
+                      title="Position auf Karte wählen"
+                    >
+                      <MapIcon fontSize="small" />
                     </IconButton>
                     <IconButton
                       size="small"
@@ -404,11 +654,13 @@ export default function PegelstandStations() {
         </DialogActions>
       </Dialog>
 
-      {/* Map Picker */}
+      {/* Map Picker for edit dialog */}
       <LocationMapPicker
         open={mapPickerOpen}
         onClose={() => setMapPickerOpen(false)}
         onConfirm={handleMapConfirm}
+        showFirecallLayers={false}
+        title={`Position wählen: ${formData.name || ''}`}
         initialLat={
           formData.lat && !isNaN(parseFloat(formData.lat))
             ? parseFloat(formData.lat)
@@ -417,6 +669,25 @@ export default function PegelstandStations() {
         initialLng={
           formData.lng && !isNaN(parseFloat(formData.lng))
             ? parseFloat(formData.lng)
+            : undefined
+        }
+      />
+
+      {/* Inline map picker for table row action */}
+      <LocationMapPicker
+        open={!!mapPickerStation}
+        onClose={() => setMapPickerStation(null)}
+        onConfirm={handleInlineMapConfirm}
+        showFirecallLayers={false}
+        title={`Position wählen: ${mapPickerStation?.name || ''}`}
+        initialLat={
+          mapPickerStation && mapPickerStation.lat
+            ? mapPickerStation.lat
+            : undefined
+        }
+        initialLng={
+          mapPickerStation && mapPickerStation.lng
+            ? mapPickerStation.lng
             : undefined
         }
       />

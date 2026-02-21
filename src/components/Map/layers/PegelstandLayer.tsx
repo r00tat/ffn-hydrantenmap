@@ -86,7 +86,7 @@ export default function PegelstandLayer() {
     return liveData
       .map((entry) => {
         const station = stationMap.get(entry.slug);
-        if (!station) return null;
+        if (!station || (!station.lat && !station.lng)) return null;
         return {
           ...entry,
           lat: station.lat,
@@ -108,6 +108,23 @@ export default function PegelstandLayer() {
         >
           <Popup>
             <b>{marker.name}</b>
+            {marker.drainLevel && (
+              <>
+                <br />
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 10,
+                    height: 10,
+                    borderRadius: '50%',
+                    backgroundColor: marker.color,
+                    marginRight: 4,
+                    verticalAlign: 'middle',
+                  }}
+                />
+                {marker.drainLevel}
+              </>
+            )}
             {marker.waterLevel && (
               <>
                 <br />

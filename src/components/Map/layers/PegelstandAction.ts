@@ -12,16 +12,69 @@ export interface PegelstandData {
   discharge?: string;
   temperature?: string;
   color: string;
+  /** Human-readable drain level label, e.g. "MQ-HQ1" (rivers only) */
+  drainLevel?: string;
   detailUrl: string;
 }
 
 const DEFAULT_COLOR = '#2196F3';
 
+/** Drain CSS classes → hex colors from the site's hydrography.css */
+const DRAIN_COLORS: Record<string, string> = {
+  'drain-Q95': '#8a4705',
+  'drain-MQ-Q95': '#00fb84',
+  'drain-HQ1-MQ': '#007e00',
+  'drain-HQ5-HQ1': '#0085ff',
+  'drain-HQ10-HQ5': '#ffe25f',
+  'drain-HQ30-HQ10': '#ff8400',
+  'drain-HQ100-HQ30': '#ff2300',
+  'drain-HQ100': '#c31e09',
+};
+
+/** Drain class → human-readable label for the popup */
+const DRAIN_LABELS: Record<string, string> = {
+  'drain-Q95': '<Q95%',
+  'drain-MQ-Q95': 'Q95%-MQ',
+  'drain-HQ1-MQ': 'MQ-HQ1',
+  'drain-HQ5-HQ1': 'HQ1-HQ5',
+  'drain-HQ10-HQ5': 'HQ5-HQ10',
+  'drain-HQ30-HQ10': 'HQ10-HQ30',
+  'drain-HQ100-HQ30': 'HQ30-HQ100',
+  'drain-HQ100': '>HQ100',
+};
+
 const RIVER_URL = 'https://wasser.bgld.gv.at/hydrographie/die-fluesse';
 const LAKE_URL = 'https://wasser.bgld.gv.at/hydrographie/die-seen';
 
+/**
+ * Build a slug→drain-class map from the interactive map section of the page.
+ * Map station records look like:
+ *   <a class="station_map_record drain-HQ1-MQ ..." href="/hydrographie/die-fluesse/burg">
+ */
+function parseMapDrainClasses(
+  html: string,
+  pathPrefix: string
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const regex = new RegExp(
+    `station_map_record[\\s\\S]*?(drain-[A-Za-z0-9-]+)[\\s\\S]*?href="${pathPrefix}/([^"]+)"`,
+    'gi'
+  );
+  let m;
+  while ((m = regex.exec(html)) !== null) {
+    map.set(m[2], m[1]);
+  }
+  return map;
+}
+
 function parseRiverPage(html: string): PegelstandData[] {
   const results: PegelstandData[] = [];
+
+  // Extract drain classes from the map section (slug → drain class)
+  const drainMap = parseMapDrainClasses(
+    html,
+    '/hydrographie/die-fluesse'
+  );
 
   // Match table rows containing station data
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
@@ -47,11 +100,10 @@ function parseRiverPage(html: string): PegelstandData[] {
       cells.push(cellMatch[1].replace(/<[^>]*>/g, '').trim());
     }
 
-    // Try to extract color from the row or cell styles
-    const colorMatch = rowHtml.match(
-      /(?:background-color|color)\s*:\s*(#[0-9a-fA-F]{3,6}|rgb[^)]*\))/i
-    );
-    const color = colorMatch ? colorMatch[1] : DEFAULT_COLOR;
+    // Look up color from the drain class extracted from the map section
+    const drainClass = drainMap.get(slug);
+    const color = (drainClass && DRAIN_COLORS[drainClass]) || DEFAULT_COLOR;
+    const drainLevel = drainClass ? DRAIN_LABELS[drainClass] : undefined;
 
     // River rows: [station name, timestamp, discharge Q (m3/s), water level (cm), temperature (C)]
     if (cells.length >= 4) {
@@ -70,6 +122,7 @@ function parseRiverPage(html: string): PegelstandData[] {
         discharge: discharge || undefined,
         temperature: temperature || undefined,
         color,
+        drainLevel,
         detailUrl: `/hydrographie/die-fluesse/${slug}`,
       });
     }
@@ -104,12 +157,6 @@ function parseLakePage(html: string): PegelstandData[] {
       cells.push(cellMatch[1].replace(/<[^>]*>/g, '').trim());
     }
 
-    // Try to extract color from the row or cell styles
-    const colorMatch = rowHtml.match(
-      /(?:background-color|color)\s*:\s*(#[0-9a-fA-F]{3,6}|rgb[^)]*\))/i
-    );
-    const color = colorMatch ? colorMatch[1] : DEFAULT_COLOR;
-
     // Lake rows: [station name, timestamp, water level (müA), temperature (C)]
     if (cells.length >= 3) {
       const timestamp = cells[1]?.replace(/\s+/g, ' ').trim() || '';
@@ -125,7 +172,7 @@ function parseLakePage(html: string): PegelstandData[] {
         waterLevelUnit: 'müA',
         discharge: undefined,
         temperature: temperature || undefined,
-        color,
+        color: DEFAULT_COLOR,
         detailUrl: `/hydrographie/die-seen/${slug}`,
       });
     }

@@ -75,56 +75,215 @@ export async function deletePegelstandStation(slug: string): Promise<void> {
   await firestore.collection('pegelstand_stations').doc(slug).delete();
 }
 
-export async function importOgcStations(
+/**
+ * Try to match a scraped station name to an OGC station.
+ * OGC names look like "Burg" or "Deutsch-Jahrndorf (Neurießäcker)"
+ * Scraped names look like "Burg / Pinka" or "Dt. Jahrndorf KL / Kleine Leitha"
+ */
+function findOgcMatch(
+  scrapedName: string,
+  ogcStations: OgcStation[]
+): OgcStation | undefined {
+  const scrapedLower = scrapedName.toLowerCase();
+  const scrapedLocation = scrapedLower.split(' / ')[0].trim();
+  // Also try without common abbreviations
+  const scrapedNormalized = scrapedLocation
+    .replace(/\bdt\.\s*/g, 'deutsch-')
+    .replace(/\bst\.\s*/g, 'st. ')
+    .replace(/\ba\.\s*d\.\s*/g, 'a. d. ')
+    .replace(/\s+/g, ' ');
+
+  return ogcStations.find((ogc) => {
+    const ogcLower = ogc.name.toLowerCase();
+    const ogcLocation = ogcLower.split(' (')[0].trim();
+
+    // Exact location match
+    if (scrapedLocation === ogcLocation) return true;
+    // Normalized match
+    if (scrapedNormalized === ogcLocation) return true;
+    // One contains the other
+    if (ogcLocation.includes(scrapedLocation)) return true;
+    if (scrapedLocation.includes(ogcLocation)) return true;
+    // Full name containment
+    if (scrapedLower.includes(ogcLower)) return true;
+    if (ogcLower.includes(scrapedLower)) return true;
+
+    return false;
+  });
+}
+
+export interface DetailPageData {
+  lat: number;
+  lng: number;
+  hzbnr?: string;
+}
+
+/**
+ * Parse coordinates and HZBNR from a station detail page.
+ * Coordinates: <div id="StationMap" data-center='[lng,lat]'>
+ * HZBNR: <p>HZBNR: 210260</p>
+ */
+function parseDetailPage(html: string): DetailPageData | null {
+  const centerMatch = html.match(
+    /id="StationMap"\s+data-center='?\[([^\]]+)\]/
+  );
+  if (!centerMatch) return null;
+
+  const [lngStr, latStr] = centerMatch[1].split(',');
+  const lng = parseFloat(lngStr);
+  const lat = parseFloat(latStr);
+  if (isNaN(lat) || isNaN(lng)) return null;
+
+  const hzbnrMatch = html.match(/HZBNR:\s*(\d+)/);
+  const hzbnr = hzbnrMatch ? hzbnrMatch[1] : undefined;
+
+  return { lat, lng, hzbnr };
+}
+
+const BASE_URL = 'https://wasser.bgld.gv.at';
+
+async function fetchDetailPageData(
+  detailUrl: string
+): Promise<DetailPageData | null> {
+  try {
+    const response = await fetch(`${BASE_URL}${detailUrl}`);
+    if (!response.ok) return null;
+    const html = await response.text();
+    return parseDetailPage(html);
+  } catch {
+    return null;
+  }
+}
+
+export interface ImportResult {
+  total: number;
+  withCoordinates: number;
+  withoutCoordinates: number;
+  fromDetailPages: number;
+}
+
+/**
+ * Import ALL scraped stations to Firestore.
+ * 1. Stations that already have coordinates in Firestore keep them (metadata updated).
+ * 2. For new/missing coordinates: fetch detail page first (exact per-station coordinates).
+ * 3. Fallback to OGC API match if detail page has no coordinates.
+ */
+export async function importAllStations(
   ogcStations: OgcStation[],
-  scrapedSlugs: {
+  scrapedStations: {
     slug: string;
     name: string;
     type: 'river' | 'lake';
     detailUrl: string;
   }[]
-): Promise<number> {
+): Promise<ImportResult> {
   await actionAdminRequired();
 
-  const batch = firestore.batch();
-  let importCount = 0;
-
-  for (const ogcStation of ogcStations) {
-    const ogcNameLower = ogcStation.name.toLowerCase();
-    const ogcLocationPart = ogcNameLower.split(' (')[0].trim();
-
-    const matched = scrapedSlugs.find((scraped) => {
-      const scrapedNameLower = scraped.name.toLowerCase();
-      const scrapedLocationPart = scrapedNameLower.split(' / ')[0].trim();
-
-      return (
-        scrapedNameLower.includes(ogcNameLower) ||
-        ogcNameLower.includes(scrapedNameLower) ||
-        scrapedLocationPart === ogcLocationPart
-      );
+  // Check which stations already have coordinates in Firestore
+  const existingDocs = await firestore
+    .collection('pegelstand_stations')
+    .get();
+  const existingStations = new Map<
+    string,
+    { lat: number; lng: number; hzbnr?: string }
+  >();
+  existingDocs.forEach((doc) => {
+    const data = doc.data();
+    existingStations.set(doc.id, {
+      lat: data.lat || 0,
+      lng: data.lng || 0,
+      hzbnr: data.hzbnr,
     });
+  });
 
-    if (matched) {
-      const doc: PegelstandStationDoc = {
-        name: matched.name,
-        type: matched.type,
-        hzbnr: ogcStation.hzbnr,
-        lat: ogcStation.lat,
-        lng: ogcStation.lng,
-        detailUrl: matched.detailUrl,
-      };
+  const batch = firestore.batch();
+  let withCoordinates = 0;
+  let withoutCoordinates = 0;
+  let fromDetailPages = 0;
 
-      const ref = firestore
-        .collection('pegelstand_stations')
-        .doc(matched.slug);
-      batch.set(ref, doc, { merge: true });
-      importCount++;
+  for (const scraped of scrapedStations) {
+    const ref = firestore
+      .collection('pegelstand_stations')
+      .doc(scraped.slug);
+    const existing = existingStations.get(scraped.slug);
+    const hasExistingCoords =
+      existing && (existing.lat !== 0 || existing.lng !== 0);
+
+    // Station already has coordinates — just update metadata
+    if (hasExistingCoords) {
+      batch.set(
+        ref,
+        {
+          name: scraped.name,
+          type: scraped.type,
+          detailUrl: scraped.detailUrl,
+        },
+        { merge: true }
+      );
+      withCoordinates++;
+      continue;
     }
+
+    // Primary: fetch the station's detail page for exact coordinates + hzbnr
+    const detailData = await fetchDetailPageData(scraped.detailUrl);
+    if (detailData) {
+      batch.set(
+        ref,
+        {
+          name: scraped.name,
+          type: scraped.type,
+          hzbnr: detailData.hzbnr,
+          lat: detailData.lat,
+          lng: detailData.lng,
+          detailUrl: scraped.detailUrl,
+        },
+        { merge: true }
+      );
+      withCoordinates++;
+      fromDetailPages++;
+      continue;
+    }
+
+    // Fallback: try OGC match if detail page had no coordinates
+    const ogcMatch = findOgcMatch(scraped.name, ogcStations);
+    if (ogcMatch) {
+      batch.set(
+        ref,
+        {
+          name: scraped.name,
+          type: scraped.type,
+          hzbnr: ogcMatch.hzbnr,
+          lat: ogcMatch.lat,
+          lng: ogcMatch.lng,
+          detailUrl: scraped.detailUrl,
+        },
+        { merge: true }
+      );
+      withCoordinates++;
+      continue;
+    }
+
+    // No coordinates available — admin sets them manually later
+    batch.set(
+      ref,
+      {
+        name: scraped.name,
+        type: scraped.type,
+        lat: 0,
+        lng: 0,
+        detailUrl: scraped.detailUrl,
+      },
+      { merge: true }
+    );
+    withoutCoordinates++;
   }
 
-  if (importCount > 0) {
-    await batch.commit();
-  }
+  await batch.commit();
 
-  return importCount;
+  return {
+    total: scrapedStations.length,
+    withCoordinates,
+    withoutCoordinates,
+    fromDetailPages,
+  };
 }
