@@ -25,6 +25,7 @@ import FirecallLayer from './layers/FirecallLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PowerOutageLayer from './layers/PowerOutageLayer';
+import PegelstandLayer from './layers/PegelstandLayer';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
 
@@ -109,6 +110,9 @@ export default function Map() {
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Stromausfälle">
             <PowerOutageLayer />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="Pegelstände">
+            <PegelstandLayer />
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
             .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')

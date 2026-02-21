@@ -22,6 +22,7 @@ import { DistanceLayer } from '../Map/layers/DistanceLayer';
 import FirecallLayer from '../Map/layers/FirecallLayer';
 import LocationsLayer from '../Map/layers/LocationsLayer';
 import PowerOutageLayer from '../Map/layers/PowerOutageLayer';
+import PegelstandLayer from '../Map/layers/PegelstandLayer';
 import DistanceMarker from '../Map/markers/DistanceMarker';
 import PositionMarker from '../Map/markers/PositionMarker';
 
@@ -168,6 +169,9 @@ export default function LocationMapPicker({
             </LayersControl.Overlay>
             <LayersControl.Overlay name="Stromausfälle">
               <PowerOutageLayer />
+            </LayersControl.Overlay>
+            <LayersControl.Overlay name="Pegelstände">
+              <PegelstandLayer />
             </LayersControl.Overlay>
           </LayersControl>
           <ClickHandler onClick={handleClick} />
