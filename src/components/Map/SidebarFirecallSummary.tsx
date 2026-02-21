@@ -1,14 +1,21 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Box, Typography } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Badge,
+  Box,
+  Typography,
+} from '@mui/material';
 import Image from 'next/image';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
 import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
-  filterDisplayableItems,
   FirecallItem,
   NON_DISPLAYABLE_ITEMS,
 } from '../firebase/firestore';
@@ -75,59 +82,69 @@ export default function SidebarFirecallSummary() {
 
   return (
     <Box sx={{ mt: 1.5 }}>
-      <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-        Einsatz Zusammenfassung
-      </Typography>
-      {summary.map((entry) => (
-        <Box
-          key={entry.type}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-            py: 0.25,
-          }}
+      <Accordion defaultExpanded disableGutters>
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0.75, alignItems: 'center' } }}
         >
-          <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {!entry.isApiIcon && (
-              <Image
-                src={entry.iconUrl}
-                alt={entry.label}
-                width={16}
-                height={16}
-              />
-            )}
-            {entry.isApiIcon && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={entry.iconUrl}
-                alt={entry.label}
-                width={16}
-                height={16}
-                style={{ objectFit: 'contain' }}
-              />
-            )}
-          </Box>
-          <Typography
-            variant="caption"
-            fontSize={12}
-            sx={{
-              flex: 1,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
+          <Badge
+            badgeContent={records.length}
+            color="primary"
+            max={999}
+            sx={{ '& .MuiBadge-badge': { right: -20, top: 10 } }}
           >
-            {entry.label}
-          </Typography>
-          <Typography variant="caption" fontSize={12} fontWeight={600}>
-            {entry.count}
-          </Typography>
-        </Box>
-      ))}
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-        Gesamt: {records.length}
-      </Typography>
+            <Typography variant="subtitle2">Zusammenfassung</Typography>
+          </Badge>
+        </AccordionSummary>
+        <AccordionDetails sx={{ p: 1, pt: 0 }}>
+          {summary.map((entry) => (
+            <Box
+              key={entry.type}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.75,
+                py: 0.5,
+              }}
+            >
+              <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {!entry.isApiIcon && (
+                  <Image
+                    src={entry.iconUrl}
+                    alt={entry.label}
+                    width={16}
+                    height={16}
+                  />
+                )}
+                {entry.isApiIcon && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={entry.iconUrl}
+                    alt={entry.label}
+                    width={16}
+                    height={16}
+                    style={{ objectFit: 'contain' }}
+                  />
+                )}
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {entry.label}
+              </Typography>
+              <Typography variant="body2" fontWeight={600}>
+                {entry.count}
+              </Typography>
+            </Box>
+          ))}
+        </AccordionDetails>
+      </Accordion>
     </Box>
   );
 }
