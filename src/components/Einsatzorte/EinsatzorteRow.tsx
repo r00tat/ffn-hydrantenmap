@@ -9,6 +9,7 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import NavigateButton from '../common/NavigateButton';
 import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
@@ -387,11 +388,14 @@ export default function EinsatzorteRow({
             InputProps={{
               readOnly: true,
               endAdornment: (
-                <Tooltip title="Auf Karte wählen">
-                  <IconButton size="small" onClick={() => setMapOpen(true)}>
-                    <MyLocationIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                <>
+                  {!isNew && <NavigateButton lat={local.lat} lng={local.lng} />}
+                  <Tooltip title="Auf Karte wählen">
+                    <IconButton size="small" onClick={() => setMapOpen(true)}>
+                      <MyLocationIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </>
               ),
             }}
           />

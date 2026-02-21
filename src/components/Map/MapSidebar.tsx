@@ -21,6 +21,7 @@ import Image from 'next/image';
 import React from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useMapEditor from '../../hooks/useMapEditor';
+import NavigateButton from '../common/NavigateButton';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
 import { getItemInstance } from '../FirecallItems/elements';
@@ -262,6 +263,12 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            <NavigateButton lat={item.lat} lng={item.lng} />
+          </CardActions>
+        )}
+        {!editable && !isEditing && item.lat && item.lng && (
+          <CardActions sx={{ pt: 0 }}>
+            <NavigateButton lat={item.lat} lng={item.lng} />
           </CardActions>
         )}
         {isEditing && (
@@ -278,6 +285,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            <NavigateButton lat={item.lat} lng={item.lng} />
           </CardActions>
         )}
         {displayUpdateDialog && (

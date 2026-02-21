@@ -11,6 +11,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import NavigateButton from '../common/NavigateButton';
 import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
@@ -356,9 +357,12 @@ export default function EinsatzorteCard({
                 ? `${local.lat.toFixed(5)}, ${local.lng.toFixed(5)}`
                 : 'Keine Koordinaten'}
             </Typography>
-            <IconButton onClick={() => setMapOpen(true)}>
-              <MyLocationIcon />
-            </IconButton>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {!isNew && <NavigateButton lat={local.lat} lng={local.lng} size="medium" />}
+              <IconButton onClick={() => setMapOpen(true)}>
+                <MyLocationIcon />
+              </IconButton>
+            </Box>
           </Box>
         </CardContent>
       </Card>
