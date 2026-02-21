@@ -138,12 +138,20 @@ export default function Einsatzorte() {
     });
   }, [locations, sortField, sortDirection]);
 
-  // Auto-import on mount when firecall.id is available
+  // Auto-import on mount and every 60 seconds when firecall.id is available
   useEffect(() => {
-    if (firecall?.id && firecall.id !== 'unknown' && !hasAutoImported.current) {
+    if (!firecall?.id || firecall.id === 'unknown') return;
+
+    if (!hasAutoImported.current) {
       hasAutoImported.current = true;
       importFromEmail();
     }
+
+    const interval = setInterval(() => {
+      importFromEmail();
+    }, 60_000);
+
+    return () => clearInterval(interval);
   }, [firecall?.id, importFromEmail]);
 
   // Auto-hide success badge after 5 seconds + create diary entry for imports
