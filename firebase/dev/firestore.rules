@@ -117,6 +117,12 @@ service cloud.firestore {
       allow write: if adminUser();
     }
 
+    // Pegelstand stations - read for all authorized, write for admin
+    match /pegelstand_stations/{doc=**} {
+      allow read: if authorizedUser();
+      allow write: if adminUser();
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
