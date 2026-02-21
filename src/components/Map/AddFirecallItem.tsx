@@ -25,6 +25,8 @@ export default function AddFirecallItem() {
     setEditFirecallItemIsOpen,
     editFirecallItemIsOpen,
     editFirecallItem,
+    lastSelectedLayer,
+    setLastSelectedLayer,
   } = useMapEditor();
 
   const saveItem = useCallback(
@@ -71,6 +73,9 @@ export default function AddFirecallItem() {
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setEditFirecallItemIsOpen(false);
+      if (fzg) {
+        setLastSelectedLayer(fzg.layer || '');
+      }
       if (fcItemClasses[fzg?.type || '']?.isPolyline()) {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
@@ -101,7 +106,7 @@ export default function AddFirecallItem() {
         // saveItem(fzg);
       }
     },
-    [leitungen, map, saveItem, setEditFirecallItemIsOpen]
+    [leitungen, map, saveItem, setEditFirecallItemIsOpen, setLastSelectedLayer]
   );
 
   return (
@@ -110,7 +115,15 @@ export default function AddFirecallItem() {
         <FirecallItemDialog
           onClose={fzgDialogClose}
           type={editFirecallItem?.type || 'marker'}
-          item={editFirecallItem}
+          item={
+            editFirecallItem?.id
+              ? editFirecallItem
+              : editFirecallItem
+                ? { ...editFirecallItem, layer: editFirecallItem.layer ?? lastSelectedLayer }
+                : lastSelectedLayer
+                  ? { layer: lastSelectedLayer } as FirecallItem
+                  : undefined
+          }
         />
       )}
       {fzgDrawing && (

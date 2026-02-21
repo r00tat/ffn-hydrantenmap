@@ -155,8 +155,10 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
 
 export default function Clusters({
   clustered = true,
+  defaultChecked,
 }: {
   clustered?: boolean;
+  defaultChecked?: { [name: string]: boolean };
 }) {
   const map = useMap();
   const [center, setCenter] = useState(map.getCenter() || defaultPosition);
@@ -200,16 +202,16 @@ export default function Clusters({
     useClusters(center, radius * 2);
   return (
     <>
-      <LayersControl.Overlay name="Hydranten" checked>
-        <HydrantenLayer hydranten={hydranten} clustered={clustered} />
+      <LayersControl.Overlay name="Hydranten" checked={defaultChecked?.hydranten ?? true}>
+        <HydrantenLayer hydranten={hydranten} clustered={clustered} summaryPosition="hover" />
       </LayersControl.Overlay>
-      <LayersControl.Overlay name="Saugstellen" checked>
+      <LayersControl.Overlay name="Saugstellen" checked={defaultChecked?.saugstellen ?? true}>
         <LayerGroup>
           <LoeschteicheLayer loeschteiche={loeschteiche} />
           <SaugstellenLayer saugstellen={saugstellen} />
         </LayerGroup>
       </LayersControl.Overlay>
-      <LayersControl.Overlay name="Risiko Objekte" checked>
+      <LayersControl.Overlay name="Risiko Objekte" checked={defaultChecked?.risikoobjekte ?? true}>
         <LayerGroup>
           <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
           <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />

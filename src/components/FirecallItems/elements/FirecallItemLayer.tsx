@@ -1,10 +1,13 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { SimpleMap } from '../../../common/types';
 import { FirecallLayer } from '../../firebase/firestore';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 
 export class FirecallItemLayer extends FirecallItemBase {
   grouped?: string;
+  showSummary?: string;
+  summaryPosition?: string;
+  clusterMode?: string;
 
   public constructor(firecallItem?: FirecallLayer) {
     super({
@@ -13,6 +16,14 @@ export class FirecallItemLayer extends FirecallItemBase {
     } as FirecallItemLayer);
     this.type = 'layer';
     ({ grouped: this.grouped = '' } = firecallItem || {});
+    this.showSummary = firecallItem?.showSummary ?? 'true';
+    // Backward compat: derive summaryPosition from showSummary if not set
+    if (firecallItem?.summaryPosition) {
+      this.summaryPosition = firecallItem.summaryPosition;
+    } else {
+      this.summaryPosition = this.showSummary === 'true' ? 'right' : '';
+    }
+    this.clusterMode = firecallItem?.clusterMode ?? '';
   }
 
   public static firebaseCollectionName(): string {
@@ -40,6 +51,8 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fields(),
       grouped: 'Elemente gruppieren',
+      summaryPosition: 'Zusammenfassung Position',
+      clusterMode: 'Gruppierung',
     };
   }
 
@@ -47,6 +60,27 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       grouped: 'boolean',
+      summaryPosition: 'select',
+      clusterMode: 'select',
+    };
+  }
+
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      ...super.selectValues(),
+      summaryPosition: {
+        '': 'Aus',
+        hover: 'Bei Hover',
+        top: 'Oben',
+        bottom: 'Unten',
+        left: 'Links',
+        right: 'Rechts',
+      },
+      clusterMode: {
+        wenig: 'Wenig',
+        '': 'Normal',
+        viel: 'Viel',
+      },
     };
   }
 
@@ -54,6 +88,8 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.data(),
       grouped: this.grouped,
+      summaryPosition: this.summaryPosition,
+      clusterMode: this.clusterMode,
     };
   }
 }

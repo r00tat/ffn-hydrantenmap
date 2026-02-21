@@ -22,6 +22,8 @@ interface VehicleAutocompleteProps {
   onKostenersatzVehicleSelected?: (vehicleName: string) => void;
   /** Called when an existing map vehicle is selected */
   onMapVehicleSelected?: (vehicleId: string, vehicleName: string) => void;
+  /** Called when user creates a new vehicle from typed input */
+  onCreateVehicle?: (name: string, fw: string) => void;
 }
 
 type SuggestionOption = {
@@ -30,6 +32,9 @@ type SuggestionOption = {
 } | {
   type: 'kostenersatz';
   name: string;
+} | {
+  type: 'create';
+  inputValue: string;
 };
 
 export default function VehicleAutocomplete({
@@ -40,6 +45,7 @@ export default function VehicleAutocomplete({
   disabled = false,
   onKostenersatzVehicleSelected,
   onMapVehicleSelected,
+  onCreateVehicle,
 }: VehicleAutocompleteProps) {
   const [inputValue, setInputValue] = useState('');
 
@@ -66,16 +72,46 @@ export default function VehicleAutocomplete({
 
     // Sort alphabetically by display name
     result.sort((a, b) => {
-      const nameA = a.type === 'map' ? a.vehicle.name : a.name;
-      const nameB = b.type === 'map' ? b.vehicle.name : b.name;
+      const nameA = a.type === 'map' ? a.vehicle.name : a.type === 'kostenersatz' ? a.name : a.inputValue;
+      const nameB = b.type === 'map' ? b.vehicle.name : b.type === 'kostenersatz' ? b.name : b.inputValue;
       return nameA.localeCompare(nameB, 'de', { sensitivity: 'base' });
     });
 
     return result;
   }, [mapVehicles, kostenersatzVehicleNames, value]);
 
+  const filterOptions = useCallback(
+    (options: SuggestionOption[], state: { inputValue: string }): SuggestionOption[] => {
+      const input = state.inputValue.trim();
+      if (!input) return options;
+
+      const inputLower = input.toLowerCase();
+
+      // Filter options that match the input
+      const filtered = options.filter((option) => {
+        const label = option.type === 'map' ? option.vehicle.name : option.type === 'kostenersatz' ? option.name : '';
+        return label.toLowerCase().includes(inputLower);
+      });
+
+      // Check if any option is an exact match
+      const hasExactMatch = options.some((option) => {
+        const label = option.type === 'map' ? option.vehicle.name : option.type === 'kostenersatz' ? option.name : '';
+        return label.toLowerCase() === inputLower;
+      });
+
+      // Append create option if no exact match
+      if (!hasExactMatch && onCreateVehicle) {
+        filtered.push({ type: 'create', inputValue: input });
+      }
+
+      return filtered;
+    },
+    [onCreateVehicle]
+  );
+
   // Get display name for an option
   const getOptionLabel = useCallback((option: SuggestionOption): string => {
+    if (option.type === 'create') return option.inputValue;
     return option.type === 'map' ? option.vehicle.name : option.name;
   }, []);
 
@@ -94,14 +130,20 @@ export default function VehicleAutocomplete({
             onChange({ ...value, [vehicle.id]: vehicle.name });
           }
         }
-      } else {
+      } else if (option.type === 'kostenersatz') {
         // Kostenersatz vehicle: trigger callback to add to map first
         onKostenersatzVehicleSelected?.(option.name);
+      } else if (option.type === 'create') {
+        // Split input: first word = name, rest = fw
+        const parts = option.inputValue.split(/\s+/);
+        const name = parts[0];
+        const fw = parts.slice(1).join(' ');
+        onCreateVehicle?.(name, fw);
       }
 
       setInputValue('');
     },
-    [value, onChange, onKostenersatzVehicleSelected, onMapVehicleSelected]
+    [value, onChange, onKostenersatzVehicleSelected, onMapVehicleSelected, onCreateVehicle]
   );
 
   // Remove a vehicle by ID
@@ -152,6 +194,8 @@ export default function VehicleAutocomplete({
         onChange={handleChange}
         disabled={disabled}
         clearOnBlur={false}
+        autoHighlight
+        filterOptions={filterOptions}
         blurOnSelect
         isOptionEqualToValue={(option, val) => {
           if (option.type === 'map' && val.type === 'map') {
@@ -160,9 +204,20 @@ export default function VehicleAutocomplete({
           if (option.type === 'kostenersatz' && val.type === 'kostenersatz') {
             return option.name === val.name;
           }
+          if (option.type === 'create' && val.type === 'create') {
+            return option.inputValue === val.inputValue;
+          }
           return false;
         }}
         renderOption={(props, option) => {
+          if (option.type === 'create') {
+            return (
+              <Box component="li" {...props} key="__create__">
+                <Typography color="primary">+ Neu: {option.inputValue}</Typography>
+              </Box>
+            );
+          }
+
           const name = option.type === 'map' ? option.vehicle.name : option.name;
           const fw = option.type === 'map' ? option.vehicle.fw : undefined;
           const isKostenersatz = option.type === 'kostenersatz';

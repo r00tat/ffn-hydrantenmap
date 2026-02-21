@@ -138,12 +138,20 @@ export default function Einsatzorte() {
     });
   }, [locations, sortField, sortDirection]);
 
-  // Auto-import on mount when firecall.id is available
+  // Auto-import on mount and every 60 seconds when firecall.id is available
   useEffect(() => {
-    if (firecall?.id && firecall.id !== 'unknown' && !hasAutoImported.current) {
+    if (!firecall?.id || firecall.id === 'unknown') return;
+
+    if (!hasAutoImported.current) {
       hasAutoImported.current = true;
       importFromEmail();
     }
+
+    const interval = setInterval(() => {
+      importFromEmail();
+    }, 60_000);
+
+    return () => clearInterval(interval);
   }, [firecall?.id, importFromEmail]);
 
   // Auto-hide success badge after 5 seconds + create diary entry for imports
@@ -344,6 +352,55 @@ export default function Einsatzorte() {
     [saveHistory, updateLocation, addDiaryEntry]
   );
 
+  const handleCreateVehicle = useCallback(
+    async (name: string, fw: string, location: FirecallLocation) => {
+      const lat = location.lat ?? firecall?.lat;
+      const lng = location.lng ?? firecall?.lng;
+
+      if (lat === undefined || lng === undefined) {
+        console.warn(
+          `Cannot place vehicle "${name}": no coordinates available for location or firecall`
+        );
+        return;
+      }
+
+      try {
+        const locationDisplayName = getLocationDisplayName(location);
+        await saveHistory(`Status vor ${name} zu Einsatzort ${locationDisplayName} zugeordnet`);
+
+        const newVehicle: Fzg = {
+          name,
+          type: 'vehicle',
+          fw: fw || undefined,
+          lat,
+          lng,
+        };
+
+        const docRef = await addFirecallItem(newVehicle);
+        const vehicleId = docRef.id;
+
+        const vehicleDisplayName = fw ? `${name} ${fw}` : name;
+        setSnackbar(`${vehicleDisplayName} erstellt`);
+
+        // Add vehicle reference to the location
+        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        if (!currentVehicles[vehicleId]) {
+          await updateLocation(location.id!, {
+            vehicles: { ...currentVehicles, [vehicleId]: vehicleDisplayName },
+          });
+        }
+
+        addDiaryEntry(
+          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`
+        );
+      } catch (error) {
+        console.error(`Failed to create vehicle "${name}":`, error);
+        setSnackbar(`Fehler beim Erstellen von ${name}`);
+      }
+    },
+    [firecall, addFirecallItem, saveHistory, updateLocation, addDiaryEntry]
+  );
+
   if (!firecall || firecall.id === 'unknown') {
     return (
       <Box sx={{ p: 3 }}>
@@ -407,6 +464,7 @@ export default function Einsatzorte() {
               kostenersatzVehicleNames={kostenersatzVehicleNames}
               onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
               onMapVehicleSelected={handleMapVehicleSelected}
+              onCreateVehicle={handleCreateVehicle}
             />
           ))}
           <EinsatzorteCard
@@ -419,6 +477,7 @@ export default function Einsatzorte() {
             kostenersatzVehicleNames={kostenersatzVehicleNames}
             onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
             onMapVehicleSelected={handleMapVehicleSelected}
+            onCreateVehicle={handleCreateVehicle}
           />
         </Box>
       ) : (
@@ -431,6 +490,7 @@ export default function Einsatzorte() {
           kostenersatzVehicleNames={kostenersatzVehicleNames}
           onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
           onMapVehicleSelected={handleMapVehicleSelected}
+          onCreateVehicle={handleCreateVehicle}
           sortField={sortField}
           sortDirection={sortDirection}
           onSortClick={handleSortClick}
