@@ -194,6 +194,7 @@ export default function VehicleAutocomplete({
         onChange={handleChange}
         disabled={disabled}
         clearOnBlur={false}
+        autoHighlight
         filterOptions={filterOptions}
         blurOnSelect
         isOptionEqualToValue={(option, val) => {
