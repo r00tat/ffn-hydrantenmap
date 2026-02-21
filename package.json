@@ -66,6 +66,7 @@
     "react-firebase-hooks": "^5.1.1",
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^5.0.0",
+    "recharts": "^3.7.0",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "uuid": "^13.0.0"
