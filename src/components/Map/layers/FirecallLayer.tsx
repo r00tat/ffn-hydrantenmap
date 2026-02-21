@@ -34,7 +34,9 @@ export default function FirecallLayer({
             key={layerId}
           >
             {layer.grouped === 'true' && (
-              <MarkerClusterLayer>
+              <MarkerClusterLayer
+                showSummary={layer.showSummary !== 'false'}
+              >
                 <FirecallItemsLayer layer={layer} />
               </MarkerClusterLayer>
             )}

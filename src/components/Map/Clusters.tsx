@@ -203,7 +203,7 @@ export default function Clusters({
   return (
     <>
       <LayersControl.Overlay name="Hydranten" checked={defaultChecked?.hydranten ?? true}>
-        <HydrantenLayer hydranten={hydranten} clustered={clustered} />
+        <HydrantenLayer hydranten={hydranten} clustered={clustered} showSummary={true} />
       </LayersControl.Overlay>
       <LayersControl.Overlay name="Saugstellen" checked={defaultChecked?.saugstellen ?? true}>
         <LayerGroup>

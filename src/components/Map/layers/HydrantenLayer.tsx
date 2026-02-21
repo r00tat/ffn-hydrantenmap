@@ -6,15 +6,17 @@ import { LayerGroup } from 'react-leaflet';
 export interface HydrantenLayerProps {
   hydranten: HydrantenRecord[];
   clustered?: boolean;
+  showSummary?: boolean;
 }
 
 export default function HydrantenLayer({
   hydranten,
   clustered = true,
+  showSummary = true,
 }: HydrantenLayerProps) {
   if (clustered) {
     return (
-      <MarkerClusterLayer>
+      <MarkerClusterLayer showSummary={showSummary}>
         {hydranten.map((hydrant) => (
           <HydrantMarker hydrant={hydrant} key={hydrant.name} />
         ))}
