@@ -22,7 +22,9 @@ export default function LocationsLayer() {
                 color: LOCATION_STATUS_COLORS[location.status as LocationStatus] || 'red',
                 beschreibung: [
                   `${location.street} ${location.number}, ${location.city}`,
-                  location.vehicles && `Fahrzeuge: ${location.vehicles}`,
+                  location.vehicles && typeof location.vehicles === 'object'
+                    ? `Fahrzeuge: ${Object.values(location.vehicles).join(', ')}`
+                    : location.vehicles && `Fahrzeuge: ${location.vehicles}`,
                   location.description,
                 ].filter(Boolean).join('\n'),
                 draggable: false,

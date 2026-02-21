@@ -6,9 +6,31 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { LatLng } from 'leaflet';
+import {
+  LayersControl,
+  MapContainer,
+  TileLayer,
+  Marker,
+  WMSTileLayer,
+  useMapEvents,
+} from 'react-leaflet';
+import L, { LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { availableLayers, overlayLayers } from '../Map/tiles';
+import Clusters from '../Map/Clusters';
+import { DistanceLayer } from '../Map/layers/DistanceLayer';
+import FirecallLayer from '../Map/layers/FirecallLayer';
+import LocationsLayer from '../Map/layers/LocationsLayer';
+import PowerOutageLayer from '../Map/layers/PowerOutageLayer';
+import DistanceMarker from '../Map/markers/DistanceMarker';
+import PositionMarker from '../Map/markers/PositionMarker';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: '/icons/leaflet/marker-icon-2x.png',
+  iconUrl: '/icons/leaflet/marker-icon.png',
+  shadowUrl: '/icons/leaflet/marker-shadow.png',
+});
 
 interface LocationMapPickerProps {
   open: boolean;
@@ -63,13 +85,91 @@ export default function LocationMapPicker({
       <DialogContent sx={{ height: 400, p: 0 }}>
         <MapContainer
           center={[mapCenter.lat, mapCenter.lng]}
-          zoom={14}
+          zoom={15}
+          maxZoom={24}
           style={{ height: '100%', width: '100%' }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <LayersControl position="topright">
+            {Object.entries(availableLayers).map(([key, layer], index) => (
+              <LayersControl.BaseLayer
+                checked={index === 0}
+                name={layer.name}
+                key={key}
+              >
+                <TileLayer
+                  attribution={layer.options.attribution}
+                  url={layer.url}
+                  maxZoom={layer.options.maxZoom}
+                  maxNativeZoom={layer.options.maxNativeZoom}
+                  bounds={layer.options.bounds}
+                  subdomains={layer.options.subdomains}
+                  key={key}
+                />
+              </LayersControl.BaseLayer>
+            ))}
+            {Object.entries(overlayLayers)
+              .filter(([key, layer]) => (layer.type || 'WTMS') === 'WTMS')
+              .map(([key, layer]) => (
+                <LayersControl.Overlay
+                  name={layer.name}
+                  key={key}
+                  checked={layer.enabled}
+                >
+                  <TileLayer
+                    attribution={layer.options.attribution}
+                    url={layer.url}
+                    maxZoom={layer.options.maxZoom}
+                    maxNativeZoom={layer.options.maxNativeZoom}
+                    bounds={layer.options.bounds}
+                    subdomains={layer.options.subdomains}
+                    key={key}
+                  />
+                </LayersControl.Overlay>
+              ))}
+            {Object.entries(overlayLayers)
+              .filter(([key, layer]) => layer.type === 'WMS')
+              .map(([key, layer]) => (
+                <LayersControl.Overlay name={layer.name} key={key}>
+                  <WMSTileLayer
+                    layers={layer.options.layers}
+                    attribution={layer.options.attribution}
+                    url={layer.url}
+                    maxZoom={layer.options.maxZoom}
+                    maxNativeZoom={layer.options.maxNativeZoom}
+                    bounds={layer.options.bounds}
+                    subdomains={layer.options.subdomains}
+                    key={key}
+                    format={layer.options.format}
+                    transparent={layer.options.transparent}
+                    tileSize={512}
+                    uppercase={layer.options.uppercase}
+                  />
+                </LayersControl.Overlay>
+              ))}
+            <FirecallLayer defaultChecked={false} />
+            <LayersControl.Overlay name="Einsatzorte" checked>
+              <LocationsLayer />
+            </LayersControl.Overlay>
+            <LayersControl.Overlay name="Entfernung">
+              <DistanceMarker />
+            </LayersControl.Overlay>
+            <Clusters
+              defaultChecked={{
+                hydranten: false,
+                saugstellen: false,
+                risikoobjekte: true,
+              }}
+            />
+            <LayersControl.Overlay name="Umkreis">
+              <DistanceLayer />
+            </LayersControl.Overlay>
+            <LayersControl.Overlay name="Position">
+              <PositionMarker />
+            </LayersControl.Overlay>
+            <LayersControl.Overlay name="Stromausfälle">
+              <PowerOutageLayer />
+            </LayersControl.Overlay>
+          </LayersControl>
           <ClickHandler onClick={handleClick} />
           {position && <Marker position={[position.lat, position.lng]} />}
         </MapContainer>

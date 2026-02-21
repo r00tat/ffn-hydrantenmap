@@ -5,13 +5,17 @@ import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import MarkerClusterLayer from './MarkerClusterLayer';
 
-export default function FirecallLayer() {
+export default function FirecallLayer({
+  defaultChecked = true,
+}: {
+  defaultChecked?: boolean;
+}) {
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
 
   return (
     <>
-      <LayersControl.Overlay name="Einsatz" checked>
+      <LayersControl.Overlay name="Einsatz" checked={defaultChecked}>
         <LayerGroup>
           {firecallId !== 'unknown' && (
             <>
@@ -26,7 +30,7 @@ export default function FirecallLayer() {
         Object.entries(layers).map(([layerId, layer]) => (
           <LayersControl.Overlay
             name={`Einsatz ${layer.name}`}
-            checked
+            checked={defaultChecked}
             key={layerId}
           >
             {layer.grouped === 'true' && (
