@@ -262,7 +262,7 @@ function WeatherChart({
   const tooltip = (
     <Tooltip
       labelFormatter={(v) => tooltipTimestamp(v as number)}
-      formatter={(value: number) => [
+      formatter={(value: number | undefined) => [
         `${value != null ? value.toFixed(1) : '\u2013'} ${config.unit}`,
       ]}
     />
