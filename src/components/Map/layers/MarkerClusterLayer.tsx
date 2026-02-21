@@ -7,94 +7,146 @@ import { MarkerClusterGroup } from 'leaflet.markercluster';
 import { LayerGroupProps } from 'react-leaflet';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import './MarkerClusterSummary.css';
+
+export type SummaryPosition = '' | 'hover' | 'top' | 'bottom' | 'left' | 'right';
+
+export type ClusterMode = '' | 'wenig' | 'viel';
 
 export interface MarkerClusterLayerOptions extends LayerGroupProps {
-  showSummary?: boolean;
+  summaryPosition?: SummaryPosition;
+  clusterMode?: ClusterMode;
 }
 
-function getClusterSizeClass(childCount: number): string {
-  if (childCount < 10) return 'small';
-  if (childCount < 100) return 'medium';
-  return 'large';
-}
-
-/** Map icon URL patterns to type keys for grouping in cluster badges */
-const BADGE_TYPE_MAP: { pattern: string | RegExp; typeKey: string; icon: string }[] = [
-  { pattern: '/icons/unterflur-hydrant-icon.png', typeKey: 'hydrant', icon: '/icons/hydrant.png' },
-  { pattern: /^\/api\/fzg\?/, typeKey: 'vehicle', icon: '/icons/leaflet/marker-icon.png' },
-  { pattern: /^\/api\/icons\/marker\?/, typeKey: 'marker', icon: '/icons/leaflet/marker-icon.png' },
+/** Map icon URL patterns to type keys for grouping in cluster tooltips */
+const TYPE_MAP: { pattern: string | RegExp; typeKey: string }[] = [
+  { pattern: '/icons/unterflur-hydrant-icon.png', typeKey: 'unterflurhydrant' },
+  { pattern: '/icons/hydrant-icon-fuellen.png', typeKey: 'fuellhydrant' },
+  { pattern: '/icons/hydrant.png', typeKey: 'hydrant' },
+  { pattern: /^\/api\/fzg\?/, typeKey: 'vehicle' },
+  { pattern: /^\/api\/icons\/marker\?/, typeKey: 'marker' },
+  { pattern: '/icons/fire.svg', typeKey: 'fire' },
+  { pattern: /^\/icons\/rohr/, typeKey: 'rohr' },
+  { pattern: '/icons/marker.svg', typeKey: 'marker' },
+  { pattern: '/icons/assp.svg', typeKey: 'assp' },
+  { pattern: '/icons/el.svg', typeKey: 'el' },
+  { pattern: '/icons/circle.svg', typeKey: 'circle' },
+  { pattern: '/icons/risiko.svg', typeKey: 'risiko' },
+  { pattern: '/icons/gefahr.svg', typeKey: 'gefahr' },
+  { pattern: '/icons/loeschteich-icon.png', typeKey: 'loeschteich' },
+  { pattern: '/icons/saugstelle-icon.png', typeKey: 'saugstelle' },
 ];
 
-function getBadgeTypeInfo(iconUrl: string): { typeKey: string; icon: string } {
-  for (const entry of BADGE_TYPE_MAP) {
+/** Human-readable labels for grouped type keys */
+const TYPE_LABELS: Record<string, string> = {
+  hydrant: 'Hydranten',
+  unterflurhydrant: 'Unterflurhydranten',
+  fuellhydrant: 'Füllhydranten',
+  vehicle: 'Fahrzeuge',
+  marker: 'Marker',
+  fire: 'Einsatzort',
+  rohr: 'Rohre',
+  assp: 'Atemschutz-Sammelplatz',
+  el: 'Einsatzleitung',
+  circle: 'Kreise',
+  risiko: 'Risikoobjekte',
+  gefahr: 'Gefahrobjekte',
+  loeschteich: 'Löschteiche',
+  saugstelle: 'Saugstellen',
+};
+
+function getTypeKey(iconUrl: string): string {
+  for (const entry of TYPE_MAP) {
     if (typeof entry.pattern === 'string') {
-      if (iconUrl === entry.pattern) return { typeKey: entry.typeKey, icon: entry.icon };
+      if (iconUrl === entry.pattern) return entry.typeKey;
     } else {
-      if (entry.pattern.test(iconUrl)) return { typeKey: entry.typeKey, icon: entry.icon };
+      if (entry.pattern.test(iconUrl)) return entry.typeKey;
     }
   }
-  return { typeKey: iconUrl, icon: iconUrl };
+  return iconUrl;
 }
 
-function escapeHtmlAttr(str: string): string {
+function getLabelForTypeKey(typeKey: string): string {
+  if (TYPE_LABELS[typeKey]) return TYPE_LABELS[typeKey];
+  return typeKey
+    .replace(/^.*\//, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\.\w+$/, '')
+    .replace(/\bicon\b/gi, '')
+    .trim() || 'Marker';
+}
+
+function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function createSummaryIconCreateFunction() {
-  return (cluster: any) => {
-    const childMarkers = cluster.getAllChildMarkers();
-    const childCount = cluster.getChildCount();
-    const sizeClass = getClusterSizeClass(childCount);
+function buildTooltipContent(cluster: any): string {
+  const childMarkers = cluster.getAllChildMarkers();
+  const typeCounts = new Map<string, { count: number; icon: string }>();
 
-    // Group markers by type
-    const typeCounts = new Map<string, { count: number; icon: string }>();
-    for (const marker of childMarkers) {
-      const icon = marker.options.icon;
-      const iconUrl = icon?.options?.iconUrl || 'unknown';
-      const typeInfo = getBadgeTypeInfo(iconUrl);
-      const existing = typeCounts.get(typeInfo.typeKey);
-      if (existing) {
-        existing.count++;
-      } else {
-        typeCounts.set(typeInfo.typeKey, { count: 1, icon: typeInfo.icon });
-      }
+  for (const marker of childMarkers) {
+    const icon = marker.options.icon;
+    const iconUrl = icon?.options?.iconUrl || 'unknown';
+    const typeKey = getTypeKey(iconUrl);
+    const existing = typeCounts.get(typeKey);
+    if (existing) {
+      existing.count++;
+    } else {
+      typeCounts.set(typeKey, { count: 1, icon: iconUrl });
     }
+  }
 
-    // Build badge HTML sorted by count
-    const entries = Array.from(typeCounts.values()).sort(
-      (a, b) => b.count - a.count
-    );
-    const displayEntries = entries.slice(0, 4);
-    let badgeHtml = displayEntries
-      .map(
-        ({ icon, count }) =>
-          `<span class="cluster-badge-item"><img src="${escapeHtmlAttr(icon)}" width="14" height="14" alt="" />${count}</span>`
-      )
-      .join('');
-    if (entries.length > 4) {
-      badgeHtml += `<span class="cluster-badge-item">+${entries.length - 4}</span>`;
-    }
-
-    const html = `<div><span>${childCount}</span></div><span class="cluster-badge-row">${badgeHtml}</span>`;
-
-    return new L.DivIcon({
-      html,
-      className: `marker-cluster marker-cluster-${sizeClass} marker-cluster-summary`,
-      iconSize: new L.Point(40, 50),
-    });
-  };
+  return Array.from(typeCounts.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(
+      ([typeKey, { count, icon }]) =>
+        `<div style="display:flex;align-items:center;gap:4px;padding:1px 0"><img src="${escapeHtml(icon)}" width="16" height="16" style="object-fit:contain;flex-shrink:0" /><span>${count} ${escapeHtml(getLabelForTypeKey(typeKey))}</span></div>`
+    )
+    .join('');
 }
 
+/** Bind permanent tooltips to all currently visible clusters */
+function bindPermanentTooltips(instance: any, direction: string) {
+  const fg = instance._featureGroup;
+  if (!fg) return;
+  fg.eachLayer((layer: any) => {
+    if (layer.getAllChildMarkers) {
+      const content = buildTooltipContent(layer);
+      layer.unbindTooltip();
+      layer.bindTooltip(content, { permanent: true, direction });
+    }
+  });
+}
+
+/** Resolve clusterMode preset to MarkerClusterGroup options */
+const CLUSTER_PRESETS: Record<string, Record<string, unknown>> = {
+  '': { maxClusterRadius: 60 },
+  wenig: { maxClusterRadius: 30 },
+  viel: { maxClusterRadius: 120 },
+};
+
 function createMarkerClusterLayer(
-  { children: _c, showSummary, ...options }: MarkerClusterLayerOptions,
+  { children: _c, summaryPosition, clusterMode, ...rest }: MarkerClusterLayerOptions,
   ctx: LeafletContextInterface
 ) {
-  const clusterOptions: Record<string, any> = { ...options };
-  if (showSummary) {
-    clusterOptions.iconCreateFunction = createSummaryIconCreateFunction();
+  const clusterOptions = CLUSTER_PRESETS[clusterMode || ''] || {};
+  const instance = new MarkerClusterGroup(clusterOptions);
+
+  if (summaryPosition === 'hover') {
+    instance.on('clustermouseover', (event: L.LeafletEvent) => {
+      const cluster = (event as any).propagatedFrom || (event as any).layer;
+      if (!cluster?.getAllChildMarkers) return;
+      const content = buildTooltipContent(cluster);
+      cluster.unbindTooltip();
+      cluster.bindTooltip(content, { sticky: false, direction: 'top' }).openTooltip();
+    });
+  } else if (summaryPosition === 'top' || summaryPosition === 'bottom' || summaryPosition === 'left' || summaryPosition === 'right') {
+    const dir = summaryPosition;
+    const update = () => bindPermanentTooltips(instance, dir);
+    instance.on('animationend', update);
+    // Initial bind after markers are added
+    setTimeout(update, 500);
   }
-  const instance = new MarkerClusterGroup([], clusterOptions);
+
   return { instance, context: { ...ctx, layerContainer: instance } };
 }
 

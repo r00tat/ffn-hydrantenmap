@@ -35,7 +35,8 @@ export default function FirecallLayer({
           >
             {layer.grouped === 'true' && (
               <MarkerClusterLayer
-                showSummary={layer.showSummary !== 'false'}
+                summaryPosition={(layer.summaryPosition || (layer.showSummary !== 'false' ? 'right' : '')) as any}
+                clusterMode={(layer.clusterMode || '') as any}
               >
                 <FirecallItemsLayer layer={layer} />
               </MarkerClusterLayer>
