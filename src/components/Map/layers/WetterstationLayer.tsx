@@ -1,6 +1,7 @@
 'use client';
 
 import L from 'leaflet';
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LayerGroup, Marker, Popup } from 'react-leaflet';
 
@@ -360,6 +361,14 @@ export default function WetterstationLayer() {
                 Stand: {formatTimestamp(m.timestamp)}
               </>
             )}
+              <br />
+              <Link
+                href={`/wetter/${m.stationId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Verlauf &rarr;
+              </Link>
           </Popup>
         </Marker>
       ))}
