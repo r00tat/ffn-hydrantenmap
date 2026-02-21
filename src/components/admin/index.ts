@@ -15,3 +15,4 @@ export { default as AdminActions } from './AdminActions';
 export { default as AdminTabs } from './AdminTabs';
 export { default as GisDataPipeline } from './GisDataPipeline';
 export { default as HydrantClusters } from './HydrantClusters';
+export { default as PegelstandStations } from './PegelstandStations';
