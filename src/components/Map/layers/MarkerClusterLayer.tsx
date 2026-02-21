@@ -20,7 +20,6 @@ function getClusterSizeClass(childCount: number): string {
 }
 
 function createSummaryIconCreateFunction() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (cluster: any) => {
     const childMarkers = cluster.getAllChildMarkers();
     const childCount = cluster.getChildCount();
@@ -65,7 +64,6 @@ function createMarkerClusterLayer(
   { children: _c, showSummary, ...options }: MarkerClusterLayerOptions,
   ctx: LeafletContextInterface
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clusterOptions: Record<string, any> = { ...options };
   if (showSummary) {
     clusterOptions.iconCreateFunction = createSummaryIconCreateFunction();
