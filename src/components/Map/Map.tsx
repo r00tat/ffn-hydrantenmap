@@ -25,7 +25,6 @@ import FirecallLayer from './layers/FirecallLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PowerOutageLayer from './layers/PowerOutageLayer';
-import ClusterLegend from './layers/ClusterLegend';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
 
@@ -158,7 +157,6 @@ export default function Map() {
           <Leitungen />
         </LeitungsProvider>
         <PositionAction />
-        <ClusterLegend />
       </StyledMapContainer>
       <MapSidebar />
     </Box>
