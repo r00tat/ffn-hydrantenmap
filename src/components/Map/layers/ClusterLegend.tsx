@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMap, useMapEvent } from 'react-leaflet';
 import L from 'leaflet';
 import Box from '@mui/material/Box';
@@ -16,9 +16,41 @@ interface LegendEntry {
   count: number;
 }
 
+/** Map icon URL patterns to type keys and German labels */
+const ICON_TYPE_MAP: { pattern: string | RegExp; typeKey: string; label: string; defaultIcon: string }[] = [
+  { pattern: '/icons/hydrant.png', typeKey: 'hydrant', label: 'Hydranten', defaultIcon: '/icons/hydrant.png' },
+  { pattern: '/icons/unterflur-hydrant-icon.png', typeKey: 'hydrant', label: 'Hydranten', defaultIcon: '/icons/hydrant.png' },
+  { pattern: '/icons/hydrant-icon-fuellen.png', typeKey: 'hydrant-fuell', label: 'Füllhydranten', defaultIcon: '/icons/hydrant-icon-fuellen.png' },
+  { pattern: '/icons/saugstelle-icon.png', typeKey: 'saugstelle', label: 'Saugstellen', defaultIcon: '/icons/saugstelle-icon.png' },
+  { pattern: '/icons/loeschteich-icon.png', typeKey: 'loeschteich', label: 'Löschteiche', defaultIcon: '/icons/loeschteich-icon.png' },
+  { pattern: '/icons/risiko.svg', typeKey: 'risiko', label: 'Risiko Objekte', defaultIcon: '/icons/risiko.svg' },
+  { pattern: '/icons/gefahr.svg', typeKey: 'gefahr', label: 'Gefahr Objekte', defaultIcon: '/icons/gefahr.svg' },
+  { pattern: '/icons/fire.svg', typeKey: 'fire', label: 'Einsatz', defaultIcon: '/icons/fire.svg' },
+  { pattern: /^\/api\/fzg\?/, typeKey: 'vehicle', label: 'Fahrzeuge', defaultIcon: '/icons/leaflet/marker-icon.png' },
+  { pattern: /^\/api\/icons\/marker\?/, typeKey: 'marker', label: 'Marker', defaultIcon: '/icons/leaflet/marker-icon.png' },
+];
+
+function getTypeInfo(iconUrl: string): { typeKey: string; label: string; icon: string } {
+  for (const entry of ICON_TYPE_MAP) {
+    if (typeof entry.pattern === 'string') {
+      if (iconUrl === entry.pattern) return { typeKey: entry.typeKey, label: entry.label, icon: entry.defaultIcon };
+    } else {
+      if (entry.pattern.test(iconUrl)) return { typeKey: entry.typeKey, label: entry.label, icon: entry.defaultIcon };
+    }
+  }
+  // Fallback: use the URL itself as type key
+  const label = iconUrl
+    .replace(/^.*\//, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\.\w+$/, '')
+    .replace(/\bicon\b/gi, '')
+    .trim() || 'Marker';
+  return { typeKey: iconUrl, label, icon: iconUrl };
+}
+
 function collectVisibleMarkerTypes(map: L.Map): LegendEntry[] {
   const bounds = map.getBounds();
-  const iconCounts = new Map<string, { count: number; label: string }>();
+  const typeCounts = new Map<string, { count: number; label: string; iconUrl: string }>();
 
   map.eachLayer((layer) => {
     if (
@@ -30,29 +62,23 @@ function collectVisibleMarkerTypes(map: L.Map): LegendEntry[] {
         const icon = layer.options.icon;
         const iconUrl = icon?.options?.iconUrl;
         if (iconUrl) {
-          const existing = iconCounts.get(iconUrl);
-          const title = layer.options.title || '';
+          const typeInfo = getTypeInfo(iconUrl);
+          const existing = typeCounts.get(typeInfo.typeKey);
           if (existing) {
             existing.count++;
           } else {
-            // Derive a label from the icon URL: /icons/hydrant.png -> Hydrant
-            const label =
-              title ||
-              iconUrl
-                .replace(/^.*\//, '')
-                .replace(/[-_]/g, ' ')
-                .replace(/\.\w+$/, '')
-                .replace(/\bicon\b/gi, '')
-                .trim() || 'Marker';
-            iconCounts.set(iconUrl, { count: 1, label });
+            typeCounts.set(typeInfo.typeKey, {
+              count: 1,
+              label: typeInfo.label,
+              iconUrl: typeInfo.icon,
+            });
           }
         }
       }
     }
   });
 
-  return Array.from(iconCounts.entries())
-    .map(([iconUrl, { count, label }]) => ({ iconUrl, count, label }))
+  return Array.from(typeCounts.values())
     .sort((a, b) => b.count - a.count);
 }
 
@@ -61,15 +87,15 @@ export default function ClusterLegend() {
   const [entries, setEntries] = useState<LegendEntry[]>([]);
   const [collapsed, setCollapsed] = useState(false);
 
-  const updateLegend = useMemo(
-    () => () => {
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const updateLegend = useCallback(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       setEntries(collectVisibleMarkerTypes(map));
-    },
-    [map]
-  );
+    }, 150);
+  }, [map]);
 
   useMapEvent('moveend', updateLegend);
-  useMapEvent('zoomend', updateLegend);
   useMapEvent('layeradd', updateLegend);
   useMapEvent('layerremove', updateLegend);
 

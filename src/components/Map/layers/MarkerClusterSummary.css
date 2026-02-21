@@ -2,13 +2,23 @@
   overflow: visible !important;
 }
 
+/* Ensure the count circle inside summary clusters is not affected */
+.marker-cluster-summary > div {
+  width: 30px;
+  height: 30px;
+  margin-left: 5px;
+  margin-top: 5px;
+  text-align: center;
+  border-radius: 15px;
+}
+
 .cluster-badge-row {
   display: flex;
   flex-wrap: nowrap;
   justify-content: center;
   gap: 2px;
   position: absolute;
-  bottom: -14px;
+  bottom: -4px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.9);
@@ -19,6 +29,9 @@
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   pointer-events: none;
+  width: auto;
+  height: auto;
+  margin: 0;
 }
 
 .cluster-badge-item {
