@@ -5,6 +5,7 @@ import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallItemLayer extends FirecallItemBase {
   grouped?: string;
+  showSummary?: string;
 
   public constructor(firecallItem?: FirecallLayer) {
     super({
@@ -13,6 +14,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     } as FirecallItemLayer);
     this.type = 'layer';
     ({ grouped: this.grouped = '' } = firecallItem || {});
+    this.showSummary = firecallItem?.showSummary ?? 'true';
   }
 
   public static firebaseCollectionName(): string {
@@ -40,6 +42,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fields(),
       grouped: 'Elemente gruppieren',
+      showSummary: 'Zusammenfassung anzeigen',
     };
   }
 
@@ -47,6 +50,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       grouped: 'boolean',
+      showSummary: 'boolean',
     };
   }
 
@@ -54,6 +58,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.data(),
       grouped: this.grouped,
+      showSummary: this.showSummary,
     };
   }
 }

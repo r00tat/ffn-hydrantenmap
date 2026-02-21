@@ -53,6 +53,7 @@ export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback'];
 
 export interface FirecallLayer extends FirecallItem {
   grouped?: string;
+  showSummary?: string;
 }
 
 export interface FcAttachment {
