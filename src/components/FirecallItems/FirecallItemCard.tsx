@@ -132,12 +132,8 @@ export default function FirecallItemCard({
 
   const mergedRef = useCallback((node: HTMLDivElement | null) => {
     setDragRef(node);
-    if (cardRef) {
-      if (typeof cardRef === 'function') {
-        cardRef(node);
-      } else {
-        (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-      }
+    if (typeof cardRef === 'function') {
+      cardRef(node);
     }
   }, [setDragRef, cardRef]);
 

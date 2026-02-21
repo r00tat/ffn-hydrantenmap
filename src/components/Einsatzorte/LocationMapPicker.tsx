@@ -70,10 +70,12 @@ function ClickHandler({
 function FlyTo({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   const prevRef = useRef({ lat: 0, lng: 0 });
-  if (prevRef.current.lat !== lat || prevRef.current.lng !== lng) {
-    prevRef.current = { lat, lng };
-    map.flyTo([lat, lng], 15);
-  }
+  useEffect(() => {
+    if (prevRef.current.lat !== lat || prevRef.current.lng !== lng) {
+      prevRef.current = { lat, lng };
+      map.flyTo([lat, lng], 15);
+    }
+  }, [lat, lng, map]);
   return null;
 }
 
