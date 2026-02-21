@@ -20,6 +20,11 @@ export const firebaseApp = getApp();
 export const firestore = process.env.NEXT_PUBLIC_FIRESTORE_DB
   ? getFirestore(firebaseApp, process.env.NEXT_PUBLIC_FIRESTORE_DB)
   : getFirestore(firebaseApp);
+try {
+  firestore.settings({ ignoreUndefinedProperties: true });
+} catch {
+  // Settings already applied on a previous import of this module
+}
 export const firebaseAuth = getAuth(firebaseApp);
 
 // Helper functions to get specific database instances

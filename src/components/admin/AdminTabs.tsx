@@ -9,6 +9,7 @@ import AdminActions from './AdminActions';
 import GisDataPipeline from './GisDataPipeline';
 import HydrantClusters from './HydrantClusters';
 import KostenersatzAdminSettings from '../Kostenersatz/KostenersatzAdminSettings';
+import PegelstandStations from './PegelstandStations';
 
 interface TabPanelProps {
   children?: ReactNode;
@@ -54,6 +55,7 @@ export default function AdminTabs() {
           <Tab label="GIS Data Pipeline" {...a11yProps(1)} />
           <Tab label="Hydrant Clusters" {...a11yProps(2)} />
           <Tab label="Kostenersatz" {...a11yProps(3)} />
+          <Tab label="Pegelstände" {...a11yProps(4)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -67,6 +69,9 @@ export default function AdminTabs() {
       </TabPanel>
       <TabPanel value={value} index={3}>
         <KostenersatzAdminSettings />
+      </TabPanel>
+      <TabPanel value={value} index={4}>
+        <PegelstandStations />
       </TabPanel>
     </Box>
   );
