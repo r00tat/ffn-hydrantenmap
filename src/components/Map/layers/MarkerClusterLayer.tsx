@@ -55,6 +55,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 function getTypeKey(iconUrl: string): string {
+  // Group markers by their tactical sign name
+  const tzMatch = iconUrl.match(/\/icons\/taktische_zeichen\/[^/]+\/([^/]+)\.png$/);
+  if (tzMatch) return `tz:${tzMatch[1]}`;
+
   for (const entry of TYPE_MAP) {
     if (typeof entry.pattern === 'string') {
       if (iconUrl === entry.pattern) return entry.typeKey;
@@ -66,6 +70,9 @@ function getTypeKey(iconUrl: string): string {
 }
 
 function getLabelForTypeKey(typeKey: string): string {
+  // Tactical sign: strip prefix and format name
+  if (typeKey.startsWith('tz:')) return typeKey.slice(3).replace(/_/g, ' ');
+
   if (TYPE_LABELS[typeKey]) return TYPE_LABELS[typeKey];
   return typeKey
     .replace(/^.*\//, '')

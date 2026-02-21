@@ -20,6 +20,7 @@ import {
   NON_DISPLAYABLE_ITEMS,
 } from '../firebase/firestore';
 import { fcItemNames, getItemClass } from '../FirecallItems/elements';
+import { iconKeys } from '../FirecallItems/elements/icons';
 import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 
 interface TypeSummary {
@@ -53,9 +54,17 @@ export default function SidebarFirecallSummary() {
 
   const summary = useMemo(() => {
     const typeCounts = new Map<string, number>();
+    // Track tactical sign sub-groups for markers
+    const zeichenCounts = new Map<string, number>();
     for (const record of records) {
       const type = record.type || 'fallback';
-      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+      // Sub-group markers by tactical sign
+      const zeichen = type === 'marker' ? (record as any).zeichen || '' : '';
+      if (zeichen) {
+        zeichenCounts.set(zeichen, (zeichenCounts.get(zeichen) || 0) + 1);
+      } else {
+        typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+      }
     }
 
     const result: TypeSummary[] = [];
@@ -69,6 +78,19 @@ export default function SidebarFirecallSummary() {
         label: fcItemNames[type] || type,
         iconUrl,
         isApiIcon: iconUrl.indexOf('/api') > -1,
+        count,
+      });
+    }
+
+    // Add tactical sign sub-groups
+    for (const [zeichen, count] of zeichenCounts.entries()) {
+      const zeichenIcon = iconKeys[zeichen];
+      const iconUrl = zeichenIcon?.url || '/icons/marker.svg';
+      result.push({
+        type: `marker:${zeichen}`,
+        label: zeichen.replace(/_/g, ' '),
+        iconUrl,
+        isApiIcon: false,
         count,
       });
     }
