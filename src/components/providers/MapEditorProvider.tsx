@@ -31,6 +31,7 @@ function useMapEditorProvider() {
     useState<FirecallItem>();
   const [editFirecallItemIsOpen, setEditFirecallItemIsOpen] = useState(false);
   const [editFirecallItem, setEditFirecallItem] = useState<FirecallItem>();
+  const [lastSelectedLayer, setLastSelectedLayer] = useState('');
   const firecallId = useFirecallId();
 
   useEffect(() => {
@@ -86,6 +87,8 @@ function useMapEditorProvider() {
     setEditFirecallItemIsOpen,
     editFirecallItem,
     openFirecallItemDialog,
+    lastSelectedLayer,
+    setLastSelectedLayer,
   };
 
   return options;

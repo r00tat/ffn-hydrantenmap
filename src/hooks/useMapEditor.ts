@@ -23,6 +23,8 @@ export interface MapEditorOptions {
   editFirecallItemIsOpen: boolean;
   setEditFirecallItemIsOpen: Dispatch<SetStateAction<boolean>>;
   editFirecallItem?: FirecallItem;
+  lastSelectedLayer: string;
+  setLastSelectedLayer: Dispatch<SetStateAction<string>>;
 }
 
 export const MapEditorContext = createContext<MapEditorOptions>({
@@ -38,6 +40,8 @@ export const MapEditorContext = createContext<MapEditorOptions>({
   openFirecallItemDialog: () => {},
   editFirecallItemIsOpen: false,
   setEditFirecallItemIsOpen: () => {},
+  lastSelectedLayer: '',
+  setLastSelectedLayer: () => {},
 });
 
 export default function useMapEditor() {
