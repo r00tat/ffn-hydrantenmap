@@ -264,6 +264,7 @@ function useWetterstationData() {
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
+      stationsRef.current = null;
     };
   }, []);
 
