@@ -12,6 +12,7 @@ import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
+import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import {
   addFirecallPosition,
@@ -88,6 +89,7 @@ export default function ConnectionMarker({
                 }}
               >
                 <Popup>
+                  <PopupNavigateButton lat={p[0]} lng={p[1]} />
                   {editable && (
                     <>
                       <Tooltip title="Linie bearbeiten">
@@ -144,6 +146,7 @@ export default function ConnectionMarker({
         }}
       >
         <Popup>
+          <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
             <Tooltip title="Einen Punkt hinzufügen">
               <IconButton

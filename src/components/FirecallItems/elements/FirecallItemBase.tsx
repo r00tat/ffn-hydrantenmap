@@ -1,6 +1,8 @@
 'use client';
+import DirectionsIcon from '@mui/icons-material/Directions';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Popup } from 'react-leaflet';
@@ -19,18 +21,40 @@ import {
 } from './marker/FirecallItemDefault';
 import React from 'react';
 
+export function PopupNavigateButton({ lat, lng }: { lat?: number; lng?: number }) {
+  if (!lat || !lng) return null;
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  return (
+    <Tooltip title="Navigation starten">
+      <IconButton
+        size="small"
+        onClick={() => window.open(url, '_blank')}
+        color="primary"
+        sx={{ float: 'right' }}
+      >
+        <DirectionsIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+  );
+}
+
 export interface FirecallItemPopupProps {
   children: ReactNode;
   onClick: () => void;
+  lat?: number;
+  lng?: number;
 }
 
 export function FirecallItemPopup({
   children,
   onClick,
+  lat,
+  lng,
 }: FirecallItemPopupProps) {
   const editable = useMapEditable();
   return (
     <Popup>
+      <PopupNavigateButton lat={lat} lng={lng} />
       {editable && (
         <IconButton
           sx={{ marginLeft: 'auto', float: 'right' }}
@@ -221,7 +245,7 @@ export class FirecallItemBase {
 
   public renderPopup(selectItem: (item: FirecallItem) => void): ReactNode {
     return (
-      <FirecallItemPopup onClick={() => selectItem(this.data())}>
+      <FirecallItemPopup onClick={() => selectItem(this.data())} lat={this.lat} lng={this.lng}>
         {this.popupFn()}
       </FirecallItemPopup>
     );

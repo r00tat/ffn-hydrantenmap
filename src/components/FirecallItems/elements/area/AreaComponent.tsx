@@ -14,6 +14,7 @@ import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
+import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import {
   addFirecallPosition,
@@ -81,6 +82,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
             }}
           >
             <Popup>
+              <PopupNavigateButton lat={p[0]} lng={p[1]} />
               {editable && (
                 <>
                   <IconButton
@@ -126,6 +128,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
         }}
       >
         <Popup>
+          <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
             <Tooltip title="Einen Punkt hinzufügen">
               <IconButton

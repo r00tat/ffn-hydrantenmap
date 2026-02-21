@@ -2,6 +2,7 @@ import L from 'leaflet';
 import { ReactNode } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import { GefahrObjekt } from '../../../common/gis-objects';
+import { PopupNavigateButton } from '../../FirecallItems/elements/FirecallItemBase';
 
 export interface GefahrObjektMarkerProps {
   objekt: GefahrObjekt;
@@ -27,6 +28,7 @@ export default function GefahrObjektMarker({
       icon={gefahrObjektIcon}
     >
       <Popup>
+        <PopupNavigateButton lat={o.lat} lng={o.lng} />
         <b>
           {o.ortschaft} {o.name}
         </b>

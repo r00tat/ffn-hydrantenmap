@@ -7,6 +7,7 @@ import useFirecall from '../../../hooks/useFirecall';
 import { useMapEditable } from '../../../hooks/useMapEditor';
 import { firestore } from '../../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../../firebase/firestore';
+import { PopupNavigateButton } from '../../FirecallItems/elements/FirecallItemBase';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { logAuditChange } from '../../../hooks/useAuditLog';
 
@@ -76,7 +77,10 @@ export default function FirecallMarker() {
         dragend: (event: L.DragEndEvent) => onDragEnd(firecall, event, email),
       }}
     >
-      <Popup>Einsatzort {firecall.name}</Popup>
+      <Popup>
+        <PopupNavigateButton lat={firecall.lat} lng={firecall.lng} />
+        Einsatzort {firecall.name}
+      </Popup>
     </Marker>
   );
 }

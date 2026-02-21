@@ -4,6 +4,7 @@ import { Marker, Popup } from 'react-leaflet';
 import { HydrantenRecord } from '../../../common/gis-objects';
 import useMapEditor from '../../../hooks/useMapEditor';
 import { HydrantenItem } from '../../firebase/firestore';
+import { PopupNavigateButton } from '../../FirecallItems/elements/FirecallItemBase';
 
 export interface HydrantenMarkerProps {
   hydrant: HydrantenRecord;
@@ -61,6 +62,7 @@ export default function HydrantMarker({
       }}
     >
       <Popup>
+        <PopupNavigateButton lat={hydrant.lat} lng={hydrant.lng} />
         <b>
           {hydrant.ortschaft} {hydrant.name}
           <br />
