@@ -31,6 +31,7 @@ interface EinsatzorteTableProps {
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
   onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;
+  onCreateVehicle?: (name: string, fw: string, location: FirecallLocation) => void;
   sortField?: EinsatzorteSortField;
   sortDirection?: 'asc' | 'desc';
   onSortClick?: (field: EinsatzorteSortField) => void;
@@ -45,6 +46,7 @@ export default function EinsatzorteTable({
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
   onMapVehicleSelected,
+  onCreateVehicle,
   sortField = 'created',
   sortDirection = 'asc',
   onSortClick,
@@ -153,6 +155,7 @@ export default function EinsatzorteTable({
               kostenersatzVehicleNames={kostenersatzVehicleNames}
               onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
               onMapVehicleSelected={onMapVehicleSelected}
+              onCreateVehicle={onCreateVehicle}
             />
           ))}
           <EinsatzorteRow
@@ -165,6 +168,7 @@ export default function EinsatzorteTable({
             kostenersatzVehicleNames={kostenersatzVehicleNames}
             onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
             onMapVehicleSelected={onMapVehicleSelected}
+            onCreateVehicle={onCreateVehicle}
           />
         </TableBody>
       </Table>
