@@ -167,7 +167,7 @@ const CHARTS: ChartConfig[] = [
   {
     title: 'Temperatur',
     keys: [{ key: 'TL', label: 'Temperatur', color: '#e53935' }],
-    unit: '\u00B0C',
+    unit: '°C',
     type: 'line',
   },
   {
@@ -198,8 +198,8 @@ const CHARTS: ChartConfig[] = [
     type: 'line',
   },
   {
-    title: 'Schneeh\u00F6he',
-    keys: [{ key: 'SCHNEE', label: 'Schneeh\u00F6he', color: '#90caf9' }],
+    title: 'Schneehöhe',
+    keys: [{ key: 'SCHNEE', label: 'Schneehöhe', color: '#90caf9' }],
     unit: 'cm',
     type: 'area',
   },
@@ -212,7 +212,7 @@ const CHARTS: ChartConfig[] = [
   {
     title: 'Globalstrahlung',
     keys: [{ key: 'GLOW', label: 'Strahlung', color: '#ff9800' }],
-    unit: 'W/m\u00B2',
+    unit: 'W/m²',
     type: 'area',
   },
 ];
@@ -263,7 +263,7 @@ function WeatherChart({
     <Tooltip
       labelFormatter={(v) => tooltipTimestamp(v as number)}
       formatter={(value: number | undefined) => [
-        `${value != null ? value.toFixed(1) : '\u2013'} ${config.unit}`,
+        `${value != null ? value.toFixed(1) : '–'} ${config.unit}`,
       ]}
     />
   );
@@ -382,7 +382,7 @@ export default function WetterstationHistory({
   return (
     <Box sx={{ p: 2, maxWidth: 900, mx: 'auto' }}>
       <Link href="/map" style={{ textDecoration: 'none' }}>
-        &larr; Zur\u00FCck zur Karte
+        &larr; Zurück zur Karte
       </Link>
 
       <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>
@@ -416,7 +416,7 @@ export default function WetterstationHistory({
         </Box>
       ) : data.length === 0 ? (
         <Typography color="text.secondary">
-          Keine Daten f\u00FCr den gew\u00E4hlten Zeitraum verf\u00FCgbar.
+          Keine Daten für den gewählten Zeitraum verfügbar.
         </Typography>
       ) : (
         CHARTS.filter((chart) =>

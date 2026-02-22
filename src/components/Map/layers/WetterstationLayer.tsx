@@ -300,75 +300,102 @@ export default function WetterstationLayer() {
             <b>
               {m.name} ({m.altitude}&thinsp;m)
             </b>
-            {m.temperature !== null && (
-              <>
-                <br />
-                Temperatur: {m.temperature.toFixed(1)}&thinsp;&deg;C
-              </>
-            )}
-            {m.windSpeed !== null && (
-              <>
-                <br />
-                Wind: {m.windSpeed.toFixed(1)}&thinsp;m/s{' '}
-                {degreesToCompass(m.windDirection)}
-              </>
-            )}
-            {m.windGust !== null && (
-              <>
-                <br />
-                Windspitze: {m.windGust.toFixed(1)}&thinsp;m/s
-              </>
-            )}
-            {m.humidity !== null && (
-              <>
-                <br />
-                Feuchte: {m.humidity.toFixed(0)}&thinsp;%
-              </>
-            )}
-            {m.pressure !== null && (
-              <>
-                <br />
-                Luftdruck: {m.pressure.toFixed(1)}&thinsp;hPa
-              </>
-            )}
-            {m.precipitation !== null && m.precipitation > 0 && (
-              <>
-                <br />
-                Niederschlag: {m.precipitation.toFixed(1)}&thinsp;mm
-              </>
-            )}
-            {m.snowDepth !== null && m.snowDepth > 0 && (
-              <>
-                <br />
-                Schneeh&ouml;he: {m.snowDepth.toFixed(0)}&thinsp;cm
-              </>
-            )}
-            {m.sunshine !== null && m.sunshine > 0 && (
-              <>
-                <br />
-                Sonnenschein: {Math.round(m.sunshine / 60)}&thinsp;min
-              </>
-            )}
-            {m.solarRadiation !== null && m.solarRadiation > 0 && (
-              <>
-                <br />
-                Globalstrahlung: {m.solarRadiation.toFixed(0)}&thinsp;W/m&sup2;
-              </>
-            )}
+            <table
+              style={{
+                borderCollapse: 'collapse',
+                margin: '4px 0',
+                width: '100%',
+              }}
+            >
+              <tbody>
+                {m.temperature !== null && (
+                  <tr>
+                    <td>Temperatur</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.temperature.toFixed(1)}&thinsp;&deg;C
+                    </td>
+                  </tr>
+                )}
+                {m.windSpeed !== null && (
+                  <tr>
+                    <td>Wind</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.windSpeed.toFixed(1)}&thinsp;m/s{' '}
+                      {degreesToCompass(m.windDirection)}
+                    </td>
+                  </tr>
+                )}
+                {m.windGust !== null && (
+                  <tr>
+                    <td>Windspitze</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.windGust.toFixed(1)}&thinsp;m/s
+                    </td>
+                  </tr>
+                )}
+                {m.humidity !== null && (
+                  <tr>
+                    <td>Feuchte</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.humidity.toFixed(0)}&thinsp;%
+                    </td>
+                  </tr>
+                )}
+                {m.pressure !== null && (
+                  <tr>
+                    <td>Luftdruck</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.pressure.toFixed(1)}&thinsp;hPa
+                    </td>
+                  </tr>
+                )}
+                {m.precipitation !== null && m.precipitation > 0 && (
+                  <tr>
+                    <td>Niederschlag</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.precipitation.toFixed(1)}&thinsp;mm
+                    </td>
+                  </tr>
+                )}
+                {m.snowDepth !== null && m.snowDepth > 0 && (
+                  <tr>
+                    <td>Schneehöhe</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.snowDepth.toFixed(0)}&thinsp;cm
+                    </td>
+                  </tr>
+                )}
+                {m.sunshine !== null && m.sunshine > 0 && (
+                  <tr>
+                    <td>Sonnenschein</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {Math.round(m.sunshine / 60)}&thinsp;min
+                    </td>
+                  </tr>
+                )}
+                {m.solarRadiation !== null && m.solarRadiation > 0 && (
+                  <tr>
+                    <td>Globalstrahlung</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.solarRadiation.toFixed(0)}&thinsp;W/m&sup2;
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
             {m.timestamp && (
-              <>
-                <br />
+              <span style={{ fontSize: '0.85em', color: '#666' }}>
                 Stand: {formatTimestamp(m.timestamp)}
-              </>
+              </span>
             )}
-              <br />
-              <Link
-                href={`/wetter/${m.stationId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Verlauf &rarr;
-              </Link>
+            <br />
+            <Link
+              href={`/wetter/${m.stationId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Verlauf &rarr;
+            </Link>
           </Popup>
         </Marker>
       ))}
