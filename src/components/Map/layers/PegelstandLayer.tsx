@@ -85,6 +85,15 @@ export default function PegelstandLayer() {
 
     return liveData
       .map((entry) => {
+        // NÖ and Stmk entries carry coordinates directly
+        if ((entry.source === 'noe' || entry.source === 'stmk') && entry.lat && entry.lng) {
+          return {
+            ...entry,
+            lat: entry.lat,
+            lng: entry.lng,
+          };
+        }
+        // Burgenland entries need Firestore station lookup
         const station = stationMap.get(entry.slug);
         if (!station || (!station.lat && !station.lng)) return null;
         return {
@@ -98,7 +107,7 @@ export default function PegelstandLayer() {
 
   return (
     <LayerGroup
-      attribution='Pegelst&auml;nde: <a href="https://wasser.bgld.gv.at" target="_blank" rel="noopener noreferrer">Wasserportal Burgenland</a>'
+      attribution='Pegelst&auml;nde: <a href="https://wasser.bgld.gv.at" target="_blank" rel="noopener noreferrer">Wasserportal Burgenland</a> | <a href="https://www.noel.gv.at/wasserstand/" target="_blank" rel="noopener noreferrer">Land Nieder&ouml;sterreich</a> | <a href="https://www.hydrografie.steiermark.at/" target="_blank" rel="noopener noreferrer">Land Steiermark</a>'
     >
       {markers.map((marker) => (
         <Marker
@@ -108,6 +117,12 @@ export default function PegelstandLayer() {
         >
           <Popup>
             <b>{marker.name}</b>
+            {marker.rivername && (
+              <>
+                <br />
+                <small>{marker.rivername}</small>
+              </>
+            )}
             {marker.drainLevel && (
               <>
                 <br />
@@ -131,16 +146,60 @@ export default function PegelstandLayer() {
                 Wasserstand: {marker.waterLevel} {marker.waterLevelUnit}
               </>
             )}
+            {marker.waterLevelForecast && (
+              <>
+                <br />
+                Prognose: {marker.waterLevelForecast} {marker.waterLevelUnit}
+              </>
+            )}
             {marker.discharge && (
               <>
                 <br />
                 Abfluss: {marker.discharge} m&sup3;/s
               </>
             )}
+            {marker.dischargeForecast && (
+              <>
+                <br />
+                Abfluss-Prognose: {marker.dischargeForecast} m&sup3;/s
+              </>
+            )}
             {marker.temperature && (
               <>
                 <br />
-                Temperatur: {marker.temperature} &deg;C
+                Wassertemperatur: {marker.temperature} &deg;C
+              </>
+            )}
+            {marker.groundwaterLevel && (
+              <>
+                <br />
+                Grundwasser: {marker.groundwaterLevel} m &uuml;.A.
+              </>
+            )}
+            {(marker.precipitation3h ||
+              marker.precipitation12h ||
+              marker.precipitation24h) && (
+              <>
+                <br />
+                Niederschlag:
+                {marker.precipitation3h &&
+                  ` ${marker.precipitation3h}mm/3h`}
+                {marker.precipitation12h &&
+                  ` ${marker.precipitation12h}mm/12h`}
+                {marker.precipitation24h &&
+                  ` ${marker.precipitation24h}mm/24h`}
+              </>
+            )}
+            {marker.airTemperature && (
+              <>
+                <br />
+                Lufttemperatur: {marker.airTemperature} &deg;C
+              </>
+            )}
+            {marker.humidity && (
+              <>
+                <br />
+                Luftfeuchtigkeit: {marker.humidity}%
               </>
             )}
             {marker.timestamp && (
@@ -150,13 +209,23 @@ export default function PegelstandLayer() {
               </>
             )}
             <br />
-            <a
-              href={`https://wasser.bgld.gv.at${marker.detailUrl}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Details &rarr;
-            </a>
+            {marker.source === 'noe' || marker.source === 'stmk' ? (
+              <a
+                href={marker.detailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Details &rarr;
+              </a>
+            ) : (
+              <a
+                href={`https://wasser.bgld.gv.at${marker.detailUrl}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Details &rarr;
+              </a>
+            )}
           </Popup>
         </Marker>
       ))}
