@@ -40,12 +40,9 @@ export default function KostenersatzEinsatzTab({
   const [durationInput, setDurationInput] = useState<string | null>(null);
 
   // Use override values if set, otherwise fall back to firecall data
-  const displayDate = calculation.callDateOverride || firecall.date;
   const displayDescription =
     calculation.nameOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
-
-  const dateValue = toDateTimeLocalValue(displayDate);
 
   // Start/end date values for datetime-local inputs
   const displayStartDate =
@@ -71,25 +68,6 @@ export default function KostenersatzEinsatzTab({
         helperText={calculation.nameOverride ? 'Überschrieben' : undefined}
       />
 
-      <TextField
-        label="Einsatzdatum"
-        type="datetime-local"
-        value={dateValue}
-        onChange={(e) => onChange('callDateOverride', e.target.value)}
-        fullWidth
-        disabled={disabled}
-        slotProps={{ inputLabel: { shrink: true } }}
-        helperText={
-          calculation.callDateOverride
-            ? 'Überschrieben - Original: ' +
-              (firecall.date
-                ? parseTimestamp(firecall.date)?.format('DD.MM.YYYY HH:mm') ||
-                  'ungültig'
-                : 'nicht gesetzt')
-            : undefined
-        }
-      />
-
       <Box
         sx={{
           display: 'flex',
@@ -98,7 +76,7 @@ export default function KostenersatzEinsatzTab({
         }}
       >
         <TextField
-          label="Startzeit (Alarmierung)"
+          label="Alarmierung"
           type="datetime-local"
           value={startValue}
           onChange={(e) => onChange('startDateOverride', e.target.value)}
