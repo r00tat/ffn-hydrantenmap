@@ -65,13 +65,46 @@ const LAKE_URL = 'https://wasser.bgld.gv.at/hydrographie/die-seen';
 const NOE_MAPLIST_URL =
   'https://www.noel.gv.at/wasserstand/kidata/maplist/MapList.json';
 
-/** Bounding box: ~50km buffer around Burgenland (46.85-48.1°N, 16.1-17.1°E) */
-const NOE_BBOX = {
-  minLat: 46.4,
-  maxLat: 48.55,
-  minLng: 15.45,
-  maxLng: 17.75,
-};
+/** Max distance in km from the Burgenland border for NÖ stations */
+const NOE_MAX_DISTANCE_KM = 50;
+
+/** Reference points along the Burgenland-NÖ border for distance calculation */
+const BURGENLAND_BORDER_POINTS: [number, number][] = [
+  [48.02, 16.85], // Bruck an der Leitha (north)
+  [47.94, 16.48], // Deutsch Brodersdorf
+  [47.82, 16.27], // Wiener Neustadt
+  [47.74, 16.22], // Lanzenkirchen
+  [47.68, 16.14], // Gloggnitz area
+  [47.58, 16.1], // Aspang area
+  [47.5, 16.05], // Hochneukirchen (south)
+];
+
+/** Haversine distance in km between two lat/lng points */
+function haversineDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Minimum distance from a point to the Burgenland border reference points */
+function distanceToBurgenland(lat: number, lng: number): number {
+  return Math.min(
+    ...BURGENLAND_BORDER_POINTS.map(([bLat, bLng]) =>
+      haversineDistance(lat, lng, bLat, bLng)
+    )
+  );
+}
 
 interface NoeMapListEntry {
   Parameter: string;
@@ -112,17 +145,14 @@ async function fetchNoeData(): Promise<PegelstandData[]> {
 
   const entries: NoeMapListEntry[] = await response.json();
 
-  // Filter by bounding box
+  // Filter by distance to Burgenland border
   const filtered = entries.filter((e) => {
     const lat = parseFloat(e.Lat);
     const lng = parseFloat(e.Long);
     return (
       !isNaN(lat) &&
       !isNaN(lng) &&
-      lat >= NOE_BBOX.minLat &&
-      lat <= NOE_BBOX.maxLat &&
-      lng >= NOE_BBOX.minLng &&
-      lng <= NOE_BBOX.maxLng
+      distanceToBurgenland(lat, lng) <= NOE_MAX_DISTANCE_KM
     );
   });
 
