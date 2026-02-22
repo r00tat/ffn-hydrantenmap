@@ -44,7 +44,6 @@ export default function EinsatzDialog({
       fw: 'Neusiedl am See',
       description: '',
       date: new Date().toISOString(),
-      alarmierung: new Date().toISOString(),
       eintreffen: new Date().toISOString(),
       deleted: false,
     }
@@ -72,7 +71,6 @@ export default function EinsatzDialog({
       ...prev,
       name,
       date: new Date(alarm.alarmDate).toISOString(),
-      alarmierung: new Date(alarm.alarmDate).toISOString(),
       description: alarm.alarmText,
       ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
     }));
@@ -236,7 +234,7 @@ export default function EinsatzDialog({
           value={einsatz.fw}
         />
         <MyDateTimePicker
-          label="Einsatzdatum"
+          label="Alarmierung"
           value={parseTimestamp(einsatz.date) || null}
           setValue={(newValue) => {
             setEinsatz({ ...einsatz, date: newValue?.toISOString() });
@@ -251,14 +249,6 @@ export default function EinsatzDialog({
           variant="standard"
           onChange={onChange('description')}
           value={einsatz.description}
-        />
-
-        <MyDateTimePicker
-          label="Alarmierung"
-          value={parseTimestamp(einsatz.alarmierung) || null}
-          setValue={(newValue) => {
-            setEinsatz({ ...einsatz, alarmierung: newValue?.toISOString() });
-          }}
         />
         <MyDateTimePicker
           label="Eintreffen"

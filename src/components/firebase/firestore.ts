@@ -162,7 +162,6 @@ export interface Firecall {
   date?: string;
   description?: string;
   deleted?: boolean;
-  alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
   lat?: number;

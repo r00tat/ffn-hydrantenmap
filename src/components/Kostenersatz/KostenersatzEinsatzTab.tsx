@@ -48,7 +48,8 @@ export default function KostenersatzEinsatzTab({
   const dateValue = toDateTimeLocalValue(displayDate);
 
   // Start/end date values for datetime-local inputs
-  const displayStartDate = calculation.startDateOverride || firecall.alarmierung;
+  const displayStartDate =
+    calculation.startDateOverride || firecall.date;
   const startValue = toDateTimeLocalValue(displayStartDate);
   const displayEndDate = calculation.endDateOverride || firecall.abruecken;
   const endValue = toDateTimeLocalValue(displayEndDate);
@@ -56,7 +57,7 @@ export default function KostenersatzEinsatzTab({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="subtitle2" color="text.secondary">
-        Einsatzdaten aus Firecall (können überschrieben werden)
+        Einsatzdaten (können überschrieben werden)
       </Typography>
 
       <TextField
@@ -67,11 +68,7 @@ export default function KostenersatzEinsatzTab({
         multiline
         rows={2}
         disabled={disabled}
-        helperText={
-          calculation.nameOverride
-            ? 'Überschrieben'
-            : undefined
-        }
+        helperText={calculation.nameOverride ? 'Überschrieben' : undefined}
       />
 
       <TextField
@@ -84,12 +81,22 @@ export default function KostenersatzEinsatzTab({
         slotProps={{ inputLabel: { shrink: true } }}
         helperText={
           calculation.callDateOverride
-            ? 'Überschrieben - Original: ' + (firecall.date ? (parseTimestamp(firecall.date)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
+            ? 'Überschrieben - Original: ' +
+              (firecall.date
+                ? parseTimestamp(firecall.date)?.format('DD.MM.YYYY HH:mm') ||
+                  'ungültig'
+                : 'nicht gesetzt')
             : undefined
         }
       />
 
-      <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 2,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}
+      >
         <TextField
           label="Startzeit (Alarmierung)"
           type="datetime-local"
@@ -100,7 +107,12 @@ export default function KostenersatzEinsatzTab({
           slotProps={{ inputLabel: { shrink: true } }}
           helperText={
             calculation.startDateOverride
-              ? 'Überschrieben - Original: ' + (firecall.alarmierung ? (parseTimestamp(firecall.alarmierung)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
+              ? 'Überschrieben - Original: ' +
+                (firecall.date
+                  ? parseTimestamp(firecall.date)?.format(
+                      'DD.MM.YYYY HH:mm',
+                    ) || 'ungültig'
+                  : 'nicht gesetzt')
               : undefined
           }
         />
@@ -114,7 +126,12 @@ export default function KostenersatzEinsatzTab({
           slotProps={{ inputLabel: { shrink: true } }}
           helperText={
             calculation.endDateOverride
-              ? 'Überschrieben - Original: ' + (firecall.abruecken ? (parseTimestamp(firecall.abruecken)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
+              ? 'Überschrieben - Original: ' +
+                (firecall.abruecken
+                  ? parseTimestamp(firecall.abruecken)?.format(
+                      'DD.MM.YYYY HH:mm',
+                    ) || 'ungültig'
+                  : 'nicht gesetzt')
               : undefined
           }
         />
@@ -135,7 +152,9 @@ export default function KostenersatzEinsatzTab({
         <TextField
           label="Einsatzdauer in Stunden"
           type="number"
-          value={durationInput !== null ? durationInput : calculation.defaultStunden}
+          value={
+            durationInput !== null ? durationInput : calculation.defaultStunden
+          }
           onChange={(e) => {
             setDurationInput(e.target.value);
             const value = parseFloat(e.target.value);
@@ -160,11 +179,13 @@ export default function KostenersatzEinsatzTab({
         />
       </Box>
 
-      {suggestedDuration > 1 && calculation.defaultStunden !== suggestedDuration && (
-        <Alert severity="info" sx={{ mt: 1 }}>
-          Die Einsatzdauer ({calculation.defaultStunden}h) weicht von der berechneten Dauer ({suggestedDuration}h) ab.
-        </Alert>
-      )}
+      {suggestedDuration > 1 &&
+        calculation.defaultStunden !== suggestedDuration && (
+          <Alert severity="info" sx={{ mt: 1 }}>
+            Die Einsatzdauer ({calculation.defaultStunden}h) weicht von der
+            berechneten Dauer ({suggestedDuration}h) ab.
+          </Alert>
+        )}
     </Box>
   );
 }
