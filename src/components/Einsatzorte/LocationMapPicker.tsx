@@ -30,6 +30,7 @@ import FirecallLayer from '../Map/layers/FirecallLayer';
 import LocationsLayer from '../Map/layers/LocationsLayer';
 import PowerOutageLayer from '../Map/layers/PowerOutageLayer';
 import PegelstandLayer from '../Map/layers/PegelstandLayer';
+import WetterstationLayer from '../Map/layers/WetterstationLayer';
 import DistanceMarker from '../Map/markers/DistanceMarker';
 import PositionMarker from '../Map/markers/PositionMarker';
 
@@ -69,10 +70,12 @@ function ClickHandler({
 function FlyTo({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   const prevRef = useRef({ lat: 0, lng: 0 });
-  if (prevRef.current.lat !== lat || prevRef.current.lng !== lng) {
-    prevRef.current = { lat, lng };
-    map.flyTo([lat, lng], 15);
-  }
+  useEffect(() => {
+    if (prevRef.current.lat !== lat || prevRef.current.lng !== lng) {
+      prevRef.current = { lat, lng };
+      map.flyTo([lat, lng], 15);
+    }
+  }, [lat, lng, map]);
   return null;
 }
 
@@ -278,6 +281,9 @@ export default function LocationMapPicker({
             </LayersControl.Overlay>
             <LayersControl.Overlay name="Pegelstände">
               <PegelstandLayer />
+            </LayersControl.Overlay>
+            <LayersControl.Overlay name="Wetterstationen">
+              <WetterstationLayer />
             </LayersControl.Overlay>
           </LayersControl>
           <ClickHandler onClick={handleClick} />
