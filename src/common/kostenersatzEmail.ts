@@ -129,7 +129,7 @@ export function buildTemplateContext(
 
   // Build firecall name/description
   const firecallName =
-    calculation.callDescriptionOverride || firecall.name || '';
+    calculation.nameOverride || firecall.name || '';
 
   return {
     recipient: {

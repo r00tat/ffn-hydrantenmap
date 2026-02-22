@@ -190,9 +190,9 @@ export default function KostenersatzPdf({
   );
 
   // Get display values
-  const displayDate = formatDate(calculation.callDateOverride || firecall.date);
+  const displayDate = formatDate(calculation.callDateOverride || calculation.startDateOverride || firecall.date);
   const displayDescription =
-    calculation.callDescriptionOverride ||
+    calculation.nameOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
 
   return (
@@ -215,18 +215,12 @@ export default function KostenersatzPdf({
           <Text style={styles.sectionTitle}>Einsatzdaten</Text>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Einsatz:</Text>
-            <Text style={styles.value}>{firecall.name}</Text>
+            <Text style={styles.value}>{displayDescription}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.label}>Datum:</Text>
             <Text style={styles.value}>{displayDate}</Text>
           </View>
-          {displayDescription && displayDescription !== firecall.name && (
-            <View style={styles.infoRow}>
-              <Text style={styles.label}>Beschreibung:</Text>
-              <Text style={styles.value}>{displayDescription}</Text>
-            </View>
-          )}
           <View style={styles.infoRow}>
             <Text style={styles.label}>Einsatzdauer:</Text>
             <Text style={styles.value}>
