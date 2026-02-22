@@ -7,7 +7,7 @@ import Alert from '@mui/material/Alert';
 import { useState } from 'react';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
-import { formatTimestamp, parseTimestamp } from '../../common/time-format';
+import { parseTimestamp } from '../../common/time-format';
 
 /**
  * Convert a date string (ISO or other supported format) to datetime-local input value (YYYY-MM-DDTHH:mm)
@@ -45,10 +45,7 @@ export default function KostenersatzEinsatzTab({
     calculation.callDescriptionOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
 
-  const parsedDate = displayDate ? parseTimestamp(displayDate) : undefined;
-  const formattedDate = parsedDate
-    ? formatTimestamp(parsedDate.toDate())
-    : '';
+  const dateValue = toDateTimeLocalValue(displayDate);
 
   // Start/end date values for datetime-local inputs
   const displayStartDate = calculation.startDateOverride || firecall.alarmierung;
@@ -79,10 +76,12 @@ export default function KostenersatzEinsatzTab({
 
       <TextField
         label="Einsatzdatum"
-        value={formattedDate}
+        type="datetime-local"
+        value={dateValue}
         onChange={(e) => onChange('callDateOverride', e.target.value)}
         fullWidth
         disabled={disabled}
+        slotProps={{ inputLabel: { shrink: true } }}
         helperText={
           calculation.callDateOverride
             ? 'Überschrieben - Original: ' + (firecall.date ? (parseTimestamp(firecall.date)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
