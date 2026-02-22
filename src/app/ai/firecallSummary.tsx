@@ -56,7 +56,7 @@ export default function useFirecallSummary() {
 
   const summary = useMemo(() => {
     const sum = `Einsatz ${firecall.name} am ${formatTimestamp(
-      firecall.alarmierung || firecall.datum
+      firecall.date
     )}
 
     ${firecall.beschreibung || ''}}

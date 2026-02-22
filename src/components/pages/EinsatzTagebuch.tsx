@@ -443,7 +443,7 @@ export function EinsatzTagebuch({
     const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
       firecall.name
     } ${firecall.description || ''} am ${formatTimestamp(
-      firecall.alarmierung || firecall.date
+      firecall.date
     )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
       .filter((d) => d.textRepresenation)
       .map((d) => d.textRepresenation)
@@ -451,7 +451,6 @@ export function EinsatzTagebuch({
     query(prompt);
   }, [
     diaries,
-    firecall.alarmierung,
     firecall.date,
     firecall.description,
     firecall.name,

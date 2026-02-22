@@ -389,11 +389,7 @@ export default function WetterstationLayer() {
               </span>
             )}
             <br />
-            <Link
-              href={`/wetter/${m.stationId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link href={`/wetter/${m.stationId}`}>
               Verlauf &rarr;
             </Link>
           </Popup>

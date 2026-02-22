@@ -58,7 +58,7 @@ function useFirecallUpdate() {
         elementId: einsatz.id || '',
         elementName: einsatz.name || '',
         firecallId: einsatz.id,
-        newValue: { name: einsatz.name, description: einsatz.description, alarmierung: einsatz.alarmierung, eintreffen: einsatz.eintreffen, abruecken: einsatz.abruecken },
+        newValue: { name: einsatz.name, description: einsatz.description, date: einsatz.date, eintreffen: einsatz.eintreffen, abruecken: einsatz.abruecken },
       });
     },
     [email, logChange]
