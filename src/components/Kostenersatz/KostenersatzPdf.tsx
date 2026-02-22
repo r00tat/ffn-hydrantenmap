@@ -190,7 +190,7 @@ export default function KostenersatzPdf({
   );
 
   // Get display values
-  const displayDate = formatDate(calculation.callDateOverride || firecall.date);
+  const displayDate = formatDate(calculation.callDateOverride || calculation.startDateOverride || firecall.date);
   const displayDescription =
     calculation.callDescriptionOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;

@@ -9,6 +9,16 @@ import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { formatTimestamp, parseTimestamp } from '../../common/time-format';
 
+/**
+ * Convert a date string (ISO or other supported format) to datetime-local input value (YYYY-MM-DDTHH:mm)
+ */
+function toDateTimeLocalValue(dateStr?: string): string {
+  if (!dateStr) return '';
+  const m = parseTimestamp(dateStr);
+  if (!m) return '';
+  return m.format('YYYY-MM-DDTHH:mm');
+}
+
 export interface KostenersatzEinsatzTabProps {
   firecall: Firecall;
   calculation: KostenersatzCalculation;
@@ -40,11 +50,32 @@ export default function KostenersatzEinsatzTab({
     ? formatTimestamp(parsedDate.toDate())
     : '';
 
+  // Start/end date values for datetime-local inputs
+  const displayStartDate = calculation.startDateOverride || firecall.alarmierung;
+  const startValue = toDateTimeLocalValue(displayStartDate);
+  const displayEndDate = calculation.endDateOverride || firecall.abruecken;
+  const endValue = toDateTimeLocalValue(displayEndDate);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="subtitle2" color="text.secondary">
         Einsatzdaten aus Firecall (können überschrieben werden)
       </Typography>
+
+      <TextField
+        label="Titel"
+        value={displayDescription}
+        onChange={(e) => onChange('callDescriptionOverride', e.target.value)}
+        fullWidth
+        multiline
+        rows={2}
+        disabled={disabled}
+        helperText={
+          calculation.callDescriptionOverride
+            ? 'Überschrieben'
+            : undefined
+        }
+      />
 
       <TextField
         label="Einsatzdatum"
@@ -59,20 +90,36 @@ export default function KostenersatzEinsatzTab({
         }
       />
 
-      <TextField
-        label="Einsatzbeschreibung"
-        value={displayDescription}
-        onChange={(e) => onChange('callDescriptionOverride', e.target.value)}
-        fullWidth
-        multiline
-        rows={2}
-        disabled={disabled}
-        helperText={
-          calculation.callDescriptionOverride
-            ? 'Überschrieben'
-            : undefined
-        }
-      />
+      <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+        <TextField
+          label="Startzeit (Alarmierung)"
+          type="datetime-local"
+          value={startValue}
+          onChange={(e) => onChange('startDateOverride', e.target.value)}
+          fullWidth
+          disabled={disabled}
+          slotProps={{ inputLabel: { shrink: true } }}
+          helperText={
+            calculation.startDateOverride
+              ? 'Überschrieben - Original: ' + (firecall.alarmierung ? (parseTimestamp(firecall.alarmierung)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
+              : undefined
+          }
+        />
+        <TextField
+          label="Endzeit (Abrücken)"
+          type="datetime-local"
+          value={endValue}
+          onChange={(e) => onChange('endDateOverride', e.target.value)}
+          fullWidth
+          disabled={disabled}
+          slotProps={{ inputLabel: { shrink: true } }}
+          helperText={
+            calculation.endDateOverride
+              ? 'Überschrieben - Original: ' + (firecall.abruecken ? (parseTimestamp(firecall.abruecken)?.format('DD.MM.YYYY HH:mm') || 'ungültig') : 'nicht gesetzt')
+              : undefined
+          }
+        />
+      </Box>
 
       <TextField
         label="Kommentar"

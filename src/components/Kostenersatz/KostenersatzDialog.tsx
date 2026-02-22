@@ -81,8 +81,8 @@ export default function KostenersatzDialog({
   const addCalculation = useKostenersatzAdd(firecallId);
   const updateCalculation = useKostenersatzUpdate(firecallId);
 
-  // Calculate suggested duration from firecall
-  const suggestedDuration = useMemo(() => {
+  // Calculate initial duration from firecall for new calculations
+  const initialDuration = useMemo(() => {
     return calculateDurationHours(firecall.alarmierung, firecall.abruecken) || 1;
   }, [firecall.alarmierung, firecall.abruecken]);
 
@@ -92,10 +92,17 @@ export default function KostenersatzDialog({
       return existingCalculation;
     }
     return {
-      ...createEmptyCalculation(email || '', activeVersion?.id || 'LGBl_77_2023', suggestedDuration),
+      ...createEmptyCalculation(email || '', activeVersion?.id || 'LGBl_77_2023', initialDuration),
       id: undefined,
     } as KostenersatzCalculation;
   });
+
+  // Calculate suggested duration considering overrides (after calculation state is available)
+  const suggestedDuration = useMemo((): number => {
+    const start = calculation.startDateOverride || firecall.alarmierung;
+    const end = calculation.endDateOverride || firecall.abruecken;
+    return calculateDurationHours(start, end) || 1;
+  }, [calculation.startDateOverride, calculation.endDateOverride, firecall.alarmierung, firecall.abruecken]);
 
   // Update calculation when activeVersion changes (only for new calculations)
   useEffect(() => {

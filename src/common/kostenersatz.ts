@@ -100,6 +100,8 @@ export interface KostenersatzCalculation {
   // Override firecall defaults if needed
   callDateOverride?: string;
   callDescriptionOverride?: string;
+  startDateOverride?: string; // Override firecall.alarmierung for duration calculation
+  endDateOverride?: string; // Override firecall.abruecken for duration calculation
   comment: string;
   defaultStunden: number;
 
