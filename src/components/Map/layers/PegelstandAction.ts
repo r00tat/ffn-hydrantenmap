@@ -15,6 +15,22 @@ export interface PegelstandData {
   /** Human-readable drain level label, e.g. "MQ-HQ1" (rivers only) */
   drainLevel?: string;
   detailUrl: string;
+  /** Data source: 'bgld' for Burgenland, 'noe' for Niederösterreich */
+  source?: 'bgld' | 'noe';
+  /** Coordinates (NÖ entries carry these directly; Bgld uses Firestore lookup) */
+  lat?: number;
+  lng?: number;
+  /** River name from NÖ API */
+  rivername?: string;
+  /** NÖ-specific measurement fields (all parameter types) */
+  waterLevelForecast?: string;
+  dischargeForecast?: string;
+  groundwaterLevel?: string;
+  precipitation3h?: string;
+  precipitation12h?: string;
+  precipitation24h?: string;
+  airTemperature?: string;
+  humidity?: string;
 }
 
 const DEFAULT_COLOR = '#2196F3';
@@ -45,6 +61,152 @@ const DRAIN_LABELS: Record<string, string> = {
 
 const RIVER_URL = 'https://wasser.bgld.gv.at/hydrographie/die-fluesse';
 const LAKE_URL = 'https://wasser.bgld.gv.at/hydrographie/die-seen';
+
+const NOE_MAPLIST_URL =
+  'https://www.noel.gv.at/wasserstand/kidata/maplist/MapList.json';
+
+/** Bounding box: ~50km buffer around Burgenland (46.85-48.1°N, 16.1-17.1°E) */
+const NOE_BBOX = {
+  minLat: 46.4,
+  maxLat: 48.55,
+  minLng: 15.45,
+  maxLng: 17.75,
+};
+
+interface NoeMapListEntry {
+  Parameter: string;
+  Stationnumber: string;
+  Stationname: string;
+  Timestamp: string;
+  Value: string;
+  Unit: string;
+  ClassID: string;
+  Class: string;
+  TextColor: string;
+  Lat: string;
+  Long: string;
+  Linkparameter: string;
+  Grafik: string;
+  Rivername: string;
+  HydroUnit: string;
+  Catchment: string;
+}
+
+/** NÖ alert level ClassID → human-readable label */
+const NOE_DRAIN_LABELS: Record<string, string> = {
+  '1': '< MW',
+  '2': '> MW',
+  '3': '> HW1',
+  '4': '> HW5',
+  '5': '> HW30',
+};
+
+async function fetchNoeData(): Promise<PegelstandData[]> {
+  const response = await fetch(NOE_MAPLIST_URL, { next: { revalidate: 300 } });
+  if (!response.ok) {
+    console.error(
+      `Failed to fetch NÖ data: ${response.status} ${response.statusText}`
+    );
+    return [];
+  }
+
+  const entries: NoeMapListEntry[] = await response.json();
+
+  // Filter by bounding box
+  const filtered = entries.filter((e) => {
+    const lat = parseFloat(e.Lat);
+    const lng = parseFloat(e.Long);
+    return (
+      !isNaN(lat) &&
+      !isNaN(lng) &&
+      lat >= NOE_BBOX.minLat &&
+      lat <= NOE_BBOX.maxLat &&
+      lng >= NOE_BBOX.minLng &&
+      lng <= NOE_BBOX.maxLng
+    );
+  });
+
+  // Group by station number
+  const stationGroups = new Map<string, NoeMapListEntry[]>();
+  for (const entry of filtered) {
+    const group = stationGroups.get(entry.Stationnumber) || [];
+    group.push(entry);
+    stationGroups.set(entry.Stationnumber, group);
+  }
+
+  // Convert each station group to a PegelstandData entry
+  const results: PegelstandData[] = [];
+  for (const [stationNumber, group] of stationGroups) {
+    const byParam = new Map<string, NoeMapListEntry>();
+    for (const e of group) {
+      byParam.set(e.Parameter, e);
+    }
+
+    // Use first entry for common fields
+    const first = group[0];
+    const lat = parseFloat(first.Lat);
+    const lng = parseFloat(first.Long);
+
+    // Determine color from Wasserstand > Durchfluss > default
+    const wsEntry =
+      byParam.get('Wasserstand') || byParam.get('WasserstandPrognose');
+    const dfEntry =
+      byParam.get('Durchfluss') || byParam.get('DurchflussPrognose');
+    const colorSource = wsEntry || dfEntry || first;
+    const classId = colorSource.ClassID;
+    // ClassID 0 returns #ffffff (white) which is invisible on the map
+    const color =
+      classId && classId !== '0' && colorSource.Class
+        ? colorSource.Class
+        : DEFAULT_COLOR;
+    const drainLevel =
+      classId && classId !== '0' ? NOE_DRAIN_LABELS[classId] : undefined;
+
+    // Pick the most recent timestamp from all parameters
+    const timestamps = group
+      .map((e) => e.Timestamp)
+      .filter(Boolean)
+      .sort()
+      .reverse();
+    const timestamp = timestamps[0]
+      ? new Date(timestamps[0]).toLocaleString('de-AT', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
+
+    results.push({
+      slug: `noe-${stationNumber}`,
+      name: first.Stationname,
+      type: 'river', // NÖ doesn't distinguish river/lake in this API
+      timestamp,
+      waterLevel: byParam.get('Wasserstand')?.Value,
+      waterLevelUnit: byParam.get('Wasserstand')?.Unit || 'cm',
+      waterLevelForecast: byParam.get('WasserstandPrognose')?.Value,
+      discharge: byParam.get('Durchfluss')?.Value,
+      dischargeForecast: byParam.get('DurchflussPrognose')?.Value,
+      temperature: byParam.get('Wassertemperatur')?.Value,
+      groundwaterLevel: byParam.get('Grundwasserspiegel')?.Value,
+      precipitation3h: byParam.get('Niederschlag03h')?.Value,
+      precipitation12h: byParam.get('Niederschlag12h')?.Value,
+      precipitation24h: byParam.get('Niederschlag24h')?.Value,
+      airTemperature: byParam.get('Lufttemperatur')?.Value,
+      humidity: byParam.get('Luftfeuchtigkeit')?.Value,
+      color,
+      drainLevel,
+      detailUrl: `https://www.noel.gv.at/wasserstand/#/de/Messstellen/Details/${stationNumber}/${first.Linkparameter || 'Wasserstand'}/${first.Grafik || '3Tage'}`,
+      source: 'noe',
+      lat,
+      lng,
+      rivername: first.Rivername,
+    });
+  }
+
+  return results;
+}
 
 /**
  * Build a slug→drain-class map from the interactive map section of the page.
@@ -124,6 +286,7 @@ function parseRiverPage(html: string): PegelstandData[] {
         color,
         drainLevel,
         detailUrl: `/hydrographie/die-fluesse/${slug}`,
+        source: 'bgld',
       });
     }
   }
@@ -174,6 +337,7 @@ function parseLakePage(html: string): PegelstandData[] {
         temperature: temperature || undefined,
         color: DEFAULT_COLOR,
         detailUrl: `/hydrographie/die-seen/${slug}`,
+        source: 'bgld',
       });
     }
   }
@@ -185,9 +349,10 @@ export async function fetchPegelstandData(): Promise<PegelstandData[]> {
   await actionUserRequired();
 
   try {
-    const [riverResponse, lakeResponse] = await Promise.all([
+    const [riverResponse, lakeResponse, noeData] = await Promise.all([
       fetch(RIVER_URL, { next: { revalidate: 300 } }),
       fetch(LAKE_URL, { next: { revalidate: 300 } }),
+      fetchNoeData(),
     ]);
 
     const results: PegelstandData[] = [];
@@ -209,6 +374,8 @@ export async function fetchPegelstandData(): Promise<PegelstandData[]> {
         `Failed to fetch lake data: ${lakeResponse.status} ${lakeResponse.statusText}`
       );
     }
+
+    results.push(...noeData);
 
     return results;
   } catch (error) {
