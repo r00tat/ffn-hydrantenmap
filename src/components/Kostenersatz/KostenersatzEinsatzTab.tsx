@@ -42,7 +42,7 @@ export default function KostenersatzEinsatzTab({
   // Use override values if set, otherwise fall back to firecall data
   const displayDate = calculation.callDateOverride || firecall.date;
   const displayDescription =
-    calculation.callDescriptionOverride ||
+    calculation.nameOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
 
   const dateValue = toDateTimeLocalValue(displayDate);
@@ -62,13 +62,13 @@ export default function KostenersatzEinsatzTab({
       <TextField
         label="Titel"
         value={displayDescription}
-        onChange={(e) => onChange('callDescriptionOverride', e.target.value)}
+        onChange={(e) => onChange('nameOverride', e.target.value)}
         fullWidth
         multiline
         rows={2}
         disabled={disabled}
         helperText={
-          calculation.callDescriptionOverride
+          calculation.nameOverride
             ? 'Überschrieben'
             : undefined
         }
