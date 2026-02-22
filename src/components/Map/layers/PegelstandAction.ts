@@ -16,7 +16,7 @@ export interface PegelstandData {
   drainLevel?: string;
   detailUrl: string;
   /** Data source: 'bgld' for Burgenland, 'noe' for Niederösterreich */
-  source?: 'bgld' | 'noe';
+  source?: 'bgld' | 'noe' | 'stmk';
   /** Coordinates (NÖ entries carry these directly; Bgld uses Firestore lookup) */
   lat?: number;
   lng?: number;
@@ -65,18 +65,24 @@ const LAKE_URL = 'https://wasser.bgld.gv.at/hydrographie/die-seen';
 const NOE_MAPLIST_URL =
   'https://www.noel.gv.at/wasserstand/kidata/maplist/MapList.json';
 
-/** Max distance in km from the Burgenland border for NÖ stations */
-const NOE_MAX_DISTANCE_KM = 50;
+/** Max distance in km from the Burgenland border for neighboring stations */
+const MAX_DISTANCE_KM = 50;
 
-/** Reference points along the Burgenland-NÖ border for distance calculation */
+/** Reference points along the Burgenland border for distance calculation */
 const BURGENLAND_BORDER_POINTS: [number, number][] = [
+  // NÖ border (north/west)
   [48.02, 16.85], // Bruck an der Leitha (north)
   [47.94, 16.48], // Deutsch Brodersdorf
   [47.82, 16.27], // Wiener Neustadt
   [47.74, 16.22], // Lanzenkirchen
   [47.68, 16.14], // Gloggnitz area
   [47.58, 16.1], // Aspang area
-  [47.5, 16.05], // Hochneukirchen (south)
+  // Steiermark border (southwest)
+  [47.5, 16.05], // Hochneukirchen
+  [47.37, 16.12], // Pinkafeld area
+  [47.29, 16.2], // Oberwart area
+  [47.06, 16.32], // Güssing area
+  [46.93, 16.14], // Jennersdorf (south)
 ];
 
 /** Haversine distance in km between two lat/lng points */
@@ -152,7 +158,7 @@ async function fetchNoeData(): Promise<PegelstandData[]> {
     return (
       !isNaN(lat) &&
       !isNaN(lng) &&
-      distanceToBurgenland(lat, lng) <= NOE_MAX_DISTANCE_KM
+      distanceToBurgenland(lat, lng) <= MAX_DISTANCE_KM
     );
   });
 
@@ -232,6 +238,190 @@ async function fetchNoeData(): Promise<PegelstandData[]> {
       lat,
       lng,
       rivername: first.Rivername,
+    });
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Steiermark (HyDaVis) data source
+// ---------------------------------------------------------------------------
+
+const STMK_BASE_URL =
+  'https://egov.stmk.gv.at/at.gv.stmk.hydavis-p/pub/praesentation/index.xhtml';
+
+/** messcode values for Steiermark HyDaVis parameter types */
+const STMK_PARAMS = {
+  wasserstand: '2001',
+  durchfluss: '2002',
+} as const;
+
+interface StmkStation {
+  letzterMesswert: {
+    dbmsnr: number;
+    zeitpunkt: string; // "Feb 22, 2026, 6:00:00 PM"
+    wert: number;
+  };
+  tagessumme?: number;
+  zeigeSumme: boolean;
+  hatGueltigenMesswert: boolean;
+  dbmsnr: number;
+  hdnr: string;
+  mstnam: string;
+  koordinatenLaenge: number;
+  koordinatenBreite: number;
+  utmo: number;
+  utmn: number;
+  owMq?: number;
+  owGruen?: number;
+  owGelb?: number;
+  owRot?: number;
+  gewaesser: string;
+}
+
+/** Extract the embedded JSON station array from HyDaVis HTML */
+function parseStmkHtml(html: string): StmkStation[] {
+  const match = html.match(/\[\{"letzterMesswert[^\]]*\]/);
+  if (!match) return [];
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return [];
+  }
+}
+
+/** Determine color from Durchfluss value vs thresholds */
+function stmkColor(
+  durchflussWert: number | undefined,
+  station: StmkStation
+): { color: string; drainLevel?: string } {
+  const val = durchflussWert ?? station.letzterMesswert.wert;
+  if (station.owRot && val >= station.owRot)
+    return { color: '#ff0000', drainLevel: '> Rot' };
+  if (station.owGelb && val >= station.owGelb)
+    return { color: '#ff8c00', drainLevel: '> Gelb' };
+  if (station.owGruen && val >= station.owGruen)
+    return { color: '#ffff00', drainLevel: '> Grün' };
+  if (station.owMq && val >= station.owMq)
+    return { color: '#4169e1', drainLevel: '> MQ' };
+  return { color: DEFAULT_COLOR };
+}
+
+/** Parse Steiermark Java-style timestamp "Feb 22, 2026, 6:00:00 PM" */
+function parseStmkTimestamp(ts: string): string {
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    return d.toLocaleString('de-AT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return ts;
+  }
+}
+
+async function fetchStmkPage(messcode: string): Promise<StmkStation[]> {
+  try {
+    const url = `${STMK_BASE_URL}?messcode=${messcode}&ansichtstyp=karte&stationsstatus=ONLINE`;
+    const response = await fetch(url, {
+      next: { revalidate: 300 },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    if (!response.ok) {
+      console.error(
+        `Failed to fetch Stmk messcode=${messcode}: ${response.status}`
+      );
+      return [];
+    }
+    const html = await response.text();
+    return parseStmkHtml(html);
+  } catch (error) {
+    console.error(`Failed to fetch Stmk messcode=${messcode}:`, error);
+    return [];
+  }
+}
+
+async function fetchStmkData(): Promise<PegelstandData[]> {
+  const [wsStations, dfStations] = await Promise.all([
+    fetchStmkPage(STMK_PARAMS.wasserstand),
+    fetchStmkPage(STMK_PARAMS.durchfluss),
+  ]);
+
+  // Index Durchfluss by hdnr for merging with Wasserstand
+  const dfByHdnr = new Map<string, StmkStation>();
+  for (const s of dfStations) {
+    dfByHdnr.set(s.hdnr, s);
+  }
+
+  // Use Wasserstand stations as base, merge Durchfluss where available
+  const results: PegelstandData[] = [];
+  const seenHdnr = new Set<string>();
+
+  for (const ws of wsStations) {
+    const lat = ws.koordinatenBreite;
+    const lng = ws.koordinatenLaenge;
+    if (distanceToBurgenland(lat, lng) > MAX_DISTANCE_KM) continue;
+
+    seenHdnr.add(ws.hdnr);
+    const df = dfByHdnr.get(ws.hdnr);
+    const durchflussWert = df?.letzterMesswert.wert;
+    const { color, drainLevel } = stmkColor(durchflussWert, ws);
+
+    results.push({
+      slug: `stmk-${ws.hdnr}`,
+      name: ws.mstnam,
+      type: 'river',
+      timestamp: parseStmkTimestamp(ws.letzterMesswert.zeitpunkt),
+      waterLevel: ws.hatGueltigenMesswert
+        ? String(Math.round(ws.letzterMesswert.wert))
+        : undefined,
+      waterLevelUnit: 'cm',
+      discharge: df?.hatGueltigenMesswert
+        ? String(Math.round(df.letzterMesswert.wert * 100) / 100)
+        : undefined,
+      temperature: undefined,
+      color,
+      drainLevel,
+      detailUrl: `https://egov.stmk.gv.at/at.gv.stmk.hydavis-p/pub/praesentation/index.xhtml?messcode=2001&ansichtstyp=einzelstation&hdnr=${ws.hdnr}`,
+      source: 'stmk',
+      lat,
+      lng,
+      rivername: ws.gewaesser,
+    });
+  }
+
+  // Add Durchfluss-only stations not in Wasserstand list
+  for (const df of dfStations) {
+    if (seenHdnr.has(df.hdnr)) continue;
+    const lat = df.koordinatenBreite;
+    const lng = df.koordinatenLaenge;
+    if (distanceToBurgenland(lat, lng) > MAX_DISTANCE_KM) continue;
+
+    const { color, drainLevel } = stmkColor(df.letzterMesswert.wert, df);
+
+    results.push({
+      slug: `stmk-${df.hdnr}`,
+      name: df.mstnam,
+      type: 'river',
+      timestamp: parseStmkTimestamp(df.letzterMesswert.zeitpunkt),
+      waterLevel: undefined,
+      waterLevelUnit: 'cm',
+      discharge: df.hatGueltigenMesswert
+        ? String(Math.round(df.letzterMesswert.wert * 100) / 100)
+        : undefined,
+      temperature: undefined,
+      color,
+      drainLevel,
+      detailUrl: `https://egov.stmk.gv.at/at.gv.stmk.hydavis-p/pub/praesentation/index.xhtml?messcode=2002&ansichtstyp=einzelstation&hdnr=${df.hdnr}`,
+      source: 'stmk',
+      lat,
+      lng,
+      rivername: df.gewaesser,
     });
   }
 
@@ -379,11 +569,13 @@ export async function fetchPegelstandData(): Promise<PegelstandData[]> {
   await actionUserRequired();
 
   try {
-    const [riverResponse, lakeResponse, noeData] = await Promise.all([
-      fetch(RIVER_URL, { next: { revalidate: 300 } }),
-      fetch(LAKE_URL, { next: { revalidate: 300 } }),
-      fetchNoeData(),
-    ]);
+    const [riverResponse, lakeResponse, noeData, stmkData] =
+      await Promise.all([
+        fetch(RIVER_URL, { next: { revalidate: 300 } }),
+        fetch(LAKE_URL, { next: { revalidate: 300 } }),
+        fetchNoeData(),
+        fetchStmkData(),
+      ]);
 
     const results: PegelstandData[] = [];
 
@@ -406,6 +598,7 @@ export async function fetchPegelstandData(): Promise<PegelstandData[]> {
     }
 
     results.push(...noeData);
+    results.push(...stmkData);
 
     return results;
   } catch (error) {

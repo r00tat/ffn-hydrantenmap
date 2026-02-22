@@ -85,8 +85,8 @@ export default function PegelstandLayer() {
 
     return liveData
       .map((entry) => {
-        // NÖ entries carry coordinates directly
-        if (entry.source === 'noe' && entry.lat && entry.lng) {
+        // NÖ and Stmk entries carry coordinates directly
+        if ((entry.source === 'noe' || entry.source === 'stmk') && entry.lat && entry.lng) {
           return {
             ...entry,
             lat: entry.lat,
@@ -107,7 +107,7 @@ export default function PegelstandLayer() {
 
   return (
     <LayerGroup
-      attribution='Pegelst&auml;nde: <a href="https://wasser.bgld.gv.at" target="_blank" rel="noopener noreferrer">Wasserportal Burgenland</a> | <a href="https://www.noel.gv.at/wasserstand/" target="_blank" rel="noopener noreferrer">Land Nieder&ouml;sterreich</a>'
+      attribution='Pegelst&auml;nde: <a href="https://wasser.bgld.gv.at" target="_blank" rel="noopener noreferrer">Wasserportal Burgenland</a> | <a href="https://www.noel.gv.at/wasserstand/" target="_blank" rel="noopener noreferrer">Land Nieder&ouml;sterreich</a> | <a href="https://www.hydrografie.steiermark.at/" target="_blank" rel="noopener noreferrer">Land Steiermark</a>'
     >
       {markers.map((marker) => (
         <Marker
@@ -209,7 +209,7 @@ export default function PegelstandLayer() {
               </>
             )}
             <br />
-            {marker.source === 'noe' ? (
+            {marker.source === 'noe' || marker.source === 'stmk' ? (
               <a
                 href={marker.detailUrl}
                 target="_blank"
