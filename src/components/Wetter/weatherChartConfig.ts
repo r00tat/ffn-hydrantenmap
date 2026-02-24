@@ -29,15 +29,38 @@ export interface HistoryDataPoint {
 
 export type TimeRange = '12h' | '24h' | '48h' | '7d';
 
+export type AggregationInterval = 10 | 30 | 60 | 180;
+
+export interface AggregatedDataPoint extends HistoryDataPoint {
+  _min?: Partial<Record<keyof HistoryDataPoint, number | null>>;
+  _max?: Partial<Record<keyof HistoryDataPoint, number | null>>;
+}
+
 // --- Constants ---
 
 export const TAWES_HISTORICAL =
   'https://dataset.api.hub.geosphere.at/v1/station/historical/tawes-v1-10min';
-export const KLIMA_HOURLY =
-  'https://dataset.api.hub.geosphere.at/v1/station/historical/klima-v1-1h';
 export const TAWES_METADATA =
   'https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata';
 export const PARAMETERS = 'TL,FF,FFX,DD,RF,P,RR,SCHNEE,SO,GLOW';
+
+export const INTERVAL_LABELS: Record<AggregationInterval, string> = {
+  10: '10min',
+  30: '30min',
+  60: '1h',
+  180: '3h',
+};
+
+export function availableIntervals(range: TimeRange): AggregationInterval[] {
+  switch (range) {
+    case '12h':
+    case '24h':
+      return [10, 30, 60];
+    case '48h':
+    case '7d':
+      return [10, 30, 60, 180];
+  }
+}
 
 export const RANGE_HOURS: Record<TimeRange, number> = {
   '12h': 12,
@@ -66,8 +89,7 @@ export async function fetchHistory(
   const now = new Date();
   const start = new Date(now.getTime() - RANGE_HOURS[range] * 3600000);
 
-  const baseUrl = range === '7d' ? KLIMA_HOURLY : TAWES_HISTORICAL;
-  const url = `${baseUrl}?parameters=${PARAMETERS}&station_ids=${stationId}&start=${start.toISOString()}&end=${now.toISOString()}&output_format=geojson`;
+  const url = `${TAWES_HISTORICAL}?parameters=${PARAMETERS}&station_ids=${stationId}&start=${start.toISOString()}&end=${now.toISOString()}&output_format=geojson`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`History fetch failed: ${res.status}`);
@@ -86,8 +108,8 @@ export async function fetchHistory(
     timestamp: ts,
     time: new Date(ts).getTime(),
     TL: params.TL?.data[i] ?? null,
-    FF: params.FF?.data[i] ?? null,
-    FFX: params.FFX?.data[i] ?? null,
+    FF: params.FF?.data[i] != null ? Math.round(params.FF.data[i]! * 3.6) : null,
+    FFX: params.FFX?.data[i] != null ? Math.round(params.FFX.data[i]! * 3.6) : null,
     DD: params.DD?.data[i] ?? null,
     RF: params.RF?.data[i] ?? null,
     P: params.P?.data[i] ?? null,
@@ -135,6 +157,85 @@ export function hasData(
   return data.some((d) => d[key] !== null);
 }
 
+// --- Aggregation helper ---
+
+/** Bucket data points into fixed-width time intervals. */
+export function aggregateData(
+  data: HistoryDataPoint[],
+  minutes: number,
+  keys: (keyof HistoryDataPoint)[],
+  mode: 'sum' | 'avg' | Record<string, 'sum' | 'avg' | 'max'> = 'sum',
+  trackMinMax = false,
+): AggregatedDataPoint[] {
+  const modeFor = (k: string) =>
+    typeof mode === 'string' ? mode : (mode[k] ?? 'avg');
+  if (data.length === 0) return [];
+  const bucketMs = minutes * 60_000;
+  const buckets = new Map<number, {
+    point: any;
+    counts: Record<string, number>;
+    mins: Record<string, number>;
+    maxs: Record<string, number>;
+  }>();
+
+  for (const d of data) {
+    const bucketStart = Math.floor(d.time / bucketMs) * bucketMs;
+    let entry = buckets.get(bucketStart);
+    if (!entry) {
+      const point = { ...d, time: bucketStart, timestamp: new Date(bucketStart).toISOString() };
+      const counts: Record<string, number> = {};
+      const mins: Record<string, number> = {};
+      const maxs: Record<string, number> = {};
+      for (const k of keys) {
+        point[k as keyof typeof point] = null as never;
+        counts[k as string] = 0;
+        mins[k as string] = Infinity;
+        maxs[k as string] = -Infinity;
+      }
+      entry = { point, counts, mins, maxs };
+      buckets.set(bucketStart, entry);
+    }
+    for (const k of keys) {
+      const val = d[k] as number | null;
+      if (val != null) {
+        entry.point[k] = ((entry.point[k] as number | null) ?? 0) + val;
+        entry.counts[k as string]++;
+        entry.mins[k as string] = Math.min(entry.mins[k as string], val);
+        entry.maxs[k as string] = Math.max(entry.maxs[k as string], val);
+      }
+    }
+  }
+
+  const result: AggregatedDataPoint[] = [];
+  for (const { point, counts, mins, maxs } of buckets.values()) {
+    for (const k of keys) {
+      const count = counts[k as string];
+      if (count > 0) {
+        const m = modeFor(k as string);
+        if (m === 'avg') {
+          point[k] = point[k] / count;
+        } else if (m === 'max') {
+          point[k] = maxs[k as string];
+        }
+        // 'sum' keeps the accumulated value as-is
+      }
+    }
+    if (trackMinMax) {
+      point._min = {};
+      point._max = {};
+      for (const k of keys) {
+        if (counts[k as string] > 0) {
+          point._min[k] = mins[k as string];
+          point._max[k] = maxs[k as string];
+        }
+      }
+    }
+    result.push(point as AggregatedDataPoint);
+  }
+
+  return result.sort((a, b) => a.time - b.time);
+}
+
 // --- Chart config ---
 
 export interface ChartConfig {
@@ -144,9 +245,12 @@ export interface ChartConfig {
     label: string;
     color: string;
     dashed?: boolean;
+    /** Override aggregation mode for this key ('max' for wind gusts, etc.) */
+    aggregateMode?: 'sum' | 'avg' | 'max';
   }[];
   unit: string;
   type: 'line' | 'bar' | 'area';
+  aggregateMinutes?: number | ((range: TimeRange) => number | undefined);
 }
 
 export const CHARTS: ChartConfig[] = [
@@ -160,9 +264,9 @@ export const CHARTS: ChartConfig[] = [
     title: 'Wind',
     keys: [
       { key: 'FF', label: 'Windgeschwindigkeit', color: '#1976d2' },
-      { key: 'FFX', label: 'Windspitze', color: '#1976d2', dashed: true },
+      { key: 'FFX', label: 'Windspitze', color: '#1976d2', dashed: true, aggregateMode: 'max' },
     ],
-    unit: 'm/s',
+    unit: 'km/h',
     type: 'line',
   },
   {
@@ -170,6 +274,7 @@ export const CHARTS: ChartConfig[] = [
     keys: [{ key: 'RR', label: 'Niederschlag', color: '#1565c0' }],
     unit: 'mm',
     type: 'bar',
+    aggregateMinutes: (range) => (range === '48h' || range === '7d' ? 60 : undefined),
   },
   {
     title: 'Luftfeuchtigkeit',
@@ -194,6 +299,7 @@ export const CHARTS: ChartConfig[] = [
     keys: [{ key: 'SO', label: 'Sonnenschein', color: '#fdd835' }],
     unit: 'min',
     type: 'bar',
+    aggregateMinutes: () => 60,
   },
   {
     title: 'Globalstrahlung',

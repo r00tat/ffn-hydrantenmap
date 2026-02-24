@@ -4,17 +4,16 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import CircularProgress from '@mui/material/CircularProgress';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TawesStation, HistoryDataPoint, TimeRange } from './weatherChartConfig';
-import { fetchStationInfo, fetchHistory } from './weatherChartConfig';
-import WetterstationHistoryRechartsView from './WetterstationHistoryRecharts';
+import type { TawesStation, HistoryDataPoint, TimeRange, AggregationInterval } from './weatherChartConfig';
+import { fetchStationInfo, fetchHistory, availableIntervals, INTERVAL_LABELS } from './weatherChartConfig';
 import WetterstationHistoryMuiCharts from './WetterstationHistoryMui';
-
-type ChartLib = 'recharts' | 'mui';
 
 export default function WetterstationHistory({
   stationId,
@@ -25,7 +24,8 @@ export default function WetterstationHistory({
   const [data, setData] = useState<HistoryDataPoint[]>([]);
   const [range, setRange] = useState<TimeRange>('24h');
   const [loading, setLoading] = useState(true);
-  const [chartLib, setChartLib] = useState<ChartLib>('recharts');
+  const [aggregation, setAggregation] = useState<AggregationInterval>(10);
+  const [showMinMax, setShowMinMax] = useState(false);
   const mountedRef = useRef(true);
 
   const loadData = useCallback(
@@ -59,6 +59,20 @@ export default function WetterstationHistory({
 
   const handleRangeChange = (r: TimeRange) => {
     setRange(r);
+    if (!availableIntervals(r).includes(aggregation)) {
+      setAggregation(10);
+      setShowMinMax(false);
+    }
+  };
+
+  const handleAggregationChange = (
+    _event: React.MouseEvent<HTMLElement>,
+    value: AggregationInterval | null,
+  ) => {
+    if (value !== null) {
+      setAggregation(value);
+      if (value === 10) setShowMinMax(false);
+    }
   };
 
   return (
@@ -94,14 +108,30 @@ export default function WetterstationHistory({
         </ButtonGroup>
 
         <ToggleButtonGroup
-          value={chartLib}
+          value={aggregation}
           exclusive
-          onChange={(_e, v) => v && setChartLib(v as ChartLib)}
+          onChange={handleAggregationChange}
           size="small"
         >
-          <ToggleButton value="recharts">Recharts</ToggleButton>
-          <ToggleButton value="mui">MUI X Charts</ToggleButton>
+          {availableIntervals(range).map((iv) => (
+            <ToggleButton key={iv} value={iv}>
+              {INTERVAL_LABELS[iv]}
+            </ToggleButton>
+          ))}
         </ToggleButtonGroup>
+
+        {aggregation !== 10 && (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showMinMax}
+                onChange={(e) => setShowMinMax(e.target.checked)}
+                size="small"
+              />
+            }
+            label="Min/Max"
+          />
+        )}
       </Box>
 
       {loading ? (
@@ -112,10 +142,13 @@ export default function WetterstationHistory({
         <Typography color="text.secondary">
           Keine Daten für den gewählten Zeitraum verfügbar.
         </Typography>
-      ) : chartLib === 'recharts' ? (
-        <WetterstationHistoryRechartsView data={data} range={range} />
       ) : (
-        <WetterstationHistoryMuiCharts data={data} range={range} />
+        <WetterstationHistoryMuiCharts
+          data={data}
+          range={range}
+          globalAggregation={aggregation}
+          showMinMax={showMinMax}
+        />
       )}
 
       <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
