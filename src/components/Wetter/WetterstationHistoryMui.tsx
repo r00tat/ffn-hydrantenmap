@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { LineChart } from '@mui/x-charts/LineChart';
+import type { SxProps } from '@mui/system/styleFunctionSx';
 import type { HistoryDataPoint, ChartConfig, TimeRange } from './weatherChartConfig';
 import { CHARTS, formatXAxisTick, tooltipTimestamp, hasData } from './weatherChartConfig';
 
@@ -40,18 +41,31 @@ function WeatherChartMui({
 
   if (config.type === 'line' || config.type === 'area') {
     const series = config.keys.map((k) => ({
+      id: k.key,
       data: data.map((d) => d[k.key] as number | null),
       label: k.label,
       color: k.color,
       showMark: false,
       connectNulls: true,
       area: config.type === 'area',
-      ...(k.dashed
-        ? {
-            // Dashed line via sx doesn't apply per-series, use baseline styling
-          }
-        : {}),
+      valueFormatter: (v: number | null) =>
+        v != null ? `${v.toFixed(1)} ${config.unit}` : '–',
     }));
+
+    // Build sx styles: dashed lines by series ID, area opacity
+    const sx: SxProps = {};
+    if (config.type === 'area') {
+      Object.assign(sx, {
+        '& .MuiAreaElement-root': { fillOpacity: 0.3 },
+      });
+    }
+    for (const k of config.keys) {
+      if (k.dashed) {
+        Object.assign(sx, {
+          [`.MuiLineElement-series-${k.key}`]: { strokeDasharray: '5 5' },
+        });
+      }
+    }
 
     return (
       <Box sx={{ mb: 3 }}>
@@ -66,22 +80,7 @@ function WeatherChartMui({
           series={series}
           grid={{ horizontal: true }}
           hideLegend={config.keys.length <= 1}
-          sx={
-            config.type === 'area'
-              ? {
-                  '& .MuiAreaElement-root': {
-                    fillOpacity: 0.3,
-                  },
-                }
-              : config.keys.some((k) => k.dashed)
-                ? {
-                    // Apply dashed style to the second line (wind gusts)
-                    '& .MuiLineElement-root:nth-of-type(2)': {
-                      strokeDasharray: '5 5',
-                    },
-                  }
-                : undefined
-          }
+          sx={Object.keys(sx).length > 0 ? sx : undefined}
         />
       </Box>
     );
@@ -92,6 +91,8 @@ function WeatherChartMui({
     dataKey: k.key,
     label: k.label,
     color: k.color,
+    valueFormatter: (v: number | null) =>
+      v != null ? `${v.toFixed(1)} ${config.unit}` : '–',
   }));
 
   // For BarChart we need dataset + band xAxis
