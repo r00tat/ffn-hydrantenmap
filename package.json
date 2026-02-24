@@ -28,6 +28,7 @@
     "@mui/icons-material": "^7.3.8",
     "@mui/lab": "^7.0.1-beta.22",
     "@mui/material": "^7.0.2",
+    "@mui/x-charts": "^8.27.0",
     "@mui/x-date-pickers": "^8.27.2",
     "@react-leaflet/core": "^3.0.0",
     "@react-pdf/renderer": "^4.3.2",
@@ -66,7 +67,6 @@
     "react-firebase-hooks": "^5.1.1",
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^5.0.0",
-    "recharts": "^3.7.0",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "uuid": "^13.0.0"
