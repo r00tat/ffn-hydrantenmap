@@ -1,13 +1,19 @@
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
+import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormGroup from '@mui/material/FormGroup';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import InputLabel from '@mui/material/InputLabel';
 import ListItemText from '@mui/material/ListItemText';
 import MenuItem from '@mui/material/MenuItem';
@@ -15,7 +21,12 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
-import React, { useState } from 'react';
+import Typography from '@mui/material/Typography';
+import React, { useCallback, useState } from 'react';
+import {
+  sendPasswordResetEmailAction,
+  setUserPasswordAction,
+} from '../../app/users/action';
 import { feuerwehren } from '../../common/feuerwehren';
 import { UserRecordExtended, userTextFields } from '../../common/users';
 
@@ -34,6 +45,148 @@ export interface UserRecordExtendedDialogOptions {
   onClose: (item?: UserRecordExtended) => void;
   user: UserRecordExtended;
   groups: { [key: string]: string };
+}
+
+function generatePassword() {
+  const chars =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, (b) => chars[b % chars.length]).join('');
+}
+
+function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
+  const [resetLink, setResetLink] = useState('');
+  const [newPassword, setNewPassword] = useState(generatePassword);
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const handleSendResetEmail = useCallback(async () => {
+    setLoading(true);
+    setFeedback(null);
+    setResetLink('');
+    try {
+      const result = await sendPasswordResetEmailAction(email);
+      setResetLink(result.link);
+      setFeedback({
+        type: 'success',
+        message: `Passwort-Reset Link für ${email} wurde generiert.`,
+      });
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: `Fehler: ${err.message || err}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [email]);
+
+  const handleSetPassword = useCallback(async () => {
+    if (!newPassword || newPassword.length < 6) {
+      setFeedback({
+        type: 'error',
+        message: 'Passwort muss mindestens 6 Zeichen lang sein.',
+      });
+      return;
+    }
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await setUserPasswordAction(uid, newPassword);
+      setFeedback({
+        type: 'success',
+        message: 'Passwort wurde erfolgreich gesetzt.',
+      });
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: `Fehler: ${err.message || err}`,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [uid, newPassword]);
+
+  return (
+    <>
+      {feedback && (
+        <Alert severity={feedback.type} sx={{ mb: 1 }} onClose={() => setFeedback(null)}>
+          {feedback.message}
+        </Alert>
+      )}
+      <Button
+        variant="outlined"
+        onClick={handleSendResetEmail}
+        disabled={loading || !email}
+        sx={{ mb: 1 }}
+      >
+        {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+        Reset-Link generieren
+      </Button>
+      {resetLink && (
+        <TextField
+          fullWidth
+          size="small"
+          value={resetLink}
+          slotProps={{
+            input: {
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => navigator.clipboard.writeText(resetLink)}
+                    size="small"
+                    title="Link kopieren"
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ mb: 1 }}
+        />
+      )}
+      <TextField
+        margin="dense"
+        label="Neues Passwort"
+        type="text"
+        fullWidth
+        variant="outlined"
+        size="small"
+        value={newPassword}
+        onChange={(e) => setNewPassword(e.target.value)}
+        slotProps={{
+          input: {
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={() => navigator.clipboard.writeText(newPassword)}
+                  size="small"
+                  title="Passwort kopieren"
+                >
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
+      <Button
+        variant="outlined"
+        onClick={handleSetPassword}
+        disabled={loading || !newPassword}
+        sx={{ mt: 1 }}
+      >
+        {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+        Passwort setzen
+      </Button>
+    </>
+  );
 }
 
 export default function UserRecordExtendedDialog({
@@ -165,6 +318,12 @@ export default function UserRecordExtendedDialog({
             label="Authorized"
           />
         </FormGroup>
+
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle1" gutterBottom>
+          Passwort
+        </Typography>
+        <PasswordResetSection uid={user.uid} email={user.email || ''} />
       </DialogContent>
       <DialogActions>
         <Button

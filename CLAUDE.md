@@ -54,6 +54,18 @@ git checkout -- next-env.d.ts
 - `src/worker/` - Service worker with FCM integration
 - `firebase/` - Firestore rules and indexes (separate dev/prod environments)
 
+### Server Actions vs API Routes
+
+Prefer Next.js Server Actions (`'use server'`) over API route handlers (`src/app/api/`) for data mutations and server-side operations. Server Actions provide better type safety, simpler client integration, and reduce boilerplate compared to manually creating API endpoints.
+
+**All server actions must be protected** with the appropriate auth guard from `src/app/auth.ts`:
+
+- `actionAdminRequired()` — admin-only operations (user management, system config)
+- `actionUserRequired()` — any authorized/logged-in user
+- `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall
+
+Call the guard at the top of every server action before any logic. For API routes (legacy), use `adminRequired(req)` from `src/server/auth/adminRequired.ts` instead.
+
 ### Key Patterns
 
 **Context Providers** (in `src/components/providers/`): FirecallProvider, FirecallLayerProvider, MapEditorProvider wrap the app for global state.
