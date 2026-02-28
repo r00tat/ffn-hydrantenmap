@@ -21,12 +21,12 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
 import React, { useCallback, useState } from 'react';
 import {
   sendPasswordResetEmailAction,
   setUserPasswordAction,
 } from '../../app/users/action';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { feuerwehren } from '../../common/feuerwehren';
 import { UserRecordExtended, userTextFields } from '../../common/users';
 
@@ -57,7 +57,8 @@ function generatePassword() {
 
 function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
   const [resetLink, setResetLink] = useState('');
-  const [newPassword, setNewPassword] = useState(generatePassword);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
@@ -86,20 +87,15 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
   }, [email]);
 
   const handleSetPassword = useCallback(async () => {
-    if (!newPassword || newPassword.length < 6) {
-      setFeedback({
-        type: 'error',
-        message: 'Passwort muss mindestens 6 Zeichen lang sein.',
-      });
-      return;
-    }
     setLoading(true);
     setFeedback(null);
+    const password = generatePassword();
     try {
-      await setUserPasswordAction(uid, newPassword);
+      await setUserPasswordAction(uid, password);
+      setGeneratedPassword(password);
       setFeedback({
         type: 'success',
-        message: 'Passwort wurde erfolgreich gesetzt.',
+        message: 'Neues Passwort wurde gesetzt:',
       });
     } catch (err: any) {
       setFeedback({
@@ -109,7 +105,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
     } finally {
       setLoading(false);
     }
-  }, [uid, newPassword]);
+  }, [uid]);
 
   return (
     <>
@@ -118,19 +114,38 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
           {feedback.message}
         </Alert>
       )}
-      <Button
-        variant="outlined"
-        onClick={handleSendResetEmail}
-        disabled={loading || !email}
-        sx={{ mb: 1 }}
-      >
-        {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
-        Reset-Link generieren
-      </Button>
+      {generatedPassword && (
+        <TextField
+          fullWidth
+          size="small"
+          label="Neues Passwort"
+          value={generatedPassword}
+          slotProps={{
+            input: {
+              readOnly: true,
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() =>
+                      navigator.clipboard.writeText(generatedPassword)
+                    }
+                    size="small"
+                    title="Passwort kopieren"
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ mb: 1 }}
+        />
+      )}
       {resetLink && (
         <TextField
           fullWidth
           size="small"
+          label="Reset-Link"
           value={resetLink}
           slotProps={{
             input: {
@@ -151,40 +166,34 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
           sx={{ mb: 1 }}
         />
       )}
-      <TextField
-        margin="dense"
-        label="Neues Passwort"
-        type="text"
-        fullWidth
-        variant="outlined"
-        size="small"
-        value={newPassword}
-        onChange={(e) => setNewPassword(e.target.value)}
-        slotProps={{
-          input: {
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  onClick={() => navigator.clipboard.writeText(newPassword)}
-                  size="small"
-                  title="Passwort kopieren"
-                >
-                  <ContentCopyIcon fontSize="small" />
-                </IconButton>
-              </InputAdornment>
-            ),
-          },
-        }}
-      />
       <Button
         variant="outlined"
-        onClick={handleSetPassword}
-        disabled={loading || !newPassword}
-        sx={{ mt: 1 }}
+        onClick={handleSendResetEmail}
+        disabled={loading || !email}
+        sx={{ mr: 1 }}
       >
         {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
-        Passwort setzen
+        Passwort Reset-Link generieren
       </Button>
+      <Button
+        variant="outlined"
+        onClick={() => setShowConfirm(true)}
+        disabled={loading}
+      >
+        Passwort zurücksetzen
+      </Button>
+      {showConfirm && (
+        <ConfirmDialog
+          title="Passwort zurücksetzen"
+          text={`Soll das Passwort für ${email} wirklich zurückgesetzt werden?`}
+          onConfirm={(confirmed) => {
+            setShowConfirm(false);
+            if (confirmed) {
+              handleSetPassword();
+            }
+          }}
+        />
+      )}
     </>
   );
 }
@@ -320,9 +329,6 @@ export default function UserRecordExtendedDialog({
         </FormGroup>
 
         <Divider sx={{ my: 2 }} />
-        <Typography variant="subtitle1" gutterBottom>
-          Passwort
-        </Typography>
         <PasswordResetSection uid={user.uid} email={user.email || ''} />
       </DialogContent>
       <DialogActions>
