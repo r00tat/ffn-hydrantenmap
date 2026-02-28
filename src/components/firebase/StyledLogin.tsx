@@ -14,13 +14,13 @@ import {
   getAdditionalUserInfo,
   GoogleAuthProvider,
   sendEmailVerification,
-  sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
+import { sendPasswordReset } from '../../app/actions/passwordReset';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -153,17 +153,14 @@ export default function StyledLoginButton({
       setError('Bitte geben Sie eine gültige Email Adresse ein.');
       return;
     }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setInfo(
-        'Eine Email zum Zurücksetzen des Passworts wurde versandt. Bitte prüfen Sie Ihre Email.'
-      );
+    const result = await sendPasswordReset(email);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setInfo(result.info || '');
       setError(undefined);
-    } catch (err) {
-      console.error(`password reset failed`, err);
-      setError((err as any).message || `${err}`);
     }
-  }, [auth, email]);
+  }, [email]);
 
   useEffect(() => {
     (async () => {
