@@ -31,7 +31,7 @@ const MenuProps = {
 };
 
 export interface UserRecordExtendedDialogOptions {
-  onClose: (item?: UserRecordExtended) => void;
+  onClose: (item?: UserRecordExtended, newPassword?: string) => void;
   user: UserRecordExtended;
   groups: { [key: string]: string };
 }
@@ -44,6 +44,7 @@ export default function UserRecordExtendedDialog({
   const [open, setOpen] = useState(true);
   const [user, setUserRecordExtended] =
     useState<UserRecordExtended>(userDefault);
+  const [newPassword, setNewPassword] = useState('');
 
   const onChange =
     (field: string) =>
@@ -129,6 +130,22 @@ export default function UserRecordExtendedDialog({
             value={((user as any)[key] as string) || ''}
           />
         ))}
+        <TextField
+          margin="dense"
+          id="newPassword"
+          label="Neues Passwort setzen"
+          type="password"
+          fullWidth
+          variant="standard"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          helperText={
+            newPassword && newPassword.length < 6
+              ? 'Mindestens 6 Zeichen'
+              : undefined
+          }
+        />
         <FormControl sx={{ m: 1, width: 300 }}>
           <InputLabel id="user-group-checkbox-label">Gruppen</InputLabel>
           <Select
@@ -178,7 +195,7 @@ export default function UserRecordExtendedDialog({
         <Button
           onClick={() => {
             setOpen(false);
-            onClose(user);
+            onClose(user, newPassword || undefined);
           }}
         >
           Aktualisieren

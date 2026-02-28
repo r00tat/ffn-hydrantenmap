@@ -25,6 +25,7 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
 import { Group } from '../groups/groupTypes';
+import { setUserPasswordAction } from './action';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -330,10 +331,19 @@ export default function Users() {
         <UserRecordExtendedDialog
           user={editUser}
           groups={groups}
-          onClose={(user) => {
+          onClose={async (user, newPassword) => {
             setShowEditUserDialog(false);
             if (user) {
-              updateUser(user);
+              await updateUser(user);
+              if (newPassword) {
+                const result = await setUserPasswordAction(
+                  user.uid,
+                  newPassword
+                );
+                if (result.error) {
+                  alert(result.error);
+                }
+              }
             }
           }}
         />
