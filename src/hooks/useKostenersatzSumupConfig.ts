@@ -65,6 +65,8 @@ export function useKostenersatzSumupConfig() {
       const updatedConfig: KostenersatzSumupConfig = {
         ...config,
         ...newConfig,
+        updatedAt: new Date().toISOString(),
+        updatedBy: email || 'unknown',
       };
 
       try {

@@ -146,7 +146,7 @@ export async function createSumupCheckout(
         merchant_code: config.merchantCode,
         description: `Kostenersatz ${firecallId}`,
         return_url: `${baseUrl}/api/sumup/webhook`,
-        redirect_url: `${baseUrl}/app/firecall/${firecallId}/kostenersatz/${calculationId}`,
+        redirect_url: config.redirectUrl || `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}`,
         hosted_checkout: {
           enabled: true,
         },

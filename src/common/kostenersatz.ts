@@ -169,6 +169,8 @@ export interface KostenersatzSumupConfig {
   merchantCode: string;
   currency: string;
   redirectUrl?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export const DEFAULT_SUMUP_CONFIG: KostenersatzSumupConfig = {
