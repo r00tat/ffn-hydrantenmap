@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { firestore } from '../../../../server/firebase/admin';
-import { FIRECALL_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { KOSTENERSATZ_SUBCOLLECTION } from '../../../../common/kostenersatz';
 
 export async function POST(request: Request) {
@@ -8,7 +7,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { id, event_type } = body;
 
-    if (event_type !== 'CHECKOUT_STATUS_CHANGED' || !id) {
+    if (event_type !== 'CHECKOUT_STATUS_CHANGED' || !id || typeof id !== 'string' || id.length > 100) {
       return NextResponse.json({ received: true });
     }
 
@@ -56,39 +55,42 @@ export async function POST(request: Request) {
     }
 
     // Find the calculation by sumupCheckoutId across all firecalls
-    const firecallsSnapshot = await firestore
-      .collection(FIRECALL_COLLECTION_ID)
+    const calcSnapshot = await firestore
+      .collectionGroup(KOSTENERSATZ_SUBCOLLECTION)
+      .where('sumupCheckoutId', '==', id)
+      .limit(1)
       .get();
 
-    for (const firecallDoc of firecallsSnapshot.docs) {
-      const calcSnapshot = await firecallDoc.ref
-        .collection(KOSTENERSATZ_SUBCOLLECTION)
-        .where('sumupCheckoutId', '==', id)
-        .limit(1)
-        .get();
+    if (!calcSnapshot.empty) {
+      const calcDoc = calcSnapshot.docs[0];
+      const existingData = calcDoc.data();
 
-      if (!calcSnapshot.empty) {
-        const calcDoc = calcSnapshot.docs[0];
-        const updateData: Record<string, any> = {
-          sumupPaymentStatus: paymentStatus,
-          updatedAt: new Date().toISOString(),
-        };
-
-        if (paymentStatus === 'paid') {
-          updateData.sumupPaidAt = new Date().toISOString();
-          // Store transaction code if available
-          if (checkout.transactions?.[0]?.transaction_code) {
-            updateData.sumupTransactionCode =
-              checkout.transactions[0].transaction_code;
-          }
-        }
-
-        await calcDoc.ref.update(updateData);
+      // Skip if already in this status (idempotency)
+      if (existingData.sumupPaymentStatus === paymentStatus) {
         console.info(
-          `SumUp webhook: updated calculation ${calcDoc.id} to ${paymentStatus}`
+          `SumUp webhook: calculation ${calcDoc.id} already ${paymentStatus}, skipping`
         );
-        break;
+        return NextResponse.json({ received: true });
       }
+
+      const updateData: Record<string, any> = {
+        sumupPaymentStatus: paymentStatus,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (paymentStatus === 'paid') {
+        updateData.sumupPaidAt = new Date().toISOString();
+        // Store transaction code if available
+        if (checkout.transactions?.[0]?.transaction_code) {
+          updateData.sumupTransactionCode =
+            checkout.transactions[0].transaction_code;
+        }
+      }
+
+      await calcDoc.ref.update(updateData);
+      console.info(
+        `SumUp webhook: updated calculation ${calcDoc.id} to ${paymentStatus}`
+      );
     }
 
     return NextResponse.json({ received: true });
