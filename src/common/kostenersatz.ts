@@ -423,9 +423,10 @@ export function formatCurrency(value: number): string {
 }
 
 /**
- * Format payment method for display
+ * Format payment method for display.
+ * For SumUp methods, optionally include payment status.
  */
-export function formatPaymentMethod(method: PaymentMethod): string {
+export function formatPaymentMethod(method: PaymentMethod, sumupPaymentStatus?: string): string {
   switch (method) {
     case 'bar':
       return 'Bar: Betrag eingehoben';
@@ -433,10 +434,22 @@ export function formatPaymentMethod(method: PaymentMethod): string {
       return 'Kreditkarte: Betrag eingehoben';
     case 'rechnung':
       return 'Rechnung: Betrag ausständig';
-    case 'sumup_online':
-      return 'Onlinezahlung (SumUp)';
-    case 'sumup_app':
-      return 'Kartenzahlung (SumUp)';
+    case 'sumup_online': {
+      const label = 'Onlinezahlung (SumUp)';
+      if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
+      if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
+      if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
+      if (sumupPaymentStatus === 'pending') return `${label}: Betrag ausständig`;
+      return label;
+    }
+    case 'sumup_app': {
+      const label = 'Kartenzahlung (SumUp)';
+      if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
+      if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
+      if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
+      if (sumupPaymentStatus === 'pending') return `${label}: Betrag ausständig`;
+      return label;
+    }
   }
 }
 
