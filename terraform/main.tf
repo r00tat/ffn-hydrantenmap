@@ -113,6 +113,64 @@ resource "google_artifact_registry_repository" "run_docker" {
   #   }
   # }
 }
+# ============================================================================
+# Secret Manager
+# ============================================================================
+
+locals {
+  secrets = toset([
+    "AUTH_SECRET",
+    "GOOGLE_SERVICE_ACCOUNT",
+    "BLAULICHTSMS_USERNAME",
+    "BLAULICHTSMS_PASSWORD",
+    "BLAULICHTSMS_CUSTOMER_ID",
+    "SUMUP_API_KEY",
+    "SUMUP_AFFILIATE_KEY",
+  ])
+}
+
+resource "google_secret_manager_secret" "secrets" {
+  for_each  = local.secrets
+  secret_id = each.value
+  project   = var.project
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "secret_access" {
+  for_each  = local.secrets
+  secret_id = google_secret_manager_secret.secrets[each.key].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.run_sa.member
+}
+
+import {
+  to = google_secret_manager_secret.secrets["AUTH_SECRET"]
+  id = "projects/${var.project}/secrets/AUTH_SECRET"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["GOOGLE_SERVICE_ACCOUNT"]
+  id = "projects/${var.project}/secrets/GOOGLE_SERVICE_ACCOUNT"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["BLAULICHTSMS_USERNAME"]
+  id = "projects/${var.project}/secrets/BLAULICHTSMS_USERNAME"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["BLAULICHTSMS_PASSWORD"]
+  id = "projects/${var.project}/secrets/BLAULICHTSMS_PASSWORD"
+}
+
+import {
+  to = google_secret_manager_secret.secrets["BLAULICHTSMS_CUSTOMER_ID"]
+  id = "projects/${var.project}/secrets/BLAULICHTSMS_CUSTOMER_ID"
+}
+
 resource "google_artifact_registry_repository" "run_docker2" {
   project       = var.project
   location      = var.run_region
