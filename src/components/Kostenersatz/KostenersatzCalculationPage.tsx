@@ -580,6 +580,9 @@ export default function KostenersatzCalculationPage({
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
               disabled={!isEditable}
+              firecallId={firecallId}
+              calculationId={existingCalculation?.id || calculation.id}
+              sumupPaymentStatus={calculation.sumupPaymentStatus}
             />
           </TabPanel>
         </Box>
