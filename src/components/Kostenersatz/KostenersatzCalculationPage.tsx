@@ -135,6 +135,20 @@ export default function KostenersatzCalculationPage({
     }
   }, [activeVersion, existingCalculation]);
 
+  // Sync SumUp payment status from Firestore real-time updates
+  useEffect(() => {
+    if (existingCalculation?.sumupPaymentStatus &&
+        existingCalculation.sumupPaymentStatus !== calculation.sumupPaymentStatus) {
+      setCalculation((prev) => ({
+        ...prev,
+        sumupPaymentStatus: existingCalculation.sumupPaymentStatus,
+        sumupPaidAt: existingCalculation.sumupPaidAt,
+        sumupTransactionCode: existingCalculation.sumupTransactionCode,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.sumupPaymentStatus to avoid infinite loop
+  }, [existingCalculation?.sumupPaymentStatus, existingCalculation?.sumupPaidAt, existingCalculation?.sumupTransactionCode]);
+
   // Recalculate totals when items change
   useEffect(() => {
     const subtotals = calculateSubtotals(calculation.items, rates);
@@ -580,6 +594,9 @@ export default function KostenersatzCalculationPage({
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
               disabled={!isEditable}
+              firecallId={firecallId}
+              calculationId={existingCalculation?.id || calculation.id}
+              sumupPaymentStatus={calculation.sumupPaymentStatus}
             />
           </TabPanel>
         </Box>
