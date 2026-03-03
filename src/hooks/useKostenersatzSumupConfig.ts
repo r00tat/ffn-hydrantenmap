@@ -77,7 +77,7 @@ export function useKostenersatzSumupConfig() {
         throw err;
       }
     },
-    [config]
+    [config, email]
   );
 
   return {
