@@ -6,6 +6,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
 import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
@@ -15,9 +19,13 @@ import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PaymentIcon from '@mui/icons-material/Payment';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import QrCodeIcon from '@mui/icons-material/QrCode';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   formatPaymentMethod,
   KostenersatzRecipient,
@@ -63,6 +71,8 @@ export default function KostenersatzEmpfaengerTab({
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   // Auto-check payment status when there's a pending payment
   useEffect(() => {
@@ -125,7 +135,8 @@ export default function KostenersatzEmpfaengerTab({
     try {
       const result = await createSumupCheckout(firecallId, calculationId);
       if (result.success && result.checkoutUrl) {
-        window.open(result.checkoutUrl, '_blank');
+        setCheckoutUrl(result.checkoutUrl);
+        setShowPaymentDialog(true);
       } else {
         setError(result.error || 'Fehler beim Erstellen der Zahlung');
       }
@@ -133,6 +144,16 @@ export default function KostenersatzEmpfaengerTab({
       setError(err.message || 'Fehler beim Erstellen der Zahlung');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!checkoutUrl) return;
+    try {
+      await navigator.clipboard.writeText(checkoutUrl);
+      setStatusMessage('Link kopiert');
+    } catch {
+      setError('Link konnte nicht kopiert werden');
     }
   };
 
@@ -221,14 +242,14 @@ export default function KostenersatzEmpfaengerTab({
       </FormControl>
 
       {recipient.paymentMethod === 'sumup_online' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Button
             variant="contained"
             startIcon={isLoading ? <CircularProgress size={20} /> : <PaymentIcon />}
             onClick={handleOnlinePayment}
             disabled={sumupButtonDisabled}
           >
-            Online bezahlen
+            Zahlung erstellen
           </Button>
           {sumupPaymentStatus && (
             <>
@@ -265,6 +286,51 @@ export default function KostenersatzEmpfaengerTab({
           )}
         </Box>
       )}
+
+      {/* Payment sharing dialog with QR code */}
+      <Dialog
+        open={showPaymentDialog}
+        onClose={() => setShowPaymentDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Zahlungslink</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pt: 1 }}>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              QR-Code scannen oder Link teilen, um die Zahlung durchzuf&uuml;hren
+            </Typography>
+            {checkoutUrl && (
+              <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1 }}>
+                <QRCodeSVG value={checkoutUrl} size={220} />
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+              <Button
+                variant="outlined"
+                startIcon={<ContentCopyIcon />}
+                onClick={handleCopyLink}
+                fullWidth
+              >
+                Link kopieren
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<OpenInNewIcon />}
+                onClick={() => { if (checkoutUrl) window.open(checkoutUrl, '_blank'); }}
+                fullWidth
+              >
+                Im Browser &ouml;ffnen
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowPaymentDialog(false)}>
+            Schlie&szlig;en
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={!!statusMessage}
