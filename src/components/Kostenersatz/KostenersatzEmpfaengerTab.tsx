@@ -1,25 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import PaymentIcon from '@mui/icons-material/Payment';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   formatPaymentMethod,
   KostenersatzRecipient,
   PaymentMethod,
 } from '../../common/kostenersatz';
-import { createSumupCheckout, getSumupDeepLink } from './sumupActions';
+import { createSumupCheckout, getSumupDeepLink, checkSumupPaymentStatus } from './sumupActions';
 
 export interface KostenersatzEmpfaengerTabProps {
   recipient: KostenersatzRecipient;
@@ -56,7 +59,34 @@ export default function KostenersatzEmpfaengerTab({
   sumupPaymentStatus,
 }: KostenersatzEmpfaengerTabProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-check payment status when there's a pending payment
+  useEffect(() => {
+    if (sumupPaymentStatus === 'pending' && firecallId && calculationId) {
+      setIsCheckingStatus(true);
+      checkSumupPaymentStatus(firecallId, calculationId)
+        .catch(() => {})
+        .finally(() => setIsCheckingStatus(false));
+    }
+  }, [sumupPaymentStatus, firecallId, calculationId]);
+
+  const handleCheckStatus = async () => {
+    if (!firecallId || !calculationId) return;
+    setIsCheckingStatus(true);
+    setError(null);
+    try {
+      const result = await checkSumupPaymentStatus(firecallId, calculationId);
+      if (!result.success) {
+        setError(result.error || 'Fehler beim Prüfen des Status');
+      }
+    } catch {
+      setError('Fehler beim Prüfen des Zahlungsstatus');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   const handleFieldChange =
     (field: keyof KostenersatzRecipient) =>
@@ -187,7 +217,16 @@ export default function KostenersatzEmpfaengerTab({
           >
             Online bezahlen
           </Button>
-          {sumupPaymentStatus && <PaymentStatusChip status={sumupPaymentStatus} />}
+          {sumupPaymentStatus && (
+            <>
+              <PaymentStatusChip status={sumupPaymentStatus} />
+              <Tooltip title="Status prüfen">
+                <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
+                  {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
         </Box>
       )}
 
@@ -201,7 +240,16 @@ export default function KostenersatzEmpfaengerTab({
           >
             In SumUp App bezahlen
           </Button>
-          {sumupPaymentStatus && <PaymentStatusChip status={sumupPaymentStatus} />}
+          {sumupPaymentStatus && (
+            <>
+              <PaymentStatusChip status={sumupPaymentStatus} />
+              <Tooltip title="Status prüfen">
+                <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
+                  {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
         </Box>
       )}
 

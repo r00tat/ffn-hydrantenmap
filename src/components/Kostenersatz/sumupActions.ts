@@ -30,6 +30,12 @@ interface SumupDeepLinkResponse {
   error?: string;
 }
 
+interface SumupPaymentStatusResponse {
+  success: boolean;
+  status?: 'pending' | 'paid' | 'failed' | 'expired';
+  error?: string;
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -238,5 +244,92 @@ export async function getSumupDeepLink(
   } catch (error: any) {
     console.error('Error generating SumUp deep link:', error);
     return { success: false, error: 'Failed to generate SumUp deep link' };
+  }
+}
+
+/**
+ * Check the current payment status of a SumUp checkout.
+ *
+ * Queries the SumUp API for the checkout status and updates Firestore
+ * if the status has changed. This serves as a fallback when the webhook
+ * is not reachable (e.g. local development) or fails.
+ */
+export async function checkSumupPaymentStatus(
+  firecallId: string,
+  calculationId: string
+): Promise<SumupPaymentStatusResponse> {
+  try {
+    await requireKostenersatzUser(firecallId);
+
+    const calculation = await getCalculation(firecallId, calculationId);
+
+    if (!calculation.sumupCheckoutId) {
+      return { success: false, error: 'Keine SumUp-Zahlung vorhanden' };
+    }
+
+    const apiKey = process.env.SUMUP_API_KEY;
+    if (!apiKey) {
+      return { success: false, error: 'SumUp API key not configured' };
+    }
+
+    const checkoutResponse = await fetch(
+      `https://api.sumup.com/v0.1/checkouts/${calculation.sumupCheckoutId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      }
+    );
+
+    if (!checkoutResponse.ok) {
+      return { success: false, error: 'Fehler beim Abrufen des Zahlungsstatus' };
+    }
+
+    const checkout = await checkoutResponse.json();
+    const sumupStatus = checkout.status?.toUpperCase();
+
+    let paymentStatus: 'pending' | 'paid' | 'failed' | 'expired';
+    switch (sumupStatus) {
+      case 'PAID':
+        paymentStatus = 'paid';
+        break;
+      case 'FAILED':
+        paymentStatus = 'failed';
+        break;
+      case 'EXPIRED':
+        paymentStatus = 'expired';
+        break;
+      default:
+        paymentStatus = 'pending';
+    }
+
+    // Update Firestore if status changed
+    if (calculation.sumupPaymentStatus !== paymentStatus) {
+      const calculationRef = firestore
+        .collection(FIRECALL_COLLECTION_ID)
+        .doc(firecallId)
+        .collection(KOSTENERSATZ_SUBCOLLECTION)
+        .doc(calculationId);
+
+      const updateData: Record<string, any> = {
+        sumupPaymentStatus: paymentStatus,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (paymentStatus === 'paid') {
+        updateData.sumupPaidAt = new Date().toISOString();
+        if (checkout.transactions?.[0]?.transaction_code) {
+          updateData.sumupTransactionCode =
+            checkout.transactions[0].transaction_code;
+        }
+      }
+
+      await calculationRef.update(updateData);
+    }
+
+    return { success: true, status: paymentStatus };
+  } catch (error: any) {
+    console.error('Error checking SumUp payment status:', error);
+    return { success: false, error: 'Fehler beim Prüfen des Zahlungsstatus' };
   }
 }
