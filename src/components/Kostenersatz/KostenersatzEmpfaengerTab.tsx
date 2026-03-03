@@ -11,6 +11,7 @@ import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
+import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -265,11 +266,12 @@ export default function KostenersatzEmpfaengerTab({
         </Box>
       )}
 
-      {statusMessage && (
-        <Alert severity="info" onClose={() => setStatusMessage(null)}>
-          {statusMessage}
-        </Alert>
-      )}
+      <Snackbar
+        open={!!statusMessage}
+        autoHideDuration={4000}
+        onClose={() => setStatusMessage(null)}
+        message={statusMessage}
+      />
 
       {error && (
         <Alert severity="error" onClose={() => setError(null)}>
