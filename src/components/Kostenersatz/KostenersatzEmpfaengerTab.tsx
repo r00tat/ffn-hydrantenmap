@@ -61,6 +61,7 @@ export default function KostenersatzEmpfaengerTab({
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Auto-check payment status when there's a pending payment
   useEffect(() => {
@@ -72,13 +73,24 @@ export default function KostenersatzEmpfaengerTab({
     }
   }, [sumupPaymentStatus, firecallId, calculationId]);
 
+  const statusLabels: Record<string, string> = {
+    pending: 'ausstehend',
+    paid: 'bezahlt',
+    failed: 'fehlgeschlagen',
+    expired: 'abgelaufen',
+  };
+
   const handleCheckStatus = async () => {
     if (!firecallId || !calculationId) return;
     setIsCheckingStatus(true);
     setError(null);
+    setStatusMessage(null);
     try {
       const result = await checkSumupPaymentStatus(firecallId, calculationId);
-      if (!result.success) {
+      if (result.success && result.status) {
+        const label = statusLabels[result.status] || result.status;
+        setStatusMessage(`Zahlungsstatus: ${label}`);
+      } else if (!result.success) {
         setError(result.error || 'Fehler beim Prüfen des Status');
       }
     } catch {
@@ -251,6 +263,12 @@ export default function KostenersatzEmpfaengerTab({
             </>
           )}
         </Box>
+      )}
+
+      {statusMessage && (
+        <Alert severity="info" onClose={() => setStatusMessage(null)}>
+          {statusMessage}
+        </Alert>
       )}
 
       {error && (
