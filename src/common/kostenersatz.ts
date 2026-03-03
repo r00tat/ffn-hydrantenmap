@@ -439,16 +439,14 @@ export function formatPaymentMethod(method: PaymentMethod, sumupPaymentStatus?: 
       if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
       if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
       if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
-      if (sumupPaymentStatus === 'pending') return `${label}: Betrag ausständig`;
-      return label;
+      return `${label}: Betrag ausständig`;
     }
     case 'sumup_app': {
       const label = 'Kartenzahlung (SumUp)';
       if (sumupPaymentStatus === 'paid') return `${label}: Betrag eingehoben`;
       if (sumupPaymentStatus === 'failed') return `${label}: Zahlung fehlgeschlagen`;
       if (sumupPaymentStatus === 'expired') return `${label}: Zahlung abgelaufen`;
-      if (sumupPaymentStatus === 'pending') return `${label}: Betrag ausständig`;
-      return label;
+      return `${label}: Betrag ausständig`;
     }
   }
 }
