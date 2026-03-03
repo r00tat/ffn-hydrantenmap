@@ -19,7 +19,7 @@ export interface KostenersatzEmpfaengerTabProps {
   disabled?: boolean;
 }
 
-const PAYMENT_METHODS: PaymentMethod[] = ['bar', 'kreditkarte', 'rechnung'];
+const PAYMENT_METHODS: PaymentMethod[] = ['bar', 'kreditkarte', 'rechnung', 'sumup_online', 'sumup_app'];
 
 export default function KostenersatzEmpfaengerTab({
   recipient,

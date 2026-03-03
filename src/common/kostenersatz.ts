@@ -62,7 +62,12 @@ export interface KostenersatzTemplate {
 // Calculation Types
 // ============================================================================
 
-export type PaymentMethod = 'bar' | 'kreditkarte' | 'rechnung';
+export type PaymentMethod =
+  | 'bar'
+  | 'kreditkarte'
+  | 'rechnung'
+  | 'sumup_online'
+  | 'sumup_app';
 export type CalculationStatus = 'draft' | 'completed' | 'sent';
 
 export interface KostenersatzRecipient {
@@ -125,6 +130,13 @@ export interface KostenersatzCalculation {
   // PDF/Email tracking
   pdfUrl?: string;
   emailSentAt?: string;
+
+  // SumUp payment tracking
+  sumupCheckoutId?: string;
+  sumupCheckoutRef?: string;
+  sumupPaymentStatus?: 'pending' | 'paid' | 'failed' | 'expired';
+  sumupPaidAt?: string;
+  sumupTransactionCode?: string;
 }
 
 // ============================================================================
@@ -136,6 +148,7 @@ export const KOSTENERSATZ_VERSIONS_COLLECTION = 'kostenersatzVersions';
 export const KOSTENERSATZ_TEMPLATES_COLLECTION = 'kostenersatzTemplates';
 export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
 export const KOSTENERSATZ_VEHICLES_COLLECTION = 'kostenersatzVehicles';
+export const KOSTENERSATZ_SUMUP_CONFIG_DOC = 'sumupSettings';
 
 // Group key for kostenersatz authorization
 export const KOSTENERSATZ_GROUP = 'kostenersatz';
@@ -151,6 +164,17 @@ export interface KostenersatzVehicle {
   description?: string; // e.g., "Kommando Neusiedl am See"
   sortOrder: number; // For consistent display order
 }
+
+export interface KostenersatzSumupConfig {
+  merchantCode: string;
+  currency: string;
+  redirectUrl?: string;
+}
+
+export const DEFAULT_SUMUP_CONFIG: KostenersatzSumupConfig = {
+  merchantCode: '',
+  currency: 'EUR',
+};
 
 // ============================================================================
 // Calculation Logic
@@ -210,7 +234,7 @@ export function calculateItemSum(
   einheiten: number,
   price: number,
   pricePauschal?: number,
-  pauschalHours: number = 12
+  pauschalHours: number = 12,
 ): number {
   if (einheiten <= 0 || anzahlStunden <= 0) {
     return 0;
@@ -241,7 +265,7 @@ export function calculateItemSum(
  */
 export function calculateCustomItemSum(
   quantity: number,
-  pricePerUnit: number
+  pricePerUnit: number,
 ): number {
   return roundCurrency(quantity * pricePerUnit);
 }
@@ -258,7 +282,7 @@ export function roundCurrency(value: number): number {
  */
 export function calculateSubtotals(
   items: KostenersatzLineItem[],
-  rates: KostenersatzRate[]
+  rates: KostenersatzRate[],
 ): Record<string, number> {
   const subtotals: Record<string, number> = {};
 
@@ -283,7 +307,7 @@ export function calculateSubtotals(
  */
 export function calculateTotalSum(
   items: KostenersatzLineItem[],
-  customItems: KostenersatzCustomItem[]
+  customItems: KostenersatzCustomItem[],
 ): number {
   const itemsSum = items.reduce((sum, item) => sum + item.sum, 0);
   const customSum = customItems.reduce((sum, item) => sum + item.sum, 0);
@@ -296,13 +320,19 @@ export function calculateTotalSum(
 export function recalculateLineItem(
   item: KostenersatzLineItem,
   rate: KostenersatzRate,
-  defaultStunden: number
+  defaultStunden: number,
 ): KostenersatzLineItem {
   const stunden = item.stundenOverridden ? item.anzahlStunden : defaultStunden;
   return {
     ...item,
     anzahlStunden: stunden,
-    sum: calculateItemSum(stunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
+    sum: calculateItemSum(
+      stunden,
+      item.einheiten,
+      rate.price,
+      rate.pricePauschal,
+      rate.pauschalHours,
+    ),
   };
 }
 
@@ -312,7 +342,7 @@ export function recalculateLineItem(
 export function createEmptyCalculation(
   createdBy: string,
   rateVersion: string,
-  defaultStunden: number = 1
+  defaultStunden: number = 1,
 ): Omit<KostenersatzCalculation, 'id'> {
   const now = new Date().toISOString();
   return {
@@ -345,7 +375,7 @@ export function createLineItem(
   einheiten: number,
   anzahlStunden: number,
   rate: KostenersatzRate,
-  defaultStunden: number
+  defaultStunden: number,
 ): KostenersatzLineItem {
   const stundenOverridden = anzahlStunden !== defaultStunden;
   return {
@@ -353,7 +383,13 @@ export function createLineItem(
     einheiten,
     anzahlStunden,
     stundenOverridden,
-    sum: calculateItemSum(anzahlStunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
+    sum: calculateItemSum(
+      anzahlStunden,
+      einheiten,
+      rate.price,
+      rate.pricePauschal,
+      rate.pauschalHours,
+    ),
   };
 }
 
@@ -395,6 +431,10 @@ export function formatPaymentMethod(method: PaymentMethod): string {
       return 'Kreditkarte: Betrag eingehoben';
     case 'rechnung':
       return 'Rechnung: Betrag ausständig';
+    case 'sumup_online':
+      return 'Onlinezahlung (SumUp)';
+    case 'sumup_app':
+      return 'Kartenzahlung (SumUp)';
   }
 }
 
@@ -416,7 +456,7 @@ export function formatStatus(status: CalculationStatus): string {
  * Get status color for MUI chips
  */
 export function getStatusColor(
-  status: CalculationStatus
+  status: CalculationStatus,
 ): 'default' | 'primary' | 'success' {
   switch (status) {
     case 'draft':
@@ -438,7 +478,7 @@ export function getStatusColor(
  */
 export function calculateDurationHours(
   startTime: string | undefined,
-  endTime: string | undefined
+  endTime: string | undefined,
 ): number | undefined {
   if (!startTime || !endTime) {
     return undefined;
