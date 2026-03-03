@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { auth } from '../../app/auth';
+import { actionUserAuthorizedForFirecall, auth } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
@@ -48,29 +48,8 @@ async function requireKostenersatzUser(firecallId: string) {
     throw new Error('User is not in the kostenersatz group');
   }
 
-  // Check firecall authorization
-  const firecallDoc = await firestore
-    .collection(FIRECALL_COLLECTION_ID)
-    .doc(firecallId)
-    .get();
-
-  if (!firecallDoc.exists) {
-    throw new Error(`Firecall ${firecallId} does not exist`);
-  }
-
-  const firecallData = firecallDoc.data();
-  if (!firecallData || !firecallData.group) {
-    throw new Error(`Firecall ${firecallId} has no data`);
-  }
-
-  if (
-    !session.user.groups.includes(firecallData.group) &&
-    session.user.firecall !== firecallId
-  ) {
-    throw new Error(
-      `User ${session.user.id} is not authorized for firecall ${firecallId}`
-    );
-  }
+  // Use existing pattern instead of reimplementing
+  await actionUserAuthorizedForFirecall(firecallId);
 
   return session;
 }
@@ -137,6 +116,10 @@ export async function createSumupCheckout(
       getCalculation(firecallId, calculationId),
     ]);
 
+    if (calculation.totalSum <= 0) {
+      return { success: false, error: 'Calculation total must be greater than 0' };
+    }
+
     if (!config.merchantCode) {
       return { success: false, error: 'SumUp merchant code not configured' };
     }
@@ -195,18 +178,16 @@ export async function createSumupCheckout(
       updatedAt: new Date().toISOString(),
     });
 
-    // The hosted checkout URL is typically the checkout id appended to the SumUp pay URL
-    const checkoutUrl =
-      checkoutData.hosted_checkout_url ||
-      `https://pay.sumup.com/b2c/Q${checkoutData.id}`;
+    const checkoutUrl = checkoutData.hosted_checkout_url;
+    if (!checkoutUrl) {
+      console.error('SumUp did not return hosted_checkout_url:', checkoutData);
+      return { success: false, error: 'SumUp did not return a payment URL' };
+    }
 
     return { success: true, checkoutUrl };
   } catch (error: any) {
     console.error('Error creating SumUp checkout:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to create SumUp checkout',
-    };
+    return { success: false, error: 'Failed to create SumUp checkout' };
   }
 }
 
@@ -227,6 +208,10 @@ export async function getSumupDeepLink(
       getSumupConfig(),
       getCalculation(firecallId, calculationId),
     ]);
+
+    if (calculation.totalSum <= 0) {
+      return { success: false, error: 'Calculation total must be greater than 0' };
+    }
 
     if (!config.merchantCode) {
       return { success: false, error: 'SumUp merchant code not configured' };
@@ -252,9 +237,6 @@ export async function getSumupDeepLink(
     return { success: true, deepLinkUrl };
   } catch (error: any) {
     console.error('Error generating SumUp deep link:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to generate SumUp deep link',
-    };
+    return { success: false, error: 'Failed to generate SumUp deep link' };
   }
 }
