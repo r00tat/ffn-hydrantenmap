@@ -442,6 +442,7 @@ export default function KostenersatzCalculationPage({
         const newId = await addCalculation(calcWithoutId);
         setCalculation((prev) => ({ ...prev, id: newId }));
         setHasUnsavedChanges(false);
+        window.history.replaceState(null, '', `/einsatz/${firecallId}/kostenersatz/${newId}`);
         return newId;
       }
     } catch (error) {
@@ -450,7 +451,7 @@ export default function KostenersatzCalculationPage({
     } finally {
       setIsSaving(false);
     }
-  }, [calculation, existingCalculation, addCalculation, updateCalculation]);
+  }, [calculation, existingCalculation, addCalculation, updateCalculation, firecallId]);
 
   // Save handlers
   const handleSave = useCallback(
