@@ -9,6 +9,7 @@ import {
   KOSTENERSATZ_SUBCOLLECTION,
   KOSTENERSATZ_GROUP,
 } from '../../common/kostenersatz';
+import { completePaymentAndNotify } from './completePaymentAndNotify';
 
 // ============================================================================
 // Types
@@ -29,6 +30,7 @@ interface SumupDeepLinkResponse {
 interface SumupPaymentStatusResponse {
   success: boolean;
   status?: 'pending' | 'paid' | 'failed' | 'expired';
+  autoCompleted?: boolean;
   error?: string;
 }
 
@@ -303,6 +305,22 @@ export async function checkSumupPaymentStatus(
       }
 
       await calculationRef.update(updateData);
+
+      if (paymentStatus === 'paid') {
+        try {
+          await completePaymentAndNotify(firecallId, calculationId);
+          return { success: true, status: paymentStatus, autoCompleted: true };
+        } catch (error) {
+          console.error('checkSumupPaymentStatus: completePaymentAndNotify failed:', error);
+        }
+      }
+    } else if (paymentStatus === 'paid' && calculation.status === 'draft') {
+      try {
+        await completePaymentAndNotify(firecallId, calculationId);
+        return { success: true, status: paymentStatus, autoCompleted: true };
+      } catch (error) {
+        console.error('checkSumupPaymentStatus: completePaymentAndNotify retry failed:', error);
+      }
     }
 
     return { success: true, status: paymentStatus };

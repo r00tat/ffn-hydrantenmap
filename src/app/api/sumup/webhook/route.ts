@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { firestore } from '../../../../server/firebase/admin';
 import { KOSTENERSATZ_SUBCOLLECTION } from '../../../../common/kostenersatz';
+import { completePaymentAndNotify } from '../../../../components/Kostenersatz/completePaymentAndNotify';
 
 export async function POST(request: Request) {
   try {
@@ -91,6 +92,17 @@ export async function POST(request: Request) {
       console.info(
         `SumUp webhook: updated calculation ${calcDoc.id} to ${paymentStatus}`
       );
+
+      if (paymentStatus === 'paid') {
+        const firecallId = calcDoc.ref.parent.parent?.id;
+        if (firecallId) {
+          try {
+            await completePaymentAndNotify(firecallId, calcDoc.id);
+          } catch (error) {
+            console.error('SumUp webhook: completePaymentAndNotify failed:', error);
+          }
+        }
+      }
     }
 
     return NextResponse.json({ received: true });
