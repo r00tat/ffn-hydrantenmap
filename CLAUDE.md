@@ -32,6 +32,12 @@ Before committing, reset `next-env.d.ts` to avoid noise from dev/build path swit
 git checkout -- next-env.d.ts
 ```
 
+When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
+
+```bash
+GITHUB_TOKEN= gh <command>
+```
+
 ## Tech Stack
 
 - **Next.js 16** with App Router (not Pages Router)
