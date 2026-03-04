@@ -7,12 +7,8 @@ import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
-  KOSTENERSATZ_SUMUP_CONFIG_DOC,
-  KostenersatzSumupConfig,
-  DEFAULT_SUMUP_CONFIG,
   KOSTENERSATZ_GROUP,
 } from '../../common/kostenersatz';
-import { KOSTENERSATZ_CONFIG_COLLECTION } from '../../common/kostenersatzEmail';
 
 // ============================================================================
 // Types
@@ -61,22 +57,6 @@ async function requireKostenersatzUser(firecallId: string) {
 }
 
 /**
- * Read SumUp configuration from Firestore.
- */
-async function getSumupConfig(): Promise<KostenersatzSumupConfig> {
-  const configDoc = await firestore
-    .collection(KOSTENERSATZ_CONFIG_COLLECTION)
-    .doc(KOSTENERSATZ_SUMUP_CONFIG_DOC)
-    .get();
-
-  if (configDoc.exists) {
-    return configDoc.data() as KostenersatzSumupConfig;
-  }
-
-  return DEFAULT_SUMUP_CONFIG;
-}
-
-/**
  * Read a Kostenersatz calculation from Firestore.
  */
 async function getCalculation(
@@ -117,16 +97,14 @@ export async function createSumupCheckout(
   try {
     await requireKostenersatzUser(firecallId);
 
-    const [config, calculation] = await Promise.all([
-      getSumupConfig(),
-      getCalculation(firecallId, calculationId),
-    ]);
+    const calculation = await getCalculation(firecallId, calculationId);
 
     if (calculation.totalSum <= 0) {
       return { success: false, error: 'Calculation total must be greater than 0' };
     }
 
-    if (!config.merchantCode) {
+    const merchantCode = process.env.SUMUP_MERCHANT_CODE;
+    if (!merchantCode) {
       return { success: false, error: 'SumUp merchant code not configured' };
     }
 
@@ -148,11 +126,11 @@ export async function createSumupCheckout(
       body: JSON.stringify({
         checkout_reference: checkoutReference,
         amount: calculation.totalSum,
-        currency: config.currency,
-        merchant_code: config.merchantCode,
+        currency: 'EUR',
+        merchant_code: merchantCode,
         description: `Kostenersatz ${firecallId}`,
         return_url: `${baseUrl}/api/sumup/webhook`,
-        redirect_url: config.redirectUrl || `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}`,
+        redirect_url: `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}`,
         hosted_checkout: {
           enabled: true,
         },
@@ -210,16 +188,14 @@ export async function getSumupDeepLink(
   try {
     await requireKostenersatzUser(firecallId);
 
-    const [config, calculation] = await Promise.all([
-      getSumupConfig(),
-      getCalculation(firecallId, calculationId),
-    ]);
+    const calculation = await getCalculation(firecallId, calculationId);
 
     if (calculation.totalSum <= 0) {
       return { success: false, error: 'Calculation total must be greater than 0' };
     }
 
-    if (!config.merchantCode) {
+    const merchantCode = process.env.SUMUP_MERCHANT_CODE;
+    if (!merchantCode) {
       return { success: false, error: 'SumUp merchant code not configured' };
     }
 
@@ -233,7 +209,7 @@ export async function getSumupDeepLink(
     const params = new URLSearchParams({
       'affiliate-key': affiliateKey,
       total: calculation.totalSum.toFixed(2),
-      currency: config.currency,
+      currency: 'EUR',
       title: `Kostenersatz ${firecallId}`,
       'foreign-tx-id': foreignTxId,
     });

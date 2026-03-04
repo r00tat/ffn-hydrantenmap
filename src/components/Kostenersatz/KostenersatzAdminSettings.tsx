@@ -54,8 +54,8 @@ import {
   useKostenersatzVersionSetActive,
 } from '../../hooks/useKostenersatzMutations';
 import { useKostenersatzEmailConfig } from '../../hooks/useKostenersatzEmailConfig';
-import { useKostenersatzSumupConfig } from '../../hooks/useKostenersatzSumupConfig';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
+import SumUpTransactionList from './SumUpTransactionList';
 import KostenersatzVehicleTab from './KostenersatzVehicleTab';
 import Alert from '@mui/material/Alert';
 
@@ -64,8 +64,6 @@ export default function KostenersatzAdminSettings() {
   const { rates, loading: ratesLoading } = useKostenersatzRates(activeVersion?.id);
   const { sharedTemplates, loading: templatesLoading } = useKostenersatzTemplates();
   const { config: emailConfig, loading: emailConfigLoading, saveConfig: saveEmailConfig } = useKostenersatzEmailConfig();
-  const { config: sumupConfig, loading: sumupConfigLoading, saveConfig: saveSumupConfig } = useKostenersatzSumupConfig();
-
   const seedDefaultRates = useKostenersatzSeedDefaultRates();
   const setVersionActive = useKostenersatzVersionSetActive();
   const deleteTemplate = useKostenersatzTemplateDelete();
@@ -86,13 +84,6 @@ export default function KostenersatzAdminSettings() {
   const [savingEmailConfig, setSavingEmailConfig] = useState(false);
   const [emailConfigSaved, setEmailConfigSaved] = useState(false);
   const [emailConfigError, setEmailConfigError] = useState<string | null>(null);
-
-  // SumUp settings state
-  const [sumupMerchantCodeEdit, setSumupMerchantCodeEdit] = useState('');
-  const [sumupCurrencyEdit, setSumupCurrencyEdit] = useState('');
-  const [savingSumupConfig, setSavingSumupConfig] = useState(false);
-  const [sumupConfigSaved, setSumupConfigSaved] = useState(false);
-  const [sumupConfigError, setSumupConfigError] = useState<string | null>(null);
 
   // Rate editing state
   const [editingRate, setEditingRate] = useState<KostenersatzRate | undefined>();
@@ -122,14 +113,6 @@ export default function KostenersatzAdminSettings() {
     }
   }, [emailConfig, emailConfigLoading]);
 
-  // Initialize SumUp settings from config
-  useEffect(() => {
-    if (!sumupConfigLoading && sumupConfig) {
-      setSumupMerchantCodeEdit(sumupConfig.merchantCode);
-      setSumupCurrencyEdit(sumupConfig.currency);
-    }
-  }, [sumupConfig, sumupConfigLoading]);
-
   // Email config save handler
   const handleSaveEmailConfig = async () => {
     setSavingEmailConfig(true);
@@ -150,27 +133,6 @@ export default function KostenersatzAdminSettings() {
       setEmailConfigError('Fehler beim Speichern der E-Mail-Einstellungen.');
     } finally {
       setSavingEmailConfig(false);
-    }
-  };
-
-  // SumUp config save handler
-  const handleSaveSumupConfig = async () => {
-    setSavingSumupConfig(true);
-    setSumupConfigError(null);
-    setSumupConfigSaved(false);
-
-    try {
-      await saveSumupConfig({
-        merchantCode: sumupMerchantCodeEdit,
-        currency: sumupCurrencyEdit,
-      });
-      setSumupConfigSaved(true);
-      setTimeout(() => setSumupConfigSaved(false), 3000);
-    } catch (error) {
-      console.error('Error saving SumUp config:', error);
-      setSumupConfigError('Fehler beim Speichern der SumUp-Einstellungen.');
-    } finally {
-      setSavingSumupConfig(false);
     }
   };
 
@@ -651,57 +613,8 @@ export default function KostenersatzAdminSettings() {
       </Card>
       )}
 
-      {/* Tab 4: SumUp */}
-      {activeTab === 4 && (
-        <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            SumUp Einstellungen
-          </Typography>
-
-          {sumupConfigLoading ? (
-            <CircularProgress size={20} />
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {sumupConfigSaved && (
-                <Alert severity="success">SumUp-Einstellungen gespeichert!</Alert>
-              )}
-              {sumupConfigError && (
-                <Alert severity="error">{sumupConfigError}</Alert>
-              )}
-
-              <TextField
-                label="Merchant Code"
-                value={sumupMerchantCodeEdit}
-                onChange={(e) => setSumupMerchantCodeEdit(e.target.value)}
-                fullWidth
-                size="small"
-                helperText="Der Merchant Code aus dem SumUp Dashboard"
-              />
-
-              <TextField
-                label="Währung"
-                value={sumupCurrencyEdit}
-                onChange={(e) => setSumupCurrencyEdit(e.target.value)}
-                fullWidth
-                size="small"
-                helperText="Währungscode (z.B. EUR)"
-              />
-
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  onClick={handleSaveSumupConfig}
-                  disabled={savingSumupConfig}
-                >
-                  {savingSumupConfig ? <CircularProgress size={20} /> : 'Speichern'}
-                </Button>
-              </Box>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-      )}
+      {/* Tab 4: SumUp Transaktionen */}
+      {activeTab === 4 && <SumUpTransactionList />}
 
       {/* Seed Dialog */}
       <Dialog open={seedDialogOpen} onClose={() => setSeedDialogOpen(false)}>

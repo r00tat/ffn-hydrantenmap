@@ -36,13 +36,86 @@ resource "google_firebaserules_ruleset" "dev" {
   }
 }
 
+# ============================================================================
+# Firestore Index Locals
+# ============================================================================
+
 locals {
   firestore_index_replace_regex = "/([\"{}: ,\\[\\]]|fieldPath|order)+/"
-  firestore_index_file_dev      = jsondecode(file("../firebase/dev/firestore.indexes.json"))
+
+  # Dev database indexes
+  firestore_index_file_dev = jsondecode(file("../firebase/dev/firestore.indexes.json"))
   firestore_indexes_dev = {
-    for index in local.firestore_index_file_dev.indexes : "${index.collectionGroup}-${index.queryScope}-${replace(jsonencode(index.fields), local.firestore_index_replace_regex, "-")}" => index
+    for index in local.firestore_index_file_dev.indexes :
+    "${index.collectionGroup}-${index.queryScope}-${replace(jsonencode(index.fields), local.firestore_index_replace_regex, "-")}" => index
+  }
+  firestore_field_overrides_dev = {
+    for fo in try(local.firestore_index_file_dev.fieldOverrides, []) :
+    "${fo.collectionGroup}-${fo.fieldPath}" => fo
+  }
+
+  # Prod database indexes
+  firestore_index_file_prod = jsondecode(file("../firebase/prod/firestore.indexes.json"))
+  firestore_indexes_prod = {
+    for index in local.firestore_index_file_prod.indexes :
+    "${index.collectionGroup}-${index.queryScope}-${replace(jsonencode(index.fields), local.firestore_index_replace_regex, "-")}" => index
+  }
+  firestore_field_overrides_prod = {
+    for fo in try(local.firestore_index_file_prod.fieldOverrides, []) :
+    "${fo.collectionGroup}-${fo.fieldPath}" => fo
   }
 }
+
+# ============================================================================
+# Imports for existing Firestore field overrides
+# ============================================================================
+
+# sumupCheckoutId field override - already exists in both databases
+import {
+  to = google_firestore_field.dev["kostenersatz-sumupCheckoutId"]
+  id = "projects/${var.project}/databases/ffndev/collectionGroups/kostenersatz/fields/sumupCheckoutId"
+}
+
+import {
+  to = google_firestore_field.prod["kostenersatz-sumupCheckoutId"]
+  id = "projects/${var.project}/databases/(default)/collectionGroups/kostenersatz/fields/sumupCheckoutId"
+}
+
+# Dev composite indexes
+import {
+  to = google_firestore_index.dev["call-COLLECTION--deleted-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgOjXh4EK"
+}
+
+import {
+  to = google_firestore_index.dev["call-COLLECTION--group-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgJiUpoMJ"
+}
+
+import {
+  to = google_firestore_index.dev["call-COLLECTION--deleted-ASCENDING-group-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgJim14AK"
+}
+
+# Prod composite indexes
+import {
+  to = google_firestore_index.prod["call-COLLECTION--deleted-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJiUpoMK"
+}
+
+import {
+  to = google_firestore_index.prod["call-COLLECTION--group-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJim14AK"
+}
+
+import {
+  to = google_firestore_index.prod["call-COLLECTION--deleted-ASCENDING-group-ASCENDING-date-DESCENDING-"]
+  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJjF9oIK"
+}
+
+# ============================================================================
+# Dev Firestore Database + Indexes
+# ============================================================================
 
 resource "google_firestore_database" "dev" {
   project                           = var.project
@@ -50,26 +123,80 @@ resource "google_firestore_database" "dev" {
   location_id                       = "eur3"
   type                              = "FIRESTORE_NATIVE"
   point_in_time_recovery_enablement = "POINT_IN_TIME_RECOVERY_ENABLED"
-  # delete_protection_state = "DELETE_PROTECTION_DISABLED"
-  # deletion_policy         = "DELETE"
 }
 
-# resource "google_firestore_index" "dev" {
-#   project    = var.project
-#   database   = google_firestore_database.dev.name
-#   for_each   = local.firestore_indexes_dev
-#   collection = each.value.collectionGroup
+resource "google_firestore_index" "dev" {
+  for_each   = local.firestore_indexes_dev
+  project    = var.project
+  database   = google_firestore_database.dev.name
+  collection = each.value.collectionGroup
 
+  query_scope = each.value.queryScope
 
-#   query_scope = each.value.queryScope
-#   # api_scope   = "DATASTORE_MODE_API"
+  dynamic "fields" {
+    for_each = each.value.fields
+    content {
+      field_path = fields.value.fieldPath
+      order      = try(fields.value.order, "ASCENDING")
+    }
+  }
+}
 
-#   dynamic "fields" {
-#     for_each = each.value.fields
-#     content {
-#       field_path = fields.value.fieldPath
-#       order      = try(fields.value.order, "ASCENDING")
-#     }
-#   }
+resource "google_firestore_field" "dev" {
+  for_each   = local.firestore_field_overrides_dev
+  project    = var.project
+  database   = google_firestore_database.dev.name
+  collection = each.value.collectionGroup
+  field      = each.value.fieldPath
 
-# }
+  index_config {
+    dynamic "indexes" {
+      for_each = each.value.indexes
+      content {
+        order        = try(indexes.value.order, null)
+        array_config = try(indexes.value.arrayConfig, null)
+        query_scope  = try(indexes.value.queryScope, "COLLECTION")
+      }
+    }
+  }
+}
+
+# ============================================================================
+# Prod Firestore Indexes (default database)
+# ============================================================================
+
+resource "google_firestore_index" "prod" {
+  for_each   = local.firestore_indexes_prod
+  project    = var.project
+  database   = "(default)"
+  collection = each.value.collectionGroup
+
+  query_scope = each.value.queryScope
+
+  dynamic "fields" {
+    for_each = each.value.fields
+    content {
+      field_path = fields.value.fieldPath
+      order      = try(fields.value.order, "ASCENDING")
+    }
+  }
+}
+
+resource "google_firestore_field" "prod" {
+  for_each   = local.firestore_field_overrides_prod
+  project    = var.project
+  database   = "(default)"
+  collection = each.value.collectionGroup
+  field      = each.value.fieldPath
+
+  index_config {
+    dynamic "indexes" {
+      for_each = each.value.indexes
+      content {
+        order        = try(indexes.value.order, null)
+        array_config = try(indexes.value.arrayConfig, null)
+        query_scope  = try(indexes.value.queryScope, "COLLECTION")
+      }
+    }
+  }
+}
