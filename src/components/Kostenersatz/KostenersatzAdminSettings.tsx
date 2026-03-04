@@ -557,7 +557,7 @@ export default function KostenersatzAdminSettings() {
                 onChange={(e) => setEmailFromEdit(e.target.value)}
                 fullWidth
                 size="small"
-                helperText="Diese Adresse muss bei SendGrid verifiziert sein"
+                helperText="Diese Adresse wird als Reply-To verwendet"
               />
 
               <TextField
