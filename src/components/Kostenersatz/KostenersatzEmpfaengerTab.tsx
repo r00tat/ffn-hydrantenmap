@@ -231,7 +231,7 @@ export default function KostenersatzEmpfaengerTab({
         >
           {PAYMENT_METHODS.map((method) => (
             <MenuItem key={method} value={method}>
-              {formatPaymentMethod(method)}
+              {formatPaymentMethod(method, method === recipient.paymentMethod ? sumupPaymentStatus : undefined)}
             </MenuItem>
           ))}
         </Select>
