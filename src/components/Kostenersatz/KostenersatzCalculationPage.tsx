@@ -38,6 +38,7 @@ import KostenersatzPdfButton from './KostenersatzPdfButton';
 import KostenersatzEmailDialog from './KostenersatzEmailDialog';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
 import KostenersatzTemplateSelector from './KostenersatzTemplateSelector';
+import { updateRecipientAction } from './updateRecipientAction';
 import EmailIcon from '@mui/icons-material/Email';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -392,6 +393,23 @@ export default function KostenersatzCalculationPage({
     }));
   }, []);
 
+  const handleSaveRecipient = useCallback(async () => {
+    const calcId = existingCalculation?.id || calculation.id;
+    if (!calcId) return;
+    setIsSaving(true);
+    try {
+      const result = await updateRecipientAction(firecallId, calcId, calculation.recipient);
+      if (result.success) {
+        setHasUnsavedChanges(false);
+        setSuccessMessage('Empfänger gespeichert');
+      }
+    } catch (error) {
+      console.error('Error saving recipient:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [existingCalculation?.id, calculation.id, calculation.recipient, firecallId]);
+
   // Save handlers
   const handleSave = useCallback(
     async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<boolean> => {
@@ -656,15 +674,25 @@ export default function KostenersatzCalculationPage({
               </>
             )}
             {!isEditable && (
-              <Button
-                variant="outlined"
-                startIcon={<ContentCopyIcon />}
-                onClick={handleCopy}
-                disabled={isSaving}
-                size="small"
-              >
-                Kopieren
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={handleSaveRecipient}
+                  disabled={isSaving || !hasUnsavedChanges}
+                  size="small"
+                >
+                  Empfänger speichern
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={handleCopy}
+                  disabled={isSaving}
+                  size="small"
+                >
+                  Kopieren
+                </Button>
+              </>
             )}
             <Button
               variant="outlined"

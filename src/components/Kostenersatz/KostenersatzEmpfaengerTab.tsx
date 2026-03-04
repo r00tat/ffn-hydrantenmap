@@ -190,7 +190,6 @@ export default function KostenersatzEmpfaengerTab({
         onChange={handleFieldChange('name')}
         fullWidth
         required
-        disabled={disabled}
         placeholder="Vor- und Nachname oder Firmenname"
       />
 
@@ -201,7 +200,6 @@ export default function KostenersatzEmpfaengerTab({
         fullWidth
         multiline
         rows={3}
-        disabled={disabled}
         placeholder="Stra&szlig;e, Hausnummer&#10;PLZ Ort"
       />
 
@@ -210,7 +208,6 @@ export default function KostenersatzEmpfaengerTab({
         value={recipient.phone}
         onChange={handleFieldChange('phone')}
         fullWidth
-        disabled={disabled}
         type="tel"
         placeholder="+43 ..."
       />
@@ -220,7 +217,6 @@ export default function KostenersatzEmpfaengerTab({
         value={recipient.email}
         onChange={handleFieldChange('email')}
         fullWidth
-        disabled={disabled}
         type="email"
         placeholder="email@example.com"
       />
