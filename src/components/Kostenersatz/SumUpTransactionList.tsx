@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import NextLink from 'next/link';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -8,6 +9,7 @@ import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -153,7 +155,13 @@ export default function SumUpTransactionList() {
               <TableBody>
                 {sorted.map((row) => (
                   <TableRow key={`${row.firecallId}-${row.calculationId}`}>
-                    <TableCell>{row.recipientName || '-'}</TableCell>
+                    <TableCell>
+                      {row.recipientName ? (
+                        <Link component={NextLink} href={`/einsatz/${row.firecallId}/kostenersatz/${row.calculationId}`}>
+                          {row.recipientName}
+                        </Link>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>{formatCurrency(row.totalSum)}</TableCell>
                     <TableCell>
                       <StatusChip status={row.sumupPaymentStatus} />
@@ -163,7 +171,11 @@ export default function SumUpTransactionList() {
                     <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
                       {row.sumupTransactionCode || '-'}
                     </TableCell>
-                    <TableCell>{row.firecallName}</TableCell>
+                    <TableCell>
+                      <Link component={NextLink} href={`/einsatz/${row.firecallId}/kostenersatz`}>
+                        {row.firecallName}
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
