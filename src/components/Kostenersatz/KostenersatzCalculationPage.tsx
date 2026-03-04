@@ -136,7 +136,7 @@ export default function KostenersatzCalculationPage({
     }
   }, [activeVersion, existingCalculation]);
 
-  // Sync SumUp payment status from Firestore real-time updates
+  // Sync SumUp payment status and calculation status from Firestore real-time updates
   useEffect(() => {
     if (existingCalculation?.sumupPaymentStatus &&
         existingCalculation.sumupPaymentStatus !== calculation.sumupPaymentStatus) {
@@ -149,6 +149,19 @@ export default function KostenersatzCalculationPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.sumupPaymentStatus to avoid infinite loop
   }, [existingCalculation?.sumupPaymentStatus, existingCalculation?.sumupPaidAt, existingCalculation?.sumupTransactionCode]);
+
+  // Sync calculation status from Firestore (e.g. after auto-close on payment)
+  useEffect(() => {
+    if (existingCalculation?.status &&
+        existingCalculation.status !== calculation.status &&
+        existingCalculation.status !== 'draft') {
+      setCalculation((prev) => ({
+        ...prev,
+        status: existingCalculation.status,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.status to avoid infinite loop
+  }, [existingCalculation?.status]);
 
   // Recalculate totals when items change
   useEffect(() => {

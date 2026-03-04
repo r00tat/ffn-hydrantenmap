@@ -69,7 +69,7 @@ export default function KostenersatzEmpfaengerTab({
   sumupPaymentStatus,
   onSaveBeforePayment,
 }: KostenersatzEmpfaengerTabProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<'online' | 'app' | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -132,7 +132,7 @@ export default function KostenersatzEmpfaengerTab({
 
   const handleOnlinePayment = async () => {
     if (!firecallId) return;
-    setIsLoading(true);
+    setLoadingAction('online');
     setError(null);
     try {
       // Set payment method to sumup_online before saving
@@ -158,7 +158,7 @@ export default function KostenersatzEmpfaengerTab({
     } catch (err: any) {
       setError(err.message || 'Fehler beim Erstellen der Zahlung');
     } finally {
-      setIsLoading(false);
+      setLoadingAction(null);
     }
   };
 
@@ -174,7 +174,7 @@ export default function KostenersatzEmpfaengerTab({
 
   const handleAppPayment = async () => {
     if (!firecallId) return;
-    setIsLoading(true);
+    setLoadingAction('app');
     setError(null);
     try {
       // Set payment method to sumup_app before saving
@@ -199,11 +199,11 @@ export default function KostenersatzEmpfaengerTab({
     } catch (err: any) {
       setError(err.message || 'Fehler beim Erstellen des Deep Links');
     } finally {
-      setIsLoading(false);
+      setLoadingAction(null);
     }
   };
 
-  const sumupButtonDisabled = !firecallId || isLoading;
+  const sumupButtonDisabled = !firecallId || loadingAction !== null;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -267,7 +267,7 @@ export default function KostenersatzEmpfaengerTab({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Button
           variant="contained"
-          startIcon={isLoading ? <CircularProgress size={20} /> : <PaymentIcon />}
+          startIcon={loadingAction === 'online' ? <CircularProgress size={20} /> : <PaymentIcon />}
           onClick={handleOnlinePayment}
           disabled={sumupButtonDisabled}
         >
@@ -275,7 +275,7 @@ export default function KostenersatzEmpfaengerTab({
         </Button>
         <Button
           variant="contained"
-          startIcon={isLoading ? <CircularProgress size={20} /> : <PhoneAndroidIcon />}
+          startIcon={loadingAction === 'app' ? <CircularProgress size={20} /> : <PhoneAndroidIcon />}
           onClick={handleAppPayment}
           disabled={sumupButtonDisabled}
         >

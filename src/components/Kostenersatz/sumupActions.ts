@@ -105,14 +105,46 @@ export async function createSumupCheckout(
       return { success: false, error: 'Calculation total must be greater than 0' };
     }
 
-    const merchantCode = process.env.SUMUP_MERCHANT_CODE;
-    if (!merchantCode) {
-      return { success: false, error: 'SumUp merchant code not configured' };
-    }
-
     const apiKey = process.env.SUMUP_API_KEY;
     if (!apiKey) {
       return { success: false, error: 'SumUp API key not configured' };
+    }
+
+    const calculationRef = firestore
+      .collection(FIRECALL_COLLECTION_ID)
+      .doc(firecallId)
+      .collection(KOSTENERSATZ_SUBCOLLECTION)
+      .doc(calculationId);
+
+    // Ensure payment method is set to sumup_online in Firestore
+    if (calculation.recipient?.paymentMethod !== 'sumup_online') {
+      await calculationRef.update({
+        'recipient.paymentMethod': 'sumup_online',
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    // Reuse existing pending checkout if available
+    if (calculation.sumupCheckoutId && calculation.sumupPaymentStatus === 'pending') {
+      const existingResponse = await fetch(
+        `https://api.sumup.com/v0.1/checkouts/${calculation.sumupCheckoutId}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+      if (existingResponse.ok) {
+        const existingCheckout = await existingResponse.json();
+        const status = existingCheckout.status?.toUpperCase();
+        if (status === 'PENDING') {
+          const checkoutUrl = existingCheckout.hosted_checkout_url;
+          if (checkoutUrl) {
+            return { success: true, checkoutUrl };
+          }
+        }
+      }
+    }
+
+    const merchantCode = process.env.SUMUP_MERCHANT_CODE;
+    if (!merchantCode) {
+      return { success: false, error: 'SumUp merchant code not configured' };
     }
 
     const baseUrl =
@@ -152,12 +184,6 @@ export async function createSumupCheckout(
     const checkoutData = await response.json();
 
     // Update Firestore calculation with checkout details
-    const calculationRef = firestore
-      .collection(FIRECALL_COLLECTION_ID)
-      .doc(firecallId)
-      .collection(KOSTENERSATZ_SUBCOLLECTION)
-      .doc(calculationId);
-
     await calculationRef.update({
       sumupCheckoutId: checkoutData.id,
       sumupCheckoutRef: checkoutReference,
@@ -196,6 +222,19 @@ export async function getSumupDeepLink(
 
     if (calculation.totalSum <= 0) {
       return { success: false, error: 'Calculation total must be greater than 0' };
+    }
+
+    // Ensure payment method is set to sumup_app in Firestore
+    if (calculation.recipient?.paymentMethod !== 'sumup_app') {
+      await firestore
+        .collection(FIRECALL_COLLECTION_ID)
+        .doc(firecallId)
+        .collection(KOSTENERSATZ_SUBCOLLECTION)
+        .doc(calculationId)
+        .update({
+          'recipient.paymentMethod': 'sumup_app',
+          updatedAt: new Date().toISOString(),
+        });
     }
 
     const merchantCode = process.env.SUMUP_MERCHANT_CODE;
