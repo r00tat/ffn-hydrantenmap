@@ -116,6 +116,7 @@ export async function createSumupCheckout(
     const baseUrl =
       process.env.NEXTAUTH_URL || 'https://hydrant.ffnd.at';
     const checkoutReference = `KE-${firecallId}-${calculationId}-${Date.now()}`;
+    const redirectToken = crypto.randomUUID();
 
     const response = await fetch('https://api.sumup.com/v0.1/checkouts', {
       method: 'POST',
@@ -130,7 +131,7 @@ export async function createSumupCheckout(
         merchant_code: merchantCode,
         description: `Kostenersatz ${firecallId}`,
         return_url: `${baseUrl}/api/sumup/webhook`,
-        redirect_url: `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}`,
+        redirect_url: `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}/payment?token=${redirectToken}`,
         hosted_checkout: {
           enabled: true,
         },
@@ -158,6 +159,7 @@ export async function createSumupCheckout(
     await calculationRef.update({
       sumupCheckoutId: checkoutData.id,
       sumupCheckoutRef: checkoutReference,
+      sumupRedirectToken: redirectToken,
       sumupPaymentStatus: 'pending',
       updatedAt: new Date().toISOString(),
     });

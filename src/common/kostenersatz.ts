@@ -137,6 +137,7 @@ export interface KostenersatzCalculation {
   sumupPaymentStatus?: 'pending' | 'paid' | 'failed' | 'expired';
   sumupPaidAt?: string;
   sumupTransactionCode?: string;
+  sumupRedirectToken?: string;
 }
 
 // ============================================================================
