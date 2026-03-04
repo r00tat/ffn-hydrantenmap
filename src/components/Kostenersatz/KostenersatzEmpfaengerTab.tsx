@@ -23,7 +23,6 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PaymentIcon from '@mui/icons-material/Payment';
 import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import QrCodeIcon from '@mui/icons-material/QrCode';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -40,6 +39,8 @@ export interface KostenersatzEmpfaengerTabProps {
   firecallId?: string;
   calculationId?: string;
   sumupPaymentStatus?: string;
+  /** Save the calculation before creating a SumUp payment. Returns the calculationId on success. */
+  onSaveBeforePayment?: () => Promise<string | undefined>;
 }
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bar', 'kreditkarte', 'rechnung', 'sumup_online', 'sumup_app'];
@@ -66,8 +67,9 @@ export default function KostenersatzEmpfaengerTab({
   firecallId,
   calculationId,
   sumupPaymentStatus,
+  onSaveBeforePayment,
 }: KostenersatzEmpfaengerTabProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<'online' | 'app' | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -129,11 +131,24 @@ export default function KostenersatzEmpfaengerTab({
   };
 
   const handleOnlinePayment = async () => {
-    if (!firecallId || !calculationId) return;
-    setIsLoading(true);
+    if (!firecallId) return;
+    setLoadingAction('online');
     setError(null);
     try {
-      const result = await createSumupCheckout(firecallId, calculationId);
+      // Set payment method to sumup_online before saving
+      if (recipient.paymentMethod !== 'sumup_online') {
+        onChange({ ...recipient, paymentMethod: 'sumup_online' });
+      }
+      let calcId = calculationId;
+      if (!calcId && onSaveBeforePayment) {
+        calcId = await onSaveBeforePayment();
+        if (!calcId) {
+          setError('Berechnung konnte nicht gespeichert werden');
+          return;
+        }
+      }
+      if (!calcId) return;
+      const result = await createSumupCheckout(firecallId, calcId);
       if (result.success && result.checkoutUrl) {
         setCheckoutUrl(result.checkoutUrl);
         setShowPaymentDialog(true);
@@ -143,7 +158,7 @@ export default function KostenersatzEmpfaengerTab({
     } catch (err: any) {
       setError(err.message || 'Fehler beim Erstellen der Zahlung');
     } finally {
-      setIsLoading(false);
+      setLoadingAction(null);
     }
   };
 
@@ -158,11 +173,24 @@ export default function KostenersatzEmpfaengerTab({
   };
 
   const handleAppPayment = async () => {
-    if (!firecallId || !calculationId) return;
-    setIsLoading(true);
+    if (!firecallId) return;
+    setLoadingAction('app');
     setError(null);
     try {
-      const result = await getSumupDeepLink(firecallId, calculationId);
+      // Set payment method to sumup_app before saving
+      if (recipient.paymentMethod !== 'sumup_app') {
+        onChange({ ...recipient, paymentMethod: 'sumup_app' });
+      }
+      let calcId = calculationId;
+      if (!calcId && onSaveBeforePayment) {
+        calcId = await onSaveBeforePayment();
+        if (!calcId) {
+          setError('Berechnung konnte nicht gespeichert werden');
+          return;
+        }
+      }
+      if (!calcId) return;
+      const result = await getSumupDeepLink(firecallId, calcId);
       if (result.success && result.deepLinkUrl) {
         window.location.href = result.deepLinkUrl;
       } else {
@@ -171,12 +199,11 @@ export default function KostenersatzEmpfaengerTab({
     } catch (err: any) {
       setError(err.message || 'Fehler beim Erstellen des Deep Links');
     } finally {
-      setIsLoading(false);
+      setLoadingAction(null);
     }
   };
 
-  const isSumupMethod = recipient.paymentMethod === 'sumup_online' || recipient.paymentMethod === 'sumup_app';
-  const sumupButtonDisabled = !firecallId || !calculationId || isLoading;
+  const sumupButtonDisabled = !firecallId || loadingAction !== null;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -190,7 +217,6 @@ export default function KostenersatzEmpfaengerTab({
         onChange={handleFieldChange('name')}
         fullWidth
         required
-        disabled={disabled}
         placeholder="Vor- und Nachname oder Firmenname"
       />
 
@@ -201,7 +227,6 @@ export default function KostenersatzEmpfaengerTab({
         fullWidth
         multiline
         rows={3}
-        disabled={disabled}
         placeholder="Stra&szlig;e, Hausnummer&#10;PLZ Ort"
       />
 
@@ -210,7 +235,6 @@ export default function KostenersatzEmpfaengerTab({
         value={recipient.phone}
         onChange={handleFieldChange('phone')}
         fullWidth
-        disabled={disabled}
         type="tel"
         placeholder="+43 ..."
       />
@@ -220,7 +244,6 @@ export default function KostenersatzEmpfaengerTab({
         value={recipient.email}
         onChange={handleFieldChange('email')}
         fullWidth
-        disabled={disabled}
         type="email"
         placeholder="email@example.com"
       />
@@ -235,57 +258,40 @@ export default function KostenersatzEmpfaengerTab({
         >
           {PAYMENT_METHODS.map((method) => (
             <MenuItem key={method} value={method}>
-              {formatPaymentMethod(method)}
+              {formatPaymentMethod(method, method === recipient.paymentMethod ? sumupPaymentStatus : undefined)}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
 
-      {recipient.paymentMethod === 'sumup_online' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Button
-            variant="contained"
-            startIcon={isLoading ? <CircularProgress size={20} /> : <PaymentIcon />}
-            onClick={handleOnlinePayment}
-            disabled={sumupButtonDisabled}
-          >
-            Zahlung erstellen
-          </Button>
-          {sumupPaymentStatus && (
-            <>
-              <PaymentStatusChip status={sumupPaymentStatus} />
-              <Tooltip title="Status prüfen">
-                <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
-                  {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-        </Box>
-      )}
-
-      {recipient.paymentMethod === 'sumup_app' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={isLoading ? <CircularProgress size={20} /> : <PhoneAndroidIcon />}
-            onClick={handleAppPayment}
-            disabled={sumupButtonDisabled}
-          >
-            In SumUp App bezahlen
-          </Button>
-          {sumupPaymentStatus && (
-            <>
-              <PaymentStatusChip status={sumupPaymentStatus} />
-              <Tooltip title="Status prüfen">
-                <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
-                  {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Button
+          variant="contained"
+          startIcon={loadingAction === 'online' ? <CircularProgress size={20} /> : <PaymentIcon />}
+          onClick={handleOnlinePayment}
+          disabled={sumupButtonDisabled}
+        >
+          Onlinezahlung erstellen
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={loadingAction === 'app' ? <CircularProgress size={20} /> : <PhoneAndroidIcon />}
+          onClick={handleAppPayment}
+          disabled={sumupButtonDisabled}
+        >
+          In SumUp App bezahlen
+        </Button>
+        {sumupPaymentStatus && (
+          <>
+            <PaymentStatusChip status={sumupPaymentStatus} />
+            <Tooltip title="Status prüfen">
+              <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
+                {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          </>
+        )}
+      </Box>
 
       {/* Payment sharing dialog with QR code */}
       <Dialog
@@ -345,11 +351,6 @@ export default function KostenersatzEmpfaengerTab({
         </Alert>
       )}
 
-      {isSumupMethod && !firecallId && (
-        <Alert severity="info">
-          Berechnung muss zuerst gespeichert werden, bevor eine Zahlung erstellt werden kann.
-        </Alert>
-      )}
     </Box>
   );
 }

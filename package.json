@@ -42,7 +42,7 @@
     "csv-parse": "^6.1.0",
     "csv-stringify": "^6.6.0",
     "epsg": "^0.5.0",
-    "firebase": "12.8.0",
+    "firebase": "12.10.0",
     "firebase-admin": "^13.7.0",
     "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
@@ -80,7 +80,7 @@
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^25.3.3",
     "@types/nunjucks": "^3.2.6",
-    "@types/react": "19.2.10",
+    "@types/react": "19.2.14",
     "@types/uuid": "^11.0.0",
     "baseline-browser-mapping": "^2.10.0",
     "eslint": "^9.0.0",
@@ -90,9 +90,9 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
-    "firebase": "12.8.0",
-    "@types/react": "19.2.10",
-    "fast-xml-parser": "5.3.6",
-    "minimatch": "10.2.1"
+    "firebase": "12.10.0",
+    "@types/react": "19.2.14",
+    "fast-xml-parser": "5.3.8",
+    "minimatch": "10.2.3"
   }
 }

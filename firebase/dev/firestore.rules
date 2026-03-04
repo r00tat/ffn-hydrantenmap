@@ -11,9 +11,13 @@ service cloud.firestore {
     }
     
     function adminUser() {
-      return request.auth != null && 
+      return request.auth != null &&
       request.auth.token.isAdmin == true
       // get(/databases/$(database)/documents/user/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function kostenersatzUser() {
+      return authorizedUser() && 'kostenersatz' in request.auth.token.groups;
     }
     
     match /hydrant/{doc=*} {
@@ -85,35 +89,35 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == doc
     }
 
-    // Kostenersatz rate versions - read for all authorized, write for admin
+    // Kostenersatz rate versions - read for kostenersatz group, write for admin
     match /kostenersatzVersions/{doc=**} {
-      allow read: if authorizedUser();
+      allow read: if kostenersatzUser();
       allow write: if adminUser();
     }
 
-    // Kostenersatz rates - read for all authorized, write for admin
+    // Kostenersatz rates - read for kostenersatz group, write for admin
     match /kostenersatzRates/{doc=**} {
-      allow read: if authorizedUser();
+      allow read: if kostenersatzUser();
       allow write: if adminUser();
     }
 
-    // Kostenersatz templates - read for all, create for authorized, update/delete for owner or admin
+    // Kostenersatz templates - read/create for kostenersatz group, update/delete for owner or admin
     match /kostenersatzTemplates/{templateId} {
-      allow read: if authorizedUser();
-      allow create: if authorizedUser();
-      allow update, delete: if authorizedUser() &&
+      allow read: if kostenersatzUser();
+      allow create: if kostenersatzUser();
+      allow update, delete: if kostenersatzUser() &&
         (resource.data.createdBy == request.auth.token.email || adminUser());
     }
 
-    // Kostenersatz config (email settings) - read for all authorized, write for admin
+    // Kostenersatz config (email settings) - read for kostenersatz group, write for admin
     match /kostenersatzConfig/{doc=**} {
-      allow read: if authorizedUser();
+      allow read: if kostenersatzUser();
       allow write: if adminUser();
     }
 
-    // Kostenersatz vehicles - read for all authorized, write for admin
+    // Kostenersatz vehicles - read for kostenersatz group, write for admin
     match /kostenersatzVehicles/{doc=**} {
-      allow read: if authorizedUser();
+      allow read: if kostenersatzUser();
       allow write: if adminUser();
     }
 

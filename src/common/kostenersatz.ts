@@ -137,6 +137,7 @@ export interface KostenersatzCalculation {
   sumupPaymentStatus?: 'pending' | 'paid' | 'failed' | 'expired';
   sumupPaidAt?: string;
   sumupTransactionCode?: string;
+  sumupRedirectToken?: string;
 }
 
 // ============================================================================
@@ -148,8 +149,6 @@ export const KOSTENERSATZ_VERSIONS_COLLECTION = 'kostenersatzVersions';
 export const KOSTENERSATZ_TEMPLATES_COLLECTION = 'kostenersatzTemplates';
 export const KOSTENERSATZ_SUBCOLLECTION = 'kostenersatz';
 export const KOSTENERSATZ_VEHICLES_COLLECTION = 'kostenersatzVehicles';
-export const KOSTENERSATZ_SUMUP_CONFIG_DOC = 'sumupSettings';
-
 // Group key for kostenersatz authorization
 export const KOSTENERSATZ_GROUP = 'kostenersatz';
 
@@ -164,19 +163,6 @@ export interface KostenersatzVehicle {
   description?: string; // e.g., "Kommando Neusiedl am See"
   sortOrder: number; // For consistent display order
 }
-
-export interface KostenersatzSumupConfig {
-  merchantCode: string;
-  currency: string;
-  redirectUrl?: string;
-  updatedAt?: string;
-  updatedBy?: string;
-}
-
-export const DEFAULT_SUMUP_CONFIG: KostenersatzSumupConfig = {
-  merchantCode: '',
-  currency: 'EUR',
-};
 
 // ============================================================================
 // Calculation Logic

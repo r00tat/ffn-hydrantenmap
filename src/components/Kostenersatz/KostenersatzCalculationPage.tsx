@@ -38,6 +38,7 @@ import KostenersatzPdfButton from './KostenersatzPdfButton';
 import KostenersatzEmailDialog from './KostenersatzEmailDialog';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
 import KostenersatzTemplateSelector from './KostenersatzTemplateSelector';
+import { updateRecipientAction } from './updateRecipientAction';
 import EmailIcon from '@mui/icons-material/Email';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -135,7 +136,7 @@ export default function KostenersatzCalculationPage({
     }
   }, [activeVersion, existingCalculation]);
 
-  // Sync SumUp payment status from Firestore real-time updates
+  // Sync SumUp payment status and calculation status from Firestore real-time updates
   useEffect(() => {
     if (existingCalculation?.sumupPaymentStatus &&
         existingCalculation.sumupPaymentStatus !== calculation.sumupPaymentStatus) {
@@ -148,6 +149,19 @@ export default function KostenersatzCalculationPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.sumupPaymentStatus to avoid infinite loop
   }, [existingCalculation?.sumupPaymentStatus, existingCalculation?.sumupPaidAt, existingCalculation?.sumupTransactionCode]);
+
+  // Sync calculation status from Firestore (e.g. after auto-close on payment)
+  useEffect(() => {
+    if (existingCalculation?.status &&
+        existingCalculation.status !== calculation.status &&
+        existingCalculation.status !== 'draft') {
+      setCalculation((prev) => ({
+        ...prev,
+        status: existingCalculation.status,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally excludes calculation.status to avoid infinite loop
+  }, [existingCalculation?.status]);
 
   // Recalculate totals when items change
   useEffect(() => {
@@ -392,6 +406,52 @@ export default function KostenersatzCalculationPage({
     }));
   }, []);
 
+  const handleSaveRecipient = useCallback(async () => {
+    const calcId = existingCalculation?.id || calculation.id;
+    if (!calcId) return;
+    setIsSaving(true);
+    try {
+      const result = await updateRecipientAction(firecallId, calcId, calculation.recipient);
+      if (result.success) {
+        setHasUnsavedChanges(false);
+        setSuccessMessage('Empfänger gespeichert');
+      }
+    } catch (error) {
+      console.error('Error saving recipient:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [existingCalculation?.id, calculation.id, calculation.recipient, firecallId]);
+
+  // Save before SumUp payment — saves as draft and returns the new calculationId
+  const handleSaveBeforePayment = useCallback(async (): Promise<string | undefined> => {
+    setIsSaving(true);
+    try {
+      const calcToSave = {
+        ...calculation,
+        status: calculation.status || ('draft' as const),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingCalculation?.id || calculation.id) {
+        await updateCalculation(calcToSave);
+        setHasUnsavedChanges(false);
+        return existingCalculation?.id || calculation.id;
+      } else {
+        const { id: _id, ...calcWithoutId } = calcToSave;
+        const newId = await addCalculation(calcWithoutId);
+        setCalculation((prev) => ({ ...prev, id: newId }));
+        setHasUnsavedChanges(false);
+        return newId;
+      }
+    } catch (error) {
+      console.error('Error saving before payment:', error);
+      return undefined;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [calculation, existingCalculation, addCalculation, updateCalculation]);
+
   // Save handlers
   const handleSave = useCallback(
     async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<boolean> => {
@@ -597,6 +657,7 @@ export default function KostenersatzCalculationPage({
               firecallId={firecallId}
               calculationId={existingCalculation?.id || calculation.id}
               sumupPaymentStatus={calculation.sumupPaymentStatus}
+              onSaveBeforePayment={handleSaveBeforePayment}
             />
           </TabPanel>
         </Box>
@@ -656,15 +717,25 @@ export default function KostenersatzCalculationPage({
               </>
             )}
             {!isEditable && (
-              <Button
-                variant="outlined"
-                startIcon={<ContentCopyIcon />}
-                onClick={handleCopy}
-                disabled={isSaving}
-                size="small"
-              >
-                Kopieren
-              </Button>
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={handleSaveRecipient}
+                  disabled={isSaving || !hasUnsavedChanges}
+                  size="small"
+                >
+                  Empfänger speichern
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={handleCopy}
+                  disabled={isSaving}
+                  size="small"
+                >
+                  Kopieren
+                </Button>
+              </>
             )}
             <Button
               variant="outlined"
