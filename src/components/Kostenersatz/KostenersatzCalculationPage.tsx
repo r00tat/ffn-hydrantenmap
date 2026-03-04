@@ -410,6 +410,35 @@ export default function KostenersatzCalculationPage({
     }
   }, [existingCalculation?.id, calculation.id, calculation.recipient, firecallId]);
 
+  // Save before SumUp payment — saves as draft and returns the new calculationId
+  const handleSaveBeforePayment = useCallback(async (): Promise<string | undefined> => {
+    setIsSaving(true);
+    try {
+      const calcToSave = {
+        ...calculation,
+        status: calculation.status || ('draft' as const),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingCalculation?.id || calculation.id) {
+        await updateCalculation(calcToSave);
+        setHasUnsavedChanges(false);
+        return existingCalculation?.id || calculation.id;
+      } else {
+        const { id: _id, ...calcWithoutId } = calcToSave;
+        const newId = await addCalculation(calcWithoutId);
+        setCalculation((prev) => ({ ...prev, id: newId }));
+        setHasUnsavedChanges(false);
+        return newId;
+      }
+    } catch (error) {
+      console.error('Error saving before payment:', error);
+      return undefined;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [calculation, existingCalculation, addCalculation, updateCalculation]);
+
   // Save handlers
   const handleSave = useCallback(
     async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<boolean> => {
@@ -615,6 +644,7 @@ export default function KostenersatzCalculationPage({
               firecallId={firecallId}
               calculationId={existingCalculation?.id || calculation.id}
               sumupPaymentStatus={calculation.sumupPaymentStatus}
+              onSaveBeforePayment={handleSaveBeforePayment}
             />
           </TabPanel>
         </Box>
