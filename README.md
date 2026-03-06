@@ -138,4 +138,4 @@ firebase/          # Firestore Rules und Indexes
 
 ## License
 
-[MPL-2.0](LICENSE)
+[GNU General Public License v3](LICENSE)
