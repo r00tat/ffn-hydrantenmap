@@ -1,5 +1,5 @@
 import { where } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -12,24 +12,30 @@ import {
 import { getItemInstance } from '../../FirecallItems/elements';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
+import { sortByZIndex } from '../../../hooks/useFirecallLayers';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
+  pane?: string;
 }
 
 function renderMarker(
   record: FirecallItem,
-  setFirecallItem: (item: FirecallItem) => void
+  setFirecallItem: (item: FirecallItem) => void,
+  pane?: string
 ) {
   try {
-    return getItemInstance(record).renderMarker(setFirecallItem);
+    return getItemInstance(record).renderMarker(setFirecallItem, { pane });
   } catch (err) {
     console.error('Failed to render item ', record, err);
   }
   return <></>;
 }
 
-export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
+export default function FirecallItemsLayer({
+  layer,
+  pane,
+}: FirecallLayerOptions) {
   const firecallId = useFirecallId();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const historyPathSegments = useHistoryPathSegments();
@@ -58,20 +64,15 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
     filterFn,
   });
 
+  const sortedRecords = useMemo(() => sortByZIndex(records), [records]);
+
   return (
     <>
-      {records.map(
-        (record) => (
-          <React.Fragment key={record.id}>
-            <>{renderMarker(record, setFirecallItem)}</>
-          </React.Fragment>
-        )
-        // <FirecallItemMarker
-        //   record={record}
-        //   key={record.id}
-        //   selectItem={setFirecallItem}
-        // />
-      )}
+      {sortedRecords.map((record) => (
+        <React.Fragment key={record.id}>
+          <>{renderMarker(record, setFirecallItem, pane)}</>
+        </React.Fragment>
+      ))}
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}
