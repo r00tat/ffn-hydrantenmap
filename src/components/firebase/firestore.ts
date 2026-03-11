@@ -67,6 +67,10 @@ export interface HeatmapConfig {
   colorMode: 'auto' | 'manual';
   /** When true, auto mode uses red→yellow→green (low=red, high=green) */
   invertAutoColor?: boolean;
+  /** Heatmap overlay radius in pixels (default 25) */
+  radius?: number;
+  /** Heatmap overlay blur in pixels (default 15) */
+  blur?: number;
   min?: number;
   max?: number;
   colorStops?: { value: number; color: string }[];

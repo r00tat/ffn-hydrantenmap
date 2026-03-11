@@ -40,8 +40,8 @@ export default function HeatmapOverlay({
 
       // leaflet.heat patches L with heatLayer
       const layer = (L as Record<string, unknown>).heatLayer(data, {
-        radius: 25,
-        blur: 15,
+        radius: config.radius ?? 25,
+        blur: config.blur ?? 15,
         maxZoom: 17,
         max: 1,
       }) as L.Layer;

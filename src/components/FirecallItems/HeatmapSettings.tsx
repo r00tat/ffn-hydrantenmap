@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
+import Slider from '@mui/material/Slider';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
@@ -185,6 +186,34 @@ export default function HeatmapSettings({
               </Button>
             </Box>
           )}
+          <Box>
+            <Typography variant="body2" gutterBottom>
+              Radius: {current.radius ?? 25}px
+            </Typography>
+            <Slider
+              value={current.radius ?? 25}
+              onChange={(_, val) => update({ radius: val as number })}
+              min={5}
+              max={100}
+              step={5}
+              size="small"
+              valueLabelDisplay="auto"
+            />
+          </Box>
+          <Box>
+            <Typography variant="body2" gutterBottom>
+              Weichzeichner: {current.blur ?? 15}px
+            </Typography>
+            <Slider
+              value={current.blur ?? 15}
+              onChange={(_, val) => update({ blur: val as number })}
+              min={1}
+              max={50}
+              step={1}
+              size="small"
+              valueLabelDisplay="auto"
+            />
+          </Box>
         </Box>
       )}
     </Box>
