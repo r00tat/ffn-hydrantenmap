@@ -117,7 +117,7 @@ export class CircleMarker extends FirecallItemBase {
           key={'circle' + this.id}
           radius={this.radius}
           center={L.latLng(this.lat, this.lng)}
-          pane={pane}
+          {...(pane ? { pane } : {})}
           pathOptions={{
             color: this.color,
             fill: this.fill === 'true',

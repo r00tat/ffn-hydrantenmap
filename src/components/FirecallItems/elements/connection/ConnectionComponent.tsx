@@ -78,7 +78,7 @@ export default function ConnectionMarker({
                 icon={record.icon()}
                 draggable={editable}
                 autoPan={false}
-                pane={pane}
+                {...(pane ? { pane } : {})}
                 eventHandlers={{
                   dragend: (event) => {
                     updateFirecallPositions(
@@ -129,7 +129,7 @@ export default function ConnectionMarker({
         )}
       <Polyline
         positions={positions.filter(([pLat, pLng]) => pLat && pLng)}
-        pane={pane}
+        {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,

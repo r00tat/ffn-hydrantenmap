@@ -70,7 +70,7 @@ export default function AreaMarker({ record, selectItem, pane }: AreaMarkerProps
             icon={record.icon()}
             draggable={editable}
             autoPan={false}
-            pane={pane}
+            {...(pane ? { pane } : {})}
             eventHandlers={{
               dragend: (event) => {
                 updateFirecallPositions(
@@ -109,7 +109,7 @@ export default function AreaMarker({ record, selectItem, pane }: AreaMarkerProps
         ))}
       <Polygon
         positions={positions}
-        pane={pane}
+        {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: 0.8,

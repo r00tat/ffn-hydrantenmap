@@ -103,7 +103,7 @@ export function FirecallItemMarkerDefault({
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
-        pane={pane}
+        {...(pane ? { pane } : {})}
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
