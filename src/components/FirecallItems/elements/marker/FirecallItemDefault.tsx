@@ -20,6 +20,9 @@ export interface MarkerRenderOptions {
   hidePopup?: boolean;
   /* disable click handler (used for preview markers during placement) */
   disableClick?: boolean;
+  pane?: string;
+  /* callback for right-click context menu */
+  onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void;
 }
 
 export interface FirecallItemMarkerProps {
@@ -72,7 +75,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick } = {},
+  options: { hidePopup, disableClick, onContextMenu } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
@@ -115,6 +118,14 @@ export function FirecallItemMarkerDefault({
                   selectFirecallItem(record);
                 },
               }),
+          ...(onContextMenu
+            ? {
+                contextmenu: (e: L.LeafletMouseEvent) => {
+                  e.originalEvent.preventDefault();
+                  onContextMenu(record, e);
+                },
+              }
+            : {}),
         }}
         rotationAngle={
           record?.rotation &&

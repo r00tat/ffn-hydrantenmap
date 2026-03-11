@@ -20,7 +20,7 @@ export default function useFirecallItemUpdate() {
       const newData: any = {
         datum: new Date().toISOString(),
         ...Object.entries(item)
-          .filter(([k, v]) => v)
+          .filter(([k, v]) => v !== undefined && v !== null && v !== '')
           .reduce((p, [k, v]) => {
             p[k] = v;
             return p;

@@ -8,12 +8,10 @@ export default function FirecallLayerProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const layers = useFirecallLayersFromFirstore();
+  const layersContextValue = useFirecallLayersFromFirstore();
   return (
-    <>
-      <FirecallLayersContext.Provider value={layers}>
-        {children}
-      </FirecallLayersContext.Provider>
-    </>
+    <FirecallLayersContext.Provider value={layersContextValue}>
+      {children}
+    </FirecallLayersContext.Provider>
   );
 }

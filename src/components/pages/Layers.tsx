@@ -12,7 +12,14 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import AddIcon from '@mui/icons-material/Add';
+import DragHandleIcon from '@mui/icons-material/DragHandle';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -30,7 +37,10 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
-import { useFirecallLayers } from '../../hooks/useFirecallLayers';
+import {
+  useFirecallLayers,
+  useFirecallLayersSorted,
+} from '../../hooks/useFirecallLayers';
 import useMapEditor from '../../hooks/useMapEditor';
 import FirecallItemCard, {
   FirecallItemCardOptions,
@@ -42,6 +52,7 @@ import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
+  FirecallLayer,
   filterDisplayableItems,
 } from '../firebase/firestore';
 
@@ -51,6 +62,7 @@ export function DroppableFirecallCard({
 }: FirecallItemCardOptions) {
   const { isOver, setNodeRef } = useDroppable({
     id: '' + item.id,
+    data: { type: 'layer' as const },
   });
   return (
     <FirecallItemCard
@@ -68,9 +80,77 @@ export function DroppableFirecallCard({
   );
 }
 
+function SortableLayerCard({
+  layer,
+  subItems,
+}: {
+  layer: FirecallLayer;
+  subItems: FirecallItem[];
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: '' + layer.id,
+    data: { type: 'layer' as const },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+  };
+
+  // Note: useSortable already registers this element as a droppable.
+  // Do NOT add a separate useDroppable with the same ID — it would conflict.
+  // Item-to-layer drops are handled by DroppableFirecallCard inside.
+
+  return (
+    <Grid size={{ xs: 12, md: 12, lg: 12 }}>
+      <Box ref={setNodeRef} style={style}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'stretch',
+          }}
+        >
+          <Box
+            {...attributes}
+            {...listeners}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              px: 0.5,
+              cursor: 'grab',
+              '&:active': { cursor: 'grabbing' },
+              color: 'text.secondary',
+            }}
+          >
+            <DragHandleIcon />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <DroppableFirecallCard
+              item={layer}
+              subItems={subItems}
+              subItemsDraggable
+              compact
+              subItemsCompact
+            />
+          </Box>
+        </Box>
+      </Box>
+    </Grid>
+  );
+}
+
 function DroppableUnassigned({ items, ...breakpoints }: { items: FirecallItem[] } & GridBaseProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'default',
+    data: { type: 'layer' as const },
   });
   return (
     <Grid
@@ -102,14 +182,13 @@ export default function LayersPage() {
   const { isAuthorized } = useFirebaseLogin();
   const [addDialog, setAddDialog] = useState(false);
   const [activeItem, setActiveItem] = useState<FirecallItem | null>(null);
-  // const columns = useGridColumns();
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
+  const sortedLayers = useFirecallLayersSorted();
   const { historyPathSegments, historyModeActive } = useMapEditor();
 
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
-    // queryConstraints,
     pathSegments: [
       firecallId,
       ...historyPathSegments,
@@ -119,6 +198,17 @@ export default function LayersPage() {
   });
 
   const updateFirecallItem = useFirecallItemUpdate();
+
+  // Layers sorted descending by zIndex for display (top of list = highest z = renders on top)
+  const displayLayers = useMemo(
+    () => [...sortedLayers].reverse(),
+    [sortedLayers]
+  );
+
+  const layerIds = useMemo(
+    () => displayLayers.map((l) => '' + l.id),
+    [displayLayers]
+  );
 
   const layerItems: SimpleMap<FirecallItem[]> = useMemo(() => {
     const elements: SimpleMap<FirecallItem[]> = {};
@@ -149,6 +239,7 @@ export default function LayersPage() {
   const dialogClose = useCallback(
     async (item?: FirecallItem) => {
       if (item) {
+        // zIndex auto-assignment is handled by useFirecallItemAdd
         await addItem(item);
       }
       setAddDialog(false);
@@ -158,6 +249,12 @@ export default function LayersPage() {
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
+      const dragType = event.active.data.current?.type;
+      if (dragType === 'layer') {
+        // Don't show overlay for layer reorder
+        setActiveItem(null);
+        return;
+      }
       const item = items.find((i) => i.id === event.active.id);
       setActiveItem(item || null);
     },
@@ -167,6 +264,39 @@ export default function LayersPage() {
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       setActiveItem(null);
+      const dragType = event.active.data.current?.type;
+
+      if (dragType === 'layer') {
+        // Layer reorder
+        const activeId = '' + event.active.id;
+        const overId = event.over?.id ? '' + event.over.id : null;
+        if (!overId || activeId === overId) return;
+
+        const oldIndex = displayLayers.findIndex(
+          (l) => '' + l.id === activeId
+        );
+        const newIndex = displayLayers.findIndex(
+          (l) => '' + l.id === overId
+        );
+        if (oldIndex < 0 || newIndex < 0) return;
+
+        // Reorder: move item from oldIndex to newIndex
+        const reordered = [...displayLayers];
+        const [moved] = reordered.splice(oldIndex, 1);
+        reordered.splice(newIndex, 0, moved);
+
+        // Renumber: display is descending, so top of list = highest zIndex
+        // index 0 = highest, index N-1 = lowest
+        reordered.forEach((layer, idx) => {
+          const newZIndex = reordered.length - 1 - idx;
+          if ((layer.zIndex ?? 0) !== newZIndex) {
+            updateFirecallItem({ ...layer, type: 'layer', zIndex: newZIndex });
+          }
+        });
+        return;
+      }
+
+      // Item-to-layer reassignment (existing behavior)
       const layerId = event.over?.id;
       const activeId = event.active.id;
       console.info(`FirecallItem drag end ${activeId} on to ${layerId}`);
@@ -178,7 +308,7 @@ export default function LayersPage() {
         });
       }
     },
-    [items, updateFirecallItem]
+    [items, displayLayers, updateFirecallItem]
   );
 
   const mouseSensor = useSensor(MouseSensor, {
@@ -224,18 +354,20 @@ export default function LayersPage() {
               <Typography variant="h5">
                 Erstellte Ebenen
               </Typography>
-              <Grid container spacing={2}>
-                {Object.entries(layers).map(([layerId, item]) => (
-                  <DroppableFirecallCard
-                    item={item}
-                    key={layerId}
-                    subItems={layerItems[layerId]}
-                    subItemsDraggable
-                    compact
-                    subItemsCompact
-                  />
-                ))}
-              </Grid>
+              <SortableContext
+                items={layerIds}
+                strategy={verticalListSortingStrategy}
+              >
+                <Grid container spacing={2}>
+                  {displayLayers.map((layer) => (
+                    <SortableLayerCard
+                      key={layer.id}
+                      layer={layer}
+                      subItems={layerItems[layer.id!] || []}
+                    />
+                  ))}
+                </Grid>
+              </SortableContext>
             </Grid>
             <DroppableUnassigned
               size={hasUnassignedItems ? { xs: 12, md: 5, xl: 4 } : { xs: 12, xl: 2 }}

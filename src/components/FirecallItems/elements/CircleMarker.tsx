@@ -108,21 +108,32 @@ export class CircleMarker extends FirecallItemBase {
 
   public renderMarker(
     selectItem: (item: FirecallItem) => void,
-    { hidePopup = false }: MarkerRenderOptions = {}
+    { hidePopup = false, pane, onContextMenu }: MarkerRenderOptions = {}
   ) {
     return (
       <>
-        {!hidePopup && super.renderMarker(selectItem)}
+        {!hidePopup && super.renderMarker(selectItem, { pane, onContextMenu })}
         <LeafletCircle
           key={'circle' + this.id}
           radius={this.radius}
           center={L.latLng(this.lat, this.lng)}
+          {...(pane ? { pane } : {})}
           pathOptions={{
             color: this.color,
             fill: this.fill === 'true',
             opacity: this.opacity / 100,
             fillOpacity: this.opacity / 100 / 3,
           }}
+          eventHandlers={
+            onContextMenu
+              ? {
+                  contextmenu: (e: L.LeafletMouseEvent) => {
+                    e.originalEvent.preventDefault();
+                    onContextMenu(this, e);
+                  },
+                }
+              : {}
+          }
         >
           {!hidePopup && this.renderPopup(selectItem)}
         </LeafletCircle>
