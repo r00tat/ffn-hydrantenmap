@@ -70,7 +70,6 @@ export default function AreaMarker({ record, selectItem, pane }: AreaMarkerProps
             icon={record.icon()}
             draggable={editable}
             autoPan={false}
-            {...(pane ? { pane } : {})}
             eventHandlers={{
               dragend: (event) => {
                 updateFirecallPositions(

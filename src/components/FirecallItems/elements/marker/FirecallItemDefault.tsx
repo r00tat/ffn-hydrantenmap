@@ -73,7 +73,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick, pane } = {},
+  options: { hidePopup, disableClick } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
@@ -103,7 +103,6 @@ export function FirecallItemMarkerDefault({
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
-        {...(pane ? { pane } : {})}
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
