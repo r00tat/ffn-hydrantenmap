@@ -69,19 +69,21 @@ export function getHeatmapColor(
 
   if (max === min) return stops[0]?.color ?? NO_DATA_COLOR;
 
-  // Clamp value
-  const clamped = Math.max(min, Math.min(max, value));
+  // Clamp value to stop range (not config min/max, which may differ)
+  const stopMin = stops[0].value;
+  const stopMax = stops[stops.length - 1].value;
+  if (value <= stopMin) return stops[0].color;
+  if (value >= stopMax) return stops[stops.length - 1].color;
 
   // Find surrounding stops
   for (let i = 0; i < stops.length - 1; i++) {
-    if (clamped >= stops[i].value && clamped <= stops[i + 1].value) {
+    if (value >= stops[i].value && value <= stops[i + 1].value) {
       const range = stops[i + 1].value - stops[i].value;
-      const t = range === 0 ? 0 : (clamped - stops[i].value) / range;
+      const t = range === 0 ? 0 : (value - stops[i].value) / range;
       return interpolateColor(stops[i].color, stops[i + 1].color, t);
     }
   }
 
-  // Edge case: value at or beyond last stop
   return stops[stops.length - 1].color;
 }
 
