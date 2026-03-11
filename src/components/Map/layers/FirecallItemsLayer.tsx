@@ -15,6 +15,7 @@ import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/Firecal
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import HeatmapLegend from '../HeatmapLegend';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
+import HeatmapOverlay from './HeatmapOverlay';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
@@ -76,6 +77,17 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
       .filter((v): v is number => typeof v === 'number');
   }, [records, heatmapConfig]);
 
+  const heatmapPoints = useMemo(() => {
+    if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
+    return records
+      .filter((r) => typeof r.fieldData?.[heatmapConfig.activeKey] === 'number' && r.lat && r.lng)
+      .map((r) => ({
+        lat: r.lat,
+        lng: r.lng,
+        value: r.fieldData![heatmapConfig.activeKey] as number,
+      }));
+  }, [records, heatmapConfig]);
+
   return (
     <>
       {records.map((record) => {
@@ -96,6 +108,13 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
           </React.Fragment>
         );
       })}
+      {heatmapConfig?.enabled && heatmapConfig?.activeKey && heatmapPoints.length > 0 && (
+        <HeatmapOverlay
+          points={heatmapPoints}
+          config={heatmapConfig}
+          allValues={allValues}
+        />
+      )}
       {heatmapConfig?.enabled && heatmapConfig?.activeKey && dataSchema && (
         <HeatmapLegend
           config={heatmapConfig}
