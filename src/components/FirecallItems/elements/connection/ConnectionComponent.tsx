@@ -24,11 +24,13 @@ import {
 export interface ConnectionMarkerProps {
   record: FirecallMultiPoint;
   selectItem: (item: FirecallItem) => void;
+  pane?: string;
 }
 
 export default function ConnectionMarker({
   record,
   selectItem,
+  pane,
 }: ConnectionMarkerProps) {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
@@ -76,6 +78,7 @@ export default function ConnectionMarker({
                 icon={record.icon()}
                 draggable={editable}
                 autoPan={false}
+                pane={pane}
                 eventHandlers={{
                   dragend: (event) => {
                     updateFirecallPositions(
@@ -126,6 +129,7 @@ export default function ConnectionMarker({
         )}
       <Polyline
         positions={positions.filter(([pLat, pLng]) => pLat && pLng)}
+        pane={pane}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: ((record as any)?.opacity || 100.0) / 100,

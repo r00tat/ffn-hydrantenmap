@@ -9,6 +9,7 @@ import {
 import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import ConnectionMarker from './connection/ConnectionComponent';
+import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class FirecallMultiPoint extends FirecallItemBase {
   destLat: number = defaultPosition.lat;
@@ -132,10 +133,18 @@ export class FirecallMultiPoint extends FirecallItemBase {
       </>
     );
   }
-  public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    options: MarkerRenderOptions = {}
+  ): ReactNode {
     try {
       return (
-        <ConnectionMarker record={this} selectItem={selectItem} key={this.id} />
+        <ConnectionMarker
+          record={this}
+          selectItem={selectItem}
+          key={this.id}
+          pane={options.pane}
+        />
       );
     } catch (err) {
       console.error('failed to render marker', err, this.data());

@@ -26,9 +26,10 @@ import {
 export interface AreaMarkerProps {
   record: FirecallArea;
   selectItem: (item: FirecallItem) => void;
+  pane?: string;
 }
 
-export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
+export default function AreaMarker({ record, selectItem, pane }: AreaMarkerProps) {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [showMarkers, setShowMarkers] = useState(false);
@@ -69,6 +70,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
             icon={record.icon()}
             draggable={editable}
             autoPan={false}
+            pane={pane}
             eventHandlers={{
               dragend: (event) => {
                 updateFirecallPositions(
@@ -107,6 +109,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
         ))}
       <Polygon
         positions={positions}
+        pane={pane}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: 0.8,
