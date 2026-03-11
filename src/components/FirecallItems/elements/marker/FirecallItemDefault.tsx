@@ -20,6 +20,7 @@ export interface MarkerRenderOptions {
   hidePopup?: boolean;
   /* disable click handler (used for preview markers during placement) */
   disableClick?: boolean;
+  pane?: string;
 }
 
 export interface FirecallItemMarkerProps {
@@ -72,7 +73,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick } = {},
+  options: { hidePopup, disableClick, pane } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon();
@@ -102,6 +103,7 @@ export function FirecallItemMarkerDefault({
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
+        pane={pane}
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
