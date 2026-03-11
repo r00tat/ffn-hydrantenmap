@@ -106,6 +106,17 @@ export default function HeatmapSettings({
             <ToggleButton value="auto">Auto</ToggleButton>
             <ToggleButton value="manual">Manuell</ToggleButton>
           </ToggleButtonGroup>
+          {current.colorMode === 'auto' && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={!!current.invertAutoColor}
+                  onChange={(e) => update({ invertAutoColor: e.target.checked })}
+                />
+              }
+              label={current.invertAutoColor ? 'Mehr ist grün' : 'Weniger ist grün'}
+            />
+          )}
           {current.colorMode === 'manual' && (
             <Box>
               <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>

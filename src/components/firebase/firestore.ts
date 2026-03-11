@@ -65,6 +65,8 @@ export interface HeatmapConfig {
   enabled: boolean;
   activeKey: string;
   colorMode: 'auto' | 'manual';
+  /** When true, auto mode uses red→yellow→green (low=red, high=green) */
+  invertAutoColor?: boolean;
   min?: number;
   max?: number;
   colorStops?: { value: number; color: string }[];

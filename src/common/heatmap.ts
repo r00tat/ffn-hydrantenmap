@@ -24,6 +24,12 @@ const DEFAULT_COLOR_STOPS = [
   { value: 1, color: '#ff0000' },   // red (high)
 ];
 
+const DEFAULT_COLOR_STOPS_INVERTED = [
+  { value: 0, color: '#ff0000' },   // red (low)
+  { value: 0.5, color: '#ffff00' }, // yellow (mid)
+  { value: 1, color: '#00ff00' },   // green (high)
+];
+
 const NO_DATA_COLOR = '#999999';
 
 /**
@@ -54,7 +60,8 @@ export function getHeatmapColor(
     max = allValues.reduce((a, b) => Math.max(a, b), -Infinity);
     // All identical -> midpoint color (yellow)
     if (min === max) return '#ffff00';
-    stops = DEFAULT_COLOR_STOPS.map((s) => ({
+    const baseStops = config.invertAutoColor ? DEFAULT_COLOR_STOPS_INVERTED : DEFAULT_COLOR_STOPS;
+    stops = baseStops.map((s) => ({
       value: min + s.value * (max - min),
       color: s.color,
     }));

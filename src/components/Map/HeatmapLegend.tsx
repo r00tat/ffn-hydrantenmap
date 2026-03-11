@@ -62,7 +62,9 @@ export default function HeatmapLegend({
               `${s.color} ${((s.value - min) / (max - min || 1)) * 100}%`
           )
           .join(', ')
-      : '#00ff00 0%, #ffff00 50%, #ff0000 100%';
+      : config.invertAutoColor
+        ? '#ff0000 0%, #ffff00 50%, #00ff00 100%'
+        : '#00ff00 0%, #ffff00 50%, #ff0000 100%';
 
   return (
     <Box
