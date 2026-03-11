@@ -47,15 +47,36 @@ export interface FirecallItem {
 
   // L.LeafletEventHandlerFnMap
   eventHandlers?: L.LeafletEventHandlerFnMap;
+
+  fieldData?: Record<string, string | number | boolean>;
 }
 
 export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback'];
+
+export interface DataSchemaField {
+  key: string;
+  label: string;
+  unit: string;
+  type: 'number' | 'text' | 'boolean';
+  defaultValue?: string | number | boolean;
+}
+
+export interface HeatmapConfig {
+  enabled: boolean;
+  activeKey: string;
+  colorMode: 'auto' | 'manual';
+  min?: number;
+  max?: number;
+  colorStops?: { value: number; color: string }[];
+}
 
 export interface FirecallLayer extends FirecallItem {
   grouped?: string;
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  dataSchema?: DataSchemaField[];
+  heatmapConfig?: HeatmapConfig;
 }
 
 export interface FcAttachment {
