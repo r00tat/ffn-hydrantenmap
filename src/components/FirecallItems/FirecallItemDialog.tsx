@@ -118,9 +118,9 @@ export default function FirecallItemDialog({
               />
             </>
           )}
-          {item.type !== 'layer' && item.layer && layers[item.layer]?.dataSchema && (
+          {item.type !== 'layer' && (
             <ItemDataFields
-              dataSchema={layers[item.layer].dataSchema!}
+              dataSchema={item.layer ? layers[item.layer]?.dataSchema : undefined}
               fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
               onChange={(fieldData) => setItemField('fieldData', fieldData)}
               isNew={!item.id}

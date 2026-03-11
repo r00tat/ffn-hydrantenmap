@@ -1,15 +1,19 @@
 'use client';
 
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
 
 interface ItemDataFieldsProps {
-  dataSchema: DataSchemaField[];
+  dataSchema?: DataSchemaField[];
   fieldData: Record<string, string | number | boolean>;
   onChange: (fieldData: Record<string, string | number | boolean>) => void;
   isNew?: boolean;
@@ -21,6 +25,8 @@ export default function ItemDataFields({
   onChange,
   isNew,
 }: ItemDataFieldsProps) {
+  const [newKey, setNewKey] = useState('');
+
   const updateValue = useCallback(
     (key: string, value: string | number | boolean | undefined) => {
       if (value === undefined) {
@@ -33,14 +39,36 @@ export default function ItemDataFields({
     [fieldData, onChange]
   );
 
-  if (dataSchema.length === 0) return null;
+  const removeKey = useCallback(
+    (key: string) => {
+      const { [key]: _, ...rest } = fieldData;
+      onChange(rest);
+    },
+    [fieldData, onChange]
+  );
+
+  const addFreeFormKey = useCallback(() => {
+    if (newKey.trim() && !(newKey.trim() in fieldData)) {
+      onChange({ ...fieldData, [newKey.trim()]: '' });
+      setNewKey('');
+    }
+  }, [newKey, fieldData, onChange]);
+
+  const schemaFields = dataSchema || [];
+  const schemaKeys = new Set(schemaFields.map((f) => f.key));
+  const freeFormKeys = Object.keys(fieldData).filter((k) => !schemaKeys.has(k));
+  const hasContent = schemaFields.length > 0 || freeFormKeys.length > 0 || Object.keys(fieldData).length > 0;
+
+  if (!hasContent && !dataSchema) {
+    // Show just the add button to allow starting free-form entry
+  }
 
   return (
     <Box sx={{ mt: 2 }}>
       <Typography variant="subtitle1" gutterBottom>
         Daten
       </Typography>
-      {dataSchema.map((field) => {
+      {schemaFields.map((field) => {
         const currentValue =
           fieldData[field.key] ??
           (isNew ? field.defaultValue : undefined) ??
@@ -85,6 +113,43 @@ export default function ItemDataFields({
           />
         );
       })}
+      {freeFormKeys.map((key) => (
+        <Box key={key} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+          <TextField
+            label={key}
+            size="small"
+            fullWidth
+            value={fieldData[key] ?? ''}
+            onChange={(e) => updateValue(key, e.target.value)}
+          />
+          <IconButton size="small" onClick={() => removeKey(key)} color="error">
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      ))}
+      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+        <TextField
+          label="Neues Feld"
+          size="small"
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addFreeFormKey();
+            }
+          }}
+          sx={{ flex: 1 }}
+        />
+        <Button
+          startIcon={<AddIcon />}
+          onClick={addFreeFormKey}
+          size="small"
+          disabled={!newKey.trim() || newKey.trim() in fieldData}
+        >
+          Hinzufügen
+        </Button>
+      </Box>
     </Box>
   );
 }
