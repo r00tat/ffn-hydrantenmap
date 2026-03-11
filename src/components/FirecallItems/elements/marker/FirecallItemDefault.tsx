@@ -77,10 +77,10 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick } = {},
+  options: { hidePopup, disableClick, heatmapColor } = {},
   children,
 }: FirecallItemMarkerProps) {
-  const icon = record.icon();
+  const icon = record.icon(heatmapColor);
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [startPos, setStartPos] = useState<L.LatLng>(

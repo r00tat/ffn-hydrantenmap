@@ -246,7 +246,7 @@ export class FirecallItemBase {
   public titleFn(): string {
     return this.name;
   }
-  public icon(): Icon<IconOptions> {
+  public icon(_heatmapColor?: string): Icon<IconOptions> {
     return leafletIcons().fallback;
   }
 

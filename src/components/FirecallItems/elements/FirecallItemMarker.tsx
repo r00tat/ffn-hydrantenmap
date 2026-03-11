@@ -122,7 +122,7 @@ export class FirecallItemMarker extends FirecallItemBase {
   public titleFn(): string {
     return `${this.zeichen?.replace(/_/g, ' ')} ${this.name}`;
   }
-  public icon(): LeafletIcon<IconOptions> {
+  public icon(heatmapColor?: string): LeafletIcon<IconOptions> {
     if (this.zeichen && iconKeys[this.zeichen]?.url) {
       const customIcon = iconKeys[this.zeichen];
       return L.icon({
@@ -138,8 +138,9 @@ export class FirecallItemMarker extends FirecallItemBase {
       });
     }
 
+    const color = heatmapColor || this.color;
     return L.icon({
-      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + this.color)}`,
+      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + color)}`,
       iconSize: [30, 30],
       iconAnchor: [15, 30],
       popupAnchor: [0, -25],
