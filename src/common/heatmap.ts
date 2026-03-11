@@ -107,5 +107,7 @@ export function normalizeValue(
   }
 
   if (max === min) return 0.5;
-  return Math.max(0, Math.min(1, (value - min) / (max - min)));
+  // Clamp to [0.1, 1] so even min-value points are visible on the heatmap
+  const normalized = (value - min) / (max - min);
+  return Math.max(0.1, Math.min(1, normalized));
 }
