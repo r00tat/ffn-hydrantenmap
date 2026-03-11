@@ -13,6 +13,7 @@ import {
 import { getItemInstance } from '../../FirecallItems/elements';
 import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
+import HeatmapLegend from '../HeatmapLegend';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 
 export interface FirecallLayerOptions {
@@ -95,6 +96,13 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
           </React.Fragment>
         );
       })}
+      {heatmapConfig?.enabled && heatmapConfig?.activeKey && dataSchema && (
+        <HeatmapLegend
+          config={heatmapConfig}
+          dataSchema={dataSchema}
+          allValues={allValues}
+        />
+      )}
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}
