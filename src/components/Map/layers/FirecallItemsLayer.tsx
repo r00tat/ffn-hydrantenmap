@@ -101,6 +101,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
           config={heatmapConfig}
           dataSchema={dataSchema}
           allValues={allValues}
+          layerName={layer?.name}
         />
       )}
       {firecallItem && (

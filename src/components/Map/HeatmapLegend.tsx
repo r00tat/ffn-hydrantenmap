@@ -8,12 +8,14 @@ interface HeatmapLegendProps {
   config: HeatmapConfig;
   dataSchema: DataSchemaField[];
   allValues: number[];
+  layerName?: string;
 }
 
 export default function HeatmapLegend({
   config,
   dataSchema,
   allValues,
+  layerName,
 }: HeatmapLegendProps) {
   const field = dataSchema.find((f) => f.key === config.activeKey);
   if (!field) return null;
@@ -76,8 +78,13 @@ export default function HeatmapLegend({
         minWidth: 120,
       }}
     >
+      {layerName && (
+        <Typography variant="caption" display="block" sx={{ fontWeight: 'bold' }}>
+          {layerName}
+        </Typography>
+      )}
       <Typography variant="caption" display="block" gutterBottom>
-        {field.label} ({field.unit})
+        {field.label}{field.unit ? ` (${field.unit})` : ''}
       </Typography>
       <Box
         sx={{
