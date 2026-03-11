@@ -6,6 +6,30 @@ import { useMap } from 'react-leaflet';
 import { HeatmapConfig } from '../../firebase/firestore';
 import { normalizeValue } from '../../../common/heatmap';
 
+/**
+ * Build a leaflet.heat gradient object from config color stops.
+ * Maps normalized intensity (0–1) to color strings.
+ */
+function buildGradient(config: HeatmapConfig): Record<number, string> {
+  if (config.colorMode === 'manual' && config.colorStops?.length && config.colorStops.length >= 2) {
+    const sorted = [...config.colorStops].sort((a, b) => a.value - b.value);
+    const min = sorted[0].value;
+    const max = sorted[sorted.length - 1].value;
+    const range = max - min || 1;
+    const gradient: Record<number, string> = {};
+    for (const stop of sorted) {
+      const t = (stop.value - min) / range;
+      gradient[t] = stop.color;
+    }
+    return gradient;
+  }
+  // Auto mode: use the same green→yellow→red (or inverted)
+  if (config.invertAutoColor) {
+    return { 0: '#ff0000', 0.5: '#ffff00', 1: '#00ff00' };
+  }
+  return { 0: '#00ff00', 0.5: '#ffff00', 1: '#ff0000' };
+}
+
 interface HeatmapOverlayProps {
   points: { lat: number; lng: number; value: number }[];
   config: HeatmapConfig;
@@ -44,6 +68,7 @@ export default function HeatmapOverlay({
         blur: config.blur ?? 15,
         maxZoom: 17,
         max: 1,
+        gradient: buildGradient(config),
       }) as L.Layer;
 
       layer.addTo(map);
