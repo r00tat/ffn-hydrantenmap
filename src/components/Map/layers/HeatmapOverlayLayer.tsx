@@ -12,6 +12,7 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
+import HeatmapLegend from '../HeatmapLegend';
 import HeatmapOverlay from './HeatmapOverlay';
 
 interface HeatmapOverlayLayerProps {
@@ -63,10 +64,20 @@ export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps)
   }
 
   return (
-    <HeatmapOverlay
-      points={heatmapPoints}
-      config={heatmapConfig}
-      allValues={allValues}
-    />
+    <>
+      <HeatmapOverlay
+        points={heatmapPoints}
+        config={heatmapConfig}
+        allValues={allValues}
+      />
+      {layer.dataSchema && (
+        <HeatmapLegend
+          config={heatmapConfig}
+          dataSchema={layer.dataSchema}
+          allValues={allValues}
+          layerName={layer.name}
+        />
+      )}
+    </>
   );
 }
