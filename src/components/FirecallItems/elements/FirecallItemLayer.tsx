@@ -1,6 +1,10 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { SimpleMap } from '../../../common/types';
-import { FirecallLayer } from '../../firebase/firestore';
+import {
+  DataSchemaField,
+  FirecallLayer,
+  HeatmapConfig,
+} from '../../firebase/firestore';
 import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 
 export class FirecallItemLayer extends FirecallItemBase {
@@ -8,6 +12,8 @@ export class FirecallItemLayer extends FirecallItemBase {
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  dataSchema: DataSchemaField[];
+  heatmapConfig?: HeatmapConfig;
 
   public constructor(firecallItem?: FirecallLayer) {
     super({
@@ -24,6 +30,8 @@ export class FirecallItemLayer extends FirecallItemBase {
       this.summaryPosition = this.showSummary === 'true' ? 'right' : '';
     }
     this.clusterMode = firecallItem?.clusterMode ?? '';
+    this.dataSchema = firecallItem?.dataSchema ?? [];
+    this.heatmapConfig = firecallItem?.heatmapConfig;
   }
 
   public static firebaseCollectionName(): string {
@@ -90,6 +98,8 @@ export class FirecallItemLayer extends FirecallItemBase {
       grouped: this.grouped,
       summaryPosition: this.summaryPosition,
       clusterMode: this.clusterMode,
+      ...(this.dataSchema.length > 0 ? { dataSchema: this.dataSchema } : {}),
+      ...(this.heatmapConfig ? { heatmapConfig: this.heatmapConfig } : {}),
     };
   }
 }
