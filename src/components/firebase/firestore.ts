@@ -40,6 +40,11 @@ export interface FirecallItem {
    */
   layer?: string;
 
+  /**
+   * z-index for rendering order. Higher values render on top.
+   */
+  zIndex?: number;
+
   updatedBy?: string;
   updatedAt?: string;
   creator?: string;
