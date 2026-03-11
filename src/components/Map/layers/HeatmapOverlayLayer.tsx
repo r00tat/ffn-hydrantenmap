@@ -15,6 +15,17 @@ import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import HeatmapLegend from '../HeatmapLegend';
 import HeatmapOverlay from './HeatmapOverlay';
 
+/** Extract a numeric value from fieldData, coercing strings if needed */
+function getNumericValue(fieldData: Record<string, unknown> | undefined, key: string): number | undefined {
+  const raw = fieldData?.[key];
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string' && raw !== '') {
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 interface HeatmapOverlayLayerProps {
   layer: FirecallLayer;
 }
@@ -43,21 +54,31 @@ export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps)
   const allValues = useMemo(() => {
     if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
     return records
-      .map((r) => (r.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey])
-      .filter((v): v is number => typeof v === 'number');
+      .map((r) => getNumericValue(r.fieldData as Record<string, unknown>, heatmapConfig.activeKey))
+      .filter((v): v is number => v !== undefined);
   }, [records, heatmapConfig]);
 
   const heatmapPoints = useMemo(() => {
     if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
-    return records
-      .filter((r): r is typeof r & { lat: number; lng: number } =>
-        typeof r.fieldData?.[heatmapConfig.activeKey] === 'number' && r.lat != null && r.lng != null)
-      .map((r) => ({
-        lat: r.lat,
-        lng: r.lng,
-        value: r.fieldData![heatmapConfig.activeKey] as number,
-      }));
+    const points: { lat: number; lng: number; value: number }[] = [];
+    for (const r of records) {
+      const value = getNumericValue(r.fieldData as Record<string, unknown>, heatmapConfig.activeKey);
+      if (value !== undefined && r.lat != null && r.lng != null) {
+        points.push({ lat: r.lat, lng: r.lng, value });
+      }
+    }
+    return points;
   }, [records, heatmapConfig]);
+
+  console.log('HeatmapOverlayLayer', {
+    layerId: layer.id,
+    layerName: layer.name,
+    recordCount: records.length,
+    allValuesCount: allValues.length,
+    heatmapPointsCount: heatmapPoints.length,
+    heatmapPoints,
+    sampleFieldData: records.slice(0, 3).map((r) => ({ name: r.name, fieldData: r.fieldData })),
+  });
 
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;

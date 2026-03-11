@@ -107,7 +107,9 @@ export function normalizeValue(
   }
 
   if (max === min) return 0.5;
-  // Clamp to [0.1, 1] so even min-value points are visible on the heatmap
+  // Map to [0.3, 1] so even min-value points are clearly visible on the heatmap
+  // (leaflet.heat gradient starts from transparent, so low values need a floor)
   const normalized = (value - min) / (max - min);
-  return Math.max(0.1, Math.min(1, normalized));
+  const clamped = Math.max(0, Math.min(1, normalized));
+  return 0.3 + clamped * 0.7;
 }
