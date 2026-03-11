@@ -21,6 +21,8 @@ export interface MarkerRenderOptions {
   hidePopup?: boolean;
   /* disable click handler (used for preview markers during placement) */
   disableClick?: boolean;
+  /* override marker color from heatmap computation */
+  heatmapColor?: string;
   /* data schema for rendering fieldData in popup */
   dataSchema?: DataSchemaField[];
 }

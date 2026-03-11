@@ -1,5 +1,6 @@
 import { where } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { getHeatmapColor } from '../../../common/heatmap';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -64,20 +65,36 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
     filterFn,
   });
 
+  const heatmapConfig = layer?.heatmapConfig;
+  const dataSchema = layer?.dataSchema;
+
+  const allValues = useMemo(() => {
+    if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
+    return records
+      .map((r) => (r.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey])
+      .filter((v): v is number => typeof v === 'number');
+  }, [records, heatmapConfig]);
+
   return (
     <>
-      {records.map(
-        (record) => (
+      {records.map((record) => {
+        let heatmapColor: string | undefined;
+        if (heatmapConfig?.enabled && heatmapConfig?.activeKey) {
+          const value = (record.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey];
+          heatmapColor =
+            typeof value === 'number'
+              ? getHeatmapColor(value, heatmapConfig, allValues)
+              : '#999999';
+        }
+        return (
           <React.Fragment key={record.id}>
-            <>{renderMarker(record, setFirecallItem, layer?.dataSchema ? { dataSchema: layer.dataSchema } : undefined)}</>
+            <>{renderMarker(record, setFirecallItem, {
+              heatmapColor,
+              dataSchema,
+            })}</>
           </React.Fragment>
-        )
-        // <FirecallItemMarker
-        //   record={record}
-        //   key={record.id}
-        //   selectItem={setFirecallItem}
-        // />
-      )}
+        );
+      })}
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}
