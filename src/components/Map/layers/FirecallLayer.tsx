@@ -1,9 +1,11 @@
+import React from 'react';
 import { LayerGroup, LayersControl } from 'react-leaflet';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import FirecallItemsLayer from './FirecallItemsLayer';
 import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import MarkerClusterLayer from './MarkerClusterLayer';
+import HeatmapOverlayLayer from './HeatmapOverlayLayer';
 
 export default function FirecallLayer({
   defaultChecked = true,
@@ -28,25 +30,36 @@ export default function FirecallLayer({
 
       {firecallId !== 'unknown' &&
         Object.entries(layers).map(([layerId, layer]) => (
-          <LayersControl.Overlay
-            name={`Einsatz ${layer.name}`}
-            checked={defaultChecked}
-            key={layerId}
-          >
-            {layer.grouped === 'true' && (
-              <MarkerClusterLayer
-                summaryPosition={(layer.summaryPosition || (layer.showSummary !== 'false' ? 'right' : '')) as any}
-                clusterMode={(layer.clusterMode || '') as any}
+          <React.Fragment key={layerId}>
+            <LayersControl.Overlay
+              name={`Einsatz ${layer.name}`}
+              checked={defaultChecked}
+            >
+              {layer.grouped === 'true' && (
+                <MarkerClusterLayer
+                  summaryPosition={(layer.summaryPosition || (layer.showSummary !== 'false' ? 'right' : '')) as any}
+                  clusterMode={(layer.clusterMode || '') as any}
+                >
+                  <FirecallItemsLayer layer={layer} />
+                </MarkerClusterLayer>
+              )}
+              {layer.grouped !== 'true' && (
+                <LayerGroup>
+                  <FirecallItemsLayer layer={layer} />
+                </LayerGroup>
+              )}
+            </LayersControl.Overlay>
+            {layer.heatmapConfig?.enabled && (
+              <LayersControl.Overlay
+                name={`${layer.name} Heatmap`}
+                checked={false}
               >
-                <FirecallItemsLayer layer={layer} />
-              </MarkerClusterLayer>
+                <LayerGroup>
+                  <HeatmapOverlayLayer layer={layer} />
+                </LayerGroup>
+              </LayersControl.Overlay>
             )}
-            {layer.grouped !== 'true' && (
-              <LayerGroup>
-                <FirecallItemsLayer layer={layer} />
-              </LayerGroup>
-            )}
-          </LayersControl.Overlay>
+          </React.Fragment>
         ))}
     </>
   );
