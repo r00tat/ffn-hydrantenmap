@@ -17,7 +17,7 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 import readFileAsText from '../upload/readFile';
-import { FcMarker, FirecallItem, Line } from './firestore';
+import { DataSchemaField, FcMarker, FirecallItem, Line } from './firestore';
 
 export interface KmlGeoProperties {
   name: string;
@@ -53,13 +53,81 @@ function kmlToGeoJson(kml: string) {
   return geoJson;
 }
 
-function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
+const KML_STYLE_PROPERTIES = new Set([
+  'styleurl',
+  'stylehash',
+  'stroke',
+  'stroke-opacity',
+  'stroke-width',
+  'fill',
+  'fill-opacity',
+  'visibility',
+  'icon',
+  'name',
+]);
+
+function inferType(value: any): DataSchemaField['type'] {
+  if (typeof value === 'boolean' || value === 'true' || value === 'false')
+    return 'boolean';
+  if (
+    typeof value === 'number' ||
+    (typeof value === 'string' && value !== '' && !isNaN(Number(value)))
+  )
+    return 'number';
+  return 'text';
+}
+
+function coerceValue(
+  value: any,
+  type: DataSchemaField['type']
+): string | number | boolean {
+  if (type === 'boolean') return value === true || value === 'true';
+  if (type === 'number')
+    return typeof value === 'number' ? value : parseFloat(value) || 0;
+  return String(value);
+}
+
+function generateSchemaFromFeatures(
+  features: GeoJsonFeatureColleaction['features']
+): DataSchemaField[] {
+  const fieldMap = new Map<string, Set<DataSchemaField['type']>>();
+
+  for (const feature of features) {
+    for (const [key, value] of Object.entries(feature.properties)) {
+      if (KML_STYLE_PROPERTIES.has(key.toLowerCase())) continue;
+      if (value === undefined || value === null) continue;
+      if (!fieldMap.has(key)) fieldMap.set(key, new Set());
+      fieldMap.get(key)!.add(inferType(value));
+    }
+  }
+
+  return Array.from(fieldMap.entries()).map(([key, types]) => ({
+    key,
+    label: key,
+    unit: '',
+    type: types.size === 1 ? types.values().next().value! : 'text',
+  }));
+}
+
+function parseGeoJson(
+  geojson: GeoJsonFeatureColleaction,
+  schema: DataSchemaField[]
+): FirecallItem[] {
   return geojson.features.map((f) => {
     const latlng = GeoPosition.fromGeoJsonPosition(
       f.geometry.type === 'Point'
         ? (f.geometry as Point).coordinates
         : (f.geometry as LineString).coordinates[0]
     );
+
+    const fieldData: Record<string, string | number | boolean> = {};
+    for (const field of schema) {
+      const value = f.properties[field.key];
+      if (value !== undefined && value !== null) {
+        fieldData[field.key] = coerceValue(value, field.type);
+      }
+    }
+
     const item: FirecallItem = {
       type: 'marker',
       name: `${f.properties.name}`,
@@ -71,13 +139,7 @@ function parseGeoJson(geojson: GeoJsonFeatureColleaction): FirecallItem[] {
       lat: latlng.lat,
       lng: latlng.lng,
       alt: latlng.alt,
-      beschreibung: Object.entries(f.properties)
-        .filter(
-          ([k, v]) =>
-            ['styleurl', 'stylehash', 'name'].indexOf(k.toLowerCase()) < 0
-        )
-        .map(([k, v]) => `${k}: ${v}`)
-        .join('\n'),
+      fieldData,
     };
 
     if (f.geometry.type === 'Point') {
@@ -149,13 +211,16 @@ export default function KmlImport() {
 
               const geoJson = kmlToGeoJson(kmlData);
 
-              const fcItems = parseGeoJson(geoJson);
+              const schema = generateSchemaFromFeatures(geoJson.features);
+
+              const fcItems = parseGeoJson(geoJson, schema);
 
               // console.log(`importing Kml \n${JSON.stringify(fcItems)}`);
 
               const layer = await addFirecallItem({
                 name: `KML Import ${formatTimestamp(new Date())}`,
                 type: 'layer',
+                dataSchema: schema,
               } as FirecallItem);
               await Promise.allSettled(
                 fcItems
