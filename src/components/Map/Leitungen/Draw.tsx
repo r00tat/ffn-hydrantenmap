@@ -1,10 +1,11 @@
-import { LatLng, LeafletMouseEvent, LeafletMouseEventHandlerFn } from 'leaflet';
-import { useCallback, useState } from 'react';
-import { Marker, Polyline, useMap, useMapEvent } from 'react-leaflet';
+import L, { LatLng } from 'leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { Marker, Polyline, useMap } from 'react-leaflet';
 import { leafletIcons } from '../../FirecallItems/icons';
 import { useLeitungen } from './context';
 
-// const itemInfo = firecallItemInfo('marker');
+const DRAWING_PANE = 'drawingPane';
+const DRAWING_PANE_Z = 650;
 
 const LeitungenDraw = () => {
   const map = useMap();
@@ -12,21 +13,65 @@ const LeitungenDraw = () => {
   const [complete, setComplete] = useState(false);
   const leitungen = useLeitungen();
 
-  const handler: LeafletMouseEventHandlerFn = useCallback(
-    (event: LeafletMouseEvent) => {
-      console.info(`clicked on ${event.latlng}`);
-      if (leitungen.isDrawing) {
-        if (complete) {
-          setPositions([event.latlng]);
-          setComplete(false);
-        } else {
-          setPositions([...positions, event.latlng]);
-        }
+  // Create a custom pane for drawing markers
+  useEffect(() => {
+    if (!map.getPane(DRAWING_PANE)) {
+      const pane = map.createPane(DRAWING_PANE);
+      pane.style.zIndex = String(DRAWING_PANE_Z);
+    }
+  }, [map]);
+
+  // Use refs so the capture handler always sees current state
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  const completeRef = useRef(complete);
+  completeRef.current = complete;
+
+  // During drawing mode, capture clicks on the map container in the
+  // capture phase (before Leaflet's event delegation). This ensures
+  // clicks on existing markers/vectors are intercepted and turned into
+  // drawing points instead of being consumed by those layers.
+  // Clicks on drawing point markers (in the drawingPane) are let through.
+  useEffect(() => {
+    if (!leitungen.isDrawing) return;
+
+    const container = map.getContainer();
+    container.style.cursor = 'crosshair';
+
+    const handleClick = (e: MouseEvent) => {
+      // Let clicks on drawing point markers through (they're in the drawingPane)
+      const drawingPane = map.getPane(DRAWING_PANE);
+      if (drawingPane && drawingPane.contains(e.target as Node)) {
+        return;
       }
-    },
-    [complete, leitungen, positions]
-  );
-  useMapEvent('click', handler);
+
+      // Stop the event from reaching Leaflet's _handleDOMEvent
+      e.stopPropagation();
+
+      // Convert pixel position to latlng
+      const rect = container.getBoundingClientRect();
+      const containerPoint = new L.Point(
+        e.clientX - rect.left,
+        e.clientY - rect.top
+      );
+      const latlng = map.containerPointToLatLng(containerPoint);
+      console.info(`drawing click at ${latlng}`);
+
+      if (completeRef.current) {
+        setPositions([latlng]);
+        setComplete(false);
+      } else {
+        setPositions([...positionsRef.current, latlng]);
+      }
+    };
+
+    container.addEventListener('click', handleClick, true);
+    return () => {
+      container.removeEventListener('click', handleClick, true);
+      container.style.cursor = '';
+    };
+  }, [map, leitungen.isDrawing]);
+
   return (
     <>
       {positions.map((p, index) => (
@@ -37,6 +82,7 @@ const LeitungenDraw = () => {
           icon={leafletIcons().circle}
           draggable
           autoPan={false}
+          pane={DRAWING_PANE}
           eventHandlers={{
             click: (event) => {
               console.info(`click on ${p} ${index}`);

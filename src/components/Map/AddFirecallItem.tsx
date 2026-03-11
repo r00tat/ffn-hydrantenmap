@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useMap, useMapEvent } from 'react-leaflet';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
@@ -55,6 +55,17 @@ export default function AddFirecallItem() {
       });
     }
   });
+
+  // Disable pointer-events on existing markers while placing a new item
+  // so clicks pass through to the map
+  useEffect(() => {
+    const markerPane = map.getPane('markerPane');
+    if (!markerPane || !fzgDrawing) return;
+    markerPane.style.pointerEvents = 'none';
+    return () => {
+      markerPane.style.pointerEvents = '';
+    };
+  }, [map, fzgDrawing]);
 
   useMapEvent('click', (e) => {
     if (fzgDrawing) {
