@@ -8,6 +8,7 @@ import useMapEditor from '../../../../hooks/useMapEditor';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
 import {
+  DataSchemaField,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
@@ -20,6 +21,8 @@ export interface MarkerRenderOptions {
   hidePopup?: boolean;
   /* disable click handler (used for preview markers during placement) */
   disableClick?: boolean;
+  /* data schema for rendering fieldData in popup */
+  dataSchema?: DataSchemaField[];
 }
 
 export interface FirecallItemMarkerProps {

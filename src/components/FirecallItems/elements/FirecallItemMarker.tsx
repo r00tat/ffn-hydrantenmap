@@ -110,6 +110,12 @@ export class FirecallItemMarker extends FirecallItemBase {
         Position: {Number.parseFloat('' + this.lat).toFixed(6)},
         {Number.parseFloat('' + this.lng).toFixed(6)}
         {this.alt && ` ${Math.round(this.alt)}m`}
+        {this.formatFieldData() && (
+          <>
+            <br />
+            <Typography variant="caption">{this.formatFieldData()}</Typography>
+          </>
+        )}
       </>
     );
   }

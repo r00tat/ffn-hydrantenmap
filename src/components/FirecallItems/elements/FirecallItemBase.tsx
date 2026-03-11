@@ -11,6 +11,7 @@ import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
 import { useMapEditable } from '../../../hooks/useMapEditor';
 import {
+  DataSchemaField,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../../firebase/firestore';
@@ -121,6 +122,8 @@ export class FirecallItemBase {
   draggable: boolean;
 
   fieldData: Record<string, string | number | boolean>;
+
+  _renderDataSchema?: DataSchemaField[];
 
   eventHandlers: L.LeafletEventHandlerFnMap = {};
 
@@ -292,5 +295,15 @@ export class FirecallItemBase {
   public addEventHandlers(handlers: L.LeafletEventHandlerFnMap) {
     this.eventHandlers = { ...this.eventHandlers, ...handlers };
     return this;
+  }
+
+  public formatFieldData(): string {
+    if (!this.fieldData || Object.keys(this.fieldData).length === 0) return '';
+    if (!this._renderDataSchema || this._renderDataSchema.length === 0) return '';
+
+    return this._renderDataSchema
+      .filter((f) => this.fieldData[f.key] !== undefined && this.fieldData[f.key] !== null)
+      .map((f) => `${f.label}: ${this.fieldData[f.key]}${f.unit ? f.unit : ''}`)
+      .join(' | ');
   }
 }

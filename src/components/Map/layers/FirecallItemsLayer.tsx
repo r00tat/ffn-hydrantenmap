@@ -10,6 +10,7 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 
@@ -19,10 +20,15 @@ export interface FirecallLayerOptions {
 
 function renderMarker(
   record: FirecallItem,
-  setFirecallItem: (item: FirecallItem) => void
+  setFirecallItem: (item: FirecallItem) => void,
+  options?: MarkerRenderOptions
 ) {
   try {
-    return getItemInstance(record).renderMarker(setFirecallItem);
+    const instance = getItemInstance(record);
+    if (options?.dataSchema) {
+      instance._renderDataSchema = options.dataSchema;
+    }
+    return instance.renderMarker(setFirecallItem, options);
   } catch (err) {
     console.error('Failed to render item ', record, err);
   }
@@ -63,7 +69,7 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
       {records.map(
         (record) => (
           <React.Fragment key={record.id}>
-            <>{renderMarker(record, setFirecallItem)}</>
+            <>{renderMarker(record, setFirecallItem, layer?.dataSchema ? { dataSchema: layer.dataSchema } : undefined)}</>
           </React.Fragment>
         )
         // <FirecallItemMarker
