@@ -29,8 +29,10 @@ export default function HeatmapOverlay({
 
     // Dynamic import to avoid SSR issues
     let cancelled = false;
-    import('leaflet.heat').then((heatLayer) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (import('leaflet.heat') as Promise<any>).then((mod) => {
       if (cancelled) return;
+      const heatLayer = typeof mod === 'function' ? mod : mod.default;
 
       const data = points.map((p) => [
         p.lat,
@@ -43,7 +45,7 @@ export default function HeatmapOverlay({
         blur: 15,
         maxZoom: 17,
         max: 1,
-      });
+      }) as L.Layer;
 
       layer.addTo(map);
       layerRef.current = layer;

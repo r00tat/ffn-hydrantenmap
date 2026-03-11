@@ -22,8 +22,13 @@ export default function ItemDataFields({
   isNew,
 }: ItemDataFieldsProps) {
   const updateValue = useCallback(
-    (key: string, value: string | number | boolean) => {
-      onChange({ ...fieldData, [key]: value });
+    (key: string, value: string | number | boolean | undefined) => {
+      if (value === undefined) {
+        const { [key]: _, ...rest } = fieldData;
+        onChange(rest);
+      } else {
+        onChange({ ...fieldData, [key]: value });
+      }
     },
     [fieldData, onChange]
   );

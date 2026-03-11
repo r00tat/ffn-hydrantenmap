@@ -80,7 +80,8 @@ export default function FirecallItemsLayer({ layer }: FirecallLayerOptions) {
   const heatmapPoints = useMemo(() => {
     if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
     return records
-      .filter((r) => typeof r.fieldData?.[heatmapConfig.activeKey] === 'number' && r.lat && r.lng)
+      .filter((r): r is typeof r & { lat: number; lng: number } =>
+        typeof r.fieldData?.[heatmapConfig.activeKey] === 'number' && r.lat != null && r.lng != null)
       .map((r) => ({
         lat: r.lat,
         lng: r.lng,
