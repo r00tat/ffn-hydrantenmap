@@ -36,7 +36,7 @@ export default function HeatmapLegend({
         <Box
           sx={{
             position: 'absolute',
-            bottom: 30,
+            bottom: 80,
             left: 10,
             zIndex: 1000,
             bgcolor: 'background.paper',
