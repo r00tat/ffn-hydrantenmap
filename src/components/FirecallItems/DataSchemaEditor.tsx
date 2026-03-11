@@ -88,99 +88,103 @@ export default function DataSchemaEditor({
       </Typography>
       {dataSchema.map((field, index) => (
         <Box
-          key={index}
-          sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}
+          key={field.key || index}
+          sx={{ mb: 2, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
         >
-          <TextField
-            label="Label"
-            size="small"
-            value={field.label}
-            onChange={(e) => updateField(index, { label: e.target.value })}
-            sx={{ flex: 2 }}
-          />
-          <TextField
-            label="Key"
-            size="small"
-            value={field.key}
-            onChange={(e) =>
-              updateField(index, { key: e.target.value })
-            }
-            sx={{ flex: 1.5 }}
-          />
-          <TextField
-            label="Einheit"
-            size="small"
-            value={field.unit}
-            onChange={(e) => updateField(index, { unit: e.target.value })}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            label="Typ"
-            size="small"
-            select
-            value={field.type}
-            onChange={(e) =>
-              updateField(index, {
-                type: e.target.value as DataSchemaField['type'],
-              })
-            }
-            sx={{ flex: 1 }}
-          >
-            <MenuItem value="number">Zahl</MenuItem>
-            <MenuItem value="text">Text</MenuItem>
-            <MenuItem value="boolean">Ja/Nein</MenuItem>
-          </TextField>
-          {field.type === 'boolean' ? (
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={!!field.defaultValue}
-                  onChange={(e) =>
-                    updateField(index, { defaultValue: e.target.checked })
-                  }
-                />
+          <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <TextField
+              label="Label"
+              size="small"
+              value={field.label}
+              onChange={(e) => updateField(index, { label: e.target.value })}
+              sx={{ flex: 2 }}
+            />
+            <TextField
+              label="Key"
+              size="small"
+              value={field.key}
+              onChange={(e) =>
+                updateField(index, { key: e.target.value })
               }
-              label="Standard"
+              sx={{ flex: 2 }}
+            />
+            <TextField
+              label="Einheit"
+              size="small"
+              value={field.unit}
+              onChange={(e) => updateField(index, { unit: e.target.value })}
               sx={{ flex: 1 }}
             />
-          ) : (
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <TextField
-              label="Standard"
+              label="Typ"
               size="small"
-              type={field.type === 'number' ? 'number' : 'text'}
-              value={field.defaultValue ?? ''}
+              select
+              value={field.type}
               onChange={(e) =>
                 updateField(index, {
-                  defaultValue:
-                    field.type === 'number'
-                      ? (e.target.value !== '' ? parseFloat(e.target.value) : undefined)
-                      : (e.target.value !== '' ? e.target.value : undefined),
+                  type: e.target.value as DataSchemaField['type'],
                 })
               }
               sx={{ flex: 1 }}
-            />
-          )}
-          <IconButton
-            size="small"
-            onClick={() => moveField(index, -1)}
-            disabled={index === 0}
-          >
-            <ArrowUpwardIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => moveField(index, 1)}
-            disabled={index === dataSchema.length - 1}
-          >
-            <ArrowDownwardIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => removeField(index)}
-            color="error"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+            >
+              <MenuItem value="number">Zahl</MenuItem>
+              <MenuItem value="text">Text</MenuItem>
+              <MenuItem value="boolean">Ja/Nein</MenuItem>
+            </TextField>
+            {field.type === 'boolean' ? (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={!!field.defaultValue}
+                    onChange={(e) =>
+                      updateField(index, { defaultValue: e.target.checked })
+                    }
+                  />
+                }
+                label="Standard"
+                sx={{ flex: 1 }}
+              />
+            ) : (
+              <TextField
+                label="Standard"
+                size="small"
+                type={field.type === 'number' ? 'number' : 'text'}
+                value={field.defaultValue ?? ''}
+                onChange={(e) =>
+                  updateField(index, {
+                    defaultValue:
+                      field.type === 'number'
+                        ? (e.target.value !== '' ? parseFloat(e.target.value) : undefined)
+                        : (e.target.value !== '' ? e.target.value : undefined),
+                  })
+                }
+                sx={{ flex: 1 }}
+              />
+            )}
+            <IconButton
+              size="small"
+              onClick={() => moveField(index, -1)}
+              disabled={index === 0}
+            >
+              <ArrowUpwardIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => moveField(index, 1)}
+              disabled={index === dataSchema.length - 1}
+            >
+              <ArrowDownwardIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => removeField(index)}
+              color="error"
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Box>
         </Box>
       ))}
       <Button startIcon={<AddIcon />} onClick={addField} size="small">

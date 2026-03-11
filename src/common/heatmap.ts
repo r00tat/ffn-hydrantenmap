@@ -50,8 +50,8 @@ export function getHeatmapColor(
   } else {
     // Auto mode (or manual fallback)
     if (allValues.length === 0) return NO_DATA_COLOR;
-    min = Math.min(...allValues);
-    max = Math.max(...allValues);
+    min = allValues.reduce((a, b) => Math.min(a, b), Infinity);
+    max = allValues.reduce((a, b) => Math.max(a, b), -Infinity);
     // All identical -> midpoint color (yellow)
     if (min === max) return '#ffff00';
     stops = DEFAULT_COLOR_STOPS.map((s) => ({
@@ -93,8 +93,8 @@ export function normalizeValue(
     min = config.min;
     max = config.max;
   } else {
-    min = Math.min(...allValues);
-    max = Math.max(...allValues);
+    min = allValues.reduce((a, b) => Math.min(a, b), Infinity);
+    max = allValues.reduce((a, b) => Math.max(a, b), -Infinity);
   }
 
   if (max === min) return 0.5;

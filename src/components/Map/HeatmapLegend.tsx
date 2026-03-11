@@ -47,8 +47,8 @@ export default function HeatmapLegend({
         </Box>
       );
     }
-    min = Math.min(...allValues);
-    max = Math.max(...allValues);
+    min = allValues.reduce((a, b) => Math.min(a, b), Infinity);
+    max = allValues.reduce((a, b) => Math.max(a, b), -Infinity);
   }
 
   const gradient =

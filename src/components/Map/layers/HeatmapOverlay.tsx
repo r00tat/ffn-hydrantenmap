@@ -27,12 +27,10 @@ export default function HeatmapOverlay({
       layerRef.current = null;
     }
 
-    // Dynamic import to avoid SSR issues
+    // Dynamic import — leaflet.heat is a side-effect plugin that patches L.heatLayer
     let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (import('leaflet.heat') as Promise<any>).then((mod) => {
+    import('leaflet.heat').then(() => {
       if (cancelled) return;
-      const heatLayer = typeof mod === 'function' ? mod : mod.default;
 
       const data = points.map((p) => [
         p.lat,
@@ -40,7 +38,8 @@ export default function HeatmapOverlay({
         normalizeValue(p.value, config, allValues),
       ] as [number, number, number]);
 
-      const layer = heatLayer(data, {
+      // leaflet.heat patches L with heatLayer
+      const layer = (L as Record<string, unknown>).heatLayer(data, {
         radius: 25,
         blur: 15,
         maxZoom: 17,
