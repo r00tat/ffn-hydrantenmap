@@ -16,6 +16,7 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import React, { useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { DataSchemaField, FirecallItem, HeatmapConfig } from '../firebase/firestore';
 import { fcItemNames, getItemInstance } from './elements';
@@ -23,6 +24,7 @@ import { FirecallItemBase } from './elements/FirecallItemBase';
 import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
 import HeatmapSettings from './HeatmapSettings';
+import ItemDataFields from './ItemDataFields';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -40,6 +42,7 @@ export default function FirecallItemDialog({
   autoFocusField,
 }: FirecallItemDialogOptions) {
   const firecallId = useFirecallId();
+  const layers = useFirecallLayers();
   const [open, setOpen] = useState(true);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
     getItemInstance({
@@ -114,6 +117,14 @@ export default function FirecallItemDialog({
                 }
               />
             </>
+          )}
+          {item.type !== 'layer' && item.layer && layers[item.layer]?.dataSchema && (
+            <ItemDataFields
+              dataSchema={layers[item.layer].dataSchema!}
+              fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
+              onChange={(fieldData) => setItemField('fieldData', fieldData)}
+              isNew={!item.id}
+            />
           )}
         </DialogContent>
         <DialogActions>
