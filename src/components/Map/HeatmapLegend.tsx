@@ -35,7 +35,7 @@ export default function HeatmapLegend({
           sx={{
             position: 'absolute',
             bottom: 30,
-            right: 10,
+            left: 10,
             zIndex: 1000,
             bgcolor: 'background.paper',
             p: 1,
