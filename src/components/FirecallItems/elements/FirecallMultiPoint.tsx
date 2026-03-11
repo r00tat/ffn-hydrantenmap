@@ -144,6 +144,7 @@ export class FirecallMultiPoint extends FirecallItemBase {
           selectItem={selectItem}
           key={this.id}
           pane={options.pane}
+          onContextMenu={options.onContextMenu}
         />
       );
     } catch (err) {

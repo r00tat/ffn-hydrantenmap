@@ -126,6 +126,7 @@ export class FirecallArea extends FirecallItemBase {
         selectItem={selectItem}
         key={this.id}
         pane={options.pane}
+        onContextMenu={options.onContextMenu}
       />
     );
   }

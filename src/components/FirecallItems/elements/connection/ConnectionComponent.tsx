@@ -12,6 +12,7 @@ import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
+import type { LeafletMouseEvent } from 'leaflet';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import {
@@ -25,12 +26,14 @@ export interface ConnectionMarkerProps {
   record: FirecallMultiPoint;
   selectItem: (item: FirecallItem) => void;
   pane?: string;
+  onContextMenu?: (item: FirecallItem, event: LeafletMouseEvent) => void;
 }
 
 export default function ConnectionMarker({
   record,
   selectItem,
   pane,
+  onContextMenu,
 }: ConnectionMarkerProps) {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
@@ -146,6 +149,14 @@ export default function ConnectionMarker({
           // mouseout: () => setShowMarkers(false),
           popupopen: () => setShowMarkers(true),
           popupclose: () => setShowMarkers(false),
+          ...(onContextMenu
+            ? {
+                contextmenu: (e: L.LeafletMouseEvent) => {
+                  e.originalEvent.preventDefault();
+                  onContextMenu(record, e);
+                },
+              }
+            : {}),
         }}
       >
         <Popup>

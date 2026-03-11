@@ -20,13 +20,13 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { where } from 'firebase/firestore';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useHistoryPathSegments } from '../../hooks/useMapEditor';
+import useZOrderActions from '../../hooks/useZOrderActions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import {
   FIRECALL_COLLECTION_ID,
@@ -37,7 +37,6 @@ import {
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import FirecallItemFields from './FirecallItemFields';
-import { sortByZIndex } from '../../hooks/useFirecallLayers';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -64,7 +63,6 @@ export default function FirecallItemDialog({
     } as FirecallItem)
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const updateItem = useFirecallItemUpdate();
   const historyPathSegments = useHistoryPathSegments();
 
   // Load siblings for z-order operations (only when editing existing items)
@@ -89,64 +87,10 @@ export default function FirecallItemDialog({
     filterFn,
   });
 
-  const sortedSiblings = useMemo(() => sortByZIndex(siblings), [siblings]);
-
-  const handleZIndexChange = useCallback(
-    async (newZIndex: number, swapItem?: FirecallItem) => {
-      const updatedItem = { ...item.data(), zIndex: newZIndex };
-      await updateItem(updatedItem);
-      if (swapItem && swapItem.id) {
-        await updateItem({
-          ...swapItem,
-          zIndex: item.zIndex,
-        });
-      }
+  const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
+    useZOrderActions(item.data(), siblings, (newZIndex) => {
       setFirecallItem((prev) => prev.copy().set('zIndex', newZIndex));
-    },
-    [item, updateItem]
-  );
-
-  const handleBringToFront = useCallback(() => {
-    const maxZ = sortedSiblings.length > 0
-      ? Math.max(...sortedSiblings.map((s) => s.zIndex ?? 0))
-      : 0;
-    handleZIndexChange(maxZ + 1);
-  }, [sortedSiblings, handleZIndexChange]);
-
-  const handleSendToBack = useCallback(() => {
-    const minZ = sortedSiblings.length > 0
-      ? Math.min(...sortedSiblings.map((s) => s.zIndex ?? 0))
-      : 0;
-    handleZIndexChange(minZ - 1);
-  }, [sortedSiblings, handleZIndexChange]);
-
-  const handleBringForward = useCallback(() => {
-    const currentIndex = sortedSiblings.findIndex((s) => s.id === item.id);
-    if (currentIndex < 0 || currentIndex >= sortedSiblings.length - 1) {
-      handleZIndexChange((item.zIndex ?? 0) + 1);
-      return;
-    }
-    const nextItem = sortedSiblings[currentIndex + 1];
-    if ((nextItem.zIndex ?? 0) === (item.zIndex ?? 0)) {
-      handleZIndexChange((item.zIndex ?? 0) + 1);
-    } else {
-      handleZIndexChange(nextItem.zIndex ?? 0, nextItem);
-    }
-  }, [sortedSiblings, item, handleZIndexChange]);
-
-  const handleSendBackward = useCallback(() => {
-    const currentIndex = sortedSiblings.findIndex((s) => s.id === item.id);
-    if (currentIndex <= 0) {
-      handleZIndexChange((item.zIndex ?? 0) - 1);
-      return;
-    }
-    const prevItem = sortedSiblings[currentIndex - 1];
-    if ((prevItem.zIndex ?? 0) === (item.zIndex ?? 0)) {
-      handleZIndexChange((item.zIndex ?? 0) - 1);
-    } else {
-      handleZIndexChange(prevItem.zIndex ?? 0, prevItem);
-    }
-  }, [sortedSiblings, item, handleZIndexChange]);
+    });
 
   const setItemField = (field: string, value: any) => {
     setFirecallItem((prev) => prev.copy().set(field, value));
