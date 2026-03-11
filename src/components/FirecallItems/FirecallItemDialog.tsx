@@ -17,10 +17,12 @@ import React, { useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import { FirecallItem } from '../firebase/firestore';
+import { DataSchemaField, FirecallItem, HeatmapConfig } from '../firebase/firestore';
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
+import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
+import HeatmapSettings from './HeatmapSettings';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -96,6 +98,23 @@ export default function FirecallItemDialog({
             showLatLng={!!item.id}
             autoFocusField={autoFocusField}
           />
+          {item.type === 'layer' && (
+            <>
+              <DataSchemaEditor
+                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
+                onChange={(schema: DataSchemaField[]) =>
+                  setItemField('dataSchema', schema)
+                }
+              />
+              <HeatmapSettings
+                config={item.get<HeatmapConfig>('heatmapConfig')}
+                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
+                onChange={(config: HeatmapConfig | undefined) =>
+                  setItemField('heatmapConfig', config)
+                }
+              />
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button
