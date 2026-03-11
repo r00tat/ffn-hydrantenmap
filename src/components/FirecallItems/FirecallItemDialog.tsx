@@ -199,7 +199,10 @@ export default function FirecallItemDialog({
             autoFocusField={autoFocusField}
           />
           {isExistingItem && (
-            <Box sx={{ display: 'flex', gap: 0.5, mt: 2, justifyContent: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 0.5, mt: 2, alignItems: 'center', justifyContent: 'center' }}>
+              <Box component="span" sx={{ mr: 0.5, fontSize: '0.875rem', color: 'text.secondary' }}>
+                Reihenfolge:
+              </Box>
               <Tooltip title="Ganz nach hinten">
                 <IconButton size="small" onClick={handleSendToBack}>
                   <VerticalAlignBottomIcon fontSize="small" />
