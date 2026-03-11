@@ -96,6 +96,7 @@ export class FirecallItemBase {
       alt: this.alt,
       draggable: this.draggable = true,
       eventHandlers: this.eventHandlers = {},
+      fieldData: this.fieldData = {},
     } = firecallItem || {});
   }
 
@@ -118,6 +119,8 @@ export class FirecallItemBase {
   creator?: string;
   created?: string;
   draggable: boolean;
+
+  fieldData: Record<string, string | number | boolean>;
 
   eventHandlers: L.LeafletEventHandlerFnMap = {};
 
@@ -149,12 +152,17 @@ export class FirecallItemBase {
       created: this.created,
       updatedAt: this.updatedAt,
       updatedBy: this.updatedBy,
+      ...(Object.keys(this.fieldData).length > 0
+        ? { fieldData: this.fieldData }
+        : {}),
     };
   }
 
   public filteredData(): FirecallItem {
     return Object.fromEntries(
-      Object.entries(this.data()).filter(([key, value]) => value),
+      Object.entries(this.data()).filter(
+        ([key, value]) => value !== undefined && value !== null && value !== '',
+      ),
     ) as FirecallItem;
   }
 
