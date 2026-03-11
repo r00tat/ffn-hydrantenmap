@@ -37,6 +37,8 @@ export default function ZOrderContextMenu({
     onClose();
   };
 
+  const editable = !!(onEdit || onDelete);
+
   return (
     <Menu
       open={!!anchorPosition}
@@ -57,23 +59,31 @@ export default function ZOrderContextMenu({
           <ListItemText>Löschen</ListItemText>
         </MenuItem>
       )}
-      {(onEdit || onDelete) && <Divider />}
-      <MenuItem onClick={() => handle(handleBringToFront)}>
-        <ListItemIcon><VerticalAlignTopIcon fontSize="small" /></ListItemIcon>
-        <ListItemText>Ganz nach vorne</ListItemText>
-      </MenuItem>
-      <MenuItem onClick={() => handle(handleBringForward)}>
-        <ListItemIcon><ArrowUpwardIcon fontSize="small" /></ListItemIcon>
-        <ListItemText>Nach vorne</ListItemText>
-      </MenuItem>
-      <MenuItem onClick={() => handle(handleSendBackward)}>
-        <ListItemIcon><ArrowDownwardIcon fontSize="small" /></ListItemIcon>
-        <ListItemText>Nach hinten</ListItemText>
-      </MenuItem>
-      <MenuItem onClick={() => handle(handleSendToBack)}>
-        <ListItemIcon><VerticalAlignBottomIcon fontSize="small" /></ListItemIcon>
-        <ListItemText>Ganz nach hinten</ListItemText>
-      </MenuItem>
+      {editable && <Divider />}
+      {editable && (
+        <MenuItem onClick={() => handle(handleBringToFront)}>
+          <ListItemIcon><VerticalAlignTopIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Ganz nach vorne</ListItemText>
+        </MenuItem>
+      )}
+      {editable && (
+        <MenuItem onClick={() => handle(handleBringForward)}>
+          <ListItemIcon><ArrowUpwardIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Nach vorne</ListItemText>
+        </MenuItem>
+      )}
+      {editable && (
+        <MenuItem onClick={() => handle(handleSendBackward)}>
+          <ListItemIcon><ArrowDownwardIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Nach hinten</ListItemText>
+        </MenuItem>
+      )}
+      {editable && (
+        <MenuItem onClick={() => handle(handleSendToBack)}>
+          <ListItemIcon><VerticalAlignBottomIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Ganz nach hinten</ListItemText>
+        </MenuItem>
+      )}
     </Menu>
   );
 }

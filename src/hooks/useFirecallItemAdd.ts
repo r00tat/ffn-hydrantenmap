@@ -29,7 +29,7 @@ export default function useFirecallItemAdd() {
       };
       // New items render on top by default: use Date.now() as a monotonically
       // increasing zIndex that is always higher than manually assigned values.
-      if (newData.zIndex === undefined || newData.zIndex === null) {
+      if (!newData.zIndex) {
         newData.zIndex = Date.now();
       }
       const itemClass = getItemClass(item?.type);
