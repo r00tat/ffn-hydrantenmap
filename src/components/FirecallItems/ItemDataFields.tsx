@@ -26,6 +26,7 @@ export default function ItemDataFields({
   isNew,
 }: ItemDataFieldsProps) {
   const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
 
   const updateValue = useCallback(
     (key: string, value: string | number | boolean | undefined) => {
@@ -49,10 +50,11 @@ export default function ItemDataFields({
 
   const addFreeFormKey = useCallback(() => {
     if (newKey.trim() && !(newKey.trim() in fieldData)) {
-      onChange({ ...fieldData, [newKey.trim()]: '' });
+      onChange({ ...fieldData, [newKey.trim()]: newValue });
       setNewKey('');
+      setNewValue('');
     }
-  }, [newKey, fieldData, onChange]);
+  }, [newKey, newValue, fieldData, onChange]);
 
   const schemaFields = dataSchema || [];
   const schemaKeys = new Set(schemaFields.map((f) => f.key));
@@ -127,7 +129,7 @@ export default function ItemDataFields({
           </IconButton>
         </Box>
       ))}
-      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+      <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
         <TextField
           label="Neues Feld"
           size="small"
@@ -141,14 +143,27 @@ export default function ItemDataFields({
           }}
           sx={{ flex: 1 }}
         />
-        <Button
-          startIcon={<AddIcon />}
+        <TextField
+          label="Wert"
+          size="small"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addFreeFormKey();
+            }
+          }}
+          sx={{ flex: 1 }}
+        />
+        <IconButton
           onClick={addFreeFormKey}
           size="small"
+          color="primary"
           disabled={!newKey.trim() || newKey.trim() in fieldData}
         >
-          Hinzufügen
-        </Button>
+          <AddIcon />
+        </IconButton>
       </Box>
     </Box>
   );
