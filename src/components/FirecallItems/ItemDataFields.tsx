@@ -48,6 +48,15 @@ export default function ItemDataFields({
     [fieldData, onChange]
   );
 
+  const renameKey = useCallback(
+    (oldKey: string, newKey: string) => {
+      if (!newKey.trim() || (newKey.trim() !== oldKey && newKey.trim() in fieldData)) return;
+      const { [oldKey]: value, ...rest } = fieldData;
+      onChange({ ...rest, [newKey.trim()]: value });
+    },
+    [fieldData, onChange]
+  );
+
   const addFreeFormKey = useCallback(() => {
     if (newKey.trim() && !(newKey.trim() in fieldData)) {
       onChange({ ...fieldData, [newKey.trim()]: newValue });
@@ -118,11 +127,18 @@ export default function ItemDataFields({
       {freeFormKeys.map((key) => (
         <Box key={key} sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
           <TextField
-            label={key}
+            label="Feld"
             size="small"
-            fullWidth
+            value={key}
+            onChange={(e) => renameKey(key, e.target.value)}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            label="Wert"
+            size="small"
             value={fieldData[key] ?? ''}
             onChange={(e) => updateValue(key, e.target.value)}
+            sx={{ flex: 1 }}
           />
           <IconButton size="small" onClick={() => removeKey(key)} color="error">
             <DeleteIcon fontSize="small" />
