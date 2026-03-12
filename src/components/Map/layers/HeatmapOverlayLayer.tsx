@@ -14,6 +14,7 @@ import {
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import HeatmapLegend from '../HeatmapLegend';
 import HeatmapOverlay from './HeatmapOverlay';
+import InterpolationOverlay from './InterpolationOverlay';
 
 /** Extract a numeric value from fieldData, coercing strings if needed */
 function getNumericValue(fieldData: Record<string, unknown> | undefined, key: string): number | undefined {
@@ -74,13 +75,15 @@ export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps)
     return null;
   }
 
+  const isInterpolation = heatmapConfig.visualizationMode === 'interpolation';
+
   return (
     <>
-      <HeatmapOverlay
-        points={heatmapPoints}
-        config={heatmapConfig}
-        allValues={allValues}
-      />
+      {isInterpolation ? (
+        <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
+      ) : (
+        <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
+      )}
       {layer.dataSchema && (
         <HeatmapLegend
           config={heatmapConfig}
