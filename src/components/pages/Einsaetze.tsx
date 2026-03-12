@@ -80,6 +80,7 @@ function EinsatzCard({
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
   const [tokenLink, setTokenLink] = useState<string>();
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>();
 
   const updateFn = useCallback(
@@ -108,9 +109,11 @@ function EinsatzCard({
     if (token.token) {
       const tokenLink = `${window.location.origin}/einsatz/${firefallId}?token=${token.token}`;
       setTokenLink(tokenLink);
-      if (navigator.clipboard?.writeText) {
-        // we do not know if it was successfull so we do not show an info
-        navigator.clipboard.writeText(tokenLink);
+      try {
+        await navigator.clipboard?.writeText(tokenLink);
+        setCopied(true);
+      } catch {
+        setCopied(false);
       }
     } else {
       setError(`Token konnte nicht erstellt werden: ${token.error}`);
@@ -131,9 +134,21 @@ function EinsatzCard({
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
           {tokenLink && (
-            <Link href={tokenLink} target="_blank">
-              {tokenLink.substring(0, 100)}...
-            </Link>
+            <>
+              {copied && (
+                <Typography variant="body2" color="success.main">
+                  Link in Zwischenablage kopiert
+                </Typography>
+              )}
+              {!copied && (
+                <Typography variant="body2" color="text.secondary">
+                  Link konnte nicht kopiert werden. Bitte manuell kopieren:
+                </Typography>
+              )}
+              <Link href={tokenLink} target="_blank">
+                {tokenLink.substring(0, 100)}...
+              </Link>
+            </>
           )}
           {error && <Typography color="error">{error}</Typography>}
         </CardContent>
