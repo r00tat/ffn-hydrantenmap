@@ -79,6 +79,14 @@ export interface HeatmapConfig {
   min?: number;
   max?: number;
   colorStops?: { value: number; color: string }[];
+  /** Visualization mode: 'heatmap' (default) or 'interpolation' */
+  visualizationMode?: 'heatmap' | 'interpolation';
+  /** IDW buffer radius in meters beyond convex hull boundary (default 30) */
+  interpolationRadius?: number;
+  /** IDW power parameter — higher = sharper transitions near points (default 2) */
+  interpolationPower?: number;
+  /** Interpolation surface opacity 0-1 (default 0.6) */
+  interpolationOpacity?: number;
 }
 
 export interface FirecallLayer extends FirecallItem {
