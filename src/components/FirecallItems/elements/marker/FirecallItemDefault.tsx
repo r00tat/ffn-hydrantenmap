@@ -80,7 +80,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick, heatmapColor, pane, onContextMenu } = {},
+  options: { hidePopup, disableClick, heatmapColor, onContextMenu } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon(heatmapColor);
@@ -110,7 +110,6 @@ export function FirecallItemMarkerDefault({
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
-        pane={pane}
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
