@@ -85,6 +85,9 @@ export default function HeatmapLegend({
           {layerName}
         </Typography>
       )}
+      <Typography variant="caption" display="block" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+        {config.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}
+      </Typography>
       <Typography variant="caption" display="block" gutterBottom>
         {field.label}{field.unit ? ` (${field.unit})` : ''}
       </Typography>
