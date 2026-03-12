@@ -87,7 +87,7 @@ export default function HeatmapOverlay({
       const centerLat = points.length > 0
         ? points.reduce((sum, p) => sum + p.lat, 0) / points.length
         : map.getCenter().lat;
-      const radiusMeters = config.radius ?? 100;
+      const radiusMeters = config.radius ?? 30;
       const radiusPx = Math.max(5, Math.round(metersToPixels(map, radiusMeters, centerLat)));
       const blurPx = Math.max(1, Math.round(radiusPx * ((config.blur ?? 15) / 25)));
 
