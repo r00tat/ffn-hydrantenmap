@@ -98,6 +98,19 @@ export default function HeatmapSettings({
               </MenuItem>
             ))}
           </TextField>
+          <Typography variant="body2" gutterBottom>
+            Darstellung
+          </Typography>
+          <ToggleButtonGroup
+            value={current.visualizationMode || 'heatmap'}
+            exclusive
+            onChange={(_, val) => val && update({ visualizationMode: val })}
+            size="small"
+            sx={{ mb: 1 }}
+          >
+            <ToggleButton value="heatmap">Heatmap</ToggleButton>
+            <ToggleButton value="interpolation">Interpolation</ToggleButton>
+          </ToggleButtonGroup>
           <ToggleButtonGroup
             value={current.colorMode}
             exclusive
@@ -186,34 +199,83 @@ export default function HeatmapSettings({
               </Button>
             </Box>
           )}
-          <Box>
-            <Typography variant="body2" gutterBottom>
-              Radius: {current.radius ?? 30}m
-            </Typography>
-            <Slider
-              value={current.radius ?? 30}
-              onChange={(_, val) => update({ radius: val as number })}
-              min={10}
-              max={1000}
-              step={10}
-              size="small"
-              valueLabelDisplay="auto"
-            />
-          </Box>
-          <Box>
-            <Typography variant="body2" gutterBottom>
-              Weichzeichner: {Math.round(((current.blur ?? 15) / 25) * 100)}%
-            </Typography>
-            <Slider
-              value={current.blur ?? 15}
-              onChange={(_, val) => update({ blur: val as number })}
-              min={1}
-              max={50}
-              step={1}
-              size="small"
-              valueLabelDisplay="auto"
-            />
-          </Box>
+          {(current.visualizationMode || 'heatmap') === 'heatmap' ? (
+            <>
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Radius: {current.radius ?? 30}m
+                </Typography>
+                <Slider
+                  value={current.radius ?? 30}
+                  onChange={(_, val) => update({ radius: val as number })}
+                  min={10}
+                  max={1000}
+                  step={10}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Weichzeichner: {Math.round(((current.blur ?? 15) / 25) * 100)}%
+                </Typography>
+                <Slider
+                  value={current.blur ?? 15}
+                  onChange={(_, val) => update({ blur: val as number })}
+                  min={1}
+                  max={50}
+                  step={1}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+            </>
+          ) : (
+            <>
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Radius: {current.interpolationRadius ?? 30}m
+                </Typography>
+                <Slider
+                  value={current.interpolationRadius ?? 30}
+                  onChange={(_, val) => update({ interpolationRadius: val as number })}
+                  min={10}
+                  max={500}
+                  step={10}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  IDW Exponent: {current.interpolationPower ?? 2}
+                </Typography>
+                <Slider
+                  value={current.interpolationPower ?? 2}
+                  onChange={(_, val) => update({ interpolationPower: val as number })}
+                  min={1}
+                  max={5}
+                  step={0.5}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+              <Box>
+                <Typography variant="body2" gutterBottom>
+                  Deckkraft: {Math.round((current.interpolationOpacity ?? 0.6) * 100)}%
+                </Typography>
+                <Slider
+                  value={current.interpolationOpacity ?? 0.6}
+                  onChange={(_, val) => update({ interpolationOpacity: val as number })}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  size="small"
+                  valueLabelDisplay="auto"
+                />
+              </Box>
+            </>
+          )}
         </Box>
       )}
     </Box>
