@@ -188,21 +188,21 @@ export default function HeatmapSettings({
           )}
           <Box>
             <Typography variant="body2" gutterBottom>
-              Radius: {current.radius ?? 25}px
+              Radius: {current.radius ?? 100}m
             </Typography>
             <Slider
-              value={current.radius ?? 25}
+              value={current.radius ?? 100}
               onChange={(_, val) => update({ radius: val as number })}
-              min={5}
-              max={100}
-              step={5}
+              min={10}
+              max={1000}
+              step={10}
               size="small"
               valueLabelDisplay="auto"
             />
           </Box>
           <Box>
             <Typography variant="body2" gutterBottom>
-              Weichzeichner: {current.blur ?? 15}px
+              Weichzeichner: {current.blur ?? 15}
             </Typography>
             <Slider
               value={current.blur ?? 15}

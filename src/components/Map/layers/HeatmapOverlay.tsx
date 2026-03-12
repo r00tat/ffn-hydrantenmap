@@ -1,10 +1,23 @@
 'use client';
 
 import L from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMap } from 'react-leaflet';
 import { HeatmapConfig } from '../../firebase/firestore';
 import { normalizeValue } from '../../../common/heatmap';
+
+/**
+ * Convert a distance in meters to pixels at the current map zoom and latitude.
+ */
+function metersToPixels(map: L.Map, meters: number, lat: number): number {
+  const zoom = map.getZoom();
+  const point = map.project(L.latLng(lat, 0), zoom);
+  const pointPlusMeters = map.project(
+    L.latLng(lat, 0).toBounds(meters * 2).getNorthEast(),
+    zoom
+  );
+  return Math.abs(pointPlusMeters.x - point.x);
+}
 
 /**
  * Build a leaflet.heat gradient object from config color stops.
@@ -43,6 +56,14 @@ export default function HeatmapOverlay({
 }: HeatmapOverlayProps) {
   const map = useMap();
   const layerRef = useRef<L.Layer | null>(null);
+  const [zoom, setZoom] = useState(map.getZoom());
+
+  // Track zoom changes to recalculate pixel radius
+  const onZoom = useCallback(() => setZoom(map.getZoom()), [map]);
+  useEffect(() => {
+    map.on('zoomend', onZoom);
+    return () => { map.off('zoomend', onZoom); };
+  }, [map, onZoom]);
 
   useEffect(() => {
     // Clean up previous layer
@@ -62,11 +83,19 @@ export default function HeatmapOverlay({
         normalizeValue(p.value, config, allValues),
       ] as [number, number, number]);
 
+      // Convert meter-based radius to pixels at the center latitude
+      const centerLat = points.length > 0
+        ? points.reduce((sum, p) => sum + p.lat, 0) / points.length
+        : map.getCenter().lat;
+      const radiusMeters = config.radius ?? 100;
+      const radiusPx = Math.max(5, Math.round(metersToPixels(map, radiusMeters, centerLat)));
+      const blurPx = Math.max(1, Math.round(radiusPx * ((config.blur ?? 15) / 25)));
+
       // leaflet.heat patches L with heatLayer
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const layer = (L as any).heatLayer(data, {
-        radius: config.radius ?? 25,
-        blur: config.blur ?? 15,
+        radius: radiusPx,
+        blur: blurPx,
         maxZoom: 17,
         max: 1,
         gradient: buildGradient(config),
@@ -84,7 +113,7 @@ export default function HeatmapOverlay({
         layerRef.current = null;
       }
     };
-  }, [map, points, config, allValues]);
+  }, [map, points, config, allValues, zoom]);
 
   return null;
 }
