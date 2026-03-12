@@ -64,7 +64,7 @@ export default function FirecallLayer({
             />
             {layer.heatmapConfig?.enabled && (
               <LayersControl.Overlay
-                name={`${layer.name} Heatmap`}
+                name={`${layer.name} ${layer.heatmapConfig.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}`}
                 checked={false}
               >
                 <LayerGroup>
