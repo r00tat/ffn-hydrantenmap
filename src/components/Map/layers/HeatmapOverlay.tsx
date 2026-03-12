@@ -167,44 +167,33 @@ const CustomHeatLayer = L.Layer.extend({
     // Create a fresh simpleheat instance on our correctly-sized canvas
     const heat: SimpleHeatInstance = simpleheat(canvas);
     heat.radius(radiusPx, blurPx);
+
+    // Fix simpleheat's shadow-offset stamp trick: it uses a hardcoded
+    // shadowOffset of 200px.  When _r (= radiusPx + blurPx) exceeds 200
+    // the *source* filled circle is no longer fully off the stamp canvas,
+    // producing hard straight-line clipping artifacts.  Recreate the stamp
+    // with a large enough offset so the source circle is entirely off-canvas.
+    const stampR = heat._r; // radiusPx + blurPx
+    if (stampR > 100) {
+      const offset = stampR + radiusPx + 10; // guarantee source circle is off-canvas
+      const stamp = document.createElement('canvas');
+      stamp.width = stamp.height = 2 * stampR;
+      const sctx = stamp.getContext('2d')!;
+      sctx.shadowOffsetX = sctx.shadowOffsetY = offset;
+      sctx.shadowBlur = blurPx;
+      sctx.shadowColor = 'black';
+      sctx.beginPath();
+      sctx.arc(stampR - offset, stampR - offset, radiusPx, 0, 2 * Math.PI, true);
+      sctx.closePath();
+      sctx.fill();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (heat as any)._circle = stamp;
+    }
+
     heat.max(this.options.maxVal);
     heat.gradient(this.options.gradient);
     heat.data(data).draw(this.options.minOpacity);
 
-    // DEBUG: draw circle outlines and canvas boundary
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Red border around the full canvas
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, canvasW - 2, canvasH - 2);
-      // Blue border around the viewport area within the canvas
-      ctx.strokeStyle = 'blue';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(pad, pad, size.x, size.y);
-      // Green circle outlines at each data point
-      ctx.strokeStyle = 'lime';
-      ctx.lineWidth = 2;
-      for (let j = 0; j < data.length; j++) {
-        ctx.beginPath();
-        ctx.arc(data[j][0], data[j][1], radiusPx, 0, 2 * Math.PI);
-        ctx.stroke();
-        // Cross at center
-        ctx.beginPath();
-        ctx.moveTo(data[j][0] - 10, data[j][1]);
-        ctx.lineTo(data[j][0] + 10, data[j][1]);
-        ctx.moveTo(data[j][0], data[j][1] - 10);
-        ctx.lineTo(data[j][0], data[j][1] + 10);
-        ctx.stroke();
-      }
-      console.log('[heatmap] DEBUG: canvas=' + canvasW + 'x' + canvasH +
-        ' pad=' + pad + ' radiusPx=' + radiusPx + ' blurPx=' + blurPx +
-        ' viewport=' + size.x + 'x' + size.y + ' points=' + data.length +
-        ' zoom=' + zoom);
-      for (let j = 0; j < data.length; j++) {
-        console.log('[heatmap]   point ' + j + ': canvas=(' + data[j][0] + ',' + data[j][1] + ') intensity=' + data[j][2]);
-      }
-    }
   },
 });
 
