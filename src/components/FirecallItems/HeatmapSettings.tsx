@@ -70,9 +70,6 @@ export default function HeatmapSettings({
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Typography variant="subtitle1" gutterBottom>
-        Heatmap
-      </Typography>
       <FormControlLabel
         control={
           <Switch
