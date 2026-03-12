@@ -70,16 +70,6 @@ export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps)
     return points;
   }, [records, heatmapConfig]);
 
-  console.log('HeatmapOverlayLayer', {
-    layerId: layer.id,
-    layerName: layer.name,
-    recordCount: records.length,
-    allValuesCount: allValues.length,
-    heatmapPointsCount: heatmapPoints.length,
-    heatmapPoints,
-    sampleFieldData: records.slice(0, 3).map((r) => ({ name: r.name, fieldData: r.fieldData })),
-  });
-
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;
   }

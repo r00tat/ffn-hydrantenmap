@@ -63,7 +63,8 @@ export default function HeatmapOverlay({
       ] as [number, number, number]);
 
       // leaflet.heat patches L with heatLayer
-      const layer = (L as Record<string, unknown>).heatLayer(data, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const layer = (L as any).heatLayer(data, {
         radius: config.radius ?? 25,
         blur: config.blur ?? 15,
         maxZoom: 17,
