@@ -7,6 +7,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
@@ -81,6 +82,7 @@ function EinsatzCard({
   const router = useRouter();
   const [tokenLink, setTokenLink] = useState<string>();
   const [copied, setCopied] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
 
   const updateFn = useCallback(
@@ -104,6 +106,7 @@ function EinsatzCard({
 
   const createLink = useCallback(async (firefallId: string) => {
     setError('');
+    setCreatingLink(true);
     const token = await createCustomFirebaseTokenForFirecall(firefallId);
     console.info('created new token for link:', token);
     if (token.token) {
@@ -119,6 +122,7 @@ function EinsatzCard({
       setError(`Token konnte nicht erstellt werden: ${token.error}`);
       console.warn(`unable to create token: ${token.error}\n${token.details}`);
     }
+    setCreatingLink(false);
   }, []);
 
   return (
@@ -187,18 +191,22 @@ function EinsatzCard({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Link für anonymen Zugriff erstellen">
-            <IconButton
-              size="small"
-              onClick={() => {
-                if (einsatz.id) {
-                  createLink(einsatz.id);
-                }
-              }}
-            >
-              <ShareIcon />
-            </IconButton>
-          </Tooltip>
+          {creatingLink ? (
+            <CircularProgress size={24} sx={{ mx: 1 }} />
+          ) : (
+            <Tooltip title="Link für anonymen Zugriff erstellen">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  if (einsatz.id) {
+                    createLink(einsatz.id);
+                  }
+                }}
+              >
+                <ShareIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Kostenersatz-Berechnungen">
             <IconButton
               size="small"
