@@ -13,7 +13,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
@@ -24,7 +24,7 @@ import { FirecallItemBase } from './elements/FirecallItemBase';
 import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
 import HeatmapSettings from './HeatmapSettings';
-import ItemDataFields from './ItemDataFields';
+import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -44,6 +44,7 @@ export default function FirecallItemDialog({
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
   const [open, setOpen] = useState(true);
+  const dataFieldsRef = useRef<ItemDataFieldsHandle>(null);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
     getItemInstance({
       type: itemType,
@@ -124,6 +125,7 @@ export default function FirecallItemDialog({
               fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
               onChange={(fieldData) => setItemField('fieldData', fieldData)}
               isNew={!item.id}
+              flushRef={dataFieldsRef}
             />
           )}
         </DialogContent>
@@ -164,8 +166,13 @@ export default function FirecallItemDialog({
             color="primary"
             startIcon={item.id ? <SaveIcon /> : <AddIcon />}
             onClick={() => {
+              // Flush any pending free-form field before saving
+              const flushedFieldData = dataFieldsRef.current?.flush();
+              const saveItem = flushedFieldData
+                ? { ...item.filteredData(), fieldData: flushedFieldData }
+                : item.filteredData();
               setOpen(false);
-              onClose(item.filteredData());
+              onClose(saveItem);
             }}
           >
             {item.id ? 'Aktualisieren' : 'Hinzufügen'}

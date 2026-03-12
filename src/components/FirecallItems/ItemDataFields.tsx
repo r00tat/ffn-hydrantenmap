@@ -9,14 +9,20 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useImperativeHandle, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
+
+export interface ItemDataFieldsHandle {
+  /** Flush pending new field into fieldData. Returns the updated fieldData. */
+  flush: () => Record<string, string | number | boolean>;
+}
 
 interface ItemDataFieldsProps {
   dataSchema?: DataSchemaField[];
   fieldData: Record<string, string | number | boolean>;
   onChange: (fieldData: Record<string, string | number | boolean>) => void;
   isNew?: boolean;
+  flushRef?: React.Ref<ItemDataFieldsHandle>;
 }
 
 export default function ItemDataFields({
@@ -24,6 +30,7 @@ export default function ItemDataFields({
   fieldData,
   onChange,
   isNew,
+  flushRef,
 }: ItemDataFieldsProps) {
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
@@ -65,19 +72,18 @@ export default function ItemDataFields({
     }
   }, [newKey, newValue, fieldData, onChange]);
 
-  const addRowRef = useRef<HTMLDivElement>(null);
-  const handleAddRowBlur = useCallback(
-    (e: React.FocusEvent) => {
-      // Only flush if focus is leaving the add row entirely
-      if (addRowRef.current?.contains(e.relatedTarget as Node)) return;
+  useImperativeHandle(flushRef, () => ({
+    flush: () => {
       if (newKey.trim() && !(newKey.trim() in fieldData)) {
-        onChange({ ...fieldData, [newKey.trim()]: newValue });
+        const updated = { ...fieldData, [newKey.trim()]: newValue };
+        onChange(updated);
         setNewKey('');
         setNewValue('');
+        return updated;
       }
+      return fieldData;
     },
-    [newKey, newValue, fieldData, onChange]
-  );
+  }), [newKey, newValue, fieldData, onChange]);
 
   const schemaFields = dataSchema || [];
   const schemaKeys = new Set(schemaFields.map((f) => f.key));
@@ -159,7 +165,7 @@ export default function ItemDataFields({
           </IconButton>
         </Box>
       ))}
-      <Box ref={addRowRef} onBlur={handleAddRowBlur} sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
         <TextField
           label="Neues Feld"
           size="small"
