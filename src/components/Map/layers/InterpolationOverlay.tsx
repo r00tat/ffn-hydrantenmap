@@ -90,23 +90,24 @@ const InterpolationCanvasLayer = L.Layer.extend({
       ),
     );
 
-    const canvasW = size.x;
-    const canvasH = size.y;
+    // Size canvas to viewport + padding so interpolation at edges isn't clipped
+    const canvasW = size.x + 2 * bufferPx;
+    const canvasH = size.y + 2 * bufferPx;
 
     const canvas: HTMLCanvasElement = this._canvas;
     canvas.width = canvasW;
     canvas.height = canvasH;
 
-    // Position canvas at viewport origin
-    const topLeft = map.containerPointToLayerPoint(L.point(0, 0));
+    // Position canvas so (0,0) of the bitmap = container (-bufferPx, -bufferPx)
+    const topLeft = map.containerPointToLayerPoint(L.point(-bufferPx, -bufferPx));
     L.DomUtil.setPosition(canvas, topLeft);
 
-    // Convert lat/lng to pixel coordinates
+    // Convert lat/lng to pixel coordinates (offset by bufferPx)
     const pixelPoints: DataPoint[] = [];
     for (let i = 0; i < this._latlngs.length; i++) {
       const ll = this._latlngs[i];
       const p = map.latLngToContainerPoint(L.latLng(ll.lat, ll.lng));
-      pixelPoints.push({ x: p.x, y: p.y, value: ll.value });
+      pixelPoints.push({ x: Math.round(p.x + bufferPx), y: Math.round(p.y + bufferPx), value: ll.value });
     }
 
     // Compute convex hull
