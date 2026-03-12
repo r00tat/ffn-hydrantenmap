@@ -113,3 +113,29 @@ export function normalizeValue(
   const clamped = Math.max(0, Math.min(1, normalized));
   return 0.3 + clamped * 0.7;
 }
+
+/**
+ * Normalize a value to full 0-1 range for direct canvas rendering.
+ * Unlike normalizeValue() which maps to [0.3, 1.0] for leaflet.heat,
+ * this uses the full range since we control RGBA directly.
+ */
+export function normalizeValueFull(
+  value: number,
+  config: HeatmapConfig,
+  allValues: number[]
+): number {
+  let min: number;
+  let max: number;
+
+  if (config.colorMode === 'manual' && config.min !== undefined && config.max !== undefined) {
+    min = config.min;
+    max = config.max;
+  } else {
+    min = allValues.reduce((a, b) => Math.min(a, b), Infinity);
+    max = allValues.reduce((a, b) => Math.max(a, b), -Infinity);
+  }
+
+  if (max === min) return 0.5;
+  const normalized = (value - min) / (max - min);
+  return Math.max(0, Math.min(1, normalized));
+}
