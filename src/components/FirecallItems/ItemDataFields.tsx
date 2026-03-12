@@ -9,7 +9,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
 
 interface ItemDataFieldsProps {
@@ -64,6 +64,20 @@ export default function ItemDataFields({
       setNewValue('');
     }
   }, [newKey, newValue, fieldData, onChange]);
+
+  const addRowRef = useRef<HTMLDivElement>(null);
+  const handleAddRowBlur = useCallback(
+    (e: React.FocusEvent) => {
+      // Only flush if focus is leaving the add row entirely
+      if (addRowRef.current?.contains(e.relatedTarget as Node)) return;
+      if (newKey.trim() && !(newKey.trim() in fieldData)) {
+        onChange({ ...fieldData, [newKey.trim()]: newValue });
+        setNewKey('');
+        setNewValue('');
+      }
+    },
+    [newKey, newValue, fieldData, onChange]
+  );
 
   const schemaFields = dataSchema || [];
   const schemaKeys = new Set(schemaFields.map((f) => f.key));
@@ -145,7 +159,7 @@ export default function ItemDataFields({
           </IconButton>
         </Box>
       ))}
-      <Box sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
+      <Box ref={addRowRef} onBlur={handleAddRowBlur} sx={{ display: 'flex', gap: 1, mt: 1, alignItems: 'center' }}>
         <TextField
           label="Neues Feld"
           size="small"
