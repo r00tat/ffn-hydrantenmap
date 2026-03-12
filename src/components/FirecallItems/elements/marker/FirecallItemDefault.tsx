@@ -25,6 +25,9 @@ export interface MarkerRenderOptions {
   heatmapColor?: string;
   /* data schema for rendering fieldData in popup */
   dataSchema?: DataSchemaField[];
+  pane?: string;
+  /* callback for right-click context menu */
+  onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void;
 }
 
 export interface FirecallItemMarkerProps {
@@ -77,7 +80,7 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick, heatmapColor } = {},
+  options: { hidePopup, disableClick, heatmapColor, pane, onContextMenu } = {},
   children,
 }: FirecallItemMarkerProps) {
   const icon = record.icon(heatmapColor);
@@ -107,6 +110,7 @@ export function FirecallItemMarkerDefault({
         icon={icon}
         draggable={editable && record.draggable}
         autoPan={false}
+        pane={pane}
         eventHandlers={{
           ...record.eventHandlers,
           dragend: (event) => {
@@ -120,6 +124,14 @@ export function FirecallItemMarkerDefault({
                   selectFirecallItem(record);
                 },
               }),
+          ...(onContextMenu
+            ? {
+                contextmenu: (e: L.LeafletMouseEvent) => {
+                  e.originalEvent.preventDefault();
+                  onContextMenu(record, e);
+                },
+              }
+            : {}),
         }}
         rotationAngle={
           record?.rotation &&

@@ -5,6 +5,7 @@ import { Area, FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import AreaMarker from './area/AreaComponent';
+import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class FirecallArea extends FirecallItemBase {
   distance: number = 0;
@@ -115,8 +116,19 @@ export class FirecallArea extends FirecallItemBase {
     return new FirecallArea();
   }
 
-  public renderMarker(selectItem: (item: FirecallItem) => void): ReactNode {
-    return <AreaMarker record={this} selectItem={selectItem} key={this.id} />;
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    options: MarkerRenderOptions = {}
+  ): ReactNode {
+    return (
+      <AreaMarker
+        record={this}
+        selectItem={selectItem}
+        key={this.id}
+        pane={options.pane}
+        onContextMenu={options.onContextMenu}
+      />
+    );
   }
 
   public static isPolyline(): boolean {

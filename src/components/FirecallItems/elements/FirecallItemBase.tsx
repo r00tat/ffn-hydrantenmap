@@ -89,6 +89,7 @@ export class FirecallItemBase {
       datum: this.datum = '',
       rotation: this.rotation = '0',
       layer: this.layer = '',
+      zIndex: this.zIndex = 0,
       deleted: this.deleted = false,
       updatedAt: this.updatedAt,
       updatedBy: this.updatedBy,
@@ -117,6 +118,7 @@ export class FirecallItemBase {
   original?: FirecallItem;
   rotation: string;
   layer: string;
+  zIndex: number;
   creator?: string;
   created?: string;
   draggable: boolean;
@@ -151,6 +153,7 @@ export class FirecallItemBase {
       datum: this.datum,
       rotation: this.rotation,
       layer: this.layer,
+      zIndex: this.zIndex,
       creator: this.creator,
       created: this.created,
       updatedAt: this.updatedAt,

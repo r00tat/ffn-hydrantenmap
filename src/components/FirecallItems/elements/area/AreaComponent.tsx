@@ -14,6 +14,7 @@ import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
+import type { LeafletMouseEvent } from 'leaflet';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import {
@@ -26,9 +27,11 @@ import {
 export interface AreaMarkerProps {
   record: FirecallArea;
   selectItem: (item: FirecallItem) => void;
+  pane?: string;
+  onContextMenu?: (item: FirecallItem, event: LeafletMouseEvent) => void;
 }
 
-export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
+export default function AreaMarker({ record, selectItem, pane, onContextMenu }: AreaMarkerProps) {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [showMarkers, setShowMarkers] = useState(false);
@@ -107,6 +110,7 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
         ))}
       <Polygon
         positions={positions}
+        {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',
           opacity: 0.8,
@@ -125,6 +129,14 @@ export default function AreaMarker({ record, selectItem }: AreaMarkerProps) {
           // mouseout: () => setShowMarkers(false),
           popupopen: () => setShowMarkers(true),
           popupclose: () => setShowMarkers(false),
+          ...(onContextMenu
+            ? {
+                contextmenu: (e: L.LeafletMouseEvent) => {
+                  e.originalEvent.preventDefault();
+                  onContextMenu(record, e);
+                },
+              }
+            : {}),
         }}
       >
         <Popup>

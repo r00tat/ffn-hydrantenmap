@@ -19,7 +19,7 @@ export default function useFirecallItemAdd() {
       const newData: any = {
         datum: new Date().toISOString(),
         ...Object.entries(item)
-          .filter(([k, v]) => v)
+          .filter(([k, v]) => v !== undefined && v !== null && v !== '')
           .reduce((p, [k, v]) => {
             p[k] = v;
             return p;
@@ -27,6 +27,11 @@ export default function useFirecallItemAdd() {
         created: new Date().toISOString(),
         creator: email,
       };
+      // New items render on top by default: use Date.now() as a monotonically
+      // increasing zIndex that is always higher than manually assigned values.
+      if (!newData.zIndex) {
+        newData.zIndex = Date.now();
+      }
       const itemClass = getItemClass(item?.type);
       console.info(
         `add firecall ${itemClass.firebaseCollectionName()}: ${JSON.stringify(

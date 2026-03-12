@@ -15,14 +15,46 @@ import { useHistoryPathSegments } from './useMapEditor';
 
 export type FirecallLayers = SimpleMap<FirecallLayer>;
 
-export const FirecallLayersContext = React.createContext<FirecallLayers>({});
+export interface FirecallLayersContextValue {
+  layersMap: FirecallLayers;
+  sortedLayers: FirecallLayer[];
+}
 
-export const useFirecallLayers = () => {
-  const layers = useContext(FirecallLayersContext);
-  return layers;
+export const FirecallLayersContext =
+  React.createContext<FirecallLayersContextValue>({
+    layersMap: {},
+    sortedLayers: [],
+  });
+
+/**
+ * Returns the layers map (keyed by ID) for lookup.
+ * Use `useFirecallLayersSorted` for ordered iteration.
+ */
+export const useFirecallLayers = (): FirecallLayers => {
+  const { layersMap } = useContext(FirecallLayersContext);
+  return layersMap;
 };
 
-export function useFirecallLayersFromFirstore(): FirecallLayers {
+/**
+ * Returns layers sorted by zIndex ascending (lowest first = renders behind).
+ */
+export const useFirecallLayersSorted = (): FirecallLayer[] => {
+  const { sortedLayers } = useContext(FirecallLayersContext);
+  return sortedLayers;
+};
+
+export function sortByZIndex<T extends { zIndex?: number; datum?: string }>(
+  items: T[]
+): T[] {
+  return [...items].sort((a, b) => {
+    const zA = a.zIndex ?? 0;
+    const zB = b.zIndex ?? 0;
+    if (zA !== zB) return zA - zB;
+    return (a.datum ?? '').localeCompare(b.datum ?? '');
+  });
+}
+
+export function useFirecallLayersFromFirstore(): FirecallLayersContextValue {
   const firecallId = useFirecallId();
   const historyPathSegments = useHistoryPathSegments();
 
@@ -37,8 +69,9 @@ export function useFirecallLayersFromFirstore(): FirecallLayers {
     queryConstraints: [orderBy('name', 'asc')],
   });
 
-  return useMemo(
-    () => Object.fromEntries(layers.map((l) => [l.id, l])),
-    [layers]
-  );
+  return useMemo(() => {
+    const layersMap = Object.fromEntries(layers.map((l) => [l.id, l]));
+    const sortedLayers = sortByZIndex(layers);
+    return { layersMap, sortedLayers };
+  }, [layers]);
 }
