@@ -169,9 +169,9 @@ function LayerPaneEntry({
             (layer.summaryPosition ||
               (layer.showSummary !== 'false'
                 ? 'right'
-                : '')) as any
+                : 'off')) as any
           }
-          clusterMode={(layer.clusterMode || '') as any}
+          clusterMode={(layer.clusterMode || 'normal') as any}
         >
           <FirecallItemsLayer layer={layer} pane={paneName} />
         </MarkerClusterLayer>

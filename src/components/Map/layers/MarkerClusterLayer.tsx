@@ -8,9 +8,9 @@ import { LayerGroupProps } from 'react-leaflet';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
-export type SummaryPosition = '' | 'hover' | 'top' | 'bottom' | 'left' | 'right';
+export type SummaryPosition = 'off' | 'hover' | 'top' | 'bottom' | 'left' | 'right';
 
-export type ClusterMode = '' | 'wenig' | 'viel';
+export type ClusterMode = 'normal' | 'wenig' | 'viel';
 
 export interface MarkerClusterLayerOptions extends LayerGroupProps {
   summaryPosition?: SummaryPosition;
@@ -126,7 +126,7 @@ function bindPermanentTooltips(instance: any, direction: string) {
 
 /** Resolve clusterMode preset to MarkerClusterGroup options */
 const CLUSTER_PRESETS: Record<string, Record<string, unknown>> = {
-  '': { maxClusterRadius: 60 },
+  normal: { maxClusterRadius: 60 },
   wenig: { maxClusterRadius: 30 },
   viel: { maxClusterRadius: 120 },
 };
@@ -135,7 +135,7 @@ function createMarkerClusterLayer(
   { children: _c, summaryPosition, clusterMode, ...rest }: MarkerClusterLayerOptions,
   ctx: LeafletContextInterface
 ) {
-  const clusterOptions = CLUSTER_PRESETS[clusterMode || ''] || {};
+  const clusterOptions = CLUSTER_PRESETS[clusterMode || 'normal'] || {};
   const instance = new MarkerClusterGroup(clusterOptions);
 
   if (summaryPosition === 'hover') {

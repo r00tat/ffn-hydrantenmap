@@ -23,14 +23,14 @@ export class FirecallItemLayer extends FirecallItemBase {
     } as FirecallItemLayer);
     this.type = 'layer';
     ({ grouped: this.grouped = '' } = firecallItem || {});
-    this.showSummary = firecallItem?.showSummary ?? 'true';
-    // Backward compat: derive summaryPosition from showSummary if not set
-    if (firecallItem?.summaryPosition) {
-      this.summaryPosition = firecallItem.summaryPosition;
+    // Backward compat: derive summaryPosition from old showSummary if not set
+    if (firecallItem?.summaryPosition !== undefined) {
+      this.summaryPosition = firecallItem.summaryPosition || 'off';
     } else {
-      this.summaryPosition = this.showSummary === 'true' ? 'right' : '';
+      const showSummary = firecallItem?.showSummary ?? 'true';
+      this.summaryPosition = showSummary === 'true' ? 'right' : 'off';
     }
-    this.clusterMode = firecallItem?.clusterMode ?? '';
+    this.clusterMode = firecallItem?.clusterMode || 'normal';
     this.showLabels = firecallItem?.showLabels ?? 'true';
     this.dataSchema = firecallItem?.dataSchema ?? [];
     this.heatmapConfig = firecallItem?.heatmapConfig;
@@ -86,7 +86,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.selectValues(),
       summaryPosition: {
-        '': 'Aus',
+        off: 'Aus',
         hover: 'Bei Hover',
         top: 'Oben',
         bottom: 'Unten',
@@ -95,7 +95,7 @@ export class FirecallItemLayer extends FirecallItemBase {
       },
       clusterMode: {
         wenig: 'Wenig',
-        '': 'Normal',
+        normal: 'Normal',
         viel: 'Viel',
       },
     };
