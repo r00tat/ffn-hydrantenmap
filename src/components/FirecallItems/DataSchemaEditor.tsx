@@ -12,7 +12,7 @@ import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
 
 function slugify(label: string): string {
@@ -30,10 +30,23 @@ interface DataSchemaEditorProps {
   onChange: (schema: DataSchemaField[]) => void;
 }
 
+let nextFieldId = 0;
+
 export default function DataSchemaEditor({
   dataSchema,
   onChange,
 }: DataSchemaEditorProps) {
+  const fieldIds = useRef<string[]>([]);
+
+  // Ensure we have a stable ID for each field index
+  while (fieldIds.current.length < dataSchema.length) {
+    fieldIds.current.push(`field-${nextFieldId++}`);
+  }
+  // Trim if fields were removed
+  if (fieldIds.current.length > dataSchema.length) {
+    fieldIds.current.length = dataSchema.length;
+  }
+
   const updateField = useCallback(
     (index: number, updates: Partial<DataSchemaField>) => {
       const updated = [...dataSchema];
@@ -54,6 +67,7 @@ export default function DataSchemaEditor({
   );
 
   const addField = useCallback(() => {
+    fieldIds.current.push(`field-${nextFieldId++}`);
     onChange([
       ...dataSchema,
       { key: '', label: '', unit: '', type: 'number' as const },
@@ -62,6 +76,7 @@ export default function DataSchemaEditor({
 
   const removeField = useCallback(
     (index: number) => {
+      fieldIds.current.splice(index, 1);
       onChange(dataSchema.filter((_, i) => i !== index));
     },
     [dataSchema, onChange]
@@ -76,6 +91,8 @@ export default function DataSchemaEditor({
         updated[newIndex],
         updated[index],
       ];
+      const ids = fieldIds.current;
+      [ids[index], ids[newIndex]] = [ids[newIndex], ids[index]];
       onChange(updated);
     },
     [dataSchema, onChange]
@@ -88,7 +105,7 @@ export default function DataSchemaEditor({
       </Typography>
       {dataSchema.map((field, index) => (
         <Box
-          key={field.key || index}
+          key={fieldIds.current[index]}
           sx={{ mb: 2, p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
         >
           <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>

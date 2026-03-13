@@ -111,6 +111,7 @@ export default function FirecallItemDialog({
   };
 
   const isExistingItem = !!item.id;
+  const canSave = !!(item as any).name?.trim();
 
   return (
     <>
@@ -194,6 +195,17 @@ export default function FirecallItemDialog({
               />
             </>
           )}
+          {item.type !== 'layer' && (
+            <ItemDataFields
+              dataSchema={
+                item.layer ? layers[item.layer]?.dataSchema : undefined
+              }
+              fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
+              onChange={(fieldData) => setItemField('fieldData', fieldData)}
+              isNew={!item.id}
+              flushRef={dataFieldsRef}
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -230,6 +242,7 @@ export default function FirecallItemDialog({
           )}
           <Button
             color="primary"
+            disabled={!canSave}
             startIcon={item.id ? <SaveIcon /> : <AddIcon />}
             onClick={() => {
               // Flush any pending free-form field before saving

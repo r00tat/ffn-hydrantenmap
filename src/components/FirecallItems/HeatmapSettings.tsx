@@ -13,7 +13,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { DataSchemaField, HeatmapConfig } from '../firebase/firestore';
 
 interface HeatmapSettingsProps {
@@ -35,6 +35,29 @@ export default function HeatmapSettings({
 }: HeatmapSettingsProps) {
   const current = config || defaultConfig;
   const numericFields = dataSchema.filter((f) => f.type === 'number');
+
+  // Auto-select first numeric field when heatmap is enabled and no field is selected
+  useEffect(() => {
+    if (
+      current.enabled &&
+      !current.activeKey &&
+      numericFields.length > 0
+    ) {
+      onChange({ ...current, activeKey: numericFields[0].key });
+    }
+  }, [current, numericFields, onChange]);
+
+  // Clear activeKey if the selected field no longer exists in the schema
+  useEffect(() => {
+    if (
+      current.enabled &&
+      current.activeKey &&
+      numericFields.length > 0 &&
+      !numericFields.some((f) => f.key === current.activeKey)
+    ) {
+      onChange({ ...current, activeKey: numericFields[0].key });
+    }
+  }, [current, numericFields, onChange]);
 
   const update = useCallback(
     (updates: Partial<HeatmapConfig>) => {
@@ -85,9 +108,18 @@ export default function HeatmapSettings({
             label="Aktives Feld"
             size="small"
             select
+            required
             value={current.activeKey}
             onChange={(e) => update({ activeKey: e.target.value })}
             fullWidth
+            error={!current.activeKey}
+            helperText={
+              numericFields.length === 0
+                ? 'Zuerst ein numerisches Datenfeld hinzufügen'
+                : !current.activeKey
+                  ? 'Bitte ein Feld auswählen'
+                  : undefined
+            }
           >
             {numericFields.map((f) => (
               <MenuItem key={f.key} value={f.key}>
