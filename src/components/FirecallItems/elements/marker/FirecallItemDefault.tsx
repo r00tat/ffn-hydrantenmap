@@ -25,6 +25,8 @@ export interface MarkerRenderOptions {
   heatmapColor?: string;
   /* data schema for rendering fieldData in popup */
   dataSchema?: DataSchemaField[];
+  /** Layer-level label visibility setting */
+  layerShowLabels?: boolean;
   pane?: string;
   /* callback for right-click context menu */
   onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void;

@@ -12,6 +12,7 @@ export class FirecallItemLayer extends FirecallItemBase {
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  showLabels?: string;
   dataSchema: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
 
@@ -30,6 +31,7 @@ export class FirecallItemLayer extends FirecallItemBase {
       this.summaryPosition = this.showSummary === 'true' ? 'right' : '';
     }
     this.clusterMode = firecallItem?.clusterMode ?? '';
+    this.showLabels = firecallItem?.showLabels ?? 'true';
     this.dataSchema = firecallItem?.dataSchema ?? [];
     this.heatmapConfig = firecallItem?.heatmapConfig;
   }
@@ -56,17 +58,24 @@ export class FirecallItemLayer extends FirecallItemBase {
   }
 
   public fields(): SimpleMap<string> {
+    const isGrouped = this.grouped === 'true' || this.grouped === true as any;
     return {
       ...super.fields(),
+      showLabels: 'Labels anzeigen',
       grouped: 'Elemente gruppieren',
-      summaryPosition: 'Zusammenfassung Position',
-      clusterMode: 'Gruppierung',
+      ...(isGrouped
+        ? {
+            summaryPosition: 'Zusammenfassung Position',
+            clusterMode: 'Gruppierung',
+          }
+        : {}),
     };
   }
 
   public fieldTypes(): SimpleMap<string> {
     return {
       ...super.fieldTypes(),
+      showLabels: 'boolean',
       grouped: 'boolean',
       summaryPosition: 'select',
       clusterMode: 'select',
@@ -98,6 +107,7 @@ export class FirecallItemLayer extends FirecallItemBase {
       grouped: this.grouped,
       summaryPosition: this.summaryPosition,
       clusterMode: this.clusterMode,
+      showLabels: this.showLabels,
       ...(this.dataSchema.length > 0 ? { dataSchema: this.dataSchema } : {}),
       ...(this.heatmapConfig ? { heatmapConfig: this.heatmapConfig } : {}),
     };

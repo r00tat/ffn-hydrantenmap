@@ -341,6 +341,7 @@ export function buildInterpolationGrid(params: {
 
       // Determine if this cell is inside the render boundary
       let alpha = 1.0;
+      let valueFade = 1.0;
 
       if (isDegenerate) {
         // For 1 point: circle boundary; for 2+ points: capsule (buffered line segments)
@@ -365,6 +366,8 @@ export function buildInterpolationGrid(params: {
           }
         }
         if (minDist > bufferPx) continue; // outside
+        // Linear value decay across entire buffer distance
+        valueFade = 1 - minDist / bufferPx;
         if (minDist > fadeStart) {
           alpha = 1 - (minDist - fadeStart) / (bufferPx - fadeStart);
         }
@@ -373,14 +376,16 @@ export function buildInterpolationGrid(params: {
         if (!inside) {
           const edgeDist = distanceToPolygonEdge(cx, cy, hull);
           if (edgeDist > bufferPx) continue; // outside buffer
+          // Linear value decay across entire buffer zone
+          valueFade = 1 - edgeDist / bufferPx;
           if (edgeDist > fadeStart) {
             alpha = 1 - (edgeDist - fadeStart) / (bufferPx - fadeStart);
           }
         }
       }
 
-      // Compute IDW value
-      const value = idwInterpolate(cx, cy, points, power);
+      // Compute IDW value, attenuated in buffer zone
+      const value = idwInterpolate(cx, cy, points, power) * valueFade;
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 

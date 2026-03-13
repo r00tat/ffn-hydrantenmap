@@ -18,6 +18,7 @@ import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 import readFileAsText from '../upload/readFile';
 import { DataSchemaField, FcMarker, FirecallItem, Line } from './firestore';
+import { coerceValue, inferType } from './importUtils';
 
 export interface KmlGeoProperties {
   name: string;
@@ -65,27 +66,6 @@ const KML_STYLE_PROPERTIES = new Set([
   'icon',
   'name',
 ]);
-
-function inferType(value: any): DataSchemaField['type'] {
-  if (typeof value === 'boolean' || value === 'true' || value === 'false')
-    return 'boolean';
-  if (
-    typeof value === 'number' ||
-    (typeof value === 'string' && value !== '' && !isNaN(Number(value)))
-  )
-    return 'number';
-  return 'text';
-}
-
-function coerceValue(
-  value: any,
-  type: DataSchemaField['type']
-): string | number | boolean {
-  if (type === 'boolean') return value === true || value === 'true';
-  if (type === 'number')
-    return typeof value === 'number' ? value : parseFloat(value) || 0;
-  return String(value);
-}
 
 function generateSchemaFromFeatures(
   features: GeoJsonFeatureColleaction['features']

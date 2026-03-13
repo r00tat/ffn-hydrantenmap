@@ -133,7 +133,8 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
 
       const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
 
-      // Check if click is within the colored area
+      // Check if click is within the colored area and compute boundary decay
+      let valueFade = 1.0;
       if (isInterpolation) {
         // Interpolation: convex hull + buffer radius
         const bufferM = heatmapConfig?.interpolationRadius ?? 30;
@@ -142,6 +143,8 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
           if (!inside) {
             const edgeDist = distanceToPolygonEdge(clickM.x, clickM.y, hull);
             if (edgeDist > bufferM) return;
+            // Linear value decay in buffer zone
+            valueFade = 1 - edgeDist / bufferM;
           }
         } else {
           // Degenerate hull (1-2 points): check distance to nearest point
@@ -151,7 +154,10 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
             const dy = clickM.y - p.y;
             minDist = Math.min(minDist, Math.sqrt(dx * dx + dy * dy));
           }
-          if (minDist > (heatmapConfig?.interpolationRadius ?? 30)) return;
+          const radius = heatmapConfig?.interpolationRadius ?? 30;
+          if (minDist > radius) return;
+          // Linear value decay based on distance
+          valueFade = 1 - minDist / radius;
         }
       } else {
         // Heatmap: within radius of any data point
@@ -169,7 +175,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
       }
 
       const power = heatmapConfig?.interpolationPower ?? 2;
-      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
+      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power) * valueFade;
       const rounded = Math.round(value * 100) / 100;
 
       const popup = L.popup({ closeOnClick: true })

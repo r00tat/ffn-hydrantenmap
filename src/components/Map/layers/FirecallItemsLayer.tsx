@@ -75,6 +75,10 @@ export default function FirecallItemsLayer({
 
   const heatmapConfig = layer?.heatmapConfig;
   const dataSchema = layer?.dataSchema;
+  const layerShowLabels =
+    layer?.showLabels === undefined
+      ? undefined
+      : layer.showLabels === 'true' || layer.showLabels === true as any;
 
   const allValues = useMemo(() => {
     if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
@@ -139,6 +143,7 @@ export default function FirecallItemsLayer({
               onContextMenu: handleContextMenu,
               heatmapColor,
               dataSchema,
+              layerShowLabels,
             })}</>
           </React.Fragment>
         );

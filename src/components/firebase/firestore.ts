@@ -94,6 +94,7 @@ export interface FirecallLayer extends FirecallItem {
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  showLabels?: string;
   dataSchema?: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
 }

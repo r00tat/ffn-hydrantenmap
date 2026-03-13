@@ -14,16 +14,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useRef } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
-
-function slugify(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[äöüß]/g, (c) =>
-      c === 'ä' ? 'ae' : c === 'ö' ? 'oe' : c === 'ü' ? 'ue' : 'ss'
-    )
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
-}
+import { slugify } from '../firebase/importUtils';
 
 interface DataSchemaEditorProps {
   dataSchema: DataSchemaField[];
@@ -51,17 +42,24 @@ export default function DataSchemaEditor({
     (index: number, updates: Partial<DataSchemaField>) => {
       const updated = [...dataSchema];
       updated[index] = { ...updated[index], ...updates };
-      // Auto-slugify key from label if key hasn't been manually edited
-      if (updates.label && !updates.key) {
-        const autoKey = slugify(updates.label);
-        const existingKeys = updated
-          .filter((_, i) => i !== index)
-          .map((f) => f.key);
-        if (!existingKeys.includes(autoKey)) {
-          updated[index].key = autoKey;
-        }
-      }
       onChange(updated);
+    },
+    [dataSchema, onChange]
+  );
+
+  const handleLabelBlur = useCallback(
+    (index: number) => {
+      const field = dataSchema[index];
+      if (!field || field.key || !field.label) return;
+      const autoKey = slugify(field.label);
+      const existingKeys = dataSchema
+        .filter((_, i) => i !== index)
+        .map((f) => f.key);
+      if (autoKey && !existingKeys.includes(autoKey)) {
+        const updated = [...dataSchema];
+        updated[index] = { ...updated[index], key: autoKey };
+        onChange(updated);
+      }
     },
     [dataSchema, onChange]
   );
@@ -114,6 +112,7 @@ export default function DataSchemaEditor({
               size="small"
               value={field.label}
               onChange={(e) => updateField(index, { label: e.target.value })}
+              onBlur={() => handleLabelBlur(index)}
               sx={{ flex: 2 }}
             />
             <TextField
