@@ -49,6 +49,23 @@ export default function FirecallLayer({
   const sortedLayers = useFirecallLayersSorted();
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
 
+  // Seed visible overlays when heatmap layers first become available
+  const seededRef = React.useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    const heatmapNames = sortedLayers
+      .filter((layer) => layer.heatmapConfig?.enabled)
+      .map((layer) => getOverlayName(layer));
+    if (heatmapNames.length > 0) {
+      seededRef.current = true;
+      setVisibleOverlays((prev) => {
+        const next = new Set(prev);
+        heatmapNames.forEach((name) => next.add(name));
+        return next;
+      });
+    }
+  }, [sortedLayers]);
+
   const onOverlayAdd = useCallback((e: L.LayersControlEvent) => {
     setVisibleOverlays((prev) => {
       const next = new Set(prev);
@@ -109,7 +126,7 @@ export default function FirecallLayer({
             {layer.heatmapConfig?.enabled && (
               <LayersControl.Overlay
                 name={getOverlayName(layer)}
-                checked={false}
+                checked={true}
               >
                 <LayerGroup>
                   <HeatmapOverlayLayer
