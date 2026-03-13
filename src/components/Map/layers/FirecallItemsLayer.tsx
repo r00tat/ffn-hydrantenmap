@@ -16,7 +16,7 @@ import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/Firecal
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import { useHistoryPathSegments, useMapEditable } from '../../../hooks/useMapEditor';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
-import { sortByZIndex } from '../../../hooks/useFirecallLayers';
+import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import ZOrderContextMenu from '../../FirecallItems/ZOrderContextMenu';
 
 export interface FirecallLayerOptions {
@@ -48,6 +48,7 @@ export default function FirecallItemsLayer({
   const firecallId = useFirecallId();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const historyPathSegments = useHistoryPathSegments();
+  const activeLayers = useFirecallLayers();
   const queryConstraints = useMemo(
     () => (layer?.id ? [where('layer', '==', layer.id)] : []),
     [layer]
@@ -57,9 +58,13 @@ export default function FirecallItemsLayer({
       layer?.id
         ? filterDisplayableItems
         : (e: FirecallItem) =>
-            (e.layer === undefined || e.layer === '') &&
+            // Show items with no layer, or items whose layer no longer exists
+            // (orphaned items from deleted layers)
+            (e.layer === undefined ||
+              e.layer === '' ||
+              !(e.layer in activeLayers)) &&
             filterDisplayableItems(e),
-    [layer?.id]
+    [layer?.id, activeLayers]
   );
 
   const records = useFirebaseCollection<FirecallItem>({

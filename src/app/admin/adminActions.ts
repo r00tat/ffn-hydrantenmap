@@ -285,12 +285,23 @@ export interface DeletedItemInfo {
   type: string;
   layer?: string;
   layerName?: string;
+  layerDeleted?: boolean;
   datum?: string;
+}
+
+export interface DeletedItemsResult {
+  items: DeletedItemInfo[];
+  /** Layers that are deleted but still have orphaned (non-deleted) items */
+  orphanedLayers: {
+    id: string;
+    name: string;
+    orphanedItemCount: number;
+  }[];
 }
 
 export async function getDeletedItems(
   firecallId: string
-): Promise<DeletedItemInfo[]> {
+): Promise<DeletedItemsResult> {
   await actionAdminRequired();
 
   const fcRef = firestore
@@ -299,17 +310,23 @@ export async function getDeletedItems(
   const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
   const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
 
-  // Build layer name lookup
+  // Build layer lookups
   const allLayers = await layersRef.get();
   const layerNames = new Map(
     allLayers.docs.map((doc) => [doc.id, doc.data().name || '(unnamed)'])
   );
+  const deletedLayerIds = new Set(
+    allLayers.docs
+      .filter((doc) => doc.data().deleted === true)
+      .map((doc) => doc.id)
+  );
 
+  // Get deleted items
   const deletedItems = await itemsRef
     .where('deleted', '==', true)
     .get();
 
-  return deletedItems.docs.map((doc) => {
+  const items = deletedItems.docs.map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,
@@ -317,23 +334,77 @@ export async function getDeletedItems(
       type: data.type || 'unknown',
       layer: data.layer,
       layerName: data.layer ? layerNames.get(data.layer) : undefined,
+      layerDeleted: data.layer ? deletedLayerIds.has(data.layer) : undefined,
       datum: data.datum,
     };
   });
+
+  // Find orphaned items: non-deleted items whose layer is deleted
+  const allItems = await itemsRef.get();
+  const orphanedByLayer = new Map<string, number>();
+  for (const doc of allItems.docs) {
+    const data = doc.data();
+    if (
+      data.deleted !== true &&
+      data.layer &&
+      deletedLayerIds.has(data.layer)
+    ) {
+      orphanedByLayer.set(
+        data.layer,
+        (orphanedByLayer.get(data.layer) || 0) + 1
+      );
+    }
+  }
+
+  const orphanedLayers = Array.from(orphanedByLayer.entries()).map(
+    ([layerId, count]) => ({
+      id: layerId,
+      name: layerNames.get(layerId) || '(unnamed)',
+      orphanedItemCount: count,
+    })
+  );
+
+  return { items, orphanedLayers };
 }
 
 export async function restoreDeletedItems(
   firecallId: string,
-  itemIds: string[]
-): Promise<number> {
+  itemIds: string[],
+  restoreLayer?: boolean
+): Promise<{ itemsRestored: number; layerRestored: boolean }> {
   await actionAdminRequired();
 
-  const itemsRef = firestore
+  const fcRef = firestore
     .collection(FIRECALL_COLLECTION_ID)
-    .doc(firecallId)
-    .collection(FIRECALL_ITEMS_COLLECTION_ID);
+    .doc(firecallId);
+  const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
 
   let totalRestored = 0;
+  let layerRestored = false;
+
+  // If restoreLayer, find the layer for these items and restore it too
+  if (restoreLayer && itemIds.length > 0) {
+    // Read the first item to find its layer
+    const firstItem = await itemsRef.doc(itemIds[0]).get();
+    const layerId = firstItem.data()?.layer;
+    if (layerId) {
+      const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+      const layerDoc = await layersRef.doc(layerId).get();
+      if (layerDoc.exists && layerDoc.data()?.deleted === true) {
+        await layersRef.doc(layerId).update({ deleted: false });
+        // Also restore the layer item in the items collection
+        const layerItems = await itemsRef
+          .where('type', '==', 'layer')
+          .get();
+        for (const doc of layerItems.docs) {
+          if (doc.id === layerId || doc.data().name === layerDoc.data()?.name) {
+            await doc.ref.update({ deleted: false });
+          }
+        }
+        layerRestored = true;
+      }
+    }
+  }
 
   for (let i = 0; i < itemIds.length; i += 500) {
     const batch = firestore.batch();
@@ -345,7 +416,39 @@ export async function restoreDeletedItems(
     totalRestored += chunk.length;
   }
 
-  return totalRestored;
+  return { itemsRestored: totalRestored, layerRestored };
+}
+
+export async function restoreLayer(
+  firecallId: string,
+  layerId: string
+): Promise<boolean> {
+  await actionAdminRequired();
+
+  const fcRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId);
+  const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+  const layerDoc = await layersRef.doc(layerId).get();
+
+  if (!layerDoc.exists || layerDoc.data()?.deleted !== true) {
+    return false;
+  }
+
+  await layersRef.doc(layerId).update({ deleted: false });
+
+  // Also restore the layer entry in the items collection if it exists
+  const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
+  const layerItems = await itemsRef
+    .where('type', '==', 'layer')
+    .get();
+  for (const doc of layerItems.docs) {
+    if (doc.id === layerId || doc.data().name === layerDoc.data()?.name) {
+      await doc.ref.update({ deleted: false });
+    }
+  }
+
+  return true;
 }
 
 export async function copyUserAndGroupsToDev(): Promise<CopyCollectionResult> {
