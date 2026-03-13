@@ -1,8 +1,8 @@
 'use client';
 
+import { useLeafletContext } from '@react-leaflet/core';
 import L from 'leaflet';
 import { useEffect, useRef } from 'react';
-import { useMap } from 'react-leaflet';
 import { HeatmapConfig } from '../../firebase/firestore';
 import { normalizeValue } from '../../../common/heatmap';
 
@@ -208,12 +208,13 @@ export default function HeatmapOverlay({
   config,
   allValues,
 }: HeatmapOverlayProps) {
-  const map = useMap();
+  const context = useLeafletContext();
+  const container = context.layerContainer || context.map;
   const layerRef = useRef<L.Layer | null>(null);
 
   useEffect(() => {
     if (layerRef.current) {
-      map.removeLayer(layerRef.current);
+      container.removeLayer(layerRef.current);
       layerRef.current = null;
     }
 
@@ -244,18 +245,18 @@ export default function HeatmapOverlay({
         gradient: buildGradient(config),
       }) as L.Layer;
 
-      layer.addTo(map);
+      container.addLayer(layer);
       layerRef.current = layer;
     });
 
     return () => {
       cancelled = true;
       if (layerRef.current) {
-        map.removeLayer(layerRef.current);
+        container.removeLayer(layerRef.current);
         layerRef.current = null;
       }
     };
-  }, [map, points, config, allValues]);
+  }, [container, points, config, allValues]);
 
   return null;
 }

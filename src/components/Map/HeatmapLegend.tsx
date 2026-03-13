@@ -35,10 +35,6 @@ export default function HeatmapLegend({
       return (
         <Box
           sx={{
-            position: 'absolute',
-            bottom: 80,
-            left: 10,
-            zIndex: 1000,
             bgcolor: 'background.paper',
             p: 1,
             borderRadius: 1,
@@ -69,10 +65,6 @@ export default function HeatmapLegend({
   return (
     <Box
       sx={{
-        position: 'absolute',
-        bottom: 30,
-        right: 10,
-        zIndex: 1000,
         bgcolor: 'background.paper',
         p: 1,
         borderRadius: 1,

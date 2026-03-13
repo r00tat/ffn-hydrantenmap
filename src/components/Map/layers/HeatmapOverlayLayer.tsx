@@ -1,7 +1,9 @@
 'use client';
 
 import { where } from 'firebase/firestore';
-import { useMemo } from 'react';
+import L from 'leaflet';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useMap } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -12,7 +14,13 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
-import HeatmapLegend from '../HeatmapLegend';
+import {
+  computeConvexHull,
+  distanceToPolygonEdge,
+  idwInterpolate,
+  DataPoint,
+  pointInPolygon,
+} from '../../../common/interpolation';
 import HeatmapOverlay from './HeatmapOverlay';
 import InterpolationOverlay from './InterpolationOverlay';
 
@@ -27,14 +35,27 @@ function getNumericValue(fieldData: Record<string, unknown> | undefined, key: st
   return undefined;
 }
 
-interface HeatmapOverlayLayerProps {
-  layer: FirecallLayer;
+/**
+ * Approximate meters per degree at a given latitude.
+ * Used to normalize lat/lng into roughly equal-scale coordinates for IDW.
+ */
+function latlngToMeters(lat: number, lng: number, refLat: number): { x: number; y: number } {
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos((refLat * Math.PI) / 180);
+  return { x: lng * mPerDegLng, y: lat * mPerDegLat };
 }
 
-export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps) {
+interface HeatmapOverlayLayerProps {
+  layer: FirecallLayer;
+  visible?: boolean;
+}
+
+export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLayerProps) {
   const firecallId = useFirecallId();
+  const map = useMap();
   const historyPathSegments = useHistoryPathSegments();
   const heatmapConfig = layer.heatmapConfig;
+  const popupRef = useRef<L.Popup | null>(null);
 
   const queryConstraints = useMemo(
     () => (layer.id ? [where('layer', '==', layer.id)] : []),
@@ -71,27 +92,125 @@ export default function HeatmapOverlayLayer({ layer }: HeatmapOverlayLayerProps)
     return points;
   }, [records, heatmapConfig]);
 
+  // Field info for popup display
+  const fieldInfo = useMemo(() => {
+    if (!heatmapConfig?.activeKey || !layer.dataSchema) return null;
+    const field = layer.dataSchema.find((f) => f.key === heatmapConfig.activeKey);
+    if (!field) return null;
+    return { label: field.label, unit: field.unit || '' };
+  }, [heatmapConfig, layer.dataSchema]);
+
+  const refLat = useMemo(
+    () => heatmapPoints.length > 0
+      ? heatmapPoints.reduce((s, p) => s + p.lat, 0) / heatmapPoints.length
+      : 0,
+    [heatmapPoints],
+  );
+
+  // IDW data points in meter-space for click interpolation
+  const idwPoints = useMemo(() => {
+    if (heatmapPoints.length === 0) return [];
+    return heatmapPoints.map((p) => {
+      const m = latlngToMeters(p.lat, p.lng, refLat);
+      return { x: m.x, y: m.y, value: p.value } as DataPoint;
+    });
+  }, [heatmapPoints, refLat]);
+
+  // Convex hull in meter-space for boundary check
+  const hull = useMemo(() => computeConvexHull(idwPoints), [idwPoints]);
+
+  const isInterpolation = heatmapConfig?.visualizationMode === 'interpolation';
+
+  const handleMapClick = useCallback(
+    (e: L.LeafletMouseEvent) => {
+      if (!fieldInfo || idwPoints.length === 0) return;
+
+      // Remove existing popup
+      if (popupRef.current) {
+        map.closePopup(popupRef.current);
+        popupRef.current = null;
+      }
+
+      const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
+
+      // Check if click is within the colored area
+      if (isInterpolation) {
+        // Interpolation: convex hull + buffer radius
+        const bufferM = heatmapConfig?.interpolationRadius ?? 30;
+        if (hull.length >= 3) {
+          const inside = pointInPolygon(clickM.x, clickM.y, hull);
+          if (!inside) {
+            const edgeDist = distanceToPolygonEdge(clickM.x, clickM.y, hull);
+            if (edgeDist > bufferM) return;
+          }
+        } else {
+          // Degenerate hull (1-2 points): check distance to nearest point
+          let minDist = Infinity;
+          for (const p of idwPoints) {
+            const dx = clickM.x - p.x;
+            const dy = clickM.y - p.y;
+            minDist = Math.min(minDist, Math.sqrt(dx * dx + dy * dy));
+          }
+          if (minDist > (heatmapConfig?.interpolationRadius ?? 30)) return;
+        }
+      } else {
+        // Heatmap: within radius of any data point
+        const radiusM = heatmapConfig?.radius ?? 30;
+        let withinRadius = false;
+        for (const p of idwPoints) {
+          const dx = clickM.x - p.x;
+          const dy = clickM.y - p.y;
+          if (Math.sqrt(dx * dx + dy * dy) <= radiusM) {
+            withinRadius = true;
+            break;
+          }
+        }
+        if (!withinRadius) return;
+      }
+
+      const power = heatmapConfig?.interpolationPower ?? 2;
+      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
+      const rounded = Math.round(value * 100) / 100;
+
+      const popup = L.popup({ closeOnClick: true })
+        .setLatLng(e.latlng)
+        .setContent(
+          `<b>${fieldInfo.label}</b><br/>${rounded}${fieldInfo.unit ? ' ' + fieldInfo.unit : ''}`
+        )
+        .openOn(map);
+
+      popupRef.current = popup;
+    },
+    [map, fieldInfo, idwPoints, hull, refLat, heatmapConfig, isInterpolation],
+  );
+
+  // Attach/detach click handler based on visibility
+  useEffect(() => {
+    if (!visible) {
+      if (popupRef.current) {
+        map.closePopup(popupRef.current);
+        popupRef.current = null;
+      }
+      return;
+    }
+
+    map.on('click', handleMapClick);
+    return () => {
+      map.off('click', handleMapClick);
+      if (popupRef.current) {
+        map.closePopup(popupRef.current);
+        popupRef.current = null;
+      }
+    };
+  }, [map, visible, handleMapClick]);
+
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;
   }
 
-  const isInterpolation = heatmapConfig.visualizationMode === 'interpolation';
-
-  return (
-    <>
-      {isInterpolation ? (
-        <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
-      ) : (
-        <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
-      )}
-      {layer.dataSchema && (
-        <HeatmapLegend
-          config={heatmapConfig}
-          dataSchema={layer.dataSchema}
-          allValues={allValues}
-          layerName={layer.name}
-        />
-      )}
-    </>
+  return isInterpolation ? (
+    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
+  ) : (
+    <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
   );
 }
