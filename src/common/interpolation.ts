@@ -175,9 +175,9 @@ export function idwInterpolate(
     const distSq = dx * dx + dy * dy;
 
     // If very close to a data point, return its value directly
-    if (distSq < 1) return points[i].value;
+    if (distSq < 1e-10) return points[i].value;
 
-    const weight = 1 / Math.pow(Math.sqrt(distSq), power);
+    const weight = 1 / Math.pow(distSq, power / 2);
     weightSum += weight;
     valueSum += weight * points[i].value;
   }
@@ -332,16 +332,18 @@ export function buildInterpolationGrid(params: {
   const imageData = new ImageData(canvasWidth, canvasHeight);
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
-  const fadeStart = bufferPx * 0.8; // fade begins at 80% of buffer
 
   for (let by = 0; by < canvasHeight; by += blockSize) {
     for (let bx = 0; bx < canvasWidth; bx += blockSize) {
       const cx = bx + blockSize / 2;
       const cy = by + blockSize / 2;
 
-      // Determine if this cell is inside the render boundary
+      // Determine if this cell is inside the render boundary.
+      // alpha: opacity fade based on hull/boundary distance (smooth edge)
+      // valueFade: color fade based on nearest data point (value → 0 at border)
       let alpha = 1.0;
       let valueFade = 1.0;
+      let insideHull = false;
 
       if (isDegenerate) {
         // For 1 point: circle boundary; for 2+ points: capsule (buffered line segments)
@@ -366,27 +368,42 @@ export function buildInterpolationGrid(params: {
           }
         }
         if (minDist > bufferPx) continue; // outside
-        // Linear value decay across entire buffer distance
-        valueFade = 1 - minDist / bufferPx;
-        if (minDist > fadeStart) {
-          alpha = 1 - (minDist - fadeStart) / (bufferPx - fadeStart);
-        }
+        // Smooth opacity fade across entire buffer
+        alpha = 1 - minDist / bufferPx;
       } else {
-        const inside = pointInPolygon(cx, cy, hull);
-        if (!inside) {
+        insideHull = pointInPolygon(cx, cy, hull);
+        if (!insideHull) {
           const edgeDist = distanceToPolygonEdge(cx, cy, hull);
           if (edgeDist > bufferPx) continue; // outside buffer
-          // Linear value decay across entire buffer zone
-          valueFade = 1 - edgeDist / bufferPx;
-          if (edgeDist > fadeStart) {
-            alpha = 1 - (edgeDist - fadeStart) / (bufferPx - fadeStart);
-          }
+          // Smooth opacity fade across entire buffer
+          alpha = 1 - edgeDist / bufferPx;
         }
       }
 
-      // Compute IDW value, attenuated in buffer zone
-      const value = idwInterpolate(cx, cy, points, power) * valueFade;
-      const normalized = normalizeValueFull(value, config, allValues);
+      // Value decay outside the hull (buffer zone).
+      // Inside the hull, IDW interpolation works normally (valueFade = 1.0).
+      // Outside, decay based on distance to nearest data point so each
+      // marker's value extends outward and the color fades toward min.
+      if (!insideHull) {
+        let nearestDistSq = Infinity;
+        for (let i = 0; i < points.length; i++) {
+          const dx = cx - points[i].x;
+          const dy = cy - points[i].y;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < nearestDistSq) nearestDistSq = dSq;
+        }
+        const nearestDist = Math.sqrt(nearestDistSq);
+        if (nearestDist > bufferPx) {
+          valueFade = 0;
+        } else {
+          valueFade = 1 - nearestDist / bufferPx;
+        }
+      }
+
+      // Compute IDW value; apply boundary fade to normalized value (not raw)
+      // so the color transitions smoothly across the full buffer width.
+      const value = idwInterpolate(cx, cy, points, power);
+      const normalized = normalizeValueFull(value, config, allValues) * valueFade;
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
       // Look up color from LUT
