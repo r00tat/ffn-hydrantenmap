@@ -3,6 +3,7 @@
  * distance calculations, IDW interpolation, and grid rendering.
  */
 
+import KDBush from 'kdbush';
 import { HeatmapConfig } from '../components/firebase/firestore';
 import { normalizeValueFull } from './heatmap';
 
@@ -153,6 +154,22 @@ export function distanceToPolygonEdge(
 }
 
 // ---------------------------------------------------------------------------
+// Spatial Index
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a KDBush spatial index from data points for fast radius queries.
+ */
+export function buildSpatialIndex(points: DataPoint[]): KDBush {
+  const index = new KDBush(points.length);
+  for (let i = 0; i < points.length; i++) {
+    index.add(points[i].x, points[i].y);
+  }
+  index.finish();
+  return index;
+}
+
+// ---------------------------------------------------------------------------
 // IDW Interpolation
 // ---------------------------------------------------------------------------
 
@@ -180,6 +197,45 @@ export function idwInterpolate(
     const weight = 1 / Math.pow(distSq, power / 2);
     weightSum += weight;
     valueSum += weight * points[i].value;
+  }
+
+  return weightSum > 0 ? valueSum / weightSum : 0;
+}
+
+/**
+ * Compute IDW interpolated value using a spatial index for fast neighbor lookup.
+ * Only considers points within the given search radius, which produces nearly
+ * identical results to the full scan since distant points have negligible weight.
+ */
+export function idwInterpolateIndexed(
+  x: number,
+  y: number,
+  points: DataPoint[],
+  power: number,
+  index: KDBush,
+  searchRadius: number
+): number {
+  const neighborIds = index.within(x, y, searchRadius);
+
+  // Fallback: if no neighbors within radius, use the full set
+  if (neighborIds.length === 0) {
+    return idwInterpolate(x, y, points, power);
+  }
+
+  let weightSum = 0;
+  let valueSum = 0;
+
+  for (let i = 0; i < neighborIds.length; i++) {
+    const pt = points[neighborIds[i]];
+    const dx = x - pt.x;
+    const dy = y - pt.y;
+    const distSq = dx * dx + dy * dy;
+
+    if (distSq < 1e-10) return pt.value;
+
+    const weight = 1 / Math.pow(distSq, power / 2);
+    weightSum += weight;
+    valueSum += weight * pt.value;
   }
 
   return weightSum > 0 ? valueSum / weightSum : 0;
@@ -300,8 +356,11 @@ export function buildColorLUT(
  *
  * For each blockSize x blockSize pixel block, computes the IDW value,
  * normalizes it, looks up the color in the LUT, and writes RGBA pixels.
- * Only renders inside the convex hull + buffer boundary.
- * The outer 20% of the buffer fades to transparent.
+ *
+ * Boundary uses a hybrid approach:
+ * - Inside the convex hull AND within proximity of data → filled surface
+ * - Inside hull but far from any data → skipped (prevents empty hull corners)
+ * - Outside hull but within bufferPx of data → rendered with fade
  */
 export function buildInterpolationGrid(params: {
   canvasWidth: number;
@@ -333,77 +392,87 @@ export function buildInterpolationGrid(params: {
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
 
+  // Build spatial index for fast neighbor queries.
+  const spatialIndex = buildSpatialIndex(points);
+  // IDW search radius: 5× buffer gives enough nearby points for accurate
+  // interpolation while skipping distant points with negligible weight.
+  const searchRadius = bufferPx * 5;
+  // Max proximity for interior hull cells: cells inside the hull are rendered
+  // if they have a data point within this distance. This prevents filling
+  // large empty areas inside the convex hull (e.g. between distant flight lines).
+  const interiorMaxDist = bufferPx * 3;
+
   for (let by = 0; by < canvasHeight; by += blockSize) {
     for (let bx = 0; bx < canvasWidth; bx += blockSize) {
       const cx = bx + blockSize / 2;
       const cy = by + blockSize / 2;
 
-      // Determine if this cell is inside the render boundary.
-      // alpha: opacity fade based on hull/boundary distance (smooth edge)
-      // valueFade: color fade based on nearest data point (value → 0 at border)
+      // Hybrid boundary: convex hull + point proximity.
+      // Only alpha (opacity) is used for fading — the interpolated COLOR is
+      // never distorted. IDW handles value blending naturally between points.
       let alpha = 1.0;
-      let valueFade = 1.0;
-      let insideHull = false;
 
       if (isDegenerate) {
-        // For 1 point: circle boundary; for 2+ points: capsule (buffered line segments)
-        let minDist: number;
-        if (points.length === 1) {
-          const dx = cx - points[0].x;
-          const dy = cy - points[0].y;
-          minDist = Math.sqrt(dx * dx + dy * dy);
-        } else {
-          // Distance to nearest line segment between consecutive points
-          minDist = Infinity;
-          for (let i = 0; i < points.length - 1; i++) {
-            const d = distanceToSegment(
-              cx,
-              cy,
-              points[i].x,
-              points[i].y,
-              points[i + 1].x,
-              points[i + 1].y
-            );
-            if (d < minDist) minDist = d;
-          }
-        }
-        if (minDist > bufferPx) continue; // outside
-        // Smooth opacity fade across entire buffer
-        alpha = 1 - minDist / bufferPx;
-      } else {
-        insideHull = pointInPolygon(cx, cy, hull);
-        if (!insideHull) {
-          const edgeDist = distanceToPolygonEdge(cx, cy, hull);
-          if (edgeDist > bufferPx) continue; // outside buffer
-          // Smooth opacity fade across entire buffer
-          alpha = 1 - edgeDist / bufferPx;
-        }
-      }
-
-      // Value decay outside the hull (buffer zone).
-      // Inside the hull, IDW interpolation works normally (valueFade = 1.0).
-      // Outside, decay based on distance to nearest data point so each
-      // marker's value extends outward and the color fades toward min.
-      if (!insideHull) {
+        // For < 3 non-collinear points: use pure point-proximity boundary
+        const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
+        if (nearbyIds.length === 0) continue;
         let nearestDistSq = Infinity;
-        for (let i = 0; i < points.length; i++) {
-          const dx = cx - points[i].x;
-          const dy = cy - points[i].y;
+        for (let i = 0; i < nearbyIds.length; i++) {
+          const pt = points[nearbyIds[i]];
+          const dx = cx - pt.x;
+          const dy = cy - pt.y;
           const dSq = dx * dx + dy * dy;
           if (dSq < nearestDistSq) nearestDistSq = dSq;
         }
         const nearestDist = Math.sqrt(nearestDistSq);
-        if (nearestDist > bufferPx) {
-          valueFade = 0;
+        alpha = 1 - nearestDist / bufferPx;
+      } else {
+        const insideHull = pointInPolygon(cx, cy, hull);
+
+        if (insideHull) {
+          // Inside hull: check proximity to data points.
+          // Skip if too far from any point (empty area inside convex hull).
+          const nearbyIds = spatialIndex.within(cx, cy, interiorMaxDist);
+          if (nearbyIds.length === 0) continue;
+
+          // Find nearest point distance
+          let nearestDistSq = Infinity;
+          for (let i = 0; i < nearbyIds.length; i++) {
+            const pt = points[nearbyIds[i]];
+            const dx = cx - pt.x;
+            const dy = cy - pt.y;
+            const dSq = dx * dx + dy * dy;
+            if (dSq < nearestDistSq) nearestDistSq = dSq;
+          }
+          const nearestDist = Math.sqrt(nearestDistSq);
+
+          // Fade alpha only in interior gaps (far from all data points).
+          // No hull-edge fade — the outside-hull proximity fade handles
+          // the outer boundary, avoiding a double-fade artifact.
+          if (nearestDist > bufferPx) {
+            alpha = 1 - (nearestDist - bufferPx) / (interiorMaxDist - bufferPx);
+          }
         } else {
-          valueFade = 1 - nearestDist / bufferPx;
+          // Outside hull: render within bufferPx of a data point with fade
+          const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
+          if (nearbyIds.length === 0) continue;
+
+          let nearestDistSq = Infinity;
+          for (let i = 0; i < nearbyIds.length; i++) {
+            const pt = points[nearbyIds[i]];
+            const dx = cx - pt.x;
+            const dy = cy - pt.y;
+            const dSq = dx * dx + dy * dy;
+            if (dSq < nearestDistSq) nearestDistSq = dSq;
+          }
+          const nearestDist = Math.sqrt(nearestDistSq);
+          alpha = 1 - nearestDist / bufferPx;
         }
       }
 
-      // Compute IDW value; apply boundary fade to normalized value (not raw)
-      // so the color transitions smoothly across the full buffer width.
-      const value = idwInterpolate(cx, cy, points, power);
-      const normalized = normalizeValueFull(value, config, allValues) * valueFade;
+      // Compute IDW value — color is purely from interpolation, no value fade.
+      const value = idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+      const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
       // Look up color from LUT

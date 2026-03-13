@@ -15,11 +15,8 @@ import {
 } from '../../firebase/firestore';
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import {
-  computeConvexHull,
-  distanceToPolygonEdge,
   idwInterpolate,
   DataPoint,
-  pointInPolygon,
 } from '../../../common/interpolation';
 import HeatmapOverlay from './HeatmapOverlay';
 import InterpolationOverlay from './InterpolationOverlay';
@@ -116,9 +113,6 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     });
   }, [heatmapPoints, refLat]);
 
-  // Convex hull in meter-space for boundary check
-  const hull = useMemo(() => computeConvexHull(idwPoints), [idwPoints]);
-
   const isInterpolation = heatmapConfig?.visualizationMode === 'interpolation';
 
   const handleMapClick = useCallback(
@@ -133,32 +127,18 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
 
       const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
 
-      // Check if click is within the colored area and compute boundary decay
-      let valueFade = 1.0;
+      // Check if click is within the colored area
       if (isInterpolation) {
-        // Interpolation: convex hull + buffer radius
+        // Point-proximity boundary: only respond within bufferM of a data point
         const bufferM = heatmapConfig?.interpolationRadius ?? 30;
-        if (hull.length >= 3) {
-          const inside = pointInPolygon(clickM.x, clickM.y, hull);
-          if (!inside) {
-            const edgeDist = distanceToPolygonEdge(clickM.x, clickM.y, hull);
-            if (edgeDist > bufferM) return;
-            // Linear value decay in buffer zone
-            valueFade = 1 - edgeDist / bufferM;
-          }
-        } else {
-          // Degenerate hull (1-2 points): check distance to nearest point
-          let minDist = Infinity;
-          for (const p of idwPoints) {
-            const dx = clickM.x - p.x;
-            const dy = clickM.y - p.y;
-            minDist = Math.min(minDist, Math.sqrt(dx * dx + dy * dy));
-          }
-          const radius = heatmapConfig?.interpolationRadius ?? 30;
-          if (minDist > radius) return;
-          // Linear value decay based on distance
-          valueFade = 1 - minDist / radius;
+        let nearestDist = Infinity;
+        for (const p of idwPoints) {
+          const dx = clickM.x - p.x;
+          const dy = clickM.y - p.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < nearestDist) nearestDist = d;
         }
+        if (nearestDist > bufferM) return;
       } else {
         // Heatmap: within radius of any data point
         const radiusM = heatmapConfig?.radius ?? 30;
@@ -175,7 +155,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
       }
 
       const power = heatmapConfig?.interpolationPower ?? 2;
-      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power) * valueFade;
+      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
       const rounded = Math.round(value * 100) / 100;
 
       const popup = L.popup({ closeOnClick: true })
@@ -187,7 +167,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
 
       popupRef.current = popup;
     },
-    [map, fieldInfo, idwPoints, hull, refLat, heatmapConfig, isInterpolation],
+    [map, fieldInfo, idwPoints, refLat, heatmapConfig, isInterpolation],
   );
 
   // Attach/detach click handler based on visibility

@@ -49,6 +49,7 @@
     "googleapis": "^171.4.0",
     "haversine-distance": "^1.2.4",
     "jose": "^6.2.1",
+    "kdbush": "^4.0.2",
     "leaflet": "^1.9.4",
     "leaflet-geometryutil": "^0.10.3",
     "leaflet-rotatedmarker": "^0.2.0",

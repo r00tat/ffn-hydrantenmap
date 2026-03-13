@@ -26,6 +26,7 @@ const defaultConfig: HeatmapConfig = {
   enabled: false,
   activeKey: '',
   colorMode: 'auto',
+  visualizationMode: 'interpolation',
 };
 
 export default function HeatmapSettings({
@@ -35,6 +36,17 @@ export default function HeatmapSettings({
 }: HeatmapSettingsProps) {
   const current = config || defaultConfig;
   const numericFields = dataSchema.filter((f) => f.type === 'number');
+
+  // Auto-enable heatmap when config is not yet set and numeric fields exist
+  useEffect(() => {
+    if (!config && numericFields.length > 0) {
+      onChange({
+        ...defaultConfig,
+        enabled: true,
+        activeKey: numericFields[0].key,
+      });
+    }
+  }, [config, numericFields, onChange]);
 
   // Auto-select first numeric field when heatmap is enabled and no field is selected
   useEffect(() => {

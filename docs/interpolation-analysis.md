@@ -61,7 +61,7 @@ Every grid cell iterates over ALL data points. For a 1920×1080 viewport with `b
 | 500    | ~200ms                           | ~30ms               |
 | 1000   | ~400ms+                          | ~40ms               |
 
-**Status:** Open
+**Status:** Fixed — `buildSpatialIndex()` + `idwInterpolateIndexed()` added, used in `buildInterpolationGrid`
 
 ### 4. Grid re-rendered on every pan/zoom with no offloading
 
@@ -109,7 +109,7 @@ When `valueFade → 0`, the normalized value → 0, which maps to the minimum-en
 | `@turf/interpolate` | IDW | Not recommended | Returns GeoJSON polygons, not raster — loses the fast canvas pipeline |
 | `kriging.js` / `@sakitam-gis/kriging` | Kriging | Not recommended | Unmaintained (~2016), O(n³) fitting, overkill for this use case |
 | `delaunator` / `d3-delaunay` | Delaunay/TIN | Consider later | Could enable TIN or Natural Neighbor interpolation |
-| `kdbush` | Spatial index | Recommended | 2KB, zero-dep, makes IDW O(k) instead of O(n) per cell |
+| `kdbush` | Spatial index | Integrated | 2KB, zero-dep, makes IDW O(k) instead of O(n) per cell |
 | `d3-contour` | Contouring | Future option | If iso-lines are desired on top of the heatmap |
 | `ml-matrix` | Matrix ops | Consider later | Could enable RBF interpolation (requires wiring up kernel + solve) |
 | `concaveman` | Concave hull | Consider later | Better boundary for non-convex data distributions |
@@ -136,9 +136,9 @@ Current: linear decay `1 - d/buffer`. Alternatives for smoother edges:
 
 ## Improvement Priority
 
-1. **sqrt optimization** — trivial, immediate speedup (done)
-2. **Fix distSq threshold** — small change, prevents zoom-dependent artifacts
-3. **kdbush spatial index** — biggest performance win for >100 points
+1. ~~**sqrt optimization** — trivial, immediate speedup~~ (done)
+2. ~~**Fix distSq threshold** — small change, prevents zoom-dependent artifacts~~ (done)
+3. ~~**kdbush spatial index** — biggest performance win for >100 points~~ (done)
 4. **Web Worker offloading** — prevents UI jank during pan/zoom
 5. **Adaptive blockSize** — easy win for low-zoom performance
 6. **Smooth boundary decay** — visual improvement

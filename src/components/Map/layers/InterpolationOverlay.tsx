@@ -110,7 +110,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       pixelPoints.push({ x: Math.round(p.x + bufferPx), y: Math.round(p.y + bufferPx), value: ll.value });
     }
 
-    // Compute convex hull
+    // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
 
     // Build interpolation grid and paint
