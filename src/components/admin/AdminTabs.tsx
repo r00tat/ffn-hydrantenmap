@@ -9,6 +9,7 @@ import AdminActions from './AdminActions';
 import GisDataPipeline from './GisDataPipeline';
 import HydrantClusters from './HydrantClusters';
 import KostenersatzAdminSettings from '../Kostenersatz/KostenersatzAdminSettings';
+import DeletedItems from './DeletedItems';
 import PegelstandStations from './PegelstandStations';
 
 interface TabPanelProps {
@@ -56,6 +57,7 @@ export default function AdminTabs() {
           <Tab label="Hydrant Clusters" {...a11yProps(2)} />
           <Tab label="Kostenersatz" {...a11yProps(3)} />
           <Tab label="Pegelstände" {...a11yProps(4)} />
+          <Tab label="Deleted Items" {...a11yProps(5)} />
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
@@ -72,6 +74,9 @@ export default function AdminTabs() {
       </TabPanel>
       <TabPanel value={value} index={4}>
         <PegelstandStations />
+      </TabPanel>
+      <TabPanel value={value} index={5}>
+        <DeletedItems />
       </TabPanel>
     </Box>
   );

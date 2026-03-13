@@ -5,6 +5,8 @@ import { UserRecordExtended } from '../../common/users';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_ITEMS_COLLECTION_ID,
+  FIRECALL_LAYERS_COLLECTION_ID,
   GROUP_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
@@ -92,6 +94,258 @@ export async function setCustomClaimsForAllUsers() {
 export interface CopyCollectionResult {
   usersCount: number;
   groupsCount: number;
+}
+
+export interface OrphanedItemsResult {
+  firecallId: string;
+  firecallName: string;
+  deletedLayers: {
+    layerId: string;
+    layerName: string;
+    orphanedCount: number;
+    orphanedItems: { id: string; name: string; type: string }[];
+  }[];
+  totalOrphaned: number;
+}
+
+export async function findOrphanedItems(): Promise<OrphanedItemsResult[]> {
+  await actionAdminRequired();
+
+  const results: OrphanedItemsResult[] = [];
+  const firecalls = await firestore.collection(FIRECALL_COLLECTION_ID).get();
+
+  for (const fc of firecalls.docs) {
+    const fcRef = firestore
+      .collection(FIRECALL_COLLECTION_ID)
+      .doc(fc.id);
+    const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
+    // Layers are in a separate 'layer' subcollection
+    const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+
+    // Get all layers from the layer subcollection
+    const allLayers = await layersRef.get();
+    const activeLayers = new Set(
+      allLayers.docs
+        .filter((doc) => doc.data().deleted !== true)
+        .map((doc) => doc.id)
+    );
+    const deletedLayerDocs = new Map(
+      allLayers.docs
+        .filter((doc) => doc.data().deleted === true)
+        .map((doc) => [doc.id, doc.data().name || '(unnamed)'])
+    );
+
+    // Get all non-deleted items that have a layer reference
+    const allItems = await itemsRef.get();
+    const itemsWithLayer = allItems.docs.filter(
+      (doc) =>
+        doc.data().deleted !== true &&
+        doc.data().layer
+    );
+
+    // Group orphaned items by layer ID
+    const orphanedByLayer = new Map<
+      string,
+      { id: string; name: string; type: string }[]
+    >();
+    for (const doc of itemsWithLayer) {
+      const layerId = doc.data().layer;
+      if (activeLayers.has(layerId)) continue; // layer is active, not orphaned
+
+      if (!orphanedByLayer.has(layerId)) {
+        orphanedByLayer.set(layerId, []);
+      }
+      orphanedByLayer.get(layerId)!.push({
+        id: doc.id,
+        name: doc.data().name || '(unnamed)',
+        type: doc.data().type || 'unknown',
+      });
+    }
+
+    if (orphanedByLayer.size > 0) {
+      const deletedLayerResults: OrphanedItemsResult['deletedLayers'] = [];
+      for (const [layerId, items] of orphanedByLayer) {
+        deletedLayerResults.push({
+          layerId,
+          layerName:
+            deletedLayerDocs.get(layerId) || `(missing: ${layerId})`,
+          orphanedCount: items.length,
+          orphanedItems: items,
+        });
+      }
+      results.push({
+        firecallId: fc.id,
+        firecallName: fc.data().name || '(unnamed)',
+        deletedLayers: deletedLayerResults,
+        totalOrphaned: deletedLayerResults.reduce(
+          (sum, l) => sum + l.orphanedCount,
+          0
+        ),
+      });
+    }
+  }
+
+  return results;
+}
+
+export async function cleanupOrphanedItems(
+  firecallId: string
+): Promise<number> {
+  await actionAdminRequired();
+
+  const fcRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId);
+  const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
+  const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+
+  // Get active layer IDs from the layer subcollection
+  const allLayers = await layersRef.get();
+  const activeLayers = new Set(
+    allLayers.docs
+      .filter((doc) => doc.data().deleted !== true)
+      .map((doc) => doc.id)
+  );
+
+  // Find all non-deleted items with a layer that isn't active
+  const allItems = await itemsRef.get();
+  const orphaned = allItems.docs.filter(
+    (doc) =>
+      doc.data().deleted !== true &&
+      doc.data().layer &&
+      !activeLayers.has(doc.data().layer)
+  );
+
+  let totalFixed = 0;
+
+  // Firestore batch limit is 500
+  for (let i = 0; i < orphaned.length; i += 500) {
+    const batch = firestore.batch();
+    const chunk = orphaned.slice(i, i + 500);
+    for (const doc of chunk) {
+      batch.update(doc.ref, { deleted: true });
+    }
+    await batch.commit();
+    totalFixed += chunk.length;
+  }
+
+  return totalFixed;
+}
+
+/**
+ * Restore items that were incorrectly marked as deleted.
+ * Un-deletes all items in the given firecall that belong to active layers.
+ */
+export async function restoreIncorrectlyDeletedItems(
+  firecallId: string
+): Promise<number> {
+  await actionAdminRequired();
+
+  const fcRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId);
+  const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
+  const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+
+  // Get active layer IDs
+  const allLayers = await layersRef.get();
+  const activeLayers = new Set(
+    allLayers.docs
+      .filter((doc) => doc.data().deleted !== true)
+      .map((doc) => doc.id)
+  );
+
+  // Find deleted items whose layer is actually active
+  const allItems = await itemsRef.get();
+  const wronglyDeleted = allItems.docs.filter(
+    (doc) =>
+      doc.data().deleted === true &&
+      doc.data().layer &&
+      activeLayers.has(doc.data().layer)
+  );
+
+  let totalRestored = 0;
+
+  for (let i = 0; i < wronglyDeleted.length; i += 500) {
+    const batch = firestore.batch();
+    const chunk = wronglyDeleted.slice(i, i + 500);
+    for (const doc of chunk) {
+      batch.update(doc.ref, { deleted: false });
+    }
+    await batch.commit();
+    totalRestored += chunk.length;
+  }
+
+  return totalRestored;
+}
+
+export interface DeletedItemInfo {
+  id: string;
+  name: string;
+  type: string;
+  layer?: string;
+  layerName?: string;
+  datum?: string;
+}
+
+export async function getDeletedItems(
+  firecallId: string
+): Promise<DeletedItemInfo[]> {
+  await actionAdminRequired();
+
+  const fcRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId);
+  const itemsRef = fcRef.collection(FIRECALL_ITEMS_COLLECTION_ID);
+  const layersRef = fcRef.collection(FIRECALL_LAYERS_COLLECTION_ID);
+
+  // Build layer name lookup
+  const allLayers = await layersRef.get();
+  const layerNames = new Map(
+    allLayers.docs.map((doc) => [doc.id, doc.data().name || '(unnamed)'])
+  );
+
+  const deletedItems = await itemsRef
+    .where('deleted', '==', true)
+    .get();
+
+  return deletedItems.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name || '(unnamed)',
+      type: data.type || 'unknown',
+      layer: data.layer,
+      layerName: data.layer ? layerNames.get(data.layer) : undefined,
+      datum: data.datum,
+    };
+  });
+}
+
+export async function restoreDeletedItems(
+  firecallId: string,
+  itemIds: string[]
+): Promise<number> {
+  await actionAdminRequired();
+
+  const itemsRef = firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .collection(FIRECALL_ITEMS_COLLECTION_ID);
+
+  let totalRestored = 0;
+
+  for (let i = 0; i < itemIds.length; i += 500) {
+    const batch = firestore.batch();
+    const chunk = itemIds.slice(i, i + 500);
+    for (const id of chunk) {
+      batch.update(itemsRef.doc(id), { deleted: false });
+    }
+    await batch.commit();
+    totalRestored += chunk.length;
+  }
+
+  return totalRestored;
 }
 
 export async function copyUserAndGroupsToDev(): Promise<CopyCollectionResult> {
