@@ -20,6 +20,7 @@ import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { WgsObject } from '../../common/gis-objects';
 import {
@@ -240,6 +241,22 @@ export default function ClusterItemBrowser() {
                     <IconButton size="small" onClick={() => handleDelete(item)} title="Löschen">
                       <DeleteIcon fontSize="small" />
                     </IconButton>
+                    {typeof (item as Record<string, unknown>).link === 'string' &&
+                      (item as Record<string, string>).link !== '' && (
+                        <IconButton
+                          size="small"
+                          title="Link öffnen"
+                          onClick={() =>
+                            window.open(
+                              (item as Record<string, string>).link,
+                              '_blank',
+                              'noopener,noreferrer'
+                            )
+                          }
+                        >
+                          <OpenInNewIcon fontSize="small" />
+                        </IconButton>
+                      )}
                   </TableCell>
                 </TableRow>
               ))
