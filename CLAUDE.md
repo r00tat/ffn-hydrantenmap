@@ -24,6 +24,10 @@ npm run clusterHydrants               # Generate geohashed clusters
 npm run updateClusters                # Update cluster data in Firestore
 ```
 
+## Git Worktrees
+
+Use `.worktrees/` directory for git worktrees (project-local, hidden).
+
 ## Git Workflow
 
 Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching:
