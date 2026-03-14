@@ -138,9 +138,11 @@ export default function Einsatzorte() {
     });
   }, [locations, sortField, sortDirection]);
 
+  const isGroupFfn = firecall?.group === 'ffn';
+
   // Auto-import on mount and every 60 seconds when firecall.id is available
   useEffect(() => {
-    if (!firecall?.id || firecall.id === 'unknown') return;
+    if (!firecall?.id || firecall.id === 'unknown' || !isGroupFfn) return;
 
     if (!hasAutoImported.current) {
       hasAutoImported.current = true;
@@ -152,7 +154,7 @@ export default function Einsatzorte() {
     }, 60_000);
 
     return () => clearInterval(interval);
-  }, [firecall?.id, importFromEmail]);
+  }, [firecall?.id, isGroupFfn, importFromEmail]);
 
   // Auto-hide success badge after 5 seconds + create diary entry for imports
   useEffect(() => {
@@ -427,28 +429,30 @@ export default function Einsatzorte() {
       >
         <Typography variant="h5">Einsatzorte - {firecall.name}</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {lastResult && lastResult.added > 0 && (
+          {isGroupFfn && lastResult && lastResult.added > 0 && (
             <Chip
               label={`${lastResult.added} neue Standorte`}
               color="success"
               size="small"
             />
           )}
-          <Tooltip title="E-Mails prüfen">
-            <span>
-              <IconButton
-                onClick={importFromEmail}
-                disabled={isImporting}
-                size="small"
-              >
-                {isImporting ? (
-                  <CircularProgress size={20} />
-                ) : (
-                  <EmailIcon />
-                )}
-              </IconButton>
-            </span>
-          </Tooltip>
+          {isGroupFfn && (
+            <Tooltip title="E-Mails prüfen">
+              <span>
+                <IconButton
+                  onClick={importFromEmail}
+                  disabled={isImporting}
+                  size="small"
+                >
+                  {isImporting ? (
+                    <CircularProgress size={20} />
+                  ) : (
+                    <EmailIcon />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
         </Box>
       </Box>
 
