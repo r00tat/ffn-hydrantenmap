@@ -22,7 +22,7 @@ export class FirecallHydrant extends FirecallItemBase {
   public constructor(firecallItem?: HydrantenItem) {
     super(firecallItem);
     this.type = 'hydrant';
-    this.editable = false;
+    this.editable = true;
     ({
       ortschaft: this.ortschaft = '',
       typ: this.typ = 'Überflurhydrant',
@@ -59,6 +59,41 @@ export class FirecallHydrant extends FirecallItemBase {
       geohash: this.geohash,
       leistung: this.leistung,
     } as HydrantenItem;
+  }
+
+  public fields(): { [fieldName: string]: string } {
+    return {
+      name: 'Name',
+      ortschaft: 'Ortschaft',
+      typ: 'Typ',
+      hydranten_nummer: 'Hydrantennummer',
+      fuellhydrant: 'Füllhydrant',
+      dimension: 'Dimension (mm)',
+      leitungsart: 'Leitungsart',
+      statischer_druck: 'Statischer Druck (bar)',
+      dynamischer_druck: 'Dynamischer Druck (bar)',
+      leistung: 'Leistung (l/min)',
+      beschreibung: 'Beschreibung',
+    };
+  }
+
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      ...super.fieldTypes(),
+      typ: 'select',
+      fuellhydrant: 'select',
+      dimension: 'number',
+      statischer_druck: 'number',
+      dynamischer_druck: 'number',
+      beschreibung: 'textarea',
+    };
+  }
+
+  public selectValues(): { [fieldName: string]: string[] } {
+    return {
+      typ: ['Überflurhydrant', 'Unterflurhydrant'],
+      fuellhydrant: ['', 'ja', 'nein'],
+    };
   }
 
   public markerName() {
