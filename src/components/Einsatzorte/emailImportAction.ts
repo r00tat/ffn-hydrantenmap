@@ -212,9 +212,15 @@ export async function processUnwetterEmails(
     };
   }
 
-  // Check authorization
+  // Check authorization and restrict to group 'ffn'
   try {
-    await actionUserAuthorizedForFirecall(firecallId);
+    const firecallData = await actionUserAuthorizedForFirecall(firecallId);
+    if (firecallData.group !== 'ffn') {
+      return {
+        ...result,
+        errors: ['Email import is only available for firecalls in group ffn'],
+      };
+    }
   } catch (error: any) {
     return {
       ...result,

@@ -2,10 +2,12 @@
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { useState, useCallback } from 'react';
 import ProgressStepper, { StepStatus } from './ProgressStepper';
+import ClusterItemBrowser from './ClusterItemBrowser';
 
 interface ProgressEvent {
   step: number;
@@ -157,6 +159,20 @@ export default function HydrantClusters() {
           </Button>
         </Box>
       )}
+
+      <Divider sx={{ my: 4 }} />
+
+      <Box>
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Objekte verwalten
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Bearbeiten Sie Hydranten, Risikoobjekte, Gefahrobjekte, Löschteiche und Saugstellen.
+          Nach Änderungen bitte &quot;Update Clusters&quot; ausführen, um die Cluster-Daten zu
+          aktualisieren.
+        </Typography>
+        <ClusterItemBrowser />
+      </Box>
     </Paper>
   );
 }
