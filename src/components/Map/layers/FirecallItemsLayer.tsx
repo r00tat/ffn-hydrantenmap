@@ -1,6 +1,7 @@
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
 import React, { useCallback, useMemo, useState } from 'react';
+import { getHeatmapColor } from '../../../common/heatmap';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -11,10 +12,11 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import { useHistoryPathSegments, useMapEditable } from '../../../hooks/useMapEditor';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
-import { sortByZIndex } from '../../../hooks/useFirecallLayers';
+import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import ZOrderContextMenu from '../../FirecallItems/ZOrderContextMenu';
 
 export interface FirecallLayerOptions {
@@ -25,14 +27,14 @@ export interface FirecallLayerOptions {
 function renderMarker(
   record: FirecallItem,
   setFirecallItem: (item: FirecallItem) => void,
-  pane?: string,
-  onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void
+  options?: MarkerRenderOptions
 ) {
   try {
-    return getItemInstance(record).renderMarker(setFirecallItem, {
-      pane,
-      onContextMenu,
-    });
+    const instance = getItemInstance(record);
+    if (options?.dataSchema) {
+      instance._renderDataSchema = options.dataSchema;
+    }
+    return instance.renderMarker(setFirecallItem, options);
   } catch (err) {
     console.error('Failed to render item ', record, err);
   }
@@ -46,6 +48,7 @@ export default function FirecallItemsLayer({
   const firecallId = useFirecallId();
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const historyPathSegments = useHistoryPathSegments();
+  const activeLayers = useFirecallLayers();
   const queryConstraints = useMemo(
     () => (layer?.id ? [where('layer', '==', layer.id)] : []),
     [layer]
@@ -55,9 +58,13 @@ export default function FirecallItemsLayer({
       layer?.id
         ? filterDisplayableItems
         : (e: FirecallItem) =>
-            (e.layer === undefined || e.layer === '') &&
+            // Show items with no layer, or items whose layer no longer exists
+            // (orphaned items from deleted layers)
+            (e.layer === undefined ||
+              e.layer === '' ||
+              !(e.layer in activeLayers)) &&
             filterDisplayableItems(e),
-    [layer?.id]
+    [layer?.id, activeLayers]
   );
 
   const records = useFirebaseCollection<FirecallItem>({
@@ -70,6 +77,20 @@ export default function FirecallItemsLayer({
     ],
     filterFn,
   });
+
+  const heatmapConfig = layer?.heatmapConfig;
+  const dataSchema = layer?.dataSchema;
+  const layerShowLabels =
+    layer?.showLabels === undefined
+      ? undefined
+      : layer.showLabels === 'true' || layer.showLabels === true as any;
+
+  const allValues = useMemo(() => {
+    if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey) return [];
+    return records
+      .map((r) => (r.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey])
+      .filter((v): v is number => typeof v === 'number');
+  }, [records, heatmapConfig]);
 
   const sortedRecords = useMemo(() => sortByZIndex(records), [records]);
 
@@ -111,11 +132,27 @@ export default function FirecallItemsLayer({
 
   return (
     <>
-      {sortedRecords.map((record) => (
-        <React.Fragment key={record.id}>
-          <>{renderMarker(record, setFirecallItem, pane, handleContextMenu)}</>
-        </React.Fragment>
-      ))}
+      {sortedRecords.map((record) => {
+        let heatmapColor: string | undefined;
+        if (heatmapConfig?.enabled && heatmapConfig?.activeKey) {
+          const value = (record.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey];
+          heatmapColor =
+            typeof value === 'number'
+              ? getHeatmapColor(value, heatmapConfig, allValues)
+              : '#999999';
+        }
+        return (
+          <React.Fragment key={record.id}>
+            <>{renderMarker(record, setFirecallItem, {
+              pane,
+              onContextMenu: handleContextMenu,
+              heatmapColor,
+              dataSchema,
+              layerShowLabels,
+            })}</>
+          </React.Fragment>
+        );
+      })}
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}

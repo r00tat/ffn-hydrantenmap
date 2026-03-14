@@ -1,14 +1,22 @@
-import { useEffect } from 'react';
+import L from 'leaflet';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
 import { LayerGroup, LayersControl, useMap } from 'react-leaflet';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import FirecallItemsLayer from './FirecallItemsLayer';
 import FirecallMarker from '../markers/FirecallMarker';
 import { useFirecallLayersSorted } from '../../../hooks/useFirecallLayers';
 import MarkerClusterLayer from './MarkerClusterLayer';
+import HeatmapOverlayLayer from './HeatmapOverlayLayer';
+import HeatmapLegendEntry from '../HeatmapLegendEntry';
 import { FirecallLayer as FirecallLayerType } from '../../firebase/firestore';
 
 const PANE_BASE_Z_INDEX = 400;
 const DEFAULT_PANE_NAME = 'firecall-default';
+
+function getOverlayName(layer: FirecallLayerType): string {
+  return `Einsatz ${layer.name} ${layer.heatmapConfig?.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}`;
+}
 
 /**
  * Create a Leaflet pane imperatively (not via react-leaflet's <Pane>).
@@ -37,9 +45,63 @@ export default function FirecallLayer({
   defaultChecked?: boolean;
 }) {
   const firecallId = useFirecallId();
+  const map = useMap();
   const sortedLayers = useFirecallLayersSorted();
+  const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
+
+  // Seed visible overlays when heatmap layers first become available
+  const seededRef = React.useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    const heatmapNames = sortedLayers
+      .filter((layer) => layer.heatmapConfig?.enabled)
+      .map((layer) => getOverlayName(layer));
+    if (heatmapNames.length > 0) {
+      seededRef.current = true;
+      setVisibleOverlays((prev) => {
+        const next = new Set(prev);
+        heatmapNames.forEach((name) => next.add(name));
+        return next;
+      });
+    }
+  }, [sortedLayers]);
+
+  const onOverlayAdd = useCallback((e: L.LayersControlEvent) => {
+    setVisibleOverlays((prev) => {
+      const next = new Set(prev);
+      next.add(e.name);
+      return next;
+    });
+  }, []);
+
+  const onOverlayRemove = useCallback((e: L.LayersControlEvent) => {
+    setVisibleOverlays((prev) => {
+      const next = new Set(prev);
+      next.delete(e.name);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    map.on('overlayadd', onOverlayAdd as L.LeafletEventHandlerFn);
+    map.on('overlayremove', onOverlayRemove as L.LeafletEventHandlerFn);
+    return () => {
+      map.off('overlayadd', onOverlayAdd as L.LeafletEventHandlerFn);
+      map.off('overlayremove', onOverlayRemove as L.LeafletEventHandlerFn);
+    };
+  }, [map, onOverlayAdd, onOverlayRemove]);
 
   useCreatePane(DEFAULT_PANE_NAME, PANE_BASE_Z_INDEX);
+
+  const visibleHeatmapLayers = useMemo(
+    () =>
+      sortedLayers.filter(
+        (layer) =>
+          layer.heatmapConfig?.enabled &&
+          visibleOverlays.has(getOverlayName(layer)),
+      ),
+    [sortedLayers, visibleOverlays],
+  );
 
   return (
     <>
@@ -56,12 +118,47 @@ export default function FirecallLayer({
 
       {firecallId !== 'unknown' &&
         sortedLayers.map((layer) => (
-          <LayerPaneEntry
-            key={layer.id}
-            layer={layer}
-            defaultChecked={defaultChecked}
-          />
+          <React.Fragment key={layer.id}>
+            <LayerPaneEntry
+              layer={layer}
+              defaultChecked={defaultChecked}
+            />
+            {layer.heatmapConfig?.enabled && (
+              <LayersControl.Overlay
+                name={getOverlayName(layer)}
+                checked={true}
+              >
+                <LayerGroup>
+                  <HeatmapOverlayLayer
+                    layer={layer}
+                    visible={visibleOverlays.has(getOverlayName(layer))}
+                  />
+                </LayerGroup>
+              </LayersControl.Overlay>
+            )}
+          </React.Fragment>
         ))}
+
+      {visibleHeatmapLayers.length > 0 && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 30,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            display: 'flex',
+            gap: 1,
+            maxWidth: '80vw',
+            overflowX: 'auto',
+            pointerEvents: 'auto',
+          }}
+        >
+          {visibleHeatmapLayers.map((layer) => (
+            <HeatmapLegendEntry key={layer.id} layer={layer} />
+          ))}
+        </Box>
+      )}
     </>
   );
 }
@@ -89,9 +186,9 @@ function LayerPaneEntry({
             (layer.summaryPosition ||
               (layer.showSummary !== 'false'
                 ? 'right'
-                : '')) as any
+                : 'off')) as any
           }
-          clusterMode={(layer.clusterMode || '') as any}
+          clusterMode={(layer.clusterMode || 'normal') as any}
         >
           <FirecallItemsLayer layer={layer} pane={paneName} />
         </MarkerClusterLayer>

@@ -11,6 +11,7 @@ import { SimpleMap } from '../../../common/types';
 import { defaultPosition } from '../../../hooks/constants';
 import { useMapEditable } from '../../../hooks/useMapEditor';
 import {
+  DataSchemaField,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../../firebase/firestore';
@@ -97,6 +98,7 @@ export class FirecallItemBase {
       alt: this.alt,
       draggable: this.draggable = true,
       eventHandlers: this.eventHandlers = {},
+      fieldData: this.fieldData = {},
     } = firecallItem || {});
   }
 
@@ -120,6 +122,10 @@ export class FirecallItemBase {
   creator?: string;
   created?: string;
   draggable: boolean;
+
+  fieldData: Record<string, string | number | boolean>;
+
+  _renderDataSchema?: DataSchemaField[];
 
   eventHandlers: L.LeafletEventHandlerFnMap = {};
 
@@ -152,12 +158,17 @@ export class FirecallItemBase {
       created: this.created,
       updatedAt: this.updatedAt,
       updatedBy: this.updatedBy,
+      ...(Object.keys(this.fieldData).length > 0
+        ? { fieldData: this.fieldData }
+        : {}),
     };
   }
 
   public filteredData(): FirecallItem {
     return Object.fromEntries(
-      Object.entries(this.data()).filter(([key, value]) => value || typeof value === 'number'),
+      Object.entries(this.data()).filter(
+        ([key, value]) => value !== undefined && value !== null && value !== '',
+      ),
     ) as FirecallItem;
   }
 
@@ -238,7 +249,7 @@ export class FirecallItemBase {
   public titleFn(): string {
     return this.name;
   }
-  public icon(): Icon<IconOptions> {
+  public icon(_heatmapColor?: string): Icon<IconOptions> {
     return leafletIcons().fallback;
   }
 
@@ -287,5 +298,15 @@ export class FirecallItemBase {
   public addEventHandlers(handlers: L.LeafletEventHandlerFnMap) {
     this.eventHandlers = { ...this.eventHandlers, ...handlers };
     return this;
+  }
+
+  public formatFieldData(): string {
+    if (!this.fieldData || Object.keys(this.fieldData).length === 0) return '';
+    if (!this._renderDataSchema || this._renderDataSchema.length === 0) return '';
+
+    return this._renderDataSchema
+      .filter((f) => this.fieldData[f.key] !== undefined && this.fieldData[f.key] !== null)
+      .map((f) => `${f.label}: ${this.fieldData[f.key]}${f.unit ? f.unit : ''}`)
+      .join(' | ');
   }
 }

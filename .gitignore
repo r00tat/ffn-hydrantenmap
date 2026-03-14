@@ -181,3 +181,4 @@ dist
 /firebase-tools
 .worktrees/
 test-results/
+.serena

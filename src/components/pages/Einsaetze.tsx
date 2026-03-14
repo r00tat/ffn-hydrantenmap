@@ -7,6 +7,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
@@ -80,6 +81,8 @@ function EinsatzCard({
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
   const [tokenLink, setTokenLink] = useState<string>();
+  const [copied, setCopied] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
 
   const updateFn = useCallback(
@@ -103,19 +106,23 @@ function EinsatzCard({
 
   const createLink = useCallback(async (firefallId: string) => {
     setError('');
+    setCreatingLink(true);
     const token = await createCustomFirebaseTokenForFirecall(firefallId);
     console.info('created new token for link:', token);
     if (token.token) {
       const tokenLink = `${window.location.origin}/einsatz/${firefallId}?token=${token.token}`;
       setTokenLink(tokenLink);
-      if (navigator.clipboard?.writeText) {
-        // we do not know if it was successfull so we do not show an info
-        navigator.clipboard.writeText(tokenLink);
+      try {
+        await navigator.clipboard?.writeText(tokenLink);
+        setCopied(true);
+      } catch {
+        setCopied(false);
       }
     } else {
       setError(`Token konnte nicht erstellt werden: ${token.error}`);
       console.warn(`unable to create token: ${token.error}\n${token.details}`);
     }
+    setCreatingLink(false);
   }, []);
 
   return (
@@ -131,9 +138,21 @@ function EinsatzCard({
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
           {tokenLink && (
-            <Link href={tokenLink} target="_blank">
-              {tokenLink.substring(0, 100)}...
-            </Link>
+            <>
+              {copied && (
+                <Typography variant="body2" color="success.main">
+                  Link in Zwischenablage kopiert
+                </Typography>
+              )}
+              {!copied && (
+                <Typography variant="body2" color="text.secondary">
+                  Link konnte nicht kopiert werden. Bitte manuell kopieren:
+                </Typography>
+              )}
+              <Link href={tokenLink} target="_blank">
+                {tokenLink.substring(0, 100)}...
+              </Link>
+            </>
           )}
           {error && <Typography color="error">{error}</Typography>}
         </CardContent>
@@ -172,18 +191,22 @@ function EinsatzCard({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Link für anonymen Zugriff erstellen">
-            <IconButton
-              size="small"
-              onClick={() => {
-                if (einsatz.id) {
-                  createLink(einsatz.id);
-                }
-              }}
-            >
-              <ShareIcon />
-            </IconButton>
-          </Tooltip>
+          {creatingLink ? (
+            <CircularProgress size={24} sx={{ mx: 1 }} />
+          ) : (
+            <Tooltip title="Link für anonymen Zugriff erstellen">
+              <IconButton
+                size="small"
+                onClick={() => {
+                  if (einsatz.id) {
+                    createLink(einsatz.id);
+                  }
+                }}
+              >
+                <ShareIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title="Kostenersatz-Berechnungen">
             <IconButton
               size="small"

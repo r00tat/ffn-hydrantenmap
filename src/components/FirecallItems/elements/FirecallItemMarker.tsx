@@ -20,7 +20,8 @@ export class FirecallItemMarker extends FirecallItemBase {
   zeichen: string;
   attachments: FcItemAttachment[];
   color?: string;
-  showLabel: boolean = false;
+  showLabel: boolean | undefined;
+  private _showLabelExplicit: boolean;
 
   public constructor(firecallItem?: FcMarker) {
     super(firecallItem);
@@ -31,10 +32,16 @@ export class FirecallItemMarker extends FirecallItemBase {
       attachments: this.attachments = [],
       color: this.color = '#0000ff',
     } = firecallItem || {});
-    this.showLabel =
-      firecallItem?.showLabel === true ||
-      (firecallItem?.showLabel as unknown as string) === 'true' ||
-      firecallItem?.showLabel === undefined;
+    // Track whether the marker has an explicit showLabel setting
+    this._showLabelExplicit = firecallItem?.showLabel !== undefined;
+    if (this._showLabelExplicit) {
+      this.showLabel =
+        firecallItem?.showLabel === true ||
+        (firecallItem?.showLabel as unknown as string) === 'true';
+    } else {
+      // undefined = inherit from layer
+      this.showLabel = undefined;
+    }
   }
 
   public copy(): FirecallItemBase {
@@ -48,7 +55,7 @@ export class FirecallItemMarker extends FirecallItemBase {
       zeichen: this.zeichen,
       attachments: this.attachments,
       color: this.color,
-      showLabel: this.showLabel,
+      ...(this._showLabelExplicit ? { showLabel: this.showLabel } : {}),
     } as FcMarker;
   }
 
@@ -110,13 +117,19 @@ export class FirecallItemMarker extends FirecallItemBase {
         Position: {Number.parseFloat('' + this.lat).toFixed(6)},
         {Number.parseFloat('' + this.lng).toFixed(6)}
         {this.alt && ` ${Math.round(this.alt)}m`}
+        {this.formatFieldData() && (
+          <>
+            <br />
+            <Typography variant="caption">{this.formatFieldData()}</Typography>
+          </>
+        )}
       </>
     );
   }
   public titleFn(): string {
     return `${this.zeichen?.replace(/_/g, ' ')} ${this.name}`;
   }
-  public icon(): LeafletIcon<IconOptions> {
+  public icon(heatmapColor?: string): LeafletIcon<IconOptions> {
     if (this.zeichen && iconKeys[this.zeichen]?.url) {
       const customIcon = iconKeys[this.zeichen];
       return L.icon({
@@ -132,8 +145,9 @@ export class FirecallItemMarker extends FirecallItemBase {
       });
     }
 
+    const color = heatmapColor || this.color;
     return L.icon({
-      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + this.color)}`,
+      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + color)}`,
       iconSize: [30, 30],
       iconAnchor: [15, 30],
       popupAnchor: [0, -25],
@@ -169,6 +183,13 @@ export class FirecallItemMarker extends FirecallItemBase {
     selectItem: (item: FirecallItem) => void,
     options: MarkerRenderOptions = {}
   ): ReactNode {
+    // Resolve effective label visibility: marker override > layer setting > default true
+    const effectiveShowLabel =
+      this.showLabel !== undefined
+        ? this.showLabel
+        : options.layerShowLabels !== undefined
+          ? options.layerShowLabels
+          : true;
     try {
       return (
         <FirecallItemMarkerDefault
@@ -177,7 +198,7 @@ export class FirecallItemMarker extends FirecallItemBase {
           key={this.id}
           options={options}
         >
-          {this.showLabel && (
+          {effectiveShowLabel && (
             <Tooltip
               direction="bottom"
               permanent

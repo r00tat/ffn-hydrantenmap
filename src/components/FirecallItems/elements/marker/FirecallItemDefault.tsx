@@ -8,6 +8,7 @@ import useMapEditor from '../../../../hooks/useMapEditor';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
 import { firestore } from '../../../firebase/firebase';
 import {
+  DataSchemaField,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
@@ -20,6 +21,12 @@ export interface MarkerRenderOptions {
   hidePopup?: boolean;
   /* disable click handler (used for preview markers during placement) */
   disableClick?: boolean;
+  /* override marker color from heatmap computation */
+  heatmapColor?: string;
+  /* data schema for rendering fieldData in popup */
+  dataSchema?: DataSchemaField[];
+  /** Layer-level label visibility setting */
+  layerShowLabels?: boolean;
   pane?: string;
   /* callback for right-click context menu */
   onContextMenu?: (item: FirecallItem, event: L.LeafletMouseEvent) => void;
@@ -75,10 +82,10 @@ async function updateFircallItemPos(
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
-  options: { hidePopup, disableClick, onContextMenu } = {},
+  options: { hidePopup, disableClick, heatmapColor, onContextMenu } = {},
   children,
 }: FirecallItemMarkerProps) {
-  const icon = record.icon();
+  const icon = record.icon(heatmapColor);
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [startPos, setStartPos] = useState<L.LatLng>(

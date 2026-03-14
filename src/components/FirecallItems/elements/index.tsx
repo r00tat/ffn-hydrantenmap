@@ -18,18 +18,18 @@ import { FirecallVehicle } from './FirecallVehicle';
 export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   fallback: FirecallItemBase,
   marker: FirecallItemMarker,
-  rohr: FirecallRohr,
-  connection: FirecallConnection,
-  diary: FirecallDiary,
+  layer: FirecallItemLayer,
+  vehicle: FirecallVehicle,
   line: FirecallLine,
   circle: CircleMarker,
   area: FirecallArea,
+  rohr: FirecallRohr,
+  connection: FirecallConnection,
   assp: FirecallAssp,
   el: FirecallEinsatzleitung,
-  vehicle: FirecallVehicle,
-  gb: FirecallGb,
-  layer: FirecallItemLayer,
   hydrant: FirecallHydrant,
+  diary: FirecallDiary,
+  gb: FirecallGb,
 };
 
 export const fcItemNames: { [key: string]: string } = {};

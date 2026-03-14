@@ -20,23 +20,29 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { where } from 'firebase/firestore';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 import useZOrderActions from '../../hooks/useZOrderActions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import {
+  DataSchemaField,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
+  HeatmapConfig,
   filterDisplayableItems,
 } from '../firebase/firestore';
 import { fcItemNames, getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
+import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
+import HeatmapSettings from './HeatmapSettings';
+import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
@@ -54,7 +60,9 @@ export default function FirecallItemDialog({
   autoFocusField,
 }: FirecallItemDialogOptions) {
   const firecallId = useFirecallId();
+  const layers = useFirecallLayers();
   const [open, setOpen] = useState(true);
+  const dataFieldsRef = useRef<ItemDataFieldsHandle>(null);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
     getItemInstance({
       type: itemType,
@@ -103,6 +111,7 @@ export default function FirecallItemDialog({
   };
 
   const isExistingItem = !!item.id;
+  const canSave = !!(item as any).name?.trim();
 
   return (
     <>
@@ -169,6 +178,34 @@ export default function FirecallItemDialog({
               </Tooltip>
             </Box>
           )}
+          {item.type === 'layer' && (
+            <>
+              <DataSchemaEditor
+                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
+                onChange={(schema: DataSchemaField[]) =>
+                  setItemField('dataSchema', schema)
+                }
+              />
+              <HeatmapSettings
+                config={item.get<HeatmapConfig>('heatmapConfig')}
+                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
+                onChange={(config: HeatmapConfig | undefined) =>
+                  setItemField('heatmapConfig', config)
+                }
+              />
+            </>
+          )}
+          {item.type !== 'layer' && (
+            <ItemDataFields
+              dataSchema={
+                item.layer ? layers[item.layer]?.dataSchema : undefined
+              }
+              fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
+              onChange={(fieldData) => setItemField('fieldData', fieldData)}
+              isNew={!item.id}
+              flushRef={dataFieldsRef}
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button
@@ -205,10 +242,16 @@ export default function FirecallItemDialog({
           )}
           <Button
             color="primary"
+            disabled={!canSave}
             startIcon={item.id ? <SaveIcon /> : <AddIcon />}
             onClick={() => {
+              // Flush any pending free-form field before saving
+              const flushedFieldData = dataFieldsRef.current?.flush();
+              const saveItem = flushedFieldData
+                ? { ...item.filteredData(), fieldData: flushedFieldData }
+                : item.filteredData();
               setOpen(false);
-              onClose(item.filteredData());
+              onClose(saveItem);
             }}
           >
             {item.id ? 'Aktualisieren' : 'Hinzufügen'}

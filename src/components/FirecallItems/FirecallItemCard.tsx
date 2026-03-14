@@ -110,7 +110,7 @@ export default function FirecallItemCard({
             )
           );
 
-          Promise.allSettled(
+          await Promise.allSettled(
             docs.docs.map((doc) =>
               updateItem({
                 ...doc.data(),

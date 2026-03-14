@@ -1,6 +1,10 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { SimpleMap } from '../../../common/types';
-import { FirecallLayer } from '../../firebase/firestore';
+import {
+  DataSchemaField,
+  FirecallLayer,
+  HeatmapConfig,
+} from '../../firebase/firestore';
 import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 
 export class FirecallItemLayer extends FirecallItemBase {
@@ -8,6 +12,9 @@ export class FirecallItemLayer extends FirecallItemBase {
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  showLabels?: string;
+  dataSchema: DataSchemaField[];
+  heatmapConfig?: HeatmapConfig;
 
   public constructor(firecallItem?: FirecallLayer) {
     super({
@@ -16,14 +23,17 @@ export class FirecallItemLayer extends FirecallItemBase {
     } as FirecallItemLayer);
     this.type = 'layer';
     ({ grouped: this.grouped = '' } = firecallItem || {});
-    this.showSummary = firecallItem?.showSummary ?? 'true';
-    // Backward compat: derive summaryPosition from showSummary if not set
-    if (firecallItem?.summaryPosition) {
-      this.summaryPosition = firecallItem.summaryPosition;
+    // Backward compat: derive summaryPosition from old showSummary if not set
+    if (firecallItem?.summaryPosition !== undefined) {
+      this.summaryPosition = firecallItem.summaryPosition || 'off';
     } else {
-      this.summaryPosition = this.showSummary === 'true' ? 'right' : '';
+      const showSummary = firecallItem?.showSummary ?? 'true';
+      this.summaryPosition = showSummary === 'true' ? 'right' : 'off';
     }
-    this.clusterMode = firecallItem?.clusterMode ?? '';
+    this.clusterMode = firecallItem?.clusterMode || 'normal';
+    this.showLabels = firecallItem?.showLabels ?? 'true';
+    this.dataSchema = firecallItem?.dataSchema ?? [];
+    this.heatmapConfig = firecallItem?.heatmapConfig;
   }
 
   public static firebaseCollectionName(): string {
@@ -48,17 +58,24 @@ export class FirecallItemLayer extends FirecallItemBase {
   }
 
   public fields(): SimpleMap<string> {
+    const isGrouped = this.grouped === 'true' || this.grouped === true as any;
     return {
       ...super.fields(),
+      showLabels: 'Labels anzeigen',
       grouped: 'Elemente gruppieren',
-      summaryPosition: 'Zusammenfassung Position',
-      clusterMode: 'Gruppierung',
+      ...(isGrouped
+        ? {
+            summaryPosition: 'Zusammenfassung Position',
+            clusterMode: 'Gruppierung',
+          }
+        : {}),
     };
   }
 
   public fieldTypes(): SimpleMap<string> {
     return {
       ...super.fieldTypes(),
+      showLabels: 'boolean',
       grouped: 'boolean',
       summaryPosition: 'select',
       clusterMode: 'select',
@@ -69,7 +86,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.selectValues(),
       summaryPosition: {
-        '': 'Aus',
+        off: 'Aus',
         hover: 'Bei Hover',
         top: 'Oben',
         bottom: 'Unten',
@@ -78,7 +95,7 @@ export class FirecallItemLayer extends FirecallItemBase {
       },
       clusterMode: {
         wenig: 'Wenig',
-        '': 'Normal',
+        normal: 'Normal',
         viel: 'Viel',
       },
     };
@@ -90,6 +107,9 @@ export class FirecallItemLayer extends FirecallItemBase {
       grouped: this.grouped,
       summaryPosition: this.summaryPosition,
       clusterMode: this.clusterMode,
+      showLabels: this.showLabels,
+      ...(this.dataSchema.length > 0 ? { dataSchema: this.dataSchema } : {}),
+      ...(this.heatmapConfig ? { heatmapConfig: this.heatmapConfig } : {}),
     };
   }
 }

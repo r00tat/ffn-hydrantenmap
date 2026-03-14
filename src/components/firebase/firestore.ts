@@ -52,15 +52,51 @@ export interface FirecallItem {
 
   // L.LeafletEventHandlerFnMap
   eventHandlers?: L.LeafletEventHandlerFnMap;
+
+  fieldData?: Record<string, string | number | boolean>;
 }
 
 export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback'];
+
+export interface DataSchemaField {
+  key: string;
+  label: string;
+  unit: string;
+  type: 'number' | 'text' | 'boolean';
+  defaultValue?: string | number | boolean;
+}
+
+export interface HeatmapConfig {
+  enabled: boolean;
+  activeKey: string;
+  colorMode: 'auto' | 'manual';
+  /** When true, auto mode uses red→yellow→green (low=red, high=green) */
+  invertAutoColor?: boolean;
+  /** Heatmap overlay radius in pixels (default 25) */
+  radius?: number;
+  /** Heatmap overlay blur in pixels (default 15) */
+  blur?: number;
+  min?: number;
+  max?: number;
+  colorStops?: { value: number; color: string }[];
+  /** Visualization mode: 'heatmap' (default) or 'interpolation' */
+  visualizationMode?: 'heatmap' | 'interpolation';
+  /** IDW buffer radius in meters beyond convex hull boundary (default 30) */
+  interpolationRadius?: number;
+  /** IDW power parameter — higher = sharper transitions near points (default 2) */
+  interpolationPower?: number;
+  /** Interpolation surface opacity 0-1 (default 0.6) */
+  interpolationOpacity?: number;
+}
 
 export interface FirecallLayer extends FirecallItem {
   grouped?: string;
   showSummary?: string;
   summaryPosition?: string;
   clusterMode?: string;
+  showLabels?: string;
+  dataSchema?: DataSchemaField[];
+  heatmapConfig?: HeatmapConfig;
 }
 
 export interface FcAttachment {
