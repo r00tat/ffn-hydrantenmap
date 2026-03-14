@@ -89,10 +89,17 @@ export class FirecallHydrant extends FirecallItemBase {
     };
   }
 
-  public selectValues(): { [fieldName: string]: string[] } {
+  public selectValues() {
     return {
-      typ: ['Überflurhydrant', 'Unterflurhydrant'],
-      fuellhydrant: ['', 'ja', 'nein'],
+      typ: {
+        Überflurhydrant: 'Überflurhydrant',
+        Unterflurhydrant: 'Unterflurhydrant',
+      },
+      fuellhydrant: {
+        '': '',
+        ja: 'Ja',
+        nein: 'Nein',
+      },
     };
   }
 
