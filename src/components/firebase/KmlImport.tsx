@@ -120,7 +120,7 @@ function parseGeoJson(
   // Build reverse map: schemaKey → field (for type coercion)
   const schemaByKey = new Map(schema.map((f) => [f.key, f]));
 
-  return geojson.features.map((f) => {
+  return geojson.features.map((f, index) => {
     const latlng = GeoPosition.fromGeoJsonPosition(
       f.geometry.type === 'Point'
         ? (f.geometry as Point).coordinates
@@ -138,7 +138,7 @@ function parseGeoJson(
 
     const item: FirecallItem = {
       type: 'marker',
-      name: `${f.properties.name}`,
+      name: f.properties.name || `${index + 1}`,
       datum: new Date(
         f.properties['Time Stamp'] ??
           f.properties['timestamp'] ??
