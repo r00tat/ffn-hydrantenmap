@@ -275,6 +275,11 @@ export default function HeatmapSettings({
                   <ToggleButton value="idw">IDW</ToggleButton>
                   <ToggleButton value="spline">Spline</ToggleButton>
                 </ToggleButtonGroup>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  {(current.interpolationAlgorithm ?? 'idw') === 'idw'
+                    ? 'IDW (Inverse Distance Weighting): Gewichteter Durchschnitt – begrenzt auf den Wertebereich der Messpunkte. Gut für diskrete Messwerte.'
+                    : 'Spline (Thin-Plate): Glatte Fläche durch alle Messpunkte – kann Werte außerhalb des gemessenen Bereichs schätzen. Gut für physikalische Felder wie Strahlung oder Temperatur.'}
+                </Typography>
               </Box>
               <Box>
                 <Typography variant="body2" gutterBottom>
