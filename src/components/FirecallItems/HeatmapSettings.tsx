@@ -264,6 +264,20 @@ export default function HeatmapSettings({
             <>
               <Box>
                 <Typography variant="body2" gutterBottom>
+                  Algorithmus
+                </Typography>
+                <ToggleButtonGroup
+                  value={current.interpolationAlgorithm ?? 'idw'}
+                  exclusive
+                  onChange={(_, val) => val && update({ interpolationAlgorithm: val })}
+                  size="small"
+                >
+                  <ToggleButton value="idw">IDW</ToggleButton>
+                  <ToggleButton value="spline">Spline</ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+              <Box>
+                <Typography variant="body2" gutterBottom>
                   Radius: {current.interpolationRadius ?? 30}m
                 </Typography>
                 <Slider
@@ -276,20 +290,22 @@ export default function HeatmapSettings({
                   valueLabelDisplay="auto"
                 />
               </Box>
-              <Box>
-                <Typography variant="body2" gutterBottom>
-                  IDW Exponent: {current.interpolationPower ?? 2}
-                </Typography>
-                <Slider
-                  value={current.interpolationPower ?? 2}
-                  onChange={(_, val) => update({ interpolationPower: val as number })}
-                  min={1}
-                  max={5}
-                  step={0.5}
-                  size="small"
-                  valueLabelDisplay="auto"
-                />
-              </Box>
+              {(current.interpolationAlgorithm ?? 'idw') === 'idw' && (
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    IDW Exponent: {current.interpolationPower ?? 2}
+                  </Typography>
+                  <Slider
+                    value={current.interpolationPower ?? 2}
+                    onChange={(_, val) => update({ interpolationPower: val as number })}
+                    min={1}
+                    max={5}
+                    step={0.5}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                </Box>
+              )}
               <Box>
                 <Typography variant="body2" gutterBottom>
                   Deckkraft: {Math.round((current.interpolationOpacity ?? 0.6) * 100)}%
