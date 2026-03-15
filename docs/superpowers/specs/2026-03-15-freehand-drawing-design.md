@@ -46,11 +46,23 @@ Each stroke is its own Firestore document. This avoids large parent documents an
 
 ### Firestore rules
 
-The `stroke` subcollection must be covered by the existing Firestore security rules for authorized users of a firecall. Rules must allow read/write on `/call/{firecallId}/item/{itemId}/stroke/{strokeId}`.
+No rule changes required. The existing wildcard rule in `firebase/firestore.rules`:
+
+```javascript
+match /{subitem=**} {
+  allow read, write: if callAuthorized()
+}
+```
+
+already covers all subcollections under `/call/{callId}/`, including the new `stroke` subcollection.
 
 ---
 
 ## Architecture
+
+### Dependencies
+
+Add `simplify-js` to `package.json` for Ramer-Douglas-Peucker path simplification. It is small (~1KB), has no transitive dependencies, and has TypeScript types via `@types/simplify-js`.
 
 ### New files
 
@@ -70,7 +82,6 @@ The `stroke` subcollection must be covered by the existing Firestore security ru
 | `src/components/FirecallItems/elements/index.tsx` | Register `drawing` → `FirecallDrawing` in `fcItemClasses` |
 | `src/components/Map/AddFirecallItem.tsx` | Activate drawing mode when item type is `drawing` |
 | `src/components/Map/Map.tsx` (or map provider) | Add `DrawingProvider` alongside `LeitungenProvider` |
-| `firebase/firestore.rules` (dev + prod) | Allow read/write on `stroke` subcollection |
 
 ---
 
@@ -118,8 +129,9 @@ Actions: `startDrawing`, `addPoint`, `commitStroke`, `undoLastStroke`, `setColor
 - During drawing mode, captures `mousemove`/`touchmove` events throttled to **50ms** intervals
 - Converts container pixel coordinates to geo `LatLng` via `map.containerPointToLatLng()`
 - Adds point to `currentPoints` in context
-- On `mouseup`/`touchend`: runs **Ramer-Douglas-Peucker** simplification with tolerance ~0.00003 degrees (~3m), then calls `commitStroke`
+- On `mouseup`/`touchend`: runs **Ramer-Douglas-Peucker** simplification (via `simplify-js`) with tolerance ~0.00003 degrees (~3m), then calls `commitStroke`
 - Renders the current in-progress stroke as a live `<Polyline>` preview
+- While `isDrawing` is true, calls `map.dragging.disable()` on mount and `map.dragging.enable()` on unmount to prevent map panning during drawing
 
 RDP simplification is applied per-stroke before it enters the buffer, keeping point counts low (typically 20–50 points per stroke).
 
