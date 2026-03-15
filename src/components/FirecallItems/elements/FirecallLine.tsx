@@ -1,6 +1,8 @@
+import { Icon, IconOptions } from 'leaflet';
 import React, { ReactNode } from 'react';
 import { LatLngPosition } from '../../../common/geo';
 import { Connection, Line } from '../../firebase/firestore';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
@@ -22,6 +24,10 @@ export class FirecallLine extends FirecallMultiPoint {
 
   public markerName() {
     return 'Linie';
+  }
+
+  public icon(): Icon<IconOptions> {
+    return leafletIcons().linie;
   }
 
   public info(): string {

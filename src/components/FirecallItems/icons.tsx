@@ -46,6 +46,27 @@ export const leafletIcons = (): IconMap => {
       iconAnchor: [6, 6],
       popupAnchor: [0, 0],
     }),
+
+    linie: L.icon({
+      iconUrl: `/icons/linie.svg`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, 0],
+    }),
+
+    flaeche: L.icon({
+      iconUrl: `/icons/flaeche.svg`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, 0],
+    }),
+
+    leitung: L.icon({
+      iconUrl: `/icons/leitung.svg`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, 0],
+    }),
   });
 
   initialized = true;
