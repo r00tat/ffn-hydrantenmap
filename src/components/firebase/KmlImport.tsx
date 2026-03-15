@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
-import LinearProgress from '@mui/material/LinearProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -306,7 +305,9 @@ export default function KmlImport() {
       <Button
         component="label"
         variant="contained"
-        startIcon={<CloudUploadIcon />}
+        startIcon={parsing ? undefined : <CloudUploadIcon />}
+        endIcon={parsing ? <CircularProgress size={16} color="inherit" /> : undefined}
+        disabled={parsing}
       >
         KML importieren
         <VisuallyHiddenInput
@@ -322,9 +323,6 @@ export default function KmlImport() {
           }}
         />
       </Button>
-      {parsing && (
-        <LinearProgress sx={{ mt: 0.5, width: '100%' }} />
-      )}
       {uploadInProgress && (
         <>
           <Typography component="span" sx={{ ml: 1 }}>
