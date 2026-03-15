@@ -252,10 +252,13 @@ export interface TpsWeights {
   a: Float64Array;
   /** Input points snapshot used to solve (same reference as DataPoint[]) */
   points: DataPoint[];
-  /** Coordinate normalization: x_norm = (x - minX) / scale */
-  minX: number;
-  minY: number;
+  /** Coordinate normalization: x_norm = (x - shiftX) / scale */
+  shiftX: number;
+  shiftY: number;
   scale: number;
+  /** Data value range for clamping extrapolation */
+  dataMin: number;
+  dataMax: number;
 }
 
 /**
@@ -270,41 +273,45 @@ function tpsPhi(r: number): number {
  * Solve the Thin-Plate Spline system for the given data points.
  * Returns weights and polynomial coefficients.
  *
- * Coordinates are normalized to [0,1] before solving so that φ(r) = r²ln(r)
- * stays well-conditioned (raw pixel distances cause φ to grow to millions,
- * leading to a divergent surface outside the data boundary).
+ * Coordinates are center-and-scale normalized to [-1, 1] (like scipy's
+ * RBFInterpolator) so that φ(r) = r²ln(r) stays well-conditioned.
  *
- * A small Tikhonov regularization (λ on the K diagonal) damps overshoot from
- * high-value outlier points — e.g. a 60 µSv/h hotspot surrounded by 10s.
+ * Tikhonov regularization (λ scaled to K matrix magnitude, like MATLAB's
+ * tpaps) damps overshoot from high-value outlier points.
  *
  * Uses Gaussian elimination with partial pivoting.
  * Suitable for n ≤ 300 points (O(n²) memory, O(n³) time — done once per render).
  *
- * @param lambda Tikhonov regularization (default 0.1 in normalized space).
- *   0 = exact interpolation (can overshoot), higher = smoother surface.
+ * @param lambda Tikhonov regularization factor (default 0.1), scaled relative
+ *   to average |K| entry. 0 = exact interpolation, higher = smoother surface.
  */
 export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
   const n = points.length;
   const size = n + 3;
 
-  // Normalize coordinates to [0, 1] range for numerical stability.
-  // Without this, φ(r) = r²ln(r) grows to millions for large pixel distances,
-  // causing the surface to diverge unpredictably outside the data boundary.
+  // Center-and-scale normalization to [-1, 1] for numerical stability.
+  // Centering on the midpoint (like scipy's RBFInterpolator) keeps pairwise
+  // distances symmetric and avoids the φ(r) = r²ln(r) zero-crossing at r=1
+  // falling in the middle of the typical distance range.
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let dataMin = Infinity, dataMax = -Infinity;
   for (let i = 0; i < n; i++) {
     if (points[i].x < minX) minX = points[i].x;
     if (points[i].x > maxX) maxX = points[i].x;
     if (points[i].y < minY) minY = points[i].y;
     if (points[i].y > maxY) maxY = points[i].y;
+    if (points[i].value < dataMin) dataMin = points[i].value;
+    if (points[i].value > dataMax) dataMax = points[i].value;
   }
-  const scale = Math.max(maxX - minX, maxY - minY, 1e-10);
+  const shiftX = (maxX + minX) / 2;
+  const shiftY = (maxY + minY) / 2;
+  const scale = Math.max(maxX - minX, maxY - minY, 1e-10) / 2;
 
   // Build matrix A (row-major, flattened) and RHS vector b
   const A = new Float64Array(size * size);
   const b = new Float64Array(size);
 
   // Top-left n×n block: K[i][j] = φ(||p_i - p_j||) in normalized coords.
-  // Diagonal gets λ for Tikhonov regularization.
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
       const dx = (points[i].x - points[j].x) / scale;
@@ -312,13 +319,27 @@ export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
       const r = Math.sqrt(dx * dx + dy * dy);
       A[i * size + j] = tpsPhi(r);
     }
-    A[i * size + i] += lambda;
+  }
+
+  // Scale λ relative to K matrix magnitude (like MATLAB's tpaps).
+  // A fixed λ is either too aggressive or too weak depending on data geometry;
+  // scaling by average |K| entry adapts automatically.
+  let kAbsSum = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      kAbsSum += Math.abs(A[i * size + j]);
+    }
+  }
+  const kAvg = kAbsSum / (n * n) || 1;
+  const effectiveLambda = lambda * kAvg;
+  for (let i = 0; i < n; i++) {
+    A[i * size + i] += effectiveLambda;
   }
 
   // Top-right n×3 and bottom-left 3×n blocks: [1, x_norm, y_norm]
   for (let i = 0; i < n; i++) {
-    const xn = (points[i].x - minX) / scale;
-    const yn = (points[i].y - minY) / scale;
+    const xn = (points[i].x - shiftX) / scale;
+    const yn = (points[i].y - shiftY) / scale;
     A[i * size + n] = 1;
     A[i * size + n + 1] = xn;
     A[i * size + n + 2] = yn;
@@ -383,28 +404,34 @@ export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
     w: x.slice(0, n),
     a: x.slice(n, n + 3),
     points,
-    minX,
-    minY,
+    shiftX,
+    shiftY,
     scale,
+    dataMin,
+    dataMax,
   };
 }
 
 /**
  * Evaluate a solved TPS at point (x, y).
- * Applies the same coordinate normalization used during solveTPS.
+ * Applies the same center-and-scale normalization used during solveTPS.
+ * Result is clamped to the data value range to prevent extrapolation overshoot.
  */
 export function evaluateTPS(x: number, y: number, tps: TpsWeights): number {
-  const xn = (x - tps.minX) / tps.scale;
-  const yn = (y - tps.minY) / tps.scale;
+  const xn = (x - tps.shiftX) / tps.scale;
+  const yn = (y - tps.shiftY) / tps.scale;
   let value = tps.a[0] + tps.a[1] * xn + tps.a[2] * yn;
   const pts = tps.points;
   for (let i = 0; i < pts.length; i++) {
-    const dx = xn - (pts[i].x - tps.minX) / tps.scale;
-    const dy = yn - (pts[i].y - tps.minY) / tps.scale;
+    const dx = xn - (pts[i].x - tps.shiftX) / tps.scale;
+    const dy = yn - (pts[i].y - tps.shiftY) / tps.scale;
     const r = Math.sqrt(dx * dx + dy * dy);
     value += tps.w[i] * tpsPhi(r);
   }
-  return value;
+  // Clamp to data range: TPS is a global method and can overshoot/undershoot
+  // between widely spaced points (like bending a metal plate). For visualization
+  // purposes, clamping prevents extreme values from compressing the color scale.
+  return Math.max(tps.dataMin, Math.min(tps.dataMax, value));
 }
 
 // ---------------------------------------------------------------------------
@@ -564,11 +591,10 @@ export function buildInterpolationGrid(params: {
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
 
-  // Pre-compute data range for TPS exterior clamping (see below).
-  let dataMin = Infinity, dataMax = -Infinity;
+  // Data minimum for outside-hull value fade.
+  let dataMinVal = Infinity;
   for (let i = 0; i < allValues.length; i++) {
-    if (allValues[i] < dataMin) dataMin = allValues[i];
-    if (allValues[i] > dataMax) dataMax = allValues[i];
+    if (allValues[i] < dataMinVal) dataMinVal = allValues[i];
   }
 
   // Build spatial index for fast neighbor queries.
@@ -591,6 +617,11 @@ export function buildInterpolationGrid(params: {
       // never distorted. IDW handles value blending naturally between points.
       let alpha = 1.0;
       let isOutsideHull = false;
+      // Value of nearest data point when outside hull (used to cap extrapolation).
+      let nearestOutsideValue: number | null = null;
+      // Local value range of nearby data points (for TPS local clamping).
+      let localMin = -Infinity;
+      let localMax = Infinity;
 
       if (isDegenerate) {
         // For < 3 non-collinear points: use pure point-proximity boundary
@@ -615,16 +646,21 @@ export function buildInterpolationGrid(params: {
           const nearbyIds = spatialIndex.within(cx, cy, interiorMaxDist);
           if (nearbyIds.length === 0) continue;
 
-          // Find nearest point distance
+          // Find nearest point distance and local value range
           let nearestDistSq = Infinity;
+          let lMin = Infinity, lMax = -Infinity;
           for (let i = 0; i < nearbyIds.length; i++) {
             const pt = points[nearbyIds[i]];
             const dx = cx - pt.x;
             const dy = cy - pt.y;
             const dSq = dx * dx + dy * dy;
             if (dSq < nearestDistSq) nearestDistSq = dSq;
+            if (pt.value < lMin) lMin = pt.value;
+            if (pt.value > lMax) lMax = pt.value;
           }
           const nearestDist = Math.sqrt(nearestDistSq);
+          localMin = lMin;
+          localMax = lMax;
 
           // Fade alpha only in interior gaps (far from all data points).
           // No hull-edge fade — the outside-hull proximity fade handles
@@ -639,29 +675,46 @@ export function buildInterpolationGrid(params: {
           if (nearbyIds.length === 0) continue;
 
           let nearestDistSq = Infinity;
+          let nearestIdx = nearbyIds[0];
           for (let i = 0; i < nearbyIds.length; i++) {
             const pt = points[nearbyIds[i]];
             const dx = cx - pt.x;
             const dy = cy - pt.y;
             const dSq = dx * dx + dy * dy;
-            if (dSq < nearestDistSq) nearestDistSq = dSq;
+            if (dSq < nearestDistSq) {
+              nearestDistSq = dSq;
+              nearestIdx = nearbyIds[i];
+            }
           }
           const nearestDist = Math.sqrt(nearestDistSq);
           alpha = 1 - nearestDist / bufferPx;
+          nearestOutsideValue = points[nearestIdx].value;
         }
       }
 
-      // Compute interpolated value — IDW or TPS depending on algorithm.
-      let value =
-        algorithm === 'spline' && tpsWeights
-          ? evaluateTPS(cx, cy, tpsWeights)
-          : idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
-
-      // Outside the convex hull the TPS polynomial term grows unboundedly,
-      // producing values above the outermost data points. Clamp to data range
-      // so the fade region never shows colours brighter than any measurement.
-      if (isOutsideHull && algorithm === 'spline') {
-        value = Math.max(dataMin, Math.min(dataMax, value));
+      // Compute interpolated value.
+      // Outside the hull, start from the nearest data point's value and
+      // fade it toward the data minimum using the same distance ratio as
+      // the alpha fade. This makes both colour intensity and opacity
+      // decrease with distance, preventing bright fringes.
+      let value: number;
+      if (isOutsideHull) {
+        const nearest = nearestOutsideValue!;
+        value = dataMinVal + alpha * (nearest - dataMinVal);
+      } else if (algorithm === 'spline' && tpsWeights) {
+        value = evaluateTPS(cx, cy, tpsWeights);
+        // TPS is global: distant high-value points can pull up the surface
+        // beyond what local data supports. Clamp to the range of nearby
+        // data points so the surface stays consistent with local measurements.
+        value = Math.max(localMin, Math.min(localMax, value));
+      } else {
+        value = idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+        // IDW with a wide search radius can also pull values beyond the local
+        // data range when distant high-value points contribute. Apply same
+        // local clamp as TPS.
+        if (localMax !== Infinity) {
+          value = Math.max(localMin, Math.min(localMax, value));
+        }
       }
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
