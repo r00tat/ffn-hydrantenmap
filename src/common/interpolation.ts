@@ -248,10 +248,14 @@ export function idwInterpolateIndexed(
 export interface TpsWeights {
   /** Solved weights w_i for each input point */
   w: Float64Array;
-  /** Polynomial coefficients [a0, a1, a2] */
+  /** Polynomial coefficients [a0, a1, a2] (in normalized coordinate space) */
   a: Float64Array;
   /** Input points snapshot used to solve (same reference as DataPoint[]) */
   points: DataPoint[];
+  /** Coordinate normalization: x_norm = (x - minX) / scale */
+  minX: number;
+  minY: number;
+  scale: number;
 }
 
 /**
@@ -266,35 +270,61 @@ function tpsPhi(r: number): number {
  * Solve the Thin-Plate Spline system for the given data points.
  * Returns weights and polynomial coefficients.
  *
+ * Coordinates are normalized to [0,1] before solving so that φ(r) = r²ln(r)
+ * stays well-conditioned (raw pixel distances cause φ to grow to millions,
+ * leading to a divergent surface outside the data boundary).
+ *
+ * A small Tikhonov regularization (λ on the K diagonal) damps overshoot from
+ * high-value outlier points — e.g. a 60 µSv/h hotspot surrounded by 10s.
+ *
  * Uses Gaussian elimination with partial pivoting.
  * Suitable for n ≤ 300 points (O(n²) memory, O(n³) time — done once per render).
+ *
+ * @param lambda Tikhonov regularization (default 0.1 in normalized space).
+ *   0 = exact interpolation (can overshoot), higher = smoother surface.
  */
-export function solveTPS(points: DataPoint[]): TpsWeights {
+export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
   const n = points.length;
   const size = n + 3;
+
+  // Normalize coordinates to [0, 1] range for numerical stability.
+  // Without this, φ(r) = r²ln(r) grows to millions for large pixel distances,
+  // causing the surface to diverge unpredictably outside the data boundary.
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (points[i].x < minX) minX = points[i].x;
+    if (points[i].x > maxX) maxX = points[i].x;
+    if (points[i].y < minY) minY = points[i].y;
+    if (points[i].y > maxY) maxY = points[i].y;
+  }
+  const scale = Math.max(maxX - minX, maxY - minY, 1e-10);
 
   // Build matrix A (row-major, flattened) and RHS vector b
   const A = new Float64Array(size * size);
   const b = new Float64Array(size);
 
-  // Top-left n×n block: K[i][j] = φ(||p_i - p_j||)
+  // Top-left n×n block: K[i][j] = φ(||p_i - p_j||) in normalized coords.
+  // Diagonal gets λ for Tikhonov regularization.
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      const dx = points[i].x - points[j].x;
-      const dy = points[i].y - points[j].y;
+      const dx = (points[i].x - points[j].x) / scale;
+      const dy = (points[i].y - points[j].y) / scale;
       const r = Math.sqrt(dx * dx + dy * dy);
       A[i * size + j] = tpsPhi(r);
     }
+    A[i * size + i] += lambda;
   }
 
-  // Top-right n×3 and bottom-left 3×n blocks: [1, x, y]
+  // Top-right n×3 and bottom-left 3×n blocks: [1, x_norm, y_norm]
   for (let i = 0; i < n; i++) {
+    const xn = (points[i].x - minX) / scale;
+    const yn = (points[i].y - minY) / scale;
     A[i * size + n] = 1;
-    A[i * size + n + 1] = points[i].x;
-    A[i * size + n + 2] = points[i].y;
+    A[i * size + n + 1] = xn;
+    A[i * size + n + 2] = yn;
     A[n * size + i] = 1;
-    A[(n + 1) * size + i] = points[i].x;
-    A[(n + 2) * size + i] = points[i].y;
+    A[(n + 1) * size + i] = xn;
+    A[(n + 2) * size + i] = yn;
   }
   // Bottom-right 3×3 block: already zero (Float64Array is zero-initialised)
 
@@ -353,18 +383,24 @@ export function solveTPS(points: DataPoint[]): TpsWeights {
     w: x.slice(0, n),
     a: x.slice(n, n + 3),
     points,
+    minX,
+    minY,
+    scale,
   };
 }
 
 /**
  * Evaluate a solved TPS at point (x, y).
+ * Applies the same coordinate normalization used during solveTPS.
  */
 export function evaluateTPS(x: number, y: number, tps: TpsWeights): number {
-  let value = tps.a[0] + tps.a[1] * x + tps.a[2] * y;
+  const xn = (x - tps.minX) / tps.scale;
+  const yn = (y - tps.minY) / tps.scale;
+  let value = tps.a[0] + tps.a[1] * xn + tps.a[2] * yn;
   const pts = tps.points;
   for (let i = 0; i < pts.length; i++) {
-    const dx = x - pts[i].x;
-    const dy = y - pts[i].y;
+    const dx = xn - (pts[i].x - tps.minX) / tps.scale;
+    const dy = yn - (pts[i].y - tps.minY) / tps.scale;
     const r = Math.sqrt(dx * dx + dy * dy);
     value += tps.w[i] * tpsPhi(r);
   }
