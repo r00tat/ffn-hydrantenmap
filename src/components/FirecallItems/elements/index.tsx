@@ -5,6 +5,7 @@ import { FirecallArea } from './FirecallArea';
 import { FirecallAssp } from './FirecallAssp';
 import { FirecallConnection } from './FirecallConnection';
 import { FirecallDiary } from './FirecallDiary';
+import { FirecallDrawing } from './FirecallDrawing';
 import { FirecallEinsatzleitung } from './FirecallEl';
 import { FirecallGb } from './FirecallGb';
 import { FirecallHydrant } from './FirecallHydrant';
@@ -29,6 +30,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   el: FirecallEinsatzleitung,
   hydrant: FirecallHydrant,
   diary: FirecallDiary,
+  drawing: FirecallDrawing,
   gb: FirecallGb,
 };
 
