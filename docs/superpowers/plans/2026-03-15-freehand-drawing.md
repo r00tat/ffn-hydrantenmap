@@ -388,7 +388,6 @@ interface DrawingContextValue {
   activeColor: string;
   activeWidth: number;
   strokes: DrawingStroke[];
-  currentPoints: [number, number][];
   sessionItem?: DrawingSessionItem;
   startDrawing: (item: DrawingSessionItem) => void;
   commitStroke: (simplifiedPoints: [number, number][]) => void;
@@ -408,7 +407,6 @@ export const useDrawingProvider = (): DrawingContextValue => {
   const [activeColor, setActiveColor] = useState('#ff0000');
   const [activeWidth, setActiveWidth] = useState(5);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
-  const [currentPoints, setCurrentPoints] = useState<[number, number][]>([]);
   const [sessionItem, setSessionItem] = useState<DrawingSessionItem>();
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
@@ -416,7 +414,6 @@ export const useDrawingProvider = (): DrawingContextValue => {
   const startDrawing = useCallback((item: DrawingSessionItem) => {
     setSessionItem(item);
     setStrokes([]);
-    setCurrentPoints([]);
     setIsDrawing(true);
   }, []);
 
@@ -432,8 +429,7 @@ export const useDrawingProvider = (): DrawingContextValue => {
         };
         return [...prev, newStroke];
       });
-      setCurrentPoints([]);
-    },
+      },
     [activeColor, activeWidth]
   );
 
@@ -481,13 +477,11 @@ export const useDrawingProvider = (): DrawingContextValue => {
     setIsDrawing(false);
     setStrokes([]);
     setSessionItem(undefined);
-    setCurrentPoints([]);
   }, [sessionItem, strokes, firecallId, email]);
 
   const cancel = useCallback(() => {
     setIsDrawing(false);
     setStrokes([]);
-    setCurrentPoints([]);
     setSessionItem(undefined);
   }, []);
 
@@ -496,7 +490,6 @@ export const useDrawingProvider = (): DrawingContextValue => {
     activeColor,
     activeWidth,
     strokes,
-    currentPoints,
     sessionItem,
     startDrawing,
     commitStroke,
