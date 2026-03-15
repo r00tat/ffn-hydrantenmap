@@ -564,6 +564,13 @@ export function buildInterpolationGrid(params: {
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
 
+  // Pre-compute data range for TPS exterior clamping (see below).
+  let dataMin = Infinity, dataMax = -Infinity;
+  for (let i = 0; i < allValues.length; i++) {
+    if (allValues[i] < dataMin) dataMin = allValues[i];
+    if (allValues[i] > dataMax) dataMax = allValues[i];
+  }
+
   // Build spatial index for fast neighbor queries.
   const spatialIndex = buildSpatialIndex(points);
   // IDW search radius: 5× buffer gives enough nearby points for accurate
@@ -583,6 +590,7 @@ export function buildInterpolationGrid(params: {
       // Only alpha (opacity) is used for fading — the interpolated COLOR is
       // never distorted. IDW handles value blending naturally between points.
       let alpha = 1.0;
+      let isOutsideHull = false;
 
       if (isDegenerate) {
         // For < 3 non-collinear points: use pure point-proximity boundary
@@ -625,6 +633,7 @@ export function buildInterpolationGrid(params: {
             alpha = 1 - (nearestDist - bufferPx) / (interiorMaxDist - bufferPx);
           }
         } else {
+          isOutsideHull = true;
           // Outside hull: render within bufferPx of a data point with fade
           const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
           if (nearbyIds.length === 0) continue;
@@ -643,10 +652,17 @@ export function buildInterpolationGrid(params: {
       }
 
       // Compute interpolated value — IDW or TPS depending on algorithm.
-      const value =
+      let value =
         algorithm === 'spline' && tpsWeights
           ? evaluateTPS(cx, cy, tpsWeights)
           : idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+
+      // Outside the convex hull the TPS polynomial term grows unboundedly,
+      // producing values above the outermost data points. Clamp to data range
+      // so the fade region never shows colours brighter than any measurement.
+      if (isOutsideHull && algorithm === 'spline') {
+        value = Math.max(dataMin, Math.min(dataMax, value));
+      }
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
