@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PlaylistAddIcon from '@mui/icons-material/PlaylistAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SmsIcon from '@mui/icons-material/Sms';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Fab from '@mui/material/Fab';
@@ -22,6 +23,7 @@ import {
   getGroupsAction,
   updateGroupAction,
 } from './GroupAction';
+import BlaulichtsmsCredentialsDialog from './BlaulichtsmsCredentialsDialog';
 import GroupDialog from './GroupDialog';
 import { Group, KNOWN_GROUPS } from './groupTypes';
 
@@ -30,8 +32,9 @@ interface UserRowButtonParams {
 
   editFn: (group: Group) => void;
   deleteFn: (group: Group) => void;
+  configBlsFn: (group: Group) => void;
 }
-function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
+function GroupRowButtons({ row, editFn, deleteFn, configBlsFn }: UserRowButtonParams) {
   return (
     <>
       <Tooltip title={`Edit ${row.name}`}>
@@ -53,6 +56,16 @@ function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
           color="warning"
         >
           <DeleteIcon />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="BlaulichtSMS Zugangsdaten">
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            configBlsFn(row);
+          }}
+        >
+          <SmsIcon />
         </IconButton>
       </Tooltip>
     </>
@@ -87,6 +100,7 @@ export default function Groups() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();
+  const [blsGroup, setBlsGroup] = useState<Group | undefined>();
   const [groups, getGroups, users] = useGroupList();
 
   const missingKnownGroups = useMemo(() => {
@@ -111,6 +125,10 @@ export default function Groups() {
     setEditGroup(group);
     console.info(`confirm group delete: ${JSON.stringify(group)}`);
     setIsConfirmOpen(true);
+  }, []);
+
+  const configBlsAction = useCallback((group: Group) => {
+    setBlsGroup(group);
   }, []);
 
   const deleteAction = useCallback(
@@ -171,6 +189,7 @@ export default function Groups() {
                   row={group}
                   editFn={editAction}
                   deleteFn={showDeleteConfirm}
+                  configBlsFn={configBlsAction}
                 />
               </Grid>
               <Grid size={{ xs: 5, md: 3, lg: 3 }}>{group.id}</Grid>
@@ -210,6 +229,13 @@ export default function Groups() {
             }
             setIsConfirmOpen(false);
           }}
+        />
+      )}
+
+      {blsGroup && (
+        <BlaulichtsmsCredentialsDialog
+          group={blsGroup}
+          onClose={() => setBlsGroup(undefined)}
         />
       )}
 
