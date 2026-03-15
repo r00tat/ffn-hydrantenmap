@@ -99,8 +99,12 @@ function generateSchemaFromFeatures(
 
 function parseGeoJson(
   geojson: GeoJsonFeatureColleaction,
-  schema: DataSchemaField[]
+  schema: DataSchemaField[],
+  headerToSchemaKey: Map<string, string>
 ): FirecallItem[] {
+  // Build reverse map: schemaKey → field (for type coercion)
+  const schemaByKey = new Map(schema.map((f) => [f.key, f]));
+
   return geojson.features.map((f) => {
     const latlng = GeoPosition.fromGeoJsonPosition(
       f.geometry.type === 'Point'
@@ -109,10 +113,11 @@ function parseGeoJson(
     );
 
     const fieldData: Record<string, string | number | boolean> = {};
-    for (const field of schema) {
-      const value = f.properties[field.key];
-      if (value !== undefined && value !== null) {
-        fieldData[field.key] = coerceValue(value, field.type);
+    for (const [originalKey, schemaKey] of headerToSchemaKey.entries()) {
+      const value = f.properties[originalKey];
+      const field = schemaByKey.get(schemaKey);
+      if (value !== undefined && value !== null && field) {
+        fieldData[schemaKey] = coerceValue(value, field.type);
       }
     }
 
@@ -134,10 +139,8 @@ function parseGeoJson(
       (item as FcMarker).color = f.properties.fill;
       (item as FcMarker).iconUrl = f.properties.icon;
     } else if (f.geometry.type === 'LineString') {
-      // line
       item.type = 'line';
       const lineString = f.geometry as LineString;
-
       (item as Line).positions = JSON.stringify(
         lineString.coordinates.map((c) =>
           GeoPosition.fromGeoJsonPosition(c).toLatLngPosition()
@@ -146,7 +149,6 @@ function parseGeoJson(
       const dest = GeoPosition.fromGeoJsonPosition(
         lineString.coordinates[lineString.coordinates.length - 1]
       );
-
       (item as Line).destLat = dest.lat;
       (item as Line).destLng = dest.lng;
       (item as Line).opacity = f.properties['fill-opacity']
@@ -156,17 +158,14 @@ function parseGeoJson(
     } else if (f.geometry.type === 'Polygon') {
       const polygon = f.geometry as Polygon;
       item.type = 'area';
-
       (item as FirecallArea).positions = JSON.stringify(
         polygon.coordinates[0].map((c) =>
           GeoPosition.fromGeoJsonPosition(c).toLatLngPosition()
         )
       );
-
       const dest = GeoPosition.fromGeoJsonPosition(
         polygon.coordinates[0][polygon.coordinates[0].length - 1]
       );
-
       (item as Line).destLat = dest.lat;
       (item as Line).destLng = dest.lng;
       (item as Line).opacity = f.properties['fill-opacity']
