@@ -125,6 +125,18 @@ jobs:
       #       AUTH_SECRET=AUTH_SECRET:latest
       #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
       - name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v2"
         if: ${{ env.workload_identity_provider != '' }}
