@@ -214,6 +214,28 @@ export default function KmlImport() {
     setPreview(parseKmlFile(kmlText, file.name));
   }, []);
 
+  const handleSchemaChange = useCallback(
+    (newSchema: DataSchemaField[]) => {
+      if (!preview) return;
+      // Rebuild headerToSchemaKey: match old schema fields to new by index
+      // so renaming a key updates the map value
+      const oldSchema = preview.schema;
+      const newHeaderToSchemaKey = new Map(preview.headerToSchemaKey);
+      for (const [origKey, oldSchemaKey] of newHeaderToSchemaKey.entries()) {
+        const oldIdx = oldSchema.findIndex((f) => f.key === oldSchemaKey);
+        if (oldIdx >= 0 && oldIdx < newSchema.length) {
+          newHeaderToSchemaKey.set(origKey, newSchema[oldIdx].key);
+        }
+      }
+      setPreview({
+        ...preview,
+        schema: newSchema,
+        headerToSchemaKey: newHeaderToSchemaKey,
+      });
+    },
+    [preview]
+  );
+
   const handleImport = useCallback(async () => {
     if (!preview) return;
     setPreview(null);
@@ -320,7 +342,7 @@ export default function KmlImport() {
 
               <DataSchemaEditor
                 dataSchema={preview.schema}
-                onChange={(schema) => setPreview({ ...preview, schema })}
+                onChange={handleSchemaChange}
               />
             </Box>
           </DialogContent>
