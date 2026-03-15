@@ -99,6 +99,13 @@ export interface FirecallLayer extends FirecallItem {
   heatmapConfig?: HeatmapConfig;
 }
 
+export interface DrawingStroke {
+  color: string; // hex color, e.g. '#ff0000'
+  width: number; // stroke width in pixels, 1–20
+  points: number[][]; // [[lat, lng], ...] — RDP-simplified geo coords
+  order: number; // ascending integer — determines render order
+}
+
 export interface FcAttachment {
   name: string;
   mimeType?: string;
