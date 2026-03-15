@@ -87,6 +87,8 @@ export interface HeatmapConfig {
   interpolationPower?: number;
   /** Interpolation surface opacity 0-1 (default 0.6) */
   interpolationOpacity?: number;
+  /** Interpolation algorithm: 'idw' (default) or 'spline' (Thin-Plate Spline) */
+  interpolationAlgorithm?: 'idw' | 'spline';
 }
 
 export interface FirecallLayer extends FirecallItem {
