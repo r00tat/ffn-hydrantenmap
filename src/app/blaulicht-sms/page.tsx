@@ -2,17 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Container,
-  Typography,
+  Box,
   Card,
   CardContent,
   CardHeader,
-  Box,
-  CircularProgress,
   Chip,
+  CircularProgress,
+  Container,
+  Typography,
 } from '@mui/material';
 import { getBlaulichtSmsAlarms, BlaulichtSmsAlarm } from './actions';
+import { hasBlaulichtsmsConfig } from './credentialsActions';
 import AlarmMap from './Map';
+import useFirecall from '../../hooks/useFirecall';
 
 const AlarmCard = ({ alarm }: { alarm: BlaulichtSmsAlarm }) => {
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
@@ -146,22 +148,39 @@ const AlarmCard = ({ alarm }: { alarm: BlaulichtSmsAlarm }) => {
 const BlaulichtSmsPage = () => {
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [noCredentials, setNoCredentials] = useState(false);
+  const firecall = useFirecall();
+  const groupId = firecall?.group;
 
   useEffect(() => {
-    const fetchAlarms = async () => {
+    const loadData = async () => {
+      if (!groupId) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      const fetchedAlarms = await getBlaulichtSmsAlarms();
-      // Sort alarms by date, newest first
-      const sortedAlarms = fetchedAlarms.sort(
-        (a, b) =>
-          new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
-      );
-      setAlarms(sortedAlarms);
-      setLoading(false);
+      setNoCredentials(false);
+
+      try {
+        const [hasCreds, fetchedAlarms] = await Promise.all([
+          hasBlaulichtsmsConfig(groupId),
+          getBlaulichtSmsAlarms(groupId),
+        ]);
+        setNoCredentials(!hasCreds);
+        const sorted = [...fetchedAlarms].sort(
+          (a, b) =>
+            new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
+        );
+        setAlarms(sorted);
+      } catch (err) {
+        console.error('Failed to load BlaulichtSMS data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    fetchAlarms();
-  }, []);
+    loadData();
+  }, [groupId]);
 
   const currentAlarm = alarms.length > 0 ? alarms[0] : null;
   const recentAlarms = alarms.length > 1 ? alarms.slice(1) : [];
@@ -176,6 +195,15 @@ const BlaulichtSmsPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
           <CircularProgress />
         </Box>
+      ) : !groupId ? (
+        <Typography variant="body1" sx={{ mt: 4 }}>
+          Kein aktiver Einsatz ausgewählt.
+        </Typography>
+      ) : noCredentials ? (
+        <Typography variant="body1" sx={{ mt: 4 }}>
+          Keine BlaulichtSMS-Zugangsdaten für diese Gruppe konfiguriert. Bitte
+          in den Admin-Einstellungen hinterlegen.
+        </Typography>
       ) : (
         <>
           {currentAlarm && (
@@ -200,7 +228,7 @@ const BlaulichtSmsPage = () => {
 
           {!currentAlarm && !recentAlarms.length && (
             <Typography variant="body1" sx={{ mt: 4 }}>
-              No alarms found.
+              Keine Alarme gefunden.
             </Typography>
           )}
         </>
