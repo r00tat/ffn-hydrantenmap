@@ -9,6 +9,8 @@ import {
   buildInterpolationGrid,
   computeConvexHull,
   DataPoint,
+  solveTPS,
+  TpsWeights,
 } from '../../../common/interpolation';
 
 /**
@@ -35,6 +37,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       _colorLUT: Uint8Array;
       _config: HeatmapConfig;
       _allValues: number[];
+      _tpsWeights: TpsWeights | null;
     } & L.Layer,
     latlngs: { lat: number; lng: number; value: number }[],
     centerLat: number,
@@ -48,6 +51,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
     this._colorLUT = colorLUT;
     this._config = config;
     this._allValues = allValues;
+    this._tpsWeights = null;
     L.setOptions(this, options);
   },
 
@@ -110,6 +114,12 @@ const InterpolationCanvasLayer = L.Layer.extend({
       pixelPoints.push({ x: Math.round(p.x + bufferPx), y: Math.round(p.y + bufferPx), value: ll.value });
     }
 
+    this._points = pixelPoints;
+
+    const algo = (this._config.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline';
+    this._tpsWeights =
+      algo === 'spline' && this._points.length >= 3 ? solveTPS(this._points) : null;
+
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
 
@@ -125,6 +135,8 @@ const InterpolationCanvasLayer = L.Layer.extend({
       colorLUT: this._colorLUT,
       config: this._config,
       allValues: this._allValues,
+      algorithm: (this._config.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline',
+      tpsWeights: this._tpsWeights ?? undefined,
     });
 
     const ctx = canvas.getContext('2d');
