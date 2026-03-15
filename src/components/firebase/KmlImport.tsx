@@ -1,8 +1,16 @@
 import { kml as toGeoJSON } from '@mapbox/togeojson';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
 import {
   FeatureCollection,
   Geometry,
@@ -196,55 +204,60 @@ function parseKmlFile(kmlText: string, fileName: string): KmlPreviewState {
 
 export default function KmlImport() {
   const [uploadInProgress, setUploadInProgress] = useState(false);
-
+  const [preview, setPreview] = useState<KmlPreviewState | null>(null);
   const addFirecallItem = useFirecallItemAdd();
 
-  const handleUpload = useCallback(
-    async (files: FileList): Promise<void> => {
-      console.log(`kml import upload change `, files);
+  const handleFileSelect = useCallback(async (files: FileList) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const kmlText = await readFileAsText(file);
+    setPreview(parseKmlFile(kmlText, file.name));
+  }, []);
 
-      if (files) {
-        setUploadInProgress(true);
+  const handleImport = useCallback(async () => {
+    if (!preview) return;
+    setPreview(null);
+    setUploadInProgress(true);
 
-        const refs = await Promise.allSettled(
-          Array.from(files).map(async (file) => {
-            try {
-              console.log(`uploading ${file.name}`);
-              const kmlData = await readFileAsText(file);
+    try {
+      const { geoJson, schema, headerToSchemaKey, layerName } = preview;
+      const fcItems = parseGeoJson(geoJson, schema, headerToSchemaKey);
 
-              const geoJson = kmlToGeoJson(kmlData);
+      const layer = await addFirecallItem({
+        name: layerName || `KML Import ${formatTimestamp(new Date())}`,
+        type: 'layer',
+        dataSchema: schema,
+      } as FirecallItem);
 
-              const schema = generateSchemaFromFeatures(geoJson.features);
+      await Promise.allSettled(
+        fcItems.map((i) => ({ ...i, layer: layer.id })).map(addFirecallItem)
+      );
+    } catch (err) {
+      console.error('Failed to import KML', err);
+    }
 
-              const fcItems = parseGeoJson(geoJson, schema);
+    setUploadInProgress(false);
+  }, [preview, addFirecallItem]);
 
-              // console.log(`importing Kml \n${JSON.stringify(fcItems)}`);
+  // Compute per-type counts from features
+  const typeCounts = preview
+    ? preview.geoJson.features.reduce(
+        (acc, f) => {
+          const t = f.geometry.type;
+          acc[t] = (acc[t] ?? 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>
+      )
+    : {};
 
-              const layer = await addFirecallItem({
-                name: `KML Import ${formatTimestamp(new Date())}`,
-                type: 'layer',
-                dataSchema: schema,
-              } as FirecallItem);
-              await Promise.allSettled(
-                fcItems
-                  .map((i) => ({ ...i, layer: layer.id }))
-                  .map(addFirecallItem)
-              );
+  const totalCount = Object.values(typeCounts).reduce((a, b) => a + b, 0);
 
-              // console.debug(`import finished with IDs: ${ref.id}`);
-              // return ref;
-            } catch (err) {
-              console.error('failed to parse geojson', err);
-            }
-          })
-        );
-        // .filter((p) => p.status === 'fulfilled');
-        // .map((p) => (p as PromiseFulfilledResult<StorageReference>).value);
-        setUploadInProgress(false);
-      }
-    },
-    [addFirecallItem]
-  );
+  const TYPE_LABELS: Record<string, string> = {
+    Point: 'Punkte',
+    LineString: 'Linien',
+    Polygon: 'Flächen',
+  };
 
   return (
     <>
@@ -257,11 +270,10 @@ export default function KmlImport() {
         <VisuallyHiddenInput
           type="file"
           accept=".kml,text/xml,application/vnd.google-earth.kml+xml"
-          // multiple
           onChange={(event) => {
             (async () => {
               if (event.target.files) {
-                await handleUpload(event.target.files);
+                await handleFileSelect(event.target.files);
                 event.target.value = '';
               }
             })();
@@ -270,9 +282,59 @@ export default function KmlImport() {
       </Button>
       {uploadInProgress && (
         <>
-          <Typography>Uploading ... </Typography>
-          <CircularProgress />
+          <Typography component="span" sx={{ ml: 1 }}>
+            Importiere...
+          </Typography>
+          <CircularProgress size={20} sx={{ ml: 1 }} />
         </>
+      )}
+      {preview && (
+        <Dialog
+          open
+          onClose={() => setPreview(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>KML Import</DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+              <TextField
+                label="Ebenenname"
+                size="small"
+                fullWidth
+                value={preview.layerName}
+                onChange={(e) =>
+                  setPreview({ ...preview, layerName: e.target.value })
+                }
+              />
+
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {Object.entries(typeCounts).map(([type, count]) => (
+                  <Chip
+                    key={type}
+                    label={`${count} ${TYPE_LABELS[type] ?? type}`}
+                    size="small"
+                  />
+                ))}
+              </Box>
+
+              <DataSchemaEditor
+                dataSchema={preview.schema}
+                onChange={(schema) => setPreview({ ...preview, schema })}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPreview(null)}>Abbrechen</Button>
+            <Button
+              variant="contained"
+              onClick={handleImport}
+              disabled={totalCount === 0}
+            >
+              {totalCount} Objekte importieren
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </>
   );
