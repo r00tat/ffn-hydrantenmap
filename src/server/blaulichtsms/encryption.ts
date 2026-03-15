@@ -55,6 +55,12 @@ export async function decryptPassword(encrypted: string): Promise<string> {
   const iv = Buffer.from(ivHex, 'hex');
   const ciphertext = Buffer.from(ciphertextHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
+  if (iv.length !== 12) {
+    throw new Error(`Invalid IV length: expected 12 bytes, got ${iv.length}`);
+  }
+  if (authTag.length !== 16) {
+    throw new Error(`Invalid auth tag length: expected 16 bytes, got ${authTag.length}`);
+  }
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
   const decrypted = Buffer.concat([
