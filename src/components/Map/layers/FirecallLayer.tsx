@@ -58,6 +58,7 @@ export default function FirecallLayer({
       .map((layer) => getOverlayName(layer));
     if (heatmapNames.length > 0) {
       seededRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleOverlays((prev) => {
         const next = new Set(prev);
         heatmapNames.forEach((name) => next.add(name));
