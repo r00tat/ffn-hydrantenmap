@@ -33,10 +33,12 @@ interface DrawingContextValue {
   activeColor: string;
   activeWidth: number;
   strokes: DrawingStroke[];
+  redoStack: DrawingStroke[];
   sessionItem?: DrawingSessionItem;
   startDrawing: (item: DrawingSessionItem) => void;
   commitStroke: (simplifiedPoints: [number, number][]) => void;
   undoLastStroke: () => void;
+  redoLastStroke: () => void;
   setColor: (color: string) => void;
   setWidth: (width: number) => void;
   save: () => Promise<void>;
@@ -52,6 +54,7 @@ export const useDrawingProvider = (): DrawingContextValue => {
   const [activeColor, setActiveColor] = useState('#ff0000');
   const [activeWidth, setActiveWidth] = useState(5);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
+  const [redoStack, setRedoStack] = useState<DrawingStroke[]>([]);
   const [sessionItem, setSessionItem] = useState<DrawingSessionItem>();
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
@@ -59,12 +62,14 @@ export const useDrawingProvider = (): DrawingContextValue => {
   const startDrawing = useCallback((item: DrawingSessionItem) => {
     setSessionItem(item);
     setStrokes([]);
+    setRedoStack([]);
     setIsDrawing(true);
   }, []);
 
   const commitStroke = useCallback(
     (simplifiedPoints: [number, number][]) => {
       if (simplifiedPoints.length < 2) return;
+      setRedoStack([]); // new stroke clears redo history
       setStrokes((prev) => {
         const newStroke: DrawingStroke = {
           color: activeColor,
@@ -79,7 +84,21 @@ export const useDrawingProvider = (): DrawingContextValue => {
   );
 
   const undoLastStroke = useCallback(() => {
-    setStrokes((prev) => prev.slice(0, -1));
+    setStrokes((prev) => {
+      if (prev.length === 0) return prev;
+      const removed = prev[prev.length - 1];
+      setRedoStack((r) => [...r, removed]);
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const redoLastStroke = useCallback(() => {
+    setRedoStack((prev) => {
+      if (prev.length === 0) return prev;
+      const restored = prev[prev.length - 1];
+      setStrokes((s) => [...s, { ...restored, order: s.length }]);
+      return prev.slice(0, -1);
+    });
   }, []);
 
   const setColor = useCallback((color: string) => setActiveColor(color), []);
@@ -111,12 +130,13 @@ export const useDrawingProvider = (): DrawingContextValue => {
       );
 
       // Batch-write strokes to subcollection
+      // Firestore does not support nested arrays, so flatten points to [lat, lng, lat, lng, ...]
       const batch = writeBatch(firestore);
       for (const stroke of strokes) {
         const strokeRef = doc(
           collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID, itemRef.id, 'stroke')
         );
-        batch.set(strokeRef, stroke);
+        batch.set(strokeRef, { ...stroke, points: stroke.points.flat() });
       }
       await batch.commit();
 
@@ -132,6 +152,7 @@ export const useDrawingProvider = (): DrawingContextValue => {
   const cancel = useCallback(() => {
     setIsDrawing(false);
     setStrokes([]);
+    setRedoStack([]);
     setSessionItem(undefined);
   }, []);
 
@@ -140,10 +161,12 @@ export const useDrawingProvider = (): DrawingContextValue => {
     activeColor,
     activeWidth,
     strokes,
+    redoStack,
     sessionItem,
     startDrawing,
     commitStroke,
     undoLastStroke,
+    redoLastStroke,
     setColor,
     setWidth,
     save,

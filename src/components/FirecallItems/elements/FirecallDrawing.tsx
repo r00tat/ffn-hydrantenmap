@@ -1,3 +1,4 @@
+import L, { Icon, IconOptions } from 'leaflet';
 import React, { ReactNode } from 'react';
 import { FirecallItem } from '../../firebase/firestore';
 import { FirecallItemBase } from './FirecallItemBase';
@@ -22,6 +23,15 @@ export class FirecallDrawing extends FirecallItemBase {
     return {
       name: 'Name',
     };
+  }
+
+  public icon(): Icon<IconOptions> {
+    return L.icon({
+      iconUrl: '/icons/zeichnung.svg',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+      popupAnchor: [0, 0],
+    });
   }
 
   public static factory(): FirecallItemBase {

@@ -1,5 +1,6 @@
 'use client';
 
+import RedoIcon from '@mui/icons-material/Redo';
 import UndoIcon from '@mui/icons-material/Undo';
 import {
   Box,
@@ -97,6 +98,19 @@ export default function DrawingToolbar() {
               onClick={drawing.undoLastStroke}
             >
               <UndoIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        {/* Redo */}
+        <Tooltip title="Letzten Strich wiederherstellen">
+          <span>
+            <IconButton
+              size="small"
+              disabled={drawing.redoStack.length === 0}
+              onClick={drawing.redoLastStroke}
+            >
+              <RedoIcon />
             </IconButton>
           </span>
         </Tooltip>

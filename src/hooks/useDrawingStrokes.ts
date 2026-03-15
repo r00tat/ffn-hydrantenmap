@@ -29,7 +29,19 @@ export function useDrawingStrokes(itemId?: string): DrawingStroke[] {
 
     getDocs(q)
       .then((snapshot) => {
-        setStrokes(snapshot.docs.map((doc) => doc.data() as DrawingStroke));
+        setStrokes(
+          snapshot.docs.map((d) => {
+            const raw = d.data() as Omit<DrawingStroke, 'points'> & {
+              points: number[];
+            };
+            // Firestore stores points as flat [lat, lng, lat, lng, ...]
+            const points: [number, number][] = [];
+            for (let i = 0; i + 1 < raw.points.length; i += 2) {
+              points.push([raw.points[i], raw.points[i + 1]]);
+            }
+            return { ...raw, points };
+          })
+        );
       })
       .catch((error) => {
         console.error('Failed to load drawing strokes:', error);
