@@ -135,7 +135,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       colorLUT: this._colorLUT,
       config: this._config,
       allValues: this._allValues,
-      algorithm: (this._config.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline',
+      algorithm: algo,
       tpsWeights: this._tpsWeights ?? undefined,
     });
 
