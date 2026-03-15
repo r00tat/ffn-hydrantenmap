@@ -127,6 +127,12 @@ service cloud.firestore {
       allow write: if adminUser();
     }
 
+    // BlaulichtSMS per-group credentials (encrypted passwords).
+    // Access is only through server-side Admin SDK actions — no direct client reads intended.
+    match /blaulichtsmsConfig/{doc=**} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
