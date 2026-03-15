@@ -82,13 +82,14 @@ export default function BlaulichtsmsCredentialsDialog({ group, onClose }: Props)
         username,
         password: password || undefined,
       });
-      await loadConfig();
     } catch (err) {
       setError('Fehler beim Speichern der Konfiguration.');
       console.error(err);
-    } finally {
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    await loadConfig();
   };
 
   const handleDelete = async () => {
