@@ -1,5 +1,5 @@
 import L, { LatLng } from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Marker, Polyline, useMap } from 'react-leaflet';
 import { leafletIcons } from '../../FirecallItems/icons';
 import { useLeitungen } from './context';
@@ -23,9 +23,9 @@ const LeitungenDraw = () => {
 
   // Use refs so the capture handler always sees current state
   const positionsRef = useRef(positions);
-  positionsRef.current = positions;
+  useLayoutEffect(() => { positionsRef.current = positions; });
   const completeRef = useRef(complete);
-  completeRef.current = complete;
+  useLayoutEffect(() => { completeRef.current = complete; });
 
   // During drawing mode, capture clicks on the map container in the
   // capture phase (before Leaflet's event delegation). This ensures
