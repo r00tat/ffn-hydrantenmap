@@ -150,6 +150,38 @@ resource "google_secret_manager_secret_iam_member" "secret_access" {
   member    = google_service_account.run_sa.member
 }
 
+# ============================================================================
+# BlaulichtSMS Encryption Key
+# ============================================================================
+
+resource "random_id" "blaulichtsms_encryption_key" {
+  byte_length = 32
+}
+
+resource "google_secret_manager_secret" "blaulichtsms_encryption_key" {
+  secret_id = "BLAULICHTSMS_ENCRYPTION_KEY"
+  project   = var.project
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "blaulichtsms_encryption_key" {
+  secret      = google_secret_manager_secret.blaulichtsms_encryption_key.id
+  secret_data = random_id.blaulichtsms_encryption_key.hex
+
+  lifecycle {
+    ignore_changes = [secret_data]
+  }
+}
+
+resource "google_secret_manager_secret_iam_member" "blaulichtsms_encryption_key_access" {
+  secret_id = google_secret_manager_secret.blaulichtsms_encryption_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.run_sa.member
+}
+
 import {
   to = google_secret_manager_secret.secrets["AUTH_SECRET"]
   id = "projects/${var.project}/secrets/AUTH_SECRET"
