@@ -69,7 +69,7 @@ const KML_STYLE_PROPERTIES = new Set([
 
 function generateSchemaFromFeatures(
   features: GeoJsonFeatureColleaction['features']
-): DataSchemaField[] {
+): { schema: DataSchemaField[]; headerToSchemaKey: Map<string, string> } {
   const fieldMap = new Map<string, Set<DataSchemaField['type']>>();
 
   for (const feature of features) {
@@ -81,12 +81,20 @@ function generateSchemaFromFeatures(
     }
   }
 
-  return Array.from(fieldMap.entries()).map(([key, types]) => ({
-    key,
-    label: key,
-    unit: '',
-    type: types.size === 1 ? types.values().next().value! : 'text',
-  }));
+  const schema: DataSchemaField[] = Array.from(fieldMap.entries()).map(
+    ([key, types]) => ({
+      key,
+      label: key,
+      unit: '',
+      type: types.size === 1 ? types.values().next().value! : 'text',
+    })
+  );
+
+  const headerToSchemaKey = new Map<string, string>(
+    schema.map((f) => [f.key, f.key])
+  );
+
+  return { schema, headerToSchemaKey };
 }
 
 function parseGeoJson(
