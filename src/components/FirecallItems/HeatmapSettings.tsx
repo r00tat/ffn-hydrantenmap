@@ -281,6 +281,18 @@ export default function HeatmapSettings({
                     : 'Spline (Thin-Plate): Glatte Fläche durch alle Messpunkte – kann Werte außerhalb des gemessenen Bereichs schätzen. Gut für physikalische Felder wie Strahlung oder Temperatur.'}
                 </Typography>
               </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!current.interpolationLogScale}
+                    onChange={(e) => update({ interpolationLogScale: e.target.checked })}
+                  />
+                }
+                label="Logarithmische Interpolation"
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Interpoliert im Log-Raum – erzeugt exponentielle Gradienten um Hotspots (z.B. Strahlung).
+              </Typography>
               <Box>
                 <Typography variant="body2" gutterBottom>
                   Radius: {current.interpolationRadius ?? 30}m

@@ -16,10 +16,6 @@ import {
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import {
   idwInterpolate,
-  computeConvexHull,
-  pointInPolygon,
-  solveTPS,
-  evaluateTPS,
   DataPoint,
 } from '../../../common/interpolation';
 import HeatmapOverlay from './HeatmapOverlay';
@@ -57,6 +53,8 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
   const historyPathSegments = useHistoryPathSegments();
   const heatmapConfig = layer.heatmapConfig;
   const popupRef = useRef<L.Popup | null>(null);
+  // Ref to the interpolation layer for direct value lookups on click.
+  const interpLayerRef = useRef<any>(null);
 
   const queryConstraints = useMemo(
     () => (layer.id ? [where('layer', '==', layer.id)] : []),
@@ -119,17 +117,6 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
 
   const isInterpolation = heatmapConfig?.visualizationMode === 'interpolation';
 
-  // Convex hull and TPS weights for click interpolation (meter-space)
-  const clickHull = useMemo(
-    () => idwPoints.length >= 3 ? computeConvexHull(idwPoints) : [],
-    [idwPoints],
-  );
-  const algo = (heatmapConfig?.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline';
-  const clickTps = useMemo(
-    () => algo === 'spline' && idwPoints.length >= 3 ? solveTPS(idwPoints) : null,
-    [idwPoints, algo],
-  );
-
   const handleMapClick = useCallback(
     (e: L.LeafletMouseEvent) => {
       if (!fieldInfo || idwPoints.length === 0) return;
@@ -140,22 +127,18 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
         popupRef.current = null;
       }
 
-      const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
+      let value: number | undefined;
 
-      // Check if click is within the colored area
       if (isInterpolation) {
-        // Point-proximity boundary: only respond within bufferM of a data point
-        const bufferM = heatmapConfig?.interpolationRadius ?? 30;
-        let nearestDist = Infinity;
-        for (const p of idwPoints) {
-          const dx = clickM.x - p.x;
-          const dy = clickM.y - p.y;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < nearestDist) nearestDist = d;
-        }
-        if (nearestDist > bufferM) return;
+        // Look up the exact value from the rendered interpolation grid.
+        // This guarantees the popup matches the displayed colour.
+        const layer = interpLayerRef.current;
+        const gridVal = layer?.getValueAtLatLng?.(e.latlng) as number | null;
+        if (gridVal == null) return; // click outside rendered area
+        value = gridVal;
       } else {
-        // Heatmap: within radius of any data point
+        // Heatmap mode: check within radius and use IDW
+        const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
         const radiusM = heatmapConfig?.radius ?? 30;
         let withinRadius = false;
         for (const p of idwPoints) {
@@ -167,37 +150,11 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
           }
         }
         if (!withinRadius) return;
-      }
 
-      // Outside the hull, fade value toward data minimum with distance
-      // (same logic as buildInterpolationGrid).
-      const insideHull = clickHull.length >= 3 && pointInPolygon(clickM.x, clickM.y, clickHull);
-      const bufferM = heatmapConfig?.interpolationRadius ?? 30;
-      let value: number;
-      if (!insideHull) {
-        // Nearest data point value, faded toward data min by distance
-        let nearestDistSq = Infinity;
-        let nearestVal = 0;
-        let dataMin = Infinity;
-        for (const p of idwPoints) {
-          const dx = clickM.x - p.x;
-          const dy = clickM.y - p.y;
-          const dSq = dx * dx + dy * dy;
-          if (dSq < nearestDistSq) {
-            nearestDistSq = dSq;
-            nearestVal = p.value;
-          }
-          if (p.value < dataMin) dataMin = p.value;
-        }
-        const nearestDist = Math.sqrt(nearestDistSq);
-        const fade = 1 - nearestDist / bufferM;
-        value = dataMin + fade * (nearestVal - dataMin);
-      } else if (algo === 'spline' && clickTps) {
-        value = evaluateTPS(clickM.x, clickM.y, clickTps);
-      } else {
         const power = heatmapConfig?.interpolationPower ?? 2;
         value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
       }
+
       const rounded = Math.round(value * 100) / 100;
 
       const popup = L.popup({ closeOnClick: true })
@@ -209,7 +166,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
 
       popupRef.current = popup;
     },
-    [map, fieldInfo, idwPoints, refLat, heatmapConfig, isInterpolation, clickHull, clickTps, algo],
+    [map, fieldInfo, idwPoints, refLat, heatmapConfig, isInterpolation],
   );
 
   // Attach/detach click handler based on visibility
@@ -237,7 +194,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
   }
 
   return isInterpolation ? (
-    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
+    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} layerRef={interpLayerRef} />
   ) : (
     <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
   );

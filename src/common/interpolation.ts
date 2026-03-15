@@ -256,9 +256,8 @@ export interface TpsWeights {
   shiftX: number;
   shiftY: number;
   scale: number;
-  /** Data value range for clamping extrapolation */
+  /** Data minimum for clamping extrapolation undershoot */
   dataMin: number;
-  dataMax: number;
 }
 
 /**
@@ -294,14 +293,13 @@ export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
   // distances symmetric and avoids the φ(r) = r²ln(r) zero-crossing at r=1
   // falling in the middle of the typical distance range.
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  let dataMin = Infinity, dataMax = -Infinity;
+  let dataMin = Infinity;
   for (let i = 0; i < n; i++) {
     if (points[i].x < minX) minX = points[i].x;
     if (points[i].x > maxX) maxX = points[i].x;
     if (points[i].y < minY) minY = points[i].y;
     if (points[i].y > maxY) maxY = points[i].y;
     if (points[i].value < dataMin) dataMin = points[i].value;
-    if (points[i].value > dataMax) dataMax = points[i].value;
   }
   const shiftX = (maxX + minX) / 2;
   const shiftY = (maxY + minY) / 2;
@@ -408,7 +406,6 @@ export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
     shiftY,
     scale,
     dataMin,
-    dataMax,
   };
 }
 
@@ -431,7 +428,7 @@ export function evaluateTPS(x: number, y: number, tps: TpsWeights): number {
   // Clamp to data range: TPS is a global method and can overshoot/undershoot
   // between widely spaced points (like bending a metal plate). For visualization
   // purposes, clamping prevents extreme values from compressing the color scale.
-  return Math.max(tps.dataMin, Math.min(tps.dataMax, value));
+  return Math.max(tps.dataMin, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +568,7 @@ export function buildInterpolationGrid(params: {
   algorithm?: 'idw' | 'spline';
   /** Pre-solved TPS weights — required when algorithm === 'spline' */
   tpsWeights?: TpsWeights;
-}): ImageData {
+}): { imageData: ImageData; valueGrid: Float32Array; gridCols: number } {
   const {
     canvasWidth,
     canvasHeight,
@@ -591,14 +588,30 @@ export function buildInterpolationGrid(params: {
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
 
+  // Value grid: stores the final interpolated value per block for click lookup.
+  const gridCols = Math.ceil(canvasWidth / blockSize);
+  const gridRows = Math.ceil(canvasHeight / blockSize);
+  const valueGrid = new Float32Array(gridCols * gridRows).fill(NaN);
+  const logScale = !!config.interpolationLogScale;
+
+  // When log-scale is active, transform point values into log space before
+  // interpolation and exp() the result afterwards. This produces exponential
+  // gradients that match physical phenomena like radiation decay.
+  // Values ≤ 0 are floored to a small positive number so log() is safe.
+  const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+  const interpPoints = logScale
+    ? points.map((p) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
+    : points;
+  const interpAllValues = logScale ? allValues.map(safeLog) : allValues;
+
   // Data minimum for outside-hull value fade.
   let dataMinVal = Infinity;
-  for (let i = 0; i < allValues.length; i++) {
-    if (allValues[i] < dataMinVal) dataMinVal = allValues[i];
+  for (let i = 0; i < interpAllValues.length; i++) {
+    if (interpAllValues[i] < dataMinVal) dataMinVal = interpAllValues[i];
   }
 
-  // Build spatial index for fast neighbor queries.
-  const spatialIndex = buildSpatialIndex(points);
+  // Build spatial index for fast neighbor queries (coordinates unchanged).
+  const spatialIndex = buildSpatialIndex(interpPoints);
   // IDW search radius: 5× buffer gives enough nearby points for accurate
   // interpolation while skipping distant points with negligible weight.
   const searchRadius = bufferPx * 5;
@@ -621,7 +634,6 @@ export function buildInterpolationGrid(params: {
       let nearestOutsideValue: number | null = null;
       // Local value range of nearby data points (for TPS local clamping).
       let localMin = -Infinity;
-      let localMax = Infinity;
 
       if (isDegenerate) {
         // For < 3 non-collinear points: use pure point-proximity boundary
@@ -648,19 +660,17 @@ export function buildInterpolationGrid(params: {
 
           // Find nearest point distance and local value range
           let nearestDistSq = Infinity;
-          let lMin = Infinity, lMax = -Infinity;
+          let lMin = Infinity;
           for (let i = 0; i < nearbyIds.length; i++) {
-            const pt = points[nearbyIds[i]];
+            const pt = interpPoints[nearbyIds[i]];
             const dx = cx - pt.x;
             const dy = cy - pt.y;
             const dSq = dx * dx + dy * dy;
             if (dSq < nearestDistSq) nearestDistSq = dSq;
             if (pt.value < lMin) lMin = pt.value;
-            if (pt.value > lMax) lMax = pt.value;
           }
           const nearestDist = Math.sqrt(nearestDistSq);
           localMin = lMin;
-          localMax = lMax;
 
           // Fade alpha only in interior gaps (far from all data points).
           // No hull-edge fade — the outside-hull proximity fade handles
@@ -688,7 +698,7 @@ export function buildInterpolationGrid(params: {
           }
           const nearestDist = Math.sqrt(nearestDistSq);
           alpha = 1 - nearestDist / bufferPx;
-          nearestOutsideValue = points[nearestIdx].value;
+          nearestOutsideValue = interpPoints[nearestIdx].value;
         }
       }
 
@@ -703,19 +713,26 @@ export function buildInterpolationGrid(params: {
         value = dataMinVal + alpha * (nearest - dataMinVal);
       } else if (algorithm === 'spline' && tpsWeights) {
         value = evaluateTPS(cx, cy, tpsWeights);
-        // TPS is global: distant high-value points can pull up the surface
-        // beyond what local data supports. Clamp to the range of nearby
-        // data points so the surface stays consistent with local measurements.
-        value = Math.max(localMin, Math.min(localMax, value));
+        // TPS is global: distant high-value points can pull the surface below
+        // local data. Clamp to local minimum so values don't drop artificially.
+        value = Math.max(localMin, value);
       } else {
-        value = idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+        value = idwInterpolateIndexed(cx, cy, interpPoints, power, spatialIndex, searchRadius);
         // IDW with a wide search radius can also pull values beyond the local
         // data range when distant high-value points contribute. Apply same
         // local clamp as TPS.
-        if (localMax !== Infinity) {
-          value = Math.max(localMin, Math.min(localMax, value));
+        if (localMin !== -Infinity) {
+          value = Math.max(localMin, value);
         }
       }
+      // Transform back from log space before normalization.
+      if (logScale) value = Math.exp(value);
+
+      // Store in value grid for click lookup.
+      const gx = Math.floor(bx / blockSize);
+      const gy = Math.floor(by / blockSize);
+      valueGrid[gy * gridCols + gx] = value;
+
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
@@ -740,5 +757,5 @@ export function buildInterpolationGrid(params: {
     }
   }
 
-  return imageData;
+  return { imageData, valueGrid, gridCols };
 }
