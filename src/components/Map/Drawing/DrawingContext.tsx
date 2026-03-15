@@ -94,34 +94,39 @@ export const useDrawingProvider = (): DrawingContextValue => {
     const lat = allPoints.reduce((sum, [la]) => sum + la, 0) / allPoints.length;
     const lng = allPoints.reduce((sum, [, ln]) => sum + ln, 0) / allPoints.length;
 
-    // Write parent item
-    const itemRef = await addDoc(
-      collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID),
-      {
-        type: 'drawing',
-        name: sessionItem.name,
-        lat,
-        lng,
-        layer: sessionItem.layer || '',
-        created: new Date().toISOString(),
-        creator: email,
-        deleted: false,
-      }
-    );
-
-    // Batch-write strokes to subcollection
-    const batch = writeBatch(firestore);
-    for (const stroke of strokes) {
-      const strokeRef = doc(
-        collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID, itemRef.id, 'stroke')
+    try {
+      // Write parent item
+      const itemRef = await addDoc(
+        collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID),
+        {
+          type: 'drawing',
+          name: sessionItem.name,
+          lat,
+          lng,
+          layer: sessionItem.layer || '',
+          created: new Date().toISOString(),
+          creator: email,
+          deleted: false,
+        }
       );
-      batch.set(strokeRef, stroke);
-    }
-    await batch.commit();
 
-    setIsDrawing(false);
-    setStrokes([]);
-    setSessionItem(undefined);
+      // Batch-write strokes to subcollection
+      const batch = writeBatch(firestore);
+      for (const stroke of strokes) {
+        const strokeRef = doc(
+          collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID, itemRef.id, 'stroke')
+        );
+        batch.set(strokeRef, stroke);
+      }
+      await batch.commit();
+
+      setIsDrawing(false);
+      setStrokes([]);
+      setSessionItem(undefined);
+    } catch (error) {
+      console.error('Failed to save drawing:', error);
+      // Keep drawing mode open so user can retry
+    }
   }, [sessionItem, strokes, firecallId, email]);
 
   const cancel = useCallback(() => {

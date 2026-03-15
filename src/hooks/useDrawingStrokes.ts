@@ -27,9 +27,13 @@ export function useDrawingStrokes(itemId?: string): DrawingStroke[] {
     );
     const q = query(strokesRef, orderBy('order', 'asc'));
 
-    getDocs(q).then((snapshot) => {
-      setStrokes(snapshot.docs.map((doc) => doc.data() as DrawingStroke));
-    });
+    getDocs(q)
+      .then((snapshot) => {
+        setStrokes(snapshot.docs.map((doc) => doc.data() as DrawingStroke));
+      })
+      .catch((error) => {
+        console.error('Failed to load drawing strokes:', error);
+      });
   }, [itemId, firecallId]);
 
   return strokes;

@@ -10,7 +10,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from '@mui/material';
-import React from 'react';
+import React, { useState } from 'react';
 import { useDrawing } from './DrawingContext';
 
 const PRESET_COLORS = [
@@ -32,6 +32,7 @@ const PRESET_WIDTHS = [
 
 export default function DrawingToolbar() {
   const drawing = useDrawing();
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!drawing.isDrawing) return null;
 
@@ -39,7 +40,7 @@ export default function DrawingToolbar() {
     <Box
       sx={{
         position: 'fixed',
-        bottom: 32,
+        bottom: 'env(safe-area-inset-bottom, 32px)',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 1200,
@@ -105,8 +106,12 @@ export default function DrawingToolbar() {
           variant="contained"
           color="primary"
           size="small"
-          disabled={drawing.strokes.length === 0}
-          onClick={() => drawing.save()}
+          disabled={drawing.strokes.length === 0 || isSaving}
+          onClick={async () => {
+            setIsSaving(true);
+            await drawing.save();
+            setIsSaving(false);
+          }}
         >
           Fertig
         </Button>

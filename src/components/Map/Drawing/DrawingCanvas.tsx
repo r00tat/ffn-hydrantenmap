@@ -21,9 +21,11 @@ export default function DrawingCanvas() {
     if (!drawing.isDrawing) return;
     map.dragging.disable();
     map.scrollWheelZoom.disable();
+    map.getContainer().style.cursor = 'crosshair';
     return () => {
       map.dragging.enable();
       map.scrollWheelZoom.enable();
+      map.getContainer().style.cursor = '';
     };
   }, [map, drawing.isDrawing]);
 
