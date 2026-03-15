@@ -109,7 +109,7 @@ export class FirecallArea extends FirecallItemBase {
     return `${this.markerName()} ${this.name}\n${this.beschreibung || ''}`;
   }
   public icon(): Icon<IconOptions> {
-    return leafletIcons().circle;
+    return leafletIcons().flaeche;
   }
 
   public static factory(): FirecallItemBase {

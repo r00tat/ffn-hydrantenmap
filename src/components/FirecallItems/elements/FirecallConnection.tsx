@@ -1,5 +1,7 @@
+import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Connection } from '../../firebase/firestore';
+import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
@@ -19,6 +21,10 @@ export class FirecallConnection extends FirecallMultiPoint {
       new FirecallConnection(this.data() as Connection),
       this
     );
+  }
+
+  public icon(): Icon<IconOptions> {
+    return leafletIcons().leitung;
   }
 
   public markerName() {

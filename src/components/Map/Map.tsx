@@ -16,6 +16,9 @@ import { useMapEditable } from '../../hooks/useMapEditor';
 import Clusters from './Clusters';
 import Leitungen from './Leitungen/Draw';
 import { LeitungsProvider } from './Leitungen/context';
+import { DrawingProvider } from './Drawing/DrawingContext';
+import DrawingCanvas from './Drawing/DrawingCanvas';
+import DrawingToolbar from './Drawing/DrawingToolbar';
 import MapActionButtons from './MapActionButtons';
 import MapSidebar from './MapSidebar';
 import PositionAction from './PositionAction';
@@ -161,8 +164,12 @@ export default function Map() {
         {/* <FullscreenControl /> */}
         <UpdateMapPosition />
         <LeitungsProvider>
-          <ActionButtons />
-          <Leitungen />
+          <DrawingProvider>
+            <ActionButtons />
+            <Leitungen />
+            <DrawingCanvas />
+            <DrawingToolbar />
+          </DrawingProvider>
         </LeitungsProvider>
         <PositionAction />
       </StyledMapContainer>

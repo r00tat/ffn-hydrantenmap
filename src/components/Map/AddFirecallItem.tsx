@@ -10,6 +10,7 @@ import {
   NON_DISPLAYABLE_ITEMS,
 } from '../firebase/firestore';
 import { useLeitungen } from './Leitungen/context';
+import { useDrawing } from './Drawing/DrawingContext';
 import useMapEditor from '../../hooks/useMapEditor';
 
 export interface MapActionButtonsOptions {
@@ -19,6 +20,7 @@ export interface MapActionButtonsOptions {
 export default function AddFirecallItem() {
   const map = useMap();
   const leitungen = useLeitungen();
+  const drawingCtx = useDrawing();
   const addFirecallItem = useFirecallItemAdd();
   const [fzgDrawing, setFzgDrawing] = useState<FirecallItem>();
   const {
@@ -90,6 +92,11 @@ export default function AddFirecallItem() {
       if (fcItemClasses[fzg?.type || '']?.isPolyline()) {
         leitungen.setIsDrawing(true);
         leitungen.setFirecallItem(fzg as Connection);
+      } else if (fzg?.type === 'drawing') {
+        drawingCtx.startDrawing({
+          name: fzg.name || 'Zeichnung',
+          layer: fzg.layer,
+        });
       } else {
         if (fzg) {
           console.info(`firecall dialog close for ${fzg.type} ${fzg.name}`);
@@ -117,7 +124,7 @@ export default function AddFirecallItem() {
         // saveItem(fzg);
       }
     },
-    [leitungen, map, saveItem, setEditFirecallItemIsOpen, setLastSelectedLayer]
+    [leitungen, drawingCtx, map, saveItem, setEditFirecallItemIsOpen, setLastSelectedLayer]
   );
 
   return (
