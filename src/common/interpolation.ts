@@ -504,6 +504,10 @@ export function buildInterpolationGrid(params: {
   config: HeatmapConfig;
   allValues: number[];
   blockSize?: number;
+  /** Interpolation algorithm (default: 'idw') */
+  algorithm?: 'idw' | 'spline';
+  /** Pre-solved TPS weights — required when algorithm === 'spline' */
+  tpsWeights?: TpsWeights;
 }): ImageData {
   const {
     canvasWidth,
@@ -516,6 +520,8 @@ export function buildInterpolationGrid(params: {
     config,
     allValues,
     blockSize = 4,
+    algorithm = 'idw',
+    tpsWeights,
   } = params;
 
   const imageData = new ImageData(canvasWidth, canvasHeight);
@@ -600,8 +606,11 @@ export function buildInterpolationGrid(params: {
         }
       }
 
-      // Compute IDW value — color is purely from interpolation, no value fade.
-      const value = idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+      // Compute interpolated value — IDW or TPS depending on algorithm.
+      const value =
+        algorithm === 'spline' && tpsWeights
+          ? evaluateTPS(cx, cy, tpsWeights)
+          : idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
