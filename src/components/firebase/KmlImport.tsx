@@ -62,6 +62,12 @@ function kmlToGeoJson(kml: string) {
   return geoJson;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  Point: 'Punkte',
+  LineString: 'Linien',
+  Polygon: 'Flächen',
+};
+
 const KML_STYLE_PROPERTIES = new Set([
   'styleurl',
   'stylehash',
@@ -217,16 +223,29 @@ export default function KmlImport() {
   const handleSchemaChange = useCallback(
     (newSchema: DataSchemaField[]) => {
       if (!preview) return;
-      // Rebuild headerToSchemaKey: match old schema fields to new by index
-      // so renaming a key updates the map value
       const oldSchema = preview.schema;
-      const newHeaderToSchemaKey = new Map(preview.headerToSchemaKey);
-      for (const [origKey, oldSchemaKey] of newHeaderToSchemaKey.entries()) {
+      const newHeaderToSchemaKey = new Map<string, string>();
+
+      for (const [origKey, oldSchemaKey] of preview.headerToSchemaKey.entries()) {
         const oldIdx = oldSchema.findIndex((f) => f.key === oldSchemaKey);
-        if (oldIdx >= 0 && oldIdx < newSchema.length) {
-          newHeaderToSchemaKey.set(origKey, newSchema[oldIdx].key);
+        if (oldIdx < 0) continue; // shouldn't happen
+
+        if (oldIdx < newSchema.length) {
+          // Same position exists in new schema — could be a rename or unchanged
+          // Only use positional mapping if schemas are the same length (rename, not delete)
+          // If lengths differ (deletion happened), only keep if the key still exists
+          if (oldSchema.length === newSchema.length) {
+            // Rename case: map to new key at same position
+            newHeaderToSchemaKey.set(origKey, newSchema[oldIdx].key);
+          } else if (newSchema.some((f) => f.key === oldSchemaKey)) {
+            // Deletion case: key still exists somewhere, keep it
+            newHeaderToSchemaKey.set(origKey, oldSchemaKey);
+          }
+          // else: field was deleted, drop the entry
         }
+        // else: index out of bounds = field was deleted, drop the entry
       }
+
       setPreview({
         ...preview,
         schema: newSchema,
@@ -274,12 +293,6 @@ export default function KmlImport() {
     : {};
 
   const totalCount = Object.values(typeCounts).reduce((a, b) => a + b, 0);
-
-  const TYPE_LABELS: Record<string, string> = {
-    Point: 'Punkte',
-    LineString: 'Linien',
-    Polygon: 'Flächen',
-  };
 
   return (
     <>
