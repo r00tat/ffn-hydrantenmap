@@ -20,7 +20,7 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { where } from 'firebase/firestore';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -100,9 +100,14 @@ export default function FirecallItemDialog({
       setFirecallItem((prev) => prev.copy().set('zIndex', newZIndex));
     });
 
-  const setItemField = (field: string, value: any) => {
+  const setItemField = useCallback((field: string, value: any) => {
     setFirecallItem((prev) => prev.copy().set(field, value));
-  };
+  }, []);
+
+  const onHeatmapChange = useCallback(
+    (config: HeatmapConfig | undefined) => setItemField('heatmapConfig', config),
+    [setItemField]
+  );
 
   const handleChange = (event: SelectChangeEvent) => {
     setFirecallItem((prev) =>
@@ -189,9 +194,7 @@ export default function FirecallItemDialog({
               <HeatmapSettings
                 config={item.get<HeatmapConfig>('heatmapConfig')}
                 dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
-                onChange={(config: HeatmapConfig | undefined) =>
-                  setItemField('heatmapConfig', config)
-                }
+                onChange={onHeatmapChange}
               />
             </>
           )}
