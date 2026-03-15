@@ -131,8 +131,14 @@ const InterpolationCanvasLayer = L.Layer.extend({
     const tpsPoints = logScale
       ? this._points.map((p: DataPoint) => ({ x: p.x, y: p.y, value: Math.log(Math.max(p.value, 1e-10)) }))
       : this._points;
+    // In log-scale mode, use exact interpolation (λ=0) so the spline passes
+    // through all data points. In log space, even small TPS overshoot becomes
+    // large after exp(), producing the exponential peaks expected for radiation.
+    // With regularization, the surface gets smoothed toward nearby values and
+    // never overshoots, defeating the purpose of log-scale interpolation.
+    const tpsLambda = logScale ? 0 : undefined;
     this._tpsWeights =
-      algo === 'spline' && tpsPoints.length >= 3 ? solveTPS(tpsPoints) : null;
+      algo === 'spline' && tpsPoints.length >= 3 ? solveTPS(tpsPoints, tpsLambda) : null;
 
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
