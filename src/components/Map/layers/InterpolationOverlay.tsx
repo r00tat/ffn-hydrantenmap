@@ -2,13 +2,15 @@
 
 import { useLeafletContext } from '@react-leaflet/core';
 import L from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { MutableRefObject, useEffect, useRef } from 'react';
 import { HeatmapConfig } from '../../firebase/firestore';
 import {
   buildColorLUT,
   buildInterpolationGrid,
   computeConvexHull,
   DataPoint,
+  solveTPS,
+  TpsWeights,
 } from '../../../common/interpolation';
 
 /**
@@ -35,6 +37,11 @@ const InterpolationCanvasLayer = L.Layer.extend({
       _colorLUT: Uint8Array;
       _config: HeatmapConfig;
       _allValues: number[];
+      _tpsWeights: TpsWeights | null;
+      _valueGrid: Float32Array | null;
+      _gridCols: number;
+      _blockSize: number;
+      _bufferPx: number;
     } & L.Layer,
     latlngs: { lat: number; lng: number; value: number }[],
     centerLat: number,
@@ -48,6 +55,11 @@ const InterpolationCanvasLayer = L.Layer.extend({
     this._colorLUT = colorLUT;
     this._config = config;
     this._allValues = allValues;
+    this._tpsWeights = null;
+    this._valueGrid = null;
+    this._gridCols = 0;
+    this._blockSize = 4;
+    this._bufferPx = 0;
     L.setOptions(this, options);
   },
 
@@ -110,11 +122,30 @@ const InterpolationCanvasLayer = L.Layer.extend({
       pixelPoints.push({ x: Math.round(p.x + bufferPx), y: Math.round(p.y + bufferPx), value: ll.value });
     }
 
+    this._points = pixelPoints;
+
+    const algo = (this._config.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline';
+    // When log-scale is active, solve TPS in log space so the spline
+    // surface produces exponential gradients matching physical decay.
+    const logScale = !!this._config.interpolationLogScale;
+    const tpsPoints = logScale
+      ? this._points.map((p: DataPoint) => ({ x: p.x, y: p.y, value: Math.log(Math.max(p.value, 1e-10)) }))
+      : this._points;
+    // In log-scale mode, use exact interpolation (λ=0) so the spline passes
+    // through all data points. In log space, even small TPS overshoot becomes
+    // large after exp(), producing the exponential peaks expected for radiation.
+    // With regularization, the surface gets smoothed toward nearby values and
+    // never overshoots, defeating the purpose of log-scale interpolation.
+    const tpsLambda = logScale ? 0 : undefined;
+    this._tpsWeights =
+      algo === 'spline' && tpsPoints.length >= 3 ? solveTPS(tpsPoints, tpsLambda) : null;
+
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
 
     // Build interpolation grid and paint
-    const imageData = buildInterpolationGrid({
+    const blockSize = 4;
+    const { imageData, valueGrid, gridCols } = buildInterpolationGrid({
       canvasWidth: canvasW,
       canvasHeight: canvasH,
       points: pixelPoints,
@@ -125,12 +156,36 @@ const InterpolationCanvasLayer = L.Layer.extend({
       colorLUT: this._colorLUT,
       config: this._config,
       allValues: this._allValues,
+      blockSize,
+      algorithm: algo,
+      tpsWeights: this._tpsWeights ?? undefined,
     });
+
+    this._valueGrid = valueGrid;
+    this._gridCols = gridCols;
+    this._blockSize = blockSize;
+    this._bufferPx = bufferPx;
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.putImageData(imageData, 0, 0);
     }
+  },
+
+  /** Look up the rendered interpolated value at a given lat/lng.
+   *  Returns the exact value used for colouring, or null if outside the rendered area. */
+  getValueAtLatLng(this: any, latlng: L.LatLng): number | null {
+    if (!this._map || !this._valueGrid) return null;
+    const p = this._map.latLngToContainerPoint(latlng);
+    const px = Math.round(p.x + this._bufferPx);
+    const py = Math.round(p.y + this._bufferPx);
+    const gx = Math.floor(px / this._blockSize);
+    const gy = Math.floor(py / this._blockSize);
+    if (gx < 0 || gy < 0 || gx >= this._gridCols) return null;
+    const idx = gy * this._gridCols + gx;
+    if (idx < 0 || idx >= this._valueGrid.length) return null;
+    const v = this._valueGrid[idx];
+    return isNaN(v) ? null : v;
   },
 });
 
@@ -138,21 +193,25 @@ interface InterpolationOverlayProps {
   points: { lat: number; lng: number; value: number }[];
   config: HeatmapConfig;
   allValues: number[];
+  /** Optional ref to the Leaflet layer for value lookups from click handlers */
+  layerRef?: MutableRefObject<any>;
 }
 
 export default function InterpolationOverlay({
   points,
   config,
   allValues,
+  layerRef,
 }: InterpolationOverlayProps) {
   const context = useLeafletContext();
   const container = context.layerContainer || context.map;
-  const layerRef = useRef<L.Layer | null>(null);
+  const localLayerRef = useRef<L.Layer | null>(null);
 
   useEffect(() => {
-    if (layerRef.current) {
-      container.removeLayer(layerRef.current);
-      layerRef.current = null;
+    if (localLayerRef.current) {
+      container.removeLayer(localLayerRef.current);
+      localLayerRef.current = null;
+      if (layerRef) layerRef.current = null;
     }
 
     if (points.length === 0) return;
@@ -177,15 +236,17 @@ export default function InterpolationOverlay({
     ) as L.Layer;
 
     container.addLayer(layer);
-    layerRef.current = layer;
+    localLayerRef.current = layer;
+    if (layerRef) layerRef.current = layer;
 
     return () => {
-      if (layerRef.current) {
-        container.removeLayer(layerRef.current);
-        layerRef.current = null;
+      if (localLayerRef.current) {
+        container.removeLayer(localLayerRef.current);
+        localLayerRef.current = null;
+        if (layerRef) layerRef.current = null;
       }
     };
-  }, [container, points, config, allValues]);
+  }, [container, points, config, allValues, layerRef]);
 
   return null;
 }

@@ -242,6 +242,196 @@ export function idwInterpolateIndexed(
 }
 
 // ---------------------------------------------------------------------------
+// Thin-Plate Spline (TPS) Interpolation
+// ---------------------------------------------------------------------------
+
+export interface TpsWeights {
+  /** Solved weights w_i for each input point */
+  w: Float64Array;
+  /** Polynomial coefficients [a0, a1, a2] (in normalized coordinate space) */
+  a: Float64Array;
+  /** Input points snapshot used to solve (same reference as DataPoint[]) */
+  points: DataPoint[];
+  /** Coordinate normalization: x_norm = (x - shiftX) / scale */
+  shiftX: number;
+  shiftY: number;
+  scale: number;
+  /** Data minimum for clamping extrapolation undershoot */
+  dataMin: number;
+}
+
+/**
+ * TPS radial basis function: φ(r) = r² ln(r), with φ(0) = 0.
+ */
+function tpsPhi(r: number): number {
+  if (r < 1e-10) return 0;
+  return r * r * Math.log(r);
+}
+
+/**
+ * Solve the Thin-Plate Spline system for the given data points.
+ * Returns weights and polynomial coefficients.
+ *
+ * Coordinates are center-and-scale normalized to [-1, 1] (like scipy's
+ * RBFInterpolator) so that φ(r) = r²ln(r) stays well-conditioned.
+ *
+ * Tikhonov regularization (λ scaled to K matrix magnitude, like MATLAB's
+ * tpaps) damps overshoot from high-value outlier points.
+ *
+ * Uses Gaussian elimination with partial pivoting.
+ * Suitable for n ≤ 300 points (O(n²) memory, O(n³) time — done once per render).
+ *
+ * @param lambda Tikhonov regularization factor (default 0.1), scaled relative
+ *   to average |K| entry. 0 = exact interpolation, higher = smoother surface.
+ */
+export function solveTPS(points: DataPoint[], lambda = 0.1): TpsWeights {
+  const n = points.length;
+  const size = n + 3;
+
+  // Center-and-scale normalization to [-1, 1] for numerical stability.
+  // Centering on the midpoint (like scipy's RBFInterpolator) keeps pairwise
+  // distances symmetric and avoids the φ(r) = r²ln(r) zero-crossing at r=1
+  // falling in the middle of the typical distance range.
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let dataMin = Infinity;
+  for (let i = 0; i < n; i++) {
+    if (points[i].x < minX) minX = points[i].x;
+    if (points[i].x > maxX) maxX = points[i].x;
+    if (points[i].y < minY) minY = points[i].y;
+    if (points[i].y > maxY) maxY = points[i].y;
+    if (points[i].value < dataMin) dataMin = points[i].value;
+  }
+  const shiftX = (maxX + minX) / 2;
+  const shiftY = (maxY + minY) / 2;
+  const scale = Math.max(maxX - minX, maxY - minY, 1e-10) / 2;
+
+  // Build matrix A (row-major, flattened) and RHS vector b
+  const A = new Float64Array(size * size);
+  const b = new Float64Array(size);
+
+  // Top-left n×n block: K[i][j] = φ(||p_i - p_j||) in normalized coords.
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const dx = (points[i].x - points[j].x) / scale;
+      const dy = (points[i].y - points[j].y) / scale;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      A[i * size + j] = tpsPhi(r);
+    }
+  }
+
+  // Scale λ relative to K matrix magnitude (like MATLAB's tpaps).
+  // A fixed λ is either too aggressive or too weak depending on data geometry;
+  // scaling by average |K| entry adapts automatically.
+  let kAbsSum = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      kAbsSum += Math.abs(A[i * size + j]);
+    }
+  }
+  const kAvg = kAbsSum / (n * n) || 1;
+  const effectiveLambda = lambda * kAvg;
+  for (let i = 0; i < n; i++) {
+    A[i * size + i] += effectiveLambda;
+  }
+
+  // Top-right n×3 and bottom-left 3×n blocks: [1, x_norm, y_norm]
+  for (let i = 0; i < n; i++) {
+    const xn = (points[i].x - shiftX) / scale;
+    const yn = (points[i].y - shiftY) / scale;
+    A[i * size + n] = 1;
+    A[i * size + n + 1] = xn;
+    A[i * size + n + 2] = yn;
+    A[n * size + i] = 1;
+    A[(n + 1) * size + i] = xn;
+    A[(n + 2) * size + i] = yn;
+  }
+  // Bottom-right 3×3 block: already zero (Float64Array is zero-initialised)
+
+  // RHS: data values, then three zeros
+  for (let i = 0; i < n; i++) {
+    b[i] = points[i].value;
+  }
+
+  // Gaussian elimination with partial pivoting
+  for (let col = 0; col < size; col++) {
+    // Find pivot
+    let maxVal = Math.abs(A[col * size + col]);
+    let maxRow = col;
+    for (let row = col + 1; row < size; row++) {
+      const v = Math.abs(A[row * size + col]);
+      if (v > maxVal) {
+        maxVal = v;
+        maxRow = row;
+      }
+    }
+    // Swap rows
+    if (maxRow !== col) {
+      for (let k = 0; k < size; k++) {
+        const tmp = A[col * size + k];
+        A[col * size + k] = A[maxRow * size + k];
+        A[maxRow * size + k] = tmp;
+      }
+      const tmp = b[col];
+      b[col] = b[maxRow];
+      b[maxRow] = tmp;
+    }
+    // Eliminate below
+    const pivot = A[col * size + col];
+    if (Math.abs(pivot) < 1e-14) continue; // singular/near-singular row
+    for (let row = col + 1; row < size; row++) {
+      const factor = A[row * size + col] / pivot;
+      for (let k = col; k < size; k++) {
+        A[row * size + k] -= factor * A[col * size + k];
+      }
+      b[row] -= factor * b[col];
+    }
+  }
+
+  // Back-substitution
+  const x = new Float64Array(size);
+  for (let row = size - 1; row >= 0; row--) {
+    let sum = b[row];
+    for (let col = row + 1; col < size; col++) {
+      sum -= A[row * size + col] * x[col];
+    }
+    const diag = A[row * size + row];
+    x[row] = Math.abs(diag) < 1e-14 ? 0 : sum / diag;
+  }
+
+  return {
+    w: x.slice(0, n),
+    a: x.slice(n, n + 3),
+    points,
+    shiftX,
+    shiftY,
+    scale,
+    dataMin,
+  };
+}
+
+/**
+ * Evaluate a solved TPS at point (x, y).
+ * Applies the same center-and-scale normalization used during solveTPS.
+ * Result is clamped to the data value range to prevent extrapolation overshoot.
+ */
+export function evaluateTPS(x: number, y: number, tps: TpsWeights): number {
+  const xn = (x - tps.shiftX) / tps.scale;
+  const yn = (y - tps.shiftY) / tps.scale;
+  let value = tps.a[0] + tps.a[1] * xn + tps.a[2] * yn;
+  const pts = tps.points;
+  for (let i = 0; i < pts.length; i++) {
+    const dx = xn - (pts[i].x - tps.shiftX) / tps.scale;
+    const dy = yn - (pts[i].y - tps.shiftY) / tps.scale;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    value += tps.w[i] * tpsPhi(r);
+  }
+  // Clamp to data range: TPS is a global method and can overshoot/undershoot
+  // between widely spaced points (like bending a metal plate). For visualization
+  // purposes, clamping prevents extreme values from compressing the color scale.
+  return Math.max(tps.dataMin, value);
+}
+
+// ---------------------------------------------------------------------------
 // Color LUT
 // ---------------------------------------------------------------------------
 
@@ -374,7 +564,11 @@ export function buildInterpolationGrid(params: {
   config: HeatmapConfig;
   allValues: number[];
   blockSize?: number;
-}): ImageData {
+  /** Interpolation algorithm (default: 'idw') */
+  algorithm?: 'idw' | 'spline';
+  /** Pre-solved TPS weights — required when algorithm === 'spline' */
+  tpsWeights?: TpsWeights;
+}): { imageData: ImageData; valueGrid: Float32Array; gridCols: number } {
   const {
     canvasWidth,
     canvasHeight,
@@ -386,14 +580,38 @@ export function buildInterpolationGrid(params: {
     config,
     allValues,
     blockSize = 4,
+    algorithm = 'idw',
+    tpsWeights,
   } = params;
 
   const imageData = new ImageData(canvasWidth, canvasHeight);
   const data = imageData.data;
   const isDegenerate = hull.length < 3;
 
-  // Build spatial index for fast neighbor queries.
-  const spatialIndex = buildSpatialIndex(points);
+  // Value grid: stores the final interpolated value per block for click lookup.
+  const gridCols = Math.ceil(canvasWidth / blockSize);
+  const gridRows = Math.ceil(canvasHeight / blockSize);
+  const valueGrid = new Float32Array(gridCols * gridRows).fill(NaN);
+  const logScale = !!config.interpolationLogScale;
+
+  // When log-scale is active, transform point values into log space before
+  // interpolation and exp() the result afterwards. This produces exponential
+  // gradients that match physical phenomena like radiation decay.
+  // Values ≤ 0 are floored to a small positive number so log() is safe.
+  const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+  const interpPoints = logScale
+    ? points.map((p) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
+    : points;
+  const interpAllValues = logScale ? allValues.map(safeLog) : allValues;
+
+  // Data minimum for outside-hull value fade.
+  let dataMinVal = Infinity;
+  for (let i = 0; i < interpAllValues.length; i++) {
+    if (interpAllValues[i] < dataMinVal) dataMinVal = interpAllValues[i];
+  }
+
+  // Build spatial index for fast neighbor queries (coordinates unchanged).
+  const spatialIndex = buildSpatialIndex(interpPoints);
   // IDW search radius: 5× buffer gives enough nearby points for accurate
   // interpolation while skipping distant points with negligible weight.
   const searchRadius = bufferPx * 5;
@@ -411,6 +629,11 @@ export function buildInterpolationGrid(params: {
       // Only alpha (opacity) is used for fading — the interpolated COLOR is
       // never distorted. IDW handles value blending naturally between points.
       let alpha = 1.0;
+      let isOutsideHull = false;
+      // Value of nearest data point when outside hull (used to cap extrapolation).
+      let nearestOutsideValue: number | null = null;
+      // Local value range of nearby data points (for TPS local clamping).
+      let localMin = -Infinity;
 
       if (isDegenerate) {
         // For < 3 non-collinear points: use pure point-proximity boundary
@@ -435,16 +658,19 @@ export function buildInterpolationGrid(params: {
           const nearbyIds = spatialIndex.within(cx, cy, interiorMaxDist);
           if (nearbyIds.length === 0) continue;
 
-          // Find nearest point distance
+          // Find nearest point distance and local value range
           let nearestDistSq = Infinity;
+          let lMin = Infinity;
           for (let i = 0; i < nearbyIds.length; i++) {
-            const pt = points[nearbyIds[i]];
+            const pt = interpPoints[nearbyIds[i]];
             const dx = cx - pt.x;
             const dy = cy - pt.y;
             const dSq = dx * dx + dy * dy;
             if (dSq < nearestDistSq) nearestDistSq = dSq;
+            if (pt.value < lMin) lMin = pt.value;
           }
           const nearestDist = Math.sqrt(nearestDistSq);
+          localMin = lMin;
 
           // Fade alpha only in interior gaps (far from all data points).
           // No hull-edge fade — the outside-hull proximity fade handles
@@ -453,25 +679,60 @@ export function buildInterpolationGrid(params: {
             alpha = 1 - (nearestDist - bufferPx) / (interiorMaxDist - bufferPx);
           }
         } else {
+          isOutsideHull = true;
           // Outside hull: render within bufferPx of a data point with fade
           const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
           if (nearbyIds.length === 0) continue;
 
           let nearestDistSq = Infinity;
+          let nearestIdx = nearbyIds[0];
           for (let i = 0; i < nearbyIds.length; i++) {
             const pt = points[nearbyIds[i]];
             const dx = cx - pt.x;
             const dy = cy - pt.y;
             const dSq = dx * dx + dy * dy;
-            if (dSq < nearestDistSq) nearestDistSq = dSq;
+            if (dSq < nearestDistSq) {
+              nearestDistSq = dSq;
+              nearestIdx = nearbyIds[i];
+            }
           }
           const nearestDist = Math.sqrt(nearestDistSq);
           alpha = 1 - nearestDist / bufferPx;
+          nearestOutsideValue = interpPoints[nearestIdx].value;
         }
       }
 
-      // Compute IDW value — color is purely from interpolation, no value fade.
-      const value = idwInterpolateIndexed(cx, cy, points, power, spatialIndex, searchRadius);
+      // Compute interpolated value.
+      // Outside the hull, start from the nearest data point's value and
+      // fade it toward the data minimum using the same distance ratio as
+      // the alpha fade. This makes both colour intensity and opacity
+      // decrease with distance, preventing bright fringes.
+      let value: number;
+      if (isOutsideHull) {
+        const nearest = nearestOutsideValue!;
+        value = dataMinVal + alpha * (nearest - dataMinVal);
+      } else if (algorithm === 'spline' && tpsWeights) {
+        value = evaluateTPS(cx, cy, tpsWeights);
+        // TPS is global: distant high-value points can pull the surface below
+        // local data. Clamp to local minimum so values don't drop artificially.
+        value = Math.max(localMin, value);
+      } else {
+        value = idwInterpolateIndexed(cx, cy, interpPoints, power, spatialIndex, searchRadius);
+        // IDW with a wide search radius can also pull values beyond the local
+        // data range when distant high-value points contribute. Apply same
+        // local clamp as TPS.
+        if (localMin !== -Infinity) {
+          value = Math.max(localMin, value);
+        }
+      }
+      // Transform back from log space before normalization.
+      if (logScale) value = Math.exp(value);
+
+      // Store in value grid for click lookup.
+      const gx = Math.floor(bx / blockSize);
+      const gy = Math.floor(by / blockSize);
+      valueGrid[gy * gridCols + gx] = value;
+
       const normalized = normalizeValueFull(value, config, allValues);
       const lutIdx = Math.round(Math.max(0, Math.min(1, normalized)) * 255);
 
@@ -496,5 +757,5 @@ export function buildInterpolationGrid(params: {
     }
   }
 
-  return imageData;
+  return { imageData, valueGrid, gridCols };
 }

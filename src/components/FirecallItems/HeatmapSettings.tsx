@@ -264,6 +264,37 @@ export default function HeatmapSettings({
             <>
               <Box>
                 <Typography variant="body2" gutterBottom>
+                  Algorithmus
+                </Typography>
+                <ToggleButtonGroup
+                  value={current.interpolationAlgorithm ?? 'idw'}
+                  exclusive
+                  onChange={(_, val) => val && update({ interpolationAlgorithm: val })}
+                  size="small"
+                >
+                  <ToggleButton value="idw">IDW</ToggleButton>
+                  <ToggleButton value="spline">Spline</ToggleButton>
+                </ToggleButtonGroup>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                  {(current.interpolationAlgorithm ?? 'idw') === 'idw'
+                    ? 'IDW (Inverse Distance Weighting): Gewichteter Durchschnitt – begrenzt auf den Wertebereich der Messpunkte. Gut für diskrete Messwerte.'
+                    : 'Spline (Thin-Plate): Glatte Fläche durch alle Messpunkte – kann Werte außerhalb des gemessenen Bereichs schätzen. Gut für physikalische Felder wie Strahlung oder Temperatur.'}
+                </Typography>
+              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!current.interpolationLogScale}
+                    onChange={(e) => update({ interpolationLogScale: e.target.checked })}
+                  />
+                }
+                label="Logarithmische Interpolation"
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Interpoliert im Log-Raum – erzeugt exponentielle Gradienten um Hotspots (z.B. Strahlung).
+              </Typography>
+              <Box>
+                <Typography variant="body2" gutterBottom>
                   Radius: {current.interpolationRadius ?? 30}m
                 </Typography>
                 <Slider
@@ -276,20 +307,22 @@ export default function HeatmapSettings({
                   valueLabelDisplay="auto"
                 />
               </Box>
-              <Box>
-                <Typography variant="body2" gutterBottom>
-                  IDW Exponent: {current.interpolationPower ?? 2}
-                </Typography>
-                <Slider
-                  value={current.interpolationPower ?? 2}
-                  onChange={(_, val) => update({ interpolationPower: val as number })}
-                  min={1}
-                  max={5}
-                  step={0.5}
-                  size="small"
-                  valueLabelDisplay="auto"
-                />
-              </Box>
+              {(current.interpolationAlgorithm ?? 'idw') === 'idw' && (
+                <Box>
+                  <Typography variant="body2" gutterBottom>
+                    IDW Exponent: {current.interpolationPower ?? 2}
+                  </Typography>
+                  <Slider
+                    value={current.interpolationPower ?? 2}
+                    onChange={(_, val) => update({ interpolationPower: val as number })}
+                    min={1}
+                    max={5}
+                    step={0.5}
+                    size="small"
+                    valueLabelDisplay="auto"
+                  />
+                </Box>
+              )}
               <Box>
                 <Typography variant="body2" gutterBottom>
                   Deckkraft: {Math.round((current.interpolationOpacity ?? 0.6) * 100)}%

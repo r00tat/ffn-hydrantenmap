@@ -53,6 +53,8 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
   const historyPathSegments = useHistoryPathSegments();
   const heatmapConfig = layer.heatmapConfig;
   const popupRef = useRef<L.Popup | null>(null);
+  // Ref to the interpolation layer for direct value lookups on click.
+  const interpLayerRef = useRef<any>(null);
 
   const queryConstraints = useMemo(
     () => (layer.id ? [where('layer', '==', layer.id)] : []),
@@ -125,22 +127,18 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
         popupRef.current = null;
       }
 
-      const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
+      let value: number | undefined;
 
-      // Check if click is within the colored area
       if (isInterpolation) {
-        // Point-proximity boundary: only respond within bufferM of a data point
-        const bufferM = heatmapConfig?.interpolationRadius ?? 30;
-        let nearestDist = Infinity;
-        for (const p of idwPoints) {
-          const dx = clickM.x - p.x;
-          const dy = clickM.y - p.y;
-          const d = Math.sqrt(dx * dx + dy * dy);
-          if (d < nearestDist) nearestDist = d;
-        }
-        if (nearestDist > bufferM) return;
+        // Look up the exact value from the rendered interpolation grid.
+        // This guarantees the popup matches the displayed colour.
+        const layer = interpLayerRef.current;
+        const gridVal = layer?.getValueAtLatLng?.(e.latlng) as number | null;
+        if (gridVal == null) return; // click outside rendered area
+        value = gridVal;
       } else {
-        // Heatmap: within radius of any data point
+        // Heatmap mode: check within radius and use IDW
+        const clickM = latlngToMeters(e.latlng.lat, e.latlng.lng, refLat);
         const radiusM = heatmapConfig?.radius ?? 30;
         let withinRadius = false;
         for (const p of idwPoints) {
@@ -152,10 +150,11 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
           }
         }
         if (!withinRadius) return;
+
+        const power = heatmapConfig?.interpolationPower ?? 2;
+        value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
       }
 
-      const power = heatmapConfig?.interpolationPower ?? 2;
-      const value = idwInterpolate(clickM.x, clickM.y, idwPoints, power);
       const rounded = Math.round(value * 100) / 100;
 
       const popup = L.popup({ closeOnClick: true })
@@ -195,7 +194,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
   }
 
   return isInterpolation ? (
-    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
+    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} layerRef={interpLayerRef} />
   ) : (
     <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
   );
