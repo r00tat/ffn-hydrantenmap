@@ -166,7 +166,7 @@ const BlaulichtSmsPage = () => {
           hasBlaulichtsmsConfig(groupId),
           getBlaulichtSmsAlarms(groupId),
         ]);
-        setNoCredentials(!hasCreds);
+        setNoCredentials(!hasCreds && fetchedAlarms.length === 0);
         const sorted = [...fetchedAlarms].sort(
           (a, b) =>
             new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
@@ -218,7 +218,7 @@ const BlaulichtSmsPage = () => {
           {recentAlarms.length > 0 && (
             <Box sx={{ my: 4 }}>
               <Typography variant="h5" component="h2" gutterBottom>
-                Recent Alarms
+                Vergangene Alarme
               </Typography>
               {recentAlarms.map((alarm) => (
                 <AlarmCard key={alarm.alarmId} alarm={alarm} />

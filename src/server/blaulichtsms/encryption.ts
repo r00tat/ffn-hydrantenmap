@@ -3,6 +3,8 @@ import 'server-only';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
+// Module-level cache: valid for the lifetime of this server instance.
+// If the secret is rotated, redeploy to pick up the new key.
 let cachedKey: Buffer | null = null;
 
 async function getEncryptionKey(): Promise<Buffer> {
