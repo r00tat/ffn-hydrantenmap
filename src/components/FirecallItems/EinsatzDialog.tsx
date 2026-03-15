@@ -24,6 +24,7 @@ import {
   getBlaulichtSmsAlarms,
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
+import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -48,16 +49,15 @@ export default function EinsatzDialog({
       deleted: false,
     }
   );
-  const { email, myGroups, groups } = useFirebaseLogin();
+  const { email, myGroups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
 
   const isNewEinsatz = !einsatzDefault;
-  const isInFfnd = groups?.includes('ffnd') ?? false;
 
+  const [configuredGroups, setConfiguredGroups] = useState<string[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
-  const [alarmsLoading, setAlarmsLoading] = useState(
-    isNewEinsatz && isInFfnd
-  );
+  const [alarmsLoading, setAlarmsLoading] = useState(false);
   const [selectedAlarmId, setSelectedAlarmId] = useState<string>('');
 
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
@@ -76,27 +76,48 @@ export default function EinsatzDialog({
     }));
   }, []);
 
+  // Load which groups have BlaulichtSMS credentials (once on dialog mount)
   useEffect(() => {
-    if (isNewEinsatz && isInFfnd) {
-      getBlaulichtSmsAlarms()
-        .then((fetchedAlarms) => {
-          const sorted = [...fetchedAlarms].sort(
-            (a, b) =>
-              new Date(b.alarmDate).getTime() -
-              new Date(a.alarmDate).getTime()
-          );
-          setAlarms(sorted);
-          if (sorted.length > 0) {
-            setSelectedAlarmId(sorted[0].alarmId);
-            applyAlarm(sorted[0]);
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to fetch BlaulichtSMS alarms:', error);
-        })
-        .finally(() => setAlarmsLoading(false));
-    }
-  }, [isNewEinsatz, isInFfnd, applyAlarm]);
+    if (!isNewEinsatz) return;
+    getGroupsWithBlaulichtsmsConfig()
+      .then(setConfiguredGroups)
+      .catch((err) =>
+        console.error('Failed to load BlaulichtSMS configured groups:', err)
+      );
+  }, [isNewEinsatz]);
+
+  // Fetch alarms when selected group changes and has credentials
+  useEffect(() => {
+    const shouldFetch =
+      isNewEinsatz && selectedGroup && configuredGroups.includes(selectedGroup);
+
+    const fetchAlarms = async () => {
+      if (!shouldFetch) {
+        setAlarms([]);
+        setSelectedAlarmId('');
+        return;
+      }
+      setAlarmsLoading(true);
+      try {
+        const fetchedAlarms = await getBlaulichtSmsAlarms(selectedGroup);
+        const sorted = [...fetchedAlarms].sort(
+          (a, b) =>
+            new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
+        );
+        setAlarms(sorted);
+        if (sorted.length > 0) {
+          setSelectedAlarmId(sorted[0].alarmId);
+          applyAlarm(sorted[0]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch BlaulichtSMS alarms:', err);
+      } finally {
+        setAlarmsLoading(false);
+      }
+    };
+
+    fetchAlarms();
+  }, [isNewEinsatz, selectedGroup, configuredGroups, applyAlarm]);
 
   const handleAlarmChange = useCallback(
     (event: SelectChangeEvent) => {
@@ -155,8 +176,9 @@ export default function EinsatzDialog({
   );
 
   const handleChange = (event: SelectChangeEvent) => {
-    // setItemField('type', event.target.value);
-    setEinsatz((prev) => ({ ...prev, group: event.target.value }));
+    const newGroup = event.target.value;
+    setEinsatz((prev) => ({ ...prev, group: newGroup }));
+    setSelectedGroup(newGroup);
   };
 
   return (
@@ -164,7 +186,7 @@ export default function EinsatzDialog({
       <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
       <DialogContent>
         <DialogContentText>Neuer Einsatz</DialogContentText>
-        {isNewEinsatz && isInFfnd && alarmsLoading && (
+        {isNewEinsatz && alarmsLoading && (
           <DialogContentText
             sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
           >
@@ -172,11 +194,9 @@ export default function EinsatzDialog({
             Blaulicht-SMS Alarme werden geladen...
           </DialogContentText>
         )}
-        {isNewEinsatz && isInFfnd && !alarmsLoading && alarms.length > 0 && (
+        {isNewEinsatz && !alarmsLoading && alarms.length > 0 && (
           <FormControl fullWidth variant="standard" sx={{ mb: 1 }}>
-            <InputLabel id="alarm-select-label">
-              Blaulicht-SMS Alarm
-            </InputLabel>
+            <InputLabel id="alarm-select-label">Blaulicht-SMS Alarm</InputLabel>
             <Select
               labelId="alarm-select-label"
               id="alarm-select"
