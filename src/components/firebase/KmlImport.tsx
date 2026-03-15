@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -210,14 +211,20 @@ function parseKmlFile(kmlText: string, fileName: string): KmlPreviewState {
 
 export default function KmlImport() {
   const [uploadInProgress, setUploadInProgress] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState<KmlPreviewState | null>(null);
   const addFirecallItem = useFirecallItemAdd();
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    const kmlText = await readFileAsText(file);
-    setPreview(parseKmlFile(kmlText, file.name));
+    setParsing(true);
+    try {
+      const kmlText = await readFileAsText(file);
+      setPreview(parseKmlFile(kmlText, file.name));
+    } finally {
+      setParsing(false);
+    }
   }, []);
 
   const handleSchemaChange = useCallback(
@@ -315,6 +322,9 @@ export default function KmlImport() {
           }}
         />
       </Button>
+      {parsing && (
+        <LinearProgress sx={{ mt: 0.5, width: '100%' }} />
+      )}
       {uploadInProgress && (
         <>
           <Typography component="span" sx={{ ml: 1 }}>
