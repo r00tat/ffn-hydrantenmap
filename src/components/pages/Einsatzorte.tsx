@@ -20,16 +20,23 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import { useVehicleSuggestions } from '../../hooks/useVehicleSuggestions';
-import { Diary, FirecallLocation, defaultFirecallLocation, Fzg } from '../firebase/firestore';
-import EinsatzorteTable, { type EinsatzorteSortField } from '../Einsatzorte/EinsatzorteTable';
+import {
+  Diary,
+  FirecallLocation,
+  defaultFirecallLocation,
+  Fzg,
+} from '../firebase/firestore';
+import EinsatzorteTable, {
+  type EinsatzorteSortField,
+} from '../Einsatzorte/EinsatzorteTable';
 import EinsatzorteCard from '../Einsatzorte/EinsatzorteCard';
 
-function getLocationDisplayName(
-  location: Partial<FirecallLocation>
-): string {
+function getLocationDisplayName(location: Partial<FirecallLocation>): string {
   return (
     location.name ||
-    [location.street, location.number, location.city].filter(Boolean).join(' ') ||
+    [location.street, location.number, location.city]
+      .filter(Boolean)
+      .join(' ') ||
     'Unbekannt'
   );
 }
@@ -62,7 +69,7 @@ export default function Einsatzorte() {
     () =>
       firecallItems.filter((f) => f.type === 'diary' && (f as Diary).nummer)
         .length + 1,
-    [firecallItems]
+    [firecallItems],
   );
   const diaryCounterRef = useRef(diaryCounter);
   useEffect(() => {
@@ -80,21 +87,24 @@ export default function Einsatzorte() {
         beschreibung: beschreibung || '',
       } as Diary).catch(() => {});
     },
-    [addFirecallItem]
+    [addFirecallItem],
   );
 
   // Sorting state
   const [sortField, setSortField] = useState<EinsatzorteSortField>('created');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const handleSortClick = useCallback((field: EinsatzorteSortField) => {
-    if (field === sortField) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  }, [sortField]);
+  const handleSortClick = useCallback(
+    (field: EinsatzorteSortField) => {
+      if (field === sortField) {
+        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setSortField(field);
+        setSortDirection('asc');
+      }
+    },
+    [sortField],
+  );
 
   const sortedLocations = useMemo(() => {
     return [...locations].sort((a, b) => {
@@ -138,7 +148,7 @@ export default function Einsatzorte() {
     });
   }, [locations, sortField, sortDirection]);
 
-  const isGroupFfn = firecall?.group === 'ffn';
+  const isGroupFfn = !firecall?.group || firecall.group === 'ffnd';
 
   // Auto-import on mount and every 60 seconds when firecall.id is available
   useEffect(() => {
@@ -162,7 +172,7 @@ export default function Einsatzorte() {
       const names = lastResult.addedNames || [];
       addDiaryEntry(
         `${lastResult.added} Einsatzort${lastResult.added > 1 ? 'e' : ''} per E-Mail importiert`,
-        names.length > 0 ? names.join(', ') : ''
+        names.length > 0 ? names.join(', ') : '',
       );
 
       const timer = setTimeout(() => {
@@ -185,14 +195,14 @@ export default function Einsatzorte() {
         const displayName = getLocationDisplayName(location);
         addDiaryEntry(
           `Einsatzort ${displayName} angelegt`,
-          location.status ? `Status: ${location.status}` : ''
+          location.status ? `Status: ${location.status}` : '',
         );
       } catch (error) {
         setSnackbar('Fehler beim Hinzufügen');
         console.error('Add failed:', error);
       }
     },
-    [addLocation, addDiaryEntry]
+    [addLocation, addDiaryEntry],
   );
 
   const handleUpdate = useCallback(
@@ -213,10 +223,12 @@ export default function Einsatzorte() {
           // Diary entry for vehicle unassignment
           if (updates.vehicles) {
             const oldVehicles = location.vehicles || {};
-            for (const [vehicleId, vehicleName] of Object.entries(oldVehicles)) {
+            for (const [vehicleId, vehicleName] of Object.entries(
+              oldVehicles,
+            )) {
               if (!(vehicleId in updates.vehicles)) {
                 addDiaryEntry(
-                  `${vehicleName} von Einsatzort ${displayName} abgezogen`
+                  `${vehicleName} von Einsatzort ${displayName} abgezogen`,
                 );
               }
             }
@@ -227,7 +239,7 @@ export default function Einsatzorte() {
         console.error('Update failed:', error);
       }
     },
-    [updateLocation, locations, addDiaryEntry]
+    [updateLocation, locations, addDiaryEntry],
   );
 
   const handleDelete = useCallback(
@@ -239,7 +251,7 @@ export default function Einsatzorte() {
         console.error('Delete failed:', error);
       }
     },
-    [deleteLocation]
+    [deleteLocation],
   );
 
   /**
@@ -254,20 +266,26 @@ export default function Einsatzorte() {
 
       if (lat === undefined || lng === undefined) {
         console.warn(
-          `Cannot place vehicle "${vehicleName}": no coordinates available for location or firecall`
+          `Cannot place vehicle "${vehicleName}": no coordinates available for location or firecall`,
         );
         return;
       }
 
       // Check if vehicle already exists in firecall items (by name match)
       const existingVehicle = firecallVehicles.find(
-        (v) => v.name.toLowerCase() === vehicleName.toLowerCase()
+        (v) => v.name.toLowerCase() === vehicleName.toLowerCase(),
       );
 
       try {
         // Save history snapshot before any changes
-        const locationDisplayName = location.name || [location.street, location.number, location.city].filter(Boolean).join(' ');
-        await saveHistory(`Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`);
+        const locationDisplayName =
+          location.name ||
+          [location.street, location.number, location.city]
+            .filter(Boolean)
+            .join(' ');
+        await saveHistory(
+          `Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
+        );
 
         let vehicleId: string;
         let vehicleDisplayName: string;
@@ -278,7 +296,7 @@ export default function Einsatzorte() {
           vehicleDisplayName = existingVehicle.name;
 
           console.info(
-            `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`
+            `Updating existing vehicle "${vehicleName}" position to ${lat}, ${lng}`,
           );
 
           await updateFirecallItem({
@@ -291,7 +309,7 @@ export default function Einsatzorte() {
         } else {
           // Vehicle doesn't exist: create new vehicle item
           console.info(
-            `Creating new vehicle "${vehicleName}" at position ${lat}, ${lng}`
+            `Creating new vehicle "${vehicleName}" at position ${lat}, ${lng}`,
           );
 
           const newVehicle: Fzg = {
@@ -310,7 +328,8 @@ export default function Einsatzorte() {
         }
 
         // Now add the vehicle reference to the location
-        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        const currentVehicles =
+          (location.vehicles as Record<string, string>) || {};
         if (!currentVehicles[vehicleId]) {
           await updateLocation(location.id!, {
             vehicles: { ...currentVehicles, [vehicleId]: vehicleDisplayName },
@@ -319,23 +338,38 @@ export default function Einsatzorte() {
 
         // Diary entry for vehicle assignment
         addDiaryEntry(
-          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`
+          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`,
         );
       } catch (error) {
         console.error(`Failed to add/update vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Aktualisieren von ${vehicleName}`);
       }
     },
-    [firecall, firecallVehicles, addFirecallItem, updateFirecallItem, saveHistory, updateLocation, addDiaryEntry]
+    [
+      firecall,
+      firecallVehicles,
+      addFirecallItem,
+      updateFirecallItem,
+      saveHistory,
+      updateLocation,
+      addDiaryEntry,
+    ],
   );
 
   const handleMapVehicleSelected = useCallback(
-    async (vehicleId: string, vehicleName: string, location: FirecallLocation) => {
+    async (
+      vehicleId: string,
+      vehicleName: string,
+      location: FirecallLocation,
+    ) => {
       try {
         const locationDisplayName = getLocationDisplayName(location);
-        await saveHistory(`Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`);
+        await saveHistory(
+          `Status vor ${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
+        );
 
-        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        const currentVehicles =
+          (location.vehicles as Record<string, string>) || {};
         if (!currentVehicles[vehicleId]) {
           await updateLocation(location.id!, {
             vehicles: { ...currentVehicles, [vehicleId]: vehicleName },
@@ -344,14 +378,14 @@ export default function Einsatzorte() {
 
         // Diary entry for vehicle assignment
         addDiaryEntry(
-          `${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`
+          `${vehicleName} zu Einsatzort ${locationDisplayName} zugeordnet`,
         );
       } catch (error) {
         console.error(`Failed to assign vehicle "${vehicleName}":`, error);
         setSnackbar(`Fehler beim Zuordnen von ${vehicleName}`);
       }
     },
-    [saveHistory, updateLocation, addDiaryEntry]
+    [saveHistory, updateLocation, addDiaryEntry],
   );
 
   const handleCreateVehicle = useCallback(
@@ -361,14 +395,16 @@ export default function Einsatzorte() {
 
       if (lat === undefined || lng === undefined) {
         console.warn(
-          `Cannot place vehicle "${name}": no coordinates available for location or firecall`
+          `Cannot place vehicle "${name}": no coordinates available for location or firecall`,
         );
         return;
       }
 
       try {
         const locationDisplayName = getLocationDisplayName(location);
-        await saveHistory(`Status vor ${name} zu Einsatzort ${locationDisplayName} zugeordnet`);
+        await saveHistory(
+          `Status vor ${name} zu Einsatzort ${locationDisplayName} zugeordnet`,
+        );
 
         const newVehicle: Fzg = {
           name,
@@ -385,7 +421,8 @@ export default function Einsatzorte() {
         setSnackbar(`${vehicleDisplayName} erstellt`);
 
         // Add vehicle reference to the location
-        const currentVehicles = (location.vehicles as Record<string, string>) || {};
+        const currentVehicles =
+          (location.vehicles as Record<string, string>) || {};
         if (!currentVehicles[vehicleId]) {
           await updateLocation(location.id!, {
             vehicles: { ...currentVehicles, [vehicleId]: vehicleDisplayName },
@@ -393,14 +430,14 @@ export default function Einsatzorte() {
         }
 
         addDiaryEntry(
-          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`
+          `${vehicleDisplayName} zu Einsatzort ${locationDisplayName} zugeordnet`,
         );
       } catch (error) {
         console.error(`Failed to create vehicle "${name}":`, error);
         setSnackbar(`Fehler beim Erstellen von ${name}`);
       }
     },
-    [firecall, addFirecallItem, saveHistory, updateLocation, addDiaryEntry]
+    [firecall, addFirecallItem, saveHistory, updateLocation, addDiaryEntry],
   );
 
   if (!firecall || firecall.id === 'unknown') {
@@ -444,11 +481,7 @@ export default function Einsatzorte() {
                   disabled={isImporting}
                   size="small"
                 >
-                  {isImporting ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <EmailIcon />
-                  )}
+                  {isImporting ? <CircularProgress size={20} /> : <EmailIcon />}
                 </IconButton>
               </span>
             </Tooltip>

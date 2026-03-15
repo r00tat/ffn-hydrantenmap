@@ -27,7 +27,6 @@ import { Group, KNOWN_GROUPS } from './groupTypes';
 
 interface UserRowButtonParams {
   row: Group;
-
   editFn: (group: Group) => void;
   deleteFn: (group: Group) => void;
 }

@@ -2,6 +2,10 @@
 import 'server-only';
 
 import { actionUserRequired } from '../auth';
+import { firestore } from '../../server/firebase/admin';
+import { decryptPassword } from '../../server/blaulichtsms/encryption';
+
+const COLLECTION = 'blaulichtsmsConfig';
 
 export interface BlaulichtSmsAlarm {
   productType: string;
@@ -48,37 +52,61 @@ export interface BlaulichtSmsAlarm {
   }[];
 }
 
-export async function getBlaulichtSmsAlarms(): Promise<BlaulichtSmsAlarm[]> {
-  const session = await actionUserRequired();
-  const requiredGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP || 'ffnd';
+interface BlaulichtsmsCredentials {
+  username: string;
+  password: string;
+  customerId: string;
+}
 
-  if (!session.user.groups.includes(requiredGroup)) {
-    return [];
+async function loadCredentials(
+  groupId: string
+): Promise<BlaulichtsmsCredentials | null> {
+  // Try Firestore first
+  const doc = await firestore.collection(COLLECTION).doc(groupId).get();
+  if (doc.exists) {
+    const data = doc.data()!;
+    try {
+      const password = await decryptPassword(data.passwordEncrypted);
+      return { username: data.username, password, customerId: data.customerId };
+    } catch (err) {
+      console.error(
+        `Failed to decrypt BlaulichtSMS password for group "${groupId}":`,
+        err
+      );
+      return null;
+    }
   }
-  const username = process.env.BLAULICHTSMS_USERNAME;
-  const password = process.env.BLAULICHTSMS_PASSWORD;
-  const customerId = process.env.BLAULICHTSMS_CUSTOMER_ID;
 
-  if (!username || !password || !customerId) {
-    console.error(
-      'BlaulichtSMS credentials (BLAULICHTSMS_USERNAME, BLAULICHTSMS_PASSWORD, BLAULICHTSMS_CUSTOMER_ID) are not set in environment variables.'
-    );
-    return [];
+  // Fall back to env vars for the legacy group
+  const legacyGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP ?? 'ffnd';
+  if (groupId === legacyGroup) {
+    const username = process.env.BLAULICHTSMS_USERNAME;
+    const password = process.env.BLAULICHTSMS_PASSWORD;
+    const customerId = process.env.BLAULICHTSMS_CUSTOMER_ID;
+    if (username && password && customerId) {
+      return { username, password, customerId };
+    }
   }
 
-  // Step 1: Login to get sessionId
+  return null;
+}
+
+export async function getBlaulichtSmsAlarms(
+  groupId: string
+): Promise<BlaulichtSmsAlarm[]> {
+  await actionUserRequired();
+
+  const creds = await loadCredentials(groupId);
+  if (!creds) return [];
+
+  const { username, password, customerId } = creds;
+
   const loginResponse = await fetch(
     'https://api.blaulichtsms.net/blaulicht/api/alarm/v1/dashboard/login',
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username,
-        password,
-        customerId,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, customerId }),
     }
   );
 
@@ -88,15 +116,11 @@ export async function getBlaulichtSmsAlarms(): Promise<BlaulichtSmsAlarm[]> {
       loginResponse.status,
       loginResponse.statusText
     );
-    const errorBody = await loginResponse.text();
-    console.error('Error body:', errorBody);
     return [];
   }
 
-  const loginData: { sessionId: string } = await loginResponse.json();
-  const sessionId = loginData.sessionId;
+  const { sessionId } = await loginResponse.json();
 
-  // Step 2: Fetch dashboard data using sessionId
   const dashboardResponse = await fetch(
     `https://api.blaulichtsms.net/blaulicht/api/alarm/v1/dashboard/${sessionId}`
   );
@@ -107,15 +131,8 @@ export async function getBlaulichtSmsAlarms(): Promise<BlaulichtSmsAlarm[]> {
       dashboardResponse.status,
       dashboardResponse.statusText
     );
-    const errorBody = await dashboardResponse.text();
-    console.error('Error body:', errorBody);
     return [];
   }
 
-  const dashboardData: BlaulichtSmsAlarm[] = (await dashboardResponse.json())
-    .alarms;
-
-  // console.info(`active alarms: ${JSON.stringify(dashboardData)}`);
-
-  return dashboardData;
+  return ((await dashboardResponse.json()).alarms ?? []) as BlaulichtSmsAlarm[];
 }
