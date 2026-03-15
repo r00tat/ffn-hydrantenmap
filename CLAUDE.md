@@ -34,6 +34,21 @@ When setting up a worktree, copy `.env.local` into it (it's gitignored and won't
 cp .env.local .worktrees/<branch-name>/
 ```
 
+## Serena Plugin
+
+The Serena MCP plugin provides semantic code navigation (LSP-backed symbol search, cross-reference lookup, symbolic editing). It is initialized for this project with the name `hydranten-map`.
+
+**At the start of a conversation**, activate the project and check onboarding status:
+
+```text
+activate_project("hydranten-map")
+check_onboarding_performed()
+```
+
+**Project memories** (`code_style_and_conventions`, `project_overview`, `suggested_commands`, `task_completion_checklist`) contain project-specific guidance — read them when relevant via `read_memory`.
+
+**Using Serena in a worktree**: activate by full worktree path instead of the project name — Serena registers it as a separate project with its own LSP instance. Worktrees do not inherit the main project's memories; run `onboarding` if you want worktree-specific memories, or skip it and use the tools directly.
+
 ## Git Workflow
 
 Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching:
