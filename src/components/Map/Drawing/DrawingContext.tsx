@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  addDoc,
   collection,
   doc,
   writeBatch,
@@ -114,24 +113,26 @@ export const useDrawingProvider = (): DrawingContextValue => {
     const lng = allPoints.reduce((sum, [, ln]) => sum + ln, 0) / allPoints.length;
 
     try {
-      // Write parent item
-      const itemRef = await addDoc(
-        collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID),
-        {
-          type: 'drawing',
-          name: sessionItem.name,
-          lat,
-          lng,
-          layer: sessionItem.layer || '',
-          created: new Date().toISOString(),
-          creator: email,
-          deleted: false,
-        }
+      // Use a single batch for parent item + strokes to avoid race condition:
+      // if written separately, the Firestore listener fires after addDoc and
+      // DrawingComponent mounts before strokes exist, causing empty rendering.
+      const itemRef = doc(
+        collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID)
       );
-
-      // Batch-write strokes to subcollection
-      // Firestore does not support nested arrays, so flatten points to [lat, lng, lat, lng, ...]
       const batch = writeBatch(firestore);
+
+      batch.set(itemRef, {
+        type: 'drawing',
+        name: sessionItem.name,
+        lat,
+        lng,
+        layer: sessionItem.layer || '',
+        created: new Date().toISOString(),
+        creator: email,
+        deleted: false,
+      });
+
+      // Firestore does not support nested arrays, so flatten points to [lat, lng, lat, lng, ...]
       for (const stroke of strokes) {
         const strokeRef = doc(
           collection(firestore, FIRECALL_COLLECTION_ID, firecallId, FIRECALL_ITEMS_COLLECTION_ID, itemRef.id, 'stroke')
