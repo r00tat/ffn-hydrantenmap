@@ -178,6 +178,22 @@ function parseGeoJson(
   });
 }
 
+interface KmlPreviewState {
+  geoJson: GeoJsonFeatureColleaction;
+  schema: DataSchemaField[];
+  headerToSchemaKey: Map<string, string>;
+  layerName: string;
+}
+
+function parseKmlFile(kmlText: string, fileName: string): KmlPreviewState {
+  const geoJson = kmlToGeoJson(kmlText);
+  const { schema, headerToSchemaKey } = generateSchemaFromFeatures(
+    geoJson.features
+  );
+  const layerName = fileName.replace(/\.kml$/i, '');
+  return { geoJson, schema, headerToSchemaKey, layerName };
+}
+
 export default function KmlImport() {
   const [uploadInProgress, setUploadInProgress] = useState(false);
 
