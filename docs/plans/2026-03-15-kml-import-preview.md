@@ -1,86 +1,27 @@
-import { kml as toGeoJSON } from '@mapbox/togeojson';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Typography from '@mui/material/Typography';
-import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
-import {
-  FeatureCollection,
-  Geometry,
-  LineString,
-  Point,
-  Polygon,
-} from 'geojson';
-import { useCallback, useState } from 'react';
-import { GeoPosition } from '../../common/geo';
-import { formatTimestamp } from '../../common/time-format';
-import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
-import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
-import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
-import readFileAsText from '../upload/readFile';
-import { DataSchemaField, FcMarker, FirecallItem, Line } from './firestore';
-import { coerceValue, inferType } from './importUtils';
+# KML Import Preview UI Implementation Plan
 
-export interface KmlGeoProperties {
-  name: string;
-  styleUrl?: string;
-  styleHash?: string;
-  stroke?: string;
-  'stroke-opacity'?: number;
-  'stroke-width'?: number;
-  fill?: string;
-  'fill-opacity'?: number;
-  visibility?: string;
-  [key: string]: any;
-}
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-export type GeoJsonFeatureColleaction = FeatureCollection<
-  Geometry,
-  KmlGeoProperties
->;
+**Goal:** Add a preview dialog to `KmlImport.tsx` so users can review per-type item counts, edit the field schema, and set the layer name before committing the import.
 
-function kmlToGeoJson(kml: string) {
-  var dom = new DOMParser().parseFromString(kml, 'text/xml');
-  // console.info('dom', dom);
-  const geoJson: GeoJsonFeatureColleaction = toGeoJSON(dom);
-  geoJson.features.map((f) => {
-    if (f.geometry.type === 'Point' && f.properties.styleUrl) {
-      const styleElement = dom.querySelector(f.properties.styleUrl);
-      f.properties.fill =
-        styleElement?.querySelector('color')?.textContent ?? '#0000ff';
-    }
-    return f;
-  });
-  // console.info(`geojson\n${JSON.stringify(geoJson)}`);
-  return geoJson;
-}
+**Architecture:** Single-file refactor of `KmlImport.tsx`. Parse KML on file select → open a MUI Dialog → user edits state → confirm triggers existing item creation logic. Mirrors `CsvImport.tsx` pattern. No new files.
 
-const TYPE_LABELS: Record<string, string> = {
-  Point: 'Punkte',
-  LineString: 'Linien',
-  Polygon: 'Flächen',
-};
+**Tech Stack:** React 19, TypeScript, MUI Dialog/TextField/Chip, existing `DataSchemaEditor` component, existing `generateSchemaFromFeatures` + `parseGeoJson` helpers in the same file.
 
-const KML_STYLE_PROPERTIES = new Set([
-  'styleurl',
-  'stylehash',
-  'stroke',
-  'stroke-opacity',
-  'stroke-width',
-  'fill',
-  'fill-opacity',
-  'visibility',
-  'icon',
-  'name',
-]);
+---
 
+### Task 1: Update `generateSchemaFromFeatures` to return `headerToSchemaKey`
+
+Currently returns `DataSchemaField[]`. Needs to also return a `Map<string, string>` mapping the original KML property key to the initial schema key. This map is later used by the import step so that property lookups survive user edits to `field.key`.
+
+**Files:**
+- Modify: `src/components/firebase/KmlImport.tsx:70-90`
+
+**Step 1: Change the return type and add the map**
+
+Replace the function body:
+
+```ts
 function generateSchemaFromFeatures(
   features: GeoJsonFeatureColleaction['features']
 ): { schema: DataSchemaField[]; headerToSchemaKey: Map<string, string> } {
@@ -110,7 +51,36 @@ function generateSchemaFromFeatures(
 
   return { schema, headerToSchemaKey };
 }
+```
 
+**Step 2: Run lint to confirm no type errors**
+
+```bash
+cd .worktrees/feature/kml-import-preview && npm run lint 2>&1 | head -30
+```
+
+Expected: errors only in `KmlImport.tsx` (call sites not yet updated) — that's fine, we fix those in the next tasks.
+
+**Step 3: Commit**
+
+```bash
+cd .worktrees/feature/kml-import-preview
+git add src/components/firebase/KmlImport.tsx
+git commit -m "refactor: generateSchemaFromFeatures returns headerToSchemaKey"
+```
+
+---
+
+### Task 2: Update `parseGeoJson` to use `headerToSchemaKey`
+
+Currently does `f.properties[field.key]` — breaks if the user renamed `field.key`. Switch to iterating via `headerToSchemaKey` (originalKey → schemaKey) so property lookup always uses the original KML property name.
+
+**Files:**
+- Modify: `src/components/firebase/KmlImport.tsx:92-172`
+
+**Step 1: Add `headerToSchemaKey` parameter and update the lookup**
+
+```ts
 function parseGeoJson(
   geojson: GeoJsonFeatureColleaction,
   schema: DataSchemaField[],
@@ -119,7 +89,7 @@ function parseGeoJson(
   // Build reverse map: schemaKey → field (for type coercion)
   const schemaByKey = new Map(schema.map((f) => [f.key, f]));
 
-  return geojson.features.map((f, index) => {
+  return geojson.features.map((f) => {
     const latlng = GeoPosition.fromGeoJsonPosition(
       f.geometry.type === 'Point'
         ? (f.geometry as Point).coordinates
@@ -137,7 +107,7 @@ function parseGeoJson(
 
     const item: FirecallItem = {
       type: 'marker',
-      name: f.properties.name || `${index + 1}`,
+      name: `${f.properties.name}`,
       datum: new Date(
         f.properties['Time Stamp'] ??
           f.properties['timestamp'] ??
@@ -191,7 +161,36 @@ function parseGeoJson(
     return item;
   });
 }
+```
 
+**Step 2: Run lint**
+
+```bash
+cd .worktrees/feature/kml-import-preview && npm run lint 2>&1 | head -30
+```
+
+Expected: remaining errors only in the `KmlImport` component (call sites) — fixed in Task 3.
+
+**Step 3: Commit**
+
+```bash
+cd .worktrees/feature/kml-import-preview
+git add src/components/firebase/KmlImport.tsx
+git commit -m "refactor: parseGeoJson uses headerToSchemaKey for property lookup"
+```
+
+---
+
+### Task 3: Add `KmlPreviewState` interface and `parseKmlFile` helper
+
+Extract the parsing into a pure function that returns all the state the dialog needs. Mirrors `buildPreview()` in `CsvImport.tsx`.
+
+**Files:**
+- Modify: `src/components/firebase/KmlImport.tsx` (add after the `parseGeoJson` function, before the component)
+
+**Step 1: Add the interface and helper**
+
+```ts
 interface KmlPreviewState {
   geoJson: GeoJsonFeatureColleaction;
   schema: DataSchemaField[];
@@ -207,59 +206,63 @@ function parseKmlFile(kmlText: string, fileName: string): KmlPreviewState {
   const layerName = fileName.replace(/\.kml$/i, '');
   return { geoJson, schema, headerToSchemaKey, layerName };
 }
+```
 
+**Step 2: Run lint**
+
+```bash
+cd .worktrees/feature/kml-import-preview && npm run lint 2>&1 | head -30
+```
+
+Expected: no new errors.
+
+**Step 3: Commit**
+
+```bash
+cd .worktrees/feature/kml-import-preview
+git add src/components/firebase/KmlImport.tsx
+git commit -m "refactor: add KmlPreviewState and parseKmlFile helper"
+```
+
+---
+
+### Task 4: Refactor `KmlImport` component — state + handlers
+
+Replace the current single-file-loop `handleUpload` with `handleFileSelect` (opens dialog) and `handleImport` (runs on dialog confirm). Add MUI imports needed for the dialog.
+
+**Files:**
+- Modify: `src/components/firebase/KmlImport.tsx:1-22` (imports)
+- Modify: `src/components/firebase/KmlImport.tsx:174-256` (component)
+
+**Step 1: Add MUI imports**
+
+Add to the import block at the top:
+
+```ts
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import TextField from '@mui/material/TextField';
+import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
+```
+
+**Step 2: Replace the component body**
+
+```ts
 export default function KmlImport() {
   const [uploadInProgress, setUploadInProgress] = useState(false);
-  const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState<KmlPreviewState | null>(null);
   const addFirecallItem = useFirecallItemAdd();
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    setParsing(true);
-    try {
-      const kmlText = await readFileAsText(file);
-      setPreview(parseKmlFile(kmlText, file.name));
-    } finally {
-      setParsing(false);
-    }
+    const kmlText = await readFileAsText(file);
+    setPreview(parseKmlFile(kmlText, file.name));
   }, []);
-
-  const handleSchemaChange = useCallback(
-    (newSchema: DataSchemaField[]) => {
-      if (!preview) return;
-      const oldSchema = preview.schema;
-      const newHeaderToSchemaKey = new Map<string, string>();
-
-      for (const [origKey, oldSchemaKey] of preview.headerToSchemaKey.entries()) {
-        const oldIdx = oldSchema.findIndex((f) => f.key === oldSchemaKey);
-        if (oldIdx < 0) continue; // shouldn't happen
-
-        if (oldIdx < newSchema.length) {
-          // Same position exists in new schema — could be a rename or unchanged
-          // Only use positional mapping if schemas are the same length (rename, not delete)
-          // If lengths differ (deletion happened), only keep if the key still exists
-          if (oldSchema.length === newSchema.length) {
-            // Rename case: map to new key at same position
-            newHeaderToSchemaKey.set(origKey, newSchema[oldIdx].key);
-          } else if (newSchema.some((f) => f.key === oldSchemaKey)) {
-            // Deletion case: key still exists somewhere, keep it
-            newHeaderToSchemaKey.set(origKey, oldSchemaKey);
-          }
-          // else: field was deleted, drop the entry
-        }
-        // else: index out of bounds = field was deleted, drop the entry
-      }
-
-      setPreview({
-        ...preview,
-        schema: newSchema,
-        headerToSchemaKey: newHeaderToSchemaKey,
-      });
-    },
-    [preview]
-  );
 
   const handleImport = useCallback(async () => {
     if (!preview) return;
@@ -300,14 +303,18 @@ export default function KmlImport() {
 
   const totalCount = Object.values(typeCounts).reduce((a, b) => a + b, 0);
 
+  const TYPE_LABELS: Record<string, string> = {
+    Point: 'Punkte',
+    LineString: 'Linien',
+    Polygon: 'Flächen',
+  };
+
   return (
     <>
       <Button
         component="label"
         variant="contained"
-        startIcon={parsing ? undefined : <CloudUploadIcon />}
-        endIcon={parsing ? <CircularProgress size={16} color="inherit" /> : undefined}
-        disabled={parsing}
+        startIcon={<CloudUploadIcon />}
       >
         KML importieren
         <VisuallyHiddenInput
@@ -363,7 +370,7 @@ export default function KmlImport() {
 
               <DataSchemaEditor
                 dataSchema={preview.schema}
-                onChange={handleSchemaChange}
+                onChange={(schema) => setPreview({ ...preview, schema })}
               />
             </Box>
           </DialogContent>
@@ -382,3 +389,45 @@ export default function KmlImport() {
     </>
   );
 }
+```
+
+**Step 3: Run lint — expect clean**
+
+```bash
+cd .worktrees/feature/kml-import-preview && npm run lint 2>&1 | head -40
+```
+
+Expected: no errors.
+
+**Step 4: Build to confirm no type errors**
+
+```bash
+cd .worktrees/feature/kml-import-preview && npm run build 2>&1 | tail -20
+```
+
+Expected: successful build.
+
+**Step 5: Commit**
+
+```bash
+cd .worktrees/feature/kml-import-preview
+git add src/components/firebase/KmlImport.tsx
+git commit -m "feat: KML import preview dialog with per-type counts and schema editor"
+```
+
+---
+
+## Manual Test Checklist
+
+After the build succeeds, test in the browser:
+
+1. Open a firecall → Layers panel → click "KML importieren"
+2. Pick a `.kml` file with at least Points and one LineString or Polygon
+3. **Verify:** Dialog opens with the filename (minus `.kml`) in the layer name field
+4. **Verify:** Chips show correct per-type counts matching the KML content
+5. **Verify:** DataSchemaEditor shows the custom properties from the KML
+6. Edit a field label — confirm the label changes in the editor
+7. Click "Importieren"
+8. **Verify:** Layer appears in the map with the correct name
+9. **Verify:** Items are created with the correct types (markers/lines/areas)
+10. **Verify:** Custom field data is stored correctly on items

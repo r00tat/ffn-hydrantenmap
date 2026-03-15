@@ -117,10 +117,11 @@ export default function FirecallLayer({
       </LayersControl.Overlay>
 
       {firecallId !== 'unknown' &&
-        sortedLayers.map((layer) => (
+        sortedLayers.map((layer, rank) => (
           <React.Fragment key={layer.id}>
             <LayerPaneEntry
               layer={layer}
+              rank={rank}
               defaultChecked={defaultChecked}
             />
             {layer.heatmapConfig?.enabled && (
@@ -165,13 +166,18 @@ export default function FirecallLayer({
 
 function LayerPaneEntry({
   layer,
+  rank,
   defaultChecked,
 }: {
   layer: FirecallLayerType;
+  rank: number;
   defaultChecked: boolean;
 }) {
   const paneName = `firecall-layer-${layer.id}`;
-  const paneZIndex = PANE_BASE_Z_INDEX + (layer.zIndex ?? 0) + 1;
+  // Use rank (0-based sort position) instead of raw zIndex so the pane
+  // z-index stays well below Leaflet's popupPane (700), regardless of how
+  // large the stored zIndex value is (e.g. Date.now()).
+  const paneZIndex = PANE_BASE_Z_INDEX + rank + 1;
 
   useCreatePane(paneName, paneZIndex);
 
