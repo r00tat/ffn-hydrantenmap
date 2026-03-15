@@ -242,6 +242,136 @@ export function idwInterpolateIndexed(
 }
 
 // ---------------------------------------------------------------------------
+// Thin-Plate Spline (TPS) Interpolation
+// ---------------------------------------------------------------------------
+
+export interface TpsWeights {
+  /** Solved weights w_i for each input point */
+  w: Float64Array;
+  /** Polynomial coefficients [a0, a1, a2] */
+  a: Float64Array;
+  /** Input points snapshot used to solve (same reference as DataPoint[]) */
+  points: DataPoint[];
+}
+
+/**
+ * TPS radial basis function: φ(r) = r² ln(r), with φ(0) = 0.
+ */
+function tpsPhi(r: number): number {
+  if (r < 1e-10) return 0;
+  return r * r * Math.log(r);
+}
+
+/**
+ * Solve the Thin-Plate Spline system for the given data points.
+ * Returns weights and polynomial coefficients.
+ *
+ * Uses Gaussian elimination with partial pivoting.
+ * Suitable for n ≤ 300 points (O(n²) memory, O(n³) time — done once per render).
+ */
+export function solveTPS(points: DataPoint[]): TpsWeights {
+  const n = points.length;
+  const size = n + 3;
+
+  // Build matrix A (row-major, flattened) and RHS vector b
+  const A = new Float64Array(size * size);
+  const b = new Float64Array(size);
+
+  // Top-left n×n block: K[i][j] = φ(||p_i - p_j||)
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const dx = points[i].x - points[j].x;
+      const dy = points[i].y - points[j].y;
+      const r = Math.sqrt(dx * dx + dy * dy);
+      A[i * size + j] = tpsPhi(r);
+    }
+  }
+
+  // Top-right n×3 and bottom-left 3×n blocks: [1, x, y]
+  for (let i = 0; i < n; i++) {
+    A[i * size + n] = 1;
+    A[i * size + n + 1] = points[i].x;
+    A[i * size + n + 2] = points[i].y;
+    A[n * size + i] = 1;
+    A[(n + 1) * size + i] = points[i].x;
+    A[(n + 2) * size + i] = points[i].y;
+  }
+  // Bottom-right 3×3 block: already zero (Float64Array is zero-initialised)
+
+  // RHS: data values, then three zeros
+  for (let i = 0; i < n; i++) {
+    b[i] = points[i].value;
+  }
+
+  // Gaussian elimination with partial pivoting
+  for (let col = 0; col < size; col++) {
+    // Find pivot
+    let maxVal = Math.abs(A[col * size + col]);
+    let maxRow = col;
+    for (let row = col + 1; row < size; row++) {
+      const v = Math.abs(A[row * size + col]);
+      if (v > maxVal) {
+        maxVal = v;
+        maxRow = row;
+      }
+    }
+    // Swap rows
+    if (maxRow !== col) {
+      for (let k = 0; k < size; k++) {
+        const tmp = A[col * size + k];
+        A[col * size + k] = A[maxRow * size + k];
+        A[maxRow * size + k] = tmp;
+      }
+      const tmp = b[col];
+      b[col] = b[maxRow];
+      b[maxRow] = tmp;
+    }
+    // Eliminate below
+    const pivot = A[col * size + col];
+    if (Math.abs(pivot) < 1e-14) continue; // singular/near-singular row
+    for (let row = col + 1; row < size; row++) {
+      const factor = A[row * size + col] / pivot;
+      for (let k = col; k < size; k++) {
+        A[row * size + k] -= factor * A[col * size + k];
+      }
+      b[row] -= factor * b[col];
+    }
+  }
+
+  // Back-substitution
+  const x = new Float64Array(size);
+  for (let row = size - 1; row >= 0; row--) {
+    let sum = b[row];
+    for (let col = row + 1; col < size; col++) {
+      sum -= A[row * size + col] * x[col];
+    }
+    const diag = A[row * size + row];
+    x[row] = Math.abs(diag) < 1e-14 ? 0 : sum / diag;
+  }
+
+  return {
+    w: x.slice(0, n),
+    a: x.slice(n, n + 3),
+    points,
+  };
+}
+
+/**
+ * Evaluate a solved TPS at point (x, y).
+ */
+export function evaluateTPS(x: number, y: number, tps: TpsWeights): number {
+  let value = tps.a[0] + tps.a[1] * x + tps.a[2] * y;
+  const pts = tps.points;
+  for (let i = 0; i < pts.length; i++) {
+    const dx = x - pts[i].x;
+    const dy = y - pts[i].y;
+    const r = Math.sqrt(dx * dx + dy * dy);
+    value += tps.w[i] * tpsPhi(r);
+  }
+  return value;
+}
+
+// ---------------------------------------------------------------------------
 // Color LUT
 // ---------------------------------------------------------------------------
 
