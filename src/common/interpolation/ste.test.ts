@@ -253,7 +253,9 @@ describe('STE algorithm interface', () => {
     expect(() => steAlgorithm.prepare(points, {})).not.toThrow();
   });
 
-  it('evaluate returns 0 upwind of source', () => {
+  it('evaluate uses IDW: returns positive values everywhere (not 0 upwind)', () => {
+    // evaluate uses IDW from the measurement points — it interpolates the hull
+    // area and does not model the Gaussian Plume corridor.
     const points: DataPoint[] = [
       { x: 100, y: 0, value: 5 },
       { x: 200, y: 0, value: 2 },
@@ -266,8 +268,107 @@ describe('STE algorithm interface', () => {
       searchResolution: 20,
     });
 
-    const cUpwind = steAlgorithm.evaluate(-500, 0, state);
-    expect(cUpwind).toBe(0);
+    // IDW returns a distance-weighted average — always positive for positive inputs
+    expect(steAlgorithm.evaluate(-500, 0, state)).toBeGreaterThan(0);
+    expect(steAlgorithm.evaluate(150, 0, state)).toBeGreaterThan(0);
+  });
+
+  it('evaluate uses IDW: value near high marker > value near low marker', () => {
+    const points: DataPoint[] = [
+      { x: 100, y: 0, value: 10 },
+      { x: 200, y: 0, value:  1 },
+    ];
+    const state = steAlgorithm.prepare(points, {
+      windDirection: 270, windSpeed: 3, stabilityClass: 4, releaseHeight: 0, searchResolution: 20,
+    });
+    const nearHigh = steAlgorithm.evaluate(100, 0, state);
+    const nearLow  = steAlgorithm.evaluate(200, 0, state);
+    expect(nearHigh).toBeGreaterThan(nearLow);
+  });
+});
+
+describe('STE 5-marker scenario: scattered field measurements', () => {
+  /**
+   * Simulates a team taking measurements at different positions around an
+   * incident — not lined up, not symmetric. Positions are like street corners
+   * or vehicle locations scattered in the downwind area.
+   *
+   * True source at (0,0), wind from west (→ east, +x).
+   * Markers at irregular positions, all to the east of the source:
+   *
+   *           y
+   *     M4(150,60) ●
+   *           |
+   *  src ─────┼──── M1(80,-20) ──── M3(200,10)
+   *           |
+   *     M2(120,-50) ●
+   *           |
+   *     M5(100,-45) ●
+   *
+   * None of the 5 markers are on the same line.
+   * Values are generated from the true Gaussian Plume.
+   */
+  const trueQ = 300;
+  const plumeBase = { Q: trueQ, windSpeed: 3, stabilityClass: 4, releaseHeight: 0 };
+  const prepParams = {
+    windDirection: 270,
+    windSpeed: 3,
+    stabilityClass: 4,
+    releaseHeight: 0,
+    searchResolution: 10,
+  };
+
+  const markers: DataPoint[] = [
+    { x:  80, y: -20, value: gaussianPlume( 80, -20, plumeBase) },
+    { x: 120, y: -50, value: gaussianPlume(120, -50, plumeBase) },
+    { x: 200, y:  10, value: gaussianPlume(200,  10, plumeBase) },
+    { x: 150, y:  60, value: gaussianPlume(150,  60, plumeBase) },
+    { x: 100, y: -45, value: gaussianPlume(100, -45, plumeBase) },
+  ];
+
+  let state: ReturnType<typeof steAlgorithm.prepare>;
+  beforeAll(() => { state = steAlgorithm.prepare(markers, prepParams); });
+
+  it('all 5 markers have positive values with meaningful variation', () => {
+    const vals = markers.map((m) => m.value);
+    for (const v of vals) expect(v).toBeGreaterThan(0);
+    // Markers at different distances and crosswind offsets → values vary
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    expect(max / min).toBeGreaterThan(3);
+  });
+
+  it('source is estimated within 30m of the true source (0,0)', () => {
+    const dist = Math.sqrt(state.sourceX ** 2 + state.sourceY ** 2);
+    expect(dist).toBeLessThan(30);
+  });
+
+  it('release rate is positive', () => {
+    expect(state.releaseRate).toBeGreaterThan(0);
+  });
+
+  it('estimated release rate is in the right order of magnitude', () => {
+    // Scattered markers have less constraint than an inline set, so allow
+    // a factor-of-10 window around the true Q=300.
+    expect(state.releaseRate).toBeGreaterThan(trueQ / 10);
+    expect(state.releaseRate).toBeLessThan(trueQ * 10);
+  });
+
+  it('evaluate (IDW): returns positive values everywhere', () => {
+    // evaluate uses IDW — always positive, no plume corridor
+    expect(steAlgorithm.evaluate(  80, -20, state)).toBeGreaterThan(0);
+    expect(steAlgorithm.evaluate( 200,  10, state)).toBeGreaterThan(0);
+    expect(steAlgorithm.evaluate(-300,   0, state)).toBeGreaterThan(0); // "upwind" — still positive
+  });
+
+  it('evaluate (IDW): value near the highest-reading marker is higher than near the lowest', () => {
+    // Find which marker has the max and min value from the actual plume data.
+    // (Not obvious by eye — crosswind offset matters as much as distance.)
+    const maxMarker = markers.reduce((a, b) => (a.value > b.value ? a : b));
+    const minMarker = markers.reduce((a, b) => (a.value < b.value ? a : b));
+    const nearMax = steAlgorithm.evaluate(maxMarker.x, maxMarker.y, state);
+    const nearMin = steAlgorithm.evaluate(minMarker.x, minMarker.y, state);
+    expect(nearMax).toBeGreaterThan(nearMin);
   });
 });
 
@@ -358,14 +459,17 @@ describe('STE 5-marker scenario: plume shape sanity check', () => {
     expect(cLeft).toBeCloseTo(cRight, 5);
   });
 
-  it('upwind of source returns 0', () => {
-    expect(steAlgorithm.evaluate(-100, 0, state)).toBe(0);
-    expect(steAlgorithm.evaluate(-300, 0, state)).toBe(0);
+  it('evaluate (IDW): value near high-reading marker (M1) > near low-reading marker (M3)', () => {
+    // M1(80,0) is closest to source → highest value; M3(250,0) is far → lowest value
+    const nearM1 = steAlgorithm.evaluate( 80, 0, state);
+    const nearM3 = steAlgorithm.evaluate(250, 0, state);
+    expect(nearM1).toBeGreaterThan(nearM3);
   });
 
-  it('concentration far off-axis is negligible compared to centerline', () => {
-    const cCenter  = steAlgorithm.evaluate(150,   0, state);
-    const cFarSide = steAlgorithm.evaluate(150, 300, state);
-    expect(cFarSide).toBeLessThan(cCenter * 0.01);
+  it('evaluate (IDW): symmetric markers produce symmetric values about the centerline', () => {
+    // M4(150,+40) and M5(150,-40) have the same value → IDW output is symmetric
+    const cPlus  = steAlgorithm.evaluate(150,  80, state);
+    const cMinus = steAlgorithm.evaluate(150, -80, state);
+    expect(cPlus).toBeCloseTo(cMinus, 5);
   });
 });
