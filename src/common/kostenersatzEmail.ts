@@ -2,7 +2,6 @@
  * Kostenersatz Email Configuration and Template Rendering
  */
 
-import nunjucks from 'nunjucks';
 import { formatCurrency, KostenersatzCalculation } from './kostenersatz';
 import { Firecall } from '../components/firebase/firestore';
 
@@ -99,9 +98,6 @@ RLBBAT2E`,
 // Template Rendering
 // ============================================================================
 
-// Configure nunjucks (no auto-escaping for plain text emails)
-const nunjucksEnv = nunjucks.configure({ autoescape: false });
-
 /**
  * Build template context from calculation and firecall data
  */
@@ -152,17 +148,28 @@ export function buildTemplateContext(
 }
 
 /**
- * Render a template string with the given context
+ * Render a template string with the given context.
+ * Supports {{ var.path }} dot-notation substitution.
  */
 export function renderTemplate(
   template: string,
   context: EmailTemplateContext,
 ): string {
   try {
-    return nunjucksEnv.renderString(template, context);
+    return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, path: string) => {
+      const value = path
+        .split('.')
+        .reduce(
+          (obj: unknown, key: string) =>
+            obj != null && typeof obj === 'object'
+              ? (obj as Record<string, unknown>)[key]
+              : undefined,
+          context as unknown,
+        );
+      return value != null ? String(value) : match;
+    });
   } catch (error) {
     console.error('Template rendering error:', error);
-    // Return original template if rendering fails
     return template;
   }
 }
