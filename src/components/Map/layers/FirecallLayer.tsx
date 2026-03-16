@@ -54,7 +54,7 @@ export default function FirecallLayer({
   useEffect(() => {
     if (seededRef.current) return;
     const heatmapNames = sortedLayers
-      .filter((layer) => layer.heatmapConfig?.enabled)
+      .filter((layer) => layer.heatmapConfig?.enabled && layer.defaultVisible !== 'false')
       .map((layer) => getOverlayName(layer));
     if (heatmapNames.length > 0) {
       seededRef.current = true;
@@ -123,12 +123,12 @@ export default function FirecallLayer({
             <LayerPaneEntry
               layer={layer}
               rank={rank}
-              defaultChecked={defaultChecked}
+              defaultChecked={defaultChecked && layer.defaultVisible !== 'false'}
             />
             {layer.heatmapConfig?.enabled && (
               <LayersControl.Overlay
                 name={getOverlayName(layer)}
-                checked={true}
+                checked={layer.defaultVisible !== 'false'}
               >
                 <LayerGroup>
                   <HeatmapOverlayLayer

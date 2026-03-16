@@ -13,6 +13,9 @@ npm run dev          # Development server (Turbopack)
 npm run build        # Production build (Webpack)
 npm run start        # Start production server
 npm run lint         # ESLint validation
+npm run test         # Run Vitest tests once
+npm run test:watch   # Run Vitest in watch mode
+NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
 Data import scripts (require `GOOGLE_APPLICATION_CREDENTIALS` env var):
@@ -38,12 +41,7 @@ cp .env.local .worktrees/<branch-name>/
 
 The Serena MCP plugin provides semantic code navigation (LSP-backed symbol search, cross-reference lookup, symbolic editing). It is initialized for this project with the name `hydranten-map`.
 
-**At the start of a conversation**, activate the project and check onboarding status:
-
-```text
-activate_project("hydranten-map")
-check_onboarding_performed()
-```
+**At the start of a conversation**, you must activate the project by calling `check_onboarding_performed()`. This implicitly activates the `hydranten-map` project. Without this call, all other Serena tools will fail with a "No active project" error. There is no separate `activate_project` tool — `check_onboarding_performed()` is the activation mechanism.
 
 **Project memories** (`code_style_and_conventions`, `project_overview`, `suggested_commands`, `task_completion_checklist`) contain project-specific guidance — read them when relevant via `read_memory`.
 
@@ -62,6 +60,17 @@ When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
 ```bash
 GITHUB_TOKEN= gh <command>
 ```
+
+## Testing (TDD)
+
+**For all new features, write tests first before writing implementation code.** Follow test-driven development:
+
+1. Write failing tests that define the expected behavior
+2. Run `npm run test` to confirm the tests fail
+3. Implement the feature code to make the tests pass
+4. Run `npm run test` again to confirm all tests pass
+
+Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-dom`. Place test files **directly next to** the source file they test using the `*.test.ts` / `*.test.tsx` naming convention (e.g., `utils.ts` → `utils.test.ts` in the same directory). Do **not** use `__tests__/` folders.
 
 ## Tech Stack
 

@@ -13,6 +13,7 @@ export class FirecallItemLayer extends FirecallItemBase {
   summaryPosition?: string;
   clusterMode?: string;
   showLabels?: string;
+  defaultVisible?: string;
   dataSchema: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
 
@@ -32,6 +33,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     }
     this.clusterMode = firecallItem?.clusterMode || 'normal';
     this.showLabels = firecallItem?.showLabels ?? 'true';
+    this.defaultVisible = firecallItem?.defaultVisible ?? 'true';
     this.dataSchema = firecallItem?.dataSchema ?? [];
     this.heatmapConfig = firecallItem?.heatmapConfig;
   }
@@ -62,6 +64,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fields(),
       showLabels: 'Labels anzeigen',
+      defaultVisible: 'Standardmäßig sichtbar',
       grouped: 'Elemente gruppieren',
       ...(isGrouped
         ? {
@@ -76,6 +79,7 @@ export class FirecallItemLayer extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       showLabels: 'boolean',
+      defaultVisible: 'boolean',
       grouped: 'boolean',
       summaryPosition: 'select',
       clusterMode: 'select',
@@ -108,6 +112,7 @@ export class FirecallItemLayer extends FirecallItemBase {
       summaryPosition: this.summaryPosition,
       clusterMode: this.clusterMode,
       showLabels: this.showLabels,
+      defaultVisible: this.defaultVisible,
       ...(this.dataSchema.length > 0 ? { dataSchema: this.dataSchema } : {}),
       ...(this.heatmapConfig ? { heatmapConfig: this.heatmapConfig } : {}),
     };

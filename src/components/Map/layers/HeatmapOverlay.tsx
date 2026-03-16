@@ -85,7 +85,6 @@ const CustomHeatLayer = L.Layer.extend({
     } & L.Layer,
     latlngs: [number, number, number][],
     centerLat: number,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     options: any,
   ) {
     this._latlngs = latlngs;
@@ -93,7 +92,6 @@ const CustomHeatLayer = L.Layer.extend({
     L.setOptions(this, options);
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onAdd(this: any, map: L.Map) {
     this._map = map;
 
@@ -114,13 +112,11 @@ const CustomHeatLayer = L.Layer.extend({
     this._reset();
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onRemove(this: any, map: L.Map) {
     map.getPanes().overlayPane.removeChild(this._canvas);
     map.off('moveend', this._reset, this);
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _reset(this: any) {
     if (!this._map) return;
 
@@ -186,7 +182,6 @@ const CustomHeatLayer = L.Layer.extend({
       sctx.arc(stampR - offset, stampR - offset, radiusPx, 0, 2 * Math.PI, true);
       sctx.closePath();
       sctx.fill();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (heat as any)._circle = stamp;
     }
 
@@ -237,7 +232,6 @@ export default function HeatmapOverlay({
       const centerLat =
         points.reduce((sum, p) => sum + p.lat, 0) / points.length;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const layer = new (CustomHeatLayer as any)(data, centerLat, {
         radiusMeters: config.radius ?? 30,
         blurFraction: (config.blur ?? 15) / 25,

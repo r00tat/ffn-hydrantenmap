@@ -33,7 +33,7 @@ export async function checkFirebaseToken(token: string) {
       });
     }
   }
-  console.info(`user verified`);
+  console.info(`user ${decodedToken.sub} verified`);
   return decodedToken;
 }
 
@@ -78,7 +78,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await ensureUserProvisioned(
           tokenInfo.sub,
           tokenInfo.email,
-          tokenInfo.name
+          tokenInfo.name,
         );
 
         // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
@@ -126,7 +126,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const userData = await getUserSessionData(
           session.user.id,
           session.user.email,
-          session.user.name
+          session.user.name,
         );
         if (userData) {
           session.user.isAuthorized = userData.isAuthorized;
@@ -196,7 +196,7 @@ export async function userAuthorized(session: Session, firecallId: string) {
     session.user.firecall !== firecallId
   ) {
     throw new Error(
-      `user ${session.user.id} is not in group ${firecallData.group}`
+      `user ${session.user.id} is not in group ${firecallData.group}`,
     );
   }
   return firecallData;

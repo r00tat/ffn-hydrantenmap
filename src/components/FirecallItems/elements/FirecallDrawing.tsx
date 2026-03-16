@@ -48,6 +48,7 @@ export class FirecallDrawing extends FirecallItemBase {
         key={this.id}
         item={this.data() as FirecallItem}
         pane={options.pane}
+        onContextMenu={options.onContextMenu}
       />
     );
   }

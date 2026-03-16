@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -12,23 +13,25 @@ import MenuItem from '@mui/material/MenuItem';
 import { FirecallItem } from '../firebase/firestore';
 import useZOrderActions from '../../hooks/useZOrderActions';
 
-export interface ZOrderContextMenuProps {
+export interface ItemContextMenuProps {
   item: FirecallItem | undefined;
   siblings: FirecallItem[];
   anchorPosition: { top: number; left: number } | undefined;
   onClose: () => void;
   onEdit?: (item: FirecallItem) => void;
   onDelete?: (item: FirecallItem) => void;
+  customActions?: ReactNode;
 }
 
-export default function ZOrderContextMenu({
+export default function ItemContextMenu({
   item,
   siblings,
   anchorPosition,
   onClose,
   onEdit,
   onDelete,
-}: ZOrderContextMenuProps) {
+  customActions,
+}: ItemContextMenuProps) {
   const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
     useZOrderActions(item, siblings);
 
@@ -60,6 +63,8 @@ export default function ZOrderContextMenu({
         </MenuItem>
       )}
       {editable && <Divider />}
+      {customActions}
+      {customActions && editable && <Divider />}
       {editable && (
         <MenuItem onClick={() => handle(handleBringToFront)}>
           <ListItemIcon><VerticalAlignTopIcon fontSize="small" /></ListItemIcon>

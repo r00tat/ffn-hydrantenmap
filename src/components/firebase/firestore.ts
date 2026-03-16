@@ -83,14 +83,16 @@ export interface HeatmapConfig {
   visualizationMode?: 'heatmap' | 'interpolation';
   /** IDW buffer radius in meters beyond convex hull boundary (default 30) */
   interpolationRadius?: number;
-  /** IDW power parameter — higher = sharper transitions near points (default 2) */
+  /** @deprecated Use interpolationParams.power instead. Kept for migration. */
   interpolationPower?: number;
   /** Interpolation surface opacity 0-1 (default 0.6) */
   interpolationOpacity?: number;
-  /** Interpolation algorithm: 'idw' (default) or 'spline' (Thin-Plate Spline) */
-  interpolationAlgorithm?: 'idw' | 'spline';
+  /** Interpolation algorithm id (default 'idw') */
+  interpolationAlgorithm?: string;
   /** Interpolate in log space — produces exponential gradients around hotspots */
   interpolationLogScale?: boolean;
+  /** Algorithm-specific parameters — keys match AlgorithmParamDescriptor.key */
+  interpolationParams?: Record<string, number | boolean>;
 }
 
 export interface FirecallLayer extends FirecallItem {
@@ -99,6 +101,8 @@ export interface FirecallLayer extends FirecallItem {
   summaryPosition?: string;
   clusterMode?: string;
   showLabels?: string;
+  /** Whether the layer is visible by default when opening the map (default: 'true') */
+  defaultVisible?: string;
   dataSchema?: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
 }

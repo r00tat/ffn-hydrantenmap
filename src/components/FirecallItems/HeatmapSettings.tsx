@@ -14,6 +14,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { useCallback, useEffect } from 'react';
+import { getAlgorithm, getAlgorithmList } from '../../common/interpolation';
 import { DataSchemaField, HeatmapConfig } from '../firebase/firestore';
 
 interface HeatmapSettingsProps {
@@ -269,17 +270,99 @@ export default function HeatmapSettings({
                 <ToggleButtonGroup
                   value={current.interpolationAlgorithm ?? 'idw'}
                   exclusive
-                  onChange={(_, val) => val && update({ interpolationAlgorithm: val })}
+                  onChange={(_, val) => val && update({ interpolationAlgorithm: val, interpolationParams: {} })}
                   size="small"
                 >
-                  <ToggleButton value="idw">IDW</ToggleButton>
-                  <ToggleButton value="spline">Spline</ToggleButton>
+                  {getAlgorithmList().map((algo) => (
+                    <ToggleButton key={algo.id} value={algo.id}>
+                      {algo.label}
+                    </ToggleButton>
+                  ))}
                 </ToggleButtonGroup>
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  {(current.interpolationAlgorithm ?? 'idw') === 'idw'
-                    ? 'IDW (Inverse Distance Weighting): Gewichteter Durchschnitt – begrenzt auf den Wertebereich der Messpunkte. Gut für diskrete Messwerte.'
-                    : 'Spline (Thin-Plate): Glatte Fläche durch alle Messpunkte – kann Werte außerhalb des gemessenen Bereichs schätzen. Gut für physikalische Felder wie Strahlung oder Temperatur.'}
-                </Typography>
+                {(() => {
+                  const algo = getAlgorithm(current.interpolationAlgorithm ?? 'idw');
+                  if (!algo) return null;
+                  return (
+                    <>
+                      {algo.description && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                          {algo.description}
+                        </Typography>
+                      )}
+                      {algo.params.map((param) => {
+                        const savedParams = current.interpolationParams ?? {};
+                        // Migration: check legacy interpolationPower
+                        const legacyValue = param.key === 'power' ? current.interpolationPower : undefined;
+                        const value = savedParams[param.key] ?? legacyValue ?? param.default;
+
+                        if (param.type === 'boolean') {
+                          return (
+                            <FormControlLabel
+                              key={param.key}
+                              control={
+                                <Switch
+                                  checked={!!value}
+                                  onChange={(e) =>
+                                    update({
+                                      interpolationParams: { ...savedParams, [param.key]: e.target.checked },
+                                    })
+                                  }
+                                />
+                              }
+                              label={param.label}
+                            />
+                          );
+                        }
+
+                        if (param.type === 'select' && param.options) {
+                          return (
+                            <TextField
+                              key={param.key}
+                              label={param.label}
+                              size="small"
+                              select
+                              value={value as number}
+                              onChange={(e) =>
+                                update({
+                                  interpolationParams: { ...savedParams, [param.key]: Number(e.target.value) },
+                                })
+                              }
+                              fullWidth
+                            >
+                              {param.options.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          );
+                        }
+
+                        // number type → Slider
+                        return (
+                          <Box key={param.key}>
+                            <Typography variant="body2" gutterBottom>
+                              {param.label}: {value as number}
+                            </Typography>
+                            <Slider
+                              value={value as number}
+                              onChange={(_, val) =>
+                                update({
+                                  interpolationParams: { ...savedParams, [param.key]: val as number },
+                                })
+                              }
+                              min={param.min ?? 0}
+                              max={param.max ?? 10}
+                              step={param.step ?? 1}
+                              size="small"
+                              valueLabelDisplay="auto"
+                            />
+                          </Box>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </Box>
               <FormControlLabel
                 control={
@@ -307,22 +390,6 @@ export default function HeatmapSettings({
                   valueLabelDisplay="auto"
                 />
               </Box>
-              {(current.interpolationAlgorithm ?? 'idw') === 'idw' && (
-                <Box>
-                  <Typography variant="body2" gutterBottom>
-                    IDW Exponent: {current.interpolationPower ?? 2}
-                  </Typography>
-                  <Slider
-                    value={current.interpolationPower ?? 2}
-                    onChange={(_, val) => update({ interpolationPower: val as number })}
-                    min={1}
-                    max={5}
-                    step={0.5}
-                    size="small"
-                    valueLabelDisplay="auto"
-                  />
-                </Box>
-              )}
               <Box>
                 <Typography variant="body2" gutterBottom>
                   Deckkraft: {Math.round((current.interpolationOpacity ?? 0.6) * 100)}%
