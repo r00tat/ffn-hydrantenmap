@@ -101,6 +101,8 @@ export interface FirecallLayer extends FirecallItem {
   summaryPosition?: string;
   clusterMode?: string;
   showLabels?: string;
+  /** Whether the layer is visible by default when opening the map (default: 'true') */
+  defaultVisible?: string;
   dataSchema?: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
 }
