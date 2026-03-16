@@ -123,7 +123,14 @@ export const invSquareAlgorithm: InterpolationAlgorithm<InvSquareState> = {
     'Strahlenquelle (Inverse-Square): Schätzt Quellposition und -stärke aus den Messwerten. ' +
     'Berücksichtigt Abschirmung über richtungsabhängige Restanalyse. ' +
     'Geeignet für Strahlung und andere punktförmige Quellen.',
-  params: [],
+  params: [
+    {
+      key: 'fullCanvasRender',
+      label: 'Gesamte Karte rendern (Quellfeld über Messbereich hinaus)',
+      type: 'boolean',
+      default: false,
+    },
+  ],
 
   fullCanvasRender: (state: InvSquareState) => state.fullCanvasRender,
 
@@ -134,9 +141,9 @@ export const invSquareAlgorithm: InterpolationAlgorithm<InvSquareState> = {
     const mpp =
       typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
     const fullCanvas =
-      typeof params._fullCanvasRender === 'boolean'
-        ? params._fullCanvasRender
-        : true;
+      typeof params.fullCanvasRender === 'boolean'
+        ? params.fullCanvasRender
+        : false;
 
     if (points.length === 0) {
       return {
