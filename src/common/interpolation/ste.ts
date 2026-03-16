@@ -53,3 +53,33 @@ export function pasquillSigmaZ(x: number, stabilityClass: number): number {
   const dist = Math.max(1, x);
   return Math.max(MIN_SIGMA, a * Math.pow(dist, b));
 }
+
+export interface GaussianPlumeParams {
+  Q: number;
+  windSpeed: number;
+  stabilityClass: number;
+  releaseHeight: number;
+}
+
+export function gaussianPlume(
+  downwind: number,
+  crosswind: number,
+  params: GaussianPlumeParams
+): number {
+  if (downwind <= 0) return 0;
+
+  const { Q, windSpeed, stabilityClass, releaseHeight } = params;
+  const u = Math.max(0.1, windSpeed);
+
+  const sigmaY = pasquillSigmaY(downwind, stabilityClass);
+  const sigmaZ = pasquillSigmaZ(downwind, stabilityClass);
+
+  const crosswindTerm = Math.exp(
+    -(crosswind * crosswind) / (2 * sigmaY * sigmaY)
+  );
+  const verticalTerm = Math.exp(
+    -(releaseHeight * releaseHeight) / (2 * sigmaZ * sigmaZ)
+  );
+
+  return (Q / (2 * Math.PI * u * sigmaY * sigmaZ)) * crosswindTerm * verticalTerm;
+}
