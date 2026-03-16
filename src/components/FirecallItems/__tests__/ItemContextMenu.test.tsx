@@ -12,7 +12,7 @@ vi.mock('../../../hooks/useZOrderActions', () => ({
   })),
 }));
 
-import ZOrderContextMenu from '../ZOrderContextMenu';
+import ItemContextMenu from '../ItemContextMenu';
 
 const baseProps = {
   item: { id: '1', name: 'Test', type: 'marker' } as any,
@@ -23,16 +23,16 @@ const baseProps = {
   onDelete: vi.fn(),
 };
 
-describe('ZOrderContextMenu', () => {
+describe('ItemContextMenu', () => {
   it('renders edit and delete menu items', () => {
-    render(<ZOrderContextMenu {...baseProps} />);
+    render(<ItemContextMenu {...baseProps} />);
     expect(screen.getByText('Bearbeiten')).toBeInTheDocument();
     expect(screen.getByText('Löschen')).toBeInTheDocument();
   });
 
   it('renders customActions when provided', () => {
     render(
-      <ZOrderContextMenu
+      <ItemContextMenu
         {...baseProps}
         customActions={<li data-testid="custom-action">Custom Action</li>}
       />
@@ -42,14 +42,14 @@ describe('ZOrderContextMenu', () => {
   });
 
   it('does not render extra divider when customActions is not provided', () => {
-    render(<ZOrderContextMenu {...baseProps} />);
+    render(<ItemContextMenu {...baseProps} />);
     const dividers = document.querySelectorAll('.MuiDivider-root');
     expect(dividers.length).toBe(1);
   });
 
   it('renders extra divider when customActions is provided', () => {
     const { container } = render(
-      <ZOrderContextMenu
+      <ItemContextMenu
         {...baseProps}
         customActions={<li>Custom</li>}
       />

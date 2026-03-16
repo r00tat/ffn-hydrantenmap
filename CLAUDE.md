@@ -13,6 +13,8 @@ npm run dev          # Development server (Turbopack)
 npm run build        # Production build (Webpack)
 npm run start        # Start production server
 npm run lint         # ESLint validation
+npm run test         # Run Vitest tests once
+npm run test:watch   # Run Vitest in watch mode
 ```
 
 Data import scripts (require `GOOGLE_APPLICATION_CREDENTIALS` env var):
@@ -62,6 +64,17 @@ When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
 ```bash
 GITHUB_TOKEN= gh <command>
 ```
+
+## Testing (TDD)
+
+**For all new features, write tests first before writing implementation code.** Follow test-driven development:
+
+1. Write failing tests that define the expected behavior
+2. Run `npm run test` to confirm the tests fail
+3. Implement the feature code to make the tests pass
+4. Run `npm run test` again to confirm all tests pass
+
+Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-dom`. Place test files next to the code they test using the `*.test.ts` / `*.test.tsx` naming convention.
 
 ## Tech Stack
 

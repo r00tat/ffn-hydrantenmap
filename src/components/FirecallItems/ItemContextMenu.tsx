@@ -13,7 +13,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { FirecallItem } from '../firebase/firestore';
 import useZOrderActions from '../../hooks/useZOrderActions';
 
-export interface ZOrderContextMenuProps {
+export interface ItemContextMenuProps {
   item: FirecallItem | undefined;
   siblings: FirecallItem[];
   anchorPosition: { top: number; left: number } | undefined;
@@ -23,7 +23,7 @@ export interface ZOrderContextMenuProps {
   customActions?: ReactNode;
 }
 
-export default function ZOrderContextMenu({
+export default function ItemContextMenu({
   item,
   siblings,
   anchorPosition,
@@ -31,7 +31,7 @@ export default function ZOrderContextMenu({
   onEdit,
   onDelete,
   customActions,
-}: ZOrderContextMenuProps) {
+}: ItemContextMenuProps) {
   const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
     useZOrderActions(item, siblings);
 

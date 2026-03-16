@@ -17,7 +17,7 @@ import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import { useHistoryPathSegments, useMapEditable } from '../../../hooks/useMapEditor';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
-import ZOrderContextMenu from '../../FirecallItems/ZOrderContextMenu';
+import ItemContextMenu from '../../FirecallItems/ItemContextMenu';
 
 export interface FirecallLayerOptions {
   layer?: FirecallLayer;
@@ -164,7 +164,7 @@ export default function FirecallItemsLayer({
           close={() => setFirecallItem(undefined)}
         />
       )}
-      <ZOrderContextMenu
+      <ItemContextMenu
         item={contextMenuTarget}
         siblings={records}
         anchorPosition={contextMenuPos}
