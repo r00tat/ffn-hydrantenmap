@@ -94,6 +94,42 @@ export default function SidebarAddItemPanel() {
                 </Tooltip>
               );
             })}
+            <Tooltip title="Ebene">
+              <IconButton
+                onClick={() => openFirecallItemDialog({ type: 'layer' } as any)}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  borderRadius: 1,
+                  p: 0.75,
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                  },
+                }}
+              >
+                <Image
+                  src="/icons/layer.svg"
+                  alt="layer"
+                  width={24}
+                  height={24}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    mt: 0.5,
+                    textAlign: 'center',
+                    fontSize: '0.65rem',
+                    lineHeight: 1.2,
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  Ebene
+                </Typography>
+              </IconButton>
+            </Tooltip>
           </Box>
         </AccordionDetails>
       </Accordion>
