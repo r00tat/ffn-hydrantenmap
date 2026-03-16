@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { invSquareAlgorithm, valueAt1m } from '../invSquare';
-import type { DataPoint } from '../types';
+import { invSquareAlgorithm, valueAt1m } from './invSquare';
+import type { DataPoint } from './types';
 
 // All tests use 1 pixel = 1 metre so pixel coords == metric coords.
 const MPP = 1.0;

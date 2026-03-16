@@ -9,20 +9,20 @@ vi.mock('next-auth/react', () => ({
   signOut: vi.fn(),
 }));
 
-vi.mock('../../../../components/firebase/firebase', () => ({
+vi.mock('../../../components/firebase/firebase', () => ({
   firestore: {},
 }));
 
-vi.mock('../../../../components/firebase/firestore', () => ({
+vi.mock('../../../components/firebase/firestore', () => ({
   FIRECALL_ITEMS_COLLECTION_ID: 'item',
   DataSchemaField: {},
 }));
 
-vi.mock('../../../../hooks/useMapEditor', () => ({
+vi.mock('../../../hooks/useMapEditor', () => ({
   useMapEditable: vi.fn(() => false),
 }));
 
-import { FirecallItemBase } from '../FirecallItemBase';
+import { FirecallItemBase } from './FirecallItemBase';
 
 describe('FirecallItemBase.contextMenuItems', () => {
   it('returns null by default', () => {

@@ -4,8 +4,8 @@ import {
   getAlgorithm,
   getAlgorithmList,
   resetRegistry,
-} from '../registry';
-import type { InterpolationAlgorithm, DataPoint } from '../types';
+} from './registry';
+import type { InterpolationAlgorithm, DataPoint } from './types';
 
 const mockAlgo: InterpolationAlgorithm<null> = {
   id: 'mock',

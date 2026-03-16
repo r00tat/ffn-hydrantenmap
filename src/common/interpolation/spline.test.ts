@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { splineAlgorithm } from '../spline';
-import type { DataPoint } from '../types';
+import { splineAlgorithm } from './spline';
+import type { DataPoint } from './types';
 
 describe('Spline (TPS) algorithm', () => {
   const points: DataPoint[] = [

@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
-vi.mock('../../../hooks/useZOrderActions', () => ({
+vi.mock('../../hooks/useZOrderActions', () => ({
   default: vi.fn(() => ({
     handleBringToFront: vi.fn(),
     handleSendToBack: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('../../../hooks/useZOrderActions', () => ({
   })),
 }));
 
-import ItemContextMenu from '../ItemContextMenu';
+import ItemContextMenu from './ItemContextMenu';
 
 const baseProps = {
   item: { id: '1', name: 'Test', type: 'marker' } as any,

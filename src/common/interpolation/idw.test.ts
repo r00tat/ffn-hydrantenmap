@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { idwAlgorithm } from '../idw';
-import type { DataPoint } from '../types';
+import { idwAlgorithm } from './idw';
+import type { DataPoint } from './types';
 
 describe('IDW algorithm', () => {
   const points: DataPoint[] = [
