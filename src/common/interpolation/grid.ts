@@ -80,7 +80,8 @@ export function buildInterpolationGrid(params: {
   // Max proximity for interior hull cells
   const interiorMaxDist = bufferPx * 3;
 
-  const fullCanvas = !!algorithm.fullCanvasRender;
+  const fcr = algorithm.fullCanvasRender;
+  const fullCanvas = typeof fcr === 'function' ? fcr(state) : !!fcr;
 
   for (let by = 0; by < canvasHeight; by += blockSize) {
     for (let bx = 0; bx < canvasWidth; bx += blockSize) {

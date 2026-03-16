@@ -60,11 +60,12 @@ export interface InterpolationAlgorithm<TState = unknown> {
   params: AlgorithmParamDescriptor[];
 
   /**
-   * When true, the grid builder renders the full canvas instead of clipping
-   * to the convex hull + proximity of data points. Use for algorithms like STE
-   * that produce a field extending far beyond the measurement points.
+   * When true (or when this function returns true for the prepared state),
+   * the grid builder renders the full canvas instead of clipping to the
+   * convex hull + proximity of data points.
+   * Pass a function to make this user-selectable via algorithm params.
    */
-  fullCanvasRender?: boolean;
+  fullCanvasRender?: boolean | ((state: TState) => boolean);
 
   /**
    * Precomputation phase. Called once when points or params change.

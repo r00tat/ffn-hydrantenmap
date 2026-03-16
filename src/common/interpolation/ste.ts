@@ -135,28 +135,8 @@ interface SteState {
   releaseHeight: number;
   /** Real-world scale: meters per pixel */
   metersPerPixel: number;
-  /**
-   * Fallback data points for IDW evaluation when source estimation fails
-   * (Q=0 means no valid downwind source position was found).
-   */
-  fallbackPoints: DataPoint[];
-}
-
-/**
- * Simple IDW evaluation used as fallback when Gaussian Plume estimation fails.
- */
-function idwFallback(x: number, y: number, points: DataPoint[]): number {
-  let wSum = 0;
-  let vSum = 0;
-  for (const pt of points) {
-    const dx = x - pt.x;
-    const dy = y - pt.y;
-    const distSq = Math.max(dx * dx + dy * dy, 1e-10);
-    const w = 1 / distSq; // power=2
-    wSum += w;
-    vSum += w * pt.value;
-  }
-  return wSum > 0 ? vSum / wSum : 0;
+  /** Whether to render the full canvas (user-selectable via param) */
+  fullCanvasRender: boolean;
 }
 
 /**
@@ -218,6 +198,15 @@ export function estimateSource(
     releaseHeight: params.releaseHeight,
   };
 
+  // Floor used only for the error term on zero measurements: keeps
+  // log-space error finite while still penalising high predicted
+  // concentrations at locations where the observed value is zero.
+  let maxMeasurement = 0;
+  for (const p of points) {
+    if (p.value > maxMeasurement) maxMeasurement = p.value;
+  }
+  const dataFloor = Math.max(maxMeasurement * 0.001, 1e-9);
+
   let bestError = Infinity;
   let bestX = 0;
   let bestY = 0;
@@ -248,12 +237,18 @@ export function estimateSource(
 
       if (!valid) continue;
 
+      // Estimate Q from positive measurements only: zero readings tell us
+      // about source position (via the valid check above) but not Q magnitude.
       let sumLogRatio = 0;
+      let posCount = 0;
       for (let i = 0; i < points.length; i++) {
+        if (points[i].value <= 0) continue;
         sumLogRatio +=
-          Math.log(Math.max(points[i].value, 1e-30)) - Math.log(unitConcs[i]);
+          Math.log(points[i].value) - Math.log(unitConcs[i]);
+        posCount++;
       }
-      const logQ = sumLogRatio / points.length;
+      if (posCount === 0) continue;
+      const logQ = sumLogRatio / posCount;
       const Q = Math.exp(logQ);
 
       if (Q <= 0) continue;
@@ -261,7 +256,7 @@ export function estimateSource(
       let error = 0;
       for (let i = 0; i < points.length; i++) {
         const logPred = Math.log(Q * unitConcs[i]);
-        const logObs = Math.log(Math.max(points[i].value, 1e-30));
+        const logObs = Math.log(Math.max(points[i].value, dataFloor));
         const diff = logPred - logObs;
         error += diff * diff;
       }
@@ -325,10 +320,10 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       key: 'releaseHeight',
       label: 'Quellhöhe (m)',
       type: 'number',
-      min: 0,
+      min: 1,
       max: 100,
       step: 1,
-      default: 0,
+      default: 1,
     },
     {
       key: 'searchResolution',
@@ -339,6 +334,12 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       step: 5,
       default: 20,
     },
+    {
+      key: 'fullCanvasRender',
+      label: 'Gesamte Karte rendern (Fahnenform über Messbereich hinaus)',
+      type: 'boolean',
+      default: false,
+    },
   ],
 
   prepare(points: DataPoint[], params: Record<string, number | boolean>): SteState {
@@ -347,13 +348,14 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     const stabilityClass =
       typeof params.stabilityClass === 'number' ? params.stabilityClass : 4;
     const releaseHeight =
-      typeof params.releaseHeight === 'number' ? params.releaseHeight : 0;
+      typeof params.releaseHeight === 'number' ? params.releaseHeight : 1;
     const searchResolution =
       typeof params.searchResolution === 'number' ? params.searchResolution : 20;
     // Injected by InterpolationOverlay — real-world scale for the Gaussian Plume model.
     // Falls back to 1.0 in unit tests where coordinates are already in meters.
     const metersPerPixel =
       typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
+    const fullCanvasRender = !!params.fullCanvasRender;
 
     const windDirRad = windFromDegreesToRad(windDir);
 
@@ -374,22 +376,22 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       stabilityClass,
       releaseHeight,
       metersPerPixel,
-      fallbackPoints: points,
+      fullCanvasRender,
     };
   },
 
-  evaluate(x: number, y: number, state: SteState): number {
-    // When source estimation failed (no valid downwind position found), fall
-    // back to IDW so the hull shows meaningful interpolated values instead of
-    // a uniform minimum.
-    if (state.releaseRate < 1e-30) {
-      return idwFallback(x, y, state.fallbackPoints);
-    }
+  fullCanvasRender(state: SteState): boolean {
+    return state.fullCanvasRender;
+  },
 
+  evaluate(x: number, y: number, state: SteState): number {
+    // When source estimation failed (releaseRate=0), return 0 — no overlay.
+    // Showing interpolated values here would imply a valid result when none was found.
+    if (state.releaseRate < 1.0) return 0;
+
+    const mpp = Math.max(state.metersPerPixel, 1e-6);
     const dx = x - state.sourceX;
     const dy = y - state.sourceY;
-    // Use same compass-bearing convention as toWindCoords, then scale to meters
-    const mpp = Math.max(state.metersPerPixel, 1e-6);
     const downwind =
       (dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad)) * mpp;
     const crosswind =

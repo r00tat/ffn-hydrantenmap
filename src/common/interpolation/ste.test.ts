@@ -167,8 +167,35 @@ describe('STE algorithm interface', () => {
     );
   });
 
-  it('does not set fullCanvasRender (renders hull + buffer only)', () => {
-    expect(steAlgorithm.fullCanvasRender).toBeFalsy();
+  it('fullCanvasRender is a function (driven by user param)', () => {
+    expect(typeof steAlgorithm.fullCanvasRender).toBe('function');
+  });
+
+  it('has a fullCanvasRender boolean param with default false', () => {
+    const param = steAlgorithm.params.find((p) => p.key === 'fullCanvasRender');
+    expect(param).toBeDefined();
+    expect(param!.type).toBe('boolean');
+    expect(param!.default).toBe(false);
+  });
+
+  it('fullCanvasRender(state) returns false when param is false (default)', () => {
+    const points: DataPoint[] = [
+      { x: 100, y: 0, value: 5 },
+      { x: 200, y: 0, value: 2 },
+    ];
+    const state = steAlgorithm.prepare(points, { fullCanvasRender: false });
+    const fn = steAlgorithm.fullCanvasRender as (s: unknown) => boolean;
+    expect(fn(state)).toBe(false);
+  });
+
+  it('fullCanvasRender(state) returns true when param is true', () => {
+    const points: DataPoint[] = [
+      { x: 100, y: 0, value: 5 },
+      { x: 200, y: 0, value: 2 },
+    ];
+    const state = steAlgorithm.prepare(points, { fullCanvasRender: true });
+    const fn = steAlgorithm.fullCanvasRender as (s: unknown) => boolean;
+    expect(fn(state)).toBe(true);
   });
 
   it('has all required param descriptors with defaults', () => {
@@ -253,9 +280,7 @@ describe('STE algorithm interface', () => {
     expect(() => steAlgorithm.prepare(points, {})).not.toThrow();
   });
 
-  it('evaluate uses IDW: returns positive values everywhere (not 0 upwind)', () => {
-    // evaluate uses IDW from the measurement points — it interpolates the hull
-    // area and does not model the Gaussian Plume corridor.
+  it('evaluate returns 0 upwind of estimated source', () => {
     const points: DataPoint[] = [
       { x: 100, y: 0, value: 5 },
       { x: 200, y: 0, value: 2 },
@@ -268,22 +293,8 @@ describe('STE algorithm interface', () => {
       searchResolution: 20,
     });
 
-    // IDW returns a distance-weighted average — always positive for positive inputs
-    expect(steAlgorithm.evaluate(-500, 0, state)).toBeGreaterThan(0);
+    expect(steAlgorithm.evaluate(-500, 0, state)).toBe(0);
     expect(steAlgorithm.evaluate(150, 0, state)).toBeGreaterThan(0);
-  });
-
-  it('evaluate uses IDW: value near high marker > value near low marker', () => {
-    const points: DataPoint[] = [
-      { x: 100, y: 0, value: 10 },
-      { x: 200, y: 0, value:  1 },
-    ];
-    const state = steAlgorithm.prepare(points, {
-      windDirection: 270, windSpeed: 3, stabilityClass: 4, releaseHeight: 0, searchResolution: 20,
-    });
-    const nearHigh = steAlgorithm.evaluate(100, 0, state);
-    const nearLow  = steAlgorithm.evaluate(200, 0, state);
-    expect(nearHigh).toBeGreaterThan(nearLow);
   });
 });
 
@@ -354,21 +365,10 @@ describe('STE 5-marker scenario: scattered field measurements', () => {
     expect(state.releaseRate).toBeLessThan(trueQ * 10);
   });
 
-  it('evaluate (IDW): returns positive values everywhere', () => {
-    // evaluate uses IDW — always positive, no plume corridor
+  it('evaluate returns 0 upwind of estimated source', () => {
     expect(steAlgorithm.evaluate(  80, -20, state)).toBeGreaterThan(0);
     expect(steAlgorithm.evaluate( 200,  10, state)).toBeGreaterThan(0);
-    expect(steAlgorithm.evaluate(-300,   0, state)).toBeGreaterThan(0); // "upwind" — still positive
-  });
-
-  it('evaluate (IDW): value near the highest-reading marker is higher than near the lowest', () => {
-    // Find which marker has the max and min value from the actual plume data.
-    // (Not obvious by eye — crosswind offset matters as much as distance.)
-    const maxMarker = markers.reduce((a, b) => (a.value > b.value ? a : b));
-    const minMarker = markers.reduce((a, b) => (a.value < b.value ? a : b));
-    const nearMax = steAlgorithm.evaluate(maxMarker.x, maxMarker.y, state);
-    const nearMin = steAlgorithm.evaluate(minMarker.x, minMarker.y, state);
-    expect(nearMax).toBeGreaterThan(nearMin);
+    expect(steAlgorithm.evaluate(-300,   0, state)).toBe(0); // upwind → 0
   });
 });
 
@@ -459,15 +459,13 @@ describe('STE 5-marker scenario: plume shape sanity check', () => {
     expect(cLeft).toBeCloseTo(cRight, 5);
   });
 
-  it('evaluate (IDW): value near high-reading marker (M1) > near low-reading marker (M3)', () => {
-    // M1(80,0) is closest to source → highest value; M3(250,0) is far → lowest value
+  it('concentration at M1 (close, centerline) > M3 (far, centerline)', () => {
     const nearM1 = steAlgorithm.evaluate( 80, 0, state);
     const nearM3 = steAlgorithm.evaluate(250, 0, state);
     expect(nearM1).toBeGreaterThan(nearM3);
   });
 
-  it('evaluate (IDW): symmetric markers produce symmetric values about the centerline', () => {
-    // M4(150,+40) and M5(150,-40) have the same value → IDW output is symmetric
+  it('plume is symmetric: equal crosswind positions produce equal concentrations', () => {
     const cPlus  = steAlgorithm.evaluate(150,  80, state);
     const cMinus = steAlgorithm.evaluate(150, -80, state);
     expect(cPlus).toBeCloseTo(cMinus, 5);
