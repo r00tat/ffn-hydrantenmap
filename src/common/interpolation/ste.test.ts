@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
   pasquillSigmaY,
   pasquillSigmaZ,
@@ -268,5 +268,104 @@ describe('STE algorithm interface', () => {
 
     const cUpwind = steAlgorithm.evaluate(-500, 0, state);
     expect(cUpwind).toBe(0);
+  });
+});
+
+describe('STE 5-marker scenario: plume shape sanity check', () => {
+  /**
+   * Scenario: known source at (0, 0), Q=500 Bq/s, wind from west (270°, u=3 m/s),
+   * stability class D (neutral). Five markers placed at realistic positions
+   * with values generated from the Gaussian Plume formula.
+   *
+   * Coordinate system: 1 pixel = 1 meter (metersPerPixel defaults to 1).
+   *
+   *   Marker layout (wind → east, i.e. +x):
+   *
+   *            y
+   *            |
+   *     M4(150,40) ●
+   *            |
+   *   source ──┼──── M1(80,0) ── M2(150,0) ── M3(250,0) ──► x (downwind)
+   *            |
+   *     M5(150,-40) ●
+   */
+  const trueSource = { x: 0, y: 0 };
+  const trueQ = 500;
+  const plumeParams = { Q: trueQ, windSpeed: 3, stabilityClass: 4, releaseHeight: 0 };
+
+  // Generate realistic marker values from the true plume
+  const markers: DataPoint[] = [
+    { x: 80,  y:   0, value: gaussianPlume( 80,   0, plumeParams) }, // close, centerline
+    { x: 150, y:   0, value: gaussianPlume(150,   0, plumeParams) }, // mid, centerline
+    { x: 250, y:   0, value: gaussianPlume(250,   0, plumeParams) }, // far, centerline
+    { x: 150, y:  40, value: gaussianPlume(150,  40, plumeParams) }, // mid, +crosswind
+    { x: 150, y: -40, value: gaussianPlume(150, -40, plumeParams) }, // mid, -crosswind
+  ];
+
+  const prepParams = {
+    windDirection: 270,
+    windSpeed: 3,
+    stabilityClass: 4,
+    releaseHeight: 0,
+    searchResolution: 10,
+  };
+
+  let state: ReturnType<typeof steAlgorithm.prepare>;
+  beforeAll(() => {
+    state = steAlgorithm.prepare(markers, prepParams);
+  });
+
+  it('all 5 marker values are positive and differ from each other', () => {
+    const values = markers.map((m) => m.value);
+    for (const v of values) expect(v).toBeGreaterThan(0);
+    // Not all the same — there is real variation in the input data
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    expect(max / min).toBeGreaterThan(2);
+  });
+
+  it('estimates the source near (0, 0)', () => {
+    const distFromTrue = Math.sqrt(
+      (state.sourceX - trueSource.x) ** 2 + (state.sourceY - trueSource.y) ** 2
+    );
+    // Grid search resolution is 10m, so allow up to 20m error
+    expect(distFromTrue).toBeLessThan(20);
+  });
+
+  it('estimates a positive release rate', () => {
+    expect(state.releaseRate).toBeGreaterThan(0);
+  });
+
+  it('concentration decreases with downwind distance on centerline', () => {
+    const c80  = steAlgorithm.evaluate( 80, 0, state);
+    const c150 = steAlgorithm.evaluate(150, 0, state);
+    const c250 = steAlgorithm.evaluate(250, 0, state);
+    expect(c80).toBeGreaterThan(c150);
+    expect(c150).toBeGreaterThan(c250);
+  });
+
+  it('centerline concentration is higher than off-centerline at same downwind distance', () => {
+    const cCenter   = steAlgorithm.evaluate(150,  0, state);
+    const cOffLeft  = steAlgorithm.evaluate(150,  40, state);
+    const cOffRight = steAlgorithm.evaluate(150, -40, state);
+    expect(cCenter).toBeGreaterThan(cOffLeft);
+    expect(cCenter).toBeGreaterThan(cOffRight);
+  });
+
+  it('plume is symmetric about the centerline', () => {
+    const cLeft  = steAlgorithm.evaluate(150,  40, state);
+    const cRight = steAlgorithm.evaluate(150, -40, state);
+    expect(cLeft).toBeCloseTo(cRight, 5);
+  });
+
+  it('upwind of source returns 0', () => {
+    expect(steAlgorithm.evaluate(-100, 0, state)).toBe(0);
+    expect(steAlgorithm.evaluate(-300, 0, state)).toBe(0);
+  });
+
+  it('concentration far off-axis is negligible compared to centerline', () => {
+    const cCenter  = steAlgorithm.evaluate(150,   0, state);
+    const cFarSide = steAlgorithm.evaluate(150, 300, state);
+    expect(cFarSide).toBeLessThan(cCenter * 0.01);
   });
 });
