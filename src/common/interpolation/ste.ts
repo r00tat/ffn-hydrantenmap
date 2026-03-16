@@ -61,6 +61,12 @@ export interface GaussianPlumeParams {
   releaseHeight: number;
 }
 
+/**
+ * Gaussian Plume concentration at a point in wind-aligned coordinates.
+ * Simplified model without ground reflection — the estimated Q absorbs the
+ * factor of 2 for ground-level releases (H=0). For elevated releases (H>0)
+ * the model underpredicts by ~2x compared to the standard formulation.
+ */
 export function gaussianPlume(
   downwind: number,
   crosswind: number,
@@ -137,6 +143,11 @@ function windFromDegreesToRad(degrees: number): number {
   return (towardsDeg * Math.PI) / 180;
 }
 
+/**
+ * Estimate the source location and release rate from measurement points.
+ * Uses brute-force grid search with log-space least-squares Q estimation.
+ * Requires at least 2 (ideally 3+) measurement points for meaningful results.
+ */
 export function estimateSource(
   points: DataPoint[],
   windDirRad: number,
