@@ -74,7 +74,7 @@ GITHUB_TOKEN= gh <command>
 3. Implement the feature code to make the tests pass
 4. Run `npm run test` again to confirm all tests pass
 
-Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-dom`. Place test files next to the code they test using the `*.test.ts` / `*.test.tsx` naming convention.
+Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-dom`. Place test files **directly next to** the source file they test using the `*.test.ts` / `*.test.tsx` naming convention (e.g., `utils.ts` → `utils.test.ts` in the same directory). Do **not** use `__tests__/` folders.
 
 ## Tech Stack
 
