@@ -98,11 +98,13 @@ describe('Gaussian Plume concentration', () => {
 describe('Source estimation (grid search)', () => {
   // Wind blowing from west (270deg) -> towards east
   const windDirRad = Math.PI / 2; // "towards" direction (east) in math coords
+  // metersPerPixel: 1 means coordinates are already in meters (unit-test convention)
   const params = {
     windSpeed: 3,
     stabilityClass: 4,
     releaseHeight: 0,
     searchResolution: 10,
+    metersPerPixel: 1,
   };
 
   it('estimates source near the true source for a simple scenario', () => {
@@ -165,6 +167,10 @@ describe('STE algorithm interface', () => {
     );
   });
 
+  it('does not set fullCanvasRender (renders hull + buffer only)', () => {
+    expect(steAlgorithm.fullCanvasRender).toBeFalsy();
+  });
+
   it('has all required param descriptors with defaults', () => {
     for (const param of steAlgorithm.params) {
       expect(param.key).toBeTruthy();
@@ -173,6 +179,10 @@ describe('STE algorithm interface', () => {
       if (param.type === 'number') {
         expect(param.min).toBeDefined();
         expect(param.max).toBeDefined();
+      }
+      if (param.type === 'select') {
+        expect(param.options).toBeDefined();
+        expect(param.options!.length).toBeGreaterThan(0);
       }
     }
   });
@@ -197,6 +207,42 @@ describe('STE algorithm interface', () => {
 
     const cCrosswind = steAlgorithm.evaluate(150, 200, state);
     expect(cCrosswind).toBeLessThan(cDownwind);
+  });
+
+  it('_metersPerPixel scales pixel coordinates to meters correctly', () => {
+    // Place measurements at pixel coords; 1 pixel = 5 meters
+    const mpp = 5;
+    const points: DataPoint[] = [
+      { x: 20, y: 0, value: 5 },  // 100m downwind in meter space
+      { x: 40, y: 0, value: 2 },  // 200m
+      { x: 60, y: 0, value: 1 },  // 300m
+    ];
+    const stateWithScale = steAlgorithm.prepare(points, {
+      windDirection: 270,
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 0,
+      searchResolution: 20,
+      _metersPerPixel: mpp,
+    });
+    // Equivalent meter-space points
+    const meterPoints: DataPoint[] = points.map((p) => ({
+      x: p.x * mpp,
+      y: p.y * mpp,
+      value: p.value,
+    }));
+    const stateMeters = steAlgorithm.prepare(meterPoints, {
+      windDirection: 270,
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 0,
+      searchResolution: 20,
+      _metersPerPixel: 1,
+    });
+    // Both should produce the same concentration at equivalent positions
+    const cPixelSpace = steAlgorithm.evaluate(30, 0, stateWithScale); // px=30 → 150m
+    const cMeterSpace = steAlgorithm.evaluate(150, 0, stateMeters);
+    expect(cPixelSpace).toBeCloseTo(cMeterSpace, 3);
   });
 
   it('prepare with default params does not throw', () => {

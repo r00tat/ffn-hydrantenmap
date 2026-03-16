@@ -144,6 +144,12 @@ const InterpolationCanvasLayer = L.Layer.extend({
     mergedParams._searchRadius = bufferPx * 5;
     // Pass lambda hint for TPS log-scale mode
     if (logScale) mergedParams._lambda = 0;
+    // Pass real-world scale for algorithms that need metric distances (e.g. STE Gaussian Plume)
+    {
+      const p0 = map.containerPointToLatLng(L.point(0, 0));
+      const p1 = map.containerPointToLatLng(L.point(1, 0));
+      mergedParams._metersPerPixel = p0.distanceTo(p1);
+    }
 
     const preparedState = interpPoints.length >= (algo.id === 'spline' ? 3 : 1)
       ? algo.prepare(interpPoints, mergedParams)

@@ -101,7 +101,10 @@ interface SearchParams {
   windSpeed: number;
   stabilityClass: number;
   releaseHeight: number;
+  /** Grid search step in meters */
   searchResolution: number;
+  /** Real-world scale: meters per pixel (injected by InterpolationOverlay) */
+  metersPerPixel: number;
 }
 
 /**
@@ -130,6 +133,30 @@ interface SteState {
   windSpeed: number;
   stabilityClass: number;
   releaseHeight: number;
+  /** Real-world scale: meters per pixel */
+  metersPerPixel: number;
+  /**
+   * Fallback data points for IDW evaluation when source estimation fails
+   * (Q=0 means no valid downwind source position was found).
+   */
+  fallbackPoints: DataPoint[];
+}
+
+/**
+ * Simple IDW evaluation used as fallback when Gaussian Plume estimation fails.
+ */
+function idwFallback(x: number, y: number, points: DataPoint[]): number {
+  let wSum = 0;
+  let vSum = 0;
+  for (const pt of points) {
+    const dx = x - pt.x;
+    const dy = y - pt.y;
+    const distSq = Math.max(dx * dx + dy * dy, 1e-10);
+    const w = 1 / distSq; // power=2
+    wSum += w;
+    vSum += w * pt.value;
+  }
+  return wSum > 0 ? vSum / wSum : 0;
 }
 
 /**
@@ -175,7 +202,9 @@ export function estimateSource(
   minY -= buffer;
   maxY += buffer;
 
-  const res = params.searchResolution;
+  // Convert search resolution from meters to pixels
+  const mpp = Math.max(params.metersPerPixel, 1e-6);
+  const res = params.searchResolution / mpp;
   // Align grid to multiples of res so that origin (0,0) is always a grid point
   minX = Math.floor(minX / res) * res;
   maxX = Math.ceil(maxX / res) * res;
@@ -199,13 +228,16 @@ export function estimateSource(
       let valid = true;
       const unitConcs: number[] = [];
       for (const p of points) {
-        const [downwind, crosswind] = toWindCoords(
+        const [downwindPx, crosswindPx] = toWindCoords(
           p.x,
           p.y,
           cx,
           cy,
           windDirRad
         );
+        // Scale pixel distances to meters for the Gaussian Plume model
+        const downwind = downwindPx * mpp;
+        const crosswind = crosswindPx * mpp;
         const c = gaussianPlume(downwind, crosswind, plumeParams);
         unitConcs.push(c);
         if (c <= 0) {
@@ -270,18 +302,23 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       key: 'windSpeed',
       label: 'Windgeschwindigkeit (m/s)',
       type: 'number',
-      min: 0.5,
+      min: 0,
       max: 30,
       step: 0.5,
       default: 3,
     },
     {
       key: 'stabilityClass',
-      label: 'Stabilitätsklasse (1=A … 6=F)',
-      type: 'number',
-      min: 1,
-      max: 6,
-      step: 1,
+      label: 'Stabilitätsklasse',
+      type: 'select',
+      options: [
+        { value: 1, label: 'A – sehr labil (sonnig, schwach windig)' },
+        { value: 2, label: 'B – labil (sonnig, mäßig windig)' },
+        { value: 3, label: 'C – leicht labil (bewölkt, windig)' },
+        { value: 4, label: 'D – neutral (bedeckt oder windig)' },
+        { value: 5, label: 'E – leicht stabil (Nacht, leichter Wind)' },
+        { value: 6, label: 'F – stabil (klare Nacht, windstill)' },
+      ],
       default: 4,
     },
     {
@@ -313,6 +350,10 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       typeof params.releaseHeight === 'number' ? params.releaseHeight : 0;
     const searchResolution =
       typeof params.searchResolution === 'number' ? params.searchResolution : 20;
+    // Injected by InterpolationOverlay — real-world scale for the Gaussian Plume model.
+    // Falls back to 1.0 in unit tests where coordinates are already in meters.
+    const metersPerPixel =
+      typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
 
     const windDirRad = windFromDegreesToRad(windDir);
 
@@ -321,6 +362,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       stabilityClass,
       releaseHeight,
       searchResolution,
+      metersPerPixel,
     });
 
     return {
@@ -331,15 +373,27 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       windSpeed,
       stabilityClass,
       releaseHeight,
+      metersPerPixel,
+      fallbackPoints: points,
     };
   },
 
   evaluate(x: number, y: number, state: SteState): number {
+    // When source estimation failed (no valid downwind position found), fall
+    // back to IDW so the hull shows meaningful interpolated values instead of
+    // a uniform minimum.
+    if (state.releaseRate < 1e-30) {
+      return idwFallback(x, y, state.fallbackPoints);
+    }
+
     const dx = x - state.sourceX;
     const dy = y - state.sourceY;
-    // Use same compass-bearing convention as toWindCoords
-    const downwind = dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad);
-    const crosswind = dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad);
+    // Use same compass-bearing convention as toWindCoords, then scale to meters
+    const mpp = Math.max(state.metersPerPixel, 1e-6);
+    const downwind =
+      (dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad)) * mpp;
+    const crosswind =
+      (dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad)) * mpp;
 
     return gaussianPlume(downwind, crosswind, {
       Q: state.releaseRate,

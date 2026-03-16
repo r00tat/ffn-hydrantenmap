@@ -80,6 +80,8 @@ export function buildInterpolationGrid(params: {
   // Max proximity for interior hull cells
   const interiorMaxDist = bufferPx * 3;
 
+  const fullCanvas = !!algorithm.fullCanvasRender;
+
   for (let by = 0; by < canvasHeight; by += blockSize) {
     for (let bx = 0; bx < canvasWidth; bx += blockSize) {
       const cx = bx + blockSize / 2;
@@ -90,7 +92,9 @@ export function buildInterpolationGrid(params: {
       let nearestOutsideValue: number | null = null;
       let localMin = -Infinity;
 
-      if (isDegenerate) {
+      if (fullCanvas) {
+        // No hull/proximity clipping — render every pixel.
+      } else if (isDegenerate) {
         const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
         if (nearbyIds.length === 0) continue;
         let nearestDistSq = Infinity;
