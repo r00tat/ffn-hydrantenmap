@@ -20,16 +20,26 @@ export interface TpsWeights {
 }
 
 /**
+ * Option entry for select-type parameters (rendered as dropdown).
+ */
+export interface ParamSelectOption {
+  value: number;
+  label: string;
+}
+
+/**
  * Descriptor for a single algorithm parameter.
  * Used to auto-generate UI controls in HeatmapSettings.
  */
 export interface AlgorithmParamDescriptor {
   key: string;
   label: string;
-  type: 'number' | 'boolean';
+  type: 'number' | 'boolean' | 'select';
   min?: number;
   max?: number;
   step?: number;
+  /** Options for type 'select' — rendered as a dropdown */
+  options?: ParamSelectOption[];
   default: number | boolean;
 }
 

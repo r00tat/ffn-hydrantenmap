@@ -314,6 +314,30 @@ export default function HeatmapSettings({
                           );
                         }
 
+                        if (param.type === 'select' && param.options) {
+                          return (
+                            <TextField
+                              key={param.key}
+                              label={param.label}
+                              size="small"
+                              select
+                              value={value as number}
+                              onChange={(e) =>
+                                update({
+                                  interpolationParams: { ...savedParams, [param.key]: Number(e.target.value) },
+                                })
+                              }
+                              fullWidth
+                            >
+                              {param.options.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          );
+                        }
+
                         // number type → Slider
                         return (
                           <Box key={param.key}>

@@ -282,10 +282,12 @@ export const krigingAlgorithm: InterpolationAlgorithm<KrigingState> = {
     {
       key: 'variogramModel',
       label: 'Variogramm-Modell',
-      type: 'number',
-      min: 0,
-      max: 2,
-      step: 1,
+      type: 'select',
+      options: [
+        { value: VARIOGRAM_SPHERICAL, label: 'Sphärisch' },
+        { value: VARIOGRAM_EXPONENTIAL, label: 'Exponentiell' },
+        { value: VARIOGRAM_GAUSSIAN, label: 'Gaußsch' },
+      ],
       default: VARIOGRAM_SPHERICAL,
     },
     {
