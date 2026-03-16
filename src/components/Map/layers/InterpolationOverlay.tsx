@@ -9,8 +9,8 @@ import {
   buildInterpolationGrid,
   computeConvexHull,
   DataPoint,
-  solveTPS,
-  TpsWeights,
+  getAlgorithm,
+  idwAlgorithm,
 } from '../../../common/interpolation';
 
 /**
@@ -25,7 +25,6 @@ function metersToPixelsAtZoom(meters: number, lat: number, zoom: number): number
 const InterpolationCanvasLayer = L.Layer.extend({
   options: {
     radiusMeters: 30,
-    power: 2,
     opacity: 0.6,
   },
 
@@ -37,7 +36,6 @@ const InterpolationCanvasLayer = L.Layer.extend({
       _colorLUT: Uint8Array;
       _config: HeatmapConfig;
       _allValues: number[];
-      _tpsWeights: TpsWeights | null;
       _valueGrid: Float32Array | null;
       _gridCols: number;
       _blockSize: number;
@@ -55,7 +53,6 @@ const InterpolationCanvasLayer = L.Layer.extend({
     this._colorLUT = colorLUT;
     this._config = config;
     this._allValues = allValues;
-    this._tpsWeights = null;
     this._valueGrid = null;
     this._gridCols = 0;
     this._blockSize = 4;
@@ -124,21 +121,33 @@ const InterpolationCanvasLayer = L.Layer.extend({
 
     this._points = pixelPoints;
 
-    const algo = (this._config.interpolationAlgorithm ?? 'idw') as 'idw' | 'spline';
-    // When log-scale is active, solve TPS in log space so the spline
-    // surface produces exponential gradients matching physical decay.
+    const algoId = this._config.interpolationAlgorithm ?? 'idw';
+    const algo = getAlgorithm(algoId) ?? idwAlgorithm;
+
     const logScale = !!this._config.interpolationLogScale;
-    const tpsPoints = logScale
-      ? this._points.map((p: DataPoint) => ({ x: p.x, y: p.y, value: Math.log(Math.max(p.value, 1e-10)) }))
-      : this._points;
-    // In log-scale mode, use exact interpolation (λ=0) so the spline passes
-    // through all data points. In log space, even small TPS overshoot becomes
-    // large after exp(), producing the exponential peaks expected for radiation.
-    // With regularization, the surface gets smoothed toward nearby values and
-    // never overshoots, defeating the purpose of log-scale interpolation.
-    const tpsLambda = logScale ? 0 : undefined;
-    this._tpsWeights =
-      algo === 'spline' && tpsPoints.length >= 3 ? solveTPS(tpsPoints, tpsLambda) : null;
+    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+    const interpPoints = logScale
+      ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
+      : pixelPoints;
+
+    // Merge saved params with algorithm defaults
+    const savedParams = this._config.interpolationParams ?? {};
+    const mergedParams: Record<string, number | boolean> = {};
+    for (const desc of algo.params) {
+      mergedParams[desc.key] = savedParams[desc.key] ?? desc.default;
+    }
+    // Migration: if interpolationPower exists but not in interpolationParams, use it
+    if (algo.id === 'idw' && mergedParams.power === undefined && this._config.interpolationPower != null) {
+      mergedParams.power = this._config.interpolationPower;
+    }
+    // Pass search radius hint for IDW optimization
+    mergedParams._searchRadius = bufferPx * 5;
+    // Pass lambda hint for TPS log-scale mode
+    if (logScale) mergedParams._lambda = 0;
+
+    const preparedState = interpPoints.length >= (algo.id === 'spline' ? 3 : 1)
+      ? algo.prepare(interpPoints, mergedParams)
+      : null;
 
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
@@ -151,14 +160,13 @@ const InterpolationCanvasLayer = L.Layer.extend({
       points: pixelPoints,
       hull,
       bufferPx,
-      power: this.options.power,
       opacity: this.options.opacity,
       colorLUT: this._colorLUT,
       config: this._config,
       allValues: this._allValues,
       blockSize,
       algorithm: algo,
-      tpsWeights: this._tpsWeights ?? undefined,
+      state: preparedState,
     });
 
     this._valueGrid = valueGrid;
@@ -230,7 +238,6 @@ export default function InterpolationOverlay({
       allValues,
       {
         radiusMeters: config.interpolationRadius ?? 30,
-        power: config.interpolationPower ?? 2,
         opacity,
       },
     ) as L.Layer;
