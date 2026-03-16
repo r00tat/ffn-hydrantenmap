@@ -155,7 +155,7 @@ export default function FirecallItemCard({
         onClick={compact ? (
           subItems && subItems.length > 0
             ? () => setExpanded((prev) => !prev)
-            : canEdit ? () => setDisplayUpdateDialog(true) : undefined
+            : canEdit ? (e: React.MouseEvent) => { e.stopPropagation(); setDisplayUpdateDialog(true); } : undefined
         ) : undefined}
       >
         <CardContent sx={compact ? { py: 1, '&:last-child': { pb: 1 } } : undefined}>
@@ -274,22 +274,24 @@ export default function FirecallItemCard({
           </CardContent>
         </Collapse>
       </Card>
-      {displayUpdateDialog && (
-        <FirecallItemUpdateDialog
-          item={item.original || item}
-          allowTypeChange={allowTypeChange}
-          callback={() => {
-            setDisplayUpdateDialog(false);
-          }}
-        />
-      )}
-      {isConfirmOpen && (
-        <ConfirmDialog
-          title={`${item.title()} löschen`}
-          text={`${item.markerName()} ${item.name} wirklich löschen?`}
-          onConfirm={deleteFn}
-        />
-      )}
+      <div onClick={(e) => e.stopPropagation()} role="presentation">
+        {displayUpdateDialog && (
+          <FirecallItemUpdateDialog
+            item={item.original || item}
+            allowTypeChange={allowTypeChange}
+            callback={() => {
+              setDisplayUpdateDialog(false);
+            }}
+          />
+        )}
+        {isConfirmOpen && (
+          <ConfirmDialog
+            title={`${item.title()} löschen`}
+            text={`${item.markerName()} ${item.name} wirklich löschen?`}
+            onConfirm={deleteFn}
+          />
+        )}
+      </div>
     </Grid>
   );
 }
