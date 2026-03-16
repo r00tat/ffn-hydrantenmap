@@ -116,6 +116,27 @@ function toWindCoords(
   return [downwind, crosswind];
 }
 
+interface SteState {
+  sourceX: number;
+  sourceY: number;
+  releaseRate: number;
+  windDirRad: number;
+  windSpeed: number;
+  stabilityClass: number;
+  releaseHeight: number;
+}
+
+/**
+ * Convert wind direction from meteorological degrees (where wind comes FROM,
+ * 0=N, 90=E, clockwise) to radians in compass-bearing convention used by
+ * toWindCoords (0=north, PI/2=east).
+ */
+function windFromDegreesToRad(degrees: number): number {
+  // Meteorological "from" + 180 = "towards" direction in compass degrees
+  const towardsDeg = (degrees + 180) % 360;
+  return (towardsDeg * Math.PI) / 180;
+}
+
 export function estimateSource(
   points: DataPoint[],
   windDirRad: number,
@@ -218,3 +239,102 @@ export function estimateSource(
     error: bestError,
   };
 }
+
+export const steAlgorithm: InterpolationAlgorithm<SteState> = {
+  id: 'ste',
+  label: 'Source Term Estimation',
+  description:
+    'Quellstärkenabschätzung: Schätzt aus Messwerten den Ursprung und die Stärke einer Emissionsquelle mittels Gaußschem Ausbreitungsmodell (Gauß-Fahne).',
+  params: [
+    {
+      key: 'windDirection',
+      label: 'Windrichtung (°, woher)',
+      type: 'number',
+      min: 0,
+      max: 360,
+      step: 5,
+      default: 270,
+    },
+    {
+      key: 'windSpeed',
+      label: 'Windgeschwindigkeit (m/s)',
+      type: 'number',
+      min: 0.5,
+      max: 30,
+      step: 0.5,
+      default: 3,
+    },
+    {
+      key: 'stabilityClass',
+      label: 'Stabilitätsklasse (1=A … 6=F)',
+      type: 'number',
+      min: 1,
+      max: 6,
+      step: 1,
+      default: 4,
+    },
+    {
+      key: 'releaseHeight',
+      label: 'Quellhöhe (m)',
+      type: 'number',
+      min: 0,
+      max: 100,
+      step: 1,
+      default: 0,
+    },
+    {
+      key: 'searchResolution',
+      label: 'Suchraster (m)',
+      type: 'number',
+      min: 5,
+      max: 50,
+      step: 5,
+      default: 20,
+    },
+  ],
+
+  prepare(points: DataPoint[], params: Record<string, number | boolean>): SteState {
+    const windDir = typeof params.windDirection === 'number' ? params.windDirection : 270;
+    const windSpeed = typeof params.windSpeed === 'number' ? params.windSpeed : 3;
+    const stabilityClass =
+      typeof params.stabilityClass === 'number' ? params.stabilityClass : 4;
+    const releaseHeight =
+      typeof params.releaseHeight === 'number' ? params.releaseHeight : 0;
+    const searchResolution =
+      typeof params.searchResolution === 'number' ? params.searchResolution : 20;
+
+    const windDirRad = windFromDegreesToRad(windDir);
+
+    const estimate = estimateSource(points, windDirRad, {
+      windSpeed,
+      stabilityClass,
+      releaseHeight,
+      searchResolution,
+    });
+
+    return {
+      sourceX: estimate.sourceX,
+      sourceY: estimate.sourceY,
+      releaseRate: estimate.releaseRate,
+      windDirRad,
+      windSpeed,
+      stabilityClass,
+      releaseHeight,
+    };
+  },
+
+  evaluate(x: number, y: number, state: SteState): number {
+    const dx = x - state.sourceX;
+    const dy = y - state.sourceY;
+    // Use same compass-bearing convention as toWindCoords
+    const downwind = dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad);
+    const crosswind = dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad);
+
+    return gaussianPlume(downwind, crosswind, {
+      Q: state.releaseRate,
+      windSpeed: state.windSpeed,
+      stabilityClass: state.stabilityClass,
+      releaseHeight: state.releaseHeight,
+    });
+  },
+};
