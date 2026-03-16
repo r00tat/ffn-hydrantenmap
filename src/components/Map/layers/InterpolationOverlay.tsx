@@ -151,15 +151,27 @@ const InterpolationCanvasLayer = L.Layer.extend({
       mergedParams._metersPerPixel = p0.distanceTo(p1);
     }
 
-    const preparedState = interpPoints.length >= (algo.id === 'spline' ? 3 : 1)
+    const minPoints = algo.minPoints ?? 1;
+    const preparedState = interpPoints.length >= minPoints
       ? algo.prepare(interpPoints, mergedParams)
       : null;
 
-    // Compute convex hull for interior filling
-    const hull = computeConvexHull(pixelPoints);
-
     // Build interpolation grid and paint
     const blockSize = 4;
+
+    if (preparedState === null) {
+      // Not enough points for this algorithm — clear canvas and bail out.
+      this._valueGrid = null;
+      this._gridCols = 0;
+      this._blockSize = blockSize;
+      this._bufferPx = bufferPx;
+      const ctx2 = canvas.getContext('2d');
+      if (ctx2) ctx2.clearRect(0, 0, canvasW, canvasH);
+      return;
+    }
+
+    // Compute convex hull for interior filling
+    const hull = computeConvexHull(pixelPoints);
     const { imageData, valueGrid, gridCols } = buildInterpolationGrid({
       canvasWidth: canvasW,
       canvasHeight: canvasH,
