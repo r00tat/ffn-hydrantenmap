@@ -83,3 +83,138 @@ export function gaussianPlume(
 
   return (Q / (2 * Math.PI * u * sigmaY * sigmaZ)) * crosswindTerm * verticalTerm;
 }
+
+export interface SourceEstimate {
+  sourceX: number;
+  sourceY: number;
+  releaseRate: number;
+  error: number;
+}
+
+interface SearchParams {
+  windSpeed: number;
+  stabilityClass: number;
+  releaseHeight: number;
+  searchResolution: number;
+}
+
+/**
+ * Transform (px, py) from global coords to wind-aligned coords relative to a candidate source.
+ * Returns [downwind, crosswind].
+ */
+function toWindCoords(
+  px: number,
+  py: number,
+  srcX: number,
+  srcY: number,
+  windDirRad: number
+): [number, number] {
+  const dx = px - srcX;
+  const dy = py - srcY;
+  const downwind = dx * Math.sin(windDirRad) + dy * Math.cos(windDirRad);
+  const crosswind = dx * Math.cos(windDirRad) - dy * Math.sin(windDirRad);
+  return [downwind, crosswind];
+}
+
+export function estimateSource(
+  points: DataPoint[],
+  windDirRad: number,
+  params: SearchParams
+): SourceEstimate {
+  if (points.length === 0) {
+    return { sourceX: 0, sourceY: 0, releaseRate: 0, error: Infinity };
+  }
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+
+  const extent = Math.max(maxX - minX, maxY - minY, 100);
+  const buffer = extent * 1.5;
+  minX -= buffer;
+  maxX += buffer;
+  minY -= buffer;
+  maxY += buffer;
+
+  const res = params.searchResolution;
+  // Align grid to multiples of res so that origin (0,0) is always a grid point
+  minX = Math.floor(minX / res) * res;
+  maxX = Math.ceil(maxX / res) * res;
+  minY = Math.floor(minY / res) * res;
+  maxY = Math.ceil(maxY / res) * res;
+
+  const plumeParams: GaussianPlumeParams = {
+    Q: 1,
+    windSpeed: params.windSpeed,
+    stabilityClass: params.stabilityClass,
+    releaseHeight: params.releaseHeight,
+  };
+
+  let bestError = Infinity;
+  let bestX = 0;
+  let bestY = 0;
+  let bestQ = 0;
+
+  for (let cx = minX; cx <= maxX; cx += res) {
+    for (let cy = minY; cy <= maxY; cy += res) {
+      let valid = true;
+      const unitConcs: number[] = [];
+      for (const p of points) {
+        const [downwind, crosswind] = toWindCoords(
+          p.x,
+          p.y,
+          cx,
+          cy,
+          windDirRad
+        );
+        const c = gaussianPlume(downwind, crosswind, plumeParams);
+        unitConcs.push(c);
+        if (c <= 0) {
+          valid = false;
+          break;
+        }
+      }
+
+      if (!valid) continue;
+
+      let sumLogRatio = 0;
+      for (let i = 0; i < points.length; i++) {
+        sumLogRatio +=
+          Math.log(Math.max(points[i].value, 1e-30)) - Math.log(unitConcs[i]);
+      }
+      const logQ = sumLogRatio / points.length;
+      const Q = Math.exp(logQ);
+
+      if (Q <= 0) continue;
+
+      let error = 0;
+      for (let i = 0; i < points.length; i++) {
+        const logPred = Math.log(Q * unitConcs[i]);
+        const logObs = Math.log(Math.max(points[i].value, 1e-30));
+        const diff = logPred - logObs;
+        error += diff * diff;
+      }
+
+      if (error < bestError) {
+        bestError = error;
+        bestX = cx;
+        bestY = cy;
+        bestQ = Q;
+      }
+    }
+  }
+
+  return {
+    sourceX: bestX,
+    sourceY: bestY,
+    releaseRate: bestQ,
+    error: bestError,
+  };
+}
