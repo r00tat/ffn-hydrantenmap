@@ -21,6 +21,8 @@ export { idwAlgorithm, idwInterpolate } from './idw';
 export { splineAlgorithm, solveTPS, evaluateTPS } from './spline';
 export { krigingAlgorithm, fitVariogram, VARIOGRAM_SPHERICAL, VARIOGRAM_EXPONENTIAL, VARIOGRAM_GAUSSIAN } from './kriging';
 export { steAlgorithm } from './ste';
+export { invSquareAlgorithm, valueAt1m } from './invSquare';
+export type { InvSquareState } from './invSquare';
 
 // Register built-in algorithms on import
 import { registerAlgorithm } from './registry';
@@ -28,8 +30,10 @@ import { idwAlgorithm } from './idw';
 import { splineAlgorithm } from './spline';
 import { krigingAlgorithm } from './kriging';
 import { steAlgorithm } from './ste';
+import { invSquareAlgorithm } from './invSquare';
 
 registerAlgorithm(idwAlgorithm);
 registerAlgorithm(splineAlgorithm);
 registerAlgorithm(krigingAlgorithm);
 registerAlgorithm(steAlgorithm);
+registerAlgorithm(invSquareAlgorithm);
