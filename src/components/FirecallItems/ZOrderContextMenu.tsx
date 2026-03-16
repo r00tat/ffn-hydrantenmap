@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,6 +20,7 @@ export interface ZOrderContextMenuProps {
   onClose: () => void;
   onEdit?: (item: FirecallItem) => void;
   onDelete?: (item: FirecallItem) => void;
+  customActions?: ReactNode;
 }
 
 export default function ZOrderContextMenu({
@@ -28,6 +30,7 @@ export default function ZOrderContextMenu({
   onClose,
   onEdit,
   onDelete,
+  customActions,
 }: ZOrderContextMenuProps) {
   const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
     useZOrderActions(item, siblings);
@@ -60,6 +63,8 @@ export default function ZOrderContextMenu({
         </MenuItem>
       )}
       {editable && <Divider />}
+      {customActions}
+      {customActions && editable && <Divider />}
       {editable && (
         <MenuItem onClick={() => handle(handleBringToFront)}>
           <ListItemIcon><VerticalAlignTopIcon fontSize="small" /></ListItemIcon>
