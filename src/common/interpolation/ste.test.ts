@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pasquillSigmaY, pasquillSigmaZ, gaussianPlume } from './ste';
+import { pasquillSigmaY, pasquillSigmaZ, gaussianPlume, estimateSource } from './ste';
+import type { DataPoint } from './types';
 
 describe('Pasquill-Gifford dispersion coefficients', () => {
   it('returns positive sigma_y for all stability classes at 100m downwind', () => {
@@ -85,5 +86,61 @@ describe('Gaussian Plume concentration', () => {
   it('returns 0 at downwind distance of 0', () => {
     const c = gaussianPlume(0, 0, baseParams);
     expect(c).toBe(0);
+  });
+});
+
+describe('Source estimation (grid search)', () => {
+  // Wind blowing from west (270deg) -> towards east
+  const windDirRad = Math.PI / 2; // "towards" direction (east) in math coords
+  const params = {
+    windSpeed: 3,
+    stabilityClass: 4,
+    releaseHeight: 0,
+    searchResolution: 10,
+  };
+
+  it('estimates source near the true source for a simple scenario', () => {
+    // True source at (0, 0), generate synthetic measurements downwind
+    const trueQ = 100;
+    const measurements: DataPoint[] = [];
+    for (const dist of [50, 100, 200]) {
+      const c = gaussianPlume(dist, 0, {
+        Q: trueQ,
+        windSpeed: params.windSpeed,
+        stabilityClass: params.stabilityClass,
+        releaseHeight: params.releaseHeight,
+      });
+      measurements.push({ x: dist, y: 0, value: c });
+    }
+
+    const result = estimateSource(measurements, windDirRad, params);
+
+    expect(result.sourceX).toBeCloseTo(0, -1); // within ~10 units
+    expect(result.sourceY).toBeCloseTo(0, -1);
+    expect(result.releaseRate).toBeGreaterThan(0);
+  });
+
+  it('returns positive release rate', () => {
+    const measurements: DataPoint[] = [
+      { x: 50, y: 0, value: 5 },
+      { x: 100, y: 0, value: 2 },
+      { x: 150, y: 0, value: 1 },
+    ];
+
+    const result = estimateSource(measurements, windDirRad, params);
+    expect(result.releaseRate).toBeGreaterThan(0);
+  });
+
+  it('handles measurements at different crosswind positions', () => {
+    const trueQ = 100;
+    const measurements: DataPoint[] = [
+      { x: 100, y: 0, value: gaussianPlume(100, 0, { Q: trueQ, ...params }) },
+      { x: 100, y: 20, value: gaussianPlume(100, 20, { Q: trueQ, ...params }) },
+      { x: 200, y: 0, value: gaussianPlume(200, 0, { Q: trueQ, ...params }) },
+    ];
+
+    const result = estimateSource(measurements, windDirRad, params);
+    expect(result.sourceX).toBeCloseTo(0, -1);
+    expect(result.releaseRate).toBeGreaterThan(0);
   });
 });
