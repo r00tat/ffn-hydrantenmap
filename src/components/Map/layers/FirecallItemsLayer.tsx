@@ -130,6 +130,11 @@ export default function FirecallItemsLayer({
     [updateItem]
   );
 
+  const customActions = useMemo(() => {
+    if (!contextMenuTarget) return undefined;
+    return getItemInstance(contextMenuTarget).contextMenuItems(closeContextMenu);
+  }, [contextMenuTarget, closeContextMenu]);
+
   return (
     <>
       {sortedRecords.map((record) => {
@@ -166,6 +171,7 @@ export default function FirecallItemsLayer({
         onClose={closeContextMenu}
         onEdit={editable ? handleEdit : undefined}
         onDelete={editable ? handleDelete : undefined}
+        customActions={customActions}
       />
     </>
   );
