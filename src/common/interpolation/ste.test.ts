@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { pasquillSigmaY, pasquillSigmaZ, gaussianPlume, estimateSource } from './ste';
+import {
+  pasquillSigmaY,
+  pasquillSigmaZ,
+  gaussianPlume,
+  estimateSource,
+  steAlgorithm,
+} from './ste';
 import type { DataPoint } from './types';
 
 describe('Pasquill-Gifford dispersion coefficients', () => {
@@ -142,5 +148,79 @@ describe('Source estimation (grid search)', () => {
     const result = estimateSource(measurements, windDirRad, params);
     expect(result.sourceX).toBeCloseTo(0, -1);
     expect(result.releaseRate).toBeGreaterThan(0);
+  });
+});
+
+describe('STE algorithm interface', () => {
+  it('has correct metadata', () => {
+    expect(steAlgorithm.id).toBe('ste');
+    expect(steAlgorithm.label).toBe('Source Term Estimation');
+    expect(steAlgorithm.params.length).toBeGreaterThan(0);
+    expect(steAlgorithm.params).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'windDirection' }),
+        expect.objectContaining({ key: 'windSpeed' }),
+        expect.objectContaining({ key: 'stabilityClass' }),
+      ])
+    );
+  });
+
+  it('has all required param descriptors with defaults', () => {
+    for (const param of steAlgorithm.params) {
+      expect(param.key).toBeTruthy();
+      expect(param.label).toBeTruthy();
+      expect(param.default).toBeDefined();
+      if (param.type === 'number') {
+        expect(param.min).toBeDefined();
+        expect(param.max).toBeDefined();
+      }
+    }
+  });
+
+  it('prepare + evaluate produces plume-shaped output', () => {
+    const points: DataPoint[] = [
+      { x: 100, y: 0, value: 5 },
+      { x: 200, y: 0, value: 2 },
+      { x: 300, y: 0, value: 1 },
+    ];
+
+    const state = steAlgorithm.prepare(points, {
+      windDirection: 270, // from west
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 0,
+      searchResolution: 20,
+    });
+
+    const cDownwind = steAlgorithm.evaluate(150, 0, state);
+    expect(cDownwind).toBeGreaterThan(0);
+
+    const cCrosswind = steAlgorithm.evaluate(150, 200, state);
+    expect(cCrosswind).toBeLessThan(cDownwind);
+  });
+
+  it('prepare with default params does not throw', () => {
+    const points: DataPoint[] = [
+      { x: 50, y: 0, value: 10 },
+      { x: 100, y: 0, value: 5 },
+    ];
+    expect(() => steAlgorithm.prepare(points, {})).not.toThrow();
+  });
+
+  it('evaluate returns 0 upwind of source', () => {
+    const points: DataPoint[] = [
+      { x: 100, y: 0, value: 5 },
+      { x: 200, y: 0, value: 2 },
+    ];
+    const state = steAlgorithm.prepare(points, {
+      windDirection: 270,
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 0,
+      searchResolution: 20,
+    });
+
+    const cUpwind = steAlgorithm.evaluate(-500, 0, state);
+    expect(cUpwind).toBe(0);
   });
 });
