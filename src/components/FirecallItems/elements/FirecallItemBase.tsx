@@ -284,6 +284,10 @@ export class FirecallItemBase {
     }
   }
 
+  public contextMenuItems(_onClose: () => void): ReactNode {
+    return null;
+  }
+
   public get<T = any>(key: string): T {
     return (this as any)[key] as T;
   }
