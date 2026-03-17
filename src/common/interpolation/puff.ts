@@ -78,11 +78,14 @@ interface PuffSearchParams {
   metersPerPixel: number;
   /** Elapsed time in seconds (timeSinceRelease + predictionOffset) */
   tElapsed: number;
+  /** true when y-axis points south (Leaflet pixel coords) */
+  yFlip?: boolean;
 }
 
 /**
  * Transform (px, py) from map coords to wind-aligned coords relative to a candidate source.
  * Returns [downwind, crosswind] in meters.
+ * @param yFlip - true when y-axis points south (Leaflet pixel coords); false for math coords (+y = north)
  */
 function toWindCoords(
   px: number,
@@ -90,10 +93,12 @@ function toWindCoords(
   srcX: number,
   srcY: number,
   windDirRad: number,
-  mpp: number
+  mpp: number,
+  yFlip: boolean
 ): [number, number] {
   const dx = (px - srcX) * mpp;
-  const dy = (py - srcY) * mpp;
+  // When y-axis points south (Leaflet pixels), negate to get standard math coords (+y = north)
+  const dy = (yFlip ? -(py - srcY) : (py - srcY)) * mpp;
   const downwind = dx * Math.sin(windDirRad) + dy * Math.cos(windDirRad);
   const crosswind = dx * Math.cos(windDirRad) - dy * Math.sin(windDirRad);
   return [downwind, crosswind];
@@ -125,6 +130,7 @@ export function estimatePuffSource(
   const buffer = extent * 1.5;
   const mpp = Math.max(params.metersPerPixel, 1e-6);
   const res = params.searchResolution / mpp;
+  const ySign = params.yFlip ? -1 : 1; // -1 for Leaflet (+y south), +1 for math (+y north)
 
   // Estimate source location: centroid of measurements shifted upwind by puff travel distance.
   // This ensures the grid always covers the upwind region where the source must be.
@@ -132,7 +138,7 @@ export function estimatePuffSource(
   const centY = (minY + maxY) / 2;
   const dPixels = (params.windSpeed * params.tElapsed) / mpp;
   const estSrcX = centX - Math.sin(windDirRad) * dPixels;
-  const estSrcY = centY - Math.cos(windDirRad) * dPixels;
+  const estSrcY = centY - ySign * Math.cos(windDirRad) * dPixels;
 
   const gMinX = Math.floor((Math.min(minX, estSrcX) - buffer) / res) * res;
   const gMaxX = Math.ceil((Math.max(maxX, estSrcX) + buffer) / res) * res;
@@ -172,7 +178,7 @@ export function estimatePuffSource(
       let valid = true;
 
       for (const p of points) {
-        const [downwind, crosswind] = toWindCoords(p.x, p.y, cx, cy, windDirRad, mpp);
+        const [downwind, crosswind] = toWindCoords(p.x, p.y, cx, cy, windDirRad, mpp, !!params.yFlip);
         const c = gaussianPuff(downwind, crosswind, params.tElapsed, unitParams);
         unitConcs.push(c);
         if (c <= 0) { valid = false; break; }
@@ -201,9 +207,9 @@ export function estimatePuffSource(
         error += diff * diff;
       }
 
-      // Puff center position in pixel coords for this candidate source
+      // Puff center position for this candidate source
       const pcX = cx + (params.windSpeed * params.tElapsed / mpp) * Math.sin(windDirRad);
-      const pcY = cy + (params.windSpeed * params.tElapsed / mpp) * Math.cos(windDirRad);
+      const pcY = cy + ySign * (params.windSpeed * params.tElapsed / mpp) * Math.cos(windDirRad);
       const puffCentDist = (pcX - centXAvg) ** 2 + (pcY - centYAvg) ** 2;
 
       const EPSILON = 1e-10;
@@ -241,6 +247,8 @@ interface PuffState {
   depositionTau: number;
   metersPerPixel: number;
   fullCanvasRender: boolean;
+  /** true when in Leaflet pixel coords (+y = south); false for meter-space (+y = north) */
+  yFlip: boolean;
 }
 
 export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
@@ -257,7 +265,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       min: 0,
       max: 360,
       step: 5,
-      default: 270,
+      default: 0,
     },
     {
       key: 'windSpeed',
@@ -297,7 +305,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       type: 'number',
       min: 0,
       max: 240,
-      step: 1,
+      step: 0.5,
       default: 30,
     },
     {
@@ -306,7 +314,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       type: 'number',
       min: 0,
       max: 120,
-      step: 1,
+      step: 0.5,
       default: 0,
     },
     {
@@ -346,6 +354,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     const searchResolution = typeof params.searchResolution === 'number' ? params.searchResolution : 20;
     const metersPerPixel = typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
     const fullCanvasRender = params.fullCanvasRender !== false; // default true
+    const yFlip = params._yAxisSouth === true; // Leaflet pixel coords (+y = south)
 
     const windDirRad = windFromDegreesToRad(windDir);
     // Convert minutes to seconds.
@@ -362,7 +371,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       return {
         sourceX: 0, sourceY: 0, releaseQuantity: 0,
         windDirRad, windSpeed, stabilityClass, releaseHeight,
-        tElapsed, depositionTau, metersPerPixel, fullCanvasRender,
+        tElapsed, depositionTau, metersPerPixel, fullCanvasRender, yFlip,
       };
     }
 
@@ -373,6 +382,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       searchResolution,
       metersPerPixel,
       tElapsed: tMeasured,
+      yFlip,
     });
 
     // Sanity check: if the predicted peak at the puff center is unreasonably large
@@ -404,6 +414,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       depositionTau,
       metersPerPixel,
       fullCanvasRender,
+      yFlip,
     };
   },
 
@@ -411,14 +422,43 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     return state.fullCanvasRender;
   },
 
+  peakPoint(state: PuffState) {
+    if (state.releaseQuantity <= 0) return null;
+    const mpp = Math.max(state.metersPerPixel, 1e-6);
+    const ySign = state.yFlip ? -1 : 1;
+    const x = state.sourceX + Math.sin(state.windDirRad) * state.windSpeed * state.tElapsed / mpp;
+    const y = state.sourceY + ySign * Math.cos(state.windDirRad) * state.windSpeed * state.tElapsed / mpp;
+    const value = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
+      Q: state.releaseQuantity,
+      windSpeed: state.windSpeed,
+      stabilityClass: state.stabilityClass,
+      releaseHeight: state.releaseHeight,
+      depositionTau: state.depositionTau > 0 ? state.depositionTau : undefined,
+    });
+    if (!isFinite(value) || value <= 0) return null;
+    return { x, y, value };
+  },
+
+  colorScaleValues(state: PuffState) {
+    if (state.releaseQuantity <= 0) return null;
+    const peak = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
+      Q: state.releaseQuantity,
+      windSpeed: state.windSpeed,
+      stabilityClass: state.stabilityClass,
+      releaseHeight: state.releaseHeight,
+      depositionTau: state.depositionTau > 0 ? state.depositionTau : undefined,
+    });
+    if (!isFinite(peak) || peak <= 0) return null;
+    return [0, peak];
+  },
+
   evaluate(x: number, y: number, state: PuffState): number {
     if (state.releaseQuantity < 1e-9) return 0;
 
     const mpp = Math.max(state.metersPerPixel, 1e-6);
-    const dx = (x - state.sourceX) * mpp;
-    const dy = (y - state.sourceY) * mpp;
-    const downwind = dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad);
-    const crosswind = dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad);
+    const [downwind, crosswind] = toWindCoords(
+      x, y, state.sourceX, state.sourceY, state.windDirRad, mpp, state.yFlip
+    );
 
     return gaussianPuff(downwind, crosswind, state.tElapsed, {
       Q: state.releaseQuantity,

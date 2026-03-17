@@ -84,6 +84,22 @@ export interface InterpolationAlgorithm<TState = unknown> {
    * Must be fast — O(k) or better where k = nearby points.
    */
   evaluate(x: number, y: number, state: TState): number;
+
+  /**
+   * Optional: return the location and value of the peak concentration.
+   * Coordinates use the same space as evaluate() (pixels or meters depending on caller).
+   * When provided, the max-value marker on the map jumps to this location instead of
+   * being estimated from a coarse grid search over the measurement bounding box.
+   */
+  peakPoint?(state: TState): { x: number; y: number; value: number } | null;
+
+  /**
+   * Optional: return synthetic values that define the color scale [min, max].
+   * When provided, the interpolation grid is color-normalized against these values
+   * instead of the raw measurement values. Useful for physics-based algorithms
+   * (e.g. Gaussian Puff) where the rendered peak may differ from the measurements.
+   */
+  colorScaleValues?(state: TState): number[] | null;
 }
 
 /**

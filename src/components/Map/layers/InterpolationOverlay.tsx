@@ -160,6 +160,8 @@ const InterpolationCanvasLayer = L.Layer.extend({
       const p1 = map.containerPointToLatLng(L.point(1, 0));
       mergedParams._metersPerPixel = p0.distanceTo(p1);
     }
+    // Leaflet pixel coords have +y pointing south; signal to algorithms
+    mergedParams._yAxisSouth = true;
 
     // Debug: log interpolation input for diagnostics
     console.log(JSON.stringify({
@@ -192,6 +194,11 @@ const InterpolationCanvasLayer = L.Layer.extend({
       return;
     }
 
+    // Physics-based algorithms (e.g. puff) can provide their own color scale range
+    // so the rendered peak maps to the hottest color rather than the measurement max.
+    const effectiveAllValues =
+      (algo.colorScaleValues ? algo.colorScaleValues(preparedState) : null) ?? this._allValues;
+
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
     const { imageData, valueGrid, gridCols } = buildInterpolationGrid({
@@ -203,7 +210,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       opacity: this.options.opacity,
       colorLUT: this._colorLUT,
       config: this._config,
-      allValues: this._allValues,
+      allValues: effectiveAllValues,
       blockSize,
       algorithm: algo,
       state: preparedState,

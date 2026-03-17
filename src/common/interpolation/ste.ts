@@ -105,6 +105,8 @@ interface SearchParams {
   searchResolution: number;
   /** Real-world scale: meters per pixel (injected by InterpolationOverlay) */
   metersPerPixel: number;
+  /** true when y-axis points south (Leaflet pixel coords) */
+  yFlip?: boolean;
 }
 
 /**
@@ -116,10 +118,12 @@ function toWindCoords(
   py: number,
   srcX: number,
   srcY: number,
-  windDirRad: number
+  windDirRad: number,
+  yFlip: boolean
 ): [number, number] {
   const dx = px - srcX;
-  const dy = py - srcY;
+  // When y-axis points south (Leaflet pixels), negate to get standard math coords (+y = north)
+  const dy = (yFlip ? -(py - srcY) : (py - srcY));
   const downwind = dx * Math.sin(windDirRad) + dy * Math.cos(windDirRad);
   const crosswind = dx * Math.cos(windDirRad) - dy * Math.sin(windDirRad);
   return [downwind, crosswind];
@@ -137,6 +141,8 @@ interface SteState {
   metersPerPixel: number;
   /** Whether to render the full canvas (user-selectable via param) */
   fullCanvasRender: boolean;
+  /** true when y-axis points south (Leaflet pixel coords) */
+  yFlip: boolean;
 }
 
 /**
@@ -222,7 +228,8 @@ export function estimateSource(
           p.y,
           cx,
           cy,
-          windDirRad
+          windDirRad,
+          !!params.yFlip
         );
         // Scale pixel distances to meters for the Gaussian Plume model
         const downwind = downwindPx * mpp;
@@ -356,6 +363,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     const metersPerPixel =
       typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
     const fullCanvasRender = !!params.fullCanvasRender;
+    const yFlip = params._yAxisSouth === true;
 
     const windDirRad = windFromDegreesToRad(windDir);
 
@@ -365,6 +373,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       releaseHeight,
       searchResolution,
       metersPerPixel,
+      yFlip,
     });
 
     return {
@@ -377,6 +386,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       releaseHeight,
       metersPerPixel,
       fullCanvasRender,
+      yFlip,
     };
   },
 
@@ -390,12 +400,9 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     if (state.releaseRate < 1.0) return 0;
 
     const mpp = Math.max(state.metersPerPixel, 1e-6);
-    const dx = x - state.sourceX;
-    const dy = y - state.sourceY;
-    const downwind =
-      (dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad)) * mpp;
-    const crosswind =
-      (dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad)) * mpp;
+    const [dwPx, cwPx] = toWindCoords(x, y, state.sourceX, state.sourceY, state.windDirRad, state.yFlip);
+    const downwind = dwPx * mpp;
+    const crosswind = cwPx * mpp;
 
     return gaussianPlume(downwind, crosswind, {
       Q: state.releaseRate,

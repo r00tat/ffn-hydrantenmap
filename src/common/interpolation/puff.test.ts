@@ -222,6 +222,37 @@ describe('puffAlgorithm', () => {
     }
   });
 
+  it('wind from north (0°) moves puff south (meter-space: +y = north)', () => {
+    // Wind from 0° blows south. In meter-space (+y = north, yFlip=false),
+    // south = decreasing y. Source is upwind (north = higher y).
+    // Place measurements at y=0 (south). Source should be at y>0 (north/upwind).
+    const points: DataPoint[] = [
+      { x: 0, y: 0, value: 500 },
+      { x: 20, y: 0, value: 200 },
+      { x: -20, y: 0, value: 200 },
+    ];
+    const state = puffAlgorithm.prepare(points, {
+      windDirection: 0, // from north
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 1,
+      timeSinceRelease: 2, // 120s → puff travels 360m south
+      predictionOffset: 0,
+      depositionTimeConstant: 0,
+      searchResolution: 20,
+      fullCanvasRender: true,
+      _metersPerPixel: 1,
+      // yFlip not set → meter-space (+y = north)
+    });
+    // Source should be upwind (north) of measurements → higher y
+    expect(state.sourceY).toBeGreaterThan(0);
+    // Evaluate at measurement cluster: should have high concentration
+    const concAtMeas = puffAlgorithm.evaluate(0, 0, state);
+    // Evaluate well north of source (further upwind): should be near zero
+    const concUpwind = puffAlgorithm.evaluate(0, state.sourceY + 200, state);
+    expect(concAtMeas).toBeGreaterThan(concUpwind * 10);
+  });
+
   it('fullCanvasRender defaults to true', () => {
     const points: DataPoint[] = [
       { x: 300, y: 0, value: 10 },
