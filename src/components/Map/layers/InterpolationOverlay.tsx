@@ -124,12 +124,6 @@ const InterpolationCanvasLayer = L.Layer.extend({
     const algoId = this._config.interpolationAlgorithm ?? 'idw';
     const algo = getAlgorithm(algoId) ?? idwAlgorithm;
 
-    const logScale = !!this._config.interpolationLogScale;
-    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
-    const interpPoints = logScale
-      ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
-      : pixelPoints;
-
     // Merge saved params with algorithm defaults
     const savedParams = this._config.interpolationParams ?? {};
     const mergedParams: Record<string, number | boolean> = {};
@@ -140,6 +134,22 @@ const InterpolationCanvasLayer = L.Layer.extend({
     if (algo.id === 'idw' && mergedParams.power === undefined && this._config.interpolationPower != null) {
       mergedParams.power = this._config.interpolationPower;
     }
+    // Migration: carry global interpolationLogScale into per-algorithm param
+    if (
+      mergedParams.logScale === false &&
+      savedParams.logScale === undefined &&
+      this._config.interpolationLogScale
+    ) {
+      mergedParams.logScale = true;
+    }
+
+    // Log-scale is now a per-algorithm param (only offered by IDW, Spline, Kriging)
+    const logScale = !!mergedParams.logScale;
+    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+    const interpPoints = logScale
+      ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
+      : pixelPoints;
+
     // Pass search radius hint for IDW optimization
     mergedParams._searchRadius = bufferPx * 5;
     // Pass lambda hint for TPS log-scale mode
@@ -198,6 +208,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       blockSize,
       algorithm: algo,
       state: preparedState,
+      logScale,
     });
 
     this._valueGrid = valueGrid;

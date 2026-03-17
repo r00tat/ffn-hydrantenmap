@@ -35,6 +35,8 @@ export function buildInterpolationGrid(params: {
   algorithm: InterpolationAlgorithm<any>;
   /** Pre-computed state from algorithm.prepare() */
   state: unknown;
+  /** Whether values were log-transformed before prepare() */
+  logScale?: boolean;
 }): { imageData: ImageData; valueGrid: Float32Array; gridCols: number } {
   const {
     canvasWidth,
@@ -48,6 +50,7 @@ export function buildInterpolationGrid(params: {
     blockSize = 4,
     algorithm,
     state,
+    logScale = false,
   } = params;
 
   const imageData = new ImageData(canvasWidth, canvasHeight);
@@ -58,7 +61,6 @@ export function buildInterpolationGrid(params: {
   const gridCols = Math.ceil(canvasWidth / blockSize);
   const gridRows = Math.ceil(canvasHeight / blockSize);
   const valueGrid = new Float32Array(gridCols * gridRows).fill(NaN);
-  const logScale = !!config.interpolationLogScale;
 
   // When log-scale is active, transform point values into log space before
   // interpolation and exp() the result afterwards.

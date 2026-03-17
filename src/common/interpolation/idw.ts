@@ -56,6 +56,12 @@ export const idwAlgorithm: InterpolationAlgorithm<IdwState> = {
       step: 0.5,
       default: 2,
     },
+    {
+      key: 'logScale',
+      label: 'Logarithmische Interpolation',
+      type: 'boolean',
+      default: false,
+    },
   ],
 
   prepare(points: DataPoint[], params: Record<string, number | boolean>): IdwState {

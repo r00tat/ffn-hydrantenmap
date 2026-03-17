@@ -167,7 +167,14 @@ export const splineAlgorithm: InterpolationAlgorithm<TpsWeights> = {
   minPoints: 3,
   description:
     'Spline (Thin-Plate): Glatte Fläche durch alle Messpunkte – kann Werte außerhalb des gemessenen Bereichs schätzen. Gut für physikalische Felder wie Strahlung oder Temperatur.',
-  params: [],
+  params: [
+    {
+      key: 'logScale',
+      label: 'Logarithmische Interpolation',
+      type: 'boolean',
+      default: false,
+    },
+  ],
 
   prepare(points: DataPoint[], params: Record<string, number | boolean>): TpsWeights {
     if (points.length < 3) {

@@ -364,18 +364,6 @@ export default function HeatmapSettings({
                   );
                 })()}
               </Box>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!current.interpolationLogScale}
-                    onChange={(e) => update({ interpolationLogScale: e.target.checked })}
-                  />
-                }
-                label="Logarithmische Interpolation"
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                Interpoliert im Log-Raum – erzeugt exponentielle Gradienten um Hotspots (z.B. Strahlung).
-              </Typography>
               <Box>
                 <Typography variant="body2" gutterBottom>
                   Radius: {current.interpolationRadius ?? 30}m
