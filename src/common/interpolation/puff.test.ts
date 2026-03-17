@@ -184,4 +184,33 @@ describe('puffAlgorithm', () => {
   it('minPoints is at least 2', () => {
     expect(puffAlgorithm.minPoints).toBeGreaterThanOrEqual(2);
   });
+
+  it('rendered peak with predictionOffset > 0 stays within reasonable range of measured values', () => {
+    // Regression: Q must be fitted at timeSinceRelease, not timeSinceRelease+predictionOffset.
+    // Before the fix, predictionOffset > 0 caused Q to be massively overestimated because
+    // estimatePuffSource was called with the future tElapsed, making measurements appear to
+    // be in a near-zero region of the puff and forcing Q enormous.
+    const points: DataPoint[] = [
+      { x: 180, y: 0,  value: 500 },
+      { x: 180, y: 30, value: 200 },
+      { x: 180, y: -30, value: 200 },
+    ];
+    const commonParams = {
+      windDirection: 270, // blows east
+      windSpeed: 3,
+      stabilityClass: 4,
+      releaseHeight: 1,
+      depositionTimeConstant: 0,
+      searchResolution: 20,
+      fullCanvasRender: false,
+      _metersPerPixel: 1,
+    };
+
+    const stateNoOffset = puffAlgorithm.prepare(points, { ...commonParams, timeSinceRelease: 1, predictionOffset: 0 });
+    const stateWithOffset = puffAlgorithm.prepare(points, { ...commonParams, timeSinceRelease: 1, predictionOffset: 5 });
+
+    // Both should have a similar releaseQuantity — the puff source doesn't change,
+    // only the render time does. A 100x inflation indicates the bug is present.
+    expect(stateWithOffset.releaseQuantity / stateNoOffset.releaseQuantity).toBeLessThan(10);
+  });
 });

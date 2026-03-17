@@ -348,7 +348,12 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     const fullCanvasRender = !!params.fullCanvasRender;
 
     const windDirRad = windFromDegreesToRad(windDir);
-    // Convert minutes to seconds
+    // Convert minutes to seconds.
+    // tMeasured: when measurements were taken (used to fit Q and source position).
+    // tElapsed:  when to render the puff (timeSinceRelease + predictionOffset).
+    // These must be kept separate so that Q is never overestimated due to the puff
+    // having already traveled past the measurement points when predictionOffset > 0.
+    const tMeasured = timeSinceRelease * 60;
     const tElapsed = (timeSinceRelease + predictionOffset) * 60;
     const depositionTau = depositionTimeConstant * 60;
 
@@ -358,7 +363,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       releaseHeight,
       searchResolution,
       metersPerPixel,
-      tElapsed,
+      tElapsed: tMeasured,
     });
 
     return {
