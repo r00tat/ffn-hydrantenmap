@@ -118,27 +118,39 @@ export function estimatePuffSource(
     return { sourceX: 0, sourceY: 0, releaseQuantity: 0, error: Infinity };
   }
 
+  const mpp = Math.max(params.metersPerPixel, 1e-6);
+
+  // Convert input points to a local meter coordinate system centered on the data
+  // centroid. This makes the grid search independent of the viewport: when the map
+  // pans, all pixel coords shift by the same amount, but centroid-relative meter
+  // coords stay identical → stable source estimation across re-renders.
+  const centXPx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const centYPx = points.reduce((s, p) => s + p.y, 0) / points.length;
+  const ySign = params.yFlip ? -1 : 1;
+  const meterPoints: DataPoint[] = points.map(p => ({
+    x: (p.x - centXPx) * mpp,
+    y: ySign * (p.y - centYPx) * mpp, // flip y if Leaflet pixels → standard math coords
+    value: p.value,
+  }));
+
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const p of points) {
+  for (const p of meterPoints) {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y);
     maxY = Math.max(maxY, p.y);
   }
 
-  const extent = Math.max(maxX - minX, maxY - minY, 100);
+  const extent = Math.max(maxX - minX, maxY - minY, 100 * mpp);
   const buffer = extent * 1.5;
-  const mpp = Math.max(params.metersPerPixel, 1e-6);
-  const res = params.searchResolution / mpp;
-  const ySign = params.yFlip ? -1 : 1; // -1 for Leaflet (+y south), +1 for math (+y north)
+  const res = params.searchResolution; // already in meters
 
-  // Estimate source location: centroid of measurements shifted upwind by puff travel distance.
-  // This ensures the grid always covers the upwind region where the source must be.
-  const centX = (minX + maxX) / 2;
-  const centY = (minY + maxY) / 2;
-  const dPixels = (params.windSpeed * params.tElapsed) / mpp;
-  const estSrcX = centX - Math.sin(windDirRad) * dPixels;
-  const estSrcY = centY - ySign * Math.cos(windDirRad) * dPixels;
+  // Estimated source: centroid shifted upwind by puff travel distance.
+  const dMeters = params.windSpeed * params.tElapsed;
+  const centMX = (minX + maxX) / 2;
+  const centMY = (minY + maxY) / 2;
+  const estSrcX = centMX - Math.sin(windDirRad) * dMeters;
+  const estSrcY = centMY - Math.cos(windDirRad) * dMeters;
 
   const gMinX = Math.floor((Math.min(minX, estSrcX) - buffer) / res) * res;
   const gMaxX = Math.ceil((Math.max(maxX, estSrcX) + buffer) / res) * res;
@@ -153,18 +165,14 @@ export function estimatePuffSource(
   };
 
   let maxMeasurement = 0;
-  for (const p of points) {
+  for (const p of meterPoints) {
     if (p.value > maxMeasurement) maxMeasurement = p.value;
   }
   const dataFloor = Math.max(maxMeasurement * 0.001, 1e-9);
 
-  // Puff-center-to-centroid distance is used as a tiebreaker: when multiple source
-  // candidates produce equally small fitting errors (degenerate case where all measurements
-  // lie on the same downwind line), prefer the candidate whose puff center falls closest
-  // to the measurement centroid. This has a clear physical interpretation: the source
-  // that places the peak concentration at the observed measurement cluster is preferred.
-  const centXAvg = points.reduce((s, p) => s + p.x, 0) / points.length;
-  const centYAvg = points.reduce((s, p) => s + p.y, 0) / points.length;
+  // Puff-center-to-centroid tiebreaker (meter-space centroid is at origin by construction)
+  const centAvgMX = meterPoints.reduce((s, p) => s + p.x, 0) / meterPoints.length;
+  const centAvgMY = meterPoints.reduce((s, p) => s + p.y, 0) / meterPoints.length;
 
   let bestError = Infinity;
   let bestPuffCentDist = Infinity;
@@ -177,8 +185,10 @@ export function estimatePuffSource(
       const unitConcs: number[] = [];
       let valid = true;
 
-      for (const p of points) {
-        const [downwind, crosswind] = toWindCoords(p.x, p.y, cx, cy, windDirRad, mpp, !!params.yFlip);
+      for (const p of meterPoints) {
+        // Already in meter-space with +y = north, so no yFlip needed
+        const downwind = (p.x - cx) * Math.sin(windDirRad) + (p.y - cy) * Math.cos(windDirRad);
+        const crosswind = (p.x - cx) * Math.cos(windDirRad) - (p.y - cy) * Math.sin(windDirRad);
         const c = gaussianPuff(downwind, crosswind, params.tElapsed, unitParams);
         unitConcs.push(c);
         if (c <= 0) { valid = false; break; }
@@ -189,9 +199,9 @@ export function estimatePuffSource(
       // Estimate Q from positive measurements via log-space least-squares
       let sumLogRatio = 0;
       let posCount = 0;
-      for (let i = 0; i < points.length; i++) {
-        if (points[i].value <= 0) continue;
-        sumLogRatio += Math.log(points[i].value) - Math.log(unitConcs[i]);
+      for (let i = 0; i < meterPoints.length; i++) {
+        if (meterPoints[i].value <= 0) continue;
+        sumLogRatio += Math.log(meterPoints[i].value) - Math.log(unitConcs[i]);
         posCount++;
       }
       if (posCount === 0) continue;
@@ -200,17 +210,17 @@ export function estimatePuffSource(
       if (Q <= 0) continue;
 
       let error = 0;
-      for (let i = 0; i < points.length; i++) {
+      for (let i = 0; i < meterPoints.length; i++) {
         const logPred = Math.log(Q * unitConcs[i]);
-        const logObs = Math.log(Math.max(points[i].value, dataFloor));
+        const logObs = Math.log(Math.max(meterPoints[i].value, dataFloor));
         const diff = logPred - logObs;
         error += diff * diff;
       }
 
-      // Puff center position for this candidate source
-      const pcX = cx + (params.windSpeed * params.tElapsed / mpp) * Math.sin(windDirRad);
-      const pcY = cy + ySign * (params.windSpeed * params.tElapsed / mpp) * Math.cos(windDirRad);
-      const puffCentDist = (pcX - centXAvg) ** 2 + (pcY - centYAvg) ** 2;
+      // Puff center position in meter-space for tiebreaker
+      const pcX = cx + dMeters * Math.sin(windDirRad);
+      const pcY = cy + dMeters * Math.cos(windDirRad);
+      const puffCentDist = (pcX - centAvgMX) ** 2 + (pcY - centAvgMY) ** 2;
 
       const EPSILON = 1e-10;
       const isBetter = error < bestError - EPSILON;
@@ -225,9 +235,10 @@ export function estimatePuffSource(
     }
   }
 
+  // Convert best source position from meter-space back to input coordinate space
   return {
-    sourceX: bestX,
-    sourceY: bestY,
+    sourceX: centXPx + bestX / mpp,
+    sourceY: centYPx + ySign * bestY / mpp,
     releaseQuantity: bestQ,
     error: bestError,
   };
