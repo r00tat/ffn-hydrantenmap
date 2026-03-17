@@ -97,6 +97,35 @@ describe('invSquareAlgorithm — directional shielding', () => {
   });
 });
 
+describe('invSquareAlgorithm — two points (source beyond measurements)', () => {
+  // Two measurements at different distances from an unseen source.
+  // The algorithm must NOT produce values far exceeding the measurements.
+  const points: DataPoint[] = [
+    { x: 0, y: 0, value: 30 },
+    { x: 100, y: 0, value: 45 },
+  ];
+
+  it('source is placed beyond the higher-value point, not between them', () => {
+    const state = invSquareAlgorithm.prepare(points, { _metersPerPixel: MPP });
+    // Source should be beyond x=100 (the 45-value point)
+    expect(state.sourceX).toBeGreaterThan(100);
+  });
+
+  it('value between the two points stays between measured values', () => {
+    const state = invSquareAlgorithm.prepare(points, { _metersPerPixel: MPP });
+    const mid = invSquareAlgorithm.evaluate(50, 0, state);
+    // Must not explode — should be in the range of the measurements
+    expect(mid).toBeGreaterThan(20);
+    expect(mid).toBeLessThan(60);
+  });
+
+  it('value next to the higher-value marker does not exceed 2× measurement', () => {
+    const state = invSquareAlgorithm.prepare(points, { _metersPerPixel: MPP });
+    const nearHigh = invSquareAlgorithm.evaluate(99, 0, state);
+    expect(nearHigh).toBeLessThan(90); // should be close to 45, not 700+
+  });
+});
+
 describe('invSquareAlgorithm — edge cases', () => {
   it('returns 0 for empty point set', () => {
     const state = invSquareAlgorithm.prepare([], { _metersPerPixel: MPP });

@@ -74,6 +74,15 @@ export interface InterpolationAlgorithm<TState = unknown> {
   fullCanvasRender?: boolean | ((state: TState) => boolean);
 
   /**
+   * When true, the overlay skips log-scale pre-processing even if the user
+   * has enabled it.  Algorithms with built-in nonlinear decay (e.g.
+   * inverse-square, Gaussian plume) should set this to true because applying
+   * log on top of an already-decaying model distorts the fit and amplifies
+   * near-source values after exp() back-transform.
+   */
+  ignoreLogScale?: boolean;
+
+  /**
    * Precomputation phase. Called once when points or params change.
    * Build spatial indices, solve matrices, etc.
    */
