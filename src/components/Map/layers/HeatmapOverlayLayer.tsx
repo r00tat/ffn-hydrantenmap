@@ -247,6 +247,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
         allValues={allValues}
         layerRef={interpLayerRef}
       />
+      {/* visible !== false: show marker when prop is omitted (undefined = default visible) */}
       {visible !== false && maxPoint && maxMarkerIcon && (
         <Marker
           position={[maxPoint.lat, maxPoint.lng]}
