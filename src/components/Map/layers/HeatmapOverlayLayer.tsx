@@ -3,7 +3,7 @@
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useMap } from 'react-leaflet';
+import { useMap, Marker } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -106,6 +106,14 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     [heatmapPoints],
   );
 
+  const maxPoint = useMemo(
+    () =>
+      heatmapPoints.length === 0
+        ? null
+        : heatmapPoints.reduce((best, p) => (p.value > best.value ? p : best)),
+    [heatmapPoints],
+  );
+
   // IDW data points in meter-space for click interpolation
   const idwPoints = useMemo(() => {
     if (heatmapPoints.length === 0) return [];
@@ -189,12 +197,64 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     };
   }, [map, visible, handleMapClick]);
 
+  const maxMarkerIcon = useMemo(() => {
+    if (!maxPoint || !fieldInfo) return null;
+    const rounded = Math.round(maxPoint.value * 100) / 100;
+    const label = `${rounded}${fieldInfo.unit ? '\u00a0' + fieldInfo.unit : ''}`;
+    const html = `
+    <div style="
+      background:#b71c1c;
+      color:#fff;
+      font-weight:bold;
+      font-size:12px;
+      padding:3px 7px;
+      border-radius:4px;
+      white-space:nowrap;
+      box-shadow:0 1px 4px rgba(0,0,0,0.5);
+      position:relative;
+    ">
+      ${label}
+      <div style="
+        position:absolute;
+        left:50%;
+        transform:translateX(-50%);
+        bottom:-6px;
+        width:0;height:0;
+        border-left:6px solid transparent;
+        border-right:6px solid transparent;
+        border-top:6px solid #b71c1c;
+      "></div>
+    </div>`;
+    const approxWidth = label.length * 7 + 14;
+    return L.divIcon({
+      html,
+      className: '',
+      iconAnchor: [approxWidth / 2, 28 + 6], // center-x, bottom including triangle
+      iconSize: [approxWidth, 34],
+      popupAnchor: [0, -34],
+    });
+  }, [maxPoint, fieldInfo]);
+
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;
   }
 
   return isInterpolation ? (
-    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} layerRef={interpLayerRef} />
+    <>
+      <InterpolationOverlay
+        points={heatmapPoints}
+        config={heatmapConfig}
+        allValues={allValues}
+        layerRef={interpLayerRef}
+      />
+      {visible !== false && maxPoint && maxMarkerIcon && (
+        <Marker
+          position={[maxPoint.lat, maxPoint.lng]}
+          icon={maxMarkerIcon}
+          zIndexOffset={1000}
+        />
+      )}
+    </>
   ) : (
     <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
   );
