@@ -20,7 +20,7 @@ export { registerAlgorithm, getAlgorithm, getAlgorithmList } from './registry';
 export { idwAlgorithm, idwInterpolate } from './idw';
 export { splineAlgorithm, solveTPS, evaluateTPS } from './spline';
 export { krigingAlgorithm, fitVariogram, VARIOGRAM_SPHERICAL, VARIOGRAM_EXPONENTIAL, VARIOGRAM_GAUSSIAN } from './kriging';
-export { steAlgorithm } from './ste';
+export { steAlgorithm, windFromDegreesToRad } from './ste';
 export { invSquareAlgorithm, valueAt1m } from './invSquare';
 export type { InvSquareState } from './invSquare';
 

@@ -144,7 +144,7 @@ interface SteState {
  * 0=N, 90=E, clockwise) to radians in compass-bearing convention used by
  * toWindCoords (0=north, PI/2=east).
  */
-function windFromDegreesToRad(degrees: number): number {
+export function windFromDegreesToRad(degrees: number): number {
   // Meteorological "from" + 180 = "towards" direction in compass degrees
   const towardsDeg = (degrees + 180) % 360;
   return (towardsDeg * Math.PI) / 180;
