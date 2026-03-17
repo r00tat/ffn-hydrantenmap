@@ -260,6 +260,8 @@ interface PuffState {
   fullCanvasRender: boolean;
   /** true when in Leaflet pixel coords (+y = south); false for meter-space (+y = north) */
   yFlip: boolean;
+  /** IDW correction factors at measurement locations to honor measured values */
+  corrections: { x: number; y: number; ratio: number }[];
 }
 
 export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
@@ -383,6 +385,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
         sourceX: 0, sourceY: 0, releaseQuantity: 0,
         windDirRad, windSpeed, stabilityClass, releaseHeight,
         tElapsed, depositionTau, metersPerPixel, fullCanvasRender, yFlip,
+        corrections: [],
       };
     }
 
@@ -413,6 +416,23 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       }
     }
 
+    // Compute correction factors at measurement points (same approach as STE).
+    const corrections: { x: number; y: number; ratio: number }[] = [];
+    if (releaseQuantity > 0) {
+      const mpp = Math.max(metersPerPixel, 1e-6);
+      for (const p of points) {
+        const [dw, cw] = toWindCoords(
+          p.x, p.y, estimate.sourceX, estimate.sourceY, windDirRad, mpp, yFlip
+        );
+        const predicted = gaussianPuff(dw, cw, tMeasured, {
+          Q: releaseQuantity, windSpeed, stabilityClass, releaseHeight,
+        });
+        if (predicted > 0 && p.value > 0) {
+          corrections.push({ x: p.x, y: p.y, ratio: p.value / predicted });
+        }
+      }
+    }
+
     return {
       sourceX: estimate.sourceX,
       sourceY: estimate.sourceY,
@@ -426,6 +446,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       metersPerPixel,
       fullCanvasRender,
       yFlip,
+      corrections,
     };
   },
 
@@ -452,14 +473,19 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
 
   colorScaleValues(state: PuffState) {
     if (state.releaseQuantity <= 0) return null;
-    const peak = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
+    const rawPeak = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
       Q: state.releaseQuantity,
       windSpeed: state.windSpeed,
       stabilityClass: state.stabilityClass,
       releaseHeight: state.releaseHeight,
       depositionTau: state.depositionTau > 0 ? state.depositionTau : undefined,
     });
-    if (!isFinite(peak) || peak <= 0) return null;
+    if (!isFinite(rawPeak) || rawPeak <= 0) return null;
+    let peak = rawPeak;
+    for (const c of state.corrections) {
+      const adjusted = rawPeak * c.ratio;
+      if (adjusted > peak) peak = adjusted;
+    }
     return [0, peak];
   },
 
@@ -471,12 +497,27 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       x, y, state.sourceX, state.sourceY, state.windDirRad, mpp, state.yFlip
     );
 
-    return gaussianPuff(downwind, crosswind, state.tElapsed, {
+    const raw = gaussianPuff(downwind, crosswind, state.tElapsed, {
       Q: state.releaseQuantity,
       windSpeed: state.windSpeed,
       stabilityClass: state.stabilityClass,
       releaseHeight: state.releaseHeight,
       depositionTau: state.depositionTau > 0 ? state.depositionTau : undefined,
     });
+
+    if (raw <= 0 || state.corrections.length === 0) return raw;
+
+    // IDW-interpolate correction factors from measurement points.
+    let wSum = 0;
+    let wrSum = 0;
+    for (const c of state.corrections) {
+      const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
+      if (d2 < 1e-10) return raw * c.ratio;
+      const w = 1 / (d2 * d2); // power=4 for sharp local correction
+      wSum += w;
+      wrSum += w * c.ratio;
+    }
+
+    return raw * (wrSum / wSum);
   },
 };
