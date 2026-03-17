@@ -124,7 +124,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
     const algoId = this._config.interpolationAlgorithm ?? 'idw';
     const algo = getAlgorithm(algoId) ?? idwAlgorithm;
 
-    const logScale = !!this._config.interpolationLogScale && !algo.ignoreLogScale;
+    const logScale = !!this._config.interpolationLogScale;
     const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
     const interpPoints = logScale
       ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))

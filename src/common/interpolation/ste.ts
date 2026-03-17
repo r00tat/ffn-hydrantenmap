@@ -283,7 +283,6 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
   label: 'Source Term Estimation',
   description:
     'Quellstärkenabschätzung: Schätzt aus Messwerten den Ursprung und die Stärke einer Emissionsquelle mittels Gaußschem Ausbreitungsmodell (Gauß-Fahne).',
-  ignoreLogScale: true,
   params: [
     {
       key: 'windDirection',

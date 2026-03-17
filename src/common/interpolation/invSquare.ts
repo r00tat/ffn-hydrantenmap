@@ -4,8 +4,9 @@ import type { DataPoint, InterpolationAlgorithm } from './types';
 // Inverse-Square + Directional Shielding (ISDS) interpolation
 //
 // Algorithm overview:
-//  1. Locate source: grid-search minimising CV of v·d² → (sourceX, sourceY)
-//  2. Fit source strength k: robust median of vᵢ·dᵢ²
+//  1. Locate source: grid-search the TPS surface peak → (sourceX, sourceY)
+//  2. Fit source strength k: closed-form LS so that k/d² ≈ v for all points
+//     k = Σ(vᵢ/dᵢ²) / Σ(1/dᵢ⁴)  (minimises Σ(k/dᵢ² − vᵢ)²)
 //  3. Per-measurement shielding factor: sᵢ = vᵢ / (k / dᵢ²)
 //     sᵢ = 1 → unshielded, sᵢ < 1 → attenuated by obstacle(s)
 //  4. Evaluate at (x,y): use angular IDW over the shielding factors to
@@ -28,166 +29,27 @@ export interface InvSquareState {
 }
 
 // ---------------------------------------------------------------------------
-// Source location: optimised to minimise coefficient-of-variation of v·d²
+// Source location: value-weighted centroid of measurements
 //
-// For a perfect inverse-square source, every measurement satisfies v·d² = k.
-// The best source estimate is the position where these estimates agree best
-// (lowest CV). A multi-pass grid search finds this position, with a
-// tie-breaker preferring positions farther from measurements (avoids placing
-// the source between measurements, which creates a near-source singularity).
+// Physically motivated: the source is inferred to lie in the direction of
+// highest field values. For ring measurements with one shielded sector the
+// centroid shifts slightly away from that sector, placing the source estimate
+// on the correct side. This is more robust than TPS peak search, which can
+// have spurious maxima at extrapolation corners outside the measurement hull.
 // ---------------------------------------------------------------------------
 
-/** CV of v·d² at candidate source (sx, sy). Lower = better inverse-square fit. */
-function invSquareCV(
-  points: DataPoint[],
-  sx: number,
-  sy: number
-): number {
-  if (points.length < 2) return Infinity;
-  let sum = 0,
-    sumSq = 0,
-    n = 0;
-  for (const p of points) {
-    const dx = p.x - sx;
-    const dy = p.y - sy;
-    const dSq = dx * dx + dy * dy;
-    if (dSq < 1e-6) continue;
-    const vd2 = p.value * dSq;
-    sum += vd2;
-    sumSq += vd2 * vd2;
-    n++;
-  }
-  if (n < 2) return Infinity;
-  const mean = sum / n;
-  if (mean < 1e-30) return Infinity;
-  const variance = sumSq / n - mean * mean;
-  return Math.sqrt(Math.max(0, variance)) / mean;
-}
-
-/** Squared distance from (sx, sy) to the nearest measurement point. */
-function minDistSq(
-  points: DataPoint[],
-  sx: number,
-  sy: number
-): number {
-  let min = Infinity;
-  for (const p of points) {
-    const dx = p.x - sx;
-    const dy = p.y - sy;
-    min = Math.min(min, dx * dx + dy * dy);
-  }
-  return min;
-}
-
 function findSource(points: DataPoint[]): { x: number; y: number } {
-  if (points.length === 0) return { x: 0, y: 0 };
-  if (points.length === 1) return { x: points[0].x, y: points[0].y };
-
-  // Bounding box of measurements
-  let bbMinX = Infinity,
-    bbMaxX = -Infinity,
-    bbMinY = Infinity,
-    bbMaxY = -Infinity;
+  let wSum = 0,
+    wxSum = 0,
+    wySum = 0;
   for (const p of points) {
-    bbMinX = Math.min(bbMinX, p.x);
-    bbMaxX = Math.max(bbMaxX, p.x);
-    bbMinY = Math.min(bbMinY, p.y);
-    bbMaxY = Math.max(bbMaxY, p.y);
+    wSum += p.value;
+    wxSum += p.value * p.x;
+    wySum += p.value * p.y;
   }
-  const span = Math.max(bbMaxX - bbMinX, bbMaxY - bbMinY, 1);
-
-  // Value-gradient direction: centroid → highest-value point
-  const maxPt = points.reduce((best, p) =>
-    p.value > best.value ? p : best
-  );
-  let meanX = 0,
-    meanY = 0;
-  for (const p of points) {
-    meanX += p.x;
-    meanY += p.y;
-  }
-  meanX /= points.length;
-  meanY /= points.length;
-  const gdx = maxPt.x - meanX;
-  const gdy = maxPt.y - meanY;
-  const gLen = Math.sqrt(gdx * gdx + gdy * gdy);
-
-  // Search extension: derived from value ratios so the grid reaches the
-  // "beyond highest-value" solution even when values are close.
-  let ext = 5 * span;
-  for (let i = 0; i < points.length; i++) {
-    for (let j = i + 1; j < points.length; j++) {
-      const dx = points[i].x - points[j].x;
-      const dy = points[i].y - points[j].y;
-      const pairDist = Math.sqrt(dx * dx + dy * dy);
-      if (pairDist < 1e-6) continue;
-      const svi = Math.sqrt(Math.max(points[i].value, 1e-30));
-      const svj = Math.sqrt(Math.max(points[j].value, 1e-30));
-      const denom = Math.abs(svi - svj);
-      if (denom > 0.01 * Math.max(svi, svj)) {
-        ext = Math.max(ext, 1.5 * Math.min(svi, svj) * pairDist / denom);
-      }
-    }
-  }
-  ext = Math.min(ext, 20 * span);
-
-  // Build search area: bbox + 1×span padding + extension along gradient
-  let sMinX = bbMinX - span,
-    sMaxX = bbMaxX + span,
-    sMinY = bbMinY - span,
-    sMaxY = bbMaxY + span;
-  if (gLen > 1e-6) {
-    const ndx = gdx / gLen;
-    const ndy = gdy / gLen;
-    const extX = maxPt.x + ext * ndx;
-    const extY = maxPt.y + ext * ndy;
-    sMinX = Math.min(sMinX, extX);
-    sMaxX = Math.max(sMaxX, extX);
-    sMinY = Math.min(sMinY, extY);
-    sMaxY = Math.max(sMaxY, extY);
-  } else {
-    sMinX -= ext;
-    sMaxX += ext;
-    sMinY -= ext;
-    sMaxY += ext;
-  }
-
-  // Multi-pass grid search (3 passes, 21×21 each, refining around best)
-  let bestX = meanX,
-    bestY = meanY,
-    bestCv = invSquareCV(points, meanX, meanY),
-    bestMd = minDistSq(points, meanX, meanY);
-
-  const GRID = 20;
-  for (let pass = 0; pass < 3; pass++) {
-    const stepX = (sMaxX - sMinX) / GRID;
-    const stepY = (sMaxY - sMinY) / GRID;
-
-    for (let i = 0; i <= GRID; i++) {
-      for (let j = 0; j <= GRID; j++) {
-        const sx = sMinX + i * stepX;
-        const sy = sMinY + j * stepY;
-        const cv = invSquareCV(points, sx, sy);
-        const md = minDistSq(points, sx, sy);
-        // Lower CV wins; within 5% tolerance prefer farther from measurements
-        if (cv < bestCv * 0.95 || (cv <= bestCv * 1.05 && md > bestMd)) {
-          bestCv = cv;
-          bestMd = md;
-          bestX = sx;
-          bestY = sy;
-        }
-      }
-    }
-
-    // Refine around best
-    const margin = Math.max(stepX, stepY) * 2;
-    sMinX = bestX - margin;
-    sMaxX = bestX + margin;
-    sMinY = bestY - margin;
-    sMaxY = bestY + margin;
-  }
-
-  return { x: bestX, y: bestY };
+  return wSum > 0
+    ? { x: wxSum / wSum, y: wySum / wSum }
+    : { x: 0, y: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +132,6 @@ export const invSquareAlgorithm: InterpolationAlgorithm<InvSquareState> = {
     'Strahlenquelle (Inverse-Square): Schätzt Quellposition und -stärke aus den Messwerten. ' +
     'Berücksichtigt Abschirmung über richtungsabhängige Restanalyse. ' +
     'Geeignet für Strahlung und andere punktförmige Quellen.',
-  ignoreLogScale: true,
   params: [
     {
       key: 'fullCanvasRender',
