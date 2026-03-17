@@ -2,7 +2,7 @@
 
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMap, Marker } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
@@ -16,6 +16,8 @@ import {
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import {
   idwInterpolate,
+  getAlgorithm,
+  idwAlgorithm,
   DataPoint,
 } from '../../../common/interpolation';
 import HeatmapOverlay from './HeatmapOverlay';
@@ -106,9 +108,75 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     [heatmapPoints],
   );
 
-  // Max point from the rendered interpolation grid (updated after each canvas draw).
-  // This reflects the true surface maximum, which can exceed any raw data value for spline algorithms.
-  const [maxGridPoint, setMaxGridPoint] = useState<{ latlng: L.LatLng; value: number } | null>(null);
+  // Compute the surface maximum in metric space — stable across zoom levels.
+  // Samples the algorithm at a 50×50 grid covering the data bounding box.
+  const maxGridPoint = useMemo(() => {
+    if (heatmapPoints.length === 0 || !heatmapConfig || heatmapConfig.visualizationMode !== 'interpolation') return null;
+
+    const algoId = heatmapConfig.interpolationAlgorithm ?? 'idw';
+    const algo = getAlgorithm(algoId) ?? idwAlgorithm;
+    const logScale = !!heatmapConfig.interpolationLogScale;
+    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+
+    // Convert to metric space (same reference as idwPoints)
+    const metricPoints: DataPoint[] = heatmapPoints.map((p) => {
+      const m = latlngToMeters(p.lat, p.lng, refLat);
+      return { x: m.x, y: m.y, value: logScale ? safeLog(p.value) : p.value };
+    });
+
+    const minPoints = algo.minPoints ?? 1;
+    if (metricPoints.length < minPoints) return null;
+
+    // Mirror param-merging logic from InterpolationOverlay._reset
+    const savedParams = heatmapConfig.interpolationParams ?? {};
+    const mergedParams: Record<string, number | boolean> = {};
+    for (const desc of algo.params) {
+      mergedParams[desc.key] = savedParams[desc.key] ?? desc.default;
+    }
+    if (algo.id === 'idw' && mergedParams.power === undefined && heatmapConfig.interpolationPower != null) {
+      mergedParams.power = heatmapConfig.interpolationPower;
+    }
+    if (logScale) mergedParams._lambda = 0;
+    // Metric space: 1 unit = 1 m; large search radius to include all points
+    mergedParams._metersPerPixel = 1;
+    const xs = metricPoints.map((p) => p.x);
+    const ys = metricPoints.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    mergedParams._searchRadius = (Math.max(maxX - minX, maxY - minY) + 1) * 10;
+
+    const state = algo.prepare(metricPoints, mergedParams);
+    if (!state) return null;
+
+    // Sample at 50×50 grid
+    const N = 50;
+    const stepX = (maxX - minX) / Math.max(N - 1, 1);
+    const stepY = (maxY - minY) / Math.max(N - 1, 1);
+
+    let maxVal = -Infinity;
+    let bestX = metricPoints[0].x;
+    let bestY = metricPoints[0].y;
+
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const x = minX + i * stepX;
+        const y = minY + j * stepY;
+        const v = (algo as any).evaluate(x, y, state) as number;
+        if (typeof v === 'number' && isFinite(v) && v > maxVal) {
+          maxVal = v;
+          bestX = x;
+          bestY = y;
+        }
+      }
+    }
+
+    if (!isFinite(maxVal)) return null;
+
+    // Convert metric coords back to lat/lng
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos((refLat * Math.PI) / 180);
+    return { latlng: L.latLng(bestY / mPerDegLat, bestX / mPerDegLng), value: maxVal };
+  }, [heatmapPoints, heatmapConfig, refLat]);
 
   // IDW data points in meter-space for click interpolation
   const idwPoints = useMemo(() => {
@@ -235,7 +303,6 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
         config={heatmapConfig}
         allValues={allValues}
         layerRef={interpLayerRef}
-        onMaxPoint={setMaxGridPoint}
       />
       {/* visible !== false: show marker when prop is omitted (undefined = default visible) */}
       {visible !== false && maxGridPoint && maxMarkerIcon && (
