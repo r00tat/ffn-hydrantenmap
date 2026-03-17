@@ -124,12 +124,6 @@ const InterpolationCanvasLayer = L.Layer.extend({
     const algoId = this._config.interpolationAlgorithm ?? 'idw';
     const algo = getAlgorithm(algoId) ?? idwAlgorithm;
 
-    const logScale = !!this._config.interpolationLogScale;
-    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
-    const interpPoints = logScale
-      ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
-      : pixelPoints;
-
     // Merge saved params with algorithm defaults
     const savedParams = this._config.interpolationParams ?? {};
     const mergedParams: Record<string, number | boolean> = {};
@@ -140,6 +134,22 @@ const InterpolationCanvasLayer = L.Layer.extend({
     if (algo.id === 'idw' && mergedParams.power === undefined && this._config.interpolationPower != null) {
       mergedParams.power = this._config.interpolationPower;
     }
+    // Migration: carry global interpolationLogScale into per-algorithm param
+    if (
+      mergedParams.logScale === false &&
+      savedParams.logScale === undefined &&
+      this._config.interpolationLogScale
+    ) {
+      mergedParams.logScale = true;
+    }
+
+    // Log-scale is now a per-algorithm param (only offered by IDW, Spline, Kriging)
+    const logScale = !!mergedParams.logScale;
+    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+    const interpPoints = logScale
+      ? pixelPoints.map((p: DataPoint) => ({ x: p.x, y: p.y, value: safeLog(p.value) }))
+      : pixelPoints;
+
     // Pass search radius hint for IDW optimization
     mergedParams._searchRadius = bufferPx * 5;
     // Pass lambda hint for TPS log-scale mode
@@ -151,15 +161,39 @@ const InterpolationCanvasLayer = L.Layer.extend({
       mergedParams._metersPerPixel = p0.distanceTo(p1);
     }
 
-    const preparedState = interpPoints.length >= (algo.id === 'spline' ? 3 : 1)
+    // Debug: log interpolation input for diagnostics
+    console.log(JSON.stringify({
+      algorithm: algoId,
+      logScale,
+      zoom,
+      metersPerPixel: mergedParams._metersPerPixel,
+      params: mergedParams,
+      latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
+      pixelPoints,
+      interpPoints,
+    }));
+
+    const minPoints = algo.minPoints ?? 1;
+    const preparedState = interpPoints.length >= minPoints
       ? algo.prepare(interpPoints, mergedParams)
       : null;
 
-    // Compute convex hull for interior filling
-    const hull = computeConvexHull(pixelPoints);
-
     // Build interpolation grid and paint
     const blockSize = 4;
+
+    if (preparedState === null) {
+      // Not enough points for this algorithm — clear canvas and bail out.
+      this._valueGrid = null;
+      this._gridCols = 0;
+      this._blockSize = blockSize;
+      this._bufferPx = bufferPx;
+      const ctx2 = canvas.getContext('2d');
+      if (ctx2) ctx2.clearRect(0, 0, canvasW, canvasH);
+      return;
+    }
+
+    // Compute convex hull for interior filling
+    const hull = computeConvexHull(pixelPoints);
     const { imageData, valueGrid, gridCols } = buildInterpolationGrid({
       canvasWidth: canvasW,
       canvasHeight: canvasH,
@@ -173,6 +207,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       blockSize,
       algorithm: algo,
       state: preparedState,
+      logScale,
     });
 
     this._valueGrid = valueGrid;

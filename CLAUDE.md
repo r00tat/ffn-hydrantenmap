@@ -41,7 +41,7 @@ cp .env.local .worktrees/<branch-name>/
 
 The Serena MCP plugin provides semantic code navigation (LSP-backed symbol search, cross-reference lookup, symbolic editing). It is initialized for this project with the name `hydranten-map`.
 
-**At the start of a conversation**, you must activate the project by calling `check_onboarding_performed()`. This implicitly activates the `hydranten-map` project. Without this call, all other Serena tools will fail with a "No active project" error. There is no separate `activate_project` tool — `check_onboarding_performed()` is the activation mechanism.
+**At the start of a conversation**, activate the project by calling `activate_project("hydranten-map")`. Without this, all other Serena tools will fail with a "No active project" error. After activating, call `check_onboarding_performed()` to verify onboarding state.
 
 **Project memories** (`code_style_and_conventions`, `project_overview`, `suggested_commands`, `task_completion_checklist`) contain project-specific guidance — read them when relevant via `read_memory`.
 

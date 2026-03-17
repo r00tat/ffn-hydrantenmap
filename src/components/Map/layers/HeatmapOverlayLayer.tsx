@@ -3,7 +3,7 @@
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useMap } from 'react-leaflet';
+import { useMap, Marker } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
 import {
@@ -16,6 +16,8 @@ import {
 import { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import {
   idwInterpolate,
+  getAlgorithm,
+  idwAlgorithm,
   DataPoint,
 } from '../../../common/interpolation';
 import HeatmapOverlay from './HeatmapOverlay';
@@ -106,6 +108,76 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     [heatmapPoints],
   );
 
+  // Compute the surface maximum in metric space — stable across zoom levels.
+  // Samples the algorithm at a 50×50 grid covering the data bounding box.
+  const maxGridPoint = useMemo(() => {
+    if (heatmapPoints.length === 0 || !heatmapConfig || heatmapConfig.visualizationMode !== 'interpolation') return null;
+
+    const algoId = heatmapConfig.interpolationAlgorithm ?? 'idw';
+    const algo = getAlgorithm(algoId) ?? idwAlgorithm;
+    const logScale = !!heatmapConfig.interpolationLogScale;
+    const safeLog = (v: number) => Math.log(Math.max(v, 1e-10));
+
+    // Convert to metric space (same reference as idwPoints)
+    const metricPoints: DataPoint[] = heatmapPoints.map((p) => {
+      const m = latlngToMeters(p.lat, p.lng, refLat);
+      return { x: m.x, y: m.y, value: logScale ? safeLog(p.value) : p.value };
+    });
+
+    const minPoints = algo.minPoints ?? 1;
+    if (metricPoints.length < minPoints) return null;
+
+    // Mirror param-merging logic from InterpolationOverlay._reset
+    const savedParams = heatmapConfig.interpolationParams ?? {};
+    const mergedParams: Record<string, number | boolean> = {};
+    for (const desc of algo.params) {
+      mergedParams[desc.key] = savedParams[desc.key] ?? desc.default;
+    }
+    if (algo.id === 'idw' && mergedParams.power === undefined && heatmapConfig.interpolationPower != null) {
+      mergedParams.power = heatmapConfig.interpolationPower;
+    }
+    if (logScale) mergedParams._lambda = 0;
+    // Metric space: 1 unit = 1 m; large search radius to include all points
+    mergedParams._metersPerPixel = 1;
+    const xs = metricPoints.map((p) => p.x);
+    const ys = metricPoints.map((p) => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    mergedParams._searchRadius = (Math.max(maxX - minX, maxY - minY) + 1) * 10;
+
+    const state = algo.prepare(metricPoints, mergedParams);
+    if (!state) return null;
+
+    // Sample at 50×50 grid
+    const N = 50;
+    const stepX = (maxX - minX) / Math.max(N - 1, 1);
+    const stepY = (maxY - minY) / Math.max(N - 1, 1);
+
+    let maxVal = -Infinity;
+    let bestX = metricPoints[0].x;
+    let bestY = metricPoints[0].y;
+
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const x = minX + i * stepX;
+        const y = minY + j * stepY;
+        const v = (algo as any).evaluate(x, y, state) as number;
+        if (typeof v === 'number' && isFinite(v) && v > maxVal) {
+          maxVal = v;
+          bestX = x;
+          bestY = y;
+        }
+      }
+    }
+
+    if (!isFinite(maxVal)) return null;
+
+    // Convert metric coords back to lat/lng
+    const mPerDegLat = 111320;
+    const mPerDegLng = 111320 * Math.cos((refLat * Math.PI) / 180);
+    return { latlng: L.latLng(bestY / mPerDegLat, bestX / mPerDegLng), value: maxVal };
+  }, [heatmapPoints, heatmapConfig, refLat]);
+
   // IDW data points in meter-space for click interpolation
   const idwPoints = useMemo(() => {
     if (heatmapPoints.length === 0) return [];
@@ -189,12 +261,58 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     };
   }, [map, visible, handleMapClick]);
 
+  const maxMarkerIcon = useMemo(() => {
+    if (!maxGridPoint || !fieldInfo) return null;
+    const rounded = Math.round(maxGridPoint.value * 100) / 100;
+    const label = `${rounded}${fieldInfo.unit ? '\u00a0' + fieldInfo.unit : ''}`;
+    // Pin shape: rounded label badge → thin stem → triangle pointer
+    const html = `
+    <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">
+      <div style="
+        background:#b71c1c;
+        color:#fff;
+        font-weight:bold;
+        font-size:12px;
+        padding:4px 8px;
+        border-radius:12px;
+        white-space:nowrap;
+        box-shadow:0 2px 4px rgba(0,0,0,0.45);
+      ">${label}</div>
+      <div style="width:2px;height:6px;background:#b71c1c;"></div>
+      <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:9px solid #b71c1c;"></div>
+    </div>`;
+    const approxWidth = label.length * 7 + 16;
+    // Total height: ~24px label + 6px stem + 9px triangle = 39px
+    return L.divIcon({
+      html,
+      className: '',
+      iconAnchor: [approxWidth / 2, 39],
+      iconSize: [approxWidth, 39],
+      popupAnchor: [0, -39],
+    });
+  }, [maxGridPoint, fieldInfo]);
+
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;
   }
 
   return isInterpolation ? (
-    <InterpolationOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} layerRef={interpLayerRef} />
+    <>
+      <InterpolationOverlay
+        points={heatmapPoints}
+        config={heatmapConfig}
+        allValues={allValues}
+        layerRef={interpLayerRef}
+      />
+      {/* visible !== false: show marker when prop is omitted (undefined = default visible) */}
+      {visible !== false && maxGridPoint && maxMarkerIcon && (
+        <Marker
+          position={[maxGridPoint.latlng.lat, maxGridPoint.latlng.lng]}
+          icon={maxMarkerIcon}
+          zIndexOffset={1000}
+        />
+      )}
+    </>
   ) : (
     <HeatmapOverlay points={heatmapPoints} config={heatmapConfig} allValues={allValues} />
   );

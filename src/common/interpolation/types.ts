@@ -60,6 +60,12 @@ export interface InterpolationAlgorithm<TState = unknown> {
   params: AlgorithmParamDescriptor[];
 
   /**
+   * Minimum number of data points required for this algorithm to produce a
+   * valid prepared state. Defaults to 1 if omitted.
+   */
+  minPoints?: number;
+
+  /**
    * When true (or when this function returns true for the prepared state),
    * the grid builder renders the full canvas instead of clipping to the
    * convex hull + proximity of data points.

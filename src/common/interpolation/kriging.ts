@@ -308,6 +308,12 @@ export const krigingAlgorithm: InterpolationAlgorithm<KrigingState> = {
       step: 5,
       default: 25,
     },
+    {
+      key: 'logScale',
+      label: 'Logarithmische Interpolation',
+      type: 'boolean',
+      default: false,
+    },
   ],
 
   prepare(points: DataPoint[], params: Record<string, number | boolean>): KrigingState {
