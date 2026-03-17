@@ -53,7 +53,13 @@ function findSource(points: DataPoint[]): { x: number; y: number } {
 }
 
 // ---------------------------------------------------------------------------
-// Source-strength fit: closed-form weighted least-squares
+// Source-strength fit: robust median estimator
+//
+// Each measurement yields an estimate k̂ᵢ = vᵢ · dᵢ².  The median is used
+// instead of mean or weighted-LS because:
+//  • it is not biased toward the closest point (the old 1/d⁴-weighted LS
+//    let one nearby measurement dominate, making k too small)
+//  • it is robust to shielded measurements (which produce low k̂ᵢ outliers)
 // ---------------------------------------------------------------------------
 
 function fitK(
@@ -62,17 +68,20 @@ function fitK(
   srcY: number,
   mpp: number
 ): number {
-  let num = 0,
-    denom = 0;
+  const estimates: number[] = [];
   for (const p of points) {
     const dx = (p.x - srcX) * mpp;
     const dy = (p.y - srcY) * mpp;
     const dSq = dx * dx + dy * dy;
     if (dSq < 1e-6) continue; // skip measurements coincident with source
-    num += p.value / dSq;
-    denom += 1 / (dSq * dSq);
+    estimates.push(p.value * dSq);
   }
-  return denom > 0 ? num / denom : 0;
+  if (estimates.length === 0) return 0;
+  estimates.sort((a, b) => a - b);
+  const mid = estimates.length >> 1;
+  return estimates.length % 2 === 1
+    ? estimates[mid]
+    : (estimates[mid - 1] + estimates[mid]) / 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +185,7 @@ export const invSquareAlgorithm: InterpolationAlgorithm<InvSquareState> = {
       if (dSq < 1e-6 || k < 1e-30) {
         shielding[i] = 1;
       } else {
-        shielding[i] = Math.max(0, points[i].value / (k / dSq));
+        shielding[i] = Math.min(1, Math.max(0, points[i].value / (k / dSq)));
       }
     }
 
