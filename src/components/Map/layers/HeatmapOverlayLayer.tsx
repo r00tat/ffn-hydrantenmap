@@ -151,15 +151,6 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     const mPerDegLat = 111320;
     const mPerDegLng = 111320 * Math.cos((refLat * Math.PI) / 180);
 
-    // Allow algorithms (e.g. puff) to provide the peak location directly,
-    // bypassing the grid search that only covers the measurement bounding box.
-    if (algo.peakPoint) {
-      const peak = algo.peakPoint(state);
-      if (peak && isFinite(peak.value)) {
-        return { latlng: L.latLng(peak.y / mPerDegLat, peak.x / mPerDegLng), value: peak.value };
-      }
-    }
-
     // Sample at 50×50 grid plus the exact measurement points
     const N = 50;
     const stepX = (maxX - minX) / Math.max(N - 1, 1);
@@ -168,6 +159,16 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     let maxVal = -Infinity;
     let bestX = metricPoints[0].x;
     let bestY = metricPoints[0].y;
+
+    // Allow algorithms (e.g. puff) to provide a peak candidate directly.
+    if (algo.peakPoint) {
+      const peak = algo.peakPoint(state);
+      if (peak && isFinite(peak.value) && peak.value > maxVal) {
+        maxVal = peak.value;
+        bestX = peak.x;
+        bestY = peak.y;
+      }
+    }
 
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {

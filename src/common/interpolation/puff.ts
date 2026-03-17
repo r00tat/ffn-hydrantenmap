@@ -460,14 +460,28 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     const ySign = state.yFlip ? -1 : 1;
     const x = state.sourceX + Math.sin(state.windDirRad) * state.windSpeed * state.tElapsed / mpp;
     const y = state.sourceY + ySign * Math.cos(state.windDirRad) * state.windSpeed * state.tElapsed / mpp;
-    const value = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
+    const rawValue = gaussianPuff(state.windSpeed * state.tElapsed, 0, state.tElapsed, {
       Q: state.releaseQuantity,
       windSpeed: state.windSpeed,
       stabilityClass: state.stabilityClass,
       releaseHeight: state.releaseHeight,
       depositionTau: state.depositionTau > 0 ? state.depositionTau : undefined,
     });
-    if (!isFinite(value) || value <= 0) return null;
+    if (!isFinite(rawValue) || rawValue <= 0) return null;
+    // Apply IDW correction at the peak location
+    let value = rawValue;
+    if (state.corrections.length > 0) {
+      let wSum = 0;
+      let wrSum = 0;
+      for (const c of state.corrections) {
+        const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
+        if (d2 < 1e-10) { value = rawValue * c.ratio; wSum = 1; wrSum = c.ratio; break; }
+        const w = 1 / (d2 * d2);
+        wSum += w;
+        wrSum += w * c.ratio;
+      }
+      if (wSum > 0) value = rawValue * (wrSum / wSum);
+    }
     return { x, y, value };
   },
 
