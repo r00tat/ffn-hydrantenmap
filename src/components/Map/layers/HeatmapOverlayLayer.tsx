@@ -2,7 +2,7 @@
 
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMap, Marker } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../../hooks/useFirecall';
@@ -106,13 +106,9 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
     [heatmapPoints],
   );
 
-  const maxPoint = useMemo(
-    () =>
-      heatmapPoints.length === 0
-        ? null
-        : heatmapPoints.reduce((best, p) => (p.value > best.value ? p : best)),
-    [heatmapPoints],
-  );
+  // Max point from the rendered interpolation grid (updated after each canvas draw).
+  // This reflects the true surface maximum, which can exceed any raw data value for spline algorithms.
+  const [maxGridPoint, setMaxGridPoint] = useState<{ latlng: L.LatLng; value: number } | null>(null);
 
   // IDW data points in meter-space for click interpolation
   const idwPoints = useMemo(() => {
@@ -198,42 +194,35 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
   }, [map, visible, handleMapClick]);
 
   const maxMarkerIcon = useMemo(() => {
-    if (!maxPoint || !fieldInfo) return null;
-    const rounded = Math.round(maxPoint.value * 100) / 100;
+    if (!maxGridPoint || !fieldInfo) return null;
+    const rounded = Math.round(maxGridPoint.value * 100) / 100;
     const label = `${rounded}${fieldInfo.unit ? '\u00a0' + fieldInfo.unit : ''}`;
+    // Pin shape: rounded label badge → thin stem → triangle pointer
     const html = `
-    <div style="
-      background:#b71c1c;
-      color:#fff;
-      font-weight:bold;
-      font-size:12px;
-      padding:3px 7px;
-      border-radius:4px;
-      white-space:nowrap;
-      box-shadow:0 1px 4px rgba(0,0,0,0.5);
-      position:relative;
-    ">
-      ${label}
+    <div style="display:flex;flex-direction:column;align-items:center;pointer-events:none;">
       <div style="
-        position:absolute;
-        left:50%;
-        transform:translateX(-50%);
-        bottom:-6px;
-        width:0;height:0;
-        border-left:6px solid transparent;
-        border-right:6px solid transparent;
-        border-top:6px solid #b71c1c;
-      "></div>
+        background:#b71c1c;
+        color:#fff;
+        font-weight:bold;
+        font-size:12px;
+        padding:4px 8px;
+        border-radius:12px;
+        white-space:nowrap;
+        box-shadow:0 2px 4px rgba(0,0,0,0.45);
+      ">${label}</div>
+      <div style="width:2px;height:6px;background:#b71c1c;"></div>
+      <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:9px solid #b71c1c;"></div>
     </div>`;
-    const approxWidth = label.length * 7 + 14;
+    const approxWidth = label.length * 7 + 16;
+    // Total height: ~24px label + 6px stem + 9px triangle = 39px
     return L.divIcon({
       html,
       className: '',
-      iconAnchor: [approxWidth / 2, 28 + 6], // center-x, bottom including triangle
-      iconSize: [approxWidth, 34],
-      popupAnchor: [0, -34],
+      iconAnchor: [approxWidth / 2, 39],
+      iconSize: [approxWidth, 39],
+      popupAnchor: [0, -39],
     });
-  }, [maxPoint, fieldInfo]);
+  }, [maxGridPoint, fieldInfo]);
 
   if (!heatmapConfig?.enabled || !heatmapConfig?.activeKey || heatmapPoints.length === 0) {
     return null;
@@ -246,11 +235,12 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
         config={heatmapConfig}
         allValues={allValues}
         layerRef={interpLayerRef}
+        onMaxPoint={setMaxGridPoint}
       />
       {/* visible !== false: show marker when prop is omitted (undefined = default visible) */}
-      {visible !== false && maxPoint && maxMarkerIcon && (
+      {visible !== false && maxGridPoint && maxMarkerIcon && (
         <Marker
-          position={[maxPoint.lat, maxPoint.lng]}
+          position={[maxGridPoint.latlng.lat, maxGridPoint.latlng.lng]}
           icon={maxMarkerIcon}
           zIndexOffset={1000}
         />

@@ -151,6 +151,18 @@ const InterpolationCanvasLayer = L.Layer.extend({
       mergedParams._metersPerPixel = p0.distanceTo(p1);
     }
 
+    // Debug: log interpolation input for diagnostics
+    console.log(JSON.stringify({
+      algorithm: algoId,
+      logScale,
+      zoom,
+      metersPerPixel: mergedParams._metersPerPixel,
+      params: mergedParams,
+      latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
+      pixelPoints,
+      interpPoints,
+    }));
+
     const minPoints = algo.minPoints ?? 1;
     const preparedState = interpPoints.length >= minPoints
       ? algo.prepare(interpPoints, mergedParams)
@@ -167,6 +179,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       this._bufferPx = bufferPx;
       const ctx2 = canvas.getContext('2d');
       if (ctx2) ctx2.clearRect(0, 0, canvasW, canvasH);
+      this.options.onMaxPoint?.(null);
       return;
     }
 
@@ -196,6 +209,30 @@ const InterpolationCanvasLayer = L.Layer.extend({
     if (ctx) {
       ctx.putImageData(imageData, 0, 0);
     }
+
+    // Report the grid-space maximum back to the caller so they can place a marker.
+    if (this.options.onMaxPoint) {
+      let maxVal = -Infinity;
+      let maxIdx = -1;
+      for (let i = 0; i < valueGrid.length; i++) {
+        const v = valueGrid[i];
+        if (!isNaN(v) && v > maxVal) {
+          maxVal = v;
+          maxIdx = i;
+        }
+      }
+      if (maxIdx >= 0) {
+        const gx = maxIdx % gridCols;
+        const gy = Math.floor(maxIdx / gridCols);
+        // Convert grid cell centre back to container coordinates (subtract bufferPx offset)
+        const cx = gx * blockSize + blockSize / 2 - bufferPx;
+        const cy = gy * blockSize + blockSize / 2 - bufferPx;
+        const latlng = map.containerPointToLatLng(L.point(cx, cy));
+        this.options.onMaxPoint({ latlng, value: maxVal });
+      } else {
+        this.options.onMaxPoint(null);
+      }
+    }
   },
 
   /** Look up the rendered interpolated value at a given lat/lng.
@@ -221,6 +258,8 @@ interface InterpolationOverlayProps {
   allValues: number[];
   /** Optional ref to the Leaflet layer for value lookups from click handlers */
   layerRef?: MutableRefObject<any>;
+  /** Called after each render with the grid-space maximum point, or null when unavailable */
+  onMaxPoint?: (info: { latlng: L.LatLng; value: number } | null) => void;
 }
 
 export default function InterpolationOverlay({
@@ -228,6 +267,7 @@ export default function InterpolationOverlay({
   config,
   allValues,
   layerRef,
+  onMaxPoint,
 }: InterpolationOverlayProps) {
   const context = useLeafletContext();
   const container = context.layerContainer || context.map;
@@ -257,6 +297,7 @@ export default function InterpolationOverlay({
       {
         radiusMeters: config.interpolationRadius ?? 30,
         opacity,
+        onMaxPoint,
       },
     ) as L.Layer;
 
@@ -269,9 +310,10 @@ export default function InterpolationOverlay({
         container.removeLayer(localLayerRef.current);
         localLayerRef.current = null;
         if (layerRef) layerRef.current = null;
+        onMaxPoint?.(null);
       }
     };
-  }, [container, points, config, allValues, layerRef]);
+  }, [container, points, config, allValues, layerRef, onMaxPoint]);
 
   return null;
 }
