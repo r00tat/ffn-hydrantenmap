@@ -331,7 +331,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       key: 'fullCanvasRender',
       label: 'Gesamte Karte rendern (Wolkenform über Messbereich hinaus)',
       type: 'boolean',
-      default: false,
+      default: true,
     },
   ],
 
@@ -345,7 +345,7 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     const depositionTimeConstant = typeof params.depositionTimeConstant === 'number' ? params.depositionTimeConstant : 0;
     const searchResolution = typeof params.searchResolution === 'number' ? params.searchResolution : 20;
     const metersPerPixel = typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
-    const fullCanvasRender = !!params.fullCanvasRender;
+    const fullCanvasRender = params.fullCanvasRender !== false; // default true
 
     const windDirRad = windFromDegreesToRad(windDir);
     // Convert minutes to seconds.
@@ -357,6 +357,15 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
     const tElapsed = (timeSinceRelease + predictionOffset) * 60;
     const depositionTau = depositionTimeConstant * 60;
 
+    // Guard: cannot fit a puff that hasn't been released yet.
+    if (tMeasured <= 0) {
+      return {
+        sourceX: 0, sourceY: 0, releaseQuantity: 0,
+        windDirRad, windSpeed, stabilityClass, releaseHeight,
+        tElapsed, depositionTau, metersPerPixel, fullCanvasRender,
+      };
+    }
+
     const estimate = estimatePuffSource(points, windDirRad, {
       windSpeed,
       stabilityClass,
@@ -366,10 +375,27 @@ export const puffAlgorithm: InterpolationAlgorithm<PuffState> = {
       tElapsed: tMeasured,
     });
 
+    // Sanity check: if the predicted peak at the puff center is unreasonably large
+    // compared to the highest measurement, the puff sigma is too small for the
+    // measurement spacing at this time (e.g. t=1 min → sigma ~22 m but markers
+    // hundreds of meters apart). Suppress rendering rather than show garbage values.
+    let releaseQuantity = estimate.releaseQuantity;
+    if (releaseQuantity > 0) {
+      const maxMeasValue = points.reduce((m, p) => Math.max(m, p.value), 0);
+      if (maxMeasValue > 0) {
+        const peakConc = gaussianPuff(windSpeed * tMeasured, 0, tMeasured, {
+          Q: releaseQuantity, windSpeed, stabilityClass, releaseHeight,
+        });
+        if (peakConc > maxMeasValue * 1e6) {
+          releaseQuantity = 0;
+        }
+      }
+    }
+
     return {
       sourceX: estimate.sourceX,
       sourceY: estimate.sourceY,
-      releaseQuantity: estimate.releaseQuantity,
+      releaseQuantity,
       windDirRad,
       windSpeed,
       stabilityClass,

@@ -185,6 +185,57 @@ describe('puffAlgorithm', () => {
     expect(puffAlgorithm.minPoints).toBeGreaterThanOrEqual(2);
   });
 
+  it('returns zero releaseQuantity when timeSinceRelease is 0 (puff not yet released)', () => {
+    const points: DataPoint[] = [
+      { x: 300, y: 0, value: 500 },
+      { x: 300, y: 30, value: 200 },
+    ];
+    const state = puffAlgorithm.prepare(points, {
+      windDirection: 270, windSpeed: 3, stabilityClass: 4, releaseHeight: 1,
+      timeSinceRelease: 0, predictionOffset: 0, depositionTimeConstant: 0,
+      searchResolution: 20, fullCanvasRender: true, _metersPerPixel: 1,
+    });
+    expect(state.releaseQuantity).toBe(0);
+  });
+
+  it('suppresses rendering when puff sigma is too small for measurement spacing (enormous Q)', () => {
+    // At t=1 min, sigma ~22 m but markers are 500+ m apart → Q blows up.
+    // The algorithm should return releaseQuantity=0 rather than rendering garbage.
+    const points: DataPoint[] = [
+      { x: 0,   y: 0,   value: 100 },
+      { x: 500, y: 0,   value: 500 },
+      { x: 500, y: 300, value: 100 },
+    ];
+    const state = puffAlgorithm.prepare(points, {
+      windDirection: 270, windSpeed: 3, stabilityClass: 4, releaseHeight: 1,
+      timeSinceRelease: 1, predictionOffset: 0, depositionTimeConstant: 0,
+      searchResolution: 20, fullCanvasRender: true, _metersPerPixel: 1,
+    });
+    // Either renders sensibly (peak ≤ 1e6 * max measurement) or suppresses
+    if (state.releaseQuantity > 0) {
+      const peak = puffAlgorithm.evaluate(state.sourceX + 60, state.sourceY, state);
+      expect(peak).toBeLessThanOrEqual(500 * 1e6);
+    }
+    // If suppressed, evaluate returns 0 everywhere
+    else {
+      expect(puffAlgorithm.evaluate(500, 0, state)).toBe(0);
+    }
+  });
+
+  it('fullCanvasRender defaults to true', () => {
+    const points: DataPoint[] = [
+      { x: 300, y: 0, value: 10 },
+      { x: 300, y: 30, value: 5 },
+    ];
+    const state = puffAlgorithm.prepare(points, {
+      windDirection: 270, windSpeed: 3, stabilityClass: 4, releaseHeight: 1,
+      timeSinceRelease: 10, predictionOffset: 0, depositionTimeConstant: 0,
+      searchResolution: 20, _metersPerPixel: 1,
+      // fullCanvasRender intentionally omitted — should default to true
+    });
+    expect(puffAlgorithm.fullCanvasRender!(state)).toBe(true);
+  });
+
   it('rendered peak with predictionOffset > 0 stays within reasonable range of measured values', () => {
     // Regression: Q must be fitted at timeSinceRelease, not timeSinceRelease+predictionOffset.
     // Before the fix, predictionOffset > 0 caused Q to be massively overestimated because
