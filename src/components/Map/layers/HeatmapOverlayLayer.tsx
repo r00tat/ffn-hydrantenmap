@@ -160,7 +160,7 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
       }
     }
 
-    // Sample at 50×50 grid
+    // Sample at 50×50 grid plus the exact measurement points
     const N = 50;
     const stepX = (maxX - minX) / Math.max(N - 1, 1);
     const stepY = (maxY - minY) / Math.max(N - 1, 1);
@@ -179,6 +179,16 @@ export default function HeatmapOverlayLayer({ layer, visible }: HeatmapOverlayLa
           bestX = x;
           bestY = y;
         }
+      }
+    }
+
+    // Also evaluate at exact measurement points so we never miss a peak
+    for (const pt of metricPoints) {
+      const v = (algo as any).evaluate(pt.x, pt.y, state) as number;
+      if (typeof v === 'number' && isFinite(v) && v > maxVal) {
+        maxVal = v;
+        bestX = pt.x;
+        bestY = pt.y;
       }
     }
 
