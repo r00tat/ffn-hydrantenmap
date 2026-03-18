@@ -113,5 +113,5 @@ export const useFirebaseDebugging = (): DebugLogging => {
       setDisplayMessages,
       messages,
     };
-  }, [displayMessages, messages]);
+  }, [displayMessages, setDisplayMessages, messages]);
 };

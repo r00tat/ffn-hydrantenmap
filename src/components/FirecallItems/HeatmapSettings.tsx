@@ -23,9 +23,9 @@ interface HeatmapSettingsProps {
   onChange: (config: HeatmapConfig | undefined) => void;
 }
 
-/** Number input that keeps its own string state so intermediate values (e.g. clearing
- *  "270" to type "0") don't snap back to the previous value. Commits to parent on
- *  every valid change and reverts on blur if the text is still invalid. */
+/** Number input that keeps its own string state while focused so intermediate
+ *  values (e.g. clearing "270" to type "0") don't snap back. When not focused,
+ *  displays the parent value directly. */
 function NumberParamInput({
   value,
   min,
@@ -39,41 +39,22 @@ function NumberParamInput({
   step: number;
   onChange: (v: number) => void;
 }) {
-  const [text, setText] = useState(String(value));
-  const prevValue = useRef(value);
-
-  useEffect(() => {
-    if (value !== prevValue.current) {
-      prevValue.current = value;
-      setText(String(value));
-    }
-  }, [value]);
+  const [editing, setEditing] = useState<string | null>(null);
 
   return (
     <TextField
       type="number"
       size="small"
-      value={text}
+      value={editing ?? String(value)}
+      onFocus={() => setEditing(String(value))}
       onChange={(e) => {
-        setText(e.target.value);
+        setEditing(e.target.value);
         const parsed = parseFloat(e.target.value);
         if (!isNaN(parsed)) {
-          const clamped = Math.max(min, Math.min(max, parsed));
-          prevValue.current = clamped;
-          onChange(clamped);
+          onChange(Math.max(min, Math.min(max, parsed)));
         }
       }}
-      onBlur={() => {
-        const parsed = parseFloat(text);
-        if (!isNaN(parsed)) {
-          const clamped = Math.max(min, Math.min(max, parsed));
-          prevValue.current = clamped;
-          setText(String(clamped));
-          onChange(clamped);
-        } else {
-          setText(String(prevValue.current));
-        }
-      }}
+      onBlur={() => setEditing(null)}
       inputProps={{ min, max, step }}
       sx={{ width: 90 }}
     />
