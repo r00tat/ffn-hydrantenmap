@@ -3,6 +3,7 @@
 import { useLeafletContext } from '@react-leaflet/core';
 import L from 'leaflet';
 import { MutableRefObject, useEffect, useRef } from 'react';
+import { useDebugLogging } from '../../../hooks/useDebugging';
 import { HeatmapConfig } from '../../firebase/firestore';
 import {
   buildColorLUT,
@@ -26,6 +27,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
   options: {
     radiusMeters: 30,
     opacity: 0.6,
+    logInfo: undefined as ((message: string, properties?: Record<string, any>) => Promise<void>) | undefined,
   },
 
   initialize(
@@ -160,18 +162,22 @@ const InterpolationCanvasLayer = L.Layer.extend({
       const p1 = map.containerPointToLatLng(L.point(1, 0));
       mergedParams._metersPerPixel = p0.distanceTo(p1);
     }
+    // Leaflet pixel coords have +y pointing south; signal to algorithms
+    mergedParams._yAxisSouth = true;
 
     // Debug: log interpolation input for diagnostics
-    console.log(JSON.stringify({
-      algorithm: algoId,
-      logScale,
-      zoom,
-      metersPerPixel: mergedParams._metersPerPixel,
-      params: mergedParams,
-      latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
-      pixelPoints,
-      interpPoints,
-    }));
+    if (this.options.logInfo) {
+      this.options.logInfo('Interpolation input', {
+        algorithm: algoId,
+        logScale,
+        zoom,
+        metersPerPixel: mergedParams._metersPerPixel,
+        params: mergedParams,
+        latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
+        pixelPoints,
+        interpPoints,
+      });
+    }
 
     const minPoints = algo.minPoints ?? 1;
     const preparedState = interpPoints.length >= minPoints
@@ -192,6 +198,11 @@ const InterpolationCanvasLayer = L.Layer.extend({
       return;
     }
 
+    // Physics-based algorithms (e.g. puff) can provide their own color scale range
+    // so the rendered peak maps to the hottest color rather than the measurement max.
+    const effectiveAllValues =
+      (algo.colorScaleValues ? algo.colorScaleValues(preparedState) : null) ?? this._allValues;
+
     // Compute convex hull for interior filling
     const hull = computeConvexHull(pixelPoints);
     const { imageData, valueGrid, gridCols } = buildInterpolationGrid({
@@ -203,7 +214,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
       opacity: this.options.opacity,
       colorLUT: this._colorLUT,
       config: this._config,
-      allValues: this._allValues,
+      allValues: effectiveAllValues,
       blockSize,
       algorithm: algo,
       state: preparedState,
@@ -255,6 +266,11 @@ export default function InterpolationOverlay({
   const context = useLeafletContext();
   const container = context.layerContainer || context.map;
   const localLayerRef = useRef<L.Layer | null>(null);
+  const { info } = useDebugLogging();
+  const infoRef = useRef(info);
+  useEffect(() => {
+    infoRef.current = info;
+  }, [info]);
 
   useEffect(() => {
     if (localLayerRef.current) {
@@ -280,6 +296,7 @@ export default function InterpolationOverlay({
       {
         radiusMeters: config.interpolationRadius ?? 30,
         opacity,
+        logInfo: (message: string, properties?: Record<string, any>) => infoRef.current(message, properties),
       },
     ) as L.Layer;
 

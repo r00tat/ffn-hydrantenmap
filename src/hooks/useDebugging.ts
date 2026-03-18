@@ -4,7 +4,9 @@ import {
   Dispatch,
   SetStateAction,
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -58,7 +60,23 @@ export const useLoggingError = () => {
 
 export const useFirebaseDebugging = (): DebugLogging => {
   const [messages, setMessages] = useState<DebugMessage[]>([]);
-  const [displayMessages, setDisplayMessages] = useState(false);
+  const [displayMessages, setDisplayMessagesState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('debugDisplayMessages') === 'true';
+    }
+    return false;
+  });
+
+  const setDisplayMessages: Dispatch<SetStateAction<boolean>> = useCallback(
+    (action) => {
+      setDisplayMessagesState((prev) => {
+        const next = typeof action === 'function' ? action(prev) : action;
+        localStorage.setItem('debugDisplayMessages', String(next));
+        return next;
+      });
+    },
+    [],
+  );
 
   return useMemo((): DebugLogging => {
     const analytics = getAnalytics(app);
@@ -95,5 +113,5 @@ export const useFirebaseDebugging = (): DebugLogging => {
       setDisplayMessages,
       messages,
     };
-  }, [displayMessages, messages]);
+  }, [displayMessages, setDisplayMessages, messages]);
 };

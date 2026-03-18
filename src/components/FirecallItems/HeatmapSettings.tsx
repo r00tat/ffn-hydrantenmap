@@ -13,7 +13,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAlgorithm, getAlgorithmList } from '../../common/interpolation';
 import { DataSchemaField, HeatmapConfig } from '../firebase/firestore';
 
@@ -21,6 +21,44 @@ interface HeatmapSettingsProps {
   config: HeatmapConfig | undefined;
   dataSchema: DataSchemaField[];
   onChange: (config: HeatmapConfig | undefined) => void;
+}
+
+/** Number input that keeps its own string state while focused so intermediate
+ *  values (e.g. clearing "270" to type "0") don't snap back. When not focused,
+ *  displays the parent value directly. */
+function NumberParamInput({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+
+  return (
+    <TextField
+      type="number"
+      size="small"
+      value={editing ?? String(value)}
+      onFocus={() => setEditing(String(value))}
+      onChange={(e) => {
+        setEditing(e.target.value);
+        const parsed = parseFloat(e.target.value);
+        if (!isNaN(parsed)) {
+          onChange(Math.max(min, Math.min(max, parsed)));
+        }
+      }}
+      onBlur={() => setEditing(null)}
+      inputProps={{ min, max, step }}
+      sx={{ width: 90 }}
+    />
+  );
 }
 
 const defaultConfig: HeatmapConfig = {
@@ -338,12 +376,23 @@ export default function HeatmapSettings({
                           );
                         }
 
-                        // number type → Slider
+                        // number type → Slider + text input
                         return (
                           <Box key={param.key}>
-                            <Typography variant="body2" gutterBottom>
-                              {param.label}: {value as number}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                              <Typography variant="body2" sx={{ flex: 1 }}>
+                                {param.label}
+                              </Typography>
+                              <NumberParamInput
+                                value={value as number}
+                                min={param.min ?? 0}
+                                max={param.max ?? 1e9}
+                                step={param.step ?? 1}
+                                onChange={(v) =>
+                                  update({ interpolationParams: { ...savedParams, [param.key]: v } })
+                                }
+                              />
+                            </Box>
                             <Slider
                               value={value as number}
                               onChange={(_, val) =>

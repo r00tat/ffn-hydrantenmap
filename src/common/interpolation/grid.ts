@@ -7,7 +7,7 @@
 import { HeatmapConfig } from '../../components/firebase/firestore';
 import { normalizeValueFull } from '../heatmap';
 import type { DataPoint, InterpolationAlgorithm, Point2D } from './types';
-import { buildSpatialIndex, pointInPolygon } from './utils';
+import { buildSpatialIndex, distanceToPolygonEdge, pointInPolygon } from './utils';
 
 /**
  * Build the full interpolation grid as an ImageData.
@@ -76,11 +76,9 @@ export function buildInterpolationGrid(params: {
     if (interpAllValues[i] < dataMinVal) dataMinVal = interpAllValues[i];
   }
 
-  // Build spatial index for fast neighbor queries (boundary checks).
+  // Build spatial index for fast neighbor queries (outside-hull boundary checks).
   // This is separate from any index the algorithm builds internally.
   const spatialIndex = buildSpatialIndex(interpPoints);
-  // Max proximity for interior hull cells
-  const interiorMaxDist = bufferPx * 3;
 
   const fcr = algorithm.fullCanvasRender;
   const fullCanvas = typeof fcr === 'function' ? fcr(state) : !!fcr;
@@ -91,9 +89,6 @@ export function buildInterpolationGrid(params: {
       const cy = by + blockSize / 2;
 
       let alpha = 1.0;
-      let isOutsideHull = false;
-      let nearestOutsideValue: number | null = null;
-      let localMin = -Infinity;
 
       if (fullCanvas) {
         // No hull/proximity clipping — render every pixel.
@@ -113,60 +108,19 @@ export function buildInterpolationGrid(params: {
       } else {
         const insideHull = pointInPolygon(cx, cy, hull);
 
-        if (insideHull) {
-          const nearbyIds = spatialIndex.within(cx, cy, interiorMaxDist);
-          if (nearbyIds.length === 0) continue;
-
-          let nearestDistSq = Infinity;
-          let lMin = Infinity;
-          for (let i = 0; i < nearbyIds.length; i++) {
-            const pt = interpPoints[nearbyIds[i]];
-            const dx = cx - pt.x;
-            const dy = cy - pt.y;
-            const dSq = dx * dx + dy * dy;
-            if (dSq < nearestDistSq) nearestDistSq = dSq;
-            if (pt.value < lMin) lMin = pt.value;
-          }
-          const nearestDist = Math.sqrt(nearestDistSq);
-          localMin = lMin;
-
-          if (nearestDist > bufferPx) {
-            alpha = 1 - (nearestDist - bufferPx) / (interiorMaxDist - bufferPx);
-          }
-        } else {
-          isOutsideHull = true;
-          const nearbyIds = spatialIndex.within(cx, cy, bufferPx);
-          if (nearbyIds.length === 0) continue;
-
-          let nearestDistSq = Infinity;
-          let nearestIdx = nearbyIds[0];
-          for (let i = 0; i < nearbyIds.length; i++) {
-            const pt = points[nearbyIds[i]];
-            const dx = cx - pt.x;
-            const dy = cy - pt.y;
-            const dSq = dx * dx + dy * dy;
-            if (dSq < nearestDistSq) {
-              nearestDistSq = dSq;
-              nearestIdx = nearbyIds[i];
-            }
-          }
-          const nearestDist = Math.sqrt(nearestDistSq);
-          alpha = 1 - nearestDist / bufferPx;
-          nearestOutsideValue = interpPoints[nearestIdx].value;
+        if (!insideHull) {
+          // Outside hull: fade based on distance to hull edge
+          const distToHull = distanceToPolygonEdge(cx, cy, hull);
+          if (distToHull > bufferPx) continue;
+          alpha = 1 - distToHull / bufferPx;
         }
+        // Inside hull: alpha stays 1.0
       }
 
-      // Compute interpolated value
-      let value: number;
-      if (isOutsideHull) {
-        const nearest = nearestOutsideValue!;
-        value = dataMinVal + alpha * (nearest - dataMinVal);
-      } else {
-        value = algorithm.evaluate(cx, cy, state);
-        if (localMin !== -Infinity) {
-          value = Math.max(localMin, value);
-        }
-      }
+      // Compute interpolated value (same algorithm everywhere for smooth transition)
+      let value = algorithm.evaluate(cx, cy, state);
+      // Clamp to global data minimum to prevent TPS undershoot
+      value = Math.max(dataMinVal, value);
       // Transform back from log space before normalization.
       if (logScale) value = Math.exp(value);
 

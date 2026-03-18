@@ -25,6 +25,14 @@ const SZ_COEFFS: [number, number][] = [
 const MIN_SIGMA = 0.1;
 
 /**
+ * Minimum effective distance (meters) for dispersion coefficient computation.
+ * The Gaussian model is not valid at sub-meter distances; using a floor of 10m
+ * prevents the near-source singularity (tiny sigma → extreme concentration)
+ * and ensures a smooth, physically reasonable near-field region.
+ */
+const MIN_NEAR_FIELD = 10;
+
+/**
  * Compute the lateral (crosswind) dispersion coefficient sigma_y
  * using Pasquill-Gifford parameterization.
  *
@@ -66,28 +74,61 @@ export interface GaussianPlumeParams {
  * Simplified model without ground reflection — the estimated Q absorbs the
  * factor of 2 for ground-level releases (H=0). For elevated releases (H>0)
  * the model underpredicts by ~2x compared to the standard formulation.
+ *
+ * Downwind branch uses max(MIN_NEAR_FIELD, downwind) for sigma computation,
+ * preserving classical Gaussian plume physics while preventing the near-source
+ * singularity. Upwind branch uses max(MIN_NEAR_FIELD, total_distance) with an
+ * additional along-wind Gaussian decay (sigma_x) for pressure-driven and
+ * turbulent near-source dispersion.
  */
 export function gaussianPlume(
   downwind: number,
   crosswind: number,
   params: GaussianPlumeParams
 ): number {
-  if (downwind <= 0) return 0;
-
   const { Q, windSpeed, stabilityClass, releaseHeight } = params;
   const u = Math.max(0.1, windSpeed);
 
-  const sigmaY = pasquillSigmaY(downwind, stabilityClass);
-  const sigmaZ = pasquillSigmaZ(downwind, stabilityClass);
+  if (downwind > 0) {
+    // Classical Gaussian plume. Floor downwind at MIN_NEAR_FIELD to prevent
+    // the near-source singularity (tiny sigma → extreme concentration).
+    const dw = Math.max(MIN_NEAR_FIELD, downwind);
+    const sigmaY = pasquillSigmaY(dw, stabilityClass);
+    const sigmaZ = pasquillSigmaZ(dw, stabilityClass);
 
+    const crosswindTerm = Math.exp(
+      -(crosswind * crosswind) / (2 * sigmaY * sigmaY)
+    );
+    const verticalTerm = Math.exp(
+      -(releaseHeight * releaseHeight) / (2 * sigmaZ * sigmaZ)
+    );
+
+    return (Q / (2 * Math.PI * u * sigmaY * sigmaZ)) * crosswindTerm * verticalTerm;
+  }
+
+  // Upwind or at source (downwind <= 0): along-wind diffusion.
+  // Use total distance from source for dispersion coefficients.
+  const dist = Math.sqrt(downwind * downwind + crosswind * crosswind);
+  const dEff = Math.max(MIN_NEAR_FIELD, dist);
+
+  const sigmaY = pasquillSigmaY(dEff, stabilityClass);
+  const sigmaZ = pasquillSigmaZ(dEff, stabilityClass);
+  // sigma_x grows with sqrt(distance) and shrinks with sqrt(wind speed),
+  // modeling stronger upwind diffusion at low wind speeds.
+  const sigmaX = (3 * Math.sqrt(dEff)) / Math.sqrt(u);
+
+  const baseTerm = Q / (2 * Math.PI * u * sigmaY * sigmaZ);
   const crosswindTerm = Math.exp(
     -(crosswind * crosswind) / (2 * sigmaY * sigmaY)
   );
   const verticalTerm = Math.exp(
     -(releaseHeight * releaseHeight) / (2 * sigmaZ * sigmaZ)
   );
+  const alongWindTerm = Math.exp(
+    -(downwind * downwind) / (2 * sigmaX * sigmaX)
+  );
 
-  return (Q / (2 * Math.PI * u * sigmaY * sigmaZ)) * crosswindTerm * verticalTerm;
+  return baseTerm * crosswindTerm * verticalTerm * alongWindTerm;
 }
 
 export interface SourceEstimate {
@@ -105,6 +146,8 @@ interface SearchParams {
   searchResolution: number;
   /** Real-world scale: meters per pixel (injected by InterpolationOverlay) */
   metersPerPixel: number;
+  /** true when y-axis points south (Leaflet pixel coords) */
+  yFlip?: boolean;
 }
 
 /**
@@ -116,13 +159,22 @@ function toWindCoords(
   py: number,
   srcX: number,
   srcY: number,
-  windDirRad: number
+  windDirRad: number,
+  yFlip: boolean
 ): [number, number] {
   const dx = px - srcX;
-  const dy = py - srcY;
+  // When y-axis points south (Leaflet pixels), negate to get standard math coords (+y = north)
+  const dy = (yFlip ? -(py - srcY) : (py - srcY));
   const downwind = dx * Math.sin(windDirRad) + dy * Math.cos(windDirRad);
   const crosswind = dx * Math.cos(windDirRad) - dy * Math.sin(windDirRad);
   return [downwind, crosswind];
+}
+
+/** Correction factor at a measurement point: ratio of measured to model-predicted value. */
+interface CorrectionPoint {
+  x: number;
+  y: number;
+  ratio: number;
 }
 
 interface SteState {
@@ -137,6 +189,12 @@ interface SteState {
   metersPerPixel: number;
   /** Whether to render the full canvas (user-selectable via param) */
   fullCanvasRender: boolean;
+  /** true when y-axis points south (Leaflet pixel coords) */
+  yFlip: boolean;
+  /** IDW correction factors at measurement locations to honor measured values */
+  corrections: CorrectionPoint[];
+  /** Maximum measured value — used for color scale */
+  maxMeasuredValue: number;
 }
 
 /**
@@ -144,7 +202,7 @@ interface SteState {
  * 0=N, 90=E, clockwise) to radians in compass-bearing convention used by
  * toWindCoords (0=north, PI/2=east).
  */
-function windFromDegreesToRad(degrees: number): number {
+export function windFromDegreesToRad(degrees: number): number {
   // Meteorological "from" + 180 = "towards" direction in compass degrees
   const towardsDeg = (degrees + 180) % 360;
   return (towardsDeg * Math.PI) / 180;
@@ -164,32 +222,35 @@ export function estimateSource(
     return { sourceX: 0, sourceY: 0, releaseRate: 0, error: Infinity };
   }
 
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
-  for (const p of points) {
+  const mpp = Math.max(params.metersPerPixel, 1e-6);
+
+  // Convert to centroid-relative meter-space for stable grid search
+  // (same approach as puff). Relative positions are viewport-independent.
+  const centXPx = points.reduce((s, p) => s + p.x, 0) / points.length;
+  const centYPx = points.reduce((s, p) => s + p.y, 0) / points.length;
+  const ySign = params.yFlip ? -1 : 1;
+  const meterPoints: DataPoint[] = points.map(p => ({
+    x: (p.x - centXPx) * mpp,
+    y: ySign * (p.y - centYPx) * mpp,
+    value: p.value,
+  }));
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of meterPoints) {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y);
     maxY = Math.max(maxY, p.y);
   }
 
-  const extent = Math.max(maxX - minX, maxY - minY, 100);
-  const buffer = extent * 1.5;
-  minX -= buffer;
-  maxX += buffer;
-  minY -= buffer;
-  maxY += buffer;
+  const extent = Math.max(maxX - minX, maxY - minY, 100 * mpp);
+  const buffer = extent * 1.0;
+  const res = params.searchResolution; // already in meters
 
-  // Convert search resolution from meters to pixels
-  const mpp = Math.max(params.metersPerPixel, 1e-6);
-  const res = params.searchResolution / mpp;
-  // Align grid to multiples of res so that origin (0,0) is always a grid point
-  minX = Math.floor(minX / res) * res;
-  maxX = Math.ceil(maxX / res) * res;
-  minY = Math.floor(minY / res) * res;
-  maxY = Math.ceil(maxY / res) * res;
+  const gMinX = Math.floor((minX - buffer) / res) * res;
+  const gMaxX = Math.ceil((maxX + buffer) / res) * res;
+  const gMinY = Math.floor((minY - buffer) / res) * res;
+  const gMaxY = Math.ceil((maxY + buffer) / res) * res;
 
   const plumeParams: GaussianPlumeParams = {
     Q: 1,
@@ -198,11 +259,8 @@ export function estimateSource(
     releaseHeight: params.releaseHeight,
   };
 
-  // Floor used only for the error term on zero measurements: keeps
-  // log-space error finite while still penalising high predicted
-  // concentrations at locations where the observed value is zero.
   let maxMeasurement = 0;
-  for (const p of points) {
+  for (const p of meterPoints) {
     if (p.value > maxMeasurement) maxMeasurement = p.value;
   }
   const dataFloor = Math.max(maxMeasurement * 0.001, 1e-9);
@@ -212,53 +270,39 @@ export function estimateSource(
   let bestY = 0;
   let bestQ = 0;
 
-  for (let cx = minX; cx <= maxX; cx += res) {
-    for (let cy = minY; cy <= maxY; cy += res) {
-      let valid = true;
+  for (let cx = gMinX; cx <= gMaxX; cx += res) {
+    for (let cy = gMinY; cy <= gMaxY; cy += res) {
       const unitConcs: number[] = [];
-      for (const p of points) {
-        const [downwindPx, crosswindPx] = toWindCoords(
-          p.x,
-          p.y,
-          cx,
-          cy,
-          windDirRad
-        );
-        // Scale pixel distances to meters for the Gaussian Plume model
-        const downwind = downwindPx * mpp;
-        const crosswind = crosswindPx * mpp;
+      for (const p of meterPoints) {
+        // Already in meter-space with +y = north, no yFlip needed
+        const downwind = (p.x - cx) * Math.sin(windDirRad) + (p.y - cy) * Math.cos(windDirRad);
+        const crosswind = (p.x - cx) * Math.cos(windDirRad) - (p.y - cy) * Math.sin(windDirRad);
         const c = gaussianPlume(downwind, crosswind, plumeParams);
         unitConcs.push(c);
-        if (c <= 0) {
-          valid = false;
-          break;
-        }
       }
 
-      if (!valid) continue;
-
-      // Estimate Q from positive measurements only: zero readings tell us
-      // about source position (via the valid check above) but not Q magnitude.
       let sumLogRatio = 0;
-      let posCount = 0;
-      for (let i = 0; i < points.length; i++) {
-        if (points[i].value <= 0) continue;
-        sumLogRatio +=
-          Math.log(points[i].value) - Math.log(unitConcs[i]);
-        posCount++;
+      let totalWeight = 0;
+      for (let i = 0; i < meterPoints.length; i++) {
+        if (meterPoints[i].value <= 0 || unitConcs[i] <= 0) continue;
+        const w = meterPoints[i].value / maxMeasurement;
+        sumLogRatio += w * (Math.log(meterPoints[i].value) - Math.log(unitConcs[i]));
+        totalWeight += w;
       }
-      if (posCount === 0) continue;
-      const logQ = sumLogRatio / posCount;
-      const Q = Math.exp(logQ);
-
+      if (totalWeight === 0) continue;
+      const Q = Math.exp(sumLogRatio / totalWeight);
       if (Q <= 0) continue;
 
       let error = 0;
-      for (let i = 0; i < points.length; i++) {
+      for (let i = 0; i < meterPoints.length; i++) {
         const logPred = Math.log(Q * unitConcs[i]);
-        const logObs = Math.log(Math.max(points[i].value, dataFloor));
+        const logObs = Math.log(Math.max(meterPoints[i].value, dataFloor));
         const diff = logPred - logObs;
-        error += diff * diff;
+        // Weight by squared measurement fraction: high-value points strongly
+        // pull the source toward them, preventing drift to distant positions
+        // where the model can fit all points with a "flat" plume.
+        const w = meterPoints[i].value / maxMeasurement;
+        error += w * diff * diff;
       }
 
       if (error < bestError) {
@@ -270,9 +314,10 @@ export function estimateSource(
     }
   }
 
+  // Convert from meter-space back to input coordinate space
   return {
-    sourceX: bestX,
-    sourceY: bestY,
+    sourceX: centXPx + bestX / mpp,
+    sourceY: centYPx + ySign * bestY / mpp,
     releaseRate: bestQ,
     error: bestError,
   };
@@ -291,7 +336,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       min: 0,
       max: 360,
       step: 5,
-      default: 270,
+      default: 0,
     },
     {
       key: 'windSpeed',
@@ -338,12 +383,12 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       key: 'fullCanvasRender',
       label: 'Gesamte Karte rendern (Fahnenform über Messbereich hinaus)',
       type: 'boolean',
-      default: false,
+      default: true,
     },
   ],
 
   prepare(points: DataPoint[], params: Record<string, number | boolean>): SteState {
-    const windDir = typeof params.windDirection === 'number' ? params.windDirection : 270;
+    const windDir = typeof params.windDirection === 'number' ? params.windDirection : 0;
     const windSpeed = typeof params.windSpeed === 'number' ? params.windSpeed : 3;
     const stabilityClass =
       typeof params.stabilityClass === 'number' ? params.stabilityClass : 4;
@@ -356,6 +401,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     const metersPerPixel =
       typeof params._metersPerPixel === 'number' ? params._metersPerPixel : 1;
     const fullCanvasRender = !!params.fullCanvasRender;
+    const yFlip = params._yAxisSouth === true;
 
     const windDirRad = windFromDegreesToRad(windDir);
 
@@ -365,7 +411,35 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       releaseHeight,
       searchResolution,
       metersPerPixel,
+      yFlip,
     });
+
+    // Compute multiplicative correction factors at each measurement point.
+    // The Gaussian plume model can't perfectly fit all measurements, so we
+    // store the ratio (measured / predicted) at each point and IDW-interpolate
+    // it during evaluate(). This ensures the rendered values honor measurements
+    // at marker locations while preserving the plume shape elsewhere.
+    const corrections: CorrectionPoint[] = [];
+    if (estimate.releaseRate >= 1.0) {
+      const mpp = Math.max(metersPerPixel, 1e-6);
+      const plumeParams: GaussianPlumeParams = {
+        Q: estimate.releaseRate,
+        windSpeed,
+        stabilityClass,
+        releaseHeight,
+      };
+      for (const p of points) {
+        const [dwPx, cwPx] = toWindCoords(
+          p.x, p.y, estimate.sourceX, estimate.sourceY, windDirRad, yFlip
+        );
+        const predicted = gaussianPlume(dwPx * mpp, cwPx * mpp, plumeParams);
+        if (predicted > 0 && p.value > 0) {
+          // Clamp ratio to prevent extreme amplification from model-measurement mismatch
+          const ratio = Math.max(0.1, Math.min(10, p.value / predicted));
+          corrections.push({ x: p.x, y: p.y, ratio });
+        }
+      }
+    }
 
     return {
       sourceX: estimate.sourceX,
@@ -377,6 +451,9 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       releaseHeight,
       metersPerPixel,
       fullCanvasRender,
+      yFlip,
+      corrections,
+      maxMeasuredValue: Math.max(...points.map(p => p.value), 0),
     };
   },
 
@@ -384,24 +461,71 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     return state.fullCanvasRender;
   },
 
+  peakPoint(state: SteState) {
+    if (state.releaseRate < 1.0) return null;
+    const mpp = Math.max(state.metersPerPixel, 1e-6);
+    const ySign = state.yFlip ? -1 : 1;
+    const plumeParams: GaussianPlumeParams = {
+      Q: state.releaseRate,
+      windSpeed: state.windSpeed,
+      stabilityClass: state.stabilityClass,
+      releaseHeight: state.releaseHeight,
+    };
+    // Sample downwind distances to find the centerline peak.
+    // For elevated releases, the peak is at some distance where σz ≈ H/√2.
+    let bestConc = 0;
+    let bestDist = 0;
+    for (let d = MIN_NEAR_FIELD; d <= 5000; d += Math.max(1, d * 0.05)) {
+      const c = gaussianPlume(d, 0, plumeParams);
+      if (c > bestConc) { bestConc = c; bestDist = d; }
+    }
+    if (bestConc <= 0) return null;
+    // Convert downwind distance to pixel offset from source
+    const dPx = bestDist / mpp;
+    const x = state.sourceX + Math.sin(state.windDirRad) * dPx;
+    const y = state.sourceY + ySign * Math.cos(state.windDirRad) * dPx;
+    // Cap displayed value at measured maximum — the theoretical plume peak
+    // can be orders of magnitude higher than real measurements.
+    return { x, y, value: Math.min(bestConc, state.maxMeasuredValue) };
+  },
+
+  colorScaleValues(state: SteState) {
+    if (state.releaseRate < 1.0) return null;
+    // Use measured maximum for the color scale. The theoretical plume peak
+    // can be orders of magnitude higher than actual measurements (especially
+    // when the source is estimated far from the data cluster), which would
+    // compress all meaningful values into an invisible fraction of the scale.
+    if (state.maxMeasuredValue <= 0) return null;
+    return [0, state.maxMeasuredValue];
+  },
+
   evaluate(x: number, y: number, state: SteState): number {
-    // When source estimation failed (releaseRate=0), return 0 — no overlay.
-    // Showing interpolated values here would imply a valid result when none was found.
     if (state.releaseRate < 1.0) return 0;
 
     const mpp = Math.max(state.metersPerPixel, 1e-6);
-    const dx = x - state.sourceX;
-    const dy = y - state.sourceY;
-    const downwind =
-      (dx * Math.sin(state.windDirRad) + dy * Math.cos(state.windDirRad)) * mpp;
-    const crosswind =
-      (dx * Math.cos(state.windDirRad) - dy * Math.sin(state.windDirRad)) * mpp;
-
-    return gaussianPlume(downwind, crosswind, {
+    const [dwPx, cwPx] = toWindCoords(x, y, state.sourceX, state.sourceY, state.windDirRad, state.yFlip);
+    const raw = gaussianPlume(dwPx * mpp, cwPx * mpp, {
       Q: state.releaseRate,
       windSpeed: state.windSpeed,
       stabilityClass: state.stabilityClass,
       releaseHeight: state.releaseHeight,
     });
+
+    if (raw <= 0 || state.corrections.length === 0) return raw;
+
+    // IDW-interpolate correction factors from measurement points.
+    // At measurement locations the corrected value equals the measurement;
+    // away from measurements the plume shape is preserved.
+    let wSum = 0;
+    let wrSum = 0;
+    for (const c of state.corrections) {
+      const d2 = (x - c.x) ** 2 + (y - c.y) ** 2;
+      if (d2 < 1e-10) return raw * c.ratio;
+      const w = 1 / (d2 * d2); // power=4 for sharp local correction
+      wSum += w;
+      wrSum += w * c.ratio;
+    }
+
+    return raw * (wrSum / wSum);
   },
 };
