@@ -3,6 +3,7 @@
 import { useLeafletContext } from '@react-leaflet/core';
 import L from 'leaflet';
 import { MutableRefObject, useEffect, useRef } from 'react';
+import { useDebugLogging } from '../../../hooks/useDebugging';
 import { HeatmapConfig } from '../../firebase/firestore';
 import {
   buildColorLUT,
@@ -26,6 +27,7 @@ const InterpolationCanvasLayer = L.Layer.extend({
   options: {
     radiusMeters: 30,
     opacity: 0.6,
+    logInfo: undefined as ((message: string, properties?: Record<string, any>) => Promise<void>) | undefined,
   },
 
   initialize(
@@ -164,16 +166,18 @@ const InterpolationCanvasLayer = L.Layer.extend({
     mergedParams._yAxisSouth = true;
 
     // Debug: log interpolation input for diagnostics
-    console.log(JSON.stringify({
-      algorithm: algoId,
-      logScale,
-      zoom,
-      metersPerPixel: mergedParams._metersPerPixel,
-      params: mergedParams,
-      latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
-      pixelPoints,
-      interpPoints,
-    }));
+    if (this.options.logInfo) {
+      this.options.logInfo('Interpolation input', {
+        algorithm: algoId,
+        logScale,
+        zoom,
+        metersPerPixel: mergedParams._metersPerPixel,
+        params: mergedParams,
+        latlngs: this._latlngs.map((ll: any) => ({ lat: ll.lat, lng: ll.lng, value: ll.value })),
+        pixelPoints,
+        interpPoints,
+      });
+    }
 
     const minPoints = algo.minPoints ?? 1;
     const preparedState = interpPoints.length >= minPoints
@@ -262,6 +266,11 @@ export default function InterpolationOverlay({
   const context = useLeafletContext();
   const container = context.layerContainer || context.map;
   const localLayerRef = useRef<L.Layer | null>(null);
+  const { info } = useDebugLogging();
+  const infoRef = useRef(info);
+  useEffect(() => {
+    infoRef.current = info;
+  }, [info]);
 
   useEffect(() => {
     if (localLayerRef.current) {
@@ -287,6 +296,7 @@ export default function InterpolationOverlay({
       {
         radiusMeters: config.interpolationRadius ?? 30,
         opacity,
+        logInfo: (message: string, properties?: Record<string, any>) => infoRef.current(message, properties),
       },
     ) as L.Layer;
 
