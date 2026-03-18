@@ -193,6 +193,8 @@ interface SteState {
   yFlip: boolean;
   /** IDW correction factors at measurement locations to honor measured values */
   corrections: CorrectionPoint[];
+  /** Maximum measured value — used for color scale */
+  maxMeasuredValue: number;
 }
 
 /**
@@ -242,7 +244,7 @@ export function estimateSource(
   }
 
   const extent = Math.max(maxX - minX, maxY - minY, 100 * mpp);
-  const buffer = extent * 1.5;
+  const buffer = extent * 1.0;
   const res = params.searchResolution; // already in meters
 
   const gMinX = Math.floor((minX - buffer) / res) * res;
@@ -280,14 +282,15 @@ export function estimateSource(
       }
 
       let sumLogRatio = 0;
-      let posCount = 0;
+      let totalWeight = 0;
       for (let i = 0; i < meterPoints.length; i++) {
         if (meterPoints[i].value <= 0 || unitConcs[i] <= 0) continue;
-        sumLogRatio += Math.log(meterPoints[i].value) - Math.log(unitConcs[i]);
-        posCount++;
+        const w = meterPoints[i].value / maxMeasurement;
+        sumLogRatio += w * (Math.log(meterPoints[i].value) - Math.log(unitConcs[i]));
+        totalWeight += w;
       }
-      if (posCount === 0) continue;
-      const Q = Math.exp(sumLogRatio / posCount);
+      if (totalWeight === 0) continue;
+      const Q = Math.exp(sumLogRatio / totalWeight);
       if (Q <= 0) continue;
 
       let error = 0;
@@ -295,7 +298,11 @@ export function estimateSource(
         const logPred = Math.log(Q * unitConcs[i]);
         const logObs = Math.log(Math.max(meterPoints[i].value, dataFloor));
         const diff = logPred - logObs;
-        error += diff * diff;
+        // Weight by squared measurement fraction: high-value points strongly
+        // pull the source toward them, preventing drift to distant positions
+        // where the model can fit all points with a "flat" plume.
+        const w = meterPoints[i].value / maxMeasurement;
+        error += w * diff * diff;
       }
 
       if (error < bestError) {
@@ -446,6 +453,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
       fullCanvasRender,
       yFlip,
       corrections,
+      maxMeasuredValue: Math.max(...points.map(p => p.value), 0),
     };
   },
 
@@ -476,32 +484,19 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     const dPx = bestDist / mpp;
     const x = state.sourceX + Math.sin(state.windDirRad) * dPx;
     const y = state.sourceY + ySign * Math.cos(state.windDirRad) * dPx;
-    return { x, y, value: bestConc };
+    // Cap displayed value at measured maximum — the theoretical plume peak
+    // can be orders of magnitude higher than real measurements.
+    return { x, y, value: Math.min(bestConc, state.maxMeasuredValue) };
   },
 
   colorScaleValues(state: SteState) {
     if (state.releaseRate < 1.0) return null;
-    const plumeParams: GaussianPlumeParams = {
-      Q: state.releaseRate,
-      windSpeed: state.windSpeed,
-      stabilityClass: state.stabilityClass,
-      releaseHeight: state.releaseHeight,
-    };
-    // Find raw peak on centerline
-    let rawPeak = 0;
-    for (let d = MIN_NEAR_FIELD; d <= 5000; d += Math.max(1, d * 0.05)) {
-      const c = gaussianPlume(d, 0, plumeParams);
-      if (c > rawPeak) rawPeak = c;
-    }
-    // The correction factors can push values above the raw peak,
-    // so use the max correction-adjusted value if it's higher.
-    let correctedPeak = rawPeak;
-    for (const c of state.corrections) {
-      const adjusted = rawPeak * c.ratio;
-      if (adjusted > correctedPeak) correctedPeak = adjusted;
-    }
-    if (correctedPeak <= 0) return null;
-    return [0, correctedPeak];
+    // Use measured maximum for the color scale. The theoretical plume peak
+    // can be orders of magnitude higher than actual measurements (especially
+    // when the source is estimated far from the data cluster), which would
+    // compress all meaningful values into an invisible fraction of the scale.
+    if (state.maxMeasuredValue <= 0) return null;
+    return [0, state.maxMeasuredValue];
   },
 
   evaluate(x: number, y: number, state: SteState): number {
