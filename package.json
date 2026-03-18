@@ -102,7 +102,7 @@
   "overrides": {
     "firebase": "12.10.0",
     "@types/react": "19.2.14",
-    "fast-xml-parser": "5.5.3",
+    "fast-xml-parser": "5.5.6",
     "minimatch": "10.2.4",
     "http-proxy-agent": "^7.0.0"
   }
