@@ -16,38 +16,35 @@ import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useVehicles from '../../hooks/useVehicles';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
-import { FirecallItem, Fzg } from '../firebase/firestore';
+import { FirecallItem } from '../firebase/firestore';
 import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { getItemInstance } from '../FirecallItems/elements';
 import StrengthTable from './StrengthTable';
+import { calculateStrength } from './fahrzeuge-utils';
 
-function downloadVehicles(vehicles: Fzg[]) {
+function downloadEinsatzmittel(items: FirecallItem[]) {
+  const { rows } = calculateStrength(items);
   downloadRowsAsCsv(
     [
-      [
-        'Bezeichnung',
-        'Feuerwehr',
-        'Besatzung',
-        'ATS',
-        'Beschreibung',
-        'Alarmierung',
-        'Eintreffen',
-        'Abrücken',
-      ],
-      ...vehicles.map((v) => [
-        v.name,
-        v.fw,
-        v.besatzung ? Number.parseInt(v.besatzung, 10) + 1 : 1,
-        v.ats,
-        v.beschreibung,
-        v.alarmierung ? formatTimestamp(v.alarmierung) : '',
-        v.eintreffen ? formatTimestamp(v.eintreffen) : '',
-        v.abruecken ? formatTimestamp(v.abruecken) : '',
-      ]),
+      ['Bezeichnung', 'Feuerwehr', 'Typ', 'Stärke', 'ATS', 'Beschreibung', 'Alarmierung', 'Eintreffen', 'Abrücken'],
+      ...rows.map((r) => {
+        const item = items.find((i) => i.name === r.name);
+        return [
+          r.name,
+          r.fw,
+          r.typ,
+          r.mann,
+          r.ats,
+          item?.beschreibung || '',
+          r.alarmierung ? formatTimestamp(r.alarmierung) : '',
+          r.eintreffen ? formatTimestamp(r.eintreffen) : '',
+          r.abruecken ? formatTimestamp(r.abruecken) : '',
+        ];
+      }),
     ],
-    'Fahrzeuge.csv',
+    'Einsatzmittel.csv',
   );
 }
 
@@ -246,8 +243,8 @@ export default function Fahrzeuge() {
       <Typography variant="h3" gutterBottom>
         {totalItems} Einsatzmittel ({vehicles.length} Fahrzeuge){' '}
         <DownloadButton
-          tooltip="Fahrzeuge als CSV herunterladen"
-          onClick={() => downloadVehicles(vehicles)}
+          tooltip="Einsatzmittel als CSV herunterladen"
+          onClick={() => downloadEinsatzmittel(displayItems)}
         />
       </Typography>
 
