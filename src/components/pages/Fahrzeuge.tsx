@@ -21,6 +21,7 @@ import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { getItemInstance } from '../FirecallItems/elements';
+import StrengthTable from './StrengthTable';
 
 function downloadVehicles(vehicles: Fzg[]) {
   downloadRowsAsCsv(
@@ -249,6 +250,8 @@ export default function Fahrzeuge() {
           onClick={() => downloadVehicles(vehicles)}
         />
       </Typography>
+
+      <StrengthTable items={displayItems} />
 
       {Object.entries(layers).map(([layerId, layer]) => {
         const items = groupedByLayer[layerId] || [];
