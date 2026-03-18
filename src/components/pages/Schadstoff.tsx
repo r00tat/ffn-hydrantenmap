@@ -43,7 +43,7 @@ export default function SchadstoffPage() {
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h3" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Schadstoff
         </Typography>
 

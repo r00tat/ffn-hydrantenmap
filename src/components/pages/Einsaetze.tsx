@@ -284,7 +284,7 @@ export default function Einsaetze() {
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h3" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Einsätze
         </Typography>
         <Grid container spacing={2}>

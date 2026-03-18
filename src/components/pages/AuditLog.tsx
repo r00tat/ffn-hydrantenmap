@@ -187,7 +187,7 @@ export default function AuditLog() {
 
   if (firecallId === 'unknown') {
     return (
-      <Typography variant="h3" gutterBottom sx={{ p: 2, m: 2 }}>
+      <Typography variant="h4" gutterBottom sx={{ p: 2, m: 2 }}>
         Audit Log
       </Typography>
     );
@@ -195,7 +195,7 @@ export default function AuditLog() {
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
-      <Typography variant="h3" gutterBottom>
+      <Typography variant="h4" gutterBottom>
         Audit Log{' '}
         <DownloadButton
           onClick={() => downloadAuditLog(filteredAndSorted)}
