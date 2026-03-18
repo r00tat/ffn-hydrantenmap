@@ -141,6 +141,37 @@ export interface Fzg extends FirecallItem {
   type: 'vehicle';
 }
 
+export const TACTICAL_UNIT_TYPES = [
+  'einheit', 'trupp', 'gruppe', 'zug',
+  'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv',
+] as const;
+
+export type TacticalUnitType = (typeof TACTICAL_UNIT_TYPES)[number];
+
+export const TACTICAL_UNIT_LABELS: Record<TacticalUnitType, string> = {
+  einheit: 'Einheit',
+  trupp: 'Trupp',
+  gruppe: 'Gruppe',
+  zug: 'Zug',
+  bereitschaft: 'Bereitschaft',
+  abschnitt: 'Abschnitt',
+  bezirk: 'Bezirk',
+  lfv: 'LFV',
+  oebfv: 'ÖBFV',
+};
+
+export interface TacticalUnit extends FirecallItem {
+  type: 'tacticalUnit';
+  unitType?: TacticalUnitType;
+  fw?: string;
+  mann?: number;
+  fuehrung?: string;
+  ats?: number;
+  alarmierung?: string;
+  eintreffen?: string;
+  abruecken?: string;
+}
+
 export interface Rohr extends FirecallItem {
   art: 'C' | 'B' | 'Wasserwerfer' | string;
   durchfluss?: number;
