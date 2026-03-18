@@ -259,7 +259,6 @@ export function estimateSource(
 
   for (let cx = gMinX; cx <= gMaxX; cx += res) {
     for (let cy = gMinY; cy <= gMaxY; cy += res) {
-      let valid = true;
       const unitConcs: number[] = [];
       for (const p of meterPoints) {
         // Already in meter-space with +y = north, no yFlip needed
@@ -267,18 +266,12 @@ export function estimateSource(
         const crosswind = (p.x - cx) * Math.cos(windDirRad) - (p.y - cy) * Math.sin(windDirRad);
         const c = gaussianPlume(downwind, crosswind, plumeParams);
         unitConcs.push(c);
-        if (c <= 0) {
-          valid = false;
-          break;
-        }
       }
-
-      if (!valid) continue;
 
       let sumLogRatio = 0;
       let posCount = 0;
       for (let i = 0; i < meterPoints.length; i++) {
-        if (meterPoints[i].value <= 0) continue;
+        if (meterPoints[i].value <= 0 || unitConcs[i] <= 0) continue;
         sumLogRatio += Math.log(meterPoints[i].value) - Math.log(unitConcs[i]);
         posCount++;
       }

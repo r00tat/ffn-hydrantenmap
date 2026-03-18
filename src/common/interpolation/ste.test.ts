@@ -527,3 +527,65 @@ describe('STE 5-marker scenario: plume shape sanity check', () => {
     expect(cPlus).toBeCloseTo(cMinus, 5);
   });
 });
+
+describe('STE source estimation with upwind measurement points', () => {
+  /**
+   * Scenario: source at (0, 0), wind from west (270°, → east) at 1 m/s.
+   * Low wind speed makes along-wind diffusion significant, so upwind
+   * markers get meaningful (but still smaller) concentrations.
+   * Most markers are downwind (east), but two markers are upwind (west)
+   * with low values (background readings). The algorithm must still
+   * estimate the source near (0, 0) instead of pushing it far west.
+   *
+   *       M_up2(-80,30) ●           y
+   *                   |             |
+   *   M_up1(-50,0) ● ── src ──── M1(80,0) ── M2(200,0) ──► x (downwind)
+   *                                 |
+   *                          M3(120,-40) ●
+   */
+  const trueQ = 300;
+  const plumeBase = { Q: trueQ, windSpeed: 1, stabilityClass: 4, releaseHeight: 0 };
+  const prepParams = {
+    windDirection: 270,
+    windSpeed: 1,
+    stabilityClass: 4,
+    releaseHeight: 0,
+    searchResolution: 10,
+  };
+
+  const markers: DataPoint[] = [
+    { x:  80, y:   0, value: gaussianPlume( 80,   0, plumeBase) },
+    { x: 200, y:   0, value: gaussianPlume(200,   0, plumeBase) },
+    { x: 120, y: -40, value: gaussianPlume(120, -40, plumeBase) },
+    // Upwind points — get small values from along-wind diffusion
+    { x: -50, y:   0, value: gaussianPlume(-50,   0, plumeBase) },
+    { x: -80, y:  30, value: gaussianPlume(-80,  30, plumeBase) },
+  ];
+
+  let state: ReturnType<typeof steAlgorithm.prepare>;
+  beforeAll(() => { state = steAlgorithm.prepare(markers, prepParams); });
+
+  it('upwind markers have small but positive values', () => {
+    const upwindValues = markers.filter(m => m.x < 0).map(m => m.value);
+    for (const v of upwindValues) expect(v).toBeGreaterThan(0);
+    // Upwind values should be much smaller than downwind
+    const downwindMax = Math.max(...markers.filter(m => m.x > 0).map(m => m.value));
+    for (const v of upwindValues) expect(v).toBeLessThan(downwindMax * 0.5);
+  });
+
+  it('source is estimated within 50m of true source (0, 0)', () => {
+    const dist = Math.sqrt(state.sourceX ** 2 + state.sourceY ** 2);
+    expect(dist).toBeLessThan(50);
+  });
+
+  it('source is NOT pushed far upwind by upwind measurements', () => {
+    // The old bug: source was forced far west (negative x) to keep
+    // all points downwind. Now it should be near 0.
+    expect(state.sourceX).toBeGreaterThan(-50);
+  });
+
+  it('release rate is in the right order of magnitude', () => {
+    expect(state.releaseRate).toBeGreaterThan(trueQ / 10);
+    expect(state.releaseRate).toBeLessThan(trueQ * 10);
+  });
+});
