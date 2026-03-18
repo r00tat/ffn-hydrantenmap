@@ -25,6 +25,14 @@ const SZ_COEFFS: [number, number][] = [
 const MIN_SIGMA = 0.1;
 
 /**
+ * Minimum effective distance (meters) for dispersion coefficient computation.
+ * The Gaussian model is not valid at sub-meter distances; using a floor of 10m
+ * prevents the near-source singularity (tiny sigma → extreme concentration)
+ * and ensures a smooth, physically reasonable near-field region.
+ */
+const MIN_NEAR_FIELD = 10;
+
+/**
  * Compute the lateral (crosswind) dispersion coefficient sigma_y
  * using Pasquill-Gifford parameterization.
  *
@@ -67,9 +75,11 @@ export interface GaussianPlumeParams {
  * factor of 2 for ground-level releases (H=0). For elevated releases (H>0)
  * the model underpredicts by ~2x compared to the standard formulation.
  *
- * For upwind points (downwind <= 0), applies along-wind Gaussian diffusion
- * (sigma_x) using total distance from source for dispersion coefficients.
- * This models pressure-driven and turbulent near-source dispersion.
+ * Downwind branch uses max(MIN_NEAR_FIELD, downwind) for sigma computation,
+ * preserving classical Gaussian plume physics while preventing the near-source
+ * singularity. Upwind branch uses max(MIN_NEAR_FIELD, total_distance) with an
+ * additional along-wind Gaussian decay (sigma_x) for pressure-driven and
+ * turbulent near-source dispersion.
  */
 export function gaussianPlume(
   downwind: number,
@@ -80,9 +90,11 @@ export function gaussianPlume(
   const u = Math.max(0.1, windSpeed);
 
   if (downwind > 0) {
-    // Classical Gaussian plume — unchanged
-    const sigmaY = pasquillSigmaY(downwind, stabilityClass);
-    const sigmaZ = pasquillSigmaZ(downwind, stabilityClass);
+    // Classical Gaussian plume. Floor downwind at MIN_NEAR_FIELD to prevent
+    // the near-source singularity (tiny sigma → extreme concentration).
+    const dw = Math.max(MIN_NEAR_FIELD, downwind);
+    const sigmaY = pasquillSigmaY(dw, stabilityClass);
+    const sigmaZ = pasquillSigmaZ(dw, stabilityClass);
 
     const crosswindTerm = Math.exp(
       -(crosswind * crosswind) / (2 * sigmaY * sigmaY)
@@ -95,24 +107,23 @@ export function gaussianPlume(
   }
 
   // Upwind or at source (downwind <= 0): along-wind diffusion.
-  // Use total distance from source for dispersion coefficients,
-  // and apply Gaussian decay in the upwind direction.
+  // Use total distance from source for dispersion coefficients.
   const dist = Math.sqrt(downwind * downwind + crosswind * crosswind);
-  const dEff = Math.max(1, dist);
+  const dEff = Math.max(MIN_NEAR_FIELD, dist);
 
   const sigmaY = pasquillSigmaY(dEff, stabilityClass);
   const sigmaZ = pasquillSigmaZ(dEff, stabilityClass);
-  const sigmaX = (3 * Math.sqrt(dEff)) / Math.sqrt(u); // along-wind diffusion: sqrt growth ensures decay at large distances
+  // sigma_x grows with sqrt(distance) and shrinks with sqrt(wind speed),
+  // modeling stronger upwind diffusion at low wind speeds.
+  const sigmaX = (3 * Math.sqrt(dEff)) / Math.sqrt(u);
 
   const baseTerm = Q / (2 * Math.PI * u * sigmaY * sigmaZ);
-
   const crosswindTerm = Math.exp(
     -(crosswind * crosswind) / (2 * sigmaY * sigmaY)
   );
   const verticalTerm = Math.exp(
     -(releaseHeight * releaseHeight) / (2 * sigmaZ * sigmaZ)
   );
-  // Gaussian decay in the upwind direction (downwind is negative or zero)
   const alongWindTerm = Math.exp(
     -(downwind * downwind) / (2 * sigmaX * sigmaX)
   );
@@ -416,7 +427,9 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
         );
         const predicted = gaussianPlume(dwPx * mpp, cwPx * mpp, plumeParams);
         if (predicted > 0 && p.value > 0) {
-          corrections.push({ x: p.x, y: p.y, ratio: p.value / predicted });
+          // Clamp ratio to prevent extreme amplification from model-measurement mismatch
+          const ratio = Math.max(0.1, Math.min(10, p.value / predicted));
+          corrections.push({ x: p.x, y: p.y, ratio });
         }
       }
     }
@@ -454,7 +467,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     // For elevated releases, the peak is at some distance where σz ≈ H/√2.
     let bestConc = 0;
     let bestDist = 0;
-    for (let d = 1; d <= 5000; d += Math.max(1, d * 0.05)) {
+    for (let d = MIN_NEAR_FIELD; d <= 5000; d += Math.max(1, d * 0.05)) {
       const c = gaussianPlume(d, 0, plumeParams);
       if (c > bestConc) { bestConc = c; bestDist = d; }
     }
@@ -476,7 +489,7 @@ export const steAlgorithm: InterpolationAlgorithm<SteState> = {
     };
     // Find raw peak on centerline
     let rawPeak = 0;
-    for (let d = 1; d <= 5000; d += Math.max(1, d * 0.05)) {
+    for (let d = MIN_NEAR_FIELD; d <= 5000; d += Math.max(1, d * 0.05)) {
       const c = gaussianPlume(d, 0, plumeParams);
       if (c > rawPeak) rawPeak = c;
     }
