@@ -6,6 +6,7 @@ import {
   Fzg,
   NON_DISPLAYABLE_ITEMS,
   Rohr,
+  TacticalUnit,
   filterActiveItems,
 } from '../components/firebase/firestore';
 import useFirebaseCollection from './useFirebaseCollection';
@@ -32,6 +33,13 @@ export default function useVehicles() {
     () =>
       (firecallItems?.filter((item) => item?.type === 'vehicle') ||
         []) as Fzg[],
+    [firecallItems]
+  );
+
+  const tacticalUnits = useMemo(
+    () =>
+      (firecallItems?.filter((item) => item?.type === 'tacticalUnit') ||
+        []) as TacticalUnit[],
     [firecallItems]
   );
 
@@ -62,6 +70,7 @@ export default function useVehicles() {
 
   return {
     vehicles,
+    tacticalUnits,
     rohre,
     otherItems,
     displayItems,
