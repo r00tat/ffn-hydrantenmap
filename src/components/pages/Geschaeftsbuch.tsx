@@ -527,7 +527,7 @@ export default function Geschaeftsbuch({
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Geschäftsbuch{' '}
           <DownloadButton
             onClick={() => downloadGb(eintraege)}

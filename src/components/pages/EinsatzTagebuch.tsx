@@ -470,7 +470,7 @@ export function EinsatzTagebuch({
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Einsatz Tagebuch{' '}
           <DownloadButton
             onClick={() => downloadDiaries(diaries)}
@@ -712,7 +712,7 @@ export default function Tagebuch({
 
   if (firecallId === 'unknown') {
     return (
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h4" gutterBottom>
         Einsatz Tagebuch
       </Typography>
     );

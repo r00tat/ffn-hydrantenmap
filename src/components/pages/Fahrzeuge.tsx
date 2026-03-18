@@ -240,7 +240,7 @@ export default function Fahrzeuge() {
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h4" gutterBottom>
         {totalItems} Einsatzmittel ({vehicles.length} Fahrzeuge){' '}
         <DownloadButton
           tooltip="Einsatzmittel als CSV herunterladen"

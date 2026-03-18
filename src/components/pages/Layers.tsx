@@ -345,7 +345,7 @@ export default function LayersPage() {
     <>
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} sensors={sensors}>
         <Box sx={{ p: 2, m: 2 }}>
-          <Typography variant="h5" gutterBottom>
+          <Typography variant="h4" gutterBottom>
             Ebenen {!historyModeActive && <><KmlImport /><CsvImport /></>}
           </Typography>
           <Grid container spacing={2}>
