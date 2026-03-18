@@ -1,12 +1,19 @@
+import Typography from '@mui/material/Typography';
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
+import { Tooltip } from 'react-leaflet';
 import { formatTimestamp } from '../../../common/time-format';
 import {
+  FirecallItem,
   TacticalUnit,
   TACTICAL_UNIT_LABELS,
   TacticalUnitType,
 } from '../../firebase/firestore';
 import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
+import {
+  FirecallItemMarkerDefault,
+  MarkerRenderOptions,
+} from './marker/FirecallItemDefault';
 import { SimpleMap } from '../../../common/types';
 
 const UNIT_TYPE_ICON_MAP: Record<TacticalUnitType, string> = {
@@ -211,6 +218,39 @@ export class FirecallTacticalUnit extends FirecallItemBase {
         )}
       </>
     );
+  }
+
+  public renderMarker(
+    selectItem: (item: FirecallItem) => void,
+    options: MarkerRenderOptions = {},
+  ): ReactNode {
+    const effectiveShowLabel =
+      options.layerShowLabels !== undefined ? options.layerShowLabels : true;
+    try {
+      return (
+        <FirecallItemMarkerDefault
+          record={this}
+          selectItem={selectItem}
+          key={this.id}
+          options={options}
+        >
+          {effectiveShowLabel && (
+            <Tooltip
+              direction="bottom"
+              permanent
+              offset={[0, 10]}
+              opacity={0.8}
+              className="nopadding"
+            >
+              <Typography variant="caption">{this.name}</Typography>
+            </Tooltip>
+          )}
+        </FirecallItemMarkerDefault>
+      );
+    } catch (err) {
+      console.error('failed to render marker', err, this.data());
+      return <></>;
+    }
   }
 
   public static factory(): FirecallItemBase {
