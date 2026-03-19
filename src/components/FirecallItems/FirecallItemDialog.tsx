@@ -210,7 +210,7 @@ export default function FirecallItemDialog({
             />
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
           <Button
             startIcon={<CloseIcon />}
             onClick={() => {
