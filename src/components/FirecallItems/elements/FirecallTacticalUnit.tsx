@@ -30,7 +30,7 @@ const UNIT_TYPE_ICON_MAP: Record<TacticalUnitType, string> = {
 };
 
 export class FirecallTacticalUnit extends FirecallItemBase {
-  unitType?: TacticalUnitType;
+  unitType?: TacticalUnitType = 'zug';
   fw?: string;
   mann?: number;
   fuehrung?: string;
@@ -44,7 +44,6 @@ export class FirecallTacticalUnit extends FirecallItemBase {
     this.type = 'tacticalUnit';
     if (firecallItem) {
       ({
-        unitType: this.unitType,
         fw: this.fw,
         mann: this.mann,
         fuehrung: this.fuehrung,
@@ -53,6 +52,7 @@ export class FirecallTacticalUnit extends FirecallItemBase {
         eintreffen: this.eintreffen,
         abruecken: this.abruecken,
       } = firecallItem);
+      this.unitType = firecallItem.unitType ?? 'zug';
     }
   }
 
@@ -195,9 +195,7 @@ export class FirecallTacticalUnit extends FirecallItemBase {
             Stärke: {this.mann}
           </>
         )}
-        {this.ats !== undefined && this.ats > 0 && (
-          <> ({this.ats} ATS)</>
-        )}
+        {this.ats !== undefined && this.ats > 0 && <> ({this.ats} ATS)</>}
         {this.alarmierung && (
           <>
             <br />

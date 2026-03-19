@@ -68,7 +68,7 @@ export default function FirecallItemDialog({
       type: itemType,
       ...itemDefault,
       datum: itemDefault?.datum || new Date().toISOString(),
-    } as FirecallItem)
+    } as FirecallItem),
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const historyPathSegments = useHistoryPathSegments();
@@ -77,7 +77,7 @@ export default function FirecallItemDialog({
   const layerFilter = item.layer || '';
   const queryConstraints = useMemo(
     () => (layerFilter ? [where('layer', '==', layerFilter)] : []),
-    [layerFilter]
+    [layerFilter],
   );
   const filterFn = useMemo(
     () =>
@@ -86,47 +86,86 @@ export default function FirecallItemDialog({
         : (e: FirecallItem) =>
             (e.layer === undefined || e.layer === '') &&
             filterDisplayableItems(e),
-    [layerFilter]
+    [layerFilter],
   );
   const siblings = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
     queryConstraints,
-    pathSegments: [firecallId, ...historyPathSegments, FIRECALL_ITEMS_COLLECTION_ID],
+    pathSegments: [
+      firecallId,
+      ...historyPathSegments,
+      FIRECALL_ITEMS_COLLECTION_ID,
+    ],
     filterFn,
   });
 
-  const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
-    useZOrderActions(item.data(), siblings, (newZIndex) => {
-      setFirecallItem((prev) => prev.copy().set('zIndex', newZIndex));
-    });
+  const {
+    handleBringToFront,
+    handleSendToBack,
+    handleBringForward,
+    handleSendBackward,
+  } = useZOrderActions(item.data(), siblings, (newZIndex) => {
+    setFirecallItem((prev) => prev.copy().set('zIndex', newZIndex));
+  });
 
   const setItemField = useCallback((field: string, value: any) => {
     setFirecallItem((prev) => prev.copy().set(field, value));
   }, []);
 
   const onHeatmapChange = useCallback(
-    (config: HeatmapConfig | undefined) => setItemField('heatmapConfig', config),
-    [setItemField]
+    (config: HeatmapConfig | undefined) =>
+      setItemField('heatmapConfig', config),
+    [setItemField],
   );
 
   const handleChange = (event: SelectChangeEvent) => {
     setFirecallItem((prev) =>
-      getItemInstance({ ...prev.data(), type: event.target.value })
+      getItemInstance({ ...prev.data(), type: event.target.value }),
     );
   };
 
   const isExistingItem = !!item.id;
   const canSave = !!(item as any).name?.trim();
 
+  const handleSave = useCallback(() => {
+    if (!canSave) return;
+    const flushedFieldData = dataFieldsRef.current?.flush();
+    const saveItem = flushedFieldData
+      ? { ...item.filteredData(), fieldData: flushedFieldData }
+      : item.filteredData();
+    setOpen(false);
+    onClose(saveItem);
+  }, [canSave, item, onClose]);
+
   return (
     <>
-      <Dialog open={open} onClose={() => onClose()}>
-        <DialogTitle>
+      <Dialog
+        open={open}
+        onClose={() => onClose()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && canSave) {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+      >
+        <DialogTitle sx={{ pr: 4 }}>
           {item.id ? (
             <>{item.markerName()} bearbeiten</>
           ) : (
             <>Neu: {item.markerName()} hinzufügen</>
           )}
+          <IconButton
+            aria-label="Abbrechen"
+            onClick={() => {
+              setOpen(false);
+              onClose();
+            }}
+            size="large"
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon fontSize="medium" />
+          </IconButton>
         </DialogTitle>
         <DialogContent>
           <DialogContentText>{item.dialogText()}</DialogContentText>
@@ -157,8 +196,19 @@ export default function FirecallItemDialog({
             autoFocusField={autoFocusField}
           />
           {isExistingItem && (
-            <Box sx={{ display: 'flex', gap: 0.5, mt: 2, alignItems: 'center', justifyContent: 'center' }}>
-              <Box component="span" sx={{ mr: 0.5, fontSize: '0.875rem', color: 'text.secondary' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 0.5,
+                mt: 2,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Box
+                component="span"
+                sx={{ mr: 0.5, fontSize: '0.875rem', color: 'text.secondary' }}
+              >
                 Reihenfolge:
               </Box>
               <Tooltip title="Ganz nach hinten">
@@ -203,7 +253,11 @@ export default function FirecallItemDialog({
               dataSchema={
                 item.layer ? layers[item.layer]?.dataSchema : undefined
               }
-              fieldData={item.get<Record<string, string | number | boolean>>('fieldData') || {}}
+              fieldData={
+                item.get<Record<string, string | number | boolean>>(
+                  'fieldData',
+                ) || {}
+              }
               onChange={(fieldData) => setItemField('fieldData', fieldData)}
               isNew={!item.id}
               flushRef={dataFieldsRef}
@@ -211,53 +265,38 @@ export default function FirecallItemDialog({
           )}
         </DialogContent>
         <DialogActions>
-          <Button
-            startIcon={<CloseIcon />}
-            onClick={() => {
-              setOpen(false);
-              onClose();
-            }}
-          >
-            Abbrechen
-          </Button>
           {item.id && (
-            <Button
-              startIcon={<ContentCopyIcon />}
-              onClick={async () => {
-                await copyAndSaveFirecallItems(firecallId, item.filteredData());
-                setOpen(false);
-                onClose();
-              }}
-            >
-              Kopieren
-            </Button>
+            <Tooltip title="Kopieren">
+              <IconButton
+                onClick={async () => {
+                  await copyAndSaveFirecallItems(
+                    firecallId,
+                    item.filteredData(),
+                  );
+                  setOpen(false);
+                  onClose();
+                }}
+              >
+                <ContentCopyIcon />
+              </IconButton>
+            </Tooltip>
           )}
           {item.id && (
-            <Button
-              startIcon={<DeleteIcon />}
-              onClick={() => {
-                setConfirmDelete(true);
-              }}
-              color="error"
-            >
-              Löschen
-            </Button>
+            <Tooltip title="Löschen">
+              <IconButton onClick={() => setConfirmDelete(true)} color="error">
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           )}
+          <Box sx={{ flex: 1 }} />
           <Button
             color="primary"
             disabled={!canSave}
             startIcon={item.id ? <SaveIcon /> : <AddIcon />}
-            onClick={() => {
-              // Flush any pending free-form field before saving
-              const flushedFieldData = dataFieldsRef.current?.flush();
-              const saveItem = flushedFieldData
-                ? { ...item.filteredData(), fieldData: flushedFieldData }
-                : item.filteredData();
-              setOpen(false);
-              onClose(saveItem);
-            }}
+            variant="contained"
+            onClick={handleSave}
           >
-            {item.id ? 'Aktualisieren' : 'Hinzufügen'}
+            {item.id ? 'Speichern' : 'Hinzufügen'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -14,8 +14,9 @@ import {
 import { getItemInstance } from '../../FirecallItems/elements';
 import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
-import { useHistoryPathSegments, useMapEditable } from '../../../hooks/useMapEditor';
+import useMapEditor, { useHistoryPathSegments } from '../../../hooks/useMapEditor';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
+import copyAndSaveFirecallItems from '../../../hooks/copyLayer';
 import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
 import ItemContextMenu from '../../FirecallItems/ItemContextMenu';
 
@@ -117,17 +118,25 @@ export default function FirecallItemsLayer({
     setContextMenuPos(undefined);
   }, []);
 
-  const editable = useMapEditable();
+  const { editable, setEditable } = useMapEditor();
   const updateItem = useFirecallItemUpdate();
 
   const handleEdit = useCallback(
-    (item: FirecallItem) => setFirecallItem(item),
-    []
+    (item: FirecallItem) => {
+      if (!editable) setEditable(true);
+      setFirecallItem(item);
+    },
+    [editable, setEditable]
   );
 
   const handleDelete = useCallback(
     (item: FirecallItem) => updateItem({ ...item, deleted: true }),
     [updateItem]
+  );
+
+  const handleCopy = useCallback(
+    (item: FirecallItem) => copyAndSaveFirecallItems(firecallId, item),
+    [firecallId]
   );
 
   const customActions = useMemo(() => {
@@ -164,15 +173,18 @@ export default function FirecallItemsLayer({
           close={() => setFirecallItem(undefined)}
         />
       )}
-      <ItemContextMenu
-        item={contextMenuTarget}
-        siblings={records}
-        anchorPosition={contextMenuPos}
-        onClose={closeContextMenu}
-        onEdit={editable ? handleEdit : undefined}
-        onDelete={editable ? handleDelete : undefined}
-        customActions={customActions}
-      />
+      {contextMenuPos && (
+        <ItemContextMenu
+          item={contextMenuTarget}
+          siblings={records}
+          anchorPosition={contextMenuPos}
+          onClose={closeContextMenu}
+          onEdit={handleEdit}
+          onDelete={editable ? handleDelete : undefined}
+          onCopy={handleCopy}
+          customActions={customActions}
+        />
+      )}
     </>
   );
 }

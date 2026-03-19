@@ -90,6 +90,7 @@ export async function hasBlaulichtsmsConfig(
 // Used by EinsatzDialog to decide whether to show the alarm dropdown.
 export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
   await actionUserRequired();
+  const { appendLegacyGroup } = await import('./legacyGroup');
   const snapshot = await firestore.collection(COLLECTION).get();
-  return snapshot.docs.map((d) => d.id);
+  return appendLegacyGroup(snapshot.docs.map((d) => d.id));
 }
