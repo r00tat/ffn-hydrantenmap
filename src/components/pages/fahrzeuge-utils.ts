@@ -20,6 +20,8 @@ export interface StrengthSummary {
   totalMann: number;
   totalAts: number;
   totalUnits: number;
+  totalFw: number;
+  typCounts: Record<string, number>;
   rows: StrengthRow[];
 }
 
@@ -55,10 +57,18 @@ export function calculateStrength(items: FirecallItem[]): StrengthSummary {
     }
   }
 
+  const fwSet = new Set(rows.map((r) => r.fw).filter(Boolean));
+  const typCounts: Record<string, number> = {};
+  for (const r of rows) {
+    typCounts[r.typ] = (typCounts[r.typ] || 0) + 1;
+  }
+
   return {
     totalMann: rows.reduce((sum, r) => sum + r.mann, 0),
     totalAts: rows.reduce((sum, r) => sum + r.ats, 0),
     totalUnits: rows.length,
+    totalFw: fwSet.size,
+    typCounts,
     rows,
   };
 }

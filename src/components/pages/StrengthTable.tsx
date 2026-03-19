@@ -14,7 +14,7 @@ import { formatTimestamp } from '../../common/time-format';
 import { calculateStrength } from './fahrzeuge-utils';
 
 export default function StrengthTable({ items }: { items: FirecallItem[] }) {
-  const { rows, totalMann, totalAts, totalUnits } = useMemo(
+  const { rows, totalMann, totalAts, totalFw, typCounts } = useMemo(
     () => calculateStrength(items),
     [items]
   );
@@ -51,11 +51,13 @@ export default function StrengthTable({ items }: { items: FirecallItem[] }) {
           ))}
           <TableRow sx={{ '& td': { fontWeight: 'bold' } }}>
             <TableCell>Gesamt</TableCell>
-            <TableCell />
+            <TableCell>{totalFw} FW</TableCell>
             <TableCell>
-              <Typography variant="body2" fontWeight="bold">
-                {totalUnits} Einheiten
-              </Typography>
+              {Object.entries(typCounts).map(([typ, count]) => (
+                <Typography variant="body2" fontWeight="bold" key={typ}>
+                  {count} {typ}
+                </Typography>
+              ))}
             </TableCell>
             <TableCell align="right">{totalMann}</TableCell>
             <TableCell align="right">{totalAts}</TableCell>

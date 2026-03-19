@@ -69,7 +69,7 @@ export default function AppDrawer({
       href: '/einsaetze',
     },
     { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
-    { text: 'Fahrzeuge', icon: <DirectionsCarIcon />, href: '/fahrzeuge' },
+    { text: 'Einsatzmittel', icon: <DirectionsCarIcon />, href: '/einsatzmittel' },
     {
       text: 'Einsatz Tagebuch',
       icon: <LibraryBooksIcon />,

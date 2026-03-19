@@ -22,6 +22,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   marker: FirecallItemMarker,
   layer: FirecallItemLayer,
   vehicle: FirecallVehicle,
+  tacticalUnit: FirecallTacticalUnit,
   line: FirecallLine,
   circle: CircleMarker,
   area: FirecallArea,
@@ -33,7 +34,6 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   diary: FirecallDiary,
   drawing: FirecallDrawing,
   gb: FirecallGb,
-  tacticalUnit: FirecallTacticalUnit,
 };
 
 export const fcItemNames: { [key: string]: string } = {};
