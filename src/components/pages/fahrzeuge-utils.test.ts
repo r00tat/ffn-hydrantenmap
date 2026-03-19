@@ -62,6 +62,25 @@ describe('calculateStrength', () => {
     expect(result.totalUnits).toBe(0);
   });
 
+  it('converts string ats and mann values to numbers', () => {
+    const items: FirecallItem[] = [
+      { name: 'TLF', type: 'vehicle', besatzung: '5', ats: '2' } as any,
+      {
+        name: '1. Gruppe',
+        type: 'tacticalUnit',
+        mann: '8',
+        ats: '4',
+      } as any,
+    ];
+    const result = calculateStrength(items);
+    expect(result.totalMann).toBe(6 + 8); // 14
+    expect(result.totalAts).toBe(2 + 4); // 6
+    expect(result.rows[0].mann).toBe(6);
+    expect(result.rows[0].ats).toBe(2);
+    expect(result.rows[1].mann).toBe(8);
+    expect(result.rows[1].ats).toBe(4);
+  });
+
   it('returns per-item strength data', () => {
     const items: FirecallItem[] = [
       {
