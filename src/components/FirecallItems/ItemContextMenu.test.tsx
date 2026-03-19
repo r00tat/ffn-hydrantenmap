@@ -30,6 +30,16 @@ describe('ItemContextMenu', () => {
     expect(screen.getByText('Löschen')).toBeInTheDocument();
   });
 
+  it('renders copy menu item when onCopy is provided', () => {
+    render(<ItemContextMenu {...baseProps} onCopy={vi.fn()} />);
+    expect(screen.getByText('Kopieren')).toBeInTheDocument();
+  });
+
+  it('does not render copy menu item when onCopy is not provided', () => {
+    render(<ItemContextMenu {...baseProps} />);
+    expect(screen.queryByText('Kopieren')).not.toBeInTheDocument();
+  });
+
   it('renders customActions when provided', () => {
     render(
       <ItemContextMenu

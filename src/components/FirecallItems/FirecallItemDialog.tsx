@@ -1,6 +1,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
@@ -148,12 +149,23 @@ export default function FirecallItemDialog({
           }
         }}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ pr: 4 }}>
           {item.id ? (
             <>{item.markerName()} bearbeiten</>
           ) : (
             <>Neu: {item.markerName()} hinzufügen</>
           )}
+          <IconButton
+            aria-label="Abbrechen"
+            onClick={() => {
+              setOpen(false);
+              onClose();
+            }}
+            size="large"
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon fontSize="medium" />
+          </IconButton>
         </DialogTitle>
         <DialogContent>
           <DialogContentText>{item.dialogText()}</DialogContentText>
@@ -257,7 +269,10 @@ export default function FirecallItemDialog({
             <Tooltip title="Kopieren">
               <IconButton
                 onClick={async () => {
-                  await copyAndSaveFirecallItems(firecallId, item.filteredData());
+                  await copyAndSaveFirecallItems(
+                    firecallId,
+                    item.filteredData(),
+                  );
                   setOpen(false);
                   onClose();
                 }}
@@ -268,23 +283,12 @@ export default function FirecallItemDialog({
           )}
           {item.id && (
             <Tooltip title="Löschen">
-              <IconButton
-                onClick={() => setConfirmDelete(true)}
-                color="error"
-              >
+              <IconButton onClick={() => setConfirmDelete(true)} color="error">
                 <DeleteIcon />
               </IconButton>
             </Tooltip>
           )}
           <Box sx={{ flex: 1 }} />
-          <Button
-            onClick={() => {
-              setOpen(false);
-              onClose();
-            }}
-          >
-            Abbrechen
-          </Button>
           <Button
             color="primary"
             disabled={!canSave}
@@ -292,7 +296,7 @@ export default function FirecallItemDialog({
             variant="contained"
             onClick={handleSave}
           >
-            {item.id ? 'Aktualisieren' : 'Hinzufügen'}
+            {item.id ? 'Speichern' : 'Hinzufügen'}
           </Button>
         </DialogActions>
       </Dialog>

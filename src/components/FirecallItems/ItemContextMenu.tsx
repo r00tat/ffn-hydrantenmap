@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import VerticalAlignBottomIcon from '@mui/icons-material/VerticalAlignBottom';
@@ -20,6 +21,7 @@ export interface ItemContextMenuProps {
   onClose: () => void;
   onEdit?: (item: FirecallItem) => void;
   onDelete?: (item: FirecallItem) => void;
+  onCopy?: (item: FirecallItem) => void;
   customActions?: ReactNode;
 }
 
@@ -30,6 +32,7 @@ export default function ItemContextMenu({
   onClose,
   onEdit,
   onDelete,
+  onCopy,
   customActions,
 }: ItemContextMenuProps) {
   const { handleBringToFront, handleSendToBack, handleBringForward, handleSendBackward } =
@@ -54,6 +57,12 @@ export default function ItemContextMenu({
         <MenuItem onClick={() => { onEdit(item); onClose(); }}>
           <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Bearbeiten</ListItemText>
+        </MenuItem>
+      )}
+      {onCopy && item && (
+        <MenuItem onClick={() => { onCopy(item); onClose(); }}>
+          <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Kopieren</ListItemText>
         </MenuItem>
       )}
       {onDelete && item && (
