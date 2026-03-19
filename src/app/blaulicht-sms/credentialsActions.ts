@@ -91,5 +91,18 @@ export async function hasBlaulichtsmsConfig(
 export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
   await actionUserRequired();
   const snapshot = await firestore.collection(COLLECTION).get();
-  return snapshot.docs.map((d) => d.id);
+  const groups = snapshot.docs.map((d) => d.id);
+
+  // Include legacy group configured via env vars
+  const legacyGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP ?? 'ffnd';
+  if (
+    !groups.includes(legacyGroup) &&
+    process.env.BLAULICHTSMS_USERNAME &&
+    process.env.BLAULICHTSMS_PASSWORD &&
+    process.env.BLAULICHTSMS_CUSTOMER_ID
+  ) {
+    groups.push(legacyGroup);
+  }
+
+  return groups;
 }
