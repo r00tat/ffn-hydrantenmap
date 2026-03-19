@@ -1,18 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('server-only', () => ({}));
-vi.mock('../auth', () => ({
-  actionUserRequired: vi.fn(),
-  actionAdminRequired: vi.fn(),
-}));
-vi.mock('../../server/firebase/admin', () => ({
-  firestore: { collection: vi.fn() },
-}));
-vi.mock('../../server/blaulichtsms/encryption', () => ({
-  encryptPassword: vi.fn(),
-}));
-
-import { appendLegacyGroup } from './credentialsActions';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { appendLegacyGroup } from './legacyGroup';
 
 describe('appendLegacyGroup', () => {
   beforeEach(() => {
