@@ -86,14 +86,12 @@ export async function hasBlaulichtsmsConfig(
   return doc.exists;
 }
 
-// User-accessible: returns group IDs that have credentials configured.
-// Used by EinsatzDialog to decide whether to show the alarm dropdown.
-export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
-  await actionUserRequired();
-  const snapshot = await firestore.collection(COLLECTION).get();
-  const groups = snapshot.docs.map((d) => d.id);
-
-  // Include legacy group configured via env vars
+/**
+ * Appends the legacy env-var group to the list if it has credentials
+ * configured via environment variables and isn't already present.
+ */
+export function appendLegacyGroup(firestoreGroups: string[]): string[] {
+  const groups = [...firestoreGroups];
   const legacyGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP ?? 'ffnd';
   if (
     !groups.includes(legacyGroup) &&
@@ -103,6 +101,13 @@ export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
   ) {
     groups.push(legacyGroup);
   }
-
   return groups;
+}
+
+// User-accessible: returns group IDs that have credentials configured.
+// Used by EinsatzDialog to decide whether to show the alarm dropdown.
+export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
+  await actionUserRequired();
+  const snapshot = await firestore.collection(COLLECTION).get();
+  return appendLegacyGroup(snapshot.docs.map((d) => d.id));
 }
