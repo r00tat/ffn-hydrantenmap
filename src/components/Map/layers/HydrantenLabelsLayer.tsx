@@ -39,9 +39,12 @@ export default function HydrantenLabelsLayer({
             className="nopadding"
           >
             <Typography variant="caption" component="div">
-              {formatLabel(h).map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
+              <div style={{ fontWeight: 'bold' }}>{h.name}</div>
+              {formatLabel(h)
+                .slice(1)
+                .map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
             </Typography>
           </Tooltip>
         </CircleMarker>
