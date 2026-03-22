@@ -91,7 +91,7 @@ export default function SearchButton() {
         sx={{
           // '& > :not(style)': { m: 1 },
           position: 'absolute',
-          bottom: 96,
+          bottom: 120,
           right: 16,
         }}
       >

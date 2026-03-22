@@ -21,6 +21,7 @@ import { DrawingProvider } from './Drawing/DrawingContext';
 import DrawingCanvas from './Drawing/DrawingCanvas';
 import DrawingToolbar from './Drawing/DrawingToolbar';
 import MapActionButtons from './MapActionButtons';
+import ScaleRatioControl from './ScaleRatioControl';
 import MapSidebar from './MapSidebar';
 import PositionAction from './PositionAction';
 import UpdateMapPosition from './UpdateMapPosition';
@@ -163,6 +164,7 @@ export default function Map() {
             ))}
         </LayersControl>
         <ScaleControl position="bottomright" metric={true} imperial={false} />
+        <ScaleRatioControl />
         {/* <FullscreenControl /> */}
         <UpdateMapPosition />
         <LeitungsProvider>
