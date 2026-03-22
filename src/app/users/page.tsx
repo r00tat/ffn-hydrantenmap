@@ -20,6 +20,7 @@ import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
 import React, { useCallback, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
+import AdminGuard from '../../components/site/AdminGuard';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
@@ -62,7 +63,15 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
   );
 }
 
-export default function Users() {
+export default function UsersPage() {
+  return (
+    <AdminGuard>
+      <Users />
+    </AdminGuard>
+  );
+}
+
+function Users() {
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [editUser, setEditUser] = useState<UserRecordExtended>();
   const [users, fetchUsers] = useUserList();

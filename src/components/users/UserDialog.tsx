@@ -326,6 +326,15 @@ export default function UserRecordExtendedDialog({
             }
             label="Authorized"
           />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={!!user.isAdmin}
+                onChange={onChangeSwitch('isAdmin')}
+              />
+            }
+            label="Admin"
+          />
         </FormGroup>
 
         <Divider sx={{ my: 2 }} />
