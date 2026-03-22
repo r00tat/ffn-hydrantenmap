@@ -16,6 +16,7 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     displayName: user.displayName,
     email: user.email,
     authorized: isTruthy(user.authorized),
+    isAdmin: !!user.isAdmin,
     feuerwehr: user.feuerwehr || 'neusiedl',
     abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
     groups: uniqueArray([...(user.groups || []), 'allUsers']),

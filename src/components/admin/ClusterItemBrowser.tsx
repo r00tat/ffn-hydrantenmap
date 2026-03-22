@@ -67,9 +67,8 @@ export default function ClusterItemBrowser() {
       const searchable = [
         item.name,
         (item as Record<string, unknown>).ortschaft,
-        (item as Record<string, unknown>).bezeichnung,
+        (item as Record<string, unknown>).description,
         (item as Record<string, unknown>).adresse,
-        (item as Record<string, unknown>).bezeichnung_adresse,
       ]
         .filter(Boolean)
         .join(' ')

@@ -163,7 +163,7 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
       <Box
         sx={{
           position: 'absolute',
-          bottom: 148,
+          bottom: 172,
           right: 16,
           display: 'flex',
           flexDirection: 'row',

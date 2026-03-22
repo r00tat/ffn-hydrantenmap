@@ -15,8 +15,11 @@ npm run start        # Start production server
 npm run lint         # ESLint validation
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
+npm run check        # Run all checks: tsc, lint, tests, build
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
+
+**After completing a feature or bugfix, run `npm run check` to catch errors before committing.**
 
 Data import scripts (require `GOOGLE_APPLICATION_CREDENTIALS` env var):
 

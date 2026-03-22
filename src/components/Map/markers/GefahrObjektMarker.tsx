@@ -34,6 +34,12 @@ export default function GefahrObjektMarker({
         </b>
         <br />
         {o.adresse}
+        {o.description && (
+          <>
+            <br />
+            {o.description}
+          </>
+        )}
         {o.link && (
           <>
             <br />

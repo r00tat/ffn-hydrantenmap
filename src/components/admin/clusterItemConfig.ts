@@ -8,7 +8,7 @@ export type ClusterCollectionType =
 export interface FieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'date';
+  type: 'text' | 'textarea' | 'number' | 'date';
   required?: boolean;
   tableColumn?: boolean;
 }
@@ -51,7 +51,7 @@ export const collectionConfigs: CollectionConfig[] = [
     displayName: 'Risikoobjekte',
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, tableColumn: true },
-      { key: 'bezeichnung', label: 'Bezeichnung', type: 'text', tableColumn: true },
+      { key: 'description', label: 'Beschreibung', type: 'textarea', tableColumn: true },
       { key: 'adresse', label: 'Adresse', type: 'text', tableColumn: true },
       { key: 'ortschaft', label: 'Ortschaft', type: 'text', tableColumn: true },
       { key: 'risikogruppe', label: 'Risikogruppe', type: 'text', tableColumn: true },
@@ -65,7 +65,7 @@ export const collectionConfigs: CollectionConfig[] = [
     displayName: 'Gefahrobjekte',
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, tableColumn: true },
-      { key: 'bezeichnung', label: 'Bezeichnung', type: 'text', tableColumn: true },
+      { key: 'description', label: 'Beschreibung', type: 'textarea', tableColumn: true },
       { key: 'adresse', label: 'Adresse', type: 'text', tableColumn: true },
       { key: 'ortschaft', label: 'Ortschaft', type: 'text', tableColumn: true },
       { key: 'einsatzplanummer', label: 'Einsatzplanummer', type: 'text' },
@@ -78,7 +78,7 @@ export const collectionConfigs: CollectionConfig[] = [
     displayName: 'Löschteiche',
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, tableColumn: true },
-      { key: 'bezeichnung_adresse', label: 'Bezeichnung/Adresse', type: 'text', tableColumn: true },
+      { key: 'adresse', label: 'Adresse', type: 'text', tableColumn: true },
       { key: 'ortschaft', label: 'Ortschaft', type: 'text', tableColumn: true },
       { key: 'fassungsverm_gen_m3_', label: 'Fassungsvermögen (m³)', type: 'number', tableColumn: true },
       { key: 'zufluss_l_min_', label: 'Zufluss (l/min)', type: 'number' },
@@ -90,7 +90,7 @@ export const collectionConfigs: CollectionConfig[] = [
     displayName: 'Saugstellen',
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, tableColumn: true },
-      { key: 'bezeichnung_adresse', label: 'Bezeichnung/Adresse', type: 'text', tableColumn: true },
+      { key: 'adresse', label: 'Adresse', type: 'text', tableColumn: true },
       { key: 'ortschaft', label: 'Ortschaft', type: 'text', tableColumn: true },
       { key: 'geod_tische_saugh_he_m_', label: 'Geodätische Saughöhe (m)', type: 'number', tableColumn: true },
       { key: 'saugleitungsl_nge_m_', label: 'Saugleitungslänge (m)', type: 'text' },

@@ -36,6 +36,12 @@ export default function RisikoObjektMarker({
         {r.risikogruppe}
         <br />
         {r.adresse}
+        {r.description && (
+          <>
+            <br />
+            {r.description}
+          </>
+        )}
         {r.link && (
           <>
             <br />

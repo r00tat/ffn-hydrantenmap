@@ -15,6 +15,7 @@ import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
+import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import {
@@ -69,7 +70,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
             key={index}
             position={p}
             title={record.titleFn()}
-            icon={record.icon()}
+            icon={leafletIcons().circle}
             draggable={editable}
             autoPan={false}
             eventHandlers={{

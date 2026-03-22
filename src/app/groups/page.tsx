@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
+import AdminGuard from '../../components/site/AdminGuard';
 import { getUsers } from '../users/action';
 import {
   createKnownGroupsAction,
@@ -82,7 +83,15 @@ function useGroupList(): [
   return [groups, getGroups, users];
 }
 
-export default function Groups() {
+export default function GroupsPage() {
+  return (
+    <AdminGuard>
+      <Groups />
+    </AdminGuard>
+  );
+}
+
+function Groups() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();

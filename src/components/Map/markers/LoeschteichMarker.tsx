@@ -22,7 +22,7 @@ export default function LoeschteichMarker({
   return (
     <Marker
       position={[o.lat, o.lng]}
-      title={o.bezeichnung_adresse}
+      title={o.adresse}
       key={o.id}
       icon={loeschteichIcon}
     >
