@@ -41,7 +41,7 @@ export interface HydrantenRecord extends WgsObject, Hydrant {}
 
 export interface RisikoObjekt extends WgsObject {
   adresse: string;
-  bezeichnung: string;
+  description?: string;
   einsatzplanummer: string;
   erfassungsdatum: string;
   ortschaft: string;
@@ -51,7 +51,7 @@ export interface RisikoObjekt extends WgsObject {
 
 export interface GefahrObjekt extends WgsObject {
   adresse: string;
-  bezeichnung: string;
+  description?: string;
   einsatzplanummer: string;
   erfassungsdatum: string;
   ortschaft: string;
@@ -59,14 +59,14 @@ export interface GefahrObjekt extends WgsObject {
 }
 
 export interface Loeschteich extends WgsObject {
-  bezeichnung_adresse: string;
+  adresse: string;
   erfassungsdatum: string;
   fassungsverm_gen_m3_: number;
   ortschaft: string;
   zufluss_l_min_: number;
 }
 export interface Saugstelle extends WgsObject {
-  bezeichnung_adresse: string;
+  adresse: string;
   erfassungsdatum: string;
   geod_tische_saugh_he_m_: number;
   ortschaft: string;

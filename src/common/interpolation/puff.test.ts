@@ -177,6 +177,8 @@ describe('puffAlgorithm', () => {
       depositionTau: 0,
       metersPerPixel: 1,
       fullCanvasRender: false,
+      yFlip: false,
+      corrections: [],
     };
     expect(puffAlgorithm.evaluate(100, 0, emptyState)).toBe(0);
   });
@@ -264,7 +266,8 @@ describe('puffAlgorithm', () => {
       searchResolution: 20, _metersPerPixel: 1,
       // fullCanvasRender intentionally omitted — should default to true
     });
-    expect(puffAlgorithm.fullCanvasRender!(state)).toBe(true);
+    const fn = puffAlgorithm.fullCanvasRender as (s: unknown) => boolean;
+    expect(fn(state)).toBe(true);
   });
 
   it('rendered peak with predictionOffset > 0 stays within reasonable range of measured values', () => {

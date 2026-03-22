@@ -286,7 +286,8 @@ export default async function exportGeoJson(
             description: `<b>${r.ortschaft} ${r.name}</b><br />${
               r.risikogruppe
             }<br />${r.adresse}${
-              r.link
+              r.description ? `<br />${r.description}` : ''
+            }${r.link
                 ? `<br/><a href="${encodeURI(
                     r.link
                   )}" target="_blank">Einsatzunterlagen</a>`
@@ -318,7 +319,8 @@ export default async function exportGeoJson(
           properties: {
             id: r.name,
             description: `<b>${r.ortschaft} ${r.name}</b><br />${r.adresse}${
-              r.link
+              r.description ? `<br />${r.description}` : ''
+            }${r.link
                 ? `<br/><a href="${encodeURI(
                     r.link
                   )}" target="_blank">Einsatzunterlagen</a>`
@@ -348,9 +350,9 @@ export default async function exportGeoJson(
           geometry: { coordinates: [l.lng, l.lat], type: 'Point' },
           properties: {
             id: l.name,
-            description: `<b>Löschteich ${l.ortschaft} ${l.bezeichnung_adresse}</b><br/>Fassungsvermögen: ${l.fassungsverm_gen_m3_}<br />Zufluss: ${l.zufluss_l_min_}`,
+            description: `<b>Löschteich ${l.ortschaft} ${l.adresse}</b><br/>Fassungsvermögen: ${l.fassungsverm_gen_m3_}<br />Zufluss: ${l.zufluss_l_min_}`,
             ortschaft: l.ortschaft,
-            adresse: l.bezeichnung_adresse,
+            adresse: l.adresse,
             fassungsvermoegen: l.fassungsverm_gen_m3_,
             zufluss: l.zufluss_l_min_,
             typ: 'Loeschteich',
@@ -373,7 +375,7 @@ export default async function exportGeoJson(
           properties: {
             id: s.name,
             description: `<b>Saugstelle ${s.ortschaft} ${
-              s.bezeichnung_adresse
+              s.adresse
             }</b><br /> ${s.wasserentnahme_l_min_} l/min<br />${
               s.geod_tische_saugh_he_m_
                 ? s.geod_tische_saugh_he_m_ + 'm Saughöhe <br />'
@@ -384,7 +386,7 @@ export default async function exportGeoJson(
                 : ''
             }`,
             ortschaft: s.ortschaft,
-            adresse: s.bezeichnung_adresse,
+            adresse: s.adresse,
             saughoehe: s.geod_tische_saugh_he_m_,
             saugleitungslaenge: s.saugleitungsl_nge_m_,
             leistung: s.wasserentnahme_l_min_,

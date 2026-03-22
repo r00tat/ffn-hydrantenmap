@@ -106,6 +106,8 @@ export default function ClusterItemEditDialog({
                 type={field.type === 'number' ? 'number' : 'text'}
                 required={field.required}
                 fullWidth
+                multiline={field.type === 'textarea'}
+                minRows={field.type === 'textarea' ? 3 : undefined}
                 InputLabelProps={field.type === 'date' ? { shrink: true } : undefined}
               />
             ))}

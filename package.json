@@ -14,7 +14,8 @@
     "updateClusters": "npx tsc --outDir dist src/server/cluster-import && node dist/server/cluster-import.js",
     "docs:screenshots": "playwright test --config=playwright/playwright.config.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check": "npx tsc --noEmit && npx eslint && vitest run && next build --webpack"
   },
   "dependencies": {
     "@auth/core": "^0.41.1",
