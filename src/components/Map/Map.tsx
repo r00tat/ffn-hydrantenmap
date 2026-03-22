@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import {
   LayersControl,
   MapContainer,
+  ScaleControl,
   TileLayer,
   useMap,
   WMSTileLayer,
@@ -161,6 +162,7 @@ export default function Map() {
               </LayersControl.Overlay>
             ))}
         </LayersControl>
+        <ScaleControl position="bottomright" metric={true} imperial={false} />
         {/* <FullscreenControl /> */}
         <UpdateMapPosition />
         <LeitungsProvider>

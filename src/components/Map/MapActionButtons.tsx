@@ -49,7 +49,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         sx={{
           // '& > :not(style)': { m: 1 },
           position: 'absolute',
-          bottom: 24,
+          bottom: 48,
           right: 16,
         }}
       >
