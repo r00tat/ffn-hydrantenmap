@@ -3,7 +3,7 @@ import 'server-only';
 
 import { actionUserAuthorizedForFirecall, auth } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
-import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
@@ -63,7 +63,7 @@ async function requireKostenersatzUser(firecallId: string) {
  */
 async function getCalculation(
   firecallId: string,
-  calculationId: string
+  calculationId: string,
 ): Promise<KostenersatzCalculation> {
   const calculationDoc = await firestore
     .collection(FIRECALL_COLLECTION_ID)
@@ -94,7 +94,7 @@ async function getCalculation(
  */
 export async function createSumupCheckout(
   firecallId: string,
-  calculationId: string
+  calculationId: string,
 ): Promise<SumupCheckoutResponse> {
   try {
     await requireKostenersatzUser(firecallId);
@@ -102,7 +102,10 @@ export async function createSumupCheckout(
     const calculation = await getCalculation(firecallId, calculationId);
 
     if (calculation.totalSum <= 0) {
-      return { success: false, error: 'Calculation total must be greater than 0' };
+      return {
+        success: false,
+        error: 'Calculation total must be greater than 0',
+      };
     }
 
     const apiKey = process.env.SUMUP_API_KEY;
@@ -125,10 +128,13 @@ export async function createSumupCheckout(
     }
 
     // Reuse existing pending checkout if available
-    if (calculation.sumupCheckoutId && calculation.sumupPaymentStatus === 'pending') {
+    if (
+      calculation.sumupCheckoutId &&
+      calculation.sumupPaymentStatus === 'pending'
+    ) {
       const existingResponse = await fetch(
         `https://api.sumup.com/v0.1/checkouts/${calculation.sumupCheckoutId}`,
-        { headers: { Authorization: `Bearer ${apiKey}` } }
+        { headers: { Authorization: `Bearer ${apiKey}` } },
       );
       if (existingResponse.ok) {
         const existingCheckout = await existingResponse.json();
@@ -147,8 +153,7 @@ export async function createSumupCheckout(
       return { success: false, error: 'SumUp merchant code not configured' };
     }
 
-    const baseUrl =
-      process.env.NEXTAUTH_URL || 'https://hydrant.ffnd.at';
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://einsatz.ffnd.at';
     const checkoutReference = `KE-${firecallId}-${calculationId}-${Date.now()}`;
     const redirectToken = crypto.randomUUID();
 
@@ -174,7 +179,11 @@ export async function createSumupCheckout(
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error('SumUp checkout creation failed:', response.status, errorBody);
+      console.error(
+        'SumUp checkout creation failed:',
+        response.status,
+        errorBody,
+      );
       return {
         success: false,
         error: `SumUp API error: ${response.status}`,
@@ -213,15 +222,22 @@ export async function createSumupCheckout(
  */
 export async function getSumupDeepLink(
   firecallId: string,
-  calculationId: string
+  calculationId: string,
 ): Promise<SumupDeepLinkResponse> {
   try {
     await requireKostenersatzUser(firecallId);
 
+    const firecall = (
+      await firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId).get()
+    ).data() as Firecall;
+
     const calculation = await getCalculation(firecallId, calculationId);
 
     if (calculation.totalSum <= 0) {
-      return { success: false, error: 'Calculation total must be greater than 0' };
+      return {
+        success: false,
+        error: 'Calculation total must be greater than 0',
+      };
     }
 
     // Ensure payment method is set to sumup_app in Firestore
@@ -247,14 +263,35 @@ export async function getSumupDeepLink(
       return { success: false, error: 'SumUp affiliate key not configured' };
     }
 
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://einsatz.ffnd.at';
     const foreignTxId = `KE-${firecallId}-${calculationId}-${Date.now()}`;
+    const redirectToken = crypto.randomUUID();
+    const callbackUrl = `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}/payment?token=${redirectToken}`;
+
+    // Store redirect token and foreign tx ID in Firestore for verification
+    await firestore
+      .collection(FIRECALL_COLLECTION_ID)
+      .doc(firecallId)
+      .collection(KOSTENERSATZ_SUBCOLLECTION)
+      .doc(calculationId)
+      .update({
+        sumupRedirectToken: redirectToken,
+        sumupForeignTxId: foreignTxId,
+        sumupPaymentStatus: 'pending',
+        updatedAt: new Date().toISOString(),
+      });
 
     const params = new URLSearchParams({
       'affiliate-key': affiliateKey,
       total: calculation.totalSum.toFixed(2),
       currency: 'EUR',
-      title: `Kostenersatz ${firecallId}`,
+      title: calculation.nameOverride || `Kostenersatz ${firecall.name}`,
       'foreign-tx-id': foreignTxId,
+      // iOS callback params
+      callbacksuccess: callbackUrl,
+      callbackfail: callbackUrl,
+      // Android callback param
+      callback: callbackUrl,
     });
 
     const deepLinkUrl = `sumupmerchant://pay/1.0?${params.toString()}`;
@@ -275,7 +312,7 @@ export async function getSumupDeepLink(
  */
 export async function checkSumupPaymentStatus(
   firecallId: string,
-  calculationId: string
+  calculationId: string,
 ): Promise<SumupPaymentStatusResponse> {
   try {
     await requireKostenersatzUser(firecallId);
@@ -297,11 +334,14 @@ export async function checkSumupPaymentStatus(
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },
-      }
+      },
     );
 
     if (!checkoutResponse.ok) {
-      return { success: false, error: 'Fehler beim Abrufen des Zahlungsstatus' };
+      return {
+        success: false,
+        error: 'Fehler beim Abrufen des Zahlungsstatus',
+      };
     }
 
     const checkout = await checkoutResponse.json();
@@ -350,7 +390,10 @@ export async function checkSumupPaymentStatus(
           await completePaymentAndNotify(firecallId, calculationId);
           return { success: true, status: paymentStatus, autoCompleted: true };
         } catch (error) {
-          console.error('checkSumupPaymentStatus: completePaymentAndNotify failed:', error);
+          console.error(
+            'checkSumupPaymentStatus: completePaymentAndNotify failed:',
+            error,
+          );
         }
       }
     } else if (paymentStatus === 'paid' && calculation.status === 'draft') {
@@ -358,7 +401,10 @@ export async function checkSumupPaymentStatus(
         await completePaymentAndNotify(firecallId, calculationId);
         return { success: true, status: paymentStatus, autoCompleted: true };
       } catch (error) {
-        console.error('checkSumupPaymentStatus: completePaymentAndNotify retry failed:', error);
+        console.error(
+          'checkSumupPaymentStatus: completePaymentAndNotify retry failed:',
+          error,
+        );
       }
     }
 

@@ -6,12 +6,19 @@ import PaymentConfirmation from './PaymentConfirmation';
 
 interface PaymentPageProps {
   params: Promise<{ firecallId: string; calculationId: string }>;
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{
+    token?: string;
+    'smp-status'?: string;
+    'smp-tx-code'?: string;
+  }>;
 }
 
 export default async function PaymentPage({ params, searchParams }: PaymentPageProps) {
   const { firecallId, calculationId } = await params;
-  const { token } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const token = resolvedSearchParams.token;
+  const smpStatus = resolvedSearchParams['smp-status'];
+  const smpTxCode = resolvedSearchParams['smp-tx-code'];
 
   if (!token) {
     return (
@@ -34,6 +41,8 @@ export default async function PaymentPage({ params, searchParams }: PaymentPageP
       firecallId={firecallId}
       calculationId={calculationId}
       token={token}
+      smpStatus={smpStatus}
+      smpTxCode={smpTxCode}
     />
   );
 }

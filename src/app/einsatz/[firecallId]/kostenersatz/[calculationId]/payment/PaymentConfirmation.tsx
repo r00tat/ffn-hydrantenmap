@@ -21,18 +21,22 @@ interface PaymentConfirmationProps {
   firecallId: string;
   calculationId: string;
   token: string;
+  smpStatus?: string;
+  smpTxCode?: string;
 }
 
 export default function PaymentConfirmation({
   firecallId,
   calculationId,
   token,
+  smpStatus,
+  smpTxCode,
 }: PaymentConfirmationProps) {
   const [result, setResult] = useState<PaymentVerificationResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    verifyPaymentAndComplete(firecallId, calculationId, token)
+    verifyPaymentAndComplete(firecallId, calculationId, token, smpStatus, smpTxCode)
       .then(setResult)
       .catch(() => setResult({ success: false, error: 'Ein Fehler ist aufgetreten' }))
       .finally(() => setLoading(false));

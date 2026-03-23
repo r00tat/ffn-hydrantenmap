@@ -73,7 +73,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             export NEXT_PUBLIC_FIRESTORE_DB=""
             export RUN_SERVICE=$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')
-            export NEXTAUTH_URL="https://hydrant.ffnd.at"
+            export NEXTAUTH_URL="https://einsatz.ffnd.at"
             export SUMUP_SECRET_SUFFIX=""
           fi
 
