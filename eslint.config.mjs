@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     // scope manager lacks addGlobals() required by ESLint 10. Ignore until upstream fix.
     'next.config.js',
     'eslint.config.mjs',
+    '.skills/**',
+    '.agents/**',
   ]),
 ]);
 

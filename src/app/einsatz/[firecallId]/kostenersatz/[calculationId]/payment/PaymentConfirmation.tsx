@@ -40,7 +40,7 @@ export default function PaymentConfirmation({
       .then(setResult)
       .catch(() => setResult({ success: false, error: 'Ein Fehler ist aufgetreten' }))
       .finally(() => setLoading(false));
-  }, [firecallId, calculationId, token]);
+  }, [firecallId, calculationId, token, smpStatus, smpTxCode]);
 
   if (loading) {
     return (
