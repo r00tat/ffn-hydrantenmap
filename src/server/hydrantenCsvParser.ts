@@ -57,8 +57,13 @@ export function autoDetectMapping(csvHeaders: string[]): Record<string, string> 
   const mapping: Record<string, string> = {};
   for (const header of csvHeaders) {
     const normalized = normalizeHeader(header);
-    if (DEFAULT_COLUMN_MAP[normalized]) {
-      mapping[header] = DEFAULT_COLUMN_MAP[normalized];
+    // Try exact match, then with trailing underscore (headers may have trailing spaces
+    // that get trimmed by the UI but produce a trailing _ in normalizeHeader)
+    const match = DEFAULT_COLUMN_MAP[normalized]
+      ?? DEFAULT_COLUMN_MAP[normalized + '_']
+      ?? DEFAULT_COLUMN_MAP[normalized.replace(/_$/, '')];
+    if (match) {
+      mapping[header] = match;
     }
   }
   return mapping;

@@ -288,9 +288,9 @@ export default function HydrantenCsvImport() {
                     <TableCell>{result.ortschaft}</TableCell>
                     <TableCell>{result.hydranten_nummer}</TableCell>
                     <TableCell>{result.typ}</TableCell>
-                    <TableCell>{result.dimension}</TableCell>
-                    <TableCell>{result.statischer_druck}</TableCell>
-                    <TableCell>{result.dynamischer_druck}</TableCell>
+                    <TableCell>{Number.isNaN(result.dimension) ? '—' : result.dimension}</TableCell>
+                    <TableCell>{Number.isNaN(result.statischer_druck) ? '—' : result.statischer_druck}</TableCell>
+                    <TableCell>{Number.isNaN(result.dynamischer_druck) ? '—' : result.dynamischer_druck}</TableCell>
                     <TableCell>{result.duplicateDocId ?? '—'}</TableCell>
                     <TableCell>
                       <IconButton size="small" onClick={() => setMapResult(result)}>
