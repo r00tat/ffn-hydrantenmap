@@ -183,3 +183,5 @@ dist
 test-results/
 .serena
 .skills
+.agents
+hydranten.csv
