@@ -11,6 +11,8 @@ Test Wasserverband,Testgemeinde,Überflurhydrant,TEST-HY1,---,80,Endstrang,"5,6"
 Test Wasserverband,Testgemeinde,Unterflurhydrant,TEST-HY2,ja,100,Ringleitung,"4,8","3,5",18/10/2024,"120,3","37700,5","310350,8"
 Test Wasserverband,Testgemeinde,Überflurhydrant,TEST-HY3,---,80,Ringleitung,"5,1","4,2",19/10/2024,"118,9","37750,0","310400,0"`;
 
+// We need the converted coordinates for TEST-HY2 to set up a nearby alias match.
+// TEST-HY2 CSV coords: X=37700.5, Y=310350.8 -> approx lat 47.930, lng 16.836
 const existingDocs: ExistingHydrant[] = [
   // Direct match — same document key
   {
@@ -19,11 +21,13 @@ const existingDocs: ExistingHydrant[] = [
     hydranten_nummer: 'TEST-HY1',
     leistung: 900,
   },
-  // Alias match — old key with short ortschaft prefix
+  // Alias match — old key with short ortschaft prefix, coordinates ~50m away
   {
     id: 'tgtest-hy2',
     ortschaft: 'TG',
     hydranten_nummer: 'TEST-HY2',
+    lat: 47.9307,  // approx same location as TEST-HY2 CSV coords
+    lng: 16.8367,
     leistung: 750,
   },
   // TEST-HY3 has no existing match — should be "new"

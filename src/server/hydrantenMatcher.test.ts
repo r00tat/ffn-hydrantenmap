@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchHydranten, type MatchResult, type ExistingHydrant } from './hydrantenMatcher';
+import { matchHydranten, type ExistingHydrant } from './hydrantenMatcher';
 import type { ConvertedHydrantRow } from './hydrantenCsvConverter';
 
 function makeRow(overrides: Partial<ConvertedHydrantRow>): ConvertedHydrantRow {
@@ -40,6 +40,8 @@ describe('matchHydranten', () => {
       id: 'neusiedl_hy1',
       ortschaft: 'Neusiedl',
       hydranten_nummer: 'HY1',
+      lat: 47.92995,
+      lng: 16.83597,
       leistung: 1074,
     }];
     const result = matchHydranten(rows, existing);
@@ -48,7 +50,42 @@ describe('matchHydranten', () => {
     expect(result[0].preservedFields).toEqual({ leistung: 1074 });
   });
 
-  it('detects duplicate when alias key exists (ND vs Neusiedl)', () => {
+  it('detects duplicate when alias key exists with nearby coordinates', () => {
+    const rows = [makeRow({})];
+    // Same hydranten_nummer, different ortschaft, coordinates ~50m away
+    const existing: ExistingHydrant[] = [{
+      id: 'ndhy1',
+      ortschaft: 'ND',
+      hydranten_nummer: 'HY1',
+      lat: 47.9300,  // ~50m north of 47.92995
+      lng: 16.83597,
+      leistung: 1074,
+    }];
+    const result = matchHydranten(rows, existing);
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('update');
+    expect(result[0].duplicateDocId).toBe('ndhy1');
+    expect(result[0].preservedFields).toEqual({ leistung: 1074 });
+  });
+
+  it('does NOT match as duplicate when same nummer but far away', () => {
+    const rows = [makeRow({})];
+    // Same hydranten_nummer HY1, but in a completely different location (Bad Sauerbrunn)
+    const existing: ExistingHydrant[] = [{
+      id: 'bad_sauerbrunn_hy1',
+      ortschaft: 'Bad Sauerbrunn',
+      hydranten_nummer: 'HY1',
+      lat: 47.7738,  // ~17km south
+      lng: 16.3152,
+      leistung: 800,
+    }];
+    const result = matchHydranten(rows, existing);
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('new');
+    expect(result[0].duplicateDocId).toBeUndefined();
+  });
+
+  it('does NOT match as duplicate when existing has no coordinates', () => {
     const rows = [makeRow({})];
     const existing: ExistingHydrant[] = [{
       id: 'ndhy1',
@@ -58,9 +95,7 @@ describe('matchHydranten', () => {
     }];
     const result = matchHydranten(rows, existing);
     expect(result).toHaveLength(1);
-    expect(result[0].status).toBe('update');
-    expect(result[0].duplicateDocId).toBe('ndhy1');
-    expect(result[0].preservedFields).toEqual({ leistung: 1074 });
+    expect(result[0].status).toBe('new');
   });
 
   it('preserves leistung from existing record', () => {
@@ -84,5 +119,19 @@ describe('matchHydranten', () => {
     }];
     const result = matchHydranten(rows, existing);
     expect(result[0].preservedFields).toEqual({});
+  });
+
+  it('includes existing lat/lng in match result', () => {
+    const rows = [makeRow({})];
+    const existing: ExistingHydrant[] = [{
+      id: 'neusiedl_hy1',
+      ortschaft: 'Neusiedl',
+      hydranten_nummer: 'HY1',
+      lat: 47.929,
+      lng: 16.835,
+    }];
+    const result = matchHydranten(rows, existing);
+    expect(result[0].existingLat).toBe(47.929);
+    expect(result[0].existingLng).toBe(16.835);
   });
 });

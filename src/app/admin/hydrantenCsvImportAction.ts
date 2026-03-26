@@ -31,6 +31,10 @@ export interface ClientMatchResult {
   dimension: number;
   statischer_druck: number;
   dynamischer_druck: number;
+  lat: number;
+  lng: number;
+  existingLat?: number;
+  existingLng?: number;
   duplicateDocId?: string;
 }
 
@@ -85,6 +89,10 @@ export async function parseAndMatchCsv(
     dimension: r.row.dimension,
     statischer_druck: r.row.statischer_druck,
     dynamischer_druck: r.row.dynamischer_druck,
+    lat: r.row.lat,
+    lng: r.row.lng,
+    existingLat: r.existingLat,
+    existingLng: r.existingLng,
     duplicateDocId: r.duplicateDocId,
   }));
 

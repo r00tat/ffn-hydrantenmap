@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -13,9 +14,11 @@ import TableRow from '@mui/material/TableRow';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import MapIcon from '@mui/icons-material/Map';
 import { useState, useCallback, useMemo } from 'react';
 import FileUpload from './FileUpload';
 import ProgressStepper, { type StepStatus } from './ProgressStepper';
+import HydrantMapDialog from './HydrantMapDialog';
 import {
   parseAndMatchCsv,
   importRecords,
@@ -44,6 +47,7 @@ export default function HydrantenCsvImport() {
   const [parseMatchResult, setParseMatchResult] = useState<ParseAndMatchResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [mapResult, setMapResult] = useState<ClientMatchResult | null>(null);
 
   const resetAll = useCallback(() => {
     setCsvFile(null);
@@ -54,6 +58,7 @@ export default function HydrantenCsvImport() {
     setParseMatchResult(null);
     setImportResult(null);
     setStatusFilter('all');
+    setMapResult(null);
   }, []);
 
   const startParsing = useCallback(async () => {
@@ -207,6 +212,7 @@ export default function HydrantenCsvImport() {
                   <TableCell sx={{ fontWeight: 'bold' }}>Stat. Druck</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Dyn. Druck</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Duplikat</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Karte</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -226,6 +232,11 @@ export default function HydrantenCsvImport() {
                     <TableCell>{result.statischer_druck}</TableCell>
                     <TableCell>{result.dynamischer_druck}</TableCell>
                     <TableCell>{result.duplicateDocId ?? '—'}</TableCell>
+                    <TableCell>
+                      <IconButton size="small" onClick={() => setMapResult(result)}>
+                        <MapIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -274,6 +285,11 @@ export default function HydrantenCsvImport() {
           </Button>
         </Box>
       )}
+      <HydrantMapDialog
+        open={mapResult !== null}
+        onClose={() => setMapResult(null)}
+        result={mapResult}
+      />
     </Paper>
   );
 }
