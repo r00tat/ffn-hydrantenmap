@@ -1,5 +1,5 @@
-import * as epsg from 'epsg';
-import * as proj4 from 'proj4';
+const proj4 = require('proj4') as typeof import('proj4');
+const epsg: Record<string, string> = require('epsg');
 import { Coordinates } from './gis-objects';
 
 /**
