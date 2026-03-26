@@ -1,6 +1,9 @@
-const proj4 = require('proj4') as typeof import('proj4');
-const epsg: Record<string, string> = require('epsg');
+import * as _proj4 from 'proj4';
+import * as epsg from 'epsg';
 import { Coordinates } from './gis-objects';
+
+// Handle CJS/ESM interop: webpack wraps as {default: fn}, vitest/node exposes fn directly
+const proj4 = (typeof _proj4 === 'function' ? _proj4 : (_proj4 as any).default) as typeof _proj4;
 
 /**
  * source: https://agsolutions.at/en/blog/transforming-vienna-gis-to-wgs84-coordinates/
