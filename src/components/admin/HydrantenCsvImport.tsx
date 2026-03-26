@@ -19,6 +19,11 @@ import { useState, useCallback, useMemo } from 'react';
 import FileUpload from './FileUpload';
 import ProgressStepper, { type StepStatus } from './ProgressStepper';
 import HydrantMapDialog from './HydrantMapDialog';
+import CsvColumnMappingEditor, { type ColumnMapping } from './CsvColumnMappingEditor';
+import {
+  autoDetectMapping,
+  TARGET_FIELDS,
+} from '../../server/hydrantenCsvParser';
 import {
   parseAndMatchCsv,
   importRecords,
@@ -37,8 +42,32 @@ const STEPS = [
 
 type StatusFilter = 'all' | 'new' | 'update' | 'duplicate';
 
+/** Read CSV headers (first line) from a File */
+async function readCsvHeaders(file: File): Promise<string[]> {
+  const text = await file.text();
+  const firstLine = text.split('\n')[0] ?? '';
+  // Simple CSV header split — handles quoted headers
+  const headers: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (const char of firstLine) {
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      headers.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) headers.push(current.trim());
+  return headers;
+}
+
 export default function HydrantenCsvImport() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [activeStep, setActiveStep] = useState(-1);
   const [status, setStatus] = useState<StepStatus>('pending');
   const [error, setError] = useState<string | undefined>();
@@ -51,6 +80,8 @@ export default function HydrantenCsvImport() {
 
   const resetAll = useCallback(() => {
     setCsvFile(null);
+    setCsvHeaders([]);
+    setColumnMapping({});
     setActiveStep(-1);
     setStatus('pending');
     setError(undefined);
@@ -61,22 +92,39 @@ export default function HydrantenCsvImport() {
     setMapResult(null);
   }, []);
 
+  const handleFileSelect = useCallback(async (file: File) => {
+    setCsvFile(file);
+    setParseMatchResult(null);
+    setActiveStep(-1);
+    setStatus('pending');
+    setError(undefined);
+
+    // Read headers and auto-detect mapping
+    const headers = await readCsvHeaders(file);
+    setCsvHeaders(headers);
+    setColumnMapping(autoDetectMapping(headers));
+  }, []);
+
+  const requiredFields = TARGET_FIELDS.filter((f) => f.required).map((f) => f.key);
+  const assignedTargets = new Set(Object.values(columnMapping).filter(Boolean));
+  const missingRequired = requiredFields.filter((f) => !assignedTargets.has(f));
+  const canAnalyze = csvFile && missingRequired.length === 0 && !isRunning;
+
   const startParsing = useCallback(async () => {
     if (!csvFile) return;
     setIsRunning(true);
     setError(undefined);
 
     try {
-      // Steps 0-2: Parse + Convert + Match (all server-side)
       setActiveStep(0);
       setStatus('in_progress');
 
       const formData = new FormData();
       formData.append('csvFile', csvFile);
+      formData.append('columnMapping', JSON.stringify(columnMapping));
       const result = await parseAndMatchCsv(formData);
       setParseMatchResult(result);
 
-      // Step 3: Preview
       setActiveStep(3);
       setStatus('pending');
       setIsRunning(false);
@@ -85,7 +133,7 @@ export default function HydrantenCsvImport() {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setIsRunning(false);
     }
-  }, [csvFile]);
+  }, [csvFile, columnMapping]);
 
   const startImport = useCallback(async () => {
     if (!parseMatchResult) return;
@@ -119,6 +167,7 @@ export default function HydrantenCsvImport() {
     return matches.filter((r) => r.status === statusFilter);
   }, [matches, statusFilter]);
 
+  const showMapping = csvHeaders.length > 0 && !parseMatchResult;
   const showPreview = activeStep === 3 && status === 'pending' && matches.length > 0;
   const showSuccess = activeStep === 4 && status === 'completed' && importResult;
 
@@ -136,20 +185,31 @@ export default function HydrantenCsvImport() {
         <FileUpload
           accept=".csv"
           label="CSV Datei auswählen"
-          onFileSelect={setCsvFile}
+          onFileSelect={handleFileSelect}
           selectedFile={csvFile}
           disabled={isRunning}
         />
-        <Box>
-          <Button
-            variant="contained"
-            onClick={startParsing}
-            disabled={!csvFile || isRunning}
-          >
-            CSV analysieren
-          </Button>
-        </Box>
       </Box>
+
+      {showMapping && (
+        <Box sx={{ mb: 3 }}>
+          <CsvColumnMappingEditor
+            csvHeaders={csvHeaders}
+            mapping={columnMapping}
+            onMappingChange={setColumnMapping}
+            disabled={isRunning}
+          />
+          <Box sx={{ mt: 2 }}>
+            <Button
+              variant="contained"
+              onClick={startParsing}
+              disabled={!canAnalyze}
+            >
+              CSV analysieren
+            </Button>
+          </Box>
+        </Box>
+      )}
 
       {activeStep >= 0 && (
         <Box sx={{ mb: 3 }}>

@@ -16,7 +16,24 @@ export interface ParsedHydrantRow {
   documentKey: string;
 }
 
-const COLUMN_MAP: Record<string, string> = {
+/** All available target fields that CSV columns can be mapped to */
+export const TARGET_FIELDS: { key: string; label: string; required?: boolean }[] = [
+  { key: 'ortschaft', label: 'Ortschaft', required: true },
+  { key: 'typ', label: 'Typ' },
+  { key: 'hydranten_nummer', label: 'Hydranten-Nr.', required: true },
+  { key: 'fuellhydrant', label: 'Füllhydrant' },
+  { key: 'dimension', label: 'Dimension' },
+  { key: 'leitungsart', label: 'Leitungsart' },
+  { key: 'statischer_druck', label: 'Statischer Druck' },
+  { key: 'dynamischer_druck', label: 'Dynamischer Druck' },
+  { key: 'druckmessung_datum', label: 'Druckmessung Datum' },
+  { key: 'meereshoehe', label: 'Meereshöhe' },
+  { key: 'raw_x', label: 'X-Koordinate (GK M34)', required: true },
+  { key: 'raw_y', label: 'Y-Koordinate (GK M34)', required: true },
+];
+
+/** Default mapping: normalized CSV header → target field key */
+export const DEFAULT_COLUMN_MAP: Record<string, string> = {
   ortsnetz_versorgungseinheit: 'ortschaft',
   art: 'typ',
   hydranten_nr_: 'hydranten_nummer',
@@ -31,8 +48,20 @@ const COLUMN_MAP: Record<string, string> = {
   y_koordinate: 'raw_y',
 };
 
-function normalizeHeader(header: string): string {
+export function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
+
+/** Auto-detect mapping from CSV headers using the default column map */
+export function autoDetectMapping(csvHeaders: string[]): Record<string, string> {
+  const mapping: Record<string, string> = {};
+  for (const header of csvHeaders) {
+    const normalized = normalizeHeader(header);
+    if (DEFAULT_COLUMN_MAP[normalized]) {
+      mapping[header] = DEFAULT_COLUMN_MAP[normalized];
+    }
+  }
+  return mapping;
 }
 
 function parseDecimalComma(value: string): number {
@@ -56,13 +85,36 @@ function generateDocumentKey(
     .replace(/[^a-z0-9_-]+/g, '_');
 }
 
-export function parseHydrantenCsv(csvText: string): ParsedHydrantRow[] {
+/**
+ * Parse WLV CSV text into hydrant records.
+ * @param csvText Raw CSV text
+ * @param customMapping Optional mapping from original CSV header → target field.
+ *   If not provided, uses auto-detection via DEFAULT_COLUMN_MAP on normalized headers.
+ */
+export function parseHydrantenCsv(
+  csvText: string,
+  customMapping?: Record<string, string>
+): ParsedHydrantRow[] {
   const lines = csvText.split('\n');
   if (lines.length >= 2) {
     // Remove the description row (second line)
     lines.splice(1, 1);
   }
   const cleaned = lines.join('\n');
+
+  // Build the effective mapping: normalized header → target field
+  let effectiveMap: Record<string, string>;
+  if (customMapping) {
+    // customMapping is original header → target, convert to normalized header → target
+    effectiveMap = {};
+    for (const [originalHeader, target] of Object.entries(customMapping)) {
+      if (target) {
+        effectiveMap[normalizeHeader(originalHeader)] = target;
+      }
+    }
+  } else {
+    effectiveMap = DEFAULT_COLUMN_MAP;
+  }
 
   const records: Record<string, string>[] = parse(cleaned, {
     columns: (header: string[]) => header.map(normalizeHeader),
@@ -72,7 +124,7 @@ export function parseHydrantenCsv(csvText: string): ParsedHydrantRow[] {
 
   return records.map((record) => {
     const mapped: Record<string, unknown> = {};
-    for (const [csvKey, targetKey] of Object.entries(COLUMN_MAP)) {
+    for (const [csvKey, targetKey] of Object.entries(effectiveMap)) {
       if (record[csvKey] !== undefined) {
         mapped[targetKey] = record[csvKey];
       }

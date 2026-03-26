@@ -56,9 +56,11 @@ export async function parseAndMatchCsv(
   const file = formData.get('csvFile') as File;
   if (!file) throw new Error('No CSV file provided');
 
-  // Step 1: Parse CSV
+  // Step 1: Parse CSV (with optional custom column mapping)
   const csvText = await file.text();
-  const parsed = parseHydrantenCsv(csvText);
+  const mappingJson = formData.get('columnMapping') as string | null;
+  const customMapping = mappingJson ? JSON.parse(mappingJson) as Record<string, string> : undefined;
+  const parsed = parseHydrantenCsv(csvText, customMapping);
 
   // Step 2: Convert coordinates
   const converted = convertCoordinates(parsed);
