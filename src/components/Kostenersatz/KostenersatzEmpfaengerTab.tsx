@@ -273,6 +273,7 @@ export default function KostenersatzEmpfaengerTab({
         >
           Onlinezahlung erstellen
         </Button>
+        {/* TODO: SumUp app deep link does not support NFC payments, disabled until resolved
         <Button
           variant="contained"
           startIcon={loadingAction === 'app' ? <CircularProgress size={20} /> : <PhoneAndroidIcon />}
@@ -281,6 +282,7 @@ export default function KostenersatzEmpfaengerTab({
         >
           In SumUp App bezahlen
         </Button>
+        */}
         {sumupPaymentStatus && (
           <>
             <PaymentStatusChip status={sumupPaymentStatus} />
