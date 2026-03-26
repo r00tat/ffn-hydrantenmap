@@ -3,6 +3,7 @@ import 'server-only';
 
 import { UserRecordExtended } from '../../common/users';
 import {
+  CLUSTER_COLLECTION_ID,
   Firecall,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
@@ -10,6 +11,7 @@ import {
   GROUP_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
+import { ALLOWED_COLLECTIONS } from '../../components/admin/clusterItemConfig';
 import {
   firestore,
   getDevFirestore,
@@ -505,4 +507,66 @@ export async function copyUserAndGroupsToDev(): Promise<CopyCollectionResult> {
     usersCount: prodUsers.size,
     groupsCount: prodGroups.size,
   };
+}
+
+export interface CopyClusterDataResult {
+  collections: Record<string, number>;
+  clustersCount: number;
+}
+
+async function copyCollection(
+  prodDb: FirebaseFirestore.Firestore,
+  devDb: FirebaseFirestore.Firestore,
+  collectionId: string
+): Promise<number> {
+  const prodDocs = await prodDb.collection(collectionId).get();
+  const devRef = devDb.collection(collectionId);
+
+  // Delete existing docs in dev
+  const existingDev = await devRef.get();
+  for (let i = 0; i < existingDev.docs.length; i += 500) {
+    const batch = devDb.batch();
+    existingDev.docs.slice(i, i + 500).forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+  }
+
+  // Copy all docs from prod to dev (in batches of 500)
+  for (let i = 0; i < prodDocs.docs.length; i += 500) {
+    const batch = devDb.batch();
+    prodDocs.docs.slice(i, i + 500).forEach((doc) => {
+      batch.set(devRef.doc(doc.id), doc.data());
+    });
+    await batch.commit();
+  }
+
+  return prodDocs.size;
+}
+
+export async function copyClusterDataToDev(): Promise<CopyClusterDataResult> {
+  await actionAdminRequired();
+
+  console.info(`BULK ACTION: copyClusterDataToDev`);
+
+  const prodDb = getProdFirestore();
+  const devDb = getDevFirestore();
+
+  const collections: Record<string, number> = {};
+
+  // Copy all base collections
+  for (const collectionId of ALLOWED_COLLECTIONS) {
+    collections[collectionId] = await copyCollection(prodDb, devDb, collectionId);
+  }
+
+  // Copy clusters collection
+  const clustersCount = await copyCollection(prodDb, devDb, CLUSTER_COLLECTION_ID);
+
+  console.info(
+    `BULK ACTION COMPLETE: copyClusterDataToDev - ${Object.entries(collections)
+      .map(([k, v]) => `${v} ${k}`)
+      .join(', ')}, ${clustersCount} clusters`
+  );
+
+  return { collections, clustersCount };
 }
