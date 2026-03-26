@@ -32,7 +32,7 @@ const STEPS = [
   { label: 'Import', description: 'Daten in Firestore schreiben' },
 ];
 
-type StatusFilter = 'all' | 'new' | 'update';
+type StatusFilter = 'all' | 'new' | 'update' | 'duplicate';
 
 export default function HydrantenCsvImport() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -108,11 +108,11 @@ export default function HydrantenCsvImport() {
     duplicateCount: matches.filter((r) => r.duplicateDocId).length,
   }), [matches]);
 
-  const filteredResults = useMemo(() =>
-    statusFilter === 'all'
-      ? matches
-      : matches.filter((r) => r.status === statusFilter),
-    [matches, statusFilter]);
+  const filteredResults = useMemo(() => {
+    if (statusFilter === 'all') return matches;
+    if (statusFilter === 'duplicate') return matches.filter((r) => r.duplicateDocId);
+    return matches.filter((r) => r.status === statusFilter);
+  }, [matches, statusFilter]);
 
   const showPreview = activeStep === 3 && status === 'pending' && matches.length > 0;
   const showSuccess = activeStep === 4 && status === 'completed' && importResult;
@@ -190,6 +190,9 @@ export default function HydrantenCsvImport() {
             <ToggleButton value="all">Alle ({matches.length})</ToggleButton>
             <ToggleButton value="new">Neu ({newCount})</ToggleButton>
             <ToggleButton value="update">Update ({updateCount})</ToggleButton>
+            {duplicateCount > 0 && (
+              <ToggleButton value="duplicate">Duplikate ({duplicateCount})</ToggleButton>
+            )}
           </ToggleButtonGroup>
 
           <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
