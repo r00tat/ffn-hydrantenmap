@@ -67,31 +67,42 @@ export async function importRecords(
   const stats = { created: 0, updated: 0, duplicatesDeleted: 0 };
   const collection = firestore.collection('hydrant');
 
-  // Process in batches of 400 (Firestore limit is 500 per batch)
-  const batchSize = 400;
-  for (let i = 0; i < matchResults.length; i += batchSize) {
-    const batch = firestore.batch();
-    const chunk = matchResults.slice(i, i + batchSize);
+  // Process in batches, respecting Firestore's 500 operations per batch limit.
+  // Each record is 1 set + optionally 1 delete, so we track operation count.
+  const maxOps = 490;
+  let batch = firestore.batch();
+  let opCount = 0;
 
-    for (const result of chunk) {
-      const { row, status, duplicateDocId, preservedFields } = result;
+  for (const result of matchResults) {
+    const { row, status, duplicateDocId, preservedFields } = result;
 
-      // Build document data (exclude raw_x, raw_y, documentKey)
-      const { raw_x, raw_y, documentKey, ...data } = row;
-      const docData = { ...data, ...preservedFields };
+    // Build document data (exclude raw_x, raw_y, documentKey)
+    const { raw_x, raw_y, documentKey, ...data } = row;
+    const docData = { ...data, ...preservedFields };
 
-      batch.set(collection.doc(row.documentKey), docData, { merge: true });
+    const opsNeeded = duplicateDocId && duplicateDocId !== row.documentKey ? 2 : 1;
 
-      if (status === 'new') stats.created++;
-      else stats.updated++;
-
-      // Delete duplicate doc if found
-      if (duplicateDocId && duplicateDocId !== row.documentKey) {
-        batch.delete(collection.doc(duplicateDocId));
-        stats.duplicatesDeleted++;
-      }
+    if (opCount + opsNeeded > maxOps) {
+      await batch.commit();
+      batch = firestore.batch();
+      opCount = 0;
     }
 
+    batch.set(collection.doc(row.documentKey), docData, { merge: true });
+    opCount++;
+
+    if (status === 'new') stats.created++;
+    else stats.updated++;
+
+    // Delete duplicate doc if found
+    if (duplicateDocId && duplicateDocId !== row.documentKey) {
+      batch.delete(collection.doc(duplicateDocId));
+      opCount++;
+      stats.duplicatesDeleted++;
+    }
+  }
+
+  if (opCount > 0) {
     await batch.commit();
   }
 

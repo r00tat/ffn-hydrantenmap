@@ -13,7 +13,7 @@ import TableRow from '@mui/material/TableRow';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import FileUpload from './FileUpload';
 import ProgressStepper, { type StepStatus } from './ProgressStepper';
 import {
@@ -111,13 +111,17 @@ export default function HydrantenCsvImport() {
     }
   }, [matchResults]);
 
-  const newCount = matchResults.filter((r) => r.status === 'new').length;
-  const updateCount = matchResults.filter((r) => r.status === 'update').length;
-  const duplicateCount = matchResults.filter((r) => r.duplicateDocId).length;
+  const { newCount, updateCount, duplicateCount } = useMemo(() => ({
+    newCount: matchResults.filter((r) => r.status === 'new').length,
+    updateCount: matchResults.filter((r) => r.status === 'update').length,
+    duplicateCount: matchResults.filter((r) => r.duplicateDocId).length,
+  }), [matchResults]);
 
-  const filteredResults = statusFilter === 'all'
-    ? matchResults
-    : matchResults.filter((r) => r.status === statusFilter);
+  const filteredResults = useMemo(() =>
+    statusFilter === 'all'
+      ? matchResults
+      : matchResults.filter((r) => r.status === statusFilter),
+    [matchResults, statusFilter]);
 
   const showPreview = activeStep === 3 && status === 'pending' && matchResults.length > 0;
   const showSuccess = activeStep === 4 && status === 'completed' && importResult;
@@ -212,8 +216,8 @@ export default function HydrantenCsvImport() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredResults.slice(0, 100).map((result, i) => (
-                  <TableRow key={i}>
+                {filteredResults.slice(0, 100).map((result) => (
+                  <TableRow key={result.row.documentKey}>
                     <TableCell>
                       <Chip
                         label={result.status === 'new' ? 'Neu' : 'Update'}
