@@ -164,8 +164,11 @@ function getParamValue(
 ): number | null {
   const p = params[key];
   if (!p || !p.data || p.data.length === 0) return null;
-  // Use last data point to match the last timestamp
-  return p.data[p.data.length - 1];
+  // Use last non-null data point (latest value may be null if interval just started)
+  for (let i = p.data.length - 1; i >= 0; i--) {
+    if (p.data[i] !== null) return p.data[i];
+  }
+  return null;
 }
 
 // --- Data hook ---
@@ -255,6 +258,12 @@ function useWetterstationData() {
           .filter(Boolean) as WetterstationData[];
 
         if (mountedRef.current) {
+          if (result.length === 0) {
+            console.warn(
+              'Wetterstation: no stations in result, features:',
+              geojson.features.length
+            );
+          }
           setData(result);
         }
       } catch (err) {
