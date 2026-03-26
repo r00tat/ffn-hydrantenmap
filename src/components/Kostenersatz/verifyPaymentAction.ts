@@ -23,7 +23,9 @@ export interface PaymentVerificationResult {
 export async function verifyPaymentAndComplete(
   firecallId: string,
   calculationId: string,
-  token: string
+  token: string,
+  smpStatus?: string,
+  smpTxCode?: string,
 ): Promise<PaymentVerificationResult> {
   if (!firecallId || !calculationId || !token) {
     return { success: false, error: 'Ungültige Parameter' };
@@ -52,48 +54,65 @@ export async function verifyPaymentAndComplete(
       return { success: false, error: 'Ungültiger Zugangstoken' };
     }
 
-    // Verify payment with SumUp API
-    if (!calculation.sumupCheckoutId) {
-      return { success: false, error: 'Keine Zahlung gefunden' };
-    }
-
-    const apiKey = process.env.SUMUP_API_KEY;
-    if (!apiKey) {
-      return { success: false, error: 'Zahlungssystem nicht konfiguriert' };
-    }
-
-    const checkoutResponse = await fetch(
-      `https://api.sumup.com/v0.1/checkouts/${calculation.sumupCheckoutId}`,
-      { headers: { Authorization: `Bearer ${apiKey}` } }
-    );
-
-    if (!checkoutResponse.ok) {
-      return { success: false, error: 'Zahlungsstatus konnte nicht geprüft werden' };
-    }
-
-    const checkout = await checkoutResponse.json();
-    const sumupStatus = checkout.status?.toUpperCase();
-
-    if (sumupStatus !== 'PAID') {
-      return {
-        success: false,
-        error: sumupStatus === 'PENDING'
-          ? 'Zahlung wird noch verarbeitet. Bitte versuchen Sie es in Kürze erneut.'
-          : 'Zahlung war nicht erfolgreich',
-      };
-    }
-
-    // Update payment status if not yet updated (webhook may not have fired yet)
-    if (calculation.sumupPaymentStatus !== 'paid') {
-      const updateData: Record<string, any> = {
-        sumupPaymentStatus: 'paid',
-        sumupPaidAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      if (checkout.transactions?.[0]?.transaction_code) {
-        updateData.sumupTransactionCode = checkout.transactions[0].transaction_code;
+    // Verify payment: hosted checkout (has sumupCheckoutId) or deep link (has smpStatus)
+    if (calculation.sumupCheckoutId) {
+      // Hosted checkout flow: verify via SumUp API
+      const apiKey = process.env.SUMUP_API_KEY;
+      if (!apiKey) {
+        return { success: false, error: 'Zahlungssystem nicht konfiguriert' };
       }
-      await calculationRef.update(updateData);
+
+      const checkoutResponse = await fetch(
+        `https://api.sumup.com/v0.1/checkouts/${calculation.sumupCheckoutId}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+
+      if (!checkoutResponse.ok) {
+        return { success: false, error: 'Zahlungsstatus konnte nicht geprüft werden' };
+      }
+
+      const checkout = await checkoutResponse.json();
+      const checkoutStatus = checkout.status?.toUpperCase();
+
+      if (checkoutStatus !== 'PAID') {
+        return {
+          success: false,
+          error: checkoutStatus === 'PENDING'
+            ? 'Zahlung wird noch verarbeitet. Bitte versuchen Sie es in Kürze erneut.'
+            : 'Zahlung war nicht erfolgreich',
+        };
+      }
+
+      if (calculation.sumupPaymentStatus !== 'paid') {
+        const updateData: Record<string, any> = {
+          sumupPaymentStatus: 'paid',
+          sumupPaidAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        if (checkout.transactions?.[0]?.transaction_code) {
+          updateData.sumupTransactionCode = checkout.transactions[0].transaction_code;
+        }
+        await calculationRef.update(updateData);
+      }
+    } else if (smpStatus) {
+      // Deep link flow: SumUp app returned via callback with smp-status
+      if (smpStatus !== 'success') {
+        return { success: false, error: 'Zahlung war nicht erfolgreich' };
+      }
+
+      if (calculation.sumupPaymentStatus !== 'paid') {
+        const updateData: Record<string, any> = {
+          sumupPaymentStatus: 'paid',
+          sumupPaidAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        if (smpTxCode) {
+          updateData.sumupTransactionCode = smpTxCode;
+        }
+        await calculationRef.update(updateData);
+      }
+    } else {
+      return { success: false, error: 'Keine Zahlung gefunden' };
     }
 
     // Auto-close and send email (idempotent — safe if webhook already did it)

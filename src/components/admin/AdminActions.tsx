@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import { useCallback, useState } from 'react';
 import {
   cleanupOrphanedItems,
+  copyClusterDataToDev,
   copyUserAndGroupsToDev,
   findOrphanedItems,
   OrphanedItemsResult,
@@ -81,6 +82,17 @@ export default function AdminActions() {
     );
   }, []);
 
+  const copyClustersToDev = useCallback(async () => {
+    setStatus('Copying cluster data to dev...');
+    const result = await copyClusterDataToDev();
+    const collectionSummary = Object.entries(result.collections)
+      .map(([name, count]) => `${count} ${name}`)
+      .join(', ');
+    setStatus(
+      `Copied ${collectionSummary} and ${result.clustersCount} clusters from prod to dev (ffndev).`
+    );
+  }, []);
+
   return (
     <Box>
       <Typography variant="body1" sx={{ mb: 2 }}>
@@ -117,6 +129,14 @@ export default function AdminActions() {
           </Button>{' '}
           <Typography component="span" variant="body2" color="text.secondary">
             Copy user and groups collections from prod to ffndev
+          </Typography>
+        </Box>
+        <Box>
+          <Button onClick={copyClustersToDev} variant="contained" color="warning">
+            Copy cluster data to dev
+          </Button>{' '}
+          <Typography component="span" variant="body2" color="text.secondary">
+            Copy base collections (hydrant, risikoobjekt, ...) and clusters from prod to ffndev
           </Typography>
         </Box>
         <Box>
