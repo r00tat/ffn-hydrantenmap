@@ -17,13 +17,12 @@ import { useState, useCallback, useMemo } from 'react';
 import FileUpload from './FileUpload';
 import ProgressStepper, { type StepStatus } from './ProgressStepper';
 import {
-  parseAndConvertCsv,
-  matchRecords,
+  parseAndMatchCsv,
   importRecords,
-  type CsvParseResult,
+  type ParseAndMatchResult,
+  type ClientMatchResult,
   type ImportResult,
 } from '../../app/admin/hydrantenCsvImportAction';
-import type { MatchResult } from '../../server/hydrantenMatcher';
 
 const STEPS = [
   { label: 'CSV parsen', description: 'Datei lesen, Felder mappen, Dezimalkomma konvertieren' },
@@ -42,8 +41,7 @@ export default function HydrantenCsvImport() {
   const [error, setError] = useState<string | undefined>();
   const [isRunning, setIsRunning] = useState(false);
 
-  const [parseResult, setParseResult] = useState<CsvParseResult | null>(null);
-  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [parseMatchResult, setParseMatchResult] = useState<ParseAndMatchResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -53,8 +51,7 @@ export default function HydrantenCsvImport() {
     setStatus('pending');
     setError(undefined);
     setIsRunning(false);
-    setParseResult(null);
-    setMatchResults([]);
+    setParseMatchResult(null);
     setImportResult(null);
     setStatusFilter('all');
   }, []);
@@ -65,23 +62,14 @@ export default function HydrantenCsvImport() {
     setError(undefined);
 
     try {
-      // Step 0+1: Parse + Convert
+      // Steps 0-2: Parse + Convert + Match (all server-side)
       setActiveStep(0);
       setStatus('in_progress');
 
       const formData = new FormData();
       formData.append('csvFile', csvFile);
-      const result = await parseAndConvertCsv(formData);
-      setParseResult(result);
-
-      setActiveStep(1);
-      setStatus('completed');
-
-      // Step 2: Match
-      setActiveStep(2);
-      setStatus('in_progress');
-      const matches = await matchRecords(result.records);
-      setMatchResults(matches);
+      const result = await parseAndMatchCsv(formData);
+      setParseMatchResult(result);
 
       // Step 3: Preview
       setActiveStep(3);
@@ -95,12 +83,13 @@ export default function HydrantenCsvImport() {
   }, [csvFile]);
 
   const startImport = useCallback(async () => {
+    if (!parseMatchResult) return;
     setIsRunning(true);
     setActiveStep(4);
     setStatus('in_progress');
 
     try {
-      const result = await importRecords(matchResults);
+      const result = await importRecords(parseMatchResult.sessionId);
       setImportResult(result);
       setStatus('completed');
       setIsRunning(false);
@@ -109,21 +98,23 @@ export default function HydrantenCsvImport() {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setIsRunning(false);
     }
-  }, [matchResults]);
+  }, [parseMatchResult]);
+
+  const matches = parseMatchResult?.matches ?? [];
 
   const { newCount, updateCount, duplicateCount } = useMemo(() => ({
-    newCount: matchResults.filter((r) => r.status === 'new').length,
-    updateCount: matchResults.filter((r) => r.status === 'update').length,
-    duplicateCount: matchResults.filter((r) => r.duplicateDocId).length,
-  }), [matchResults]);
+    newCount: matches.filter((r) => r.status === 'new').length,
+    updateCount: matches.filter((r) => r.status === 'update').length,
+    duplicateCount: matches.filter((r) => r.duplicateDocId).length,
+  }), [matches]);
 
   const filteredResults = useMemo(() =>
     statusFilter === 'all'
-      ? matchResults
-      : matchResults.filter((r) => r.status === statusFilter),
-    [matchResults, statusFilter]);
+      ? matches
+      : matches.filter((r) => r.status === statusFilter),
+    [matches, statusFilter]);
 
-  const showPreview = activeStep === 3 && status === 'pending' && matchResults.length > 0;
+  const showPreview = activeStep === 3 && status === 'pending' && matches.length > 0;
   const showSuccess = activeStep === 4 && status === 'completed' && importResult;
 
   return (
@@ -166,11 +157,11 @@ export default function HydrantenCsvImport() {
         </Box>
       )}
 
-      {parseResult && activeStep >= 1 && (
+      {parseMatchResult && activeStep >= 3 && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2">
-            {parseResult.totalParsed} Zeilen geparst, {parseResult.records.length} mit gültigen Koordinaten
-            {parseResult.skippedInvalidCoords > 0 && ` (${parseResult.skippedInvalidCoords} übersprungen)`}
+            {parseMatchResult.totalParsed} Zeilen geparst, {parseMatchResult.totalConverted} mit gültigen Koordinaten
+            {parseMatchResult.skippedInvalidCoords > 0 && ` (${parseMatchResult.skippedInvalidCoords} übersprungen)`}
           </Typography>
         </Box>
       )}
@@ -196,7 +187,7 @@ export default function HydrantenCsvImport() {
             size="small"
             sx={{ mb: 2 }}
           >
-            <ToggleButton value="all">Alle ({matchResults.length})</ToggleButton>
+            <ToggleButton value="all">Alle ({matches.length})</ToggleButton>
             <ToggleButton value="new">Neu ({newCount})</ToggleButton>
             <ToggleButton value="update">Update ({updateCount})</ToggleButton>
           </ToggleButtonGroup>
@@ -217,7 +208,7 @@ export default function HydrantenCsvImport() {
               </TableHead>
               <TableBody>
                 {filteredResults.slice(0, 100).map((result) => (
-                  <TableRow key={result.row.documentKey}>
+                  <TableRow key={`${result.ortschaft}_${result.hydranten_nummer}`}>
                     <TableCell>
                       <Chip
                         label={result.status === 'new' ? 'Neu' : 'Update'}
@@ -225,12 +216,12 @@ export default function HydrantenCsvImport() {
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{result.row.ortschaft}</TableCell>
-                    <TableCell>{result.row.hydranten_nummer}</TableCell>
-                    <TableCell>{result.row.typ}</TableCell>
-                    <TableCell>{result.row.dimension}</TableCell>
-                    <TableCell>{result.row.statischer_druck}</TableCell>
-                    <TableCell>{result.row.dynamischer_druck}</TableCell>
+                    <TableCell>{result.ortschaft}</TableCell>
+                    <TableCell>{result.hydranten_nummer}</TableCell>
+                    <TableCell>{result.typ}</TableCell>
+                    <TableCell>{result.dimension}</TableCell>
+                    <TableCell>{result.statischer_druck}</TableCell>
+                    <TableCell>{result.dynamischer_druck}</TableCell>
                     <TableCell>{result.duplicateDocId ?? '—'}</TableCell>
                   </TableRow>
                 ))}
@@ -249,7 +240,7 @@ export default function HydrantenCsvImport() {
               Abbrechen
             </Button>
             <Button variant="contained" onClick={startImport}>
-              Import starten ({matchResults.length} Hydranten)
+              Import starten ({matches.length} Hydranten)
             </Button>
           </Box>
         </Box>
