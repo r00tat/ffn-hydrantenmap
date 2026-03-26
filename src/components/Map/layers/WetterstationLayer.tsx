@@ -164,7 +164,8 @@ function getParamValue(
 ): number | null {
   const p = params[key];
   if (!p || !p.data || p.data.length === 0) return null;
-  return p.data[0];
+  // Use last data point to match the last timestamp
+  return p.data[p.data.length - 1];
 }
 
 // --- Data hook ---
@@ -219,10 +220,11 @@ function useWetterstationData() {
           stationMap.set(s.id, s);
         }
 
-        const timestamp =
+        const lastIndex =
           geojson.timestamps && geojson.timestamps.length > 0
-            ? geojson.timestamps[geojson.timestamps.length - 1]
-            : '';
+            ? geojson.timestamps.length - 1
+            : -1;
+        const timestamp = lastIndex >= 0 ? geojson.timestamps[lastIndex] : '';
 
         const result: WetterstationData[] = geojson.features
           .map((feature) => {
@@ -257,6 +259,12 @@ function useWetterstationData() {
         }
       } catch (err) {
         console.error('Failed to fetch Wetterstation data', err);
+        // Retry after 30 seconds on failure instead of waiting full 10 minutes
+        if (mountedRef.current) {
+          setTimeout(() => {
+            if (mountedRef.current) refresh();
+          }, 30000);
+        }
       }
     };
 
