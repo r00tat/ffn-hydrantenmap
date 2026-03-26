@@ -13,6 +13,7 @@ import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
+import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import {
@@ -78,7 +79,7 @@ export default function ConnectionMarker({
                 key={index}
                 position={p}
                 title={record.titleFn()}
-                icon={record.icon()}
+                icon={leafletIcons().circle}
                 draggable={editable}
                 autoPan={false}
                 eventHandlers={{
