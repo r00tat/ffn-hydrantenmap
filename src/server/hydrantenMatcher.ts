@@ -12,7 +12,15 @@ export interface MatchResult {
   preservedFields: Record<string, unknown>;
 }
 
-const PRESERVE_FIELDS = ['leistung'];
+/** Fields that come from the CSV — these will be overwritten, not preserved */
+const CSV_FIELDS = new Set([
+  'ortschaft', 'typ', 'hydranten_nummer', 'fuellhydrant', 'dimension',
+  'leitungsart', 'statischer_druck', 'dynamischer_druck', 'druckmessung_datum',
+  'meereshoehe', 'lat', 'lng', 'geohash', 'name',
+]);
+
+/** Firestore/internal fields to skip when preserving */
+const SKIP_FIELDS = new Set(['id']);
 
 /** Maximum distance in meters for alias matching */
 const MAX_ALIAS_DISTANCE_M = 200;
@@ -43,11 +51,13 @@ function distanceMeters(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** Preserve all fields from existing doc that are NOT provided by the CSV */
 function extractPreservedFields(doc: ExistingHydrant): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
-  for (const field of PRESERVE_FIELDS) {
-    if (doc[field] !== undefined && doc[field] !== null) {
-      fields[field] = doc[field];
+  for (const [key, value] of Object.entries(doc)) {
+    if (CSV_FIELDS.has(key) || SKIP_FIELDS.has(key)) continue;
+    if (value !== undefined && value !== null) {
+      fields[key] = value;
     }
   }
   return fields;

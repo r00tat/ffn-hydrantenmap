@@ -98,19 +98,41 @@ describe('matchHydranten', () => {
     expect(result[0].status).toBe('new');
   });
 
-  it('preserves leistung from existing record', () => {
+  it('preserves all non-CSV fields from existing record', () => {
     const rows = [makeRow({})];
     const existing: ExistingHydrant[] = [{
       id: 'neusiedl_hy1',
       ortschaft: 'Neusiedl',
       hydranten_nummer: 'HY1',
       leistung: 1074,
+      custom_note: 'near school',
+      c_x: 37648,
+      c_y: 310270,
     }];
     const result = matchHydranten(rows, existing);
-    expect(result[0].preservedFields).toEqual({ leistung: 1074 });
+    expect(result[0].preservedFields).toMatchObject({
+      leistung: 1074,
+      custom_note: 'near school',
+      c_x: 37648,
+      c_y: 310270,
+    });
   });
 
-  it('does not preserve leistung if not present in existing', () => {
+  it('does not preserve CSV fields from existing record', () => {
+    const rows = [makeRow({})];
+    const existing: ExistingHydrant[] = [{
+      id: 'neusiedl_hy1',
+      ortschaft: 'Neusiedl',
+      hydranten_nummer: 'HY1',
+      dimension: 999, // CSV field — should NOT be preserved
+      leistung: 1074, // non-CSV field — should be preserved
+    }];
+    const result = matchHydranten(rows, existing);
+    expect(result[0].preservedFields.leistung).toBe(1074);
+    expect(result[0].preservedFields.dimension).toBeUndefined();
+  });
+
+  it('returns empty preservedFields when no extra fields exist', () => {
     const rows = [makeRow({})];
     const existing: ExistingHydrant[] = [{
       id: 'neusiedl_hy1',
