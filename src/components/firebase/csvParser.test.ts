@@ -139,3 +139,54 @@ describe('csvToRecords with column mapping', () => {
     expect(record['DoseRate']).toBe('5.36');
   });
 });
+
+describe('RadiaCode TSV end-to-end', () => {
+  const FULL_SAMPLE = `Track: 2026-03-27 08-48-01\tRC-110-004760\tTritolwerk\tEC
+Timestamp\tTime\tLatitude\tLongitude\tAccuracy\tDoseRate\tCountRate\tComment
+134190712898740000\t2026-03-27 07:48:09\t47.9484002\t16.8484409\t9.79\t5.36\t10.6\t
+134190712900590000\t2026-03-27 07:48:10\t47.9484018\t16.8484379\t9.12\t5.36\t10.6\t `;
+
+  it('correctly parses full RadiaCode TSV with auto-detected headerRow', () => {
+    const delimiter = detectDelimiter(FULL_SAMPLE);
+    expect(delimiter).toBe('\t');
+
+    const headerRow = detectHeaderRow(FULL_SAMPLE, delimiter);
+    expect(headerRow).toBe(1);
+
+    const { headers, rows, preHeaderLines } = parseCsv(FULL_SAMPLE, delimiter, headerRow);
+    expect(headers).toContain('Latitude');
+    expect(headers).toContain('Longitude');
+    expect(preHeaderLines).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+
+    const result = csvToRecords(headers, rows);
+    expect(result.latIndex).toBe(2);
+    expect(result.lngIndex).toBe(3);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0]['Latitude']).toBe('47.9484002');
+
+    const metadata = parsePreHeaderMetadata(preHeaderLines, delimiter);
+    expect(metadata.suggestedName).toBe('Tritolwerk');
+  });
+
+  it('supports explicit mapping with excluded columns', () => {
+    const delimiter = detectDelimiter(FULL_SAMPLE);
+    const headerRow = detectHeaderRow(FULL_SAMPLE, delimiter);
+    const { headers, rows } = parseCsv(FULL_SAMPLE, delimiter, headerRow);
+
+    const mapping: ColumnMapping = {
+      latColumn: 2,
+      lngColumn: 3,
+      nameColumn: -1,
+      timestampColumn: 1,
+    };
+    const excluded = new Set([0, 7]); // exclude Timestamp raw + Comment
+
+    const result = csvToRecords(headers, rows, mapping, excluded);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0]['Timestamp']).toBeUndefined();
+    expect(result.records[0]['Comment']).toBeUndefined();
+    expect(result.records[0]['DoseRate']).toBe('5.36');
+    expect(result.records[0]['Accuracy']).toBe('9.79');
+  });
+});
