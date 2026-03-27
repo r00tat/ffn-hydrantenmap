@@ -107,6 +107,7 @@ export function parseGeoJson(
       datum: new Date(
         f.properties['Time Stamp'] ??
           f.properties['timestamp'] ??
+          f.properties['time'] ??
           new Date().toISOString()
       ).toISOString(),
       lat: latlng.lat,

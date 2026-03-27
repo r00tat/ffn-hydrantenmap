@@ -87,6 +87,18 @@ describe('explodeTracksToPoints', () => {
     expect(trackPoints[1].properties.time).toBe('2026-03-27T07:48:10Z');
   });
 
+  it('extracts elevation into ele property', () => {
+    const result = parseGpxFile(SIMPLE_GPX, 'test.gpx');
+    const exploded = explodeTracksToPoints(result.geoJson);
+    const trackPoints = exploded.features.filter(
+      (f) =>
+        f.geometry.type === 'Point' &&
+        f.properties.name?.startsWith('Test Track')
+    );
+    expect(trackPoints[0].properties.ele).toBeCloseTo(5.36);
+    expect(trackPoints[1].properties.ele).toBeCloseTo(10.2);
+  });
+
   it('preserves elevation in coordinates', () => {
     const result = parseGpxFile(SIMPLE_GPX, 'test.gpx');
     const exploded = explodeTracksToPoints(result.geoJson);
@@ -95,7 +107,6 @@ describe('explodeTracksToPoints', () => {
         f.geometry.type === 'Point' &&
         f.properties.name?.startsWith('Test Track')
     );
-    // coordinates are [lon, lat, ele]
     expect((trackPoints[0].geometry as any).coordinates[2]).toBeCloseTo(5.36);
     expect((trackPoints[1].geometry as any).coordinates[2]).toBeCloseTo(10.2);
   });

@@ -41,6 +41,10 @@ export function explodeTracksToPoints(
         if (time) {
           props.time = time;
         }
+        // Extract elevation from coordinates[2] into a property
+        if (coord.length > 2) {
+          props.ele = coord[2];
+        }
         // Remove array-level coordTimes from individual points
         delete props.coordTimes;
 
