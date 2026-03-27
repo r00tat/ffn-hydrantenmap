@@ -14,7 +14,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Slider from '@mui/material/Slider';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
@@ -40,7 +40,7 @@ import {
   TYPE_LABELS,
 } from './geoJsonImport';
 import { generateSchemaFromRecords } from './importUtils';
-import { parseGpxFile } from './gpxParser';
+import { explodeTracksToPoints, parseGpxFile } from './gpxParser';
 
 // --- Format detection ---
 
@@ -192,6 +192,7 @@ export default function LayerImport() {
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [everyNth, setEveryNth] = useState(1);
   const [useMetadataAsLayerName, setUseMetadataAsLayerName] = useState(false);
+  const [gpxAsPoints, setGpxAsPoints] = useState(false);
   const addFirecallItem = useFirecallItemAdd();
 
   // --- File select ---
@@ -207,6 +208,7 @@ export default function LayerImport() {
         setPreview(parseKmlFile(text, file.name));
       } else if (format === 'gpx') {
         const gpx = parseGpxFile(text, file.name);
+        setGpxAsPoints(false);
         setPreview({ format: 'gpx', ...gpx });
       } else {
         const delimiter = detectDelimiter(text);
@@ -348,6 +350,17 @@ export default function LayerImport() {
     [preview]
   );
 
+  // --- GPX: effective geoJson + schema depending on points mode ---
+  const gpxEffective = useMemo(() => {
+    if (!preview || preview.format !== 'gpx') return null;
+    if (!gpxAsPoints) return preview;
+    const exploded = explodeTracksToPoints(preview.geoJson);
+    const { schema, headerToSchemaKey } = generateSchemaFromFeatures(
+      exploded.features
+    );
+    return { ...preview, geoJson: exploded, schema, headerToSchemaKey };
+  }, [preview, gpxAsPoints]);
+
   // --- Import ---
   const handleImport = useCallback(async () => {
     if (!preview) return;
@@ -373,7 +386,9 @@ export default function LayerImport() {
             .map(addFirecallItem)
         );
       } else {
-        const { geoJson, schema, headerToSchemaKey } = preview;
+        const effective =
+          preview.format === 'gpx' && gpxEffective ? gpxEffective : preview;
+        const { geoJson, schema, headerToSchemaKey } = effective;
         const fcItems = parseGeoJson(geoJson, schema, headerToSchemaKey);
         const formatLabel = preview.format === 'kml' ? 'KML' : 'GPX';
 
@@ -393,12 +408,15 @@ export default function LayerImport() {
     }
 
     setUploadInProgress(false);
-  }, [preview, everyNth, layerName, addFirecallItem]);
+  }, [preview, gpxEffective, everyNth, layerName, addFirecallItem]);
 
   // --- Computed values ---
+  const effectivePreview =
+    preview?.format === 'gpx' && gpxEffective ? gpxEffective : preview;
+
   const typeCounts =
-    preview && preview.format !== 'csv'
-      ? preview.geoJson.features.reduce(
+    effectivePreview && effectivePreview.format !== 'csv'
+      ? effectivePreview.geoJson.features.reduce(
           (acc, f) => {
             const t = f.geometry.type;
             acc[t] = (acc[t] ?? 0) + 1;
@@ -514,6 +532,23 @@ export default function LayerImport() {
                 value={layerName}
                 onChange={(e) => handleLayerNameChange(e.target.value)}
               />
+
+              {/* GPX-specific: Import mode */}
+              {preview.format === 'gpx' && (
+                <TextField
+                  label="Import-Modus"
+                  size="small"
+                  select
+                  value={gpxAsPoints ? 'points' : 'lines'}
+                  onChange={(e) => setGpxAsPoints(e.target.value === 'points')}
+                  fullWidth
+                >
+                  <MenuItem value="lines">Tracks als Linien</MenuItem>
+                  <MenuItem value="points">
+                    Tracks als einzelne Messpunkte
+                  </MenuItem>
+                </TextField>
+              )}
 
               {/* CSV-specific: Delimiter */}
               {preview.format === 'csv' && (
@@ -717,7 +752,11 @@ export default function LayerImport() {
 
               {/* Shared: Schema editor */}
               <DataSchemaEditor
-                dataSchema={preview.schema}
+                dataSchema={
+                  effectivePreview?.format !== 'csv'
+                    ? (effectivePreview?.schema ?? preview.schema)
+                    : preview.schema
+                }
                 onChange={handleSchemaChange}
               />
             </Box>
