@@ -167,6 +167,8 @@ jobs:
           context: .
           push: ${{ env.workload_identity_provider != '' }}
           tags: ${{ env.IMAGE_TAG }}
+          build-args: |
+            DOCKER_REGISTRY=${{ env.RUN_REGION }}-docker.pkg.dev/${{ env.GOOGLE_CLOUD_PROJECT }}/dockerhub/
           cache-from: type=registry,ref=${{ env.IMAGE }}:cache
           cache-to: type=inline
       - id: deploy
