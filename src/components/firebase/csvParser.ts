@@ -244,10 +244,13 @@ export function csvRecordsToItems(
         ? record[headers[nameIndex]]
         : `${index + 1}`;
 
-    const datum =
-      timestampIndex >= 0 && record[headers[timestampIndex]]
-        ? new Date(record[headers[timestampIndex]]).toISOString()
-        : new Date().toISOString();
+    let datum = new Date().toISOString();
+    if (timestampIndex >= 0 && record[headers[timestampIndex]]) {
+      const parsed = new Date(record[headers[timestampIndex]]);
+      if (!isNaN(parsed.getTime())) {
+        datum = parsed.toISOString();
+      }
+    }
 
     // Build fieldData using the stable header → schema mapping
     const fieldData: Record<string, string | number | boolean> = {};
