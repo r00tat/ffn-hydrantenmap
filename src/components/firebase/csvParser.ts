@@ -11,39 +11,90 @@ import { DataSchemaField, FirecallItem } from './firestore';
 export type Delimiter = ',' | ';' | '\t';
 
 /**
- * Detect the most likely delimiter by counting occurrences in the first line.
+ * Count occurrences of a delimiter in a single line.
+ */
+function countDelimiter(line: string, delimiter: string): number {
+  return (line.match(new RegExp(delimiter === '\t' ? '\\t' : delimiter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+}
+
+/**
+ * Detect the most likely delimiter by counting occurrences in the first 3
+ * non-empty lines and picking the line with the most delimiters for counting.
  */
 export function detectDelimiter(text: string): Delimiter {
-  const firstLine = text.split('\n')[0] || '';
-  const counts: Record<Delimiter, number> = {
-    ',': (firstLine.match(/,/g) || []).length,
-    ';': (firstLine.match(/;/g) || []).length,
-    '\t': (firstLine.match(/\t/g) || []).length,
-  };
+  const lines = text
+    .split('\n')
+    .map((l) => l.replace(/\r$/, ''))
+    .filter((l) => l.trim() !== '')
+    .slice(0, 3);
+
+  const delimiters: Delimiter[] = [',', ';', '\t'];
+  const totals: Record<Delimiter, number> = { ',': 0, ';': 0, '\t': 0 };
+
+  for (const d of delimiters) {
+    // Use the max count across the first few lines
+    for (const line of lines) {
+      const c = countDelimiter(line, d);
+      if (c > totals[d]) totals[d] = c;
+    }
+  }
+
   // Pick delimiter with highest count; default to ','
   return (
-    (Object.entries(counts) as [Delimiter, number][]).sort(
+    (Object.entries(totals) as [Delimiter, number][]).sort(
       (a, b) => b[1] - a[1]
     )[0][0] || ','
   );
 }
 
 /**
- * Parse CSV text into headers and rows.
- * Strips trailing empty columns from headers.
+ * Detect which line is the header row.
+ * If line 0 has significantly fewer delimiters than line 1 (less than half),
+ * returns 1 (header is on line 1). Otherwise returns 0.
  */
-export function parseCsv(
-  text: string,
-  delimiter: Delimiter
-): { headers: string[]; rows: string[][] } {
+export function detectHeaderRow(text: string, delimiter: string): number {
   const lines = text
     .split('\n')
     .map((l) => l.replace(/\r$/, ''))
     .filter((l) => l.trim() !== '');
 
-  if (lines.length === 0) return { headers: [], rows: [] };
+  if (lines.length < 2) return 0;
 
-  let headers = lines[0].split(delimiter);
+  const count0 = countDelimiter(lines[0], delimiter);
+  const count1 = countDelimiter(lines[1], delimiter);
+
+  // If line 0 has less than half the delimiters of line 1, it's metadata
+  if (count1 > 0 && count0 < count1 / 2) return 1;
+
+  return 0;
+}
+
+/**
+ * Parse CSV text into headers and rows.
+ * Strips trailing empty columns from headers.
+ *
+ * @param headerRow - Zero-based index of the header line (default 0).
+ *   Lines before headerRow are returned as `preHeaderLines`.
+ */
+export function parseCsv(
+  text: string,
+  delimiter: Delimiter,
+  headerRow: number = 0
+): { headers: string[]; rows: string[][]; preHeaderLines: string[] } {
+  const lines = text
+    .split('\n')
+    .map((l) => l.replace(/\r$/, ''))
+    .filter((l) => l.trim() !== '');
+
+  if (lines.length === 0) return { headers: [], rows: [], preHeaderLines: [] };
+
+  const preHeaderLines = lines.slice(0, headerRow);
+
+  if (headerRow >= lines.length) {
+    return { headers: [], rows: [], preHeaderLines: lines };
+  }
+
+  let headers = lines[headerRow].split(delimiter);
 
   // Trim trailing empty headers
   while (headers.length > 0 && headers[headers.length - 1].trim() === '') {
@@ -51,13 +102,13 @@ export function parseCsv(
   }
   headers = headers.map((h) => h.trim());
 
-  const rows = lines.slice(1).map((line) => {
+  const rows = lines.slice(headerRow + 1).map((line) => {
     const cols = line.split(delimiter);
     // Only take as many columns as we have headers
     return cols.slice(0, headers.length);
   });
 
-  return { headers, rows };
+  return { headers, rows, preHeaderLines };
 }
 
 export interface CsvParseResult {
