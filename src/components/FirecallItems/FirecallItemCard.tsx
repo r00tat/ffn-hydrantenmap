@@ -28,6 +28,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../firebase/firestore';
+import LayerExportMenu from '../firebase/LayerExportMenu';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
 import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
@@ -187,6 +188,12 @@ export default function FirecallItemCard({
                 size="small"
                 variant="outlined"
                 sx={{ flexShrink: 0 }}
+              />
+            )}
+            {compact && subItems && subItems.length > 0 && item.type === 'layer' && (
+              <LayerExportMenu
+                layerName={item.name}
+                items={subItems}
               />
             )}
             {compact && subItems && subItems.length > 0 && canEdit && (
