@@ -76,6 +76,61 @@ export function detectHeaderRow(text: string, delimiter: string): number {
  * @param headerRow - Zero-based index of the header line (default 0).
  *   Lines before headerRow are returned as `preHeaderLines`.
  */
+/**
+ * Split a CSV/TSV line into fields, respecting quoted fields.
+ * - Quoted fields: "value" → value
+ * - Escaped quotes: "say ""hi""" → say "hi"
+ * - Delimiter inside quotes is preserved: "a;b" → a;b
+ * - Unquoted fields are returned as-is
+ */
+function splitCsvLine(line: string, delimiter: string): string[] {
+  const fields: string[] = [];
+  let i = 0;
+  while (i <= line.length) {
+    if (i === line.length) {
+      fields.push('');
+      break;
+    }
+    if (line[i] === '"') {
+      // Quoted field
+      let value = '';
+      i++; // skip opening quote
+      while (i < line.length) {
+        if (line[i] === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            // Escaped quote
+            value += '"';
+            i += 2;
+          } else {
+            // Closing quote
+            i++; // skip closing quote
+            break;
+          }
+        } else {
+          value += line[i];
+          i++;
+        }
+      }
+      fields.push(value);
+      // Skip delimiter after quoted field
+      if (i < line.length && line[i] === delimiter) {
+        i++;
+      }
+    } else {
+      // Unquoted field
+      const nextDelim = line.indexOf(delimiter, i);
+      if (nextDelim === -1) {
+        fields.push(line.substring(i));
+        break;
+      } else {
+        fields.push(line.substring(i, nextDelim));
+        i = nextDelim + 1;
+      }
+    }
+  }
+  return fields;
+}
+
 export function parseCsv(
   text: string,
   delimiter: Delimiter,
@@ -94,7 +149,7 @@ export function parseCsv(
     return { headers: [], rows: [], preHeaderLines: lines };
   }
 
-  let headers = lines[headerRow].split(delimiter);
+  let headers = splitCsvLine(lines[headerRow], delimiter);
 
   // Trim trailing empty headers
   while (headers.length > 0 && headers[headers.length - 1].trim() === '') {
@@ -103,7 +158,7 @@ export function parseCsv(
   headers = headers.map((h) => h.trim());
 
   const rows = lines.slice(headerRow + 1).map((line) => {
-    const cols = line.split(delimiter);
+    const cols = splitCsvLine(line, delimiter);
     // Only take as many columns as we have headers
     return cols.slice(0, headers.length);
   });
