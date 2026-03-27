@@ -157,6 +157,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
 
       - id: image
         name: Build and push image
@@ -165,8 +167,8 @@ jobs:
           context: .
           push: ${{ env.workload_identity_provider != '' }}
           tags: ${{ env.IMAGE_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=inline
       - id: deploy
         name: deploy to Cloud Run
         if: ${{ env.workload_identity_provider != '' }}
