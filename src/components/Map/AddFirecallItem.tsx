@@ -12,6 +12,7 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import { useDrawing } from './Drawing/DrawingContext';
 import useMapEditor from '../../hooks/useMapEditor';
+import { usePositionContext } from './Position';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -19,6 +20,7 @@ export interface MapActionButtonsOptions {
 
 export default function AddFirecallItem() {
   const map = useMap();
+  const [userPosition, gotPosition, , enableTracking] = usePositionContext();
   const leitungen = useLeitungen();
   const drawingCtx = useDrawing();
   const addFirecallItem = useFirecallItemAdd();
@@ -31,6 +33,13 @@ export default function AddFirecallItem() {
     setLastSelectedLayer,
   } = useMapEditor();
 
+  const getDefaultPosition = useCallback((): L.LatLng => {
+    if (gotPosition && map.getBounds().contains([userPosition.lat, userPosition.lng])) {
+      return L.latLng(userPosition.lat, userPosition.lng);
+    }
+    return map.getCenter();
+  }, [map, gotPosition, userPosition]);
+
   const saveItem = useCallback(
     (item?: FirecallItem) => {
       if (item) {
@@ -38,13 +47,13 @@ export default function AddFirecallItem() {
 
         addFirecallItem({
           datum: new Date().toISOString(),
-          lat: map.getCenter().lat,
-          lng: map.getCenter().lng,
+          lat: getDefaultPosition().lat,
+          lng: getDefaultPosition().lng,
           ...rest,
         });
       }
     },
-    [addFirecallItem, map]
+    [addFirecallItem, map, getDefaultPosition]
   );
 
   useMapEvent('mousemove', (e) => {
@@ -57,6 +66,12 @@ export default function AddFirecallItem() {
       });
     }
   });
+
+  useEffect(() => {
+    if (editFirecallItemIsOpen) {
+      enableTracking();
+    }
+  }, [editFirecallItemIsOpen, enableTracking]);
 
   // Disable pointer-events on existing markers while placing a new item
   // so clicks pass through to the map
@@ -107,8 +122,8 @@ export default function AddFirecallItem() {
           ) {
             saveItem({
               ...fzg,
-              lat: map.getCenter().lat,
-              lng: map.getCenter().lng,
+              lat: getDefaultPosition().lat,
+              lng: getDefaultPosition().lng,
             });
           } else {
             console.info(
@@ -116,15 +131,15 @@ export default function AddFirecallItem() {
             );
             setFzgDrawing({
               ...fzg,
-              lat: map.getCenter().lat,
-              lng: map.getCenter().lng,
+              lat: getDefaultPosition().lat,
+              lng: getDefaultPosition().lng,
             });
           }
         }
         // saveItem(fzg);
       }
     },
-    [leitungen, drawingCtx, map, saveItem, setEditFirecallItemIsOpen, setLastSelectedLayer]
+    [leitungen, drawingCtx, map, saveItem, getDefaultPosition, setEditFirecallItemIsOpen, setLastSelectedLayer]
   );
 
   return (

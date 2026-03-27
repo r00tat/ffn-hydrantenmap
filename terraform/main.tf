@@ -207,6 +207,30 @@ import {
   id = "projects/${var.project}/secrets/BLAULICHTSMS_CUSTOMER_ID"
 }
 
+resource "google_artifact_registry_repository" "dockerhub_cache" {
+  project       = var.project
+  location      = var.run_region
+  repository_id = "dockerhub"
+  description   = "Pull-through cache for Docker Hub to avoid rate limits"
+  format        = "DOCKER"
+  mode          = "REMOTE_REPOSITORY"
+
+  remote_repository_config {
+    description = "Docker Hub mirror"
+    docker_repository {
+      public_repository = "DOCKER_HUB"
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-stale-90d"
+    action = "DELETE"
+    condition {
+      older_than = "${90 * 24 * 60 * 60}s"
+    }
+  }
+}
+
 resource "google_artifact_registry_repository" "run_docker2" {
   project       = var.project
   location      = var.run_region

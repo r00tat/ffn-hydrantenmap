@@ -151,17 +151,26 @@ jobs:
       - name: "Set up Cloud SDK"
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker for Artifact Registry
+        if: ${{ env.workload_identity_provider != '' }}
+        run: gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+
       - id: image
-        name: Build image
-        run: |
-          set -eo pipefail
-          docker build . --tag ${IMAGE_TAG}
-          if [[ -n "${workload_identity_provider}" ]]; then
-            gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
-            docker push ${IMAGE_TAG}
-          else
-            echo "Skipping push to Cloud run as there are no credentials"
-          fi
+        name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ env.workload_identity_provider != '' }}
+          tags: ${{ env.IMAGE_TAG }}
+          build-args: |
+            DOCKER_REGISTRY=${{ env.RUN_REGION }}-docker.pkg.dev/${{ env.GOOGLE_CLOUD_PROJECT }}/dockerhub/
+          cache-from: type=registry,ref=${{ env.IMAGE }}:cache
+          cache-to: type=inline
       - id: deploy
         name: deploy to Cloud Run
         if: ${{ env.workload_identity_provider != '' }}

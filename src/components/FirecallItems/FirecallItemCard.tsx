@@ -14,6 +14,7 @@ import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Grid, { GridBaseProps } from '@mui/material/Grid';
 import IconButton, { IconButtonProps } from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { SxProps, Theme, styled } from '@mui/material/styles';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -169,19 +170,21 @@ export default function FirecallItemCard({
                 style={{ width: 24, height: 24, objectFit: 'contain', flexShrink: 0 }}
               />
             )}
-            <Typography
-              variant={compact ? 'body1' : 'h5'}
-              component="div"
-              sx={compact ? {
-                flex: 1,
-                minWidth: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              } : { flex: 1 }}
-            >
-              {item.title()} {item.deleted && <b>gelöscht</b>}
-            </Typography>
+            <Tooltip title={compact ? item.title() : ''} enterDelay={300}>
+              <Typography
+                variant={compact ? 'body1' : 'h5'}
+                component="div"
+                sx={compact ? {
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                } : { flex: 1 }}
+              >
+                {compact ? item.name : item.title()} {item.deleted && <b>gelöscht</b>}
+              </Typography>
+            </Tooltip>
             {compact && !iconUrl && (
               <Chip
                 label={item.markerName()}

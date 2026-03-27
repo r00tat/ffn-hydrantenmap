@@ -264,8 +264,6 @@ export default function FirecallItemFields({
                 onChange={onChange(key)}
                 value={((item as any)[key] as string) || ''}
                 inputRef={key === firstTextFieldKey ? autoFocusRef : undefined}
-                required={key === 'name'}
-                error={key === 'name' && !((item as any)[key] as string)?.trim()}
               />
             )}
         </React.Fragment>
