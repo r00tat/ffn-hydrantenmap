@@ -3,6 +3,9 @@ import {
   detectDelimiter,
   detectHeaderRow,
   parseCsv,
+  csvToRecords,
+  parsePreHeaderMetadata,
+  ColumnMapping,
 } from './csvParser';
 
 const RADIACODE_TSV = [
@@ -71,5 +74,68 @@ describe('detectDelimiter', () => {
 
   it('detects comma for simple CSV', () => {
     expect(detectDelimiter(SIMPLE_CSV)).toBe(',');
+  });
+});
+
+describe('parsePreHeaderMetadata', () => {
+  it('extracts a layer name from RadiaCode pre-header', () => {
+    const lines = ['Track: 2026-03-27 08-48-01\tRC-110-004760\tTritolwerk\tEC'];
+    const result = parsePreHeaderMetadata(lines, '\t');
+    expect(result.suggestedName).toBe('Tritolwerk');
+  });
+
+  it('uses first field when no recognizable name found', () => {
+    const lines = ['Some metadata line'];
+    const result = parsePreHeaderMetadata(lines, '\t');
+    expect(result.suggestedName).toBe('Some metadata line');
+  });
+
+  it('returns empty string for empty pre-header', () => {
+    const result = parsePreHeaderMetadata([], '\t');
+    expect(result.suggestedName).toBe('');
+  });
+});
+
+describe('csvToRecords with column mapping', () => {
+  const TSV_HEADERS = ['Timestamp', 'Time', 'Latitude', 'Longitude', 'Accuracy', 'DoseRate', 'CountRate', 'Comment'];
+  const TSV_ROWS = [
+    ['134190712898740000', '2026-03-27 07:48:09', '47.9484002', '16.8484409', '9.79', '5.36', '10.6', ' '],
+  ];
+
+  it('uses auto-detect when no mapping is provided', () => {
+    const result = csvToRecords(TSV_HEADERS, TSV_ROWS);
+    expect(result.latIndex).toBe(2); // Latitude
+    expect(result.lngIndex).toBe(3); // Longitude
+  });
+
+  it('uses explicit mapping when provided', () => {
+    const mapping: ColumnMapping = {
+      latColumn: 2,
+      lngColumn: 3,
+      nameColumn: -1,
+      timestampColumn: 1,
+    };
+    const result = csvToRecords(TSV_HEADERS, TSV_ROWS, mapping);
+    expect(result.latIndex).toBe(2);
+    expect(result.lngIndex).toBe(3);
+    expect(result.nameIndex).toBe(-1);
+    expect(result.timestampIndex).toBe(1);
+    expect(result.records).toHaveLength(1);
+  });
+
+  it('respects excludedColumns and omits them from records', () => {
+    const mapping: ColumnMapping = {
+      latColumn: 2,
+      lngColumn: 3,
+      nameColumn: -1,
+      timestampColumn: 1,
+    };
+    const excludedColumns = new Set([0, 4, 7]); // Timestamp(raw), Accuracy, Comment
+    const result = csvToRecords(TSV_HEADERS, TSV_ROWS, mapping, excludedColumns);
+    const record = result.records[0];
+    expect(record['Accuracy']).toBeUndefined();
+    expect(record['Comment']).toBeUndefined();
+    expect(record['Timestamp']).toBeUndefined();
+    expect(record['DoseRate']).toBe('5.36');
   });
 });

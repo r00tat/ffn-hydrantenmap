@@ -127,17 +127,32 @@ export interface CsvParseResult {
   skippedRows: number;
 }
 
+export interface ColumnMapping {
+  latColumn: number; // -1 = not assigned
+  lngColumn: number;
+  nameColumn: number;
+  timestampColumn: number;
+}
+
 /**
  * Convert parsed CSV to records, detecting special columns and filtering invalid rows.
+ *
+ * When `mapping` is provided, its indices are used instead of auto-detecting
+ * via `findColumn`. When `excludedColumns` is provided, those column indices
+ * are skipped when building records.
  */
 export function csvToRecords(
   headers: string[],
-  rows: string[][]
+  rows: string[][],
+  mapping?: ColumnMapping,
+  excludedColumns?: Set<number>
 ): CsvParseResult {
-  const latIndex = findColumn(headers, KNOWN_LAT_NAMES);
-  const lngIndex = findColumn(headers, KNOWN_LNG_NAMES);
-  const nameIndex = findColumn(headers, KNOWN_NAME_NAMES);
-  const timestampIndex = findColumn(headers, KNOWN_TIMESTAMP_NAMES);
+  const latIndex = mapping ? mapping.latColumn : findColumn(headers, KNOWN_LAT_NAMES);
+  const lngIndex = mapping ? mapping.lngColumn : findColumn(headers, KNOWN_LNG_NAMES);
+  const nameIndex = mapping ? mapping.nameColumn : findColumn(headers, KNOWN_NAME_NAMES);
+  const timestampIndex = mapping
+    ? mapping.timestampColumn
+    : findColumn(headers, KNOWN_TIMESTAMP_NAMES);
 
   let skippedRows = 0;
   const records: Record<string, string>[] = [];
@@ -157,6 +172,7 @@ export function csvToRecords(
 
     const record: Record<string, string> = {};
     for (let i = 0; i < headers.length; i++) {
+      if (excludedColumns?.has(i)) continue;
       const value = row[i]?.trim() ?? '';
       if (value !== '') {
         record[headers[i]] = value;
@@ -254,4 +270,32 @@ export function csvRecordsToItems(
       fieldData,
     } as FirecallItem;
   });
+}
+
+/**
+ * Extract metadata from pre-header lines (lines before the CSV header).
+ * Returns a suggested layer name derived from the first pre-header line.
+ */
+export function parsePreHeaderMetadata(
+  preHeaderLines: string[],
+  delimiter: string
+): { suggestedName: string } {
+  if (preHeaderLines.length === 0) return { suggestedName: '' };
+
+  const fields = preHeaderLines[0]
+    .split(delimiter)
+    .map((f) => f.trim())
+    .filter((f) => f !== '');
+
+  // Try to find a name-like field: non-numeric, length > 1, not a date/ID/Track pattern
+  const nameLike = fields.find(
+    (f) =>
+      f.length > 1 &&
+      isNaN(Number(f)) &&
+      !/^\d{4}-\d{2}-\d{2}/.test(f) &&
+      !/^[A-Z]{2,3}-\d+/.test(f) && // Skip device IDs like RC-110-004760
+      !/^Track:/i.test(f) // Skip "Track: ..." metadata fields
+  );
+
+  return { suggestedName: nameLike || fields[0] || '' };
 }
