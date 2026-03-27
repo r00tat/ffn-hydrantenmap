@@ -67,6 +67,44 @@ describe('parseCsv with headerRow', () => {
   });
 });
 
+describe('parseCsv with quoted fields', () => {
+  it('strips surrounding quotes from fields', () => {
+    const csv = 'name;value\n"hello";world';
+    const result = parseCsv(csv, ';', 0);
+    expect(result.rows[0][0]).toBe('hello');
+    expect(result.rows[0][1]).toBe('world');
+  });
+
+  it('treats "" as empty string', () => {
+    const csv = 'a;b;c\n1;"";3';
+    const result = parseCsv(csv, ';', 0);
+    expect(result.rows[0][1]).toBe('');
+  });
+
+  it('handles delimiter inside quoted fields', () => {
+    const csv = 'name;desc\n"hello;world";test';
+    const result = parseCsv(csv, ';', 0);
+    expect(result.rows[0][0]).toBe('hello;world');
+    expect(result.rows[0][1]).toBe('test');
+  });
+
+  it('handles escaped quotes inside quoted fields', () => {
+    const csv = 'name;value\n"say ""hi""";ok';
+    const result = parseCsv(csv, ';', 0);
+    expect(result.rows[0][0]).toBe('say "hi"');
+  });
+
+  it('parses RadiaCode CSV with quoted empty strings and semicolons', () => {
+    const csv = [
+      'Id;Event;Comment;Latitude;Longitude',
+      '233696;"Current device parameters";"";0;0',
+    ].join('\n');
+    const result = parseCsv(csv, ';', 0);
+    expect(result.rows[0][1]).toBe('Current device parameters');
+    expect(result.rows[0][2]).toBe('');
+  });
+});
+
 describe('detectDelimiter', () => {
   it('detects tab as delimiter for RadiaCode TSV', () => {
     expect(detectDelimiter(RADIACODE_TSV)).toBe('\t');

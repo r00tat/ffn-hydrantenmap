@@ -46,10 +46,16 @@ import { parseGpxFile } from './gpxParser';
 
 type ImportFormat = 'kml' | 'gpx' | 'csv';
 
-function detectFormat(fileName: string): ImportFormat {
+function detectFormat(fileName: string, content: string): ImportFormat {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'kml') return 'kml';
   if (ext === 'gpx') return 'gpx';
+  // For .xml or unknown extensions, sniff the content for XML root element
+  if (ext === 'xml' || content.trimStart().startsWith('<?xml')) {
+    const lower = content.toLowerCase();
+    if (lower.includes('<gpx')) return 'gpx';
+    if (lower.includes('<kml')) return 'kml';
+  }
   return 'csv';
 }
 
@@ -195,7 +201,7 @@ export default function LayerImport() {
     setParsing(true);
     try {
       const text = await readFileAsText(file);
-      const format = detectFormat(file.name);
+      const format = detectFormat(file.name, text);
 
       if (format === 'kml') {
         setPreview(parseKmlFile(text, file.name));
@@ -466,7 +472,7 @@ export default function LayerImport() {
         Importieren
         <VisuallyHiddenInput
           type="file"
-          accept=".kml,.gpx,.csv,.tsv,.txt,text/xml,application/vnd.google-earth.kml+xml"
+          accept=".kml,.gpx,.xml,.csv,.tsv,.txt,text/xml,application/vnd.google-earth.kml+xml"
           onChange={(event) => {
             (async () => {
               if (event.target.files) {
