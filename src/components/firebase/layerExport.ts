@@ -224,13 +224,14 @@ export function exportLayerItemsToCsv(items: FirecallItem[]): string {
 /**
  * Export layer items to GPX 1.1 format.
  */
-export function exportLayerItemsToGpx(items: FirecallItem[]): string {
+export function exportLayerItemsToGpx(items: FirecallItem[], layerName: string): string {
   const parts: string[] = [];
 
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
   parts.push(
     '<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1" creator="Einsatzkarte">',
   );
+  parts.push(`  <metadata><name>${escapeXml(layerName)}</name></metadata>`);
 
   for (const item of items) {
     const instance = getItemInstance(item);
@@ -301,12 +302,13 @@ export function exportLayerItemsToGpx(items: FirecallItem[]): string {
 /**
  * Export layer items to KML 2.2 format.
  */
-export function exportLayerItemsToKml(items: FirecallItem[]): string {
+export function exportLayerItemsToKml(items: FirecallItem[], layerName: string): string {
   const parts: string[] = [];
 
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
   parts.push('<kml xmlns="http://www.opengis.net/kml/2.2">');
   parts.push('  <Document>');
+  parts.push(`    <name>${escapeXml(layerName)}</name>`);
 
   for (const item of items) {
     const instance = getItemInstance(item);

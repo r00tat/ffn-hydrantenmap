@@ -338,7 +338,7 @@ describe('exportLayerItemsToCsv', () => {
 
 describe('exportLayerItemsToGpx', () => {
   it('returns empty GPX document for empty array', () => {
-    const gpx = exportLayerItemsToGpx([]);
+    const gpx = exportLayerItemsToGpx([],  'Testebene');
     expect(gpx).toContain('<?xml');
     expect(gpx).toContain('<gpx');
     expect(gpx).toContain('</gpx>');
@@ -347,7 +347,7 @@ describe('exportLayerItemsToGpx', () => {
   });
 
   it('generates waypoint for point item', () => {
-    const gpx = exportLayerItemsToGpx([makeMarker()]);
+    const gpx = exportLayerItemsToGpx([makeMarker()],  'Testebene');
     expect(gpx).toContain('<wpt');
     expect(gpx).toContain('lat="47.948"');
     expect(gpx).toContain('lon="16.848"');
@@ -359,7 +359,7 @@ describe('exportLayerItemsToGpx', () => {
   });
 
   it('generates track for line item', () => {
-    const gpx = exportLayerItemsToGpx([makeLine()]);
+    const gpx = exportLayerItemsToGpx([makeLine()],  'Testebene');
     expect(gpx).toContain('<trk>');
     expect(gpx).toContain('<name>Test Line</name>');
     expect(gpx).toContain('<trkseg>');
@@ -376,19 +376,19 @@ describe('exportLayerItemsToGpx', () => {
   });
 
   it('generates track for connection item', () => {
-    const gpx = exportLayerItemsToGpx([makeConnection()]);
+    const gpx = exportLayerItemsToGpx([makeConnection()],  'Testebene');
     expect(gpx).toContain('<trk>');
     expect(gpx).toContain('<name>Connection 1</name>');
   });
 
   it('generates track for area item', () => {
-    const gpx = exportLayerItemsToGpx([makeArea()]);
+    const gpx = exportLayerItemsToGpx([makeArea()],  'Testebene');
     expect(gpx).toContain('<trk>');
     expect(gpx).toContain('<name>Test Area</name>');
   });
 
   it('includes type-specific fields in extensions', () => {
-    const gpx = exportLayerItemsToGpx([makeVehicle()]);
+    const gpx = exportLayerItemsToGpx([makeVehicle()],  'Testebene');
     expect(gpx).toContain('<extensions>');
     expect(gpx).toContain('<fw>FF Neusiedl</fw>');
     expect(gpx).toContain('<besatzung>6</besatzung>');
@@ -400,7 +400,7 @@ describe('exportLayerItemsToGpx', () => {
     const item = makeMarker({
       fieldData: { temperature: 25 },
     });
-    const gpx = exportLayerItemsToGpx([item]);
+    const gpx = exportLayerItemsToGpx([item],  'Testebene');
     expect(gpx).toContain('<extensions>');
     expect(gpx).toContain('<fieldData.temperature>25</fieldData.temperature>');
     expect(gpx).toContain('</extensions>');
@@ -408,14 +408,14 @@ describe('exportLayerItemsToGpx', () => {
 
   it('escapes XML entities in text content', () => {
     const item = makeMarker({ name: 'A & B <test>', beschreibung: '"quoted"' });
-    const gpx = exportLayerItemsToGpx([item]);
+    const gpx = exportLayerItemsToGpx([item],  'Testebene');
     expect(gpx).toContain('<name>A &amp; B &lt;test&gt;</name>');
     expect(gpx).toContain('<desc>&quot;quoted&quot;</desc>');
   });
 
   it('falls back to start+end points when positions is missing for multipoint', () => {
     const item = makeLine({ positions: undefined });
-    const gpx = exportLayerItemsToGpx([item]);
+    const gpx = exportLayerItemsToGpx([item],  'Testebene');
     expect(gpx).toContain('<trk>');
     // Should use lat/lng as start, destLat/destLng as end
     expect(gpx).toContain('lat="47.948"');
@@ -425,7 +425,7 @@ describe('exportLayerItemsToGpx', () => {
   });
 
   it('contains valid GPX 1.1 header', () => {
-    const gpx = exportLayerItemsToGpx([]);
+    const gpx = exportLayerItemsToGpx([],  'Testebene');
     expect(gpx).toContain('version="1.1"');
     expect(gpx).toContain('xmlns="http://www.topografix.com/GPX/1/1"');
   });
@@ -435,7 +435,7 @@ describe('exportLayerItemsToGpx', () => {
 
 describe('exportLayerItemsToKml', () => {
   it('returns empty KML document for empty array', () => {
-    const kml = exportLayerItemsToKml([]);
+    const kml = exportLayerItemsToKml([], 'Testebene');
     expect(kml).toContain('<?xml');
     expect(kml).toContain('<kml');
     expect(kml).toContain('</kml>');
@@ -443,7 +443,7 @@ describe('exportLayerItemsToKml', () => {
   });
 
   it('generates Point placemark for point item', () => {
-    const kml = exportLayerItemsToKml([makeMarker()]);
+    const kml = exportLayerItemsToKml([makeMarker()], 'Testebene');
     expect(kml).toContain('<Placemark>');
     expect(kml).toContain('<name>Test Marker</name>');
     expect(kml).toContain('<description>A test marker</description>');
@@ -455,7 +455,7 @@ describe('exportLayerItemsToKml', () => {
   });
 
   it('generates LineString for line item', () => {
-    const kml = exportLayerItemsToKml([makeLine()]);
+    const kml = exportLayerItemsToKml([makeLine()], 'Testebene');
     expect(kml).toContain('<LineString>');
     expect(kml).toContain('<coordinates>');
     // Check lng,lat order for line points
@@ -467,12 +467,12 @@ describe('exportLayerItemsToKml', () => {
   });
 
   it('generates LineString for connection item', () => {
-    const kml = exportLayerItemsToKml([makeConnection()]);
+    const kml = exportLayerItemsToKml([makeConnection()], 'Testebene');
     expect(kml).toContain('<LineString>');
   });
 
   it('generates Polygon for area item', () => {
-    const kml = exportLayerItemsToKml([makeArea()]);
+    const kml = exportLayerItemsToKml([makeArea()], 'Testebene');
     expect(kml).toContain('<Polygon>');
     expect(kml).toContain('<outerBoundaryIs>');
     expect(kml).toContain('<LinearRing>');
@@ -492,7 +492,7 @@ describe('exportLayerItemsToKml', () => {
   });
 
   it('includes ExtendedData for type-specific fields', () => {
-    const kml = exportLayerItemsToKml([makeVehicle()]);
+    const kml = exportLayerItemsToKml([makeVehicle()], 'Testebene');
     expect(kml).toContain('<ExtendedData>');
     expect(kml).toContain('<Data name="fw">');
     expect(kml).toContain('<value>FF Neusiedl</value>');
@@ -505,31 +505,31 @@ describe('exportLayerItemsToKml', () => {
     const item = makeMarker({
       fieldData: { temperature: 25 },
     });
-    const kml = exportLayerItemsToKml([item]);
+    const kml = exportLayerItemsToKml([item], 'Testebene');
     expect(kml).toContain('<Data name="fieldData.temperature">');
     expect(kml).toContain('<value>25</value>');
   });
 
   it('escapes XML entities', () => {
     const item = makeMarker({ name: 'A & B <test>' });
-    const kml = exportLayerItemsToKml([item]);
+    const kml = exportLayerItemsToKml([item], 'Testebene');
     expect(kml).toContain('<name>A &amp; B &lt;test&gt;</name>');
   });
 
   it('uses altitude 0 when alt is undefined', () => {
     const item = makeMarker({ alt: undefined });
-    const kml = exportLayerItemsToKml([item]);
+    const kml = exportLayerItemsToKml([item], 'Testebene');
     expect(kml).toContain('<coordinates>16.848,47.948,0</coordinates>');
   });
 
   it('contains valid KML 2.2 header', () => {
-    const kml = exportLayerItemsToKml([]);
+    const kml = exportLayerItemsToKml([], 'Testebene');
     expect(kml).toContain('xmlns="http://www.opengis.net/kml/2.2"');
   });
 
   it('falls back to start+end for multipoint without positions', () => {
     const item = makeConnection({ positions: undefined });
-    const kml = exportLayerItemsToKml([item]);
+    const kml = exportLayerItemsToKml([item], 'Testebene');
     expect(kml).toContain('<LineString>');
     // Should contain start and end coordinates
     expect(kml).toContain('16.848,47.948');

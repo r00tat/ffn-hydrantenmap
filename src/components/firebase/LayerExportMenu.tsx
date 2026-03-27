@@ -50,21 +50,21 @@ export default function LayerExportMenu({
 
   const handleGpx = useCallback(() => {
     downloadText(
-      exportLayerItemsToGpx(items),
+      exportLayerItemsToGpx(items, layerName),
       `${baseName}.gpx`,
       'application/gpx+xml;charset=utf-8'
     );
     handleClose();
-  }, [items, baseName, handleClose]);
+  }, [items, layerName, baseName, handleClose]);
 
   const handleKml = useCallback(() => {
     downloadText(
-      exportLayerItemsToKml(items),
+      exportLayerItemsToKml(items, layerName),
       `${baseName}.kml`,
       'application/vnd.google-earth.kml+xml;charset=utf-8'
     );
     handleClose();
-  }, [items, baseName, handleClose]);
+  }, [items, layerName, baseName, handleClose]);
 
   if (items.length === 0) return null;
 
