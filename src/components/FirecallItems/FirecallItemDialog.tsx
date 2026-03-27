@@ -125,17 +125,28 @@ export default function FirecallItemDialog({
   };
 
   const isExistingItem = !!item.id;
-  const canSave = !!(item as any).name?.trim();
+  const canSave = true;
 
   const handleSave = useCallback(() => {
     if (!canSave) return;
     const flushedFieldData = dataFieldsRef.current?.flush();
+    const data = item.filteredData();
+
+    // Auto-generate name if empty
+    if (!data.name?.trim()) {
+      const typeName = item.markerName();
+      const sameTypeSiblings = siblings.filter(
+        (s) => s.type === item.type && s.id !== item.id,
+      );
+      data.name = `${typeName} ${sameTypeSiblings.length + 1}`;
+    }
+
     const saveItem = flushedFieldData
-      ? { ...item.filteredData(), fieldData: flushedFieldData }
-      : item.filteredData();
+      ? { ...data, fieldData: flushedFieldData }
+      : data;
     setOpen(false);
     onClose(saveItem);
-  }, [canSave, item, onClose]);
+  }, [canSave, item, siblings, onClose]);
 
   return (
     <>
