@@ -11,7 +11,7 @@ import { FirecallArea } from '../FirecallItems/elements/FirecallArea';
 import { coerceValue, inferType } from './importUtils';
 
 export interface KmlGeoProperties {
-  name: string;
+  name?: string;
   styleUrl?: string;
   styleHash?: string;
   stroke?: string;

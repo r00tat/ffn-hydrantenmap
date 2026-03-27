@@ -47,8 +47,7 @@ import FirecallItemCard, {
 } from '../FirecallItems/FirecallItemCard';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { getItemInstance } from '../FirecallItems/elements';
-import CsvImport from '../firebase/CsvImport';
-import KmlImport from '../firebase/KmlImport';
+import LayerImport from '../firebase/LayerImport';
 import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
@@ -346,7 +345,7 @@ export default function LayersPage() {
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} sensors={sensors}>
         <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h4" gutterBottom>
-            Ebenen {!historyModeActive && <><KmlImport /><CsvImport /></>}
+            Ebenen {!historyModeActive && <LayerImport />}
           </Typography>
           <Grid container spacing={2}>
             <Grid
