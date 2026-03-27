@@ -153,7 +153,7 @@ export default function HydrantenCsvImport() {
     }
   }, [parseMatchResult]);
 
-  const matches = parseMatchResult?.matches ?? [];
+  const matches = useMemo(() => parseMatchResult?.matches ?? [], [parseMatchResult]);
 
   const { newCount, updateCount, duplicateCount } = useMemo(() => ({
     newCount: matches.filter((r) => r.status === 'new').length,
