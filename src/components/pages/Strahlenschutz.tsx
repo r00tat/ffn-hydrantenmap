@@ -12,6 +12,9 @@ import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useCallback, useMemo, useState } from 'react';
 import {
+  AufenthaltszeitHistoryEntry,
+  AufenthaltszeitValues,
+  calculateAufenthaltszeit,
   calculateInverseSquareLaw,
   calculateSchutzwert,
   SchutzwertHistoryEntry,
@@ -28,6 +31,116 @@ function parseInput(value: string): number | null {
 
 function formatValue(value: number): string {
   return value.toFixed(4).replace(/\.?0+$/, '');
+}
+
+function FormulaDisplay({
+  formula,
+  substituted,
+}: {
+  formula: string;
+  substituted: string;
+}) {
+  return (
+    <Box sx={{ mt: 1, fontFamily: 'monospace' }}>
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+        {formula}
+      </Typography>
+      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+        {substituted}
+      </Typography>
+    </Box>
+  );
+}
+
+function getAbstandFormulaDisplay(
+  field: keyof StrahlenschutzValues,
+  values: StrahlenschutzValues,
+  resultValue: number
+) {
+  const v = (key: keyof StrahlenschutzValues) =>
+    key === field ? formatValue(resultValue) : formatValue(values[key]!);
+
+  switch (field) {
+    case 'r2':
+      return {
+        formula: 'R2 = D1² × R1 / D2²',
+        substituted: `R2 = ${v('d1')}² × ${v('r1')} / ${v('d2')}² = ${v('r2')}`,
+      };
+    case 'r1':
+      return {
+        formula: 'R1 = D2² × R2 / D1²',
+        substituted: `R1 = ${v('d2')}² × ${v('r2')} / ${v('d1')}² = ${v('r1')}`,
+      };
+    case 'd2':
+      return {
+        formula: 'D2 = D1 × √(R1 / R2)',
+        substituted: `D2 = ${v('d1')} × √(${v('r1')} / ${v('r2')}) = ${v('d2')}`,
+      };
+    case 'd1':
+      return {
+        formula: 'D1 = D2 × √(R2 / R1)',
+        substituted: `D1 = ${v('d2')} × √(${v('r2')} / ${v('r1')}) = ${v('d1')}`,
+      };
+  }
+}
+
+function getSchutzwertFormulaDisplay(
+  field: keyof SchutzwertValues,
+  values: SchutzwertValues,
+  resultValue: number
+) {
+  const v = (key: keyof SchutzwertValues) =>
+    key === field ? formatValue(resultValue) : formatValue(values[key]!);
+
+  switch (field) {
+    case 'r':
+      return {
+        formula: 'R = R₀ / S^n',
+        substituted: `R = ${v('r0')} / ${v('s')}^${v('n')} = ${v('r')}`,
+      };
+    case 'r0':
+      return {
+        formula: 'R₀ = R × S^n',
+        substituted: `R₀ = ${v('r')} × ${v('s')}^${v('n')} = ${v('r0')}`,
+      };
+    case 's':
+      return {
+        formula: 'S = (R₀ / R)^(1/n)',
+        substituted: `S = (${v('r0')} / ${v('r')})^(1/${v('n')}) = ${v('s')}`,
+      };
+    case 'n':
+      return {
+        formula: 'n = log(R₀ / R) / log(S)',
+        substituted: `n = log(${v('r0')} / ${v('r')}) / log(${v('s')}) = ${v('n')}`,
+      };
+  }
+}
+
+function getAufenthaltszeitFormulaDisplay(
+  field: keyof AufenthaltszeitValues,
+  values: AufenthaltszeitValues,
+  resultValue: number
+) {
+  const v = (key: keyof AufenthaltszeitValues) =>
+    key === field ? formatValue(resultValue) : formatValue(values[key]!);
+
+  switch (field) {
+    case 't':
+      return {
+        formula: 't = D / R',
+        substituted: `t = ${v('d')} / ${v('r')} = ${v('t')}`,
+      };
+    case 'd':
+      return {
+        formula: 'D = t × R',
+        substituted: `D = ${v('t')} × ${v('r')} = ${v('d')}`,
+      };
+    case 'r':
+      return {
+        formula: 'R = D / t',
+        substituted: `R = ${v('d')} / ${v('t')} = ${v('r')}`,
+      };
+  }
 }
 
 // --- Abstandsgesetz ---
@@ -137,21 +250,28 @@ function Abstandsgesetz() {
         </Button>
       </Box>
 
-      {result && (
-        <Box
-          sx={{
-            mt: 2,
-            p: 2,
-            bgcolor: 'success.main',
-            color: 'success.contrastText',
-            borderRadius: 1,
-          }}
-        >
-          <Typography variant="h6">
-            {abstandLabels[result.field]} = {formatValue(result.value)}
-          </Typography>
-        </Box>
-      )}
+      {result && (() => {
+        const formulaDisplay = getAbstandFormulaDisplay(result.field, values, result.value);
+        return (
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              bgcolor: 'success.main',
+              color: 'success.contrastText',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="h6">
+              {abstandLabels[result.field]} = {formatValue(result.value)}
+            </Typography>
+            <FormulaDisplay
+              formula={formulaDisplay.formula}
+              substituted={formulaDisplay.substituted}
+            />
+          </Box>
+        );
+      })()}
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -306,21 +426,28 @@ function SchutzwertRechner() {
         </Button>
       </Box>
 
-      {result && (
-        <Box
-          sx={{
-            mt: 2,
-            p: 2,
-            bgcolor: 'success.main',
-            color: 'success.contrastText',
-            borderRadius: 1,
-          }}
-        >
-          <Typography variant="h6">
-            {schutzwertLabels[result.field]} = {formatValue(result.value)}
-          </Typography>
-        </Box>
-      )}
+      {result && (() => {
+        const formulaDisplay = getSchutzwertFormulaDisplay(result.field, values, result.value);
+        return (
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              bgcolor: 'success.main',
+              color: 'success.contrastText',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="h6">
+              {schutzwertLabels[result.field]} = {formatValue(result.value)}
+            </Typography>
+            <FormulaDisplay
+              formula={formulaDisplay.formula}
+              substituted={formulaDisplay.substituted}
+            />
+          </Box>
+        );
+      })()}
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -368,6 +495,178 @@ function SchutzwertRechner() {
   );
 }
 
+// --- Aufenthaltszeit ---
+
+const aufenthaltszeitLabels: Record<keyof AufenthaltszeitValues, string> = {
+  t: 'Aufenthaltszeit (h)',
+  d: 'Zulässige Dosis (mSv)',
+  r: 'Dosisleistung (mSv/h)',
+};
+
+function AufenthaltszeitRechner() {
+  const [inputs, setInputs] = useState<
+    Record<keyof AufenthaltszeitValues, string>
+  >({
+    t: '',
+    d: '',
+    r: '',
+  });
+  const [history, setHistory] = useState<AufenthaltszeitHistoryEntry[]>([]);
+
+  const values: AufenthaltszeitValues = useMemo(
+    () => ({
+      t: parseInput(inputs.t),
+      d: parseInput(inputs.d),
+      r: parseInput(inputs.r),
+    }),
+    [inputs]
+  );
+
+  const result = useMemo(() => calculateAufenthaltszeit(values), [values]);
+  const nullCount = Object.values(values).filter((v) => v === null).length;
+
+  const handleChange = useCallback(
+    (field: keyof AufenthaltszeitValues) =>
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        setInputs((prev) => ({ ...prev, [field]: event.target.value }));
+      },
+    []
+  );
+
+  const handleCalculate = useCallback(() => {
+    if (!result) return;
+    const entry: AufenthaltszeitHistoryEntry = {
+      t: result.field === 't' ? result.value : values.t!,
+      d: result.field === 'd' ? result.value : values.d!,
+      r: result.field === 'r' ? result.value : values.r!,
+      calculatedField: result.field,
+      timestamp: new Date(),
+    };
+    setHistory((prev) => [entry, ...prev]);
+    setInputs((prev) => ({
+      ...prev,
+      [result.field]: formatValue(result.value),
+    }));
+  }, [result, values]);
+
+  const handleClear = useCallback(() => {
+    setInputs({ t: '', d: '', r: '' });
+  }, []);
+
+  const handleDeleteHistoryEntry = useCallback((index: number) => {
+    setHistory((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  return (
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        Aufenthaltszeit
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        t = D / R — Gib 2 Werte ein, der 3. wird berechnet. Lasse das zu
+        berechnende Feld leer.
+      </Typography>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+        {(
+          Object.keys(aufenthaltszeitLabels) as (keyof AufenthaltszeitValues)[]
+        ).map((field) => (
+          <TextField
+            key={field}
+            label={aufenthaltszeitLabels[field]}
+            value={inputs[field]}
+            onChange={handleChange(field)}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        ))}
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+        <Button
+          variant="contained"
+          onClick={handleCalculate}
+          disabled={!result}
+        >
+          Berechnen
+        </Button>
+        <Button variant="outlined" onClick={handleClear}>
+          Löschen
+        </Button>
+      </Box>
+
+      {result && (() => {
+        const formulaDisplay = getAufenthaltszeitFormulaDisplay(result.field, values, result.value);
+        return (
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              bgcolor: 'success.main',
+              color: 'success.contrastText',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="h6">
+              {aufenthaltszeitLabels[result.field]} = {formatValue(result.value)}
+            </Typography>
+            <FormulaDisplay
+              formula={formulaDisplay.formula}
+              substituted={formulaDisplay.substituted}
+            />
+          </Box>
+        );
+      })()}
+
+      {nullCount !== 1 && nullCount > 0 && (
+        <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+          Bitte genau 2 Werte eingeben (aktuell {3 - nullCount} von 2).
+        </Typography>
+      )}
+      {nullCount === 0 && (
+        <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
+          Alle Felder sind ausgefüllt. Lösche ein Feld um eine Berechnung
+          durchzuführen.
+        </Typography>
+      )}
+
+      {history.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Divider sx={{ mb: 1 }} />
+          <Typography variant="h6" gutterBottom>
+            Berechnungsverlauf
+          </Typography>
+          <List dense>
+            {history.map((entry, index) => (
+              <ListItem
+                key={index}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    aria-label="Löschen"
+                    onClick={() => handleDeleteHistoryEntry(index)}
+                    size="small"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                }
+              >
+                <ListItemText
+                  primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                  secondary={`t=${entry.t} h, D=${entry.d} mSv, R=${entry.r} mSv/h — ${entry.timestamp.toLocaleTimeString()}`}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 // --- Main component ---
 
 export default function Strahlenschutz() {
@@ -376,6 +675,8 @@ export default function Strahlenschutz() {
       <Abstandsgesetz />
       <Divider />
       <SchutzwertRechner />
+      <Divider />
+      <AufenthaltszeitRechner />
     </Box>
   );
 }

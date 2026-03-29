@@ -168,3 +168,79 @@ export function calculateSchutzwert(
 
   return { field, value: result };
 }
+
+/**
+ * Aufenthaltszeit-Berechnung (Permissible Exposure Time).
+ * Used in Strahlenschutz Leistungsbewerb Bronze.
+ *
+ * Formula: t = D / R
+ *
+ * t = zulässige Aufenthaltszeit (h)
+ * D = zulässige Dosis (mSv)
+ * R = Dosisleistung (mSv/h)
+ */
+
+export interface AufenthaltszeitValues {
+  t: number | null; // Aufenthaltszeit (h)
+  d: number | null; // Dosis (mSv)
+  r: number | null; // Dosisleistung (mSv/h)
+}
+
+export interface AufenthaltszeitResult {
+  field: keyof AufenthaltszeitValues;
+  value: number;
+}
+
+export interface AufenthaltszeitHistoryEntry {
+  t: number;
+  d: number;
+  r: number;
+  calculatedField: keyof AufenthaltszeitValues;
+  timestamp: Date;
+}
+
+/**
+ * Calculate the missing exposure time value using t = D / R.
+ * Exactly one field must be null; the other two must be positive numbers.
+ * Returns null if the input is invalid.
+ */
+export function calculateAufenthaltszeit(
+  values: AufenthaltszeitValues
+): AufenthaltszeitResult | null {
+  const entries = Object.entries(values) as [
+    keyof AufenthaltszeitValues,
+    number | null,
+  ][];
+  const nullFields = entries.filter(([, v]) => v === null);
+
+  if (nullFields.length !== 1) return null;
+
+  const [field] = nullFields[0];
+  const filled = Object.fromEntries(
+    entries.filter(([, v]) => v !== null)
+  ) as Record<string, number>;
+
+  // All filled values must be positive
+  if (Object.values(filled).some((v) => v <= 0)) return null;
+
+  let result: number;
+
+  switch (field) {
+    case 't':
+      // t = D / R
+      result = filled.d / filled.r;
+      break;
+    case 'd':
+      // D = t × R
+      result = filled.t * filled.r;
+      break;
+    case 'r':
+      // R = D / t
+      result = filled.d / filled.t;
+      break;
+    default:
+      return null;
+  }
+
+  return { field, value: result };
+}
