@@ -38,6 +38,23 @@ function formatValue(value: number): string {
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
+/** Format hours as human-readable duration (e.g. "2 d 3 h 15 min 30 s") */
+function formatDuration(hours: number): string {
+  const totalSeconds = Math.round(hours * 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  const min = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} d`);
+  if (h > 0) parts.push(`${h} h`);
+  if (min > 0) parts.push(`${min} min`);
+  if (s > 0) parts.push(`${s} s`);
+
+  return parts.length > 0 ? parts.join(' ') : '0 s';
+}
+
 function FormulaDisplay({
   formula,
   substituted,
@@ -351,7 +368,7 @@ function SchutzwertRechner() {
     r0: '',
     r: '',
     s: '',
-    n: '',
+    n: '1',
   });
   const [history, setHistory] = useState<SchutzwertHistoryEntry[]>([]);
 
@@ -639,6 +656,7 @@ function AufenthaltszeitRechner() {
           >
             <Typography variant="h6">
               {aufenthaltszeitLabels[result.field]} = {formatValue(result.value)}
+              {result.field === 't' && ` (${formatDuration(result.value)})`}
             </Typography>
             <FormulaDisplay
               formula={formulaDisplay.formula}
@@ -684,7 +702,7 @@ function AufenthaltszeitRechner() {
                   }
                 >
                   <ListItemText
-                    primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}${entry.calculatedField === 't' ? ` (${formatDuration(entry.t)})` : ''}`}
                     secondary={
                       <>
                         {fd.formula}
