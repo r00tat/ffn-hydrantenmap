@@ -116,11 +116,11 @@ export default function HeatmapLegend({
           />
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="caption">
-              {min}
+              {Number.isInteger(min) ? min : min.toFixed(2)}
               {field.unit}
             </Typography>
             <Typography variant="caption">
-              {max}
+              {Number.isInteger(max) ? max : max.toFixed(2)}
               {field.unit}
             </Typography>
           </Box>

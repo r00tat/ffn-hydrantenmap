@@ -106,8 +106,11 @@ export default function ItemDataFields({
           (field.type === 'boolean' ? false : field.type === 'number' || field.type === 'computed' ? '' : '');
 
         if (field.type === 'computed') {
-          const computedValue = field.formula
-            ? evaluateFormula(field.formula, fieldData) ?? ''
+          const rawComputed = field.formula
+            ? evaluateFormula(field.formula, fieldData)
+            : undefined;
+          const computedValue = rawComputed !== undefined
+            ? (Number.isInteger(rawComputed) ? rawComputed : parseFloat(rawComputed.toFixed(2)))
             : '';
           const label = field.unit
             ? `${field.label} (${field.unit}) — berechnet`
