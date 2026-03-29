@@ -79,47 +79,49 @@ export function calculateInverseSquareLaw(
 }
 
 /**
- * Abschirmung / Schutzwert (Shielding calculation).
+ * Schutzwert-Berechnung (Shielding / Protection Factor).
+ * Used in Strahlenschutz Leistungsbewerb Bronze, Station 1.
  *
- * Formula: R = R₀ × (1/2)^(d / H)
+ * Formula: R = R₀ / S^n
  *
- * R₀ = dose rate without shielding (Dosisleistung ohne Abschirmung)
- * R  = dose rate with shielding (Dosisleistung mit Abschirmung)
- * d  = material thickness (Schichtdicke in cm)
- * H  = half-value layer (Halbwertsschichtdicke in cm)
+ * R₀ = Dosisleistung ohne Abschirmung (dose rate without shielding)
+ * R  = Dosisleistung mit Abschirmung (dose rate with shielding)
+ * S  = Schutzwert des Materials (protection factor of the material)
+ * n  = Anzahl der Schichten (number of shielding layers)
  */
 
-export interface AbschirmungValues {
+export interface SchutzwertValues {
   r0: number | null; // Dosisleistung ohne Abschirmung
   r: number | null; // Dosisleistung mit Abschirmung
-  d: number | null; // Schichtdicke
-  h: number | null; // Halbwertsschichtdicke
+  s: number | null; // Schutzwert
+  n: number | null; // Anzahl der Schichten
 }
 
-export interface AbschirmungResult {
-  field: keyof AbschirmungValues;
+export interface SchutzwertResult {
+  field: keyof SchutzwertValues;
   value: number;
 }
 
-export interface AbschirmungHistoryEntry {
+export interface SchutzwertHistoryEntry {
   r0: number;
   r: number;
-  d: number;
-  h: number;
-  calculatedField: keyof AbschirmungValues;
+  s: number;
+  n: number;
+  calculatedField: keyof SchutzwertValues;
   timestamp: Date;
 }
 
 /**
- * Calculate the missing shielding value.
+ * Calculate the missing shielding value using R = R₀ / S^n.
  * Exactly one field must be null; the other three must be positive numbers.
+ * Additionally, S must be >= 1 (a shielding factor < 1 makes no physical sense).
  * Returns null if the input is invalid.
  */
-export function calculateAbschirmung(
-  values: AbschirmungValues
-): AbschirmungResult | null {
+export function calculateSchutzwert(
+  values: SchutzwertValues
+): SchutzwertResult | null {
   const entries = Object.entries(values) as [
-    keyof AbschirmungValues,
+    keyof SchutzwertValues,
     number | null,
   ][];
   const nullFields = entries.filter(([, v]) => v === null);
@@ -134,24 +136,31 @@ export function calculateAbschirmung(
   // All filled values must be positive
   if (Object.values(filled).some((v) => v <= 0)) return null;
 
+  // S must be >= 1 when provided
+  if (field !== 's' && filled.s < 1) return null;
+
+  // R must be <= R₀ when both are provided
+  if (field !== 'r' && field !== 'r0' && filled.r > filled.r0) return null;
+
   let result: number;
 
   switch (field) {
     case 'r':
-      // R = R₀ × (1/2)^(d / H)
-      result = filled.r0 * Math.pow(0.5, filled.d / filled.h);
+      // R = R₀ / S^n
+      result = filled.r0 / Math.pow(filled.s, filled.n);
       break;
     case 'r0':
-      // R₀ = R / (1/2)^(d / H)
-      result = filled.r / Math.pow(0.5, filled.d / filled.h);
+      // R₀ = R × S^n
+      result = filled.r * Math.pow(filled.s, filled.n);
       break;
-    case 'd':
-      // d = H × log₂(R₀ / R)
-      result = filled.h * Math.log2(filled.r0 / filled.r);
+    case 's':
+      // S = (R₀ / R)^(1/n)
+      result = Math.pow(filled.r0 / filled.r, 1 / filled.n);
       break;
-    case 'h':
-      // H = d / log₂(R₀ / R)
-      result = filled.d / Math.log2(filled.r0 / filled.r);
+    case 'n':
+      // n = log(R₀ / R) / log(S)
+      if (filled.s === 1) return null; // log(1) = 0, division by zero
+      result = Math.log(filled.r0 / filled.r) / Math.log(filled.s);
       break;
     default:
       return null;

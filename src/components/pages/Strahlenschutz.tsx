@@ -12,10 +12,10 @@ import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  AbschirmungHistoryEntry,
-  AbschirmungValues,
-  calculateAbschirmung,
   calculateInverseSquareLaw,
+  calculateSchutzwert,
+  SchutzwertHistoryEntry,
+  SchutzwertValues,
   StrahlenschutzHistoryEntry,
   StrahlenschutzValues,
 } from '../../common/strahlenschutz';
@@ -199,41 +199,41 @@ function Abstandsgesetz() {
   );
 }
 
-// --- Abschirmung / Schutzwert ---
+// --- Schutzwert ---
 
-const abschirmungLabels: Record<keyof AbschirmungValues, string> = {
+const schutzwertLabels: Record<keyof SchutzwertValues, string> = {
   r0: 'Dosisleistung ohne Abschirmung (µSv/h)',
   r: 'Dosisleistung mit Abschirmung (µSv/h)',
-  d: 'Schichtdicke (cm)',
-  h: 'Halbwertsschichtdicke (cm)',
+  s: 'Schutzwert (S)',
+  n: 'Anzahl der Schichten (n)',
 };
 
-function AbschirmungRechner() {
+function SchutzwertRechner() {
   const [inputs, setInputs] = useState<
-    Record<keyof AbschirmungValues, string>
+    Record<keyof SchutzwertValues, string>
   >({
     r0: '',
     r: '',
-    d: '',
-    h: '',
+    s: '',
+    n: '',
   });
-  const [history, setHistory] = useState<AbschirmungHistoryEntry[]>([]);
+  const [history, setHistory] = useState<SchutzwertHistoryEntry[]>([]);
 
-  const values: AbschirmungValues = useMemo(
+  const values: SchutzwertValues = useMemo(
     () => ({
       r0: parseInput(inputs.r0),
       r: parseInput(inputs.r),
-      d: parseInput(inputs.d),
-      h: parseInput(inputs.h),
+      s: parseInput(inputs.s),
+      n: parseInput(inputs.n),
     }),
     [inputs]
   );
 
-  const result = useMemo(() => calculateAbschirmung(values), [values]);
+  const result = useMemo(() => calculateSchutzwert(values), [values]);
   const nullCount = Object.values(values).filter((v) => v === null).length;
 
   const handleChange = useCallback(
-    (field: keyof AbschirmungValues) =>
+    (field: keyof SchutzwertValues) =>
       (event: React.ChangeEvent<HTMLInputElement>) => {
         setInputs((prev) => ({ ...prev, [field]: event.target.value }));
       },
@@ -242,11 +242,11 @@ function AbschirmungRechner() {
 
   const handleCalculate = useCallback(() => {
     if (!result) return;
-    const entry: AbschirmungHistoryEntry = {
+    const entry: SchutzwertHistoryEntry = {
       r0: result.field === 'r0' ? result.value : values.r0!,
       r: result.field === 'r' ? result.value : values.r!,
-      d: result.field === 'd' ? result.value : values.d!,
-      h: result.field === 'h' ? result.value : values.h!,
+      s: result.field === 's' ? result.value : values.s!,
+      n: result.field === 'n' ? result.value : values.n!,
       calculatedField: result.field,
       timestamp: new Date(),
     };
@@ -258,7 +258,7 @@ function AbschirmungRechner() {
   }, [result, values]);
 
   const handleClear = useCallback(() => {
-    setInputs({ r0: '', r: '', d: '', h: '' });
+    setInputs({ r0: '', r: '', s: '', n: '' });
   }, []);
 
   const handleDeleteHistoryEntry = useCallback((index: number) => {
@@ -268,19 +268,19 @@ function AbschirmungRechner() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Abschirmung (Schutzwert)
+        Schutzwert (Abschirmung)
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        R = R₀ × (½)^(d / H) — Gib 3 Werte ein, der 4. wird berechnet. Lasse
-        das zu berechnende Feld leer.
+        R = R₀ / S^n — Gib 3 Werte ein, der 4. wird berechnet. Lasse das zu
+        berechnende Feld leer.
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        {(Object.keys(abschirmungLabels) as (keyof AbschirmungValues)[]).map(
+        {(Object.keys(schutzwertLabels) as (keyof SchutzwertValues)[]).map(
           (field) => (
             <TextField
               key={field}
-              label={abschirmungLabels[field]}
+              label={schutzwertLabels[field]}
               value={inputs[field]}
               onChange={handleChange(field)}
               type="text"
@@ -317,7 +317,7 @@ function AbschirmungRechner() {
           }}
         >
           <Typography variant="h6">
-            {abschirmungLabels[result.field]} = {formatValue(result.value)}
+            {schutzwertLabels[result.field]} = {formatValue(result.value)}
           </Typography>
         </Box>
       )}
@@ -356,8 +356,8 @@ function AbschirmungRechner() {
                 }
               >
                 <ListItemText
-                  primary={`${abschirmungLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
-                  secondary={`R₀=${entry.r0} µSv/h, R=${entry.r} µSv/h, d=${entry.d} cm, H=${entry.h} cm — ${entry.timestamp.toLocaleTimeString()}`}
+                  primary={`${schutzwertLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                  secondary={`R₀=${entry.r0} µSv/h, R=${entry.r} µSv/h, S=${entry.s}, n=${entry.n} — ${entry.timestamp.toLocaleTimeString()}`}
                 />
               </ListItem>
             ))}
@@ -375,7 +375,7 @@ export default function Strahlenschutz() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <Abstandsgesetz />
       <Divider />
-      <AbschirmungRechner />
+      <SchutzwertRechner />
     </Box>
   );
 }
