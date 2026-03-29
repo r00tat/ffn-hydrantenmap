@@ -312,3 +312,110 @@ export function getCompatibleUnits(source: RadiationUnit): RadiationUnit[] {
   if (isDoseUnit(source)) return DOSE_UNITS;
   return DOSE_RATE_UNITS;
 }
+
+/**
+ * Dosisleistungsberechnung aus Nuklidaktivität.
+ *
+ * Formula: H = Gamma × A
+ *
+ * H     = Ortsdosisleistung in 1m Abstand (µSv/h)
+ * Gamma = Dosisleistungskonstante (µSv·m²/(h·GBq))
+ * A     = Aktivität (GBq)
+ */
+
+export interface Nuclide {
+  name: string;
+  gamma: number; // µSv·m²/(h·GBq)
+}
+
+/** Nuclides sorted by name, with gamma dose rate constants. */
+export const NUCLIDES: Nuclide[] = [
+  { name: 'Am-241', gamma: 3.1 },
+  { name: 'Au-198', gamma: 62 },
+  { name: 'Ba-133', gamma: 52 },
+  { name: 'Co-57', gamma: 16 },
+  { name: 'Co-60', gamma: 351 },
+  { name: 'Cr-51', gamma: 5 },
+  { name: 'Cs-137', gamma: 92 },
+  { name: 'Eu-152', gamma: 168 },
+  { name: 'I-125', gamma: 17 },
+  { name: 'I-131', gamma: 66 },
+  { name: 'Ir-192', gamma: 130 },
+  { name: 'Mn-54', gamma: 122 },
+  { name: 'Mo-99', gamma: 26 },
+  { name: 'Na-22', gamma: 327 },
+  { name: 'Ra-226', gamma: 195 },
+  { name: 'Se-75', gamma: 56 },
+  { name: 'Sr-90', gamma: 6 },
+  { name: 'Tc-99m', gamma: 17 },
+  { name: 'Zn-65', gamma: 82 },
+];
+
+export type ActivityUnit = 'TBq' | 'GBq' | 'MBq' | 'kBq' | 'Bq' | 'Ci';
+
+export const ACTIVITY_UNITS: ActivityUnit[] = ['TBq', 'GBq', 'MBq', 'kBq', 'Bq', 'Ci'];
+
+/** Convert activity value to GBq. */
+const ACTIVITY_TO_GBQ: Record<ActivityUnit, number> = {
+  TBq: 1000,
+  GBq: 1,
+  MBq: 0.001,
+  kBq: 1e-6,
+  Bq: 1e-9,
+  Ci: 37,
+};
+
+export function convertActivityToGBq(
+  value: number,
+  unit: ActivityUnit
+): number {
+  return value * ACTIVITY_TO_GBQ[unit];
+}
+
+export interface DosisleistungNuklidValues {
+  activity: number | null;
+  doseRate: number | null;
+}
+
+export interface DosisleistungNuklidResult {
+  field: 'activity' | 'doseRate';
+  value: number;
+}
+
+export interface DosisleistungNuklidHistoryEntry {
+  nuclide: string;
+  gamma: number;
+  activityGBq: number;
+  activityUnit: ActivityUnit;
+  activityInUnit: number;
+  doseRate: number;
+  calculatedField: 'activity' | 'doseRate';
+  timestamp: Date;
+}
+
+/**
+ * Calculate dose rate at 1m from nuclide activity, or activity from dose rate.
+ * Exactly one of activity/doseRate must be null.
+ * gamma must be positive, the filled value must be positive.
+ * Activity is in GBq, doseRate in µSv/h.
+ */
+export function calculateDosisleistungNuklid(
+  gamma: number,
+  values: DosisleistungNuklidValues
+): DosisleistungNuklidResult | null {
+  if (gamma <= 0) return null;
+
+  const { activity, doseRate } = values;
+  const nullCount = [activity, doseRate].filter((v) => v === null).length;
+  if (nullCount !== 1) return null;
+
+  if (activity === null) {
+    // A = H / Gamma
+    if (doseRate! <= 0) return null;
+    return { field: 'activity', value: doseRate! / gamma };
+  } else {
+    // H = Gamma × A
+    if (activity <= 0) return null;
+    return { field: 'doseRate', value: gamma * activity };
+  }
+}
