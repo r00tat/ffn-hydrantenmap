@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  calculateAbschirmung,
   calculateInverseSquareLaw,
+  calculateSchutzwert,
   StrahlenschutzValues,
 } from './strahlenschutz';
 
@@ -99,54 +99,66 @@ describe('calculateInverseSquareLaw', () => {
   });
 });
 
-describe('calculateAbschirmung', () => {
-  // R₀=100, d=10cm, H=10cm (1 half-value layer) → R = 100 * 0.5^1 = 50
-  it('calculates R when R₀, d, H are given', () => {
-    const result = calculateAbschirmung({ r0: 100, r: null, d: 10, h: 10 });
+describe('calculateSchutzwert', () => {
+  // R₀=100, S=2, n=1 → R = 100 / 2^1 = 50
+  it('calculates R when R₀, S, n are given', () => {
+    const result = calculateSchutzwert({ r0: 100, r: null, s: 2, n: 1 });
     expect(result).toEqual({ field: 'r', value: 50 });
   });
 
-  // R=50, d=10, H=10 → R₀ = 50 / 0.5^1 = 100
-  it('calculates R₀ when R, d, H are given', () => {
-    const result = calculateAbschirmung({ r0: null, r: 50, d: 10, h: 10 });
+  // R=50, S=2, n=1 → R₀ = 50 × 2^1 = 100
+  it('calculates R₀ when R, S, n are given', () => {
+    const result = calculateSchutzwert({ r0: null, r: 50, s: 2, n: 1 });
     expect(result).toEqual({ field: 'r0', value: 100 });
   });
 
-  // R₀=100, R=25, H=10 → d = 10 * log₂(100/25) = 10 * 2 = 20
-  it('calculates d when R₀, R, H are given', () => {
-    const result = calculateAbschirmung({ r0: 100, r: 25, d: null, h: 10 });
-    expect(result).toEqual({ field: 'd', value: 20 });
+  // R₀=100, R=25, n=2 → S = (100/25)^(1/2) = 4^0.5 = 2
+  it('calculates S when R₀, R, n are given', () => {
+    const result = calculateSchutzwert({ r0: 100, r: 25, s: null, n: 2 });
+    expect(result).toEqual({ field: 's', value: 2 });
   });
 
-  // R₀=100, R=25, d=20 → H = 20 / log₂(100/25) = 20 / 2 = 10
-  it('calculates H when R₀, R, d are given', () => {
-    const result = calculateAbschirmung({ r0: 100, r: 25, d: 20, h: null });
-    expect(result).toEqual({ field: 'h', value: 10 });
+  // R₀=100, R=25, S=2 → n = log(100/25) / log(2) = log(4)/log(2) = 2
+  it('calculates n when R₀, R, S are given', () => {
+    const result = calculateSchutzwert({ r0: 100, r: 25, s: 2, n: null });
+    expect(result).toEqual({ field: 'n', value: 2 });
   });
 
-  // 2 half-value layers: R₀=200, d=14, H=7 → R = 200 * 0.5^2 = 50
-  it('handles multiple half-value layers', () => {
-    const result = calculateAbschirmung({ r0: 200, r: null, d: 14, h: 7 });
-    expect(result).toEqual({ field: 'r', value: 50 });
+  // Multiple layers: R₀=200, S=4, n=2 → R = 200 / 4^2 = 200/16 = 12.5
+  it('handles multiple layers with higher S', () => {
+    const result = calculateSchutzwert({ r0: 200, r: null, s: 4, n: 2 });
+    expect(result).toEqual({ field: 'r', value: 12.5 });
+  });
+
+  // Fractional n: R₀=100, R=50, S=4 → n = log(2)/log(4) = 0.5
+  it('handles fractional number of layers', () => {
+    const result = calculateSchutzwert({ r0: 100, r: 50, s: 4, n: null });
+    expect(result!.field).toBe('n');
+    expect(result!.value).toBeCloseTo(0.5);
+  });
+
+  it('returns null when S is 1 and calculating n (division by zero)', () => {
+    const result = calculateSchutzwert({ r0: 100, r: 100, s: 1, n: null });
+    expect(result).toBeNull();
   });
 
   it('returns null when more than one field is null', () => {
-    const result = calculateAbschirmung({ r0: null, r: null, d: 10, h: 10 });
+    const result = calculateSchutzwert({ r0: null, r: null, s: 2, n: 1 });
     expect(result).toBeNull();
   });
 
   it('returns null when no field is null', () => {
-    const result = calculateAbschirmung({ r0: 100, r: 50, d: 10, h: 10 });
+    const result = calculateSchutzwert({ r0: 100, r: 50, s: 2, n: 1 });
     expect(result).toBeNull();
   });
 
   it('returns null when a filled value is zero', () => {
-    const result = calculateAbschirmung({ r0: 100, r: null, d: 0, h: 10 });
+    const result = calculateSchutzwert({ r0: 100, r: null, s: 0, n: 1 });
     expect(result).toBeNull();
   });
 
   it('returns null when a filled value is negative', () => {
-    const result = calculateAbschirmung({ r0: 100, r: null, d: -5, h: 10 });
+    const result = calculateSchutzwert({ r0: 100, r: null, s: -2, n: 1 });
     expect(result).toBeNull();
   });
 });
