@@ -74,7 +74,7 @@ export default function HeatmapSettings({
   onChange,
 }: HeatmapSettingsProps) {
   const current = config || defaultConfig;
-  const numericFields = dataSchema.filter((f) => f.type === 'number');
+  const numericFields = dataSchema.filter((f) => f.type === 'number' || f.type === 'computed');
 
   // Auto-select first numeric field when heatmap is enabled and no field is selected
   useEffect(() => {
@@ -166,6 +166,19 @@ export default function HeatmapSettings({
                 {f.label} ({f.unit})
               </MenuItem>
             ))}
+          </TextField>
+          <TextField
+            label="Farbskala"
+            size="small"
+            select
+            value={current.colorScale || 'linear'}
+            onChange={(e) => update({ colorScale: e.target.value as HeatmapConfig['colorScale'] })}
+            fullWidth
+          >
+            <MenuItem value="linear">Linear</MenuItem>
+            <MenuItem value="log">Logarithmisch</MenuItem>
+            <MenuItem value="sqrt">Wurzel (√)</MenuItem>
+            <MenuItem value="quantile">Quantile</MenuItem>
           </TextField>
           <Typography variant="body2" gutterBottom>
             Darstellung

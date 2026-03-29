@@ -10,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
+import { evaluateFormula } from '../../common/computeFieldValue';
 
 export interface ItemDataFieldsHandle {
   /** Flush pending new field into fieldData. Returns the updated fieldData. */
@@ -102,7 +103,35 @@ export default function ItemDataFields({
         const currentValue =
           fieldData[field.key] ??
           (isNew ? field.defaultValue : undefined) ??
-          (field.type === 'boolean' ? false : field.type === 'number' ? '' : '');
+          (field.type === 'boolean' ? false : field.type === 'number' || field.type === 'computed' ? '' : '');
+
+        if (field.type === 'computed') {
+          const rawComputed = field.formula
+            ? evaluateFormula(field.formula, fieldData)
+            : undefined;
+          const computedValue = rawComputed !== undefined
+            ? (Number.isInteger(rawComputed) ? rawComputed : parseFloat(rawComputed.toFixed(2)))
+            : '';
+          const label = field.unit
+            ? `${field.label} (${field.unit}) — berechnet`
+            : `${field.label} — berechnet`;
+          return (
+            <TextField
+              key={field.key}
+              label={label}
+              size="small"
+              fullWidth
+              value={computedValue}
+              disabled
+              sx={{ mb: 1 }}
+              slotProps={{
+                input: {
+                  sx: { fontStyle: 'italic' },
+                },
+              }}
+            />
+          );
+        }
 
         if (field.type === 'boolean') {
           return (

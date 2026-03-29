@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateAufenthaltszeit,
-  calculateDosisleistungNuklid,
   calculateInverseSquareLaw,
   calculateSchutzwert,
-  convertActivityToGBq,
   convertRadiationUnit,
   getCompatibleUnits,
   isDoseUnit,
   isDoseRateUnit,
-  NUCLIDES,
   StrahlenschutzValues,
 } from './strahlenschutz';
 
@@ -297,136 +294,5 @@ describe('isDoseUnit / isDoseRateUnit', () => {
     expect(isDoseRateUnit('Sv/h')).toBe(true);
     expect(isDoseRateUnit('R/h')).toBe(true);
     expect(isDoseRateUnit('mSv')).toBe(false);
-  });
-});
-
-describe('convertActivityToGBq', () => {
-  it('converts GBq to GBq (identity)', () => {
-    expect(convertActivityToGBq(5, 'GBq')).toBe(5);
-  });
-
-  it('converts MBq to GBq', () => {
-    expect(convertActivityToGBq(1000, 'MBq')).toBe(1);
-  });
-
-  it('converts TBq to GBq', () => {
-    expect(convertActivityToGBq(1, 'TBq')).toBe(1000);
-  });
-
-  it('converts kBq to GBq', () => {
-    expect(convertActivityToGBq(1000000, 'kBq')).toBe(1);
-  });
-
-  it('converts Bq to GBq', () => {
-    expect(convertActivityToGBq(1e9, 'Bq')).toBe(1);
-  });
-
-  it('converts Ci to GBq', () => {
-    expect(convertActivityToGBq(1, 'Ci')).toBe(37);
-  });
-});
-
-describe('NUCLIDES', () => {
-  it('contains expected nuclides', () => {
-    const names = NUCLIDES.map((n) => n.name);
-    expect(names).toContain('Co-60');
-    expect(names).toContain('Cs-137');
-    expect(names).toContain('Ir-192');
-    expect(names).toContain('Am-241');
-    expect(names).toContain('Sr-90');
-  });
-
-  it('is sorted alphabetically by name', () => {
-    const names = NUCLIDES.map((n) => n.name);
-    const sorted = [...names].sort();
-    expect(names).toEqual(sorted);
-  });
-
-  it('all gamma values are positive', () => {
-    NUCLIDES.forEach((n) => {
-      expect(n.gamma).toBeGreaterThan(0);
-    });
-  });
-});
-
-describe('calculateDosisleistungNuklid', () => {
-  it('calculates dose rate from activity', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: 1,
-      doseRate: null,
-    });
-    expect(result).toEqual({ field: 'doseRate', value: 351 });
-  });
-
-  it('calculates activity from dose rate', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: null,
-      doseRate: 351,
-    });
-    expect(result).toEqual({ field: 'activity', value: 1 });
-  });
-
-  it('handles fractional activity', () => {
-    const result = calculateDosisleistungNuklid(92, {
-      activity: 0.5,
-      doseRate: null,
-    });
-    expect(result).toEqual({ field: 'doseRate', value: 46 });
-  });
-
-  it('returns null when both fields are null', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: null,
-      doseRate: null,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when no field is null', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: 1,
-      doseRate: 351,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when gamma is zero', () => {
-    const result = calculateDosisleistungNuklid(0, {
-      activity: 1,
-      doseRate: null,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when gamma is negative', () => {
-    const result = calculateDosisleistungNuklid(-10, {
-      activity: 1,
-      doseRate: null,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when filled activity is zero', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: 0,
-      doseRate: null,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when filled activity is negative', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: -1,
-      doseRate: null,
-    });
-    expect(result).toBeNull();
-  });
-
-  it('returns null when filled doseRate is zero', () => {
-    const result = calculateDosisleistungNuklid(351, {
-      activity: null,
-      doseRate: 0,
-    });
-    expect(result).toBeNull();
   });
 });

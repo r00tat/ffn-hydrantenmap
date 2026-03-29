@@ -1,6 +1,44 @@
 import { HeatmapConfig } from '../components/firebase/firestore';
 
 /**
+ * Apply a color scale transformation to a normalized [0,1] value.
+ * - linear: identity (no transformation)
+ * - log: spreads low values apart, compresses high values
+ * - sqrt: milder version of log
+ * - quantile: requires allValues, distributes evenly across data points
+ */
+function applyScale(
+  normalized: number,
+  scale: HeatmapConfig['colorScale']
+): number {
+  switch (scale) {
+    case 'log':
+      return Math.log1p(normalized * 99) / Math.log1p(99);
+    case 'sqrt':
+      return Math.sqrt(normalized);
+    default:
+      return normalized;
+  }
+}
+
+/**
+ * Compute quantile-based normalized value: what fraction of allValues
+ * are <= the given value. Returns a value in [0, 1].
+ */
+function quantileNormalize(value: number, sortedValues: number[]): number {
+  if (sortedValues.length <= 1) return 0.5;
+  // Count how many values are strictly less than value
+  let below = 0;
+  let equal = 0;
+  for (const v of sortedValues) {
+    if (v < value) below++;
+    else if (v === value) equal++;
+  }
+  // Use midpoint of equal values for smoother distribution
+  return (below + equal / 2) / (sortedValues.length - 1);
+}
+
+/**
  * Interpolate between color stops. Colors are hex strings.
  */
 function interpolateColor(color1: string, color2: string, t: number): string {
@@ -49,6 +87,8 @@ export function getHeatmapColor(
   let max: number;
   let stops: { value: number; color: string }[];
 
+  const scale = config.colorScale || 'linear';
+
   if (config.colorMode === 'manual' && config.min !== undefined && config.max !== undefined && config.colorStops && config.colorStops.length >= 2) {
     min = config.min;
     max = config.max;
@@ -69,13 +109,50 @@ export function getHeatmapColor(
 
   if (max === min) return stops[0]?.color ?? NO_DATA_COLOR;
 
-  // Clamp value to stop range (not config min/max, which may differ)
+  // For quantile scale, use rank-based normalization
+  if (scale === 'quantile') {
+    const sorted = [...allValues].sort((a, b) => a - b);
+    const t = quantileNormalize(value, sorted);
+    const clamped = Math.max(0, Math.min(1, t));
+    // Map quantile position to the stop range
+    const stopMin = stops[0].value;
+    const stopMax = stops[stops.length - 1].value;
+    const mappedValue = stopMin + clamped * (stopMax - stopMin);
+    // Find surrounding stops for the mapped value
+    if (mappedValue <= stopMin) return stops[0].color;
+    if (mappedValue >= stopMax) return stops[stops.length - 1].color;
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (mappedValue >= stops[i].value && mappedValue <= stops[i + 1].value) {
+        const range = stops[i + 1].value - stops[i].value;
+        const st = range === 0 ? 0 : (mappedValue - stops[i].value) / range;
+        return interpolateColor(stops[i].color, stops[i + 1].color, st);
+      }
+    }
+    return stops[stops.length - 1].color;
+  }
+
+  // For log/sqrt scales in auto mode, remap the value through the scale function
+  // We normalize value to [0,1], apply scale, then map back to stop range
   const stopMin = stops[0].value;
   const stopMax = stops[stops.length - 1].value;
   if (value <= stopMin) return stops[0].color;
   if (value >= stopMax) return stops[stops.length - 1].color;
 
-  // Find surrounding stops
+  if (scale !== 'linear') {
+    const normalized = (value - stopMin) / (stopMax - stopMin);
+    const scaled = applyScale(normalized, scale);
+    const mappedValue = stopMin + scaled * (stopMax - stopMin);
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (mappedValue >= stops[i].value && mappedValue <= stops[i + 1].value) {
+        const range = stops[i + 1].value - stops[i].value;
+        const t = range === 0 ? 0 : (mappedValue - stops[i].value) / range;
+        return interpolateColor(stops[i].color, stops[i + 1].color, t);
+      }
+    }
+    return stops[stops.length - 1].color;
+  }
+
+  // Linear: find surrounding stops directly
   for (let i = 0; i < stops.length - 1; i++) {
     if (value >= stops[i].value && value <= stops[i + 1].value) {
       const range = stops[i + 1].value - stops[i].value;
@@ -107,9 +184,17 @@ export function normalizeValue(
   }
 
   if (max === min) return 0.5;
+  const scale = config.colorScale || 'linear';
+  let normalized: number;
+  if (scale === 'quantile') {
+    const sorted = [...allValues].sort((a, b) => a - b);
+    normalized = quantileNormalize(value, sorted);
+  } else {
+    normalized = (value - min) / (max - min);
+    normalized = applyScale(normalized, scale);
+  }
   // Map to [0.3, 1] so even min-value points are clearly visible on the heatmap
   // (leaflet.heat gradient starts from transparent, so low values need a floor)
-  const normalized = (value - min) / (max - min);
   const clamped = Math.max(0, Math.min(1, normalized));
   return 0.3 + clamped * 0.7;
 }
@@ -136,6 +221,14 @@ export function normalizeValueFull(
   }
 
   if (max === min) return 0.5;
-  const normalized = (value - min) / (max - min);
+  const scale = config.colorScale || 'linear';
+  let normalized: number;
+  if (scale === 'quantile') {
+    const sorted = [...allValues].sort((a, b) => a - b);
+    normalized = quantileNormalize(value, sorted);
+  } else {
+    normalized = (value - min) / (max - min);
+    normalized = applyScale(normalized, scale);
+  }
   return Math.max(0, Math.min(1, normalized));
 }

@@ -26,13 +26,6 @@ import {
   SchutzwertValues,
   StrahlenschutzHistoryEntry,
   StrahlenschutzValues,
-  ACTIVITY_UNITS,
-  ActivityUnit,
-  calculateDosisleistungNuklid,
-  convertActivityToGBq,
-  DosisleistungNuklidHistoryEntry,
-  DosisleistungNuklidValues,
-  NUCLIDES,
 } from '../../common/strahlenschutz';
 
 function parseInput(value: string): number | null {
@@ -224,6 +217,10 @@ function Abstandsgesetz() {
       timestamp: new Date(),
     };
     setHistory((prev) => [entry, ...prev]);
+    setInputs((prev) => ({
+      ...prev,
+      [result.field]: formatValue(result.value),
+    }));
   }, [result, values]);
 
   const handleClear = useCallback(() => {
@@ -407,6 +404,10 @@ function SchutzwertRechner() {
       timestamp: new Date(),
     };
     setHistory((prev) => [entry, ...prev]);
+    setInputs((prev) => ({
+      ...prev,
+      [result.field]: formatValue(result.value),
+    }));
   }, [result, values]);
 
   const handleClear = useCallback(() => {
@@ -586,6 +587,10 @@ function AufenthaltszeitRechner() {
       timestamp: new Date(),
     };
     setHistory((prev) => [entry, ...prev]);
+    setInputs((prev) => ({
+      ...prev,
+      [result.field]: formatValue(result.value),
+    }));
   }, [result, values]);
 
   const handleClear = useCallback(() => {
@@ -698,275 +703,6 @@ function AufenthaltszeitRechner() {
                 >
                   <ListItemText
                     primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}${entry.calculatedField === 't' ? ` (${formatDuration(entry.t)})` : ''}`}
-                    secondary={
-                      <>
-                        {fd.formula}
-                        <br />
-                        {fd.substituted}
-                        <br />
-                        {entry.timestamp.toLocaleTimeString()}
-                      </>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-// --- Dosisleistung aus Nuklid ---
-
-function getDosisleistungNuklidFormulaDisplay(
-  field: 'activity' | 'doseRate',
-  gamma: number,
-  activityGBq: number,
-  activityInUnit: number,
-  unit: ActivityUnit,
-  doseRate: number
-) {
-  const hStr = formatValue(doseRate);
-  const gStr = formatValue(gamma);
-
-  if (field === 'doseRate') {
-    return {
-      formula: `Ḣ = Γ × A`,
-      substituted: `Ḣ = ${gStr} × ${formatValue(activityGBq)} = ${hStr} µSv/h`,
-    };
-  } else {
-    return {
-      formula: `A = Ḣ / Γ`,
-      substituted: `A = ${hStr} / ${gStr} = ${formatValue(activityInUnit)} ${unit}`,
-    };
-  }
-}
-
-function DosisleistungNuklidRechner() {
-  const [selectedNuclide, setSelectedNuclide] = useState<string>(NUCLIDES[0].name);
-  const [activityInput, setActivityInput] = useState('');
-  const [activityUnit, setActivityUnit] = useState<ActivityUnit>('GBq');
-  const [doseRateInput, setDoseRateInput] = useState('');
-  const [history, setHistory] = useState<DosisleistungNuklidHistoryEntry[]>([]);
-
-  const nuclide = useMemo(
-    () => NUCLIDES.find((n) => n.name === selectedNuclide) ?? NUCLIDES[0],
-    [selectedNuclide]
-  );
-
-  const parsedActivity = useMemo(() => parseInput(activityInput), [activityInput]);
-  const parsedDoseRate = useMemo(() => parseInput(doseRateInput), [doseRateInput]);
-
-  const activityInGBq = useMemo(
-    () => (parsedActivity !== null ? convertActivityToGBq(parsedActivity, activityUnit) : null),
-    [parsedActivity, activityUnit]
-  );
-
-  const values: DosisleistungNuklidValues = useMemo(
-    () => ({ activity: activityInGBq, doseRate: parsedDoseRate }),
-    [activityInGBq, parsedDoseRate]
-  );
-
-  const result = useMemo(
-    () => calculateDosisleistungNuklid(nuclide.gamma, values),
-    [nuclide.gamma, values]
-  );
-
-  const handleCalculate = useCallback(() => {
-    if (!result) return;
-    const actGBq = result.field === 'activity' ? result.value : activityInGBq!;
-    const dr = result.field === 'doseRate' ? result.value : parsedDoseRate!;
-    const entry: DosisleistungNuklidHistoryEntry = {
-      nuclide: nuclide.name,
-      gamma: nuclide.gamma,
-      activityGBq: actGBq,
-      activityUnit,
-      activityInUnit: result.field === 'activity' ? result.value / convertActivityToGBq(1, activityUnit) : parsedActivity!,
-      doseRate: dr,
-      calculatedField: result.field,
-      timestamp: new Date(),
-    };
-    setHistory((prev) => [entry, ...prev]);
-  }, [result, activityInGBq, parsedDoseRate, nuclide, activityUnit, parsedActivity]);
-
-  const handleClear = useCallback(() => {
-    setActivityInput('');
-    setDoseRateInput('');
-  }, []);
-
-  const handleDeleteHistoryEntry = useCallback((index: number) => {
-    setHistory((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  return (
-    <Box>
-      <Typography variant="h5" gutterBottom>
-        Dosisleistung aus Nuklidaktivität
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Ḣ = Γ × A — Berechne Dosisleistung in 1m Abstand aus Aktivität oder
-        umgekehrt. Lasse das zu berechnende Feld leer.
-      </Typography>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        <TextField
-          select
-          label="Nuklid"
-          value={selectedNuclide}
-          onChange={(e) => setSelectedNuclide(e.target.value)}
-          variant="outlined"
-          size="small"
-        >
-          {NUCLIDES.map((n) => (
-            <MenuItem key={n.name} value={n.name}>
-              {n.name} (Γ = {n.gamma})
-            </MenuItem>
-          ))}
-        </TextField>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ alignSelf: 'center' }}
-        >
-          Γ = {nuclide.gamma} µSv·m²/(h·GBq)
-        </Typography>
-      </Box>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          gap: 2,
-          mt: 2,
-        }}
-      >
-        <TextField
-          label={`Aktivität (${activityUnit})`}
-          value={activityInput}
-          onChange={(e) => setActivityInput(e.target.value)}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          select
-          label="Einheit"
-          value={activityUnit}
-          onChange={(e) => setActivityUnit(e.target.value as ActivityUnit)}
-          variant="outlined"
-          size="small"
-          sx={{ minWidth: 90 }}
-        >
-          {ACTIVITY_UNITS.map((u) => (
-            <MenuItem key={u} value={u}>
-              {u}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          label="Dosisleistung in 1m (µSv/h)"
-          value={doseRateInput}
-          onChange={(e) => setDoseRateInput(e.target.value)}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-        <Button
-          variant="contained"
-          onClick={handleCalculate}
-          disabled={!result}
-        >
-          Berechnen
-        </Button>
-        <Button variant="outlined" onClick={handleClear}>
-          Löschen
-        </Button>
-      </Box>
-
-      {result &&
-        (() => {
-          const actGBq =
-            result.field === 'activity' ? result.value : activityInGBq!;
-          const actInUnit =
-            result.field === 'activity' ? result.value / convertActivityToGBq(1, activityUnit) : parsedActivity!;
-          const dr =
-            result.field === 'doseRate' ? result.value : parsedDoseRate!;
-          const fd = getDosisleistungNuklidFormulaDisplay(
-            result.field,
-            nuclide.gamma,
-            actGBq,
-            actInUnit,
-            activityUnit,
-            dr
-          );
-          const resultLabel =
-            result.field === 'doseRate'
-              ? `Dosisleistung in 1m = ${formatValue(result.value)} µSv/h`
-              : `Aktivität = ${formatValue(actInUnit)} ${activityUnit}`;
-          return (
-            <Box
-              sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: 'success.main',
-                color: 'success.contrastText',
-                borderRadius: 1,
-              }}
-            >
-              <Typography variant="h6">{resultLabel}</Typography>
-              <FormulaDisplay
-                formula={fd.formula}
-                substituted={fd.substituted}
-              />
-            </Box>
-          );
-        })()}
-
-      {history.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Divider sx={{ mb: 1 }} />
-          <Typography variant="h6" gutterBottom>
-            Berechnungsverlauf
-          </Typography>
-          <List dense>
-            {history.map((entry, index) => {
-              const fd = getDosisleistungNuklidFormulaDisplay(
-                entry.calculatedField,
-                entry.gamma,
-                entry.activityGBq,
-                entry.activityInUnit,
-                entry.activityUnit,
-                entry.doseRate
-              );
-              const primary =
-                entry.calculatedField === 'doseRate'
-                  ? `${entry.nuclide}: Ḣ = ${formatValue(entry.doseRate)} µSv/h`
-                  : `${entry.nuclide}: A = ${formatValue(entry.activityInUnit)} ${entry.activityUnit}`;
-              return (
-                <ListItem
-                  key={index}
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      aria-label="Löschen"
-                      onClick={() => handleDeleteHistoryEntry(index)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText
-                    primary={primary}
                     secondary={
                       <>
                         {fd.formula}
@@ -1164,8 +900,6 @@ export default function Strahlenschutz() {
       <SchutzwertRechner />
       <Divider />
       <AufenthaltszeitRechner />
-      <Divider />
-      <DosisleistungNuklidRechner />
       <Divider />
       <Einheitenumrechnung />
     </Box>

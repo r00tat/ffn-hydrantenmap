@@ -62,8 +62,10 @@ export interface DataSchemaField {
   key: string;
   label: string;
   unit: string;
-  type: 'number' | 'text' | 'boolean';
+  type: 'number' | 'text' | 'boolean' | 'computed';
   defaultValue?: string | number | boolean;
+  /** Formula expression for computed fields, e.g. "dosisleistung * 0.3" */
+  formula?: string;
 }
 
 export interface HeatmapConfig {
@@ -93,6 +95,8 @@ export interface HeatmapConfig {
   interpolationLogScale?: boolean;
   /** Algorithm-specific parameters — keys match AlgorithmParamDescriptor.key */
   interpolationParams?: Record<string, number | boolean>;
+  /** Color scale distribution: linear (default), log, sqrt, or quantile */
+  colorScale?: 'linear' | 'log' | 'sqrt' | 'quantile';
 }
 
 export interface FirecallLayer extends FirecallItem {

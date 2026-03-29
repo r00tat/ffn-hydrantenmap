@@ -12,10 +12,12 @@ import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
 import {
+  DataSchemaField,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
 } from '../components/firebase/firestore';
+import { computeAllFields } from '../common/computeFieldValue';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
@@ -74,6 +76,45 @@ export default function useFirecallItemUpdate() {
             batch.update(d.ref, { deleted: true, updatedAt: now, updatedBy: email });
           });
           await batch.commit();
+        }
+      }
+
+      // When a layer's dataSchema changes and has computed fields, recalculate all items
+      if (item.type === 'layer' && item.id && !item.deleted) {
+        const schema = (item as any).dataSchema as DataSchemaField[] | undefined;
+        const hasComputed = schema?.some((f) => f.type === 'computed' && f.formula);
+        if (hasComputed && schema) {
+          const itemsCol = collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            FIRECALL_ITEMS_COLLECTION_ID
+          );
+          const snapshot = await getDocs(
+            query(itemsCol, where('layer', '==', item.id))
+          );
+          if (!snapshot.empty) {
+            const batch = writeBatch(firestore);
+            const now = new Date().toISOString();
+            let hasUpdates = false;
+            snapshot.docs.forEach((d) => {
+              const data = d.data();
+              const fieldData = (data.fieldData || {}) as Record<string, string | number | boolean>;
+              const computed = computeAllFields(fieldData, schema);
+              if (Object.keys(computed).length > 0) {
+                const updatedFieldData = { ...fieldData, ...computed };
+                batch.update(d.ref, {
+                  fieldData: updatedFieldData,
+                  updatedAt: now,
+                  updatedBy: email,
+                });
+                hasUpdates = true;
+              }
+            });
+            if (hasUpdates) {
+              await batch.commit();
+            }
+          }
         }
       }
 

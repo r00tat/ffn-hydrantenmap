@@ -1,7 +1,11 @@
 'use client';
 
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import { useState } from 'react';
 import { DataSchemaField, HeatmapConfig } from '../firebase/firestore';
 
 interface HeatmapLegendProps {
@@ -17,6 +21,7 @@ export default function HeatmapLegend({
   allValues,
   layerName,
 }: HeatmapLegendProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const field = dataSchema.find((f) => f.key === config.activeKey);
   if (!field) return null;
 
@@ -66,41 +71,61 @@ export default function HeatmapLegend({
     <Box
       sx={{
         bgcolor: 'background.paper',
-        p: 1,
+        p: 0.5,
+        px: 1,
         borderRadius: 1,
         boxShadow: 2,
-        minWidth: 120,
+        minWidth: collapsed ? 'auto' : 120,
       }}
     >
-      {layerName && (
-        <Typography variant="caption" display="block" sx={{ fontWeight: 'bold' }}>
-          {layerName}
-        </Typography>
-      )}
-      <Typography variant="caption" display="block" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
-        {config.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}
-      </Typography>
-      <Typography variant="caption" display="block" gutterBottom>
-        {field.label}{field.unit ? ` (${field.unit})` : ''}
-      </Typography>
       <Box
         sx={{
-          height: 12,
-          borderRadius: 1,
-          background: `linear-gradient(to right, ${gradient})`,
-          mb: 0.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
         }}
-      />
-      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography variant="caption">
-          {min}
-          {field.unit}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <Typography variant="caption" sx={{ fontWeight: 'bold', mr: 0.5 }}>
+          {layerName || field.label}
         </Typography>
-        <Typography variant="caption">
-          {max}
-          {field.unit}
-        </Typography>
+        <IconButton size="small" sx={{ p: 0 }}>
+          {collapsed ? (
+            <ExpandMoreIcon sx={{ fontSize: 16 }} />
+          ) : (
+            <ExpandLessIcon sx={{ fontSize: 16 }} />
+          )}
+        </IconButton>
       </Box>
+      {!collapsed && (
+        <>
+          {layerName && (
+            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+              {config.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}
+              {' · '}{field.label}{field.unit ? ` (${field.unit})` : ''}
+            </Typography>
+          )}
+          <Box
+            sx={{
+              height: 12,
+              borderRadius: 1,
+              background: `linear-gradient(to right, ${gradient})`,
+              my: 0.5,
+            }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="caption">
+              {Number.isInteger(min) ? min : min.toFixed(2)}
+              {field.unit}
+            </Typography>
+            <Typography variant="caption">
+              {Number.isInteger(max) ? max : max.toFixed(2)}
+              {field.unit}
+            </Typography>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
