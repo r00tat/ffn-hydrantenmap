@@ -77,3 +77,85 @@ export function calculateInverseSquareLaw(
 
   return { field, value: result };
 }
+
+/**
+ * Abschirmung / Schutzwert (Shielding calculation).
+ *
+ * Formula: R = R₀ × (1/2)^(d / H)
+ *
+ * R₀ = dose rate without shielding (Dosisleistung ohne Abschirmung)
+ * R  = dose rate with shielding (Dosisleistung mit Abschirmung)
+ * d  = material thickness (Schichtdicke in cm)
+ * H  = half-value layer (Halbwertsschichtdicke in cm)
+ */
+
+export interface AbschirmungValues {
+  r0: number | null; // Dosisleistung ohne Abschirmung
+  r: number | null; // Dosisleistung mit Abschirmung
+  d: number | null; // Schichtdicke
+  h: number | null; // Halbwertsschichtdicke
+}
+
+export interface AbschirmungResult {
+  field: keyof AbschirmungValues;
+  value: number;
+}
+
+export interface AbschirmungHistoryEntry {
+  r0: number;
+  r: number;
+  d: number;
+  h: number;
+  calculatedField: keyof AbschirmungValues;
+  timestamp: Date;
+}
+
+/**
+ * Calculate the missing shielding value.
+ * Exactly one field must be null; the other three must be positive numbers.
+ * Returns null if the input is invalid.
+ */
+export function calculateAbschirmung(
+  values: AbschirmungValues
+): AbschirmungResult | null {
+  const entries = Object.entries(values) as [
+    keyof AbschirmungValues,
+    number | null,
+  ][];
+  const nullFields = entries.filter(([, v]) => v === null);
+
+  if (nullFields.length !== 1) return null;
+
+  const [field] = nullFields[0];
+  const filled = Object.fromEntries(
+    entries.filter(([, v]) => v !== null)
+  ) as Record<string, number>;
+
+  // All filled values must be positive
+  if (Object.values(filled).some((v) => v <= 0)) return null;
+
+  let result: number;
+
+  switch (field) {
+    case 'r':
+      // R = R₀ × (1/2)^(d / H)
+      result = filled.r0 * Math.pow(0.5, filled.d / filled.h);
+      break;
+    case 'r0':
+      // R₀ = R / (1/2)^(d / H)
+      result = filled.r / Math.pow(0.5, filled.d / filled.h);
+      break;
+    case 'd':
+      // d = H × log₂(R₀ / R)
+      result = filled.h * Math.log2(filled.r0 / filled.r);
+      break;
+    case 'h':
+      // H = d / log₂(R₀ / R)
+      result = filled.d / Math.log2(filled.r0 / filled.r);
+      break;
+    default:
+      return null;
+  }
+
+  return { field, value: result };
+}
