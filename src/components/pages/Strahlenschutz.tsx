@@ -297,26 +297,37 @@ function Abstandsgesetz() {
             Berechnungsverlauf
           </Typography>
           <List dense>
-            {history.map((entry, index) => (
-              <ListItem
-                key={index}
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="Löschen"
-                    onClick={() => handleDeleteHistoryEntry(index)}
-                    size="small"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                }
-              >
-                <ListItemText
-                  primary={`${abstandLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
-                  secondary={`D1=${entry.d1} m, R1=${entry.r1} µSv/h, D2=${entry.d2} m, R2=${entry.r2} µSv/h — ${entry.timestamp.toLocaleTimeString()}`}
-                />
-              </ListItem>
-            ))}
+            {history.map((entry, index) => {
+              const fd = getAbstandFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              return (
+                <ListItem
+                  key={index}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      aria-label="Löschen"
+                      onClick={() => handleDeleteHistoryEntry(index)}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText
+                    primary={`${abstandLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    secondary={
+                      <>
+                        {fd.formula}
+                        <br />
+                        {fd.substituted}
+                        <br />
+                        {entry.timestamp.toLocaleTimeString()}
+                      </>
+                    }
+                  />
+                </ListItem>
+              );
+            })}
           </List>
         </Box>
       )}
@@ -473,26 +484,37 @@ function SchutzwertRechner() {
             Berechnungsverlauf
           </Typography>
           <List dense>
-            {history.map((entry, index) => (
-              <ListItem
-                key={index}
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="Löschen"
-                    onClick={() => handleDeleteHistoryEntry(index)}
-                    size="small"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                }
-              >
-                <ListItemText
-                  primary={`${schutzwertLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
-                  secondary={`R₀=${entry.r0} µSv/h, R=${entry.r} µSv/h, S=${entry.s}, n=${entry.n} — ${entry.timestamp.toLocaleTimeString()}`}
-                />
-              </ListItem>
-            ))}
+            {history.map((entry, index) => {
+              const fd = getSchutzwertFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              return (
+                <ListItem
+                  key={index}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      aria-label="Löschen"
+                      onClick={() => handleDeleteHistoryEntry(index)}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText
+                    primary={`${schutzwertLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    secondary={
+                      <>
+                        {fd.formula}
+                        <br />
+                        {fd.substituted}
+                        <br />
+                        {entry.timestamp.toLocaleTimeString()}
+                      </>
+                    }
+                  />
+                </ListItem>
+              );
+            })}
           </List>
         </Box>
       )}
@@ -645,26 +667,37 @@ function AufenthaltszeitRechner() {
             Berechnungsverlauf
           </Typography>
           <List dense>
-            {history.map((entry, index) => (
-              <ListItem
-                key={index}
-                secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="Löschen"
-                    onClick={() => handleDeleteHistoryEntry(index)}
-                    size="small"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                }
-              >
-                <ListItemText
-                  primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
-                  secondary={`t=${entry.t} h, D=${entry.d} mSv, R=${entry.r} mSv/h — ${entry.timestamp.toLocaleTimeString()}`}
-                />
-              </ListItem>
-            ))}
+            {history.map((entry, index) => {
+              const fd = getAufenthaltszeitFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              return (
+                <ListItem
+                  key={index}
+                  secondaryAction={
+                    <IconButton
+                      edge="end"
+                      aria-label="Löschen"
+                      onClick={() => handleDeleteHistoryEntry(index)}
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  }
+                >
+                  <ListItemText
+                    primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    secondary={
+                      <>
+                        {fd.formula}
+                        <br />
+                        {fd.substituted}
+                        <br />
+                        {entry.timestamp.toLocaleTimeString()}
+                      </>
+                    }
+                  />
+                </ListItem>
+              );
+            })}
           </List>
         </Box>
       )}
