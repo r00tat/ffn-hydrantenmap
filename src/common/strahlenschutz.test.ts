@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calculateAufenthaltszeit,
   calculateInverseSquareLaw,
   calculateSchutzwert,
   StrahlenschutzValues,
@@ -159,6 +160,52 @@ describe('calculateSchutzwert', () => {
 
   it('returns null when a filled value is negative', () => {
     const result = calculateSchutzwert({ r0: 100, r: null, s: -2, n: 1 });
+    expect(result).toBeNull();
+  });
+});
+
+describe('calculateAufenthaltszeit', () => {
+  // D=100mSv, R=50mSv/h → t = 100/50 = 2h
+  it('calculates t when D and R are given', () => {
+    const result = calculateAufenthaltszeit({ t: null, d: 100, r: 50 });
+    expect(result).toEqual({ field: 't', value: 2 });
+  });
+
+  // t=2h, R=50mSv/h → D = 2 × 50 = 100mSv
+  it('calculates D when t and R are given', () => {
+    const result = calculateAufenthaltszeit({ t: 2, d: null, r: 50 });
+    expect(result).toEqual({ field: 'd', value: 100 });
+  });
+
+  // t=2h, D=100mSv → R = 100/2 = 50mSv/h
+  it('calculates R when t and D are given', () => {
+    const result = calculateAufenthaltszeit({ t: 2, d: 100, r: null });
+    expect(result).toEqual({ field: 'r', value: 50 });
+  });
+
+  // Einsatzrichtwert: D=15mSv, R=0.5mSv/h → t = 30h
+  it('handles realistic scenario with low dose rate', () => {
+    const result = calculateAufenthaltszeit({ t: null, d: 15, r: 0.5 });
+    expect(result).toEqual({ field: 't', value: 30 });
+  });
+
+  it('returns null when more than one field is null', () => {
+    const result = calculateAufenthaltszeit({ t: null, d: null, r: 50 });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when no field is null', () => {
+    const result = calculateAufenthaltszeit({ t: 2, d: 100, r: 50 });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when a filled value is zero', () => {
+    const result = calculateAufenthaltszeit({ t: null, d: 0, r: 50 });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when a filled value is negative', () => {
+    const result = calculateAufenthaltszeit({ t: null, d: -10, r: 50 });
     expect(result).toBeNull();
   });
 });
