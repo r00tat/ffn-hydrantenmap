@@ -10,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
+import { evaluateFormula } from '../../common/computeFieldValue';
 
 export interface ItemDataFieldsHandle {
   /** Flush pending new field into fieldData. Returns the updated fieldData. */
@@ -105,6 +106,9 @@ export default function ItemDataFields({
           (field.type === 'boolean' ? false : field.type === 'number' || field.type === 'computed' ? '' : '');
 
         if (field.type === 'computed') {
+          const computedValue = field.formula
+            ? evaluateFormula(field.formula, fieldData) ?? ''
+            : '';
           const label = field.unit
             ? `${field.label} (${field.unit}) — berechnet`
             : `${field.label} — berechnet`;
@@ -114,7 +118,7 @@ export default function ItemDataFields({
               label={label}
               size="small"
               fullWidth
-              value={currentValue}
+              value={computedValue}
               disabled
               sx={{ mb: 1 }}
               slotProps={{

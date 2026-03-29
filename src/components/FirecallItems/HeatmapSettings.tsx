@@ -74,7 +74,7 @@ export default function HeatmapSettings({
   onChange,
 }: HeatmapSettingsProps) {
   const current = config || defaultConfig;
-  const numericFields = dataSchema.filter((f) => f.type === 'number');
+  const numericFields = dataSchema.filter((f) => f.type === 'number' || f.type === 'computed');
 
   // Auto-select first numeric field when heatmap is enabled and no field is selected
   useEffect(() => {
