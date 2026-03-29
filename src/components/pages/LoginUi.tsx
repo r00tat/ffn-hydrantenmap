@@ -30,6 +30,13 @@ export default function LoginUi() {
     myGroups,
   } = useFirebaseLogin();
 
+  const [autoLoginTimedOut, setAutoLoginTimedOut] = useState(false);
+  useEffect(() => {
+    if (isSignedIn) return;
+    const timer = setTimeout(() => setAutoLoginTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, [isSignedIn]);
+
   const [groupClaims, setGroupClaims] = useState('');
   useEffect(() => {
     if (isAuthorized && auth.currentUser) {
@@ -49,7 +56,7 @@ export default function LoginUi() {
   }, [isAuthorized, myGroups]);
 
   const isAutoLoginInProgress =
-    !isSignedIn && (isAuthLoading || isRefreshing);
+    !isSignedIn && (isAuthLoading || isRefreshing) && !autoLoginTimedOut;
 
   return (
     <>
