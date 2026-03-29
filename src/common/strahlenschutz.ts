@@ -244,3 +244,71 @@ export function calculateAufenthaltszeit(
 
   return { field, value: result };
 }
+
+/**
+ * Dose and dose rate unit conversion.
+ *
+ * Supported dose units: Sv, mSv, µSv, R (Röntgen)
+ * Supported dose rate units: Sv/h, mSv/h, µSv/h, R/h
+ *
+ * Conversion: 1 R ≈ 0.01 Sv (for gamma radiation, soft tissue approximation)
+ */
+
+export type DoseUnit = 'Sv' | 'mSv' | 'µSv' | 'R';
+export type DoseRateUnit = 'Sv/h' | 'mSv/h' | 'µSv/h' | 'R/h';
+export type RadiationUnit = DoseUnit | DoseRateUnit;
+
+export const DOSE_UNITS: DoseUnit[] = ['Sv', 'mSv', 'µSv', 'R'];
+export const DOSE_RATE_UNITS: DoseRateUnit[] = [
+  'Sv/h',
+  'mSv/h',
+  'µSv/h',
+  'R/h',
+];
+export const ALL_RADIATION_UNITS: RadiationUnit[] = [
+  ...DOSE_UNITS,
+  ...DOSE_RATE_UNITS,
+];
+
+export function isDoseUnit(unit: RadiationUnit): unit is DoseUnit {
+  return (DOSE_UNITS as string[]).includes(unit);
+}
+
+export function isDoseRateUnit(unit: RadiationUnit): unit is DoseRateUnit {
+  return (DOSE_RATE_UNITS as string[]).includes(unit);
+}
+
+/** Factor to convert a unit to its base unit (Sv or Sv/h). */
+const TO_BASE: Record<RadiationUnit, number> = {
+  Sv: 1,
+  mSv: 1e-3,
+  µSv: 1e-6,
+  R: 0.01, // 1 R ≈ 0.01 Sv
+  'Sv/h': 1,
+  'mSv/h': 1e-3,
+  'µSv/h': 1e-6,
+  'R/h': 0.01,
+};
+
+/**
+ * Convert a radiation value between compatible units.
+ * Source and target must both be dose or both be dose rate units.
+ * Returns null if units are incompatible.
+ */
+export function convertRadiationUnit(
+  value: number,
+  from: RadiationUnit,
+  to: RadiationUnit
+): number | null {
+  if (isDoseUnit(from) !== isDoseUnit(to)) return null;
+  const baseValue = value * TO_BASE[from];
+  return baseValue / TO_BASE[to];
+}
+
+/**
+ * Get compatible target units for a given source unit.
+ */
+export function getCompatibleUnits(source: RadiationUnit): RadiationUnit[] {
+  if (isDoseUnit(source)) return DOSE_UNITS;
+  return DOSE_RATE_UNITS;
+}
