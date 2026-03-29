@@ -722,24 +722,24 @@ function AufenthaltszeitRechner() {
 
 function getDosisleistungNuklidFormulaDisplay(
   field: 'activity' | 'doseRate',
-  nuclideName: string,
   gamma: number,
   activityGBq: number,
+  activityInUnit: number,
+  unit: ActivityUnit,
   doseRate: number
 ) {
-  const aStr = formatValue(activityGBq);
   const hStr = formatValue(doseRate);
   const gStr = formatValue(gamma);
 
   if (field === 'doseRate') {
     return {
       formula: `Ḣ = Γ × A`,
-      substituted: `Ḣ = ${gStr} × ${aStr} = ${hStr} µSv/h`,
+      substituted: `Ḣ = ${gStr} × ${formatValue(activityGBq)} = ${hStr} µSv/h`,
     };
   } else {
     return {
       formula: `A = Ḣ / Γ`,
-      substituted: `A = ${hStr} / ${gStr} = ${aStr} GBq`,
+      substituted: `A = ${hStr} / ${gStr} = ${formatValue(activityInUnit)} ${unit}`,
     };
   }
 }
@@ -896,19 +896,22 @@ function DosisleistungNuklidRechner() {
         (() => {
           const actGBq =
             result.field === 'activity' ? result.value : activityInGBq!;
+          const actInUnit =
+            result.field === 'activity' ? result.value / convertActivityToGBq(1, activityUnit) : parsedActivity!;
           const dr =
             result.field === 'doseRate' ? result.value : parsedDoseRate!;
           const fd = getDosisleistungNuklidFormulaDisplay(
             result.field,
-            nuclide.name,
             nuclide.gamma,
             actGBq,
+            actInUnit,
+            activityUnit,
             dr
           );
           const resultLabel =
             result.field === 'doseRate'
               ? `Dosisleistung in 1m = ${formatValue(result.value)} µSv/h`
-              : `Aktivität = ${formatValue(result.value)} GBq`;
+              : `Aktivität = ${formatValue(actInUnit)} ${activityUnit}`;
           return (
             <Box
               sx={{
@@ -938,9 +941,10 @@ function DosisleistungNuklidRechner() {
             {history.map((entry, index) => {
               const fd = getDosisleistungNuklidFormulaDisplay(
                 entry.calculatedField,
-                entry.nuclide,
                 entry.gamma,
                 entry.activityGBq,
+                entry.activityInUnit,
+                entry.activityUnit,
                 entry.doseRate
               );
               const primary =
