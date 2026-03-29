@@ -3,6 +3,10 @@ import {
   calculateAufenthaltszeit,
   calculateInverseSquareLaw,
   calculateSchutzwert,
+  convertRadiationUnit,
+  getCompatibleUnits,
+  isDoseUnit,
+  isDoseRateUnit,
   StrahlenschutzValues,
 } from './strahlenschutz';
 
@@ -207,5 +211,88 @@ describe('calculateAufenthaltszeit', () => {
   it('returns null when a filled value is negative', () => {
     const result = calculateAufenthaltszeit({ t: null, d: -10, r: 50 });
     expect(result).toBeNull();
+  });
+});
+
+describe('convertRadiationUnit', () => {
+  // Dose conversions
+  it('converts Sv to mSv', () => {
+    expect(convertRadiationUnit(1, 'Sv', 'mSv')).toBe(1000);
+  });
+
+  it('converts mSv to µSv', () => {
+    expect(convertRadiationUnit(1, 'mSv', 'µSv')).toBeCloseTo(1000);
+  });
+
+  it('converts µSv to Sv', () => {
+    expect(convertRadiationUnit(1000000, 'µSv', 'Sv')).toBeCloseTo(1);
+  });
+
+  it('converts R to mSv (1 R ≈ 10 mSv)', () => {
+    expect(convertRadiationUnit(1, 'R', 'mSv')).toBeCloseTo(10);
+  });
+
+  it('converts mSv to R', () => {
+    expect(convertRadiationUnit(10, 'mSv', 'R')).toBeCloseTo(1);
+  });
+
+  it('converts R to µSv', () => {
+    expect(convertRadiationUnit(1, 'R', 'µSv')).toBeCloseTo(10000);
+  });
+
+  // Dose rate conversions
+  it('converts Sv/h to mSv/h', () => {
+    expect(convertRadiationUnit(1, 'Sv/h', 'mSv/h')).toBe(1000);
+  });
+
+  it('converts mSv/h to µSv/h', () => {
+    expect(convertRadiationUnit(1, 'mSv/h', 'µSv/h')).toBeCloseTo(1000);
+  });
+
+  it('converts R/h to mSv/h', () => {
+    expect(convertRadiationUnit(1, 'R/h', 'mSv/h')).toBeCloseTo(10);
+  });
+
+  // Identity conversion
+  it('converts same unit to itself', () => {
+    expect(convertRadiationUnit(42, 'mSv', 'mSv')).toBe(42);
+  });
+
+  // Incompatible units
+  it('returns null when converting dose to dose rate', () => {
+    expect(convertRadiationUnit(1, 'mSv', 'mSv/h')).toBeNull();
+  });
+
+  it('returns null when converting dose rate to dose', () => {
+    expect(convertRadiationUnit(1, 'mSv/h', 'mSv')).toBeNull();
+  });
+});
+
+describe('getCompatibleUnits', () => {
+  it('returns dose units for a dose source', () => {
+    expect(getCompatibleUnits('mSv')).toEqual(['Sv', 'mSv', 'µSv', 'R']);
+  });
+
+  it('returns dose rate units for a dose rate source', () => {
+    expect(getCompatibleUnits('mSv/h')).toEqual([
+      'Sv/h',
+      'mSv/h',
+      'µSv/h',
+      'R/h',
+    ]);
+  });
+});
+
+describe('isDoseUnit / isDoseRateUnit', () => {
+  it('identifies dose units', () => {
+    expect(isDoseUnit('Sv')).toBe(true);
+    expect(isDoseUnit('R')).toBe(true);
+    expect(isDoseUnit('mSv/h')).toBe(false);
+  });
+
+  it('identifies dose rate units', () => {
+    expect(isDoseRateUnit('Sv/h')).toBe(true);
+    expect(isDoseRateUnit('R/h')).toBe(true);
+    expect(isDoseRateUnit('mSv')).toBe(false);
   });
 });

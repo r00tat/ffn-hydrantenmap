@@ -7,16 +7,21 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useCallback, useMemo, useState } from 'react';
 import {
+  ALL_RADIATION_UNITS,
   AufenthaltszeitHistoryEntry,
   AufenthaltszeitValues,
   calculateAufenthaltszeit,
   calculateInverseSquareLaw,
   calculateSchutzwert,
+  convertRadiationUnit,
+  getCompatibleUnits,
+  RadiationUnit,
   SchutzwertHistoryEntry,
   SchutzwertValues,
   StrahlenschutzHistoryEntry,
@@ -667,6 +672,173 @@ function AufenthaltszeitRechner() {
   );
 }
 
+// --- Einheitenumrechnung ---
+
+interface ConversionHistoryEntry {
+  value: number;
+  from: RadiationUnit;
+  result: number;
+  to: RadiationUnit;
+  timestamp: Date;
+}
+
+function Einheitenumrechnung() {
+  const [inputValue, setInputValue] = useState('');
+  const [fromUnit, setFromUnit] = useState<RadiationUnit>('mSv');
+  const [toUnit, setToUnit] = useState<RadiationUnit>('µSv');
+  const [history, setHistory] = useState<ConversionHistoryEntry[]>([]);
+
+  const compatibleUnits = useMemo(
+    () => getCompatibleUnits(fromUnit),
+    [fromUnit]
+  );
+
+  // When source unit changes, ensure target unit stays compatible
+  const effectiveToUnit = useMemo(() => {
+    if (compatibleUnits.includes(toUnit)) return toUnit;
+    return compatibleUnits[0];
+  }, [compatibleUnits, toUnit]);
+
+  const parsedValue = useMemo(() => parseInput(inputValue), [inputValue]);
+
+  const result = useMemo(() => {
+    if (parsedValue === null) return null;
+    return convertRadiationUnit(parsedValue, fromUnit, effectiveToUnit);
+  }, [parsedValue, fromUnit, effectiveToUnit]);
+
+  const handleConvert = useCallback(() => {
+    if (result === null || parsedValue === null) return;
+    setHistory((prev) => [
+      {
+        value: parsedValue,
+        from: fromUnit,
+        result,
+        to: effectiveToUnit,
+        timestamp: new Date(),
+      },
+      ...prev,
+    ]);
+  }, [result, parsedValue, fromUnit, effectiveToUnit]);
+
+  const handleDeleteHistoryEntry = useCallback((index: number) => {
+    setHistory((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  return (
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        Einheitenumrechnung
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Dosis und Dosisleistung umrechnen. 1 R ≈ 0,01 Sv (Gamma, Weichteilgewebe).
+      </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <TextField
+          label="Wert"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          type="text"
+          inputMode="decimal"
+          variant="outlined"
+          size="small"
+          sx={{ minWidth: 120 }}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <TextField
+          select
+          label="Von"
+          value={fromUnit}
+          onChange={(e) => setFromUnit(e.target.value as RadiationUnit)}
+          variant="outlined"
+          size="small"
+          sx={{ minWidth: 120 }}
+        >
+          {ALL_RADIATION_UNITS.map((unit) => (
+            <MenuItem key={unit} value={unit}>
+              {unit}
+            </MenuItem>
+          ))}
+        </TextField>
+        <Typography variant="body1">=</Typography>
+        <TextField
+          select
+          label="Nach"
+          value={effectiveToUnit}
+          onChange={(e) => setToUnit(e.target.value as RadiationUnit)}
+          variant="outlined"
+          size="small"
+          sx={{ minWidth: 120 }}
+        >
+          {compatibleUnits.map((unit) => (
+            <MenuItem key={unit} value={unit}>
+              {unit}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+        <Button
+          variant="contained"
+          onClick={handleConvert}
+          disabled={result === null}
+        >
+          Umrechnen
+        </Button>
+      </Box>
+
+      {result !== null && parsedValue !== null && (
+        <Box
+          sx={{
+            mt: 2,
+            p: 2,
+            bgcolor: 'success.main',
+            color: 'success.contrastText',
+            borderRadius: 1,
+          }}
+        >
+          <Typography variant="h6">
+            {formatValue(parsedValue)} {fromUnit} = {formatValue(result)}{' '}
+            {effectiveToUnit}
+          </Typography>
+        </Box>
+      )}
+
+      {history.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Divider sx={{ mb: 1 }} />
+          <Typography variant="h6" gutterBottom>
+            Umrechnungsverlauf
+          </Typography>
+          <List dense>
+            {history.map((entry, index) => (
+              <ListItem
+                key={index}
+                secondaryAction={
+                  <IconButton
+                    edge="end"
+                    aria-label="Löschen"
+                    onClick={() => handleDeleteHistoryEntry(index)}
+                    size="small"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                }
+              >
+                <ListItemText
+                  primary={`${formatValue(entry.value)} ${entry.from} = ${formatValue(entry.result)} ${entry.to}`}
+                  secondary={entry.timestamp.toLocaleTimeString()}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 // --- Main component ---
 
 export default function Strahlenschutz() {
@@ -677,6 +849,8 @@ export default function Strahlenschutz() {
       <SchutzwertRechner />
       <Divider />
       <AufenthaltszeitRechner />
+      <Divider />
+      <Einheitenumrechnung />
     </Box>
   );
 }
