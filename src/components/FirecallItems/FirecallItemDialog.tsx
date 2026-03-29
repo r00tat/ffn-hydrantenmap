@@ -42,6 +42,7 @@ import { FirecallItemBase } from './elements/FirecallItemBase';
 import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
 import HeatmapSettings from './HeatmapSettings';
+import { computeAllFields } from '../../common/computeFieldValue';
 import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
 
 export interface FirecallItemDialogOptions {
@@ -141,12 +142,21 @@ export default function FirecallItemDialog({
       data.name = `${typeName} ${sameTypeSiblings.length + 1}`;
     }
 
-    const saveItem = flushedFieldData
-      ? { ...data, fieldData: flushedFieldData }
-      : data;
+    let finalFieldData = flushedFieldData || data.fieldData || {};
+
+    // Compute formula-based fields for non-layer items
+    if (data.type !== 'layer' && data.layer) {
+      const layerSchema = layers[data.layer]?.dataSchema;
+      if (layerSchema) {
+        const computed = computeAllFields(finalFieldData, layerSchema);
+        finalFieldData = { ...finalFieldData, ...computed };
+      }
+    }
+
+    const saveItem = { ...data, fieldData: finalFieldData };
     setOpen(false);
     onClose(saveItem);
-  }, [canSave, item, siblings, onClose]);
+  }, [canSave, item, siblings, onClose, layers]);
 
   return (
     <>

@@ -102,7 +102,29 @@ export default function ItemDataFields({
         const currentValue =
           fieldData[field.key] ??
           (isNew ? field.defaultValue : undefined) ??
-          (field.type === 'boolean' ? false : field.type === 'number' ? '' : '');
+          (field.type === 'boolean' ? false : field.type === 'number' || field.type === 'computed' ? '' : '');
+
+        if (field.type === 'computed') {
+          const label = field.unit
+            ? `${field.label} (${field.unit}) — berechnet`
+            : `${field.label} — berechnet`;
+          return (
+            <TextField
+              key={field.key}
+              label={label}
+              size="small"
+              fullWidth
+              value={currentValue}
+              disabled
+              sx={{ mb: 1 }}
+              slotProps={{
+                input: {
+                  sx: { fontStyle: 'italic' },
+                },
+              }}
+            />
+          );
+        }
 
         if (field.type === 'boolean') {
           return (

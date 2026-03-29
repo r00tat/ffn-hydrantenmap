@@ -62,8 +62,10 @@ export interface DataSchemaField {
   key: string;
   label: string;
   unit: string;
-  type: 'number' | 'text' | 'boolean';
+  type: 'number' | 'text' | 'boolean' | 'computed';
   defaultValue?: string | number | boolean;
+  /** Formula expression for computed fields, e.g. "dosisleistung * 0.3" */
+  formula?: string;
 }
 
 export interface HeatmapConfig {

@@ -16,6 +16,13 @@ import { useCallback, useRef } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
 import { slugify } from '../firebase/importUtils';
 
+function availableKeys(schema: DataSchemaField[], currentIndex: number): string {
+  return schema
+    .filter((f, i) => i !== currentIndex && f.type !== 'computed' && f.key)
+    .map((f) => f.key)
+    .join(', ') || 'keine';
+}
+
 interface DataSchemaEditorProps {
   dataSchema: DataSchemaField[];
   onChange: (schema: DataSchemaField[]) => void;
@@ -148,8 +155,21 @@ export default function DataSchemaEditor({
               <MenuItem value="number">Zahl</MenuItem>
               <MenuItem value="text">Text</MenuItem>
               <MenuItem value="boolean">Ja/Nein</MenuItem>
+              <MenuItem value="computed">Berechnet</MenuItem>
             </TextField>
-            {field.type === 'boolean' ? (
+            {field.type === 'computed' ? (
+              <TextField
+                label="Formel"
+                size="small"
+                value={field.formula ?? ''}
+                onChange={(e) =>
+                  updateField(index, { formula: e.target.value })
+                }
+                placeholder={availableKeys(dataSchema, index)}
+                helperText={`Verfügbare Felder: ${availableKeys(dataSchema, index)}`}
+                sx={{ flex: 2 }}
+              />
+            ) : field.type === 'boolean' ? (
               <FormControlLabel
                 control={
                   <Checkbox
