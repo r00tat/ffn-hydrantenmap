@@ -49,19 +49,19 @@ export default function FirecallLayer({
   const sortedLayers = useFirecallLayersSorted();
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
 
-  // Seed visible overlays when heatmap layers first become available
-  const seededRef = React.useRef(false);
+  // Track which heatmap overlay names we've already auto-added, so new ones
+  // (e.g. another user enabling a heatmap) get picked up automatically.
+  const knownHeatmapNamesRef = React.useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (seededRef.current) return;
-    const heatmapNames = sortedLayers
+    const currentNames = sortedLayers
       .filter((layer) => layer.heatmapConfig?.enabled && layer.defaultVisible !== 'false')
       .map((layer) => getOverlayName(layer));
-    if (heatmapNames.length > 0) {
-      seededRef.current = true;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    const newNames = currentNames.filter((n) => !knownHeatmapNamesRef.current.has(n));
+    currentNames.forEach((n) => knownHeatmapNamesRef.current.add(n));
+    if (newNames.length > 0) {
       setVisibleOverlays((prev) => {
         const next = new Set(prev);
-        heatmapNames.forEach((name) => next.add(name));
+        newNames.forEach((name) => next.add(name));
         return next;
       });
     }

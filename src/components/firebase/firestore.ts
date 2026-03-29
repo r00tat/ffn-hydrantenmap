@@ -95,6 +95,8 @@ export interface HeatmapConfig {
   interpolationLogScale?: boolean;
   /** Algorithm-specific parameters — keys match AlgorithmParamDescriptor.key */
   interpolationParams?: Record<string, number | boolean>;
+  /** Color scale distribution: linear (default), log, sqrt, or quantile */
+  colorScale?: 'linear' | 'log' | 'sqrt' | 'quantile';
 }
 
 export interface FirecallLayer extends FirecallItem {
