@@ -99,7 +99,7 @@ export default function SchadstoffPage() {
         </Typography>
 
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="Schadstoff Tabs">
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="Schadstoff Tabs" variant="scrollable" scrollButtons="auto">
             <Tab label="Schadstoffdatenbank" {...a11yProps(0)} />
             <Tab label="Strahlenschutz" {...a11yProps(1)} />
             <Tab label="Energiespektrum" {...a11yProps(2)} />

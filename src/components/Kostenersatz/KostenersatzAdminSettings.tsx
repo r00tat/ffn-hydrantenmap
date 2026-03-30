@@ -332,7 +332,7 @@ export default function KostenersatzAdminSettings() {
       <Typography variant="h5">Kostenersatz Einstellungen</Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
           <Tab label="Tarife" />
           <Tab label="Fahrzeuge" />
           <Tab label="Vorlagen" />
