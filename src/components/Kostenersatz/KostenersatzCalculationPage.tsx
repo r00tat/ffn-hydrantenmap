@@ -620,7 +620,7 @@ export default function KostenersatzCalculationPage({
 
       <Paper sx={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="kostenersatz tabs">
+          <Tabs value={tabValue} onChange={handleTabChange} aria-label="kostenersatz tabs" variant="scrollable" scrollButtons="auto">
             <Tab label="Einsatz" {...a11yProps(0)} />
             <Tab label="Berechnung" {...a11yProps(1)} />
             <Tab label="Empfänger" {...a11yProps(2)} />
