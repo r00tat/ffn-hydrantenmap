@@ -270,7 +270,12 @@ export default function EnergySpectrum() {
                     </IconButton>
                   </Box>
                 }
-                sx={{ opacity: s.visible ? 1 : 0.5 }}
+                sx={{
+                  opacity: s.visible ? 1 : 0.5,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+                onClick={() => toggleVisibility(s.id)}
               >
                 <Box
                   sx={{
@@ -340,15 +345,17 @@ export default function EnergySpectrum() {
             ]}
             yAxis={[
               {
-                label: 'Counts',
-                scaleType: logScale ? 'log' : 'linear',
-                ...(logScale ? { min: 1 } : {}),
+                label: logScale ? 'Counts (log)' : 'Counts',
+                valueFormatter: logScale
+                  ? (v: number | null) =>
+                      v != null ? Math.round(Math.pow(10, v) - 1).toString() : ''
+                  : undefined,
               },
             ]}
             series={chartData.series.map((s) => ({
               ...s,
               data: logScale
-                ? s.data.map((v) => Math.max(v, 0.1))
+                ? s.data.map((v) => (v > 0 ? Math.log10(v + 1) : 0))
                 : s.data,
             }))}
             margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
