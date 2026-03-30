@@ -14,6 +14,8 @@ import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -40,6 +42,7 @@ interface LoadedSpectrum {
   id: string;
   data: SpectrumData;
   matches: NuclideMatch[];
+  visible: boolean;
 }
 
 /**
@@ -86,6 +89,7 @@ export default function EnergySpectrum() {
             id: `${file.name}-${Date.now()}`,
             data,
             matches,
+            visible: true,
           });
         } catch (e) {
           console.error(`Failed to parse ${file.name}:`, e);
@@ -98,19 +102,30 @@ export default function EnergySpectrum() {
     []
   );
 
+  const toggleVisibility = useCallback((id: string) => {
+    setSpectra((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s))
+    );
+  }, []);
+
   const removeSpectrum = useCallback((id: string) => {
     setSpectra((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
-  const displayRange = useMemo(
-    () => (spectra.length > 0 ? getDisplayRange(spectra) : 0),
+  const visibleSpectra = useMemo(
+    () => spectra.filter((s) => s.visible),
     [spectra]
   );
 
-  // Collect all matched peak energies across all spectra for reference lines
+  const displayRange = useMemo(
+    () => (visibleSpectra.length > 0 ? getDisplayRange(visibleSpectra) : 0),
+    [visibleSpectra]
+  );
+
+  // Collect matched peak energies from visible spectra for reference lines
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
-    for (const s of spectra) {
+    for (const s of visibleSpectra) {
       for (const match of s.matches) {
         for (const mp of match.matchedPeaks) {
           const label = `${match.nuclide.name} (${Math.round(mp.expected)} keV)`;
@@ -119,24 +134,28 @@ export default function EnergySpectrum() {
       }
     }
     return peakMap;
-  }, [spectra]);
+  }, [visibleSpectra]);
 
-  // Build chart data: energy labels on X, one series per spectrum
+  // Build chart data from visible spectra only
   const chartData = useMemo(() => {
-    if (spectra.length === 0 || displayRange === 0) return null;
+    if (visibleSpectra.length === 0 || displayRange === 0) return null;
 
-    const energies = spectra[0].data.energies
+    const energies = visibleSpectra[0].data.energies
       .slice(0, displayRange)
       .map((e) => Math.round(e * 10) / 10);
 
-    const series = spectra.map((s, idx) => ({
-      data: s.data.counts.slice(0, displayRange),
-      label: s.data.sampleName || `Spektrum ${idx + 1}`,
-      color: SERIES_COLORS[idx % SERIES_COLORS.length],
-    }));
+    // Use original index for consistent colors
+    const series = visibleSpectra.map((s) => {
+      const originalIdx = spectra.indexOf(s);
+      return {
+        data: s.data.counts.slice(0, displayRange),
+        label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
+        color: SERIES_COLORS[originalIdx % SERIES_COLORS.length],
+      };
+    });
 
     return { energies, series };
-  }, [spectra, displayRange]);
+  }, [spectra, visibleSpectra, displayRange]);
 
   // Find closest energy band value for a given energy in keV
   const findClosestBandValue = useCallback(
@@ -233,14 +252,25 @@ export default function EnergySpectrum() {
               <ListItem
                 key={s.id}
                 secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label="Entfernen"
-                    onClick={() => removeSpectrum(s.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <IconButton
+                      aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
+                      onClick={() => toggleVisibility(s.id)}
+                      size="small"
+                    >
+                      {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                    </IconButton>
+                    <IconButton
+                      edge="end"
+                      aria-label="Entfernen"
+                      onClick={() => removeSpectrum(s.id)}
+                      size="small"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
                 }
+                sx={{ opacity: s.visible ? 1 : 0.5 }}
               >
                 <Box
                   sx={{
