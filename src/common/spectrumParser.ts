@@ -101,6 +101,8 @@ export function parseSpectrumXml(xml: string): SpectrumData {
 export interface FindPeaksOptions {
   windowSize?: number;
   significance?: number;
+  /** Minimum energy in keV to consider for peaks (filters low-energy noise). Default: 40 */
+  minEnergy?: number;
 }
 
 /**
@@ -132,13 +134,23 @@ export function findPeaks(
 ): Peak[] {
   const windowSize = options?.windowSize ?? 5;
   const significance = options?.significance ?? 3;
+  const minEnergy = options?.minEnergy ?? 40;
   const halfWindow = Math.floor(windowSize / 2);
   const peaks: Peak[] = [];
 
   // Smooth the spectrum for robust peak detection
   const smoothed = smoothCounts(counts, halfWindow);
 
-  for (let i = halfWindow; i < counts.length - halfWindow; i++) {
+  // Find the first channel at or above minEnergy
+  let startChannel = halfWindow;
+  for (let i = halfWindow; i < energies.length; i++) {
+    if (energies[i] >= minEnergy) {
+      startChannel = i;
+      break;
+    }
+  }
+
+  for (let i = startChannel; i < counts.length - halfWindow; i++) {
     const current = smoothed[i];
     if (current === 0) continue;
 
@@ -227,16 +239,27 @@ export function identifyNuclides(
 
     if (matchedPeaks.length === 0) continue;
 
-    // Confidence = weighted combination:
-    // 60% fraction of nuclide peaks matched
-    // 40% average match strength relative to max peak
+    // Confidence scoring:
+    // - fractionMatched: how many of the nuclide's known peaks were found
+    // - avgStrength: how strong matched peaks are relative to the strongest peak
+    //   (a nuclide that explains the dominant peak scores higher)
+    // - energyAccuracy: how close the matches are (closer = better)
     const fractionMatched = matchedPeaks.length / nuclide.peaks.length;
     const avgStrength =
       matchedPeaks.reduce((sum, mp) => sum + mp.found.counts, 0) /
       matchedPeaks.length /
       maxPeakCounts;
+    const avgAccuracy =
+      1 -
+      matchedPeaks.reduce(
+        (sum, mp) => sum + Math.abs(mp.found.energy - mp.expected),
+        0
+      ) /
+        matchedPeaks.length /
+        toleranceKeV;
 
-    const confidence = 0.6 * fractionMatched + 0.4 * avgStrength;
+    const confidence =
+      0.35 * fractionMatched + 0.50 * avgStrength + 0.15 * avgAccuracy;
 
     matches.push({ nuclide, confidence, matchedPeaks });
   }
