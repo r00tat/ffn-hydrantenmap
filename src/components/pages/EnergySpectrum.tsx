@@ -304,6 +304,12 @@ export default function EnergySpectrum() {
                           label={`${topMatch.nuclide.name} (${Math.round(topMatch.confidence * 100)}%)`}
                           color="success"
                           size="small"
+                          component={topMatch.nuclide.url ? 'a' : 'span'}
+                          href={topMatch.nuclide.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          clickable={!!topMatch.nuclide.url}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
                         />
                       )}
                       {!topMatch && (

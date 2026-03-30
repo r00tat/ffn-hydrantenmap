@@ -327,29 +327,33 @@ export interface Nuclide {
   name: string;
   gamma: number; // µSv·m²/(h·GBq)
   peaks?: number[]; // characteristic gamma energies in keV
+  url?: string; // link to nuclide data sheet
 }
+
+/** Base URL for RadiaCode isotope library. */
+const RC = 'https://www.radiacode.com/isotope';
 
 /** Nuclides sorted by name, with gamma dose rate constants. */
 export const NUCLIDES: Nuclide[] = [
-  { name: 'Am-241', gamma: 3.1, peaks: [59.5] },
-  { name: 'Au-198', gamma: 62, peaks: [411.8] },
-  { name: 'Ba-133', gamma: 52, peaks: [81, 276.4, 302.9, 356, 383.8] },
-  { name: 'Co-57', gamma: 16, peaks: [122.1, 136.5] },
-  { name: 'Co-60', gamma: 351, peaks: [1173.2, 1332.5] },
-  { name: 'Cr-51', gamma: 5, peaks: [320.1] },
-  { name: 'Cs-137', gamma: 92, peaks: [661.7] },
-  { name: 'Eu-152', gamma: 168, peaks: [121.8, 244.7, 344.3, 778.9, 964.1, 1112.1, 1408] },
-  { name: 'I-125', gamma: 17, peaks: [35.5] },
-  { name: 'I-131', gamma: 66, peaks: [364.5] },
-  { name: 'Ir-192', gamma: 130, peaks: [295.9, 308.5, 316.5, 468.1] },
-  { name: 'Mn-54', gamma: 122, peaks: [834.8] },
-  { name: 'Mo-99', gamma: 26, peaks: [140.5, 739.5] },
-  { name: 'Na-22', gamma: 327, peaks: [511, 1274.5] },
-  { name: 'Ra-226', gamma: 195, peaks: [186.2] },
-  { name: 'Se-75', gamma: 56, peaks: [136, 264.7, 279.5, 400.7] },
-  { name: 'Sr-90', gamma: 6 }, // pure beta, no gamma peaks
-  { name: 'Tc-99m', gamma: 17, peaks: [140.5] },
-  { name: 'Zn-65', gamma: 82, peaks: [1115.5] },
+  { name: 'Am-241', gamma: 3.1, peaks: [59.5], url: `${RC}/am-241` },
+  { name: 'Au-198', gamma: 62, peaks: [411.8], url: `${RC}/au-198` },
+  { name: 'Ba-133', gamma: 52, peaks: [81, 276.4, 302.9, 356, 383.8], url: `${RC}/ba-133` },
+  { name: 'Co-57', gamma: 16, peaks: [122.1, 136.5], url: `${RC}/co-57` },
+  { name: 'Co-60', gamma: 351, peaks: [1173.2, 1332.5], url: `${RC}/co-60` },
+  { name: 'Cr-51', gamma: 5, peaks: [320.1], url: `${RC}/cr-51` },
+  { name: 'Cs-137', gamma: 92, peaks: [661.7], url: `${RC}/cs-137` },
+  { name: 'Eu-152', gamma: 168, peaks: [121.8, 244.7, 344.3, 778.9, 964.1, 1112.1, 1408], url: `${RC}/eu-152` },
+  { name: 'I-125', gamma: 17, peaks: [35.5], url: `${RC}/i-125` },
+  { name: 'I-131', gamma: 66, peaks: [364.5], url: `${RC}/i-131` },
+  { name: 'Ir-192', gamma: 130, peaks: [295.9, 308.5, 316.5, 468.1], url: `${RC}/ir-192` },
+  { name: 'Mn-54', gamma: 122, peaks: [834.8], url: `${RC}/mn-54` },
+  { name: 'Mo-99', gamma: 26, peaks: [140.5, 739.5], url: `${RC}/mo-99` },
+  { name: 'Na-22', gamma: 327, peaks: [511, 1274.5], url: `${RC}/na-22` },
+  { name: 'Ra-226', gamma: 195, peaks: [186.2], url: `${RC}/ra-226` },
+  { name: 'Se-75', gamma: 56, peaks: [136, 264.7, 279.5, 400.7], url: `${RC}/se-75` },
+  { name: 'Sr-90', gamma: 6, url: `${RC}/sr-90` }, // pure beta emitter, no gamma peaks (Bremsstrahlung only)
+  { name: 'Tc-99m', gamma: 17, peaks: [140.5], url: `${RC}/tc-99m` },
+  { name: 'Zn-65', gamma: 82, peaks: [1115.5], url: `${RC}/zn-65` },
 ];
 
 export type ActivityUnit = 'TBq' | 'GBq' | 'MBq' | 'kBq' | 'Bq' | 'Ci';
