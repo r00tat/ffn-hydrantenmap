@@ -14,6 +14,7 @@ import { FirecallItemLayer } from './FirecallItemLayer';
 import { FirecallItemMarker } from './FirecallItemMarker';
 import { FirecallLine } from './FirecallLine';
 import { FirecallRohr } from './FirecallRohr';
+import { FirecallSpectrum } from './FirecallSpectrum';
 import { FirecallTacticalUnit } from './FirecallTacticalUnit';
 import { FirecallVehicle } from './FirecallVehicle';
 
@@ -34,6 +35,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   diary: FirecallDiary,
   drawing: FirecallDrawing,
   gb: FirecallGb,
+  spectrum: FirecallSpectrum,
 };
 
 export const fcItemNames: { [key: string]: string } = {};
