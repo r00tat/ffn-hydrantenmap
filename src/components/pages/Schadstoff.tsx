@@ -10,6 +10,7 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { SyntheticEvent, useCallback, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import useHazmatDb from '../../hooks/useHazmatDb';
 import CircularProgress from '@mui/material/CircularProgress';
 import EnergySpectrum from './EnergySpectrum';
@@ -41,17 +42,29 @@ function a11yProps(index: number) {
   };
 }
 
+const TAB_ROUTES = ['', 'strahlenschutz', 'energiespektrum'] as const;
+
+function pathnameToTab(pathname: string): number {
+  const segment = pathname.replace(/^\/schadstoff\/?/, '').replace(/\/$/, '');
+  const idx = TAB_ROUTES.indexOf(segment as (typeof TAB_ROUTES)[number]);
+  return idx >= 0 ? idx : 0;
+}
+
 export default function SchadstoffPage() {
-  const [tabValue, setTabValue] = useState(0);
+  const pathname = usePathname();
+  const router = useRouter();
+  const tabValue = pathnameToTab(pathname);
+
   const [unNumber, setUnNumber] = useState('');
   const [materialName, setMaterialName] = useState('');
   const [hazmatRecords, isInProgress] = useHazmatDb(unNumber, materialName);
 
   const handleTabChange = useCallback(
     (_event: SyntheticEvent, newValue: number) => {
-      setTabValue(newValue);
+      const route = TAB_ROUTES[newValue];
+      router.push(`/schadstoff${route ? `/${route}` : ''}`);
     },
-    []
+    [router]
   );
 
   const openEricards = useCallback((num: string, nam: string) => {
