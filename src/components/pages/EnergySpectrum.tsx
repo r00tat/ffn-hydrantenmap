@@ -20,14 +20,24 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { where } from 'firebase/firestore';
 import { NUCLIDES } from '../../common/strahlenschutz';
 import {
   parseSpectrumXml,
+  channelToEnergy,
   findPeaks,
   identifyNuclides,
   type SpectrumData,
   type NuclideMatch,
 } from '../../common/spectrumParser';
+import {
+  FIRECALL_COLLECTION_ID,
+  Spectrum,
+} from '../../components/firebase/firestore';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
+import { useFirecallId } from '../../hooks/useFirecall';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 
 /** MUI default color palette for series */
 const SERIES_COLORS = [
@@ -41,6 +51,7 @@ const SERIES_COLORS = [
 
 interface LoadedSpectrum {
   id: string;
+  firestoreId?: string;
   data: SpectrumData;
   matches: NuclideMatch[];
   visible: boolean;
@@ -89,6 +100,65 @@ export default function EnergySpectrum() {
   const [logScale, setLogScale] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const firecallId = useFirecallId();
+  const addItem = useFirecallItemAdd();
+  const updateItem = useFirecallItemUpdate();
+
+  const queryConstraints = useMemo(
+    () => [where('type', '==', 'spectrum')],
+    []
+  );
+  const filterFn = useCallback((s: Spectrum) => !s.deleted, []);
+  const savedSpectra = useFirebaseCollection<Spectrum>({
+    collectionName: FIRECALL_COLLECTION_ID,
+    pathSegments: [firecallId, 'item'],
+    queryConstraints,
+    filterFn,
+  });
+
+  // Convert Firestore spectra into LoadedSpectrum format
+  const firestoreSpectra = useMemo<LoadedSpectrum[]>(() => {
+    if (!savedSpectra || savedSpectra.length === 0) return [];
+
+    return savedSpectra.map((saved) => {
+      const energies = saved.counts.map((_, ch) =>
+        channelToEnergy(ch, saved.coefficients)
+      );
+      const dataWithEnergies: SpectrumData = {
+        sampleName: saved.sampleName,
+        deviceName: saved.deviceName,
+        measurementTime: saved.measurementTime,
+        liveTime: saved.liveTime,
+        startTime: saved.startTime,
+        endTime: saved.endTime,
+        coefficients: saved.coefficients,
+        counts: saved.counts,
+        energies,
+      };
+      const peaks = findPeaks(dataWithEnergies.counts, energies);
+      const matches = identifyNuclides(peaks);
+
+      return {
+        id: `firestore-${saved.id}`,
+        firestoreId: saved.id,
+        data: dataWithEnergies,
+        matches,
+        visible: true,
+      };
+    });
+  }, [savedSpectra]);
+
+  // Merge Firestore spectra with locally-uploaded spectra (local overrides for duplicates)
+  const allSpectra = useMemo(() => {
+    const localFirestoreIds = new Set(
+      spectra.filter((s) => s.firestoreId).map((s) => s.firestoreId)
+    );
+    const fromFirestore = firestoreSpectra.filter(
+      (s) => !localFirestoreIds.has(s.firestoreId)
+    );
+    return [...fromFirestore, ...spectra];
+  }, [spectra, firestoreSpectra]);
+
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
@@ -102,8 +172,26 @@ export default function EnergySpectrum() {
           const data = parseSpectrumXml(text);
           const peaks = findPeaks(data.counts, data.energies);
           const matches = identifyNuclides(peaks);
+
+          const spectrumItem: Spectrum = {
+            type: 'spectrum',
+            name: data.sampleName || file.name,
+            sampleName: data.sampleName,
+            deviceName: data.deviceName,
+            measurementTime: data.measurementTime,
+            liveTime: data.liveTime,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            coefficients: data.coefficients,
+            counts: data.counts,
+            matchedNuclide: matches[0]?.nuclide.name,
+            matchedConfidence: matches[0]?.confidence,
+          };
+          const docRef = await addItem(spectrumItem);
+
           newSpectra.push({
             id: `${file.name}-${Date.now()}`,
+            firestoreId: docRef.id,
             data,
             matches,
             visible: true,
@@ -116,7 +204,7 @@ export default function EnergySpectrum() {
       setSpectra((prev) => [...prev, ...newSpectra]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
-    []
+    [addItem]
   );
 
   const toggleVisibility = useCallback((id: string) => {
@@ -125,13 +213,27 @@ export default function EnergySpectrum() {
     );
   }, []);
 
-  const removeSpectrum = useCallback((id: string) => {
-    setSpectra((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const removeSpectrum = useCallback(
+    (id: string) => {
+      setSpectra((prev) => {
+        const toRemove = prev.find((s) => s.id === id);
+        if (toRemove?.firestoreId) {
+          updateItem({
+            id: toRemove.firestoreId,
+            type: 'spectrum',
+            name: toRemove.data.sampleName || '',
+            deleted: true,
+          });
+        }
+        return prev.filter((s) => s.id !== id);
+      });
+    },
+    [updateItem]
+  );
 
   const visibleSpectra = useMemo(
-    () => spectra.filter((s) => s.visible),
-    [spectra]
+    () => allSpectra.filter((s) => s.visible),
+    [allSpectra]
   );
 
   const displayRange = useMemo(
@@ -163,7 +265,7 @@ export default function EnergySpectrum() {
 
     // Use original index for consistent colors
     const series = visibleSpectra.map((s) => {
-      const originalIdx = spectra.indexOf(s);
+      const originalIdx = allSpectra.indexOf(s);
       return {
         data: s.data.counts.slice(0, displayRange),
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
@@ -172,7 +274,7 @@ export default function EnergySpectrum() {
     });
 
     return { energies, series };
-  }, [spectra, visibleSpectra, displayRange]);
+  }, [allSpectra, visibleSpectra, displayRange]);
 
   // Find closest energy band value for a given energy in keV
   const findClosestBandValue = useCallback(
@@ -262,7 +364,7 @@ export default function EnergySpectrum() {
         >
           XML-Datei(en) hochladen
         </Button>
-        {spectra.length > 0 && (
+        {allSpectra.length > 0 && (
           <FormControlLabel
             control={
               <Switch
@@ -296,9 +398,9 @@ export default function EnergySpectrum() {
       </Box>
 
       {/* Identification Results */}
-      {spectra.length > 0 && (
+      {allSpectra.length > 0 && (
         <List dense>
-          {spectra.map((s, idx) => {
+          {allSpectra.map((s, idx) => {
             const topMatch = s.matches[0];
             return (
               <ListItem
@@ -411,7 +513,7 @@ export default function EnergySpectrum() {
                       )}
                     </Box>
                   }
-                  secondary={`${s.data.deviceName} · Messzeit: ${s.data.measurementTime}s`}
+                  secondary={`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
                 />
               </ListItem>
             );
@@ -484,7 +586,7 @@ export default function EnergySpectrum() {
       )}
 
       {/* Empty state */}
-      {spectra.length === 0 && (
+      {allSpectra.length === 0 && (
         <Box
           sx={{
             mt: 4,

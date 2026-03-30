@@ -204,6 +204,19 @@ export interface GeschaeftsbuchEintrag extends FirecallItem {
   erledigt?: string;
 }
 
+export interface Spectrum extends FirecallItem {
+  sampleName: string;
+  deviceName: string;
+  measurementTime: number;
+  liveTime: number;
+  startTime: string;
+  endTime: string;
+  coefficients: number[];
+  counts: number[];
+  matchedNuclide?: string;
+  matchedConfidence?: number;
+}
+
 export interface MultiPointItem extends FirecallItem {
   destLat: number;
   destLng: number;
