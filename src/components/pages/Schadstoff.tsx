@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import { SyntheticEvent, useCallback, useState } from 'react';
 import useHazmatDb from '../../hooks/useHazmatDb';
 import CircularProgress from '@mui/material/CircularProgress';
+import EnergySpectrum from './EnergySpectrum';
 import Strahlenschutz from './Strahlenschutz';
 
 interface TabPanelProps {
@@ -88,6 +89,7 @@ export default function SchadstoffPage() {
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="Schadstoff Tabs">
             <Tab label="Schadstoffdatenbank" {...a11yProps(0)} />
             <Tab label="Strahlenschutz" {...a11yProps(1)} />
+            <Tab label="Energiespektrum" {...a11yProps(2)} />
           </Tabs>
         </Box>
 
@@ -171,6 +173,10 @@ export default function SchadstoffPage() {
 
         <TabPanel value={tabValue} index={1}>
           <Strahlenschutz />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={2}>
+          <EnergySpectrum />
         </TabPanel>
       </Box>
     </>
