@@ -13,6 +13,7 @@ import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -180,11 +181,46 @@ export default function EnergySpectrum() {
       <Typography variant="h6" gutterBottom>
         Energiespektrum
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Lade eine oder mehrere XML-Dateien eines RadiaCode Spektrometers hoch,
         um das Energiespektrum darzustellen und das Nuklid automatisch zu
         identifizieren.
       </Typography>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        <Chip
+          label="RadiaCode Spektren"
+          icon={<OpenInNewIcon />}
+          component="a"
+          href="https://www.radiacode.com/spectrum-isotopes-library"
+          target="_blank"
+          rel="noopener noreferrer"
+          clickable
+          size="small"
+          variant="outlined"
+        />
+        <Chip
+          label="IAEA Nuklidkarte"
+          icon={<OpenInNewIcon />}
+          component="a"
+          href="https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          clickable
+          size="small"
+          variant="outlined"
+        />
+        <Chip
+          label="NNDC NuDat 3"
+          icon={<OpenInNewIcon />}
+          component="a"
+          href="https://www.nndc.bnl.gov/nudat3/"
+          target="_blank"
+          rel="noopener noreferrer"
+          clickable
+          size="small"
+          variant="outlined"
+        />
+      </Box>
 
       <input
         ref={fileInputRef}
