@@ -68,6 +68,22 @@ const MATCHABLE_NUCLIDES = NUCLIDES.filter(
   (n) => n.peaks && n.peaks.length > 0
 );
 
+/**
+ * Build direct links to nuclide databases from a nuclide name like "Cs-137".
+ * Returns { iaea, nndc } URLs.
+ */
+function getNuclideDbLinks(name: string) {
+  // "Cs-137" → element="Cs", mass="137"
+  const match = name.match(/^([A-Za-z]+)-(\d+m?)$/);
+  if (!match) return null;
+  const [, element, mass] = match;
+  // NNDC NuDat 3: nucleus=137Cs
+  const nndc = `https://www.nndc.bnl.gov/nudat3/getdatasetClassic.jsp?nucleus=${mass}${element.charAt(0).toUpperCase()}${element.slice(1).toLowerCase()}&unc=NDS`;
+  // IAEA LiveChart: uses Z and A, but the search URL works with name
+  const iaea = `https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html#${mass}${element.toLowerCase()}`;
+  return { nndc, iaea };
+}
+
 export default function EnergySpectrum() {
   const [spectra, setSpectra] = useState<LoadedSpectrum[]>([]);
   const [logScale, setLogScale] = useState(false);
@@ -335,19 +351,50 @@ export default function EnergySpectrum() {
                       }}
                     >
                       <span>{s.data.sampleName || 'Unbekannt'}</span>
-                      {topMatch && (
-                        <Chip
-                          label={`${topMatch.nuclide.name} (${Math.round(topMatch.confidence * 100)}%)`}
-                          color="success"
-                          size="small"
-                          component={topMatch.nuclide.url ? 'a' : 'span'}
-                          href={topMatch.nuclide.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          clickable={!!topMatch.nuclide.url}
-                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        />
-                      )}
+                      {topMatch && (() => {
+                        const dbLinks = getNuclideDbLinks(topMatch.nuclide.name);
+                        return (
+                          <>
+                            <Chip
+                              label={`${topMatch.nuclide.name} (${Math.round(topMatch.confidence * 100)}%)`}
+                              color="success"
+                              size="small"
+                              component={topMatch.nuclide.url ? 'a' : 'span'}
+                              href={topMatch.nuclide.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              clickable={!!topMatch.nuclide.url}
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            />
+                            {dbLinks && (
+                              <>
+                                <Chip
+                                  label="IAEA"
+                                  size="small"
+                                  variant="outlined"
+                                  component="a"
+                                  href={dbLinks.iaea}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  clickable
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                />
+                                <Chip
+                                  label="NNDC"
+                                  size="small"
+                                  variant="outlined"
+                                  component="a"
+                                  href={dbLinks.nndc}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  clickable
+                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                                />
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                       {!topMatch && (
                         <Chip
                           label="Nicht identifiziert"
