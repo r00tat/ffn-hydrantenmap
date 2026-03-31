@@ -53,7 +53,7 @@ export default function AddFirecallItem() {
         });
       }
     },
-    [addFirecallItem, map, getDefaultPosition]
+    [addFirecallItem, getDefaultPosition]
   );
 
   useMapEvent('mousemove', (e) => {
@@ -139,7 +139,7 @@ export default function AddFirecallItem() {
         // saveItem(fzg);
       }
     },
-    [leitungen, drawingCtx, map, saveItem, getDefaultPosition, setEditFirecallItemIsOpen, setLastSelectedLayer]
+    [leitungen, drawingCtx, saveItem, getDefaultPosition, setEditFirecallItemIsOpen, setLastSelectedLayer]
   );
 
   return (
