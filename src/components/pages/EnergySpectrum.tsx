@@ -3,23 +3,35 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { BarChart } from '@mui/x-charts/BarChart';
+import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { where } from 'firebase/firestore';
 import { NUCLIDES } from '../../common/strahlenschutz';
 import {
@@ -55,6 +67,7 @@ interface LoadedSpectrum {
   data: SpectrumData;
   matches: NuclideMatch[];
   visible: boolean;
+  description?: string;
 }
 
 /**
@@ -95,9 +108,17 @@ function getNuclideDbLinks(name: string) {
   return { nndc, iaea };
 }
 
+interface EditDialogState {
+  id: string;
+  firestoreId?: string;
+  sampleName: string;
+  description: string;
+}
+
 export default function EnergySpectrum() {
-  const [spectra, setSpectra] = useState<LoadedSpectrum[]>([]);
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [logScale, setLogScale] = useState(false);
+  const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -116,11 +137,14 @@ export default function EnergySpectrum() {
     filterFn,
   });
 
-  // Convert Firestore spectra into LoadedSpectrum format
-  const firestoreSpectra = useMemo<LoadedSpectrum[]>(() => {
+  // Convert Firestore spectra into LoadedSpectrum format with visibility
+  const allSpectra = useMemo<LoadedSpectrum[]>(() => {
     if (!savedSpectra || savedSpectra.length === 0) return [];
 
-    return savedSpectra.map((saved) => {
+    return savedSpectra
+      .filter((saved) => saved.counts?.length > 0)
+      .map((saved) => {
+      const id = `firestore-${saved.id}`;
       const energies = saved.counts.map((_, ch) =>
         channelToEnergy(ch, saved.coefficients)
       );
@@ -139,32 +163,20 @@ export default function EnergySpectrum() {
       const matches = identifyNuclides(peaks);
 
       return {
-        id: `firestore-${saved.id}`,
+        id,
         firestoreId: saved.id,
         data: dataWithEnergies,
         matches,
-        visible: true,
+        visible: !hiddenIds.has(id),
+        description: saved.description,
       };
     });
-  }, [savedSpectra]);
-
-  // Merge Firestore spectra with locally-uploaded spectra (local overrides for duplicates)
-  const allSpectra = useMemo(() => {
-    const localFirestoreIds = new Set(
-      spectra.filter((s) => s.firestoreId).map((s) => s.firestoreId)
-    );
-    const fromFirestore = firestoreSpectra.filter(
-      (s) => !localFirestoreIds.has(s.firestoreId)
-    );
-    return [...fromFirestore, ...spectra];
-  }, [spectra, firestoreSpectra]);
+  }, [savedSpectra, hiddenIds]);
 
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
       if (!files) return;
-
-      const newSpectra: LoadedSpectrum[] = [];
 
       for (const file of Array.from(files)) {
         const text = await file.text();
@@ -187,64 +199,98 @@ export default function EnergySpectrum() {
             matchedNuclide: matches[0]?.nuclide.name,
             matchedConfidence: matches[0]?.confidence,
           };
-          const docRef = await addItem(spectrumItem);
-
-          newSpectra.push({
-            id: `${file.name}-${Date.now()}`,
-            firestoreId: docRef.id,
-            data,
-            matches,
-            visible: true,
-          });
+          await addItem(spectrumItem);
         } catch (e) {
           console.error(`Failed to parse ${file.name}:`, e);
         }
       }
 
-      setSpectra((prev) => [...prev, ...newSpectra]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     [addItem]
   );
 
   const toggleVisibility = useCallback((id: string) => {
-    setSpectra((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s))
-    );
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }, []);
 
   const removeSpectrum = useCallback(
     (id: string) => {
-      setSpectra((prev) => {
-        const toRemove = prev.find((s) => s.id === id);
-        if (toRemove?.firestoreId) {
-          updateItem({
-            id: toRemove.firestoreId,
-            type: 'spectrum',
-            name: toRemove.data.sampleName || '',
-            deleted: true,
-          });
-        }
-        return prev.filter((s) => s.id !== id);
+      const spectrum = allSpectra.find((s) => s.id === id);
+      if (spectrum?.firestoreId) {
+        updateItem({
+          id: spectrum.firestoreId,
+          type: 'spectrum',
+          name: spectrum.data.sampleName || '',
+          deleted: true,
+        });
+      }
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
     },
-    [updateItem]
+    [updateItem, allSpectra]
   );
+
+  const openEditDialog = useCallback(
+    (spectrum: LoadedSpectrum) => {
+      setEditDialog({
+        id: spectrum.id,
+        firestoreId: spectrum.firestoreId,
+        sampleName: spectrum.data.sampleName || '',
+        description: spectrum.description || '',
+      });
+    },
+    []
+  );
+
+  const handleEditSave = useCallback(() => {
+    if (!editDialog?.firestoreId) return;
+
+    // Find the original Firestore document so all fields are preserved
+    const original = savedSpectra?.find((s) => s.id === editDialog.firestoreId);
+    if (original) {
+      updateItem({
+        ...original,
+        name: editDialog.sampleName,
+        sampleName: editDialog.sampleName,
+        description: editDialog.description,
+      } as Spectrum);
+    }
+
+    setEditDialog(null);
+  }, [editDialog, updateItem, savedSpectra]);
 
   const visibleSpectra = useMemo(
     () => allSpectra.filter((s) => s.visible),
     [allSpectra]
   );
 
+  // Defer chart-related computations so the list toggles instantly
+  const deferredVisibleSpectra = useDeferredValue(visibleSpectra);
+
   const displayRange = useMemo(
-    () => (visibleSpectra.length > 0 ? getDisplayRange(visibleSpectra) : 0),
-    [visibleSpectra]
+    () =>
+      deferredVisibleSpectra.length > 0
+        ? getDisplayRange(deferredVisibleSpectra)
+        : 0,
+    [deferredVisibleSpectra]
   );
 
   // Collect matched peak energies from visible spectra for reference lines
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
-    for (const s of visibleSpectra) {
+    for (const s of deferredVisibleSpectra) {
       for (const match of s.matches) {
         for (const mp of match.matchedPeaks) {
           const label = `${match.nuclide.name} (${Math.round(mp.expected)} keV)`;
@@ -253,18 +299,18 @@ export default function EnergySpectrum() {
       }
     }
     return peakMap;
-  }, [visibleSpectra]);
+  }, [deferredVisibleSpectra]);
 
-  // Build chart data from visible spectra only
+  // Build chart data from deferred visible spectra only
   const chartData = useMemo(() => {
-    if (visibleSpectra.length === 0 || displayRange === 0) return null;
+    if (deferredVisibleSpectra.length === 0 || displayRange === 0) return null;
 
-    const energies = visibleSpectra[0].data.energies
+    const energies = deferredVisibleSpectra[0].data.energies
       .slice(0, displayRange)
       .map((e) => Math.round(e * 10) / 10);
 
     // Use original index for consistent colors
-    const series = visibleSpectra.map((s) => {
+    const series = deferredVisibleSpectra.map((s) => {
       const originalIdx = allSpectra.indexOf(s);
       return {
         data: s.data.counts.slice(0, displayRange),
@@ -274,25 +320,8 @@ export default function EnergySpectrum() {
     });
 
     return { energies, series };
-  }, [allSpectra, visibleSpectra, displayRange]);
+  }, [allSpectra, deferredVisibleSpectra, displayRange]);
 
-  // Find closest energy band value for a given energy in keV
-  const findClosestBandValue = useCallback(
-    (targetKeV: number): number | undefined => {
-      if (!chartData) return undefined;
-      let closestIdx = 0;
-      let closestDist = Infinity;
-      for (let i = 0; i < chartData.energies.length; i++) {
-        const dist = Math.abs(chartData.energies[i] - targetKeV);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestIdx = i;
-        }
-      }
-      return chartData.energies[closestIdx];
-    },
-    [chartData]
-  );
 
   return (
     <Box>
@@ -406,19 +435,38 @@ export default function EnergySpectrum() {
               <ListItem
                 key={s.id}
                 secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0 }}>
+                    <IconButton
+                      aria-label="Bearbeiten"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        openEditDialog(s);
+                      }}
+                      size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
                     <IconButton
                       aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
-                      onClick={() => toggleVisibility(s.id)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        toggleVisibility(s.id);
+                      }}
                       size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
                     >
                       {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
                     </IconButton>
                     <IconButton
                       edge="end"
                       aria-label="Entfernen"
-                      onClick={() => removeSpectrum(s.id)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        removeSpectrum(s.id);
+                      }}
                       size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -427,6 +475,7 @@ export default function EnergySpectrum() {
                 sx={{
                   opacity: s.visible ? 1 : 0.5,
                   cursor: 'pointer',
+                  pr: '148px',
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
                 onClick={() => toggleVisibility(s.id)}
@@ -452,7 +501,13 @@ export default function EnergySpectrum() {
                         flexWrap: 'wrap',
                       }}
                     >
-                      <span>{s.data.sampleName || 'Unbekannt'}</span>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{ fontWeight: 'bold' }}
+                      >
+                        {s.data.sampleName || 'Unbekannt'}
+                      </Typography>
                       {topMatch && (() => {
                         const dbLinks = getNuclideDbLinks(topMatch.nuclide.name);
                         return (
@@ -513,7 +568,21 @@ export default function EnergySpectrum() {
                       )}
                     </Box>
                   }
-                  secondary={`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
+                  secondary={
+                    <>
+                      {`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
+                      {s.description && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          display="block"
+                          color="text.secondary"
+                        >
+                          {s.description}
+                        </Typography>
+                      )}
+                    </>
+                  }
                 />
               </ListItem>
             );
@@ -521,24 +590,61 @@ export default function EnergySpectrum() {
         </List>
       )}
 
+      {/* Edit Dialog */}
+      <Dialog
+        open={editDialog !== null}
+        onClose={() => setEditDialog(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Messung bearbeiten</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Titel / Probenname"
+            fullWidth
+            value={editDialog?.sampleName ?? ''}
+            onChange={(e) =>
+              setEditDialog((prev) =>
+                prev ? { ...prev, sampleName: e.target.value } : prev
+              )
+            }
+          />
+          <TextField
+            margin="dense"
+            label="Beschreibung"
+            fullWidth
+            multiline
+            minRows={2}
+            value={editDialog?.description ?? ''}
+            onChange={(e) =>
+              setEditDialog((prev) =>
+                prev ? { ...prev, description: e.target.value } : prev
+              )
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog(null)}>Abbrechen</Button>
+          <Button onClick={handleEditSave} variant="contained">
+            Speichern
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Chart */}
       {chartData && (
         <Box sx={{ width: '100%', mt: 2 }}>
-          <BarChart
+          <LineChart
             height={400}
             xAxis={[
               {
                 id: 'energy',
                 data: chartData.energies,
                 label: 'Energie (keV)',
-                scaleType: 'band',
-                tickLabelInterval: (_value: number, index: number) =>
-                  index %
-                    Math.max(
-                      1,
-                      Math.floor(chartData.energies.length / 20)
-                    ) ===
-                  0,
+                scaleType: 'linear',
+                valueFormatter: (v: number) => `${v} keV`,
               },
             ]}
             yAxis={[
@@ -546,7 +652,9 @@ export default function EnergySpectrum() {
                 label: logScale ? 'Counts (log)' : 'Counts',
                 valueFormatter: logScale
                   ? (v: number | null) =>
-                      v != null ? Math.round(Math.pow(10, v) - 1).toString() : ''
+                      v != null
+                        ? Math.round(Math.pow(10, v) - 1).toString()
+                        : ''
                   : undefined,
               },
             ]}
@@ -555,33 +663,36 @@ export default function EnergySpectrum() {
               data: logScale
                 ? s.data.map((v) => (v > 0 ? Math.log10(v + 1) : 0))
                 : s.data,
+              area: true,
+              showMark: false,
+              curve: 'linear' as const,
+              valueFormatter: (v: number | null) => {
+                const counts = logScale && v != null ? Math.round(Math.pow(10, v) - 1) : v;
+                return `${counts} cps`;
+              },
             }))}
             margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
           >
             {Array.from(matchedPeakEnergies.entries()).map(
-              ([label, energy]) => {
-                const bandValue = findClosestBandValue(energy);
-                if (bandValue === undefined) return null;
-                return (
-                  <ChartsReferenceLine
-                    key={label}
-                    x={bandValue}
-                    label={label}
-                    lineStyle={{
-                      stroke: '#d32f2f',
-                      strokeWidth: 1.5,
-                      strokeDasharray: '4 2',
-                    }}
-                    labelStyle={{
-                      fontSize: 10,
-                      fill: '#d32f2f',
-                      fontWeight: 'bold',
-                    }}
-                  />
-                );
-              }
+              ([label, energy]) => (
+                <ChartsReferenceLine
+                  key={label}
+                  x={energy}
+                  label={label}
+                  lineStyle={{
+                    stroke: '#d32f2f',
+                    strokeWidth: 1.5,
+                    strokeDasharray: '4 2',
+                  }}
+                  labelStyle={{
+                    fontSize: 10,
+                    fill: '#d32f2f',
+                    fontWeight: 'bold',
+                  }}
+                />
+              )
             )}
-          </BarChart>
+          </LineChart>
         </Box>
       )}
 

@@ -215,6 +215,7 @@ export interface Spectrum extends FirecallItem {
   counts: number[];
   matchedNuclide?: string;
   matchedConfidence?: number;
+  description?: string;
 }
 
 export interface MultiPointItem extends FirecallItem {

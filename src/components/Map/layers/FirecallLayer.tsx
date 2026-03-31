@@ -45,13 +45,21 @@ export default function FirecallLayer({
   defaultChecked?: boolean;
 }) {
   const firecallId = useFirecallId();
+  // Key resets all state (visibleOverlays, knownHeatmapNamesRef) when firecall changes
+  return <FirecallLayerInner key={firecallId} defaultChecked={defaultChecked} />;
+}
+
+function FirecallLayerInner({
+  defaultChecked,
+}: {
+  defaultChecked: boolean;
+}) {
+  const firecallId = useFirecallId();
   const map = useMap();
   const sortedLayers = useFirecallLayersSorted();
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
-
-  // Track which heatmap overlay names we've already auto-added, so new ones
-  // (e.g. another user enabling a heatmap) get picked up automatically.
   const knownHeatmapNamesRef = React.useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const currentNames = sortedLayers
       .filter((layer) => layer.heatmapConfig?.enabled && layer.defaultVisible !== 'false')
