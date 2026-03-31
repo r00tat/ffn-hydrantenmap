@@ -257,16 +257,19 @@ export default function EnergySpectrum() {
   const handleEditSave = useCallback(() => {
     if (!editDialog?.firestoreId) return;
 
-    updateItem({
-      id: editDialog.firestoreId,
-      type: 'spectrum',
-      name: editDialog.sampleName,
-      sampleName: editDialog.sampleName,
-      description: editDialog.description,
-    } as Spectrum);
+    // Find the original Firestore document so all fields are preserved
+    const original = savedSpectra?.find((s) => s.id === editDialog.firestoreId);
+    if (original) {
+      updateItem({
+        ...original,
+        name: editDialog.sampleName,
+        sampleName: editDialog.sampleName,
+        description: editDialog.description,
+      } as Spectrum);
+    }
 
     setEditDialog(null);
-  }, [editDialog, updateItem]);
+  }, [editDialog, updateItem, savedSpectra]);
 
   const visibleSpectra = useMemo(
     () => allSpectra.filter((s) => s.visible),
