@@ -164,7 +164,9 @@ export default function FirecallItemDialog({
         open={open}
         onClose={() => onClose()}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && canSave) {
+          const target = e.target as HTMLElement;
+          const isTextarea = target.tagName === 'TEXTAREA';
+          if (e.key === 'Enter' && !e.shiftKey && !isTextarea && canSave) {
             e.preventDefault();
             handleSave();
           }

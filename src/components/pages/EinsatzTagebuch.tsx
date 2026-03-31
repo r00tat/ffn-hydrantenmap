@@ -568,6 +568,9 @@ export function EinsatzTagebuch({
                   value={inlineName}
                   onChange={(e) => setInlineName(e.target.value)}
                   fullWidth
+                  multiline
+                  minRows={1}
+                  maxRows={4}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -586,6 +589,9 @@ export function EinsatzTagebuch({
                   value={inlineBeschreibung}
                   onChange={(e) => setInlineBeschreibung(e.target.value)}
                   fullWidth
+                  multiline
+                  minRows={1}
+                  maxRows={4}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
