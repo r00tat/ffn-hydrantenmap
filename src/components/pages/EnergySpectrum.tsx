@@ -141,7 +141,9 @@ export default function EnergySpectrum() {
   const allSpectra = useMemo<LoadedSpectrum[]>(() => {
     if (!savedSpectra || savedSpectra.length === 0) return [];
 
-    return savedSpectra.map((saved) => {
+    return savedSpectra
+      .filter((saved) => saved.counts?.length > 0)
+      .map((saved) => {
       const id = `firestore-${saved.id}`;
       const energies = saved.counts.map((_, ch) =>
         channelToEnergy(ch, saved.coefficients)
