@@ -49,6 +49,13 @@ export default function FirecallLayer({
   const sortedLayers = useFirecallLayersSorted();
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
 
+  // Reset layer visibility state when firecall changes so stale overlays
+  // from the previous firecall don't persist on the map.
+  useEffect(() => {
+    setVisibleOverlays(new Set());
+    knownHeatmapNamesRef.current = new Set();
+  }, [firecallId]);
+
   // Track which heatmap overlay names we've already auto-added, so new ones
   // (e.g. another user enabling a heatmap) get picked up automatically.
   const knownHeatmapNamesRef = React.useRef<Set<string>>(new Set());
