@@ -3,15 +3,21 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -55,6 +61,7 @@ interface LoadedSpectrum {
   data: SpectrumData;
   matches: NuclideMatch[];
   visible: boolean;
+  description?: string;
 }
 
 /**
@@ -95,9 +102,17 @@ function getNuclideDbLinks(name: string) {
   return { nndc, iaea };
 }
 
+interface EditDialogState {
+  id: string;
+  firestoreId?: string;
+  sampleName: string;
+  description: string;
+}
+
 export default function EnergySpectrum() {
   const [spectra, setSpectra] = useState<LoadedSpectrum[]>([]);
   const [logScale, setLogScale] = useState(false);
+  const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -144,6 +159,7 @@ export default function EnergySpectrum() {
         data: dataWithEnergies,
         matches,
         visible: true,
+        description: saved.description,
       };
     });
   }, [savedSpectra]);
@@ -207,29 +223,93 @@ export default function EnergySpectrum() {
     [addItem]
   );
 
-  const toggleVisibility = useCallback((id: string) => {
-    setSpectra((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, visible: !s.visible } : s))
-    );
-  }, []);
+  const toggleVisibility = useCallback(
+    (id: string) => {
+      setSpectra((prev) => {
+        const existing = prev.find((s) => s.id === id);
+        if (existing) {
+          return prev.map((s) =>
+            s.id === id ? { ...s, visible: !s.visible } : s
+          );
+        }
+        // Firestore spectrum not yet in local state – add with toggled visibility
+        const fromFirestore = firestoreSpectra.find((s) => s.id === id);
+        if (fromFirestore) {
+          return [...prev, { ...fromFirestore, visible: false }];
+        }
+        return prev;
+      });
+    },
+    [firestoreSpectra]
+  );
 
   const removeSpectrum = useCallback(
     (id: string) => {
       setSpectra((prev) => {
-        const toRemove = prev.find((s) => s.id === id);
-        if (toRemove?.firestoreId) {
+        const existing = prev.find((s) => s.id === id);
+        if (existing?.firestoreId) {
           updateItem({
-            id: toRemove.firestoreId,
+            id: existing.firestoreId,
             type: 'spectrum',
-            name: toRemove.data.sampleName || '',
+            name: existing.data.sampleName || '',
             deleted: true,
           });
+        } else {
+          // Firestore-only spectrum (not yet in local state)
+          const fromFirestore = firestoreSpectra.find((s) => s.id === id);
+          if (fromFirestore?.firestoreId) {
+            updateItem({
+              id: fromFirestore.firestoreId,
+              type: 'spectrum',
+              name: fromFirestore.data.sampleName || '',
+              deleted: true,
+            });
+          }
         }
         return prev.filter((s) => s.id !== id);
       });
     },
-    [updateItem]
+    [updateItem, firestoreSpectra]
   );
+
+  const openEditDialog = useCallback(
+    (spectrum: LoadedSpectrum) => {
+      setEditDialog({
+        id: spectrum.id,
+        firestoreId: spectrum.firestoreId,
+        sampleName: spectrum.data.sampleName || '',
+        description: spectrum.description || '',
+      });
+    },
+    []
+  );
+
+  const handleEditSave = useCallback(() => {
+    if (!editDialog?.firestoreId) return;
+
+    updateItem({
+      id: editDialog.firestoreId,
+      type: 'spectrum',
+      name: editDialog.sampleName,
+      sampleName: editDialog.sampleName,
+      description: editDialog.description,
+    } as Spectrum);
+
+    // Also update local state if present
+    setSpectra((prev) =>
+      prev.map((s) =>
+        s.id === editDialog.id
+          ? {
+              ...s,
+              data: { ...s.data, sampleName: editDialog.sampleName },
+              description: editDialog.description,
+            }
+          : s
+      )
+    );
+
+    setEditDialog(null);
+  }, [editDialog, updateItem]);
 
   const visibleSpectra = useMemo(
     () => allSpectra.filter((s) => s.visible),
@@ -406,19 +486,38 @@ export default function EnergySpectrum() {
               <ListItem
                 key={s.id}
                 secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0 }}>
+                    <IconButton
+                      aria-label="Bearbeiten"
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        openEditDialog(s);
+                      }}
+                      size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
                     <IconButton
                       aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
-                      onClick={() => toggleVisibility(s.id)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        toggleVisibility(s.id);
+                      }}
                       size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
                     >
                       {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
                     </IconButton>
                     <IconButton
                       edge="end"
                       aria-label="Entfernen"
-                      onClick={() => removeSpectrum(s.id)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        removeSpectrum(s.id);
+                      }}
                       size="small"
+                      sx={{ minWidth: 44, minHeight: 44 }}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -427,6 +526,7 @@ export default function EnergySpectrum() {
                 sx={{
                   opacity: s.visible ? 1 : 0.5,
                   cursor: 'pointer',
+                  pr: '148px',
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
                 onClick={() => toggleVisibility(s.id)}
@@ -452,7 +552,13 @@ export default function EnergySpectrum() {
                         flexWrap: 'wrap',
                       }}
                     >
-                      <span>{s.data.sampleName || 'Unbekannt'}</span>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{ fontWeight: 'bold' }}
+                      >
+                        {s.data.sampleName || 'Unbekannt'}
+                      </Typography>
                       {topMatch && (() => {
                         const dbLinks = getNuclideDbLinks(topMatch.nuclide.name);
                         return (
@@ -513,13 +619,70 @@ export default function EnergySpectrum() {
                       )}
                     </Box>
                   }
-                  secondary={`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
+                  secondary={
+                    <>
+                      {`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
+                      {s.description && (
+                        <Typography
+                          component="span"
+                          variant="caption"
+                          display="block"
+                          color="text.secondary"
+                        >
+                          {s.description}
+                        </Typography>
+                      )}
+                    </>
+                  }
                 />
               </ListItem>
             );
           })}
         </List>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={editDialog !== null}
+        onClose={() => setEditDialog(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Messung bearbeiten</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Titel / Probenname"
+            fullWidth
+            value={editDialog?.sampleName ?? ''}
+            onChange={(e) =>
+              setEditDialog((prev) =>
+                prev ? { ...prev, sampleName: e.target.value } : prev
+              )
+            }
+          />
+          <TextField
+            margin="dense"
+            label="Beschreibung"
+            fullWidth
+            multiline
+            minRows={2}
+            value={editDialog?.description ?? ''}
+            onChange={(e) =>
+              setEditDialog((prev) =>
+                prev ? { ...prev, description: e.target.value } : prev
+              )
+            }
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog(null)}>Abbrechen</Button>
+          <Button onClick={handleEditSave} variant="contained">
+            Speichern
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Chart */}
       {chartData && (
