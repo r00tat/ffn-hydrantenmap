@@ -61,3 +61,122 @@ div.mobile-map {
   padding-top: 0px;
   padding-bottom: 0px;
 }
+
+/* Print utility classes */
+.print-only {
+  display: none !important;
+}
+
+/* Print styles */
+@media print {
+  @page {
+    margin: 15mm 10mm;
+    size: A4;
+  }
+
+  /* Show print-only, hide no-print */
+  .print-only {
+    display: block !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide navigation and interactive elements */
+  header.MuiAppBar-root,
+  .MuiAppBar-root,
+  .MuiDrawer-root,
+  .MuiFab-root,
+  .MuiSpeedDial-root,
+  [class*="MuiBottomNavigation"],
+  button[aria-label="edit"],
+  button[aria-label="delete"],
+  button[aria-label="add"],
+  .leaflet-control-zoom,
+  .leaflet-control-layers {
+    display: none !important;
+  }
+
+  /* Compact typography */
+  body {
+    font-size: 10pt;
+    line-height: 1.3;
+    color: #000;
+    background: #fff;
+  }
+
+  h1 { font-size: 16pt; }
+  h2 { font-size: 14pt; }
+  h3 { font-size: 12pt; }
+  h4 { font-size: 11pt; }
+  p, li, td, th { font-size: 10pt; }
+
+  /* Full-width map container */
+  #map,
+  div.leaflet-container,
+  div.desktop-map,
+  div.mobile-map {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Ensure Leaflet tiles render properly */
+  .leaflet-container {
+    overflow: visible !important;
+  }
+
+  .leaflet-tile-container,
+  .leaflet-pane {
+    overflow: visible !important;
+  }
+
+  .leaflet-tile {
+    visibility: visible !important;
+  }
+
+  /* Page-break control */
+  main,
+  .MuiContainer-root {
+    page-break-before: auto;
+  }
+
+  tr,
+  .MuiTableRow-root,
+  .MuiCard-root,
+  .MuiPaper-root {
+    page-break-inside: avoid;
+  }
+
+  /* Tables: borders and compact padding */
+  table,
+  .MuiTable-root {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td,
+  .MuiTableCell-root {
+    border: 1px solid #ccc !important;
+    padding: 4px 8px !important;
+    font-size: 9pt;
+  }
+
+  thead,
+  .MuiTableHead-root {
+    display: table-header-group;
+  }
+
+  /* Print section headings */
+  .print-section {
+    margin-top: 12pt;
+    margin-bottom: 6pt;
+    padding-bottom: 4pt;
+    border-bottom: 1px solid #999;
+    font-size: 14pt;
+    font-weight: bold;
+    page-break-after: avoid;
+  }
+}
