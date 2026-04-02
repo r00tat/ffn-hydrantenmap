@@ -40,16 +40,6 @@ When setting up a worktree, copy `.env.local` into it (it's gitignored and won't
 cp .env.local .worktrees/<branch-name>/
 ```
 
-## Serena Plugin
-
-The Serena MCP plugin provides semantic code navigation (LSP-backed symbol search, cross-reference lookup, symbolic editing). It is initialized for this project with the name `hydranten-map`.
-
-**At the start of a conversation**, activate the project by calling `activate_project("hydranten-map")`. Without this, all other Serena tools will fail with a "No active project" error. After activating, call `check_onboarding_performed()` to verify onboarding state.
-
-**Project memories** (`code_style_and_conventions`, `project_overview`, `suggested_commands`, `task_completion_checklist`) contain project-specific guidance — read them when relevant via `read_memory`.
-
-**Using Serena in a worktree**: activate by full worktree path instead of the project name — Serena registers it as a separate project with its own LSP instance. Worktrees do not inherit the main project's memories; run `onboarding` if you want worktree-specific memories, or skip it and use the tools directly.
-
 ## Git Workflow
 
 Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching:
@@ -62,6 +52,99 @@ When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
 
 ```bash
 GITHUB_TOKEN= gh <command>
+```
+
+### Conventional Commits
+
+Alle Commit-Messages müssen dem [Conventional Commits](https://www.conventionalcommits.org/) Format folgen:
+
+```text
+<type>[optional scope]: <description>
+```
+
+Typen:
+
+- `feat:` — Neues Feature (→ Minor Release)
+- `fix:` — Bugfix (→ Patch Release)
+- `chore:` — Wartung, Dependencies, CI (kein Release)
+- `docs:` — Dokumentation
+- `refactor:` — Refactoring ohne Funktionsänderung
+- `test:` — Tests hinzufügen/ändern
+- `perf:` — Performance-Verbesserung
+- `ci:` — CI/CD Änderungen
+
+Breaking Changes werden mit `!` nach dem Typ oder mit `BREAKING CHANGE:` im Body markiert (→ Major Release):
+
+```text
+feat!: neues Auth-System ersetzt bisheriges Login
+```
+
+### Pull Requests
+
+**Vor dem Erstellen eines PRs** muss `npm run check` erfolgreich durchlaufen (keine Errors, keine Warnings).
+
+**Sprache:** PR-Titel folgt dem Conventional Commit Format (englisch erlaubt), die **Beschreibung ist auf Deutsch**.
+
+**Labels:** Auf jedem PR muss automatisch das passende Label gesetzt werden, basierend auf dem Commit-Typ:
+
+- `feat:` → `feature`
+- `fix:` → `bug`
+- `docs:` → `documentation`
+- `chore(deps):` / Dependabot → `dependencies`
+- Sonstige Verbesserungen → `enhancement`
+
+**PR-Beschreibung** (Deutsch, Markdown):
+
+```markdown
+## Zusammenfassung
+
+<Kurze Beschreibung aller Änderungen im Branch gegenüber main>
+
+## Änderungen
+
+- <Auflistung der wesentlichen Änderungen>
+
+## Test plan
+
+- [ ] <Testschritte>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+Beispiel (siehe PR #462): Zusammenfassung beschreibt das Feature, Änderungen listen alle wesentlichen Punkte, Testplan enthält konkrete Schritte.
+
+### Releases
+
+Releases folgen **Semantic Versioning** mit Tag-Format `v<major>.<minor>.<patch>` (z.B. `v2.36.1`).
+
+**Versionierung** basierend auf den Commits seit dem letzten Release:
+
+- Nur `fix:` Commits → **Patch** (z.B. `v2.36.0` → `v2.36.1`)
+- Mindestens ein `feat:` oder `enhancement` → **Minor** (z.B. `v2.36.1` → `v2.37.0`)
+- Mindestens ein Breaking Change (`!` oder `BREAKING CHANGE:`) → **Major** (z.B. `v2.37.0` → `v3.0.0`)
+
+**Release-Beschreibung** (Deutsch, Markdown):
+
+1. History seit dem letzten Release-Tag prüfen: `git log <last-tag>..HEAD --oneline`
+2. Zusammenfassung auf Deutsch verfassen
+3. Kategorien aus `.github/release.yml` verwenden (🏕 Features, 🛠️ Enhancements, 🪲 Bugfixes, 👒 Dependencies)
+4. Titel: `v<version> <Kurzbeschreibung auf Deutsch>`
+
+```bash
+GITHUB_TOKEN= gh release create v<version> --title "v<version> <Kurzbeschreibung>" --notes "$(cat <<'EOF'
+## Zusammenfassung
+<Beschreibung auf Deutsch>
+
+## What's Changed
+### 🏕 Features
+* feat: ... by @r00tat in #<PR>
+
+### 🪲 Bugfixes
+* fix: ... by @r00tat in #<PR>
+
+**Full Changelog**: https://github.com/r00tat/ffn-hydrantenmap/compare/<last-tag>...<new-tag>
+EOF
+)"
 ```
 
 ## Testing (TDD)
