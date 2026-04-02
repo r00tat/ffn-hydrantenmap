@@ -472,20 +472,22 @@ export function EinsatzTagebuch({
       <Box sx={{ p: 2, m: 2 }}>
         <Typography variant="h4" gutterBottom>
           Einsatz Tagebuch{' '}
-          <span className="no-print">
-            <DownloadButton
-              onClick={() => downloadDiaries(diaries)}
-              tooltip="Einsatz Tagebuch als CSV herunterladen"
-            />
-            <Button
-              onClick={updateDescription}
-              variant="outlined"
-              disabled={isQuerying}
-            >
-              Zusammenfassung{' '}
-              {isQuerying && <CircularProgress color="primary" size={20} />}
-            </Button>
-          </span>
+          {showEditButton && (
+            <>
+              <DownloadButton
+                onClick={() => downloadDiaries(diaries)}
+                tooltip="Einsatz Tagebuch als CSV herunterladen"
+              />
+              <Button
+                onClick={updateDescription}
+                variant="outlined"
+                disabled={isQuerying}
+              >
+                Zusammenfassung{' '}
+                {isQuerying && <CircularProgress color="primary" size={20} />}
+              </Button>
+            </>
+          )}
         </Typography>
 
         {resultHtml && (
