@@ -190,7 +190,6 @@ export default function PrintPage() {
                       if (dataSchema) {
                         instance._renderDataSchema = dataSchema;
                       }
-                      const fieldDataStr = instance.formatFieldData();
                       return (
                         <tr key={item.id}>
                           <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
@@ -202,12 +201,6 @@ export default function PrintPage() {
                           <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
                             {instance.info() && <>{instance.info()}<br /></>}
                             {instance.body()}
-                            {fieldDataStr && (
-                              <>
-                                <br />
-                                <em>{fieldDataStr}</em>
-                              </>
-                            )}
                           </td>
                           <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
                             {item.lat != null && item.lng != null
