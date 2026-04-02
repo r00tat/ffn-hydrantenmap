@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { Fragment, useMemo } from 'react';
+import Checkbox from '@mui/material/Checkbox';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -31,6 +32,25 @@ export default function PrintPage() {
         (item): item is Spectrum => item.type === 'spectrum'
       ),
     [firecallItems]
+  );
+
+  const [hiddenSpectra, setHiddenSpectra] = useState<Set<string>>(new Set());
+
+  const toggleSpectrum = useCallback((id: string) => {
+    setHiddenSpectra((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const visibleSpectra = useMemo(
+    () => spectra.filter((s) => !hiddenSpectra.has(s.id || '')),
+    [spectra, hiddenSpectra]
   );
 
   const timeline = useMemo(() => {
@@ -253,6 +273,7 @@ export default function PrintPage() {
           <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
+                <th className="no-print" style={{ borderBottom: '2px solid #333', padding: '4px 8px' }} />
                 <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Probe</th>
                 <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Gerät</th>
                 <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Nuklid</th>
@@ -265,6 +286,13 @@ export default function PrintPage() {
             <tbody>
               {spectra.map((s) => (
                 <tr key={s.id}>
+                  <td className="no-print" style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>
+                    <Checkbox
+                      size="small"
+                      checked={!hiddenSpectra.has(s.id || '')}
+                      onChange={() => toggleSpectrum(s.id || '')}
+                    />
+                  </td>
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{s.sampleName}</td>
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{s.deviceName}</td>
                   <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{s.matchedNuclide || '-'}</td>
@@ -286,7 +314,7 @@ export default function PrintPage() {
               ))}
             </tbody>
           </table>
-          <SpectrumChart spectra={spectra} height={300} />
+          <SpectrumChart spectra={visibleSpectra} height={300} />
         </Box>
       )}
 

@@ -214,6 +214,12 @@ export class FirecallItemBase {
             <br />
           </>
         )}
+        {this.formatFieldData() && (
+          <>
+            {this.formatFieldData()}
+            <br />
+          </>
+        )}
       </>
     );
   }
