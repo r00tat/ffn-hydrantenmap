@@ -110,6 +110,27 @@ export const availableLayers: TileConfigs = {
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | &copy; <a href="http://opentopomap.org/">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
     },
   },
+
+  orthofoto_bgld: {
+    name: 'Orthofoto Burgenland',
+    url: 'https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?',
+    type: 'WMS',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 24,
+      attribution:
+        '<a href="https://geodaten.bgld.gv.at">Land Burgenland</a> (CC BY 4.0)',
+      format: 'image/jpeg',
+      subdomains: [''],
+      layers: '1',
+      transparent: false,
+      uppercase: true,
+      bounds: [
+        [46.82, 15.98],
+        [48.16, 17.17],
+      ],
+    },
+  },
 };
 
 export const overlayLayers: TileConfigs = {
@@ -197,6 +218,50 @@ export const overlayLayers: TileConfigs = {
       bounds: [
         [46.35877, 8.782379],
         [49.037872, 17.189532],
+      ],
+    },
+  },
+
+  naturgefahren_bgld: {
+    name: 'Naturgefahren Burgenland',
+    url: 'https://gisenterprise.bgld.gv.at/arcgis/services/public/Nur_Flaechenwidmung/MapServer/WMSServer?',
+    type: 'WMS',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 24,
+      attribution:
+        '<a href="https://geodaten.bgld.gv.at">Land Burgenland</a> (CC BY 4.0)',
+      format: 'image/png',
+      subdomains: [''],
+      layers: '5',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.83, 15.99],
+        [48.12, 17.16],
+      ],
+    },
+  },
+
+  schutzgebiete_bgld: {
+    name: 'Schutz-/Schongebiete Burgenland',
+    url: 'https://gisenterprise.bgld.gv.at/arcgis/services/public/Nur_Flaechenwidmung/MapServer/WMSServer?',
+    type: 'WMS',
+    description:
+      'Natur-, Landschafts-, Trinkwasserschutzgebiete',
+    options: {
+      maxNativeZoom: 19,
+      maxZoom: 24,
+      attribution:
+        '<a href="https://geodaten.bgld.gv.at">Land Burgenland</a> (CC BY 4.0)',
+      format: 'image/png',
+      subdomains: [''],
+      layers: '2',
+      transparent: true,
+      uppercase: true,
+      bounds: [
+        [46.76, 15.93],
+        [48.29, 17.28],
       ],
     },
   },

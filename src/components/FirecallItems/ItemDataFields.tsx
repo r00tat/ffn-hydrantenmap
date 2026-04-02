@@ -8,9 +8,54 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useCallback, useImperativeHandle, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { DataSchemaField } from '../firebase/firestore';
 import { evaluateFormula } from '../../common/computeFieldValue';
+
+function ComputedField({
+  field,
+  fieldData,
+}: {
+  field: DataSchemaField;
+  fieldData: Record<string, string | number | boolean>;
+}) {
+  const [computedValue, setComputedValue] = useState<number | string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (field.formula) {
+      evaluateFormula(field.formula, fieldData).then((raw) => {
+        if (cancelled) return;
+        setComputedValue(
+          raw !== undefined
+            ? Number.isInteger(raw) ? raw : parseFloat(raw.toFixed(2))
+            : ''
+        );
+      });
+    }
+    return () => { cancelled = true; };
+  }, [field.formula, fieldData]);
+
+  const label = field.unit
+    ? `${field.label} (${field.unit}) — berechnet`
+    : `${field.label} — berechnet`;
+
+  return (
+    <TextField
+      label={label}
+      size="small"
+      fullWidth
+      value={computedValue}
+      disabled
+      sx={{ mb: 1 }}
+      slotProps={{
+        input: {
+          sx: { fontStyle: 'italic' },
+        },
+      }}
+    />
+  );
+}
 
 export interface ItemDataFieldsHandle {
   /** Flush pending new field into fieldData. Returns the updated fieldData. */
@@ -106,30 +151,8 @@ export default function ItemDataFields({
           (field.type === 'boolean' ? false : field.type === 'number' || field.type === 'computed' ? '' : '');
 
         if (field.type === 'computed') {
-          const rawComputed = field.formula
-            ? evaluateFormula(field.formula, fieldData)
-            : undefined;
-          const computedValue = rawComputed !== undefined
-            ? (Number.isInteger(rawComputed) ? rawComputed : parseFloat(rawComputed.toFixed(2)))
-            : '';
-          const label = field.unit
-            ? `${field.label} (${field.unit}) — berechnet`
-            : `${field.label} — berechnet`;
           return (
-            <TextField
-              key={field.key}
-              label={label}
-              size="small"
-              fullWidth
-              value={computedValue}
-              disabled
-              sx={{ mb: 1 }}
-              slotProps={{
-                input: {
-                  sx: { fontStyle: 'italic' },
-                },
-              }}
-            />
+            <ComputedField key={field.key} field={field} fieldData={fieldData} />
           );
         }
 

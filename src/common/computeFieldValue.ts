@@ -1,18 +1,29 @@
-import { evaluate } from 'mathjs';
 import { DataSchemaField } from '../components/firebase/firestore';
+
+let _evaluate: typeof import('mathjs').evaluate | undefined;
+
+async function loadEvaluate() {
+  if (!_evaluate) {
+    const mathjs = await import('mathjs');
+    _evaluate = mathjs.evaluate;
+  }
+  return _evaluate;
+}
 
 /**
  * Evaluate a formula string, substituting field keys with their values from fieldData.
  * Returns the numeric result, or undefined if the formula cannot be evaluated
  * (e.g. missing fields, syntax error, non-numeric result).
  */
-export function evaluateFormula(
+export async function evaluateFormula(
   formula: string,
   fieldData: Record<string, string | number | boolean>
-): number | undefined {
+): Promise<number | undefined> {
   if (!formula || !formula.trim()) return undefined;
 
   try {
+    const evaluate = await loadEvaluate();
+
     // Build a scope object with numeric values from fieldData
     const scope: Record<string, number> = {};
     for (const [key, value] of Object.entries(fieldData)) {
@@ -40,16 +51,16 @@ export function evaluateFormula(
  * Returns a record of computed field keys to their calculated values.
  * Only includes fields that could be successfully computed.
  */
-export function computeAllFields(
+export async function computeAllFields(
   fieldData: Record<string, string | number | boolean>,
   schema: DataSchemaField[]
-): Record<string, number> {
+): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
 
   for (const field of schema) {
     if (field.type !== 'computed' || !field.formula) continue;
 
-    const value = evaluateFormula(field.formula, fieldData);
+    const value = await evaluateFormula(field.formula, fieldData);
     if (value !== undefined) {
       result[field.key] = value;
     }

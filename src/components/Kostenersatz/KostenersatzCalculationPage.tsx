@@ -475,6 +475,8 @@ export default function KostenersatzCalculationPage({
           const newId = await addCalculation(calcWithoutId);
           // Update local state with the new ID and status so subsequent saves update instead of creating duplicates
           setCalculation((prev) => ({ ...prev, id: newId, status }));
+          // Update URL so reload opens the saved calculation instead of creating a new one
+          window.history.replaceState(null, '', `/einsatz/${firecallId}/kostenersatz/${newId}`);
         }
         setHasUnsavedChanges(false);
         if (redirectAfterSave) {

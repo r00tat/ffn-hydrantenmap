@@ -89,15 +89,29 @@ export default function Map() {
               name={layer.name}
               key={key}
             >
-              <TileLayer
-                attribution={layer.options.attribution}
-                url={layer.url}
-                maxZoom={layer.options.maxZoom}
-                maxNativeZoom={layer.options.maxNativeZoom}
-                bounds={layer.options.bounds}
-                subdomains={layer.options.subdomains}
-                key={key}
-              />
+              {layer.type === 'WMS' ? (
+                <WMSTileLayer
+                  layers={layer.options.layers}
+                  attribution={layer.options.attribution}
+                  url={layer.url}
+                  maxZoom={layer.options.maxZoom}
+                  maxNativeZoom={layer.options.maxNativeZoom}
+                  bounds={layer.options.bounds}
+                  format={layer.options.format}
+                  transparent={layer.options.transparent}
+                  key={key}
+                />
+              ) : (
+                <TileLayer
+                  attribution={layer.options.attribution}
+                  url={layer.url}
+                  maxZoom={layer.options.maxZoom}
+                  maxNativeZoom={layer.options.maxNativeZoom}
+                  bounds={layer.options.bounds}
+                  subdomains={layer.options.subdomains}
+                  key={key}
+                />
+              )}
             </LayersControl.BaseLayer>
           ))}
           <FirecallLayer />

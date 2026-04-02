@@ -13,7 +13,12 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TawesStation, HistoryDataPoint, TimeRange, AggregationInterval } from './weatherChartConfig';
 import { fetchStationInfo, fetchHistory, availableIntervals, INTERVAL_LABELS } from './weatherChartConfig';
-import WetterstationHistoryMuiCharts from './WetterstationHistoryMui';
+import dynamic from 'next/dynamic';
+
+const WetterstationHistoryMuiCharts = dynamic(() => import('./WetterstationHistoryMui'), {
+  ssr: false,
+  loading: () => null,
+});
 
 export default function WetterstationHistory({
   stationId,

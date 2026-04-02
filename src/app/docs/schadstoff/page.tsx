@@ -2,6 +2,7 @@ import Typography from '@mui/material/Typography';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Alert from '@mui/material/Alert';
 import Screenshot from '../../../components/docs/Screenshot';
 
 export default function SchadstoffDocsPage() {
@@ -22,13 +23,28 @@ export default function SchadstoffDocsPage() {
       </Typography>
       <List>
         <ListItem>
-          <ListItemText primary="Gefahrstoffe suchen" />
+          <ListItemText primary="Gefahrstoffe nach UN-Nummer suchen" />
         </ListItem>
         <ListItem>
-          <ListItemText primary="Sicherheitsdatenblätter abrufen" />
+          <ListItemText primary="Gefahrstoffe nach Stoffnamen suchen" />
         </ListItem>
         <ListItem>
-          <ListItemText primary="Gefahrenhinweise anzeigen" />
+          <ListItemText primary="Sicherheitsdatenblätter (ERICards) abrufen via externer Link zu ericards.net" />
+        </ListItem>
+        <ListItem>
+          <ListItemText
+            primary="Schutzanzug-Parameter einsehen"
+            secondary="Resistenzgrad, Zeitliche Resistenz, Beschädigung"
+          />
+        </ListItem>
+        <ListItem>
+          <ListItemText primary="Strahlenschutz-Rechner (eigener Tab)" />
+        </ListItem>
+        <ListItem>
+          <ListItemText
+            primary="Energiespektrum-Analyse (eigener Tab)"
+            secondary="Gamma-Spektroskopie"
+          />
         </ListItem>
       </List>
 
@@ -37,14 +53,71 @@ export default function SchadstoffDocsPage() {
       </Typography>
 
       <Typography variant="h6" gutterBottom>
-        Gefahrstoff suchen
+        1. Gefahrstoff suchen
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Öffne die Schadstoffdatenbank</li>
-          <li>Gib den Stoffnamen oder die UN-Nummer ein</li>
-          <li>Wähle den Stoff aus der Ergebnisliste</li>
-          <li>Lies die Gefahrenhinweise und Maßnahmen</li>
+          <li>Schadstoffdatenbank Tab öffnen</li>
+          <li>UN-Nummer ODER Stoffname eingeben</li>
+          <li>Suche Button klicken</li>
+          <li>Ergebnisliste durchsehen</li>
+        </ol>
+      </Typography>
+
+      <Alert severity="info" sx={{ my: 2 }}>
+        Tipp: Du kannst entweder nach UN-Nummer (z.B. 1203 für Benzin) oder
+        nach Stoffname suchen.
+      </Alert>
+
+      <Typography variant="h6" gutterBottom>
+        2. Ergebnisse lesen
+      </Typography>
+      <Typography component="div">
+        <ol>
+          <li>
+            Jede Karte zeigt: UN-Nummer, Name, Schutzanzug-Parameter mit
+            Resistenzgrad, zeitlicher Resistenz und Beschädigung
+          </li>
+        </ol>
+      </Typography>
+
+      <Typography variant="h6" gutterBottom>
+        3. ERICards aufrufen
+      </Typography>
+      <Typography component="div">
+        <ol>
+          <li>
+            Button &quot;Ericards&quot; auf der Ergebniskarte klicken
+          </li>
+          <li>
+            Externes Fenster öffnet sich mit vollständigem
+            Sicherheitsdatenblatt
+          </li>
+        </ol>
+      </Typography>
+
+      <Alert severity="info" sx={{ my: 2 }}>
+        Tipp: Die ERICards (Emergency Response Intervention Cards) enthalten
+        detaillierte Einsatzhinweise für Ersthelfer.
+      </Alert>
+
+      <Typography variant="h6" gutterBottom>
+        4. Strahlenschutz nutzen
+      </Typography>
+      <Typography component="div">
+        <ol>
+          <li>Tab &quot;Strahlenschutz&quot; wählen</li>
+          <li>Berechnungen für Strahlenschutzmaßnahmen durchführen</li>
+        </ol>
+      </Typography>
+
+      <Typography variant="h6" gutterBottom>
+        5. Energiespektrum analysieren
+      </Typography>
+      <Typography component="div">
+        <ol>
+          <li>Tab &quot;Energiespektrum&quot; wählen</li>
+          <li>Gamma-Spektroskopie-Daten erfassen und Nuklide identifizieren</li>
         </ol>
       </Typography>
     </>

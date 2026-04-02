@@ -14,7 +14,12 @@ import EinsatzTagebuch, { useDiaries } from '../pages/EinsatzTagebuch';
 import Geschaeftsbuch, {
   useGeschaeftsbuchEintraege,
 } from '../pages/Geschaeftsbuch';
-import SpectrumChart from './SpectrumChart';
+import dynamic from 'next/dynamic';
+
+const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
+  ssr: false,
+  loading: () => null,
+});
 import StrengthTable from './StrengthTable';
 
 export default function PrintPage() {

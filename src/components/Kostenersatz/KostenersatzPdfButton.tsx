@@ -3,16 +3,14 @@
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { pdf } from '@react-pdf/renderer';
 import { useState } from 'react';
-import { KostenersatzCalculation, KostenersatzRate } from '../../common/kostenersatz';
+import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
-import KostenersatzPdf from './KostenersatzPdf';
 
 export interface KostenersatzPdfButtonProps {
   calculation: KostenersatzCalculation;
   firecall: Firecall;
-  rates: KostenersatzRate[];
+  rates?: unknown[];
   variant?: 'text' | 'outlined' | 'contained';
   size?: 'small' | 'medium' | 'large';
 }
@@ -20,7 +18,6 @@ export interface KostenersatzPdfButtonProps {
 export default function KostenersatzPdfButton({
   calculation,
   firecall,
-  rates,
   variant = 'outlined',
   size = 'medium',
 }: KostenersatzPdfButtonProps) {
@@ -29,15 +26,21 @@ export default function KostenersatzPdfButton({
   const handleGeneratePdf = async () => {
     setGenerating(true);
     try {
-      const doc = <KostenersatzPdf calculation={calculation} firecall={firecall} rates={rates} />;
-      const blob = await pdf(doc).toBlob();
+      const params = new URLSearchParams({
+        firecallId: firecall.id!,
+        calculationId: calculation.id!,
+      });
+      const response = await fetch(`/api/kostenersatz/pdf?${params}`);
 
-      // Create download link
+      if (!response.ok) {
+        throw new Error(`PDF generation failed: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
 
-      // Generate filename
       const date = calculation.callDateOverride || firecall.date || new Date().toISOString();
       const dateStr = date.split('T')[0];
       const recipientName = calculation.recipient.name.replace(/[^a-zA-Z0-9]/g, '_') || 'Kostenersatz';
@@ -49,7 +52,6 @@ export default function KostenersatzPdfButton({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      // TODO: Show error notification
     } finally {
       setGenerating(false);
     }
