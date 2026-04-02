@@ -6,6 +6,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { SxProps, Theme } from '@mui/material/styles';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAiAssistant from '../../hooks/useAiAssistant';
@@ -15,6 +16,7 @@ import { speakMessage } from '../../common/speech';
 
 interface AiAssistantButtonProps {
   firecallItems: FirecallItem[];
+  containerSx?: SxProps<Theme>;
 }
 
 const MAX_RECORDING_TIME_MS = 30000;
@@ -50,7 +52,7 @@ function playStopBeep() {
   setTimeout(() => playBeep(660, 0.15), 100); // Then higher - two-tone for stop
 }
 
-export default function AiAssistantButton({ firecallItems }: AiAssistantButtonProps) {
+export default function AiAssistantButton({ firecallItems, containerSx }: AiAssistantButtonProps) {
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, undoLastAction } = useAiAssistant(firecallItems);
 
@@ -161,16 +163,19 @@ export default function AiAssistantButton({ firecallItems }: AiAssistantButtonPr
   return (
     <>
       <Box
-        sx={{
-          position: 'absolute',
-          bottom: 172,
-          right: 16,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 1,
-          zIndex: 1000,
-        }}
+        sx={[
+          {
+            position: 'absolute',
+            bottom: 172,
+            right: 16,
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 1,
+            zIndex: 1000,
+          },
+          ...(Array.isArray(containerSx) ? containerSx : containerSx ? [containerSx] : []),
+        ]}
       >
         {statusText && (
           <Typography

@@ -28,6 +28,8 @@ import {
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import { useFirecallItems } from '../firebase/firestoreHooks';
+import AiAssistantButton from '../Map/AiAssistantButton';
 import DeleteFirecallItemDialog from '../FirecallItems/DeleteFirecallItemDialog';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
@@ -376,6 +378,7 @@ export function EinsatzTagebuch({
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
   const addEinsatzTagebuch = useFirecallItemAdd();
+  const firecallItems = useFirecallItems();
 
   const [sortField, setSortField] = useState<DiarySortField>('datum');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
@@ -691,14 +694,24 @@ export function EinsatzTagebuch({
       </Box>
 
       {showEditButton && (
-        <Fab
-          color="primary"
-          aria-label="add"
-          sx={{ position: 'fixed', bottom: 16, right: 16 }}
-          onClick={() => setTagebuchDialogIsOpen(true)}
-        >
-          <AddIcon />
-        </Fab>
+        <>
+          <AiAssistantButton
+            firecallItems={firecallItems}
+            containerSx={{
+              position: 'fixed',
+              bottom: 80,
+              right: 16,
+            }}
+          />
+          <Fab
+            color="primary"
+            aria-label="add"
+            sx={{ position: 'fixed', bottom: 16, right: 16 }}
+            onClick={() => setTagebuchDialogIsOpen(true)}
+          >
+            <AddIcon />
+          </Fab>
+        </>
       )}
 
       {tagebuchDialogIsOpen && (
