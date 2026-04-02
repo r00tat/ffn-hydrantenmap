@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -13,6 +13,7 @@ import EinsatzTagebuch, { useDiaries } from '../pages/EinsatzTagebuch';
 import Geschaeftsbuch, {
   useGeschaeftsbuchEintraege,
 } from '../pages/Geschaeftsbuch';
+import SpectrumChart from './SpectrumChart';
 import StrengthTable from './StrengthTable';
 
 export default function PrintPage() {
@@ -132,41 +133,58 @@ export default function PrintPage() {
           <Typography variant="h4" className="print-section">
             Einsatzmittel Details
           </Typography>
-          {Object.entries(groupedByLayer).map(([layerName, items]) => (
-            <Box key={layerName} sx={{ mb: 2 }}>
-              <Typography variant="h5" className="print-section">
-                {layerName} ({items.length})
-              </Typography>
-              {items.map((item) => {
-                const instance = getItemInstance(item);
-                return (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      mb: 1,
-                      pl: 2,
-                      borderLeft: '2px solid #ccc',
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                      {instance.title()}
-                    </Typography>
-                    {instance.info() && (
-                      <Typography variant="subtitle2" color="text.secondary">
-                        {instance.info()}
-                      </Typography>
-                    )}
-                    <Box sx={{ ml: 1 }}>{instance.body()}</Box>
-                    {item.lat != null && item.lng != null && (
-                      <Typography variant="caption" color="text.secondary">
-                        Position: {item.lat}, {item.lng}
-                      </Typography>
-                    )}
-                  </Box>
-                );
-              })}
-            </Box>
-          ))}
+          <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Typ</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Bezeichnung</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Details</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Position</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(groupedByLayer).map(([layerName, items]) => (
+                <Fragment key={layerName}>
+                  <tr>
+                    <th
+                      colSpan={4}
+                      style={{
+                        textAlign: 'left',
+                        borderBottom: '2px solid #333',
+                        padding: '8px 8px 4px',
+                        fontWeight: 'bold',
+                        fontSize: '1.1em',
+                      }}
+                    >
+                      {layerName} ({items.length})
+                    </th>
+                  </tr>
+                  {items.map((item) => {
+                    const instance = getItemInstance(item);
+                    return (
+                      <tr key={item.id}>
+                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                          {instance.markerName()}
+                        </td>
+                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                          {instance.title()}
+                        </td>
+                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                          {instance.info() && <>{instance.info()}<br /></>}
+                          {instance.body()}
+                        </td>
+                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                          {item.lat != null && item.lng != null
+                            ? `${item.lat}, ${item.lng}`
+                            : ''}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
         </Box>
       )}
 
@@ -251,6 +269,7 @@ export default function PrintPage() {
               ))}
             </tbody>
           </table>
+          <SpectrumChart spectra={spectra} height={300} />
         </Box>
       )}
 
