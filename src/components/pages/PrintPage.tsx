@@ -62,16 +62,18 @@ export default function PrintPage() {
   }, [vehicles, tacticalUnits]);
 
   const groupedByLayer = useMemo(() => {
-    const groups: Record<string, FirecallItem[]> = {};
+    const groups: Record<string, { name: string; layerId?: string; items: FirecallItem[] }> = {};
     for (const item of displayItems) {
       const layerId = item.layer;
-      const layerName = layerId
-        ? layers[layerId]?.name || layerId
-        : 'Nicht zugeordnet';
-      if (!groups[layerName]) {
-        groups[layerName] = [];
+      const key = layerId || '_default';
+      if (!groups[key]) {
+        groups[key] = {
+          name: layerId ? layers[layerId]?.name || layerId : 'Nicht zugeordnet',
+          layerId: layerId || undefined,
+          items: [],
+        };
       }
-      groups[layerName].push(item);
+      groups[key].items.push(item);
     }
     return groups;
   }, [displayItems, layers]);
@@ -143,46 +145,61 @@ export default function PrintPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(groupedByLayer).map(([layerName, items]) => (
-                <Fragment key={layerName}>
-                  <tr>
-                    <th
-                      colSpan={4}
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '2px solid #333',
-                        padding: '8px 8px 4px',
-                        fontWeight: 'bold',
-                        fontSize: '1.1em',
-                      }}
-                    >
-                      {layerName} ({items.length})
-                    </th>
-                  </tr>
-                  {items.map((item) => {
-                    const instance = getItemInstance(item);
-                    return (
-                      <tr key={item.id}>
-                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
-                          {instance.markerName()}
-                        </td>
-                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
-                          {instance.title()}
-                        </td>
-                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
-                          {instance.info() && <>{instance.info()}<br /></>}
-                          {instance.body()}
-                        </td>
-                        <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
-                          {item.lat != null && item.lng != null
-                            ? `${item.lat}, ${item.lng}`
-                            : ''}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </Fragment>
-              ))}
+              {Object.entries(groupedByLayer).map(([key, group]) => {
+                const dataSchema = group.layerId
+                  ? layers[group.layerId]?.dataSchema
+                  : undefined;
+                return (
+                  <Fragment key={key}>
+                    <tr>
+                      <th
+                        colSpan={4}
+                        style={{
+                          textAlign: 'left',
+                          borderBottom: '2px solid #333',
+                          padding: '8px 8px 4px',
+                          fontWeight: 'bold',
+                          fontSize: '1.1em',
+                        }}
+                      >
+                        {group.name} ({group.items.length})
+                      </th>
+                    </tr>
+                    {group.items.map((item) => {
+                      const instance = getItemInstance(item);
+                      if (dataSchema) {
+                        instance._renderDataSchema = dataSchema;
+                      }
+                      const fieldDataStr = instance.formatFieldData();
+                      return (
+                        <tr key={item.id}>
+                          <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                            {instance.markerName()}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                            {instance.title()}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                            {instance.info() && <>{instance.info()}<br /></>}
+                            {instance.body()}
+                            {fieldDataStr && (
+                              <>
+                                <br />
+                                <em>{fieldDataStr}</em>
+                              </>
+                            )}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px', verticalAlign: 'top' }}>
+                            {item.lat != null && item.lng != null
+                              ? `${item.lat}, ${item.lng}`
+                              : ''}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </Box>
