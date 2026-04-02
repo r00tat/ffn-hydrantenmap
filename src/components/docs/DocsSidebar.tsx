@@ -16,9 +16,18 @@ const docPages = [
   { label: 'Einsätze', href: '/docs/einsaetze' },
   { label: 'Tagebuch', href: '/docs/tagebuch' },
   { label: 'Fahrzeuge', href: '/docs/fahrzeuge' },
+  { label: 'Einsatzmittel', href: '/docs/einsatzmittel' },
+  { label: 'Einsatzorte', href: '/docs/einsatzorte' },
+  { label: 'Ebenen', href: '/docs/ebenen' },
+  { label: 'Chat', href: '/docs/chat' },
+  { label: 'KI-Assistent', href: '/docs/ki' },
+  { label: 'Blaulicht-SMS', href: '/docs/blaulicht-sms' },
   { label: 'Schadstoff', href: '/docs/schadstoff' },
   { label: 'Kostenersatz', href: '/docs/kostenersatz' },
   { label: 'Geschäftsbuch', href: '/docs/geschaeftsbuch' },
+  { label: 'Wetter', href: '/docs/wetter' },
+  { label: 'Drucken', href: '/docs/drucken' },
+  { label: 'Administration', href: '/docs/admin' },
 ];
 
 export default function DocsSidebar() {

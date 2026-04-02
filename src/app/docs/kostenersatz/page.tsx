@@ -2,6 +2,7 @@ import Typography from '@mui/material/Typography';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Alert from '@mui/material/Alert';
 import Screenshot from '../../../components/docs/Screenshot';
 
 export default function KostenersatzDocsPage() {
@@ -72,6 +73,12 @@ export default function KostenersatzDocsPage() {
         auf &quot;Als Vorlage speichern&quot; klickst.
       </Typography>
 
+      <Alert severity="info" sx={{ my: 2 }}>
+        Tipp: Vorlagen sind besonders nützlich für wiederkehrende Einsatzarten
+        (z.B. Brandsicherheitswache). Speichere eine Vorlage einmal und lade sie
+        bei ähnlichen Einsätzen.
+      </Alert>
+
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Positionen hinzufügen
       </Typography>
@@ -131,6 +138,11 @@ export default function KostenersatzDocsPage() {
         </ListItem>
       </List>
 
+      <Alert severity="info" sx={{ my: 2 }}>
+        Tipp: Die PDF-Rechnung wird nach der aktuellen Tarifordnung der Gemeinde
+        formatiert und enthält alle Positionen mit Einzelpreisen.
+      </Alert>
+
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Empfänger angeben
       </Typography>
@@ -168,6 +180,23 @@ export default function KostenersatzDocsPage() {
       </Typography>
       <Typography sx={{ mb: 2 }}>
         Die PDF-Rechnung wird automatisch als Anhang beigefügt.
+      </Typography>
+
+      <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+        Zahlung per SumUp
+      </Typography>
+      <Typography sx={{ mb: 2 }}>
+        Abrechnungen können direkt per Kartenzahlung über SumUp beglichen
+        werden:
+      </Typography>
+      <Typography component="div">
+        <ol>
+          <li>Abrechnung öffnen</li>
+          <li>&quot;Zahlung&quot; Button klicken</li>
+          <li>SumUp-Transaktion wird erstellt</li>
+          <li>Kunde bezahlt per Karte</li>
+          <li>Zahlung wird automatisch verifiziert</li>
+        </ol>
       </Typography>
 
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
