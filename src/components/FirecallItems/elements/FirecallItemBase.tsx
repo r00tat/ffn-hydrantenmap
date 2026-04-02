@@ -316,7 +316,11 @@ export class FirecallItemBase {
 
     return this._renderDataSchema
       .filter((f) => this.fieldData[f.key] !== undefined && this.fieldData[f.key] !== null)
-      .map((f) => `${f.label}: ${this.fieldData[f.key]}${f.unit ? f.unit : ''}`)
+      .map((f) => {
+        const val = this.fieldData[f.key];
+        const display = typeof val === 'number' ? parseFloat(val.toFixed(3)) : val;
+        return `${f.label}: ${display}${f.unit ? f.unit : ''}`;
+      })
       .join(' | ');
   }
 }
