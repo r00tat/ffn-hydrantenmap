@@ -6,6 +6,7 @@ import {
   FIRECALL_COLLECTION_ID,
   FirecallItem,
 } from '../components/firebase/firestore';
+import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
@@ -14,6 +15,7 @@ export default function useFirecallItemAdd() {
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const logChange = useAuditLog();
+  const showSnackbar = useSnackbar();
   return useCallback(
     async (item: FirecallItem) => {
       const newData: any = {
@@ -39,26 +41,35 @@ export default function useFirecallItemAdd() {
         )}`
       );
 
-      const docRef = await addDoc(
-        collection(
-          firestore,
-          FIRECALL_COLLECTION_ID,
-          firecallId,
-          itemClass.firebaseCollectionName()
-        ),
-        newData
-      );
+      try {
+        const docRef = await addDoc(
+          collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            itemClass.firebaseCollectionName()
+          ),
+          newData
+        );
 
-      logChange({
-        action: 'create',
-        elementType: item.type,
-        elementId: docRef.id,
-        elementName: item.name || '',
-        newValue: newData,
-      });
+        logChange({
+          action: 'create',
+          elementType: item.type,
+          elementId: docRef.id,
+          elementName: item.name || '',
+          newValue: newData,
+        });
 
-      return docRef;
+        return docRef;
+      } catch (err) {
+        console.error('Failed to add firecall item:', err);
+        showSnackbar(
+          'Element konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen.',
+          'error',
+        );
+        throw err;
+      }
     },
-    [email, firecallId, logChange]
+    [email, firecallId, logChange, showSnackbar]
   );
 }
