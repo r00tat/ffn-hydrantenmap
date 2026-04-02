@@ -19,6 +19,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../../hooks/useFirecall';
 import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import MyDateTimePicker from '../inputs/DateTimePicker';
 import {
   getBlaulichtSmsAlarms,
@@ -51,6 +52,8 @@ export default function EinsatzDialog({
   );
   const { email, myGroups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
+  const showSnackbar = useSnackbar();
+  const [saving, setSaving] = useState(false);
 
   const isNewEinsatz = !einsatzDefault;
 
@@ -296,14 +299,25 @@ export default function EinsatzDialog({
           Abbrechen
         </Button>
         <Button
-          disabled={!einsatz.name || !einsatz.group}
-          onClick={() => {
-            setOpen(false);
-            saveEinsatz(einsatz);
-            onClose(einsatz);
+          disabled={!einsatz.name || !einsatz.group || saving}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await saveEinsatz(einsatz);
+              setOpen(false);
+              onClose(einsatz);
+            } catch (err) {
+              console.error('Failed to save Einsatz:', err);
+              showSnackbar(
+                'Einsatz konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen.',
+                'error',
+              );
+            } finally {
+              setSaving(false);
+            }
           }}
         >
-          {einsatz.id ? 'Aktualisieren' : 'Hinzufügen'}
+          {saving ? 'Speichern...' : einsatz.id ? 'Aktualisieren' : 'Hinzufügen'}
         </Button>
       </DialogActions>
     </Dialog>

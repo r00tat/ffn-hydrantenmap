@@ -10,6 +10,7 @@ import React, { Suspense } from 'react';
 import About from '../../app/about/page';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useServiceWorkerUpdate from '../../hooks/useServiceWorkerUpdate';
 import styles from '../../styles/Home.module.css';
 import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
 import ChatMessageDisplay from '../chat/chat-message';
@@ -20,6 +21,7 @@ import HeaderBar from '../site/HeaderBar';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import MapEditorProvider from './MapEditorProvider';
+import SnackbarProvider from './SnackbarProvider';
 
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
@@ -71,6 +73,11 @@ function AuthorizationApp({ children }: AppProps) {
   );
 }
 
+function ServiceWorkerUpdateListener() {
+  useServiceWorkerUpdate();
+  return null;
+}
+
 export default function AppProviders({ children }: AppProps) {
   useFirebaseAppCheck();
 
@@ -84,14 +91,17 @@ export default function AppProviders({ children }: AppProps) {
     >
       <SessionProvider>
         <FirebaseUserProvider>
-          <DebugLoggingProvider>
-            <div className={styles.container}>
-              <CssBaseline enableColorScheme />
-              <SingedOutOneTapLogin />
+          <SnackbarProvider>
+            <ServiceWorkerUpdateListener />
+            <DebugLoggingProvider>
+              <div className={styles.container}>
+                <CssBaseline enableColorScheme />
+                <SingedOutOneTapLogin />
 
-              <AuthorizationApp>{children}</AuthorizationApp>
-            </div>
-          </DebugLoggingProvider>
+                <AuthorizationApp>{children}</AuthorizationApp>
+              </div>
+            </DebugLoggingProvider>
+          </SnackbarProvider>
         </FirebaseUserProvider>
       </SessionProvider>
     </Suspense>
