@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 
-import { google, gmail_v1 } from 'googleapis';
+import { gmail, gmail_v1 } from '@googleapis/gmail';
 import { actionUserAuthorizedForFirecall } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
@@ -230,11 +230,11 @@ export async function processUnwetterEmails(
 
   // Initialize Gmail API
   const auth = createWorkspaceAuth(GMAIL_SCOPES);
-  const gmail = google.gmail({ version: 'v1', auth });
+  const gmailClient = gmail({ version: 'v1', auth });
 
   try {
     // Search for starred emails with the einsatz-unwetter label
-    const listResponse = await gmail.users.messages.list({
+    const listResponse = await gmailClient.users.messages.list({
       userId: 'me',
       q: 'label:einsatz-unwetter is:starred',
     });
@@ -254,7 +254,7 @@ export async function processUnwetterEmails(
 
       try {
         // Get full message content
-        const messageResponse = await gmail.users.messages.get({
+        const messageResponse = await gmailClient.users.messages.get({
           userId: 'me',
           id: messageRef.id,
           format: 'full',
@@ -366,7 +366,7 @@ export async function processUnwetterEmails(
     // Unstar processed emails
     for (const messageId of processedMessageIds) {
       try {
-        await gmail.users.messages.modify({
+        await gmailClient.users.messages.modify({
           userId: 'me',
           id: messageId,
           requestBody: {

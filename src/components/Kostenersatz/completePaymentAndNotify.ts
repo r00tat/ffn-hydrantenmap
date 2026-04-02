@@ -2,7 +2,7 @@ import 'server-only';
 
 import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
-import { google } from 'googleapis';
+import { gmail } from '@googleapis/gmail';
 import { firestore } from '../../server/firebase/admin';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
 import {
@@ -288,10 +288,10 @@ export async function completePaymentAndNotify(
 
     // Initialize Gmail API with workspace auth
     const auth = createWorkspaceAuth(GMAIL_SCOPES);
-    const gmail = google.gmail({ version: 'v1', auth });
+    const gmailClient = gmail({ version: 'v1', auth });
 
     // Send email
-    await gmail.users.messages.send({
+    await gmailClient.users.messages.send({
       userId: 'me',
       requestBody: {
         raw: encodedMessage,

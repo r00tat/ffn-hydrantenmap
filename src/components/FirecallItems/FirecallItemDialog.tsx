@@ -128,7 +128,7 @@ export default function FirecallItemDialog({
   const isExistingItem = !!item.id;
   const canSave = true;
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!canSave) return;
     const flushedFieldData = dataFieldsRef.current?.flush();
     const data = item.filteredData();
@@ -148,7 +148,7 @@ export default function FirecallItemDialog({
     if (data.type !== 'layer' && data.layer) {
       const layerSchema = layers[data.layer]?.dataSchema;
       if (layerSchema) {
-        const computed = computeAllFields(finalFieldData, layerSchema);
+        const computed = await computeAllFields(finalFieldData, layerSchema);
         finalFieldData = { ...finalFieldData, ...computed };
       }
     }

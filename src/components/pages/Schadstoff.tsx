@@ -13,7 +13,12 @@ import { SyntheticEvent, useCallback, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import useHazmatDb from '../../hooks/useHazmatDb';
 import CircularProgress from '@mui/material/CircularProgress';
-import EnergySpectrum from './EnergySpectrum';
+import dynamic from 'next/dynamic';
+
+const EnergySpectrum = dynamic(() => import('./EnergySpectrum'), {
+  ssr: false,
+  loading: () => null,
+});
 import Strahlenschutz from './Strahlenschutz';
 
 interface TabPanelProps {

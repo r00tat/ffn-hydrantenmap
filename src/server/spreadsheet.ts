@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { Feature, Point } from 'geojson';
-import { google, sheets_v4 } from 'googleapis';
+import { sheets_v4, sheets } from '@googleapis/sheets';
 import { createWorkspaceAuth } from './auth/workspace';
 import {
   geoFilterFactory,
@@ -31,14 +31,14 @@ export async function getSpreadsheetData(
 
   const { valueRenderOption = 'UNFORMATTED_VALUE' } = options;
 
-  const sheets = google.sheets({
+  const sheetsClient = sheets({
     version: 'v4',
     auth,
   });
 
   const values =
     (
-      await sheets.spreadsheets.values.get({
+      await sheetsClient.spreadsheets.values.get({
         spreadsheetId,
         range,
         valueRenderOption,

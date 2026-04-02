@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { google } from 'googleapis';
 import { GoogleAuth, JWT } from 'googleapis-common';
 
 /**
@@ -16,7 +15,7 @@ export function createWorkspaceAuth(scopes: string[]) {
     process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT
   ) {
     const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-    auth = new google.auth.JWT({
+    auth = new JWT({
       email: serviceAccount.client_email,
       key: serviceAccount.private_key,
       keyId: serviceAccount.private_key_id,
@@ -26,7 +25,7 @@ export function createWorkspaceAuth(scopes: string[]) {
       subject: process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT,
     });
   } else {
-    auth = new google.auth.GoogleAuth({
+    auth = new GoogleAuth({
       scopes,
     });
   }

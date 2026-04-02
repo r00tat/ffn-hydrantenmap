@@ -100,10 +100,10 @@ export default function useFirecallItemUpdate() {
               const batch = writeBatch(firestore);
               const now = new Date().toISOString();
               let hasUpdates = false;
-              snapshot.docs.forEach((d) => {
+              for (const d of snapshot.docs) {
                 const data = d.data();
                 const fieldData = (data.fieldData || {}) as Record<string, string | number | boolean>;
-                const computed = computeAllFields(fieldData, schema);
+                const computed = await computeAllFields(fieldData, schema);
                 if (Object.keys(computed).length > 0) {
                   const updatedFieldData = { ...fieldData, ...computed };
                   batch.update(d.ref, {
@@ -113,7 +113,7 @@ export default function useFirecallItemUpdate() {
                   });
                   hasUpdates = true;
                 }
-              });
+              }
               if (hasUpdates) {
                 await batch.commit();
               }

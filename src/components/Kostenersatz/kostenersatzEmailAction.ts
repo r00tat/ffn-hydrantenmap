@@ -3,7 +3,7 @@ import 'server-only';
 
 import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
-import { google } from 'googleapis';
+import { gmail } from '@googleapis/gmail';
 import { actionUserAuthorizedForFirecall } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
 import { createWorkspaceAuth } from '../../server/auth/workspace';
@@ -202,10 +202,10 @@ export async function sendKostenersatzEmailAction(
 
     // Initialize Gmail API with workspace auth
     const auth = createWorkspaceAuth(GMAIL_SCOPES);
-    const gmail = google.gmail({ version: 'v1', auth });
+    const gmailClient = gmail({ version: 'v1', auth });
 
     // Send email via Gmail API
-    await gmail.users.messages.send({
+    await gmailClient.users.messages.send({
       userId: 'me',
       requestBody: {
         raw: encodedMessage,
