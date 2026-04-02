@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { useFirecallSelect } from '../../../hooks/useFirecall';
 
@@ -9,12 +9,12 @@ export default function EinsatzClient({
 }: {
   children: React.ReactNode;
 }) {
-  const searchParams = useSearchParams();
-  const firecallId = searchParams?.get('firecallId');
+  const { firecallId } = useParams<{ firecallId: string }>();
   const setFirecallId = useFirecallSelect();
 
   useEffect(() => {
     if (firecallId && setFirecallId) {
+      console.info(`changing firecall with navigation to ${firecallId}`);
       setFirecallId('' + firecallId);
     }
   }, [firecallId, setFirecallId]);
