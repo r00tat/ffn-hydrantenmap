@@ -12,6 +12,8 @@ import Select from '@mui/material/Select';
 import { MenuItem } from '@mui/material';
 import { instructionSet } from './assistantInstructions';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { useFirecallItems } from '../../components/firebase/firestoreHooks';
+import AiAssistantButton from '../../components/Map/AiAssistantButton';
 
 function AiAssistantPageQuery() {
   const [question, setQuestion] = useState('');
@@ -80,6 +82,7 @@ function AiAssistantPageQuery() {
 
 export default function AiAssistantPage() {
   const firecallId = useFirecallId();
+  const firecallItems = useFirecallItems();
 
   return (
     <Paper sx={{ p: 2, m: 2 }}>
@@ -87,7 +90,19 @@ export default function AiAssistantPage() {
         AI Assistant
       </Typography>
 
-      {firecallId != 'unknown' && <AiAssistantPageQuery />}
+      {firecallId != 'unknown' && (
+        <>
+          <AiAssistantPageQuery />
+          <AiAssistantButton
+            firecallItems={firecallItems}
+            containerSx={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+            }}
+          />
+        </>
+      )}
     </Paper>
   );
 }

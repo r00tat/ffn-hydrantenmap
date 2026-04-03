@@ -83,7 +83,8 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         art: {
           type: SchemaType.STRING,
           enum: ['M', 'B', 'F'],
-          description: 'Type: M=Meldung, B=Befehl, F=Feststellung',
+          description:
+            'Type: M=Meldung (default), B=Befehl, F=Feststellung. Use M unless explicitly stated otherwise.',
         },
         von: { type: SchemaType.STRING, description: 'From whom' },
         an: { type: SchemaType.STRING, description: 'To whom' },
