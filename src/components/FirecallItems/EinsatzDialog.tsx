@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
@@ -322,28 +323,31 @@ export default function EinsatzDialog({
               Anhänge
             </Typography>
             <FileUploader onFileUploadComplete={handleFileUploadComplete} />
-            {einsatz.attachments?.map((url) => (
-              <FileDisplay
-                key={url}
-                url={url}
-                edit
-                onDeleteCallback={async (deletedUrl) => {
-                  setEinsatz((prev) => ({
-                    ...prev,
-                    attachments: prev.attachments?.filter(
-                      (u) => u !== deletedUrl
-                    ),
-                  }));
-                  if (einsatz.id) {
-                    await setDoc(
-                      doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
-                      { attachments: arrayRemove(deletedUrl) },
-                      { merge: true }
-                    );
-                  }
-                }}
-              />
-            ))}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+              {einsatz.attachments?.map((url) => (
+                <Box key={url} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <FileDisplay
+                    url={url}
+                    edit
+                    onDeleteCallback={async (deletedUrl) => {
+                      setEinsatz((prev) => ({
+                        ...prev,
+                        attachments: prev.attachments?.filter(
+                          (u) => u !== deletedUrl
+                        ),
+                      }));
+                      if (einsatz.id) {
+                        await setDoc(
+                          doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
+                          { attachments: arrayRemove(deletedUrl) },
+                          { merge: true }
+                        );
+                      }
+                    }}
+                  />
+                </Box>
+              ))}
+            </Box>
           </>
         )}
       </DialogContent>

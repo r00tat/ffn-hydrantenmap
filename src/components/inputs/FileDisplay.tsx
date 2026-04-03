@@ -10,7 +10,6 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
-import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import app from '../firebase/firebase';
@@ -23,6 +22,8 @@ export interface FileDisplayProps {
   showTitleIfImage?: boolean;
   edit?: boolean;
   onDeleteCallback?: (url: string) => void;
+  /** Max size for image thumbnails in px (default: 80) */
+  imageSize?: number;
 }
 
 export async function deleteStorageObject(url: string) {
@@ -37,6 +38,7 @@ export default function FileDisplay({
   showTitleIfImage = false,
   edit = false,
   onDeleteCallback,
+  imageSize = 80,
 }: FileDisplayProps) {
   const [metadata, setMetadata] = useState<FullMetadata>();
   const [imageUrl, setImageUrl] = useState<string>();
@@ -61,16 +63,15 @@ export default function FileDisplay({
           <Typography component="span">{fileRef.name.substring(37)}</Typography>
         )}
         {isImage && imageUrl && (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={imageUrl}
-            alt={url}
-            width={80}
-            height={80}
-            sizes="(min-width: 60em) 5vw, (min-width: 30em) 10vw, 20vw"
+            alt={fileRef.name.substring(37)}
             style={{
-              maxWidth: 80,
-              maxHeight: 80,
+              maxWidth: imageSize,
+              maxHeight: imageSize,
               margin: 2,
+              width: 'auto',
               height: 'auto',
             }}
           />

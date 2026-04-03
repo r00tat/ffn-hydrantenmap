@@ -131,8 +131,10 @@ function EinsatzCard({
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
-            {einsatz.name} {einsatz.fw}{' '}
-            {firecallId === einsatz.id ? '(aktiv)' : ''}
+            <Link href={`/einsatz/${einsatz.id}/details`} style={{ textDecoration: 'none', color: 'inherit' }}>
+              {einsatz.name} {einsatz.fw}{' '}
+              {firecallId === einsatz.id ? '(aktiv)' : ''}
+            </Link>
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {formatTimestamp(einsatz.date)}
