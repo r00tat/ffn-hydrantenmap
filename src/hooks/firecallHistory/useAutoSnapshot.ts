@@ -43,6 +43,12 @@ export default function useAutoSnapshot() {
 
   const changesDetectedRef = useRef(false);
   const initialLoadRef = useRef(true);
+  const historyRef = useRef(history);
+  historyRef.current = history;
+  const saveInProgressRef = useRef(saveInProgress);
+  saveInProgressRef.current = saveInProgress;
+  const saveHistoryRef = useRef(saveHistory);
+  saveHistoryRef.current = saveHistory;
 
   const intervalMinutes =
     firecall.autoSnapshotInterval ?? DEFAULT_INTERVAL_MINUTES;
@@ -67,12 +73,14 @@ export default function useAutoSnapshot() {
     changesDetectedRef.current = true;
   }, [firecallItems]);
 
-  // Timer to check and create snapshots
+  // Stable timer callback using refs to avoid timer resets
   const checkAndSave = useCallback(async () => {
-    if (historyModeActive || saveInProgress) return;
+    if (historyModeActive || saveInProgressRef.current) return;
 
     const lastSnapshotTime =
-      history.length > 0 ? history[0].createdAt : undefined;
+      historyRef.current.length > 0
+        ? historyRef.current[0].createdAt
+        : undefined;
 
     if (
       shouldCreateSnapshot({
@@ -84,9 +92,9 @@ export default function useAutoSnapshot() {
     ) {
       changesDetectedRef.current = false;
       const timestamp = formatTimestamp(new Date());
-      await saveHistory(`Auto-Snapshot ${timestamp}`);
+      await saveHistoryRef.current(`Auto-Snapshot ${timestamp}`);
     }
-  }, [history, historyModeActive, intervalMinutes, saveHistory, saveInProgress]);
+  }, [historyModeActive, intervalMinutes]);
 
   useEffect(() => {
     if (intervalMinutes <= 0 || historyModeActive) return;
