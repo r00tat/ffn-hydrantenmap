@@ -8,6 +8,7 @@ import { usePositionContext } from '../components/Map/Position';
 import { searchPlace } from '../components/actions/maps/places';
 import { GeoPosition } from '../common/geo';
 import { defaultPosition } from './constants';
+import { evaluate } from 'mathjs';
 import useFirecallItemAdd from './useFirecallItemAdd';
 import useFirecallItemUpdate from './useFirecallItemUpdate';
 
@@ -248,6 +249,24 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           return { success: true, message: `ASSP "${args.name}" erstellt`, createdItemId: ref.id };
         }
 
+        case 'createTacticalUnit': {
+          const pos = await resolvePosition(args.position as any);
+          const ref = await addFirecallItem({
+            type: 'tacticalUnit',
+            name: (args.name as string) || 'Einheit',
+            unitType: (args.unitType as string) || 'zug',
+            fw: args.fw as string,
+            mann: args.mann as number,
+            fuehrung: args.fuehrung as string,
+            ats: args.ats as number,
+            alarmierung: args.alarmierung as string,
+            eintreffen: args.eintreffen as string,
+            ...pos,
+          } as FirecallItem);
+          setLastCreatedItem({ id: ref.id, type: 'tacticalUnit' });
+          return { success: true, message: `Taktische Einheit "${args.name}" erstellt`, createdItemId: ref.id };
+        }
+
         case 'updateItem': {
           const itemId = (args.itemId as string) || lastCreatedItem?.id;
           const itemName = args.itemName as string;
@@ -322,6 +341,19 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             message: args.answer as string,
             isAnswer: true,
           };
+
+        case 'calculate': {
+          const expression = args.expression as string;
+          const desc = args.description as string;
+          try {
+            const result = evaluate(expression);
+            const resultStr = typeof result === 'object' && result.toString ? result.toString() : String(result);
+            const message = desc ? `${desc}: ${resultStr}` : `Ergebnis: ${resultStr}`;
+            return { success: true, message, isAnswer: true };
+          } catch (e) {
+            return { success: false, message: `Rechenfehler: ${(e as Error).message}` };
+          }
+        }
 
         case 'searchAddress': {
           const address = args.address as string;
