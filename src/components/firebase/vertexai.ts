@@ -10,7 +10,7 @@ import {
   VertexAIBackend,
 } from 'firebase/ai';
 import { marked } from 'marked';
-import { GEMINI_MODEL } from '@/common/ai';
+import { GEMINI_MODEL } from '../../common/ai';
 
 // Initialize the Vertex AI service
 export const vertexAI = getAI(firebaseApp, {

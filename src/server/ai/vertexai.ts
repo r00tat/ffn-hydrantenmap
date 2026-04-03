@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { SchemaType, VertexAI } from '@google-cloud/vertexai';
-import { GEMINI_MODEL } from '@/common/ai';
+import { GEMINI_MODEL } from '../../common/ai';
 
 /**
  * Einsatz data structure extracted from alarm dispatch emails
