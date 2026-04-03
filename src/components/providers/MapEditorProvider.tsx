@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import useFirecallHistory from '../../hooks/firecallHistory/useFirecallHistory';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
+import useAutoSnapshot from '../../hooks/firecallHistory/useAutoSnapshot';
 import useSelectHistory from '../../hooks/firecallHistory/useSelectHistory';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { MapEditorContext, MapEditorOptions } from '../../hooks/useMapEditor';
@@ -69,6 +70,8 @@ function useMapEditorProvider() {
     setEditFirecallItemIsOpen(true);
     setEditFirecallItem(item);
   }, []);
+
+  useAutoSnapshot();
 
   const options: MapEditorOptions = {
     editable: historyId ? false : editable,

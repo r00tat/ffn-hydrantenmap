@@ -273,6 +273,7 @@ export interface Firecall {
   lng?: number;
   group?: string;
   attachments?: string[];
+  autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
   [key: string]: any;
 }
 
