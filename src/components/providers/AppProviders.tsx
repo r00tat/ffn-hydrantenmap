@@ -45,7 +45,7 @@ function LogedinApp({ children }: AppProps) {
               setIsDrawerOpen={setIsDrawerOpen}
             />
             <ChatMessageDisplay />
-            <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
               {children}
             </Box>
           </FirecallLayerProvider>
@@ -94,7 +94,7 @@ export default function AppProviders({ children }: AppProps) {
           <SnackbarProvider>
             <ServiceWorkerUpdateListener />
             <DebugLoggingProvider>
-              <div className={styles.container}>
+              <div className={`${styles.container} print-content-root`}>
                 <CssBaseline enableColorScheme />
                 <SingedOutOneTapLogin />
 

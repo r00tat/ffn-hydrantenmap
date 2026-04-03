@@ -104,12 +104,10 @@ div.mobile-map {
     overflow: visible !important;
   }
 
-  /* Break flex/overflow constraints that clip scrollable content */
-  body > div,
-  body > div > div {
-    height: auto !important;
+  /* Break scroll container in AppProviders */
+  .print-content-root {
     overflow: visible !important;
-    display: block !important;
+    height: auto !important;
   }
 
   /* Compact typography */

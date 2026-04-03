@@ -5,7 +5,7 @@ import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import PrintIcon from '@mui/icons-material/Print';
-import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -43,16 +43,16 @@ export default function PrintPage() {
     [firecallItems]
   );
 
-  const contentRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const handleDownloadPdf = useCallback(async () => {
-    if (!contentRef.current) return;
     setPdfLoading(true);
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       const filename = `Einsatz_${firecall.name || 'Bericht'}.pdf`
         .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
+      // Use the print-content element which wraps the page content
+      const element = document.getElementById('print-content') || document.body;
       await html2pdf()
         .set({
           margin: [10, 10, 10, 10],
@@ -61,7 +61,7 @@ export default function PrintPage() {
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
-        .from(contentRef.current)
+        .from(element)
         .save();
     } finally {
       setPdfLoading(false);
@@ -153,7 +153,6 @@ export default function PrintPage() {
         </Button>
       </Box>
 
-      <div ref={contentRef}>
       {/* 1. Einsatz-Kopfzeile */}
       <Box sx={{ p: 2 }}>
         <Typography variant="h4" className="print-section">
@@ -370,7 +369,6 @@ export default function PrintPage() {
 
       {/* 8. Geschäftsbuch */}
       {eintraege.length > 0 && <GeschaeftsbuchPrint />}
-      </div>
     </>
   );
 }
