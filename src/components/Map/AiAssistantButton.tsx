@@ -54,7 +54,7 @@ function playStopBeep() {
 
 export default function AiAssistantButton({ firecallItems, containerSx }: AiAssistantButtonProps) {
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
-  const { processAudio, undoLastAction } = useAiAssistant(firecallItems);
+  const { processAudio, processText, undoLastAction } = useAiAssistant(firecallItems);
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -156,6 +156,25 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
     }
   }, [undoLastAction]);
 
+  const handleClarificationSelect = useCallback(async (option: string) => {
+    setIsAiProcessing(true);
+    try {
+      const result = await processText(option);
+      setToast({
+        open: true,
+        message: result.message,
+        severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+        showUndo: result.success && !!result.createdItemId,
+        clarificationOptions: result.clarification?.options,
+      });
+      if (result.isAnswer && result.message) {
+        speakMessage(result.message);
+      }
+    } finally {
+      setIsAiProcessing(false);
+    }
+  }, [processText]);
+
   const isRecording = recorderState === 'recording';
   const isProcessing = recorderState === 'processing' || isAiProcessing;
   const statusText = isRecording ? 'Aufnahme...' : isProcessing ? 'Verarbeitung...' : null;
@@ -223,6 +242,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         state={toast}
         onClose={handleToastClose}
         onUndo={handleUndo}
+        onClarificationSelect={handleClarificationSelect}
       />
     </>
   );

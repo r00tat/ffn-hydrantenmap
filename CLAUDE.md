@@ -21,6 +21,8 @@ NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output
 
 **After completing a feature or bugfix, run `npm run check` to catch errors before committing.**
 
+**WICHTIG: TypeScript-Fehler (`tsc --noEmit`) dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
+
 Data import scripts (require `GOOGLE_APPLICATION_CREDENTIALS` env var):
 
 ```bash

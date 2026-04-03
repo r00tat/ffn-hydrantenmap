@@ -83,7 +83,8 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         art: {
           type: SchemaType.STRING,
           enum: ['M', 'B', 'F'],
-          description: 'Type: M=Meldung, B=Befehl, F=Feststellung',
+          description:
+            'Type: M=Meldung (default), B=Befehl, F=Feststellung. Use M unless explicitly stated otherwise.',
         },
         von: { type: SchemaType.STRING, description: 'From whom' },
         an: { type: SchemaType.STRING, description: 'To whom' },
@@ -138,6 +139,29 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
       type: SchemaType.OBJECT,
       properties: {
         name: { type: SchemaType.STRING, description: 'Name for the ASSP marker' },
+        position: positionSchema,
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'createTacticalUnit',
+    description: 'Add a tactical unit (Taktische Einheit) to the map',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        name: { type: SchemaType.STRING, description: 'Name/designation of the unit (e.g., Abschnitt Nord, Gruppe 1)' },
+        unitType: {
+          type: SchemaType.STRING,
+          enum: ['einheit', 'trupp', 'gruppe', 'zug', 'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv'],
+          description: 'Type of tactical unit: einheit=Einheit, trupp=Trupp, gruppe=Gruppe, zug=Zug (default), bereitschaft=Bereitschaft, abschnitt=Abschnitt, bezirk=Bezirk, lfv=LFV, oebfv=ÖBFV',
+        },
+        fw: { type: SchemaType.STRING, description: 'Fire department name' },
+        mann: { type: SchemaType.NUMBER, description: 'Crew strength (number of personnel)' },
+        fuehrung: { type: SchemaType.STRING, description: 'Unit commander name' },
+        ats: { type: SchemaType.NUMBER, description: 'Number of breathing apparatus carriers' },
+        alarmierung: { type: SchemaType.STRING, description: 'Alert time' },
+        eintreffen: { type: SchemaType.STRING, description: 'Arrival time' },
         position: positionSchema,
       },
       required: ['name'],
@@ -204,6 +228,26 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'calculate',
+    description:
+      'Evaluate a mathematical expression using mathjs. Use for calculations like water consumption, crew totals, areas, distances, etc.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        expression: {
+          type: SchemaType.STRING,
+          description:
+            'A mathjs expression to evaluate, e.g. "3 * 200 * 60" or "sqrt(50^2 + 30^2)" or "15 l/min * 45 min to l"',
+        },
+        description: {
+          type: SchemaType.STRING,
+          description: 'Short German description of what is being calculated',
+        },
+      },
+      required: ['expression'],
+    },
+  },
+  {
     name: 'answerQuestion',
     description: 'Answer a question about the firecall data. Use this when the user asks a question rather than giving a command.',
     parameters: {
@@ -239,15 +283,18 @@ Verfügbare Elemente:
 - circle: Kreise mit Radius (createCircle)
 - el: Einsatzleitung-Marker (createEl)
 - assp: Atemschutzsammelplatz (createAssp)
+- tacticalUnit: Taktische Einheiten wie Trupp, Gruppe, Zug, Abschnitt (createTacticalUnit)
 
 Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
+- calculate: Berechnungen mit mathjs durchführen (z.B. Wasserverbrauch, Mannschaftsstärke, Flächen)
 
 Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
 - Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken
 - Rohre: Name, Art (C/B/Wasserwerfer), Durchfluss in l/min
 - Tagebuch: Inhalt, Art (M=Meldung, B=Befehl, F=Feststellung), Von, An, Datum
 - Geschäftsbuch: Inhalt, Ausgehend/Eingehend, Von, An, Datum
+- Taktische Einheiten: Name, Art (Trupp/Gruppe/Zug/Abschnitt/etc.), Feuerwehr, Mannschaftsstärke, Einheitsführer, ATS-Träger
 
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.`;

@@ -10,6 +10,7 @@ import {
   VertexAIBackend,
 } from 'firebase/ai';
 import { marked } from 'marked';
+import { GEMINI_MODEL } from '../../common/ai';
 
 // Initialize the Vertex AI service
 export const vertexAI = getAI(firebaseApp, {
@@ -18,7 +19,7 @@ export const vertexAI = getAI(firebaseApp, {
 
 // Initialize the generative model with a model that supports your use case
 export const geminiModel = getGenerativeModel(vertexAI, {
-  model: 'gemini-3-flash-preview',
+  model: GEMINI_MODEL,
   systemInstruction: `**Systemanweisungen:**
 
 * **Rolle:**
