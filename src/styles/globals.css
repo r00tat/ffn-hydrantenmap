@@ -98,6 +98,20 @@ div.mobile-map {
     display: none !important;
   }
 
+  /* Allow content to flow beyond the viewport */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Break flex/overflow constraints that clip scrollable content */
+  body > div,
+  body > div > div {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
   /* Compact typography */
   body {
     font-size: 10pt;
@@ -112,12 +126,13 @@ div.mobile-map {
   h4 { font-size: 11pt; }
   p, li, td, th { font-size: 10pt; }
 
-  /* Full-width map container */
+  /* Full-width map container with fixed height for print */
   #map,
   div.leaflet-container,
   div.desktop-map,
   div.mobile-map {
     width: 100% !important;
+    height: 400px !important;
     padding: 0 !important;
     margin: 0 !important;
   }

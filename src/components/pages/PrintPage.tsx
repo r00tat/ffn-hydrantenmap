@@ -10,10 +10,10 @@ import useVehicles from '../../hooks/useVehicles';
 import { FirecallItem, Spectrum } from '../firebase/firestore';
 import { getItemInstance } from '../FirecallItems/elements';
 import DynamicMap from '../Map/PositionedMap';
-import EinsatzTagebuch, { useDiaries } from '../pages/EinsatzTagebuch';
-import Geschaeftsbuch, {
-  useGeschaeftsbuchEintraege,
-} from '../pages/Geschaeftsbuch';
+import { useDiaries } from '../pages/EinsatzTagebuch';
+import { useGeschaeftsbuchEintraege } from '../pages/Geschaeftsbuch';
+import EinsatzTagebuchPrint from '../pages/EinsatzTagebuchPrint';
+import GeschaeftsbuchPrint from '../pages/GeschaeftsbuchPrint';
 import dynamic from 'next/dynamic';
 
 const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
@@ -317,18 +317,10 @@ export default function PrintPage() {
       )}
 
       {/* 7. Einsatztagebuch */}
-      {diaries.length > 0 && (
-        <Box sx={{ p: 2 }}>
-          <EinsatzTagebuch showEditButton={false} sortAscending />
-        </Box>
-      )}
+      {diaries.length > 0 && <EinsatzTagebuchPrint />}
 
       {/* 8. Geschäftsbuch */}
-      {eintraege.length > 0 && (
-        <Box sx={{ p: 2 }}>
-          <Geschaeftsbuch showEditButton={false} sortAscending />
-        </Box>
-      )}
+      {eintraege.length > 0 && <GeschaeftsbuchPrint />}
     </>
   );
 }
