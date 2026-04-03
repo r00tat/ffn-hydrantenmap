@@ -10,7 +10,16 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import Typography from '@mui/material/Typography';
+import {
+  addDoc,
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  setDoc,
+} from 'firebase/firestore';
+import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
 import { formatTimestamp, parseTimestamp } from '../../common/time-format';
@@ -21,6 +30,8 @@ import { firestore } from '../firebase/firebase';
 import { Firecall, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import MyDateTimePicker from '../inputs/DateTimePicker';
+import FileDisplay from '../inputs/FileDisplay';
+import FileUploader from '../inputs/FileUploader';
 import {
   getBlaulichtSmsAlarms,
   BlaulichtSmsAlarm,
@@ -134,6 +145,24 @@ export default function EinsatzDialog({
       }
     },
     [alarms, applyAlarm]
+  );
+
+  const handleFileUploadComplete = useCallback(
+    async (refs: StorageReference[]) => {
+      const newUrls = refs.map((r) => r.toString());
+      setEinsatz((prev) => ({
+        ...prev,
+        attachments: [...(prev.attachments || []), ...newUrls],
+      }));
+      if (einsatz.id) {
+        await setDoc(
+          doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
+          { attachments: arrayUnion(...newUrls) },
+          { merge: true }
+        );
+      }
+    },
+    [einsatz.id]
   );
 
   const onChange =
@@ -287,6 +316,36 @@ export default function EinsatzDialog({
           }}
           value={parseTimestamp(einsatz.abruecken) || null}
         />
+        {einsatz.id && (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+              Anhänge
+            </Typography>
+            <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+            {einsatz.attachments?.map((url) => (
+              <FileDisplay
+                key={url}
+                url={url}
+                edit
+                onDeleteCallback={async (deletedUrl) => {
+                  setEinsatz((prev) => ({
+                    ...prev,
+                    attachments: prev.attachments?.filter(
+                      (u) => u !== deletedUrl
+                    ),
+                  }));
+                  if (einsatz.id) {
+                    await setDoc(
+                      doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
+                      { attachments: arrayRemove(deletedUrl) },
+                      { merge: true }
+                    );
+                  }
+                }}
+              />
+            ))}
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button
