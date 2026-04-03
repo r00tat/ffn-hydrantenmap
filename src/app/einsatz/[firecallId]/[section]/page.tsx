@@ -14,6 +14,7 @@ const SECTIONS: Record<
   einsatzorte: () => import('../../../../components/pages/EinsatzorteWrapper'),
   chat: () => import('../../../../components/pages/Chat'),
   print: () => import('../../../../components/pages/PrintWrapper'),
+  details: () => import('../../../../components/pages/EinsatzDetails'),
 };
 
 export default async function EinsatzSectionPage({

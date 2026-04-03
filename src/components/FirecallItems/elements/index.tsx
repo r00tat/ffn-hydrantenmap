@@ -45,6 +45,7 @@ if (typeof 'window' !== undefined) {
     fcItemNames[k] = new FcClass().markerName();
   });
 }
+fcItemNames['upload'] = 'Foto / Datei';
 
 export function getItemClass(type: string = 'fallback') {
   return fcItemClasses[type] ?? FirecallItemBase;

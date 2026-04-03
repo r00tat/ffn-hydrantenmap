@@ -20,8 +20,10 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { where } from 'firebase/firestore';
+import Typography from '@mui/material/Typography';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StorageReference } from 'firebase/storage';
+import { arrayUnion, doc, setDoc, where } from 'firebase/firestore';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -29,6 +31,10 @@ import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { useHistoryPathSegments } from '../../hooks/useMapEditor';
 import useZOrderActions from '../../hooks/useZOrderActions';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import { firestore } from '../firebase/firebase';
+import FileUploader from '../inputs/FileUploader';
+import FileDisplay from '../inputs/FileDisplay';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import {
   DataSchemaField,
   FIRECALL_COLLECTION_ID,
@@ -62,7 +68,9 @@ export default function FirecallItemDialog({
 }: FirecallItemDialogOptions) {
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
+  const showSnackbar = useSnackbar();
   const [open, setOpen] = useState(true);
+  const [uploadedRefs, setUploadedRefs] = useState<StorageReference[]>([]);
   const dataFieldsRef = useRef<ItemDataFieldsHandle>(null);
   const [item, setFirecallItem] = useState<FirecallItemBase>(
     getItemInstance({
@@ -72,6 +80,7 @@ export default function FirecallItemDialog({
     } as FirecallItem),
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const historyPathSegments = useHistoryPathSegments();
 
   // Load siblings for z-order operations (only when editing existing items)
@@ -125,8 +134,51 @@ export default function FirecallItemDialog({
     );
   };
 
+  const isUpload = item.type === 'upload';
   const isExistingItem = !!item.id;
   const canSave = true;
+
+  const handleFileUploadComplete = useCallback(
+    async (refs: StorageReference[]) => {
+      try {
+        const uris = refs.map((r) => r.toString());
+        await setDoc(
+          doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
+          { attachments: arrayUnion(...uris) },
+          { merge: true },
+        );
+        setUploadedRefs((prev) => [...prev, ...refs]);
+        showSnackbar(
+          `${refs.length} Datei${refs.length > 1 ? 'en' : ''} hochgeladen`,
+          'success',
+        );
+        setCountdown(5);
+      } catch (err) {
+        console.error('Failed to save attachments', err);
+        showSnackbar('Fehler beim Speichern der Anhänge', 'error');
+      }
+    },
+    [firecallId, showSnackbar],
+  );
+
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const timer = setTimeout(() => {
+      setCountdown((prev) => {
+        if (prev === null) return null;
+        const next = prev - 1;
+        if (next <= 0) {
+          // Schedule close outside of setState to avoid cascading renders
+          queueMicrotask(() => {
+            setOpen(false);
+            onClose();
+          });
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, onClose]);
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
@@ -166,14 +218,22 @@ export default function FirecallItemDialog({
         onKeyDown={(e) => {
           const target = e.target as HTMLElement;
           const isTextarea = target.tagName === 'TEXTAREA';
-          if (e.key === 'Enter' && !e.shiftKey && !isTextarea && canSave) {
+          if (
+            e.key === 'Enter' &&
+            !e.shiftKey &&
+            !isTextarea &&
+            canSave &&
+            !isUpload
+          ) {
             e.preventDefault();
             handleSave();
           }
         }}
       >
         <DialogTitle sx={{ pr: 4 }}>
-          {item.id ? (
+          {isUpload ? (
+            <>Datei zum Einsatz hochladen</>
+          ) : item.id ? (
             <>{item.markerName()} bearbeiten</>
           ) : (
             <>Neu: {item.markerName()} hinzufügen</>
@@ -191,7 +251,11 @@ export default function FirecallItemDialog({
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>{item.dialogText()}</DialogContentText>
+          <DialogContentText>
+            {isUpload
+              ? 'Datei oder Foto direkt zum Einsatz hochladen.'
+              : item.dialogText()}
+          </DialogContentText>
           {allowTypeChange && (
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
@@ -212,116 +276,149 @@ export default function FirecallItemDialog({
               </Select>
             </FormControl>
           )}
-          <FirecallItemFields
-            item={item}
-            setItemField={setItemField}
-            showLatLng={!!item.id}
-            autoFocusField={autoFocusField}
-          />
-          {isExistingItem && (
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 0.5,
-                mt: 2,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Box
-                component="span"
-                sx={{ mr: 0.5, fontSize: '0.875rem', color: 'text.secondary' }}
-              >
-                Reihenfolge:
-              </Box>
-              <Tooltip title="Ganz nach hinten">
-                <IconButton size="small" onClick={handleSendToBack}>
-                  <VerticalAlignBottomIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Nach hinten">
-                <IconButton size="small" onClick={handleSendBackward}>
-                  <ArrowDownwardIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Nach vorne">
-                <IconButton size="small" onClick={handleBringForward}>
-                  <ArrowUpwardIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Ganz nach vorne">
-                <IconButton size="small" onClick={handleBringToFront}>
-                  <VerticalAlignTopIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+          {isUpload ? (
+            <Box sx={{ mt: 2 }}>
+              <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+              {uploadedRefs.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  {uploadedRefs.map((r) => (
+                    <FileDisplay key={r.toString()} url={r.toString()} />
+                  ))}
+                </Box>
+              )}
+              {countdown !== null && (
+                <Typography sx={{ mt: 2 }} color="text.secondary">
+                  Schließe in {countdown}...
+                </Typography>
+              )}
             </Box>
-          )}
-          {item.type === 'layer' && (
+          ) : (
             <>
-              <DataSchemaEditor
-                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
-                onChange={(schema: DataSchemaField[]) =>
-                  setItemField('dataSchema', schema)
-                }
+              <FirecallItemFields
+                item={item}
+                setItemField={setItemField}
+                showLatLng={!!item.id}
+                autoFocusField={autoFocusField}
               />
-              <HeatmapSettings
-                config={item.get<HeatmapConfig>('heatmapConfig')}
-                dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
-                onChange={onHeatmapChange}
-              />
+              {isExistingItem && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 0.5,
+                    mt: 2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      mr: 0.5,
+                      fontSize: '0.875rem',
+                      color: 'text.secondary',
+                    }}
+                  >
+                    Reihenfolge:
+                  </Box>
+                  <Tooltip title="Ganz nach hinten">
+                    <IconButton size="small" onClick={handleSendToBack}>
+                      <VerticalAlignBottomIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Nach hinten">
+                    <IconButton size="small" onClick={handleSendBackward}>
+                      <ArrowDownwardIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Nach vorne">
+                    <IconButton size="small" onClick={handleBringForward}>
+                      <ArrowUpwardIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Ganz nach vorne">
+                    <IconButton size="small" onClick={handleBringToFront}>
+                      <VerticalAlignTopIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
+              {item.type === 'layer' && (
+                <>
+                  <DataSchemaEditor
+                    dataSchema={
+                      item.get<DataSchemaField[]>('dataSchema') || []
+                    }
+                    onChange={(schema: DataSchemaField[]) =>
+                      setItemField('dataSchema', schema)
+                    }
+                  />
+                  <HeatmapSettings
+                    config={item.get<HeatmapConfig>('heatmapConfig')}
+                    dataSchema={
+                      item.get<DataSchemaField[]>('dataSchema') || []
+                    }
+                    onChange={onHeatmapChange}
+                  />
+                </>
+              )}
+              {item.type !== 'layer' && (
+                <ItemDataFields
+                  dataSchema={
+                    item.layer ? layers[item.layer]?.dataSchema : undefined
+                  }
+                  fieldData={
+                    item.get<Record<string, string | number | boolean>>(
+                      'fieldData',
+                    ) || {}
+                  }
+                  onChange={(fieldData) => setItemField('fieldData', fieldData)}
+                  isNew={!item.id}
+                  flushRef={dataFieldsRef}
+                />
+              )}
             </>
           )}
-          {item.type !== 'layer' && (
-            <ItemDataFields
-              dataSchema={
-                item.layer ? layers[item.layer]?.dataSchema : undefined
-              }
-              fieldData={
-                item.get<Record<string, string | number | boolean>>(
-                  'fieldData',
-                ) || {}
-              }
-              onChange={(fieldData) => setItemField('fieldData', fieldData)}
-              isNew={!item.id}
-              flushRef={dataFieldsRef}
-            />
-          )}
         </DialogContent>
-        <DialogActions>
-          {item.id && (
-            <Tooltip title="Kopieren">
-              <IconButton
-                onClick={async () => {
-                  await copyAndSaveFirecallItems(
-                    firecallId,
-                    item.filteredData(),
-                  );
-                  setOpen(false);
-                  onClose();
-                }}
-              >
-                <ContentCopyIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-          {item.id && (
-            <Tooltip title="Löschen">
-              <IconButton onClick={() => setConfirmDelete(true)} color="error">
-                <DeleteIcon />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Box sx={{ flex: 1 }} />
-          <Button
-            color="primary"
-            disabled={!canSave}
-            startIcon={item.id ? <SaveIcon /> : <AddIcon />}
-            variant="contained"
-            onClick={handleSave}
-          >
-            {item.id ? 'Speichern' : 'Hinzufügen'}
-          </Button>
-        </DialogActions>
+        {!isUpload && (
+          <DialogActions>
+            {item.id && (
+              <Tooltip title="Kopieren">
+                <IconButton
+                  onClick={async () => {
+                    await copyAndSaveFirecallItems(
+                      firecallId,
+                      item.filteredData(),
+                    );
+                    setOpen(false);
+                    onClose();
+                  }}
+                >
+                  <ContentCopyIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            {item.id && (
+              <Tooltip title="Löschen">
+                <IconButton
+                  onClick={() => setConfirmDelete(true)}
+                  color="error"
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Button
+              color="primary"
+              disabled={!canSave}
+              startIcon={item.id ? <SaveIcon /> : <AddIcon />}
+              variant="contained"
+              onClick={handleSave}
+            >
+              {item.id ? 'Speichern' : 'Hinzufügen'}
+            </Button>
+          </DialogActions>
+        )}
       </Dialog>
       {confirmDelete && (
         <ConfirmDialog
