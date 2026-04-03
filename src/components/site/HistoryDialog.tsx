@@ -7,11 +7,15 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { useState } from 'react';
 import useMapEditor from '../../hooks/useMapEditor';
-import { FirecallHistory } from '../firebase/firestore';
+import { FirecallHistory, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import Typography from '@mui/material/Typography';
 import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import TextField from '@mui/material/TextField';
 import { formatTimestamp } from '../../common/time-format';
+import AutoSnapshotIntervalSelect from '../inputs/AutoSnapshotIntervalSelect';
+import useFirecall from '../../hooks/useFirecall';
+import { doc, setDoc } from 'firebase/firestore';
+import { firestore } from '../firebase/firebase';
 
 interface HistoryDialogOptions {
   onClose: (history?: FirecallHistory) => void;
@@ -24,6 +28,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
     FirecallHistory | undefined
   >(historyId ? history.find((h) => h.id === historyId) : undefined);
   const { saveHistory } = useSaveHistory();
+  const firecall = useFirecall();
 
   const handleChange = (event: SelectChangeEvent<string>) => {
     const selected = history.find((h) => h.id === event.target.value);
@@ -37,6 +42,19 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
     <Dialog open={open} onClose={() => onClose()}>
       <DialogTitle>Historie</DialogTitle>
       <DialogContent>
+        <AutoSnapshotIntervalSelect
+          value={firecall.autoSnapshotInterval}
+          onChange={async (value) => {
+            if (firecall.id) {
+              await setDoc(
+                doc(firestore, FIRECALL_COLLECTION_ID, firecall.id),
+                { autoSnapshotInterval: value },
+                { merge: true }
+              );
+            }
+          }}
+        />
+        <hr />
         <Typography>
           Wähle den gewünschten Stand aus der Historie. Wird &quot;letzten Stand
           laden&quot; ausgewählt, so befindet man sich wieder im live Modus.
