@@ -3,6 +3,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import InfoIcon from '@mui/icons-material/Info';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
@@ -130,8 +131,10 @@ function EinsatzCard({
       <Card>
         <CardContent>
           <Typography variant="h5" component="div">
-            {einsatz.name} {einsatz.fw}{' '}
-            {firecallId === einsatz.id ? '(aktiv)' : ''}
+            <Link href={`/einsatz/${einsatz.id}/details`} style={{ textDecoration: 'none', color: 'inherit' }}>
+              {einsatz.name} {einsatz.fw}{' '}
+              {firecallId === einsatz.id ? '(aktiv)' : ''}
+            </Link>
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {formatTimestamp(einsatz.date)}
@@ -169,6 +172,15 @@ function EinsatzCard({
             >
               Aktivieren
             </Button>
+          </Tooltip>
+          <Tooltip title="Einsatz-Details und Anhänge">
+            <IconButton
+              size="small"
+              component={Link}
+              href={`/einsatz/${einsatz.id}/details`}
+            >
+              <InfoIcon />
+            </IconButton>
           </Tooltip>
           {einsatz.id && <FirecallExport firecallId={einsatz.id} />}
 

@@ -272,6 +272,7 @@ export interface Firecall {
   lat?: number;
   lng?: number;
   group?: string;
+  attachments?: string[];
   [key: string]: any;
 }
 

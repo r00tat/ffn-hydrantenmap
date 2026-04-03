@@ -32,6 +32,13 @@ module.exports = async (phase) => {
           pathname: '/FFND_logo.png',
         },
       ],
+      remotePatterns: [
+        {
+          protocol: 'https',
+          hostname: 'firebasestorage.googleapis.com',
+          pathname: '/v0/b/**',
+        },
+      ],
     },
   };
 
