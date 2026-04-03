@@ -56,6 +56,8 @@ When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
 GITHUB_TOKEN= gh <command>
 ```
 
+**Wichtig:** `gh push` existiert nicht. Zum Pushen immer `git push` verwenden.
+
 ### Conventional Commits
 
 Alle Commit-Messages müssen dem [Conventional Commits](https://www.conventionalcommits.org/) Format folgen:
