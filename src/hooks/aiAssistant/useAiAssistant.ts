@@ -83,8 +83,8 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     [existingItems, isPositionSet, map, position]
   );
 
-  const processAudio = useCallback(
-    async (audioBase64: string): Promise<AiAssistantResult> => {
+  const sendToGemini = useCallback(
+    async (userParts: GenerateContentRequest['contents'][0]['parts']): Promise<AiAssistantResult> => {
       cleanupOldInteractions();
 
       const context = buildAiContext({
@@ -102,7 +102,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           {
             role: 'user',
             parts: [
-              { inlineData: { mimeType: 'audio/webm', data: audioBase64 } },
+              ...userParts,
               { text: `Kontext:\n${JSON.stringify(context, null, 2)}` },
             ],
           },
@@ -149,6 +149,20 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     [cleanupOldInteractions, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem]
   );
 
+  const processAudio = useCallback(
+    async (audioBase64: string): Promise<AiAssistantResult> => {
+      return sendToGemini([{ inlineData: { mimeType: 'audio/webm', data: audioBase64 } }]);
+    },
+    [sendToGemini]
+  );
+
+  const processText = useCallback(
+    async (text: string): Promise<AiAssistantResult> => {
+      return sendToGemini([{ text }]);
+    },
+    [sendToGemini]
+  );
+
   const undoLastAction = useCallback(async (): Promise<boolean> => {
     if (!lastCreatedItem) return false;
 
@@ -162,6 +176,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
   return {
     processAudio,
+    processText,
     undoLastAction,
     lastCreatedItem,
   };
