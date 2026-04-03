@@ -1,5 +1,6 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import {
   FullMetadata,
@@ -55,7 +56,7 @@ export default function FileDisplay({
 
   return (
     <>
-      <a href={imageUrl || '#'} target="_blank" rel="noopener noreferrer">
+      <Link href={imageUrl || '#'} target="_blank" rel="noopener noreferrer" underline="hover">
         {(!isImage || showTitleIfImage) && (
           <Typography component="span">{fileRef.name.substring(37)}</Typography>
         )}
@@ -74,7 +75,7 @@ export default function FileDisplay({
             }}
           />
         )}
-      </a>
+      </Link>
       {edit && (
         <IconButton
           aria-label="delete"

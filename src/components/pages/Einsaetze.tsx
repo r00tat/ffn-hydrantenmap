@@ -3,6 +3,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import InfoIcon from '@mui/icons-material/Info';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
@@ -31,7 +32,6 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
-import FileDisplay from '../inputs/FileDisplay';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
@@ -138,13 +138,6 @@ function EinsatzCard({
             {formatTimestamp(einsatz.date)}
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
-          {einsatz.attachments && einsatz.attachments.length > 0 && (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {einsatz.attachments.map((url) => (
-                <FileDisplay key={url} url={url} />
-              ))}
-            </Box>
-          )}
           {tokenLink && (
             <>
               {copied && (
@@ -177,6 +170,15 @@ function EinsatzCard({
             >
               Aktivieren
             </Button>
+          </Tooltip>
+          <Tooltip title="Einsatz-Details und Anhänge">
+            <IconButton
+              size="small"
+              component={Link}
+              href={`/einsatz/${einsatz.id}/details`}
+            >
+              <InfoIcon />
+            </IconButton>
           </Tooltip>
           {einsatz.id && <FirecallExport firecallId={einsatz.id} />}
 
