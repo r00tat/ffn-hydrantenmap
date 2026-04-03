@@ -49,20 +49,45 @@ export default function PrintPage() {
     setPdfLoading(true);
     try {
       const html2pdf = (await import('html2pdf.js')).default;
+      const html2canvas = (await import('html2canvas')).default;
       const filename = `Einsatz_${firecall.name || 'Bericht'}.pdf`
         .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
-      // Use the print-content element which wraps the page content
-      const element = document.getElementById('print-content') || document.body;
+
+      // Capture the Leaflet map as a static image before PDF generation
+      // html2canvas cannot render CSS 3D transforms used by Leaflet tiles
+      const mapContainer = document.querySelector('.leaflet-container') as HTMLElement | null;
+      let mapImage: HTMLImageElement | null = null;
+      if (mapContainer) {
+        const canvas = await html2canvas(mapContainer, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+        });
+        mapImage = document.createElement('img');
+        mapImage.src = canvas.toDataURL('image/jpeg', 0.95);
+        mapImage.style.width = '100%';
+        mapImage.style.height = mapContainer.offsetHeight + 'px';
+        mapContainer.style.display = 'none';
+        mapContainer.parentElement?.insertBefore(mapImage, mapContainer);
+      }
+
+      const element = document.body;
       await html2pdf()
         .set({
           margin: [10, 10, 10, 10],
           filename,
           image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(element)
         .save();
+
+      // Restore the live map
+      if (mapContainer && mapImage) {
+        mapImage.remove();
+        mapContainer.style.display = '';
+      }
     } finally {
       setPdfLoading(false);
     }
