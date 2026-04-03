@@ -44,11 +44,13 @@ export default function useAutoSnapshot() {
   const changesDetectedRef = useRef(false);
   const initialLoadRef = useRef(true);
   const historyRef = useRef(history);
-  historyRef.current = history;
   const saveInProgressRef = useRef(saveInProgress);
-  saveInProgressRef.current = saveInProgress;
   const saveHistoryRef = useRef(saveHistory);
-  saveHistoryRef.current = saveHistory;
+  useEffect(() => {
+    historyRef.current = history;
+    saveInProgressRef.current = saveInProgress;
+    saveHistoryRef.current = saveHistory;
+  }, [history, saveInProgress, saveHistory]);
 
   const intervalMinutes =
     firecall.autoSnapshotInterval ?? DEFAULT_INTERVAL_MINUTES;
