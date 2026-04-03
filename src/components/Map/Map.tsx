@@ -24,6 +24,7 @@ import MapActionButtons from './MapActionButtons';
 import ScaleRatioControl from './ScaleRatioControl';
 import MapSidebar from './MapSidebar';
 import PositionAction from './PositionAction';
+import FitBoundsToItems from './FitBoundsToItems';
 import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
@@ -180,6 +181,7 @@ export default function Map() {
         <ScaleControl position="bottomright" metric={true} imperial={false} />
         <ScaleRatioControl />
         {/* <FullscreenControl /> */}
+        <FitBoundsToItems />
         <UpdateMapPosition />
         <LeitungsProvider>
           <DrawingProvider>

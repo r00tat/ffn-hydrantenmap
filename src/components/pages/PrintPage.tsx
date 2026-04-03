@@ -1,6 +1,10 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import PrintIcon from '@mui/icons-material/Print';
 import { Fragment, useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
@@ -10,10 +14,10 @@ import useVehicles from '../../hooks/useVehicles';
 import { FirecallItem, Spectrum } from '../firebase/firestore';
 import { getItemInstance } from '../FirecallItems/elements';
 import DynamicMap from '../Map/PositionedMap';
-import EinsatzTagebuch, { useDiaries } from '../pages/EinsatzTagebuch';
-import Geschaeftsbuch, {
-  useGeschaeftsbuchEintraege,
-} from '../pages/Geschaeftsbuch';
+import { useDiaries } from '../pages/EinsatzTagebuch';
+import { useGeschaeftsbuchEintraege } from '../pages/Geschaeftsbuch';
+import EinsatzTagebuchPrint from '../pages/EinsatzTagebuchPrint';
+import GeschaeftsbuchPrint from '../pages/GeschaeftsbuchPrint';
 import dynamic from 'next/dynamic';
 
 const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
@@ -38,6 +42,56 @@ export default function PrintPage() {
       ),
     [firecallItems]
   );
+
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setPdfLoading(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const html2canvas = (await import('html2canvas')).default;
+      const filename = `Einsatz_${firecall.name || 'Bericht'}.pdf`
+        .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
+
+      // Capture the Leaflet map as a static image before PDF generation
+      // html2canvas cannot render CSS 3D transforms used by Leaflet tiles
+      const mapContainer = document.querySelector('.leaflet-container') as HTMLElement | null;
+      let mapImage: HTMLImageElement | null = null;
+      if (mapContainer) {
+        const canvas = await html2canvas(mapContainer, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+        });
+        mapImage = document.createElement('img');
+        mapImage.src = canvas.toDataURL('image/jpeg', 0.95);
+        mapImage.style.width = '100%';
+        mapImage.style.height = mapContainer.offsetHeight + 'px';
+        mapContainer.style.display = 'none';
+        mapContainer.parentElement?.insertBefore(mapImage, mapContainer);
+      }
+
+      const element = document.body;
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, allowTaint: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        })
+        .from(element)
+        .save();
+
+      // Restore the live map
+      if (mapContainer && mapImage) {
+        mapImage.remove();
+        mapContainer.style.display = '';
+      }
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [firecall.name]);
 
   const [hiddenSpectra, setHiddenSpectra] = useState<Set<string>>(new Set());
 
@@ -105,6 +159,25 @@ export default function PrintPage() {
 
   return (
     <>
+      {/* Aktionsleiste */}
+      <Box sx={{ p: 2, display: 'flex', gap: 2 }} className="no-print">
+        <Button
+          variant="contained"
+          startIcon={pdfLoading ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+        >
+          {pdfLoading ? 'PDF wird erstellt...' : 'PDF herunterladen'}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<PrintIcon />}
+          onClick={() => window.print()}
+        >
+          Drucken
+        </Button>
+      </Box>
+
       {/* 1. Einsatz-Kopfzeile */}
       <Box sx={{ p: 2 }}>
         <Typography variant="h4" className="print-section">
@@ -317,18 +390,10 @@ export default function PrintPage() {
       )}
 
       {/* 7. Einsatztagebuch */}
-      {diaries.length > 0 && (
-        <Box sx={{ p: 2 }}>
-          <EinsatzTagebuch showEditButton={false} sortAscending />
-        </Box>
-      )}
+      {diaries.length > 0 && <EinsatzTagebuchPrint />}
 
       {/* 8. Geschäftsbuch */}
-      {eintraege.length > 0 && (
-        <Box sx={{ p: 2 }}>
-          <Geschaeftsbuch showEditButton={false} sortAscending />
-        </Box>
-      )}
+      {eintraege.length > 0 && <GeschaeftsbuchPrint />}
     </>
   );
 }

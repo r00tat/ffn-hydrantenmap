@@ -16,31 +16,31 @@ export default function GeschaeftsbuchPrint() {
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h3" gutterBottom>
+        <Typography variant="h4" className="print-section">
           Geschäftsbuch
         </Typography>
-        <table>
+        <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th>Nummer</th>
-              <th>Datum</th>
-              <th>Ein/Ausgehend</th>
-              <th>Von</th>
-              <th>An</th>
-              <th>Information</th>
-              <th>Anmerkung</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Nummer</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Datum</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Ein/Ausgehend</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Von</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>An</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Information</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Anmerkung</th>
             </tr>
           </thead>
           <tbody>
             {eintraegeSorted.map((item) => (
               <tr key={item.id}>
-                <td>{item.nummer}</td>
-                <td>{item.datum}</td>
-                <td>{item.einaus}</td>
-                <td>{item.von}</td>
-                <td>{item.an}</td>
-                <td>{item.name}</td>
-                <td>{item.beschreibung}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.nummer}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.datum}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.einaus}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.von}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.an}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.name}</td>
+                <td style={{ borderBottom: '1px solid #ccc', padding: '4px 8px' }}>{item.beschreibung}</td>
               </tr>
             ))}
           </tbody>

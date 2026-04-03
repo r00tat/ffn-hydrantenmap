@@ -3,7 +3,7 @@
   "description": "Hydrantenkarte der Feuerwehr Neusiedl am See",
   "license": "MPL-2.0",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "npx eslint",
@@ -52,6 +52,7 @@
     "firebaseui": "^6.1.0",
     "geofire-common": "^6.0.0",
     "haversine-distance": "^1.2.4",
+    "html2pdf.js": "^0.14.0",
     "jose": "^6.2.2",
     "kdbush": "^4.0.2",
     "leaflet": "^1.9.4",
