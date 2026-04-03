@@ -30,12 +30,15 @@ import ListItemText from '@mui/material/ListItemText';
 import Link from 'next/link';
 import React, { useCallback } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallId } from '../../hooks/useFirecall';
 
 interface DrawerItem {
   text: string;
   icon: React.ReactNode;
   href: string;
   admin?: boolean;
+  /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
+  einsatzSection?: string;
 }
 
 export default function AppDrawer({
@@ -60,26 +63,29 @@ export default function AppDrawer({
     [setIsOpen],
   );
   const { isAdmin } = useFirebaseLogin();
+  const firecallId = useFirecallId();
 
   const drawerItems: DrawerItem[] = [
-    { text: 'Karte', icon: <MapIcon />, href: '/' },
+    { text: 'Karte', icon: <MapIcon />, href: '/', einsatzSection: '' },
     {
       text: 'Einsätze',
       icon: <LocalFireDepartmentIcon />,
       href: '/einsaetze',
     },
-    { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen' },
-    { text: 'Einsatzmittel', icon: <DirectionsCarIcon />, href: '/einsatzmittel' },
+    { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen', einsatzSection: 'ebenen' },
+    { text: 'Einsatzmittel', icon: <DirectionsCarIcon />, href: '/einsatzmittel', einsatzSection: 'einsatzmittel' },
     {
       text: 'Einsatz Tagebuch',
       icon: <LibraryBooksIcon />,
       href: '/tagebuch',
+      einsatzSection: 'tagebuch',
     },
     // { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
     {
       text: 'Einsatzorte',
       icon: <PlaceIcon />,
       href: '/einsatzorte',
+      einsatzSection: 'einsatzorte',
     },
     {
       text: 'Blaulicht-SMS',
@@ -90,19 +96,22 @@ export default function AppDrawer({
       text: 'Geschäftsbuch',
       icon: <MenuBookIcon />,
       href: '/geschaeftsbuch',
+      einsatzSection: 'geschaeftsbuch',
     },
     {
       text: 'Kostenersatz',
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',
+      einsatzSection: 'kostenersatz',
     },
-    { text: 'Chat', icon: <ChatIcon />, href: '/chat' },
+    { text: 'Chat', icon: <ChatIcon />, href: '/chat', einsatzSection: 'chat' },
     { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
-    { text: 'Drucken', icon: <PrintIcon />, href: '/print' },
+    { text: 'Drucken', icon: <PrintIcon />, href: '/print', einsatzSection: 'print' },
     {
       text: 'Schadstoff',
       icon: <Icon path={mdiBiohazard} size={1} />,
       href: '/schadstoff',
+      einsatzSection: 'schadstoff',
     },
     { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
     { text: 'Audit Log', icon: <HistoryIcon />, href: '/auditlog', admin: true },
@@ -131,14 +140,22 @@ export default function AppDrawer({
           <List>
             {drawerItems
               .filter((item) => isAdmin || !item.admin)
-              .map(({ text, icon, href }, index) => (
-                <Link href={href} passHref key={text}>
-                  <ListItemButton key={text}>
-                    <ListItemIcon>{icon}</ListItemIcon>
-                    <ListItemText primary={text} />
-                  </ListItemButton>
-                </Link>
-              ))}
+              .map(({ text, icon, href, einsatzSection }) => {
+                const resolvedHref =
+                  einsatzSection != null &&
+                  firecallId &&
+                  firecallId !== 'unknown'
+                    ? `/einsatz/${firecallId}${einsatzSection ? `/${einsatzSection}` : ''}`
+                    : href;
+                return (
+                  <Link href={resolvedHref} passHref key={text}>
+                    <ListItemButton key={text}>
+                      <ListItemIcon>{icon}</ListItemIcon>
+                      <ListItemText primary={text} />
+                    </ListItemButton>
+                  </Link>
+                );
+              })}
           </List>
         </Box>
       </Drawer>

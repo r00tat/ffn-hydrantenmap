@@ -49,16 +49,31 @@ function a11yProps(index: number) {
 
 const TAB_ROUTES = ['', 'strahlenschutz', 'energiespektrum'] as const;
 
-function pathnameToTab(pathname: string): number {
-  const segment = pathname.replace(/^\/schadstoff\/?/, '').replace(/\/$/, '');
+/**
+ * Extract the base path up to and including "schadstoff" and the active sub-segment.
+ * Works for both /schadstoff/... and /einsatz/{id}/schadstoff/...
+ */
+function parseSchadstoffPath(pathname: string): {
+  basePath: string;
+  tabIndex: number;
+} {
+  const schadstoffIdx = pathname.indexOf('/schadstoff');
+  const basePath =
+    schadstoffIdx >= 0
+      ? pathname.slice(0, schadstoffIdx + '/schadstoff'.length)
+      : '/schadstoff';
+  const segment = pathname
+    .slice(basePath.length)
+    .replace(/^\//, '')
+    .replace(/\/$/, '');
   const idx = TAB_ROUTES.indexOf(segment as (typeof TAB_ROUTES)[number]);
-  return idx >= 0 ? idx : 0;
+  return { basePath, tabIndex: idx >= 0 ? idx : 0 };
 }
 
 export default function SchadstoffPage() {
   const pathname = usePathname();
   const router = useRouter();
-  const tabValue = pathnameToTab(pathname);
+  const { basePath, tabIndex: tabValue } = parseSchadstoffPath(pathname);
 
   const [unNumber, setUnNumber] = useState('');
   const [materialName, setMaterialName] = useState('');
@@ -67,9 +82,9 @@ export default function SchadstoffPage() {
   const handleTabChange = useCallback(
     (_event: SyntheticEvent, newValue: number) => {
       const route = TAB_ROUTES[newValue];
-      router.push(`/schadstoff${route ? `/${route}` : ''}`);
+      router.push(`${basePath}${route ? `/${route}` : ''}`);
     },
-    [router]
+    [router, basePath]
   );
 
   const openEricards = useCallback((num: string, nam: string) => {
