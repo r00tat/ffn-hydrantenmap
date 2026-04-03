@@ -9,6 +9,7 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import app from '../firebase/firebase';
@@ -59,14 +60,16 @@ export default function FileDisplay({
           <Typography component="span">{fileRef.name.substring(37)}</Typography>
         )}
         {isImage && imageUrl && (
-          <img
+          <Image
             src={imageUrl}
             alt={url}
+            width={80}
+            height={80}
+            sizes="(min-width: 60em) 5vw, (min-width: 30em) 10vw, 20vw"
             style={{
               maxWidth: 80,
               maxHeight: 80,
               margin: 2,
-              width: 'auto',
               height: 'auto',
             }}
           />
