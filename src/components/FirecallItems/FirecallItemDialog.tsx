@@ -20,7 +20,8 @@ import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import Typography from '@mui/material/Typography';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StorageReference } from 'firebase/storage';
 import { arrayUnion, doc, setDoc, where } from 'firebase/firestore';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
@@ -79,6 +80,7 @@ export default function FirecallItemDialog({
     } as FirecallItem),
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const historyPathSegments = useHistoryPathSegments();
 
   // Load siblings for z-order operations (only when editing existing items)
@@ -150,15 +152,33 @@ export default function FirecallItemDialog({
           `${refs.length} Datei${refs.length > 1 ? 'en' : ''} hochgeladen`,
           'success',
         );
-        setOpen(false);
-        onClose();
+        setCountdown(5);
       } catch (err) {
         console.error('Failed to save attachments', err);
         showSnackbar('Fehler beim Speichern der Anhänge', 'error');
       }
     },
-    [firecallId, showSnackbar, onClose],
+    [firecallId, showSnackbar],
   );
+
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    const timer = setTimeout(() => {
+      setCountdown((prev) => {
+        if (prev === null) return null;
+        const next = prev - 1;
+        if (next <= 0) {
+          // Schedule close outside of setState to avoid cascading renders
+          queueMicrotask(() => {
+            setOpen(false);
+            onClose();
+          });
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, onClose]);
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
@@ -265,6 +285,11 @@ export default function FirecallItemDialog({
                     <FileDisplay key={r.toString()} url={r.toString()} />
                   ))}
                 </Box>
+              )}
+              {countdown !== null && (
+                <Typography sx={{ mt: 2 }} color="text.secondary">
+                  Schließe in {countdown}...
+                </Typography>
               )}
             </Box>
           ) : (

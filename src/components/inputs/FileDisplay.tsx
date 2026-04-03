@@ -9,8 +9,6 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
-import Image from 'next/image';
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import app from '../firebase/firebase';
@@ -56,26 +54,24 @@ export default function FileDisplay({
 
   return (
     <>
-      <Link href={imageUrl || url} target="_blank">
+      <a href={imageUrl || '#'} target="_blank" rel="noopener noreferrer">
         {(!isImage || showTitleIfImage) && (
           <Typography component="span">{fileRef.name.substring(37)}</Typography>
         )}
         {isImage && imageUrl && (
-          <Image
+          <img
             src={imageUrl}
             alt={url}
-            width={80}
-            height={80}
-            sizes="(min-width: 60em) 5vw, (min-width: 30em) 10vw, 20vw"
             style={{
               maxWidth: 80,
               maxHeight: 80,
               margin: 2,
+              width: 'auto',
               height: 'auto',
             }}
           />
         )}
-      </Link>
+      </a>
       {edit && (
         <IconButton
           aria-label="delete"
