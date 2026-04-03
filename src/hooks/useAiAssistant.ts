@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { useMap } from 'react-leaflet';
+import { useCallback, useContext, useRef, useState } from 'react';
+import { LeafletContext } from '@react-leaflet/core';
 import { GenerateContentRequest, FunctionCall } from 'firebase/ai';
 import { geminiModel } from '../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../components/firebase/aiTools';
@@ -7,6 +7,7 @@ import { FirecallItem } from '../components/firebase/firestore';
 import { usePositionContext } from '../components/Map/Position';
 import { searchPlace } from '../components/actions/maps/places';
 import { GeoPosition } from '../common/geo';
+import { defaultPosition } from './constants';
 import useFirecallItemAdd from './useFirecallItemAdd';
 import useFirecallItemUpdate from './useFirecallItemUpdate';
 
@@ -69,7 +70,8 @@ const MEMORY_TIMEOUT_MS = 60000; // 60 seconds
 const MAX_INTERACTIONS = 3;
 
 export default function useAiAssistant(existingItems: FirecallItem[]) {
-  const map = useMap();
+  const leafletContext = useContext(LeafletContext);
+  const map = leafletContext?.map ?? null;
   const [position, isPositionSet] = usePositionContext();
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
@@ -87,7 +89,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     async (
       positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
     ): Promise<{ lat: number; lng: number }> => {
-      const center = map.getCenter();
+      const center = map ? map.getCenter() : defaultPosition;
       const defaultPos = { lat: center.lat, lng: center.lng };
 
       if (!positionSpec) return defaultPos;
@@ -325,7 +327,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           const address = args.address as string;
           const shouldCreateMarker = args.createMarker !== false;
 
-          const center = map.getCenter();
+          const center = map ? map.getCenter() : defaultPosition;
           const results = await searchPlace(address, {
             position: new GeoPosition(center.lat, center.lng),
             maxResults: 1,
@@ -340,7 +342,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           const lng = parseFloat(place.lon);
 
           // Pan map to location
-          map.panTo([lat, lng]);
+          map?.panTo([lat, lng]);
 
           if (shouldCreateMarker) {
             const ref = await addFirecallItem({
@@ -368,8 +370,8 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     async (audioBase64: string): Promise<AiAssistantResult> => {
       cleanupOldInteractions();
 
-      const bounds = map.getBounds();
-      const center = map.getCenter();
+      const center = map ? map.getCenter() : defaultPosition;
+      const bounds = map ? map.getBounds() : null;
 
       // Build context items with full details based on type
       const contextItems: AiContextItem[] = existingItems
@@ -435,13 +437,15 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
       const context: AiContext = {
         mapCenter: { lat: center.lat, lng: center.lng },
-        mapBounds: {
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        },
-        zoomLevel: map.getZoom(),
+        mapBounds: bounds
+          ? {
+              north: bounds.getNorth(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              west: bounds.getWest(),
+            }
+          : { north: center.lat, south: center.lat, east: center.lng, west: center.lng },
+        zoomLevel: map ? map.getZoom() : 15,
         existingItems: contextItems,
         userPosition: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
         recentInteractions: interactionsRef.current,

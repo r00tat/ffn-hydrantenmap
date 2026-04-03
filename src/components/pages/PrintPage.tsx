@@ -1,7 +1,11 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import PrintIcon from '@mui/icons-material/Print';
+import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -38,6 +42,32 @@ export default function PrintPage() {
       ),
     [firecallItems]
   );
+
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!contentRef.current) return;
+    setPdfLoading(true);
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const filename = `Einsatz_${firecall.name || 'Bericht'}.pdf`
+        .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        })
+        .from(contentRef.current)
+        .save();
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [firecall.name]);
 
   const [hiddenSpectra, setHiddenSpectra] = useState<Set<string>>(new Set());
 
@@ -105,6 +135,26 @@ export default function PrintPage() {
 
   return (
     <>
+      {/* Aktionsleiste */}
+      <Box sx={{ p: 2, display: 'flex', gap: 2 }} className="no-print">
+        <Button
+          variant="contained"
+          startIcon={pdfLoading ? <CircularProgress size={20} color="inherit" /> : <PictureAsPdfIcon />}
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+        >
+          {pdfLoading ? 'PDF wird erstellt...' : 'PDF herunterladen'}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<PrintIcon />}
+          onClick={() => window.print()}
+        >
+          Drucken
+        </Button>
+      </Box>
+
+      <div ref={contentRef}>
       {/* 1. Einsatz-Kopfzeile */}
       <Box sx={{ p: 2 }}>
         <Typography variant="h4" className="print-section">
@@ -321,6 +371,7 @@ export default function PrintPage() {
 
       {/* 8. Geschäftsbuch */}
       {eintraege.length > 0 && <GeschaeftsbuchPrint />}
+      </div>
     </>
   );
 }
