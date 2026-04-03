@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { SchemaType, VertexAI } from '@google-cloud/vertexai';
+import { GEMINI_MODEL } from '@/common/ai';
 
 /**
  * Einsatz data structure extracted from alarm dispatch emails
@@ -154,7 +155,7 @@ const einsatzResponseSchema = {
  */
 function getGeminiModel() {
   return getVertexAI().getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODEL,
     generationConfig: {
       temperature: 0.1, // Low temperature for deterministic extraction
       responseMimeType: 'application/json',
