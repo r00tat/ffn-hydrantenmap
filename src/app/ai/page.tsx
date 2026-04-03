@@ -3,7 +3,11 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -12,9 +16,21 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
 import useAiAssistant from '../../hooks/useAiAssistant';
 import { AiAssistantResult } from '../../hooks/aiAssistant/types';
+import { useFirecallAIQueryStream } from './aiQuery';
+import { instructionSet } from './assistantInstructions';
 import AiAssistantButton from '../../components/Map/AiAssistantButton';
+import { FirecallItem } from '../../components/firebase/firestore';
 
-function AiAssistantPageQuery({ firecallItems }: { firecallItems: import('../../components/firebase/firestore').FirecallItem[] }) {
+type AiMode = 'assistant' | string;
+
+const AI_MODES: { value: AiMode; label: string }[] = [
+  { value: 'assistant', label: 'Einsatz-Assistent' },
+  ...Object.keys(instructionSet)
+    .filter((key) => key !== 'Standard')
+    .map((key) => ({ value: key, label: key })),
+];
+
+function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AiAssistantResult | null>(null);
@@ -102,9 +118,62 @@ function AiAssistantPageQuery({ firecallItems }: { firecallItems: import('../../
   );
 }
 
+function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string }) {
+  const [question, setQuestion] = useState('');
+  const {
+    resultHtml: answer,
+    query,
+    isQuerying: isLoading,
+  } = useFirecallAIQueryStream();
+
+  const askQuestion = useCallback(async () => {
+    if (!question.trim()) return;
+    await query(question, systemInstruction);
+  }, [query, question, systemInstruction]);
+
+  return (
+    <>
+      <Stack direction="row" spacing={2} alignItems="flex-start">
+        <TextField
+          label="Frage"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          fullWidth
+          variant="outlined"
+          placeholder="Stelle Fragen oder Aufgaben zum Einsatz"
+          onKeyDown={(e) => {
+            if (!isLoading && e.key === 'Enter') {
+              askQuestion();
+            }
+          }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={askQuestion}
+          disabled={isLoading || !question.trim()}
+          sx={{ minWidth: 100, height: 56 }}
+        >
+          {isLoading ? <CircularProgress size={24} /> : 'Senden'}
+        </Button>
+      </Stack>
+
+      {answer && (
+        <Box sx={{ mt: 2 }}>
+          {/* AI-generated HTML from Gemini streaming response - same pattern as original implementation */}
+          <Typography component="div">
+            <span dangerouslySetInnerHTML={{ __html: answer }} />
+          </Typography>
+        </Box>
+      )}
+    </>
+  );
+}
+
 export default function AiAssistantPage() {
   const firecallId = useFirecallId();
   const firecallItems = useFirecallItems();
+  const [mode, setMode] = useState<AiMode>('assistant');
 
   return (
     <Paper sx={{ p: 2, m: 2 }}>
@@ -114,7 +183,30 @@ export default function AiAssistantPage() {
 
       {firecallId != 'unknown' && (
         <>
-          <AiAssistantPageQuery firecallItems={firecallItems} />
+          <FormControl sx={{ mb: 2, minWidth: 200 }}>
+            <InputLabel id="ai-mode-label">Modus</InputLabel>
+            <Select
+              labelId="ai-mode-label"
+              value={mode}
+              label="Modus"
+              onChange={(e) => setMode(e.target.value)}
+            >
+              {AI_MODES.map((m) => (
+                <MenuItem value={m.value} key={m.value}>
+                  {m.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Box sx={{ mt: 1 }}>
+            {mode === 'assistant' ? (
+              <AssistantQuery firecallItems={firecallItems} />
+            ) : (
+              <TextGenerationQuery systemInstruction={instructionSet[mode]} />
+            )}
+          </Box>
+
           <AiAssistantButton
             firecallItems={firecallItems}
             containerSx={{
