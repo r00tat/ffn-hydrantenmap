@@ -1,3 +1,4 @@
+import AutoSnapshotIntervalSelect from '../inputs/AutoSnapshotIntervalSelect';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -316,6 +317,12 @@ export default function EinsatzDialog({
             setEinsatz({ ...einsatz, abruecken: newValue?.toISOString() });
           }}
           value={parseTimestamp(einsatz.abruecken) || null}
+        />
+        <AutoSnapshotIntervalSelect
+          value={einsatz.autoSnapshotInterval}
+          onChange={(value) => {
+            setEinsatz((prev) => ({ ...prev, autoSnapshotInterval: value }));
+          }}
         />
         {einsatz.id && (
           <>
