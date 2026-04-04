@@ -15,6 +15,7 @@ import { parseTimestamp } from '../../common/time-format';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 import MyDateTimePicker from '../inputs/DateTimePicker';
+import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import { FirecallItemBase } from './elements/FirecallItemBase';
@@ -214,6 +215,9 @@ export default function FirecallItemFields({
               <FileUploader
                 onFileUploadComplete={(ref) => fileUploadComplete(key, ref)}
               />
+              {(item as any)[key] && ((item as any)[key] as string[]).length > 0 && (
+                <DownloadAllButton urls={(item as any)[key] as string[]} />
+              )}
               {(item as any)[key] &&
                 ((item as any)[key] as string[]).map((url) => (
                   <FileDisplay
