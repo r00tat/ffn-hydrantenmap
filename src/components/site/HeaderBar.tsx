@@ -90,7 +90,16 @@ function HeaderBar({
                   textOverflow: 'ellipsis',
                 }}
               >
-                {firecall?.name || ''}
+                {firecall?.id ? (
+                  <Link
+                    href={`/einsatz/${firecall.id}/details`}
+                    style={{ color: 'inherit', textDecoration: 'none' }}
+                  >
+                    {firecall.name || ''}
+                  </Link>
+                ) : (
+                  firecall?.name || ''
+                )}
                 {!isSignedIn && 'Anmeldung erforderlich'}
                 {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
               </Typography>
