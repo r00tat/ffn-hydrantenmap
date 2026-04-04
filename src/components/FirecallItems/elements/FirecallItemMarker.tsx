@@ -7,6 +7,7 @@ import {
   FcMarker,
   FirecallItem,
 } from '../../firebase/firestore';
+import DownloadAllButton from '../../inputs/DownloadAllButton';
 import FileDisplay from '../../inputs/FileDisplay';
 import { FirecallItemBase } from './FirecallItemBase';
 import { iconKeys } from './icons';
@@ -103,16 +104,20 @@ export class FirecallItemMarker extends FirecallItemBase {
               <br />
             </React.Fragment>
           )) || ''}
-        {this.attachments &&
-          this.attachments
-            .filter((a) => typeof a === 'string')
-            .map((a) => (
-              <FileDisplay
-                key={a as string}
-                url={a as string}
-                showTitleIfImage={false}
-              />
-            ))}
+        {this.attachments && this.attachments.filter((a) => typeof a === 'string').length > 0 && (
+          <>
+            <DownloadAllButton urls={this.attachments.filter((a): a is string => typeof a === 'string')} />
+            {this.attachments
+              .filter((a) => typeof a === 'string')
+              .map((a) => (
+                <FileDisplay
+                  key={a as string}
+                  url={a as string}
+                  showTitleIfImage={false}
+                />
+              ))}
+          </>
+        )}
         <br />
         Position: {Number.parseFloat('' + this.lat).toFixed(6)},
         {Number.parseFloat('' + this.lng).toFixed(6)}
@@ -162,16 +167,20 @@ export class FirecallItemMarker extends FirecallItemBase {
     return (
       <>
         {super.body()}
-        {this.attachments &&
-          this.attachments
-            .filter((a) => typeof a === 'string')
-            .map((a) => (
-              <FileDisplay
-                key={a as string}
-                url={a as string}
-                showTitleIfImage={false}
-              />
-            ))}
+        {this.attachments && this.attachments.filter((a) => typeof a === 'string').length > 0 && (
+          <>
+            <DownloadAllButton urls={this.attachments.filter((a): a is string => typeof a === 'string')} />
+            {this.attachments
+              .filter((a) => typeof a === 'string')
+              .map((a) => (
+                <FileDisplay
+                  key={a as string}
+                  url={a as string}
+                  showTitleIfImage={false}
+                />
+              ))}
+          </>
+        )}
       </>
     );
   }

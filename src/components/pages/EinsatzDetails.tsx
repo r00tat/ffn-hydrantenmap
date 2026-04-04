@@ -36,9 +36,12 @@ import {
   Firecall,
   FIRECALL_COLLECTION_ID,
 } from '../firebase/firestore';
+import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import { KostenersatzList } from '../Kostenersatz';
+import EinsatzorteWrapper from './EinsatzorteWrapper';
+import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
 
 export default function EinsatzDetails() {
@@ -297,9 +300,14 @@ export default function EinsatzDetails() {
       </Grid>
 
       {/* Attachments */}
-      <Typography variant="h5" gutterBottom>
-        Anhänge
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="h5" gutterBottom>
+          Anhänge
+        </Typography>
+        {firecall.attachments && firecall.attachments.length > 0 && (
+          <DownloadAllButton urls={firecall.attachments} />
+        )}
+      </Box>
       <FileUploader onFileUploadComplete={handleFileUploadComplete} />
       {firecall.attachments && firecall.attachments.length > 0 ? (
         <Box
@@ -332,6 +340,11 @@ export default function EinsatzDetails() {
         </Typography>
       )}
 
+      {/* Einsatzorte */}
+      <Box sx={{ mt: 3 }}>
+        <EinsatzorteWrapper />
+      </Box>
+
       {/* Einsatzmittel */}
       {displayItems.length > 0 && (
         <>
@@ -341,6 +354,11 @@ export default function EinsatzDetails() {
           <StrengthTable items={displayItems} />
         </>
       )}
+
+      {/* Einsatztagebuch */}
+      <Box sx={{ mt: 3 }}>
+        <EinsatzTagebuchWrapper />
+      </Box>
 
       {/* Kostenersatz */}
       {firecall.id && (

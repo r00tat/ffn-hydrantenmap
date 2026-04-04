@@ -9,7 +9,7 @@ export default function EinsatzTagebuchPrint() {
   const { diaries } = useDiaries(true);
 
   const diariesSorted = useMemo(
-    () => diaries.sort((a, b) => (a.nummer || 0) - (b.nummer || 0)),
+    () => [...diaries].sort((a, b) => (a.nummer || 0) - (b.nummer || 0)),
     [diaries]
   );
 

@@ -197,6 +197,13 @@ export function useDiaries(sortAscending: boolean = false) {
         }
         return a;
       })
+      // sort ascending by timestamp to assign sequential numbers
+      .sort((a, b) => a.datum.localeCompare(b.datum))
+      .map((a, index) => ({
+        ...a,
+        nummer: index + 1,
+      }))
+      // apply requested display sort order
       .sort((a, b) =>
         sortAscending
           ? a.datum.localeCompare(b.datum)
@@ -211,9 +218,7 @@ export function useDiaries(sortAscending: boolean = false) {
       }));
     (async () => {
       setDiaries(diaries);
-      setDiaryCounter(
-        firecallEntries.filter((f) => f.type === 'diary' && f.nummer).length + 1
-      );
+      setDiaryCounter(diaries.length + 1);
     })();
   }, [firecallItems, sortAscending]);
   return { diaries, diaryCounter };

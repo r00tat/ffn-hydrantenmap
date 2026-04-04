@@ -5,9 +5,16 @@ import Typography from '@mui/material/Typography';
 import Checkbox from '@mui/material/Checkbox';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import PrintIcon from '@mui/icons-material/Print';
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import {
+  getDownloadURL,
+  getMetadata,
+  getStorage,
+  ref,
+} from 'firebase/storage';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
+import app from '../firebase/firebase';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import useVehicles from '../../hooks/useVehicles';
@@ -394,6 +401,61 @@ export default function PrintPage() {
 
       {/* 8. Geschäftsbuch */}
       {eintraege.length > 0 && <GeschaeftsbuchPrint />}
+
+      {/* 9. Anhänge */}
+      {firecall.attachments && firecall.attachments.length > 0 && (
+        <Box sx={{ p: 2 }}>
+          <Typography variant="h4" className="print-section">
+            Anhänge
+          </Typography>
+          {firecall.attachments.map((url) => (
+            <PrintAttachment key={url} url={url} />
+          ))}
+        </Box>
+      )}
     </>
+  );
+}
+
+const printStorage = getStorage(app);
+
+function PrintAttachment({ url }: { url: string }) {
+  const [downloadUrl, setDownloadUrl] = useState<string>();
+  const [isImage, setIsImage] = useState(false);
+  const [fileName, setFileName] = useState<string>('');
+
+  useEffect(() => {
+    (async () => {
+      const fileRef = ref(printStorage, url);
+      const meta = await getMetadata(fileRef);
+      const dlUrl = await getDownloadURL(fileRef);
+      setDownloadUrl(dlUrl);
+      setIsImage(meta.contentType?.startsWith('image/') ?? false);
+      setFileName(fileRef.name.substring(37));
+    })();
+  }, [url]);
+
+  if (!downloadUrl) return null;
+
+  if (isImage) {
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="caption" display="block" sx={{ mb: 0.5 }}>
+          {fileName}
+        </Typography>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={downloadUrl}
+          alt={fileName}
+          style={{ maxWidth: '100%', height: 'auto', pageBreakInside: 'avoid' }}
+        />
+      </Box>
+    );
+  }
+
+  return (
+    <Typography sx={{ mb: 1 }}>
+      {fileName}
+    </Typography>
   );
 }

@@ -1,15 +1,19 @@
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import IconButton from '@mui/material/IconButton';
 import Link from '@mui/material/Link';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import {
   FullMetadata,
   deleteObject,
+  getBlob,
   getDownloadURL,
   getMetadata,
   getStorage,
   ref,
 } from 'firebase/storage';
+import { downloadBlob } from '../firebase/download';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import app from '../firebase/firebase';
@@ -24,6 +28,12 @@ export interface FileDisplayProps {
   onDeleteCallback?: (url: string) => void;
   /** Max size for image thumbnails in px (default: 80) */
   imageSize?: number;
+}
+
+export async function downloadStorageFile(url: string) {
+  const fileRef = ref(storage, url);
+  const blob = await getBlob(fileRef);
+  downloadBlob(blob, fileRef.name.substring(37));
 }
 
 export async function deleteStorageObject(url: string) {
@@ -77,6 +87,19 @@ export default function FileDisplay({
           />
         )}
       </Link>
+
+      <Tooltip title="Herunterladen">
+        <IconButton
+          aria-label="download"
+          size="small"
+          onClick={async (e) => {
+            e.preventDefault();
+            await downloadStorageFile(url);
+          }}
+        >
+          <DownloadIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       {edit && (
         <IconButton
           aria-label="delete"
