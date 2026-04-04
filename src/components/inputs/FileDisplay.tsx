@@ -94,8 +94,7 @@ export default function FileDisplay({
           size="small"
           onClick={async (e) => {
             e.preventDefault();
-            const blob = await getBlob(fileRef);
-            downloadBlob(blob, fileRef.name.substring(37));
+            await downloadStorageFile(url);
           }}
         >
           <DownloadIcon fontSize="small" />

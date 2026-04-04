@@ -6,6 +6,7 @@ import {
   getDocs,
   orderBy,
   query,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { getBlob, getMetadata, getStorage, ref } from 'firebase/storage';
@@ -320,7 +321,6 @@ export async function importFirecall(firecall: FirecallExport) {
       })
     );
     if (newUrls.length > 0) {
-      const { updateDoc } = await import('firebase/firestore');
       await updateDoc(firecallDoc, { attachments: newUrls });
     }
   }
@@ -422,21 +422,27 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Import history entries with snapshot data
   if (history?.length) {
-    for (const h of history) {
-      const { snapshotItems, snapshotLayers, ...historyData } =
+    // Prepare history doc refs so we can batch the entries themselves
+    const historyRefs = history.map((h) => {
+      const { snapshotItems: _si, snapshotLayers: _sl, ...historyData } =
         h as ExportHistoryEntry;
       const historyDocId = h.id || uuid();
-      const historyDocRef = doc(historyCol, historyDocId);
+      return {
+        ref: doc(historyCol, historyDocId),
+        data: historyData as unknown as Record<string, unknown>,
+        entry: h as ExportHistoryEntry,
+      };
+    });
 
-      // Write history entry itself
-      const histBatch = writeBatch(firestore);
-      histBatch.set(
-        historyDocRef,
-        historyData as unknown as Record<string, unknown>
-      );
-      await histBatch.commit();
+    // Write all history entries in batches
+    await commitInBatches(
+      historyRefs.map(({ ref: r, data }) => ({ ref: r, data }))
+    );
 
-      // Write snapshot items
+    // Write snapshot sub-collections
+    for (const { ref: historyDocRef, entry } of historyRefs) {
+      const { snapshotItems, snapshotLayers } = entry;
+
       if (snapshotItems?.length) {
         await commitInBatches(
           snapshotItems.map((item) => ({
@@ -449,7 +455,6 @@ export async function importFirecall(firecall: FirecallExport) {
         );
       }
 
-      // Write snapshot layers
       if (snapshotLayers?.length) {
         await commitInBatches(
           snapshotLayers.map((layer) => ({
