@@ -14,6 +14,10 @@ export default function DownloadAllButton({ urls }: DownloadAllButtonProps) {
 
   if (urls.length === 0) return null;
 
+  if (loading) {
+    return <CircularProgress size={24} />;
+  }
+
   return (
     <Tooltip title="Alle herunterladen">
       <IconButton
@@ -26,9 +30,8 @@ export default function DownloadAllButton({ urls }: DownloadAllButtonProps) {
             setLoading(false);
           }
         }}
-        disabled={loading}
       >
-        {loading ? <CircularProgress size={24} /> : <DownloadIcon />}
+        <DownloadIcon />
       </IconButton>
     </Tooltip>
   );
