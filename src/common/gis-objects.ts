@@ -74,6 +74,18 @@ export interface Saugstelle extends WgsObject {
   wasserentnahme_l_min_: number;
 }
 
+export interface WetterstationRecord extends WgsObject {
+  altitude: number;
+  state: string;
+}
+
+export interface PegelstandRecord extends WgsObject {
+  type: 'river' | 'lake';
+  source: 'bgld' | 'noe' | 'stmk';
+  detailUrl: string;
+  rivername?: string;
+}
+
 export interface GeohashCluster {
   hydranten?: HydrantenRecord[];
   geohash: string;
@@ -81,6 +93,8 @@ export interface GeohashCluster {
   gefahrobjekt?: GefahrObjekt[];
   loeschteich?: Loeschteich[];
   saugstelle?: Saugstelle[];
+  wetterstationen?: WetterstationRecord[];
+  pegelstaende?: PegelstandRecord[];
 
   [hash: string]: any;
 }
