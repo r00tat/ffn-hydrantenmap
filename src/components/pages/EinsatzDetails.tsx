@@ -63,8 +63,9 @@ export default function EinsatzDetails() {
   const [copied, setCopied] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
-  const [alarm, setAlarm] = useState<BlaulichtSmsAlarm | null>(null);
-  const [alarmLoading, setAlarmLoading] = useState(false);
+  const [alarm, setAlarm] = useState<BlaulichtSmsAlarm | null | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     if (!firecallId || firecallId === 'unknown') return;
@@ -79,16 +80,24 @@ export default function EinsatzDetails() {
     })();
   }, [firecallId]);
 
+  const blaulichtSmsAlarmId = firecall?.blaulichtSmsAlarmId;
+  const firecallGroup = firecall?.group;
+
   useEffect(() => {
-    if (!firecall?.blaulichtSmsAlarmId || !firecall?.group) return;
-    setAlarmLoading(true);
-    getBlaulichtSmsAlarmById(firecall.group, firecall.blaulichtSmsAlarmId)
-      .then(setAlarm)
-      .catch((err) =>
-        console.error('Failed to load BlaulichtSMS alarm:', err)
-      )
-      .finally(() => setAlarmLoading(false));
-  }, [firecall?.blaulichtSmsAlarmId, firecall?.group]);
+    if (!blaulichtSmsAlarmId || !firecallGroup) return;
+    (async () => {
+      try {
+        const result = await getBlaulichtSmsAlarmById(
+          firecallGroup,
+          blaulichtSmsAlarmId
+        );
+        setAlarm(result);
+      } catch (err) {
+        console.error('Failed to load BlaulichtSMS alarm:', err);
+        setAlarm(null);
+      }
+    })();
+  }, [blaulichtSmsAlarmId, firecallGroup]);
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
@@ -323,7 +332,7 @@ export default function EinsatzDetails() {
           <Typography variant="h5" gutterBottom>
             BlaulichtSMS
           </Typography>
-          {alarmLoading ? (
+          {alarm === undefined ? (
             <CircularProgress size={24} />
           ) : alarm ? (
             <AlarmCard alarm={alarm} />
