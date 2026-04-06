@@ -14,8 +14,10 @@ import {
   GeohashCluster,
   HydrantenRecord,
   Loeschteich,
+  PegelstandRecord,
   RisikoObjekt,
   Saugstelle,
+  WetterstationRecord,
 } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
@@ -24,7 +26,9 @@ import HydrantenLabelsLayer from './layers/HydrantenLabelsLayer';
 import HydrantenLayer from './layers/HydrantenLayer';
 import LoeschteicheLayer from './layers/LoeschteichLayer';
 import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
+import PegelstandLayer from './layers/PegelstandLayer';
 import SaugstellenLayer from './layers/SaugstellenLayer';
+import WetterstationLayer from './layers/WetterstationLayer';
 import L from 'leaflet';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
@@ -87,6 +91,8 @@ interface ClusterData {
   gefahrObjekte: GefahrObjekt[];
   loeschteiche: Loeschteich[];
   saugstellen: Saugstelle[];
+  wetterstationen: WetterstationRecord[];
+  pegelstaende: PegelstandRecord[];
 }
 
 export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
@@ -97,6 +103,8 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
     gefahrObjekte: [],
     loeschteiche: [],
     saugstellen: [],
+    wetterstationen: [],
+    pegelstaende: [],
   });
 
   useEffect(() => {
@@ -138,6 +146,18 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           center,
           radiusInM
         );
+        const wetterstationen = filterRecords<WetterstationRecord>(
+          matchingDocs,
+          'wetterstationen',
+          center,
+          radiusInM
+        );
+        const pegelstaende = filterRecords<PegelstandRecord>(
+          matchingDocs,
+          'pegelstaende',
+          center,
+          radiusInM
+        );
 
         setClusterData({
           clusters: matchingDocs,
@@ -146,6 +166,8 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           gefahrObjekte: gefahr,
           loeschteiche: loeschteiche,
           saugstellen: saugstellen,
+          wetterstationen,
+          pegelstaende,
         });
       })();
     }
@@ -199,7 +221,7 @@ export default function Clusters({
     })();
   });
 
-  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen } =
+  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen, wetterstationen, pegelstaende } =
     useClusters(center, radius * 2);
   return (
     <>
@@ -220,6 +242,12 @@ export default function Clusters({
           <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
           <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
         </LayerGroup>
+      </LayersControl.Overlay>
+      <LayersControl.Overlay name="Pegelstände">
+        <PegelstandLayer pegelstaende={pegelstaende} />
+      </LayersControl.Overlay>
+      <LayersControl.Overlay name="Wetterstationen">
+        <WetterstationLayer wetterstationen={wetterstationen} />
       </LayersControl.Overlay>
     </>
   );

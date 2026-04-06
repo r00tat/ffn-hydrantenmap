@@ -5,6 +5,7 @@ import {
   GeohashCluster,
   WgsObject,
 } from '../common/gis-objects';
+import { importWetterstationen, importPegelstaende } from './cluster-stations';
 import { firestore } from './firebase/admin';
 import { writeBatches } from './firebase/import';
 
@@ -87,6 +88,15 @@ async function clusterImport() {
       }
     });
   }
+
+  // Import Wetterstationen and Pegelstände
+  console.info('importing Wetterstationen...');
+  const wetterCount = await importWetterstationen(geohashes);
+  console.info(`imported ${wetterCount} Wetterstationen`);
+
+  console.info('importing Pegelstände...');
+  const pegelCount = await importPegelstaende(geohashes);
+  console.info(`imported ${pegelCount} Pegelstände`);
 
   console.info(`geohashes updated.`);
 
