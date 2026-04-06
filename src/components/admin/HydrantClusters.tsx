@@ -117,10 +117,9 @@ export default function HydrantClusters() {
           Update Clusters from Existing Data
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Rebuilds cluster data from all existing Firestore collections (hydrant, risikoobjekt,
-          gefahrobjekt, loeschteich, saugstelle) und importiert Wetterstationen (GeoSphere API)
-          und Pegelstände (Bgld, NÖ, Stmk). Run this after importing new data via the
-          GIS Data Pipeline.
+          Aktualisiert die Cluster-Daten aus allen Firestore-Collections (Hydranten, Risikoobjekte,
+          Gefahrobjekte, Löschteiche, Saugstellen) und importiert Wetterstationen (GeoSphere API)
+          sowie Pegelstände (Bgld, NÖ, Stmk). Nach dem Import neuer GIS-Daten ausführen.
         </Typography>
         <Button
           variant="contained"
