@@ -40,6 +40,11 @@ import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import { KostenersatzList } from '../Kostenersatz';
+import {
+  getBlaulichtSmsAlarmById,
+  BlaulichtSmsAlarm,
+} from '../../app/blaulicht-sms/actions';
+import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
 import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
@@ -58,6 +63,8 @@ export default function EinsatzDetails() {
   const [copied, setCopied] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
+  const [alarm, setAlarm] = useState<BlaulichtSmsAlarm | null>(null);
+  const [alarmLoading, setAlarmLoading] = useState(false);
 
   useEffect(() => {
     if (!firecallId || firecallId === 'unknown') return;
@@ -71,6 +78,17 @@ export default function EinsatzDetails() {
       setLoading(false);
     })();
   }, [firecallId]);
+
+  useEffect(() => {
+    if (!firecall?.blaulichtSmsAlarmId || !firecall?.group) return;
+    setAlarmLoading(true);
+    getBlaulichtSmsAlarmById(firecall.group, firecall.blaulichtSmsAlarmId)
+      .then(setAlarm)
+      .catch((err) =>
+        console.error('Failed to load BlaulichtSMS alarm:', err)
+      )
+      .finally(() => setAlarmLoading(false));
+  }, [firecall?.blaulichtSmsAlarmId, firecall?.group]);
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
@@ -298,6 +316,24 @@ export default function EinsatzDetails() {
           </Grid>
         )}
       </Grid>
+
+      {/* BlaulichtSMS Details */}
+      {firecall.blaulichtSmsAlarmId && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            BlaulichtSMS
+          </Typography>
+          {alarmLoading ? (
+            <CircularProgress size={24} />
+          ) : alarm ? (
+            <AlarmCard alarm={alarm} />
+          ) : (
+            <Typography color="text.secondary">
+              BlaulichtSMS-Alarm konnte nicht geladen werden.
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Attachments */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
