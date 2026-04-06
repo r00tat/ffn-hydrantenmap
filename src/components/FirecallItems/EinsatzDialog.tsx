@@ -88,6 +88,7 @@ export default function EinsatzDialog({
       name,
       date: new Date(alarm.alarmDate).toISOString(),
       description: alarm.alarmText,
+      blaulichtSmsAlarmId: alarm.alarmId,
       ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
     }));
   }, []);
@@ -144,6 +145,8 @@ export default function EinsatzDialog({
         if (alarm) {
           applyAlarm(alarm);
         }
+      } else {
+        setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: undefined }));
       }
     },
     [alarms, applyAlarm]
