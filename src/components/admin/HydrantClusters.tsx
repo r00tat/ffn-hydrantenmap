@@ -18,10 +18,10 @@ interface ProgressEvent {
 }
 
 const UPDATE_STEPS = [
-  { label: 'Fetching existing clusters', description: 'Loading current cluster data from Firestore' },
-  { label: 'Fetching collections', description: 'Loading hydrant, risikoobjekt, gefahrobjekt, loeschteich, saugstelle' },
-  { label: 'Wetterstationen & Pegelstände', description: 'Importing weather stations (GeoSphere) and water level gauges (Bgld, NÖ, Stmk)' },
-  { label: 'Writing to Firestore', description: 'Saving updated clusters' },
+  { label: 'Bestehende Cluster laden', description: 'Aktuelle Cluster-Daten aus Firestore laden' },
+  { label: 'Collections laden', description: 'Hydranten, Risikoobjekte, Gefahrobjekte, Löschteiche, Saugstellen laden' },
+  { label: 'Wetterstationen & Pegelstände', description: 'Wetterstationen (GeoSphere) und Pegelstände (Bgld, NÖ, Stmk) importieren' },
+  { label: 'In Firestore speichern', description: 'Aktualisierte Cluster-Daten speichern' },
 ];
 
 export default function HydrantClusters() {
