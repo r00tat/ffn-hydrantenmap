@@ -210,9 +210,10 @@ export default function Clusters({
       if (Math.abs(radius - newRadius) > 50) {
         setRadius(newRadius);
       }
-      // Uncapped radius for sparse objects (weather/pegel) and the query
-      if (Math.abs(queryRadius - rawRadius) > 50) {
-        setQueryRadius(rawRadius);
+      // Query radius: grows with zoom level, capped at 50km
+      const newQueryRadius = Math.min(rawRadius, 50000);
+      if (Math.abs(queryRadius - newQueryRadius) > 50) {
+        setQueryRadius(newQueryRadius);
       }
 
       if (
