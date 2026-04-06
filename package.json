@@ -94,7 +94,7 @@
     "@types/uuid": "^11.0.0",
     "@vitejs/plugin-react": "^6.0.1",
     "baseline-browser-mapping": "^2.10.12",
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.0",
     "eslint-config-next": "16.2.1",
     "jsdom": "^29.0.1",
     "serwist": "^9.0.2",
