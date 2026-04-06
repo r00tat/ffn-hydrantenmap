@@ -26,7 +26,9 @@ import HydrantenLabelsLayer from './layers/HydrantenLabelsLayer';
 import HydrantenLayer from './layers/HydrantenLayer';
 import LoeschteicheLayer from './layers/LoeschteichLayer';
 import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
+import PegelstandLayer from './layers/PegelstandLayer';
 import SaugstellenLayer from './layers/SaugstellenLayer';
+import WetterstationLayer from './layers/WetterstationLayer';
 import L from 'leaflet';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
@@ -219,7 +221,7 @@ export default function Clusters({
     })();
   });
 
-  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen } =
+  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen, wetterstationen, pegelstaende } =
     useClusters(center, radius * 2);
   return (
     <>
@@ -240,6 +242,12 @@ export default function Clusters({
           <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
           <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
         </LayerGroup>
+      </LayersControl.Overlay>
+      <LayersControl.Overlay name="Pegelstände">
+        <PegelstandLayer pegelstaende={pegelstaende} />
+      </LayersControl.Overlay>
+      <LayersControl.Overlay name="Wetterstationen">
+        <WetterstationLayer wetterstationen={wetterstationen} />
       </LayersControl.Overlay>
     </>
   );
