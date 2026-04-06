@@ -95,7 +95,16 @@ interface ClusterData {
   pegelstaende: PegelstandRecord[];
 }
 
-export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
+/**
+ * @param center - Map center
+ * @param radiusInM - Capped radius for dense objects (hydrants etc.)
+ * @param queryRadiusInM - Uncapped radius for the Firestore query and sparse objects (weather/pegel)
+ */
+export function useClusters(
+  center: L.LatLng,
+  radiusInM: number,
+  queryRadiusInM: number
+): ClusterData {
   const [clusterData, setClusterData] = useState<ClusterData>({
     clusters: [],
     hydranten: [],
@@ -108,26 +117,24 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
   });
 
   useEffect(() => {
-    if (radiusInM > 0) {
+    if (queryRadiusInM > 0) {
       (async () => {
-        const matchingDocs = await queryClusters(center, radiusInM);
-        // console.info(matchingDocs);
+        // Query with the full visible radius
+        const matchingDocs = await queryClusters(center, queryRadiusInM);
+
+        // Dense objects: filter with capped radius
         const matchingHydranten = filterRecords<HydrantenRecord>(
           matchingDocs,
           'hydranten',
           center,
           radiusInM
         );
-        // console.info(`cluster hydranten: ${matchingHydranten.length}`);
-
         const matchingRisiko = filterRecords<RisikoObjekt>(
           matchingDocs,
           'risikoobjekt',
           center,
           radiusInM
         );
-        // console.info(`cluster risikoobjekt: ${matchingRisiko.length}`);
-
         const gefahr = filterRecords<GefahrObjekt>(
           matchingDocs,
           'gefahrobjekt',
@@ -146,17 +153,19 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           center,
           radiusInM
         );
+
+        // Sparse objects: filter with full visible radius
         const wetterstationen = filterRecords<WetterstationRecord>(
           matchingDocs,
           'wetterstationen',
           center,
-          radiusInM
+          queryRadiusInM
         );
         const pegelstaende = filterRecords<PegelstandRecord>(
           matchingDocs,
           'pegelstaende',
           center,
-          radiusInM
+          queryRadiusInM
         );
 
         setClusterData({
@@ -171,7 +180,7 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
         });
       })();
     }
-  }, [center, radiusInM]);
+  }, [center, radiusInM, queryRadiusInM]);
 
   return clusterData;
 }
@@ -186,34 +195,35 @@ export default function Clusters({
   const map = useMap();
   const [center, setCenter] = useState(map.getCenter() || defaultPosition);
   const [radius, setRadius] = useState(1000);
+  const [queryRadius, setQueryRadius] = useState(1000);
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
     (async () => {
       const b = map.getBounds();
-      // console.info(`map bounds: ${JSON.stringify(b)}`);
 
-      const newRadius = Math.min(
-        Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),
-        2500
+      const rawRadius = Math.max(
+        b.getNorthWest().distanceTo(b.getSouthEast()) / 2,
+        250
       );
+      // Capped radius for dense objects (hydrants etc.)
+      const newRadius = Math.min(rawRadius, 2500);
       if (Math.abs(radius - newRadius) > 50) {
-        // console.info(
-        //   `new radius: ${newRadius} (raw: ${
-        //     b.getNorthWest().distanceTo(b.getSouthEast()) / 2
-        //   })`
-        // );
         setRadius(newRadius);
+      }
+      // Uncapped radius for sparse objects (weather/pegel) and the query
+      if (Math.abs(queryRadius - rawRadius) > 50) {
+        setQueryRadius(rawRadius);
       }
 
       if (
         map.getCenter().lat &&
         map.getCenter().lng &&
         center &&
-        center.distanceTo(map.getCenter()) > radius
+        center.distanceTo(map.getCenter()) > queryRadius
       ) {
         console.info(
           `center changed, new center: ${map.getCenter()}, distance to last center: ${
-            center.distanceTo(map.getCenter()) > radius
+            center.distanceTo(map.getCenter()) > queryRadius
           }`
         );
         setCenter(map.getCenter());
@@ -222,7 +232,7 @@ export default function Clusters({
   });
 
   const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen, wetterstationen, pegelstaende } =
-    useClusters(center, radius * 2);
+    useClusters(center, radius * 2, queryRadius * 2);
   return (
     <>
       <LayersControl.Overlay name="Hydranten" checked={defaultChecked?.hydranten ?? true}>
