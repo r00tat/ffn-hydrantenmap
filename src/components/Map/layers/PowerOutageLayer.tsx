@@ -2,11 +2,14 @@
 
 import L from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
-import { LayerGroup, Marker, Popup } from 'react-leaflet';
+import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
 import {
   fetchPowerOutageData,
   PowerOutage,
 } from './PowerOutageAction';
+
+const LAYER_NAME = 'Stromausfälle';
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 const powerOutageIcon = L.divIcon({
   html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#d32f2f" stroke="#fff" stroke-width="1"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>`,
@@ -18,29 +21,54 @@ const powerOutageIcon = L.divIcon({
 
 function usePowerOutageData() {
   const [outages, setOutages] = useState<PowerOutage[]>([]);
+  const [visible, setVisible] = useState(false);
+  const lastFetchRef = useRef<number>(0);
   const mountedRef = useRef(true);
+  const map = useMap();
+
+  useEffect(() => {
+    const onAdd = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(true);
+    };
+    const onRemove = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(false);
+    };
+    map.on('overlayadd', onAdd as L.LeafletEventHandlerFn);
+    map.on('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    return () => {
+      map.off('overlayadd', onAdd as L.LeafletEventHandlerFn);
+      map.off('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    };
+  }, [map]);
 
   useEffect(() => {
     mountedRef.current = true;
+    if (!visible) return;
 
     const refresh = async () => {
       try {
         const data = await fetchPowerOutageData();
         if (mountedRef.current) {
           setOutages(data);
+          lastFetchRef.current = Date.now();
         }
       } catch (err) {
         console.error('Failed to fetch power outage data', err);
       }
     };
 
-    refresh();
-    const interval = setInterval(refresh, 120000);
+    const age = Date.now() - lastFetchRef.current;
+    if (age >= CACHE_TTL_MS) {
+      refresh();
+    }
+
+    const interval = setInterval(refresh, CACHE_TTL_MS);
+
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [visible]);
 
   return outages;
 }
