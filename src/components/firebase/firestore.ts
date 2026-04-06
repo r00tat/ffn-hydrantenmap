@@ -274,6 +274,7 @@ export interface Firecall {
   group?: string;
   attachments?: string[];
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
+  blaulichtSmsAlarmId?: string;
   [key: string]: any;
 }
 
