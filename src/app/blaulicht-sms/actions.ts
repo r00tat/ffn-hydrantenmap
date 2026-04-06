@@ -136,3 +136,41 @@ export async function getBlaulichtSmsAlarms(
 
   return ((await dashboardResponse.json()).alarms ?? []) as BlaulichtSmsAlarm[];
 }
+
+export async function getBlaulichtSmsAlarmById(
+  groupId: string,
+  alarmId: string
+): Promise<BlaulichtSmsAlarm | null> {
+  await actionUserRequired();
+
+  const alarms = await getBlaulichtSmsAlarms(groupId);
+  return alarms.find((a) => a.alarmId === alarmId) ?? null;
+}
+
+export async function getFirecallsByAlarmIds(
+  alarmIds: string[]
+): Promise<Record<string, { id: string; name: string }>> {
+  await actionUserRequired();
+
+  if (alarmIds.length === 0) return {};
+
+  const results: Record<string, { id: string; name: string }> = {};
+  const chunks: string[][] = [];
+  for (let i = 0; i < alarmIds.length; i += 30) {
+    chunks.push(alarmIds.slice(i, i + 30));
+  }
+
+  for (const chunk of chunks) {
+    const snapshot = await firestore
+      .collection('call')
+      .where('blaulichtSmsAlarmId', 'in', chunk)
+      .where('deleted', '!=', true)
+      .get();
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      results[data.blaulichtSmsAlarmId] = { id: doc.id, name: data.name };
+    }
+  }
+
+  return results;
+}
