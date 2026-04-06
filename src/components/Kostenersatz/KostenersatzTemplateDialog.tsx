@@ -52,7 +52,7 @@ export default function KostenersatzTemplateDialog({
   isAdmin = false,
   rates = [],
 }: KostenersatzTemplateDialogProps) {
-  const { vehiclesById } = useKostenersatzVehicles();
+  const { vehicles, vehiclesById } = useKostenersatzVehicles();
   const [name, setName] = useState(existingTemplate?.name || '');
   const [description, setDescription] = useState(existingTemplate?.description || '');
   const [isShared, setIsShared] = useState(existingTemplate?.isShared || false);
@@ -102,6 +102,14 @@ export default function KostenersatzTemplateDialog({
   const handleUpdateItemCount = (index: number, newCount: number) => {
     setEditedItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, einheiten: newCount } : item))
+    );
+  };
+
+  const editedVehicleSet = new Set(editedVehicles);
+
+  const handleToggleVehicle = (vehicleId: string) => {
+    setEditedVehicles((prev) =>
+      prev.includes(vehicleId) ? prev.filter((id) => id !== vehicleId) : [...prev, vehicleId]
     );
   };
 
@@ -187,21 +195,24 @@ export default function KostenersatzTemplateDialog({
               label="Für alle Benutzer freigeben (gemeinsame Vorlage)"
             />
           )}
-          {/* Show vehicles when saving from calculation */}
-          {editedVehicles.length > 0 && (
+          {/* Vehicle selection */}
+          {vehicles.length > 0 && (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Fahrzeuge ({editedVehicles.length})
+                Fahrzeuge{editedVehicles.length > 0 ? ` (${editedVehicles.length})` : ''}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {editedVehicles.map((vehicleId) => {
-                  const vehicle = vehiclesById.get(vehicleId);
+                {vehicles.map((vehicle) => {
+                  const isSelected = editedVehicleSet.has(vehicle.id);
                   return (
                     <Chip
-                      key={vehicleId}
-                      label={vehicle?.name || vehicleId}
+                      key={vehicle.id}
+                      label={vehicle.name}
                       size="small"
-                      variant="outlined"
+                      color={isSelected ? 'primary' : 'default'}
+                      variant={isSelected ? 'filled' : 'outlined'}
+                      onClick={() => handleToggleVehicle(vehicle.id)}
+                      title={vehicle.description || vehicle.name}
                     />
                   );
                 })}
