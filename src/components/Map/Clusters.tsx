@@ -14,8 +14,10 @@ import {
   GeohashCluster,
   HydrantenRecord,
   Loeschteich,
+  PegelstandRecord,
   RisikoObjekt,
   Saugstelle,
+  WetterstationRecord,
 } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
@@ -87,6 +89,8 @@ interface ClusterData {
   gefahrObjekte: GefahrObjekt[];
   loeschteiche: Loeschteich[];
   saugstellen: Saugstelle[];
+  wetterstationen: WetterstationRecord[];
+  pegelstaende: PegelstandRecord[];
 }
 
 export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
@@ -97,6 +101,8 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
     gefahrObjekte: [],
     loeschteiche: [],
     saugstellen: [],
+    wetterstationen: [],
+    pegelstaende: [],
   });
 
   useEffect(() => {
@@ -138,6 +144,18 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           center,
           radiusInM
         );
+        const wetterstationen = filterRecords<WetterstationRecord>(
+          matchingDocs,
+          'wetterstationen',
+          center,
+          radiusInM
+        );
+        const pegelstaende = filterRecords<PegelstandRecord>(
+          matchingDocs,
+          'pegelstaende',
+          center,
+          radiusInM
+        );
 
         setClusterData({
           clusters: matchingDocs,
@@ -146,6 +164,8 @@ export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
           gefahrObjekte: gefahr,
           loeschteiche: loeschteiche,
           saugstellen: saugstellen,
+          wetterstationen,
+          pegelstaende,
         });
       })();
     }
