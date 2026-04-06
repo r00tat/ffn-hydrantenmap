@@ -8,19 +8,23 @@ import useVehicles from '../../hooks/useVehicles';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 
 /**
- * Fits the map bounds to include all firecall items, locations,
+ * Fits the map bounds to include all displayable firecall items, locations,
  * and the firecall position. Runs once when items are loaded.
+ *
+ * Uses displayItems (filtered by NON_DISPLAYABLE_ITEMS) instead of all
+ * firecallItems to avoid non-displayable items (gb, diary, layer) with
+ * default/zero coordinates inflating the bounds.
  */
 export default function FitBoundsToItems() {
   const map = useMap();
   const firecall = useFirecall();
-  const { firecallItems } = useVehicles();
+  const { displayItems } = useVehicles();
   const { locations } = useFirecallLocations();
   const fitted = useRef(false);
 
   useEffect(() => {
     if (fitted.current) return;
-    if (firecallItems.length === 0 && locations.length === 0) return;
+    if (displayItems.length === 0 && locations.length === 0) return;
 
     const points: L.LatLngExpression[] = [];
 
@@ -28,7 +32,7 @@ export default function FitBoundsToItems() {
       points.push([firecall.lat, firecall.lng]);
     }
 
-    for (const item of firecallItems) {
+    for (const item of displayItems) {
       if (item.lat != null && item.lng != null) {
         points.push([item.lat, item.lng]);
       }
@@ -45,7 +49,7 @@ export default function FitBoundsToItems() {
     fitted.current = true;
     const bounds = L.latLngBounds(points);
     map.fitBounds(bounds, { padding: [30, 30], maxZoom: 17 });
-  }, [map, firecall, firecallItems, locations]);
+  }, [map, firecall, displayItems, locations]);
 
   return null;
 }
