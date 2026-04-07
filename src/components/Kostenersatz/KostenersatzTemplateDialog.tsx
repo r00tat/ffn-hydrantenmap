@@ -306,6 +306,20 @@ export default function KostenersatzTemplateDialog({
                   );
                 })}
               </List>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, pr: 1 }}>
+                <Typography variant="subtitle2">
+                  Gesamt (1h):{' '}
+                  {editedItems
+                    .reduce((sum, item) => {
+                      const rate = rates.find((r) => r.id === item.rateId);
+                      return sum + (rate
+                        ? calculateItemSum(1, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
+                        : 0);
+                    }, 0)
+                    .toFixed(2)}{' '}
+                  €
+                </Typography>
+              </Box>
             </Box>
           )}
         </Box>
