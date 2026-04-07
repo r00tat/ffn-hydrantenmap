@@ -41,7 +41,7 @@ import {
 import CrewVehicleColumn from './CrewVehicleColumn';
 
 export interface CrewAssignmentBoardProps {
-  alarm: BlaulichtSmsAlarm;
+  alarm?: BlaulichtSmsAlarm | null;
 }
 
 /* ─── Mobile: compact table components ─── */
@@ -193,27 +193,31 @@ export default function CrewAssignmentBoard({
   // Only sync once per alarm ID to prevent duplicate creation
   const syncedAlarmRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!alarm) return;
     if (syncedAlarmRef.current === alarm.alarmId) return;
     syncedAlarmRef.current = alarm.alarmId;
     syncFromAlarm(alarm.recipients);
-  }, [alarm.alarmId, alarm.recipients, syncFromAlarm]);
+  }, [alarm, syncFromAlarm]);
 
   // Only show crew entries for recipients who actually confirmed (yes)
+  // When alarm is unavailable, show all crew entries from Firestore
   const confirmedIds = useMemo(
     () =>
-      new Set(
-        alarm.recipients
-          .filter((r) => r.participation === 'yes')
-          .map((r) => r.id),
-      ),
-    [alarm.recipients],
+      alarm
+        ? new Set(
+            alarm.recipients
+              .filter((r) => r.participation === 'yes')
+              .map((r) => r.id),
+          )
+        : null,
+    [alarm],
   );
 
-  // Filter to confirmed recipients and deduplicate (keep first per recipientId)
+  // Filter to confirmed recipients (if alarm available) and deduplicate
   const validAssignments = useMemo(() => {
     const seen = new Set<string>();
     return crewAssignments.filter((a) => {
-      if (!confirmedIds.has(a.recipientId)) return false;
+      if (confirmedIds && !confirmedIds.has(a.recipientId)) return false;
       if (seen.has(a.recipientId)) return false;
       seen.add(a.recipientId);
       return true;

@@ -421,7 +421,7 @@ export default function EinsatzDetails() {
       )}
 
       {/* Besatzung */}
-      {alarm && alarm.recipients.some((r) => r.participation === 'yes') && (
+      {firecall.blaulichtSmsAlarmId && (
         <Box sx={{ mt: 3 }}>
           <CrewAssignmentBoard alarm={alarm} />
         </Box>
