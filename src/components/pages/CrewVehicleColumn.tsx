@@ -20,6 +20,7 @@ export interface CrewVehicleColumnProps {
     vehicleId: string | null,
     vehicleName: string,
   ) => void;
+  onRemove?: (assignmentId: string) => void;
 }
 
 export default function CrewVehicleColumn({
@@ -29,6 +30,7 @@ export default function CrewVehicleColumn({
   vehicles,
   onFunktionChange,
   onVehicleChange,
+  onRemove,
 }: CrewVehicleColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: vehicleId || 'unassigned',
@@ -80,6 +82,13 @@ export default function CrewVehicleColumn({
               vId,
               vName,
             )
+          }
+          onRemove={
+            onRemove &&
+            assignment.recipientId.startsWith('manual-') &&
+            assignment.id
+              ? () => onRemove(assignment.id!)
+              : undefined
           }
         />
       ))}

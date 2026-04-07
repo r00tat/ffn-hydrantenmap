@@ -399,6 +399,7 @@ export default function CrewAssignmentBoard({
               vehicles={vehicles}
               onFunktionChange={handleFunktionChange}
               onVehicleChange={handleVehicleChange}
+              onRemove={removeAssignment}
             />
             {vehicles.map((v) => (
               <CrewVehicleColumn
@@ -409,6 +410,7 @@ export default function CrewAssignmentBoard({
                 vehicles={vehicles}
                 onFunktionChange={handleFunktionChange}
                 onVehicleChange={handleVehicleChange}
+                onRemove={removeAssignment}
               />
             ))}
           </Box>

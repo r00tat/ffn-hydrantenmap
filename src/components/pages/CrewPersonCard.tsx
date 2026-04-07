@@ -2,13 +2,16 @@
 
 import React from 'react';
 import {
+  Box,
   Card,
   FormControl,
+  IconButton,
   MenuItem,
   Select,
   SelectChangeEvent,
   Typography,
 } from '@mui/material';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useDraggable } from '@dnd-kit/core';
 import {
@@ -23,6 +26,7 @@ export interface CrewPersonCardProps {
   vehicles: Fzg[];
   onFunktionChange: (funktion: CrewFunktion) => void;
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
+  onRemove?: () => void;
   showVehicleSelect?: boolean;
 }
 
@@ -31,6 +35,7 @@ export default function CrewPersonCard({
   vehicles,
   onFunktionChange,
   onVehicleChange,
+  onRemove,
   showVehicleSelect = false,
 }: CrewPersonCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -80,9 +85,15 @@ export default function CrewPersonCard({
           touchAction: 'none',
         }}
       />
-      <Typography variant="body2" sx={{ flexShrink: 0, mr: 'auto' }}>
+      <Typography variant="body2" sx={{ flexShrink: 0 }}>
         {assignment.name}
       </Typography>
+      {onRemove && (
+        <IconButton size="small" onClick={onRemove} color="error" sx={{ p: 0.25 }}>
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+      )}
+      <Box sx={{ flex: '1 1 0' }} />
       <FormControl size="small" sx={{ minWidth: 120, flex: '1 1 auto' }}>
         <Select
           value={assignment.funktion}
