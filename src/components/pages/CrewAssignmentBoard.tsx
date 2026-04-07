@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
@@ -73,11 +74,13 @@ function CrewRow({
   vehicles,
   onFunktionChange,
   onVehicleChange,
+  onRemove,
 }: {
   assignment: CrewAssignment;
   vehicles: Fzg[];
   onFunktionChange: (funktion: CrewFunktion) => void;
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
+  onRemove?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: assignment.id || assignment.recipientId });
@@ -159,6 +162,13 @@ function CrewRow({
           </Select>
         </FormControl>
       </TableCell>
+      {onRemove && (
+        <TableCell sx={{ width: 32, p: 0.5 }}>
+          <IconButton size="small" onClick={onRemove} color="error">
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </TableCell>
+      )}
     </TableRow>
   );
 }
@@ -186,6 +196,7 @@ export default function CrewAssignmentBoard({
     addManualPerson,
     assignVehicle,
     updateFunktion,
+    removeAssignment,
   } = useCrewAssignments();
   const [newPersonName, setNewPersonName] = useState('');
   const { vehicles } = useVehicles();
@@ -224,10 +235,13 @@ export default function CrewAssignmentBoard({
   );
 
   // Filter to confirmed recipients (if alarm available) and deduplicate
+  // Always include manual entries (recipientId starts with "manual-")
   const validAssignments = useMemo(() => {
     const seen = new Set<string>();
     return crewAssignments.filter((a) => {
-      if (confirmedIds && !confirmedIds.has(a.recipientId)) return false;
+      const isManual = a.recipientId.startsWith('manual-');
+      if (!isManual && confirmedIds && !confirmedIds.has(a.recipientId))
+        return false;
       if (seen.has(a.recipientId)) return false;
       seen.add(a.recipientId);
       return true;
@@ -287,6 +301,11 @@ export default function CrewAssignmentBoard({
         }
         onVehicleChange={(vId, vName) =>
           handleVehicleChange(a.id || a.recipientId, vId, vName)
+        }
+        onRemove={
+          a.recipientId.startsWith('manual-') && a.id
+            ? () => removeAssignment(a.id!)
+            : undefined
         }
       />
     ));
