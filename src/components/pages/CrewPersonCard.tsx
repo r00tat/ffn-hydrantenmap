@@ -65,6 +65,7 @@ export default function CrewPersonCard({
       sx={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 1,
         p: 1,
       }}
@@ -72,12 +73,17 @@ export default function CrewPersonCard({
       <DragIndicatorIcon
         {...listeners}
         {...attributes}
-        sx={{ cursor: 'grab', color: 'action.active', flexShrink: 0 }}
+        sx={{
+          cursor: 'grab',
+          color: 'action.active',
+          flexShrink: 0,
+          touchAction: 'none',
+        }}
       />
-      <Typography variant="body2" sx={{ flexShrink: 0 }}>
+      <Typography variant="body2" sx={{ flexShrink: 0, mr: 'auto' }}>
         {assignment.name}
       </Typography>
-      <FormControl size="small" sx={{ minWidth: 140, ml: 'auto' }}>
+      <FormControl size="small" sx={{ minWidth: 120, flex: '1 1 auto' }}>
         <Select
           value={assignment.funktion}
           onChange={handleFunktionChange}
@@ -92,7 +98,7 @@ export default function CrewPersonCard({
         </Select>
       </FormControl>
       {showVehicleSelect && (
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: 120, flex: '1 1 auto' }}>
           <Select
             value={assignment.vehicleId || ''}
             onChange={handleVehicleChange}

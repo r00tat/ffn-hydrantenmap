@@ -58,6 +58,10 @@ vi.mock('@dnd-kit/core', () => ({
     isOver: false,
     setNodeRef: vi.fn(),
   }),
+  useSensor: vi.fn((_sensor: unknown, _options?: unknown) => ({})),
+  useSensors: vi.fn((..._sensors: unknown[]) => []),
+  MouseSensor: vi.fn(),
+  TouchSensor: vi.fn(),
 }));
 
 vi.mock('../../hooks/useCrewAssignments', () => ({

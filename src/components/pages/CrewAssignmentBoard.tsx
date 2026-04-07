@@ -11,13 +11,57 @@ import {
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
 import useCrewAssignments from '../../hooks/useCrewAssignments';
 import useVehicles from '../../hooks/useVehicles';
 import { CrewFunktion } from '../firebase/firestore';
 import CrewVehicleColumn from './CrewVehicleColumn';
 import CrewPersonCard from './CrewPersonCard';
+
+import { useDroppable } from '@dnd-kit/core';
+
+function MobileDropSection({
+  droppableId,
+  label,
+  defaultExpanded,
+  children,
+}: {
+  droppableId: string;
+  label: string;
+  defaultExpanded?: boolean;
+  children: React.ReactNode;
+}) {
+  const { isOver, setNodeRef } = useDroppable({ id: droppableId });
+
+  return (
+    <Accordion
+      defaultExpanded={defaultExpanded}
+      ref={setNodeRef}
+      sx={{
+        borderColor: isOver ? 'primary.main' : undefined,
+        borderWidth: isOver ? 2 : undefined,
+        borderStyle: isOver ? 'solid' : undefined,
+      }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography>{label}</Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {children}
+        </Box>
+      </AccordionDetails>
+    </Accordion>
+  );
+}
 
 export interface CrewAssignmentBoardProps {
   alarm: BlaulichtSmsAlarm;
@@ -31,6 +75,14 @@ export default function CrewAssignmentBoard({
   const { vehicles } = useVehicles();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  });
+  const sensors = useSensors(mouseSensor, touchSensor);
 
   useEffect(() => {
     syncFromAlarm(alarm.recipients);
@@ -84,82 +136,63 @@ export default function CrewAssignmentBoard({
         Besatzung
       </Typography>
 
-      {isMobile ? (
-        <Box>
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography>
-                Verfügbar ({unassigned.length})
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {unassigned.map((a) => (
-                  <CrewPersonCard
-                    key={a.id || a.recipientId}
-                    assignment={a}
-                    showVehicleSelect
-                    vehicles={vehicles}
-                    onFunktionChange={(funktion) =>
-                      handleFunktionChange(
-                        a.id || a.recipientId,
-                        funktion,
-                      )
-                    }
-                    onVehicleChange={(vId, vName) =>
-                      handleVehicleChange(
-                        a.id || a.recipientId,
-                        vId,
-                        vName,
-                      )
-                    }
-                  />
-                ))}
-              </Box>
-            </AccordionDetails>
-          </Accordion>
-          {vehicles.map((v) => {
-            const assigned = assignedToVehicle(v.id!);
-            return (
-              <Accordion key={v.id}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>
-                    {v.name} ({assigned.length})
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Box
-                    sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}
-                  >
-                    {assigned.map((a) => (
-                      <CrewPersonCard
-                        key={a.id || a.recipientId}
-                        assignment={a}
-                        showVehicleSelect
-                        vehicles={vehicles}
-                        onFunktionChange={(funktion) =>
-                          handleFunktionChange(
-                            a.id || a.recipientId,
-                            funktion,
-                          )
-                        }
-                        onVehicleChange={(vId, vName) =>
-                          handleVehicleChange(
-                            a.id || a.recipientId,
-                            vId,
-                            vName,
-                          )
-                        }
-                      />
-                    ))}
-                  </Box>
-                </AccordionDetails>
-              </Accordion>
-            );
-          })}
-        </Box>
-      ) : (
-        <DndContext onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        {isMobile ? (
+          <Box>
+            <MobileDropSection
+              droppableId="unassigned"
+              label={`Verfügbar (${unassigned.length})`}
+              defaultExpanded
+            >
+              {unassigned.map((a) => (
+                <CrewPersonCard
+                  key={a.id || a.recipientId}
+                  assignment={a}
+                  showVehicleSelect
+                  vehicles={vehicles}
+                  onFunktionChange={(funktion) =>
+                    handleFunktionChange(a.id || a.recipientId, funktion)
+                  }
+                  onVehicleChange={(vId, vName) =>
+                    handleVehicleChange(a.id || a.recipientId, vId, vName)
+                  }
+                />
+              ))}
+            </MobileDropSection>
+            {vehicles.map((v) => {
+              const assigned = assignedToVehicle(v.id!);
+              return (
+                <MobileDropSection
+                  key={v.id}
+                  droppableId={v.id!}
+                  label={`${v.name} (${assigned.length})`}
+                >
+                  {assigned.map((a) => (
+                    <CrewPersonCard
+                      key={a.id || a.recipientId}
+                      assignment={a}
+                      showVehicleSelect
+                      vehicles={vehicles}
+                      onFunktionChange={(funktion) =>
+                        handleFunktionChange(
+                          a.id || a.recipientId,
+                          funktion,
+                        )
+                      }
+                      onVehicleChange={(vId, vName) =>
+                        handleVehicleChange(
+                          a.id || a.recipientId,
+                          vId,
+                          vName,
+                        )
+                      }
+                    />
+                  ))}
+                </MobileDropSection>
+              );
+            })}
+          </Box>
+        ) : (
           <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
             <CrewVehicleColumn
               vehicleId={null}
@@ -181,8 +214,8 @@ export default function CrewAssignmentBoard({
               />
             ))}
           </Box>
-        </DndContext>
-      )}
+        )}
+      </DndContext>
     </Box>
   );
 }
