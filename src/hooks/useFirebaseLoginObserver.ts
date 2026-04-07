@@ -129,6 +129,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
         const token = await user?.getIdToken();
         if (token) {
           await serverLoginRef.current();
+          lastRefreshRef.current = Date.now();
 
           // Force token refresh to get latest claims
           await user?.getIdToken(true);
@@ -169,18 +170,31 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     saveAuthToSessionStorage(loginStatus);
   }, [loginStatus]);
 
+  // Track when the last server login happened to avoid unnecessary refreshes
+  const lastRefreshRef = useRef<number>(0);
+
   // Periodic session refresh (every 30 minutes)
   useEffect(() => {
-    const clearServerInterval = setInterval(serverLogin, 1000 * 60 * 30);
+    const clearServerInterval = setInterval(() => {
+      serverLogin();
+      lastRefreshRef.current = Date.now();
+    }, 1000 * 60 * 30);
     return () => clearInterval(clearServerInterval);
   }, [serverLogin]);
 
-  // Refresh session when tab becomes visible
+  // Refresh session when tab becomes visible, but only if session is stale (>5 min)
   useEffect(() => {
+    const SESSION_STALE_MS = 5 * 60 * 1000;
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && auth.currentUser) {
-        console.info('tab became visible, refreshing session');
-        await serverLogin();
+        const elapsed = Date.now() - lastRefreshRef.current;
+        if (elapsed >= SESSION_STALE_MS) {
+          console.info(
+            `tab became visible, refreshing session (last refresh ${Math.round(elapsed / 1000)}s ago)`
+          );
+          await serverLogin();
+          lastRefreshRef.current = Date.now();
+        }
       }
     };
 
