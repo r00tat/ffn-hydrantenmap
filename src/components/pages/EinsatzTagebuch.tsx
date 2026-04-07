@@ -633,13 +633,15 @@ export function EinsatzTagebuch({
                 sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
               >
                 <Tooltip title="Eintrag hinzufügen">
-                  <IconButton
-                    color="primary"
-                    onClick={handleInlineAdd}
-                    disabled={!inlineName.trim()}
-                  >
-                    <AddIcon />
-                  </IconButton>
+                  <span>
+                    <IconButton
+                      color="primary"
+                      onClick={handleInlineAdd}
+                      disabled={!inlineName.trim()}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </span>
                 </Tooltip>
               </Grid>
             </>

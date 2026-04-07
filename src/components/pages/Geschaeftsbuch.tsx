@@ -652,13 +652,15 @@ export default function Geschaeftsbuch({
               sx={{ py: 1 }}
             >
               <Tooltip title="Eintrag hinzufügen">
-                <IconButton
-                  color="primary"
-                  onClick={handleInlineAdd}
-                  disabled={!inlineName.trim()}
-                >
-                  <AddIcon />
-                </IconButton>
+                <span>
+                  <IconButton
+                    color="primary"
+                    onClick={handleInlineAdd}
+                    disabled={!inlineName.trim()}
+                  >
+                    <AddIcon />
+                  </IconButton>
+                </span>
               </Tooltip>
             </Grid>
           </Grid>
