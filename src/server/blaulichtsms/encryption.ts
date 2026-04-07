@@ -13,6 +13,8 @@ async function getEncryptionKey(): Promise<Buffer> {
 
   const project =
     process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.GCP_PROJECT ||
+    process.env.GCLOUD_PROJECT ||
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
     firebaseApp.options.projectId;
   if (!project) {
