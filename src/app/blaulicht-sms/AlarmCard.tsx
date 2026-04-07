@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   Card,
@@ -10,6 +13,7 @@ import {
   Chip,
   Typography,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AddIcon from '@mui/icons-material/Add';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Link from 'next/link';
@@ -20,9 +24,15 @@ export interface AlarmCardProps {
   alarm: BlaulichtSmsAlarm;
   firecall?: { id: string; name: string };
   onCreateEinsatz?: (alarm: BlaulichtSmsAlarm) => void;
+  defaultExpandRecipients?: boolean;
 }
 
-const AlarmCard = ({ alarm, firecall, onCreateEinsatz }: AlarmCardProps) => {
+const AlarmCard = ({
+  alarm,
+  firecall,
+  onCreateEinsatz,
+  defaultExpandRecipients = true,
+}: AlarmCardProps) => {
   const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
 
   const attendees = alarm.recipients.filter((r) => r.participation === 'yes');
@@ -124,46 +134,58 @@ const AlarmCard = ({ alarm, firecall, onCreateEinsatz }: AlarmCardProps) => {
           ))}
         </Box>
 
-        <Typography variant="h6" component="div" sx={{ mt: 2 }}>
-          Zusagen{' '}
-          {selectedFunction && (
-            <Chip
-              label={`${selectedFunction}: ${filteredAttendees.length}`}
-              size="small"
-              onDelete={() => setSelectedFunction(null)}
-            />
-          )}
-        </Typography>
-        <Box>
-          {filteredAttendees.map((recipient) => (
-            <Box
-              key={recipient.id}
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                py: 1,
-                borderBottom: '1px solid #eee',
-              }}
-            >
-              <Typography variant="body2">{recipient.name}</Typography>
-              <Box>
-                {recipient.functions.map((func) => (
-                  <Chip
-                    key={func.functionId}
-                    label={func.shortForm}
-                    size="small"
-                    sx={{
-                      ml: 1,
-                      backgroundColor: func.backgroundHexColorCode,
-                      color: func.foregroundHexColorCode,
-                    }}
-                  />
-                ))}
+        <Accordion
+          defaultExpanded={defaultExpandRecipients}
+          disableGutters
+          elevation={0}
+          sx={{
+            '&::before': { display: 'none' },
+            backgroundColor: 'transparent',
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+            <Typography variant="h6" component="div">
+              Zusagen ({filteredAttendees.length}){' '}
+              {selectedFunction && (
+                <Chip
+                  label={selectedFunction}
+                  size="small"
+                  onDelete={() => setSelectedFunction(null)}
+                />
+              )}
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 0 }}>
+            {filteredAttendees.map((recipient) => (
+              <Box
+                key={recipient.id}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  py: 1,
+                  borderBottom: '1px solid #eee',
+                }}
+              >
+                <Typography variant="body2">{recipient.name}</Typography>
+                <Box>
+                  {recipient.functions.map((func) => (
+                    <Chip
+                      key={func.functionId}
+                      label={func.shortForm}
+                      size="small"
+                      sx={{
+                        ml: 1,
+                        backgroundColor: func.backgroundHexColorCode,
+                        color: func.foregroundHexColorCode,
+                      }}
+                    />
+                  ))}
+                </Box>
               </Box>
-            </Box>
-          ))}
-        </Box>
+            ))}
+          </AccordionDetails>
+        </Accordion>
         {alarm.geolocation?.coordinates && (
           <AlarmMap
             lat={alarm.geolocation.coordinates.lat}

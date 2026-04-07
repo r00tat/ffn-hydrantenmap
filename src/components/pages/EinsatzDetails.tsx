@@ -336,7 +336,7 @@ export default function EinsatzDetails() {
           {alarm === undefined ? (
             <CircularProgress size={24} />
           ) : alarm ? (
-            <AlarmCard alarm={alarm} />
+            <AlarmCard alarm={alarm} defaultExpandRecipients={false} />
           ) : (
             <Typography color="text.secondary">
               BlaulichtSMS-Alarm konnte nicht geladen werden.
