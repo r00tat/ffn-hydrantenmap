@@ -17,6 +17,7 @@ export const USER_COLLECTION_ID = 'user';
 export const GROUP_COLLECTION_ID = 'groups';
 export const CLUSTER_COLLECTION_ID = 'clusters6';
 export const FIRECALL_AUDITLOG_COLLECTION_ID = 'auditlog';
+export const FIRECALL_CREW_COLLECTION_ID = 'crew';
 
 /**
  * base item for all entries in a firecall
@@ -276,6 +277,34 @@ export interface Firecall {
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
   blaulichtSmsAlarmId?: string;
   [key: string]: any;
+}
+
+export type CrewFunktion =
+  | 'Feuerwehrmann'
+  | 'Maschinist'
+  | 'Gruppenkommandant'
+  | 'Atemschutzträger'
+  | 'Zugskommandant'
+  | 'Einsatzleiter';
+
+export const CREW_FUNKTIONEN: CrewFunktion[] = [
+  'Feuerwehrmann',
+  'Maschinist',
+  'Gruppenkommandant',
+  'Atemschutzträger',
+  'Zugskommandant',
+  'Einsatzleiter',
+];
+
+export interface CrewAssignment {
+  id?: string;
+  recipientId: string;
+  name: string;
+  vehicleId: string | null;
+  vehicleName: string;
+  funktion: CrewFunktion;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export function dateToYmd(date: Date) {
