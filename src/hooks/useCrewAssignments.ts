@@ -157,6 +157,22 @@ export default function useCrewAssignments() {
     [firecallId, email]
   );
 
+  const addManualPerson = useCallback(
+    async (name: string) => {
+      if (!crewCollectionRef || !name.trim()) return;
+      await addDoc(crewCollectionRef, {
+        recipientId: `manual-${Date.now()}`,
+        name: name.trim(),
+        vehicleId: null,
+        vehicleName: '',
+        funktion: 'Feuerwehrmann' as CrewFunktion,
+        updatedAt: new Date().toISOString(),
+        updatedBy: email || '',
+      });
+    },
+    [crewCollectionRef, email]
+  );
+
   const removeAssignment = useCallback(
     async (assignmentId: string) => {
       if (!firecallId || firecallId === 'unknown') return;
@@ -175,6 +191,7 @@ export default function useCrewAssignments() {
   return {
     crewAssignments,
     syncFromAlarm,
+    addManualPerson,
     assignVehicle,
     updateFunktion,
     removeAssignment,

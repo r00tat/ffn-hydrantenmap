@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   FormControl,
+  IconButton,
   MenuItem,
   Select,
   SelectChangeEvent,
@@ -13,10 +14,13 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
@@ -176,8 +180,14 @@ function funktionAbkuerzung(funktion: CrewFunktion): string {
 export default function CrewAssignmentBoard({
   alarm,
 }: CrewAssignmentBoardProps) {
-  const { crewAssignments, syncFromAlarm, assignVehicle, updateFunktion } =
-    useCrewAssignments();
+  const {
+    crewAssignments,
+    syncFromAlarm,
+    addManualPerson,
+    assignVehicle,
+    updateFunktion,
+  } = useCrewAssignments();
+  const [newPersonName, setNewPersonName] = useState('');
   const { vehicles } = useVehicles();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -283,9 +293,36 @@ export default function CrewAssignmentBoard({
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Besatzung
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Typography variant="h5">Besatzung</Typography>
+        <TextField
+          size="small"
+          placeholder="Person hinzufügen"
+          value={newPersonName}
+          onChange={(e) => setNewPersonName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newPersonName.trim()) {
+              addManualPerson(newPersonName);
+              setNewPersonName('');
+            }
+          }}
+          sx={{ ml: 'auto', maxWidth: 220 }}
+        />
+        <Tooltip title="Person hinzufügen">
+          <span>
+            <IconButton
+              color="primary"
+              disabled={!newPersonName.trim()}
+              onClick={() => {
+                addManualPerson(newPersonName);
+                setNewPersonName('');
+              }}
+            >
+              <AddIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+      </Box>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {isMobile ? (
