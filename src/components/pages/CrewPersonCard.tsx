@@ -9,6 +9,7 @@ import {
   SelectChangeEvent,
   Typography,
 } from '@mui/material';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useDraggable } from '@dnd-kit/core';
 import {
   CrewAssignment,
@@ -60,17 +61,19 @@ export default function CrewPersonCard({
     <Card
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
       variant="outlined"
       sx={{
         display: 'flex',
         alignItems: 'center',
         gap: 1,
         p: 1,
-        cursor: 'grab',
       }}
     >
+      <DragIndicatorIcon
+        {...listeners}
+        {...attributes}
+        sx={{ cursor: 'grab', color: 'action.active', flexShrink: 0 }}
+      />
       <Typography variant="body2" sx={{ flexShrink: 0 }}>
         {assignment.name}
       </Typography>
