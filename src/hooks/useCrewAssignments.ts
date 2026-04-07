@@ -1,11 +1,14 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   addDoc,
   collection,
   deleteDoc,
   doc,
+  getDocs,
+  query,
+  Query,
   updateDoc,
 } from 'firebase/firestore';
 import { firestore } from '../components/firebase/firebase';
@@ -47,21 +50,49 @@ export default function useCrewAssignments() {
     [firecallId]
   );
 
-  // Use ref to access crewAssignments without causing re-renders of syncFromAlarm
-  const crewAssignmentsRef = useRef(crewAssignments);
-  crewAssignmentsRef.current = crewAssignments;
-
+  // syncFromAlarm reads Firestore directly (getDocs) to avoid race conditions
+  // with the realtime listener. Also cleans up duplicates from earlier bugs.
   const syncFromAlarm = useCallback(
     async (recipients: BlaulichtSmsRecipient[]) => {
       if (!crewCollectionRef) return;
 
-      const existingRecipientIds = new Set(
-        crewAssignmentsRef.current.map((a) => a.recipientId)
+      const confirmed = recipients.filter((r) => r.participation === 'yes');
+      if (confirmed.length === 0) return;
+
+      // Read current state directly from Firestore
+      const snapshot = await getDocs(
+        query(crewCollectionRef) as Query<CrewAssignment>
       );
 
-      const newRecipients = recipients.filter(
-        (r) => r.participation === 'yes' && !existingRecipientIds.has(r.id)
-      );
+      // Clean up duplicates: keep only the first doc per recipientId
+      const seenIds = new Set<string>();
+      const duplicateDocs: string[] = [];
+      for (const d of snapshot.docs) {
+        const rid = d.data().recipientId;
+        if (seenIds.has(rid)) {
+          duplicateDocs.push(d.id);
+        } else {
+          seenIds.add(rid);
+        }
+      }
+      if (duplicateDocs.length > 0) {
+        await Promise.all(
+          duplicateDocs.map((id) =>
+            deleteDoc(
+              doc(
+                firestore,
+                FIRECALL_COLLECTION_ID,
+                firecallId,
+                FIRECALL_CREW_COLLECTION_ID,
+                id
+              )
+            )
+          )
+        );
+      }
+
+      // Create docs for new confirmed recipients
+      const newRecipients = confirmed.filter((r) => !seenIds.has(r.id));
 
       if (newRecipients.length === 0) return;
 
@@ -80,7 +111,7 @@ export default function useCrewAssignments() {
         )
       );
     },
-    [crewCollectionRef, email]
+    [crewCollectionRef, email, firecallId]
   );
 
   const assignVehicle = useCallback(

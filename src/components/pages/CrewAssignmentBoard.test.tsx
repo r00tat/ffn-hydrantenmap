@@ -179,14 +179,16 @@ describe('CrewAssignmentBoard', () => {
     expect(screen.getByText('Anna Beispiel')).toBeInTheDocument();
   });
 
-  it('renders vehicle section headers with counts', () => {
+  it('renders Kanban columns on desktop with vehicle names', () => {
+    mockUseMediaQuery.mockReturnValue(false);
     render(<CrewAssignmentBoard alarm={mockAlarm} />);
-    expect(screen.getByText(/Verfügbar \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(/KDTFA \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(/TLFA 4000 \(0\)/)).toBeInTheDocument();
+    expect(screen.getByText('Verfügbar')).toBeInTheDocument();
+    expect(screen.getByText('KDTFA')).toBeInTheDocument();
+    expect(screen.getByText('TLFA 4000')).toBeInTheDocument();
   });
 
-  it('renders table column headers', () => {
+  it('renders table with headers on mobile', () => {
+    mockUseMediaQuery.mockReturnValue(true);
     render(<CrewAssignmentBoard alarm={mockAlarm} />);
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Funktion')).toBeInTheDocument();

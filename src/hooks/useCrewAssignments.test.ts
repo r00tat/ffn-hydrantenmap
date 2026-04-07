@@ -8,6 +8,8 @@ vi.mock('../components/firebase/firebase', () => ({
   firestore: { type: 'mock-firestore' },
 }));
 
+const mockGetDocsResult = { docs: [] as { data: () => Record<string, unknown> }[] };
+
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn((...args: unknown[]) => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
@@ -16,6 +18,7 @@ vi.mock('firebase/firestore', () => ({
   addDoc: vi.fn(() => Promise.resolve({ id: 'new-doc-id' })),
   updateDoc: vi.fn(() => Promise.resolve()),
   deleteDoc: vi.fn(() => Promise.resolve()),
+  getDocs: vi.fn(() => Promise.resolve(mockGetDocsResult)),
   collection: vi.fn((...args: unknown[]) => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
   })),
@@ -53,6 +56,7 @@ describe('useCrewAssignments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCrewAssignments.length = 0;
+    mockGetDocsResult.docs = [];
   });
 
   describe('syncFromAlarm', () => {
@@ -110,7 +114,9 @@ describe('useCrewAssignments', () => {
     });
 
     it('skips recipients that already exist in crew assignments', async () => {
-      mockCrewAssignments.push({ recipientId: 'r1', name: 'Alice' });
+      mockGetDocsResult.docs = [
+        { data: () => ({ recipientId: 'r1', name: 'Alice' }) },
+      ];
 
       const recipients: BlaulichtSmsRecipient[] = [
         { id: 'r1', name: 'Alice', participation: 'yes' },
