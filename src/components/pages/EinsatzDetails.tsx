@@ -45,6 +45,7 @@ import {
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
 import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
+import CrewAssignmentBoard from './CrewAssignmentBoard';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
 import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
@@ -341,6 +342,13 @@ export default function EinsatzDetails() {
               BlaulichtSMS-Alarm konnte nicht geladen werden.
             </Typography>
           )}
+        </Box>
+      )}
+
+      {/* Besatzung */}
+      {alarm && alarm.recipients.some((r) => r.participation === 'yes') && (
+        <Box sx={{ mb: 3 }}>
+          <CrewAssignmentBoard alarm={alarm} />
         </Box>
       )}
 
