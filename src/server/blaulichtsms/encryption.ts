@@ -2,6 +2,7 @@ import 'server-only';
 
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { firebaseApp } from '../firebase/admin';
 
 // Module-level cache: valid for the lifetime of this server instance.
 // If the secret is rotated, redeploy to pick up the new key.
@@ -12,7 +13,8 @@ async function getEncryptionKey(): Promise<Buffer> {
 
   const project =
     process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    firebaseApp.options.projectId;
   if (!project) {
     throw new Error(
       'No GCP project ID found. Set GOOGLE_CLOUD_PROJECT or NEXT_PUBLIC_FIREBASE_PROJECT_ID.'
