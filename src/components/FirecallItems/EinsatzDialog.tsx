@@ -74,7 +74,9 @@ export default function EinsatzDialog({
   const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [alarmsLoading, setAlarmsLoading] = useState(false);
-  const [selectedAlarmId, setSelectedAlarmId] = useState<string>('');
+  const [selectedAlarmId, setSelectedAlarmId] = useState<string>(
+    einsatzDefault?.blaulichtSmsAlarmId ?? ''
+  );
 
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
     const parts = alarm.alarmText.split('/');
@@ -95,23 +97,22 @@ export default function EinsatzDialog({
 
   // Load which groups have BlaulichtSMS credentials (once on dialog mount)
   useEffect(() => {
-    if (!isNewEinsatz) return;
     getGroupsWithBlaulichtsmsConfig()
       .then(setConfiguredGroups)
       .catch((err) =>
         console.error('Failed to load BlaulichtSMS configured groups:', err)
       );
-  }, [isNewEinsatz]);
+  }, []);
 
   // Fetch alarms when selected group changes and has credentials
   useEffect(() => {
     const shouldFetch =
-      isNewEinsatz && selectedGroup && configuredGroups.includes(selectedGroup);
+      selectedGroup && configuredGroups.includes(selectedGroup);
 
     const fetchAlarms = async () => {
       if (!shouldFetch) {
         setAlarms([]);
-        setSelectedAlarmId('');
+        if (isNewEinsatz) setSelectedAlarmId('');
         return;
       }
       setAlarmsLoading(true);
@@ -122,7 +123,7 @@ export default function EinsatzDialog({
             new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
         );
         setAlarms(sorted);
-        if (sorted.length > 0) {
+        if (isNewEinsatz && sorted.length > 0) {
           setSelectedAlarmId(sorted[0].alarmId);
           applyAlarm(sorted[0]);
         }
@@ -143,13 +144,17 @@ export default function EinsatzDialog({
       if (alarmId) {
         const alarm = alarms.find((a) => a.alarmId === alarmId);
         if (alarm) {
-          applyAlarm(alarm);
+          if (isNewEinsatz) {
+            applyAlarm(alarm);
+          } else {
+            setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: alarm.alarmId }));
+          }
         }
       } else {
         setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: undefined }));
       }
     },
-    [alarms, applyAlarm]
+    [alarms, applyAlarm, isNewEinsatz]
   );
 
   const handleFileUploadComplete = useCallback(
@@ -223,7 +228,7 @@ export default function EinsatzDialog({
       <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
       <DialogContent>
         <DialogContentText>Neuer Einsatz</DialogContentText>
-        {isNewEinsatz && alarmsLoading && (
+        {alarmsLoading && (
           <DialogContentText
             sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
           >
@@ -231,7 +236,7 @@ export default function EinsatzDialog({
             Blaulicht-SMS Alarme werden geladen...
           </DialogContentText>
         )}
-        {isNewEinsatz && !alarmsLoading && alarms.length > 0 && (
+        {!alarmsLoading && alarms.length > 0 && (
           <FormControl fullWidth variant="standard" sx={{ mb: 1 }}>
             <InputLabel id="alarm-select-label">Blaulicht-SMS Alarm</InputLabel>
             <Select
@@ -241,7 +246,7 @@ export default function EinsatzDialog({
               label="Blaulicht-SMS Alarm"
               onChange={handleAlarmChange}
             >
-              <MenuItem value="">Manuell eingeben</MenuItem>
+              <MenuItem value="">{isNewEinsatz ? 'Manuell eingeben' : 'Keine Zuordnung'}</MenuItem>
               {alarms.map((alarm) => (
                 <MenuItem key={alarm.alarmId} value={alarm.alarmId}>
                   {alarm.alarmText} (
