@@ -345,13 +345,6 @@ export default function EinsatzDetails() {
         </Box>
       )}
 
-      {/* Besatzung */}
-      {alarm && alarm.recipients.some((r) => r.participation === 'yes') && (
-        <Box sx={{ mb: 3 }}>
-          <CrewAssignmentBoard alarm={alarm} />
-        </Box>
-      )}
-
       {/* Attachments */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="h5" gutterBottom>
@@ -417,6 +410,13 @@ export default function EinsatzDetails() {
       {firecall.id && (
         <Box id="kostenersatz-section" sx={{ mt: 3 }}>
           <KostenersatzList firecallId={firecall.id} />
+        </Box>
+      )}
+
+      {/* Besatzung */}
+      {alarm && alarm.recipients.some((r) => r.participation === 'yes') && (
+        <Box sx={{ mt: 3 }}>
+          <CrewAssignmentBoard alarm={alarm} />
         </Box>
       )}
 
