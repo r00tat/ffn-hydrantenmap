@@ -7,10 +7,6 @@ import {
   WgsObject,
 } from '../../../../common/gis-objects';
 import { firestore } from '../../../../server/firebase/admin';
-import {
-  importWetterstationen,
-  importPegelstaende,
-} from '../../../../server/cluster-stations';
 import { writeBatches } from '../../../../server/firebase/import';
 
 type GeohashMap = Record<string, GeohashCluster>;
@@ -119,11 +115,9 @@ export async function POST() {
       }
       send({ step: 1, status: 'completed' });
 
-      // Step 2: Import Wetterstationen and Pegelstände
-      send({ step: 2, status: 'in_progress', message: 'Importing Wetterstationen & Pegelstände...' });
-      const wetterCount = await importWetterstationen(geohashes);
-      const pegelCount = await importPegelstaende(geohashes);
-      send({ step: 2, status: 'completed', count: Object.keys(geohashes).length, wetterstationen: wetterCount, pegelstaende: pegelCount });
+      // Step 2: Merge data (already done in step 1, just signal progress)
+      send({ step: 2, status: 'in_progress', message: 'Merging data...' });
+      send({ step: 2, status: 'completed', count: Object.keys(geohashes).length });
 
       // Step 3: Write to Firestore
       send({ step: 3, status: 'in_progress', message: 'Writing to Firestore...' });

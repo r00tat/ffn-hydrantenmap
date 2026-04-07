@@ -4,17 +4,82 @@ import L from 'leaflet';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
-import { WetterstationRecord } from '../../../common/gis-objects';
-import {
-  fetchWetterstationLiveData,
-  WetterstationLiveData,
-} from './WetterstationAction';
+
+// --- Types ---
+
+interface TawesStation {
+  id: string;
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+  altitude: number;
+  is_active: boolean;
+}
+
+interface ParameterValue {
+  name: string;
+  unit: string;
+  data: (number | null)[];
+}
+
+interface TawesFeature {
+  type: 'Feature';
+  geometry: {
+    type: 'Point';
+    coordinates: [number, number]; // [lon, lat]
+  };
+  properties: {
+    station: string;
+    parameters: Record<string, ParameterValue>;
+  };
+}
+
+interface TawesGeoJSON {
+  type: 'FeatureCollection';
+  timestamps: string[];
+  features: TawesFeature[];
+}
+
+interface TawesMetadataResponse {
+  stations: TawesStation[];
+  parameters: unknown[];
+}
+
+interface WetterstationData {
+  stationId: string;
+  name: string;
+  altitude: number;
+  lat: number;
+  lon: number;
+  timestamp: string;
+  temperature: number | null;
+  windSpeed: number | null;
+  windGust: number | null;
+  windDirection: number | null;
+  humidity: number | null;
+  pressure: number | null;
+  precipitation: number | null;
+  snowDepth: number | null;
+  sunshine: number | null;
+  solarRadiation: number | null;
+}
 
 // --- Constants ---
 
 const LAYER_NAME = 'Wetterstationen';
+const METADATA_URL =
+  'https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata';
+const DATA_URL =
+  'https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min';
+const PARAMETERS = 'TL,FF,FFX,DD,RF,P,RR,SCHNEE,SO,GLOW';
 const POLL_INTERVAL = 600000; // 10 minutes
-const CACHE_TTL_MS = POLL_INTERVAL;
+
+// Bounding box for Burgenland + nearby area
+const LAT_MIN = 46.8;
+const LAT_MAX = 48.2;
+const LON_MIN = 15.8;
+const LON_MAX = 17.2;
 
 // 16-point compass directions (German)
 const COMPASS_LABELS = [
@@ -93,15 +158,25 @@ function formatTimestamp(iso: string): string {
   }
 }
 
-// --- Data hook ---
+function getParamValue(
+  params: Record<string, ParameterValue>,
+  key: string
+): number | null {
+  const p = params[key];
+  if (!p || !p.data || p.data.length === 0) return null;
+  for (let i = p.data.length - 1; i >= 0; i--) {
+    if (p.data[i] !== null) return p.data[i];
+  }
+  return null;
+}
 
-function useWetterstationLiveData(wetterstationen: WetterstationRecord[]) {
-  const [liveData, setLiveData] = useState<Map<string, WetterstationLiveData>>(
-    new Map()
-  );
+// --- Data hook (lazy: only fetches when layer is visible) ---
+
+function useWetterstationData() {
+  const [data, setData] = useState<WetterstationData[]>([]);
   const [visible, setVisible] = useState(false);
-  const lastFetchRef = useRef<number>(0);
   const mountedRef = useRef(true);
+  const stationsRef = useRef<TawesStation[] | null>(null);
   const map = useMap();
 
   // Track layer visibility
@@ -120,68 +195,131 @@ function useWetterstationLiveData(wetterstationen: WetterstationRecord[]) {
     };
   }, [map]);
 
-  // Fetch live data when visible
+  // Fetch data only when visible
   useEffect(() => {
     mountedRef.current = true;
-    if (!visible || wetterstationen.length === 0) return;
+    if (!visible) return;
+    // Already have data from a previous activation — skip initial fetch
+    if (data.length > 0) return;
 
-    const stationIds = wetterstationen.map((s) => s.id!).filter(Boolean);
+    const fetchStations = async (): Promise<TawesStation[]> => {
+      if (stationsRef.current) return stationsRef.current;
+
+      const response = await fetch(METADATA_URL);
+      if (!response.ok) {
+        throw new Error(`Metadata fetch failed: ${response.status}`);
+      }
+      const metadata: TawesMetadataResponse = await response.json();
+
+      const filtered = metadata.stations.filter(
+        (s) =>
+          s.is_active &&
+          (s.state === 'Burgenland' ||
+            (s.lat >= LAT_MIN &&
+              s.lat <= LAT_MAX &&
+              s.lon >= LON_MIN &&
+              s.lon <= LON_MAX))
+      );
+
+      stationsRef.current = filtered;
+      return filtered;
+    };
 
     const refresh = async () => {
       try {
-        const data = await fetchWetterstationLiveData(stationIds);
+        const stations = await fetchStations();
+        if (!mountedRef.current || stations.length === 0) return;
+
+        const stationIds = stations.map((s) => s.id).join(',');
+        const url = `${DATA_URL}?parameters=${PARAMETERS}&station_ids=${stationIds}&output_format=geojson`;
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Data fetch failed: ${response.status}`);
+        }
+        const geojson: TawesGeoJSON = await response.json();
+
+        const stationMap = new Map<string, TawesStation>();
+        for (const s of stations) {
+          stationMap.set(s.id, s);
+        }
+
+        const lastIndex =
+          geojson.timestamps && geojson.timestamps.length > 0
+            ? geojson.timestamps.length - 1
+            : -1;
+        const timestamp = lastIndex >= 0 ? geojson.timestamps[lastIndex] : '';
+
+        const result: WetterstationData[] = geojson.features
+          .map((feature) => {
+            const stationId = feature.properties.station;
+            const station = stationMap.get(stationId);
+            if (!station) return null;
+
+            const params = feature.properties.parameters;
+            return {
+              stationId,
+              name: station.name,
+              altitude: station.altitude,
+              lat: feature.geometry.coordinates[1],
+              lon: feature.geometry.coordinates[0],
+              timestamp,
+              temperature: getParamValue(params, 'TL'),
+              windSpeed: getParamValue(params, 'FF'),
+              windGust: getParamValue(params, 'FFX'),
+              windDirection: getParamValue(params, 'DD'),
+              humidity: getParamValue(params, 'RF'),
+              pressure: getParamValue(params, 'P'),
+              precipitation: getParamValue(params, 'RR'),
+              snowDepth: getParamValue(params, 'SCHNEE'),
+              sunshine: getParamValue(params, 'SO'),
+              solarRadiation: getParamValue(params, 'GLOW'),
+            };
+          })
+          .filter(Boolean) as WetterstationData[];
+
         if (mountedRef.current) {
-          const map = new Map<string, WetterstationLiveData>();
-          for (const d of data) {
-            map.set(d.stationId, d);
+          if (result.length === 0) {
+            console.warn(
+              'Wetterstation: no stations in result, features:',
+              geojson.features.length
+            );
           }
-          setLiveData(map);
-          lastFetchRef.current = Date.now();
+          setData(result);
         }
       } catch (err) {
-        console.error('Failed to fetch Wetterstation live data', err);
+        console.error('Failed to fetch Wetterstation data', err);
+        if (mountedRef.current) {
+          setTimeout(() => {
+            if (mountedRef.current) refresh();
+          }, 30000);
+        }
       }
     };
 
-    const age = Date.now() - lastFetchRef.current;
-    if (age >= CACHE_TTL_MS) {
-      refresh();
-    }
-
+    refresh();
     const interval = setInterval(refresh, POLL_INTERVAL);
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
     };
-  }, [visible, wetterstationen]);
+  }, [visible, data.length]);
 
-  return liveData;
+  return data;
 }
 
 // --- Component ---
 
-interface WetterstationLayerProps {
-  wetterstationen: WetterstationRecord[];
-}
-
-export default function WetterstationLayer({
-  wetterstationen,
-}: WetterstationLayerProps) {
-  const liveDataMap = useWetterstationLiveData(wetterstationen);
+export default function WetterstationLayer() {
+  const stations = useWetterstationData();
 
   const markers = useMemo(
     () =>
-      wetterstationen.map((station) => {
-        const live = liveDataMap.get(station.id!);
-        const temperature = live?.temperature ?? null;
-        return {
-          ...station,
-          stationId: station.id!,
-          live,
-          color: temperatureToColor(temperature),
-        };
-      }),
-    [wetterstationen, liveDataMap]
+      stations.map((s) => ({
+        ...s,
+        color: temperatureToColor(s.temperature),
+      })),
+    [stations]
   );
 
   return (
@@ -190,7 +328,7 @@ export default function WetterstationLayer({
     >
       {markers.map((m) => (
         <Marker
-          position={[m.lat, m.lng]}
+          position={[m.lat, m.lon]}
           icon={getThermometerIcon(m.color)}
           key={m.stationId}
         >
@@ -198,103 +336,93 @@ export default function WetterstationLayer({
             <b>
               {m.name} ({m.altitude}&thinsp;m)
             </b>
-            {m.live ? (
-              <>
-                <table
-                  style={{
-                    borderCollapse: 'collapse',
-                    margin: '4px 0',
-                    width: '100%',
-                  }}
-                >
-                  <tbody>
-                    {m.live.temperature !== null && (
-                      <tr>
-                        <td>Temperatur</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.temperature.toFixed(1)}&thinsp;&deg;C
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.windSpeed !== null && (
-                      <tr>
-                        <td>Wind</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.windSpeed.toFixed(1)}&thinsp;m/s{' '}
-                          {degreesToCompass(m.live.windDirection)}
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.windGust !== null && (
-                      <tr>
-                        <td>Windspitze</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.windGust.toFixed(1)}&thinsp;m/s
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.humidity !== null && (
-                      <tr>
-                        <td>Feuchte</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.humidity.toFixed(0)}&thinsp;%
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.pressure !== null && (
-                      <tr>
-                        <td>Luftdruck</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.pressure.toFixed(1)}&thinsp;hPa
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.precipitation !== null &&
-                      m.live.precipitation > 0 && (
-                        <tr>
-                          <td>Niederschlag</td>
-                          <td style={{ textAlign: 'right' }}>
-                            {m.live.precipitation.toFixed(1)}&thinsp;mm
-                          </td>
-                        </tr>
-                      )}
-                    {m.live.snowDepth !== null && m.live.snowDepth > 0 && (
-                      <tr>
-                        <td>Schneehöhe</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {m.live.snowDepth.toFixed(0)}&thinsp;cm
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.sunshine !== null && m.live.sunshine > 0 && (
-                      <tr>
-                        <td>Sonnenschein</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {Math.round(m.live.sunshine / 60)}&thinsp;min
-                        </td>
-                      </tr>
-                    )}
-                    {m.live.solarRadiation !== null &&
-                      m.live.solarRadiation > 0 && (
-                        <tr>
-                          <td>Globalstrahlung</td>
-                          <td style={{ textAlign: 'right' }}>
-                            {m.live.solarRadiation.toFixed(0)}&thinsp;W/m&sup2;
-                          </td>
-                        </tr>
-                      )}
-                  </tbody>
-                </table>
-                {m.live.timestamp && (
-                  <span style={{ fontSize: '0.85em', color: '#666' }}>
-                    Stand: {formatTimestamp(m.live.timestamp)}
-                  </span>
+            <table
+              style={{
+                borderCollapse: 'collapse',
+                margin: '4px 0',
+                width: '100%',
+              }}
+            >
+              <tbody>
+                {m.temperature !== null && (
+                  <tr>
+                    <td>Temperatur</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.temperature.toFixed(1)}&thinsp;&deg;C
+                    </td>
+                  </tr>
                 )}
-              </>
-            ) : (
-              <p style={{ fontSize: '0.85em', color: '#666' }}>
-                Lade Wetterdaten...
-              </p>
+                {m.windSpeed !== null && (
+                  <tr>
+                    <td>Wind</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.windSpeed.toFixed(1)}&thinsp;m/s{' '}
+                      {degreesToCompass(m.windDirection)}
+                    </td>
+                  </tr>
+                )}
+                {m.windGust !== null && (
+                  <tr>
+                    <td>Windspitze</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.windGust.toFixed(1)}&thinsp;m/s
+                    </td>
+                  </tr>
+                )}
+                {m.humidity !== null && (
+                  <tr>
+                    <td>Feuchte</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.humidity.toFixed(0)}&thinsp;%
+                    </td>
+                  </tr>
+                )}
+                {m.pressure !== null && (
+                  <tr>
+                    <td>Luftdruck</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.pressure.toFixed(1)}&thinsp;hPa
+                    </td>
+                  </tr>
+                )}
+                {m.precipitation !== null && m.precipitation > 0 && (
+                  <tr>
+                    <td>Niederschlag</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.precipitation.toFixed(1)}&thinsp;mm
+                    </td>
+                  </tr>
+                )}
+                {m.snowDepth !== null && m.snowDepth > 0 && (
+                  <tr>
+                    <td>Schneehöhe</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.snowDepth.toFixed(0)}&thinsp;cm
+                    </td>
+                  </tr>
+                )}
+                {m.sunshine !== null && m.sunshine > 0 && (
+                  <tr>
+                    <td>Sonnenschein</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {Math.round(m.sunshine / 60)}&thinsp;min
+                    </td>
+                  </tr>
+                )}
+                {m.solarRadiation !== null && m.solarRadiation > 0 && (
+                  <tr>
+                    <td>Globalstrahlung</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {m.solarRadiation.toFixed(0)}&thinsp;W/m&sup2;
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            {m.timestamp && (
+              <span style={{ fontSize: '0.85em', color: '#666' }}>
+                Stand: {formatTimestamp(m.timestamp)}
+              </span>
             )}
             <br />
             <Link href={`/wetter/${m.stationId}`}>Verlauf &rarr;</Link>

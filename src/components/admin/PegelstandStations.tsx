@@ -29,15 +29,13 @@ import DownloadIcon from '@mui/icons-material/Download';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import UploadIcon from '@mui/icons-material/Upload';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { PegelstandStation } from '../Map/layers/PegelstandLayer';
 import {
-  type PegelstandStationDoc,
   fetchOgcStations,
   importAllStations,
   savePegelstandStation,
   deletePegelstandStation,
 } from '../../app/admin/PegelstandAdminAction';
-
-type PegelstandStation = PegelstandStationDoc & { id: string };
 import { fetchPegelstandData } from '../Map/layers/PegelstandAction';
 import LocationMapPicker from '../Einsatzorte/LocationMapPicker';
 

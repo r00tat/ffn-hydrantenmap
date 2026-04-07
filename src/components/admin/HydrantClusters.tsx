@@ -18,10 +18,10 @@ interface ProgressEvent {
 }
 
 const UPDATE_STEPS = [
-  { label: 'Bestehende Cluster laden', description: 'Aktuelle Cluster-Daten aus Firestore laden' },
-  { label: 'Collections laden', description: 'Hydranten, Risikoobjekte, Gefahrobjekte, Löschteiche, Saugstellen laden' },
-  { label: 'Wetterstationen & Pegelstände', description: 'Wetterstationen (GeoSphere) und Pegelstände (Bgld, NÖ, Stmk) importieren' },
-  { label: 'In Firestore speichern', description: 'Aktualisierte Cluster-Daten speichern' },
+  { label: 'Fetching existing clusters', description: 'Loading current cluster data from Firestore' },
+  { label: 'Fetching collections', description: 'Loading hydrant, risikoobjekt, gefahrobjekt, loeschteich, saugstelle' },
+  { label: 'Merging data', description: 'Combining records into geohash clusters' },
+  { label: 'Writing to Firestore', description: 'Saving updated clusters' },
 ];
 
 export default function HydrantClusters() {
@@ -117,9 +117,9 @@ export default function HydrantClusters() {
           Update Clusters from Existing Data
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Aktualisiert die Cluster-Daten aus allen Firestore-Collections (Hydranten, Risikoobjekte,
-          Gefahrobjekte, Löschteiche, Saugstellen) und importiert Wetterstationen (GeoSphere API)
-          sowie Pegelstände (Bgld, NÖ, Stmk). Nach dem Import neuer GIS-Daten ausführen.
+          Rebuilds cluster data from all existing Firestore collections (hydrant, risikoobjekt,
+          gefahrobjekt, loeschteich, saugstelle). Run this after importing new data via the
+          GIS Data Pipeline.
         </Typography>
         <Button
           variant="contained"
@@ -168,7 +168,6 @@ export default function HydrantClusters() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Bearbeiten Sie Hydranten, Risikoobjekte, Gefahrobjekte, Löschteiche und Saugstellen.
-          Wetterstationen und Pegelstände werden automatisch beim Cluster-Update importiert.
           Nach Änderungen bitte &quot;Update Clusters&quot; ausführen, um die Cluster-Daten zu
           aktualisieren.
         </Typography>

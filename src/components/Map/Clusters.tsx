@@ -14,10 +14,8 @@ import {
   GeohashCluster,
   HydrantenRecord,
   Loeschteich,
-  PegelstandRecord,
   RisikoObjekt,
   Saugstelle,
-  WetterstationRecord,
 } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
 import { db } from '../firebase/firebase';
@@ -26,9 +24,7 @@ import HydrantenLabelsLayer from './layers/HydrantenLabelsLayer';
 import HydrantenLayer from './layers/HydrantenLayer';
 import LoeschteicheLayer from './layers/LoeschteichLayer';
 import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
-import PegelstandLayer from './layers/PegelstandLayer';
 import SaugstellenLayer from './layers/SaugstellenLayer';
-import WetterstationLayer from './layers/WetterstationLayer';
 import L from 'leaflet';
 
 export async function queryClusters(center: L.LatLng, radiusInM: number) {
@@ -91,20 +87,9 @@ interface ClusterData {
   gefahrObjekte: GefahrObjekt[];
   loeschteiche: Loeschteich[];
   saugstellen: Saugstelle[];
-  wetterstationen: WetterstationRecord[];
-  pegelstaende: PegelstandRecord[];
 }
 
-/**
- * @param center - Map center
- * @param radiusInM - Capped radius for dense objects (hydrants etc.)
- * @param queryRadiusInM - Uncapped radius for the Firestore query and sparse objects (weather/pegel)
- */
-export function useClusters(
-  center: L.LatLng,
-  radiusInM: number,
-  queryRadiusInM: number
-): ClusterData {
+export function useClusters(center: L.LatLng, radiusInM: number): ClusterData {
   const [clusterData, setClusterData] = useState<ClusterData>({
     clusters: [],
     hydranten: [],
@@ -112,29 +97,29 @@ export function useClusters(
     gefahrObjekte: [],
     loeschteiche: [],
     saugstellen: [],
-    wetterstationen: [],
-    pegelstaende: [],
   });
 
   useEffect(() => {
-    if (queryRadiusInM > 0) {
+    if (radiusInM > 0) {
       (async () => {
-        // Query with the full visible radius
-        const matchingDocs = await queryClusters(center, queryRadiusInM);
-
-        // Dense objects: filter with capped radius
+        const matchingDocs = await queryClusters(center, radiusInM);
+        // console.info(matchingDocs);
         const matchingHydranten = filterRecords<HydrantenRecord>(
           matchingDocs,
           'hydranten',
           center,
           radiusInM
         );
+        // console.info(`cluster hydranten: ${matchingHydranten.length}`);
+
         const matchingRisiko = filterRecords<RisikoObjekt>(
           matchingDocs,
           'risikoobjekt',
           center,
           radiusInM
         );
+        // console.info(`cluster risikoobjekt: ${matchingRisiko.length}`);
+
         const gefahr = filterRecords<GefahrObjekt>(
           matchingDocs,
           'gefahrobjekt',
@@ -154,20 +139,6 @@ export function useClusters(
           radiusInM
         );
 
-        // Sparse objects: filter with full visible radius
-        const wetterstationen = filterRecords<WetterstationRecord>(
-          matchingDocs,
-          'wetterstationen',
-          center,
-          queryRadiusInM
-        );
-        const pegelstaende = filterRecords<PegelstandRecord>(
-          matchingDocs,
-          'pegelstaende',
-          center,
-          queryRadiusInM
-        );
-
         setClusterData({
           clusters: matchingDocs,
           hydranten: matchingHydranten,
@@ -175,12 +146,10 @@ export function useClusters(
           gefahrObjekte: gefahr,
           loeschteiche: loeschteiche,
           saugstellen: saugstellen,
-          wetterstationen,
-          pegelstaende,
         });
       })();
     }
-  }, [center, radiusInM, queryRadiusInM]);
+  }, [center, radiusInM]);
 
   return clusterData;
 }
@@ -195,36 +164,34 @@ export default function Clusters({
   const map = useMap();
   const [center, setCenter] = useState(map.getCenter() || defaultPosition);
   const [radius, setRadius] = useState(1000);
-  const [queryRadius, setQueryRadius] = useState(1000);
 
   useMapEvent('moveend', (event: L.LeafletEvent) => {
     (async () => {
       const b = map.getBounds();
+      // console.info(`map bounds: ${JSON.stringify(b)}`);
 
-      const rawRadius = Math.max(
-        b.getNorthWest().distanceTo(b.getSouthEast()) / 2,
-        250
+      const newRadius = Math.min(
+        Math.max(b.getNorthWest().distanceTo(b.getSouthEast()) / 2, 250),
+        2500
       );
-      // Capped radius for dense objects (hydrants etc.)
-      const newRadius = Math.min(rawRadius, 2500);
       if (Math.abs(radius - newRadius) > 50) {
+        // console.info(
+        //   `new radius: ${newRadius} (raw: ${
+        //     b.getNorthWest().distanceTo(b.getSouthEast()) / 2
+        //   })`
+        // );
         setRadius(newRadius);
-      }
-      // Query radius: grows with zoom level, capped at 50km
-      const newQueryRadius = Math.min(rawRadius, 50000);
-      if (Math.abs(queryRadius - newQueryRadius) > 50) {
-        setQueryRadius(newQueryRadius);
       }
 
       if (
         map.getCenter().lat &&
         map.getCenter().lng &&
         center &&
-        center.distanceTo(map.getCenter()) > queryRadius
+        center.distanceTo(map.getCenter()) > radius
       ) {
         console.info(
           `center changed, new center: ${map.getCenter()}, distance to last center: ${
-            center.distanceTo(map.getCenter()) > queryRadius
+            center.distanceTo(map.getCenter()) > radius
           }`
         );
         setCenter(map.getCenter());
@@ -232,8 +199,8 @@ export default function Clusters({
     })();
   });
 
-  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen, wetterstationen, pegelstaende } =
-    useClusters(center, radius * 2, queryRadius * 2);
+  const { hydranten, gefahrObjekte, risikoobjekte, loeschteiche, saugstellen } =
+    useClusters(center, radius * 2);
   return (
     <>
       <LayersControl.Overlay name="Hydranten" checked={defaultChecked?.hydranten ?? true}>
@@ -253,12 +220,6 @@ export default function Clusters({
           <RisikoObjekteLayer risikoObjekte={risikoobjekte} />
           <GefahrObjekteLayer gefahrObjekte={gefahrObjekte} />
         </LayerGroup>
-      </LayersControl.Overlay>
-      <LayersControl.Overlay name="Pegelstände">
-        <PegelstandLayer pegelstaende={pegelstaende} />
-      </LayersControl.Overlay>
-      <LayersControl.Overlay name="Wetterstationen">
-        <WetterstationLayer wetterstationen={wetterstationen} />
       </LayersControl.Overlay>
     </>
   );

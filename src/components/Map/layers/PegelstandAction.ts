@@ -565,7 +565,9 @@ function parseLakePage(html: string): PegelstandData[] {
   return results;
 }
 
-async function fetchAllPegelstandData(): Promise<PegelstandData[]> {
+export async function fetchPegelstandData(): Promise<PegelstandData[]> {
+  await actionUserRequired();
+
   try {
     const [riverResponse, lakeResponse, noeData, stmkData] =
       await Promise.all([
@@ -603,21 +605,4 @@ async function fetchAllPegelstandData(): Promise<PegelstandData[]> {
     console.error('Failed to fetch Pegelstand data:', error);
     return [];
   }
-}
-
-export async function fetchPegelstandData(): Promise<PegelstandData[]> {
-  await actionUserRequired();
-  return fetchAllPegelstandData();
-}
-
-export async function fetchPegelstandLiveData(
-  stationIds: string[]
-): Promise<PegelstandData[]> {
-  await actionUserRequired();
-
-  if (stationIds.length === 0) return [];
-
-  const allData = await fetchAllPegelstandData();
-  const requestedIds = new Set(stationIds);
-  return allData.filter((d) => requestedIds.has(d.slug));
 }
