@@ -143,8 +143,18 @@ export async function getBlaulichtSmsAlarmById(
 ): Promise<BlaulichtSmsAlarm | null> {
   await actionUserRequired();
 
-  const alarms = await getBlaulichtSmsAlarms(groupId);
-  return alarms.find((a) => a.alarmId === alarmId) ?? null;
+  try {
+    const alarms = await getBlaulichtSmsAlarms(groupId);
+    if (alarms.length === 0) {
+      console.warn(
+        `BlaulichtSMS: No alarms returned for group "${groupId}" — credentials may be missing or API login failed`
+      );
+    }
+    return alarms.find((a) => a.alarmId === alarmId) ?? null;
+  } catch (err) {
+    console.error(`BlaulichtSMS: Failed to fetch alarms for group "${groupId}":`, err);
+    return null;
+  }
 }
 
 export async function getFirecallsByAlarmIds(

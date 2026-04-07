@@ -86,18 +86,22 @@ export default function EinsatzDetails() {
 
   useEffect(() => {
     if (!blaulichtSmsAlarmId || !firecallGroup) return;
+    let cancelled = false;
     (async () => {
       try {
         const result = await getBlaulichtSmsAlarmById(
           firecallGroup,
           blaulichtSmsAlarmId
         );
-        setAlarm(result);
+        if (!cancelled) setAlarm(result);
       } catch (err) {
         console.error('Failed to load BlaulichtSMS alarm:', err);
-        setAlarm(null);
+        if (!cancelled) setAlarm(null);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [blaulichtSmsAlarmId, firecallGroup]);
 
   const updateFirecall = useCallback(
@@ -339,7 +343,10 @@ export default function EinsatzDetails() {
             <AlarmCard alarm={alarm} defaultExpandRecipients={false} />
           ) : (
             <Typography color="text.secondary">
-              BlaulichtSMS-Alarm konnte nicht geladen werden.
+              BlaulichtSMS-Alarm konnte nicht geladen werden (Alarm-ID:{' '}
+              {firecall.blaulichtSmsAlarmId}). Möglicherweise sind die
+              BlaulichtSMS-Zugangsdaten nicht konfiguriert oder der Alarm ist
+              nicht mehr verfügbar.
             </Typography>
           )}
         </Box>
