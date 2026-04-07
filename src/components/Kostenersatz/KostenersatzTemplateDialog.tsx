@@ -23,6 +23,7 @@ import {
   KostenersatzLineItem,
   KostenersatzRate,
   KostenersatzTemplateItem,
+  calculateItemSum,
 } from '../../common/kostenersatz';
 import {
   useKostenersatzTemplateAdd,
@@ -108,9 +109,39 @@ export default function KostenersatzTemplateDialog({
   const editedVehicleSet = new Set(editedVehicles);
 
   const handleToggleVehicle = (vehicleId: string) => {
+    const vehicle = vehiclesById.get(vehicleId);
+    const isRemoving = editedVehicles.includes(vehicleId);
+
     setEditedVehicles((prev) =>
-      prev.includes(vehicleId) ? prev.filter((id) => id !== vehicleId) : [...prev, vehicleId]
+      isRemoving ? prev.filter((id) => id !== vehicleId) : [...prev, vehicleId]
     );
+
+    if (vehicle) {
+      setEditedItems((prev) => {
+        if (isRemoving) {
+          // Decrement or remove the item for this vehicle's rate
+          const idx = prev.findIndex((item) => item.rateId === vehicle.rateId);
+          if (idx === -1) return prev;
+          if (prev[idx].einheiten > 1) {
+            return prev.map((item, i) =>
+              i === idx ? { ...item, einheiten: item.einheiten - 1 } : item
+            );
+          }
+          return prev.filter((_, i) => i !== idx);
+        } else {
+          // Add or increment the item for this vehicle's rate
+          const existing = prev.find((item) => item.rateId === vehicle.rateId);
+          if (existing) {
+            return prev.map((item) =>
+              item.rateId === vehicle.rateId
+                ? { ...item, einheiten: item.einheiten + 1 }
+                : item
+            );
+          }
+          return [...prev, { rateId: vehicle.rateId, einheiten: 1 }];
+        }
+      });
+    }
   };
 
   const addTemplate = useKostenersatzTemplateAdd();
@@ -219,46 +250,61 @@ export default function KostenersatzTemplateDialog({
               </Box>
             </Box>
           )}
-          {/* Show items list when editing existing template */}
-          {existingTemplate?.id && editedItems.length > 0 && (
+          {/* Items list */}
+          {editedItems.length > 0 && (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Positionen ({editedItems.length})
               </Typography>
               <List dense sx={{ bgcolor: 'action.hover', borderRadius: 1 }}>
-                {editedItems.map((item, index) => (
-                  <ListItem
-                    key={`${item.rateId}-${index}`}
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        onClick={() => handleRemoveItem(index)}
-                        title="Position entfernen"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemText
-                      primary={getRateDescription(item.rateId)}
-                      secondary={
-                        <TextField
-                          type="number"
+                {editedItems.map((item, index) => {
+                  const rate = rates.find((r) => r.id === item.rateId);
+                  const costAt1h = rate
+                    ? calculateItemSum(1, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
+                    : 0;
+                  return (
+                    <ListItem
+                      key={`${item.rateId}-${index}`}
+                      secondaryAction={
+                        <IconButton
+                          edge="end"
                           size="small"
-                          value={item.einheiten}
-                          onChange={(e) =>
-                            handleUpdateItemCount(index, Math.max(1, parseInt(e.target.value) || 1))
-                          }
-                          slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                          sx={{ width: 80, mt: 0.5 }}
-                          label="Einheiten"
-                        />
+                          onClick={() => handleRemoveItem(index)}
+                          title="Position entfernen"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
                       }
-                      slotProps={{ secondary: { component: 'div' } }}
-                    />
-                  </ListItem>
-                ))}
+                    >
+                      <ListItemText
+                        primary={
+                          <>
+                            {getRateDescription(item.rateId)}
+                            {costAt1h > 0 && (
+                              <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                                ({costAt1h.toFixed(2)} € / 1h)
+                              </Typography>
+                            )}
+                          </>
+                        }
+                        secondary={
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={item.einheiten}
+                            onChange={(e) =>
+                              handleUpdateItemCount(index, Math.max(1, parseInt(e.target.value) || 1))
+                            }
+                            slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                            sx={{ width: 80, mt: 0.5 }}
+                            label="Einheiten"
+                          />
+                        }
+                        slotProps={{ secondary: { component: 'div' } }}
+                      />
+                    </ListItem>
+                  );
+                })}
               </List>
             </Box>
           )}

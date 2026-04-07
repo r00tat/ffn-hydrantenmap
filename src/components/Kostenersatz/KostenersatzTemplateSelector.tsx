@@ -19,7 +19,7 @@ import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import PersonIcon from '@mui/icons-material/Person';
 import { useState } from 'react';
 import { KostenersatzTemplate } from '../../common/kostenersatz';
-import { useKostenersatzTemplates } from '../../hooks/useKostenersatz';
+import { useKostenersatzRates, useKostenersatzTemplates } from '../../hooks/useKostenersatz';
 import { useKostenersatzTemplateDelete } from '../../hooks/useKostenersatzMutations';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import KostenersatzTemplateDialog from './KostenersatzTemplateDialog';
@@ -36,6 +36,7 @@ export default function KostenersatzTemplateSelector({
   onSelect,
 }: KostenersatzTemplateSelectorProps) {
   const { sharedTemplates, personalTemplates, loading } = useKostenersatzTemplates();
+  const { rates } = useKostenersatzRates();
   const { email, isAdmin } = useFirebaseLogin();
   const deleteTemplate = useKostenersatzTemplateDelete();
 
@@ -215,6 +216,7 @@ export default function KostenersatzTemplateSelector({
           onClose={handleEditClose}
           existingTemplate={editingTemplate}
           isAdmin={isAdmin}
+          rates={rates}
         />
       )}
 
