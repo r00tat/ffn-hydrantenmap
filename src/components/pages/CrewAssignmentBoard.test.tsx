@@ -48,11 +48,13 @@ vi.mock('@dnd-kit/core', () => ({
   DndContext: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="dnd-context">{children}</div>
   ),
+  DragOverlay: () => null,
   useDraggable: () => ({
     attributes: {},
     listeners: {},
     setNodeRef: vi.fn(),
     transform: null,
+    isDragging: false,
   }),
   useDroppable: () => ({
     isOver: false,
@@ -171,24 +173,23 @@ describe('CrewAssignmentBoard', () => {
     expect(mockSyncFromAlarm).toHaveBeenCalledWith(mockAlarm.recipients);
   });
 
-  it('renders vehicle columns on desktop', () => {
-    mockUseMediaQuery.mockReturnValue(false);
+  it('renders person names in table', () => {
     render(<CrewAssignmentBoard alarm={mockAlarm} />);
-    // DndContext wrapper should be present
-    expect(screen.getByTestId('dnd-context')).toBeInTheDocument();
-    // Should show person names
     expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
     expect(screen.getByText('Anna Beispiel')).toBeInTheDocument();
   });
 
-  it('shows accordion sections on mobile', () => {
-    mockUseMediaQuery.mockReturnValue(true);
+  it('renders vehicle section headers with counts', () => {
     render(<CrewAssignmentBoard alarm={mockAlarm} />);
-    // Accordion headers show vehicle name with count
-    expect(
-      screen.getByText(/Verfügbar \(1\)/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Verfügbar \(1\)/)).toBeInTheDocument();
     expect(screen.getByText(/KDTFA \(1\)/)).toBeInTheDocument();
     expect(screen.getByText(/TLFA 4000 \(0\)/)).toBeInTheDocument();
+  });
+
+  it('renders table column headers', () => {
+    render(<CrewAssignmentBoard alarm={mockAlarm} />);
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Funktion')).toBeInTheDocument();
+    expect(screen.getByText('Fahrzeug')).toBeInTheDocument();
   });
 });

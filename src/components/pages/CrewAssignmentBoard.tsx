@@ -2,69 +2,184 @@
 
 import React, { useCallback, useEffect } from 'react';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Box,
+  FormControl,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
   DragEndEvent,
+  DragOverlay,
   MouseSensor,
   TouchSensor,
+  useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { useDraggable } from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
 import useCrewAssignments from '../../hooks/useCrewAssignments';
 import useVehicles from '../../hooks/useVehicles';
-import { CrewFunktion } from '../firebase/firestore';
-import CrewVehicleColumn from './CrewVehicleColumn';
-import CrewPersonCard from './CrewPersonCard';
-
-import { useDroppable } from '@dnd-kit/core';
-
-function MobileDropSection({
-  droppableId,
-  label,
-  defaultExpanded,
-  children,
-}: {
-  droppableId: string;
-  label: string;
-  defaultExpanded?: boolean;
-  children: React.ReactNode;
-}) {
-  const { isOver, setNodeRef } = useDroppable({ id: droppableId });
-
-  return (
-    <Accordion
-      defaultExpanded={defaultExpanded}
-      ref={setNodeRef}
-      sx={{
-        borderColor: isOver ? 'primary.main' : undefined,
-        borderWidth: isOver ? 2 : undefined,
-        borderStyle: isOver ? 'solid' : undefined,
-      }}
-    >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography>{label}</Typography>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {children}
-        </Box>
-      </AccordionDetails>
-    </Accordion>
-  );
-}
+import {
+  CrewAssignment,
+  CrewFunktion,
+  CREW_FUNKTIONEN,
+  Fzg,
+} from '../firebase/firestore';
 
 export interface CrewAssignmentBoardProps {
   alarm: BlaulichtSmsAlarm;
+}
+
+function DroppableTableBody({
+  droppableId,
+  children,
+}: {
+  droppableId: string;
+  children: React.ReactNode;
+}) {
+  const { isOver, setNodeRef } = useDroppable({ id: droppableId });
+  return (
+    <TableBody
+      ref={setNodeRef}
+      sx={{
+        backgroundColor: isOver ? 'action.hover' : undefined,
+      }}
+    >
+      {children}
+    </TableBody>
+  );
+}
+
+function CrewRow({
+  assignment,
+  vehicles,
+  showVehicleSelect,
+  onFunktionChange,
+  onVehicleChange,
+  isMobile,
+}: {
+  assignment: CrewAssignment;
+  vehicles: Fzg[];
+  showVehicleSelect: boolean;
+  onFunktionChange: (funktion: CrewFunktion) => void;
+  onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
+  isMobile: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: assignment.id || assignment.recipientId,
+    });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 1000,
+        position: 'relative' as const,
+      }
+    : undefined;
+
+  const handleFunktionChange = (event: SelectChangeEvent) => {
+    onFunktionChange(event.target.value as CrewFunktion);
+  };
+
+  const handleVehicleChange = (event: SelectChangeEvent) => {
+    const value = event.target.value;
+    if (value === '') {
+      onVehicleChange(null, '');
+    } else {
+      const vehicle = vehicles.find((v) => v.id === value);
+      onVehicleChange(value, vehicle?.name || '');
+    }
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      sx={{ opacity: isDragging ? 0.5 : 1 }}
+    >
+      <TableCell sx={{ width: 32, p: 0.5 }}>
+        <DragIndicatorIcon
+          {...listeners}
+          {...attributes}
+          fontSize="small"
+          sx={{
+            cursor: 'grab',
+            color: 'action.active',
+            touchAction: 'none',
+          }}
+        />
+      </TableCell>
+      <TableCell sx={{ p: 0.5 }}>
+        <Typography variant="body2" noWrap>
+          {assignment.name}
+        </Typography>
+      </TableCell>
+      <TableCell sx={{ p: 0.5 }}>
+        <FormControl size="small" fullWidth>
+          <Select
+            value={assignment.funktion}
+            onChange={handleFunktionChange}
+            size="small"
+            variant="standard"
+            sx={{ fontSize: '0.875rem' }}
+          >
+            {CREW_FUNKTIONEN.map((f) => (
+              <MenuItem key={f} value={f}>
+                {isMobile ? funktionAbkuerzung(f) : f}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </TableCell>
+      {showVehicleSelect && (
+        <TableCell sx={{ p: 0.5 }}>
+          <FormControl size="small" fullWidth>
+            <Select
+              value={assignment.vehicleId || ''}
+              onChange={handleVehicleChange}
+              size="small"
+              variant="standard"
+              displayEmpty
+              sx={{ fontSize: '0.875rem' }}
+            >
+              <MenuItem value="">—</MenuItem>
+              {vehicles.map((v) => (
+                <MenuItem key={v.id} value={v.id}>
+                  {v.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+}
+
+function funktionAbkuerzung(funktion: CrewFunktion): string {
+  const map: Record<CrewFunktion, string> = {
+    Feuerwehrmann: 'FM',
+    Maschinist: 'MA',
+    Gruppenkommandant: 'GK',
+    Atemschutzträger: 'ATS',
+    Zugskommandant: 'ZK',
+    Einsatzleiter: 'EL',
+  };
+  return map[funktion];
 }
 
 export default function CrewAssignmentBoard({
@@ -130,6 +245,23 @@ export default function CrewAssignmentBoard({
     [assignVehicle],
   );
 
+  const renderRows = (assignments: CrewAssignment[]) =>
+    assignments.map((a) => (
+      <CrewRow
+        key={a.id || a.recipientId}
+        assignment={a}
+        vehicles={vehicles}
+        showVehicleSelect
+        isMobile={isMobile}
+        onFunktionChange={(funktion) =>
+          handleFunktionChange(a.id || a.recipientId, funktion)
+        }
+        onVehicleChange={(vId, vName) =>
+          handleVehicleChange(a.id || a.recipientId, vId, vName)
+        }
+      />
+    ));
+
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
@@ -137,84 +269,56 @@ export default function CrewAssignmentBoard({
       </Typography>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        {isMobile ? (
-          <Box>
-            <MobileDropSection
-              droppableId="unassigned"
-              label={`Verfügbar (${unassigned.length})`}
-              defaultExpanded
-            >
-              {unassigned.map((a) => (
-                <CrewPersonCard
-                  key={a.id || a.recipientId}
-                  assignment={a}
-                  showVehicleSelect
-                  vehicles={vehicles}
-                  onFunktionChange={(funktion) =>
-                    handleFunktionChange(a.id || a.recipientId, funktion)
-                  }
-                  onVehicleChange={(vId, vName) =>
-                    handleVehicleChange(a.id || a.recipientId, vId, vName)
-                  }
-                />
-              ))}
-            </MobileDropSection>
+        <TableContainer>
+          <Table size="small" sx={{ tableLayout: 'auto' }}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ width: 32, p: 0.5 }} />
+                <TableCell sx={{ p: 0.5 }}>Name</TableCell>
+                <TableCell sx={{ p: 0.5, minWidth: isMobile ? 60 : 140 }}>
+                  Funktion
+                </TableCell>
+                <TableCell sx={{ p: 0.5, minWidth: isMobile ? 60 : 120 }}>
+                  Fahrzeug
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            {/* Unassigned section */}
+            <DroppableTableBody droppableId="unassigned">
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  sx={{ p: 0.5, backgroundColor: 'action.hover' }}
+                >
+                  <Typography variant="subtitle2">
+                    Verfügbar ({unassigned.length})
+                  </Typography>
+                </TableCell>
+              </TableRow>
+              {renderRows(unassigned)}
+            </DroppableTableBody>
+            {/* Vehicle sections */}
             {vehicles.map((v) => {
               const assigned = assignedToVehicle(v.id!);
               return (
-                <MobileDropSection
-                  key={v.id}
-                  droppableId={v.id!}
-                  label={`${v.name} (${assigned.length})`}
-                >
-                  {assigned.map((a) => (
-                    <CrewPersonCard
-                      key={a.id || a.recipientId}
-                      assignment={a}
-                      showVehicleSelect
-                      vehicles={vehicles}
-                      onFunktionChange={(funktion) =>
-                        handleFunktionChange(
-                          a.id || a.recipientId,
-                          funktion,
-                        )
-                      }
-                      onVehicleChange={(vId, vName) =>
-                        handleVehicleChange(
-                          a.id || a.recipientId,
-                          vId,
-                          vName,
-                        )
-                      }
-                    />
-                  ))}
-                </MobileDropSection>
+                <DroppableTableBody key={v.id} droppableId={v.id!}>
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      sx={{ p: 0.5, backgroundColor: 'action.hover' }}
+                    >
+                      <Typography variant="subtitle2">
+                        {v.name} ({assigned.length})
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                  {renderRows(assigned)}
+                </DroppableTableBody>
               );
             })}
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
-            <CrewVehicleColumn
-              vehicleId={null}
-              vehicleName="Verfügbar"
-              assignments={unassigned}
-              vehicles={vehicles}
-              onFunktionChange={handleFunktionChange}
-              onVehicleChange={handleVehicleChange}
-            />
-            {vehicles.map((v) => (
-              <CrewVehicleColumn
-                key={v.id}
-                vehicleId={v.id!}
-                vehicleName={v.name}
-                assignments={assignedToVehicle(v.id!)}
-                vehicles={vehicles}
-                onFunktionChange={handleFunktionChange}
-                onVehicleChange={handleVehicleChange}
-              />
-            ))}
-          </Box>
-        )}
+          </Table>
+        </TableContainer>
+        <DragOverlay />
       </DndContext>
     </Box>
   );

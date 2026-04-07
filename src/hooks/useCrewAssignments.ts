@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import {
   addDoc,
   collection,
@@ -47,17 +47,23 @@ export default function useCrewAssignments() {
     [firecallId]
   );
 
+  // Use ref to access crewAssignments without causing re-renders of syncFromAlarm
+  const crewAssignmentsRef = useRef(crewAssignments);
+  crewAssignmentsRef.current = crewAssignments;
+
   const syncFromAlarm = useCallback(
     async (recipients: BlaulichtSmsRecipient[]) => {
       if (!crewCollectionRef) return;
 
       const existingRecipientIds = new Set(
-        crewAssignments.map((a) => a.recipientId)
+        crewAssignmentsRef.current.map((a) => a.recipientId)
       );
 
       const newRecipients = recipients.filter(
         (r) => r.participation === 'yes' && !existingRecipientIds.has(r.id)
       );
+
+      if (newRecipients.length === 0) return;
 
       const now = new Date().toISOString();
       await Promise.all(
@@ -74,7 +80,7 @@ export default function useCrewAssignments() {
         )
       );
     },
-    [crewCollectionRef, crewAssignments, email]
+    [crewCollectionRef, email]
   );
 
   const assignVehicle = useCallback(
