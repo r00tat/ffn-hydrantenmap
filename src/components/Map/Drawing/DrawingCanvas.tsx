@@ -91,24 +91,15 @@ export default function DrawingCanvas() {
     const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
     const onMouseUp = () => handleUp();
 
-    // Let touch events on interactive UI elements (buttons, inputs) pass
-    // through so the toolbar's Abbrechen/Fertig buttons remain clickable.
-    const isInteractive = (target: EventTarget | null): boolean =>
-      target instanceof HTMLElement &&
-      !!target.closest('button, a, input, [role="button"]');
-
     const onTouchStart = (e: TouchEvent) => {
-      if (isInteractive(e.target)) return;
       e.preventDefault();
       handleDown(e.touches[0].clientX, e.touches[0].clientY);
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (isInteractive(e.target)) return;
       e.preventDefault();
       handleMove(e.touches[0].clientX, e.touches[0].clientY);
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (isInteractive(e.target)) return;
       e.preventDefault();
       handleUp();
     };
