@@ -100,6 +100,7 @@ export class FirecallVehicle extends FirecallItemBase {
             Abrücken: {formatTimestamp(this.abruecken)} <br />
           </>
         )}
+        {this.id && <VehicleCrewPopup vehicleId={this.id} />}
       </>
     );
   }
