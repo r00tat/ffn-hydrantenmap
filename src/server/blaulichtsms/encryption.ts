@@ -2,7 +2,7 @@ import 'server-only';
 
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { firebaseApp } from '../firebase/admin';
+import { getGcpProjectId } from '../firebase/project';
 
 // Module-level cache: valid for the lifetime of this server instance.
 // If the secret is rotated, redeploy to pick up the new key.
@@ -11,17 +11,7 @@ let cachedKey: Buffer | null = null;
 async function getEncryptionKey(): Promise<Buffer> {
   if (cachedKey) return cachedKey;
 
-  const project =
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    process.env.GCP_PROJECT ||
-    process.env.GCLOUD_PROJECT ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    firebaseApp.options.projectId;
-  if (!project) {
-    throw new Error(
-      'No GCP project ID found. Set GOOGLE_CLOUD_PROJECT or NEXT_PUBLIC_FIREBASE_PROJECT_ID.'
-    );
-  }
+  const project = await getGcpProjectId();
 
   const secretName = `projects/${project}/secrets/BLAULICHTSMS_ENCRYPTION_KEY/versions/latest`;
   const client = new SecretManagerServiceClient();
