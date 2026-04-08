@@ -15,10 +15,13 @@ import {
   SetStateAction,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import { db, firestore } from '../components/firebase/firebase';
 import {
+  CrewAssignment,
+  CrewFunktion,
   Firecall,
   FIRECALL_COLLECTION_ID,
 } from '../components/firebase/firestore';
@@ -32,10 +35,18 @@ export const defaultFirecall: Firecall = {
 export interface FirecallContextType {
   firecall: Firecall | undefined;
   setFirecallId?: Dispatch<SetStateAction<string | undefined>>;
+  crewAssignments: CrewAssignment[];
+  assignVehicle: (id: string, vehicleId: string | null, vehicleName: string) => Promise<void>;
+  updateFunktion: (id: string, funktion: CrewFunktion) => Promise<void>;
 }
+
+const noopAsync = async () => {};
 
 export const FirecallContext = createContext<FirecallContextType>({
   firecall: defaultFirecall,
+  crewAssignments: [],
+  assignVehicle: noopAsync,
+  updateFunktion: noopAsync,
 });
 
 export function useLastFirecall() {
@@ -104,7 +115,7 @@ export function useLastFirecall() {
   return firecall;
 }
 
-export function useFirecallSwitcher(): FirecallContextType {
+export function useFirecallSwitcher(): Pick<FirecallContextType, 'firecall' | 'setFirecallId'> {
   const [firecallId, setFirecallId] = useState<string>();
   const [firecall, setFirecall] = useState<Firecall>();
 
@@ -146,7 +157,7 @@ export function useFirecallSwitcher(): FirecallContextType {
   };
 }
 
-export function useLastOrSelectedFirecall(): FirecallContextType {
+export function useLastOrSelectedFirecall(): Pick<FirecallContextType, 'firecall' | 'setFirecallId'> {
   const lastFirecall = useLastFirecall();
   const { firecall, setFirecallId } = useFirecallSwitcher();
 
@@ -168,6 +179,19 @@ export const useFirecall = (): Firecall => {
 export const useFirecallId = (): string => {
   const { firecall } = useContext(FirecallContext);
   return firecall?.id || 'unknown';
+};
+
+export const useCrewForVehicle = (vehicleId: string): CrewAssignment[] => {
+  const { crewAssignments } = useContext(FirecallContext);
+  return useMemo(
+    () => crewAssignments.filter((c) => c.vehicleId === vehicleId),
+    [crewAssignments, vehicleId]
+  );
+};
+
+export const useCrewAssignmentActions = () => {
+  const { assignVehicle, updateFunktion } = useContext(FirecallContext);
+  return { assignVehicle, updateFunktion };
 };
 
 export default useFirecall;
