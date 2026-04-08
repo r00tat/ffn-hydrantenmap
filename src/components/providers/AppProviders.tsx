@@ -10,6 +10,7 @@ import React, { Suspense } from 'react';
 import About from '../../app/about/page';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useServerActionErrorDetection from '../../hooks/useServerActionErrorDetection';
 import useServiceWorkerUpdate from '../../hooks/useServiceWorkerUpdate';
 import styles from '../../styles/Home.module.css';
 import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
@@ -75,6 +76,7 @@ function AuthorizationApp({ children }: AppProps) {
 
 function ServiceWorkerUpdateListener() {
   useServiceWorkerUpdate();
+  useServerActionErrorDetection();
   return null;
 }
 
