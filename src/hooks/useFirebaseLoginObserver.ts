@@ -20,9 +20,10 @@ import {
   loadAuthFromSessionStorage,
   saveAuthToSessionStorage,
 } from './auth/sessionStorage';
+import { loginTimer } from '../common/loginTiming';
 
 // Re-export types for backward compatibility
-export type { LoginData, LoginStatus } from './auth/types';
+export type { LoginData, LoginStatus, LoginStep } from './auth/types';
 
 function nonNull(value: any) {
   return value !== null ? value : undefined;
@@ -31,7 +32,7 @@ function nonNull(value: any) {
 function getInitialLoginStatus(): LoginData {
   const cachedAuth = loadAuthFromSessionStorage();
   if (cachedAuth) {
-    return { ...cachedAuth, isRefreshing: true, isAuthLoading: false };
+    return { ...cachedAuth, isRefreshing: true, isAuthLoading: false, loginStep: 'done' };
   }
   return {
     isSignedIn: false,
@@ -39,6 +40,7 @@ function getInitialLoginStatus(): LoginData {
     isAdmin: false,
     isAuthLoading: true,
     myGroups: [],
+    loginStep: 'idle',
   };
 }
 
@@ -68,24 +70,32 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     : loginStatus.firecall;
 
   const serverLogin = useCallback(async () => {
+    const timer = loginTimer('serverLogin');
+    timer.step('getIdToken');
     const token = await auth.currentUser?.getIdToken();
     if (token) {
+      timer.step('firebaseTokenLogin');
       await firebaseTokenLogin(token);
+      timer.done();
     } else {
+      timer.done();
       console.warn(`server login: no token available`);
     }
   }, []);
 
   const refresh = useCallback(async () => {
     if (!uid) return;
+    const timer = loginTimer('refresh');
 
     try {
+      timer.step('getMyGroupsFromServer');
       const groups = await getMyGroupsFromServer().catch(() => [] as Group[]);
       setMyGroups(groups);
 
       const hasSessionData = session?.user?.isAuthorized !== undefined;
 
       if (hasSessionData) {
+        timer.step('handleSessionBasedRefresh');
         await handleSessionBasedRefresh(
           session,
           setNeedsReLogin,
@@ -101,9 +111,12 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           isRefreshing: false,
         }));
       } else {
+        timer.step('handleFirestoreBasedRefresh');
         await handleFirestoreBasedRefresh(uid, setNeedsReLogin, setLoginStatus);
       }
+      timer.done();
     } catch (err) {
+      timer.done();
       console.error(`failed to refresh user data`, err);
       setLoginStatus((prev) => ({ ...prev, isRefreshing: false }));
     }
@@ -123,41 +136,61 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   useEffect(() => {
     const unregisterAuthObserver = auth.onAuthStateChanged(
       async (user: User | null) => {
+        const timer = loginTimer('onAuthStateChanged');
         const u: User | undefined = user != null ? user : undefined;
         setUid(u?.uid);
 
-        const token = await user?.getIdToken();
-        if (token) {
-          await serverLoginRef.current();
-
-          // Force token refresh to get latest claims
-          await user?.getIdToken(true);
-        }
-
-        const tokenResult = await user?.getIdTokenResult();
-        const idToken = await user?.getIdToken();
-
-        const authData: Partial<LoginData> = {
-          isSignedIn: !!user,
-          isAuthLoading: false,
-          user: user !== null ? user : undefined,
-          email: nonNull(u?.email),
-          displayName: nonNull(u?.displayName),
-          uid: nonNull(u?.uid),
-          photoURL: nonNull(u?.photoURL),
-          expiration: tokenResult?.expirationTime,
-          idToken,
-          groups: (tokenResult?.claims?.groups as string[]) || [],
-          isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
-          isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
-          isRefreshing: true,
-          firecall: tokenResult?.claims?.firecall as string | undefined,
-        };
-
-        setLoginStatus((prev) => ({ ...prev, ...authData }));
-        await refreshRef.current();
         if (user) {
+          setLoginStatus((prev) => ({ ...prev, loginStep: 'authenticating' }));
+          timer.step('getIdToken (initial)');
+          const token = await user.getIdToken();
+          if (token) {
+            setLoginStatus((prev) => ({ ...prev, loginStep: 'verifying' }));
+            timer.step('serverLogin');
+            await serverLoginRef.current();
+
+            timer.step('getIdToken (force refresh)');
+            await user.getIdToken(true);
+          }
+
+          timer.step('getIdTokenResult');
+          const tokenResult = await user.getIdTokenResult();
+          timer.step('getIdToken (final)');
+          const idToken = await user.getIdToken();
+
+          const authData: Partial<LoginData> = {
+            isSignedIn: true,
+            isAuthLoading: false,
+            user,
+            email: nonNull(u?.email),
+            displayName: nonNull(u?.displayName),
+            uid: nonNull(u?.uid),
+            photoURL: nonNull(u?.photoURL),
+            expiration: tokenResult?.expirationTime,
+            idToken,
+            groups: (tokenResult?.claims?.groups as string[]) || [],
+            isAdmin: (tokenResult?.claims?.isAdmin as boolean) || false,
+            isAuthorized: (tokenResult?.claims?.authorized as boolean) || false,
+            isRefreshing: true,
+            loginStep: 'loading_permissions',
+            firecall: tokenResult?.claims?.firecall as string | undefined,
+          };
+
+          setLoginStatus((prev) => ({ ...prev, ...authData }));
+          timer.step('refresh');
+          await refreshRef.current();
+          setLoginStatus((prev) => ({ ...prev, loginStep: 'done' }));
+          timer.done();
           console.info(`login completed for ${user.email}`);
+        } else {
+          setLoginStatus((prev) => ({
+            ...prev,
+            isSignedIn: false,
+            isAuthLoading: false,
+            user: undefined,
+            loginStep: 'idle',
+          }));
+          timer.done();
         }
       }
     );
@@ -280,7 +313,9 @@ async function handleSessionBasedRefresh(
   serverLogin: () => Promise<void>
 ) {
   if (!auth.currentUser) return;
+  const timer = loginTimer('handleSessionBasedRefresh');
 
+  timer.step('getIdTokenResult');
   const tokenClaims = (await auth.currentUser.getIdTokenResult()).claims;
   const sessionGroups = uniqueArray(session.user.groups || [])?.sort().join(',');
   const tokenGroups = uniqueArray((tokenClaims.groups as string[]) || [])?.sort().join(',');
@@ -291,6 +326,7 @@ async function handleSessionBasedRefresh(
   ) {
     console.info(`token claims differ from session data, attempting auto-refresh`);
 
+    timer.step('refreshTokenUntilClaimsMatch');
     const refreshed = await refreshTokenUntilClaimsMatch(
       session.user.isAuthorized,
       session.user.groups || []
@@ -300,6 +336,7 @@ async function handleSessionBasedRefresh(
       console.info(`token auto-refreshed successfully`);
       setNeedsReLogin(false);
       setCredentialsRefreshed(true);
+      timer.step('serverLogin (after claims refresh)');
       await serverLogin();
     } else {
       console.warn(`token claims still differ after auto-refresh, manual re-login may be required`);
@@ -308,6 +345,7 @@ async function handleSessionBasedRefresh(
   } else {
     setNeedsReLogin(false);
   }
+  timer.done();
 }
 
 async function handleFirestoreBasedRefresh(
