@@ -307,6 +307,18 @@ export interface CrewAssignment {
   updatedBy?: string;
 }
 
+export function funktionAbkuerzung(funktion: CrewFunktion): string {
+  const map: Record<CrewFunktion, string> = {
+    Feuerwehrmann: 'FM',
+    Maschinist: 'MA',
+    Gruppenkommandant: 'GK',
+    Atemschutzträger: 'ATS',
+    Zugskommandant: 'ZK',
+    Einsatzleiter: 'EL',
+  };
+  return map[funktion];
+}
+
 export function dateToYmd(date: Date) {
   return `${date.getFullYear()}-${
     date.getMonth() < 10 ? '0' : ''

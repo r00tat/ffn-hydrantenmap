@@ -2,6 +2,7 @@ import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { formatTimestamp } from '../../../common/time-format';
 import { Fzg } from '../../firebase/firestore';
+import VehicleCrewPopup from '../VehicleCrewPopup';
 import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallVehicle extends FirecallItemBase {
@@ -99,6 +100,7 @@ export class FirecallVehicle extends FirecallItemBase {
             Abrücken: {formatTimestamp(this.abruecken)} <br />
           </>
         )}
+        {this.id && <VehicleCrewPopup vehicleId={this.id} />}
       </>
     );
   }
@@ -165,6 +167,7 @@ export class FirecallVehicle extends FirecallItemBase {
             Abrücken: {formatTimestamp(this.abruecken)}
           </>
         )}
+        {this.id && <VehicleCrewPopup vehicleId={this.id} />}
       </>
     );
   }

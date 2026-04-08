@@ -50,6 +50,7 @@ import FirecallItemFields from './FirecallItemFields';
 import HeatmapSettings from './HeatmapSettings';
 import { computeAllFields } from '../../common/computeFieldValue';
 import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
+import VehicleCrewSection from './VehicleCrewSection';
 import VehicleQuickAddChips from './VehicleQuickAddChips';
 
 export interface FirecallItemDialogOptions {
@@ -420,6 +421,9 @@ export default function FirecallItemDialog({
                   isNew={!item.id}
                   flushRef={dataFieldsRef}
                 />
+              )}
+              {item.type === 'vehicle' && item.id && (
+                <VehicleCrewSection vehicleId={item.id} />
               )}
             </>
           )}
