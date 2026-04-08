@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import { firestore } from '../../../../../server/firebase/admin';
@@ -10,6 +11,15 @@ import {
   loadRatesForVersion,
   generatePdfBuffer,
 } from '../../../../../components/Kostenersatz/completePaymentAndNotify';
+
+function timingSafeTokenEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export async function GET(
   request: NextRequest,
@@ -42,8 +52,9 @@ export async function GET(
       ...calculationDoc.data(),
     } as KostenersatzCalculation;
 
-    // Verify token
-    if (!calculation.sumupRedirectToken || calculation.sumupRedirectToken !== token) {
+    // Verify token (timing-safe to prevent side-channel attacks)
+    const storedToken = calculation.sumupRedirectToken;
+    if (!storedToken || !timingSafeTokenEqual(storedToken, token)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

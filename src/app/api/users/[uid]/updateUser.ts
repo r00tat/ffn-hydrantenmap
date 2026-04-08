@@ -40,14 +40,12 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     });
 
   setCustomClaimsForUser(uid, {
-    ...user,
     groups: newData.groups,
-    // extend with isAdmin
-    isAdmin: !!user.isAdmin,
-    authorized: !!user.authorized,
-  } as CustomClaims);
+    isAdmin: newData.isAdmin,
+    authorized: newData.authorized,
+  });
 
-  return { ...newData, ...user };
+  return newData;
 }
 
 export interface CustomClaims {

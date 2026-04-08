@@ -1,6 +1,7 @@
 'use server';
 import 'server-only';
 
+import crypto from 'node:crypto';
 import { firestore } from '../../server/firebase/admin';
 import { FIRECALL_COLLECTION_ID } from '../firebase/firestore';
 import {
@@ -8,6 +9,18 @@ import {
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../../common/kostenersatz';
 import { completePaymentAndNotify } from './completePaymentAndNotify';
+
+/**
+ * Timing-safe comparison for redirect tokens to prevent timing side-channel attacks.
+ */
+function timingSafeTokenEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export interface PaymentVerificationResult {
   success: boolean;
@@ -20,6 +33,21 @@ export interface PaymentVerificationResult {
   alreadyCompleted?: boolean;
 }
 
+/**
+ * Verifies a SumUp payment callback and marks the calculation as completed.
+ *
+ * SECURITY: This server action intentionally does NOT use actionUserRequired().
+ * It is called from the SumUp payment redirect page, where the visitor is the
+ * external payment recipient (Kostenersatz debtor), NOT a logged-in fire department
+ * member. These external users have no account in our system and no NextAuth session.
+ *
+ * Authentication relies on the sumupRedirectToken — a crypto.randomUUID() generated
+ * per checkout (see sumupActions.ts). The token is stored in Firestore and embedded
+ * in the redirect URL sent to the payer. Only someone who received the payment link
+ * (via email) or completed the SumUp checkout flow possesses this token.
+ *
+ * The token comparison uses crypto.timingSafeEqual to prevent timing side-channel attacks.
+ */
 export async function verifyPaymentAndComplete(
   firecallId: string,
   calculationId: string,
@@ -49,8 +77,11 @@ export async function verifyPaymentAndComplete(
       ...calculationDoc.data(),
     } as KostenersatzCalculation;
 
-    // Verify token
-    if (!calculation.sumupRedirectToken || calculation.sumupRedirectToken !== token) {
+    // Verify token (timing-safe to prevent side-channel attacks)
+    if (
+      !calculation.sumupRedirectToken ||
+      !timingSafeTokenEqual(calculation.sumupRedirectToken, token)
+    ) {
       return { success: false, error: 'Ungültiger Zugangstoken' };
     }
 

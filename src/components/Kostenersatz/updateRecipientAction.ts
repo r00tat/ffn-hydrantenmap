@@ -27,8 +27,17 @@ export async function updateRecipientAction(
       .collection(KOSTENERSATZ_SUBCOLLECTION)
       .doc(calculationId);
 
+    // Only pick allowed fields to prevent injection of unexpected properties
+    const sanitizedRecipient: KostenersatzRecipient = {
+      name: recipient.name,
+      address: recipient.address,
+      phone: recipient.phone,
+      email: recipient.email,
+      paymentMethod: recipient.paymentMethod,
+    };
+
     await calculationRef.update({
-      recipient,
+      recipient: sanitizedRecipient,
       updatedAt: new Date().toISOString(),
     });
 

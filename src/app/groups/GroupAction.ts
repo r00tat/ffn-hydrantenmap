@@ -27,16 +27,24 @@ export async function updateGroupAction(group: Group, assigendUsers: string[]) {
     `${group.id ? 'Updating' : 'Adding'} group ${group.name} ${group.id || ''}`
   );
 
+  // Only pick allowed fields to prevent injection of unexpected properties
+  const sanitizedGroup: Omit<Group, 'id'> = {
+    name: group.name,
+    ...(group.description !== undefined && { description: group.description }),
+  };
+
   let groupId: string;
 
   if (group.id) {
     const doc = firestore.collection(GROUP_COLLECTION_ID).doc(group.id);
-    await doc.set(group, { merge: true });
+    await doc.set(sanitizedGroup, { merge: true });
 
     groupId = group.id;
   } else {
     // new doc
-    const result = await firestore.collection(GROUP_COLLECTION_ID).add(group);
+    const result = await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .add(sanitizedGroup);
     groupId = result.id;
   }
 

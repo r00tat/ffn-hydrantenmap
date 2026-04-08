@@ -72,7 +72,9 @@ export async function exchangeCustomJwtForFirebaseToken(customToken: string) {
 
     const uid = payload.sub;
 
-    console.info(`payload: ${JSON.stringify(payload)}`);
+    console.info(
+      `payload: ${JSON.stringify({ sub: payload.sub, firecall: payload.firecall })}`
+    );
 
     // all claims should be configured on the user
     const firebaseToken = await firebaseAuth.createCustomToken(uid, {
