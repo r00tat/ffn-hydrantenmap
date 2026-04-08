@@ -51,6 +51,7 @@ import {
   CrewFunktion,
   CREW_FUNKTIONEN,
   Fzg,
+  funktionAbkuerzung,
 } from '../firebase/firestore';
 import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
 import CrewVehicleColumn from './CrewVehicleColumn';
@@ -181,18 +182,6 @@ function CrewRow({
       )}
     </TableRow>
   );
-}
-
-function funktionAbkuerzung(funktion: CrewFunktion): string {
-  const map: Record<CrewFunktion, string> = {
-    Feuerwehrmann: 'FM',
-    Maschinist: 'MA',
-    Gruppenkommandant: 'GK',
-    Atemschutzträger: 'ATS',
-    Zugskommandant: 'ZK',
-    Einsatzleiter: 'EL',
-  };
-  return map[funktion];
 }
 
 /* ─── Main component ─── */
