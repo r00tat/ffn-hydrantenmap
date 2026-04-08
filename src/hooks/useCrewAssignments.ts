@@ -28,8 +28,9 @@ export interface BlaulichtSmsRecipient {
   participation: 'yes' | 'no' | 'unknown' | 'pending';
 }
 
-export default function useCrewAssignments() {
-  const firecallId = useFirecallId();
+export default function useCrewAssignments(firecallIdOverride?: string) {
+  const contextFirecallId = useFirecallId();
+  const firecallId = firecallIdOverride ?? contextFirecallId;
   const { email } = useFirebaseLogin();
 
   const crewAssignments = useFirebaseCollection<CrewAssignment>({

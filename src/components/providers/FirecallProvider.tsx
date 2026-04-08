@@ -12,8 +12,9 @@ export default function FirecallProvider({
   children: React.ReactNode;
 }) {
   const firecall = useLastOrSelectedFirecall();
+  const firecallId = firecall.firecall?.id;
   const { crewAssignments, assignVehicle, updateFunktion } =
-    useCrewAssignments();
+    useCrewAssignments(firecallId);
 
   const value: FirecallContextType = useMemo(
     () => ({
