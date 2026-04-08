@@ -1,9 +1,9 @@
 import { where } from 'firebase/firestore';
 import L from 'leaflet';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { getHeatmapColor } from '../../../common/heatmap';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
-import { useFirecallId } from '../../../hooks/useFirecall';
+import { FirecallContext, useFirecallId } from '../../../hooks/useFirecall';
 import {
   filterDisplayableItems,
   FIRECALL_COLLECTION_ID,
@@ -12,6 +12,7 @@ import {
   FirecallLayer,
 } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import { FirecallVehicle } from '../../FirecallItems/elements/FirecallVehicle';
 import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
 import useMapEditor, { useHistoryPathSegments } from '../../../hooks/useMapEditor';
@@ -28,10 +29,14 @@ export interface FirecallLayerOptions {
 function renderMarker(
   record: FirecallItem,
   setFirecallItem: (item: FirecallItem) => void,
-  options?: MarkerRenderOptions
+  options?: MarkerRenderOptions,
+  crewCountMap?: Map<string, number>
 ) {
   try {
     const instance = getItemInstance(record);
+    if (record.type === 'vehicle' && crewCountMap && 'crewCount' in instance) {
+      (instance as FirecallVehicle).crewCount = crewCountMap.get(record.id || '') ?? 0;
+    }
     if (options?.dataSchema) {
       instance._renderDataSchema = options.dataSchema;
     }
@@ -47,6 +52,16 @@ export default function FirecallItemsLayer({
   pane,
 }: FirecallLayerOptions) {
   const firecallId = useFirecallId();
+  const { crewAssignments } = useContext(FirecallContext);
+  const crewCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of crewAssignments) {
+      if (c.vehicleId) {
+        map.set(c.vehicleId, (map.get(c.vehicleId) || 0) + 1);
+      }
+    }
+    return map;
+  }, [crewAssignments]);
   const [firecallItem, setFirecallItem] = useState<FirecallItem>();
   const historyPathSegments = useHistoryPathSegments();
   const activeLayers = useFirecallLayers();
@@ -163,7 +178,7 @@ export default function FirecallItemsLayer({
               heatmapColor,
               dataSchema,
               layerShowLabels,
-            })}</>
+            }, crewCountMap)}</>
           </React.Fragment>
         );
       })}

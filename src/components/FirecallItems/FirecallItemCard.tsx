@@ -20,7 +20,7 @@ import { SxProps, Theme, styled } from '@mui/material/styles';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, Ref, useCallback, useMemo, useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
-import { useFirecallId } from '../../hooks/useFirecall';
+import { useCrewCountForVehicle, useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
@@ -32,6 +32,7 @@ import {
 import LayerExportMenu from '../firebase/LayerExportMenu';
 import FirecallItemUpdateDialog from './FirecallItemUpdateDialog';
 import { getItemInstance } from './elements';
+import { FirecallVehicle } from './elements/FirecallVehicle';
 import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 
 interface ExpandMoreProps extends IconButtonProps {
@@ -83,8 +84,15 @@ export default function FirecallItemCard({
   const firecallId = useFirecallId();
   const [expanded, setExpanded] = useState(false);
   const canEdit = useMapEditorCanEdit();
+  const crewCount = useCrewCountForVehicle(itemData.type === 'vehicle' ? itemData.id : undefined);
 
-  const item = useMemo(() => getItemInstance(itemData), [itemData]);
+  const item = useMemo(() => {
+    const inst = getItemInstance(itemData);
+    if (itemData.type === 'vehicle' && 'crewCount' in inst) {
+      (inst as FirecallVehicle).crewCount = crewCount;
+    }
+    return inst;
+  }, [itemData, crewCount]);
   const iconUrl = useMemo(() => {
     if (!compact) return undefined;
     try {

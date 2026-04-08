@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { SimpleMap } from '../../common/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useCrewCountForVehicle } from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { FirecallItem } from '../firebase/firestore';
@@ -21,6 +22,7 @@ import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { getItemInstance } from '../FirecallItems/elements';
+import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import StrengthTable from './StrengthTable';
 import { calculateStrength } from './fahrzeuge-utils';
 
@@ -56,7 +58,14 @@ function CompactItemCard({
   onEdit: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const instance = useMemo(() => getItemInstance(item), [item]);
+  const crewCount = useCrewCountForVehicle(item.type === 'vehicle' ? item.id : undefined);
+  const instance = useMemo(() => {
+    const inst = getItemInstance(item);
+    if (item.type === 'vehicle' && 'crewCount' in inst) {
+      (inst as FirecallVehicle).crewCount = crewCount;
+    }
+    return inst;
+  }, [item, crewCount]);
   const iconUrl = useMemo(() => {
     try {
       return instance.icon()?.options?.iconUrl;
