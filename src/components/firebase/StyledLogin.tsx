@@ -70,7 +70,10 @@ export default function StyledLoginButton({
           const url = new URL(magicLink);
           const callbackUrl = url.searchParams.get('url');
           if (callbackUrl) {
-            window.location.href = callbackUrl;
+            const parsed = new URL(callbackUrl, window.location.origin);
+            if (parsed.origin === window.location.origin) {
+              window.location.href = parsed.pathname + parsed.search;
+            }
           }
         } catch (err) {
           console.error(`email signin failed`, err);
@@ -183,7 +186,10 @@ export default function StyledLoginButton({
 
             const callbackUrl = params.get('url');
             if (callbackUrl) {
-              window.location.href = callbackUrl;
+              const parsed = new URL(callbackUrl, window.location.origin);
+              if (parsed.origin === window.location.origin) {
+                window.location.href = parsed.pathname + parsed.search;
+              }
             }
           } catch (err) {
             console.error(`email signin failed`, err);

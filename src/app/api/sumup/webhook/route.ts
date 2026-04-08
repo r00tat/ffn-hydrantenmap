@@ -1,11 +1,57 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { firestore } from '../../../../server/firebase/admin';
 import { KOSTENERSATZ_SUBCOLLECTION } from '../../../../common/kostenersatz';
 import { completePaymentAndNotify } from '../../../../components/Kostenersatz/completePaymentAndNotify';
 
+function verifySignature(
+  rawBody: string,
+  signature: string,
+  secret: string
+): boolean {
+  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+  try {
+    return timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(expected, 'hex')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const rawBody = await request.text();
+
+    // Verify webhook signature if secret is configured
+    const webhookSecret = process.env.SUMUP_WEBHOOK_SECRET;
+    const signature = request.headers.get('X-Payload-Signature');
+
+    if (webhookSecret) {
+      if (!signature) {
+        console.error(
+          'SumUp webhook: missing X-Payload-Signature header'
+        );
+        return NextResponse.json(
+          { error: 'Missing signature' },
+          { status: 401 }
+        );
+      }
+      if (!verifySignature(rawBody, signature, webhookSecret)) {
+        console.error('SumUp webhook: invalid signature');
+        return NextResponse.json(
+          { error: 'Invalid signature' },
+          { status: 401 }
+        );
+      }
+    } else {
+      console.warn(
+        'SumUp webhook: SUMUP_WEBHOOK_SECRET not configured, skipping signature verification'
+      );
+    }
+
+    const body = JSON.parse(rawBody);
     const { id, event_type } = body;
 
     if (event_type !== 'CHECKOUT_STATUS_CHANGED' || !id || typeof id !== 'string' || id.length > 100) {

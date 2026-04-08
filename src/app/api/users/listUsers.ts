@@ -8,7 +8,17 @@ import { USER_COLLECTION_ID } from '../../../components/firebase/firestore';
 export const listUsers = async (): Promise<UserRecordExtended[]> => {
   const users: UserRecordExtended[] = (
     await firebaseAuth.listUsers(1000)
-  ).users.map((u) => u.toJSON() as UserRecordExtended);
+  ).users.map(
+    (u) =>
+      ({
+        uid: u.uid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL,
+        disabled: u.disabled,
+        emailVerified: u.emailVerified,
+      } as unknown as UserRecordExtended)
+  );
   const userDocs = (await firestore.collection(USER_COLLECTION_ID).get()).docs;
   const userDocsMap: { [uid: string]: DocumentData } = {};
   userDocs.forEach((doc) => (userDocsMap[doc.id] = doc.data()));
