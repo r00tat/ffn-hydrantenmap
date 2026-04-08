@@ -2,9 +2,14 @@
 
 import L from 'leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LayerGroup, Marker, Popup } from 'react-leaflet';
+import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
 import useFirebaseCollection from '../../../hooks/useFirebaseCollection';
 import { fetchPegelstandData, PegelstandData } from './PegelstandAction';
+
+// --- Constants ---
+
+const LAYER_NAME = 'Pegelstände';
+const POLL_INTERVAL = 300000; // 5 minutes
 
 export interface PegelstandStation {
   id: string;
@@ -42,12 +47,36 @@ function getWaterDropIcon(color: string): L.DivIcon {
   return icon;
 }
 
+// --- Data hook (lazy: only fetches when layer is visible) ---
+
 function usePegelstandData() {
   const [data, setData] = useState<PegelstandData[]>([]);
+  const [visible, setVisible] = useState(false);
   const mountedRef = useRef(true);
+  const map = useMap();
 
+  // Track layer visibility
+  useEffect(() => {
+    const onAdd = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(true);
+    };
+    const onRemove = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(false);
+    };
+    map.on('overlayadd', onAdd as L.LeafletEventHandlerFn);
+    map.on('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    return () => {
+      map.off('overlayadd', onAdd as L.LeafletEventHandlerFn);
+      map.off('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    };
+  }, [map]);
+
+  // Fetch data only when visible
   useEffect(() => {
     mountedRef.current = true;
+    if (!visible) return;
+    // Already have data from a previous activation — skip initial fetch
+    if (data.length > 0) return;
 
     const refresh = async () => {
       try {
@@ -61,12 +90,12 @@ function usePegelstandData() {
     };
 
     refresh();
-    const interval = setInterval(refresh, 300000);
+    const interval = setInterval(refresh, POLL_INTERVAL);
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [visible, data.length]);
 
   return data;
 }

@@ -40,6 +40,12 @@ import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import { KostenersatzList } from '../Kostenersatz';
+import {
+  getBlaulichtSmsAlarmById,
+  BlaulichtSmsAlarm,
+} from '../../app/blaulicht-sms/actions';
+import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
+import CrewAssignmentBoard from './CrewAssignmentBoard';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
 import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
@@ -58,6 +64,9 @@ export default function EinsatzDetails() {
   const [copied, setCopied] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
+  const [alarm, setAlarm] = useState<BlaulichtSmsAlarm | null | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     if (!firecallId || firecallId === 'unknown') return;
@@ -71,6 +80,29 @@ export default function EinsatzDetails() {
       setLoading(false);
     })();
   }, [firecallId]);
+
+  const blaulichtSmsAlarmId = firecall?.blaulichtSmsAlarmId;
+  const firecallGroup = firecall?.group;
+
+  useEffect(() => {
+    if (!blaulichtSmsAlarmId || !firecallGroup) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getBlaulichtSmsAlarmById(
+          firecallGroup,
+          blaulichtSmsAlarmId
+        );
+        if (!cancelled) setAlarm(result);
+      } catch (err) {
+        console.error('Failed to load BlaulichtSMS alarm:', err);
+        if (!cancelled) setAlarm(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [blaulichtSmsAlarmId, firecallGroup]);
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
@@ -299,6 +331,27 @@ export default function EinsatzDetails() {
         )}
       </Grid>
 
+      {/* BlaulichtSMS Details */}
+      {firecall.blaulichtSmsAlarmId && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            BlaulichtSMS
+          </Typography>
+          {alarm === undefined ? (
+            <CircularProgress size={24} />
+          ) : alarm ? (
+            <AlarmCard alarm={alarm} defaultExpandRecipients={false} />
+          ) : (
+            <Typography color="text.secondary">
+              BlaulichtSMS-Alarm konnte nicht geladen werden (Alarm-ID:{' '}
+              {firecall.blaulichtSmsAlarmId}). Möglicherweise sind die
+              BlaulichtSMS-Zugangsdaten nicht konfiguriert oder der Alarm ist
+              nicht mehr verfügbar.
+            </Typography>
+          )}
+        </Box>
+      )}
+
       {/* Attachments */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="h5" gutterBottom>
@@ -366,6 +419,11 @@ export default function EinsatzDetails() {
           <KostenersatzList firecallId={firecall.id} />
         </Box>
       )}
+
+      {/* Besatzung */}
+      <Box sx={{ mt: 3 }}>
+        <CrewAssignmentBoard alarm={alarm} />
+      </Box>
 
       {/* Dialogs */}
       {displayUpdateDialog && (

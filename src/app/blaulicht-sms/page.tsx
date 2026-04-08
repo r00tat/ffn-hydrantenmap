@@ -3,152 +3,30 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Chip,
   CircularProgress,
   Container,
   Typography,
 } from '@mui/material';
-import { getBlaulichtSmsAlarms, BlaulichtSmsAlarm } from './actions';
+import {
+  getBlaulichtSmsAlarms,
+  getFirecallsByAlarmIds,
+  BlaulichtSmsAlarm,
+} from './actions';
 import { hasBlaulichtsmsConfig } from './credentialsActions';
-import AlarmMap from './Map';
+import AlarmCard from './AlarmCard';
+import EinsatzDialog from '../../components/FirecallItems/EinsatzDialog';
+import { Firecall } from '../../components/firebase/firestore';
 import useFirecall from '../../hooks/useFirecall';
-
-const AlarmCard = ({ alarm }: { alarm: BlaulichtSmsAlarm }) => {
-  const [selectedFunction, setSelectedFunction] = useState<string | null>(null);
-
-  const attendees = alarm.recipients.filter((r) => r.participation === 'yes');
-  const totalCount = attendees.length;
-
-  const functionCounts = attendees
-    .flatMap((r) => r.functions)
-    .reduce(
-      (acc, func) => {
-        const key = func.shortForm;
-        if (!acc[key]) {
-          acc[key] = {
-            count: 0,
-            background: func.backgroundHexColorCode,
-            color: func.foregroundHexColorCode,
-          };
-        }
-        acc[key].count++;
-        return acc;
-      },
-      {} as Record<string, { count: number; background: string; color: string }>
-    );
-
-  const filteredAttendees = selectedFunction
-    ? attendees.filter((r) =>
-        r.functions.some((f) => f.shortForm === selectedFunction)
-      )
-    : attendees;
-
-  return (
-    <Card key={alarm.alarmId} sx={{ mb: 2 }}>
-      <CardHeader
-        title={alarm.alarmText}
-        subheader={`Alarmzeit: ${new Date(alarm.alarmDate).toLocaleString()}`}
-      />
-      <CardContent>
-        <Typography variant="body2" color="text.secondary">
-          <strong>Endzeit:</strong> {new Date(alarm.endDate).toLocaleString()}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          <strong>Ersteller:</strong> {alarm.authorName}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          <strong>Gruppen:</strong>{' '}
-          {alarm.alarmGroups.map((g) => g.groupName).join(', ')}
-        </Typography>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-          <Typography variant="h6" component="div">
-            Funktionen
-          </Typography>
-          <Chip label={totalCount} size="small" />
-        </Box>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {Object.entries(functionCounts).map(([func, data]) => (
-            <Chip
-              key={func}
-              label={`${func}: ${data.count}`}
-              onClick={() =>
-                setSelectedFunction((prev) => (prev === func ? null : func))
-              }
-              sx={{
-                backgroundColor: data.background,
-                color: data.color,
-                cursor: 'pointer',
-                outline:
-                  selectedFunction === func
-                    ? '3px solid'
-                    : '3px solid transparent',
-                outlineColor:
-                  selectedFunction === func ? 'primary.main' : 'transparent',
-              }}
-            />
-          ))}
-        </Box>
-
-        <Typography variant="h6" component="div" sx={{ mt: 2 }}>
-          Zusagen{' '}
-          {selectedFunction && (
-            <Chip
-              label={`${selectedFunction}: ${filteredAttendees.length}`}
-              size="small"
-              onDelete={() => setSelectedFunction(null)}
-            />
-          )}
-        </Typography>
-        <Box>
-          {filteredAttendees.map((recipient) => (
-            <Box
-              key={recipient.id}
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                py: 1,
-                borderBottom: '1px solid #eee',
-              }}
-            >
-              <Typography variant="body2">{recipient.name}</Typography>
-              <Box>
-                {recipient.functions.map((func) => (
-                  <Chip
-                    key={func.functionId}
-                    label={func.shortForm}
-                    size="small"
-                    sx={{
-                      ml: 1,
-                      backgroundColor: func.backgroundHexColorCode,
-                      color: func.foregroundHexColorCode,
-                    }}
-                  />
-                ))}
-              </Box>
-            </Box>
-          ))}
-        </Box>
-        {alarm.geolocation?.coordinates && (
-          <AlarmMap
-            lat={alarm.geolocation.coordinates.lat}
-            lon={alarm.geolocation.coordinates.lon}
-            alarmText={alarm.alarmText}
-          />
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 
 const BlaulichtSmsPage = () => {
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [noCredentials, setNoCredentials] = useState(false);
+  const [firecallMap, setFirecallMap] = useState<
+    Record<string, { id: string; name: string }>
+  >({});
+  const [createFromAlarm, setCreateFromAlarm] =
+    useState<BlaulichtSmsAlarm | null>(null);
   const firecall = useFirecall();
   const groupId = firecall?.group;
 
@@ -172,6 +50,12 @@ const BlaulichtSmsPage = () => {
             new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
         );
         setAlarms(sorted);
+
+        const alarmIds = sorted.map((a) => a.alarmId);
+        if (alarmIds.length > 0) {
+          const mapping = await getFirecallsByAlarmIds(alarmIds);
+          setFirecallMap(mapping);
+        }
       } catch (err) {
         console.error('Failed to load BlaulichtSMS data:', err);
       } finally {
@@ -184,6 +68,29 @@ const BlaulichtSmsPage = () => {
 
   const currentAlarm = alarms.length > 0 ? alarms[0] : null;
   const recentAlarms = alarms.length > 1 ? alarms.slice(1) : [];
+
+  const handleCreateEinsatz = (alarm: BlaulichtSmsAlarm) => {
+    setCreateFromAlarm(alarm);
+  };
+
+  const buildEinsatzFromAlarm = (alarm: BlaulichtSmsAlarm): Firecall => {
+    const parts = alarm.alarmText.split('/');
+    const name =
+      parts.length >= 5
+        ? [parts[2], parts[3], parts[4]].join(' ').trim()
+        : alarm.alarmText;
+    const coords =
+      alarm.geolocation?.coordinates ?? alarm.coordinates ?? null;
+    return {
+      name,
+      date: new Date(alarm.alarmDate).toISOString(),
+      description: alarm.alarmText,
+      blaulichtSmsAlarmId: alarm.alarmId,
+      group: groupId ?? '',
+      fw: firecall?.fw ?? '',
+      ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
+    };
+  };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -211,7 +118,11 @@ const BlaulichtSmsPage = () => {
               <Typography variant="h5" component="h2" gutterBottom>
                 Aktive Einsätze
               </Typography>
-              <AlarmCard alarm={currentAlarm} />
+              <AlarmCard
+                alarm={currentAlarm}
+                firecall={firecallMap[currentAlarm.alarmId]}
+                onCreateEinsatz={handleCreateEinsatz}
+              />
             </Box>
           )}
 
@@ -221,7 +132,12 @@ const BlaulichtSmsPage = () => {
                 Vergangene Alarme
               </Typography>
               {recentAlarms.map((alarm) => (
-                <AlarmCard key={alarm.alarmId} alarm={alarm} />
+                <AlarmCard
+                  key={alarm.alarmId}
+                  alarm={alarm}
+                  firecall={firecallMap[alarm.alarmId]}
+                  onCreateEinsatz={handleCreateEinsatz}
+                />
               ))}
             </Box>
           )}
@@ -232,6 +148,24 @@ const BlaulichtSmsPage = () => {
             </Typography>
           )}
         </>
+      )}
+
+      {createFromAlarm && (
+        <EinsatzDialog
+          einsatz={buildEinsatzFromAlarm(createFromAlarm)}
+          onClose={(fc?: Firecall) => {
+            if (fc && createFromAlarm) {
+              setFirecallMap((prev) => ({
+                ...prev,
+                [createFromAlarm.alarmId]: {
+                  id: fc.id ?? '',
+                  name: fc.name,
+                },
+              }));
+            }
+            setCreateFromAlarm(null);
+          }}
+        />
       )}
     </Container>
   );

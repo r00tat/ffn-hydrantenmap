@@ -478,10 +478,19 @@ export function EinsatzTagebuch({
   return (
     <>
       <Box sx={{ p: 2, m: 2 }}>
-        <Typography variant="h4" gutterBottom>
-          Einsatz Tagebuch{' '}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1,
+            mb: 2,
+          }}
+        >
+          <Typography variant="h4">Einsatz Tagebuch</Typography>
           {showEditButton && (
-            <>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <DownloadButton
                 onClick={() => downloadDiaries(diaries)}
                 tooltip="Einsatz Tagebuch als CSV herunterladen"
@@ -494,9 +503,16 @@ export function EinsatzTagebuch({
                 Zusammenfassung{' '}
                 {isQuerying && <CircularProgress color="primary" size={20} />}
               </Button>
-            </>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setTagebuchDialogIsOpen(true)}
+              >
+                Neuer Eintrag
+              </Button>
+            </Box>
           )}
-        </Typography>
+        </Box>
 
         {resultHtml && (
           <Typography>
@@ -617,13 +633,15 @@ export function EinsatzTagebuch({
                 sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
               >
                 <Tooltip title="Eintrag hinzufügen">
-                  <IconButton
-                    color="primary"
-                    onClick={handleInlineAdd}
-                    disabled={!inlineName.trim()}
-                  >
-                    <AddIcon />
-                  </IconButton>
+                  <span>
+                    <IconButton
+                      color="primary"
+                      onClick={handleInlineAdd}
+                      disabled={!inlineName.trim()}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </span>
                 </Tooltip>
               </Grid>
             </>

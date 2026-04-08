@@ -1,6 +1,13 @@
 import { User } from 'firebase/auth';
 import { Group } from '../../app/groups/groupTypes';
 
+export type LoginStep =
+  | 'idle'
+  | 'authenticating'
+  | 'verifying'
+  | 'loading_permissions'
+  | 'done';
+
 export interface LoginData {
   isSignedIn: boolean;
   isAuthorized: boolean;
@@ -19,6 +26,7 @@ export interface LoginData {
   myGroups: Group[];
   needsReLogin?: boolean;
   firecall?: string;
+  loginStep: LoginStep;
 }
 
 export interface LoginStatus extends LoginData {

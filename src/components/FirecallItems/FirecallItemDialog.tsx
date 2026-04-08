@@ -50,9 +50,11 @@ import FirecallItemFields from './FirecallItemFields';
 import HeatmapSettings from './HeatmapSettings';
 import { computeAllFields } from '../../common/computeFieldValue';
 import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
+import VehicleQuickAddChips from './VehicleQuickAddChips';
 
 export interface FirecallItemDialogOptions {
   onClose: (item?: FirecallItem) => void;
+  onCloseMultiple?: (items: FirecallItem[]) => void;
   item?: FirecallItem;
   allowTypeChange?: boolean;
   type?: string;
@@ -61,6 +63,7 @@ export interface FirecallItemDialogOptions {
 
 export default function FirecallItemDialog({
   onClose,
+  onCloseMultiple,
   item: itemDefault,
   allowTypeChange = true,
   type: itemType,
@@ -81,6 +84,7 @@ export default function FirecallItemDialog({
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [quickAddSelected, setQuickAddSelected] = useState<string[]>([]);
   const historyPathSegments = useHistoryPathSegments();
 
   // Load siblings for z-order operations (only when editing existing items)
@@ -136,7 +140,41 @@ export default function FirecallItemDialog({
 
   const isUpload = item.type === 'upload';
   const isExistingItem = !!item.id;
+  const isNewVehicle = item.type === 'vehicle' && !isExistingItem;
   const canSave = true;
+
+  const existingVehicleNames = useMemo(
+    () =>
+      siblings
+        .filter(
+          (s) =>
+            s.type === 'vehicle' &&
+            (s as any).fw === 'Neusiedl am See',
+        )
+        .map((s) => s.name),
+    [siblings],
+  );
+
+  const handleQuickAddToggle = useCallback((vehicleName: string) => {
+    setQuickAddSelected((prev) =>
+      prev.includes(vehicleName)
+        ? prev.filter((n) => n !== vehicleName)
+        : [...prev, vehicleName],
+    );
+  }, []);
+
+  const handleQuickAddSubmit = useCallback(() => {
+    if (quickAddSelected.length === 0 || !onCloseMultiple) return;
+    const items: FirecallItem[] = quickAddSelected.map((name) => ({
+      type: 'vehicle',
+      name,
+      fw: 'Neusiedl am See',
+      datum: new Date().toISOString(),
+      layer: item.layer || '',
+    } as FirecallItem));
+    setOpen(false);
+    onCloseMultiple(items);
+  }, [quickAddSelected, onCloseMultiple, item.layer]);
 
   const handleFileUploadComplete = useCallback(
     async (refs: StorageReference[]) => {
@@ -294,6 +332,13 @@ export default function FirecallItemDialog({
             </Box>
           ) : (
             <>
+              {isNewVehicle && onCloseMultiple && (
+                <VehicleQuickAddChips
+                  selectedNames={quickAddSelected}
+                  existingNames={existingVehicleNames}
+                  onToggle={handleQuickAddToggle}
+                />
+              )}
               <FirecallItemFields
                 item={item}
                 setItemField={setItemField}
@@ -408,15 +453,27 @@ export default function FirecallItemDialog({
               </Tooltip>
             )}
             <Box sx={{ flex: 1 }} />
-            <Button
-              color="primary"
-              disabled={!canSave}
-              startIcon={item.id ? <SaveIcon /> : <AddIcon />}
-              variant="contained"
-              onClick={handleSave}
-            >
-              {item.id ? 'Speichern' : 'Hinzufügen'}
-            </Button>
+            {isNewVehicle && quickAddSelected.length > 0 && onCloseMultiple && (
+              <Button
+                color="primary"
+                startIcon={<AddIcon />}
+                variant="contained"
+                onClick={handleQuickAddSubmit}
+              >
+                {quickAddSelected.length} Fahrzeuge hinzufügen
+              </Button>
+            )}
+            {!(isNewVehicle && quickAddSelected.length > 0 && onCloseMultiple) && (
+              <Button
+                color="primary"
+                disabled={!canSave}
+                startIcon={item.id ? <SaveIcon /> : <AddIcon />}
+                variant="contained"
+                onClick={handleSave}
+              >
+                {item.id ? 'Speichern' : 'Hinzufügen'}
+              </Button>
+            )}
           </DialogActions>
         )}
       </Dialog>

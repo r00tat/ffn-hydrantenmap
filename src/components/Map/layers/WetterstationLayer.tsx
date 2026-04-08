@@ -3,7 +3,7 @@
 import L from 'leaflet';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LayerGroup, Marker, Popup } from 'react-leaflet';
+import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
 
 // --- Types ---
 
@@ -67,6 +67,7 @@ interface WetterstationData {
 
 // --- Constants ---
 
+const LAYER_NAME = 'Wetterstationen';
 const METADATA_URL =
   'https://dataset.api.hub.geosphere.at/v1/station/current/tawes-v1-10min/metadata';
 const DATA_URL =
@@ -104,7 +105,6 @@ const COMPASS_LABELS = [
 
 function temperatureToColor(temp: number | null): string {
   if (temp === null) return '#888888';
-  // HSL: 240 (blue) at <=0, 120 (green) at ~15, 0 (red) at >=35
   const clamped = Math.max(0, Math.min(35, temp));
   const hue = 240 - (clamped / 35) * 240;
   return `hsl(${Math.round(hue)}, 80%, 45%)`;
@@ -164,22 +164,43 @@ function getParamValue(
 ): number | null {
   const p = params[key];
   if (!p || !p.data || p.data.length === 0) return null;
-  // Use last non-null data point (latest value may be null if interval just started)
   for (let i = p.data.length - 1; i >= 0; i--) {
     if (p.data[i] !== null) return p.data[i];
   }
   return null;
 }
 
-// --- Data hook ---
+// --- Data hook (lazy: only fetches when layer is visible) ---
 
 function useWetterstationData() {
   const [data, setData] = useState<WetterstationData[]>([]);
+  const [visible, setVisible] = useState(false);
   const mountedRef = useRef(true);
   const stationsRef = useRef<TawesStation[] | null>(null);
+  const map = useMap();
 
+  // Track layer visibility
+  useEffect(() => {
+    const onAdd = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(true);
+    };
+    const onRemove = (e: L.LayersControlEvent) => {
+      if (e.name === LAYER_NAME) setVisible(false);
+    };
+    map.on('overlayadd', onAdd as L.LeafletEventHandlerFn);
+    map.on('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    return () => {
+      map.off('overlayadd', onAdd as L.LeafletEventHandlerFn);
+      map.off('overlayremove', onRemove as L.LeafletEventHandlerFn);
+    };
+  }, [map]);
+
+  // Fetch data only when visible
   useEffect(() => {
     mountedRef.current = true;
+    if (!visible) return;
+    // Already have data from a previous activation — skip initial fetch
+    if (data.length > 0) return;
 
     const fetchStations = async (): Promise<TawesStation[]> => {
       if (stationsRef.current) return stationsRef.current;
@@ -268,7 +289,6 @@ function useWetterstationData() {
         }
       } catch (err) {
         console.error('Failed to fetch Wetterstation data', err);
-        // Retry after 30 seconds on failure instead of waiting full 10 minutes
         if (mountedRef.current) {
           setTimeout(() => {
             if (mountedRef.current) refresh();
@@ -282,9 +302,8 @@ function useWetterstationData() {
     return () => {
       mountedRef.current = false;
       clearInterval(interval);
-      stationsRef.current = null;
     };
-  }, []);
+  }, [visible, data.length]);
 
   return data;
 }
@@ -406,9 +425,7 @@ export default function WetterstationLayer() {
               </span>
             )}
             <br />
-            <Link href={`/wetter/${m.stationId}`}>
-              Verlauf &rarr;
-            </Link>
+            <Link href={`/wetter/${m.stationId}`}>Verlauf &rarr;</Link>
           </Popup>
         </Marker>
       ))}

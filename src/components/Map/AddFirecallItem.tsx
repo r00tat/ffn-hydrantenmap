@@ -98,6 +98,25 @@ export default function AddFirecallItem() {
     }
   });
 
+  const handleMultipleVehicles = useCallback(
+    (items: FirecallItem[]) => {
+      setEditFirecallItemIsOpen(false);
+      if (items.length > 0) {
+        setLastSelectedLayer(items[0].layer || '');
+      }
+      const pos = getDefaultPosition();
+      for (const fzg of items) {
+        addFirecallItem({
+          datum: new Date().toISOString(),
+          lat: pos.lat,
+          lng: pos.lng,
+          ...fzg,
+        });
+      }
+    },
+    [addFirecallItem, getDefaultPosition, setEditFirecallItemIsOpen, setLastSelectedLayer],
+  );
+
   const fzgDialogClose = useCallback(
     (fzg?: FirecallItem) => {
       setEditFirecallItemIsOpen(false);
@@ -147,6 +166,7 @@ export default function AddFirecallItem() {
       {editFirecallItemIsOpen && (
         <FirecallItemDialog
           onClose={fzgDialogClose}
+          onCloseMultiple={handleMultipleVehicles}
           type={editFirecallItem?.type || 'marker'}
           item={
             editFirecallItem?.id

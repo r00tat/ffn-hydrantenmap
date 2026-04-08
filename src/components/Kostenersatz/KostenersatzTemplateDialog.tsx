@@ -3,31 +3,33 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
-import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 import {
   KostenersatzTemplate,
   KostenersatzLineItem,
   KostenersatzRate,
-  KostenersatzTemplateItem,
+  KostenersatzCalculation,
+  KostenersatzCustomItem,
+  KostenersatzVehicle,
+  calculateItemSum,
+  calculateTotalSum,
+  calculateSubtotals,
+  createLineItem,
+  formatCurrency,
 } from '../../common/kostenersatz';
 import {
   useKostenersatzTemplateAdd,
   useKostenersatzTemplateUpdate,
 } from '../../hooks/useKostenersatzMutations';
+import KostenersatzBerechnungTab from './KostenersatzBerechnungTab';
 
 export interface KostenersatzTemplateDialogProps {
   open: boolean;
@@ -42,6 +44,49 @@ export interface KostenersatzTemplateDialogProps {
   rates?: KostenersatzRate[];
 }
 
+/**
+ * Build a KostenersatzCalculation object from template data for use with BerechnungTab.
+ */
+function buildCalculationFromTemplate(
+  items: { rateId: string; einheiten: number }[],
+  vehicles: string[],
+  defaultStunden: number,
+  rates: KostenersatzRate[],
+): KostenersatzCalculation {
+  const ratesById = new Map(rates.map((r) => [r.id, r]));
+  const lineItems: KostenersatzLineItem[] = items.map((item) => {
+    const rate = ratesById.get(item.rateId);
+    return {
+      rateId: item.rateId,
+      einheiten: item.einheiten,
+      anzahlStunden: defaultStunden,
+      stundenOverridden: false,
+      sum: rate
+        ? calculateItemSum(defaultStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
+        : 0,
+    };
+  });
+
+  const subtotals = calculateSubtotals(lineItems, rates);
+  const totalSum = calculateTotalSum(lineItems, []);
+
+  return {
+    createdBy: '',
+    createdAt: '',
+    updatedAt: '',
+    status: 'draft',
+    rateVersion: '',
+    comment: '',
+    defaultStunden,
+    recipient: { name: '', address: '', phone: '', email: '', paymentMethod: 'rechnung' },
+    items: lineItems,
+    customItems: [],
+    subtotals,
+    totalSum,
+    vehicles,
+  } as KostenersatzCalculation;
+}
+
 export default function KostenersatzTemplateDialog({
   open,
   onClose,
@@ -53,12 +98,15 @@ export default function KostenersatzTemplateDialog({
   rates = [],
 }: KostenersatzTemplateDialogProps) {
   const { vehiclesById } = useKostenersatzVehicles();
-  const [name, setName] = useState(existingTemplate?.name || '');
-  const [description, setDescription] = useState(existingTemplate?.description || '');
-  const [isShared, setIsShared] = useState(existingTemplate?.isShared || false);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [isShared, setIsShared] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedItems, setEditedItems] = useState<KostenersatzTemplateItem[]>([]);
-  const [editedVehicles, setEditedVehicles] = useState<string[]>([]);
+  const [calculation, setCalculation] = useState<KostenersatzCalculation>(() =>
+    buildCalculationFromTemplate([], [], 1, rates)
+  );
+
+  const ratesById = useMemo(() => new Map(rates.map((r) => [r.id, r])), [rates]);
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -66,53 +114,135 @@ export default function KostenersatzTemplateDialog({
       setName(existingTemplate?.name || '');
       setDescription(existingTemplate?.description || '');
       setIsShared(existingTemplate?.isShared || false);
-      // Initialize edited items from existing template or calculation
-      if (calculationItems) {
-        setEditedItems(
-          calculationItems.map((item) => ({ rateId: item.rateId, einheiten: item.einheiten }))
-        );
-      } else if (existingTemplate?.items) {
-        setEditedItems([...existingTemplate.items]);
-      } else {
-        setEditedItems([]);
-      }
-      // Initialize edited vehicles
-      if (calculationVehicles) {
-        setEditedVehicles([...calculationVehicles]);
-      } else if (existingTemplate?.vehicles) {
-        setEditedVehicles([...existingTemplate.vehicles]);
-      } else {
-        setEditedVehicles([]);
-      }
+
+      const items = calculationItems
+        ? calculationItems.map((item) => ({ rateId: item.rateId, einheiten: item.einheiten }))
+        : existingTemplate?.items || [];
+      const vehicles = calculationVehicles || existingTemplate?.vehicles || [];
+      const defaultStunden = (calculationItems ? calculationDefaultStunden : existingTemplate?.defaultStunden) || 1;
+
+      setCalculation(buildCalculationFromTemplate(items, vehicles, defaultStunden, rates));
     }
-  }, [open, existingTemplate, calculationItems, calculationVehicles]);
+  }, [open, existingTemplate, calculationItems, calculationDefaultStunden, calculationVehicles, rates]);
 
-  // Helper to get rate description
-  const getRateDescription = (rateId: string): string => {
-    const rate = rates.find((r) => r.id === rateId);
-    return rate ? `${rate.id} - ${rate.description}` : rateId;
-  };
+  // Item change handler (same pattern as KostenersatzCalculationPage)
+  const handleItemChange = useCallback(
+    (rateId: string, einheiten: number, stunden: number, stundenOverridden: boolean) => {
+      const rate = ratesById.get(rateId);
+      if (!rate) return;
 
-  // Remove item from template
-  const handleRemoveItem = (index: number) => {
-    setEditedItems((prev) => prev.filter((_, i) => i !== index));
-  };
+      const sum = calculateItemSum(stunden, einheiten, rate.price, rate.pricePauschal, rate.pauschalHours);
 
-  // Update item count
-  const handleUpdateItemCount = (index: number, newCount: number) => {
-    setEditedItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, einheiten: newCount } : item))
-    );
-  };
+      setCalculation((prev) => {
+        const existingIndex = prev.items.findIndex((i) => i.rateId === rateId);
+        const newItem: KostenersatzLineItem = { rateId, einheiten, anzahlStunden: stunden, stundenOverridden, sum };
+
+        let newItems: KostenersatzLineItem[];
+        if (einheiten === 0) {
+          newItems = existingIndex >= 0
+            ? prev.items.filter((_, i) => i !== existingIndex)
+            : prev.items;
+        } else if (existingIndex >= 0) {
+          newItems = [...prev.items];
+          newItems[existingIndex] = newItem;
+        } else {
+          newItems = [...prev.items, newItem];
+        }
+
+        const subtotals = calculateSubtotals(newItems, rates);
+        const totalSum = calculateTotalSum(newItems, prev.customItems);
+        return { ...prev, items: newItems, subtotals, totalSum };
+      });
+    },
+    [ratesById, rates]
+  );
+
+  // Custom item change handler
+  const handleCustomItemChange = useCallback(
+    (index: number, item: KostenersatzCustomItem | null) => {
+      setCalculation((prev) => {
+        const newCustomItems = [...prev.customItems];
+        if (item === null) {
+          newCustomItems.splice(index, 1);
+        } else if (index >= newCustomItems.length) {
+          newCustomItems.push(item);
+        } else {
+          newCustomItems[index] = item;
+        }
+        const totalSum = calculateTotalSum(prev.items, newCustomItems);
+        return { ...prev, customItems: newCustomItems, totalSum };
+      });
+    },
+    []
+  );
+
+  // Vehicle toggle handler (same pattern as KostenersatzCalculationPage)
+  const handleVehicleToggle = useCallback(
+    (vehicle: KostenersatzVehicle) => {
+      const rate = ratesById.get(vehicle.rateId);
+      if (!rate) return;
+
+      setCalculation((prev) => {
+        const isSelected = (prev.vehicles || []).includes(vehicle.id);
+
+        if (isSelected) {
+          const newVehicles = (prev.vehicles || []).filter((id) => id !== vehicle.id);
+          const otherVehiclesWithSameRate = newVehicles.filter((vId) => {
+            const v = vehiclesById.get(vId);
+            return v && v.rateId === vehicle.rateId;
+          });
+
+          let newItems: KostenersatzLineItem[];
+          if (otherVehiclesWithSameRate.length > 0) {
+            newItems = prev.items.map((item) => {
+              if (item.rateId !== vehicle.rateId) return item;
+              const newEinheiten = item.einheiten - 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(item.anzahlStunden, newEinheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
+              };
+            });
+          } else {
+            newItems = prev.items.filter((item) => item.rateId !== vehicle.rateId);
+          }
+
+          const subtotals = calculateSubtotals(newItems, rates);
+          const totalSum = calculateTotalSum(newItems, prev.customItems);
+          return { ...prev, vehicles: newVehicles, items: newItems, subtotals, totalSum };
+        } else {
+          const newVehicles = [...(prev.vehicles || []), vehicle.id];
+          const existingItemIndex = prev.items.findIndex((item) => item.rateId === vehicle.rateId);
+
+          let newItems: KostenersatzLineItem[];
+          if (existingItemIndex >= 0) {
+            newItems = prev.items.map((item, idx) => {
+              if (idx !== existingItemIndex) return item;
+              const newEinheiten = item.einheiten + 1;
+              return {
+                ...item,
+                einheiten: newEinheiten,
+                sum: calculateItemSum(item.anzahlStunden, newEinheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
+              };
+            });
+          } else {
+            const newItem = createLineItem(vehicle.rateId, 1, prev.defaultStunden, rate, prev.defaultStunden);
+            newItems = [...prev.items, newItem];
+          }
+
+          const subtotals = calculateSubtotals(newItems, rates);
+          const totalSum = calculateTotalSum(newItems, prev.customItems);
+          return { ...prev, vehicles: newVehicles, items: newItems, subtotals, totalSum };
+        }
+      });
+    },
+    [ratesById, vehiclesById, rates]
+  );
+
+  const selectedVehicleIds = useMemo(() => calculation.vehicles || [], [calculation.vehicles]);
 
   const addTemplate = useKostenersatzTemplateAdd();
   const updateTemplate = useKostenersatzTemplateUpdate();
-
-  const defaultStundenToSave = calculationItems
-    ? calculationDefaultStunden
-    : existingTemplate?.defaultStunden;
-
-  const itemCount = editedItems.length;
 
   const handleSave = async () => {
     if (!name.trim()) return;
@@ -120,23 +250,32 @@ export default function KostenersatzTemplateDialog({
     setIsSaving(true);
     try {
       const trimmedDescription = description.trim();
+      const templateItems = calculation.items.map((item) => ({
+        rateId: item.rateId,
+        einheiten: item.einheiten,
+      }));
+      const templateVehicles = (calculation.vehicles || []).length > 0
+        ? calculation.vehicles
+        : undefined;
+
       if (existingTemplate?.id) {
         await updateTemplate({
           ...existingTemplate,
           name: name.trim(),
-          description: trimmedDescription || '', // Use empty string, not undefined
+          description: trimmedDescription || '',
           isShared,
-          items: editedItems,
-          vehicles: editedVehicles.length > 0 ? editedVehicles : undefined,
+          items: templateItems,
+          defaultStunden: calculation.defaultStunden,
+          vehicles: templateVehicles,
         });
       } else {
         await addTemplate({
           name: name.trim(),
           ...(trimmedDescription && { description: trimmedDescription }),
           isShared,
-          items: editedItems,
-          defaultStunden: defaultStundenToSave,
-          vehicles: editedVehicles.length > 0 ? editedVehicles : undefined,
+          items: templateItems,
+          defaultStunden: calculation.defaultStunden,
+          vehicles: templateVehicles,
         });
       }
       onClose(true);
@@ -148,18 +287,12 @@ export default function KostenersatzTemplateDialog({
   };
 
   return (
-    <Dialog open={open} onClose={() => onClose()} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={() => onClose()} maxWidth="md" fullWidth>
       <DialogTitle>
         {existingTemplate?.id ? 'Vorlage bearbeiten' : 'Vorlage speichern'}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          {calculationItems && (
-            <Typography variant="body2" color="text.secondary">
-              {itemCount} Position{itemCount !== 1 ? 'en' : ''} werden als Vorlage gespeichert
-              {defaultStundenToSave ? ` (${defaultStundenToSave}h Standarddauer)` : ''}.
-            </Typography>
-          )}
           <TextField
             label="Name der Vorlage"
             value={name}
@@ -176,6 +309,32 @@ export default function KostenersatzTemplateDialog({
             multiline
             rows={2}
           />
+          <TextField
+            label="Standarddauer (Stunden)"
+            type="number"
+            value={calculation.defaultStunden}
+            onChange={(e) => {
+              const newStunden = Math.max(0.5, parseFloat(e.target.value) || 1);
+              setCalculation((prev) => {
+                const newItems = prev.items.map((item) => {
+                  if (item.stundenOverridden) return item;
+                  const rate = ratesById.get(item.rateId);
+                  return {
+                    ...item,
+                    anzahlStunden: newStunden,
+                    sum: rate
+                      ? calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
+                      : item.sum,
+                  };
+                });
+                const subtotals = calculateSubtotals(newItems, rates);
+                const totalSum = calculateTotalSum(newItems, prev.customItems);
+                return { ...prev, defaultStunden: newStunden, items: newItems, subtotals, totalSum };
+              });
+            }}
+            slotProps={{ htmlInput: { min: 0.5, step: 0.5 } }}
+            sx={{ width: 200 }}
+          />
           {isAdmin && (
             <FormControlLabel
               control={
@@ -187,68 +346,25 @@ export default function KostenersatzTemplateDialog({
               label="Für alle Benutzer freigeben (gemeinsame Vorlage)"
             />
           )}
-          {/* Show vehicles when saving from calculation */}
-          {editedVehicles.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Fahrzeuge ({editedVehicles.length})
+
+          {/* Full calculation editing UI */}
+          <KostenersatzBerechnungTab
+            calculation={calculation}
+            rates={rates}
+            ratesById={ratesById}
+            onItemChange={handleItemChange}
+            onCustomItemChange={handleCustomItemChange}
+            onVehicleToggle={handleVehicleToggle}
+            selectedVehicleIds={selectedVehicleIds}
+            disabled={isSaving}
+          />
+
+          {/* Total */}
+          {calculation.totalSum > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
+              <Typography variant="h6">
+                Gesamt: {formatCurrency(calculation.totalSum)}
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {editedVehicles.map((vehicleId) => {
-                  const vehicle = vehiclesById.get(vehicleId);
-                  return (
-                    <Chip
-                      key={vehicleId}
-                      label={vehicle?.name || vehicleId}
-                      size="small"
-                      variant="outlined"
-                    />
-                  );
-                })}
-              </Box>
-            </Box>
-          )}
-          {/* Show items list when editing existing template */}
-          {existingTemplate?.id && editedItems.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Positionen ({editedItems.length})
-              </Typography>
-              <List dense sx={{ bgcolor: 'action.hover', borderRadius: 1 }}>
-                {editedItems.map((item, index) => (
-                  <ListItem
-                    key={`${item.rateId}-${index}`}
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        size="small"
-                        onClick={() => handleRemoveItem(index)}
-                        title="Position entfernen"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemText
-                      primary={getRateDescription(item.rateId)}
-                      secondary={
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={item.einheiten}
-                          onChange={(e) =>
-                            handleUpdateItemCount(index, Math.max(1, parseInt(e.target.value) || 1))
-                          }
-                          slotProps={{ htmlInput: { min: 1, step: 1 } }}
-                          sx={{ width: 80, mt: 0.5 }}
-                          label="Einheiten"
-                        />
-                      }
-                      slotProps={{ secondary: { component: 'div' } }}
-                    />
-                  </ListItem>
-                ))}
-              </List>
             </Box>
           )}
         </Box>

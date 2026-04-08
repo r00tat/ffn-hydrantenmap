@@ -2,6 +2,7 @@ import 'server-only';
 
 import { SchemaType, VertexAI } from '@google-cloud/vertexai';
 import { GEMINI_MODEL } from '../../common/ai';
+import { getGcpProjectId } from '../firebase/project';
 
 /**
  * Einsatz data structure extracted from alarm dispatch emails
@@ -16,37 +17,6 @@ export interface Einsatz {
   sachverhalt: string; // e.g., "Wasser im Keller"
   zeitpunkt: string;
   auftragsNummer: string;
-}
-
-/**
- * Get the Google Cloud project ID from GOOGLE_SERVICE_ACCOUNT environment variable
- */
-function getProjectId(): string {
-  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT;
-  if (!serviceAccountJson) {
-    throw new Error(
-      'GOOGLE_SERVICE_ACCOUNT environment variable is not set. ' +
-        'Please provide the service account JSON credentials.'
-    );
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (!serviceAccount.project_id) {
-      throw new Error(
-        'project_id not found in GOOGLE_SERVICE_ACCOUNT credentials'
-      );
-    }
-    return serviceAccount.project_id;
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(
-        'Failed to parse GOOGLE_SERVICE_ACCOUNT as JSON. ' +
-          'Ensure it contains valid JSON credentials.'
-      );
-    }
-    throw error;
-  }
 }
 
 /**
@@ -73,9 +43,9 @@ let vertexAIInstance: VertexAI | null = null;
  * Get the Vertex AI client instance, initializing it on first use.
  * This avoids errors at module load time if environment variables are not set.
  */
-function getVertexAI(): VertexAI {
+async function getVertexAI(): Promise<VertexAI> {
   if (!vertexAIInstance) {
-    const projectId = getProjectId();
+    const projectId = await getGcpProjectId();
     vertexAIInstance = new VertexAI({
       project: projectId,
       location: 'europe-west1',
@@ -153,8 +123,8 @@ const einsatzResponseSchema = {
 /**
  * Get the Gemini model instance, initializing it on first use.
  */
-function getGeminiModel() {
-  return getVertexAI().getGenerativeModel({
+async function getGeminiModel() {
+  return (await getVertexAI()).getGenerativeModel({
     model: GEMINI_MODEL,
     generationConfig: {
       temperature: 0.1, // Low temperature for deterministic extraction
@@ -192,7 +162,7 @@ Manche E-Mails können mehrere Einsätze als separate Blöcke enthalten. Extrahi
     ],
   };
 
-  const model = getGeminiModel();
+  const model = await getGeminiModel();
   const result = await model.generateContent(request);
   const response = result.response;
 
