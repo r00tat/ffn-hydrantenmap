@@ -34,9 +34,6 @@ export default function DrawingComponent({
           }}
           pane={pane}
           eventHandlers={{
-            click: () => {
-              selectFirecallItem(item);
-            },
             ...(onContextMenu
               ? {
                   contextmenu: (e: LeafletMouseEvent) => {
@@ -47,15 +44,13 @@ export default function DrawingComponent({
               : {}),
           }}
         >
-          {idx === 0 && (
-            <FirecallItemPopup
-              onClick={() => selectFirecallItem(item)}
-              lat={item.lat}
-              lng={item.lng}
-            >
-              {item.name || 'Zeichnung'}
-            </FirecallItemPopup>
-          )}
+          <FirecallItemPopup
+            onClick={() => selectFirecallItem(item)}
+            lat={item.lat}
+            lng={item.lng}
+          >
+            {item.name || 'Zeichnung'}
+          </FirecallItemPopup>
         </Polyline>
       ))}
     </>
