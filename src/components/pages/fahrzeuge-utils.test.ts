@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateStrength } from './fahrzeuge-utils';
-import { FirecallItem } from '../firebase/firestore';
+import { CrewAssignment, FirecallItem } from '../firebase/firestore';
 
 describe('calculateStrength', () => {
   it('calculates vehicle strength as besatzung + 1', () => {
@@ -79,6 +79,31 @@ describe('calculateStrength', () => {
     expect(result.rows[0].ats).toBe(2);
     expect(result.rows[1].mann).toBe(8);
     expect(result.rows[1].ats).toBe(4);
+  });
+
+  it('uses crew count as fallback when besatzung is empty', () => {
+    const items: FirecallItem[] = [
+      { type: 'vehicle', name: 'TLF', id: 'v1', besatzung: '', ats: 0 } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { recipientId: '1', name: 'A', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Gruppenkommandant' },
+      { recipientId: '2', name: 'B', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Maschinist' },
+      { recipientId: '3', name: 'C', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Feuerwehrmann' },
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.totalMann).toBe(3);
+    expect(result.rows[0].mann).toBe(3);
+  });
+
+  it('prefers manual besatzung over crew count', () => {
+    const items: FirecallItem[] = [
+      { type: 'vehicle', name: 'TLF', id: 'v1', besatzung: '8', ats: 2 } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { recipientId: '1', name: 'A', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Feuerwehrmann' },
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.totalMann).toBe(9);
   });
 
   it('returns per-item strength data', () => {

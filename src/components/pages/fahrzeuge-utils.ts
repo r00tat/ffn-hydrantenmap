@@ -1,9 +1,11 @@
 import {
+  CrewAssignment,
   FirecallItem,
   Fzg,
   TacticalUnit,
   TACTICAL_UNIT_LABELS,
 } from '../firebase/firestore';
+import { getEffectiveBesatzung } from '../../common/vehicle-utils';
 
 export interface StrengthRow {
   name: string;
@@ -25,13 +27,21 @@ export interface StrengthSummary {
   rows: StrengthRow[];
 }
 
-export function calculateStrength(items: FirecallItem[]): StrengthSummary {
+export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAssignment[] = []): StrengthSummary {
+  const crewCountMap = new Map<string, number>();
+  for (const c of crewAssignments) {
+    if (c.vehicleId) {
+      crewCountMap.set(c.vehicleId, (crewCountMap.get(c.vehicleId) ?? 0) + 1);
+    }
+  }
+
   const rows: StrengthRow[] = [];
 
   for (const item of items) {
     if (item.type === 'vehicle') {
       const v = item as Fzg;
-      const besatzung = v.besatzung ? Number.parseInt(v.besatzung, 10) : 0;
+      const crewCount = crewCountMap.get(v.id || '') ?? 0;
+      const besatzung = getEffectiveBesatzung(v.besatzung, crewCount);
       rows.push({
         name: v.name,
         fw: v.fw,
