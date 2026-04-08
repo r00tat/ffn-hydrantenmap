@@ -184,7 +184,14 @@ export const useFirecallId = (): string => {
 export const useCrewForVehicle = (vehicleId: string): CrewAssignment[] => {
   const { crewAssignments } = useContext(FirecallContext);
   return useMemo(
-    () => crewAssignments.filter((c) => c.vehicleId === vehicleId),
+    () =>
+      crewAssignments
+        .filter((c) => c.vehicleId === vehicleId)
+        .sort((a, b) => {
+          const lastA = a.name.split(' ').pop() || '';
+          const lastB = b.name.split(' ').pop() || '';
+          return lastA.localeCompare(lastB, 'de');
+        }),
     [crewAssignments, vehicleId]
   );
 };
