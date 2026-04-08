@@ -11,7 +11,7 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from '@mui/material';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useDrawing } from './DrawingContext';
 
 const PRESET_COLORS = [
@@ -35,10 +35,20 @@ export default function DrawingToolbar() {
   const drawing = useDrawing();
   const [isSaving, setIsSaving] = useState(false);
 
+  // Stop touch events from bubbling to the map container where
+  // DrawingCanvas calls preventDefault(), which suppresses click events.
+  const stopTouch = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+  }, []);
+
   if (!drawing.isDrawing) return null;
 
   return (
     <Box
+      data-drawing-toolbar
+      onTouchStart={stopTouch}
+      onTouchMove={stopTouch}
+      onTouchEnd={stopTouch}
       sx={{
         position: 'fixed',
         bottom: 'env(safe-area-inset-bottom, 32px)',
@@ -50,6 +60,7 @@ export default function DrawingToolbar() {
         boxShadow: 4,
         px: 2,
         py: 1,
+        touchAction: 'auto',
       }}
     >
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
