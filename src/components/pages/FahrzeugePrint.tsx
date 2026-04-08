@@ -5,10 +5,12 @@ import Typography from '@mui/material/Typography';
 import { formatTimestamp } from '../../common/time-format';
 import useVehicles from '../../hooks/useVehicles';
 import { getItemInstance } from '../FirecallItems/elements';
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { FirecallItem } from '../firebase/firestore';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import React from 'react';
+import { FirecallContext } from '../../hooks/useFirecall';
+import { getEffectiveBesatzung } from '../../common/vehicle-utils';
 
 interface FcItemRowProps {
   item: FirecallItem;
@@ -33,6 +35,7 @@ function FcItemRow({ item }: FcItemRowProps) {
 
 export default function FahrzeugePrint() {
   const { vehicles, rohre, otherItems: others } = useVehicles();
+  const { crewAssignments } = useContext(FirecallContext);
   const layers = useFirecallLayers();
   const otherItems = [...rohre, ...others];
 
@@ -41,7 +44,10 @@ export default function FahrzeugePrint() {
       <Typography variant="h3" gutterBottom>
         {vehicles.length} Fahrzeuge im Einsatz mit{' '}
         {vehicles
-          .map((v) => (v.besatzung ? Number.parseInt(v.besatzung, 10) : 1) + 1)
+          .map((v) => {
+            const crewCount = crewAssignments.filter((c) => c.vehicleId === v.id).length;
+            return getEffectiveBesatzung(v.besatzung, crewCount) + 1;
+          })
           .reduce((p, c) => p + c, 0)}{' '}
         Besatzung
       </Typography>
@@ -84,7 +90,11 @@ export default function FahrzeugePrint() {
                     <td>{fzg.fw}</td>
                     <td>{fzg.name}</td>
                     <td>
-                      1:{fzg.besatzung || 0} ({fzg.ats})
+                      {(() => {
+                        const crewCount = crewAssignments.filter((c) => c.vehicleId === fzg.id).length;
+                        const bes = getEffectiveBesatzung(fzg.besatzung, crewCount);
+                        return `1:${bes} (${fzg.ats})`;
+                      })()}
                     </td>
                     <td>{fzg.beschreibung}</td>
                     <td>
