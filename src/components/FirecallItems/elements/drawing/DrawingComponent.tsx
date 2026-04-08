@@ -3,6 +3,7 @@ import React from 'react';
 import { Polyline } from 'react-leaflet';
 import { FirecallItem } from '../../../firebase/firestore';
 import { useDrawingStrokes } from '../../../../hooks/useDrawingStrokes';
+import useMapEditor from '../../../../hooks/useMapEditor';
 
 interface DrawingComponentProps {
   item: FirecallItem;
@@ -16,6 +17,7 @@ export default function DrawingComponent({
   onContextMenu,
 }: DrawingComponentProps): React.ReactNode {
   const strokes = useDrawingStrokes(item.id);
+  const { selectFirecallItem } = useMapEditor();
 
   return (
     <>
@@ -31,6 +33,9 @@ export default function DrawingComponent({
           }}
           pane={pane}
           eventHandlers={{
+            click: () => {
+              selectFirecallItem(item);
+            },
             ...(onContextMenu
               ? {
                   contextmenu: (e: LeafletMouseEvent) => {
