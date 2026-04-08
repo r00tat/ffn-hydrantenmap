@@ -13,7 +13,6 @@ import useVehicles from '../../hooks/useVehicles';
 import {
   CREW_FUNKTIONEN,
   CrewFunktion,
-  funktionAbkuerzung,
 } from '../firebase/firestore';
 
 export default function VehicleCrewSection({
@@ -89,7 +88,7 @@ export default function VehicleCrewSection({
                   >
                     {CREW_FUNKTIONEN.map((f) => (
                       <MenuItem key={f} value={f}>
-                        {funktionAbkuerzung(f)} — {f}
+                        {f}
                       </MenuItem>
                     ))}
                   </Select>
