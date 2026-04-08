@@ -57,60 +57,62 @@ export default function VehicleCrewSection({
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {crew.map((c) => (
-            <Box
-              key={c.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                flexWrap: 'wrap',
-              }}
-            >
-              <Typography
-                variant="body2"
-                sx={{ minWidth: 120, flexShrink: 0 }}
+          {crew
+            .filter((c) => c.id)
+            .map((c) => (
+              <Box
+                key={c.id}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                }}
               >
-                {c.name}
-              </Typography>
-              <FormControl size="small" sx={{ minWidth: 100 }}>
-                <Select
-                  value={c.funktion}
-                  onChange={(e: SelectChangeEvent) =>
-                    handleFunktionChange(
-                      c.id!,
-                      e.target.value as CrewFunktion
-                    )
-                  }
-                  variant="standard"
-                  sx={{ fontSize: '0.875rem' }}
+                <Typography
+                  variant="body2"
+                  sx={{ minWidth: 120, flexShrink: 0 }}
                 >
-                  {CREW_FUNKTIONEN.map((f) => (
-                    <MenuItem key={f} value={f}>
-                      {funktionAbkuerzung(f)} — {f}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <Select
-                  value={c.vehicleId || ''}
-                  onChange={(e: SelectChangeEvent) =>
-                    handleVehicleChange(c.id!, e.target.value)
-                  }
-                  variant="standard"
-                  sx={{ fontSize: '0.875rem' }}
-                >
-                  <MenuItem value="">Verfügbar</MenuItem>
-                  {vehicles.map((v) => (
-                    <MenuItem key={v.id} value={v.id}>
-                      {v.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-          ))}
+                  {c.name}
+                </Typography>
+                <FormControl size="small" sx={{ minWidth: 100 }}>
+                  <Select
+                    value={c.funktion}
+                    onChange={(e: SelectChangeEvent) =>
+                      handleFunktionChange(
+                        c.id as string,
+                        e.target.value as CrewFunktion
+                      )
+                    }
+                    variant="standard"
+                    sx={{ fontSize: '0.875rem' }}
+                  >
+                    {CREW_FUNKTIONEN.map((f) => (
+                      <MenuItem key={f} value={f}>
+                        {funktionAbkuerzung(f)} — {f}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <Select
+                    value={c.vehicleId || ''}
+                    onChange={(e: SelectChangeEvent) =>
+                      handleVehicleChange(c.id as string, e.target.value)
+                    }
+                    variant="standard"
+                    sx={{ fontSize: '0.875rem' }}
+                  >
+                    <MenuItem value="">Verfügbar</MenuItem>
+                    {vehicles.map((v) => (
+                      <MenuItem key={v.id} value={v.id}>
+                        {v.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            ))}
         </Box>
       )}
     </Box>

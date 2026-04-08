@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import {
   FirecallContext,
+  FirecallContextType,
   useLastOrSelectedFirecall,
 } from '../../hooks/useFirecall';
 import useCrewAssignments from '../../hooks/useCrewAssignments';
@@ -13,15 +15,18 @@ export default function FirecallProvider({
   const { crewAssignments, assignVehicle, updateFunktion } =
     useCrewAssignments();
 
+  const value: FirecallContextType = useMemo(
+    () => ({
+      ...firecall,
+      crewAssignments,
+      assignVehicle,
+      updateFunktion,
+    }),
+    [firecall, crewAssignments, assignVehicle, updateFunktion]
+  );
+
   return (
-    <FirecallContext.Provider
-      value={{
-        ...firecall,
-        crewAssignments,
-        assignVehicle,
-        updateFunktion,
-      }}
-    >
+    <FirecallContext.Provider value={value}>
       {children}
     </FirecallContext.Provider>
   );
