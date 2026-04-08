@@ -1,10 +1,13 @@
+import EditIcon from '@mui/icons-material/Edit';
+import { IconButton } from '@mui/material';
 import { LeafletMouseEvent } from 'leaflet';
-import React from 'react';
-import { Polyline } from 'react-leaflet';
+import React, { useCallback } from 'react';
+import { Polyline, Popup } from 'react-leaflet';
 import { FirecallItem } from '../../../firebase/firestore';
 import { useDrawingStrokes } from '../../../../hooks/useDrawingStrokes';
 import useMapEditor from '../../../../hooks/useMapEditor';
-import { FirecallItemPopup } from '../FirecallItemBase';
+import { useMapEditable } from '../../../../hooks/useMapEditor';
+import { PopupNavigateButton } from '../FirecallItemBase';
 
 interface DrawingComponentProps {
   item: FirecallItem;
@@ -19,6 +22,11 @@ export default function DrawingComponent({
 }: DrawingComponentProps): React.ReactNode {
   const strokes = useDrawingStrokes(item.id);
   const { selectFirecallItem } = useMapEditor();
+  const editable = useMapEditable();
+
+  const handleEdit = useCallback(() => {
+    selectFirecallItem(item);
+  }, [selectFirecallItem, item]);
 
   return (
     <>
@@ -44,13 +52,22 @@ export default function DrawingComponent({
               : {}),
           }}
         >
-          <FirecallItemPopup
-            onClick={() => selectFirecallItem(item)}
-            lat={item.lat}
-            lng={item.lng}
-          >
+          <Popup>
+            <PopupNavigateButton lat={item.lat} lng={item.lng} />
+            {editable && (
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                onClick={handleEdit}
+                onTouchEnd={(e) => {
+                  e.stopPropagation();
+                  handleEdit();
+                }}
+              >
+                <EditIcon />
+              </IconButton>
+            )}
             {item.name || 'Zeichnung'}
-          </FirecallItemPopup>
+          </Popup>
         </Polyline>
       ))}
     </>
