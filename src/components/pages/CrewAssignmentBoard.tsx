@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Box,
   FormControl,
@@ -35,7 +41,10 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable } from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
+import { DEFAULT_VEHICLES } from '../../common/defaultKostenersatzRates';
 import useCrewAssignments from '../../hooks/useCrewAssignments';
+import { useFirecall } from '../../hooks/useFirecall';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useVehicles from '../../hooks/useVehicles';
 import {
   CrewAssignment,
@@ -43,6 +52,7 @@ import {
   CREW_FUNKTIONEN,
   Fzg,
 } from '../firebase/firestore';
+import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
 import CrewVehicleColumn from './CrewVehicleColumn';
 
 export interface CrewAssignmentBoardProps {
@@ -200,8 +210,31 @@ export default function CrewAssignmentBoard({
   } = useCrewAssignments();
   const [newPersonName, setNewPersonName] = useState('');
   const { vehicles } = useVehicles();
+  const firecall = useFirecall();
+  const addFirecallItem = useFirecallItemAdd();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const existingVehicleNames = useMemo(
+    () => vehicles.map((v) => v.name),
+    [vehicles],
+  );
+
+  const handleAddVehicle = useCallback(
+    (vehicleName: string) => {
+      const vehicle = DEFAULT_VEHICLES.find((v) => v.name === vehicleName);
+      if (!vehicle) return;
+      addFirecallItem({
+        type: 'vehicle',
+        name: vehicle.name,
+        fw: 'Neusiedl am See',
+        datum: new Date().toISOString(),
+        lat: firecall?.lat ?? 0,
+        lng: firecall?.lng ?? 0,
+      } as Fzg);
+    },
+    [addFirecallItem, firecall],
+  );
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: { distance: 8 },
@@ -342,6 +375,12 @@ export default function CrewAssignmentBoard({
           </span>
         </Tooltip>
       </Box>
+
+      <VehicleQuickAddChips
+        selectedNames={[]}
+        existingNames={existingVehicleNames}
+        onToggle={handleAddVehicle}
+      />
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {isMobile ? (

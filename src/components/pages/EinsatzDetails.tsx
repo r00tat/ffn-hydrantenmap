@@ -421,11 +421,9 @@ export default function EinsatzDetails() {
       )}
 
       {/* Besatzung */}
-      {firecall.blaulichtSmsAlarmId && (
-        <Box sx={{ mt: 3 }}>
-          <CrewAssignmentBoard alarm={alarm} />
-        </Box>
-      )}
+      <Box sx={{ mt: 3 }}>
+        <CrewAssignmentBoard alarm={alarm} />
+      </Box>
 
       {/* Dialogs */}
       {displayUpdateDialog && (

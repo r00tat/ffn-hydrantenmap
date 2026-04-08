@@ -87,6 +87,15 @@ vi.mock('../../hooks/useVehicles', () => ({
   }),
 }));
 
+vi.mock('../../hooks/useFirecallItemAdd', () => ({
+  default: () => vi.fn(),
+}));
+
+vi.mock('../../hooks/useFirecall', () => ({
+  useFirecall: () => ({ lat: 47.8, lng: 16.8 }),
+  useFirecallId: () => 'test-firecall-id',
+}));
+
 vi.mock('@mui/material/useMediaQuery', () => ({
   default: mockUseMediaQuery,
 }));
@@ -183,8 +192,8 @@ describe('CrewAssignmentBoard', () => {
     mockUseMediaQuery.mockReturnValue(false);
     render(<CrewAssignmentBoard alarm={mockAlarm} />);
     expect(screen.getByText('Verfügbar')).toBeInTheDocument();
-    expect(screen.getByText('KDTFA')).toBeInTheDocument();
-    expect(screen.getByText('TLFA 4000')).toBeInTheDocument();
+    expect(screen.getAllByText('KDTFA').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('TLFA 4000').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders table with headers on mobile', () => {
