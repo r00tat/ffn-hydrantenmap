@@ -18,15 +18,25 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import moment from 'moment';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useFirecallAIQueryStream } from '../../app/ai/aiQuery';
 import {
   dateTimeFormat,
   formatTimestamp,
   parseTimestamp,
 } from '../../common/time-format';
+import { getEffectiveBesatzung } from '../../common/vehicle-utils';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
+import useFirecall, {
+  FirecallContext,
+  useFirecallId,
+} from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AiAssistantButton from '../Map/AiAssistantButton';
@@ -53,6 +63,7 @@ export function useDiaries(sortAscending: boolean = false) {
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
   const historyPathSegments = useHistoryPathSegments();
+  const { crewAssignments } = useContext(FirecallContext);
 
   const firecallItems = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -70,6 +81,25 @@ export function useDiaries(sortAscending: boolean = false) {
     const cars: Fzg[] = firecallItems.filter(
       (item: FirecallItem) => item.type === 'vehicle'
     ) as Fzg[];
+
+    const crewCountMap = new Map<string, number>();
+    for (const c of crewAssignments) {
+      if (c.vehicleId) {
+        crewCountMap.set(
+          c.vehicleId,
+          (crewCountMap.get(c.vehicleId) || 0) + 1
+        );
+      }
+    }
+
+    const getBesatzungText = (item: Fzg) => {
+      const bes = getEffectiveBesatzung(
+        item.besatzung,
+        crewCountMap.get(item.id || '') ?? 0
+      );
+      return bes > 0 ? '1:' + bes : '';
+    };
+
     const firecallEntries: Diary[] = [
       cars
         .filter((item) => item.alarmierung)
@@ -80,13 +110,13 @@ export function useDiaries(sortAscending: boolean = false) {
               datum: item.alarmierung,
               type: 'diary',
               name: `${item.name} ${item.fw || ''} alarmiert`,
-              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+              beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
               textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
               } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
                 item.alarmierung
                   ? 'alarmiert ' + formatTimestamp(item.alarmierung)
@@ -111,13 +141,13 @@ export function useDiaries(sortAscending: boolean = false) {
               datum: item.eintreffen,
               type: 'diary',
               name: `${item.name} ${item.fw || ''} eingetroffen`,
-              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+              beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
               textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
               } ${item.ats ? 'Atemschutzträger ' + item.ats : ''}  ${
                 item.eintreffen
                   ? 'eintreffen ' + formatTimestamp(item.eintreffen)
@@ -134,13 +164,13 @@ export function useDiaries(sortAscending: boolean = false) {
               datum: item.abruecken,
               type: 'diary',
               name: `${item.name} ${item.fw || ''} abgerückt`,
-              beschreibung: `${item.besatzung ? '1:' + item.besatzung : ''} ${
+              beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
               textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                item.besatzung ? 'Besatzung 1:' + item.besatzung : ''
+                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
               } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
                 item.abruecken
                   ? 'abruecken ' + formatTimestamp(item.abruecken)
@@ -220,7 +250,7 @@ export function useDiaries(sortAscending: boolean = false) {
       setDiaries(diaries);
       setDiaryCounter(diaries.length + 1);
     })();
-  }, [firecallItems, sortAscending]);
+  }, [firecallItems, sortAscending, crewAssignments]);
   return { diaries, diaryCounter };
 }
 
