@@ -281,18 +281,34 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           console.info(`credentials changed by admin, refreshing token and session`);
           lastKnownAuthRef.current = currentAuth;
 
-          try {
-            await refreshTokenWithRetry(
-              currentAuth.authorized!,
-              currentAuth.groups!
-            );
-            await serverLogin();
-            await refresh();
-            setCredentialsRefreshed(true);
-            setNeedsReLogin(false);
-          } catch (err) {
-            console.error(`failed to refresh credentials after admin update`, err);
-          }
+          // Immediately update UI with Firestore snapshot data
+          setLoginStatus((prev) => ({
+            ...prev,
+            isAuthorized: currentAuth.authorized ?? prev.isAuthorized,
+            groups: currentAuth.groups ?? prev.groups,
+          }));
+          setCredentialsRefreshed(true);
+          setNeedsReLogin(false);
+
+          // Background: refresh token and server session (non-blocking)
+          (async () => {
+            try {
+              const refreshed = await refreshTokenWithRetry(
+                currentAuth.authorized!,
+                currentAuth.groups!
+              );
+              if (refreshed) {
+                await serverLogin();
+                await refresh();
+              } else {
+                console.warn('token claims still differ after background refresh');
+                setNeedsReLogin(true);
+              }
+            } catch (err) {
+              console.error('failed to refresh credentials after admin update', err);
+              setNeedsReLogin(true);
+            }
+          })();
         }
       },
       (error) => {
