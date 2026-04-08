@@ -1,11 +1,18 @@
 'use client';
 
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
+import { LoginStep } from '../../hooks/auth/types';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 import { auth } from '../firebase/firebase';
@@ -28,6 +35,7 @@ export default function LoginUi() {
     isRefreshing,
     needsReLogin,
     myGroups,
+    loginStep,
   } = useFirebaseLogin();
 
   const [autoLoginTimedOut, setAutoLoginTimedOut] = useState(false);
@@ -58,34 +66,71 @@ export default function LoginUi() {
   const isAutoLoginInProgress =
     !isSignedIn && (isAuthLoading || isRefreshing) && !autoLoginTimedOut;
 
+  const loginSteps: { key: LoginStep; label: string }[] = [
+    { key: 'authenticating', label: 'Anmeldung wird durchgeführt' },
+    { key: 'verifying', label: 'Anmeldung wird verifiziert' },
+    { key: 'loading_permissions', label: 'Berechtigungen werden geladen' },
+    { key: 'done', label: 'Anmeldung abgeschlossen' },
+  ];
+
+  const stepOrder: LoginStep[] = loginSteps.map((s) => s.key);
+  const currentStepIndex = stepOrder.indexOf(loginStep ?? 'idle');
+
   return (
     <>
+      {(isAutoLoginInProgress ||
+        (isSignedIn &&
+          loginStep !== 'done' &&
+          loginStep !== 'idle')) && (
+        <Paper
+          sx={{
+            p: 3,
+            m: 2,
+            backgroundColor: 'action.hover',
+          }}
+        >
+          <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
+            {isRefreshing && !isSignedIn
+              ? 'Gespeicherte Anmeldung wird geladen...'
+              : 'Anmeldung läuft...'}
+          </Typography>
+          <List dense disablePadding>
+            {loginSteps.map((step, index) => {
+              const isCompleted = currentStepIndex > index;
+              const isCurrent = currentStepIndex === index;
+              return (
+                <ListItem key={step.key} disableGutters sx={{ py: 0.25 }}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    {isCompleted ? (
+                      <CheckCircleIcon color="success" fontSize="small" />
+                    ) : isCurrent ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <RadioButtonUncheckedIcon
+                        fontSize="small"
+                        sx={{ color: 'text.disabled' }}
+                      />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={step.label}
+                    primaryTypographyProps={{
+                      color: isCurrent
+                        ? 'text.primary'
+                        : isCompleted
+                          ? 'text.secondary'
+                          : 'text.disabled',
+                      fontWeight: isCurrent ? 'medium' : 'normal',
+                    }}
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+        </Paper>
+      )}
       {!isSignedIn && (
         <>
-          {isAutoLoginInProgress && (
-            <Paper
-              sx={{
-                p: 3,
-                m: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                backgroundColor: 'action.hover',
-              }}
-            >
-              <CircularProgress size={24} />
-              <Box>
-                <Typography variant="body1" fontWeight="medium">
-                  {isAuthLoading && !isRefreshing
-                    ? 'Anmeldung wird überprüft...'
-                    : 'Gespeicherte Anmeldung wird geladen...'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Bitte warten, die automatische Anmeldung läuft.
-                </Typography>
-              </Box>
-            </Paper>
-          )}
           <Paper sx={{ p: 2, m: 2 }}>
             <Typography>
               Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle
@@ -98,34 +143,6 @@ export default function LoginUi() {
 
       {isSignedIn && (
         <Box margin={4}>
-          {isRefreshing && (
-            <Paper
-              sx={{
-                p: 3,
-                mb: 3,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                backgroundColor: 'action.hover',
-              }}
-            >
-              <CircularProgress size={24} />
-              <Box>
-                <Typography variant="body1" fontWeight="medium">
-                  {isAuthorized
-                    ? 'Berechtigungen werden geladen...'
-                    : 'Anmeldung wird überprüft...'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Willkommen zurück
-                  {auth.currentUser?.displayName
-                    ? `, ${auth.currentUser.displayName}`
-                    : ''}
-                  !
-                </Typography>
-              </Box>
-            </Paper>
-          )}
           <Typography>
             Willkommen {auth.currentUser?.displayName} (
             {auth.currentUser?.email})!
