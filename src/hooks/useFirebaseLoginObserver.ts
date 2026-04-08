@@ -53,6 +53,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const [needsReLogin, setNeedsReLogin] = useState(false);
   const [credentialsRefreshed, setCredentialsRefreshed] = useState(false);
   const lastKnownAuthRef = useRef<AuthState | null>(null);
+  const sessionStatusRef = useRef(sessionStatus);
+  useEffect(() => {
+    sessionStatusRef.current = sessionStatus;
+  }, [sessionStatus]);
 
   // Derive auth state from session when available (faster initial load)
   const hasSessionAuth = sessionStatus === 'authenticated' && session?.user;
@@ -145,12 +149,22 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           timer.step('getIdToken (initial)');
           const token = await user.getIdToken();
           if (token) {
-            setLoginStatus((prev) => ({ ...prev, loginStep: 'verifying' }));
-            timer.step('serverLogin');
-            await serverLoginRef.current();
+            const hasValidSession = sessionStatusRef.current === 'authenticated';
 
-            timer.step('getIdToken (force refresh)');
-            await user.getIdToken(true);
+            if (hasValidSession) {
+              // Skip full server roundtrip — session cookie is still valid
+              timer.step('skip serverLogin (session valid)');
+            } else {
+              setLoginStatus((prev) => ({ ...prev, loginStep: 'verifying' }));
+              timer.step('serverLogin');
+              await serverLoginRef.current();
+            }
+
+            // Only force-refresh token if no valid session (fresh login)
+            if (!hasValidSession) {
+              timer.step('getIdToken (force refresh)');
+              await user.getIdToken(true);
+            }
           }
 
           timer.step('getIdTokenResult');
