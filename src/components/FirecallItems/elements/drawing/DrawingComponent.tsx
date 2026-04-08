@@ -4,6 +4,7 @@ import { Polyline } from 'react-leaflet';
 import { FirecallItem } from '../../../firebase/firestore';
 import { useDrawingStrokes } from '../../../../hooks/useDrawingStrokes';
 import useMapEditor from '../../../../hooks/useMapEditor';
+import { FirecallItemPopup } from '../FirecallItemBase';
 
 interface DrawingComponentProps {
   item: FirecallItem;
@@ -45,7 +46,17 @@ export default function DrawingComponent({
                 }
               : {}),
           }}
-        />
+        >
+          {idx === 0 && (
+            <FirecallItemPopup
+              onClick={() => selectFirecallItem(item)}
+              lat={item.lat}
+              lng={item.lng}
+            >
+              {item.name || 'Zeichnung'}
+            </FirecallItemPopup>
+          )}
+        </Polyline>
       ))}
     </>
   );
