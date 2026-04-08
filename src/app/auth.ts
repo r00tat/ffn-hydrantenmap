@@ -13,14 +13,15 @@ import {
   ensureUserProvisioned,
   getUserSessionData,
 } from '../server/auth/autoProvisionUser';
+import { serverLoginTimer } from '../common/loginTiming';
 
 export async function checkFirebaseToken(token: string) {
-  // logic to salt and hash password
+  const timer = serverLoginTimer('checkFirebaseToken');
+  timer.step('verifyIdToken');
   const decodedToken = await firebaseAuth.verifyIdToken(token);
 
   if (!isInternalEmail(decodedToken.email)) {
-    // allow all internal users
-    // fetch the user and check if this is an active user
+    timer.step('fetchUserDoc (external user)');
     const userDoc = await firestore
       .collection(USER_COLLECTION_ID)
       .doc(decodedToken.sub)
@@ -28,11 +29,13 @@ export async function checkFirebaseToken(token: string) {
 
     console.info(`user authorization check: ${userDoc.data()?.authorized}`);
     if (!(userDoc.exists && isTruthy(userDoc.data()?.authorized))) {
+      timer.done();
       throw new ApiException('your user is not authorized', {
         status: 403,
       });
     }
   }
+  timer.done();
   console.info(`user ${decodedToken.sub} verified`);
   return decodedToken;
 }
@@ -70,18 +73,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         firebaseToken: {},
       },
       authorize: async (credentials: any) => {
-        // console.info(`running auth.js authorize`);
+        const timer = serverLoginTimer('authorize');
+        timer.step('checkFirebaseToken');
         const tokenInfo = await checkFirebaseToken(credentials.firebaseToken);
 
-        // Auto-provision internal users during sign-in so custom claims
-        // are set BEFORE the client tries to refresh the token
+        timer.step('ensureUserProvisioned');
         await ensureUserProvisioned(
           tokenInfo.sub,
           tokenInfo.email,
           tokenInfo.name,
         );
 
-        // console.info(`token Info: ${JSON.stringify(tokenInfo)}`);
+        timer.done();
         return {
           id: tokenInfo.sub,
           image: tokenInfo.picture,
@@ -115,14 +118,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     //   return true;
     // },
     session: async ({ session, token, user }) => {
+      const timer = serverLoginTimer('sessionCallback');
       // Guard against undefined token (can happen on initial load)
       if (!token?.id) {
+        timer.done();
         return session;
       }
 
       session.user.id = token.id as string;
 
       try {
+        timer.step('getUserSessionData');
         const userData = await getUserSessionData(
           session.user.id,
           session.user.email,
@@ -136,9 +142,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       } catch (err) {
         console.error(`session callback: failed to fetch user data`, err);
-        // Return session without user data rather than crashing
       }
 
+      timer.done();
       return session;
     },
     jwt: ({ token, user }) => {
