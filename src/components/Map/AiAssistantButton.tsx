@@ -54,7 +54,7 @@ function playStopBeep() {
 
 export default function AiAssistantButton({ firecallItems, containerSx }: AiAssistantButtonProps) {
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
-  const { processAudio, processText, undoLastAction } = useAiAssistant(firecallItems);
+  const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -177,7 +177,19 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
   const isRecording = recorderState === 'recording';
   const isProcessing = recorderState === 'processing' || isAiProcessing;
-  const statusText = isRecording ? 'Aufnahme...' : isProcessing ? 'Verarbeitung...' : null;
+
+  const statusLabels: Record<string, string> = {
+    transcribing: 'Transkribiere...',
+    analyzing: 'Analysiere...',
+    executing: 'Führe aus...',
+  };
+  const statusText = isRecording
+    ? 'Aufnahme...'
+    : processingStatus !== 'idle'
+      ? statusLabels[processingStatus]
+      : isProcessing
+        ? 'Verarbeitung...'
+        : null;
 
   return (
     <>
@@ -215,27 +227,29 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
           </Typography>
         )}
         <Tooltip title={isRecording ? 'Klicken zum Stoppen' : 'KI-Assistent (klicken zum Sprechen)'}>
-          <Fab
-            color={isRecording ? 'error' : 'default'}
-            aria-label="AI assistant"
-            size="small"
-            onClick={handleClick}
-            disabled={isProcessing}
-            sx={{
-              animation: isRecording ? 'pulse 1s infinite' : 'none',
-              '@keyframes pulse': {
-                '0%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
-                '70%': { boxShadow: '0 0 0 10px rgba(244, 67, 54, 0)' },
-                '100%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' },
-              },
-            }}
-          >
-            {isProcessing ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              <AutoAwesomeIcon />
-            )}
-          </Fab>
+          <span>
+            <Fab
+              color={isRecording ? 'error' : 'default'}
+              aria-label="AI assistant"
+              size="small"
+              onClick={handleClick}
+              disabled={isProcessing}
+              sx={{
+                animation: isRecording ? 'pulse 1s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.4)' },
+                  '70%': { boxShadow: '0 0 0 10px rgba(244, 67, 54, 0)' },
+                  '100%': { boxShadow: '0 0 0 0 rgba(244, 67, 54, 0)' },
+                },
+              }}
+            >
+              {isProcessing ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                <AutoAwesomeIcon />
+              )}
+            </Fab>
+          </span>
         </Tooltip>
       </Box>
       <AiActionToast

@@ -14,6 +14,8 @@ import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS }
 import { executeToolCall } from './toolHandlers';
 import { buildAiContext } from './contextBuilder';
 
+export type AiProcessingStatus = 'idle' | 'transcribing' | 'analyzing' | 'executing';
+
 export default function useAiAssistant(existingItems: FirecallItem[]) {
   const leafletContext = useContext(LeafletContext);
   const map = leafletContext?.map ?? null;
@@ -22,6 +24,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   const updateFirecallItem = useFirecallItemUpdate();
   const interactionsRef = useRef<AiInteraction[]>([]);
   const [lastCreatedItem, setLastCreatedItem] = useState<{ id: string; type: string } | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<AiProcessingStatus>('idle');
 
   const cleanupOldInteractions = useCallback(() => {
     const now = Date.now();
@@ -111,12 +114,24 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
       };
 
+      console.info('[AI] Sending request with parts:', userParts.map((p) =>
+        'text' in p ? { text: p.text?.substring(0, 100) } : { type: 'inlineData', mimeType: (p as any).inlineData?.mimeType }
+      ));
+
+      setProcessingStatus('analyzing');
       try {
         const result = await geminiModel.generateContent(request);
-        const functionCalls = result.response.functionCalls();
+        const response = result.response;
+        const functionCalls = response.functionCalls();
+        let responseText = '';
+        try { responseText = response.text?.() || ''; } catch { /* text() throws when only function calls */ }
+
+        console.info('[AI] Response text:', responseText);
+        console.info('[AI] Function calls:', functionCalls?.length ?? 0,
+          functionCalls?.map((fc) => ({ name: fc.name, args: fc.args })));
 
         if (functionCalls && functionCalls.length > 0) {
-          const execResult = await executeToolCall(functionCalls[0], {
+          const toolDeps = {
             resolvePosition,
             addFirecallItem,
             updateFirecallItem,
@@ -125,35 +140,89 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             setLastCreatedItem,
             map,
             defaultPosition,
-          });
+          };
 
-          if (execResult.success) {
-            interactionsRef.current.push({
-              timestamp: Date.now(),
-              action: functionCalls[0].name,
-              createdItemId: execResult.createdItemId,
-              createdItemType: functionCalls[0].name.replace('create', '').toLowerCase(),
-            });
+          const messages: string[] = [];
+          let lastResult: AiAssistantResult | null = null;
+
+          setProcessingStatus('executing');
+          for (const fc of functionCalls) {
+            console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
+            const execResult = await executeToolCall(fc, toolDeps);
+            console.info(`[AI] Tool result:`, { success: execResult.success, message: execResult.message });
+
+            if (execResult.success) {
+              interactionsRef.current.push({
+                timestamp: Date.now(),
+                action: fc.name,
+                createdItemId: execResult.createdItemId,
+                createdItemType: fc.name.replace('create', '').toLowerCase(),
+              });
+            }
+
+            messages.push(execResult.message);
+            lastResult = execResult;
           }
 
-          return execResult;
+          setProcessingStatus('idle');
+          return {
+            ...lastResult!,
+            message: messages.join(' | '),
+          };
         }
 
         const text = result.response.text();
+        setProcessingStatus('idle');
         return { success: false, message: text || 'Keine Aktion erkannt' };
       } catch (error) {
         console.error('AI processing error:', error);
+        setProcessingStatus('idle');
         return { success: false, message: 'Fehler bei der Verarbeitung' };
       }
     },
     [cleanupOldInteractions, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem]
   );
 
+  const transcribeAudio = useCallback(
+    async (audioBase64: string): Promise<string | null> => {
+      const request: GenerateContentRequest = {
+        systemInstruction: 'Du bist ein Transkriptions-Assistent. Transkribiere die Audio-Eingabe wortgetreu auf Deutsch. Gib NUR den transkribierten Text zurück, keine Erklärungen oder Formatierung.',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: 'audio/webm', data: audioBase64 } },
+              { text: 'Transkribiere diese Audio-Aufnahme wortgetreu.' },
+            ],
+          },
+        ],
+      };
+
+      const result = await geminiModel.generateContent(request);
+      const text = result.response.text()?.trim();
+      console.info('[AI] Transcription:', text);
+      return text || null;
+    },
+    []
+  );
+
   const processAudio = useCallback(
     async (audioBase64: string): Promise<AiAssistantResult> => {
-      return sendToGemini([{ inlineData: { mimeType: 'audio/webm', data: audioBase64 } }]);
+      try {
+        setProcessingStatus('transcribing');
+        const transcription = await transcribeAudio(audioBase64);
+        if (!transcription) {
+          setProcessingStatus('idle');
+          return { success: false, message: 'Audio konnte nicht transkribiert werden' };
+        }
+        return sendToGemini([{ text: transcription }]);
+      } catch (error) {
+        console.error('Transcription error:', error);
+        setProcessingStatus('idle');
+        return { success: false, message: 'Fehler bei der Transkription' };
+      }
     },
-    [sendToGemini]
+    [transcribeAudio, sendToGemini]
   );
 
   const processText = useCallback(
@@ -179,5 +248,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     processText,
     undoLastAction,
     lastCreatedItem,
+    processingStatus,
   };
 }

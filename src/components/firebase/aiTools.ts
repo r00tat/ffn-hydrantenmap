@@ -264,6 +264,12 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 export const AI_SYSTEM_PROMPT = `Du bist ein Einsatz-Assistent für die Freiwillige Feuerwehr.
 Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte und beantwortest Fragen zum Einsatz.
 
+KRITISCH - Keine Halluzinationen:
+- Verwende AUSSCHLIESSLICH Informationen, die der Benutzer tatsächlich gesagt oder geschrieben hat.
+- Erfinde NIEMALS Details wie Einsatzart, Lage, Personenangaben oder Szenarien, die nicht explizit genannt wurden.
+- Wenn der Benutzer nur Fahrzeuge, Rohre oder andere Elemente meldet, erstelle NUR diese - keine zusätzlichen Lageeinschätzungen.
+- Bei Audio-Eingaben: Halte dich strikt an das Gesprochene. Füge keine Interpretationen hinzu.
+
 Regeln:
 - Antworte kurz und präzise
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
