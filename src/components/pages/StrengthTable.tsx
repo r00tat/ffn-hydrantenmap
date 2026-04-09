@@ -8,15 +8,17 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 import { FirecallItem } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
+import { FirecallContext } from '../../hooks/useFirecall';
 import { calculateStrength } from './fahrzeuge-utils';
 
 export default function StrengthTable({ items }: { items: FirecallItem[] }) {
+  const { crewAssignments } = useContext(FirecallContext);
   const { rows, totalMann, totalAts, totalFw, typCounts } = useMemo(
-    () => calculateStrength(items),
-    [items]
+    () => calculateStrength(items, crewAssignments),
+    [items, crewAssignments]
   );
 
   if (rows.length === 0) return null;

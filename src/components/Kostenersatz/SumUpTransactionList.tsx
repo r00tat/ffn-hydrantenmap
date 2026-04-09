@@ -114,9 +114,11 @@ export default function SumUpTransactionList() {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6">SumUp Transaktionen</Typography>
           <Tooltip title="Aktualisieren">
-            <IconButton onClick={loadData} disabled={loading} size="small">
-              {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
-            </IconButton>
+            <span>
+              <IconButton onClick={loadData} disabled={loading} size="small">
+                {loading ? <CircularProgress size={18} /> : <RefreshIcon />}
+              </IconButton>
+            </span>
           </Tooltip>
         </Box>
 

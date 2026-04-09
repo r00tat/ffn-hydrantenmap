@@ -1,6 +1,7 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { formatTimestamp } from '../../../common/time-format';
+import { getEffectiveBesatzung } from '../../../common/vehicle-utils';
 import { Fzg } from '../../firebase/firestore';
 import VehicleCrewPopup from '../VehicleCrewPopup';
 import { FirecallItemBase } from './FirecallItemBase';
@@ -12,6 +13,7 @@ export class FirecallVehicle extends FirecallItemBase {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  crewCount?: number;
 
   public constructor(firecallItem?: Fzg) {
     super(firecallItem);
@@ -75,7 +77,8 @@ export class FirecallVehicle extends FirecallItemBase {
   }
 
   public info(): string {
-    return `1:${this.besatzung || 0} ATS: ${this.ats || 0}`;
+    const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
+    return `1:${bes} ATS: ${this.ats || 0}`;
   }
 
   public body(): ReactNode {
@@ -137,18 +140,25 @@ export class FirecallVehicle extends FirecallItemBase {
         <b>
           {this.name} {this.fw || ''}
         </b>
-        {this.besatzung && Number.parseInt(this.besatzung) > 0 && (
-          <>
-            <br />
-            Besatzung: 1:{this.besatzung}
-          </>
-        )}
-        {this.ats !== undefined && this.ats > 0 && (
-          <>
-            {!(this.besatzung && Number.parseInt(this.besatzung) > 0) && <br />}{' '}
-            ({this.ats} ATS)
-          </>
-        )}
+        {(() => {
+          const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
+          return (
+            <>
+              {bes > 0 && (
+                <>
+                  <br />
+                  Besatzung: 1:{bes}
+                </>
+              )}
+              {this.ats !== undefined && this.ats > 0 && (
+                <>
+                  {!(bes > 0) && <br />}{' '}
+                  ({this.ats} ATS)
+                </>
+              )}
+            </>
+          );
+        })()}
         {this.alarmierung && (
           <>
             <br />

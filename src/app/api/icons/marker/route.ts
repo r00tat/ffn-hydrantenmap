@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
+import {
+  sanitizeHexColor,
+  svgSecurityHeaders,
+} from '../../../../common/svg-sanitize';
 
 export async function GET(req: NextRequest) {
   try {
-    const fill = req.nextUrl.searchParams.get('fill') || '#0000ff';
+    const fill = sanitizeHexColor(
+      req.nextUrl.searchParams.get('fill') || '#0000ff',
+      '#0000ff'
+    );
     return new NextResponse(
       `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="${fill}">
   <path d="M0 0h24v24H0V0z" fill="none" />
@@ -13,9 +20,7 @@ export async function GET(req: NextRequest) {
 </svg>
 `,
       {
-        headers: {
-          'Content-Type': 'image/svg+xml',
-        },
+        headers: svgSecurityHeaders,
       }
     );
   } catch (err: any) {

@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { ApiException } from '../../app/api/errors';
 import { firestore, firebaseAuth } from '../firebase/admin';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
+import { isInternalEmail } from '../../common/internalDomains';
 
 const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   const authorization = req.headers.get('authorization');
@@ -18,10 +19,7 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   try {
     const decodedToken = await firebaseAuth.verifyIdToken(token);
     // console.log(`decoded token: ${JSON.stringify(decodedToken)}`);
-    if (
-      decodedToken.email &&
-      decodedToken.email.indexOf('@ff-neusiedlamsee.at') > 0
-    ) {
+    if (isInternalEmail(decodedToken.email)) {
       // allow all internal users
       return decodedToken;
     }

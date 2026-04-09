@@ -2,12 +2,12 @@
 
 import { FIRECALL_COLLECTION_ID } from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
-import { checkAuth } from '../firebaseAuth';
+import { actionUserRequired } from '../auth';
 
 // this is a sample server side action,
 // which can be called directly from the client without an API endpoint
 export async function sayHello(text: string) {
-  const userInfo = await checkAuth();
+  const userInfo = await actionUserRequired();
   console.info(
     `loggedin user on serverside action: ${JSON.stringify(userInfo)}`
   );

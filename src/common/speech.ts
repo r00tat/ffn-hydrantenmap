@@ -1,10 +1,20 @@
+import { auth } from '../components/firebase/firebase';
+
 let audioElement: HTMLAudioElement | null = null;
 
 async function speakWithCloudTTS(message: string): Promise<boolean> {
   try {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      return false;
+    }
+
     const response = await fetch('/api/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ text: message }),
     });
 

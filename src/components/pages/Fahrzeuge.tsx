@@ -10,22 +10,24 @@ import Collapse from '@mui/material/Collapse';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { SimpleMap } from '../../common/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { FirecallContext, useCrewCountForVehicle } from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
-import { FirecallItem } from '../firebase/firestore';
+import { CrewAssignment, FirecallItem } from '../firebase/firestore';
 import { downloadRowsAsCsv } from '../firebase/download';
 import { DownloadButton } from '../inputs/DownloadButton';
 import FirecallItemUpdateDialog from '../FirecallItems/FirecallItemUpdateDialog';
 import { getItemInstance } from '../FirecallItems/elements';
+import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import StrengthTable from './StrengthTable';
 import { calculateStrength } from './fahrzeuge-utils';
 
-function downloadEinsatzmittel(items: FirecallItem[]) {
-  const { rows } = calculateStrength(items);
+function downloadEinsatzmittel(items: FirecallItem[], crewAssignments: CrewAssignment[]) {
+  const { rows } = calculateStrength(items, crewAssignments);
   downloadRowsAsCsv(
     [
       ['Bezeichnung', 'Feuerwehr', 'Typ', 'Stärke', 'ATS', 'Beschreibung', 'Alarmierung', 'Eintreffen', 'Abrücken'],
@@ -56,7 +58,14 @@ function CompactItemCard({
   onEdit: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const instance = useMemo(() => getItemInstance(item), [item]);
+  const crewCount = useCrewCountForVehicle(item.type === 'vehicle' ? item.id : undefined);
+  const instance = useMemo(() => {
+    const inst = getItemInstance(item);
+    if (item.type === 'vehicle' && 'crewCount' in inst) {
+      (inst as FirecallVehicle).crewCount = crewCount;
+    }
+    return inst;
+  }, [item, crewCount]);
   const iconUrl = useMemo(() => {
     try {
       return instance.icon()?.options?.iconUrl;
@@ -200,6 +209,7 @@ function LayerGroup({
 
 export default function Fahrzeuge() {
   const { isAuthorized } = useFirebaseLogin();
+  const { crewAssignments } = useContext(FirecallContext);
   const { vehicles, displayItems } = useVehicles();
   const layers = useFirecallLayers();
 
@@ -244,7 +254,7 @@ export default function Fahrzeuge() {
         {totalItems} Einsatzmittel{' '}
         <DownloadButton
           tooltip="Einsatzmittel als CSV herunterladen"
-          onClick={() => downloadEinsatzmittel(displayItems)}
+          onClick={() => downloadEinsatzmittel(displayItems, crewAssignments)}
         />
       </Typography>
 

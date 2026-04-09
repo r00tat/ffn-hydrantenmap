@@ -196,6 +196,14 @@ export const useCrewForVehicle = (vehicleId: string): CrewAssignment[] => {
   );
 };
 
+export const useCrewCountForVehicle = (vehicleId: string | undefined): number => {
+  const { crewAssignments } = useContext(FirecallContext);
+  return useMemo(
+    () => vehicleId ? crewAssignments.filter((c) => c.vehicleId === vehicleId).length : 0,
+    [crewAssignments, vehicleId]
+  );
+};
+
 export const useCrewAssignmentActions = () => {
   const { assignVehicle, updateFunktion } = useContext(FirecallContext);
   return { assignVehicle, updateFunktion };

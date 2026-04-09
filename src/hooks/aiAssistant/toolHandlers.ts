@@ -87,6 +87,7 @@ export async function executeToolCall(
       const ref = await addFirecallItem({
         type: 'diary',
         name: (args.name as string) || 'Eintrag',
+        beschreibung: args.beschreibung as string,
         art: (args.art as 'M' | 'B' | 'F') || 'M',
         von: args.von as string,
         an: args.an as string,

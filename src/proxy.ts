@@ -14,7 +14,10 @@ export function proxy(req: NextRequest, ev: NextFetchEvent) {
       );
     }
 
-    res.headers.set('Access-Control-Allow-Origin', '*');
+    res.headers.set(
+      'Access-Control-Allow-Origin',
+      process.env.NEXTAUTH_URL || 'https://einsatz.ffnd.at'
+    );
     res.headers.set(
       'Access-Control-Allow-Headers',
       'Origin, X-Requested-With, Content-Type, Accept, Authorization'

@@ -3,15 +3,18 @@ import React from 'react';
 import { Polyline } from 'react-leaflet';
 import { FirecallItem } from '../../../firebase/firestore';
 import { useDrawingStrokes } from '../../../../hooks/useDrawingStrokes';
+import { FirecallItemPopup } from '../FirecallItemBase';
 
 interface DrawingComponentProps {
   item: FirecallItem;
+  selectItem: (item: FirecallItem) => void;
   pane?: string;
   onContextMenu?: (item: FirecallItem, event: LeafletMouseEvent) => void;
 }
 
 export default function DrawingComponent({
   item,
+  selectItem,
   pane,
   onContextMenu,
 }: DrawingComponentProps): React.ReactNode {
@@ -40,7 +43,15 @@ export default function DrawingComponent({
                 }
               : {}),
           }}
-        />
+        >
+          <FirecallItemPopup
+            onClick={() => selectItem(item)}
+            lat={item.lat}
+            lng={item.lng}
+          >
+            {item.name || 'Zeichnung'}
+          </FirecallItemPopup>
+        </Polyline>
       ))}
     </>
   );

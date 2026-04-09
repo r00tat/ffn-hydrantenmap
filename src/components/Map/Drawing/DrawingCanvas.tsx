@@ -91,15 +91,24 @@ export default function DrawingCanvas() {
     const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
     const onMouseUp = () => handleUp();
 
+    // Skip touch events that originate from interactive UI (toolbar buttons)
+    // so that preventDefault() does not suppress their click events.
+    const isUiElement = (t: EventTarget | null): boolean =>
+      t instanceof HTMLElement &&
+      !!t.closest('button, a, input, [role="button"], [data-drawing-toolbar]');
+
     const onTouchStart = (e: TouchEvent) => {
+      if (isUiElement(e.target)) return;
       e.preventDefault();
       handleDown(e.touches[0].clientX, e.touches[0].clientY);
     };
     const onTouchMove = (e: TouchEvent) => {
+      if (isUiElement(e.target)) return;
       e.preventDefault();
       handleMove(e.touches[0].clientX, e.touches[0].clientY);
     };
     const onTouchEnd = (e: TouchEvent) => {
+      if (isUiElement(e.target)) return;
       e.preventDefault();
       handleUp();
     };

@@ -3,6 +3,7 @@ import { auth } from '../../../auth';
 import { gk34ToWgs84 } from '../../../../common/wgs-convert';
 import { GisObject, WgsObject } from '../../../../common/gis-objects';
 import { writeBatches } from '../../../../server/firebase/import';
+import { ALLOWED_COLLECTIONS, ClusterCollectionType } from '../../../../components/admin/clusterItemConfig';
 
 interface Metadata {
   id_attr: number;
@@ -156,6 +157,13 @@ export async function POST(request: NextRequest) {
     if (body.action === 'continue') {
       const { collectionName, data } = body;
 
+      if (!ALLOWED_COLLECTIONS.includes(collectionName as ClusterCollectionType)) {
+        return NextResponse.json(
+          { error: `Invalid collection: ${collectionName}. Allowed collections: ${ALLOWED_COLLECTIONS.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
       const { stream, send, close } = createProgressStream();
 
       // Process in background
@@ -188,6 +196,13 @@ export async function POST(request: NextRequest) {
 
   if (!harFile || !collectionName) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  if (!ALLOWED_COLLECTIONS.includes(collectionName as ClusterCollectionType)) {
+    return NextResponse.json(
+      { error: `Invalid collection: ${collectionName}. Allowed collections: ${ALLOWED_COLLECTIONS.join(', ')}` },
+      { status: 400 }
+    );
   }
 
   const { stream, send, close } = createProgressStream();

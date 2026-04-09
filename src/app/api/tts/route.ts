@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import userRequired from '../../../server/auth/userRequired';
 
 const client = new TextToSpeechClient();
 
 export async function POST(request: NextRequest) {
   try {
+    await userRequired(request);
+
     const { text } = await request.json();
 
     if (!text || typeof text !== 'string') {

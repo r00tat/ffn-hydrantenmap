@@ -160,7 +160,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 export async function actionUserRequired() {
   const session = await auth();
   // console.info(`session info: ${JSON.stringify(session)}`);
-  if (!session?.user) {
+  if (!session?.user || !session.user.isAuthorized) {
     throw new ApiException('User not authorized', { status: 403 });
   }
   return session;

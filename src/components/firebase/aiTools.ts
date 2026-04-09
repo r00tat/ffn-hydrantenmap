@@ -75,11 +75,12 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: 'createDiary',
-    description: 'Add an entry to the Einsatztagebuch (operational diary)',
+    description: 'Add an entry to the Einsatztagebuch (operational diary). This is the DEFAULT action when the user input is a report/message that does not match any other tool.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
-        name: { type: SchemaType.STRING, description: 'Content of the diary entry' },
+        name: { type: SchemaType.STRING, description: 'Short title/summary of the diary entry' },
+        beschreibung: { type: SchemaType.STRING, description: 'Detailed content/description (use for longer texts)' },
         art: {
           type: SchemaType.STRING,
           enum: ['M', 'B', 'F'],
@@ -263,6 +264,12 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 export const AI_SYSTEM_PROMPT = `Du bist ein Einsatz-Assistent für die Freiwillige Feuerwehr.
 Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte und beantwortest Fragen zum Einsatz.
 
+KRITISCH - Keine Halluzinationen:
+- Verwende AUSSCHLIESSLICH Informationen, die der Benutzer tatsächlich gesagt oder geschrieben hat.
+- Erfinde NIEMALS Details wie Einsatzart, Lage, Personenangaben oder Szenarien, die nicht explizit genannt wurden.
+- Wenn der Benutzer nur Fahrzeuge, Rohre oder andere Elemente meldet, erstelle NUR diese - keine zusätzlichen Lageeinschätzungen.
+- Bei Audio-Eingaben: Halte dich strikt an das Gesprochene. Füge keine Interpretationen hinzu.
+
 Regeln:
 - Antworte kurz und präzise
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
@@ -297,4 +304,10 @@ Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Detai
 - Geschäftsbuch: Inhalt, Ausgehend/Eingehend, Von, An, Datum
 - Taktische Einheiten: Name, Art (Trupp/Gruppe/Zug/Abschnitt/etc.), Feuerwehr, Mannschaftsstärke, Einheitsführer, ATS-Träger
 
-Für Referenzen auf bestehende Elemente nutze itemName oder itemId.`;
+Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
+
+WICHTIG - Standardverhalten bei Meldungen:
+Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage zum Einsatz stellt, handelt es sich wahrscheinlich um eine Meldung.
+Erstelle in diesem Fall automatisch einen Tagebucheintrag (createDiary) mit art="M".
+- Bei kurzen Texten: verwende name für den Inhalt
+- Bei langen Texten (mehr als ein kurzer Satz): erstelle einen kurzen Titel in name und setze den vollständigen Text in beschreibung`;
