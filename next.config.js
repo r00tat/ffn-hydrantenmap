@@ -23,18 +23,8 @@ module.exports = async (phase) => {
         "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
         // Styles: self + unsafe-inline required by MUI (emotion/styled-components)
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        // Images: self + data URIs (Leaflet markers) + tile servers + Firebase Storage
-        [
-          "img-src 'self'",
-          'data:',
-          'blob:',
-          'https://*.tile.openstreetmap.org',
-          'https://*.tile.opentopomap.org',
-          'https://mapsneu.wien.gv.at',
-          'https://tiles.lfrz.gv.at',
-          'https://gisenterprise.bgld.gv.at',
-          'https://firebasestorage.googleapis.com',
-        ].join(' '),
+        // Images: self + data URIs (Leaflet markers) + any https (tile servers, Firebase Storage, Google profile pics, user-defined icons)
+        "img-src 'self' data: blob: https:",
         // Fonts: self + Google Fonts
         "font-src 'self' https://fonts.gstatic.com",
         // Connect: API calls to Firebase, Google APIs, tile servers, etc.
@@ -51,13 +41,14 @@ module.exports = async (phase) => {
           'https://tiles.lfrz.gv.at',
           'https://gisenterprise.bgld.gv.at',
           'https://unpkg.com',
+          'https://nominatim.openstreetmap.org',
         ].join(' '),
         // Frames: none (we don't embed iframes)
         "frame-src 'self'",
         // Workers: self for service worker
         "worker-src 'self'",
         // Media: self for audio recording (AI assistant)
-        "media-src 'self' blob:",
+        "media-src 'self' blob: data:",
         // Object/base: none
         "object-src 'none'",
         "base-uri 'self'",

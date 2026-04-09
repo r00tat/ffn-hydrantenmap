@@ -172,6 +172,30 @@ Tests use **Vitest** with `@testing-library/react` and `@testing-library/jest-do
 - **NextAuth.js** for session management
 - **Serwist** for PWA/service worker
 
+## MUI Guidelines
+
+**Tooltip + disabled Button:** MUI Tooltip benötigt Events vom Child-Element. Ein `disabled` Button/IconButton/Fab feuert keine Events. Daher muss ein `<span>` Wrapper um das disabled Element gelegt werden:
+
+```tsx
+// Richtig:
+<Tooltip title="Hilfe">
+  <span>
+    <IconButton disabled={isLoading}>
+      <HelpIcon />
+    </IconButton>
+  </span>
+</Tooltip>
+
+// Falsch (verursacht MUI-Warnung):
+<Tooltip title="Hilfe">
+  <IconButton disabled={isLoading}>
+    <HelpIcon />
+  </IconButton>
+</Tooltip>
+```
+
+Dies gilt für alle Button-Varianten (`Button`, `IconButton`, `Fab`) innerhalb von `Tooltip`.
+
 ## Architecture
 
 ### Directory Structure

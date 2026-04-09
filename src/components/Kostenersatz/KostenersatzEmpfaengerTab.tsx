@@ -287,9 +287,11 @@ export default function KostenersatzEmpfaengerTab({
           <>
             <PaymentStatusChip status={sumupPaymentStatus} />
             <Tooltip title="Status prüfen">
-              <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
-                {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
-              </IconButton>
+              <span>
+                <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
+                  {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                </IconButton>
+              </span>
             </Tooltip>
           </>
         )}
