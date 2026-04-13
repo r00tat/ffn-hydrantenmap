@@ -33,7 +33,7 @@
     "@mdi/react": "^1.6.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/lab": "^7.0.1-beta.23",
-    "@mui/material": "^7.0.2",
+    "@mui/material": "^9.0.0",
     "@mui/x-charts": "^8.28.2",
     "@mui/x-date-pickers": "^8.27.2",
     "@react-leaflet/core": "^3.0.0",
