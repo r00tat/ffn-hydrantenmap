@@ -408,6 +408,11 @@ export default function EinsatzDetails() {
         </>
       )}
 
+      {/* Besatzung */}
+      <Box sx={{ mt: 3 }}>
+        <CrewAssignmentBoard alarm={alarm} />
+      </Box>
+
       {/* Einsatztagebuch */}
       <Box sx={{ mt: 3 }}>
         <EinsatzTagebuchWrapper />
@@ -419,11 +424,6 @@ export default function EinsatzDetails() {
           <KostenersatzList firecallId={firecall.id} />
         </Box>
       )}
-
-      {/* Besatzung */}
-      <Box sx={{ mt: 3 }}>
-        <CrewAssignmentBoard alarm={alarm} />
-      </Box>
 
       {/* Dialogs */}
       {displayUpdateDialog && (

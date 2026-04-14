@@ -67,6 +67,7 @@ export default function AppDrawer({
 
   const drawerItems: DrawerItem[] = [
     { text: 'Karte', icon: <MapIcon />, href: '/', einsatzSection: '' },
+    { text: 'Details', icon: <InfoIcon />, href: '/', einsatzSection: 'details' },
     {
       text: 'Einsätze',
       icon: <LocalFireDepartmentIcon />,
