@@ -22,7 +22,7 @@ export default function VehicleQuickAddChips({
     <Box sx={{ mt: 2, mb: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <LocalShippingIcon color="action" fontSize="small" />
-        <Typography variant="subtitle2" fontWeight={500}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
           Fahrzeuge Neusiedl am See
         </Typography>
         {selectedNames.length > 0 && (

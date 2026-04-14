@@ -160,7 +160,7 @@ export default function SidebarFirecallSummary() {
               >
                 {entry.label}
               </Typography>
-              <Typography variant="body2" fontWeight={600}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
                 {entry.count}
               </Typography>
             </Box>

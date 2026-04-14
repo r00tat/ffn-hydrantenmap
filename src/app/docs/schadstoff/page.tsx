@@ -11,7 +11,7 @@ export default function SchadstoffDocsPage() {
       <Typography variant="h3" gutterBottom>
         Schadstoff
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Schadstoffdatenbank enthält Informationen zu gefährlichen Stoffen
         und deren Handhabung im Einsatzfall.
       </Typography>

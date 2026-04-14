@@ -110,7 +110,7 @@ export default function KostenersatzCard({
             }}
           >
             <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" fontWeight={500}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                 {calculation.recipient.name || 'Kein Empfänger'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -152,7 +152,7 @@ export default function KostenersatzCard({
               {calculation.items.length} Positionen •{' '}
               {calculation.defaultStunden}h
             </Typography>
-            <Typography variant="h6" fontWeight={600}>
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {formatCurrency(calculation.totalSum)}
             </Typography>
           </Box>

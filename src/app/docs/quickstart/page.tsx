@@ -7,7 +7,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h3" gutterBottom>
         Schnellstart
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Diese Anleitung zeigt dir, wie du in wenigen Schritten einen neuen
         Einsatz anlegst und die wichtigsten Funktionen nutzt.
       </Typography>
@@ -15,7 +15,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         1. Neuen Einsatz erstellen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Klicke oben in der Navigationsleiste auf das Feuer-Symbol, um einen
         neuen Einsatz anzulegen.
       </Typography>
@@ -23,7 +23,7 @@ export default function QuickstartDocsPage() {
         src="/docs-assets/screenshots/quickstart-firecall-button.png"
         alt="Feuer-Symbol in der Navigationsleiste"
       />
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Es öffnet sich ein Dialog, in dem du die Einsatzdaten eingeben kannst.
         Fülle die Felder aus (Adresse, Einsatzart, etc.) und speichere den
         Einsatz.
@@ -36,7 +36,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         2. Bearbeitungsmodus aktivieren
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Um Elemente auf der Karte hinzuzufügen, aktiviere den Bearbeitungsmodus.
         Klicke dazu auf das Stift-Symbol in der Kartenansicht.
       </Typography>
@@ -48,7 +48,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         3. Fahrzeug hinzufügen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Im Bearbeitungsmodus kannst du Fahrzeuge zur Karte hinzufügen. Wähle den
         Fahrzeugtyp (z.B. &quot;TLFA&quot;) und die Feuerwehr (z.B.
         &quot;Neusiedl am See&quot;) aus.
@@ -61,7 +61,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         4. Tagebucheintrag erstellen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Öffne die Seitenleiste und erstelle einen neuen Tagebucheintrag, um
         wichtige Ereignisse während des Einsatzes zu dokumentieren.
       </Typography>
@@ -73,7 +73,7 @@ export default function QuickstartDocsPage() {
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         Nächste Schritte
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Jetzt hast du die Grundlagen kennengelernt. Erkunde die weiteren
         Funktionen in den anderen Dokumentationsseiten oder probiere die App
         einfach aus!

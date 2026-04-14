@@ -148,7 +148,7 @@ export default function KostenersatzEinsatzTab({
           }}
           fullWidth
           disabled={disabled}
-          inputProps={{ min: 1, step: 0.5 }}
+          slotProps={{ htmlInput: { min: 1, step: 0.5 } }}
           helperText={
             suggestedDuration > 1
               ? `Vorgeschlagen basierend auf Alarmierung/Abrücken: ${suggestedDuration} Stunden. Halbe Stunden erlaubt (z.B. 2.5)`

@@ -56,7 +56,7 @@ export default function StrengthTable({ items }: { items: FirecallItem[] }) {
             <TableCell>{totalFw} FW</TableCell>
             <TableCell>
               {Object.entries(typCounts).map(([typ, count]) => (
-                <Typography variant="body2" fontWeight="bold" key={typ}>
+                <Typography variant="body2" sx={{ fontWeight: "bold" }} key={typ}>
                   {count} {typ}
                 </Typography>
               ))}

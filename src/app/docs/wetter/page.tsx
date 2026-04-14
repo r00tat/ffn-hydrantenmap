@@ -10,7 +10,7 @@ export default function WetterDocsPage() {
       <Typography variant="h3" gutterBottom>
         Wetter
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Wetter-Funktion zeigt aktuelle und historische Wetterdaten von
         TAWES-Messstationen (GeoSphere Austria) an. Die Daten werden in
         10-Minuten-Intervallen erfasst und als interaktive Diagramme

@@ -89,7 +89,7 @@ export default function LoginUi() {
             backgroundColor: 'action.hover',
           }}
         >
-          <Typography variant="body1" fontWeight="medium" sx={{ mb: 2 }}>
+          <Typography variant="body1" sx={{ fontWeight: "medium", mb: 2 }}>
             {isRefreshing && !isSignedIn
               ? 'Gespeicherte Anmeldung wird geladen...'
               : 'Anmeldung läuft...'}
@@ -114,13 +114,17 @@ export default function LoginUi() {
                   </ListItemIcon>
                   <ListItemText
                     primary={step.label}
-                    primaryTypographyProps={{
-                      color: isCurrent
-                        ? 'text.primary'
-                        : isCompleted
-                          ? 'text.secondary'
-                          : 'text.disabled',
-                      fontWeight: isCurrent ? 'medium' : 'normal',
+                    slotProps={{
+                      primary: {
+                        sx: {
+                          color: isCurrent
+                            ? 'text.primary'
+                            : isCompleted
+                              ? 'text.secondary'
+                              : 'text.disabled',
+                          fontWeight: isCurrent ? 'medium' : 'normal',
+                        },
+                      },
                     }}
                   />
                 </ListItem>
@@ -142,7 +146,7 @@ export default function LoginUi() {
       )}
 
       {isSignedIn && (
-        <Box margin={4}>
+        <Box sx={{ margin: 4 }}>
           <Typography>
             Willkommen {auth.currentUser?.displayName} (
             {auth.currentUser?.email})!
@@ -186,7 +190,7 @@ export default function LoginUi() {
           )}
 
           {needsReLogin && (
-            <Typography color="error" borderColor="red">
+            <Typography color="error" sx={{ borderColor: "red" }}>
               Deine Autorisierung hat sich geändert. Um die neuen Rechte nutzten
               zu können, musst du dich aus und neu einloggen.
               <br />

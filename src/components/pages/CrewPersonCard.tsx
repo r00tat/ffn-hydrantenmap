@@ -11,7 +11,7 @@ import {
   SelectChangeEvent,
   Typography,
 } from '@mui/material';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useDraggable } from '@dnd-kit/core';
 import {

@@ -35,7 +35,7 @@ export default function VehicleQuickAddPanel({
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <LocalShippingIcon color="action" />
-          <Typography variant="subtitle1" fontWeight={500}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
             Unsere Fahrzeuge
           </Typography>
           {selectedVehicleIds.length > 0 && (

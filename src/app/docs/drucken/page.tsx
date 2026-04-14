@@ -10,7 +10,7 @@ export default function DruckenDocsPage() {
       <Typography variant="h3" gutterBottom>
         Drucken
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Druckfunktion erstellt einen umfassenden Einsatzbericht, der alle
         relevanten Daten des aktiven Einsatzes in einem druckoptimierten Format
         zusammenfasst.

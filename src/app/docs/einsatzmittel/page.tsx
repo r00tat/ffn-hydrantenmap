@@ -10,7 +10,7 @@ export default function EinsatzmittelDocsPage() {
       <Typography variant="h3" gutterBottom>
         Einsatzmittel
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Einsatzmittel-Seite bietet eine Übersicht aller im Einsatz
         eingesetzten Fahrzeuge und Ressourcen mit Stärkeberechnung und
         Gruppenansicht.

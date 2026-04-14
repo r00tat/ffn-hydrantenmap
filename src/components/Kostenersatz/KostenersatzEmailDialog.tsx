@@ -151,7 +151,7 @@ export default function KostenersatzEmailDialog({
       onClose={sending ? undefined : onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{ sx: { minHeight: '60vh' } }}
+      slotProps={{ paper: { sx: { minHeight: '60vh' } } }}
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

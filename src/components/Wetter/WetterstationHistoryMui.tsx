@@ -149,7 +149,7 @@ function WeatherChartMui({
 
     return (
       <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
           {config.title}
         </Typography>
         <LineChart
@@ -184,7 +184,7 @@ function WeatherChartMui({
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
         {config.title}
       </Typography>
       <BarChart

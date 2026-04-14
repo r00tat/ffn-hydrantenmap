@@ -412,7 +412,7 @@ export default function EnergySpectrum() {
                 Erkennbare Nuklide ({MATCHABLE_NUCLIDES.length})
               </Typography>
               {MATCHABLE_NUCLIDES.map((n) => (
-                <Typography key={n.name} variant="caption" display="block">
+                <Typography key={n.name} variant="caption" sx={{ display: "block" }}>
                   {n.name}: {n.peaks!.join(', ')} keV
                 </Typography>
               ))}
@@ -575,7 +575,7 @@ export default function EnergySpectrum() {
                         <Typography
                           component="span"
                           variant="caption"
-                          display="block"
+                          sx={{ display: "block" }}
                           color="text.secondary"
                         >
                           {s.description}

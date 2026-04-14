@@ -12,7 +12,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h3" gutterBottom>
         Einsätze
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Hier kannst du Einsätze erstellen, bearbeiten und verwalten. Jeder
         Einsatz kann mit Fahrzeugen, Mannschaft und anderen Elementen verknüpft
         werden. Du kannst Einsätze per Link teilen, nach Gruppen filtern und
@@ -91,7 +91,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom>
         Neuen Einsatz anlegen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Über den Erstellen-Button kannst du einen neuen Einsatz mit allen
         relevanten Informationen anlegen.
       </Typography>
@@ -137,7 +137,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Blaulicht-SMS beim Erstellen nutzen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Wenn für deine Gruppe Zugangsdaten für die Blaulicht-SMS hinterlegt
         sind, kannst du beim Erstellen eines Einsatzes aktuelle Alarme direkt
         übernehmen.
@@ -170,7 +170,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Einsatz aktivieren
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Nur ein aktiver Einsatz wird auf der Karte angezeigt. Du kannst zwischen
         Einsätzen wechseln, indem du einen anderen Einsatz aktivierst.
       </Typography>
@@ -194,7 +194,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Einsatz bearbeiten
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Bestehende Einsätze kannst du jederzeit bearbeiten, um Details zu
         ergänzen oder zu korrigieren.
       </Typography>
@@ -213,7 +213,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Einsatz teilen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Du kannst einen Einsatz per Link mit anderen Personen teilen. Der Link
         ermöglicht den Zugriff ohne Login.
       </Typography>
@@ -243,7 +243,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Einsätze filtern
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         In der Einsatzliste kannst du die angezeigten Einsätze nach Gruppe
         filtern, um schnell den richtigen Einsatz zu finden.
       </Typography>
@@ -267,7 +267,7 @@ export default function EinsaetzeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Einsatz exportieren und importieren
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Einsatzdaten können exportiert werden, um sie zu sichern oder in ein
         anderes System zu übertragen. Ebenso können gesicherte Einsätze wieder
         importiert werden.

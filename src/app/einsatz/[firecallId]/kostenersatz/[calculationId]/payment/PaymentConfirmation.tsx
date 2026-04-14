@@ -86,16 +86,16 @@ export default function PaymentConfirmation({
           {result.recipientName && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="body2" color="text.secondary">Name:</Typography>
-              <Typography variant="body2" fontWeight="medium">{result.recipientName}</Typography>
+              <Typography variant="body2" sx={{ fontWeight: "medium" }}>{result.recipientName}</Typography>
             </Box>
           )}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography variant="body2" color="text.secondary">Betrag:</Typography>
-            <Typography variant="body2" fontWeight="medium">{formatCurrency(result.amount || 0)}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: "medium" }}>{formatCurrency(result.amount || 0)}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="body2" color="text.secondary">Referenz:</Typography>
-            <Typography variant="body2" fontWeight="medium">{result.reference}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: "medium" }}>{result.reference}</Typography>
           </Box>
         </Box>
 

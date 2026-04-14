@@ -440,7 +440,7 @@ function PrintAttachment({ url }: { url: string }) {
   if (isImage) {
     return (
       <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" display="block" sx={{ mb: 0.5 }}>
+        <Typography variant="caption" sx={{ display: "block", mb: 0.5 }}>
           {fileName}
         </Typography>
         {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -74,13 +74,13 @@ export default function ProgressStepper({
           <Step key={step.label} completed={index < activeStep}>
             <StepLabel
               error={isError}
-              StepIconComponent={() => (
+              slots={{ stepIcon: () => (
                 <StepIcon
                   stepIndex={index}
                   activeStep={activeStep}
                   status={status}
                 />
-              )}
+              ) }}
             >
               {step.label}
             </StepLabel>

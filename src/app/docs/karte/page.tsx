@@ -12,7 +12,7 @@ export default function KarteDocsPage() {
       <Typography variant="h3" gutterBottom>
         Karte
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Karte zeigt Hydranten und andere wichtige Punkte im Einsatzgebiet an.
         Du kannst die Karte verschieben, zoomen und verschiedene Layer aktivieren.
         Im Bearbeitungsmodus kannst du Elemente auf der Karte platzieren und
@@ -82,7 +82,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom>
         Hydranten anzeigen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Hydranten werden als farbige Marker auf der Karte dargestellt. Je nach
         Zoomstufe werden nahe beieinanderliegende Hydranten zu Clustern
         zusammengefasst. Beim Heranzoomen lösen sich die Cluster in einzelne
@@ -108,7 +108,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Basiskarte und Layer wechseln
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Karte unterstützt verschiedene Basiskarten und zusätzliche
         Overlay-Layer, die du nach Bedarf ein- und ausschalten kannst.
       </Typography>
@@ -187,7 +187,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Standort suchen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Mit der Suchfunktion kannst du schnell zu einer bestimmten Adresse oder
         einem Ort auf der Karte navigieren.
       </Typography>
@@ -206,7 +206,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Bearbeitungsmodus verwenden
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Im Bearbeitungsmodus kannst du Elemente zum aktiven Einsatz auf der Karte
         hinzufügen, verschieben und bearbeiten.
       </Typography>
@@ -242,7 +242,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Zeichenwerkzeuge
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Im Bearbeitungsmodus stehen dir verschiedene Zeichenwerkzeuge zur
         Verfügung, mit denen du Linien, Flächen und Markierungen direkt auf der
         Karte einzeichnen kannst.
@@ -272,7 +272,7 @@ export default function KarteDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Entfernung messen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Mit dem Entfernungs-Overlay kannst du Abstände zwischen Punkten auf der
         Karte messen.
       </Typography>

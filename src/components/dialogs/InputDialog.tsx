@@ -66,7 +66,7 @@ export default function InputDialog({
           type="text"
           fullWidth
           variant="standard"
-          inputProps={{ tabIndex: 1 }}
+          slotProps={{ htmlInput: { tabIndex: 1 } }}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
             setValue(event.target.value);
           }}

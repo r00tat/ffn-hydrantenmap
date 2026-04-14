@@ -10,7 +10,7 @@ export default function AdminDocsPage() {
       <Typography variant="h3" gutterBottom>
         Administration
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Der Admin-Bereich bietet erweiterte Verwaltungsfunktionen für
         Administratoren. Hier können Benutzer verwaltet, Daten importiert und
         Systemeinstellungen konfiguriert werden.

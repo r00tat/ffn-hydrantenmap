@@ -60,7 +60,7 @@ export default function CrewVehicleColumn({
           justifyContent: 'space-between',
         }}
       >
-        <Typography variant="subtitle1" fontWeight="bold">
+        <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
           {vehicleName}
         </Typography>
         <Chip label={String(assignments.length)} size="small" />

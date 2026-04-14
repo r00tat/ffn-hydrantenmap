@@ -55,7 +55,7 @@ function NumberParamInput({
         }
       }}
       onBlur={() => setEditing(null)}
-      inputProps={{ min, max, step }}
+      slotProps={{ htmlInput: { min, max, step } }}
       sx={{ width: 90 }}
     />
   );

@@ -135,7 +135,7 @@ export default function SchadstoffPage() {
             type="text"
             fullWidth
             variant="standard"
-            inputProps={{ tabIndex: 1 }}
+            slotProps={{ htmlInput: { tabIndex: 1 } }}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setUnNumber(event.target.value);
             }}
@@ -148,7 +148,7 @@ export default function SchadstoffPage() {
             type="text"
             fullWidth
             variant="standard"
-            inputProps={{ tabIndex: 2 }}
+            slotProps={{ htmlInput: { tabIndex: 2 } }}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               setMaterialName(event.target.value);
             }}
