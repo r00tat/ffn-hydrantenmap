@@ -246,7 +246,7 @@ function EinsatzCard({
         anchor="right"
         open={kostenersatzOpen}
         onClose={() => setKostenersatzOpen(false)}
-        PaperProps={{ sx: { width: { xs: '100%', sm: 500, md: 600 }, p: 2 } }}
+        slotProps={{ paper: { sx: { width: { xs: '100%', sm: 500, md: 600 }, p: 2 } } }}
       >
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">{einsatz.name}</Typography>

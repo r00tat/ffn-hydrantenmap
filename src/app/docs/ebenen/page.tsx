@@ -10,7 +10,7 @@ export default function EbenenDocsPage() {
       <Typography variant="h3" gutterBottom>
         Ebenen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Ebenen ermöglichen es, Einsatzelemente auf der Karte zu gruppieren und
         zu organisieren. Jede Ebene kann eigene Einstellungen für Sichtbarkeit,
         Darstellung und Datenfelder haben.

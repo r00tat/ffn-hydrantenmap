@@ -271,8 +271,10 @@ export default function KostenersatzDialog({
       onClose={() => onClose()}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: { height: '90vh', maxHeight: '900px', display: 'flex', flexDirection: 'column' },
+      slotProps={{
+        paper: {
+          sx: { height: '90vh', maxHeight: '900px', display: 'flex', flexDirection: 'column' },
+        },
       }}
     >
       <DialogTitle>

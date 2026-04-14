@@ -7,7 +7,7 @@ import AdminGuard from '../../components/site/AdminGuard';
 export default function AdminPage() {
   return (
     <AdminGuard>
-      <Box margin={2}>
+      <Box sx={{ margin: 2 }}>
         <AdminTabs />
       </Box>
     </AdminGuard>

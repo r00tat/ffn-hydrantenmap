@@ -11,7 +11,7 @@ export default function GeschaeftsbuchDocsPage() {
       <Typography variant="h3" gutterBottom>
         Geschäftsbuch
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Das Geschäftsbuch dient zur Dokumentation aller offiziellen Vorgänge
         und Protokolle der Feuerwehr.
       </Typography>

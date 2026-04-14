@@ -385,7 +385,7 @@ export default function EinsatzorteRow({
             size="small"
             variant="standard"
             sx={{ width: 140 }}
-            InputProps={{
+            slotProps={{ input: {
               readOnly: true,
               endAdornment: (
                 <>
@@ -397,7 +397,7 @@ export default function EinsatzorteRow({
                   </Tooltip>
                 </>
               ),
-            }}
+            } }}
           />
         </TableCell>
         <TableCell>

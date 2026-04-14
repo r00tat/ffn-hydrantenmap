@@ -11,7 +11,7 @@ export default function TagebuchDocsPage() {
       <Typography variant="h3" gutterBottom>
         Einsatztagebuch
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Das Einsatztagebuch dokumentiert alle wichtigen Ereignisse während eines
         Einsatzes in chronologischer Reihenfolge. Es dient als lückenlose
         Aufzeichnung aller Meldungen, Befehle und Rückfragen im Einsatzverlauf.
@@ -77,7 +77,7 @@ export default function TagebuchDocsPage() {
       <Typography variant="h6" gutterBottom>
         Eintrag erstellen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Am Desktop steht ein Inline-Formular direkt in der Tabelle zur
         Verfügung. Auf Mobilgeräten nutzt du den FAB (Floating Action Button)
         unten rechts.

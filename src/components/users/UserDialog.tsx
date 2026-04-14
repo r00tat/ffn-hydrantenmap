@@ -33,10 +33,12 @@ import { UserRecordExtended, userTextFields } from '../../common/users';
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
-  PaperProps: {
-    style: {
-      maxHeight: ITEM_HEIGHT * 10 + ITEM_PADDING_TOP,
-      width: 250,
+  slotProps: {
+    paper: {
+      style: {
+        maxHeight: ITEM_HEIGHT * 10 + ITEM_PADDING_TOP,
+        width: 250,
+      },
     },
   },
 };

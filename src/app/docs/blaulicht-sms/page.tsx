@@ -10,7 +10,7 @@ export default function BlaulichtSmsDocsPage() {
       <Typography variant="h3" gutterBottom>
         Blaulicht-SMS
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Die Blaulicht-SMS Integration zeigt eingehende Alarmierungen der
         Feuerwehr an. Du siehst aktive und vergangene Alarme mit Details zu den
         alarmierten Funktionen und Teilnehmern.

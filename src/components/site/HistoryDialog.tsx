@@ -75,7 +75,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
           ))}
         </Select>
         <hr />
-        <Typography marginTop={4}>
+        <Typography sx={{ marginTop: 4 }}>
           Speichere den aktuellen Einsatzstatus in der Historie, so dass dieser
           später wieder aufgerufen werden kann.
         </Typography>

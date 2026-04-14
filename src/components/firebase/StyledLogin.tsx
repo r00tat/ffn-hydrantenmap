@@ -201,7 +201,7 @@ export default function StyledLoginButton({
   }, [auth]);
 
   return (
-    <Grid container padding={4}>
+    <Grid container sx={{ padding: 4 }}>
       {error && (
         <Grid size={12}>
           <Alert severity="error">

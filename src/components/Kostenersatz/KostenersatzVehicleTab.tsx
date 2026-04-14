@@ -101,7 +101,7 @@ function SortableTableRow({
         </Box>
       </TableCell>
       <TableCell>
-        <Typography fontWeight={500}>{vehicle.name}</Typography>
+        <Typography sx={{ fontWeight: 500 }}>{vehicle.name}</Typography>
       </TableCell>
       <TableCell>{vehicle.description || '-'}</TableCell>
       <TableCell>

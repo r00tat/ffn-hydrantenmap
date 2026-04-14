@@ -64,7 +64,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
 
   return (
     <>
-      <Stack direction="row" spacing={2} alignItems="flex-start">
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
         <TextField
           label="Frage oder Befehl"
           value={question}
@@ -133,7 +133,7 @@ function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string
 
   return (
     <>
-      <Stack direction="row" spacing={2} alignItems="flex-start">
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
         <TextField
           label="Frage"
           value={question}

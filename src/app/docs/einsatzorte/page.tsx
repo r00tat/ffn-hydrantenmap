@@ -10,7 +10,7 @@ export default function EinsatzorteDocsPage() {
       <Typography variant="h3" gutterBottom>
         Einsatzorte
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Einsatzorte dienen zur Verwaltung einzelner Einsatzstellen innerhalb
         eines Einsatzes. Jeder Ort hat einen Status, zugewiesene Fahrzeuge und
         Zeitstempel für die Einsatzabwicklung.

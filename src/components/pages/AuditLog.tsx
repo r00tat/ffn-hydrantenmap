@@ -333,7 +333,7 @@ export default function AuditLog() {
                 <Typography variant="body2">{entry.elementType}</Typography>
               </Grid>
               <Grid size={{ xs: 4, md: 4, lg: 6 }}>
-                <Typography variant="body2" fontWeight="bold">
+                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
                   {entry.elementName}
                 </Typography>
               </Grid>

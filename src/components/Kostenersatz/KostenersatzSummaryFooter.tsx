@@ -27,7 +27,7 @@ export default function KostenersatzSummaryFooter({
       <Typography variant="h6" component="span">
         Gesamt
       </Typography>
-      <Typography variant="h5" component="span" fontWeight="bold">
+      <Typography variant="h5" component="span" sx={{ fontWeight: "bold" }}>
         {formatCurrency(totalSum)}
       </Typography>
     </Box>

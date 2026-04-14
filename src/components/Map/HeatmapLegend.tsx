@@ -101,7 +101,7 @@ export default function HeatmapLegend({
       {!collapsed && (
         <>
           {layerName && (
-            <Typography variant="caption" display="block" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+            <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontSize: '0.65rem' }}>
               {config.visualizationMode === 'interpolation' ? 'Interpolation' : 'Heatmap'}
               {' · '}{field.label}{field.unit ? ` (${field.unit})` : ''}
             </Typography>

@@ -10,7 +10,7 @@ export default function KiDocsPage() {
       <Typography variant="h3" gutterBottom>
         KI-Assistent
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Der KI-Assistent nutzt künstliche Intelligenz, um Fragen zum aktuellen
         Einsatz zu beantworten, Zusammenfassungen zu erstellen und bei der
         Öffentlichkeitsarbeit zu unterstützen. Der Assistent hat Zugriff auf

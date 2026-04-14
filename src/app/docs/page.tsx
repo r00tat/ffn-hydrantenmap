@@ -13,7 +13,7 @@ export default function DocsPage() {
       <Typography variant="h3" gutterBottom>
         Dokumentation
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Willkommen zur Dokumentation der Einsatzkarte. Hier findest du
         Anleitungen zu allen Funktionen der App.
       </Typography>

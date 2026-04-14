@@ -414,7 +414,7 @@ export default function KostenersatzAdminSettings() {
 
             return (
               <Box key={category.number} sx={{ mb: 3 }}>
-                <Typography variant="subtitle1" fontWeight={500} gutterBottom>
+                <Typography variant="subtitle1" sx={{ fontWeight: 500 }} gutterBottom>
                   {category.number}. {category.name}
                 </Typography>
                 <Table size="small">

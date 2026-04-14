@@ -63,7 +63,7 @@ export default function DrawingToolbar() {
         touchAction: 'auto',
       }}
     >
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Color swatches */}
         <Stack direction="row" spacing={0.5}>
           {PRESET_COLORS.map((c) => (

@@ -250,7 +250,7 @@ export default function Tokens() {
   const [token, setToken] = useState<Token>();
   return (
     <>
-      <Grid container spacing={2} padding={2}>
+      <Grid container spacing={2} sx={{ padding: 2 }}>
         <Grid size={{ xs: 12 }}>
           <Typography variant="h4">API Token</Typography>
           <Typography>

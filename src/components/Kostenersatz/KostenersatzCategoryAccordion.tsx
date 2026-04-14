@@ -96,7 +96,7 @@ export default function KostenersatzCategoryAccordion({
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1" fontWeight={hasItems ? 600 : 400}>
+            <Typography variant="subtitle1" sx={{ fontWeight: hasItems ? 600 : 400 }}>
               {categoryNumber}. {categoryName}
             </Typography>
             {itemCount > 0 && (
@@ -116,7 +116,7 @@ export default function KostenersatzCategoryAccordion({
           </Box>
           <Typography
             variant="subtitle1"
-            fontWeight={hasItems ? 600 : 400}
+            sx={{ fontWeight: hasItems ? 600 : 400 }}
             color={hasItems ? 'primary.main' : 'text.secondary'}
           >
             {formatCurrency(subtotal)}

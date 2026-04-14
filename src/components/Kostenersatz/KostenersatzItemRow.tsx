@@ -188,7 +188,7 @@ export default function KostenersatzItemRow({
             onChange={handleEinheitenChange}
             placeholder="0"
             disabled={disabled}
-            inputProps={{ min: 0, style: { textAlign: 'center' } }}
+            slotProps={{ htmlInput: { min: 0, style: { textAlign: 'center' } } }}
             sx={{ width: { xs: 45, sm: 55 }, '& input': { px: 0.5 } }}
           />
           <IconButton
@@ -213,7 +213,7 @@ export default function KostenersatzItemRow({
               value={localStunden}
               onChange={handleStundenChange}
               disabled={disabled || !hasValue}
-              inputProps={{ min: 0.5, step: 0.5, style: { textAlign: 'right' } }}
+              slotProps={{ htmlInput: { min: 0.5, step: 0.5, style: { textAlign: 'right' } } }}
               sx={{
                 width: { xs: 50, sm: 60 },
                 '& input': {

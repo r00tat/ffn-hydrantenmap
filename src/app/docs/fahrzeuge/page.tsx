@@ -11,7 +11,7 @@ export default function FahrzeugeDocsPage() {
       <Typography variant="h3" gutterBottom>
         Fahrzeuge
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Verwalte die Fahrzeuge im Einsatz mit Besatzungsstärke, Zeitstempeln und
         Kartenpositionen. Die Fahrzeugverwaltung bildet die Grundlage für die
         Stärketabelle und erzeugt automatisch Tagebucheinträge.
@@ -131,7 +131,7 @@ export default function FahrzeugeDocsPage() {
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
         Stärketabelle lesen
       </Typography>
-      <Typography paragraph>
+      <Typography sx={{ mb: 2 }}>
         Oben auf der Fahrzeugseite wird die Stärketabelle angezeigt. Sie enthält
         die Gesamtzahl der Fahrzeuge, die Gesamtbesatzung und die Anzahl der
         ATS-Träger.

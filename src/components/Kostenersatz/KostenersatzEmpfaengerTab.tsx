@@ -307,7 +307,7 @@ export default function KostenersatzEmpfaengerTab({
         <DialogTitle>Zahlungslink</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pt: 1 }}>
-            <Typography variant="body2" color="text.secondary" textAlign="center">
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
               QR-Code scannen oder Link teilen, um die Zahlung durchzuf&uuml;hren
             </Typography>
             {checkoutUrl && (

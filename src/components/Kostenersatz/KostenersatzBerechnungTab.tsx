@@ -175,7 +175,7 @@ export default function KostenersatzBerechnungTab({
                         handleCustomItemFieldChange(index, 'pricePerUnit', e.target.value)
                       }
                       disabled={disabled}
-                      inputProps={{ min: 0, step: 0.01 }}
+                      slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                       sx={{ width: { xs: 90, sm: 100 } }}
                     />
                     <TextField
@@ -187,7 +187,7 @@ export default function KostenersatzBerechnungTab({
                         handleCustomItemFieldChange(index, 'quantity', e.target.value)
                       }
                       disabled={disabled}
-                      inputProps={{ min: 0 }}
+                      slotProps={{ htmlInput: { min: 0 } }}
                       sx={{ width: { xs: 70, sm: 80 } }}
                     />
                     <Typography
