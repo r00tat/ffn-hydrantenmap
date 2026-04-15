@@ -43,13 +43,11 @@ export default function AddFirecallItem() {
   const saveItem = useCallback(
     (item?: FirecallItem) => {
       if (item) {
-        const { eventHandlers, ...rest } = item;
-
         addFirecallItem({
           datum: new Date().toISOString(),
           lat: getDefaultPosition().lat,
           lng: getDefaultPosition().lng,
-          ...rest,
+          ...item,
         });
       }
     },
