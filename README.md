@@ -45,7 +45,6 @@ Erforderliche Umgebungsvariablen (in `.env.local`):
 - Firebase Konfiguration (`NEXT_PUBLIC_FIREBASE_*`)
 - `NEXT_PUBLIC_FIRESTORE_DB` - `ffndev` für Entwicklung, leer für Produktion
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
-- `MAPBOX_API_KEY` für erweiterte Kartenkacheln
 
 ## Deploy to GCP
 

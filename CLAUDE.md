@@ -263,4 +263,3 @@ Required environment variables (see `.env.local`):
 - Firebase config (`NEXT_PUBLIC_FIREBASE_*`)
 - `NEXT_PUBLIC_FIRESTORE_DB` - `ffndev` for dev, empty/default for prod
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
-- `MAPBOX_API_KEY` for enhanced map tiles
