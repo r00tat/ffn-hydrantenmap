@@ -21,11 +21,6 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: NEXT_PUBLIC_FIREBASE_APIKEY
-            - name: NEXT_PUBLIC_MAPBOX_APIKEY
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: NEXT_PUBLIC_MAPBOX_APIKEY
             - name: AUTH_SECRET
               valueFrom:
                 secretKeyRef:

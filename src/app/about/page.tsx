@@ -1,8 +1,10 @@
 'use client';
 import Box from '@mui/material/Box';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Image from 'next/image';
+import NextLink from 'next/link';
 import DebugLoggingSwitch from '../../components/logging/DebugLoggingSwitch';
 
 export default function About() {
@@ -32,9 +34,8 @@ export default function About() {
         Feuerwehr Neusiedl am See
         <br />
         A-7100 Neusiedl am See, Satzgasse 9<br />
-        Tel: +43 (0) 2167 / 2250
+        Tel: +43 2167 / 2250
         <br />
-        Fax:+43 (0) 2167 / 2250 4<br />
         email: verwaltung [at] ff-neusiedlamsee [dot] at
         <br />
         <a
@@ -56,6 +57,16 @@ export default function About() {
         Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung
         für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten
         sind ausschließlich deren Betreiber verantwortlich.
+      </Typography>
+
+      <Typography variant="h5">Datenschutz</Typography>
+      <Typography>
+        Informationen zur Verarbeitung personenbezogener Daten finden Sie in
+        unserer{' '}
+        <Link component={NextLink} href="/datenschutz">
+          Datenschutzerklärung
+        </Link>
+        .
       </Typography>
 
       <Typography variant="h5">Version</Typography>

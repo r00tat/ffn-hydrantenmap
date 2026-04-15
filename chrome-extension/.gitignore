@@ -1,2 +1,5 @@
 *.crx
 *.pem
+*.zip
+.env*.local
+.env.production

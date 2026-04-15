@@ -43,7 +43,47 @@ Startet Vite im Watch-Modus mit HMR. Die Extension wird in `dist/` gebaut.
 npm run build
 ```
 
-Führt `tsc --noEmit` und `vite build` aus. Output in `dist/`.
+Führt `tsc --noEmit` und `vite build` aus. Output in `dist/`. Liest Env aus der
+projekt-weiten `.env.local` im Root (dieselbe wie die Next.js-App).
+
+### Production Release Build (ZIP + CRX)
+
+```bash
+npm run build:prod
+```
+
+Baut mit **production**-Env aus `chrome-extension/.env.production.local` und
+erzeugt zwei Artefakte im `chrome-extension/` Verzeichnis:
+
+- `einsatzkarte-<version>.zip` — flaches ZIP für den **Chrome Web Store** Upload
+- `einsatzkarte-<version>.crx` — signierte CRX für **Enterprise Policy** oder Self-Hosting
+
+Voraussetzungen:
+
+1. `chrome-extension/dist.pem` — privater Schlüssel (gitignored, von den Admins)
+2. `chrome-extension/.env.production.local` — überschreibt gezielt die Werte
+   aus der Root-`.env.local`. Nur Vars reinschreiben, die sich in Prod
+   unterscheiden. Typisch reicht:
+
+```bash
+NEXT_PUBLIC_FIRESTORE_DB=''   # leer = Prod-DB, ''ffndev'' wäre die Dev-DB
+```
+
+Alle anderen Vars (Firebase-Config, OAuth-Client-ID, Public-Key) werden aus der
+Projekt-Root-`.env.local` übernommen.
+
+Falls der Prod-Build mit einem anderen OAuth-Client oder Signaturschlüssel
+laufen soll, nur diese Zeilen zusätzlich in `.env.production.local` setzen.
+Den `CHROME_EXTENSION_PUBLIC_KEY` aus dem privaten Schlüssel ableiten:
+
+```bash
+openssl pkey -in dist.pem -pubout -outform DER | base64
+```
+
+**Hinweis:** Die CRX lässt sich **nicht** per Drag & Drop in Chrome installieren
+(`CRX_REQUIRED_PROOF_MISSING`) — dafür den Chrome Web Store oder Enterprise
+Policy verwenden. Für manuelle Tests das ZIP entpacken und als „Entpackte
+Erweiterung" laden.
 
 ### In Chrome laden
 
