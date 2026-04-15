@@ -11,7 +11,7 @@
 //   - <OUTPUT_BASE>.crx   signed extension for Enterprise/Self-Hosting
 
 import crx3 from 'crx3';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,6 +41,18 @@ const outputBase = process.env.OUTPUT_BASE || `einsatzkarte-${version}`;
 
 const zipPath = resolve(extRoot, `${outputBase}.zip`);
 const crxPath = resolve(extRoot, `${outputBase}.crx`);
+
+// Entfernt alte Build-Artefakte (auch aelterer Versionen), damit der
+// chrome-extension/ Ordner nicht vollaeuft und neuere Builds eindeutig
+// identifizierbar bleiben.
+const artefactPattern = /^einsatzkarte-.*\.(zip|crx)$/;
+for (const file of readdirSync(extRoot)) {
+  if (artefactPattern.test(file)) {
+    const path = resolve(extRoot, file);
+    unlinkSync(path);
+    console.log(`\u2717 entfernt: ${path}`);
+  }
+}
 
 await crx3([manifestPath], {
   keyPath,
