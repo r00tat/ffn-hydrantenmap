@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     'eslint.config.mjs',
     '.skills/**',
     '.agents/**',
+    // Chrome extension build artifact — bundled minified JS should not be linted.
+    'chrome-extension/dist/**',
   ]),
 ]);
 

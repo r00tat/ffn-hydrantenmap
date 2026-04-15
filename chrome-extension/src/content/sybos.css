@@ -1,0 +1,139 @@
+#einsatzkarte-widget {
+  position: fixed;
+  top: 80px;
+  right: 0;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+}
+
+#einsatzkarte-widget .ek-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #d32f2f;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px 0 0 4px;
+  font-size: 12px;
+  font-weight: bold;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+#einsatzkarte-widget .ek-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 280px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px 0 0 8px;
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  display: none;
+}
+
+#einsatzkarte-widget .ek-panel.open {
+  display: block;
+}
+
+#einsatzkarte-widget .ek-title {
+  font-weight: bold;
+  color: #d32f2f;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#einsatzkarte-widget .ek-field {
+  margin-bottom: 4px;
+  color: #333;
+}
+
+#einsatzkarte-widget .ek-field label {
+  color: #666;
+  font-size: 11px;
+  display: block;
+}
+
+#einsatzkarte-widget .ek-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: #d32f2f;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+#einsatzkarte-widget .ek-link:hover {
+  text-decoration: underline;
+}
+
+#einsatzkarte-widget .ek-status {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 16px 0;
+}
+
+#einsatzkarte-widget .ek-crew-section {
+  margin-top: 12px;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+#einsatzkarte-widget .ek-crew-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: #d32f2f;
+  margin-bottom: 6px;
+}
+
+#einsatzkarte-widget .ek-crew-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+#einsatzkarte-widget .ek-crew-btn:hover {
+  background: #b71c1c;
+}
+
+#einsatzkarte-widget .ek-crew-btn:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+#einsatzkarte-widget .ek-crew-result {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+#einsatzkarte-widget .ek-crew-result.success {
+  color: #2e7d32;
+}
+
+#einsatzkarte-widget .ek-crew-result.warning {
+  color: #e65100;
+}
+
+#einsatzkarte-widget .ek-crew-result.muted {
+  color: #666;
+}
+
+#einsatzkarte-widget .ek-crew-name {
+  font-size: 11px;
+  color: #666;
+  padding-left: 8px;
+}

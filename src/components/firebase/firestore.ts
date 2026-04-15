@@ -51,9 +51,6 @@ export interface FirecallItem {
   creator?: string;
   created?: string;
 
-  // L.LeafletEventHandlerFnMap
-  eventHandlers?: L.LeafletEventHandlerFnMap;
-
   fieldData?: Record<string, string | number | boolean>;
 }
 

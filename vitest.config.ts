@@ -10,6 +10,12 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
-    exclude: ['**/node_modules/**', '**/playwright/**', '**/.skills/**'],
+    exclude: [
+      '**/node_modules/**',
+      '**/playwright/**',
+      '**/.skills/**',
+      // chrome-extension has its own vitest config (jsdom environment) and test runner.
+      '**/chrome-extension/**',
+    ],
   },
 });

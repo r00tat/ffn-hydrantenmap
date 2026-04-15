@@ -1,0 +1,232 @@
+name: "Chrome Extension Release"
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      # - "feat/**"
+      - "main"
+    paths:
+      - "chrome-extension/**"
+      - ".github/workflows/chrome-extension-release.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Extension version (e.g. 2.37.0). Leave empty to use the latest git tag."
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    name: "Build and upload Chrome Extension"
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for Workload Identity Federation
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      NEXT_PUBLIC_FIREBASE_APIKEY: ${{ vars.NEXT_PUBLIC_FIREBASE_APIKEY }}
+      NEXT_PUBLIC_FIRESTORE_DB: ${{ vars.NEXT_PUBLIC_FIRESTORE_DB }}
+      CHROME_OAUTH_CLIENT_ID: ${{ vars.CHROME_OAUTH_CLIENT_ID }}
+      CHROME_EXTENSION_PRIVATE_KEY: ${{ secrets.CHROME_EXTENSION_KEY }}
+      GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID: ${{ vars.GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID }}
+      workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need tags for `git describe` fallback
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            chrome-extension/package-lock.json
+
+      - name: Resolve version and filename
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -eo pipefail
+
+          # Resolve the numeric version used for manifest.json.
+          # Priority: explicit workflow_dispatch input > release tag > latest git tag > 0.0.0
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+            SOURCE="input"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+            VERSION="${VERSION#v}"
+            SOURCE="tag"
+          else
+            LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)"
+            VERSION="${LATEST_TAG#v}"
+            SOURCE="latest-tag"
+          fi
+
+          # Chrome accepts up to 4 dot-separated integers (1-65535). Validate.
+          if ! [[ "${VERSION}" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]]; then
+            echo "::error::Resolved version '${VERSION}' is not a valid Chrome extension version"
+            exit 1
+          fi
+
+          # Build the output filename. Release builds keep a clean name; manual
+          # builds include branch + short SHA so they are distinguishable from
+          # real releases in the Drive folder.
+          SHORT_SHA="$(git rev-parse --short=8 HEAD)"
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            CRX_FILE="einsatzkarte-${VERSION}.crx"
+          else
+            REF_NAME="${GITHUB_REF_NAME:-unknown}"
+            # sanitize branch name: replace anything non-alphanumeric/-_.
+            SAFE_REF="$(printf '%s' "${REF_NAME}" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')"
+            CRX_FILE="einsatzkarte-${VERSION}-${SAFE_REF}-${SHORT_SHA}.crx"
+          fi
+
+          {
+            echo "VERSION=${VERSION}"
+            echo "CRX_FILE=${CRX_FILE}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION} (source: ${SOURCE})"
+          echo "Output:  ${CRX_FILE}"
+
+      - name: Write private key and derive public key
+        id: keys
+        run: |
+          set -eo pipefail
+          if [[ -z "${CHROME_EXTENSION_PRIVATE_KEY}" ]]; then
+            echo "::error::CHROME_EXTENSION_KEY secret is not set"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "${CHROME_EXTENSION_PRIVATE_KEY}" > chrome-extension/dist.pem
+
+          # Sanity-check the stored secret without leaking key material.
+          FIRST_LINE="$(head -n1 chrome-extension/dist.pem)"
+          LAST_LINE="$(tail -n1 chrome-extension/dist.pem)"
+          LINE_COUNT="$(wc -l < chrome-extension/dist.pem)"
+          echo "Key header: ${FIRST_LINE}"
+          echo "Key footer: ${LAST_LINE}"
+          echo "Key line count: ${LINE_COUNT}"
+          if [[ ! "${FIRST_LINE}" == -----BEGIN*PRIVATE\ KEY----- ]]; then
+            echo "::error::CHROME_EXTENSION_KEY does not look like a PEM private key (header missing). Ensure newlines are preserved when storing the secret."
+            exit 1
+          fi
+
+          # Derive base64-encoded DER public key that goes into manifest.key.
+          # Use `openssl pkey` so both PKCS#1 and PKCS#8 keys are accepted.
+          # Write DER to a temp file - bash variables can't hold binary (NUL) data.
+          set +e
+          openssl pkey -in chrome-extension/dist.pem -pubout -outform DER \
+            -out chrome-extension/pubkey.der 2>openssl.err
+          RC=$?
+          set -e
+          if [[ ${RC} -ne 0 || ! -s chrome-extension/pubkey.der ]]; then
+            echo "::error::Failed to derive public key from CHROME_EXTENSION_KEY (openssl exit ${RC})"
+            echo "openssl stderr:"
+            cat openssl.err || true
+            exit 1
+          fi
+          PUBLIC_KEY="$(base64 -w0 < chrome-extension/pubkey.der)"
+          rm -f chrome-extension/pubkey.der openssl.err
+          if [[ -z "${PUBLIC_KEY}" ]]; then
+            echo "::error::Empty public key after base64 encoding"
+            exit 1
+          fi
+          echo "::add-mask::${PUBLIC_KEY}"
+          echo "PUBLIC_KEY=${PUBLIC_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Write .env.local
+        env:
+          PUBLIC_KEY: ${{ steps.keys.outputs.PUBLIC_KEY }}
+        run: |
+          set -eo pipefail
+          umask 077
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
+          NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'
+          NEXT_PUBLIC_CHROME_OAUTH_CLIENT_ID='${CHROME_OAUTH_CLIENT_ID}'
+          CHROME_EXTENSION_PUBLIC_KEY='${PUBLIC_KEY}'
+          EOF
+
+      - name: Install chrome-extension dependencies
+        working-directory: chrome-extension
+        run: npm ci
+
+      - name: Build extension
+        working-directory: chrome-extension
+        run: npm run build
+
+      - name: Patch manifest version
+        working-directory: chrome-extension
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -eo pipefail
+          jq --arg v "${VERSION}" '.version = $v' dist/manifest.json > dist/manifest.json.tmp
+          mv dist/manifest.json.tmp dist/manifest.json
+          echo "manifest.json version:"
+          jq '.version' dist/manifest.json
+
+      - name: Package as .crx
+        working-directory: chrome-extension
+        env:
+          CRX_FILE: ${{ steps.version.outputs.CRX_FILE }}
+        run: |
+          set -eo pipefail
+          npx --yes crx3@latest -o "${CRX_FILE}" -p dist.pem dist/manifest.json
+          ls -l "${CRX_FILE}"
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/drive.file
+
+      - name: Upload .crx to Google Drive
+        working-directory: chrome-extension
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          FOLDER_ID: ${{ vars.GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID }}
+          CRX_FILE: ${{ steps.version.outputs.CRX_FILE }}
+        run: |
+          set -eo pipefail
+          if [[ -z "${FOLDER_ID}" ]]; then
+            echo "::error::GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID variable is not set"
+            exit 1
+          fi
+          METADATA=$(jq -n --arg name "${CRX_FILE}" --arg parent "${FOLDER_ID}" \
+            '{name:$name, parents:[$parent]}')
+
+          echo "Uploading ${CRX_FILE} to Drive folder ${FOLDER_ID}"
+          RESPONSE=$(curl -sS --fail-with-body -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -F "metadata=${METADATA};type=application/json;charset=UTF-8" \
+            -F "file=@${CRX_FILE};type=application/x-chrome-extension" \
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true")
+          echo "${RESPONSE}" | jq '.'
+          FILE_ID=$(echo "${RESPONSE}" | jq -r '.id')
+          if [[ -z "${FILE_ID}" || "${FILE_ID}" == "null" ]]; then
+            echo "::error::Drive upload did not return a file id"
+            exit 1
+          fi
+          echo "Uploaded file id: ${FILE_ID}"
+
+      - name: Cleanup private key
+        if: always()
+        run: rm -f chrome-extension/dist.pem

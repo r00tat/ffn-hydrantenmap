@@ -97,7 +97,6 @@ export class FirecallItemBase {
       created: this.created,
       alt: this.alt,
       draggable: this.draggable = true,
-      eventHandlers: this.eventHandlers = {},
       fieldData: this.fieldData = {},
     } = firecallItem || {});
   }
