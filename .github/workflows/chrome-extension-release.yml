@@ -82,25 +82,29 @@ jobs:
             exit 1
           fi
 
-          # Build the output filename. Release builds keep a clean name; manual
-          # builds include branch + short SHA so they are distinguishable from
-          # real releases in the Drive folder.
+          # Build the output base name. Release builds keep a clean name;
+          # manual builds include branch + short SHA so they are distinguishable
+          # from real releases in the Drive folder. The same base is used for
+          # the .crx and .zip artefacts.
           SHORT_SHA="$(git rev-parse --short=8 HEAD)"
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
-            CRX_FILE="einsatzkarte-${VERSION}.crx"
+            OUTPUT_BASE="einsatzkarte-${VERSION}"
           else
             REF_NAME="${GITHUB_REF_NAME:-unknown}"
             # sanitize branch name: replace anything non-alphanumeric/-_.
             SAFE_REF="$(printf '%s' "${REF_NAME}" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')"
-            CRX_FILE="einsatzkarte-${VERSION}-${SAFE_REF}-${SHORT_SHA}.crx"
+            OUTPUT_BASE="einsatzkarte-${VERSION}-${SAFE_REF}-${SHORT_SHA}"
           fi
 
           {
             echo "VERSION=${VERSION}"
-            echo "CRX_FILE=${CRX_FILE}"
+            echo "OUTPUT_BASE=${OUTPUT_BASE}"
+            echo "CRX_FILE=${OUTPUT_BASE}.crx"
+            echo "ZIP_FILE=${OUTPUT_BASE}.zip"
           } >> "$GITHUB_OUTPUT"
-          echo "Version: ${VERSION} (source: ${SOURCE})"
-          echo "Output:  ${CRX_FILE}"
+          echo "Version:   ${VERSION} (source: ${SOURCE})"
+          echo "Base name: ${OUTPUT_BASE}"
+
 
       - name: Write private key and derive public key
         id: keys
@@ -148,13 +152,13 @@ jobs:
           echo "::add-mask::${PUBLIC_KEY}"
           echo "PUBLIC_KEY=${PUBLIC_KEY}" >> "$GITHUB_OUTPUT"
 
-      - name: Write .env.local
+      - name: Write chrome-extension/.env.production.local
         env:
           PUBLIC_KEY: ${{ steps.keys.outputs.PUBLIC_KEY }}
         run: |
           set -eo pipefail
           umask 077
-          cat > .env.local <<EOF
+          cat > chrome-extension/.env.production.local <<EOF
           NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
           NEXT_PUBLIC_FIRESTORE_DB='${NEXT_PUBLIC_FIRESTORE_DB}'
           NEXT_PUBLIC_CHROME_OAUTH_CLIENT_ID='${CHROME_OAUTH_CLIENT_ID}'
@@ -167,6 +171,8 @@ jobs:
 
       - name: Build extension
         working-directory: chrome-extension
+        env:
+          EXT_ENV_LOCAL: "1"
         run: npm run build
 
       - name: Patch manifest version
@@ -180,14 +186,14 @@ jobs:
           echo "manifest.json version:"
           jq '.version' dist/manifest.json
 
-      - name: Package as .crx
+      - name: Package as .zip and .crx
         working-directory: chrome-extension
         env:
-          CRX_FILE: ${{ steps.version.outputs.CRX_FILE }}
+          OUTPUT_BASE: ${{ steps.version.outputs.OUTPUT_BASE }}
         run: |
           set -eo pipefail
-          npx --yes crx3@latest -o "${CRX_FILE}" -p dist.pem dist/manifest.json
-          ls -l "${CRX_FILE}"
+          node scripts/package.mjs
+          ls -l "${OUTPUT_BASE}.crx" "${OUTPUT_BASE}.zip"
 
       - name: Authenticate to Google Cloud
         id: auth
@@ -198,35 +204,49 @@ jobs:
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/drive.file
 
-      - name: Upload .crx to Google Drive
+      - name: Upload .crx and .zip to Google Drive
         working-directory: chrome-extension
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           FOLDER_ID: ${{ vars.GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID }}
           CRX_FILE: ${{ steps.version.outputs.CRX_FILE }}
+          ZIP_FILE: ${{ steps.version.outputs.ZIP_FILE }}
         run: |
           set -eo pipefail
           if [[ -z "${FOLDER_ID}" ]]; then
             echo "::error::GOOGLE_DRIVE_CHROME_EXTENSION_FOLDERID variable is not set"
             exit 1
           fi
-          METADATA=$(jq -n --arg name "${CRX_FILE}" --arg parent "${FOLDER_ID}" \
-            '{name:$name, parents:[$parent]}')
 
-          echo "Uploading ${CRX_FILE} to Drive folder ${FOLDER_ID}"
-          RESPONSE=$(curl -sS --fail-with-body -X POST \
-            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-            -F "metadata=${METADATA};type=application/json;charset=UTF-8" \
-            -F "file=@${CRX_FILE};type=application/x-chrome-extension" \
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true")
-          echo "${RESPONSE}" | jq '.'
-          FILE_ID=$(echo "${RESPONSE}" | jq -r '.id')
-          if [[ -z "${FILE_ID}" || "${FILE_ID}" == "null" ]]; then
-            echo "::error::Drive upload did not return a file id"
-            exit 1
-          fi
-          echo "Uploaded file id: ${FILE_ID}"
+          upload_file() {
+            local FILE="$1"
+            local MIME="$2"
+            local METADATA
+            METADATA=$(jq -n --arg name "${FILE}" --arg parent "${FOLDER_ID}" \
+              '{name:$name, parents:[$parent]}')
 
-      - name: Cleanup private key
+            echo "Uploading ${FILE} to Drive folder ${FOLDER_ID}"
+            local RESPONSE
+            RESPONSE=$(curl -sS --fail-with-body -X POST \
+              -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              -F "metadata=${METADATA};type=application/json;charset=UTF-8" \
+              -F "file=@${FILE};type=${MIME}" \
+              "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true")
+            echo "${RESPONSE}" | jq '.'
+            local FILE_ID
+            FILE_ID=$(echo "${RESPONSE}" | jq -r '.id')
+            if [[ -z "${FILE_ID}" || "${FILE_ID}" == "null" ]]; then
+              echo "::error::Drive upload of ${FILE} did not return a file id"
+              exit 1
+            fi
+            echo "Uploaded ${FILE} as file id: ${FILE_ID}"
+          }
+
+          upload_file "${CRX_FILE}" "application/x-chrome-extension"
+          upload_file "${ZIP_FILE}" "application/zip"
+
+      - name: Cleanup private key and env
         if: always()
-        run: rm -f chrome-extension/dist.pem
+        run: |
+          rm -f chrome-extension/dist.pem
+          rm -f chrome-extension/.env.production.local
