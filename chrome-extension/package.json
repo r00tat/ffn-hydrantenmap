@@ -9,8 +9,7 @@
     "build:prod": "tsc --noEmit && EXT_ENV_LOCAL=1 vite build && node scripts/package.mjs",
     "preview": "vite preview",
     "test": "vitest run",
-    "publish:cws": "npm run build:prod && node scripts/publish-cws.mjs",
-    "cws:login": "npx chrome-webstore-upload-cli@3 init --client-id=$CWS_CLIENT_ID --client-secret=$CWS_CLIENT_SECRET"
+    "publish:cws": "npm run build:prod && node scripts/publish-cws.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
