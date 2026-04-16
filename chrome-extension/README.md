@@ -85,6 +85,39 @@ openssl pkey -in dist.pem -pubout -outform DER | base64
 Policy verwenden. Für manuelle Tests das ZIP entpacken und als „Entpackte
 Erweiterung" laden.
 
+### Publish to Chrome Web Store
+
+Zum Veröffentlichen im Chrome Web Store werden OAuth2-Credentials benötigt.
+
+#### Einmalig: Refresh Token generieren
+
+1. In der Google Cloud Console unter *APIs & Services > Credentials* einen
+   OAuth 2.0 Client (Typ: **Desktop app**) erstellen (oder den bestehenden verwenden)
+1. Die Chrome Web Store API im Projekt aktivieren
+1. `CWS_CLIENT_ID` und `CWS_CLIENT_SECRET` in der `.envrc` im Projekt-Root eintragen
+1. Refresh Token interaktiv generieren:
+
+```bash
+direnv exec . npx chrome-webstore-upload-keys@latest
+```
+
+1. Den ausgegebenen Refresh Token als `CWS_REFRESH_TOKEN` in die `.envrc` eintragen
+
+#### Publish ausführen
+
+Folgende Umgebungsvariablen müssen in der `.envrc` gesetzt sein:
+
+- `CWS_CLIENT_ID` — Google OAuth2 Client ID
+- `CWS_CLIENT_SECRET` — Google OAuth2 Client Secret
+- `CWS_REFRESH_TOKEN` — OAuth2 Refresh Token
+- `CWS_EXTENSION_ID` — Chrome Web Store Extension ID
+
+```bash
+npm run publish:cws
+```
+
+Baut die Extension und veröffentlicht sie im Chrome Web Store.
+
 ### In Chrome laden
 
 1. `chrome://extensions/` öffnen

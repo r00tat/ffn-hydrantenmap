@@ -245,6 +245,22 @@ jobs:
           upload_file "${CRX_FILE}" "application/x-chrome-extension"
           upload_file "${ZIP_FILE}" "application/zip"
 
+      - name: Publish to Chrome Web Store
+        if: github.event_name == 'release'
+        working-directory: chrome-extension
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: |
+          set -eo pipefail
+          if [[ -z "${CWS_CLIENT_ID}" || -z "${CWS_CLIENT_SECRET}" || -z "${CWS_REFRESH_TOKEN}" || -z "${CWS_EXTENSION_ID}" ]]; then
+            echo "::notice::Chrome Web Store publish skipped — CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN, or CWS_EXTENSION_ID not configured"
+            exit 0
+          fi
+          node scripts/publish-cws.mjs
+
       - name: Cleanup private key and env
         if: always()
         run: |

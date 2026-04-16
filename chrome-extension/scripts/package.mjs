@@ -11,7 +11,13 @@
 //   - <OUTPUT_BASE>.crx   signed extension for Enterprise/Self-Hosting
 
 import crx3 from 'crx3';
-import { readFileSync, readdirSync, existsSync, unlinkSync } from 'node:fs';
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  existsSync,
+  unlinkSync,
+} from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,11 +60,26 @@ for (const file of readdirSync(extRoot)) {
   }
 }
 
-await crx3([manifestPath], {
-  keyPath,
-  crxPath,
-  zipPath,
-});
+// Der Chrome Web Store lehnt ZIP-Uploads mit `key` im Manifest ab. Das Feld
+// wird daher vor dem Packaging entfernt und danach in dist/manifest.json
+// wiederhergestellt, damit die Extension auch direkt aus dist/ als unpacked
+// mit stabiler ID geladen werden kann.
+const originalManifest = readFileSync(manifestPath, 'utf8');
+if (manifest.key) {
+  const { key: _key, ...manifestWithoutKey } = manifest;
+  writeFileSync(manifestPath, JSON.stringify(manifestWithoutKey, null, 2));
+}
+
+try {
+  await crx3([manifestPath], {
+    keyPath,
+    crxPath,
+    zipPath,
+  });
+} finally {
+  // Immer wiederherstellen, auch bei Fehler
+  writeFileSync(manifestPath, originalManifest);
+}
 
 console.log(`\u2713 ${zipPath}  \u2192 Upload zu Chrome Web Store`);
 console.log(`\u2713 ${crxPath}  \u2192 Enterprise Policy / Self-Hosting`);
