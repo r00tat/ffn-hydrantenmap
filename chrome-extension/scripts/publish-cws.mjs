@@ -9,7 +9,7 @@
 // Run `npm run build:prod` before this script to generate the ZIP.
 
 import chromeWebstoreUpload from 'chrome-webstore-upload';
-import { createReadStream, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,24 +32,24 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-// --- Find the latest ZIP artifact ---
-const zipPattern = /^einsatzkarte-.*\.zip$/;
-const zips = readdirSync(extRoot).filter((f) => zipPattern.test(f));
-if (zips.length === 0) {
+// --- Find the latest CRX artifact ---
+const crxPattern = /^einsatzkarte-.*\.crx$/;
+const crxFiles = readdirSync(extRoot).filter((f) => crxPattern.test(f));
+if (crxFiles.length === 0) {
   console.error(
-    'Error: no einsatzkarte-*.zip found. Run `npm run build:prod` first.',
+    'Error: no einsatzkarte-*.crx found. Run `npm run build:prod` first.',
   );
   process.exit(1);
 }
-if (zips.length > 1) {
+if (crxFiles.length > 1) {
   console.error(
-    `Error: found multiple ZIP files: ${zips.join(', ')}. ` +
+    `Error: found multiple CRX files: ${crxFiles.join(', ')}. ` +
       'Expected exactly one (build:prod cleans old artifacts).',
   );
   process.exit(1);
 }
-const zipPath = resolve(extRoot, zips[0]);
-console.log(`Publishing ${zips[0]} to Chrome Web Store...`);
+const crxPath = resolve(extRoot, crxFiles[0]);
+console.log(`Publishing ${crxFiles[0]} to Chrome Web Store...`);
 
 // --- Upload and publish ---
 const store = chromeWebstoreUpload({
@@ -59,8 +59,7 @@ const store = chromeWebstoreUpload({
   refreshToken: process.env.CWS_REFRESH_TOKEN,
 });
 
-const zipStream = createReadStream(zipPath);
-const uploadResult = await store.uploadExisting(zipStream);
+const uploadResult = await store.uploadExisting(crxPath);
 
 if (uploadResult.uploadState === 'FAILURE') {
   console.error('Upload failed:', JSON.stringify(uploadResult, null, 2));
