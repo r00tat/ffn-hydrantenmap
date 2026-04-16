@@ -1,34 +1,95 @@
-import { Box, Typography, Chip, Skeleton, Divider } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Chip,
+  Skeleton,
+  Divider,
+  Link,
+  List,
+  ListItem,
+  ListSubheader,
+} from '@mui/material';
 import LocalFireDepartment from '@mui/icons-material/LocalFireDepartment';
 import DirectionsCar from '@mui/icons-material/DirectionsCar';
+import People from '@mui/icons-material/People';
 import AccessTime from '@mui/icons-material/AccessTime';
-import { Firecall, FirecallItem } from '@shared/types';
+import {
+  Firecall,
+  FirecallItem,
+  CrewAssignment,
+  funktionAbkuerzung,
+} from '@shared/types';
+import { EINSATZKARTE_URL } from '@shared/config';
 
 interface FirecallOverviewProps {
   firecall: Firecall | undefined;
+  firecallId: string | null;
   items: FirecallItem[];
+  crew: CrewAssignment[];
   loading: boolean;
+}
+
+interface Fzg extends FirecallItem {
+  fw?: string;
+  besatzung?: string;
+  type: 'vehicle';
 }
 
 export default function FirecallOverview({
   firecall,
+  firecallId,
   items,
+  crew,
   loading,
 }: FirecallOverviewProps) {
   if (loading || !firecall) {
     return <Skeleton variant="rectangular" height={200} />;
   }
 
-  const vehicleCount = items.filter((i) => i.type === 'vehicle').length;
+  const vehicles = items.filter((i): i is Fzg => i.type === 'vehicle');
   const isActive = !!firecall.eintreffen && !firecall.abruecken;
+
+  const crewByVehicle = new Map<string | null, CrewAssignment[]>();
+  for (const member of crew) {
+    const key = member.vehicleId;
+    const list = crewByVehicle.get(key) ?? [];
+    list.push(member);
+    crewByVehicle.set(key, list);
+  }
+
+  const unassignedCrew = crewByVehicle.get(null) ?? [];
+
+  const detailUrl = firecallId
+    ? `${EINSATZKARTE_URL}/einsatz/${firecallId}/details`
+    : undefined;
+
+  const handleTitleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (detailUrl) {
+      chrome.tabs.create({ url: detailUrl });
+    }
+  };
 
   return (
     <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <LocalFireDepartment color="error" />
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          {firecall.name}
-        </Typography>
+        {detailUrl ? (
+          <Link
+            href={detailUrl}
+            onClick={handleTitleClick}
+            underline="hover"
+            color="inherit"
+            variant="h6"
+            sx={{ flex: 1, cursor: 'pointer' }}
+          >
+            {firecall.name}
+          </Link>
+        ) : (
+          <Typography variant="h6" sx={{ flex: 1 }}>
+            {firecall.name}
+          </Typography>
+        )}
         <Chip
           label={isActive ? 'Aktiv' : 'Beendet'}
           color={isActive ? 'error' : 'default'}
@@ -56,10 +117,92 @@ export default function FirecallOverview({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <DirectionsCar fontSize="small" color="action" />
           <Typography variant="body2">
-            {vehicleCount} Fahrzeug{vehicleCount !== 1 ? 'e' : ''}
+            {vehicles.length} Fahrzeug{vehicles.length !== 1 ? 'e' : ''}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <People fontSize="small" color="action" />
+          <Typography variant="body2">
+            {crew.length} Person{crew.length !== 1 ? 'en' : ''}
           </Typography>
         </Box>
       </Box>
+
+      {(vehicles.length > 0 || crew.length > 0) && (
+        <>
+          <Divider />
+          <List dense disablePadding>
+            {vehicles.map((vehicle) => {
+              const vehicleCrew = crewByVehicle.get(vehicle.id!) ?? [];
+              return (
+                <Box key={vehicle.id}>
+                  <ListSubheader
+                    disableSticky
+                    sx={{ lineHeight: '32px', px: 1 }}
+                  >
+                    <Box
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                    >
+                      <DirectionsCar fontSize="small" />
+                      <strong>{vehicle.name}</strong>
+                      {vehicle.fw && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          component="span"
+                        >
+                          ({vehicle.fw})
+                        </Typography>
+                      )}
+                    </Box>
+                  </ListSubheader>
+                  {vehicleCrew.length > 0 ? (
+                    vehicleCrew.map((member) => (
+                      <ListItem key={member.id} sx={{ py: 0, pl: 4 }}>
+                        <Typography variant="body2">
+                          {funktionAbkuerzung(member.funktion)}: {member.name}
+                        </Typography>
+                      </ListItem>
+                    ))
+                  ) : (
+                    <ListItem sx={{ py: 0, pl: 4 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontStyle: 'italic' }}
+                      >
+                        Keine Mannschaft zugeordnet
+                      </Typography>
+                    </ListItem>
+                  )}
+                </Box>
+              );
+            })}
+            {unassignedCrew.length > 0 && (
+              <Box>
+                <ListSubheader
+                  disableSticky
+                  sx={{ lineHeight: '32px', px: 1 }}
+                >
+                  <Box
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                  >
+                    <People fontSize="small" />
+                    <strong>Ohne Fahrzeug</strong>
+                  </Box>
+                </ListSubheader>
+                {unassignedCrew.map((member) => (
+                  <ListItem key={member.id} sx={{ py: 0, pl: 4 }}>
+                    <Typography variant="body2">
+                      {funktionAbkuerzung(member.funktion)}: {member.name}
+                    </Typography>
+                  </ListItem>
+                ))}
+              </Box>
+            )}
+          </List>
+        </>
+      )}
     </Box>
   );
 }

@@ -19,6 +19,7 @@ import DiaryForm from './components/DiaryForm';
 import { useFirecalls } from './hooks/useFirecalls';
 import { useFirecallItems } from './hooks/useFirecallItems';
 import { useDiaries } from './hooks/useDiaries';
+import { useCrewAssignments } from './hooks/useCrewAssignments';
 import { useUserClaims } from './hooks/useUserClaims';
 
 
@@ -31,6 +32,7 @@ function MainContent({ email }: { email: string }) {
   const [tab, setTab] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const { items, loading: itemsLoading } = useFirecallItems(selectedFirecallId);
+  const { crew, loading: crewLoading } = useCrewAssignments(selectedFirecallId);
   const { diaries, loading: diariesLoading } = useDiaries(selectedFirecallId);
 
   const selectedFirecall = firecalls.find(
@@ -87,8 +89,10 @@ function MainContent({ email }: { email: string }) {
       {tab === 0 && (
         <FirecallOverview
           firecall={selectedFirecall}
+          firecallId={selectedFirecallId}
           items={items}
-          loading={itemsLoading}
+          crew={crew}
+          loading={itemsLoading || crewLoading}
         />
       )}
       {tab === 1 && (
