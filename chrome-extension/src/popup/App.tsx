@@ -46,10 +46,15 @@ function MainContent({ email }: { email: string }) {
     });
   }, []);
 
-  // Auto-select most recent firecall if nothing persisted.
+  // Auto-select most recent firecall if nothing persisted or the persisted
+  // selection no longer exists in the current database (e.g. after switching
+  // from dev to prod).
   // setState during render is the React 19 pattern for deriving state from
   // changing props — avoids the set-state-in-effect lint rule.
-  if (firecalls.length > 0 && !selectedFirecallId) {
+  if (
+    firecalls.length > 0 &&
+    (!selectedFirecallId || !firecalls.some((fc) => fc.id === selectedFirecallId))
+  ) {
     setSelectedFirecallId(firecalls[0].id!);
   }
 
