@@ -88,16 +88,11 @@ export default defineManifest(async (env) => {
   // Base64-kodierter DER Public Key, abgeleitet aus dem privaten Schluessel
   // in chrome-extension/dist.pem (*.pem ist .gitignored).
   //
-  // Das `key`-Feld fixiert die Extension-ID nur bei Unpacked-Loads im
-  // Dev-Modus. Bei Production-Builds (EXT_ENV_LOCAL=1) wird es weggelassen:
-  //   - Der Chrome Web Store lehnt ZIP-Uploads mit `key` ab
-  //     ("Das Feld 'key' ist im Manifest nicht zulaessig").
-  //   - Die CRX wird mit dist.pem signiert; Chrome leitet die Extension-ID
-  //     automatisch aus dem in der CRX eingebetteten Public Key ab,
-  //     sodass die ID auch ohne `key` im Manifest stabil bleibt.
-  const extensionPublicKey = process.env.EXT_ENV_LOCAL
-    ? undefined
-    : viteEnv.CHROME_EXTENSION_PUBLIC_KEY;
+  // Das `key`-Feld fixiert die Extension-ID sowohl bei Unpacked-Loads als
+  // auch bei lokalen Prod-Builds (dist/ direkt laden). Der Chrome Web Store
+  // lehnt ZIP-Uploads mit `key` ab — daher entfernt package.mjs das Feld
+  // nur aus der ZIP-Datei, nicht aus dist/manifest.json.
+  const extensionPublicKey = viteEnv.CHROME_EXTENSION_PUBLIC_KEY;
 
   return {
     manifest_version: 3,
