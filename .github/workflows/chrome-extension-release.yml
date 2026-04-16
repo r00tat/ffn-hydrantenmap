@@ -253,14 +253,13 @@ jobs:
           CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
           CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
           CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
-          CRX_FILE: ${{ steps.version.outputs.CRX_FILE }}
         run: |
           set -eo pipefail
           if [[ -z "${CWS_CLIENT_ID}" || -z "${CWS_CLIENT_SECRET}" || -z "${CWS_REFRESH_TOKEN}" || -z "${CWS_EXTENSION_ID}" ]]; then
             echo "::notice::Chrome Web Store publish skipped — CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN, or CWS_EXTENSION_ID not configured"
             exit 0
           fi
-          npx chrome-webstore-upload-cli@3 upload --source "${CRX_FILE}" --auto-publish
+          node scripts/publish-cws.mjs
 
       - name: Cleanup private key and env
         if: always()

@@ -1,4 +1,4 @@
-// Publishes the latest einsatzkarte-*.zip to the Chrome Web Store.
+// Publishes the latest einsatzkarte-*.crx to the Chrome Web Store.
 //
 // Required environment variables:
 //   CWS_CLIENT_ID        — Google OAuth2 client ID
@@ -6,7 +6,7 @@
 //   CWS_REFRESH_TOKEN    — OAuth2 refresh token
 //   CWS_EXTENSION_ID     — Chrome Web Store extension ID
 //
-// Run `npm run build:prod` before this script to generate the ZIP.
+// Run `npm run build:prod` before this script to generate the CRX.
 
 import chromeWebstoreUpload from 'chrome-webstore-upload';
 import { readdirSync } from 'node:fs';
