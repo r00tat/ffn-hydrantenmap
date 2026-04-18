@@ -20,6 +20,7 @@ import {
   loadAuthFromSessionStorage,
   saveAuthToSessionStorage,
 } from './auth/sessionStorage';
+import { ensureFreshAuth } from './auth/ensureFreshAuth';
 import { loginTimer } from '../common/loginTiming';
 
 // Re-export types for backward compatibility
@@ -229,25 +230,56 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     return () => clearInterval(clearServerInterval);
   }, [serverLogin]);
 
-  // Refresh session when tab becomes visible, but only if session is stale (>5 min)
+  // Refresh session when the app wakes up (tab visible, window focused,
+  // page shown from bfcache, or network reconnected). Device standby pauses
+  // JS timers, so any of these is the first signal that we are back and
+  // should verify that the Firebase token + NextAuth session are still fresh.
   useEffect(() => {
-    const SESSION_STALE_MS = 5 * 60 * 1000;
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && auth.currentUser) {
-        const elapsed = Date.now() - lastRefreshRef.current;
-        if (elapsed >= SESSION_STALE_MS) {
-          console.info(
-            `tab became visible, refreshing session (last refresh ${Math.round(elapsed / 1000)}s ago)`
-          );
-          await serverLogin();
+    const SESSION_STALE_MS = 60 * 1000;
+    let isRunning = false;
+
+    const maybeRefresh = async (reason: string, force = false) => {
+      if (!auth.currentUser) return;
+      if (isRunning) return;
+      const elapsed = Date.now() - lastRefreshRef.current;
+      if (!force && elapsed < SESSION_STALE_MS) return;
+      isRunning = true;
+      try {
+        console.info(
+          `${reason}, refreshing session (last refresh ${Math.round(elapsed / 1000)}s ago)`
+        );
+        const ok = await ensureFreshAuth(true);
+        if (ok) {
           lastRefreshRef.current = Date.now();
+        } else {
+          console.warn(`session refresh failed after ${reason}`);
         }
+      } finally {
+        isRunning = false;
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void maybeRefresh('tab became visible');
+      }
+    };
+    const handleFocus = () => void maybeRefresh('window focused');
+    const handlePageShow = (event: PageTransitionEvent) =>
+      void maybeRefresh('page shown', event.persisted);
+    const handleOnline = () => void maybeRefresh('network back online', true);
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [serverLogin]);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   const fbSignOut = useCallback(async () => {
     clearAuthFromSessionStorage();
