@@ -10,6 +10,8 @@ import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
+import { withFreshAuth } from './auth/withFreshAuth';
+import { isAuthError } from './auth/ensureFreshAuth';
 
 export default function useFirecallItemAdd() {
   const firecallId = useFirecallId();
@@ -42,14 +44,16 @@ export default function useFirecallItemAdd() {
       );
 
       try {
-        const docRef = await addDoc(
-          collection(
-            firestore,
-            FIRECALL_COLLECTION_ID,
-            firecallId,
-            itemClass.firebaseCollectionName()
-          ),
-          newData
+        const docRef = await withFreshAuth(() =>
+          addDoc(
+            collection(
+              firestore,
+              FIRECALL_COLLECTION_ID,
+              firecallId,
+              itemClass.firebaseCollectionName()
+            ),
+            newData
+          )
         );
 
         logChange({
@@ -63,10 +67,23 @@ export default function useFirecallItemAdd() {
         return docRef;
       } catch (err) {
         console.error('Failed to add firecall item:', err);
-        showSnackbar(
-          'Element konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen.',
-          'error',
-        );
+        const reloadAction = {
+          label: 'Neu laden',
+          onClick: () => window.location.reload(),
+        };
+        if (isAuthError(err)) {
+          showSnackbar(
+            'Sitzung abgelaufen. Element wurde nicht gespeichert. Bitte Seite neu laden und erneut anmelden.',
+            'error',
+            reloadAction,
+          );
+        } else {
+          showSnackbar(
+            'Element konnte nicht gespeichert werden. Bitte Verbindung prüfen und erneut versuchen.',
+            'error',
+            reloadAction,
+          );
+        }
         throw err;
       }
     },

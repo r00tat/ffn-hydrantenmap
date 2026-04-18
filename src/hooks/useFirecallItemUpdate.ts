@@ -22,6 +22,8 @@ import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
+import { withFreshAuth } from './auth/withFreshAuth';
+import { isAuthError } from './auth/ensureFreshAuth';
 
 export default function useFirecallItemUpdate() {
   const firecallId = useFirecallId();
@@ -49,16 +51,18 @@ export default function useFirecallItemUpdate() {
       );
 
       try {
-        await setDoc(
-          doc(
-            firestore,
-            FIRECALL_COLLECTION_ID,
-            firecallId,
-            itemClass.firebaseCollectionName(),
-            '' + item.id
-          ),
-          newData,
-          { merge: false }
+        await withFreshAuth(() =>
+          setDoc(
+            doc(
+              firestore,
+              FIRECALL_COLLECTION_ID,
+              firecallId,
+              itemClass.firebaseCollectionName(),
+              '' + item.id
+            ),
+            newData,
+            { merge: false }
+          )
         );
 
         // When a layer is deleted, cascade to all items in that layer
@@ -134,10 +138,23 @@ export default function useFirecallItemUpdate() {
         });
       } catch (err) {
         console.error('Failed to update firecall item:', err);
-        showSnackbar(
-          'Element konnte nicht aktualisiert werden. Bitte Verbindung und Anmeldung prüfen.',
-          'error',
-        );
+        const reloadAction = {
+          label: 'Neu laden',
+          onClick: () => window.location.reload(),
+        };
+        if (isAuthError(err)) {
+          showSnackbar(
+            'Sitzung abgelaufen. Änderung wurde nicht gespeichert. Bitte Seite neu laden und erneut anmelden.',
+            'error',
+            reloadAction,
+          );
+        } else {
+          showSnackbar(
+            'Element konnte nicht aktualisiert werden. Bitte Verbindung prüfen und erneut versuchen.',
+            'error',
+            reloadAction,
+          );
+        }
         throw err;
       }
     },
