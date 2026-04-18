@@ -24,7 +24,7 @@ import {
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';
-import { formatTimestamp, parseTimestamp } from '../../common/time-format';
+import { parseTimestamp } from '../../common/time-format';
 import { defaultPosition } from '../../hooks/constants';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallSelect } from '../../hooks/useFirecall';
@@ -39,6 +39,8 @@ import {
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
+import { stripNullish } from '../../common/stripNullish';
+import { createDefaultEinsatz, resetEinsatzToManual } from './einsatzDefaults';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -53,15 +55,7 @@ export default function EinsatzDialog({
 }: EinsatzDialogOptions) {
   const [open, setOpen] = useState(true);
   const [einsatz, setEinsatz] = useState<Firecall>(
-    einsatzDefault || {
-      name: `Einsatz am ${formatTimestamp(new Date())}`,
-      group: 'ffnd',
-      fw: 'Neusiedl am See',
-      description: '',
-      date: new Date().toISOString(),
-      eintreffen: new Date().toISOString(),
-      deleted: false,
-    }
+    einsatzDefault || createDefaultEinsatz()
   );
   const { email, myGroups } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
@@ -150,6 +144,8 @@ export default function EinsatzDialog({
             setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: alarm.alarmId }));
           }
         }
+      } else if (isNewEinsatz) {
+        setEinsatz((prev) => resetEinsatzToManual(prev));
       } else {
         setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: undefined }));
       }
@@ -185,26 +181,27 @@ export default function EinsatzDialog({
 
   const saveEinsatz = useCallback(
     async (fc: Firecall) => {
-      // if (!fc.sheetId) {
-      //   fc.sheetId = await copyFirecallSheet(fc);
-      // }
-
       if (fc.id) {
         // update
+        const updatePayload = stripNullish({
+          ...fc,
+          updatedAt: new Date().toISOString(),
+          updatedBy: email,
+        });
         await setDoc(
           doc(firestore, FIRECALL_COLLECTION_ID, fc.id),
-          { ...fc, updatedAt: new Date().toISOString(), updatedBy: email },
+          updatePayload,
           { merge: true }
         );
       } else {
         //save new
-        const firecallData: Firecall = {
+        const firecallData = stripNullish({
           ...fc,
           user: email,
           created: new Date().toISOString(),
           lat: fc.lat ?? position.lat,
           lng: fc.lng ?? position.lng,
-        };
+        });
         const newDoc = await addDoc(
           collection(firestore, FIRECALL_COLLECTION_ID),
           firecallData
