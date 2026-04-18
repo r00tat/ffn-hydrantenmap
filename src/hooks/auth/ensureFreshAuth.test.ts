@@ -101,7 +101,7 @@ describe('ensureFreshAuth', () => {
   });
 
   it('does not reuse an inflight non-forced call for a forced caller', async () => {
-    const user = makeUser(4 * 60 * 1000); // 4min → needs refresh
+    const user = makeUser(10 * 60 * 1000); // fresh token, non-force call alone would NOT server-login
     mockAuth.currentUser = user;
     firebaseTokenLoginMock.mockResolvedValue({ ok: true });
 
@@ -112,7 +112,8 @@ describe('ensureFreshAuth', () => {
 
     expect(first).toBe(true);
     expect(second).toBe(true);
-    expect(firebaseTokenLoginMock).toHaveBeenCalled();
+    // Without the fix, second call would ride on first's non-force inflight and never force-login.
+    expect(firebaseTokenLoginMock).toHaveBeenCalledTimes(1);
   });
 
   it('forces server login when a later caller requests it during inflight', async () => {

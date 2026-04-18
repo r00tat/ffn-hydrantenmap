@@ -55,8 +55,11 @@ async function doEnsure(forceServerLogin: boolean): Promise<boolean> {
 
 /**
  * Ensure the Firebase ID token is valid and the NextAuth session is fresh.
- * De-duplicates concurrent callers and only performs network work when the
- * current token is close to expiring (unless `forceServerLogin` is true).
+ * De-duplicates concurrent callers per force-level: a forced caller never
+ * rides on a non-forced inflight promise, but a non-forced caller will ride
+ * on an inflight forced promise because force is stricter.
+ * Only performs network work when the current token is close to expiring
+ * (unless `forceServerLogin` is true).
  * Returns false when refreshing failed so callers can decide what to do.
  */
 export async function ensureFreshAuth(
