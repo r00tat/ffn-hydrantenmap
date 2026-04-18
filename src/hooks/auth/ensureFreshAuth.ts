@@ -5,7 +5,8 @@ import { firebaseTokenLogin } from '../../app/firebaseAuth';
 
 const TOKEN_MIN_LIFETIME_MS = 5 * 60 * 1000;
 
-let inflight: Promise<boolean> | null = null;
+let inflightAny: Promise<boolean> | null = null;
+let inflightForce: Promise<boolean> | null = null;
 
 function isAuthError(err: unknown): boolean {
   const code = (err as { code?: string } | null)?.code;
@@ -61,15 +62,30 @@ async function doEnsure(forceServerLogin: boolean): Promise<boolean> {
 export async function ensureFreshAuth(
   forceServerLogin = false,
 ): Promise<boolean> {
-  if (inflight) return inflight;
-  inflight = doEnsure(forceServerLogin).catch((err) => {
+  if (forceServerLogin) {
+    if (inflightForce) return inflightForce;
+    inflightForce = doEnsure(true).catch((err) => {
+      console.error('ensureFreshAuth failed', err);
+      return false;
+    });
+    try {
+      return await inflightForce;
+    } finally {
+      inflightForce = null;
+    }
+  }
+
+  // Non-force callers ride on a force promise if one is running (force is stricter).
+  if (inflightForce) return inflightForce;
+  if (inflightAny) return inflightAny;
+  inflightAny = doEnsure(false).catch((err) => {
     console.error('ensureFreshAuth failed', err);
     return false;
   });
   try {
-    return await inflight;
+    return await inflightAny;
   } finally {
-    inflight = null;
+    inflightAny = null;
   }
 }
 

@@ -99,6 +99,33 @@ describe('ensureFreshAuth', () => {
     expect(user.getIdToken).toHaveBeenCalledTimes(2); // once with true, once without
     expect(firebaseTokenLoginMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not reuse an inflight non-forced call for a forced caller', async () => {
+    const user = makeUser(4 * 60 * 1000); // 4min → needs refresh
+    mockAuth.currentUser = user;
+    firebaseTokenLoginMock.mockResolvedValue({ ok: true });
+
+    const [first, second] = await Promise.all([
+      ensureFreshAuth(false),
+      ensureFreshAuth(true),
+    ]);
+
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    expect(firebaseTokenLoginMock).toHaveBeenCalled();
+  });
+
+  it('forces server login when a later caller requests it during inflight', async () => {
+    const user = makeUser(10 * 60 * 1000); // 10min → no refresh needed on its own
+    mockAuth.currentUser = user;
+    firebaseTokenLoginMock.mockResolvedValue({ ok: true });
+
+    const p1 = ensureFreshAuth(false);
+    const p2 = ensureFreshAuth(true);
+
+    await Promise.all([p1, p2]);
+    expect(firebaseTokenLoginMock).toHaveBeenCalled();
+  });
 });
 
 describe('isAuthError', () => {
