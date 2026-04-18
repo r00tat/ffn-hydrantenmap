@@ -1,5 +1,6 @@
 'use client';
 
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -42,6 +43,7 @@ import {
   type SpectrumData,
   type NuclideMatch,
 } from '../../common/spectrumParser';
+import { buildNuclidePeakLines } from '../../common/nuclidePeakLines';
 import {
   FIRECALL_COLLECTION_ID,
   Spectrum,
@@ -59,6 +61,22 @@ const SERIES_COLORS = [
   '#f57c00',
   '#7b1fa2',
   '#0288d1',
+];
+
+/**
+ * Palette for manually selected nuclide peak lines. Intentionally distinct from
+ * SERIES_COLORS (spectrum curves) and the red (#d32f2f) used for auto-matched
+ * peaks, so the three line sets stay visually separable.
+ */
+const SELECTED_PEAK_COLORS = [
+  '#00796b',
+  '#c2185b',
+  '#5d4037',
+  '#455a64',
+  '#512da8',
+  '#ef6c00',
+  '#2e7d32',
+  '#1565c0',
 ];
 
 interface LoadedSpectrum {
@@ -119,6 +137,9 @@ export default function EnergySpectrum() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [logScale, setLogScale] = useState(false);
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
+  const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
+    []
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -287,6 +308,16 @@ export default function EnergySpectrum() {
     [deferredVisibleSpectra]
   );
 
+  const selectedPeakLines = useMemo(
+    () =>
+      buildNuclidePeakLines(
+        selectedNuclideNames,
+        MATCHABLE_NUCLIDES,
+        SELECTED_PEAK_COLORS
+      ),
+    [selectedNuclideNames]
+  );
+
   // Collect matched peak energies from visible spectra for reference lines
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
@@ -424,6 +455,42 @@ export default function EnergySpectrum() {
             <InfoOutlinedIcon />
           </IconButton>
         </Tooltip>
+        <Autocomplete
+          multiple
+          size="small"
+          options={MATCHABLE_NUCLIDES.map((n) => n.name)}
+          value={selectedNuclideNames}
+          onChange={(_, value) => setSelectedNuclideNames(value)}
+          sx={{ minWidth: 260, flex: 1 }}
+          renderValue={(value, getItemProps) =>
+            value.map((name, idx) => {
+              const color =
+                SELECTED_PEAK_COLORS[idx % SELECTED_PEAK_COLORS.length];
+              const { key, ...itemProps } = getItemProps({ index: idx });
+              return (
+                <Chip
+                  key={key}
+                  label={name}
+                  size="small"
+                  {...itemProps}
+                  sx={{
+                    borderLeft: `4px solid ${color}`,
+                    borderRadius: 1,
+                  }}
+                />
+              );
+            })
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Peaks von Nukliden einblenden"
+              placeholder={
+                selectedNuclideNames.length === 0 ? 'Nuklide wählen' : ''
+              }
+            />
+          )}
+        />
       </Box>
 
       {/* Identification Results */}
@@ -692,6 +759,23 @@ export default function EnergySpectrum() {
                 />
               )
             )}
+            {selectedPeakLines.map((line) => (
+              <ChartsReferenceLine
+                key={line.key}
+                x={line.energy}
+                label={line.label}
+                lineStyle={{
+                  stroke: line.color,
+                  strokeWidth: 1.5,
+                  strokeDasharray: '2 3',
+                }}
+                labelStyle={{
+                  fontSize: 10,
+                  fill: line.color,
+                  fontWeight: 'bold',
+                }}
+              />
+            ))}
           </LineChart>
         </Box>
       )}
