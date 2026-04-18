@@ -4,10 +4,10 @@ import {
   doc,
   getDocs,
   query,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { commitBatch, setDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
@@ -22,7 +22,6 @@ import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
-import { withFreshAuth } from './auth/withFreshAuth';
 import { isAuthError } from './auth/ensureFreshAuth';
 
 export default function useFirecallItemUpdate() {
@@ -51,18 +50,16 @@ export default function useFirecallItemUpdate() {
       );
 
       try {
-        await withFreshAuth(() =>
-          setDoc(
-            doc(
-              firestore,
-              FIRECALL_COLLECTION_ID,
-              firecallId,
-              itemClass.firebaseCollectionName(),
-              '' + item.id
-            ),
-            newData,
-            { merge: false }
-          )
+        await setDoc(
+          doc(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            itemClass.firebaseCollectionName(),
+            '' + item.id
+          ),
+          newData,
+          { merge: false }
         );
 
         // When a layer is deleted, cascade to all items in that layer
@@ -82,7 +79,7 @@ export default function useFirecallItemUpdate() {
             snapshot.docs.forEach((d) => {
               batch.update(d.ref, { deleted: true, updatedAt: now, updatedBy: email });
             });
-            await batch.commit();
+            await commitBatch(batch);
           }
         }
 
@@ -119,7 +116,7 @@ export default function useFirecallItemUpdate() {
                 }
               }
               if (hasUpdates) {
-                await batch.commit();
+                await commitBatch(batch);
               }
             }
           }

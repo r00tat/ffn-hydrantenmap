@@ -14,13 +14,12 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
-  addDoc,
   arrayRemove,
   arrayUnion,
   collection,
   doc,
-  setDoc,
 } from 'firebase/firestore';
+import { addDoc, setDoc } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
 import { GeoPositionObject } from '../../common/geo';

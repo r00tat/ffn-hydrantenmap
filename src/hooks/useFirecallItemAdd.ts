@@ -1,4 +1,5 @@
-import { addDoc, collection } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
+import { addDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
@@ -10,7 +11,6 @@ import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
-import { withFreshAuth } from './auth/withFreshAuth';
 import { isAuthError } from './auth/ensureFreshAuth';
 
 export default function useFirecallItemAdd() {
@@ -44,16 +44,14 @@ export default function useFirecallItemAdd() {
       );
 
       try {
-        const docRef = await withFreshAuth(() =>
-          addDoc(
-            collection(
-              firestore,
-              FIRECALL_COLLECTION_ID,
-              firecallId,
-              itemClass.firebaseCollectionName()
-            ),
-            newData
-          )
+        const docRef = await addDoc(
+          collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            itemClass.firebaseCollectionName()
+          ),
+          newData
         );
 
         logChange({

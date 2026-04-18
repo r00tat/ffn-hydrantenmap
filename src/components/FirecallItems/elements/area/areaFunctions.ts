@@ -1,4 +1,5 @@
-import { doc, setDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
+import { setDoc } from '../../../../lib/firestoreClient';
 import L from 'leaflet';
 import { LatLngPosition } from '../../../../common/geo';
 
