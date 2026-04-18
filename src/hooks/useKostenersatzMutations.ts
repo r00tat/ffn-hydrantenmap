@@ -27,16 +27,10 @@ import {
   KOSTENERSATZ_VERSIONS_COLLECTION,
 } from '../common/kostenersatz';
 import { getDefaultVehicles } from '../common/defaultKostenersatzRates';
+import { stripNullish } from '../common/stripNullish';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
-
-// Helper to remove undefined values (Firestore doesn't accept undefined)
-function removeUndefined<T extends object>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([_, v]) => v !== undefined)
-  ) as T;
-}
 
 // ============================================================================
 // Calculation Mutations
@@ -76,7 +70,7 @@ export function useKostenersatzAdd(firecallIdOverride?: string) {
           firecallId,
           KOSTENERSATZ_SUBCOLLECTION
         ),
-        removeUndefined(newCalc)
+        stripNullish(newCalc)
       );
 
       logChange({
@@ -134,7 +128,7 @@ export function useKostenersatzUpdate(firecallIdOverride?: string) {
           KOSTENERSATZ_SUBCOLLECTION,
           calcId
         ),
-        removeUndefined(dataWithoutId),
+        stripNullish(dataWithoutId),
         { merge: false }
       );
 
@@ -240,7 +234,7 @@ export function useKostenersatzTemplateAdd() {
 
       const docRef = await addDoc(
         collection(firestore, KOSTENERSATZ_TEMPLATES_COLLECTION),
-        removeUndefined(newTemplate)
+        stripNullish(newTemplate)
       );
 
       return docRef.id;
@@ -270,7 +264,7 @@ export function useKostenersatzTemplateUpdate() {
 
     await setDoc(
       doc(firestore, KOSTENERSATZ_TEMPLATES_COLLECTION, templateId),
-      removeUndefined(dataWithoutId),
+      stripNullish(dataWithoutId),
       { merge: false }
     );
   }, []);
@@ -396,7 +390,7 @@ export function useKostenersatzRateUpsert() {
 
     await setDoc(
       doc(firestore, KOSTENERSATZ_RATES_COLLECTION, docId),
-      removeUndefined(rate)
+      stripNullish(rate)
     );
   }, []);
 }
@@ -489,7 +483,7 @@ export function useKostenersatzVehicleUpsert() {
 
     await setDoc(
       doc(firestore, KOSTENERSATZ_VEHICLES_COLLECTION, vehicle.id),
-      removeUndefined(vehicle)
+      stripNullish(vehicle)
     );
   }, []);
 }

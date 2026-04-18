@@ -39,11 +39,8 @@ import {
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
-import {
-  createDefaultEinsatz,
-  resetEinsatzToManual,
-  stripNullish,
-} from './einsatzDefaults';
+import { stripNullish } from '../../common/stripNullish';
+import { createDefaultEinsatz, resetEinsatzToManual } from './einsatzDefaults';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
