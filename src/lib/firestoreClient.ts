@@ -30,6 +30,12 @@ import { withFreshAuth } from '../hooks/auth/withFreshAuth';
  *
  * For composite read-modify-write operations, wrap the whole block manually
  * with `withFreshAuth(() => { ... })`.
+ *
+ * The `updateDoc` field-path overload (`updateDoc(ref, 'field', value, ...)`)
+ * is intentionally not re-exported. No call site in this codebase uses it.
+ * If a future caller needs it, prefer passing a partial object:
+ * `updateDoc(ref, { field: value })`. Add the overload here if that becomes
+ * impractical.
  */
 
 export function setDoc<AppModelType, DbModelType extends DocumentData>(
@@ -71,7 +77,12 @@ export function addDoc<AppModelType, DbModelType extends DocumentData>(
   return withFreshAuth(() => fsAddDoc(reference, data));
 }
 
-export function deleteDoc(reference: DocumentReference<unknown>): Promise<void> {
+export function deleteDoc<
+  AppModelType,
+  DbModelType extends DocumentData,
+>(
+  reference: DocumentReference<AppModelType, DbModelType>,
+): Promise<void> {
   return withFreshAuth(() => fsDeleteDoc(reference));
 }
 
