@@ -52,6 +52,14 @@ export function fwhmAt(
 }
 
 /**
+ * Energy-dependent match tolerance. Defaults to HWHM for CsI(Tl) with a
+ * 5 keV floor so very low energies remain matchable despite small FWHM.
+ */
+export function toleranceFor(energyKeV: number): number {
+  return Math.max(5, 0.5 * fwhmAt(energyKeV));
+}
+
+/**
  * Parse RadiaCode-101 XML spectrum file.
  */
 export function parseSpectrumXml(xml: string): SpectrumData {
@@ -221,8 +229,8 @@ export function findPeaks(
  */
 export function identifyNuclides(
   peaks: Peak[],
-  toleranceKeV: number = 10,
-  nuclides: Nuclide[] = NUCLIDES
+  toleranceKeV?: number,
+  nuclides: Nuclide[] = NUCLIDES,
 ): NuclideMatch[] {
   const matches: NuclideMatch[] = [];
   const maxPeakCounts = peaks.length > 0 ? peaks[0].counts : 1;
@@ -233,9 +241,10 @@ export function identifyNuclides(
     const matchedPeaks: { expected: number; found: Peak }[] = [];
 
     for (const { energy: expectedEnergy } of nuclide.peaks) {
+      const tolerance = toleranceKeV ?? toleranceFor(expectedEnergy);
       // Find closest peak within tolerance
       let bestPeak: Peak | null = null;
-      let bestDistance = toleranceKeV;
+      let bestDistance = tolerance;
 
       for (const peak of peaks) {
         const distance = Math.abs(peak.energy - expectedEnergy);
@@ -265,11 +274,12 @@ export function identifyNuclides(
     const avgAccuracy =
       1 -
       matchedPeaks.reduce(
-        (sum, mp) => sum + Math.abs(mp.found.energy - mp.expected),
-        0
-      ) /
-        matchedPeaks.length /
-        toleranceKeV;
+        (sum, mp) =>
+          sum +
+          Math.abs(mp.found.energy - mp.expected) /
+            (toleranceKeV ?? toleranceFor(mp.expected)),
+        0,
+      ) / matchedPeaks.length;
 
     const confidence =
       0.35 * fractionMatched + 0.50 * avgStrength + 0.15 * avgAccuracy;

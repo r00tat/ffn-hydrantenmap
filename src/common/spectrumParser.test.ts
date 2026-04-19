@@ -8,6 +8,8 @@ import {
   fwhmAt,
   identifyNuclides,
   parseSpectrumXml,
+  toleranceFor,
+  type Peak,
 } from './spectrumParser';
 
 const AM241_XML = readFileSync(
@@ -171,5 +173,28 @@ describe('fwhmAt', () => {
 
   it('should accept custom reference resolution', () => {
     expect(fwhmAt(662, 0.09)).toBeCloseTo(59.58, 1);
+  });
+});
+
+describe('toleranceFor (energy-dependent match tolerance)', () => {
+  it('should return HWHM at high energies', () => {
+    expect(toleranceFor(662)).toBeCloseTo(39.7, 1);
+    expect(toleranceFor(1332)).toBeCloseTo(56.3, 1);
+  });
+
+  it('should enforce a minimum of 5 keV at low energies', () => {
+    expect(toleranceFor(5)).toBe(5);
+  });
+});
+
+describe('identifyNuclides with energy-dependent tolerance', () => {
+  it('should match Co-60 1332 keV peak within HWHM', () => {
+    const peaks: Peak[] = [
+      { channel: 560, energy: 1362, counts: 1000 },
+      { channel: 490, energy: 1200, counts: 1000 },
+    ];
+    const matches = identifyNuclides(peaks);
+    const co60 = matches.find((m) => m.nuclide.name === 'Co-60');
+    expect(co60?.matchedPeaks.length).toBeGreaterThanOrEqual(1);
   });
 });
