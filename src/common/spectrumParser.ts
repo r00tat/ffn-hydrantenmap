@@ -39,6 +39,19 @@ export function channelToEnergy(
 }
 
 /**
+ * Approximate FWHM of a CsI(Tl) scintillator at the given energy.
+ * Poisson-limited statistics give FWHM ∝ √E; 12% @ 662 keV is the
+ * RadiaCode-101 reference point.
+ */
+export function fwhmAt(
+  energyKeV: number,
+  referenceResolution: number = 0.12,
+  referenceEnergy: number = 662,
+): number {
+  return referenceResolution * Math.sqrt(referenceEnergy * energyKeV);
+}
+
+/**
  * Parse RadiaCode-101 XML spectrum file.
  */
 export function parseSpectrumXml(xml: string): SpectrumData {

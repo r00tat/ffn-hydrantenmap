@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   channelToEnergy,
   findPeaks,
+  fwhmAt,
   identifyNuclides,
   parseSpectrumXml,
 } from './spectrumParser';
@@ -155,5 +156,20 @@ describe('identifyNuclides', () => {
         matches[i - 1].confidence
       );
     }
+  });
+});
+
+describe('fwhmAt', () => {
+  it('should return 12% FWHM at 662 keV reference', () => {
+    expect(fwhmAt(662)).toBeCloseTo(79.44, 1);
+  });
+
+  it('should scale with sqrt(E)', () => {
+    expect(fwhmAt(1332)).toBeCloseTo(112.7, 0);
+    expect(fwhmAt(60)).toBeCloseTo(23.9, 0);
+  });
+
+  it('should accept custom reference resolution', () => {
+    expect(fwhmAt(662, 0.09)).toBeCloseTo(59.58, 1);
   });
 });
