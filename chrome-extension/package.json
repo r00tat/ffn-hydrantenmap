@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "build": "tsc --noEmit && wxt build",
-    "build:prod": "tsc --noEmit && EXT_ENV_LOCAL=1 wxt build && node scripts/package.mjs",
-    "test": "vitest run",
+    "build": "wxt prepare && tsc --noEmit && wxt build",
+    "build:prod": "wxt prepare && tsc --noEmit && EXT_ENV_LOCAL=1 wxt build && node scripts/package.mjs",
+    "test": "wxt prepare && vitest run",
+    "postinstall": "wxt prepare",
     "publish:cws": "npm run build:prod && wxt submit --chrome-zip \"$(ls einsatzkarte-*.zip | head -n1)\""
   },
   "dependencies": {
