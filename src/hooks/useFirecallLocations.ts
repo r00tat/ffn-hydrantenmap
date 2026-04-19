@@ -2,11 +2,9 @@
 
 import {
   collection,
-  deleteDoc,
   doc,
-  setDoc,
-  updateDoc,
 } from 'firebase/firestore';
+import { deleteDoc, setDoc, updateDoc } from '../lib/firestoreClient';
 import { useCallback, useMemo } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {

@@ -2,15 +2,13 @@
 
 import { useCallback, useMemo } from 'react';
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   query,
   Query,
-  updateDoc,
 } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc } from '../lib/firestoreClient';
 import { firestore } from '../components/firebase/firebase';
 import {
   CrewAssignment,
