@@ -17,8 +17,8 @@ import {
   arrayUnion,
   doc,
   getDoc,
-  setDoc,
 } from 'firebase/firestore';
+import { setDoc } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';

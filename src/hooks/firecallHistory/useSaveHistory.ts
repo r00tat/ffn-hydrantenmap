@@ -9,13 +9,13 @@ import {
 } from '../../components/firebase/firestore';
 import { firestore } from '../../components/firebase/firebase';
 import {
-  addDoc,
   collection,
   doc,
   getDocs,
   query,
   writeBatch,
 } from 'firebase/firestore';
+import { addDoc, commitBatch } from '../../lib/firestoreClient';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId } from '../useFirecall';
 
@@ -82,7 +82,7 @@ export const useSaveHistory = () => {
             }
           )
         );
-        await batch.commit();
+        await commitBatch(batch);
         console.info(`history ${newHistoryDoc.id} commited.`);
       } catch (err) {
         console.error(`failed to save history: ${err}`, err);

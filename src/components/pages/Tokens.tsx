@@ -19,13 +19,11 @@ import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
-  updateDoc,
   where,
 } from 'firebase/firestore';
+import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
 import moment, { Moment } from 'moment';
 import 'moment/locale/de';
 import { useCallback, useState } from 'react';

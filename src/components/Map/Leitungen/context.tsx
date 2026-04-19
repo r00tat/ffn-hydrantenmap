@@ -1,7 +1,8 @@
-import { addDoc, collection } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import React, { FC, ReactNode, useCallback, useContext, useState } from 'react';
 import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../../hooks/useFirecall';
+import { addDoc } from '../../../lib/firestoreClient';
 import { firestore } from '../../firebase/firebase';
 import {
   Connection,

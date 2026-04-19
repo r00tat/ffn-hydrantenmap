@@ -4,10 +4,10 @@ import {
   doc,
   getDocs,
   query,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { commitBatch, setDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
 import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
@@ -22,6 +22,7 @@ import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
+import { isAuthError } from './auth/ensureFreshAuth';
 
 export default function useFirecallItemUpdate() {
   const firecallId = useFirecallId();
@@ -78,7 +79,7 @@ export default function useFirecallItemUpdate() {
             snapshot.docs.forEach((d) => {
               batch.update(d.ref, { deleted: true, updatedAt: now, updatedBy: email });
             });
-            await batch.commit();
+            await commitBatch(batch);
           }
         }
 
@@ -115,7 +116,7 @@ export default function useFirecallItemUpdate() {
                 }
               }
               if (hasUpdates) {
-                await batch.commit();
+                await commitBatch(batch);
               }
             }
           }
@@ -134,10 +135,23 @@ export default function useFirecallItemUpdate() {
         });
       } catch (err) {
         console.error('Failed to update firecall item:', err);
-        showSnackbar(
-          'Element konnte nicht aktualisiert werden. Bitte Verbindung und Anmeldung prüfen.',
-          'error',
-        );
+        const reloadAction = {
+          label: 'Neu laden',
+          onClick: () => window.location.reload(),
+        };
+        if (isAuthError(err)) {
+          showSnackbar(
+            'Sitzung abgelaufen. Änderung wurde nicht gespeichert. Bitte Seite neu laden und erneut anmelden.',
+            'error',
+            reloadAction,
+          );
+        } else {
+          showSnackbar(
+            'Element konnte nicht aktualisiert werden. Bitte Verbindung prüfen und erneut versuchen.',
+            'error',
+            reloadAction,
+          );
+        }
         throw err;
       }
     },

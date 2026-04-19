@@ -1,7 +1,8 @@
 'use client';
 
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
+import { setDoc } from '../lib/firestoreClient';
 import { firestore } from '../components/firebase/firebase';
 import {
   DEFAULT_EMAIL_CONFIG,

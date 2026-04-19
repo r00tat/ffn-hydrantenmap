@@ -1,14 +1,13 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
   orderBy,
   query,
-  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
+import { addDoc, commitBatch, updateDoc } from '../lib/firestoreClient';
 import { getBlob, getMetadata, getStorage, ref } from 'firebase/storage';
 import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
@@ -272,7 +271,14 @@ export const blobFromBase64String = (
   return new Blob([byteArray], { type: mimeType });
 };
 
-/** Firestore writeBatch has a 500 operation limit. This helper commits in chunks. */
+/**
+ * Firestore writeBatch has a 500 operation limit. This helper commits in chunks.
+ *
+ * Each chunk's commit is routed through `commitBatch` (→ `withFreshAuth`).
+ * If a commit fails with an auth error, the central `withFreshAuth` wrapper
+ * will refresh and retry only the failing chunk — previously committed chunks
+ * remain in place.
+ */
 async function commitInBatches(
   operations: Array<{
     ref: ReturnType<typeof doc>;
@@ -286,7 +292,7 @@ async function commitInBatches(
     chunk.forEach(({ ref: docRef, data }) => {
       batch.set(docRef, data);
     });
-    await batch.commit();
+    await commitBatch(batch);
   }
 }
 

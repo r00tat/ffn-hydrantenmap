@@ -26,9 +26,6 @@ vi.mock('firebase/firestore', () => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
     id: args[args.length - 1] || 'mock-id',
   })),
-  addDoc: vi.fn(() =>
-    Promise.resolve({ id: 'new-firecall-id', path: 'call/new-firecall-id' })
-  ),
   getDoc: vi.fn(() =>
     Promise.resolve({
       data: () => ({ name: 'Test Einsatz', date: '2026-01-01' }),
@@ -44,7 +41,14 @@ vi.mock('firebase/firestore', () => ({
     set: mockBatchSet,
     commit: mockBatchCommit.mockResolvedValue(undefined),
   })),
+}));
+
+vi.mock('../lib/firestoreClient', () => ({
+  addDoc: vi.fn(() =>
+    Promise.resolve({ id: 'new-firecall-id', path: 'call/new-firecall-id' })
+  ),
   updateDoc: vi.fn(() => Promise.resolve()),
+  commitBatch: vi.fn((batch: { commit: () => Promise<void> }) => batch.commit()),
 }));
 
 import {
@@ -56,7 +60,8 @@ import {
   exportFirecall,
   importFirecall,
 } from './useExport';
-import { writeBatch, getDocs, addDoc } from 'firebase/firestore';
+import { writeBatch, getDocs } from 'firebase/firestore';
+import { addDoc } from '../lib/firestoreClient';
 
 describe('useExport', () => {
   beforeEach(() => {

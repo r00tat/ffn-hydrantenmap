@@ -15,14 +15,17 @@ vi.mock('firebase/firestore', () => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
     id: args[args.length - 1] || 'mock-id',
   })),
-  addDoc: vi.fn(() => Promise.resolve({ id: 'new-doc-id' })),
-  updateDoc: vi.fn(() => Promise.resolve()),
-  deleteDoc: vi.fn(() => Promise.resolve()),
   getDocs: vi.fn(() => Promise.resolve(mockGetDocsResult)),
   collection: vi.fn((...args: unknown[]) => ({
     path: args.filter((a) => typeof a === 'string').join('/'),
   })),
   query: vi.fn((col: unknown) => col),
+}));
+
+vi.mock('../lib/firestoreClient', () => ({
+  addDoc: vi.fn(() => Promise.resolve({ id: 'new-doc-id' })),
+  updateDoc: vi.fn(() => Promise.resolve()),
+  deleteDoc: vi.fn(() => Promise.resolve()),
 }));
 
 // Mock the hooks that useCrewAssignments depends on
@@ -46,7 +49,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-} from 'firebase/firestore';
+} from '../lib/firestoreClient';
 
 const mockAddDoc = addDoc as unknown as ReturnType<typeof vi.fn>;
 const mockUpdateDoc = updateDoc as unknown as ReturnType<typeof vi.fn>;

@@ -1,4 +1,5 @@
-import { doc, setDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
+import { setDoc } from '../../../lib/firestoreClient';
 import L, { LeafletEventHandlerFnMap } from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';

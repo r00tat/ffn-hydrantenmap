@@ -23,6 +23,25 @@ const eslintConfig = defineConfig([
     // Chrome extension build artifact — bundled minified JS should not be linted.
     'chrome-extension/dist/**',
   ]),
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/lib/firestoreClient.ts', 'src/lib/firestoreClient.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'firebase/firestore',
+              importNames: ['setDoc', 'updateDoc', 'addDoc', 'deleteDoc'],
+              message:
+                "Import these from the central firestore client at '@/lib/firestoreClient' (relative path) instead of 'firebase/firestore' directly. This ensures automatic auth-retry after standby. For batched writes, use 'commitBatch(batch)' from the same module.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
