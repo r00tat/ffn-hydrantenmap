@@ -203,6 +203,75 @@ export function parseSpectrogramRcspg(text: string): SpectrumData {
 }
 
 /**
+ * Parse a RadiaCode iOS spectrogram `.rcspg` JSON export.
+ *
+ * Format (distinct from the Android tab/hex rcspg and from NPES-JSON):
+ *  - title: sample name
+ *  - channelCount: fixed channel count (typically 1024)
+ *  - startTimeTimestamp: ms since epoch
+ *  - deviceId: device serial
+ *  - coefficients: [c0, c1, c2] as strings
+ *  - spectrums: array of per-second slices `{collectTime, timestamp, pulses}`.
+ *    The cumulative spectrum is the per-channel sum of `pulses` across slices.
+ *    Each `pulses` array may be shorter than channelCount (trailing zeros
+ *    are omitted).
+ */
+export function parseSpectrogramIosRcspg(text: string): SpectrumData {
+  const doc = JSON.parse(text);
+  if (
+    !Array.isArray(doc?.spectrums) ||
+    typeof doc?.channelCount !== 'number'
+  ) {
+    throw new Error('iOS rcspg: missing "spectrums" array or "channelCount"');
+  }
+
+  const channelCount: number = doc.channelCount;
+  const sampleName: string = doc.title ?? '';
+  const deviceName: string = doc.deviceId ?? '';
+
+  const rawCoeffs: unknown[] = Array.isArray(doc.coefficients)
+    ? doc.coefficients
+    : [0, 1, 0];
+  const coefficients = rawCoeffs.slice(0, 3).map((c) => Number(c));
+  while (coefficients.length < 3) coefficients.push(0);
+
+  const counts = new Array<number>(channelCount).fill(0);
+  let totalCollectTime = 0;
+  for (const slice of doc.spectrums) {
+    totalCollectTime += Number(slice?.collectTime ?? 0);
+    const pulses = Array.isArray(slice?.pulses) ? slice.pulses : [];
+    const n = Math.min(pulses.length, channelCount);
+    for (let i = 0; i < n; i++) {
+      counts[i] += Number(pulses[i]) || 0;
+    }
+  }
+
+  const startMs = Number(doc.startTimeTimestamp);
+  const startTime = Number.isFinite(startMs)
+    ? new Date(startMs).toISOString().replace(/\.\d{3}Z$/, '')
+    : '';
+  const endTime = Number.isFinite(startMs)
+    ? new Date(startMs + totalCollectTime * 1000)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, '')
+    : '';
+
+  const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+
+  return {
+    sampleName,
+    deviceName,
+    measurementTime: totalCollectTime,
+    liveTime: totalCollectTime,
+    startTime,
+    endTime,
+    coefficients,
+    counts,
+    energies,
+  };
+}
+
+/**
  * Parse a RadiaCode iOS spectrum export in NPES-JSON v2 format.
  * Schema: https://github.com/OpenGammaProject/NPES-JSON
  */
@@ -382,6 +451,10 @@ export function parseSpectrumFile(
     return parseSpectrogramRcspg(text);
   }
   if (head.startsWith('{')) {
+    const doc = JSON.parse(text);
+    if (Array.isArray(doc?.spectrums) && typeof doc?.channelCount === 'number') {
+      return parseSpectrogramIosRcspg(text);
+    }
     return parseSpectrumNpesJson(text);
   }
   if (/^\s*\d+\s*,\s*\d+/m.test(head)) {
