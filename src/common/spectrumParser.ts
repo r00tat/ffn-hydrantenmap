@@ -122,7 +122,14 @@ export function parseSpectrumXml(xml: string): SpectrumData {
 export interface FindPeaksOptions {
   windowSize?: number;
   significance?: number;
-  /** Minimum energy in keV to consider for peaks (filters low-energy noise). Default: 40 */
+  /**
+   * Minimum energy in keV to consider for peaks (filters low-energy noise).
+   * Default: 40 keV — keeps Am-241 (59.5 keV) and Ba-133 (81 keV) in range.
+   * Electronic noise dominates below ~30 keV on CsI(Tl); callers analysing
+   * spectra with I-125 (35.5 keV) or other sub-40-keV emitters must lower
+   * this via options, and callers looking at clean mid-/high-energy sources
+   * can raise it to cut low-energy noise.
+   */
   minEnergy?: number;
 }
 
