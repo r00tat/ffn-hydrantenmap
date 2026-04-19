@@ -31,13 +31,14 @@ export function fwhmAt(
 ```
 
 Prüfwerte:
+
 | E (keV) | FWHM (keV) | Resolution |
-|---|---|---|
-| 60  | 23.9 | 40% |
-| 356 | 58.2 | 16% |
-| 662 | 79.4 | 12% |
-| 1173 | 105.7 | 9% |
-| 1332 | 112.7 | 8% |
+| ------- | ---------- | ---------- |
+| 60      | 23.9       | 40%        |
+| 356     | 58.2       | 16%        |
+| 662     | 79.4       | 12%        |
+| 1173    | 105.7      | 9%         |
+| 1332    | 112.7      | 8%         |
 
 Die 40% @ 60 keV überschätzen die reale Auflösung (elektronisches Rauschen dominiert dort), sind aber für die Matching-Toleranz unschädlich — wichtig ist, dass die Toleranz nicht unter die echte Peakbreite fällt.
 
@@ -52,12 +53,12 @@ function toleranceFor(energyKeV: number): number {
 Min 5 keV, sonst `HWHM`. Ergibt:
 
 | E (keV) | Toleranz (keV) |
-|---|---|
-| 60 | 12.0 |
-| 356 | 29.1 |
-| 662 | 39.7 |
-| 1173 | 52.8 |
-| 1332 | 56.3 |
+| ------- | -------------- |
+| 60      | 12.0           |
+| 356     | 29.1           |
+| 662     | 39.7           |
+| 1173    | 52.8           |
+| 1332    | 56.3           |
 
 Der Parameter `toleranceKeV` der `identifyNuclides(peaks, toleranceKeV?)`-API wird zur **Override-Option**. Default = energie­abhängig.
 
@@ -68,7 +69,7 @@ Die `peaks`-Property wird auf strukturierte Einträge umgestellt:
 ```ts
 // src/common/strahlenschutz.ts
 export interface NuclidePeak {
-  energy: number;   // keV
+  energy: number; // keV
   intensity: number; // 0..1 (fraction of photons per decay)
 }
 
@@ -82,28 +83,29 @@ export interface Nuclide {
 
 Werte aus NNDC NuDat 3 / IAEA LiveChart (gerundet auf 3 signifikante Stellen):
 
-| Nuklid | Peaks (keV @ intensität) |
-|---|---|
-| Am-241 | 59.5 @ 0.359 |
-| Au-198 | 411.8 @ 0.956 |
-| Ba-133 | 81 @ 0.329, 276.4 @ 0.072, 302.9 @ 0.183, 356 @ 0.621, 383.8 @ 0.089 |
-| Co-57 | 122.1 @ 0.856, 136.5 @ 0.107 |
-| Co-60 | 1173.2 @ 0.999, 1332.5 @ 1.000 |
-| Cr-51 | 320.1 @ 0.099 |
-| Cs-137 | 661.7 @ 0.851 |
+| Nuklid | Peaks (keV @ intensität)                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------------- |
+| Am-241 | 59.5 @ 0.359                                                                                            |
+| Au-198 | 411.8 @ 0.956                                                                                           |
+| Ba-133 | 81 @ 0.329, 276.4 @ 0.072, 302.9 @ 0.183, 356 @ 0.621, 383.8 @ 0.089                                    |
+| Co-57  | 122.1 @ 0.856, 136.5 @ 0.107                                                                            |
+| Co-60  | 1173.2 @ 0.999, 1332.5 @ 1.000                                                                          |
+| Cr-51  | 320.1 @ 0.099                                                                                           |
+| Cs-137 | 661.7 @ 0.851                                                                                           |
 | Eu-152 | 121.8 @ 0.285, 244.7 @ 0.075, 344.3 @ 0.265, 778.9 @ 0.129, 964.1 @ 0.146, 1112.1 @ 0.136, 1408 @ 0.210 |
-| I-125 | 35.5 @ 0.067 |
-| I-131 | 364.5 @ 0.815 |
-| Ir-192 | 295.9 @ 0.287, 308.5 @ 0.297, 316.5 @ 0.828, 468.1 @ 0.478 |
-| Mn-54 | 834.8 @ 1.000 |
-| Mo-99 | 140.5 @ 0.894, 739.5 @ 0.121 |
-| Na-22 | 511 @ 1.807, 1274.5 @ 0.999 |
-| Ra-226 | 186.2 @ 0.036 |
-| Se-75 | 136 @ 0.585, 264.7 @ 0.589, 279.5 @ 0.250, 400.7 @ 0.114 |
-| Tc-99m | 140.5 @ 0.890 |
-| Zn-65 | 1115.5 @ 0.506 |
+| I-125  | 35.5 @ 0.067                                                                                            |
+| I-131  | 364.5 @ 0.815                                                                                           |
+| Ir-192 | 295.9 @ 0.287, 308.5 @ 0.297, 316.5 @ 0.828, 468.1 @ 0.478                                              |
+| Mn-54  | 834.8 @ 1.000                                                                                           |
+| Mo-99  | 140.5 @ 0.894, 739.5 @ 0.121                                                                            |
+| Na-22  | 511 @ 1.807, 1274.5 @ 0.999                                                                             |
+| Ra-226 | 186.2 @ 0.036                                                                                           |
+| Se-75  | 136 @ 0.585, 264.7 @ 0.589, 279.5 @ 0.250, 400.7 @ 0.114                                                |
+| Tc-99m | 140.5 @ 0.890                                                                                           |
+| Zn-65  | 1115.5 @ 0.506                                                                                          |
 
 Downstream-Anpassungen:
+
 - [buildNuclidePeakLines.ts:27](../../src/common/nuclidePeakLines.ts#L27): `for (const energy of ...)` → `for (const { energy } of ...)`
 - [EnergySpectrum.tsx:450](../../src/components/pages/EnergySpectrum.tsx#L450): `n.peaks!.join(', ')` → `n.peaks!.map(p => p.energy).join(', ')`
 
@@ -123,6 +125,7 @@ confidence = 0.40·intensityMatched + 0.45·avgStrength + 0.15·avgAccuracy
 ```
 
 Wirkung:
+
 - Cs-137 mit nur dem 662-keV-Peak: `intensityMatched = 1.0` (war `fractionMatched = 1.0` — gleich)
 - Co-60 mit nur einem gefundenen Peak: `intensityMatched = 0.5` (beide Peaks nahezu 100%), war `fractionMatched = 0.5` — gleich
 - Ba-133 mit nur dem dominanten 356-keV-Peak: `intensityMatched = 0.621 / 1.294 = 0.48` (statt `1/5 = 0.2`) → höhere Confidence, korrekt, weil der dominante Peak das stärkste Erkennungsmerkmal ist
@@ -169,8 +172,8 @@ Für jede Änderung TDD:
 
 ## Referenzen
 
-- Mariscotti (1967): *A method for automatic identification of peaks in the presence of background*, NIM 50, 309-320.
-- Currie (1968): *Limits for qualitative detection and quantitative determination*, Anal. Chem. 40, 586-593.
-- Ryan et al. (1988): *SNIP, a statistics-sensitive background treatment for the quantitative analysis of PIXE spectra*, NIM B 34, 396-402.
+- Mariscotti (1967): _A method for automatic identification of peaks in the presence of background_, NIM 50, 309-320.
+- Currie (1968): _Limits for qualitative detection and quantitative determination_, Anal. Chem. 40, 586-593.
+- Ryan et al. (1988): _SNIP, a statistics-sensitive background treatment for the quantitative analysis of PIXE spectra_, NIM B 34, 396-402.
 - RadiaCode-101 User Manual: 12%±1% FWHM @ 662 keV.
 - NNDC NuDat 3: <https://www.nndc.bnl.gov/nudat3/>

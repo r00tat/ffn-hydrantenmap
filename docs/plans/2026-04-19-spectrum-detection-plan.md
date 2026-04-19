@@ -27,6 +27,7 @@ Commit-Konvention: `feat(spektrogramm): <kurz>` oder `refactor(spektrogramm): <k
 ### Task 1: FWHM-Modell hinzufügen
 
 **Files:**
+
 - Modify: `src/common/spectrumParser.ts`
 - Test: `src/common/spectrumParser.test.ts`
 
@@ -100,6 +101,7 @@ git commit -m "feat(spektrogramm): FWHM-Modell für CsI(Tl)"
 ### Task 2: `Nuclide.peaks` auf `NuclidePeak[]` umstellen
 
 **Files:**
+
 - Modify: `src/common/strahlenschutz.ts` (interface + data)
 - Modify: `src/common/nuclidePeakLines.ts`
 - Modify: `src/common/spectrumParser.ts` (identifyNuclides)
@@ -152,7 +154,7 @@ Expected: FAIL — Struktur ist noch `number[]`.
 
 ```ts
 export interface NuclidePeak {
-  energy: number;   // keV
+  energy: number; // keV
   intensity: number; // 0..1 (photons per decay)
 }
 
@@ -168,71 +170,164 @@ Daten (Werte aus dem Design-Doc, exakt übernehmen):
 
 ```ts
 export const NUCLIDES: Nuclide[] = [
-  { name: 'Am-241', gamma: 3.1, peaks: [{ energy: 59.5, intensity: 0.359 }], url: `${RC}/am-241` },
-  { name: 'Au-198', gamma: 62,  peaks: [{ energy: 411.8, intensity: 0.956 }], url: `${RC}/au-198` },
-  { name: 'Ba-133', gamma: 52,  peaks: [
-    { energy: 81,    intensity: 0.329 },
-    { energy: 276.4, intensity: 0.072 },
-    { energy: 302.9, intensity: 0.183 },
-    { energy: 356,   intensity: 0.621 },
-    { energy: 383.8, intensity: 0.089 },
-  ], url: `${RC}/ba-133` },
-  { name: 'Co-57',  gamma: 16,  peaks: [
-    { energy: 122.1, intensity: 0.856 },
-    { energy: 136.5, intensity: 0.107 },
-  ], url: `${RC}/co-57` },
-  { name: 'Co-60',  gamma: 351, peaks: [
-    { energy: 1173.2, intensity: 0.999 },
-    { energy: 1332.5, intensity: 1.000 },
-  ], url: `${RC}/co-60` },
-  { name: 'Cr-51',  gamma: 5,   peaks: [{ energy: 320.1, intensity: 0.099 }], url: `${RC}/cr-51` },
-  { name: 'Cs-137', gamma: 92,  peaks: [{ energy: 661.7, intensity: 0.851 }], url: `${RC}/cs-137` },
-  { name: 'Eu-152', gamma: 168, peaks: [
-    { energy: 121.8,  intensity: 0.285 },
-    { energy: 244.7,  intensity: 0.075 },
-    { energy: 344.3,  intensity: 0.265 },
-    { energy: 778.9,  intensity: 0.129 },
-    { energy: 964.1,  intensity: 0.146 },
-    { energy: 1112.1, intensity: 0.136 },
-    { energy: 1408,   intensity: 0.210 },
-  ], url: `${RC}/eu-152` },
-  { name: 'I-125',  gamma: 17,  peaks: [{ energy: 35.5, intensity: 0.067 }], url: `${RC}/i-125` },
-  { name: 'I-131',  gamma: 66,  peaks: [{ energy: 364.5, intensity: 0.815 }], url: `${RC}/i-131` },
-  { name: 'Ir-192', gamma: 130, peaks: [
-    { energy: 295.9, intensity: 0.287 },
-    { energy: 308.5, intensity: 0.297 },
-    { energy: 316.5, intensity: 0.828 },
-    { energy: 468.1, intensity: 0.478 },
-  ], url: `${RC}/ir-192` },
-  { name: 'Mn-54',  gamma: 122, peaks: [{ energy: 834.8, intensity: 1.000 }], url: `${RC}/mn-54` },
-  { name: 'Mo-99',  gamma: 26,  peaks: [
-    { energy: 140.5, intensity: 0.894 },
-    { energy: 739.5, intensity: 0.121 },
-  ], url: `${RC}/mo-99` },
-  { name: 'Na-22',  gamma: 327, peaks: [
-    { energy: 511,    intensity: 1.807 },
-    { energy: 1274.5, intensity: 0.999 },
-  ], url: `${RC}/na-22` },
-  { name: 'Ra-226', gamma: 195, peaks: [{ energy: 186.2, intensity: 0.036 }], url: `${RC}/ra-226` },
-  { name: 'Se-75',  gamma: 56,  peaks: [
-    { energy: 136,   intensity: 0.585 },
-    { energy: 264.7, intensity: 0.589 },
-    { energy: 279.5, intensity: 0.250 },
-    { energy: 400.7, intensity: 0.114 },
-  ], url: `${RC}/se-75` },
-  { name: 'Sr-90',  gamma: 6, url: `${RC}/sr-90` },
-  { name: 'Tc-99m', gamma: 17,  peaks: [{ energy: 140.5, intensity: 0.890 }], url: `${RC}/tc-99m` },
-  { name: 'Zn-65',  gamma: 82,  peaks: [{ energy: 1115.5, intensity: 0.506 }], url: `${RC}/zn-65` },
+  {
+    name: 'Am-241',
+    gamma: 3.1,
+    peaks: [{ energy: 59.5, intensity: 0.359 }],
+    url: `${RC}/am-241`,
+  },
+  {
+    name: 'Au-198',
+    gamma: 62,
+    peaks: [{ energy: 411.8, intensity: 0.956 }],
+    url: `${RC}/au-198`,
+  },
+  {
+    name: 'Ba-133',
+    gamma: 52,
+    peaks: [
+      { energy: 81, intensity: 0.329 },
+      { energy: 276.4, intensity: 0.072 },
+      { energy: 302.9, intensity: 0.183 },
+      { energy: 356, intensity: 0.621 },
+      { energy: 383.8, intensity: 0.089 },
+    ],
+    url: `${RC}/ba-133`,
+  },
+  {
+    name: 'Co-57',
+    gamma: 16,
+    peaks: [
+      { energy: 122.1, intensity: 0.856 },
+      { energy: 136.5, intensity: 0.107 },
+    ],
+    url: `${RC}/co-57`,
+  },
+  {
+    name: 'Co-60',
+    gamma: 351,
+    peaks: [
+      { energy: 1173.2, intensity: 0.999 },
+      { energy: 1332.5, intensity: 1.0 },
+    ],
+    url: `${RC}/co-60`,
+  },
+  {
+    name: 'Cr-51',
+    gamma: 5,
+    peaks: [{ energy: 320.1, intensity: 0.099 }],
+    url: `${RC}/cr-51`,
+  },
+  {
+    name: 'Cs-137',
+    gamma: 92,
+    peaks: [{ energy: 661.7, intensity: 0.851 }],
+    url: `${RC}/cs-137`,
+  },
+  {
+    name: 'Eu-152',
+    gamma: 168,
+    peaks: [
+      { energy: 121.8, intensity: 0.285 },
+      { energy: 244.7, intensity: 0.075 },
+      { energy: 344.3, intensity: 0.265 },
+      { energy: 778.9, intensity: 0.129 },
+      { energy: 964.1, intensity: 0.146 },
+      { energy: 1112.1, intensity: 0.136 },
+      { energy: 1408, intensity: 0.21 },
+    ],
+    url: `${RC}/eu-152`,
+  },
+  {
+    name: 'I-125',
+    gamma: 17,
+    peaks: [{ energy: 35.5, intensity: 0.067 }],
+    url: `${RC}/i-125`,
+  },
+  {
+    name: 'I-131',
+    gamma: 66,
+    peaks: [{ energy: 364.5, intensity: 0.815 }],
+    url: `${RC}/i-131`,
+  },
+  {
+    name: 'Ir-192',
+    gamma: 130,
+    peaks: [
+      { energy: 295.9, intensity: 0.287 },
+      { energy: 308.5, intensity: 0.297 },
+      { energy: 316.5, intensity: 0.828 },
+      { energy: 468.1, intensity: 0.478 },
+    ],
+    url: `${RC}/ir-192`,
+  },
+  {
+    name: 'Mn-54',
+    gamma: 122,
+    peaks: [{ energy: 834.8, intensity: 1.0 }],
+    url: `${RC}/mn-54`,
+  },
+  {
+    name: 'Mo-99',
+    gamma: 26,
+    peaks: [
+      { energy: 140.5, intensity: 0.894 },
+      { energy: 739.5, intensity: 0.121 },
+    ],
+    url: `${RC}/mo-99`,
+  },
+  {
+    name: 'Na-22',
+    gamma: 327,
+    peaks: [
+      { energy: 511, intensity: 1.807 },
+      { energy: 1274.5, intensity: 0.999 },
+    ],
+    url: `${RC}/na-22`,
+  },
+  {
+    name: 'Ra-226',
+    gamma: 195,
+    peaks: [{ energy: 186.2, intensity: 0.036 }],
+    url: `${RC}/ra-226`,
+  },
+  {
+    name: 'Se-75',
+    gamma: 56,
+    peaks: [
+      { energy: 136, intensity: 0.585 },
+      { energy: 264.7, intensity: 0.589 },
+      { energy: 279.5, intensity: 0.25 },
+      { energy: 400.7, intensity: 0.114 },
+    ],
+    url: `${RC}/se-75`,
+  },
+  { name: 'Sr-90', gamma: 6, url: `${RC}/sr-90` },
+  {
+    name: 'Tc-99m',
+    gamma: 17,
+    peaks: [{ energy: 140.5, intensity: 0.89 }],
+    url: `${RC}/tc-99m`,
+  },
+  {
+    name: 'Zn-65',
+    gamma: 82,
+    peaks: [{ energy: 1115.5, intensity: 0.506 }],
+    url: `${RC}/zn-65`,
+  },
 ];
 ```
 
 **Step 4: Update all usages**
 
 `src/common/nuclidePeakLines.ts:27` — ersetze
+
 ```ts
 for (const energy of nuclide.peaks) {
 ```
+
 mit
+
 ```ts
 for (const { energy } of nuclide.peaks) {
 ```
@@ -240,10 +335,13 @@ for (const { energy } of nuclide.peaks) {
 `src/common/spectrumParser.ts` `identifyNuclides`: Statt `for (const expectedEnergy of nuclide.peaks)` jetzt `for (const { energy: expectedEnergy } of nuclide.peaks)`. (Intensity wird in Task 4 genutzt.)
 
 `src/components/pages/EnergySpectrum.tsx:450` — ersetze
+
 ```tsx
 {n.name}: {n.peaks!.join(', ')} keV
 ```
+
 mit
+
 ```tsx
 {n.name}: {n.peaks!.map((p) => p.energy).join(', ')} keV
 ```
@@ -268,6 +366,7 @@ git commit -m "refactor(strahlenschutz): Nuclide-Peaks mit Branching Ratios"
 ### Task 3: Energie-abhängige Match-Toleranz
 
 **Files:**
+
 - Modify: `src/common/spectrumParser.ts`
 - Test: `src/common/spectrumParser.test.ts`
 
@@ -356,9 +455,12 @@ const avgAccuracy =
   1 -
   matchedPeaks.reduce(
     (sum, mp) =>
-      sum + Math.abs(mp.found.energy - mp.expected) / (toleranceKeV ?? toleranceFor(mp.expected)),
+      sum +
+      Math.abs(mp.found.energy - mp.expected) /
+        (toleranceKeV ?? toleranceFor(mp.expected)),
     0,
-  ) / matchedPeaks.length;
+  ) /
+    matchedPeaks.length;
 ```
 
 **Step 4: Run — expect pass**
@@ -381,6 +483,7 @@ git commit -m "feat(spektrogramm): energie-abhängige Match-Toleranz (HWHM)"
 ### Task 4: Branching-Ratio-gewichtetes Confidence-Scoring
 
 **Files:**
+
 - Modify: `src/common/spectrumParser.ts`
 - Test: `src/common/spectrumParser.test.ts`
 
@@ -389,9 +492,7 @@ git commit -m "feat(spektrogramm): energie-abhängige Match-Toleranz (HWHM)"
 ```ts
 describe('identifyNuclides with intensity weighting', () => {
   it('should give Ba-133 high confidence for dominant 356 keV match only', () => {
-    const peaks: Peak[] = [
-      { channel: 150, energy: 356, counts: 1000 },
-    ];
+    const peaks: Peak[] = [{ channel: 150, energy: 356, counts: 1000 }];
     const matches = identifyNuclides(peaks);
     const ba133 = matches.find((m) => m.nuclide.name === 'Ba-133');
     expect(ba133).toBeDefined();
@@ -401,9 +502,7 @@ describe('identifyNuclides with intensity weighting', () => {
   });
 
   it('should give Co-60 partial confidence for one-of-two peaks', () => {
-    const peaks: Peak[] = [
-      { channel: 500, energy: 1332.5, counts: 1000 },
-    ];
+    const peaks: Peak[] = [{ channel: 500, energy: 1332.5, counts: 1000 }];
     const matches = identifyNuclides(peaks);
     const co60 = matches.find((m) => m.nuclide.name === 'Co-60');
     expect(co60).toBeDefined();
@@ -432,7 +531,8 @@ const matchedIntensity = matchedPeaks.reduce((s, mp) => {
   const np = nuclide.peaks!.find((p) => p.energy === mp.expected);
   return s + (np?.intensity ?? 0);
 }, 0);
-const intensityMatched = totalIntensity > 0 ? matchedIntensity / totalIntensity : 0;
+const intensityMatched =
+  totalIntensity > 0 ? matchedIntensity / totalIntensity : 0;
 
 const avgStrength =
   matchedPeaks.reduce((sum, mp) => sum + mp.found.counts, 0) /
@@ -442,7 +542,7 @@ const avgStrength =
 // avgAccuracy wie in Task 3
 
 const confidence =
-  0.40 * intensityMatched + 0.45 * avgStrength + 0.15 * avgAccuracy;
+  0.4 * intensityMatched + 0.45 * avgStrength + 0.15 * avgAccuracy;
 ```
 
 **Step 4: Run — expect pass**
@@ -465,6 +565,7 @@ git commit -m "feat(spektrogramm): Branching Ratio gewichtet Confidence-Score"
 ### Task 5: Poisson-korrekte Signifikanz in `findPeaks`
 
 **Files:**
+
 - Modify: `src/common/spectrumParser.ts`
 - Test: `src/common/spectrumParser.test.ts`
 
@@ -475,8 +576,8 @@ Konstruiertes Spektrum mit bekanntem Background-Mean:
 ```ts
 describe('findPeaks Poisson significance', () => {
   it('should reject a peak at background+2·√B', () => {
-    const counts = new Array(200).fill(100);       // mean = 100, sqrt(B) = 10
-    counts[100] = 120;                             // 2σ — unter 3σ-Schwelle
+    const counts = new Array(200).fill(100); // mean = 100, sqrt(B) = 10
+    counts[100] = 120; // 2σ — unter 3σ-Schwelle
     const energies = counts.map((_, i) => i * 3);
     const peaks = findPeaks(counts, energies, { minEnergy: 0 });
     expect(peaks.find((p) => p.channel === 100)).toBeUndefined();
@@ -484,7 +585,7 @@ describe('findPeaks Poisson significance', () => {
 
   it('should accept a peak at background+5·√B', () => {
     const counts = new Array(200).fill(100);
-    counts[100] = 150;                             // 5σ
+    counts[100] = 150; // 5σ
     const energies = counts.map((_, i) => i * 3);
     const peaks = findPeaks(counts, energies, { minEnergy: 0 });
     expect(peaks.find((p) => p.channel === 100)).toBeDefined();
