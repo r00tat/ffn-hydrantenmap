@@ -3,3 +3,6 @@
 *.zip
 .env*.local
 .env.production
+.wxt/
+.output/
+dist/
