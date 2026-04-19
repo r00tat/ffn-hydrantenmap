@@ -4,6 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   outDir: 'dist',
+  outDirTemplate: '',
   srcDir: '.',
   entrypointsDir: 'entrypoints',
   manifestVersion: 3,
