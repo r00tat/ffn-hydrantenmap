@@ -14,7 +14,8 @@ import TextField from '@mui/material/TextField';
 import { formatTimestamp } from '../../common/time-format';
 import AutoSnapshotIntervalSelect from '../inputs/AutoSnapshotIntervalSelect';
 import useFirecall from '../../hooks/useFirecall';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
+import { setDoc } from '../../lib/firestoreClient';
 import { firestore } from '../firebase/firebase';
 
 interface HistoryDialogOptions {

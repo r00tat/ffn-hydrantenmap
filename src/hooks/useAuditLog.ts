@@ -1,6 +1,7 @@
 'use client';
 
-import { addDoc, collection, orderBy } from 'firebase/firestore';
+import { collection, orderBy } from 'firebase/firestore';
+import { addDoc } from '../lib/firestoreClient';
 import { useCallback, useMemo } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import {
