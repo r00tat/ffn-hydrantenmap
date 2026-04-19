@@ -9,7 +9,8 @@ export type PositionInfo = [
   GeoPositionObject,
   boolean,
   GeolocationPosition | undefined,
-  () => void
+  () => void,
+  boolean
 ];
 
 const reloadAction = {
@@ -21,6 +22,7 @@ export default function usePosition(): PositionInfo {
   const [position, setPosition] = useState<GeoPositionObject>(defaultPosition);
   const [isSet, setIsSet] = useState(false);
   const [location, setLocation] = useState<GeolocationPosition>();
+  const [isPending, setIsPending] = useState(false);
   const watchIdRef = useRef<number | undefined>(undefined);
   const enabledRef = useRef(false);
   const lastErrorCodeRef = useRef<number | undefined>(undefined);
@@ -31,6 +33,7 @@ export default function usePosition(): PositionInfo {
       return;
     }
     if (!navigator.geolocation) {
+      setIsPending(false);
       showSnackbar(
         'Standortbestimmung wird von diesem Browser nicht unterstützt.',
         'error'
@@ -46,10 +49,12 @@ export default function usePosition(): PositionInfo {
         });
         setLocation(geolocation);
         setIsSet(true);
+        setIsPending(false);
         lastErrorCodeRef.current = undefined;
       },
       (error) => {
         console.warn('geolocation error', error);
+        setIsPending(false);
         if (lastErrorCodeRef.current === error.code) {
           return;
         }
@@ -93,6 +98,7 @@ export default function usePosition(): PositionInfo {
   const enableTracking = useCallback(() => {
     if (!enabledRef.current) {
       enabledRef.current = true;
+      setIsPending(true);
       startWatching();
     }
   }, [startWatching]);
@@ -106,5 +112,5 @@ export default function usePosition(): PositionInfo {
     };
   }, []);
 
-  return [position, isSet, location, enableTracking];
+  return [position, isSet, location, enableTracking, isPending];
 }
