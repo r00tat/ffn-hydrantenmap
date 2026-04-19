@@ -1,17 +1,20 @@
 'use client';
 
 import {
-  addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   query,
-  setDoc,
   where,
   writeBatch,
 } from 'firebase/firestore';
 import { useCallback } from 'react';
+import {
+  addDoc,
+  commitBatch,
+  deleteDoc,
+  setDoc,
+} from '../lib/firestoreClient';
 import { firestore } from '../components/firebase/firebase';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 import {
@@ -374,7 +377,7 @@ export function useKostenersatzVersionSetActive() {
 
     console.info(`Setting kostenersatz version ${versionId} as active`);
 
-    await batch.commit();
+    await commitBatch(batch);
   }, []);
 }
 
@@ -462,7 +465,7 @@ export function useKostenersatzSeedDefaultRates() {
         `Seeding ${rates.length} default rates for version ${version.id}, deleted ${deletedCount} obsolete rates`
       );
 
-      await batch.commit();
+      await commitBatch(batch);
     },
     [email]
   );
@@ -516,7 +519,7 @@ export function useKostenersatzSeedDefaultVehicles() {
 
     console.info(`Seeding ${defaultVehicles.length} default vehicles`);
 
-    await batch.commit();
+    await commitBatch(batch);
   }, []);
 }
 
@@ -537,6 +540,6 @@ export function useKostenersatzVehicleReorder() {
 
     console.info(`Reordering ${vehicles.length} vehicles`);
 
-    await batch.commit();
+    await commitBatch(batch);
   }, []);
 }
