@@ -20,6 +20,10 @@ const CS137_XML = readFileSync(
   resolve(__dirname, '../../examples/Cs-137.xml'),
   'utf-8'
 );
+const CO60_XML = readFileSync(
+  resolve(__dirname, '../../examples/Co-60.xml'),
+  'utf-8',
+);
 
 describe('channelToEnergy', () => {
   it('should evaluate polynomial calibration E(ch) = c0 + c1*ch + c2*ch²', () => {
@@ -251,5 +255,28 @@ describe('identifyNuclides with intensity weighting', () => {
     expect(co60).toBeDefined();
     expect(co60!.confidence).toBeGreaterThan(0.4);
     expect(co60!.confidence).toBeLessThan(0.85);
+  });
+});
+
+describe('identifyNuclides with example spectra', () => {
+  it('ranks Am-241 as top match for Am-241.xml', () => {
+    const data = parseSpectrumXml(AM241_XML);
+    const peaks = findPeaks(data.counts, data.energies);
+    const matches = identifyNuclides(peaks);
+    expect(matches[0].nuclide.name).toBe('Am-241');
+  });
+
+  it('ranks Cs-137 as top match for Cs-137.xml', () => {
+    const data = parseSpectrumXml(CS137_XML);
+    const peaks = findPeaks(data.counts, data.energies);
+    const matches = identifyNuclides(peaks);
+    expect(matches[0].nuclide.name).toBe('Cs-137');
+  });
+
+  it('ranks Co-60 as top match for Co-60.xml', () => {
+    const data = parseSpectrumXml(CO60_XML);
+    const peaks = findPeaks(data.counts, data.energies);
+    const matches = identifyNuclides(peaks);
+    expect(matches[0].nuclide.name).toBe('Co-60');
   });
 });
