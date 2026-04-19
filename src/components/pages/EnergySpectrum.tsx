@@ -325,19 +325,37 @@ export default function EnergySpectrum() {
   );
 
   // Collect matched peak energies from visible spectra for reference lines.
-  // Includes auto-detected matches and manually assigned nuclides so both show
-  // up as reference lines in the chart with the same styling.
+  // Only shows peaks of the *identified* nuclide per spectrum (top auto-match
+  // or manual override) — not of every candidate. Otherwise neighbouring
+  // nuclides that happen to have a peak inside the match tolerance window
+  // (e.g. Eu-152 @ 1112 keV near Co-60 @ 1173 keV) would pollute the chart
+  // with reference lines for nuclides the UI does not present as the result.
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
     for (const s of deferredVisibleSpectra) {
-      for (const match of s.matches) {
-        for (const mp of match.matchedPeaks) {
-          const label = `${match.nuclide.name} (${Math.round(mp.expected)} keV)`;
+      const topMatch = s.matches[0];
+      const identification = resolveSpectrumIdentification(
+        s.manualNuclide,
+        topMatch
+          ? { name: topMatch.nuclide.name, confidence: topMatch.confidence }
+          : undefined,
+      );
+      if (!identification.displayName) continue;
+
+      const displayedMatch = s.matches.find(
+        (m) => m.nuclide.name === identification.displayName,
+      );
+      if (displayedMatch) {
+        for (const mp of displayedMatch.matchedPeaks) {
+          const label = `${displayedMatch.nuclide.name} (${Math.round(mp.expected)} keV)`;
           peakMap.set(label, mp.found.energy);
         }
-      }
-      if (s.manualNuclide) {
-        const nuclide = NUCLIDES.find((n) => n.name === s.manualNuclide);
+      } else {
+        // Manual override without a corresponding match — fall back to the
+        // reference energies so the user still sees the expected lines.
+        const nuclide = NUCLIDES.find(
+          (n) => n.name === identification.displayName,
+        );
         if (nuclide?.peaks?.length) {
           for (const { energy } of nuclide.peaks) {
             const label = `${nuclide.name} (${Math.round(energy)} keV)`;
@@ -421,7 +439,6 @@ export default function EnergySpectrum() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xml,.rcspg"
         multiple
         style={{ display: 'none' }}
         onChange={handleFileUpload}
