@@ -262,11 +262,19 @@ export function identifyNuclides(
     if (matchedPeaks.length === 0) continue;
 
     // Confidence scoring:
-    // - fractionMatched: how many of the nuclide's known peaks were found
+    // - intensityMatched: fraction of total branching-ratio intensity explained
+    //   by matched peaks (dominant lines weigh more than weak satellites)
     // - avgStrength: how strong matched peaks are relative to the strongest peak
     //   (a nuclide that explains the dominant peak scores higher)
-    // - energyAccuracy: how close the matches are (closer = better)
-    const fractionMatched = matchedPeaks.length / nuclide.peaks.length;
+    // - avgAccuracy: how close the matches are relative to per-peak tolerance
+    const totalIntensity = nuclide.peaks.reduce((s, p) => s + p.intensity, 0);
+    const matchedIntensity = matchedPeaks.reduce((s, mp) => {
+      const np = nuclide.peaks!.find((p) => p.energy === mp.expected);
+      return s + (np?.intensity ?? 0);
+    }, 0);
+    const intensityMatched =
+      totalIntensity > 0 ? matchedIntensity / totalIntensity : 0;
+
     const avgStrength =
       matchedPeaks.reduce((sum, mp) => sum + mp.found.counts, 0) /
       matchedPeaks.length /
@@ -282,7 +290,7 @@ export function identifyNuclides(
       ) / matchedPeaks.length;
 
     const confidence =
-      0.35 * fractionMatched + 0.50 * avgStrength + 0.15 * avgAccuracy;
+      0.40 * intensityMatched + 0.45 * avgStrength + 0.15 * avgAccuracy;
 
     matches.push({ nuclide, confidence, matchedPeaks });
   }

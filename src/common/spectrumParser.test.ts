@@ -198,3 +198,28 @@ describe('identifyNuclides with energy-dependent tolerance', () => {
     expect(co60?.matchedPeaks.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('identifyNuclides with intensity weighting', () => {
+  it('should give Ba-133 high confidence for dominant 356 keV match only', () => {
+    const peaks: Peak[] = [
+      { channel: 150, energy: 356, counts: 1000 },
+    ];
+    const matches = identifyNuclides(peaks);
+    const ba133 = matches.find((m) => m.nuclide.name === 'Ba-133');
+    expect(ba133).toBeDefined();
+    // intensityMatched = 0.621 / (0.329+0.072+0.183+0.621+0.089) = 0.48
+    // confidence = 0.40*0.48 + 0.45*1.0 + 0.15*~1.0 ≈ 0.79
+    expect(ba133!.confidence).toBeGreaterThan(0.7);
+  });
+
+  it('should give Co-60 partial confidence for one-of-two peaks', () => {
+    const peaks: Peak[] = [
+      { channel: 500, energy: 1332.5, counts: 1000 },
+    ];
+    const matches = identifyNuclides(peaks);
+    const co60 = matches.find((m) => m.nuclide.name === 'Co-60');
+    expect(co60).toBeDefined();
+    expect(co60!.confidence).toBeGreaterThan(0.4);
+    expect(co60!.confidence).toBeLessThan(0.85);
+  });
+});
