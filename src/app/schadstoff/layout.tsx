@@ -1,11 +1,14 @@
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { ReactNode } from 'react';
-import SchadstoffPage from '../../components/pages/Schadstoff';
 
 export default function SchadstoffLayout({ children }: { children: ReactNode }) {
   return (
-    <>
-      <SchadstoffPage />
+    <Box sx={{ p: 2, m: 2 }}>
+      <Typography variant="h4" gutterBottom>
+        Schadstoff
+      </Typography>
       {children}
-    </>
+    </Box>
   );
 }
