@@ -276,7 +276,14 @@ export function identifyNuclides(
     //   scoring a full 1.0 on a single low-confidence line. Nuclides with
     //   ≥1 photon/decay in total are normalised as before.
     // - avgStrength: how strong matched peaks are relative to the strongest peak
-    //   (a nuclide that explains the dominant peak scores higher)
+    //   (a nuclide that explains the dominant peak scores higher).
+    //   Future improvement: normalise by signal-to-background ratio instead of
+    //   peaks[0].counts. Current formula under-rates trace nuclides in mixed
+    //   spectra (e.g. weak Co-60 alongside dominant Cs-137). A proper SNR
+    //   scoring `(counts - bg) / √bg` per matched peak would require reworking
+    //   this block to take background estimates, not just counts — kept as-is
+    //   until mixed-source spectra exist as test fixtures. See
+    //   docs/spectrum-detection.md § Future Improvements.
     // - avgAccuracy: how close the matches are relative to per-peak tolerance
     const totalIntensity = nuclide.peaks.reduce((s, p) => s + p.intensity, 0);
     const matchedIntensity = matchedPeaks.reduce((s, mp) => {
