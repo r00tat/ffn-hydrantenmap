@@ -333,7 +333,7 @@ export default function EnergySpectrum() {
       if (s.manualNuclide) {
         const nuclide = NUCLIDES.find((n) => n.name === s.manualNuclide);
         if (nuclide?.peaks?.length) {
-          for (const energy of nuclide.peaks) {
+          for (const { energy } of nuclide.peaks) {
             const label = `${nuclide.name} (${Math.round(energy)} keV)`;
             if (!peakMap.has(label)) {
               peakMap.set(label, energy);
@@ -460,7 +460,7 @@ export default function EnergySpectrum() {
                   variant="caption"
                   sx={{ display: 'block' }}
                 >
-                  {n.name}: {n.peaks!.join(', ')} keV
+                  {n.name}: {n.peaks!.map((p) => p.energy).join(', ')} keV
                 </Typography>
               ))}
             </Box>

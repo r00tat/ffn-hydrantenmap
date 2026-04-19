@@ -232,7 +232,7 @@ export function identifyNuclides(
 
     const matchedPeaks: { expected: number; found: Peak }[] = [];
 
-    for (const expectedEnergy of nuclide.peaks) {
+    for (const { energy: expectedEnergy } of nuclide.peaks) {
       // Find closest peak within tolerance
       let bestPeak: Peak | null = null;
       let bestDistance = toleranceKeV;

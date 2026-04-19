@@ -24,7 +24,7 @@ export function buildNuclidePeakLines(
     const nuclide = nuclides.find((n) => n.name === name);
     if (!nuclide?.peaks?.length) return;
     const color = palette[idx % palette.length];
-    for (const energy of nuclide.peaks) {
+    for (const { energy } of nuclide.peaks) {
       lines.push({
         key: `${idx}:${name}:${energy}`,
         label: `${name} (${energy} keV)`,
