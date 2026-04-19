@@ -4,6 +4,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -27,6 +28,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import {
+  Fragment,
   useCallback,
   useDeferredValue,
   useMemo,
@@ -36,7 +38,7 @@ import {
 import { where } from 'firebase/firestore';
 import { NUCLIDES } from '../../common/strahlenschutz';
 import {
-  parseSpectrumXml,
+  parseSpectrumFile,
   channelToEnergy,
   findPeaks,
   identifyNuclides,
@@ -79,6 +81,14 @@ const SELECTED_PEAK_COLORS = [
   '#2e7d32',
   '#1565c0',
 ];
+
+/**
+ * Stack labels in the top band of the chart to avoid the filled spectrum area
+ * at the bottom. All labels use labelAlign='start' (top anchor); consecutive
+ * peaks get a pixel dy offset cycling through these values so labels of
+ * adjacent peaks (e.g. Co-60 at 1173/1332 keV) don't overlap.
+ */
+const PEAK_LABEL_DY_OFFSETS = [0, 14, 28, 42] as const;
 
 interface LoadedSpectrum {
   id: string;
@@ -143,6 +153,19 @@ export default function EnergySpectrum() {
   const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
     [],
   );
+  const [expandedSpectrumId, setExpandedSpectrumId] = useState<string | null>(
+    null,
+  );
+
+  const toggleNuclideSelection = useCallback((name: string) => {
+    setSelectedNuclideNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+  }, []);
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedSpectrumId((prev) => (prev === id ? null : id));
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -201,9 +224,9 @@ export default function EnergySpectrum() {
       if (!files) return;
 
       for (const file of Array.from(files)) {
-        const text = await file.text();
+        const buffer = await file.arrayBuffer();
         try {
-          const data = parseSpectrumXml(text);
+          const data = parseSpectrumFile(buffer, file.name);
           const peaks = findPeaks(data.counts, data.energies);
           const matches = identifyNuclides(peaks);
 
@@ -319,21 +342,39 @@ export default function EnergySpectrum() {
   );
 
   // Collect matched peak energies from visible spectra for reference lines.
-  // Includes auto-detected matches and manually assigned nuclides so both show
-  // up as reference lines in the chart with the same styling.
+  // Only shows peaks of the *identified* nuclide per spectrum (top auto-match
+  // or manual override) — not of every candidate. Otherwise neighbouring
+  // nuclides that happen to have a peak inside the match tolerance window
+  // (e.g. Eu-152 @ 1112 keV near Co-60 @ 1173 keV) would pollute the chart
+  // with reference lines for nuclides the UI does not present as the result.
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
     for (const s of deferredVisibleSpectra) {
-      for (const match of s.matches) {
-        for (const mp of match.matchedPeaks) {
-          const label = `${match.nuclide.name} (${Math.round(mp.expected)} keV)`;
+      const topMatch = s.matches[0];
+      const identification = resolveSpectrumIdentification(
+        s.manualNuclide,
+        topMatch
+          ? { name: topMatch.nuclide.name, confidence: topMatch.confidence }
+          : undefined,
+      );
+      if (!identification.displayName) continue;
+
+      const displayedMatch = s.matches.find(
+        (m) => m.nuclide.name === identification.displayName,
+      );
+      if (displayedMatch) {
+        for (const mp of displayedMatch.matchedPeaks) {
+          const label = `${displayedMatch.nuclide.name} (${Math.round(mp.expected)} keV)`;
           peakMap.set(label, mp.found.energy);
         }
-      }
-      if (s.manualNuclide) {
-        const nuclide = NUCLIDES.find((n) => n.name === s.manualNuclide);
+      } else {
+        // Manual override without a corresponding match — fall back to the
+        // reference energies so the user still sees the expected lines.
+        const nuclide = NUCLIDES.find(
+          (n) => n.name === identification.displayName,
+        );
         if (nuclide?.peaks?.length) {
-          for (const energy of nuclide.peaks) {
+          for (const { energy } of nuclide.peaks) {
             const label = `${nuclide.name} (${Math.round(energy)} keV)`;
             if (!peakMap.has(label)) {
               peakMap.set(label, energy);
@@ -372,9 +413,9 @@ export default function EnergySpectrum() {
         Nuklid Energiespektrum
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Lade eine oder mehrere XML-Dateien eines RadiaCode Spektrometers hoch,
-        um das Energiespektrum darzustellen und das Nuklid automatisch zu
-        identifizieren.
+        Lade eine oder mehrere Dateien eines RadiaCode Spektrometers hoch (XML,
+        rcspg, zrcspg, JSON oder CSV), um das Energiespektrum darzustellen und
+        das Nuklid automatisch zu identifizieren.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <Chip
@@ -415,7 +456,6 @@ export default function EnergySpectrum() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xml"
         multiple
         style={{ display: 'none' }}
         onChange={handleFileUpload}
@@ -434,7 +474,7 @@ export default function EnergySpectrum() {
           startIcon={<UploadFileIcon />}
           onClick={() => fileInputRef.current?.click()}
         >
-          XML-Datei(en) hochladen
+          Datei(en) hochladen
         </Button>
         {allSpectra.length > 0 && (
           <FormControlLabel
@@ -460,7 +500,7 @@ export default function EnergySpectrum() {
                   variant="caption"
                   sx={{ display: 'block' }}
                 >
-                  {n.name}: {n.peaks!.join(', ')} keV
+                  {n.name}: {n.peaks!.map((p) => p.energy).join(', ')} keV
                 </Typography>
               ))}
             </Box>
@@ -529,9 +569,11 @@ export default function EnergySpectrum() {
             const dbLinks = identification.displayName
               ? getNuclideDbLinks(identification.displayName)
               : null;
+            const extraMatches = s.matches.slice(1, 4);
+            const isExpanded = expandedSpectrumId === s.id;
             return (
+              <Fragment key={s.id}>
               <ListItem
-                key={s.id}
                 secondaryAction={
                   <Box sx={{ display: 'flex', gap: 0 }}>
                     <IconButton
@@ -610,6 +652,14 @@ export default function EnergySpectrum() {
                           label={`${identification.displayName} (manuell)`}
                           color="primary"
                           size="small"
+                          onClick={
+                            extraMatches.length > 0
+                              ? (e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(s.id);
+                                }
+                              : undefined
+                          }
                         />
                       )}
                       {identification.source === 'auto' && (
@@ -617,6 +667,14 @@ export default function EnergySpectrum() {
                           label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
                           color="success"
                           size="small"
+                          onClick={
+                            extraMatches.length > 0
+                              ? (e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(s.id);
+                                }
+                              : undefined
+                          }
                         />
                       )}
                       {identification.source === 'none' && (
@@ -699,6 +757,60 @@ export default function EnergySpectrum() {
                   }
                 />
               </ListItem>
+              {extraMatches.length > 0 && (
+                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                  <Box sx={{ pl: 5, pr: '148px', pb: 1.5 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mb: 0.5 }}
+                    >
+                      Weitere Kandidaten – zum Einblenden anklicken:
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 0.5,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {extraMatches.map((m) => {
+                        const selectedIdx = selectedNuclideNames.indexOf(
+                          m.nuclide.name,
+                        );
+                        const isSelected = selectedIdx >= 0;
+                        const color = isSelected
+                          ? SELECTED_PEAK_COLORS[
+                              selectedIdx % SELECTED_PEAK_COLORS.length
+                            ]
+                          : undefined;
+                        return (
+                          <Chip
+                            key={m.nuclide.name}
+                            label={`${m.nuclide.name} (${Math.round(
+                              m.confidence * 100,
+                            )}%)`}
+                            size="small"
+                            variant={isSelected ? 'filled' : 'outlined'}
+                            onClick={() =>
+                              toggleNuclideSelection(m.nuclide.name)
+                            }
+                            sx={
+                              color
+                                ? {
+                                    borderLeft: `4px solid ${color}`,
+                                    borderRadius: 1,
+                                  }
+                                : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                </Collapse>
+              )}
+              </Fragment>
             );
           })}
         </List>
@@ -807,12 +919,20 @@ export default function EnergySpectrum() {
             }))}
             margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
           >
-            {Array.from(matchedPeakEnergies.entries()).map(
-              ([label, energy]) => (
+            {Array.from(matchedPeakEnergies.entries())
+              .sort((a, b) => a[1] - b[1])
+              .map(([label, energy], idx) => (
                 <ChartsReferenceLine
                   key={label}
                   x={energy}
                   label={label}
+                  labelAlign="start"
+                  spacing={{
+                    x: 5,
+                    y: PEAK_LABEL_DY_OFFSETS[
+                      idx % PEAK_LABEL_DY_OFFSETS.length
+                    ],
+                  }}
                   lineStyle={{
                     stroke: '#d32f2f',
                     strokeWidth: 1.5,
@@ -824,25 +944,33 @@ export default function EnergySpectrum() {
                     fontWeight: 'bold',
                   }}
                 />
-              ),
-            )}
-            {selectedPeakLines.map((line) => (
-              <ChartsReferenceLine
-                key={line.key}
-                x={line.energy}
-                label={line.label}
-                lineStyle={{
-                  stroke: line.color,
-                  strokeWidth: 1.5,
-                  strokeDasharray: '2 3',
-                }}
-                labelStyle={{
-                  fontSize: 10,
-                  fill: line.color,
-                  fontWeight: 'bold',
-                }}
-              />
-            ))}
+              ))}
+            {[...selectedPeakLines]
+              .sort((a, b) => a.energy - b.energy)
+              .map((line, idx) => (
+                <ChartsReferenceLine
+                  key={line.key}
+                  x={line.energy}
+                  label={line.label}
+                  labelAlign="start"
+                  spacing={{
+                    x: 5,
+                    y: PEAK_LABEL_DY_OFFSETS[
+                      idx % PEAK_LABEL_DY_OFFSETS.length
+                    ],
+                  }}
+                  lineStyle={{
+                    stroke: line.color,
+                    strokeWidth: 1.5,
+                    strokeDasharray: '2 3',
+                  }}
+                  labelStyle={{
+                    fontSize: 10,
+                    fill: line.color,
+                    fontWeight: 'bold',
+                  }}
+                />
+              ))}
           </LineChart>
         </Box>
       )}
@@ -860,8 +988,8 @@ export default function EnergySpectrum() {
           }}
         >
           <Typography color="text.secondary">
-            Noch keine Spektren geladen. Lade eine XML-Datei hoch, um zu
-            beginnen.
+            Noch keine Spektren geladen. Lade eine Datei (XML, rcspg, zrcspg,
+            JSON oder CSV) hoch, um zu beginnen.
           </Typography>
         </Box>
       )}

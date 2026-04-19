@@ -3,8 +3,15 @@ import { buildNuclidePeakLines } from './nuclidePeakLines';
 import type { Nuclide } from './strahlenschutz';
 
 const NUCLIDES_FIXTURE: Nuclide[] = [
-  { name: 'Cs-137', gamma: 92, peaks: [661.7] },
-  { name: 'Co-60', gamma: 351, peaks: [1173.2, 1332.5] },
+  { name: 'Cs-137', gamma: 92, peaks: [{ energy: 661.7, intensity: 0.851 }] },
+  {
+    name: 'Co-60',
+    gamma: 351,
+    peaks: [
+      { energy: 1173.2, intensity: 0.999 },
+      { energy: 1332.5, intensity: 1.0 },
+    ],
+  },
   { name: 'Sr-90', gamma: 6 }, // no peaks
 ];
 
