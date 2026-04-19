@@ -1,5 +1,6 @@
 import LocationSearchingIcon from '@mui/icons-material/LocationSearching';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import { useCallback } from 'react';
@@ -8,7 +9,8 @@ import { usePositionContext } from './Position';
 
 export default function PositionAction() {
   const map = useMap();
-  const [position, isPositionSet, , enableTracking] = usePositionContext();
+  const [position, isPositionSet, , enableTracking, isPending] =
+    usePositionContext();
 
   const setPos = useCallback(() => {
     enableTracking();
@@ -17,22 +19,21 @@ export default function PositionAction() {
     }
   }, [map, position, isPositionSet, enableTracking]);
 
+  const tooltip = isPending
+    ? 'Position wird ermittelt …'
+    : isPositionSet
+      ? 'Zur aktuellen Position zoomen'
+      : 'Position aktivieren';
+
   return (
     <Box
       sx={{
-        // '& > :not(style)': { m: 1 },
         position: 'absolute',
         bottom: 24,
         left: 16,
       }}
     >
-      <Tooltip
-        title={
-          isPositionSet
-            ? 'Zur aktuellen Position zoomen'
-            : 'Position aktivieren'
-        }
-      >
+      <Tooltip title={tooltip}>
         <Fab
           color="primary"
           aria-label="locate"
@@ -42,7 +43,11 @@ export default function PositionAction() {
             setPos();
           }}
         >
-          <LocationSearchingIcon />
+          {isPending ? (
+            <CircularProgress size={20} color="inherit" />
+          ) : (
+            <LocationSearchingIcon />
+          )}
         </Fab>
       </Tooltip>
     </Box>
