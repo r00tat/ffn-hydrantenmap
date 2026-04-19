@@ -199,6 +199,24 @@ describe('identifyNuclides with energy-dependent tolerance', () => {
   });
 });
 
+describe('findPeaks Poisson significance', () => {
+  it('should reject a peak at background+2·√B', () => {
+    const counts = new Array(200).fill(100);
+    counts[100] = 120; // 2σ — below 3σ threshold
+    const energies = counts.map((_, i) => i * 3);
+    const peaks = findPeaks(counts, energies, { minEnergy: 0 });
+    expect(peaks.find((p) => p.channel === 100)).toBeUndefined();
+  });
+
+  it('should accept a peak at background+5·√B', () => {
+    const counts = new Array(200).fill(100);
+    counts[100] = 150; // 5σ
+    const energies = counts.map((_, i) => i * 3);
+    const peaks = findPeaks(counts, energies, { minEnergy: 0 });
+    expect(peaks.find((p) => p.channel === 100)).toBeDefined();
+  });
+});
+
 describe('identifyNuclides with intensity weighting', () => {
   it('should give Ba-133 high confidence for dominant 356 keV match only', () => {
     const peaks: Peak[] = [

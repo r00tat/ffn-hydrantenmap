@@ -175,10 +175,12 @@ export function findPeaks(
     const current = smoothed[i];
     if (current === 0) continue;
 
-    // Check if local maximum in smoothed data
+    // Check if local maximum in smoothed data. Use strict greater-than so a
+    // flat plateau (common around sharp single-bin peaks after smoothing)
+    // does not disqualify the centre bin.
     let isMax = true;
     for (let j = i - halfWindow; j <= i + halfWindow; j++) {
-      if (j !== i && smoothed[j] >= current) {
+      if (j !== i && smoothed[j] > current) {
         isMax = false;
         break;
       }
@@ -201,15 +203,14 @@ export function findPeaks(
     }
     if (count === 0) continue;
     const mean = sum / count;
-    let varianceSum = 0;
-    for (let j = start; j < end; j++) {
-      if (Math.abs(j - i) > exclusionRadius) {
-        varianceSum += (counts[j] - mean) ** 2;
-      }
-    }
-    const stddev = Math.sqrt(varianceSum / count);
+    // Poisson statistics: σ = √B (background counts follow a Poisson
+    // distribution, not a normal sample distribution). Clamp to ≥1 to
+    // avoid a zero-σ degenerate case for empty regions.
+    const sigma = Math.sqrt(Math.max(mean, 1));
 
-    if (current > mean + significance * stddev) {
+    // Apply the significance test to the raw peak-bin count (Poisson σ is
+    // about bin-level counts, and smoothing would dilute a narrow peak).
+    if (counts[i] > mean + significance * sigma) {
       peaks.push({
         channel: i,
         energy: energies[i],
