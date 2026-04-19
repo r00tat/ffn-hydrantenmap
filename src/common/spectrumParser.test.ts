@@ -200,17 +200,29 @@ describe('identifyNuclides with energy-dependent tolerance', () => {
 });
 
 describe('findPeaks Poisson significance', () => {
-  it('should reject a peak at background+2·√B', () => {
+  it('should reject a weak peak (~1σ above background)', () => {
+    // background=100, σ=√100=10, threshold = 100 + 3·10 = 130
+    // smoothed peak centroid ≈ 108.8 → rejected
     const counts = new Array(200).fill(100);
-    counts[100] = 120; // 2σ — below 3σ threshold
+    counts[98] = 104;
+    counts[99] = 108;
+    counts[100] = 120;
+    counts[101] = 108;
+    counts[102] = 104;
     const energies = counts.map((_, i) => i * 3);
     const peaks = findPeaks(counts, energies, { minEnergy: 0 });
     expect(peaks.find((p) => p.channel === 100)).toBeUndefined();
   });
 
-  it('should accept a peak at background+5·√B', () => {
+  it('should accept a strong peak (~10σ raw peak height)', () => {
+    // background=100, σ=10, threshold = 130
+    // smoothed peak centroid = 144 → accepted
     const counts = new Array(200).fill(100);
-    counts[100] = 150; // 5σ
+    counts[98] = 115;
+    counts[99] = 145;
+    counts[100] = 200;
+    counts[101] = 145;
+    counts[102] = 115;
     const energies = counts.map((_, i) => i * 3);
     const peaks = findPeaks(counts, energies, { minEnergy: 0 });
     expect(peaks.find((p) => p.channel === 100)).toBeDefined();

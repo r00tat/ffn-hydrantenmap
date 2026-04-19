@@ -180,7 +180,7 @@ export function findPeaks(
     // does not disqualify the centre bin.
     let isMax = true;
     for (let j = i - halfWindow; j <= i + halfWindow; j++) {
-      if (j !== i && smoothed[j] > current) {
+      if (j !== i && smoothed[j] >= current) {
         isMax = false;
         break;
       }
@@ -210,7 +210,7 @@ export function findPeaks(
 
     // Apply the significance test to the raw peak-bin count (Poisson σ is
     // about bin-level counts, and smoothing would dilute a narrow peak).
-    if (counts[i] > mean + significance * sigma) {
+    if (current > mean + significance * sigma) {
       peaks.push({
         channel: i,
         energy: energies[i],
