@@ -742,7 +742,15 @@ export default function EnergySpectrum() {
                   }
                   secondary={
                     <>
-                      {`${s.data.deviceName} · ${s.data.startTime ? new Date(s.data.startTime).toLocaleString('de-AT') : ''} · Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`}
+                      {[
+                        s.data.deviceName,
+                        s.data.startTime
+                          ? new Date(s.data.startTime).toLocaleString('de-AT')
+                          : '',
+                        `Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                       {s.description && (
                         <Typography
                           component="span"
