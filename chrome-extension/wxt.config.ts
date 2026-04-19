@@ -88,14 +88,26 @@ function envOverlayPlugin(): Plugin {
   };
 }
 
+// Nur `wxt build` nutzt `dist/` (wird von CI, scripts/package.mjs und
+// scripts/publish-cws.mjs erwartet). `wxt` (dev) schreibt in `.output/`, damit
+// stale Build-Artefakte aus dist/ nicht vom Vite-Entry-Scanner als Entrypoints
+// aufgegriffen werden.
+const isBuildCommand = process.argv[2] === 'build';
+
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
-  outDir: 'dist',
+  outDir: isBuildCommand ? 'dist' : '.output',
   outDirTemplate: '',
   srcDir: '.',
   entrypointsDir: 'entrypoints',
   manifestVersion: 3,
   browser: 'chrome',
+
+  dev: {
+    server: {
+      port: 3100,
+    },
+  },
 
   manifest: ({ mode }) => {
     const rootEnv = loadEnv(mode, ROOT_DIR, ENV_PREFIXES_MANIFEST);
