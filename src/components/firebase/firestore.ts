@@ -213,6 +213,7 @@ export interface Spectrum extends FirecallItem {
   counts: number[];
   matchedNuclide?: string;
   matchedConfidence?: number;
+  manualNuclide?: string;
   description?: string;
 }
 
