@@ -28,7 +28,7 @@ const eslintConfig = defineConfig([
     ignores: ['src/lib/firestoreClient.ts', 'src/lib/firestoreClient.test.ts'],
     rules: {
       'no-restricted-imports': [
-        'warn',
+        'error',
         {
           paths: [
             {
