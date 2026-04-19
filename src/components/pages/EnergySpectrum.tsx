@@ -80,6 +80,12 @@ const SELECTED_PEAK_COLORS = [
   '#1565c0',
 ];
 
+/**
+ * Cycle labels through these vertical positions along the reference line so
+ * labels of adjacent peaks don't overlap (e.g. Co-60 at 1173/1332 keV).
+ */
+const PEAK_LABEL_ALIGNS = ['start', 'middle', 'end'] as const;
+
 interface LoadedSpectrum {
   id: string;
   firestoreId?: string;
@@ -807,12 +813,14 @@ export default function EnergySpectrum() {
             }))}
             margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
           >
-            {Array.from(matchedPeakEnergies.entries()).map(
-              ([label, energy]) => (
+            {Array.from(matchedPeakEnergies.entries())
+              .sort((a, b) => a[1] - b[1])
+              .map(([label, energy], idx) => (
                 <ChartsReferenceLine
                   key={label}
                   x={energy}
                   label={label}
+                  labelAlign={PEAK_LABEL_ALIGNS[idx % PEAK_LABEL_ALIGNS.length]}
                   lineStyle={{
                     stroke: '#d32f2f',
                     strokeWidth: 1.5,
@@ -824,25 +832,27 @@ export default function EnergySpectrum() {
                     fontWeight: 'bold',
                   }}
                 />
-              ),
-            )}
-            {selectedPeakLines.map((line) => (
-              <ChartsReferenceLine
-                key={line.key}
-                x={line.energy}
-                label={line.label}
-                lineStyle={{
-                  stroke: line.color,
-                  strokeWidth: 1.5,
-                  strokeDasharray: '2 3',
-                }}
-                labelStyle={{
-                  fontSize: 10,
-                  fill: line.color,
-                  fontWeight: 'bold',
-                }}
-              />
-            ))}
+              ))}
+            {[...selectedPeakLines]
+              .sort((a, b) => a.energy - b.energy)
+              .map((line, idx) => (
+                <ChartsReferenceLine
+                  key={line.key}
+                  x={line.energy}
+                  label={line.label}
+                  labelAlign={PEAK_LABEL_ALIGNS[idx % PEAK_LABEL_ALIGNS.length]}
+                  lineStyle={{
+                    stroke: line.color,
+                    strokeWidth: 1.5,
+                    strokeDasharray: '2 3',
+                  }}
+                  labelStyle={{
+                    fontSize: 10,
+                    fill: line.color,
+                    fontWeight: 'bold',
+                  }}
+                />
+              ))}
           </LineChart>
         </Box>
       )}
