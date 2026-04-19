@@ -263,8 +263,11 @@ export function identifyNuclides(
     if (matchedPeaks.length === 0) continue;
 
     // Confidence scoring:
-    // - intensityMatched: fraction of total branching-ratio intensity explained
-    //   by matched peaks (dominant lines weigh more than weak satellites)
+    // - intensityMatched: matched branching-ratio intensity normalised against
+    //   max(totalIntensity, 1.0). The floor of 1.0 photon-per-decay prevents
+    //   nuclides with very weak total branches (e.g. Ra-226 @ 3.6%) from
+    //   scoring a full 1.0 on a single low-confidence line. Nuclides with
+    //   ≥1 photon/decay in total are normalised as before.
     // - avgStrength: how strong matched peaks are relative to the strongest peak
     //   (a nuclide that explains the dominant peak scores higher)
     // - avgAccuracy: how close the matches are relative to per-peak tolerance
@@ -273,8 +276,7 @@ export function identifyNuclides(
       const np = nuclide.peaks!.find((p) => p.energy === mp.expected);
       return s + (np?.intensity ?? 0);
     }, 0);
-    const intensityMatched =
-      totalIntensity > 0 ? matchedIntensity / totalIntensity : 0;
+    const intensityMatched = matchedIntensity / Math.max(totalIntensity, 1.0);
 
     const avgStrength =
       matchedPeaks.reduce((sum, mp) => sum + mp.found.counts, 0) /

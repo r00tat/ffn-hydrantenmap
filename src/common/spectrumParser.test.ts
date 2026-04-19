@@ -233,6 +233,33 @@ describe('findPeaks Poisson significance', () => {
   });
 });
 
+describe('identifyNuclides intensity cap for weak single-branch nuclides', () => {
+  it('should not give Ra-226 (3.6% branch) full intensityMatched for a single weak peak', () => {
+    const peaks: Peak[] = [{ channel: 80, energy: 186.5, counts: 100 }];
+    const matches = identifyNuclides(peaks);
+    const ra226 = matches.find((m) => m.nuclide.name === 'Ra-226');
+    expect(ra226).toBeDefined();
+    // totalIntensity = 0.036, matchedIntensity = 0.036
+    // with cap at 1.0: intensityMatched = 0.036 / max(0.036, 1.0) = 0.036
+    // confidence = 0.40*0.036 + 0.45*avgStrength + 0.15*avgAccuracy
+    //            ≤ 0.40*0.036 + 0.45*1.0 + 0.15*1.0 = 0.614
+    // with single peak where avgStrength=1.0 and accuracy near 1.0:
+    //            ≈ 0.014 + 0.45 + ~0.15 = ~0.61 — but this is well below a
+    //            proper dominant-line match (Cs-137 single peak ≈ 0.94).
+    expect(ra226!.confidence).toBeLessThan(0.65);
+  });
+
+  it('should still give Cs-137 (85% branch) high confidence for a single peak', () => {
+    const peaks: Peak[] = [{ channel: 300, energy: 661.7, counts: 1000 }];
+    const matches = identifyNuclides(peaks);
+    const cs137 = matches.find((m) => m.nuclide.name === 'Cs-137');
+    expect(cs137).toBeDefined();
+    // intensityMatched = 0.851 / max(0.851, 1.0) = 0.851
+    // confidence = 0.40*0.851 + 0.45*1.0 + 0.15*1.0 ≈ 0.94
+    expect(cs137!.confidence).toBeGreaterThan(0.9);
+  });
+});
+
 describe('identifyNuclides with intensity weighting', () => {
   it('should give Ba-133 high confidence for dominant 356 keV match only', () => {
     const peaks: Peak[] = [
