@@ -36,7 +36,7 @@ import {
 import { where } from 'firebase/firestore';
 import { NUCLIDES } from '../../common/strahlenschutz';
 import {
-  parseSpectrumXml,
+  parseSpectrumFile,
   channelToEnergy,
   findPeaks,
   identifyNuclides,
@@ -203,7 +203,7 @@ export default function EnergySpectrum() {
       for (const file of Array.from(files)) {
         const text = await file.text();
         try {
-          const data = parseSpectrumXml(text);
+          const data = parseSpectrumFile(text);
           const peaks = findPeaks(data.counts, data.energies);
           const matches = identifyNuclides(peaks);
 
@@ -415,7 +415,7 @@ export default function EnergySpectrum() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xml"
+        accept=".xml,.rcspg"
         multiple
         style={{ display: 'none' }}
         onChange={handleFileUpload}

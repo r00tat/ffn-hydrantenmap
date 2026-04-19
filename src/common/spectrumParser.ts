@@ -119,6 +119,103 @@ export function parseSpectrumXml(xml: string): SpectrumData {
   };
 }
 
+/**
+ * Parse RadiaCode-110 spectrogram (.rcspg) text file.
+ *
+ * Format:
+ *  - Line 1: tab-separated header fields (Spectrogram, Time, Timestamp,
+ *    Accumulation time, Channels, Device serial, Flags, Comment)
+ *  - Line 2: "Spectrum: " followed by space-separated hex bytes
+ *    - 4 bytes flags/header
+ *    - 3 × float32 LE calibration coefficients
+ *    - N × uint32 LE channel counts (N from header "Channels")
+ *  - Lines 3+: time-series deltas (ignored — cumulative spectrum is on line 2)
+ */
+export function parseSpectrogramRcspg(text: string): SpectrumData {
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) {
+    throw new Error('rcspg: expected header and spectrum lines');
+  }
+
+  const headerFields: Record<string, string> = {};
+  for (const field of lines[0].split('\t')) {
+    const colon = field.indexOf(':');
+    if (colon < 0) continue;
+    headerFields[field.slice(0, colon).trim()] = field.slice(colon + 1).trim();
+  }
+
+  const sampleName = headerFields['Spectrogram'] ?? '';
+  const deviceName = headerFields['Device serial'] ?? '';
+  const accumulationTime = parseFloat(headerFields['Accumulation time'] ?? '0');
+  const channels = parseInt(headerFields['Channels'] ?? '0', 10);
+
+  // "2026-03-28  09:38:06" (double space) → "2026-03-28T09:38:06"
+  const startTimeIso = (headerFields['Time'] ?? '').trim().replace(/\s+/, 'T');
+  // Parse as UTC-style components to avoid local-timezone shifts when
+  // round-tripping through Date; output in the same naive ISO form.
+  const startUtcMs = Date.parse(startTimeIso + 'Z');
+  const endTimeIso = isNaN(startUtcMs)
+    ? ''
+    : new Date(startUtcMs + accumulationTime * 1000)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, '');
+
+  const match = lines[1].match(/^Spectrum:\s*(.*)$/);
+  if (!match) {
+    throw new Error('rcspg: missing "Spectrum:" line');
+  }
+  const hexTokens = match[1].trim().split(/\s+/);
+  const bytes = new Uint8Array(hexTokens.length);
+  for (let i = 0; i < hexTokens.length; i++) {
+    bytes[i] = parseInt(hexTokens[i], 16);
+  }
+  const expectedBytes = 16 + channels * 4;
+  if (bytes.length < expectedBytes) {
+    throw new Error(
+      `rcspg: spectrum truncated (${bytes.length} bytes, expected ${expectedBytes})`,
+    );
+  }
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const coefficients = [
+    view.getFloat32(4, true),
+    view.getFloat32(8, true),
+    view.getFloat32(12, true),
+  ];
+  const counts: number[] = new Array(channels);
+  for (let i = 0; i < channels; i++) {
+    counts[i] = view.getUint32(16 + i * 4, true);
+  }
+  const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+
+  return {
+    sampleName,
+    deviceName,
+    measurementTime: accumulationTime,
+    liveTime: accumulationTime,
+    startTime: startTimeIso,
+    endTime: endTimeIso,
+    coefficients,
+    counts,
+    energies,
+  };
+}
+
+/**
+ * Dispatch to the right parser based on content.
+ * Accepts RadiaCode XML exports or RadiaCode-110 spectrogram (.rcspg).
+ */
+export function parseSpectrumFile(text: string): SpectrumData {
+  const head = text.trimStart();
+  if (head.startsWith('<')) {
+    return parseSpectrumXml(text);
+  }
+  if (head.startsWith('Spectrogram:')) {
+    return parseSpectrogramRcspg(text);
+  }
+  throw new Error('Unknown spectrum format (expected XML or rcspg)');
+}
+
 export interface FindPeaksOptions {
   windowSize?: number;
   significance?: number;

@@ -7,6 +7,8 @@ import {
   findPeaks,
   fwhmAt,
   identifyNuclides,
+  parseSpectrogramRcspg,
+  parseSpectrumFile,
   parseSpectrumXml,
   toleranceFor,
   type Peak,
@@ -22,6 +24,10 @@ const CS137_XML = readFileSync(
 );
 const CO60_XML = readFileSync(
   resolve(__dirname, '../../examples/Co-60.xml'),
+  'utf-8',
+);
+const CS137_RCSPG = readFileSync(
+  resolve(__dirname, '../../examples/Spectrogram_Cs-137.rcspg'),
   'utf-8',
 );
 
@@ -97,6 +103,76 @@ describe('parseSpectrumXml', () => {
     const data = parseSpectrumXml(AM241_XML);
     expect(data.startTime).toBe('2026-03-28T08:29:28');
     expect(data.endTime).toBe('2026-03-28T08:30:04');
+  });
+});
+
+describe('parseSpectrogramRcspg', () => {
+  it('should parse sample name from Spectrogram header', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.sampleName).toBe('Cs-137');
+  });
+
+  it('should parse device serial as device name', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.deviceName).toBe('RC-110-004760');
+  });
+
+  it('should parse accumulation time as measurement and live time', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.measurementTime).toBe(169);
+    expect(data.liveTime).toBe(169);
+  });
+
+  it('should parse start time as ISO string', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.startTime).toBe('2026-03-28T09:38:06');
+  });
+
+  it('should compute end time as start + accumulation', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.endTime).toBe('2026-03-28T09:40:55');
+  });
+
+  it('should parse calibration coefficients from float32 LE', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.coefficients).toHaveLength(3);
+    expect(data.coefficients[0]).toBeCloseTo(2.9903646, 4);
+    expect(data.coefficients[1]).toBeCloseTo(2.3659527, 4);
+    expect(data.coefficients[2]).toBeCloseTo(0.0003559, 6);
+  });
+
+  it('should parse 1024 channel counts as uint32 LE', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.counts).toHaveLength(1024);
+    // First channel from hex "6C CB 19 00" = 0x0019CB6C = 1690476
+    expect(data.counts[0]).toBe(1690476);
+    // Channels are all non-negative
+    expect(data.counts.every((c) => c >= 0)).toBe(true);
+  });
+
+  it('should compute energies array from calibration', () => {
+    const data = parseSpectrogramRcspg(CS137_RCSPG);
+    expect(data.energies).toHaveLength(1024);
+    expect(data.energies[0]).toBeCloseTo(data.coefficients[0], 3);
+    expect(data.energies[1023]).toBeGreaterThan(data.energies[0]);
+  });
+});
+
+describe('parseSpectrumFile (dispatcher)', () => {
+  it('should parse XML content', () => {
+    const data = parseSpectrumFile(CS137_XML);
+    expect(data.sampleName).toBe('Cs-137');
+    expect(data.counts).toHaveLength(1024);
+  });
+
+  it('should parse rcspg content', () => {
+    const data = parseSpectrumFile(CS137_RCSPG);
+    expect(data.sampleName).toBe('Cs-137');
+    expect(data.counts).toHaveLength(1024);
+  });
+
+  it('should throw on unknown format', () => {
+    expect(() => parseSpectrumFile('not a spectrum')).toThrow();
   });
 });
 
