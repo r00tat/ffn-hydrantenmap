@@ -1,14 +1,65 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { crc32 } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
+
+/**
+ * Build a minimal single-entry ZIP archive (STORE, no compression) in the
+ * test environment. fflate.zipSync has a known compatibility issue with
+ * vitest/jsdom (output is mis-sized), but the production unzip path uses
+ * fflate.unzipSync which works fine — so we build the fixture archive by
+ * hand here and let the parser exercise the real unzip logic.
+ */
+function buildStoredZip(name: string, data: Uint8Array): Uint8Array {
+  const nameBytes = new TextEncoder().encode(name);
+  const crc = crc32(Buffer.from(data));
+  const size = data.length;
+  const local = new Uint8Array(30 + nameBytes.length + size);
+  const lv = new DataView(local.buffer);
+  lv.setUint32(0, 0x04034b50, true);
+  lv.setUint16(4, 20, true);
+  lv.setUint32(14, crc, true);
+  lv.setUint32(18, size, true);
+  lv.setUint32(22, size, true);
+  lv.setUint16(26, nameBytes.length, true);
+  local.set(nameBytes, 30);
+  local.set(data, 30 + nameBytes.length);
+
+  const cd = new Uint8Array(46 + nameBytes.length);
+  const cv = new DataView(cd.buffer);
+  cv.setUint32(0, 0x02014b50, true);
+  cv.setUint16(4, 20, true);
+  cv.setUint16(6, 20, true);
+  cv.setUint32(16, crc, true);
+  cv.setUint32(20, size, true);
+  cv.setUint32(24, size, true);
+  cv.setUint16(28, nameBytes.length, true);
+  cd.set(nameBytes, 46);
+
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, 1, true);
+  ev.setUint16(10, 1, true);
+  ev.setUint32(12, cd.length, true);
+  ev.setUint32(16, local.length, true);
+
+  const out = new Uint8Array(local.length + cd.length + end.length);
+  out.set(local, 0);
+  out.set(cd, local.length);
+  out.set(end, local.length + cd.length);
+  return out;
+}
 import {
   channelToEnergy,
   findPeaks,
   fwhmAt,
   identifyNuclides,
   parseSpectrogramRcspg,
+  parseSpectrumCsv,
   parseSpectrumFile,
+  parseSpectrumNpesJson,
   parseSpectrumXml,
   toleranceFor,
   type Peak,
@@ -158,6 +209,163 @@ describe('parseSpectrogramRcspg', () => {
   });
 });
 
+describe('parseSpectrumNpesJson (NPES-JSON v2)', () => {
+  const exampleSpectrum = {
+    schemaVersion: 'NPESv2',
+    data: [
+      {
+        deviceData: {
+          softwareName: 'Radiacode iOS 1.2',
+          deviceName: 'RadiaCode-103',
+        },
+        sampleInfo: {
+          name: 'Cs-137',
+          note: 'Calibration sample',
+        },
+        resultData: {
+          startTime: '2026-01-10T17:14:50+01:00',
+          endTime: '2026-01-10T17:19:56+01:00',
+          energySpectrum: {
+            numberOfChannels: 4,
+            energyCalibration: {
+              polynomialOrder: 2,
+              coefficients: [1.5, 2.0, 0.001],
+            },
+            measurementTime: 306,
+            spectrum: [10, 20, 30, 40],
+          },
+        },
+      },
+    ],
+  };
+
+  it('should reject documents without schemaVersion NPESv2', () => {
+    expect(() => parseSpectrumNpesJson('{"schemaVersion":"Other","data":[]}'))
+      .toThrow();
+  });
+
+  it('should parse sample name, device name and software', () => {
+    const data = parseSpectrumNpesJson(JSON.stringify(exampleSpectrum));
+    expect(data.sampleName).toBe('Cs-137');
+    expect(data.deviceName).toBe('RadiaCode-103');
+  });
+
+  it('should parse measurement time (live = measurement for NPES-JSON)', () => {
+    const data = parseSpectrumNpesJson(JSON.stringify(exampleSpectrum));
+    expect(data.measurementTime).toBe(306);
+    expect(data.liveTime).toBe(306);
+  });
+
+  it('should parse start and end time verbatim', () => {
+    const data = parseSpectrumNpesJson(JSON.stringify(exampleSpectrum));
+    expect(data.startTime).toBe('2026-01-10T17:14:50+01:00');
+    expect(data.endTime).toBe('2026-01-10T17:19:56+01:00');
+  });
+
+  it('should parse calibration coefficients', () => {
+    const data = parseSpectrumNpesJson(JSON.stringify(exampleSpectrum));
+    expect(data.coefficients).toEqual([1.5, 2.0, 0.001]);
+  });
+
+  it('should parse counts and compute energies', () => {
+    const data = parseSpectrumNpesJson(JSON.stringify(exampleSpectrum));
+    expect(data.counts).toEqual([10, 20, 30, 40]);
+    expect(data.energies).toHaveLength(4);
+    // E(0) = 1.5
+    expect(data.energies[0]).toBeCloseTo(1.5, 5);
+    // E(1) = 1.5 + 2.0 + 0.001 = 3.501
+    expect(data.energies[1]).toBeCloseTo(3.501, 5);
+  });
+
+  it('should default calibration to [0,1,0] when missing', () => {
+    const minimal = {
+      schemaVersion: 'NPESv2',
+      data: [
+        {
+          resultData: {
+            energySpectrum: {
+              numberOfChannels: 3,
+              spectrum: [0, 5, 10],
+            },
+          },
+        },
+      ],
+    };
+    const data = parseSpectrumNpesJson(JSON.stringify(minimal));
+    expect(data.coefficients).toEqual([0, 1, 0]);
+    expect(data.energies[2]).toBeCloseTo(2, 5);
+  });
+
+  it('should throw when numberOfChannels does not match spectrum length', () => {
+    const bad = {
+      schemaVersion: 'NPESv2',
+      data: [
+        {
+          resultData: {
+            energySpectrum: {
+              numberOfChannels: 5,
+              spectrum: [1, 2, 3],
+            },
+          },
+        },
+      ],
+    };
+    expect(() => parseSpectrumNpesJson(JSON.stringify(bad))).toThrow();
+  });
+});
+
+describe('parseSpectrumCsv', () => {
+  const sampleCsv = ['0,0', '1,5', '2,17', '3,42', '4,3'].join('\n');
+
+  it('should parse counts from channel,counts rows', () => {
+    const data = parseSpectrumCsv(sampleCsv);
+    expect(data.counts).toEqual([0, 5, 17, 42, 3]);
+  });
+
+  it('should default calibration to RadiaCode-110-like [0,3,0]', () => {
+    const data = parseSpectrumCsv(sampleCsv);
+    expect(data.coefficients).toEqual([0, 3, 0]);
+    expect(data.energies[1]).toBeCloseTo(3, 5);
+    expect(data.energies[4]).toBeCloseTo(12, 5);
+  });
+
+  it('should extract measurement time from filename "_<N>s.csv"', () => {
+    const data = parseSpectrumCsv(
+      sampleCsv,
+      'Spectrum_2021-05-12_13-5355_1426s.csv',
+    );
+    expect(data.measurementTime).toBe(1426);
+    expect(data.liveTime).toBe(1426);
+  });
+
+  it('should default measurement time to 0 when filename has no duration', () => {
+    const data = parseSpectrumCsv(sampleCsv, 'random.csv');
+    expect(data.measurementTime).toBe(0);
+    expect(data.liveTime).toBe(0);
+  });
+
+  it('should extract start time from filename and compute end time', () => {
+    const data = parseSpectrumCsv(
+      sampleCsv,
+      'Spectrum_2021-05-12_13-5355_1426s.csv',
+    );
+    expect(data.startTime).toBe('2021-05-12T13:53:55');
+    // 1426 seconds later = 13:53:55 + 23m46s = 14:17:41
+    expect(data.endTime).toBe('2021-05-12T14:17:41');
+  });
+
+  it('should use filename stem as sampleName when no metadata', () => {
+    const data = parseSpectrumCsv(sampleCsv, 'Probe_A.csv');
+    expect(data.sampleName).toBe('Probe_A');
+  });
+
+  it('should skip blank and comment lines', () => {
+    const withBlanks = ['# header', '0,0', '', '1,5', '2,10', ''].join('\n');
+    const data = parseSpectrumCsv(withBlanks);
+    expect(data.counts).toEqual([0, 5, 10]);
+  });
+});
+
 describe('parseSpectrumFile (dispatcher)', () => {
   it('should parse XML content', () => {
     const data = parseSpectrumFile(CS137_XML);
@@ -167,6 +375,47 @@ describe('parseSpectrumFile (dispatcher)', () => {
 
   it('should parse rcspg content', () => {
     const data = parseSpectrumFile(CS137_RCSPG);
+    expect(data.sampleName).toBe('Cs-137');
+    expect(data.counts).toHaveLength(1024);
+  });
+
+  it('should parse NPES-JSON content', () => {
+    const npes = JSON.stringify({
+      schemaVersion: 'NPESv2',
+      data: [
+        {
+          resultData: {
+            energySpectrum: {
+              numberOfChannels: 3,
+              spectrum: [1, 2, 3],
+            },
+          },
+        },
+      ],
+    });
+    const data = parseSpectrumFile(npes);
+    expect(data.counts).toEqual([1, 2, 3]);
+  });
+
+  it('should parse CSV content with filename metadata', () => {
+    const csv = ['0,0', '1,5', '2,10'].join('\n');
+    const data = parseSpectrumFile(csv, 'Spectrum_2021-05-12_13-5355_100s.csv');
+    expect(data.counts).toEqual([0, 5, 10]);
+    expect(data.measurementTime).toBe(100);
+  });
+
+  it('should accept an ArrayBuffer for text formats (UTF-8 decode)', () => {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(CS137_RCSPG);
+    const data = parseSpectrumFile(bytes.buffer as ArrayBuffer);
+    expect(data.sampleName).toBe('Cs-137');
+    expect(data.counts).toHaveLength(1024);
+  });
+
+  it('should unzip a zrcspg and parse the inner rcspg', () => {
+    const inner = new TextEncoder().encode(CS137_RCSPG);
+    const archive = buildStoredZip('Spectrogram_Cs-137.rcspg', inner);
+    const data = parseSpectrumFile(archive, 'Spectrogram_Cs-137.zrcspg');
     expect(data.sampleName).toBe('Cs-137');
     expect(data.counts).toHaveLength(1024);
   });

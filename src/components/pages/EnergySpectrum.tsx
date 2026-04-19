@@ -4,6 +4,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -27,6 +28,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import {
+  Fragment,
   useCallback,
   useDeferredValue,
   useMemo,
@@ -151,6 +153,19 @@ export default function EnergySpectrum() {
   const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
     [],
   );
+  const [expandedSpectrumId, setExpandedSpectrumId] = useState<string | null>(
+    null,
+  );
+
+  const toggleNuclideSelection = useCallback((name: string) => {
+    setSelectedNuclideNames((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+  }, []);
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedSpectrumId((prev) => (prev === id ? null : id));
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -209,9 +224,9 @@ export default function EnergySpectrum() {
       if (!files) return;
 
       for (const file of Array.from(files)) {
-        const text = await file.text();
+        const buffer = await file.arrayBuffer();
         try {
-          const data = parseSpectrumFile(text);
+          const data = parseSpectrumFile(buffer, file.name);
           const peaks = findPeaks(data.counts, data.energies);
           const matches = identifyNuclides(peaks);
 
@@ -398,9 +413,9 @@ export default function EnergySpectrum() {
         Nuklid Energiespektrum
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Lade eine oder mehrere XML-Dateien eines RadiaCode Spektrometers hoch,
-        um das Energiespektrum darzustellen und das Nuklid automatisch zu
-        identifizieren.
+        Lade eine oder mehrere Dateien eines RadiaCode Spektrometers hoch (XML,
+        rcspg, zrcspg, JSON oder CSV), um das Energiespektrum darzustellen und
+        das Nuklid automatisch zu identifizieren.
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <Chip
@@ -459,7 +474,7 @@ export default function EnergySpectrum() {
           startIcon={<UploadFileIcon />}
           onClick={() => fileInputRef.current?.click()}
         >
-          XML-Datei(en) hochladen
+          Datei(en) hochladen
         </Button>
         {allSpectra.length > 0 && (
           <FormControlLabel
@@ -554,9 +569,11 @@ export default function EnergySpectrum() {
             const dbLinks = identification.displayName
               ? getNuclideDbLinks(identification.displayName)
               : null;
+            const extraMatches = s.matches.slice(1, 4);
+            const isExpanded = expandedSpectrumId === s.id;
             return (
+              <Fragment key={s.id}>
               <ListItem
-                key={s.id}
                 secondaryAction={
                   <Box sx={{ display: 'flex', gap: 0 }}>
                     <IconButton
@@ -635,6 +652,14 @@ export default function EnergySpectrum() {
                           label={`${identification.displayName} (manuell)`}
                           color="primary"
                           size="small"
+                          onClick={
+                            extraMatches.length > 0
+                              ? (e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(s.id);
+                                }
+                              : undefined
+                          }
                         />
                       )}
                       {identification.source === 'auto' && (
@@ -642,6 +667,14 @@ export default function EnergySpectrum() {
                           label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
                           color="success"
                           size="small"
+                          onClick={
+                            extraMatches.length > 0
+                              ? (e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(s.id);
+                                }
+                              : undefined
+                          }
                         />
                       )}
                       {identification.source === 'none' && (
@@ -724,6 +757,60 @@ export default function EnergySpectrum() {
                   }
                 />
               </ListItem>
+              {extraMatches.length > 0 && (
+                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                  <Box sx={{ pl: 5, pr: '148px', pb: 1.5 }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mb: 0.5 }}
+                    >
+                      Weitere Kandidaten – zum Einblenden anklicken:
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 0.5,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {extraMatches.map((m) => {
+                        const selectedIdx = selectedNuclideNames.indexOf(
+                          m.nuclide.name,
+                        );
+                        const isSelected = selectedIdx >= 0;
+                        const color = isSelected
+                          ? SELECTED_PEAK_COLORS[
+                              selectedIdx % SELECTED_PEAK_COLORS.length
+                            ]
+                          : undefined;
+                        return (
+                          <Chip
+                            key={m.nuclide.name}
+                            label={`${m.nuclide.name} (${Math.round(
+                              m.confidence * 100,
+                            )}%)`}
+                            size="small"
+                            variant={isSelected ? 'filled' : 'outlined'}
+                            onClick={() =>
+                              toggleNuclideSelection(m.nuclide.name)
+                            }
+                            sx={
+                              color
+                                ? {
+                                    borderLeft: `4px solid ${color}`,
+                                    borderRadius: 1,
+                                  }
+                                : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                </Collapse>
+              )}
+              </Fragment>
             );
           })}
         </List>
@@ -901,8 +988,8 @@ export default function EnergySpectrum() {
           }}
         >
           <Typography color="text.secondary">
-            Noch keine Spektren geladen. Lade eine XML-Datei hoch, um zu
-            beginnen.
+            Noch keine Spektren geladen. Lade eine Datei (XML, rcspg, zrcspg,
+            JSON oder CSV) hoch, um zu beginnen.
           </Typography>
         </Box>
       )}

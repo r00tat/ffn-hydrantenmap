@@ -1,3 +1,4 @@
+import { unzipSync, strFromU8 } from 'fflate';
 import { type Nuclide, NUCLIDES } from './strahlenschutz';
 
 export interface SpectrumData {
@@ -202,10 +203,177 @@ export function parseSpectrogramRcspg(text: string): SpectrumData {
 }
 
 /**
- * Dispatch to the right parser based on content.
- * Accepts RadiaCode XML exports or RadiaCode-110 spectrogram (.rcspg).
+ * Parse a RadiaCode iOS spectrum export in NPES-JSON v2 format.
+ * Schema: https://github.com/OpenGammaProject/NPES-JSON
  */
-export function parseSpectrumFile(text: string): SpectrumData {
+export function parseSpectrumNpesJson(text: string): SpectrumData {
+  const doc = JSON.parse(text);
+  if (doc?.schemaVersion !== 'NPESv2') {
+    throw new Error('NPES-JSON: expected schemaVersion "NPESv2"');
+  }
+  const first = doc.data?.[0];
+  if (!first?.resultData?.energySpectrum) {
+    throw new Error('NPES-JSON: missing resultData.energySpectrum');
+  }
+  const es = first.resultData.energySpectrum;
+  const counts: number[] = (es.spectrum ?? []).map((n: unknown) => Number(n));
+  if (typeof es.numberOfChannels === 'number' && es.numberOfChannels !== counts.length) {
+    throw new Error(
+      `NPES-JSON: numberOfChannels (${es.numberOfChannels}) does not match spectrum length (${counts.length})`,
+    );
+  }
+  const rawCoeffs: number[] = es.energyCalibration?.coefficients ?? [0, 1, 0];
+  const coefficients = rawCoeffs.map((c) => Number(c));
+  const measurementTime = Number(es.measurementTime ?? 0);
+  const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+
+  return {
+    sampleName: first.sampleInfo?.name ?? '',
+    deviceName: first.deviceData?.deviceName ?? '',
+    measurementTime,
+    liveTime: measurementTime,
+    startTime: first.resultData.startTime ?? '',
+    endTime: first.resultData.endTime ?? '',
+    coefficients,
+    counts,
+    energies,
+  };
+}
+
+/**
+ * Extract `{ measurementTime, startTime }` from a RadiaCode CSV filename.
+ * Expected pattern: `Spectrum_<YYYY-MM-DD>_<HH-MMSS>_<seconds>s.csv`
+ * Example:          `Spectrum_2021-05-12_13-5355_1426s.csv`
+ * Each field is optional — unmatched parts return defaults.
+ */
+function parseCsvFilenameMetadata(
+  filename: string,
+): { measurementTime: number; startTime: string; sampleName: string } {
+  const stem = filename.replace(/\.[^./\\]+$/, '').replace(/^.*[/\\]/, '');
+  const durMatch = stem.match(/_(\d+)s$/);
+  const measurementTime = durMatch ? parseInt(durMatch[1], 10) : 0;
+
+  // Date "YYYY-MM-DD" and time "HH-MMSS" (dash splits hours from min+sec).
+  const dtMatch = stem.match(/(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})(\d{2})/);
+  let startTime = '';
+  if (dtMatch) {
+    const [, date, hh, mm, ss] = dtMatch;
+    startTime = `${date}T${hh}:${mm}:${ss}`;
+  }
+
+  const sampleName = durMatch ? stem.slice(0, durMatch.index) : stem;
+  return { measurementTime, startTime, sampleName };
+}
+
+/**
+ * Parse a RadiaCode CSV spectrum export.
+ * Format: one `channel,counts` pair per line. Lines starting with `#` and
+ * blank lines are ignored. The CSV itself has no metadata — calibration,
+ * measurement time and timestamps are derived from the filename where
+ * possible (see `parseCsvFilenameMetadata`) and default to a RadiaCode-110
+ * baseline of (0, 3, 0) keV/channel otherwise.
+ */
+export function parseSpectrumCsv(text: string, filename?: string): SpectrumData {
+  const counts: number[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const parts = line.split(',');
+    if (parts.length < 2) continue;
+    const v = parseInt(parts[1].trim(), 10);
+    counts.push(Number.isFinite(v) ? v : 0);
+  }
+
+  const meta = filename
+    ? parseCsvFilenameMetadata(filename)
+    : { measurementTime: 0, startTime: '', sampleName: '' };
+
+  const coefficients = [0, 3, 0];
+  const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+
+  let endTime = '';
+  if (meta.startTime && meta.measurementTime > 0) {
+    const startMs = Date.parse(meta.startTime + 'Z');
+    if (!Number.isNaN(startMs)) {
+      endTime = new Date(startMs + meta.measurementTime * 1000)
+        .toISOString()
+        .replace(/\.\d{3}Z$/, '');
+    }
+  }
+
+  return {
+    sampleName: meta.sampleName,
+    deviceName: '',
+    measurementTime: meta.measurementTime,
+    liveTime: meta.measurementTime,
+    startTime: meta.startTime,
+    endTime,
+    coefficients,
+    counts,
+    energies,
+  };
+}
+
+/** ZIP local-file-header magic bytes (`PK\x03\x04`). */
+function isZipArchive(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    bytes[2] === 0x03 &&
+    bytes[3] === 0x04
+  );
+}
+
+/**
+ * Extract the first spectrum-bearing member (.rcspg / .xml / .json / .csv)
+ * from a ZIP archive and return it as UTF-8 text along with the inner
+ * filename (used for CSV metadata). zrcspg and zrcsp are simple ZIP
+ * containers around a single rcspg/xml document.
+ */
+function unpackZipSpectrum(bytes: Uint8Array): { text: string; name: string } {
+  const entries = unzipSync(bytes);
+  for (const [name, data] of Object.entries(entries)) {
+    if (/\.(rcspg|xml|json|csv)$/i.test(name)) {
+      return { text: strFromU8(data), name };
+    }
+  }
+  throw new Error('ZIP archive contains no recognised spectrum file');
+}
+
+/**
+ * Dispatch to the right parser based on content.
+ * Accepts:
+ *  - RadiaCode XML exports
+ *  - RadiaCode spectrogram (.rcspg) text
+ *  - NPES-JSON v2 (RadiaCode iOS export)
+ *  - RadiaCode CSV exports (metadata derived from filename when provided)
+ *  - ZIP archives (.zrcspg / .zrcsp) containing any of the above
+ *
+ * `filename` is optional but lets the CSV parser recover the measurement
+ * time and timestamp which are not present in the file content itself.
+ */
+export function parseSpectrumFile(
+  input: string | ArrayBuffer | Uint8Array,
+  filename?: string,
+): SpectrumData {
+  let text: string;
+  let innerName = filename;
+
+  if (typeof input === 'string') {
+    text = input;
+  } else {
+    const bytes =
+      input instanceof Uint8Array ? input : new Uint8Array(input);
+    if (isZipArchive(bytes)) {
+      const unpacked = unpackZipSpectrum(bytes);
+      text = unpacked.text;
+      innerName = unpacked.name;
+    } else {
+      text = new TextDecoder('utf-8').decode(bytes);
+    }
+  }
+
   const head = text.trimStart();
   if (head.startsWith('<')) {
     return parseSpectrumXml(text);
@@ -213,7 +381,13 @@ export function parseSpectrumFile(text: string): SpectrumData {
   if (head.startsWith('Spectrogram:')) {
     return parseSpectrogramRcspg(text);
   }
-  throw new Error('Unknown spectrum format (expected XML or rcspg)');
+  if (head.startsWith('{')) {
+    return parseSpectrumNpesJson(text);
+  }
+  if (/^\s*\d+\s*,\s*\d+/m.test(head)) {
+    return parseSpectrumCsv(text, innerName);
+  }
+  throw new Error('Unknown spectrum format (expected XML, rcspg, NPES-JSON or CSV)');
 }
 
 export interface FindPeaksOptions {
