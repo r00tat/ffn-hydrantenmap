@@ -349,6 +349,29 @@ describe('NUCLIDES', () => {
   });
 });
 
+describe('NUCLIDES peak data', () => {
+  it('Cs-137 has a single peak at 661.7 keV with intensity 0.851', () => {
+    const cs137 = NUCLIDES.find((n) => n.name === 'Cs-137')!;
+    expect(cs137.peaks).toEqual([{ energy: 661.7, intensity: 0.851 }]);
+  });
+
+  it('Co-60 has two peaks near 100% intensity', () => {
+    const co60 = NUCLIDES.find((n) => n.name === 'Co-60')!;
+    expect(co60.peaks).toHaveLength(2);
+    expect(co60.peaks![0].intensity).toBeGreaterThan(0.99);
+    expect(co60.peaks![1].intensity).toBeGreaterThan(0.99);
+  });
+
+  it('Ba-133 has 356 keV as dominant peak', () => {
+    const ba133 = NUCLIDES.find((n) => n.name === 'Ba-133')!;
+    const dominant = ba133.peaks!.reduce((a, b) =>
+      a.intensity > b.intensity ? a : b,
+    );
+    expect(dominant.energy).toBe(356);
+    expect(dominant.intensity).toBeCloseTo(0.621, 2);
+  });
+});
+
 describe('calculateDosisleistungNuklid', () => {
   it('calculates dose rate from activity', () => {
     const result = calculateDosisleistungNuklid(351, {
