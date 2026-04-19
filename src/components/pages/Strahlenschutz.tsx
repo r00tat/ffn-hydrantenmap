@@ -84,7 +84,7 @@ function FormulaDisplay({
 function getAbstandFormulaDisplay(
   field: keyof StrahlenschutzValues,
   values: StrahlenschutzValues,
-  resultValue: number
+  resultValue: number,
 ) {
   const v = (key: keyof StrahlenschutzValues) =>
     key === field ? formatValue(resultValue) : formatValue(values[key]!);
@@ -116,7 +116,7 @@ function getAbstandFormulaDisplay(
 function getSchutzwertFormulaDisplay(
   field: keyof SchutzwertValues,
   values: SchutzwertValues,
-  resultValue: number
+  resultValue: number,
 ) {
   const v = (key: keyof SchutzwertValues) =>
     key === field ? formatValue(resultValue) : formatValue(values[key]!);
@@ -148,7 +148,7 @@ function getSchutzwertFormulaDisplay(
 function getAufenthaltszeitFormulaDisplay(
   field: keyof AufenthaltszeitValues,
   values: AufenthaltszeitValues,
-  resultValue: number
+  resultValue: number,
 ) {
   const v = (key: keyof AufenthaltszeitValues) =>
     key === field ? formatValue(resultValue) : formatValue(values[key]!);
@@ -199,7 +199,7 @@ function Abstandsgesetz() {
       d2: parseInput(inputs.d2),
       r2: parseInput(inputs.r2),
     }),
-    [inputs]
+    [inputs],
   );
 
   const result = useMemo(() => calculateInverseSquareLaw(values), [values]);
@@ -210,7 +210,7 @@ function Abstandsgesetz() {
       (event: React.ChangeEvent<HTMLInputElement>) => {
         setInputs((prev) => ({ ...prev, [field]: event.target.value }));
       },
-    []
+    [],
   );
 
   const handleCalculate = useCallback(() => {
@@ -244,8 +244,8 @@ function Abstandsgesetz() {
         Quadratisches Abstandsgesetz
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        D1² × R1 = D2² × R2 — Gib 3 Werte ein, der 4. wird berechnet. Lasse
-        das zu berechnende Feld leer.
+        D1² × R1 = D2² × R2 — Gib 3 Werte ein, der 4. wird berechnet. Lasse das
+        zu berechnende Feld leer.
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -262,7 +262,7 @@ function Abstandsgesetz() {
               size="small"
               slotProps={{ inputLabel: { shrink: true } }}
             />
-          )
+          ),
         )}
       </Box>
 
@@ -279,28 +279,33 @@ function Abstandsgesetz() {
         </Button>
       </Box>
 
-      {result && (() => {
-        const formulaDisplay = getAbstandFormulaDisplay(result.field, values, result.value);
-        return (
-          <Box
-            sx={{
-              mt: 2,
-              p: 2,
-              bgcolor: 'success.main',
-              color: 'success.contrastText',
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="h6">
-              {abstandLabels[result.field]} = {formatValue(result.value)}
-            </Typography>
-            <FormulaDisplay
-              formula={formulaDisplay.formula}
-              substituted={formulaDisplay.substituted}
-            />
-          </Box>
-        );
-      })()}
+      {result &&
+        (() => {
+          const formulaDisplay = getAbstandFormulaDisplay(
+            result.field,
+            values,
+            result.value,
+          );
+          return (
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: 'success.main',
+                color: 'success.contrastText',
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="h6">
+                {abstandLabels[result.field]} = {formatValue(result.value)}
+              </Typography>
+              <FormulaDisplay
+                formula={formulaDisplay.formula}
+                substituted={formulaDisplay.substituted}
+              />
+            </Box>
+          );
+        })()}
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -322,7 +327,11 @@ function Abstandsgesetz() {
           </Typography>
           <List dense>
             {history.map((entry, index) => {
-              const fd = getAbstandFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              const fd = getAbstandFormulaDisplay(
+                entry.calculatedField,
+                entry,
+                entry[entry.calculatedField],
+              );
               return (
                 <ListItem
                   key={index}
@@ -369,9 +378,7 @@ const schutzwertLabels: Record<keyof SchutzwertValues, string> = {
 };
 
 function SchutzwertRechner() {
-  const [inputs, setInputs] = useState<
-    Record<keyof SchutzwertValues, string>
-  >({
+  const [inputs, setInputs] = useState<Record<keyof SchutzwertValues, string>>({
     r0: '',
     r: '',
     s: '',
@@ -386,7 +393,7 @@ function SchutzwertRechner() {
       s: parseInput(inputs.s),
       n: parseInput(inputs.n),
     }),
-    [inputs]
+    [inputs],
   );
 
   const result = useMemo(() => calculateSchutzwert(values), [values]);
@@ -397,7 +404,7 @@ function SchutzwertRechner() {
       (event: React.ChangeEvent<HTMLInputElement>) => {
         setInputs((prev) => ({ ...prev, [field]: event.target.value }));
       },
-    []
+    [],
   );
 
   const handleCalculate = useCallback(() => {
@@ -449,7 +456,7 @@ function SchutzwertRechner() {
               size="small"
               slotProps={{ inputLabel: { shrink: true } }}
             />
-          )
+          ),
         )}
       </Box>
 
@@ -466,28 +473,33 @@ function SchutzwertRechner() {
         </Button>
       </Box>
 
-      {result && (() => {
-        const formulaDisplay = getSchutzwertFormulaDisplay(result.field, values, result.value);
-        return (
-          <Box
-            sx={{
-              mt: 2,
-              p: 2,
-              bgcolor: 'success.main',
-              color: 'success.contrastText',
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="h6">
-              {schutzwertLabels[result.field]} = {formatValue(result.value)}
-            </Typography>
-            <FormulaDisplay
-              formula={formulaDisplay.formula}
-              substituted={formulaDisplay.substituted}
-            />
-          </Box>
-        );
-      })()}
+      {result &&
+        (() => {
+          const formulaDisplay = getSchutzwertFormulaDisplay(
+            result.field,
+            values,
+            result.value,
+          );
+          return (
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: 'success.main',
+                color: 'success.contrastText',
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="h6">
+                {schutzwertLabels[result.field]} = {formatValue(result.value)}
+              </Typography>
+              <FormulaDisplay
+                formula={formulaDisplay.formula}
+                substituted={formulaDisplay.substituted}
+              />
+            </Box>
+          );
+        })()}
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -509,7 +521,11 @@ function SchutzwertRechner() {
           </Typography>
           <List dense>
             {history.map((entry, index) => {
-              const fd = getSchutzwertFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              const fd = getSchutzwertFormulaDisplay(
+                entry.calculatedField,
+                entry,
+                entry[entry.calculatedField],
+              );
               return (
                 <ListItem
                   key={index}
@@ -570,7 +586,7 @@ function AufenthaltszeitRechner() {
       d: parseInput(inputs.d),
       r: parseInput(inputs.r),
     }),
-    [inputs]
+    [inputs],
   );
 
   const result = useMemo(() => calculateAufenthaltszeit(values), [values]);
@@ -581,7 +597,7 @@ function AufenthaltszeitRechner() {
       (event: React.ChangeEvent<HTMLInputElement>) => {
         setInputs((prev) => ({ ...prev, [field]: event.target.value }));
       },
-    []
+    [],
   );
 
   const handleCalculate = useCallback(() => {
@@ -649,29 +665,35 @@ function AufenthaltszeitRechner() {
         </Button>
       </Box>
 
-      {result && (() => {
-        const formulaDisplay = getAufenthaltszeitFormulaDisplay(result.field, values, result.value);
-        return (
-          <Box
-            sx={{
-              mt: 2,
-              p: 2,
-              bgcolor: 'success.main',
-              color: 'success.contrastText',
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="h6">
-              {aufenthaltszeitLabels[result.field]} = {formatValue(result.value)}
-              {result.field === 't' && ` (${formatDuration(result.value)})`}
-            </Typography>
-            <FormulaDisplay
-              formula={formulaDisplay.formula}
-              substituted={formulaDisplay.substituted}
-            />
-          </Box>
-        );
-      })()}
+      {result &&
+        (() => {
+          const formulaDisplay = getAufenthaltszeitFormulaDisplay(
+            result.field,
+            values,
+            result.value,
+          );
+          return (
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                bgcolor: 'success.main',
+                color: 'success.contrastText',
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="h6">
+                {aufenthaltszeitLabels[result.field]} ={' '}
+                {formatValue(result.value)}
+                {result.field === 't' && ` (${formatDuration(result.value)})`}
+              </Typography>
+              <FormulaDisplay
+                formula={formulaDisplay.formula}
+                substituted={formulaDisplay.substituted}
+              />
+            </Box>
+          );
+        })()}
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -693,7 +715,11 @@ function AufenthaltszeitRechner() {
           </Typography>
           <List dense>
             {history.map((entry, index) => {
-              const fd = getAufenthaltszeitFormulaDisplay(entry.calculatedField, entry, entry[entry.calculatedField]);
+              const fd = getAufenthaltszeitFormulaDisplay(
+                entry.calculatedField,
+                entry,
+                entry[entry.calculatedField],
+              );
               return (
                 <ListItem
                   key={index}
@@ -738,7 +764,7 @@ function getDosisleistungNuklidFormulaDisplay(
   activityGBq: number,
   activityInUnit: number,
   unit: ActivityUnit,
-  doseRate: number
+  doseRate: number,
 ) {
   const hStr = formatValue(doseRate);
   const gStr = formatValue(gamma);
@@ -758,7 +784,7 @@ function getDosisleistungNuklidFormulaDisplay(
 
 function DosisleistungNuklidRechner() {
   const [selectedNuclide, setSelectedNuclide] = useState<string>(
-    NUCLIDES[0].name
+    NUCLIDES[0].name,
   );
   const [activityInput, setActivityInput] = useState('');
   const [activityUnit, setActivityUnit] = useState<ActivityUnit>('GBq');
@@ -767,16 +793,16 @@ function DosisleistungNuklidRechner() {
 
   const nuclide = useMemo(
     () => NUCLIDES.find((n) => n.name === selectedNuclide) ?? NUCLIDES[0],
-    [selectedNuclide]
+    [selectedNuclide],
   );
 
   const parsedActivity = useMemo(
     () => parseInput(activityInput),
-    [activityInput]
+    [activityInput],
   );
   const parsedDoseRate = useMemo(
     () => parseInput(doseRateInput),
-    [doseRateInput]
+    [doseRateInput],
   );
 
   const activityInGBq = useMemo(
@@ -784,23 +810,22 @@ function DosisleistungNuklidRechner() {
       parsedActivity !== null
         ? convertActivityToGBq(parsedActivity, activityUnit)
         : null,
-    [parsedActivity, activityUnit]
+    [parsedActivity, activityUnit],
   );
 
   const values: DosisleistungNuklidValues = useMemo(
     () => ({ activity: activityInGBq, doseRate: parsedDoseRate }),
-    [activityInGBq, parsedDoseRate]
+    [activityInGBq, parsedDoseRate],
   );
 
   const result = useMemo(
     () => calculateDosisleistungNuklid(nuclide.gamma, values),
-    [nuclide.gamma, values]
+    [nuclide.gamma, values],
   );
 
   const handleCalculate = useCallback(() => {
     if (!result) return;
-    const actGBq =
-      result.field === 'activity' ? result.value : activityInGBq!;
+    const actGBq = result.field === 'activity' ? result.value : activityInGBq!;
     const dr = result.field === 'doseRate' ? result.value : parsedDoseRate!;
     const entry: DosisleistungNuklidHistoryEntry = {
       nuclide: nuclide.name,
@@ -820,7 +845,7 @@ function DosisleistungNuklidRechner() {
       setDoseRateInput(formatValue(result.value));
     } else {
       setActivityInput(
-        formatValue(result.value / convertActivityToGBq(1, activityUnit))
+        formatValue(result.value / convertActivityToGBq(1, activityUnit)),
       );
     }
   }, [
@@ -949,7 +974,7 @@ function DosisleistungNuklidRechner() {
             actGBq,
             actInUnit,
             activityUnit,
-            dr
+            dr,
           );
           const resultLabel =
             result.field === 'doseRate'
@@ -988,7 +1013,7 @@ function DosisleistungNuklidRechner() {
                 entry.activityGBq,
                 entry.activityInUnit,
                 entry.activityUnit,
-                entry.doseRate
+                entry.doseRate,
               );
               const primary =
                 entry.calculatedField === 'doseRate'
@@ -1048,7 +1073,7 @@ function Einheitenumrechnung() {
 
   const compatibleUnits = useMemo(
     () => getCompatibleUnits(fromUnit),
-    [fromUnit]
+    [fromUnit],
   );
 
   // When source unit changes, ensure target unit stays compatible
@@ -1088,10 +1113,13 @@ function Einheitenumrechnung() {
         Einheitenumrechnung
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Dosis und Dosisleistung umrechnen. 1 R ≈ 0,01 Sv (Gamma, Weichteilgewebe).
+        Dosis und Dosisleistung umrechnen. 1 R ≈ 0,01 Sv (Gamma,
+        Weichteilgewebe).
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Box
+        sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
+      >
         <TextField
           label="Wert"
           value={inputValue}
@@ -1201,16 +1229,21 @@ function Einheitenumrechnung() {
 
 export default function Strahlenschutz() {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <Abstandsgesetz />
-      <Divider />
-      <SchutzwertRechner />
-      <Divider />
-      <AufenthaltszeitRechner />
-      <Divider />
-      <DosisleistungNuklidRechner />
-      <Divider />
-      <Einheitenumrechnung />
-    </Box>
+    <>
+      <Typography variant="h5" gutterBottom>
+        Strahlenschutz Berechnungen
+      </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Abstandsgesetz />
+        <Divider />
+        <SchutzwertRechner />
+        <Divider />
+        <AufenthaltszeitRechner />
+        <Divider />
+        <DosisleistungNuklidRechner />
+        <Divider />
+        <Einheitenumrechnung />
+      </Box>
+    </>
   );
 }

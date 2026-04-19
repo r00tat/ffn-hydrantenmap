@@ -109,7 +109,7 @@ function getDisplayRange(spectra: LoadedSpectrum[]): number {
 
 /** Nuclides that have peak energies defined for matching. */
 const MATCHABLE_NUCLIDES = NUCLIDES.filter(
-  (n) => n.peaks && n.peaks.length > 0
+  (n) => n.peaks && n.peaks.length > 0,
 );
 
 /**
@@ -141,7 +141,7 @@ export default function EnergySpectrum() {
   const [logScale, setLogScale] = useState(false);
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
   const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
-    []
+    [],
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,10 +149,7 @@ export default function EnergySpectrum() {
   const addItem = useFirecallItemAdd();
   const updateItem = useFirecallItemUpdate();
 
-  const queryConstraints = useMemo(
-    () => [where('type', '==', 'spectrum')],
-    []
-  );
+  const queryConstraints = useMemo(() => [where('type', '==', 'spectrum')], []);
   const filterFn = useCallback((s: Spectrum) => !s.deleted, []);
   const savedSpectra = useFirebaseCollection<Spectrum>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -168,34 +165,34 @@ export default function EnergySpectrum() {
     return savedSpectra
       .filter((saved) => saved.counts?.length > 0)
       .map((saved) => {
-      const id = `firestore-${saved.id}`;
-      const energies = saved.counts.map((_, ch) =>
-        channelToEnergy(ch, saved.coefficients)
-      );
-      const dataWithEnergies: SpectrumData = {
-        sampleName: saved.sampleName,
-        deviceName: saved.deviceName,
-        measurementTime: saved.measurementTime,
-        liveTime: saved.liveTime,
-        startTime: saved.startTime,
-        endTime: saved.endTime,
-        coefficients: saved.coefficients,
-        counts: saved.counts,
-        energies,
-      };
-      const peaks = findPeaks(dataWithEnergies.counts, energies);
-      const matches = identifyNuclides(peaks);
+        const id = `firestore-${saved.id}`;
+        const energies = saved.counts.map((_, ch) =>
+          channelToEnergy(ch, saved.coefficients),
+        );
+        const dataWithEnergies: SpectrumData = {
+          sampleName: saved.sampleName,
+          deviceName: saved.deviceName,
+          measurementTime: saved.measurementTime,
+          liveTime: saved.liveTime,
+          startTime: saved.startTime,
+          endTime: saved.endTime,
+          coefficients: saved.coefficients,
+          counts: saved.counts,
+          energies,
+        };
+        const peaks = findPeaks(dataWithEnergies.counts, energies);
+        const matches = identifyNuclides(peaks);
 
-      return {
-        id,
-        firestoreId: saved.id,
-        data: dataWithEnergies,
-        matches,
-        visible: !hiddenIds.has(id),
-        description: saved.description,
-        manualNuclide: saved.manualNuclide,
-      };
-    });
+        return {
+          id,
+          firestoreId: saved.id,
+          data: dataWithEnergies,
+          matches,
+          visible: !hiddenIds.has(id),
+          description: saved.description,
+          manualNuclide: saved.manualNuclide,
+        };
+      });
   }, [savedSpectra, hiddenIds]);
 
   const handleFileUpload = useCallback(
@@ -232,7 +229,7 @@ export default function EnergySpectrum() {
 
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
-    [addItem]
+    [addItem],
   );
 
   const toggleVisibility = useCallback((id: string) => {
@@ -264,21 +261,18 @@ export default function EnergySpectrum() {
         return next;
       });
     },
-    [updateItem, allSpectra]
+    [updateItem, allSpectra],
   );
 
-  const openEditDialog = useCallback(
-    (spectrum: LoadedSpectrum) => {
-      setEditDialog({
-        id: spectrum.id,
-        firestoreId: spectrum.firestoreId,
-        sampleName: spectrum.data.sampleName || '',
-        description: spectrum.description || '',
-        manualNuclide: spectrum.manualNuclide ?? null,
-      });
-    },
-    []
-  );
+  const openEditDialog = useCallback((spectrum: LoadedSpectrum) => {
+    setEditDialog({
+      id: spectrum.id,
+      firestoreId: spectrum.firestoreId,
+      sampleName: spectrum.data.sampleName || '',
+      description: spectrum.description || '',
+      manualNuclide: spectrum.manualNuclide ?? null,
+    });
+  }, []);
 
   const handleEditSave = useCallback(() => {
     if (!editDialog?.firestoreId) return;
@@ -300,7 +294,7 @@ export default function EnergySpectrum() {
 
   const visibleSpectra = useMemo(
     () => allSpectra.filter((s) => s.visible),
-    [allSpectra]
+    [allSpectra],
   );
 
   // Defer chart-related computations so the list toggles instantly
@@ -311,7 +305,7 @@ export default function EnergySpectrum() {
       deferredVisibleSpectra.length > 0
         ? getDisplayRange(deferredVisibleSpectra)
         : 0,
-    [deferredVisibleSpectra]
+    [deferredVisibleSpectra],
   );
 
   const selectedPeakLines = useMemo(
@@ -319,12 +313,14 @@ export default function EnergySpectrum() {
       buildNuclidePeakLines(
         selectedNuclideNames,
         MATCHABLE_NUCLIDES,
-        SELECTED_PEAK_COLORS
+        SELECTED_PEAK_COLORS,
       ),
-    [selectedNuclideNames]
+    [selectedNuclideNames],
   );
 
-  // Collect matched peak energies from visible spectra for reference lines
+  // Collect matched peak energies from visible spectra for reference lines.
+  // Includes auto-detected matches and manually assigned nuclides so both show
+  // up as reference lines in the chart with the same styling.
   const matchedPeakEnergies = useMemo(() => {
     const peakMap = new Map<string, number>(); // label -> energy keV
     for (const s of deferredVisibleSpectra) {
@@ -332,6 +328,17 @@ export default function EnergySpectrum() {
         for (const mp of match.matchedPeaks) {
           const label = `${match.nuclide.name} (${Math.round(mp.expected)} keV)`;
           peakMap.set(label, mp.found.energy);
+        }
+      }
+      if (s.manualNuclide) {
+        const nuclide = NUCLIDES.find((n) => n.name === s.manualNuclide);
+        if (nuclide?.peaks?.length) {
+          for (const energy of nuclide.peaks) {
+            const label = `${nuclide.name} (${Math.round(energy)} keV)`;
+            if (!peakMap.has(label)) {
+              peakMap.set(label, energy);
+            }
+          }
         }
       }
     }
@@ -359,11 +366,10 @@ export default function EnergySpectrum() {
     return { energies, series };
   }, [allSpectra, deferredVisibleSpectra, displayRange]);
 
-
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>
-        Energiespektrum
+      <Typography variant="h5" gutterBottom>
+        Nuklid Energiespektrum
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Lade eine oder mehrere XML-Dateien eines RadiaCode Spektrometers hoch,
@@ -449,7 +455,11 @@ export default function EnergySpectrum() {
                 Erkennbare Nuklide ({MATCHABLE_NUCLIDES.length})
               </Typography>
               {MATCHABLE_NUCLIDES.map((n) => (
-                <Typography key={n.name} variant="caption" sx={{ display: "block" }}>
+                <Typography
+                  key={n.name}
+                  variant="caption"
+                  sx={{ display: 'block' }}
+                >
                   {n.name}: {n.peaks!.join(', ')} keV
                 </Typography>
               ))}
@@ -507,8 +517,11 @@ export default function EnergySpectrum() {
             const identification = resolveSpectrumIdentification(
               s.manualNuclide,
               topMatch
-                ? { name: topMatch.nuclide.name, confidence: topMatch.confidence }
-                : undefined
+                ? {
+                    name: topMatch.nuclide.name,
+                    confidence: topMatch.confidence,
+                  }
+                : undefined,
             );
             const identNuclide = identification.displayName
               ? NUCLIDES.find((n) => n.name === identification.displayName)
@@ -570,8 +583,7 @@ export default function EnergySpectrum() {
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    backgroundColor:
-                      SERIES_COLORS[idx % SERIES_COLORS.length],
+                    backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length],
                     mr: 1,
                     flexShrink: 0,
                   }}
@@ -638,7 +650,9 @@ export default function EnergySpectrum() {
                             target="_blank"
                             rel="noopener noreferrer"
                             clickable
-                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) =>
+                              e.stopPropagation()
+                            }
                           />
                           <Chip
                             label="NNDC"
@@ -649,7 +663,9 @@ export default function EnergySpectrum() {
                             target="_blank"
                             rel="noopener noreferrer"
                             clickable
-                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) =>
+                              e.stopPropagation()
+                            }
                           />
                         </>
                       )}
@@ -657,7 +673,7 @@ export default function EnergySpectrum() {
                         identification.autoAlt && (
                           <Chip
                             label={`Auto: ${identification.autoAlt.name} (${Math.round(
-                              identification.autoAlt.confidence * 100
+                              identification.autoAlt.confidence * 100,
                             )}%)`}
                             size="small"
                             variant="outlined"
@@ -673,7 +689,7 @@ export default function EnergySpectrum() {
                         <Typography
                           component="span"
                           variant="caption"
-                          sx={{ display: "block" }}
+                          sx={{ display: 'block' }}
                           color="text.secondary"
                         >
                           {s.description}
@@ -705,7 +721,7 @@ export default function EnergySpectrum() {
             value={editDialog?.sampleName ?? ''}
             onChange={(e) =>
               setEditDialog((prev) =>
-                prev ? { ...prev, sampleName: e.target.value } : prev
+                prev ? { ...prev, sampleName: e.target.value } : prev,
               )
             }
           />
@@ -714,7 +730,7 @@ export default function EnergySpectrum() {
             value={editDialog?.manualNuclide ?? null}
             onChange={(_, value) =>
               setEditDialog((prev) =>
-                prev ? { ...prev, manualNuclide: value } : prev
+                prev ? { ...prev, manualNuclide: value } : prev,
               )
             }
             sx={{ mt: 1 }}
@@ -737,7 +753,7 @@ export default function EnergySpectrum() {
             value={editDialog?.description ?? ''}
             onChange={(e) =>
               setEditDialog((prev) =>
-                prev ? { ...prev, description: e.target.value } : prev
+                prev ? { ...prev, description: e.target.value } : prev,
               )
             }
           />
@@ -784,7 +800,8 @@ export default function EnergySpectrum() {
               showMark: false,
               curve: 'linear' as const,
               valueFormatter: (v: number | null) => {
-                const counts = logScale && v != null ? Math.round(Math.pow(10, v) - 1) : v;
+                const counts =
+                  logScale && v != null ? Math.round(Math.pow(10, v) - 1) : v;
                 return `${counts} cps`;
               },
             }))}
@@ -807,7 +824,7 @@ export default function EnergySpectrum() {
                     fontWeight: 'bold',
                   }}
                 />
-              )
+              ),
             )}
             {selectedPeakLines.map((line) => (
               <ChartsReferenceLine

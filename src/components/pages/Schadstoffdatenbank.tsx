@@ -41,6 +41,9 @@ export default function Schadstoffdatenbank() {
 
   return (
     <>
+      <Typography variant="h5" gutterBottom>
+        Schadstoffdatenbank
+      </Typography>
       <TextField
         autoFocus
         margin="dense"
@@ -91,9 +94,7 @@ export default function Schadstoffdatenbank() {
               <CardContent>
                 <Typography color="text.secondary">{r.unNumber}</Typography>
                 <Typography>{r.name}</Typography>
-                <Typography variant="caption">
-                  Schutzanzug Parameter
-                </Typography>
+                <Typography variant="caption">Schutzanzug Parameter</Typography>
                 <Typography variant="body2">
                   Resistenzgrad: Klasse {r.resistanceTemperature}
                   <br />
