@@ -1,5 +1,6 @@
 'use client';
 
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -42,6 +43,8 @@ import {
   type SpectrumData,
   type NuclideMatch,
 } from '../../common/spectrumParser';
+import { buildNuclidePeakLines } from '../../common/nuclidePeakLines';
+import { resolveSpectrumIdentification } from '../../common/spectrumIdentification';
 import {
   FIRECALL_COLLECTION_ID,
   Spectrum,
@@ -61,6 +64,22 @@ const SERIES_COLORS = [
   '#0288d1',
 ];
 
+/**
+ * Palette for manually selected nuclide peak lines. Intentionally distinct from
+ * SERIES_COLORS (spectrum curves) and the red (#d32f2f) used for auto-matched
+ * peaks, so the three line sets stay visually separable.
+ */
+const SELECTED_PEAK_COLORS = [
+  '#00796b',
+  '#c2185b',
+  '#5d4037',
+  '#455a64',
+  '#512da8',
+  '#ef6c00',
+  '#2e7d32',
+  '#1565c0',
+];
+
 interface LoadedSpectrum {
   id: string;
   firestoreId?: string;
@@ -68,6 +87,7 @@ interface LoadedSpectrum {
   matches: NuclideMatch[];
   visible: boolean;
   description?: string;
+  manualNuclide?: string;
 }
 
 /**
@@ -113,12 +133,16 @@ interface EditDialogState {
   firestoreId?: string;
   sampleName: string;
   description: string;
+  manualNuclide: string | null;
 }
 
 export default function EnergySpectrum() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [logScale, setLogScale] = useState(false);
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
+  const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
+    []
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firecallId = useFirecallId();
@@ -169,6 +193,7 @@ export default function EnergySpectrum() {
         matches,
         visible: !hiddenIds.has(id),
         description: saved.description,
+        manualNuclide: saved.manualNuclide,
       };
     });
   }, [savedSpectra, hiddenIds]);
@@ -249,6 +274,7 @@ export default function EnergySpectrum() {
         firestoreId: spectrum.firestoreId,
         sampleName: spectrum.data.sampleName || '',
         description: spectrum.description || '',
+        manualNuclide: spectrum.manualNuclide ?? null,
       });
     },
     []
@@ -265,6 +291,7 @@ export default function EnergySpectrum() {
         name: editDialog.sampleName,
         sampleName: editDialog.sampleName,
         description: editDialog.description,
+        manualNuclide: editDialog.manualNuclide ?? '',
       } as Spectrum);
     }
 
@@ -285,6 +312,16 @@ export default function EnergySpectrum() {
         ? getDisplayRange(deferredVisibleSpectra)
         : 0,
     [deferredVisibleSpectra]
+  );
+
+  const selectedPeakLines = useMemo(
+    () =>
+      buildNuclidePeakLines(
+        selectedNuclideNames,
+        MATCHABLE_NUCLIDES,
+        SELECTED_PEAK_COLORS
+      ),
+    [selectedNuclideNames]
   );
 
   // Collect matched peak energies from visible spectra for reference lines
@@ -424,6 +461,42 @@ export default function EnergySpectrum() {
             <InfoOutlinedIcon />
           </IconButton>
         </Tooltip>
+        <Autocomplete
+          multiple
+          size="small"
+          options={MATCHABLE_NUCLIDES.map((n) => n.name)}
+          value={selectedNuclideNames}
+          onChange={(_, value) => setSelectedNuclideNames(value)}
+          sx={{ minWidth: 260, flex: 1 }}
+          renderValue={(value, getItemProps) =>
+            value.map((name, idx) => {
+              const color =
+                SELECTED_PEAK_COLORS[idx % SELECTED_PEAK_COLORS.length];
+              const { key, ...itemProps } = getItemProps({ index: idx });
+              return (
+                <Chip
+                  key={key}
+                  label={name}
+                  size="small"
+                  {...itemProps}
+                  sx={{
+                    borderLeft: `4px solid ${color}`,
+                    borderRadius: 1,
+                  }}
+                />
+              );
+            })
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Peaks von Nukliden einblenden"
+              placeholder={
+                selectedNuclideNames.length === 0 ? 'Nuklide wählen' : ''
+              }
+            />
+          )}
+        />
       </Box>
 
       {/* Identification Results */}
@@ -431,6 +504,18 @@ export default function EnergySpectrum() {
         <List dense>
           {allSpectra.map((s, idx) => {
             const topMatch = s.matches[0];
+            const identification = resolveSpectrumIdentification(
+              s.manualNuclide,
+              topMatch
+                ? { name: topMatch.nuclide.name, confidence: topMatch.confidence }
+                : undefined
+            );
+            const identNuclide = identification.displayName
+              ? NUCLIDES.find((n) => n.name === identification.displayName)
+              : undefined;
+            const dbLinks = identification.displayName
+              ? getNuclideDbLinks(identification.displayName)
+              : null;
             return (
               <ListItem
                 key={s.id}
@@ -508,64 +593,77 @@ export default function EnergySpectrum() {
                       >
                         {s.data.sampleName || 'Unbekannt'}
                       </Typography>
-                      {topMatch && (() => {
-                        const dbLinks = getNuclideDbLinks(topMatch.nuclide.name);
-                        return (
-                          <>
-                            <Chip
-                              label={`${topMatch.nuclide.name} (${Math.round(topMatch.confidence * 100)}%)`}
-                              color="success"
-                              size="small"
-                            />
-                            {topMatch.nuclide.url && (
-                              <Chip
-                                label="RadiaCode"
-                                size="small"
-                                variant="outlined"
-                                component="a"
-                                href={topMatch.nuclide.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                clickable
-                                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                              />
-                            )}
-                            {dbLinks && (
-                              <>
-                                <Chip
-                                  label="IAEA"
-                                  size="small"
-                                  variant="outlined"
-                                  component="a"
-                                  href={dbLinks.iaea}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                                />
-                                <Chip
-                                  label="NNDC"
-                                  size="small"
-                                  variant="outlined"
-                                  component="a"
-                                  href={dbLinks.nndc}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  clickable
-                                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                                />
-                              </>
-                            )}
-                          </>
-                        );
-                      })()}
-                      {!topMatch && (
+                      {identification.source === 'manual' && (
+                        <Chip
+                          label={`${identification.displayName} (manuell)`}
+                          color="primary"
+                          size="small"
+                        />
+                      )}
+                      {identification.source === 'auto' && (
+                        <Chip
+                          label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
+                          color="success"
+                          size="small"
+                        />
+                      )}
+                      {identification.source === 'none' && (
                         <Chip
                           label="Nicht identifiziert"
                           color="warning"
                           size="small"
                         />
                       )}
+                      {identNuclide?.url && (
+                        <Chip
+                          label="RadiaCode"
+                          size="small"
+                          variant="outlined"
+                          component="a"
+                          href={identNuclide.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          clickable
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        />
+                      )}
+                      {dbLinks && (
+                        <>
+                          <Chip
+                            label="IAEA"
+                            size="small"
+                            variant="outlined"
+                            component="a"
+                            href={dbLinks.iaea}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            clickable
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          />
+                          <Chip
+                            label="NNDC"
+                            size="small"
+                            variant="outlined"
+                            component="a"
+                            href={dbLinks.nndc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            clickable
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          />
+                        </>
+                      )}
+                      {identification.source === 'manual' &&
+                        identification.autoAlt && (
+                          <Chip
+                            label={`Auto: ${identification.autoAlt.name} (${Math.round(
+                              identification.autoAlt.confidence * 100
+                            )}%)`}
+                            size="small"
+                            variant="outlined"
+                            color="default"
+                          />
+                        )}
                     </Box>
                   }
                   secondary={
@@ -610,6 +708,25 @@ export default function EnergySpectrum() {
                 prev ? { ...prev, sampleName: e.target.value } : prev
               )
             }
+          />
+          <Autocomplete
+            options={NUCLIDES.map((n) => n.name)}
+            value={editDialog?.manualNuclide ?? null}
+            onChange={(_, value) =>
+              setEditDialog((prev) =>
+                prev ? { ...prev, manualNuclide: value } : prev
+              )
+            }
+            sx={{ mt: 1 }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                margin="dense"
+                label="Nuklid (manuell zugeordnet)"
+                placeholder="Leer lassen, um Auto-Erkennung zu nutzen"
+                helperText="Überschreibt die automatische Erkennung in der Liste."
+              />
+            )}
           />
           <TextField
             margin="dense"
@@ -692,6 +809,23 @@ export default function EnergySpectrum() {
                 />
               )
             )}
+            {selectedPeakLines.map((line) => (
+              <ChartsReferenceLine
+                key={line.key}
+                x={line.energy}
+                label={line.label}
+                lineStyle={{
+                  stroke: line.color,
+                  strokeWidth: 1.5,
+                  strokeDasharray: '2 3',
+                }}
+                labelStyle={{
+                  fontSize: 10,
+                  fill: line.color,
+                  fontWeight: 'bold',
+                }}
+              />
+            ))}
           </LineChart>
         </Box>
       )}
