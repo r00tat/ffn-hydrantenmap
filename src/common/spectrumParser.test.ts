@@ -56,6 +56,7 @@ import {
   findPeaks,
   fwhmAt,
   identifyNuclides,
+  parseSpectrogramIosRcspg,
   parseSpectrogramRcspg,
   parseSpectrumCsv,
   parseSpectrumFile,
@@ -79,6 +80,10 @@ const CO60_XML = readFileSync(
 );
 const CS137_RCSPG = readFileSync(
   resolve(__dirname, '../../examples/Spectrogram_Cs-137.rcspg'),
+  'utf-8',
+);
+const IOS_RCSPG = readFileSync(
+  resolve(__dirname, '../../examples/Spectrum_2026-04-19 20-15-08 ios.rcspg'),
   'utf-8',
 );
 
@@ -206,6 +211,82 @@ describe('parseSpectrogramRcspg', () => {
     expect(data.energies).toHaveLength(1024);
     expect(data.energies[0]).toBeCloseTo(data.coefficients[0], 3);
     expect(data.energies[1023]).toBeGreaterThan(data.energies[0]);
+  });
+});
+
+describe('parseSpectrogramIosRcspg (iOS .rcspg JSON)', () => {
+  it('should parse title as sample name', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.sampleName).toBe('2026-04-19 20-15-08');
+  });
+
+  it('should parse deviceId as device name', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.deviceName).toBe('RC-110-004760');
+  });
+
+  it('should parse string coefficients as numbers', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.coefficients).toHaveLength(3);
+    expect(data.coefficients[0]).toBeCloseTo(2.990365, 5);
+    expect(data.coefficients[1]).toBeCloseTo(2.365953, 5);
+    expect(data.coefficients[2]).toBeCloseTo(0.000356, 6);
+  });
+
+  it('should sum pulses across all time slices into channelCount counts', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.counts).toHaveLength(1024);
+    // Total counts = sum of all pulses across all slices
+    const total = data.counts.reduce((a, b) => a + b, 0);
+    expect(total).toBe(298037);
+  });
+
+  it('should sum collectTime values into measurement time', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.measurementTime).toBe(9501);
+    expect(data.liveTime).toBe(9501);
+  });
+
+  it('should derive start time from startTimeTimestamp', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    // 1776622509102 ms = 2026-04-19T18:15:09.102Z
+    expect(data.startTime).toBe('2026-04-19T18:15:09');
+  });
+
+  it('should compute end time as start + accumulation', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    // 1776622509102 + 9501*1000 = 1776632010102 = 2026-04-19T20:53:30.102Z
+    expect(data.endTime).toBe('2026-04-19T20:53:30');
+  });
+
+  it('should compute energies from calibration', () => {
+    const data = parseSpectrogramIosRcspg(IOS_RCSPG);
+    expect(data.energies).toHaveLength(1024);
+    expect(data.energies[0]).toBeCloseTo(data.coefficients[0], 3);
+    expect(data.energies[1023]).toBeGreaterThan(data.energies[0]);
+  });
+
+  it('should pad truncated pulses arrays to channelCount', () => {
+    const minimal = {
+      title: 'test',
+      channelCount: 5,
+      startTimeTimestamp: 0,
+      deviceId: 'dev',
+      coefficients: ['0', '1', '0'],
+      spectrums: [
+        { collectTime: 1, timestamp: 0, pulses: [1, 2] },
+        { collectTime: 2, timestamp: 0, pulses: [0, 1, 1] },
+      ],
+    };
+    const data = parseSpectrogramIosRcspg(JSON.stringify(minimal));
+    expect(data.counts).toEqual([1, 3, 1, 0, 0]);
+    expect(data.measurementTime).toBe(3);
+  });
+
+  it('should throw on missing spectrums or channelCount', () => {
+    expect(() =>
+      parseSpectrogramIosRcspg('{"title":"x"}'),
+    ).toThrow();
   });
 });
 
@@ -395,6 +476,13 @@ describe('parseSpectrumFile (dispatcher)', () => {
     });
     const data = parseSpectrumFile(npes);
     expect(data.counts).toEqual([1, 2, 3]);
+  });
+
+  it('should route iOS rcspg JSON to parseSpectrogramIosRcspg', () => {
+    const data = parseSpectrumFile(IOS_RCSPG);
+    expect(data.sampleName).toBe('2026-04-19 20-15-08');
+    expect(data.counts).toHaveLength(1024);
+    expect(data.counts.reduce((a, b) => a + b, 0)).toBe(298037);
   });
 
   it('should parse CSV content with filename metadata', () => {
