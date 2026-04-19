@@ -1,3 +1,5 @@
+import Strahlenschutz from '../../../components/pages/Strahlenschutz';
+
 export default function StrahlenschutzPage() {
-  return null;
+  return <Strahlenschutz />;
 }
