@@ -20,6 +20,7 @@ import { useRadiacodeDevice } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { usePositionContext } from './Position';
+import RadiacodeLiveWidget from './RadiacodeLiveWidget';
 import TrackStartDialog, {
   TrackStartConfig,
 } from './TrackStartDialog';
@@ -173,6 +174,7 @@ export default function RecordButton() {
           </Tooltip>
         )}
       </Box>
+      <RadiacodeLiveWidget active={radiacodeActive} measurement={measurement} />
       <TrackStartDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
