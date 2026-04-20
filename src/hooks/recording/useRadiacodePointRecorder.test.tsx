@@ -188,6 +188,61 @@ describe('useRadiacodePointRecorder', () => {
     });
   });
 
+  it('calls onStart when active flips to true and onStop when going false', async () => {
+    const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
+      async () => ({ id: 'new' }),
+    );
+    const onStart = vi.fn(async () => {});
+    const onStop = vi.fn(async () => {});
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
+        useRadiacodePointRecorder(props),
+      {
+        initialProps: {
+          active: false,
+          layerId: 'layer-1',
+          sampleRate: 'normal',
+          device: DEVICE,
+          measurement: null,
+          position: null,
+          addItem,
+          onStart,
+          onStop,
+        },
+      },
+    );
+    expect(onStart).not.toHaveBeenCalled();
+    rerender({
+      active: true,
+      layerId: 'layer-1',
+      sampleRate: 'normal',
+      device: DEVICE,
+      measurement: null,
+      position: null,
+      addItem,
+      onStart,
+      onStop,
+    });
+    await vi.waitFor(() => {
+      expect(onStart).toHaveBeenCalledTimes(1);
+    });
+    expect(onStop).not.toHaveBeenCalled();
+    rerender({
+      active: false,
+      layerId: 'layer-1',
+      sampleRate: 'normal',
+      device: DEVICE,
+      measurement: null,
+      position: null,
+      addItem,
+      onStart,
+      onStop,
+    });
+    await vi.waitFor(() => {
+      expect(onStop).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('writes after maxInterval even without moving', async () => {
     const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
       async () => ({ id: 'new' }),

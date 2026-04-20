@@ -17,6 +17,8 @@ export interface UseRadiacodePointRecorderParams {
   measurement: RadiacodeMeasurement | null;
   position: { lat: number; lng: number } | null;
   addItem: (item: FirecallItem) => Promise<{ id: string }>;
+  onStart?: () => void | Promise<void>;
+  onStop?: () => void | Promise<void>;
 }
 
 interface LastSample {
@@ -33,9 +35,25 @@ export function useRadiacodePointRecorder({
   measurement,
   position,
   addItem,
+  onStart,
+  onStop,
 }: UseRadiacodePointRecorderParams): void {
   const lastSampleRef = useRef<LastSample | null>(null);
   const writingRef = useRef(false);
+
+  useEffect(() => {
+    if (active) {
+      Promise.resolve(onStart?.()).catch((err) =>
+        console.error('[RADIACODE] onStart failed', err),
+      );
+      return () => {
+        Promise.resolve(onStop?.()).catch((err) =>
+          console.error('[RADIACODE] onStop failed', err),
+        );
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   useEffect(() => {
     if (!active) {

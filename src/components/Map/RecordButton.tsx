@@ -75,6 +75,18 @@ export default function RecordButton() {
       ? { lat: position.lat, lng: position.lng }
       : null,
     addItem: addFirecallItem,
+    onStart: useCallback(
+      () =>
+        adapter.startForegroundService?.({
+          title: 'Strahlenmessung läuft',
+          body: 'Live-Messpunkte werden aufgezeichnet',
+        }) ?? Promise.resolve(),
+      [adapter],
+    ),
+    onStop: useCallback(
+      () => adapter.stopForegroundService?.() ?? Promise.resolve(),
+      [adapter],
+    ),
   });
 
   const existingRadiacodeLayers = useMemo(
@@ -116,16 +128,12 @@ export default function RecordButton() {
       setRadiacodeSampleRate(config.sampleRate);
       try {
         await connect(config.device);
-        await adapter.startForegroundService?.({
-          title: 'Strahlenmessung läuft',
-          body: `Layer: ${config.layer?.type === 'new' ? config.layer.name : layerId}`,
-        });
         setRadiacodeActive(true);
       } catch (err) {
         console.error('[RADIACODE] connect failed', err);
       }
     },
-    [gps, position, connect, adapter, addFirecallItem],
+    [gps, position, connect, addFirecallItem],
   );
 
   const handleStop = useCallback(async () => {
@@ -136,9 +144,8 @@ export default function RecordButton() {
       setRadiacodeActive(false);
       setRadiacodeLayerId(null);
       await disconnect();
-      await adapter.stopForegroundService?.();
     }
-  }, [gps, position, radiacodeActive, disconnect, adapter]);
+  }, [gps, position, radiacodeActive, disconnect]);
 
   const handleClick = useCallback(
     (event: React.MouseEvent) => {
