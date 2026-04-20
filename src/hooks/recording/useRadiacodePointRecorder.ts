@@ -19,10 +19,6 @@ export interface UseRadiacodePointRecorderParams {
   addItem: (item: FirecallItem) => Promise<{ id: string }>;
 }
 
-export interface UseRadiacodePointRecorderResult {
-  samplesWritten: number;
-}
-
 interface LastSample {
   lat: number;
   lng: number;
@@ -37,9 +33,8 @@ export function useRadiacodePointRecorder({
   measurement,
   position,
   addItem,
-}: UseRadiacodePointRecorderParams): UseRadiacodePointRecorderResult {
+}: UseRadiacodePointRecorderParams): void {
   const lastSampleRef = useRef<LastSample | null>(null);
-  const samplesRef = useRef(0);
   const writingRef = useRef(false);
 
   useEffect(() => {
@@ -86,12 +81,9 @@ export function useRadiacodePointRecorder({
       },
     };
     lastSampleRef.current = { lat: position.lat, lng: position.lng, time: now };
-    samplesRef.current += 1;
 
     addItem(marker).finally(() => {
       writingRef.current = false;
     });
   }, [active, layerId, sampleRate, device, measurement, position, addItem]);
-
-  return { samplesWritten: samplesRef.current };
 }
