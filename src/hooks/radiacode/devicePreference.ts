@@ -14,7 +14,7 @@ async function getStore(): Promise<KVStore> {
   if (cachedStore) return cachedStore;
   try {
     const modName = '@capacitor/preferences';
-    const mod = await import(/* @vite-ignore */ modName);
+    const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
     const prefs = mod.Preferences;
     cachedStore = {
       async get(key) {

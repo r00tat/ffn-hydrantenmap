@@ -12,7 +12,7 @@ const deviceNames = new Map<string, string>();
 
 async function getBleClient(): Promise<any> {
   const modName = '@capacitor-community/bluetooth-le';
-  const mod = await import(/* @vite-ignore */ modName);
+  const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
   if (!initialized) {
     await mod.BleClient.initialize({ androidNeverForLocation: true });
     initialized = true;
@@ -104,7 +104,7 @@ export const capacitorAdapter: BleAdapter = {
   async startForegroundService(opts) {
     try {
       const modName = './capacitorForegroundService';
-      const mod = await import(/* @vite-ignore */ modName);
+      const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
       await mod.startRadiacodeService(opts);
     } catch {
       // Foreground service plugin not available — BLE continues while WebView active
@@ -114,7 +114,7 @@ export const capacitorAdapter: BleAdapter = {
   async stopForegroundService() {
     try {
       const modName = './capacitorForegroundService';
-      const mod = await import(/* @vite-ignore */ modName);
+      const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
       await mod.stopRadiacodeService();
     } catch {
       // ignore

@@ -19,10 +19,10 @@ export interface BleAdapter {
 export async function getBleAdapter(): Promise<BleAdapter> {
   try {
     const coreName = '@capacitor/core';
-    const { Capacitor } = await import(/* @vite-ignore */ coreName);
+    const { Capacitor } = await import(/* @vite-ignore */ /* webpackIgnore: true */ coreName);
     if (Capacitor.isNativePlatform()) {
       const capacitorName = './bleAdapter.capacitor';
-      return (await import(/* @vite-ignore */ capacitorName)).capacitorAdapter;
+      return (await import(/* @vite-ignore */ /* webpackIgnore: true */ capacitorName)).capacitorAdapter;
     }
   } catch {
     // @capacitor/core not installed → web-only build
