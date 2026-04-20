@@ -28,6 +28,7 @@ export interface FirecallItem {
   lat?: number;
   lng?: number;
   alt?: number;
+  accuracy?: number;
   deleted?: boolean;
   type: string;
   beschreibung?: string;
@@ -107,6 +108,8 @@ export interface FirecallLayer extends FirecallItem {
   defaultVisible?: string;
   dataSchema?: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
+  layerType?: 'generic' | 'radiacode';
+  sampleRate?: 'niedrig' | 'normal' | 'hoch';
 }
 
 export interface DrawingStroke {
