@@ -93,6 +93,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "19.2.14",
     "@types/uuid": "^11.0.0",
+    "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^6.0.1",
     "baseline-browser-mapping": "^2.10.18",
     "eslint": "^9.39.4",
