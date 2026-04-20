@@ -649,8 +649,8 @@ const config: CapacitorConfig = {
   appName: 'FFN Einsatzkarte',
   webDir: 'empty',
   server: {
-    url: process.env.CAP_SERVER_URL || 'https://einsatz.ffn.at',
-    cleartext: false,
+    url: 'https://einsatz.ffn.at',  // Default; kann zur Laufzeit via In-App-Settings (Task 23) überschrieben werden
+    cleartext: true,  // Nötig für HTTP-Dev-Server bei lokalem Testen via LAN-IP
   },
 };
 
@@ -660,6 +660,8 @@ export default config;
 **Step 3: `empty/` Stub**
 
 `capacitor/empty/index.html` mit Redirect-Stub, falls server.url nicht geladen wird.
+
+**Hinweis:** URL-Konfiguration zur Laufzeit erfolgt über Task 23 (In-App-Settings + `WebView.loadUrl()`-Override). Der `server.url`-Wert hier ist nur der initiale Fallback, wenn keine User-Override gespeichert ist.
 
 **Step 4: `npx cap add android`**
 
@@ -716,7 +718,97 @@ Commit: `feat(recording): foreground service während radiacode-recording`
 
 ---
 
-### Task 23: APK-Build + Sideload
+### Task 23: Runtime-URL-Override via In-App-Settings
+
+**Ziel:** Produktions-URL (`https://einsatz.ffn.at`) ist in der APK fix eingebrannt, kann aber auf demselben Gerät via Settings auf eine Dev-URL (z.B. `http://192.168.x.x:3000`) umgestellt werden — **ohne Rebuild**.
+
+**Architektur:**
+
+- Native Android `SettingsActivity` mit `EditText` für URL + "Speichern"/"Zurücksetzen"-Buttons.
+- Persistenz via `SharedPreferences` (Key `server_url_override`).
+- `MainActivity.onCreate()` liest Override aus Preferences **bevor** Capacitor `WebView` initialisiert. Ist ein Override gesetzt, wird via `bridge.getWebView().loadUrl(override)` direkt dorthin navigiert statt auf den `capacitor.config.ts`-Default.
+- Zugang zur Settings-Activity: Long-Press auf App-Icon (Shortcut) oder versteckter Button in einem About-Dialog — muss nicht prominent sein, User:innen finden ihn nur bei Bedarf.
+
+**Files:**
+
+- Create: `capacitor/android/app/src/main/java/at/ffn/einsatzkarte/SettingsActivity.kt`
+- Create: `capacitor/android/app/src/main/res/layout/activity_settings.xml`
+- Create: `capacitor/android/app/src/main/res/xml/shortcuts.xml` (App-Shortcut für Zugang)
+- Modify: `capacitor/android/app/src/main/java/at/ffn/einsatzkarte/MainActivity.java` (oder `.kt`)
+- Modify: `capacitor/android/app/src/main/AndroidManifest.xml` (Activity-Registrierung + Shortcut-Meta)
+
+**Step 1: SettingsActivity**
+
+```kotlin
+class SettingsActivity : AppCompatActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    setContentView(R.layout.activity_settings)
+    val prefs = getSharedPreferences("einsatzkarte", MODE_PRIVATE)
+    val input = findViewById<EditText>(R.id.url_input)
+    input.setText(prefs.getString("server_url_override", ""))
+    findViewById<Button>(R.id.save).setOnClickListener {
+      prefs.edit().putString("server_url_override", input.text.toString().trim()).apply()
+      Toast.makeText(this, "Gespeichert. App neu starten.", Toast.LENGTH_LONG).show()
+      finish()
+    }
+    findViewById<Button>(R.id.reset).setOnClickListener {
+      prefs.edit().remove("server_url_override").apply()
+      input.setText("")
+      Toast.makeText(this, "Zurückgesetzt. App neu starten.", Toast.LENGTH_LONG).show()
+    }
+  }
+}
+```
+
+**Step 2: MainActivity-Hook**
+
+```java
+@Override
+public void onCreate(Bundle savedInstanceState) {
+  super.onCreate(savedInstanceState);
+  SharedPreferences prefs = getSharedPreferences("einsatzkarte", MODE_PRIVATE);
+  String override = prefs.getString("server_url_override", null);
+  if (override != null && !override.isEmpty()) {
+    this.bridge.getWebView().loadUrl(override);
+  }
+}
+```
+
+**Step 3: App-Shortcut-Registrierung**
+
+`AndroidManifest.xml` innerhalb `<activity android:name=".MainActivity">`:
+
+```xml
+<meta-data
+  android:name="android.app.shortcuts"
+  android:resource="@xml/shortcuts" />
+```
+
+`res/xml/shortcuts.xml`:
+
+```xml
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut android:shortcutId="settings" android:enabled="true"
+            android:shortcutShortLabel="@string/settings_label">
+    <intent android:action="android.intent.action.VIEW"
+            android:targetPackage="at.ffn.einsatzkarte"
+            android:targetClass="at.ffn.einsatzkarte.SettingsActivity" />
+  </shortcut>
+</shortcuts>
+```
+
+**Verifikation:**
+
+- Fresh install: App lädt `https://einsatz.ffn.at`.
+- Long-Press App-Icon → "Settings" → URL `http://192.168.1.42:3000` speichern → App neu starten → WebView zeigt Dev-Server.
+- Settings erneut öffnen, "Zurücksetzen" klicken, App neu starten → zurück auf Prod.
+
+Commit: `feat(capacitor): runtime-url-override via in-app settings`
+
+---
+
+### Task 24: APK-Build + Sideload
 
 **Files:**
 
@@ -727,17 +819,18 @@ Commit: `feat(recording): foreground service während radiacode-recording`
 
 ```bash
 cd capacitor
-CAP_SERVER_URL=https://einsatz.ffn.at npx cap sync android
+npx cap sync android
 cd android
 ./gradlew assembleRelease
 # oder assembleDebug für Tests
 ```
 
-APK signieren, sideload via `adb install`, auf Testgerät ausführen.
+Ein einziges APK für alle Umgebungen (prod-Default + runtime-override via Task 23). APK signieren, sideload via `adb install`, auf Testgerät ausführen.
 
 Test-Checkliste:
 
-- App startet, zeigt PWA.
+- App startet, zeigt Produktions-PWA.
+- Via Shortcut-Menu auf Dev-URL umschalten → nach Neustart wird Dev-Server geladen.
 - BLE-Permissions werden nach OS-Guideline abgefragt.
 - Recording-Start triggert Foreground-Service-Notification.
 - Screen sperren → Werte werden weiter geschrieben (über `adb logcat | grep '\[TRACK\]'` verifizierbar).
@@ -750,7 +843,7 @@ Commit: `build(capacitor): signierter android-build für sideload`
 
 ## Phase 9 — Final Verification
 
-### Task 24: `npm run check`
+### Task 25: `npm run check`
 
 ```bash
 NO_COLOR=1 npm run check
@@ -758,11 +851,11 @@ NO_COLOR=1 npm run check
 
 Alles grün: tsc, eslint, vitest, next build.
 
-### Task 25: Manueller E2E-Durchlauf am Einsatzgerät
+### Task 26: Manueller E2E-Durchlauf am Einsatzgerät
 
 Wie Task 18, aber auf dem finalen APK. Dokumentiere Befunde in Test-Plan des PR.
 
-### Task 26: PR erstellen
+### Task 27: PR erstellen
 
 Titel: `feat(radiacode): live-BLE-anbindung mit marker-layer und capacitor-wrapper`
 
