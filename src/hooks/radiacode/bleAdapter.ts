@@ -18,11 +18,11 @@ export interface BleAdapter {
 
 export async function getBleAdapter(): Promise<BleAdapter> {
   try {
-    // @ts-expect-error — optional dep, only present in capacitor subproject
-    const { Capacitor } = await import('@capacitor/core');
+    const coreName = '@capacitor/core';
+    const { Capacitor } = await import(/* @vite-ignore */ coreName);
     if (Capacitor.isNativePlatform()) {
-      // @ts-expect-error — created in Task 21 when capacitor subproject exists
-      return (await import('./bleAdapter.capacitor')).capacitorAdapter;
+      const capacitorName = './bleAdapter.capacitor';
+      return (await import(/* @vite-ignore */ capacitorName)).capacitorAdapter;
     }
   } catch {
     // @capacitor/core not installed → web-only build
