@@ -4,4 +4,9 @@
     <string name="title_activity_main">FFN Einsatzkarte</string>
     <string name="package_name">at.ffn.einsatzkarte</string>
     <string name="custom_url_scheme">at.ffn.einsatzkarte</string>
+    <string name="settings_label">Einstellungen</string>
+    <string name="settings_url_label">Server-URL (Override)</string>
+    <string name="settings_url_hint">Leer lassen für Produktions-URL. Nach dem Speichern App komplett beenden und neu starten.</string>
+    <string name="settings_save">Speichern</string>
+    <string name="settings_reset">Zurücksetzen</string>
 </resources>
