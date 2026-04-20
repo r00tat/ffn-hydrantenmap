@@ -58,22 +58,6 @@ function FirecallLayerInner({
   const map = useMap();
   const sortedLayers = useFirecallLayersSorted();
   const [visibleOverlays, setVisibleOverlays] = useState<Set<string>>(new Set());
-  const knownHeatmapNamesRef = React.useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const currentNames = sortedLayers
-      .filter((layer) => layer.heatmapConfig?.enabled && layer.defaultVisible !== 'false')
-      .map((layer) => getOverlayName(layer));
-    const newNames = currentNames.filter((n) => !knownHeatmapNamesRef.current.has(n));
-    currentNames.forEach((n) => knownHeatmapNamesRef.current.add(n));
-    if (newNames.length > 0) {
-      setVisibleOverlays((prev) => {
-        const next = new Set(prev);
-        newNames.forEach((name) => next.add(name));
-        return next;
-      });
-    }
-  }, [sortedLayers]);
 
   const onOverlayAdd = useCallback((e: L.LayersControlEvent) => {
     setVisibleOverlays((prev) => {
@@ -136,7 +120,7 @@ function FirecallLayerInner({
             {layer.heatmapConfig?.enabled && (
               <LayersControl.Overlay
                 name={getOverlayName(layer)}
-                checked={layer.defaultVisible !== 'false'}
+                checked={false}
               >
                 <LayerGroup>
                   <HeatmapOverlayLayer

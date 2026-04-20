@@ -42,8 +42,11 @@ export function useRadiacodeDevice(
     unsub: Unsubscribe | null;
     device: RadiacodeDeviceRef | null;
   }>({ adapter, unsub: null, device: null });
-  cleanupRef.current.adapter = adapter;
-  cleanupRef.current.device = device;
+
+  useEffect(() => {
+    cleanupRef.current.adapter = adapter;
+    cleanupRef.current.device = device;
+  });
 
   const scan = useCallback(async (): Promise<RadiacodeDeviceRef | null> => {
     setError(null);
