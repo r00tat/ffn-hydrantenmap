@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import { usePositionContext } from './Position';
 
@@ -11,13 +11,23 @@ export default function PositionAction() {
   const map = useMap();
   const [position, isPositionSet, , enableTracking, isPending] =
     usePositionContext();
+  const pendingZoomRef = useRef(false);
 
   const setPos = useCallback(() => {
-    enableTracking();
-    if (position && isPositionSet) {
+    if (isPositionSet) {
       map.setView(position);
+    } else {
+      pendingZoomRef.current = true;
+      enableTracking();
     }
   }, [map, position, isPositionSet, enableTracking]);
+
+  useEffect(() => {
+    if (isPositionSet && pendingZoomRef.current) {
+      pendingZoomRef.current = false;
+      map.setView(position);
+    }
+  }, [map, position, isPositionSet]);
 
   const tooltip = isPending
     ? 'Position wird ermittelt …'
