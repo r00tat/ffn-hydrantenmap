@@ -124,3 +124,111 @@ describe('TrackStartDialog — Layer-Auswahl', () => {
     );
   });
 });
+
+describe('TrackStartDialog — Sample-Rate + Device', () => {
+  it('defaults sample rate to normal', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ sampleRate: 'normal' }),
+    );
+  });
+
+  it('passes selected sample rate', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    fireEvent.click(screen.getByLabelText('Hoch'));
+    fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ sampleRate: 'hoch' }),
+    );
+  });
+
+  it('adopts sample rate from selected existing layer', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        existingRadiacodeLayers={[
+          {
+            id: 'layer-1',
+            name: 'Bestehende',
+            type: 'layer',
+            layerType: 'radiacode',
+            sampleRate: 'niedrig',
+          },
+        ]}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    fireEvent.mouseDown(screen.getByLabelText('Layer'));
+    fireEvent.click(screen.getByRole('option', { name: 'Bestehende' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ sampleRate: 'niedrig' }),
+    );
+  });
+
+  it('shows default device name and serial', () => {
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        defaultDevice={{ id: 'abc', name: 'RC-102', serial: 'SN1' }}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    expect(screen.getByText('RC-102 (SN1)')).toBeInTheDocument();
+  });
+
+  it('shows placeholder when no default device', () => {
+    render(
+      <TrackStartDialog open={true} onClose={vi.fn()} onStart={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    expect(screen.getByText('Kein Standardgerät')).toBeInTheDocument();
+  });
+
+  it('Wechseln button triggers onRequestDevice', () => {
+    const onRequestDevice = vi.fn();
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        onRequestDevice={onRequestDevice}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    fireEvent.click(screen.getByRole('button', { name: 'Wechseln' }));
+    expect(onRequestDevice).toHaveBeenCalled();
+  });
+
+  it('passes defaultDevice when starting in radiacode mode', () => {
+    const onStart = vi.fn();
+    const device = { id: 'abc', name: 'RC-102', serial: 'SN1' };
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        defaultDevice={device}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ device }),
+    );
+  });
+});

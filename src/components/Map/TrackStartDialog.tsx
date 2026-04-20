@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -13,6 +14,7 @@ import RadioGroup from '@mui/material/RadioGroup';
 import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallLayer } from '../firebase/firestore';
@@ -47,6 +49,8 @@ export default function TrackStartDialog({
   onClose,
   onStart,
   existingRadiacodeLayers = [],
+  defaultDevice = null,
+  onRequestDevice,
 }: TrackStartDialogProps) {
   const [mode, setMode] = useState<TrackMode>('gps');
 
@@ -58,6 +62,19 @@ export default function TrackStartDialog({
 
   const [layerSelection, setLayerSelection] = useState<string>(NEW_LAYER_VALUE);
   const [newLayerName, setNewLayerName] = useState<string>(defaultNewLayerName);
+  const [sampleRate, setSampleRate] = useState<SampleRate>('normal');
+
+  const handleLayerChange = (value: string) => {
+    setLayerSelection(value);
+    if (value === NEW_LAYER_VALUE) {
+      setSampleRate('normal');
+    } else {
+      const chosen = existingRadiacodeLayers.find((l) => l.id === value);
+      if (chosen?.sampleRate) {
+        setSampleRate(chosen.sampleRate);
+      }
+    }
+  };
 
   const buildLayerChoice = (): LayerChoice | null => {
     if (mode !== 'radiacode') return null;
@@ -71,8 +88,8 @@ export default function TrackStartDialog({
     onStart({
       mode,
       layer: buildLayerChoice(),
-      sampleRate: 'normal',
-      device: null,
+      sampleRate,
+      device: mode === 'radiacode' ? defaultDevice : null,
     });
   };
 
@@ -109,7 +126,7 @@ export default function TrackStartDialog({
                   labelId="track-layer-label"
                   label="Layer"
                   value={layerSelection}
-                  onChange={(e) => setLayerSelection(e.target.value)}
+                  onChange={(e) => handleLayerChange(e.target.value)}
                 >
                   {existingRadiacodeLayers.map((l) => (
                     <MenuItem key={l.id} value={l.id}>
@@ -128,6 +145,55 @@ export default function TrackStartDialog({
                   fullWidth
                 />
               )}
+
+              <FormControl>
+                <FormLabel id="track-rate-label">Messrate</FormLabel>
+                <RadioGroup
+                  aria-labelledby="track-rate-label"
+                  row
+                  value={sampleRate}
+                  onChange={(e) => setSampleRate(e.target.value as SampleRate)}
+                >
+                  <FormControlLabel
+                    value="niedrig"
+                    control={<Radio />}
+                    label="Niedrig"
+                  />
+                  <FormControlLabel
+                    value="normal"
+                    control={<Radio />}
+                    label="Normal"
+                  />
+                  <FormControlLabel
+                    value="hoch"
+                    control={<Radio />}
+                    label="Hoch"
+                  />
+                </RadioGroup>
+              </FormControl>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2,
+                }}
+              >
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Gerät
+                  </Typography>
+                  <Typography variant="body1">
+                    {defaultDevice
+                      ? `${defaultDevice.name} (${defaultDevice.serial})`
+                      : 'Kein Standardgerät'}
+                  </Typography>
+                </Box>
+                <Button onClick={() => onRequestDevice?.()} variant="outlined">
+                  Wechseln
+                </Button>
+              </Box>
             </>
           )}
         </Stack>
