@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FFN Einsatzkarte</string>
+    <string name="title_activity_main">FFN Einsatzkarte</string>
+    <string name="package_name">at.ffn.einsatzkarte</string>
+    <string name="custom_url_scheme">at.ffn.einsatzkarte</string>
+</resources>

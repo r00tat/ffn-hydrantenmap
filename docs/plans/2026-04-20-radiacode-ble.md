@@ -6,7 +6,7 @@
 
 **Architecture:** Plattform-abstrahierter BLE-Hook (Web-Bluetooth + Capacitor-Plugin) → `useRadiacodeDevice`-Hook → Recording-Hook schreibt FirecallItem-Marker bei GPS-Samples mit gewählter Rate. UI-Integration in bestehenden RecordButton via neuen TrackStartDialog. Capacitor-Wrapper lädt via `server.url` die PWA, liefert native BLE + Foreground-Service.
 
-**Tech Stack:** Next.js 16 / React 19 / TypeScript / Vitest / Leaflet / Firebase — plus neu: Capacitor 7, `@capawesome-team/capacitor-bluetooth-low-energy`, `@capacitor/preferences`, `@capacitor/geolocation`.
+**Tech Stack:** Next.js 16 / React 19 / TypeScript / Vitest / Leaflet / Firebase — plus neu: Capacitor 7, `@capacitor-community/bluetooth-le`, `@capacitor/preferences`, `@capacitor/geolocation`.
 
 **Design-Referenz:** [docs/plans/2026-04-20-radiacode-ble-design.md](./2026-04-20-radiacode-ble-design.md)
 
@@ -635,7 +635,7 @@ Falls Protokoll-Parsing abweicht: Fixture in `__fixtures__/` aktualisieren, Test
 ```bash
 mkdir capacitor && cd capacitor
 npm init -y
-npm i @capacitor/core @capacitor/cli @capawesome-team/capacitor-bluetooth-low-energy @capacitor/preferences @capacitor/geolocation
+npm i @capacitor/core @capacitor/cli @capacitor-community/bluetooth-le @capacitor/preferences @capacitor/geolocation
 npx cap init "FFN Einsatzkarte" "at.ffn.einsatzkarte" --web-dir=empty
 ```
 
@@ -696,7 +696,7 @@ Commit: `feat(capacitor): android manifest mit ble permissions und foreground se
 
 - Create: `src/hooks/radiacode/bleAdapter.capacitor.ts`
 
-Implementiert das `BleAdapter`-Interface gegen `@capawesome-team/capacitor-bluetooth-low-energy`. `startForegroundService`/`stopForegroundService` delegieren an das Plugin.
+Implementiert das `BleAdapter`-Interface gegen `@capacitor-community/bluetooth-le`. `startForegroundService`/`stopForegroundService` delegieren an das Plugin.
 
 Unit-Test optional (mockt das Plugin-Modul); Haupt-Verifikation ist der APK-Build + manueller Test.
 
