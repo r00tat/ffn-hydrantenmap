@@ -6,10 +6,15 @@ import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import FormLabel from '@mui/material/FormLabel';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
+import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
-import { useState } from 'react';
+import TextField from '@mui/material/TextField';
+import { useMemo, useState } from 'react';
+import { formatTimestamp } from '../../common/time-format';
 import { FirecallLayer } from '../firebase/firestore';
 import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
 
@@ -35,17 +40,37 @@ export interface TrackStartDialogProps {
   onRequestDevice?: () => void;
 }
 
+const NEW_LAYER_VALUE = '__new__';
+
 export default function TrackStartDialog({
   open,
   onClose,
   onStart,
+  existingRadiacodeLayers = [],
 }: TrackStartDialogProps) {
   const [mode, setMode] = useState<TrackMode>('gps');
+
+  const defaultNewLayerName = useMemo(
+    () => `Messung ${formatTimestamp(new Date())}`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open],
+  );
+
+  const [layerSelection, setLayerSelection] = useState<string>(NEW_LAYER_VALUE);
+  const [newLayerName, setNewLayerName] = useState<string>(defaultNewLayerName);
+
+  const buildLayerChoice = (): LayerChoice | null => {
+    if (mode !== 'radiacode') return null;
+    if (layerSelection === NEW_LAYER_VALUE) {
+      return { type: 'new', name: newLayerName.trim() || defaultNewLayerName };
+    }
+    return { type: 'existing', id: layerSelection };
+  };
 
   const handleStart = () => {
     onStart({
       mode,
-      layer: null,
+      layer: buildLayerChoice(),
       sampleRate: 'normal',
       device: null,
     });
@@ -75,6 +100,36 @@ export default function TrackStartDialog({
               />
             </RadioGroup>
           </FormControl>
+
+          {mode === 'radiacode' && (
+            <>
+              <FormControl fullWidth>
+                <InputLabel id="track-layer-label">Layer</InputLabel>
+                <Select
+                  labelId="track-layer-label"
+                  label="Layer"
+                  value={layerSelection}
+                  onChange={(e) => setLayerSelection(e.target.value)}
+                >
+                  {existingRadiacodeLayers.map((l) => (
+                    <MenuItem key={l.id} value={l.id}>
+                      {l.name}
+                    </MenuItem>
+                  ))}
+                  <MenuItem value={NEW_LAYER_VALUE}>Neuer Layer…</MenuItem>
+                </Select>
+              </FormControl>
+
+              {layerSelection === NEW_LAYER_VALUE && (
+                <TextField
+                  label="Name des neuen Layers"
+                  value={newLayerName}
+                  onChange={(e) => setNewLayerName(e.target.value)}
+                  fullWidth
+                />
+              )}
+            </>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
