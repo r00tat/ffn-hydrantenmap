@@ -23,6 +23,7 @@ const docPages = [
   { label: 'KI-Assistent', href: '/docs/ki' },
   { label: 'Blaulicht-SMS', href: '/docs/blaulicht-sms' },
   { label: 'Schadstoff', href: '/docs/schadstoff' },
+  { label: 'Energiespektrum', href: '/docs/energiespektrum' },
   { label: 'Kostenersatz', href: '/docs/kostenersatz' },
   { label: 'Geschäftsbuch', href: '/docs/geschaeftsbuch' },
   { label: 'Wetter', href: '/docs/wetter' },
