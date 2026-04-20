@@ -22,6 +22,9 @@ const eslintConfig = defineConfig([
     '.agents/**',
     // Chrome extension build artifact — bundled minified JS should not be linted.
     'chrome-extension/dist/**',
+    // WXT-generated files are recreated on every build.
+    'chrome-extension/.wxt/**',
+    'chrome-extension/.output/**',
   ]),
   {
     files: ['src/**/*.{ts,tsx}'],
