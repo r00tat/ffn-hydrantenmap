@@ -2,7 +2,6 @@
 
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { useCallback, useState } from 'react';
 import { auth } from './firebase';
 import GoogleSignInButton from './GoogleSignInButton';
@@ -27,11 +26,6 @@ export default function NativeLoginPanel() {
 
   return (
     <Stack spacing={2} sx={{ mt: 2 }}>
-      <Alert severity="info" variant="outlined">
-        <Typography variant="body2">
-          Nativer Login erkannt (Capacitor / Android).
-        </Typography>
-      </Alert>
       <GoogleSignInButton
         onClick={onGoogle}
         label={isSigningIn ? 'Android Login …' : 'Android Login'}
