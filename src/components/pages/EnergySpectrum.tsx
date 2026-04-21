@@ -19,6 +19,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -47,6 +48,7 @@ import {
   type NuclideMatch,
 } from '../../common/spectrumParser';
 import { buildNuclidePeakLines } from '../../common/nuclidePeakLines';
+import { exportSpectrumXml } from '../../common/spectrumExporter';
 import { resolveSpectrumIdentification } from '../../common/spectrumIdentification';
 import {
   FIRECALL_COLLECTION_ID,
@@ -289,6 +291,33 @@ export default function EnergySpectrum() {
     },
     [updateItem, allSpectra],
   );
+
+  const handleDownload = useCallback((spectrum: LoadedSpectrum) => {
+    const xml = exportSpectrumXml({
+      sampleName: spectrum.data.sampleName,
+      deviceName: spectrum.data.deviceName,
+      measurementTime: spectrum.data.measurementTime,
+      liveTime: spectrum.data.liveTime,
+      startTime: spectrum.data.startTime,
+      endTime: spectrum.data.endTime,
+      coefficients: spectrum.data.coefficients,
+      counts: spectrum.data.counts,
+    });
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const sanitized = (spectrum.data.sampleName || 'spektrum').replace(
+      /[^A-Za-z0-9._-]+/g,
+      '_',
+    );
+    const datePart = spectrum.data.startTime?.slice(0, 10) || 'unbekannt';
+    a.download = `Spectrum_${sanitized}_${datePart}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
 
   const openEditDialog = useCallback((spectrum: LoadedSpectrum) => {
     setEditDialog({
@@ -590,6 +619,19 @@ export default function EnergySpectrum() {
               <ListItem
                 secondaryAction={
                   <Box sx={{ display: 'flex', gap: 0 }}>
+                    <Tooltip title="XML exportieren">
+                      <IconButton
+                        aria-label="XML exportieren"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          handleDownload(s);
+                        }}
+                        size="small"
+                        sx={{ minWidth: 44, minHeight: 44 }}
+                      >
+                        <DownloadIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                     <IconButton
                       aria-label="Bearbeiten"
                       onClick={(e: React.MouseEvent) => {
@@ -629,7 +671,7 @@ export default function EnergySpectrum() {
                 sx={{
                   opacity: s.visible ? 1 : 0.5,
                   cursor: 'pointer',
-                  pr: '148px',
+                  pr: '192px',
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
                 onClick={() => toggleVisibility(s.id)}
@@ -781,7 +823,7 @@ export default function EnergySpectrum() {
               </ListItem>
               {extraMatches.length > 0 && (
                 <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                  <Box sx={{ pl: 5, pr: '148px', pb: 1.5 }}>
+                  <Box sx={{ pl: 5, pr: '192px', pb: 1.5 }}>
                     <Typography
                       variant="caption"
                       color="text.secondary"
