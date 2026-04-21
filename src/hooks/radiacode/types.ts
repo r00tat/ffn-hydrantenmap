@@ -42,3 +42,17 @@ export interface RadiacodeDeviceInfo {
   /** Modellbezeichnung aus FW_SIGNATURE, z.B. "RadiaCode RC-103" */
   model?: string;
 }
+
+export interface RadiacodeSettings {
+  doseRateAlarm1uRh: number;
+  doseRateAlarm2uRh: number;
+  doseAlarm1uR: number;
+  doseAlarm2uR: number;
+  soundOn: boolean;
+  soundVolume: number;
+  vibroOn: boolean;
+  ledsOn: boolean;
+  doseUnitsSv: boolean;
+  countRateCpm: boolean;
+  doseRateNSvh: boolean;
+}

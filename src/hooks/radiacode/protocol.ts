@@ -104,6 +104,21 @@ export const VSFR = {
   DEVICE_TIME: 0x0504,
   RAW_FILTER: 0x8006,
   SPEC_RESET: 0x0803,
+  // Signalisierung
+  SOUND_VOL: 0x0521,
+  SOUND_ON: 0x0522,
+  VIBRO_ON: 0x0531,
+  LEDS_ON: 0x0545,
+  PLAY_SIGNAL: 0x05e1,
+  // Alarm-Schwellen + Einheiten
+  DR_LEV1_uR_h: 0x8000,
+  DR_LEV2_uR_h: 0x8001,
+  DS_UNITS: 0x8004,
+  DOSE_RESET: 0x8007,
+  USE_nSv_h: 0x800c,
+  CR_UNITS: 0x8013,
+  DS_LEV1_uR: 0x8014,
+  DS_LEV2_uR: 0x8015,
 } as const;
 
 export const MAX_WRITE_CHUNK = 18;
