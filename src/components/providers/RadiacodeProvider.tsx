@@ -81,7 +81,7 @@ export function RadiacodeProvider({
   const {
     status,
     device,
-    measurement,
+    measurement: hookMeasurement,
     error,
     scan,
     connect: connectRaw,
@@ -89,6 +89,9 @@ export function RadiacodeProvider({
   } = useRadiacodeDevice(adapter);
 
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
+  const [overrideMeasurement, setOverrideMeasurement] =
+    useState<RadiacodeMeasurement | null>(null);
+  const measurement = overrideMeasurement ?? hookMeasurement;
 
   // Append live measurements using React's "adjusting state while rendering"
   // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders).
@@ -111,17 +114,12 @@ export function RadiacodeProvider({
     );
   }
 
-  // Testing feeder
+  // Testing feeder: sets override measurement (which also triggers history push
+  // via the adjust-state-while-rendering block above).
   const feederRef = useRef(feedMeasurement);
   useEffect(() => {
     feederRef.current?.((m) => {
-      setHistory((prev) =>
-        pushAndPrune(
-          prev,
-          { t: m.timestamp, dosisleistung: m.dosisleistung, cps: m.cps },
-          m.timestamp,
-        ),
-      );
+      setOverrideMeasurement(m);
     });
   }, []);
 

@@ -181,7 +181,7 @@ export default function RecordButton() {
           </Tooltip>
         )}
       </Box>
-      <RadiacodeLiveWidget active={radiacodeActive} measurement={measurement} />
+      <RadiacodeLiveWidget visible={radiacodeActive} />
       <TrackStartDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

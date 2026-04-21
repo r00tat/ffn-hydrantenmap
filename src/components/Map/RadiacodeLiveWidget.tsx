@@ -1,10 +1,9 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { RadiacodeMeasurement } from '../../hooks/radiacode/types';
+import { useRadiacode } from '../providers/RadiacodeProvider';
 
 export interface RadiacodeLiveWidgetProps {
-  active: boolean;
-  measurement: RadiacodeMeasurement | null;
+  visible?: boolean;
 }
 
 type DoseLevel = 'low' | 'medium' | 'high';
@@ -22,10 +21,10 @@ const DOSE_COLOR: Record<DoseLevel, string> = {
 };
 
 export default function RadiacodeLiveWidget({
-  active,
-  measurement,
+  visible = true,
 }: RadiacodeLiveWidgetProps) {
-  if (!active || !measurement) return null;
+  const { measurement } = useRadiacode();
+  if (!visible || !measurement) return null;
   const level = classifyDose(measurement.dosisleistung);
   return (
     <Box
