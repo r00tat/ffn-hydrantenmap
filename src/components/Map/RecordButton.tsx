@@ -6,37 +6,20 @@ import L from 'leaflet';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGpsLineRecorder } from '../../hooks/recording/useGpsLineRecorder';
 import { useRadiacodePointRecorder } from '../../hooks/recording/useRadiacodePointRecorder';
-import { BleAdapter, getBleAdapter } from '../../hooks/radiacode/bleAdapter';
-import {
-  loadDefaultDevice,
-  saveDefaultDevice,
-} from '../../hooks/radiacode/devicePreference';
+import { loadDefaultDevice } from '../../hooks/radiacode/devicePreference';
 import { createRadiacodeLayer } from '../../hooks/radiacode/layerFactory';
 import {
   RadiacodeDeviceRef,
   SampleRate,
 } from '../../hooks/radiacode/types';
-import { useRadiacodeDevice } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import { useRadiacode } from '../providers/RadiacodeProvider';
 import { usePositionContext } from './Position';
 import RadiacodeLiveWidget from './RadiacodeLiveWidget';
 import TrackStartDialog, {
   TrackStartConfig,
 } from './TrackStartDialog';
-
-const NULL_ADAPTER: BleAdapter = {
-  isSupported: () => false,
-  requestDevice: async () => {
-    throw new Error('BLE adapter not initialized');
-  },
-  connect: async () => {
-    throw new Error('BLE adapter not initialized');
-  },
-  disconnect: async () => {},
-  onNotification: async () => () => {},
-  write: async () => {},
-};
 
 export default function RecordButton() {
   const [position, isPositionSet] = usePositionContext();
@@ -51,19 +34,21 @@ export default function RecordButton() {
   const [defaultDevice, setDefaultDevice] =
     useState<RadiacodeDeviceRef | null>(null);
 
-  const [adapter, setAdapter] = useState<BleAdapter>(NULL_ADAPTER);
-  useEffect(() => {
-    getBleAdapter().then(setAdapter);
-  }, []);
-
   useEffect(() => {
     loadDefaultDevice().then(setDefaultDevice);
   }, []);
 
   const gps = useGpsLineRecorder();
 
-  const { measurement, scan, connect, disconnect, device } =
-    useRadiacodeDevice(adapter);
+  const {
+    measurement,
+    device,
+    scan,
+    connectDevice,
+    disconnect,
+    startForegroundService,
+    stopForegroundService,
+  } = useRadiacode();
 
   useRadiacodePointRecorder({
     active: radiacodeActive,
@@ -77,15 +62,15 @@ export default function RecordButton() {
     addItem: addFirecallItem,
     onStart: useCallback(
       () =>
-        adapter.startForegroundService?.({
+        startForegroundService?.({
           title: 'Strahlenmessung läuft',
           body: 'Live-Messpunkte werden aufgezeichnet',
         }) ?? Promise.resolve(),
-      [adapter],
+      [startForegroundService],
     ),
     onStop: useCallback(
-      () => adapter.stopForegroundService?.() ?? Promise.resolve(),
-      [adapter],
+      () => stopForegroundService?.() ?? Promise.resolve(),
+      [stopForegroundService],
     ),
   });
 
@@ -100,7 +85,6 @@ export default function RecordButton() {
     const scanned = await scan();
     if (scanned) {
       setDefaultDevice(scanned);
-      await saveDefaultDevice(scanned);
     }
   }, [scan]);
 
@@ -127,13 +111,13 @@ export default function RecordButton() {
       setRadiacodeLayerId(layerId);
       setRadiacodeSampleRate(config.sampleRate);
       try {
-        await connect(config.device);
+        await connectDevice(config.device);
         setRadiacodeActive(true);
       } catch (err) {
         console.error('[RADIACODE] connect failed', err);
       }
     },
-    [gps, position, connect, addFirecallItem],
+    [gps, position, connectDevice, addFirecallItem],
   );
 
   const handleStop = useCallback(async () => {

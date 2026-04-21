@@ -31,8 +31,15 @@ export interface RadiacodeContextValue {
   measurement: RadiacodeMeasurement | null;
   history: RadiacodeSample[];
   error: string | null;
+  scan: () => Promise<RadiacodeDeviceRef | null>;
   connect: () => Promise<void>;
+  connectDevice: (device: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
+  startForegroundService?: (opts: {
+    title: string;
+    body: string;
+  }) => Promise<void>;
+  stopForegroundService?: () => Promise<void>;
 }
 
 const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
@@ -123,18 +130,49 @@ export function RadiacodeProvider({
     });
   }, []);
 
-  // scan + connect combined
-  const connect = useCallback(async () => {
+  // scan + save default device
+  const scanAndSave = useCallback(async () => {
     const scanned = await scan();
+    if (scanned) {
+      await saveDefaultDevice(scanned);
+    }
+    return scanned;
+  }, [scan]);
+
+  // scan + connect combined (convenience for Dosimetrie page)
+  const connect = useCallback(async () => {
+    const scanned = await scanAndSave();
     if (!scanned) return;
-    await saveDefaultDevice(scanned);
     await connectRaw(scanned);
-  }, [scan, connectRaw]);
+  }, [scanAndSave, connectRaw]);
+
+  const connectDevice = useCallback(
+    async (d: RadiacodeDeviceRef) => {
+      await connectRaw(d);
+    },
+    [connectRaw],
+  );
 
   // Load default device on mount (non-autoconnect, user must press Connect)
   useEffect(() => {
     loadDefaultDevice().catch(() => null);
   }, []);
+
+  const startForegroundService = useMemo(
+    () =>
+      adapter.startForegroundService
+        ? (opts: { title: string; body: string }) =>
+            adapter.startForegroundService!(opts)
+        : undefined,
+    [adapter],
+  );
+  const stopForegroundService = useMemo(
+    () =>
+      adapter.stopForegroundService
+        ? () => adapter.stopForegroundService!()
+        : undefined,
+    [adapter],
+  );
 
   const value = useMemo<RadiacodeContextValue>(
     () => ({
@@ -143,10 +181,26 @@ export function RadiacodeProvider({
       measurement,
       history,
       error,
+      scan: scanAndSave,
       connect,
+      connectDevice,
       disconnect,
+      startForegroundService,
+      stopForegroundService,
     }),
-    [status, device, measurement, history, error, connect, disconnect],
+    [
+      status,
+      device,
+      measurement,
+      history,
+      error,
+      scanAndSave,
+      connect,
+      connectDevice,
+      disconnect,
+      startForegroundService,
+      stopForegroundService,
+    ],
   );
 
   return (
