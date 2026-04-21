@@ -13,6 +13,7 @@ export interface BleAdapter {
     handler: (packet: Uint8Array) => void,
   ): Promise<Unsubscribe>;
   write(deviceId: string, data: Uint8Array): Promise<void>;
+  onDisconnect?(deviceId: string, handler: () => void): Unsubscribe;
   startForegroundService?(opts: { title: string; body: string }): Promise<void>;
   stopForegroundService?(): Promise<void>;
 }

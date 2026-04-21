@@ -10,6 +10,8 @@ const WRITE_CHUNK_SIZE = 18;
 
 let initialized = false;
 const deviceNames = new Map<string, string>();
+const disconnectHandlers = new Map<string, () => void>();
+const connectedDevices = new Set<string>();
 
 async function ensureBleClient(): Promise<typeof BleClient> {
   if (!initialized) {
@@ -49,7 +51,11 @@ export const capacitorAdapter: BleAdapter = {
 
   async connect(deviceId) {
     const client = await ensureBleClient();
-    await client.connect(deviceId);
+    await client.connect(deviceId, (id) => {
+      const h = disconnectHandlers.get(id);
+      if (h) h();
+    });
+    connectedDevices.add(deviceId);
   },
 
   async disconnect(deviceId) {
@@ -64,6 +70,7 @@ export const capacitorAdapter: BleAdapter = {
       // notifications may already be stopped
     }
     await client.disconnect(deviceId);
+    connectedDevices.delete(deviceId);
   },
 
   async onNotification(deviceId, handler): Promise<Unsubscribe> {
@@ -100,5 +107,20 @@ export const capacitorAdapter: BleAdapter = {
         bytesToDataView(chunk),
       );
     }
+  },
+
+  onDisconnect(deviceId, handler): Unsubscribe {
+    // Das Capacitor-Plugin akzeptiert den onDisconnect-Callback ausschliesslich
+    // beim Aufruf von BleClient.connect(). Wir merken uns den Handler im
+    // Modul-State; `connect()` ruft ihn dann über einen Passthrough-Wrapper auf.
+    // Registrierung nach erfolgter Verbindung wird unterstützt, solange der
+    // Client anschliessend erneut connect() aufruft (z.B. beim Reconnect).
+    disconnectHandlers.set(deviceId, handler);
+    return () => {
+      const current = disconnectHandlers.get(deviceId);
+      if (current === handler) {
+        disconnectHandlers.delete(deviceId);
+      }
+    };
   },
 };

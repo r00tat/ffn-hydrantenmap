@@ -93,4 +93,16 @@ export const webAdapter: BleAdapter = {
       await entry.writeChar.writeValueWithoutResponse(chunk);
     }
   },
+
+  onDisconnect(deviceId, handler): Unsubscribe {
+    const entry = devices.get(deviceId);
+    if (!entry) {
+      throw new Error(`Gerät ${deviceId} nicht vorhanden`);
+    }
+    const listener = () => handler();
+    entry.device.addEventListener('gattserverdisconnected', listener);
+    return () => {
+      entry.device.removeEventListener('gattserverdisconnected', listener);
+    };
+  },
 };
