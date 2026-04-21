@@ -31,7 +31,8 @@ import {
 } from './types';
 
 const DOSE_RATE_TO_USVH = 10000;
-const DOSE_SV_TO_USV = 1e6;
+// RareData.dose kommt als Rohwert in mSv; für die App-Anzeige in µSv mit 1e3 skalieren.
+const DOSE_RAW_TO_USV = 1e3;
 
 interface InFlight {
   cmd: number;
@@ -443,7 +444,7 @@ function extractLatestMeasurement(
     cpsErrPct: rt.countRateErrPct,
     dosisleistungErrPct: rt.doseRateErrPct,
     ...(rareValid && {
-      dose: rareValid.dose * DOSE_SV_TO_USV,
+      dose: rareValid.dose * DOSE_RAW_TO_USV,
       durationSec: rareValid.duration,
       temperatureC: rareValid.temperatureC,
       chargePct: rareValid.chargePct,
