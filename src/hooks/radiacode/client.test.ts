@@ -132,7 +132,7 @@ function buildRareRecordBody(
     doseRateErrPct?: number;
   },
   rare: {
-    doseSv: number;
+    doseRaw: number;
     temperatureC: number;
     chargePct: number;
     durationSec?: number;
@@ -157,7 +157,7 @@ function buildRareRecordBody(
   records.push(...new Uint8Array(realtimeBuf));
 
   // Rare record: seq=1, eid=0, gid=3, tsOffset=0, then 14B payload
-  // duration u32, dose f32 (Sv), temperature u16 ((t*100)+2000), charge u16 (pct*100), flags u16
+  // duration u32, dose f32 (mSv), temperature u16 ((t*100)+2000), charge u16 (pct*100), flags u16
   const rareBuf = new ArrayBuffer(7 + 14);
   const rr = new DataView(rareBuf);
   rr.setUint8(0, 1); // seq
@@ -165,7 +165,7 @@ function buildRareRecordBody(
   rr.setUint8(2, 3); // gid
   rr.setInt32(3, 0, true);
   rr.setUint32(7, rare.durationSec ?? 100, true); // duration
-  rr.setFloat32(11, rare.doseSv, true);
+  rr.setFloat32(11, rare.doseRaw, true);
   rr.setUint16(15, Math.round(rare.temperatureC * 100) + 2000, true);
   rr.setUint16(17, Math.round(rare.chargePct * 100), true);
   rr.setUint16(19, 0, true);
@@ -310,7 +310,7 @@ describe('RadiacodeClient', () => {
     const body = buildRareRecordBody(
       { cps: 3.5, doseRateSv: 2e-7, cpsErrPct: 12.5, doseRateErrPct: 38.2 },
       {
-        doseSv: 1.23e-4,
+        doseRaw: 0.05, // mSv (Rohwert aus RareData)
         temperatureC: 23.5,
         chargePct: 87.3,
         durationSec: 540,
@@ -344,7 +344,7 @@ describe('RadiacodeClient', () => {
     const m = onMeasurement.mock.calls[0][0];
     expect(m.cps).toBeCloseTo(3.5, 2);
     expect(m.dosisleistung).toBeCloseTo(2e-7 * 10000, 5); // 0.002 µSv/h
-    expect(m.dose).toBeCloseTo(1.23e-4 * 1e6, 1); // 123 µSv
+    expect(m.dose).toBeCloseTo(0.05 * 1e3, 3); // 50 µSv (Rohwert 0.05 mSv × 1e3)
     expect(m.temperatureC).toBeCloseTo(23.5, 1);
     expect(m.chargePct).toBeCloseTo(87.3, 1);
     expect(m.cpsErrPct).toBeCloseTo(12.5, 1);
