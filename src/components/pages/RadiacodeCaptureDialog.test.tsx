@@ -63,6 +63,7 @@ function fixture(
   return {
     status: 'idle',
     device: null,
+    deviceInfo: null,
     measurement: null,
     history: [],
     error: null,

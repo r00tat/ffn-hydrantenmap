@@ -8,7 +8,10 @@ import {
   VS,
   buildRequest,
   decodeDataBufRecords,
+  decodeFwSignature,
+  decodeSerial,
   decodeSpectrumResponse,
+  decodeVersion,
   splitForWrite,
 } from './protocol';
 
@@ -284,5 +287,73 @@ describe('COMMAND / VS constants', () => {
     expect(COMMAND.RD_VIRT_STRING).toBe(0x0826);
     expect(VS.DATA_BUF).toBe(0x100);
     expect(VS.ENERGY_CALIB).toBe(0x202);
+  });
+});
+
+describe('decodeVersion', () => {
+  it('extracts boot + target major/minor and dates', () => {
+    // boot: minor=1, major=4, date="Jan 10 2024"
+    // target: minor=14, major=4, date="Apr  1 2025"
+    const bootDate = 'Jan 10 2024';
+    const targetDate = 'Apr  1 2025';
+    const buf = new Uint8Array(4 + 4 + bootDate.length + 4 + 4 + targetDate.length);
+    const v = new DataView(buf.buffer);
+    v.setUint16(0, 1, true); // boot minor
+    v.setUint16(2, 4, true); // boot major
+    v.setUint32(4, bootDate.length, true);
+    for (let i = 0; i < bootDate.length; i++) buf[8 + i] = bootDate.charCodeAt(i);
+    const targetOffset = 8 + bootDate.length;
+    v.setUint16(targetOffset, 14, true); // target minor
+    v.setUint16(targetOffset + 2, 4, true); // target major
+    v.setUint32(targetOffset + 4, targetDate.length, true);
+    for (let i = 0; i < targetDate.length; i++) {
+      buf[targetOffset + 8 + i] = targetDate.charCodeAt(i);
+    }
+    const result = decodeVersion(buf);
+    expect(result.bootMajor).toBe(4);
+    expect(result.bootMinor).toBe(1);
+    expect(result.bootDate).toBe('Jan 10 2024');
+    expect(result.targetMajor).toBe(4);
+    expect(result.targetMinor).toBe(14);
+    expect(result.targetDate).toBe('Apr  1 2025');
+  });
+});
+
+describe('decodeSerial', () => {
+  it('formats 12-byte serial as hyphen-separated hex groups', () => {
+    const buf = new Uint8Array(4 + 12);
+    const v = new DataView(buf.buffer);
+    v.setUint32(0, 12, true);
+    v.setUint32(4, 0x12345678, true);
+    v.setUint32(8, 0x9abcdef0, true);
+    v.setUint32(12, 0xdeadbeef, true);
+    expect(decodeSerial(buf)).toBe('12345678-9ABCDEF0-DEADBEEF');
+  });
+
+  it('throws on non-multiple-of-4 length', () => {
+    const buf = new Uint8Array(4 + 3);
+    new DataView(buf.buffer).setUint32(0, 3, true);
+    expect(() => decodeSerial(buf)).toThrow(/length/i);
+  });
+});
+
+describe('decodeFwSignature', () => {
+  it('extracts CRC + filename + id string', () => {
+    const fileName = 'rc-103.bin';
+    const idString = 'RadiaCode RC-103';
+    const buf = new Uint8Array(4 + 4 + fileName.length + 4 + idString.length);
+    const v = new DataView(buf.buffer);
+    v.setUint32(0, 0xdeadbeef, true);
+    v.setUint32(4, fileName.length, true);
+    for (let i = 0; i < fileName.length; i++) buf[8 + i] = fileName.charCodeAt(i);
+    const idOffset = 8 + fileName.length;
+    v.setUint32(idOffset, idString.length, true);
+    for (let i = 0; i < idString.length; i++) {
+      buf[idOffset + 4 + i] = idString.charCodeAt(i);
+    }
+    const result = decodeFwSignature(buf);
+    expect(result.signature).toBe(0xdeadbeef);
+    expect(result.fileName).toBe('rc-103.bin');
+    expect(result.idString).toBe('RadiaCode RC-103');
   });
 });

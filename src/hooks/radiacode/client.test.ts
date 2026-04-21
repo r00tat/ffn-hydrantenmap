@@ -125,8 +125,18 @@ function buildResponseChunks(
 }
 
 function buildRareRecordBody(
-  realtime: { cps: number; doseRateSv: number },
-  rare: { doseSv: number; temperatureC: number; chargePct: number },
+  realtime: {
+    cps: number;
+    doseRateSv: number;
+    cpsErrPct?: number;
+    doseRateErrPct?: number;
+  },
+  rare: {
+    doseSv: number;
+    temperatureC: number;
+    chargePct: number;
+    durationSec?: number;
+  },
 ): Uint8Array {
   // retcode(4) + flen(4) + records
   const records: number[] = [];
@@ -140,8 +150,8 @@ function buildRareRecordBody(
   rv.setInt32(3, 0, true); // tsOffset
   rv.setFloat32(7, realtime.cps, true);
   rv.setFloat32(11, realtime.doseRateSv, true);
-  rv.setUint16(15, 0, true);
-  rv.setUint16(17, 0, true);
+  rv.setUint16(15, Math.round((realtime.cpsErrPct ?? 0) * 10), true);
+  rv.setUint16(17, Math.round((realtime.doseRateErrPct ?? 0) * 10), true);
   rv.setUint16(19, 0, true);
   rv.setUint8(21, 0);
   records.push(...new Uint8Array(realtimeBuf));
@@ -154,7 +164,7 @@ function buildRareRecordBody(
   rr.setUint8(1, 0); // eid
   rr.setUint8(2, 3); // gid
   rr.setInt32(3, 0, true);
-  rr.setUint32(7, 100, true); // duration
+  rr.setUint32(7, rare.durationSec ?? 100, true); // duration
   rr.setFloat32(11, rare.doseSv, true);
   rr.setUint16(15, Math.round(rare.temperatureC * 100) + 2000, true);
   rr.setUint16(17, Math.round(rare.chargePct * 100), true);
@@ -298,8 +308,13 @@ describe('RadiacodeClient', () => {
     const adapter = makeAdapter();
     let seqCounter = 0;
     const body = buildRareRecordBody(
-      { cps: 3.5, doseRateSv: 2e-7 },
-      { doseSv: 1.23e-4, temperatureC: 23.5, chargePct: 87.3 },
+      { cps: 3.5, doseRateSv: 2e-7, cpsErrPct: 12.5, doseRateErrPct: 38.2 },
+      {
+        doseSv: 1.23e-4,
+        temperatureC: 23.5,
+        chargePct: 87.3,
+        durationSec: 540,
+      },
     );
 
     adapter.setResponder((frame) => {
@@ -332,7 +347,141 @@ describe('RadiacodeClient', () => {
     expect(m.dose).toBeCloseTo(1.23e-4 * 1e6, 1); // 123 µSv
     expect(m.temperatureC).toBeCloseTo(23.5, 1);
     expect(m.chargePct).toBeCloseTo(87.3, 1);
+    expect(m.cpsErrPct).toBeCloseTo(12.5, 1);
+    expect(m.dosisleistungErrPct).toBeCloseTo(38.2, 1);
+    expect(m.durationSec).toBe(540);
 
+    await client.disconnect();
+  });
+
+  it('getDeviceInfo: queries GET_VERSION, GET_SERIAL, FW_SIGNATURE and returns metadata', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+
+    // Build response payloads matching the decoder expectations.
+    const versionPayload = (() => {
+      const bootDate = 'Jan 10 2024';
+      const targetDate = 'Apr 1 2025';
+      const buf = new Uint8Array(4 + 4 + bootDate.length + 4 + 4 + targetDate.length);
+      const v = new DataView(buf.buffer);
+      v.setUint16(0, 1, true);
+      v.setUint16(2, 4, true);
+      v.setUint32(4, bootDate.length, true);
+      for (let i = 0; i < bootDate.length; i++) buf[8 + i] = bootDate.charCodeAt(i);
+      const targetOffset = 8 + bootDate.length;
+      v.setUint16(targetOffset, 14, true);
+      v.setUint16(targetOffset + 2, 4, true);
+      v.setUint32(targetOffset + 4, targetDate.length, true);
+      for (let i = 0; i < targetDate.length; i++) {
+        buf[targetOffset + 8 + i] = targetDate.charCodeAt(i);
+      }
+      return buf;
+    })();
+
+    const serialPayload = (() => {
+      const buf = new Uint8Array(4 + 8);
+      const v = new DataView(buf.buffer);
+      v.setUint32(0, 8, true);
+      v.setUint32(4, 0x12345678, true);
+      v.setUint32(8, 0x9abcdef0, true);
+      return buf;
+    })();
+
+    const fwSignaturePayload = (() => {
+      const fileName = 'rc-103.bin';
+      const idString = 'RadiaCode RC-103';
+      const buf = new Uint8Array(4 + 4 + fileName.length + 4 + idString.length);
+      const v = new DataView(buf.buffer);
+      v.setUint32(0, 0xdeadbeef, true);
+      v.setUint32(4, fileName.length, true);
+      for (let i = 0; i < fileName.length; i++) buf[8 + i] = fileName.charCodeAt(i);
+      const idOffset = 8 + fileName.length;
+      v.setUint32(idOffset, idString.length, true);
+      for (let i = 0; i < idString.length; i++) {
+        buf[idOffset + 4 + i] = idString.charCodeAt(i);
+      }
+      return buf;
+    })();
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR)
+        return buildResponseChunks(cmd, seq, new Uint8Array([0x01, 0, 0, 0]));
+      if (cmd === COMMAND.GET_VERSION)
+        return buildResponseChunks(cmd, seq, versionPayload);
+      if (cmd === COMMAND.GET_SERIAL)
+        return buildResponseChunks(cmd, seq, serialPayload);
+      if (cmd === COMMAND.FW_SIGNATURE)
+        return buildResponseChunks(cmd, seq, fwSignaturePayload);
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const info = await client.getDeviceInfo();
+    expect(info.firmwareVersion).toBe('4.14');
+    expect(info.bootVersion).toBe('4.1');
+    expect(info.firmwareDate).toBe('Apr 1 2025');
+    expect(info.hardwareSerial).toBe('12345678-9ABCDEF0');
+    expect(info.model).toBe('RadiaCode RC-103');
+
+    await client.disconnect();
+  });
+
+  it('getDeviceInfo: tolerates missing FW_SIGNATURE', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+
+    const versionPayload = (() => {
+      const bootDate = '';
+      const targetDate = '';
+      const buf = new Uint8Array(4 + 4 + bootDate.length + 4 + 4 + targetDate.length);
+      const v = new DataView(buf.buffer);
+      v.setUint16(0, 0, true);
+      v.setUint16(2, 4, true);
+      v.setUint32(4, 0, true);
+      v.setUint16(8, 8, true);
+      v.setUint16(10, 4, true);
+      v.setUint32(12, 0, true);
+      return buf;
+    })();
+
+    const serialPayload = (() => {
+      const buf = new Uint8Array(4 + 4);
+      const v = new DataView(buf.buffer);
+      v.setUint32(0, 4, true);
+      v.setUint32(4, 0xabcdef01, true);
+      return buf;
+    })();
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR)
+        return buildResponseChunks(cmd, seq, new Uint8Array([0x01, 0, 0, 0]));
+      if (cmd === COMMAND.GET_VERSION)
+        return buildResponseChunks(cmd, seq, versionPayload);
+      if (cmd === COMMAND.GET_SERIAL)
+        return buildResponseChunks(cmd, seq, serialPayload);
+      // FW_SIGNATURE: echo back a short payload that triggers a decoder throw.
+      if (cmd === COMMAND.FW_SIGNATURE)
+        return buildResponseChunks(cmd, seq, new Uint8Array(2));
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const info = await client.getDeviceInfo();
+    expect(info.firmwareVersion).toBe('4.8');
+    expect(info.hardwareSerial).toBe('ABCDEF01');
+    expect(info.model).toBeUndefined();
     await client.disconnect();
   });
 

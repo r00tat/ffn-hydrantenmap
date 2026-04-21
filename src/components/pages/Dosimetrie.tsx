@@ -14,6 +14,7 @@ import {
   doseRateLevel,
   formatDose,
   formatDoseRate,
+  formatDuration,
 } from '../../common/doseFormat';
 import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
@@ -30,11 +31,13 @@ function MetricTile({
   value,
   unit,
   color,
+  footer,
 }: {
   label: string;
   value: string;
   unit?: string;
   color?: string;
+  footer?: string;
 }) {
   return (
     <Box
@@ -61,8 +64,22 @@ function MetricTile({
           </Typography>
         )}
       </Typography>
+      {footer && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', fontVariantNumeric: 'tabular-nums' }}
+        >
+          {footer}
+        </Typography>
+      )}
     </Box>
   );
+}
+
+function formatErr(pct: number | undefined): string | undefined {
+  if (pct === undefined || !Number.isFinite(pct)) return undefined;
+  return `± ${pct.toFixed(1)} %`;
 }
 
 function statusLabel(
@@ -94,9 +111,17 @@ const STATUS_CHIP_COLOR: Record<
 };
 
 export default function Dosimetrie() {
-  const { status, device, measurement, history, error, connect, disconnect } =
-    useRadiacode();
-  const [logScale, setLogScale] = useState(true);
+  const {
+    status,
+    device,
+    deviceInfo,
+    measurement,
+    history,
+    error,
+    connect,
+    disconnect,
+  } = useRadiacode();
+  const [logScale, setLogScale] = useState(false);
 
   const rateLevel = measurement
     ? doseRateLevel(measurement.dosisleistung)
@@ -157,16 +182,52 @@ export default function Dosimetrie() {
           value={rateFmt.value}
           unit={rateFmt.unit}
           color={rateColor}
+          footer={formatErr(measurement?.dosisleistungErrPct)}
         />
         <MetricTile
-          label="Gesamtdosis"
+          label="Gesamtdosis (akkumuliert)"
           value={doseFmt.value}
           unit={doseFmt.unit}
+          footer={
+            measurement?.durationSec !== undefined
+              ? `über ${formatDuration(measurement.durationSec)}`
+              : undefined
+          }
         />
         <MetricTile
           label="Zählrate"
           value={measurement ? String(Math.round(measurement.cps)) : '—'}
           unit={measurement ? 'cps' : undefined}
+          footer={formatErr(measurement?.cpsErrPct)}
+        />
+      </Stack>
+
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+        <MetricTile
+          label="Temperatur"
+          value={
+            measurement?.temperatureC !== undefined
+              ? measurement.temperatureC.toFixed(1)
+              : '—'
+          }
+          unit={measurement?.temperatureC !== undefined ? '°C' : undefined}
+        />
+        <MetricTile
+          label="Akku"
+          value={
+            measurement?.chargePct !== undefined
+              ? Math.round(measurement.chargePct).toString()
+              : '—'
+          }
+          unit={measurement?.chargePct !== undefined ? '%' : undefined}
+        />
+        <MetricTile
+          label="Messdauer"
+          value={
+            measurement?.durationSec !== undefined
+              ? formatDuration(measurement.durationSec)
+              : '—'
+          }
         />
       </Stack>
 
@@ -212,6 +273,44 @@ export default function Dosimetrie() {
           />
         )}
       </Box>
+
+      {deviceInfo && (
+        <Box
+          sx={{
+            mt: 1,
+            p: 1.5,
+            borderRadius: 1,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.default',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Geräteinformation
+          </Typography>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={{ xs: 0.5, sm: 3 }}
+            sx={{ mt: 0.5, flexWrap: 'wrap' }}
+          >
+            {deviceInfo.model && (
+              <Typography variant="body2">
+                <strong>Modell:</strong> {deviceInfo.model}
+              </Typography>
+            )}
+            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              <strong>Firmware:</strong> {deviceInfo.firmwareVersion}
+              {deviceInfo.firmwareDate ? ` (${deviceInfo.firmwareDate})` : ''}
+            </Typography>
+            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              <strong>Bootloader:</strong> {deviceInfo.bootVersion}
+            </Typography>
+            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              <strong>Seriennummer:</strong> {deviceInfo.hardwareSerial}
+            </Typography>
+          </Stack>
+        </Box>
+      )}
     </Stack>
   );
 }

@@ -10,11 +10,14 @@ import {
   VSFR,
   buildRequest,
   decodeDataBufRecords,
+  decodeFwSignature,
+  decodeSerial,
   decodeSpectrumResponse,
+  decodeVersion,
   parseResponse,
   splitForWrite,
 } from './protocol';
-import { RadiacodeMeasurement } from './types';
+import { RadiacodeDeviceInfo, RadiacodeMeasurement } from './types';
 
 const DOSE_RATE_TO_USVH = 10000;
 const DOSE_SV_TO_USV = 1e6;
@@ -191,6 +194,37 @@ export class RadiacodeClient {
     return decodeSpectrumResponse(rsp.data);
   }
 
+  /**
+   * Fragt Geräte-Metadaten ab (FW-Version, HW-Serial, Modellname).
+   * FW_SIGNATURE ist optional — liefert das Gerät keine Signatur, bleibt `model`
+   * leer und die restlichen Felder werden trotzdem zurückgegeben.
+   */
+  async getDeviceInfo(): Promise<RadiacodeDeviceInfo> {
+    const versionRsp = await this.execute(COMMAND.GET_VERSION, new Uint8Array(0));
+    const version = decodeVersion(versionRsp.data);
+    const serialRsp = await this.execute(COMMAND.GET_SERIAL, new Uint8Array(0));
+    const hardwareSerial = decodeSerial(serialRsp.data);
+
+    let model: string | undefined;
+    try {
+      const sigRsp = await this.execute(
+        COMMAND.FW_SIGNATURE,
+        new Uint8Array(0),
+      );
+      model = decodeFwSignature(sigRsp.data).idString;
+    } catch {
+      // FW_SIGNATURE optional — alte Firmwares kennen das Kommando nicht.
+    }
+
+    return {
+      firmwareVersion: `${version.targetMajor}.${version.targetMinor}`,
+      bootVersion: `${version.bootMajor}.${version.bootMinor}`,
+      firmwareDate: version.targetDate || undefined,
+      hardwareSerial,
+      model,
+    };
+  }
+
   startSpectrumPolling(
     onSnapshot: (s: SpectrumSnapshot) => void,
     intervalMs = 2000,
@@ -319,8 +353,11 @@ function extractLatestMeasurement(
     cps: rt.countRate,
     dosisleistung: rt.doseRate * DOSE_RATE_TO_USVH,
     timestamp: Date.now(),
+    cpsErrPct: rt.countRateErrPct,
+    dosisleistungErrPct: rt.doseRateErrPct,
     ...(rareValid && {
       dose: rareValid.dose * DOSE_SV_TO_USV,
+      durationSec: rareValid.duration,
       temperatureC: rareValid.temperatureC,
       chargePct: rareValid.chargePct,
     }),

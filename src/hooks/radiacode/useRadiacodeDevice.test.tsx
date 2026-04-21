@@ -123,7 +123,7 @@ describe('useRadiacodeDevice', () => {
     });
   });
 
-  it('preserves dose/temperatureC/chargePct from earlier RareRecord across polls without them', async () => {
+  it('preserves dose/durationSec/temperatureC/chargePct from earlier RareRecord across polls without them', async () => {
     const adapter = makeAdapter();
     const { factory, latest } = makeFakeClientFactory();
     const { result } = renderHook(() =>
@@ -141,6 +141,7 @@ describe('useRadiacodeDevice', () => {
         cps: 3,
         timestamp: 1,
         dose: 420,
+        durationSec: 600,
         temperatureC: 24.5,
         chargePct: 88,
       });
@@ -152,6 +153,7 @@ describe('useRadiacodeDevice', () => {
       dosisleistung: 0.2,
       cps: 5,
       dose: 420,
+      durationSec: 600,
       temperatureC: 24.5,
       chargePct: 88,
     });

@@ -101,12 +101,12 @@ export function useRadiacodeDevice(
         await client.connect();
         client.startPolling(
           (m) =>
-            setMeasurement((prev) => ({
-              ...m,
-              dose: m.dose ?? prev?.dose,
-              temperatureC: m.temperatureC ?? prev?.temperatureC,
-              chargePct: m.chargePct ?? prev?.chargePct,
-            })),
+            // Rare-Record-Felder (dose, durationSec, temperatureC, chargePct)
+            // liefert das Gerät nur alle paar Sekunden. extractLatestMeasurement
+            // lässt diese Keys komplett weg, wenn kein Rare-Record im aktuellen
+            // Polling-Fenster lag — der Spread erhält dann die Werte aus dem
+            // letzten Rare-Record.
+            setMeasurement((prev) => ({ ...prev, ...m })),
           pollIntervalMs,
         );
         stateRef.current.client = client;

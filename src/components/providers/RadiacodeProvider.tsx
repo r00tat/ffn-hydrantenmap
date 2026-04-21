@@ -23,6 +23,7 @@ import {
 import { pushAndPrune, RadiacodeSample } from '../../hooks/radiacode/history';
 import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
 import {
+  RadiacodeDeviceInfo,
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
 } from '../../hooks/radiacode/types';
@@ -40,6 +41,7 @@ export interface RadiacodeSpectrumSessionState {
 export interface RadiacodeContextValue {
   status: RadiacodeStatus;
   device: RadiacodeDeviceRef | null;
+  deviceInfo: RadiacodeDeviceInfo | null;
   measurement: RadiacodeMeasurement | null;
   history: RadiacodeSample[];
   error: string | null;
@@ -120,6 +122,32 @@ export function RadiacodeProvider({
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
   const measurement = overrideMeasurement ?? hookMeasurement;
+  const [deviceInfo, setDeviceInfo] = useState<RadiacodeDeviceInfo | null>(null);
+
+  // Fetch device info once we're connected and the client is ready. Clears on
+  // disconnect so the UI doesn't show stale info for a different device.
+  useEffect(() => {
+    if (rawStatus !== 'connected') {
+      if (rawStatus === 'idle' || rawStatus === 'unavailable') {
+        setDeviceInfo(null);
+      }
+      return;
+    }
+    const client = clientRef.current;
+    if (!client) return;
+    let cancelled = false;
+    client
+      .getDeviceInfo()
+      .then((info) => {
+        if (!cancelled) setDeviceInfo(info);
+      })
+      .catch(() => {
+        // best-effort — älteren Firmwares kann der Abruf fehlschlagen.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rawStatus, clientRef]);
 
   // Append live measurements using React's "adjusting state while rendering"
   // pattern (https://react.dev/reference/react/useState#storing-information-from-previous-renders).
@@ -310,6 +338,7 @@ export function RadiacodeProvider({
     () => ({
       status,
       device,
+      deviceInfo,
       measurement,
       history,
       error,
@@ -328,6 +357,7 @@ export function RadiacodeProvider({
     [
       status,
       device,
+      deviceInfo,
       measurement,
       history,
       error,

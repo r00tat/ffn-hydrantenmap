@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { doseRateLevel, formatDose, formatDoseRate } from './doseFormat';
+import {
+  doseRateLevel,
+  formatDose,
+  formatDoseRate,
+  formatDuration,
+} from './doseFormat';
 
 describe('formatDoseRate', () => {
   it('uses µSv/h below 1000', () => {
@@ -22,6 +27,24 @@ describe('formatDose', () => {
   it('switches to mSv at 1000 µSv', () => {
     expect(formatDose(1000)).toEqual({ value: '1.00', unit: 'mSv' });
     expect(formatDose(25_000)).toEqual({ value: '25.00', unit: 'mSv' });
+  });
+});
+
+describe('formatDuration', () => {
+  it('renders mm:ss below 1 hour', () => {
+    expect(formatDuration(0)).toBe('00:00');
+    expect(formatDuration(45)).toBe('00:45');
+    expect(formatDuration(65)).toBe('01:05');
+    expect(formatDuration(3599)).toBe('59:59');
+  });
+  it('renders h:mm:ss from 1 hour onward', () => {
+    expect(formatDuration(3600)).toBe('1:00:00');
+    expect(formatDuration(3725)).toBe('1:02:05');
+    expect(formatDuration(36000)).toBe('10:00:00');
+  });
+  it('floors fractional seconds and clamps negatives', () => {
+    expect(formatDuration(12.9)).toBe('00:12');
+    expect(formatDuration(-5)).toBe('00:00');
   });
 });
 

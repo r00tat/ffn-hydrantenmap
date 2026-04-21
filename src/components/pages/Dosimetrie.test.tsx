@@ -35,6 +35,7 @@ function fixture(
   return {
     status: 'idle',
     device: null,
+    deviceInfo: null,
     measurement: null,
     history: [],
     error: null,
@@ -87,7 +88,7 @@ describe('Dosimetrie', () => {
     expect(screen.getByTestId('linechart')).toBeInTheDocument();
   });
 
-  it('toggles chart y-axis between log and linear', async () => {
+  it('toggles chart y-axis between linear and log', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
     mockedUseRadiacode.mockReturnValue(
       fixture({
@@ -99,10 +100,10 @@ describe('Dosimetrie', () => {
     );
     render(<Dosimetrie />);
     const chart = screen.getByTestId('linechart');
-    expect(chart.getAttribute('data-scale')).toBe('log');
+    expect(chart.getAttribute('data-scale')).toBe('linear');
     await user.click(screen.getByRole('checkbox', { name: /log/i }));
     expect(screen.getByTestId('linechart').getAttribute('data-scale')).toBe(
-      'linear',
+      'log',
     );
   });
 

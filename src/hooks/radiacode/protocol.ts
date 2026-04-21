@@ -13,6 +13,82 @@ export const COMMAND = {
   SET_TIME: 0x0a04,
 } as const;
 
+export interface FirmwareVersion {
+  bootMajor: number;
+  bootMinor: number;
+  bootDate: string;
+  targetMajor: number;
+  targetMinor: number;
+  targetDate: string;
+}
+
+export interface FirmwareSignature {
+  signature: number;
+  fileName: string;
+  idString: string;
+}
+
+function decodeLengthPrefixedString(
+  view: DataView,
+  offset: number,
+): { value: string; nextOffset: number } {
+  if (view.byteLength - offset < 4) {
+    throw new Error('String too short: missing length prefix');
+  }
+  const len = view.getUint32(offset, true);
+  if (view.byteLength - offset - 4 < len) {
+    throw new Error(
+      `String too short: declared ${len} B but only ${view.byteLength - offset - 4} available`,
+    );
+  }
+  const bytes = new Uint8Array(view.buffer, view.byteOffset + offset + 4, len);
+  // Strings sind typischerweise ASCII/CP1251; bei ASCII reicht TextDecoder,
+  // fremde Bytes werden als Replacement-Char dargestellt (für UI ok).
+  const value = new TextDecoder('ascii', { fatal: false }).decode(bytes);
+  return { value: value.replace(/\0+$/g, '').trim(), nextOffset: offset + 4 + len };
+}
+
+/** Decodes a GET_VERSION response payload (cmd 0x000A). */
+export function decodeVersion(data: Uint8Array): FirmwareVersion {
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  if (data.length < 4) throw new Error('Version payload too short');
+  const bootMinor = view.getUint16(0, true);
+  const bootMajor = view.getUint16(2, true);
+  const { value: bootDate, nextOffset: afterBoot } = decodeLengthPrefixedString(
+    view,
+    4,
+  );
+  const targetMinor = view.getUint16(afterBoot, true);
+  const targetMajor = view.getUint16(afterBoot + 2, true);
+  const { value: targetDate } = decodeLengthPrefixedString(view, afterBoot + 4);
+  return { bootMajor, bootMinor, bootDate, targetMajor, targetMinor, targetDate };
+}
+
+/** Decodes a GET_SERIAL response payload (cmd 0x000B). */
+export function decodeSerial(data: Uint8Array): string {
+  if (data.length < 4) throw new Error('Serial payload too short');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const len = view.getUint32(0, true);
+  if (len % 4 !== 0) throw new Error(`Unexpected serial length ${len}`);
+  if (data.length - 4 < len) throw new Error('Serial payload truncated');
+  const groups: string[] = [];
+  for (let off = 4; off < 4 + len; off += 4) {
+    const g = view.getUint32(off, true);
+    groups.push(g.toString(16).toUpperCase().padStart(8, '0'));
+  }
+  return groups.join('-');
+}
+
+/** Decodes a FW_SIGNATURE response payload (cmd 0x0101). */
+export function decodeFwSignature(data: Uint8Array): FirmwareSignature {
+  if (data.length < 4) throw new Error('FW signature payload too short');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const signature = view.getUint32(0, true);
+  const { value: fileName, nextOffset } = decodeLengthPrefixedString(view, 4);
+  const { value: idString } = decodeLengthPrefixedString(view, nextOffset);
+  return { signature, fileName, idString };
+}
+
 export const VS = {
   CONFIGURATION: 2,
   SERIAL_NUMBER: 8,

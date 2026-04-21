@@ -37,6 +37,11 @@ function makeFakeSpectrumClientFactory(): {
         startPolling: vi.fn(),
         disconnect: vi.fn(async () => {}),
         specReset: vi.fn(async () => {}),
+        getDeviceInfo: vi.fn(async () => ({
+          firmwareVersion: '4.14',
+          bootVersion: '4.1',
+          hardwareSerial: 'TEST-SERIAL',
+        })),
         readSpectrum: vi.fn(
           async () =>
             ({
