@@ -123,6 +123,40 @@ describe('useRadiacodeDevice', () => {
     });
   });
 
+  it('preserves dose/temperatureC/chargePct from earlier RareRecord across polls without them', async () => {
+    const adapter = makeAdapter();
+    const { factory, latest } = makeFakeClientFactory();
+    const { result } = renderHook(() =>
+      useRadiacodeDevice(adapter, { clientFactory: factory }),
+    );
+    await act(async () => {
+      await result.current.scan();
+    });
+    await act(async () => {
+      await result.current.connect();
+    });
+    await act(async () => {
+      latest()?.emit({
+        dosisleistung: 0.1,
+        cps: 3,
+        timestamp: 1,
+        dose: 420,
+        temperatureC: 24.5,
+        chargePct: 88,
+      });
+    });
+    await act(async () => {
+      latest()?.emit({ dosisleistung: 0.2, cps: 5, timestamp: 2 });
+    });
+    expect(result.current.measurement).toMatchObject({
+      dosisleistung: 0.2,
+      cps: 5,
+      dose: 420,
+      temperatureC: 24.5,
+      chargePct: 88,
+    });
+  });
+
   it('disconnect stops client and resets state', async () => {
     const adapter = makeAdapter();
     const { factory, latest } = makeFakeClientFactory();

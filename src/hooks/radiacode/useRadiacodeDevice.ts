@@ -94,7 +94,16 @@ export function useRadiacodeDevice(
           ? clientFactory(adapter, target.id)
           : new RadiacodeClient(adapter, target.id);
         await client.connect();
-        client.startPolling((m) => setMeasurement(m), pollIntervalMs);
+        client.startPolling(
+          (m) =>
+            setMeasurement((prev) => ({
+              ...m,
+              dose: m.dose ?? prev?.dose,
+              temperatureC: m.temperatureC ?? prev?.temperatureC,
+              chargePct: m.chargePct ?? prev?.chargePct,
+            })),
+          pollIntervalMs,
+        );
         stateRef.current.client = client;
         setStatus('connected');
       } catch (e) {
