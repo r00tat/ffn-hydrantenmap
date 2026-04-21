@@ -97,15 +97,20 @@ export default function SpectrumChart({
   const chartData = useMemo(() => {
     if (loadedSpectra.length === 0 || displayRange === 0) return null;
 
-    const energies = loadedSpectra[0].data.energies
-      .slice(0, displayRange)
-      .map((e) => Math.round(e * 10) / 10);
+    const coefficients = loadedSpectra[0].data.coefficients;
+    const energies = Array.from({ length: displayRange }, (_, ch) =>
+      Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
+    );
 
-    const series = loadedSpectra.map((s, idx) => ({
-      data: s.data.counts.slice(0, displayRange),
-      label: s.data.sampleName || `Spektrum ${idx + 1}`,
-      color: SERIES_COLORS[idx % SERIES_COLORS.length],
-    }));
+    const series = loadedSpectra.map((s, idx) => {
+      const padded = s.data.counts.slice(0, displayRange);
+      while (padded.length < displayRange) padded.push(0);
+      return {
+        data: padded,
+        label: s.data.sampleName || `Spektrum ${idx + 1}`,
+        color: SERIES_COLORS[idx % SERIES_COLORS.length],
+      };
+    });
 
     return { energies, series };
   }, [loadedSpectra, displayRange]);

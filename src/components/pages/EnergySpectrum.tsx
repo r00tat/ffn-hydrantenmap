@@ -419,15 +419,22 @@ export default function EnergySpectrum() {
   const chartData = useMemo(() => {
     if (deferredVisibleSpectra.length === 0 || displayRange === 0) return null;
 
-    const energies = deferredVisibleSpectra[0].data.energies
-      .slice(0, displayRange)
-      .map((e) => Math.round(e * 10) / 10);
+    // Build x-axis from displayRange channels using first spectrum's
+    // calibration. Generating instead of slicing guarantees length ===
+    // displayRange even if the first spectrum has fewer channels than the
+    // longest one in the set.
+    const coefficients = deferredVisibleSpectra[0].data.coefficients;
+    const energies = Array.from({ length: displayRange }, (_, ch) =>
+      Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
+    );
 
     // Use original index for consistent colors
     const series = deferredVisibleSpectra.map((s) => {
       const originalIdx = allSpectra.indexOf(s);
+      const padded = s.data.counts.slice(0, displayRange);
+      while (padded.length < displayRange) padded.push(0);
       return {
-        data: s.data.counts.slice(0, displayRange),
+        data: padded,
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
         color: SERIES_COLORS[originalIdx % SERIES_COLORS.length],
       };
