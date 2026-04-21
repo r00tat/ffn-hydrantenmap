@@ -14,10 +14,21 @@ import {
   decodeSerial,
   decodeSpectrumResponse,
   decodeVersion,
+  decodeVsfrBool,
+  decodeVsfrU32,
+  decodeVsfrU8,
+  encodeVsfrRead,
+  encodeVsfrWriteBool,
+  encodeVsfrWriteU32,
+  encodeVsfrWriteU8,
   parseResponse,
   splitForWrite,
 } from './protocol';
-import { RadiacodeDeviceInfo, RadiacodeMeasurement } from './types';
+import {
+  RadiacodeDeviceInfo,
+  RadiacodeMeasurement,
+  RadiacodeSettings,
+} from './types';
 
 const DOSE_RATE_TO_USVH = 10000;
 const DOSE_SV_TO_USV = 1e6;
@@ -187,6 +198,33 @@ export class RadiacodeClient {
     v.setUint32(0, VSFR.SPEC_RESET, true);
     v.setUint32(4, 0, true);
     await this.execute(COMMAND.WR_VIRT_SFR, args);
+  }
+
+  async readSfrU32(id: number): Promise<number> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrU32(rsp.data);
+  }
+
+  async readSfrU8(id: number): Promise<number> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrU8(rsp.data);
+  }
+
+  async readSfrBool(id: number): Promise<boolean> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrBool(rsp.data);
+  }
+
+  async writeSfrU32(id: number, value: number): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteU32(id, value));
+  }
+
+  async writeSfrU8(id: number, value: number): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteU8(id, value));
+  }
+
+  async writeSfrBool(id: number, value: boolean): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteBool(id, value));
   }
 
   async readSpectrum(): Promise<SpectrumSnapshot> {

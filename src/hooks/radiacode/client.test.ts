@@ -1183,4 +1183,70 @@ describe('RadiacodeClient', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(adapter.writes.length).toBe(writesBefore);
   });
+
+  it('readSfrU32 sends RD_VIRT_SFR(id) and decodes the u32 value', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR)
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      if (cmd === COMMAND.RD_VIRT_SFR) {
+        const payload = new Uint8Array(8);
+        const v = new DataView(payload.buffer);
+        v.setUint32(0, 1, true);
+        v.setUint32(4, 1337, true);
+        return buildResponseChunks(cmd, seq, payload);
+      }
+      return null;
+    });
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const value = await client.readSfrU32(VSFR.DR_LEV1_uR_h);
+    expect(value).toBe(1337);
+    const lastWrite = adapter.writes[adapter.writes.length - 1];
+    const args = lastWrite.slice(8);
+    expect(Array.from(args)).toEqual([0x00, 0x80, 0x00, 0x00]);
+    await client.disconnect();
+  });
+
+  it('writeSfrBool sends WR_VIRT_SFR(id, 0/1)', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const wrFrames: Uint8Array[] = [];
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        wrFrames.push(frame);
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      }
+      return null;
+    });
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const framesBefore = wrFrames.length;
+    await client.writeSfrBool(VSFR.SOUND_ON, true);
+    expect(wrFrames.length).toBe(framesBefore + 1);
+    const args = wrFrames[wrFrames.length - 1].slice(8);
+    expect(Array.from(args)).toEqual([0x22, 0x05, 0x00, 0x00, 0x01]);
+    await client.disconnect();
+  });
 });
