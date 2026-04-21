@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { exportSpectrumXml } from './spectrumExporter';
 import { parseSpectrumXml } from './spectrumParser';
