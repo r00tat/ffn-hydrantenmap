@@ -68,6 +68,8 @@ public class MainActivity extends BridgeActivity {
             applyServerUrlOverride(override.trim());
         }
 
+        registerPlugin(RadiacodeNotificationPlugin.class);
+
         super.onCreate(savedInstanceState);
 
         WebView webView = this.bridge.getWebView();

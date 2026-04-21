@@ -20,4 +20,7 @@
     <string name="offline_overlay_title">Keine Verbindung</string>
     <string name="offline_overlay_message">Einsatzkarte wartet auf Netzwerk…</string>
     <string name="offline_overlay_retry">Jetzt erneut versuchen</string>
+    <string name="radiacode_notification_channel_name">Radiacode Verbindung</string>
+    <string name="radiacode_notification_channel_desc">Zeigt Live-Messwerte während einer Radiacode-Verbindung.</string>
+    <string name="radiacode_notification_action_disconnect">Trennen</string>
 </resources>
