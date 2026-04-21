@@ -290,7 +290,7 @@ als `decodeDataBufRecords()`.
 | (0, 0)     | **RealTimeData** | `<f cr><f dr><H cr_err><H dr_err><H flags><B rt_flags>` (15 B) |            ✅ decoded + genutzt             |
 | (0, 1)     | **RawData**      | `<f cr><f dr>` (8 B)                                           |         🟡 decoded, nicht angezeigt         |
 | (0, 2)     | DoseRateDB       | `<I count><f cr><f dr><H dr_err><H flags>` (16 B)              |         🟡 decoded, nicht angezeigt         |
-| (0, 3)     | **RareData**     | `<I duration><f dose><H temp><H charge><H flags>` (14 B)       |  ✅ decoded + genutzt (dose, temp, charge)  |
+| (0, 3)     | **RareData**     | `<I duration><f dose (mSv)><H temp><H charge><H flags>` (14 B) |  ✅ decoded + genutzt (dose, temp, charge)  |
 | (0, 7)     | Event            | `<B event><B param1><H flags>` (4 B)                           | 🟡 als Rohbyte decoded, nicht interpretiert |
 | (1, 1/2/3) | Histogramm       | `<H samples><I smpl_ms>` + samples × (8/16/14 B)               |        🟡 als `unknown` übersprungen        |
 
@@ -299,7 +299,9 @@ als `decodeDataBufRecords()`.
 
 - ✅ `dosisleistung` (µSv/h, aus RealTime)
 - ✅ `cps` (aus RealTime)
-- ✅ `dose` (µSv, aus RareData)
+- ✅ `dose` (µSv, aus RareData — Rohwert kommt in mSv und wird in der
+  App mit Faktor 1e3 zu µSv skaliert,
+  siehe [client.ts](../src/hooks/radiacode/client.ts) `DOSE_RAW_TO_USV`)
 - ✅ `temperatureC` (aus RareData)
 - ✅ `chargePct` (aus RareData)
 - ❌ `countRateErrPct`, `doseRateErrPct` (werden decoded, aber nicht weitergereicht)
