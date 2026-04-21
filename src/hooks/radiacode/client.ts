@@ -24,6 +24,13 @@ interface InFlight {
   reject: (e: Error) => void;
 }
 
+interface Queued {
+  cmd: number;
+  args: Uint8Array;
+  resolve: (r: ParsedResponse) => void;
+  reject: (e: Error) => void;
+}
+
 function encodeSetTime(d: Date): Uint8Array {
   return new Uint8Array([
     d.getDate(),
@@ -45,15 +52,17 @@ function u32le(value: number): Uint8Array {
 
 /**
  * Orchestrates a single Radiacode BLE session: owns the sequence counter,
- * response reassembler, and a single-slot in-flight request queue. Request
- * ordering is strictly serial — the device pairs responses to requests by
- * sequence byte, but the reference implementation always waits for the prior
- * response before issuing the next request, and we mirror that.
+ * response reassembler, and a FIFO request queue. Request ordering is strictly
+ * serial — the device pairs responses to requests by sequence byte, but the
+ * reference implementation always waits for the prior response before issuing
+ * the next request, and we mirror that. Concurrent callers (multiple pollers,
+ * user commands) are queued transparently so they do not need retry logic.
  */
 export class RadiacodeClient {
   private seqIndex = 0;
   private reassembler = new ResponseReassembler();
   private inFlight: InFlight | null = null;
+  private queue: Queued[] = [];
   private unsubscribe: Unsubscribe | null = null;
   private polling = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -116,6 +125,11 @@ export class RadiacodeClient {
       this.inFlight.reject(new Error('Client disconnected'));
       this.inFlight = null;
     }
+    const pending = this.queue;
+    this.queue = [];
+    for (const q of pending) {
+      q.reject(new Error('Client disconnected'));
+    }
     try {
       await this.adapter.disconnect(this.deviceId);
     } catch {
@@ -135,29 +149,44 @@ export class RadiacodeClient {
   }
 
   private execute(cmd: number, args: Uint8Array): Promise<ParsedResponse> {
-    if (this.inFlight) {
-      return Promise.reject(new Error('Request already in flight'));
-    }
+    return new Promise<ParsedResponse>((resolve, reject) => {
+      this.queue.push({ cmd, args, resolve, reject });
+      this.pumpQueue();
+    });
+  }
+
+  private pumpQueue(): void {
+    if (this.inFlight || this.queue.length === 0) return;
+    const next = this.queue.shift()!;
     const seq = this.seqIndex;
     this.seqIndex = (this.seqIndex + 1) % SEQ_MODULO;
-    const frame = buildRequest(cmd, seq, args);
+    const frame = buildRequest(next.cmd, seq, next.args);
     const chunks = splitForWrite(frame, MAX_WRITE_CHUNK);
-
-    return new Promise<ParsedResponse>((resolve, reject) => {
-      this.inFlight = { cmd, seq, resolve, reject };
-      void (async () => {
-        try {
-          for (const c of chunks) {
-            await this.adapter.write(this.deviceId, c);
-          }
-        } catch (e) {
-          if (this.inFlight && this.inFlight.seq === seq) {
-            this.inFlight = null;
-          }
-          reject(e instanceof Error ? e : new Error(String(e)));
+    this.inFlight = {
+      cmd: next.cmd,
+      seq,
+      resolve: (r) => {
+        next.resolve(r);
+        this.pumpQueue();
+      },
+      reject: (e) => {
+        next.reject(e);
+        this.pumpQueue();
+      },
+    };
+    void (async () => {
+      try {
+        for (const c of chunks) {
+          await this.adapter.write(this.deviceId, c);
         }
-      })();
-    });
+      } catch (e) {
+        const waiter = this.inFlight;
+        if (waiter && waiter.seq === seq) {
+          this.inFlight = null;
+          waiter.reject(e instanceof Error ? e : new Error(String(e)));
+        }
+      }
+    })();
   }
 }
 

@@ -322,6 +322,135 @@ describe('RadiacodeClient', () => {
     await client.disconnect();
   });
 
+  it('serializes concurrent executes via FIFO queue', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const seenCmds: number[] = [];
+    const deferredResponses: Array<() => void> = [];
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.GET_STATUS) {
+        seenCmds.push(seq);
+        // Queue the response so the test can control when the device replies.
+        const chunks = buildResponseChunks(cmd, seq, new Uint8Array([seq]));
+        deferredResponses.push(() => {
+          for (const c of chunks) adapter.emit(c);
+        });
+        return null;
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const runCmd = (client as unknown as {
+      execute: (cmd: number, args: Uint8Array) => Promise<{ data: Uint8Array }>;
+    }).execute.bind(client);
+
+    const p1 = runCmd(COMMAND.GET_STATUS, new Uint8Array(0));
+    const p2 = runCmd(COMMAND.GET_STATUS, new Uint8Array(0));
+
+    // Let the queue pump: first write happens, second must wait in queue.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(seenCmds.length).toBe(1); // only first request has been written
+
+    // Release the first response → queue pumps second write.
+    deferredResponses[0]();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(seenCmds.length).toBe(2);
+
+    // Release second response.
+    deferredResponses[1]();
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.data[0]).toBe(seenCmds[0]);
+    expect(r2.data[0]).toBe(seenCmds[1]);
+    expect(seenCmds[0]).toBeLessThan(seenCmds[1]);
+
+    await client.disconnect();
+  });
+
+  it('disconnect rejects queued waiters', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    let deferredResponse: (() => void) | null = null;
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.GET_STATUS) {
+        // Defer the first GET_STATUS response so the second stays queued.
+        if (!deferredResponse) {
+          const chunks = buildResponseChunks(cmd, seq, new Uint8Array(0));
+          deferredResponse = () => {
+            for (const c of chunks) adapter.emit(c);
+          };
+          return null;
+        }
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const runCmd = (client as unknown as {
+      execute: (cmd: number, args: Uint8Array) => Promise<{ data: Uint8Array }>;
+    }).execute.bind(client);
+
+    const p1 = runCmd(COMMAND.GET_STATUS, new Uint8Array(0));
+    const p2 = runCmd(COMMAND.GET_STATUS, new Uint8Array(0));
+
+    // Attach catch handlers early to avoid unhandled rejections.
+    const p1Settled = p1.catch((e: Error) => e);
+    const p2Settled = p2.catch((e: Error) => e);
+
+    await client.disconnect();
+
+    const r1 = await p1Settled;
+    const r2 = await p2Settled;
+    expect(r1).toBeInstanceOf(Error);
+    expect(r2).toBeInstanceOf(Error);
+    expect((r1 as Error).message).toMatch(/disconnect/i);
+    expect((r2 as Error).message).toMatch(/disconnect/i);
+  });
+
   it('disconnect stops polling and unsubscribes', async () => {
     const adapter = makeAdapter();
     let seqCounter = 0;
