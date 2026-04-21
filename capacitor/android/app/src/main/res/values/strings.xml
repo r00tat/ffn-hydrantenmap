@@ -17,4 +17,7 @@
     <string name="load_error_change_url">URL ändern</string>
     <string name="load_error_retry">Erneut versuchen</string>
     <string name="load_error_dismiss">Schließen</string>
+    <string name="offline_overlay_title">Keine Verbindung</string>
+    <string name="offline_overlay_message">Einsatzkarte wartet auf Netzwerk…</string>
+    <string name="offline_overlay_retry">Jetzt erneut versuchen</string>
 </resources>
