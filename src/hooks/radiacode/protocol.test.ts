@@ -424,6 +424,17 @@ describe('VSFR decoders', () => {
 
   it('throws when payload is too short for the expected value type', () => {
     expect(() => decodeVsfrU32(new Uint8Array(6))).toThrow(/too short/i);
-    expect(() => decodeVsfrU8(new Uint8Array(4))).toThrow(/too short/i);
+    // U8: 4-byte payload with retcode=1 but no value → "truncated"
+    const truncated = new Uint8Array(4);
+    new DataView(truncated.buffer).setUint32(0, 1, true);
+    expect(() => decodeVsfrU8(truncated)).toThrow(/truncated/i);
+  });
+
+  it('decodeVsfrU8 surfaces the retcode when the device returns only <I retcode>', () => {
+    // Firmware returns 4 B with non-1 retcode for unsupported VSFRs — we want
+    // the retcode in the error, not a generic "too short".
+    const errResponse = new Uint8Array(4);
+    new DataView(errResponse.buffer).setUint32(0, 3, true);
+    expect(() => decodeVsfrU8(errResponse)).toThrow(/retcode 3/i);
   });
 });

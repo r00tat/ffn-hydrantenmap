@@ -175,10 +175,15 @@ export function decodeVsfrU32(payload: Uint8Array): number {
 }
 
 export function decodeVsfrU8(payload: Uint8Array): number {
-  if (payload.length < 5) {
-    throw new Error(`VSFR U8 response too short: ${payload.length} B (need 5)`);
-  }
+  // Response layout per protocol: <I retcode><I value> (8 B). On error the
+  // firmware may return only <I retcode> (4 B) without a value — check retcode
+  // first so callers see the real error instead of a generic "too short".
   checkVsfrRetcode(payload);
+  if (payload.length < 5) {
+    throw new Error(
+      `VSFR U8 response truncated: ${payload.length} B (retcode OK, value missing)`,
+    );
+  }
   return payload[4];
 }
 
