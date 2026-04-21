@@ -14,9 +14,11 @@ import {
   decodeSerial,
   decodeSpectrumResponse,
   decodeVersion,
+  decodeVsfrBatchRead,
   decodeVsfrBool,
   decodeVsfrU32,
   decodeVsfrU8,
+  encodeVsfrBatchRead,
   encodeVsfrRead,
   encodeVsfrWriteBool,
   encodeVsfrWriteU32,
@@ -228,19 +230,59 @@ export class RadiacodeClient {
     await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteBool(id, value));
   }
 
+  /**
+   * Batch-read multiple VSFRs in one call (`RD_VIRT_SFR_BATCH` / 0x082A).
+   * Required for u8/bool registers on firmwares that reject `RD_VIRT_SFR` for
+   * non-u32 types — matches the official Radiacode app. Values are returned as
+   * u32; callers mask the low byte / compare against 0 for u8/bool.
+   */
+  async readSfrBatch(ids: readonly number[]): Promise<number[]> {
+    const rsp = await this.execute(
+      COMMAND.RD_VIRT_SFR_BATCH,
+      encodeVsfrBatchRead(ids),
+    );
+    return decodeVsfrBatchRead(rsp.data, ids.length);
+  }
+
   async readSettings(): Promise<RadiacodeSettings> {
+    const ids = [
+      VSFR.DR_LEV1_uR_h,
+      VSFR.DR_LEV2_uR_h,
+      VSFR.DS_LEV1_uR,
+      VSFR.DS_LEV2_uR,
+      VSFR.SOUND_ON,
+      VSFR.SOUND_VOL,
+      VSFR.VIBRO_ON,
+      VSFR.LEDS_ON,
+      VSFR.DS_UNITS,
+      VSFR.CR_UNITS,
+      VSFR.USE_nSv_h,
+    ];
+    const [
+      dr1,
+      dr2,
+      ds1,
+      ds2,
+      soundOn,
+      soundVol,
+      vibroOn,
+      ledsOn,
+      dsUnits,
+      crUnits,
+      useNSvH,
+    ] = await this.readSfrBatch(ids);
     return {
-      doseRateAlarm1uRh: await this.readSfrU32(VSFR.DR_LEV1_uR_h),
-      doseRateAlarm2uRh: await this.readSfrU32(VSFR.DR_LEV2_uR_h),
-      doseAlarm1uR: await this.readSfrU32(VSFR.DS_LEV1_uR),
-      doseAlarm2uR: await this.readSfrU32(VSFR.DS_LEV2_uR),
-      soundOn: await this.readSfrBool(VSFR.SOUND_ON),
-      soundVolume: await this.readSfrU8(VSFR.SOUND_VOL),
-      vibroOn: await this.readSfrBool(VSFR.VIBRO_ON),
-      ledsOn: await this.readSfrBool(VSFR.LEDS_ON),
-      doseUnitsSv: await this.readSfrBool(VSFR.DS_UNITS),
-      countRateCpm: await this.readSfrBool(VSFR.CR_UNITS),
-      doseRateNSvh: await this.readSfrBool(VSFR.USE_nSv_h),
+      doseRateAlarm1uRh: dr1,
+      doseRateAlarm2uRh: dr2,
+      doseAlarm1uR: ds1,
+      doseAlarm2uR: ds2,
+      soundOn: soundOn !== 0,
+      soundVolume: soundVol & 0xff,
+      vibroOn: vibroOn !== 0,
+      ledsOn: ledsOn !== 0,
+      doseUnitsSv: dsUnits !== 0,
+      countRateCpm: crUnits !== 0,
+      doseRateNSvh: useNSvH !== 0,
     };
   }
 

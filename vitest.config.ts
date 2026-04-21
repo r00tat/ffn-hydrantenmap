@@ -16,6 +16,8 @@ export default defineConfig({
       '**/.skills/**',
       // chrome-extension has its own vitest config (jsdom environment) and test runner.
       '**/chrome-extension/**',
+      // worktrees are separate checkouts — their tests run from their own tree.
+      '**/.worktrees/**',
     ],
   },
 });

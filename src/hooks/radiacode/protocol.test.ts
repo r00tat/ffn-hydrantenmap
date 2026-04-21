@@ -13,9 +13,11 @@ import {
   decodeSerial,
   decodeSpectrumResponse,
   decodeVersion,
+  decodeVsfrBatchRead,
   decodeVsfrBool,
   decodeVsfrU32,
   decodeVsfrU8,
+  encodeVsfrBatchRead,
   encodeVsfrRead,
   encodeVsfrWriteBool,
   encodeVsfrWriteU32,
@@ -436,5 +438,47 @@ describe('VSFR decoders', () => {
     const errResponse = new Uint8Array(4);
     new DataView(errResponse.buffer).setUint32(0, 3, true);
     expect(() => decodeVsfrU8(errResponse)).toThrow(/retcode 3/i);
+  });
+});
+
+describe('VSFR batch codec', () => {
+  it('encodeVsfrBatchRead packs <I n><n*I ids> in little-endian', () => {
+    const ids = [0x8000, 0x0522, 0x8004];
+    const buf = encodeVsfrBatchRead(ids);
+    expect(buf.length).toBe(4 + ids.length * 4);
+    const v = new DataView(buf.buffer);
+    expect(v.getUint32(0, true)).toBe(ids.length);
+    expect(v.getUint32(4, true)).toBe(0x8000);
+    expect(v.getUint32(8, true)).toBe(0x0522);
+    expect(v.getUint32(12, true)).toBe(0x8004);
+  });
+
+  it('encodeVsfrBatchRead rejects an empty id list', () => {
+    expect(() => encodeVsfrBatchRead([])).toThrow(/empty|at least one/i);
+  });
+
+  it('decodeVsfrBatchRead returns values when all bits in the validity mask are set', () => {
+    // n=3, mask=0b111, values=[42, 0, 7]
+    const payload = new Uint8Array(4 + 3 * 4);
+    const v = new DataView(payload.buffer);
+    v.setUint32(0, 0b111, true);
+    v.setUint32(4, 42, true);
+    v.setUint32(8, 0, true);
+    v.setUint32(12, 7, true);
+    expect(decodeVsfrBatchRead(payload, 3)).toEqual([42, 0, 7]);
+  });
+
+  it('decodeVsfrBatchRead throws with the bitmask when not all VSFRs are valid', () => {
+    // n=3, mask=0b101 (middle VSFR failed)
+    const payload = new Uint8Array(4 + 3 * 4);
+    new DataView(payload.buffer).setUint32(0, 0b101, true);
+    expect(() => decodeVsfrBatchRead(payload, 3)).toThrow(/validity|101/i);
+  });
+
+  it('decodeVsfrBatchRead throws when the payload is too short for n values', () => {
+    // n=3 requested but only 2 values present
+    const payload = new Uint8Array(4 + 2 * 4);
+    new DataView(payload.buffer).setUint32(0, 0b111, true);
+    expect(() => decodeVsfrBatchRead(payload, 3)).toThrow(/too short/i);
   });
 });

@@ -191,6 +191,59 @@ export function decodeVsfrBool(payload: Uint8Array): boolean {
   return decodeVsfrU8(payload) !== 0;
 }
 
+/**
+ * Encode args for `RD_VIRT_SFR_BATCH` (0x082A): `<I n><n*I ids>` little-endian.
+ * Firmware reads/writes that don't support single-VSFR `RD_VIRT_SFR` for
+ * bool/u8 registers still accept the batch call — matches the official app.
+ */
+export function encodeVsfrBatchRead(ids: readonly number[]): Uint8Array {
+  if (ids.length === 0) {
+    throw new Error('encodeVsfrBatchRead: at least one VSFR id required');
+  }
+  const buf = new Uint8Array(4 + ids.length * 4);
+  const v = new DataView(buf.buffer);
+  v.setUint32(0, ids.length, true);
+  for (let i = 0; i < ids.length; i++) {
+    v.setUint32(4 + i * 4, ids[i] >>> 0, true);
+  }
+  return buf;
+}
+
+/**
+ * Decode a `RD_VIRT_SFR_BATCH` response: `<I validity_mask><n*I values>`.
+ * Returns one u32 per requested VSFR. Logical u8/bool callers take the low
+ * byte / compare against 0. Throws if any bit in the mask is unset — partial
+ * results are not supported (bitmask would ambiguously map to IDs).
+ */
+export function decodeVsfrBatchRead(
+  payload: Uint8Array,
+  count: number,
+): number[] {
+  const expectedLen = 4 + count * 4;
+  if (payload.length < expectedLen) {
+    throw new Error(
+      `VSFR batch response too short: ${payload.length} B (need ${expectedLen} for ${count} values)`,
+    );
+  }
+  const view = new DataView(
+    payload.buffer,
+    payload.byteOffset,
+    payload.byteLength,
+  );
+  const mask = view.getUint32(0, true);
+  const expectedMask = count === 32 ? 0xffffffff : (1 << count) - 1;
+  if (mask !== expectedMask) {
+    throw new Error(
+      `VSFR batch validity mask mismatch: got 0b${mask.toString(2)}, expected 0b${expectedMask.toString(2)}`,
+    );
+  }
+  const values: number[] = [];
+  for (let i = 0; i < count; i++) {
+    values.push(view.getUint32(4 + i * 4, true));
+  }
+  return values;
+}
+
 export function buildRequest(
   cmd: number,
   seqIndex: number,

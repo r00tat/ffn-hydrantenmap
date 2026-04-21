@@ -1219,38 +1219,41 @@ describe('RadiacodeClient', () => {
     await client.disconnect();
   });
 
-  it('readSettings reads all 11 VSFRs and returns a RadiacodeSettings object', async () => {
+  it('readSettings uses RD_VIRT_SFR_BATCH for all 11 VSFRs in one call', async () => {
     vi.useRealTimers();
     const adapter = makeAdapter();
     let seqCounter = 0;
 
-    const u32 = (value: number) => {
-      const p = new Uint8Array(8);
-      const v = new DataView(p.buffer);
-      v.setUint32(0, 1, true);
-      v.setUint32(4, value, true);
-      return p;
+    // Expected order the client requests the VSFRs in — mirrors the
+    // RadiacodeSettings key order. Using a fixed order keeps the responder
+    // simple: we build the batch response in this order.
+    const expectedOrder = [
+      VSFR.DR_LEV1_uR_h,
+      VSFR.DR_LEV2_uR_h,
+      VSFR.DS_LEV1_uR,
+      VSFR.DS_LEV2_uR,
+      VSFR.SOUND_ON,
+      VSFR.SOUND_VOL,
+      VSFR.VIBRO_ON,
+      VSFR.LEDS_ON,
+      VSFR.DS_UNITS,
+      VSFR.CR_UNITS,
+      VSFR.USE_nSv_h,
+    ];
+    const valueByVsfr: Record<number, number> = {
+      [VSFR.DR_LEV1_uR_h]: 100_000,
+      [VSFR.DR_LEV2_uR_h]: 200_000,
+      [VSFR.DS_LEV1_uR]: 10_000_000,
+      [VSFR.DS_LEV2_uR]: 20_000_000,
+      [VSFR.SOUND_ON]: 1,
+      [VSFR.SOUND_VOL]: 5,
+      [VSFR.VIBRO_ON]: 0,
+      [VSFR.LEDS_ON]: 1,
+      [VSFR.DS_UNITS]: 1,
+      [VSFR.CR_UNITS]: 0,
+      [VSFR.USE_nSv_h]: 0,
     };
-    const u8 = (value: number) => {
-      const p = new Uint8Array(5);
-      new DataView(p.buffer).setUint32(0, 1, true);
-      p[4] = value;
-      return p;
-    };
-    const responses: Record<number, Uint8Array> = {
-      [VSFR.DR_LEV1_uR_h]: u32(100_000),
-      [VSFR.DR_LEV2_uR_h]: u32(200_000),
-      [VSFR.DS_LEV1_uR]: u32(10_000_000),
-      [VSFR.DS_LEV2_uR]: u32(20_000_000),
-      [VSFR.SOUND_ON]: u8(1),
-      [VSFR.SOUND_VOL]: u8(5),
-      [VSFR.VIBRO_ON]: u8(0),
-      [VSFR.LEDS_ON]: u8(1),
-      [VSFR.DS_UNITS]: u8(1),
-      [VSFR.CR_UNITS]: u8(0),
-      [VSFR.USE_nSv_h]: u8(0),
-    };
-    const requestedIds: number[] = [];
+    const batchRequestedIds: number[] = [];
 
     adapter.setResponder((frame) => {
       const view = new DataView(
@@ -1264,11 +1267,18 @@ describe('RadiacodeClient', () => {
         return buildResponseChunks(cmd, seq, new Uint8Array(0));
       if (cmd === COMMAND.WR_VIRT_SFR)
         return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
-      if (cmd === COMMAND.RD_VIRT_SFR) {
-        const id = view.getUint32(8, true);
-        requestedIds.push(id);
-        const body = responses[id];
-        if (!body) throw new Error(`Unexpected VSFR read: 0x${id.toString(16)}`);
+      if (cmd === COMMAND.RD_VIRT_SFR_BATCH) {
+        // Args: <I n><n*I ids>. Read requested ids, respond with values in order.
+        const n = view.getUint32(8, true);
+        for (let i = 0; i < n; i++) {
+          batchRequestedIds.push(view.getUint32(12 + i * 4, true));
+        }
+        const body = new Uint8Array(4 + n * 4);
+        const bv = new DataView(body.buffer);
+        bv.setUint32(0, (1 << n) - 1, true); // all valid
+        for (let i = 0; i < n; i++) {
+          bv.setUint32(4 + i * 4, valueByVsfr[batchRequestedIds[i]] ?? 0, true);
+        }
         return buildResponseChunks(cmd, seq, body);
       }
       return null;
@@ -1290,7 +1300,7 @@ describe('RadiacodeClient', () => {
       countRateCpm: false,
       doseRateNSvh: false,
     });
-    expect(requestedIds).toHaveLength(11);
+    expect(batchRequestedIds).toEqual(expectedOrder);
     await client.disconnect();
   });
 
