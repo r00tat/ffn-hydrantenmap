@@ -31,7 +31,7 @@ export default function RadiacodeLiveWidget({
       data-dose-level={level}
       sx={{
         position: 'absolute',
-        bottom: 96,
+        bottom: 120,
         left: 80,
         bgcolor: DOSE_COLOR[level],
         color: '#fff',

@@ -8,21 +8,17 @@ import { useGpsLineRecorder } from '../../hooks/recording/useGpsLineRecorder';
 import { useRadiacodePointRecorder } from '../../hooks/recording/useRadiacodePointRecorder';
 import { loadDefaultDevice } from '../../hooks/radiacode/devicePreference';
 import { createRadiacodeLayer } from '../../hooks/radiacode/layerFactory';
-import {
-  RadiacodeDeviceRef,
-  SampleRate,
-} from '../../hooks/radiacode/types';
+import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import { usePositionContext } from './Position';
 import RadiacodeLiveWidget from './RadiacodeLiveWidget';
-import TrackStartDialog, {
-  TrackStartConfig,
-} from './TrackStartDialog';
+import TrackStartDialog, { TrackStartConfig } from './TrackStartDialog';
 
 export default function RecordButton() {
-  const [position, isPositionSet] = usePositionContext();
+  const [position, isPositionSet, , enableTracking, isPositionPending] =
+    usePositionContext();
   const sortedLayers = useFirecallLayersSorted();
   const addFirecallItem = useFirecallItemAdd();
 
@@ -31,8 +27,9 @@ export default function RecordButton() {
   const [radiacodeLayerId, setRadiacodeLayerId] = useState<string | null>(null);
   const [radiacodeSampleRate, setRadiacodeSampleRate] =
     useState<SampleRate>('normal');
-  const [defaultDevice, setDefaultDevice] =
-    useState<RadiacodeDeviceRef | null>(null);
+  const [defaultDevice, setDefaultDevice] = useState<RadiacodeDeviceRef | null>(
+    null,
+  );
 
   useEffect(() => {
     loadDefaultDevice().then(setDefaultDevice);
@@ -56,9 +53,7 @@ export default function RecordButton() {
     sampleRate: radiacodeSampleRate,
     device,
     measurement,
-    position: isPositionSet
-      ? { lat: position.lat, lng: position.lng }
-      : null,
+    position: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
     addItem: addFirecallItem,
     onStart: useCallback(
       () =>
@@ -136,11 +131,13 @@ export default function RecordButton() {
       event.preventDefault();
       if (isRecording) {
         handleStop();
+      } else if (!isPositionSet) {
+        enableTracking();
       } else {
         setDialogOpen(true);
       }
     },
-    [isRecording, handleStop],
+    [isRecording, isPositionSet, enableTracking, handleStop],
   );
 
   return (
@@ -148,22 +145,28 @@ export default function RecordButton() {
       <Box
         sx={{
           position: 'absolute',
-          bottom: 96,
+          bottom: 120,
           left: 16,
         }}
       >
-        {isPositionSet && (
-          <Tooltip title="Aufzeichnung">
-            <Fab
-              color={isRecording ? 'warning' : 'default'}
-              aria-label="add"
-              size="small"
-              onClick={handleClick}
-            >
-              <RadioButtonCheckedIcon />
-            </Fab>
-          </Tooltip>
-        )}
+        <Tooltip
+          title={
+            isPositionPending
+              ? 'Position wird ermittelt …'
+              : !isPositionSet
+                ? 'Position aktivieren, um Aufzeichnung zu starten'
+                : 'Aufzeichnung'
+          }
+        >
+          <Fab
+            color={isRecording ? 'warning' : 'default'}
+            aria-label="add"
+            size="small"
+            onClick={handleClick}
+          >
+            <RadioButtonCheckedIcon />
+          </Fab>
+        </Tooltip>
       </Box>
       <RadiacodeLiveWidget visible={radiacodeActive} />
       <TrackStartDialog

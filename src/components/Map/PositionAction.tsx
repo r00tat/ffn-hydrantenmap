@@ -39,7 +39,7 @@ export default function PositionAction() {
     <Box
       sx={{
         position: 'absolute',
-        bottom: 24,
+        bottom: 64,
         left: 16,
       }}
     >
