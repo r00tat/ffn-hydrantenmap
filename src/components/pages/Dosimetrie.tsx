@@ -1,18 +1,25 @@
 'use client';
 
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import SaveIcon from '@mui/icons-material/Save';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   doseRateLevel,
   formatDose,
@@ -21,6 +28,7 @@ import {
 } from '../../common/doseFormat';
 import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import RadiacodeSettingsDialog from './RadiacodeSettingsDialog';
 
 const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
@@ -114,6 +122,16 @@ const STATUS_CHIP_COLOR: Record<
   error: 'error',
 };
 
+function formatStartTimestamp(ts: number): string {
+  return new Date(ts).toLocaleString('de-AT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function Dosimetrie() {
   const {
     status,
@@ -121,6 +139,8 @@ export default function Dosimetrie() {
     deviceInfo,
     measurement,
     history,
+    cpsHistory,
+    spectrum,
     error,
     connect,
     disconnect,
@@ -128,9 +148,17 @@ export default function Dosimetrie() {
     writeSettings,
     playSignal,
     doseReset,
+    resetLiveSpectrum,
+    saveLiveSpectrum,
   } = useRadiacode();
+  const showSnackbar = useSnackbar();
   const [logScale, setLogScale] = useState(false);
+  const [spectrumLogScale, setSpectrumLogScale] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const rateLevel = measurement
     ? doseRateLevel(measurement.dosisleistung)
@@ -153,6 +181,50 @@ export default function Dosimetrie() {
       y: logScale ? Math.max(s.dosisleistung, 0.01) : s.dosisleistung,
     }));
   }, [history, logScale]);
+
+  const cpsChart = useMemo(() => {
+    if (cpsHistory.length === 0) return [] as { x: number; y: number }[];
+    const now = cpsHistory[cpsHistory.length - 1].t;
+    return cpsHistory.map((s) => ({ x: (s.t - now) / 1000, y: s.cps }));
+  }, [cpsHistory]);
+
+  const spectrumSeries = useMemo(() => {
+    if (!spectrum || spectrum.counts.length === 0) return null;
+    return spectrum.counts.map((c) =>
+      spectrumLogScale ? Math.max(c, 0.5) : c,
+    );
+  }, [spectrum, spectrumLogScale]);
+
+  const handleOpenSave = useCallback(() => {
+    const defaultName = `Live-Messung ${formatStartTimestamp(Date.now())}`;
+    setSaveName(defaultName);
+    setSaveDescription('');
+    setSaveOpen(true);
+  }, []);
+
+  const handleConfirmSave = useCallback(async () => {
+    if (!saveName.trim()) return;
+    setSaving(true);
+    try {
+      const id = await saveLiveSpectrum({
+        name: saveName.trim(),
+        description: saveDescription.trim() || undefined,
+      });
+      if (id) {
+        showSnackbar('Spektrum gespeichert', 'success');
+        setSaveOpen(false);
+      } else {
+        showSnackbar('Kein Live-Spektrum verfügbar', 'warning');
+      }
+    } catch (e) {
+      showSnackbar(
+        `Speichern fehlgeschlagen: ${(e as Error).message}`,
+        'error',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [saveName, saveDescription, saveLiveSpectrum, showSnackbar]);
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
@@ -294,6 +366,121 @@ export default function Dosimetrie() {
         )}
       </Box>
 
+      {spectrumSeries && (
+        <Box
+          data-testid="spectrum-chart"
+          sx={{ position: 'relative', minHeight: 320 }}
+        >
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: 'center',
+              position: 'absolute',
+              right: 8,
+              top: 0,
+              zIndex: 1,
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={spectrumLogScale}
+                  onChange={(_, v) => setSpectrumLogScale(v)}
+                  slotProps={{ input: { 'aria-label': 'Spektrum Log' } }}
+                />
+              }
+              label="Log"
+            />
+            <Tooltip title="Live-Spektrum auf Null setzen (Baseline = aktueller Snapshot)">
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<RestartAltIcon />}
+                  onClick={() => resetLiveSpectrum()}
+                >
+                  Reset
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Aktuelles Live-Spektrum als Messung speichern">
+              <span>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<SaveIcon />}
+                  onClick={handleOpenSave}
+                >
+                  Speichern
+                </Button>
+              </span>
+            </Tooltip>
+          </Stack>
+          <Typography variant="subtitle2" sx={{ mt: 1, mb: 0.5 }}>
+            Live-Spektrum
+            {spectrum?.durationSec !== undefined && (
+              <Typography
+                component="span"
+                variant="caption"
+                color="text.secondary"
+                sx={{ ml: 1 }}
+              >
+                Dauer: {formatDuration(spectrum.durationSec)}
+              </Typography>
+            )}
+          </Typography>
+          <LineChart
+            height={300}
+            xAxis={[
+              {
+                data: spectrum!.counts.map((_, i) => i),
+                scaleType: 'linear',
+                label: 'Kanal',
+              },
+            ]}
+            yAxis={[
+              {
+                scaleType: spectrumLogScale ? 'log' : 'linear',
+                label: 'Counts',
+              },
+            ]}
+            series={[
+              {
+                data: spectrumSeries,
+                showMark: false,
+              },
+            ]}
+          />
+        </Box>
+      )}
+
+      {cpsChart.length > 0 && (
+        <Box data-testid="cps-trend" sx={{ minHeight: 180 }}>
+          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+            CPS-Trend (letzte 5 min)
+          </Typography>
+          <LineChart
+            height={160}
+            series={[
+              {
+                data: cpsChart.map((d) => d.y),
+                color: '#1976d2',
+                showMark: false,
+              },
+            ]}
+            xAxis={[
+              {
+                data: cpsChart.map((d) => d.x),
+                label: 'Sekunden',
+                scaleType: 'linear',
+              },
+            ]}
+            yAxis={[{ scaleType: 'linear', label: 'cps' }]}
+          />
+        </Box>
+      )}
+
       {deviceInfo && (
         <Box
           sx={{
@@ -340,6 +527,48 @@ export default function Dosimetrie() {
         playSignal={playSignal}
         doseReset={doseReset}
       />
+
+      <Dialog
+        open={saveOpen}
+        onClose={() => (saving ? undefined : setSaveOpen(false))}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Live-Spektrum speichern</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            fullWidth
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            disabled={saving}
+          />
+          <TextField
+            margin="dense"
+            label="Beschreibung"
+            fullWidth
+            multiline
+            minRows={2}
+            value={saveDescription}
+            onChange={(e) => setSaveDescription(e.target.value)}
+            disabled={saving}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveOpen(false)} disabled={saving}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={handleConfirmSave}
+            variant="contained"
+            disabled={saving || !saveName.trim()}
+          >
+            Speichern
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

@@ -159,3 +159,77 @@ describe('Dosimetrie', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Dosimetrie — Live-Spektrum', () => {
+  it('zeigt Live-Spektrum wenn connected und spectrum vorhanden', () => {
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        spectrum: {
+          durationSec: 10,
+          coefficients: [0, 2.5, 0] as [number, number, number],
+          counts: [1, 2, 3, 4],
+          timestamp: 1000,
+        },
+      }),
+    );
+    render(<Dosimetrie />);
+    expect(screen.getByTestId('spectrum-chart')).toBeInTheDocument();
+  });
+
+  it('Reset-Button ruft resetLiveSpectrum auf', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const resetLiveSpectrum = vi.fn(async () => {});
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        spectrum: {
+          durationSec: 10,
+          coefficients: [0, 2.5, 0] as [number, number, number],
+          counts: [1, 2, 3, 4],
+          timestamp: 1000,
+        },
+        resetLiveSpectrum,
+      }),
+    );
+    render(<Dosimetrie />);
+    await user.click(screen.getByRole('button', { name: /reset/i }));
+    expect(resetLiveSpectrum).toHaveBeenCalled();
+  });
+
+  it('Speichern-Button öffnet Dialog und ruft saveLiveSpectrum mit Name/Beschreibung', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const saveLiveSpectrum = vi.fn(async () => 'doc-1');
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        spectrum: {
+          durationSec: 10,
+          coefficients: [0, 2.5, 0] as [number, number, number],
+          counts: [1, 2, 3, 4],
+          timestamp: 1000,
+        },
+        saveLiveSpectrum,
+      }),
+    );
+    render(<Dosimetrie />);
+    await user.click(screen.getByRole('button', { name: /speichern/i }));
+    const nameField = await screen.findByLabelText(/name/i);
+    await user.clear(nameField);
+    await user.type(nameField, 'Kalibrierprobe');
+    const descField = screen.getByLabelText(/beschreibung/i);
+    await user.type(descField, 'Am-241');
+    await user.click(
+      screen.getByRole('button', { name: /^speichern$/i }),
+    );
+    expect(saveLiveSpectrum).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Kalibrierprobe',
+        description: 'Am-241',
+      }),
+    );
+  });
+});
