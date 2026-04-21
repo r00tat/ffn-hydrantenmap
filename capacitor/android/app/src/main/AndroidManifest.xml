@@ -32,9 +32,14 @@
 
         <activity
             android:name=".SettingsActivity"
-            android:label="@string/settings_label"
+            android:label="@string/settings_launcher_label"
             android:exported="true"
-            android:theme="@style/AppTheme" />
+            android:theme="@style/AppTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".RadiacodeForegroundService"

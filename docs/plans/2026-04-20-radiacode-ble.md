@@ -636,7 +636,7 @@ Falls Protokoll-Parsing abweicht: Fixture in `__fixtures__/` aktualisieren, Test
 mkdir capacitor && cd capacitor
 npm init -y
 npm i @capacitor/core @capacitor/cli @capacitor-community/bluetooth-le @capacitor/preferences @capacitor/geolocation
-npx cap init "FFN Einsatzkarte" "at.ffn.einsatzkarte" --web-dir=empty
+npx cap init "FFN Einsatzkarte" "at.ffnd.einsatzkarte" --web-dir=empty
 ```
 
 **Step 2: `capacitor.config.ts`**
@@ -645,7 +645,7 @@ npx cap init "FFN Einsatzkarte" "at.ffn.einsatzkarte" --web-dir=empty
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'at.ffn.einsatzkarte',
+  appId: 'at.ffnd.einsatzkarte',
   appName: 'FFN Einsatzkarte',
   webDir: 'empty',
   server: {
@@ -731,10 +731,10 @@ Commit: `feat(recording): foreground service während radiacode-recording`
 
 **Files:**
 
-- Create: `capacitor/android/app/src/main/java/at/ffn/einsatzkarte/SettingsActivity.kt`
+- Create: `capacitor/android/app/src/main/java/at/ffnd/einsatzkarte/SettingsActivity.kt`
 - Create: `capacitor/android/app/src/main/res/layout/activity_settings.xml`
 - Create: `capacitor/android/app/src/main/res/xml/shortcuts.xml` (App-Shortcut für Zugang)
-- Modify: `capacitor/android/app/src/main/java/at/ffn/einsatzkarte/MainActivity.java` (oder `.kt`)
+- Modify: `capacitor/android/app/src/main/java/at/ffnd/einsatzkarte/MainActivity.java` (oder `.kt`)
 - Modify: `capacitor/android/app/src/main/AndroidManifest.xml` (Activity-Registrierung + Shortcut-Meta)
 
 **Step 1: SettingsActivity**
@@ -792,8 +792,8 @@ public void onCreate(Bundle savedInstanceState) {
   <shortcut android:shortcutId="settings" android:enabled="true"
             android:shortcutShortLabel="@string/settings_label">
     <intent android:action="android.intent.action.VIEW"
-            android:targetPackage="at.ffn.einsatzkarte"
-            android:targetClass="at.ffn.einsatzkarte.SettingsActivity" />
+            android:targetPackage="at.ffnd.einsatzkarte"
+            android:targetClass="at.ffnd.einsatzkarte.SettingsActivity" />
   </shortcut>
 </shortcuts>
 ```

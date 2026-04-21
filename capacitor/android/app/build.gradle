@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "at.ffn.einsatzkarte"
+    namespace = "at.ffnd.einsatzkarte"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "at.ffn.einsatzkarte"
+        applicationId "at.ffnd.einsatzkarte"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

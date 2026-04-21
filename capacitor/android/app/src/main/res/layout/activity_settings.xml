@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:fitsSystemWindows="true">
 
     <TextView
         android:layout_width="match_parent"
@@ -16,7 +18,7 @@
         android:id="@+id/url_input"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="https://einsatz.ffn.at"
+        android:hint="https://einsatz.ffnd.at"
         android:inputType="textUri"
         android:autofillHints="url"
         android:importantForAutofill="no" />
@@ -27,6 +29,21 @@
         android:text="@string/settings_url_hint"
         android:textSize="12sp"
         android:paddingTop="8dp"
+        android:paddingBottom="16dp" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/allow_insecure_ssl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_insecure_ssl_label" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_insecure_ssl_hint"
+        android:textSize="12sp"
+        android:textColor="#C62828"
+        android:paddingTop="4dp"
         android:paddingBottom="24dp" />
 
     <LinearLayout

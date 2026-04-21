@@ -2,11 +2,19 @@
 <resources>
     <string name="app_name">FFN Einsatzkarte</string>
     <string name="title_activity_main">FFN Einsatzkarte</string>
-    <string name="package_name">at.ffn.einsatzkarte</string>
-    <string name="custom_url_scheme">at.ffn.einsatzkarte</string>
+    <string name="package_name">at.ffnd.einsatzkarte</string>
+    <string name="custom_url_scheme">at.ffnd.einsatzkarte</string>
     <string name="settings_label">Einstellungen</string>
     <string name="settings_url_label">Server-URL (Override)</string>
     <string name="settings_url_hint">Leer lassen für Produktions-URL. Nach dem Speichern App komplett beenden und neu starten.</string>
     <string name="settings_save">Speichern</string>
     <string name="settings_reset">Zurücksetzen</string>
+    <string name="settings_launcher_label">Einsatzkarte Einstellungen</string>
+    <string name="settings_insecure_ssl_label">Selbstsignierte Zertifikate akzeptieren</string>
+    <string name="settings_insecure_ssl_hint">Warnung: unsicher — nur für Dev-Server verwenden. Umgeht die SSL-Zertifikatsprüfung der WebView.</string>
+    <string name="load_error_title">Seite konnte nicht geladen werden</string>
+    <string name="load_error_message">URL: %1$s\n\n%2$s</string>
+    <string name="load_error_change_url">URL ändern</string>
+    <string name="load_error_retry">Erneut versuchen</string>
+    <string name="load_error_dismiss">Schließen</string>
 </resources>

@@ -38,6 +38,42 @@ npm run start        # Production Server starten
 npm run lint         # ESLint Validierung
 ```
 
+## Android App
+
+Für Bluetooth-Funktionen (z.B. Radiacode-Live-Messung) gibt es einen Capacitor-Wrapper in [capacitor/](capacitor/), der die Produktions-PWA in eine native Android-WebView lädt. Voraussetzungen: JDK 17+, Android SDK, `adb` im Pfad.
+
+### Build
+
+```bash
+npm run build:android          # Debug-APK
+npm run build:android:release  # Release-APK (benötigt Signing-Config in capacitor/android/app)
+```
+
+Das Skript führt intern `npx cap sync android` und `./gradlew assembleDebug|assembleRelease` aus. Der fertige APK liegt anschließend unter:
+
+- Debug: `capacitor/android/app/build/outputs/apk/debug/app-debug.apk`
+- Release: `capacitor/android/app/build/outputs/apk/release/app-release.apk`
+
+### Install via adb
+
+Gerät per USB oder WLAN verbinden, dann:
+
+```bash
+npm run install:android          # baut Debug-APK und installiert via adb install -r
+npm run install:android:release  # analog für Release-APK
+```
+
+Bei mehreren Geräten `adb -s <device-id> ...` verwenden. Logs live mitlesen: `adb logcat -s Capacitor:V chromium:V`.
+
+### Release
+
+1. Signing-Config in `capacitor/android/app/build.gradle` bzw. `keystore.properties` eintragen (Keystore nicht ins Repo einchecken).
+2. Version in `capacitor/android/app/build.gradle` erhöhen (`versionCode` + `versionName`).
+3. `npm run build:android:release` ausführen.
+4. Signiertes APK aus `capacitor/android/app/build/outputs/apk/release/` verteilen oder in den Play-Store hochladen.
+
+Die App lädt standardmäßig `https://einsatz.ffnd.at` (konfiguriert in [capacitor/capacitor.config.ts](capacitor/capacitor.config.ts)). Für Tests gegen eine andere URL die `server.url` dort anpassen und neu bauen — alternativ zur Laufzeit über die „Einsatzkarte Einstellungen"-App (zweiter Launcher-Icon) eine Override-URL eintragen.
+
 ## Environment
 
 Erforderliche Umgebungsvariablen (in `.env.local`):

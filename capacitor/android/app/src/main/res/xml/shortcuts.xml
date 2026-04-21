@@ -6,7 +6,7 @@
         android:shortcutShortLabel="@string/settings_label">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="at.ffn.einsatzkarte"
-            android:targetClass="at.ffn.einsatzkarte.SettingsActivity" />
+            android:targetPackage="at.ffnd.einsatzkarte"
+            android:targetClass="at.ffnd.einsatzkarte.SettingsActivity" />
     </shortcut>
 </shortcuts>
