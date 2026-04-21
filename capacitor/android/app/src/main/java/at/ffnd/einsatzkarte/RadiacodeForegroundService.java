@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -17,6 +18,13 @@ public class RadiacodeForegroundService extends Service {
 
     public static final String CHANNEL_ID = "radiacode_connection";
     public static final int NOTIFICATION_ID = 4711;
+
+    // Hält die CPU wach, solange eine Radiacode-Session läuft. Ohne WakeLock
+    // drosselt Android im Standby BLE-GATT-Callbacks und `setTimeout` im
+    // WebView, und das Polling friert ein.
+    public static final String WAKE_LOCK_TAG = "einsatzkarte:radiacode";
+
+    private PowerManager.WakeLock wakeLock;
 
     public static final String ACTION_START = "at.ffnd.einsatzkarte.RADIACODE_START";
     public static final String ACTION_UPDATE = "at.ffnd.einsatzkarte.RADIACODE_UPDATE";
@@ -42,6 +50,7 @@ public class RadiacodeForegroundService extends Service {
             startForeground(NOTIFICATION_ID, buildNotification(
                     title != null ? title : "Radiacode verbunden",
                     body != null ? body : ""));
+            acquireWakeLock();
         } else if (ACTION_UPDATE.equals(action)) {
             String title = intent.getStringExtra(EXTRA_TITLE);
             String body = intent.getStringExtra(EXTRA_BODY);
@@ -52,6 +61,7 @@ public class RadiacodeForegroundService extends Service {
                         body != null ? body : ""));
             }
         } else if (ACTION_STOP.equals(action)) {
+            releaseWakeLock();
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
         } else if (ACTION_DISCONNECT_REQUESTED.equals(action)) {
@@ -63,6 +73,31 @@ public class RadiacodeForegroundService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) { return null; }
+
+    @Override
+    public void onDestroy() {
+        releaseWakeLock();
+        super.onDestroy();
+    }
+
+    private void acquireWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) return;
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm == null) return;
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG);
+        wakeLock.setReferenceCounted(false);
+        // Kein Timeout: Lifecycle ist an den Service gekoppelt (ACTION_STOP /
+        // onDestroy geben frei). Android lintet `acquire()` ohne Timeout,
+        // aber hier ist deterministisches Halten gewollt.
+        wakeLock.acquire();
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+        wakeLock = null;
+    }
 
     private Notification buildNotification(String title, String body) {
         Intent tapIntent = new Intent(this, MainActivity.class);

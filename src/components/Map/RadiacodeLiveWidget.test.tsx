@@ -107,4 +107,28 @@ describe('RadiacodeLiveWidget', () => {
     const root = container.querySelector('[data-dose-level]') as HTMLElement;
     expect(root.getAttribute('data-dose-level')).toBe('high');
   });
+
+  describe('sample age indicator', () => {
+    it('zeigt keinen Warnhinweis, wenn der letzte Sample <5s her ist', () => {
+      const now = 1_700_000_000_000;
+      vi.setSystemTime(new Date(now));
+      renderWithMeasurement(
+        <RadiacodeLiveWidget />,
+        { dosisleistung: 0.14, cps: 5, timestamp: now - 2_000 },
+      );
+      expect(screen.queryByText(/letzte messung vor/i)).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('zeigt warnung, wenn der letzte Sample ≥5s her ist', () => {
+      const now = 1_700_000_000_000;
+      vi.setSystemTime(new Date(now));
+      renderWithMeasurement(
+        <RadiacodeLiveWidget />,
+        { dosisleistung: 0.14, cps: 5, timestamp: now - 7_000 },
+      );
+      expect(screen.getByText(/letzte messung vor 7\s*s/i)).toBeInTheDocument();
+      vi.useRealTimers();
+    });
+  });
 });
