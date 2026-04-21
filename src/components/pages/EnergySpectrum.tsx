@@ -1,5 +1,6 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -13,6 +14,7 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -23,6 +25,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import SaveIcon from '@mui/icons-material/Save';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -56,6 +60,9 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
+import { useRadiacode } from '../providers/RadiacodeProvider';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 /** MUI default color palette for series */
@@ -67,6 +74,42 @@ const SERIES_COLORS = [
   '#7b1fa2',
   '#0288d1',
 ];
+
+const LIVE_ID = 'live';
+const LIVE_COLOR = '#e91e63';
+
+const STATUS_CHIP_COLOR: Record<
+  RadiacodeStatus,
+  'default' | 'success' | 'warning' | 'error'
+> = {
+  idle: 'default',
+  scanning: 'warning',
+  connecting: 'warning',
+  connected: 'success',
+  reconnecting: 'warning',
+  unavailable: 'error',
+  error: 'error',
+};
+
+function statusLabel(
+  status: RadiacodeStatus,
+  device: { name?: string; serial?: string } | null,
+): string {
+  if (status === 'connected' && device) {
+    return `Verbunden — ${device.name} (${device.serial})`;
+  }
+  if (status === 'connecting') return 'Verbindet …';
+  if (status === 'reconnecting') return 'Verbinde neu …';
+  if (status === 'scanning') return 'Scannen …';
+  if (status === 'unavailable') return 'Gerät nicht erreichbar';
+  if (status === 'error') return 'Fehler';
+  return 'Getrennt';
+}
+
+function colorForSpectrum(s: LoadedSpectrum, firestoreIdx: number): string {
+  if (s.id === LIVE_ID) return LIVE_COLOR;
+  return SERIES_COLORS[firestoreIdx % SERIES_COLORS.length];
+}
 
 /**
  * Palette for manually selected nuclide peak lines. Intentionally distinct from
@@ -158,6 +201,22 @@ export default function EnergySpectrum() {
   const [expandedSpectrumId, setExpandedSpectrumId] = useState<string | null>(
     null,
   );
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const {
+    status,
+    device,
+    spectrum,
+    error: radiacodeError,
+    connect,
+    disconnect,
+    resetLiveSpectrum,
+    saveLiveSpectrum,
+  } = useRadiacode();
+  const showSnackbar = useSnackbar();
 
   const toggleNuclideSelection = useCallback((name: string) => {
     setSelectedNuclideNames((prev) =>
@@ -183,11 +242,38 @@ export default function EnergySpectrum() {
     filterFn,
   });
 
+  const liveSpectrum = useMemo<LoadedSpectrum | null>(() => {
+    if (!spectrum || spectrum.counts.length === 0) return null;
+    const coefficients: number[] = [...spectrum.coefficients];
+    const energies = spectrum.counts.map((_, ch) =>
+      channelToEnergy(ch, coefficients),
+    );
+    const data: SpectrumData = {
+      sampleName: 'Live-Aufzeichnung',
+      deviceName: device?.name ?? '',
+      measurementTime: spectrum.durationSec ?? 0,
+      liveTime: spectrum.durationSec ?? 0,
+      startTime: '',
+      endTime: '',
+      coefficients,
+      counts: spectrum.counts,
+      energies,
+    };
+    const peaks = findPeaks(spectrum.counts, energies);
+    const matches = identifyNuclides(peaks);
+    return {
+      id: LIVE_ID,
+      firestoreId: undefined,
+      data,
+      matches,
+      visible: !hiddenIds.has(LIVE_ID),
+      description: 'Live-Daten vom Radiacode',
+    };
+  }, [spectrum, device, hiddenIds]);
+
   // Convert Firestore spectra into LoadedSpectrum format with visibility
   const allSpectra = useMemo<LoadedSpectrum[]>(() => {
-    if (!savedSpectra || savedSpectra.length === 0) return [];
-
-    return savedSpectra
+    const firestoreItems = (savedSpectra ?? [])
       .filter((saved) => saved.counts?.length > 0)
       .map((saved) => {
         const id = `firestore-${saved.id}`;
@@ -218,7 +304,45 @@ export default function EnergySpectrum() {
           manualNuclide: saved.manualNuclide,
         };
       });
-  }, [savedSpectra, hiddenIds]);
+    return liveSpectrum ? [liveSpectrum, ...firestoreItems] : firestoreItems;
+  }, [savedSpectra, hiddenIds, liveSpectrum]);
+
+  const handleOpenSave = useCallback(() => {
+    const defaultName = `Live-Messung ${new Date().toLocaleString('de-AT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
+    setSaveName(defaultName);
+    setSaveDescription('');
+    setSaveOpen(true);
+  }, []);
+
+  const handleConfirmSave = useCallback(async () => {
+    if (!saveName.trim()) return;
+    setSaving(true);
+    try {
+      const id = await saveLiveSpectrum({
+        name: saveName.trim(),
+        description: saveDescription.trim() || undefined,
+      });
+      if (id) {
+        showSnackbar('Spektrum gespeichert', 'success');
+        setSaveOpen(false);
+      } else {
+        showSnackbar('Kein Live-Spektrum verfügbar', 'warning');
+      }
+    } catch (e) {
+      showSnackbar(
+        `Speichern fehlgeschlagen: ${(e as Error).message}`,
+        'error',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [saveName, saveDescription, saveLiveSpectrum, showSnackbar]);
 
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -428,15 +552,18 @@ export default function EnergySpectrum() {
       Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
     );
 
-    // Use original index for consistent colors
+    // Use original index for consistent colors — subtract 1 if a live item
+    // prefixes the list so Firestore items start at palette index 0.
+    const hasLive = allSpectra.length > 0 && allSpectra[0].id === LIVE_ID;
     const series = deferredVisibleSpectra.map((s) => {
       const originalIdx = allSpectra.indexOf(s);
+      const firestoreIdx = hasLive ? originalIdx - 1 : originalIdx;
       const padded = s.data.counts.slice(0, displayRange);
       while (padded.length < displayRange) padded.push(0);
       return {
         data: padded,
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
-        color: SERIES_COLORS[originalIdx % SERIES_COLORS.length],
+        color: colorForSpectrum(s, firestoreIdx),
       };
     });
 
@@ -488,6 +615,56 @@ export default function EnergySpectrum() {
           variant="outlined"
         />
       </Box>
+
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 2 }}
+      >
+        <Chip
+          label={statusLabel(status, device)}
+          color={STATUS_CHIP_COLOR[status]}
+        />
+        <Button
+          variant="contained"
+          onClick={() => connect()}
+          disabled={status === 'connecting' || status === 'scanning'}
+        >
+          Verbinden
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => disconnect()}
+          disabled={status !== 'connected'}
+        >
+          Trennen
+        </Button>
+        {liveSpectrum && (
+          <>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RestartAltIcon />}
+              onClick={() => resetLiveSpectrum()}
+            >
+              Reset Live
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<SaveIcon />}
+              onClick={handleOpenSave}
+            >
+              Speichern
+            </Button>
+          </>
+        )}
+      </Stack>
+      {radiacodeError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {radiacodeError}
+        </Alert>
+      )}
 
       <input
         ref={fileInputRef}
@@ -589,6 +766,8 @@ export default function EnergySpectrum() {
       {allSpectra.length > 0 && (
         <List dense>
           {allSpectra.map((s, idx) => {
+            const isLive = s.id === LIVE_ID;
+            const firestoreIdx = liveSpectrum ? idx - 1 : idx;
             const topMatch = s.matches[0];
             const identification = resolveSpectrumIdentification(
               s.manualNuclide,
@@ -612,30 +791,34 @@ export default function EnergySpectrum() {
               <ListItem
                 secondaryAction={
                   <Box sx={{ display: 'flex', gap: 0 }}>
-                    <Tooltip title="XML exportieren">
+                    {!isLive && (
+                      <Tooltip title="XML exportieren">
+                        <IconButton
+                          aria-label="XML exportieren"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleDownload(s);
+                          }}
+                          size="small"
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <DownloadIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {!isLive && (
                       <IconButton
-                        aria-label="XML exportieren"
+                        aria-label="Bearbeiten"
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          handleDownload(s);
+                          openEditDialog(s);
                         }}
                         size="small"
                         sx={{ minWidth: 44, minHeight: 44 }}
                       >
-                        <DownloadIcon fontSize="small" />
+                        <EditIcon fontSize="small" />
                       </IconButton>
-                    </Tooltip>
-                    <IconButton
-                      aria-label="Bearbeiten"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        openEditDialog(s);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
+                    )}
                     <IconButton
                       aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
                       onClick={(e: React.MouseEvent) => {
@@ -647,18 +830,20 @@ export default function EnergySpectrum() {
                     >
                       {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
                     </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="Entfernen"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        removeSpectrum(s.id);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
+                    {!isLive && (
+                      <IconButton
+                        edge="end"
+                        aria-label="Entfernen"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          removeSpectrum(s.id);
+                        }}
+                        size="small"
+                        sx={{ minWidth: 44, minHeight: 44 }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
                   </Box>
                 }
                 sx={{
@@ -670,11 +855,12 @@ export default function EnergySpectrum() {
                 onClick={() => toggleVisibility(s.id)}
               >
                 <Box
+                  data-testid={`spectrum-color-${s.id}`}
                   sx={{
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length],
+                    backgroundColor: colorForSpectrum(s, firestoreIdx),
                     mr: 1,
                     flexShrink: 0,
                   }}
@@ -1002,6 +1188,49 @@ export default function EnergySpectrum() {
           />
         </Box>
       )}
+
+      {/* Save Live Spectrum Dialog */}
+      <Dialog
+        open={saveOpen}
+        onClose={() => (saving ? undefined : setSaveOpen(false))}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Live-Spektrum speichern</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Name"
+            fullWidth
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            disabled={saving}
+          />
+          <TextField
+            margin="dense"
+            label="Beschreibung"
+            fullWidth
+            multiline
+            minRows={2}
+            value={saveDescription}
+            onChange={(e) => setSaveDescription(e.target.value)}
+            disabled={saving}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveOpen(false)} disabled={saving}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={handleConfirmSave}
+            variant="contained"
+            disabled={saving || !saveName.trim()}
+          >
+            Speichern
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Empty state */}
       {allSpectra.length === 0 && (
