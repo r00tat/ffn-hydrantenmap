@@ -5,10 +5,12 @@ import {
   ParsedResponse,
   ResponseReassembler,
   SEQ_MODULO,
+  SpectrumSnapshot,
   VS,
   VSFR,
   buildRequest,
   decodeDataBufRecords,
+  decodeSpectrumResponse,
   parseResponse,
   splitForWrite,
 } from './protocol';
@@ -111,6 +113,19 @@ export class RadiacodeClient {
       }
     };
     this.pollTimer = setTimeout(tick, intervalMs);
+  }
+
+  async specReset(): Promise<void> {
+    const args = new Uint8Array(8);
+    const v = new DataView(args.buffer);
+    v.setUint32(0, VSFR.SPEC_RESET, true);
+    v.setUint32(4, 0, true);
+    await this.execute(COMMAND.WR_VIRT_SFR, args);
+  }
+
+  async readSpectrum(): Promise<SpectrumSnapshot> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_STRING, u32le(VS.SPECTRUM));
+    return decodeSpectrumResponse(rsp.data);
   }
 
   async disconnect(): Promise<void> {
