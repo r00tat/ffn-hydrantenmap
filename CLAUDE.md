@@ -19,7 +19,16 @@ npm run check        # Run all checks: tsc, lint, tests, build
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
-**After completing a feature or bugfix, run `npm run check` to catch errors before committing.**
+**After completing a feature or bugfix, run the checks individually (not `npm run check`) so the source of any error is easier to spot:**
+
+```bash
+npx tsc --noEmit        # TypeScript type check
+npx eslint              # Lint
+npx vitest run          # Tests
+npx next build --webpack  # Production build
+```
+
+Run them in order and fix errors before moving on to the next step. Only run `npm run check` when you want a single combined pass.
 
 **WICHTIG: TypeScript-Fehler (`tsc --noEmit`) dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
 
