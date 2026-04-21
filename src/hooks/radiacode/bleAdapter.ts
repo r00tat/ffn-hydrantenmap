@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { RadiacodeDeviceRef } from './types';
 
 export type Unsubscribe = () => void;
@@ -17,15 +18,12 @@ export interface BleAdapter {
 }
 
 export async function getBleAdapter(): Promise<BleAdapter> {
-  try {
-    const coreName = '@capacitor/core';
-    const { Capacitor } = await import(/* @vite-ignore */ /* webpackIgnore: true */ coreName);
-    if (Capacitor.isNativePlatform()) {
-      const capacitorName = './bleAdapter.capacitor';
-      return (await import(/* @vite-ignore */ /* webpackIgnore: true */ capacitorName)).capacitorAdapter;
-    }
-  } catch {
-    // @capacitor/core not installed → web-only build
+  const win = typeof window !== 'undefined' ? (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }) : undefined;
+  const isNative =
+    win?.Capacitor?.isNativePlatform?.() === true ||
+    Capacitor.isNativePlatform();
+  if (isNative) {
+    return (await import('./bleAdapter.capacitor')).capacitorAdapter;
   }
   return (await import('./bleAdapter.web')).webAdapter;
 }

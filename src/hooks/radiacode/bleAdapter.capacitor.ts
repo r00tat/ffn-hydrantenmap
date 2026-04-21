@@ -1,3 +1,4 @@
+import { BleClient } from '@capacitor-community/bluetooth-le';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
 import { RadiacodeDeviceRef } from './types';
 
@@ -10,14 +11,12 @@ const WRITE_CHUNK_SIZE = 18;
 let initialized = false;
 const deviceNames = new Map<string, string>();
 
-async function getBleClient(): Promise<any> {
-  const modName = '@capacitor-community/bluetooth-le';
-  const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
+async function ensureBleClient(): Promise<typeof BleClient> {
   if (!initialized) {
-    await mod.BleClient.initialize({ androidNeverForLocation: true });
+    await BleClient.initialize({ androidNeverForLocation: true });
     initialized = true;
   }
-  return mod.BleClient;
+  return BleClient;
 }
 
 function bytesToDataView(bytes: Uint8Array): DataView {
@@ -35,8 +34,8 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async requestDevice() {
-    const BleClient = await getBleClient();
-    const device = await BleClient.requestDevice({
+    const client = await ensureBleClient();
+    const device = await client.requestDevice({
       services: [RADIACODE_SERVICE_UUID],
     });
     const name = device.name ?? 'Radiacode';
@@ -49,14 +48,14 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async connect(deviceId) {
-    const BleClient = await getBleClient();
-    await BleClient.connect(deviceId);
+    const client = await ensureBleClient();
+    await client.connect(deviceId);
   },
 
   async disconnect(deviceId) {
-    const BleClient = await getBleClient();
+    const client = await ensureBleClient();
     try {
-      await BleClient.stopNotifications(
+      await client.stopNotifications(
         deviceId,
         RADIACODE_SERVICE_UUID,
         RADIACODE_NOTIFY_UUID,
@@ -64,12 +63,12 @@ export const capacitorAdapter: BleAdapter = {
     } catch {
       // notifications may already be stopped
     }
-    await BleClient.disconnect(deviceId);
+    await client.disconnect(deviceId);
   },
 
   async onNotification(deviceId, handler): Promise<Unsubscribe> {
-    const BleClient = await getBleClient();
-    await BleClient.startNotifications(
+    const client = await ensureBleClient();
+    await client.startNotifications(
       deviceId,
       RADIACODE_SERVICE_UUID,
       RADIACODE_NOTIFY_UUID,
@@ -78,46 +77,28 @@ export const capacitorAdapter: BleAdapter = {
       },
     );
     return () => {
-      BleClient.stopNotifications(
-        deviceId,
-        RADIACODE_SERVICE_UUID,
-        RADIACODE_NOTIFY_UUID,
-      ).catch(() => {
-        // ignore
-      });
+      client
+        .stopNotifications(
+          deviceId,
+          RADIACODE_SERVICE_UUID,
+          RADIACODE_NOTIFY_UUID,
+        )
+        .catch(() => {
+          // ignore
+        });
     };
   },
 
   async write(deviceId, data) {
-    const BleClient = await getBleClient();
+    const client = await ensureBleClient();
     for (let pos = 0; pos < data.length; pos += WRITE_CHUNK_SIZE) {
       const chunk = data.slice(pos, Math.min(pos + WRITE_CHUNK_SIZE, data.length));
-      await BleClient.writeWithoutResponse(
+      await client.writeWithoutResponse(
         deviceId,
         RADIACODE_SERVICE_UUID,
         RADIACODE_WRITE_UUID,
         bytesToDataView(chunk),
       );
-    }
-  },
-
-  async startForegroundService(opts) {
-    try {
-      const modName = './capacitorForegroundService';
-      const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
-      await mod.startRadiacodeService(opts);
-    } catch {
-      // Foreground service plugin not available — BLE continues while WebView active
-    }
-  },
-
-  async stopForegroundService() {
-    try {
-      const modName = './capacitorForegroundService';
-      const mod = await import(/* @vite-ignore */ /* webpackIgnore: true */ modName);
-      await mod.stopRadiacodeService();
-    } catch {
-      // ignore
     }
   },
 };
