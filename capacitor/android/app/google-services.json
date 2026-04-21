@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "429163084278-k7knang549hg3h8ie6gnh2ru9uh6h1ts.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "at.ffnd.einsatzkarte",
+            "certificate_hash": "9578368d0be1e2b431f186adf4a6ad43d16d9575"
+          }
+        },
+        {
           "client_id": "429163084278-q0ft241066jqadh3tv9cv0djcs1e7534.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -4,9 +4,11 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -15,18 +17,36 @@ import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import com.getcapacitor.CapConfig;
+
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 public class MainActivity extends BridgeActivity {
+    private static final String TAG = "MainActivity";
     private boolean errorDialogShown = false;
     private boolean allowInsecureSsl = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
         SharedPreferences prefs = getSharedPreferences("einsatzkarte", MODE_PRIVATE);
         String override = prefs.getString("server_url_override", null);
         allowInsecureSsl = prefs.getBoolean("allow_insecure_ssl", false);
+
+        // When a dev server URL is set via SettingsActivity, rewrite the
+        // CapConfig before Bridge init so Capacitor registers the
+        // document-start plugin script + URI matchers for that origin.
+        // Without this, modern WebViews (API 24+ with DOCUMENT_START_SCRIPT)
+        // only inject plugin headers for the baked-in server.url and every
+        // native plugin call from the override origin fails with
+        // "plugin is not implemented on android".
+        if (override != null && !override.trim().isEmpty()) {
+            applyServerUrlOverride(override.trim());
+        }
+
+        super.onCreate(savedInstanceState);
 
         WebView webView = this.bridge.getWebView();
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
@@ -81,8 +101,40 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        if (override != null && !override.trim().isEmpty()) {
-            webView.loadUrl(override.trim());
+    }
+
+    private void applyServerUrlOverride(String overrideUrl) {
+        try {
+            AssetManager assets = getAssets();
+            String json = readAssetText(assets, "capacitor.config.json");
+            JSONObject configJson = new JSONObject(json);
+            JSONObject server = configJson.optJSONObject("server");
+            if (server == null) {
+                server = new JSONObject();
+                configJson.put("server", server);
+            }
+            server.put("url", overrideUrl);
+            server.put("cleartext", true);
+            // CapConfig(AssetManager, JSONObject) is @Deprecated but still
+            // the only supported way to hand in a pre-built JSON config.
+            @SuppressWarnings("deprecation")
+            CapConfig overridden = new CapConfig(assets, configJson);
+            this.config = overridden;
+            Log.i(TAG, "Applied server.url override: " + overrideUrl);
+        } catch (Exception ex) {
+            Log.e(TAG, "Failed to apply server.url override " + overrideUrl, ex);
+        }
+    }
+
+    private static String readAssetText(AssetManager assets, String path) throws java.io.IOException {
+        try (InputStream in = assets.open(path)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toString("UTF-8");
         }
     }
 

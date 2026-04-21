@@ -22,7 +22,8 @@ import {
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { signInWithGoogle } from './googleAuthAdapter';
+import GoogleSignInButton from './GoogleSignInButton';
+import { isCapacitorNative, signInWithGoogle } from './googleAuthAdapter';
 
 export default function StyledLoginButton({
   firebaseAuth: auth,
@@ -308,14 +309,18 @@ export default function StyledLoginButton({
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <Button
-              color="primary"
-              variant="contained"
-              onClick={googleSignIn}
-              style={{ marginTop: 20 }}
-            >
-              Mit Google einloggen
-            </Button>
+            {isCapacitorNative() ? (
+              <GoogleSignInButton onClick={googleSignIn} />
+            ) : (
+              <Button
+                color="primary"
+                variant="contained"
+                onClick={googleSignIn}
+                style={{ marginTop: 20 }}
+              >
+                Mit Google einloggen
+              </Button>
+            )}
           </Grid>
           <Grid size={{ xs: 12 }}>
             <Button

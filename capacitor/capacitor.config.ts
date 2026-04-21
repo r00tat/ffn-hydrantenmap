@@ -7,6 +7,12 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://einsatz.ffnd.at',
     cleartext: true,
+    allowNavigation: [
+      '*.nip.io',
+      '*.nip.io:3000',
+      '*.ffnd.at',
+      '192-168-1-226.nip.io:3000',
+    ],
   },
   plugins: {
     FirebaseAuthentication: {
