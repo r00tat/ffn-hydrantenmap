@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { NotificationState } from './radiacodeNotification';
 import { RadiacodeDeviceRef } from './types';
 
 export type Unsubscribe = () => void;
@@ -15,7 +16,13 @@ export interface BleAdapter {
   write(deviceId: string, data: Uint8Array): Promise<void>;
   onDisconnect?(deviceId: string, handler: () => void): Unsubscribe;
   startForegroundService?(opts: { title: string; body: string }): Promise<void>;
+  updateForegroundService?(opts: {
+    dosisleistung: number;
+    cps: number;
+    state: NotificationState;
+  }): Promise<void>;
   stopForegroundService?(): Promise<void>;
+  onDisconnectRequested?(handler: () => void): Unsubscribe;
 }
 
 export async function getBleAdapter(): Promise<BleAdapter> {
