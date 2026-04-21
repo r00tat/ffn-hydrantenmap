@@ -1,7 +1,11 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
+import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -11,6 +15,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  nuclidesAtEnergy,
+  type NuclideAtEnergy,
+} from '../../common/nuclidesAtEnergy';
 import { channelToEnergy } from '../../common/spectrumParser';
 import {
   applyPan,
@@ -148,6 +156,14 @@ export default function ZoomableSpectrumChart({
     setXRange(defaultXRange);
   }
 
+  // Cursor-hover state for the nuclide tooltip / crosshair. `null` means the
+  // pointer is outside or a drag/pinch gesture is active.
+  const [hover, setHover] = useState<{
+    kev: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const panRef = useRef<{
     pointerId: number;
@@ -243,6 +259,7 @@ export default function ZoomableSpectrumChart({
             setXRange([newA, newA + newSpan]);
           }
         }
+        setHover(null);
         return;
       }
 
@@ -254,13 +271,14 @@ export default function ZoomableSpectrumChart({
         const span = pan.startRange[1] - pan.startRange[0];
         const deltaKev = pixelsToKev(dx, span, rect.width);
         setXRange(applyPan(pan.startRange, deltaKev));
+        setHover(null);
         return;
       }
 
-      // Hover notification only when no gesture is active.
-      if (onPointerMove) {
-        onPointerMove(pixelToKev(e.clientX - rect.left, rect.width, xRange));
-      }
+      // Hover: cursor over chart, no active gesture.
+      const kev = pixelToKev(e.clientX - rect.left, rect.width, xRange);
+      setHover({ kev, clientX: e.clientX, clientY: e.clientY });
+      if (onPointerMove) onPointerMove(kev);
     },
     [onPointerMove, xRange],
   );
@@ -304,6 +322,7 @@ export default function ZoomableSpectrumChart({
   const handlePointerLeave = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       endGesture(e.pointerId);
+      setHover(null);
       onPointerMove?.(null);
     },
     [endGesture, onPointerMove],
@@ -313,11 +332,49 @@ export default function ZoomableSpectrumChart({
     setXRange(resetRange(defaultXRange));
   }, [defaultXRange]);
 
+  const hoverHits: NuclideAtEnergy[] = useMemo(
+    () => (hover ? nuclidesAtEnergy(hover.kev) : []),
+    [hover],
+  );
+
+  // Virtual anchor element for the Popper so it tracks the cursor precisely.
+  // Popper needs getBoundingClientRect; we build a minimal stub from the
+  // hover state. When `hover` is null the anchor is null and the Popper stays
+  // closed.
+  const popperAnchor = useMemo<{
+    getBoundingClientRect: () => DOMRect;
+  } | null>(() => {
+    if (!hover) return null;
+    const { clientX, clientY } = hover;
+    return {
+      getBoundingClientRect: () =>
+        ({
+          x: clientX,
+          y: clientY,
+          left: clientX,
+          top: clientY,
+          right: clientX,
+          bottom: clientY,
+          width: 0,
+          height: 0,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    };
+  }, [hover]);
+
   if (!chartSeries || !xEnergies) {
     return null;
   }
 
   const roundedEnergies = xEnergies.map((e) => Math.round(e * 10) / 10);
+
+  // Best match (first after sorting by distance/intensity) provides the
+  // reference-line overlay for the remaining peaks of that nuclide.
+  const bestMatch = hoverHits[0];
+  const bestPeakLines =
+    bestMatch?.nuclide.peaks?.filter(
+      (p) => p.energy >= xRange[0] && p.energy <= xRange[1],
+    ) ?? [];
 
   return (
     <Box
@@ -364,7 +421,75 @@ export default function ZoomableSpectrumChart({
         margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
       >
         {overlays}
+        {hover && (
+          <ChartsReferenceLine
+            x={hover.kev}
+            lineStyle={{
+              stroke: '#455a64',
+              strokeWidth: 1,
+              strokeDasharray: '3 3',
+            }}
+          />
+        )}
+        {bestMatch &&
+          bestPeakLines.map((p) => (
+            <ChartsReferenceLine
+              key={`${bestMatch.nuclide.name}:${p.energy}`}
+              x={p.energy}
+              label={`${bestMatch.nuclide.name} ${Math.round(p.energy)}`}
+              labelAlign="start"
+              lineStyle={{
+                stroke: '#00796b',
+                strokeWidth: 1.5,
+                strokeDasharray: '4 2',
+              }}
+              labelStyle={{
+                fontSize: 10,
+                fill: '#00796b',
+                fontWeight: 'bold',
+              }}
+            />
+          ))}
       </LineChart>
+      <Popper
+        open={Boolean(hover && popperAnchor)}
+        anchorEl={popperAnchor}
+        placement="top-start"
+        modifiers={[{ name: 'offset', options: { offset: [12, 12] } }]}
+        style={{ pointerEvents: 'none', zIndex: 10 }}
+      >
+        {hover && (
+          <Paper
+            elevation={3}
+            sx={{ px: 1.25, py: 0.75, maxWidth: 260, fontSize: 12 }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
+              {hover.kev.toFixed(1)} keV
+            </Typography>
+            {hoverHits.length === 0 ? (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block' }}
+              >
+                Kein bekanntes Nuklid in der Naehe
+              </Typography>
+            ) : (
+              hoverHits.slice(0, 3).map((h) => (
+                <Typography
+                  key={h.nuclide.name}
+                  variant="caption"
+                  sx={{ display: 'block' }}
+                >
+                  <strong>{h.nuclide.name}</strong> —{' '}
+                  {h.closestPeakKev.toFixed(1)} keV ({h.distanceKev.toFixed(1)}{' '}
+                  keV, I={(h.intensity * 100).toFixed(1)}%)
+                </Typography>
+              ))
+            )}
+          </Paper>
+        )}
+      </Popper>
     </Box>
   );
 }
