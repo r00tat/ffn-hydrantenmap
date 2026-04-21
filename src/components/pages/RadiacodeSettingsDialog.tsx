@@ -324,7 +324,7 @@ function ConfirmDoseResetButton({
     );
   }
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
       <Typography variant="body2">Wirklich zurücksetzen?</Typography>
       <Button
         color="warning"
