@@ -10,10 +10,13 @@
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.1.0",
+    "@capacitor-firebase/authentication": "^8.2.0",
     "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@capacitor/geolocation": "^8.2.0",
-    "@capacitor/preferences": "^8.0.0"
+    "@capacitor/preferences": "^8.0.0",
+    "firebase": "^12.12.1"
   }
 }

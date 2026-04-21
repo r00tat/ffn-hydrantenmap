@@ -8,6 +8,12 @@ const config: CapacitorConfig = {
     url: 'https://einsatz.ffnd.at',
     cleartext: true,
   },
+  plugins: {
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ['google.com'],
+    },
+  },
 };
 
 export default config;

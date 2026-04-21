@@ -14,6 +14,7 @@ module.exports = async (phase) => {
     // dest: 'public',
     // skipWaiting: true,
     transpilePackages: ['mui-color-input'],
+    allowedDevOrigins: ['192.168.*.*', '127.0.0*', 'localhost', '*.nip.io'],
     async headers() {
       return [
         {

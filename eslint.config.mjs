@@ -25,6 +25,8 @@ const eslintConfig = defineConfig([
     // WXT-generated files are recreated on every build.
     'chrome-extension/.wxt/**',
     'chrome-extension/.output/**',
+    // Generated Android/Capacitor build artifacts (native-bridge.js etc.).
+    'capacitor/android/app/build/**',
   ]),
   {
     files: ['src/**/*.{ts,tsx}'],
