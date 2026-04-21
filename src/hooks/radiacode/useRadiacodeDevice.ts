@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { BleAdapter } from './bleAdapter';
 import { RadiacodeClient } from './client';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from './types';
@@ -18,6 +18,7 @@ export interface UseRadiacodeDeviceResult {
   scan: () => Promise<RadiacodeDeviceRef | null>;
   connect: (device?: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
+  clientRef: RefObject<RadiacodeClient | null>;
 }
 
 export interface UseRadiacodeDeviceOptions {
@@ -41,6 +42,7 @@ export function useRadiacodeDevice(
     device: RadiacodeDeviceRef | null;
     client: RadiacodeClient | null;
   }>({ adapter, device: null, client: null });
+  const clientRef = useRef<RadiacodeClient | null>(null);
 
   useEffect(() => {
     stateRef.current.adapter = adapter;
@@ -65,6 +67,7 @@ export function useRadiacodeDevice(
   const disconnect = useCallback(async () => {
     const client = stateRef.current.client;
     stateRef.current.client = null;
+    clientRef.current = null;
     if (client) {
       try {
         await client.disconnect();
@@ -105,6 +108,7 @@ export function useRadiacodeDevice(
           pollIntervalMs,
         );
         stateRef.current.client = client;
+        clientRef.current = client;
         setStatus('connected');
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -119,6 +123,7 @@ export function useRadiacodeDevice(
     return () => {
       const client = state.client;
       state.client = null;
+      clientRef.current = null;
       if (client) {
         client.disconnect().catch(() => {
           // best-effort
@@ -127,5 +132,14 @@ export function useRadiacodeDevice(
     };
   }, []);
 
-  return { status, device, measurement, error, scan, connect, disconnect };
+  return {
+    status,
+    device,
+    measurement,
+    error,
+    scan,
+    connect,
+    disconnect,
+    clientRef,
+  };
 }

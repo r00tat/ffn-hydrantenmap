@@ -10,12 +10,18 @@ import {
   useRef,
   useState,
 } from 'react';
-import { BleAdapter, getBleAdapter } from '../../hooks/radiacode/bleAdapter';
+import {
+  BleAdapter,
+  Unsubscribe,
+  getBleAdapter,
+} from '../../hooks/radiacode/bleAdapter';
+import { RadiacodeClient } from '../../hooks/radiacode/client';
 import {
   loadDefaultDevice,
   saveDefaultDevice,
 } from '../../hooks/radiacode/devicePreference';
 import { pushAndPrune, RadiacodeSample } from '../../hooks/radiacode/history';
+import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
 import {
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
@@ -24,6 +30,12 @@ import {
   RadiacodeStatus,
   useRadiacodeDevice,
 } from '../../hooks/radiacode/useRadiacodeDevice';
+
+export interface RadiacodeSpectrumSessionState {
+  active: boolean;
+  startedAt: number | null;
+  snapshotCount: number;
+}
 
 export interface RadiacodeContextValue {
   status: RadiacodeStatus;
@@ -35,6 +47,11 @@ export interface RadiacodeContextValue {
   connect: () => Promise<void>;
   connectDevice: (device: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
+  spectrum: SpectrumSnapshot | null;
+  spectrumSession: RadiacodeSpectrumSessionState;
+  startSpectrumRecording: () => Promise<void>;
+  stopSpectrumRecording: () => Promise<SpectrumSnapshot | null>;
+  cancelSpectrumRecording: () => Promise<void>;
   startForegroundService?: (opts: {
     title: string;
     body: string;
@@ -57,6 +74,8 @@ interface ProviderProps {
   adapter?: BleAdapter;
   /** Testing hook: receives a callback that pushes a measurement into the buffer. */
   feedMeasurement?: (push: (m: RadiacodeMeasurement) => void) => void;
+  /** Testing hook: factory used by the internal hook to construct the RadiacodeClient. */
+  clientFactory?: (adapter: BleAdapter, deviceId: string) => RadiacodeClient;
 }
 
 const NULL_ADAPTER: BleAdapter = {
@@ -76,6 +95,7 @@ export function RadiacodeProvider({
   children,
   adapter: providedAdapter,
   feedMeasurement,
+  clientFactory,
 }: ProviderProps) {
   const [adapter, setAdapter] = useState<BleAdapter>(
     providedAdapter ?? NULL_ADAPTER,
@@ -86,14 +106,15 @@ export function RadiacodeProvider({
   }, [providedAdapter]);
 
   const {
-    status,
+    status: rawStatus,
     device,
     measurement: hookMeasurement,
     error,
     scan,
     connect: connectRaw,
     disconnect,
-  } = useRadiacodeDevice(adapter);
+    clientRef,
+  } = useRadiacodeDevice(adapter, { clientFactory });
 
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
   const [overrideMeasurement, setOverrideMeasurement] =
@@ -129,6 +150,77 @@ export function RadiacodeProvider({
       setOverrideMeasurement(m);
     });
   }, []);
+
+  // Spectrum recording session state
+  const [spectrum, setSpectrum] = useState<SpectrumSnapshot | null>(null);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [snapshotCount, setSnapshotCount] = useState(0);
+  const [reconnecting, setReconnecting] = useState(false);
+  const sessionUnsubRef = useRef<Unsubscribe | null>(null);
+  const spectrumRef = useRef<SpectrumSnapshot | null>(null);
+  useEffect(() => {
+    spectrumRef.current = spectrum;
+  }, [spectrum]);
+
+  const stopSession = useCallback(() => {
+    clientRef.current?.stopSpectrumPolling();
+    sessionUnsubRef.current?.();
+    sessionUnsubRef.current = null;
+  }, [clientRef]);
+
+  const startSpectrumRecording = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) throw new Error('Kein Radiacode verbunden');
+    // If a prior session is still active, stop it cleanly first.
+    if (sessionUnsubRef.current) {
+      stopSession();
+    }
+    await client.specReset();
+    setSpectrum(null);
+    setSnapshotCount(0);
+    setSessionStartedAt(Date.now());
+    setSessionActive(true);
+    setReconnecting(false);
+    const unsubEvt = client.onSessionEvent((e) => {
+      if (e === 'reconnecting') setReconnecting(true);
+      else setReconnecting(false);
+    });
+    sessionUnsubRef.current = unsubEvt;
+    client.startSpectrumPolling((s) => {
+      setSpectrum(s);
+      setSnapshotCount((c) => c + 1);
+    });
+  }, [clientRef, stopSession]);
+
+  const stopSpectrumRecording =
+    useCallback(async (): Promise<SpectrumSnapshot | null> => {
+      stopSession();
+      setSessionActive(false);
+      setReconnecting(false);
+      return spectrumRef.current;
+    }, [stopSession]);
+
+  const cancelSpectrumRecording = useCallback(async () => {
+    stopSession();
+    setSessionActive(false);
+    setReconnecting(false);
+    setSpectrum(null);
+    setSessionStartedAt(null);
+    setSnapshotCount(0);
+  }, [stopSession]);
+
+  // Clean up any active session subscription on unmount.
+  useEffect(() => {
+    return () => {
+      sessionUnsubRef.current?.();
+      sessionUnsubRef.current = null;
+    };
+  }, []);
+
+  // Mask status while reconnecting — UI should show the "connecting…" state
+  // during an auto-reconnect attempt rather than flipping to idle/error.
+  const status: RadiacodeStatus = reconnecting ? 'connecting' : rawStatus;
 
   // scan + save default device
   const scanAndSave = useCallback(async () => {
@@ -174,6 +266,15 @@ export function RadiacodeProvider({
     [adapter],
   );
 
+  const spectrumSession = useMemo<RadiacodeSpectrumSessionState>(
+    () => ({
+      active: sessionActive,
+      startedAt: sessionStartedAt,
+      snapshotCount,
+    }),
+    [sessionActive, sessionStartedAt, snapshotCount],
+  );
+
   const value = useMemo<RadiacodeContextValue>(
     () => ({
       status,
@@ -185,6 +286,11 @@ export function RadiacodeProvider({
       connect,
       connectDevice,
       disconnect,
+      spectrum,
+      spectrumSession,
+      startSpectrumRecording,
+      stopSpectrumRecording,
+      cancelSpectrumRecording,
       startForegroundService,
       stopForegroundService,
     }),
@@ -198,6 +304,11 @@ export function RadiacodeProvider({
       connect,
       connectDevice,
       disconnect,
+      spectrum,
+      spectrumSession,
+      startSpectrumRecording,
+      stopSpectrumRecording,
+      cancelSpectrumRecording,
       startForegroundService,
       stopForegroundService,
     ],

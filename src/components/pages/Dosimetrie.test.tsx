@@ -42,6 +42,11 @@ function fixture(
     connect: vi.fn(async () => {}),
     connectDevice: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
+    spectrum: null,
+    spectrumSession: { active: false, startedAt: null, snapshotCount: 0 },
+    startSpectrumRecording: vi.fn(async () => {}),
+    stopSpectrumRecording: vi.fn(async () => null),
+    cancelSpectrumRecording: vi.fn(async () => {}),
     ...partial,
   };
 }
