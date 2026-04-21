@@ -42,11 +42,18 @@ function formatDuration(totalSec: number): string {
 }
 
 /**
- * Format `yyyy-MM-dd HH:mm` from a unix ms timestamp. No date-fns in this
- * project, so we slice the ISO string and swap the T for a space.
+ * Format `dd.MM.yyyy HH:mm` in the user's local timezone. Austrian fire brigades
+ * read the timestamp next to the label during an incident — using UTC would be
+ * off by 1–2 hours from what the device clock shows.
  */
 function formatStartTimestamp(ts: number): string {
-  return new Date(ts).toISOString().slice(0, 16).replace('T', ' ');
+  return new Date(ts).toLocaleString('de-AT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function RadiacodeCaptureDialog({ open, onClose }: Props) {
@@ -138,9 +145,11 @@ export default function RadiacodeCaptureDialog({ open, onClose }: Props) {
         setSaving(false);
         return;
       }
-      const identification = runLiveIdentification(snap.counts, snap.coefficients);
-      const matched =
-        identification.state === 'match' ? identification : null;
+      // Persist the nuklid the user actually saw on the chip (post-hysterese),
+      // not a fresh evaluation of the last snapshot — a single noisy final
+      // snapshot could otherwise disagree with what was on screen when Stop
+      // was pressed.
+      const matched = displayedNuclide;
       const startTs = spectrumSession.startedAt ?? snap.timestamp;
       const deviceName = `${device?.name ?? 'Radiacode'}${
         device?.serial ? ` ${device.serial}` : ''
@@ -193,6 +202,7 @@ export default function RadiacodeCaptureDialog({ open, onClose }: Props) {
     addItem,
     showSnackbar,
     onClose,
+    displayedNuclide,
   ]);
 
   const handleCancel = useCallback(async () => {
