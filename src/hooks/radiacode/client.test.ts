@@ -1219,6 +1219,158 @@ describe('RadiacodeClient', () => {
     await client.disconnect();
   });
 
+  it('readSettings reads all 11 VSFRs and returns a RadiacodeSettings object', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+
+    const u32 = (value: number) => {
+      const p = new Uint8Array(8);
+      const v = new DataView(p.buffer);
+      v.setUint32(0, 1, true);
+      v.setUint32(4, value, true);
+      return p;
+    };
+    const u8 = (value: number) => {
+      const p = new Uint8Array(5);
+      new DataView(p.buffer).setUint32(0, 1, true);
+      p[4] = value;
+      return p;
+    };
+    const responses: Record<number, Uint8Array> = {
+      [VSFR.DR_LEV1_uR_h]: u32(100_000),
+      [VSFR.DR_LEV2_uR_h]: u32(200_000),
+      [VSFR.DS_LEV1_uR]: u32(10_000_000),
+      [VSFR.DS_LEV2_uR]: u32(20_000_000),
+      [VSFR.SOUND_ON]: u8(1),
+      [VSFR.SOUND_VOL]: u8(5),
+      [VSFR.VIBRO_ON]: u8(0),
+      [VSFR.LEDS_ON]: u8(1),
+      [VSFR.DS_UNITS]: u8(1),
+      [VSFR.CR_UNITS]: u8(0),
+      [VSFR.USE_nSv_h]: u8(0),
+    };
+    const requestedIds: number[] = [];
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR)
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      if (cmd === COMMAND.RD_VIRT_SFR) {
+        const id = view.getUint32(8, true);
+        requestedIds.push(id);
+        const body = responses[id];
+        if (!body) throw new Error(`Unexpected VSFR read: 0x${id.toString(16)}`);
+        return buildResponseChunks(cmd, seq, body);
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const settings = await client.readSettings();
+    expect(settings).toEqual({
+      doseRateAlarm1uRh: 100_000,
+      doseRateAlarm2uRh: 200_000,
+      doseAlarm1uR: 10_000_000,
+      doseAlarm2uR: 20_000_000,
+      soundOn: true,
+      soundVolume: 5,
+      vibroOn: false,
+      ledsOn: true,
+      doseUnitsSv: true,
+      countRateCpm: false,
+      doseRateNSvh: false,
+    });
+    expect(requestedIds).toHaveLength(11);
+    await client.disconnect();
+  });
+
+  it('writeSettings writes only the VSFRs present in the patch', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const wrArgs: Array<{ id: number; bytes: Uint8Array }> = [];
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        const id = view.getUint32(8, true);
+        const argsAfterId = frame.slice(12);
+        wrArgs.push({ id, bytes: new Uint8Array(argsAfterId) });
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      }
+      return null;
+    });
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    wrArgs.length = 0;
+
+    await client.writeSettings({
+      doseRateAlarm1uRh: 500,
+      soundOn: false,
+      soundVolume: 3,
+    });
+
+    expect(wrArgs).toHaveLength(3);
+    const byId = Object.fromEntries(wrArgs.map((w) => [w.id, w.bytes]));
+    expect(byId[VSFR.DR_LEV1_uR_h]).toEqual(new Uint8Array([0xf4, 0x01, 0, 0]));
+    expect(byId[VSFR.SOUND_ON]).toEqual(new Uint8Array([0x00]));
+    expect(byId[VSFR.SOUND_VOL]).toEqual(new Uint8Array([0x03]));
+    await client.disconnect();
+  });
+
+  it('playSignal writes PLAY_SIGNAL=1, doseReset writes DOSE_RESET=1', async () => {
+    vi.useRealTimers();
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const wrLog: Array<{ id: number; v: number }> = [];
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        const id = view.getUint32(8, true);
+        wrLog.push({ id, v: frame[12] });
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      }
+      return null;
+    });
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    wrLog.length = 0;
+
+    await client.playSignal();
+    await client.doseReset();
+
+    expect(wrLog).toEqual([
+      { id: VSFR.PLAY_SIGNAL, v: 1 },
+      { id: VSFR.DOSE_RESET, v: 1 },
+    ]);
+    await client.disconnect();
+  });
+
   it('writeSfrBool sends WR_VIRT_SFR(id, 0/1)', async () => {
     vi.useRealTimers();
     const adapter = makeAdapter();

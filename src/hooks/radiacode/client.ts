@@ -227,6 +227,55 @@ export class RadiacodeClient {
     await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteBool(id, value));
   }
 
+  async readSettings(): Promise<RadiacodeSettings> {
+    return {
+      doseRateAlarm1uRh: await this.readSfrU32(VSFR.DR_LEV1_uR_h),
+      doseRateAlarm2uRh: await this.readSfrU32(VSFR.DR_LEV2_uR_h),
+      doseAlarm1uR: await this.readSfrU32(VSFR.DS_LEV1_uR),
+      doseAlarm2uR: await this.readSfrU32(VSFR.DS_LEV2_uR),
+      soundOn: await this.readSfrBool(VSFR.SOUND_ON),
+      soundVolume: await this.readSfrU8(VSFR.SOUND_VOL),
+      vibroOn: await this.readSfrBool(VSFR.VIBRO_ON),
+      ledsOn: await this.readSfrBool(VSFR.LEDS_ON),
+      doseUnitsSv: await this.readSfrBool(VSFR.DS_UNITS),
+      countRateCpm: await this.readSfrBool(VSFR.CR_UNITS),
+      doseRateNSvh: await this.readSfrBool(VSFR.USE_nSv_h),
+    };
+  }
+
+  async writeSettings(patch: Partial<RadiacodeSettings>): Promise<void> {
+    if (patch.doseRateAlarm1uRh !== undefined)
+      await this.writeSfrU32(VSFR.DR_LEV1_uR_h, patch.doseRateAlarm1uRh);
+    if (patch.doseRateAlarm2uRh !== undefined)
+      await this.writeSfrU32(VSFR.DR_LEV2_uR_h, patch.doseRateAlarm2uRh);
+    if (patch.doseAlarm1uR !== undefined)
+      await this.writeSfrU32(VSFR.DS_LEV1_uR, patch.doseAlarm1uR);
+    if (patch.doseAlarm2uR !== undefined)
+      await this.writeSfrU32(VSFR.DS_LEV2_uR, patch.doseAlarm2uR);
+    if (patch.soundOn !== undefined)
+      await this.writeSfrBool(VSFR.SOUND_ON, patch.soundOn);
+    if (patch.soundVolume !== undefined)
+      await this.writeSfrU8(VSFR.SOUND_VOL, patch.soundVolume);
+    if (patch.vibroOn !== undefined)
+      await this.writeSfrBool(VSFR.VIBRO_ON, patch.vibroOn);
+    if (patch.ledsOn !== undefined)
+      await this.writeSfrBool(VSFR.LEDS_ON, patch.ledsOn);
+    if (patch.doseUnitsSv !== undefined)
+      await this.writeSfrBool(VSFR.DS_UNITS, patch.doseUnitsSv);
+    if (patch.countRateCpm !== undefined)
+      await this.writeSfrBool(VSFR.CR_UNITS, patch.countRateCpm);
+    if (patch.doseRateNSvh !== undefined)
+      await this.writeSfrBool(VSFR.USE_nSv_h, patch.doseRateNSvh);
+  }
+
+  async playSignal(): Promise<void> {
+    await this.writeSfrU8(VSFR.PLAY_SIGNAL, 1);
+  }
+
+  async doseReset(): Promise<void> {
+    await this.writeSfrBool(VSFR.DOSE_RESET, true);
+  }
+
   async readSpectrum(): Promise<SpectrumSnapshot> {
     const rsp = await this.execute(COMMAND.RD_VIRT_STRING, u32le(VS.SPECTRUM));
     return decodeSpectrumResponse(rsp.data);
