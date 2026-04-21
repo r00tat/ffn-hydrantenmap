@@ -90,6 +90,15 @@ export interface RadiacodeContextValue {
   disconnect: () => Promise<void>;
   spectrum: SpectrumSnapshot | null;
   cpsHistory: CpsSample[];
+  /**
+   * `true`, solange die Energiespektrum-Seite eine Live-Aufzeichnung angefordert
+   * hat. Nur dann pollt der Provider aktiv das Spektrum vom Gerät. Ausserhalb
+   * bleibt der Provider ruhig, damit Consumer nicht im Sekundentakt neu
+   * gerendert werden.
+   */
+  liveRecording: boolean;
+  startLiveRecording: () => void;
+  stopLiveRecording: () => void;
   resetLiveSpectrum: () => Promise<void>;
   saveLiveSpectrum: (meta: SaveLiveSpectrumMeta) => Promise<string | null>;
   readSettings: () => Promise<RadiacodeSettingsReadResult>;
@@ -227,10 +236,11 @@ export function RadiacodeProvider({
     });
   }, []);
 
-  // Live spectrum state: polled permanently once connected. No explicit
-  // start/stop — the provider owns the lifecycle. Baseline subtraction keeps
-  // the displayed spectrum relative to the last reset (or initial connect).
+  // Live spectrum state: polled nur wenn der Consumer explizit per
+  // startLiveRecording() angefordert hat. Baseline-Subtraktion hält das
+  // angezeigte Spektrum relativ zum letzten Reset.
   const [spectrum, setSpectrum] = useState<SpectrumSnapshot | null>(null);
+  const [liveRecording, setLiveRecording] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const sessionUnsubRef = useRef<Unsubscribe | null>(null);
   const pollingStartedRef = useRef(false);
@@ -256,13 +266,14 @@ export function RadiacodeProvider({
     [],
   );
 
-  // When rawStatus transitions to 'connected' and a client is available,
-  // kick off permanent spectrum polling + baseline capture. Only once per
-  // client instance — useRadiacodeDevice re-creates the client on reconnect
-  // so we use a ref flag keyed implicitly on clientRef.current.
+  // When rawStatus transitions to 'connected' AND liveRecording === true,
+  // kick off spectrum polling + baseline capture. Polling stops when either
+  // condition drops. Only once per client instance — useRadiacodeDevice
+  // re-creates the client on reconnect so we use a ref flag keyed implicitly
+  // on clientRef.current.
   const lastClientRef = useRef<RadiacodeClient | null>(null);
   useEffect(() => {
-    if (rawStatus !== 'connected') {
+    if (rawStatus !== 'connected' || !liveRecording) {
       pollingStartedRef.current = false;
       lastClientRef.current = null;
       return;
@@ -293,12 +304,6 @@ export function RadiacodeProvider({
       if (cancelled) return;
       setSpectrum(null);
 
-      const unsubEvt = client.onSessionEvent((e) => {
-        if (e === 'reconnecting') setReconnecting(true);
-        else setReconnecting(false);
-      });
-      sessionUnsubRef.current = unsubEvt;
-
       client.startSpectrumPolling((s) => {
         latestRawSnapshotRef.current = s;
         setSpectrum(applyBaseline(s));
@@ -307,11 +312,40 @@ export function RadiacodeProvider({
 
     return () => {
       cancelled = true;
-      sessionUnsubRef.current?.();
-      sessionUnsubRef.current = null;
       client.stopSpectrumPolling();
+      // Nach dem Stop: Flags so zurücksetzen, dass ein erneutes
+      // startLiveRecording() das Polling sauber neu startet.
+      pollingStartedRef.current = false;
+      lastClientRef.current = null;
+      setSpectrum(null);
+      baselineRef.current = null;
+      latestRawSnapshotRef.current = null;
     };
-  }, [rawStatus, clientRef, applyBaseline]);
+  }, [rawStatus, clientRef, applyBaseline, liveRecording]);
+
+  // Session-Events (`reconnecting` / `reconnected`) gelten für die BLE-Session,
+  // nicht für das Spektrum-Polling. Deshalb in einem eigenen Effect, der nur
+  // am Connection-Status hängt und unabhängig von liveRecording läuft.
+  useEffect(() => {
+    if (rawStatus !== 'connected') {
+      setReconnecting(false);
+      return;
+    }
+    const client = clientRef.current;
+    if (!client) return;
+    const unsub = client.onSessionEvent((e) => {
+      if (e === 'reconnecting') setReconnecting(true);
+      else setReconnecting(false);
+    });
+    sessionUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      sessionUnsubRef.current = null;
+    };
+  }, [rawStatus, clientRef]);
+
+  const startLiveRecording = useCallback(() => setLiveRecording(true), []);
+  const stopLiveRecording = useCallback(() => setLiveRecording(false), []);
 
   const resetLiveSpectrum = useCallback(async () => {
     // Use the latest RAW snapshot as the new baseline. Polling continues
@@ -504,6 +538,9 @@ export function RadiacodeProvider({
       disconnect,
       spectrum,
       cpsHistory,
+      liveRecording,
+      startLiveRecording,
+      stopLiveRecording,
       resetLiveSpectrum,
       saveLiveSpectrum,
       readSettings,
@@ -525,6 +562,9 @@ export function RadiacodeProvider({
       disconnect,
       spectrum,
       cpsHistory,
+      liveRecording,
+      startLiveRecording,
+      stopLiveRecording,
       resetLiveSpectrum,
       saveLiveSpectrum,
       readSettings,

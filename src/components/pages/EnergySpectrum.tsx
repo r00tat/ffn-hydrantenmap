@@ -27,6 +27,8 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import SaveIcon from '@mui/icons-material/Save';
+import StopIcon from '@mui/icons-material/Stop';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -213,6 +215,9 @@ export default function EnergySpectrum() {
     error: radiacodeError,
     connect,
     disconnect,
+    liveRecording,
+    startLiveRecording,
+    stopLiveRecording,
     resetLiveSpectrum,
     saveLiveSpectrum,
   } = useRadiacode();
@@ -243,7 +248,8 @@ export default function EnergySpectrum() {
   });
 
   const liveSpectrum = useMemo<LoadedSpectrum | null>(() => {
-    if (!spectrum || spectrum.counts.length === 0) return null;
+    if (!liveRecording || !spectrum || spectrum.counts.length === 0)
+      return null;
     const coefficients: number[] = [...spectrum.coefficients];
     const energies = spectrum.counts.map((_, ch) =>
       channelToEnergy(ch, coefficients),
@@ -269,7 +275,7 @@ export default function EnergySpectrum() {
       visible: !hiddenIds.has(LIVE_ID),
       description: 'Live-Daten vom Radiacode',
     };
-  }, [spectrum, device, hiddenIds]);
+  }, [spectrum, device, hiddenIds, liveRecording]);
 
   // Convert Firestore spectra into LoadedSpectrum format with visibility
   const allSpectra = useMemo<LoadedSpectrum[]>(() => {
@@ -639,7 +645,7 @@ export default function EnergySpectrum() {
         >
           Trennen
         </Button>
-        {liveSpectrum && (
+        {liveRecording && liveSpectrum && (
           <>
             <Button
               variant="outlined"
@@ -689,6 +695,29 @@ export default function EnergySpectrum() {
         >
           Datei(en) hochladen
         </Button>
+        <Tooltip
+          title={
+            status !== 'connected'
+              ? 'Zuerst mit Radiacode verbinden'
+              : liveRecording
+                ? 'Live-Aufzeichnung stoppen'
+                : 'Live-Aufzeichnung starten'
+          }
+        >
+          <span>
+            <Button
+              variant={liveRecording ? 'outlined' : 'contained'}
+              color={liveRecording ? 'error' : 'primary'}
+              startIcon={liveRecording ? <StopIcon /> : <TimelineIcon />}
+              onClick={() =>
+                liveRecording ? stopLiveRecording() : startLiveRecording()
+              }
+              disabled={status !== 'connected'}
+            >
+              {liveRecording ? 'Aufzeichnung stoppen' : 'Live-Aufzeichnung'}
+            </Button>
+          </span>
+        </Tooltip>
         {allSpectra.length > 0 && (
           <FormControlLabel
             control={

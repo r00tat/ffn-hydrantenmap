@@ -50,6 +50,9 @@ function fixture(
     disconnect: vi.fn(async () => {}),
     spectrum: null,
     cpsHistory: [],
+    liveRecording: false,
+    startLiveRecording: vi.fn(),
+    stopLiveRecording: vi.fn(),
     resetLiveSpectrum: vi.fn(async () => {}),
     saveLiveSpectrum: vi.fn(async () => 'new-doc'),
     readSettings: vi.fn(async () => ({

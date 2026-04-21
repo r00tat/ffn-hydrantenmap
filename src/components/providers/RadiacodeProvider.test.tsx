@@ -146,7 +146,7 @@ describe('RadiacodeProvider', () => {
     err.mockRestore();
   });
 
-  it('startet spektrum-polling automatisch beim connect (ohne startSpectrumRecording)', async () => {
+  it('startet kein spektrum-polling vor startLiveRecording()', async () => {
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const values: ReturnType<typeof useRadiacode>[] = [];
@@ -161,7 +161,27 @@ describe('RadiacodeProvider', () => {
     });
 
     const client = latest()!;
-    // Kein startSpectrumRecording() aufgerufen — Polling muss trotzdem laufen.
+    expect(client.startSpectrumPolling).not.toHaveBeenCalled();
+  });
+
+  it('startet spektrum-polling nach startLiveRecording()', async () => {
+    const adapter = nullAdapter();
+    const { factory, latest } = makeFakeSpectrumClientFactory();
+    const values: ReturnType<typeof useRadiacode>[] = [];
+    render(
+      <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+        <Probe onValue={(v) => values.push(v)} />
+      </RadiacodeProvider>,
+    );
+
+    await act(async () => {
+      await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
+    });
+
+    const client = latest()!;
     expect(client.startSpectrumPolling).toHaveBeenCalledTimes(1);
 
     const s = snap({ durationSec: 5, timestamp: 1000 });
@@ -171,6 +191,35 @@ describe('RadiacodeProvider', () => {
 
     const ctx = values.at(-1)!;
     expect(ctx.spectrum).not.toBeNull();
+  });
+
+  it('stopLiveRecording beendet das polling und räumt spectrum auf', async () => {
+    const adapter = nullAdapter();
+    const { factory, latest } = makeFakeSpectrumClientFactory();
+    const values: ReturnType<typeof useRadiacode>[] = [];
+    render(
+      <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+        <Probe onValue={(v) => values.push(v)} />
+      </RadiacodeProvider>,
+    );
+    await act(async () => {
+      await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
+    });
+    await act(async () => {
+      latest()!.emitSnapshot(snap({ durationSec: 5, timestamp: 1000 }));
+    });
+    expect(values.at(-1)!.spectrum).not.toBeNull();
+
+    await act(async () => {
+      values.at(-1)!.stopLiveRecording();
+    });
+
+    expect(latest()!.stopSpectrumPolling).toHaveBeenCalled();
+    expect(values.at(-1)!.spectrum).toBeNull();
+    expect(values.at(-1)!.liveRecording).toBe(false);
   });
 
   it('spectrum snapshots update the context value', async () => {
@@ -185,6 +234,9 @@ describe('RadiacodeProvider', () => {
 
     await act(async () => {
       await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
     });
 
     const s = snap({ durationSec: 42, timestamp: 1234 });
@@ -222,6 +274,9 @@ describe('RadiacodeProvider', () => {
       void client;
       // Intercept: before connect finishes, set up the mock return.
       await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
     });
 
     // Replace baseline: the first readSpectrum was called during connect and
@@ -271,6 +326,9 @@ describe('RadiacodeProvider', () => {
 
     await act(async () => {
       await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
     });
     // Feed some CPS first.
     act(() => {
@@ -353,6 +411,9 @@ describe('RadiacodeProvider', () => {
     );
     await act(async () => {
       await values.at(-1)!.connect();
+    });
+    await act(async () => {
+      values.at(-1)!.startLiveRecording();
     });
     const s = snap({ durationSec: 42, timestamp: 1_700_000_000_000 });
     await act(async () => {

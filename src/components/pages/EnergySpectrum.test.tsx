@@ -58,6 +58,9 @@ function fixture(
     disconnect: vi.fn(async () => {}),
     spectrum: null,
     cpsHistory: [],
+    liveRecording: false,
+    startLiveRecording: vi.fn(),
+    stopLiveRecording: vi.fn(),
     resetLiveSpectrum: vi.fn(async () => {}),
     saveLiveSpectrum: vi.fn(async () => 'new-doc'),
     readSettings: vi.fn(async () => ({
@@ -91,7 +94,7 @@ describe('EnergySpectrum — Live-Spektrum', () => {
   it('kein Live-Item wenn spectrum === null', () => {
     mockedUseRadiacode.mockReturnValue(fixture({ spectrum: null }));
     render(<EnergySpectrum />);
-    expect(screen.queryByText(/Live-Aufzeichnung/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('spectrum-color-live')).not.toBeInTheDocument();
   });
 
   it('Live-Item erscheint als erstes Listen-Element mit Magenta-Farbkreis', () => {
@@ -99,6 +102,7 @@ describe('EnergySpectrum — Live-Spektrum', () => {
       fixture({
         status: 'connected',
         device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: true,
         spectrum: {
           durationSec: 10,
           coefficients: [0, 2.5, 0] as [number, number, number],
@@ -120,6 +124,7 @@ describe('EnergySpectrum — Live-Spektrum', () => {
       fixture({
         status: 'connected',
         device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: true,
         spectrum: {
           durationSec: 10,
           coefficients: [0, 2.5, 0] as [number, number, number],
@@ -141,6 +146,7 @@ describe('EnergySpectrum — Live-Spektrum', () => {
       fixture({
         status: 'connected',
         device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: true,
         spectrum: {
           durationSec: 10,
           coefficients: [0, 2.5, 0] as [number, number, number],
@@ -171,5 +177,72 @@ describe('EnergySpectrum — Live-Spektrum', () => {
     render(<EnergySpectrum />);
     await user.click(screen.getByRole('button', { name: /^verbinden$/i }));
     expect(connect).toHaveBeenCalled();
+  });
+
+  it('Live-Aufzeichnung-Button ist deaktiviert solange nicht verbunden', () => {
+    mockedUseRadiacode.mockReturnValue(fixture({ status: 'idle' }));
+    render(<EnergySpectrum />);
+    expect(
+      screen.getByRole('button', { name: /live-aufzeichnung/i }),
+    ).toBeDisabled();
+  });
+
+  it('Live-Aufzeichnung-Button ruft startLiveRecording auf wenn verbunden', async () => {
+    const user = userEvent.setup();
+    const startLiveRecording = vi.fn();
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: false,
+        startLiveRecording,
+      }),
+    );
+    render(<EnergySpectrum />);
+    await user.click(
+      screen.getByRole('button', { name: /live-aufzeichnung/i }),
+    );
+    expect(startLiveRecording).toHaveBeenCalled();
+  });
+
+  it('Aufzeichnung-stoppen-Button ruft stopLiveRecording auf', async () => {
+    const user = userEvent.setup();
+    const stopLiveRecording = vi.fn();
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: true,
+        stopLiveRecording,
+      }),
+    );
+    render(<EnergySpectrum />);
+    await user.click(
+      screen.getByRole('button', { name: /aufzeichnung stoppen/i }),
+    );
+    expect(stopLiveRecording).toHaveBeenCalled();
+  });
+
+  it('Reset- und Speichern-Buttons sind ausgeblendet wenn liveRecording === false', () => {
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN' },
+        liveRecording: false,
+        spectrum: {
+          durationSec: 10,
+          coefficients: [0, 2.5, 0] as [number, number, number],
+          counts: [1, 2, 3, 4],
+          timestamp: 1000,
+        },
+      }),
+    );
+    render(<EnergySpectrum />);
+    expect(
+      screen.queryByRole('button', { name: /reset live/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^speichern$/i }),
+    ).not.toBeInTheDocument();
   });
 });
