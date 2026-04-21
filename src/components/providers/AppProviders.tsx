@@ -17,6 +17,7 @@ import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
 import ChatMessageDisplay from '../chat/chat-message';
 import FirebaseUserProvider from '../firebase/FirebaseUserProvider';
 import DynamicLogin from '../pages/LoginUi';
+import { PullToRefreshIndicator } from '../PullToRefreshIndicator';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
 import FirecallLayerProvider from './FirecallLayerProvider';
@@ -98,6 +99,7 @@ export default function AppProviders({ children }: AppProps) {
         <FirebaseUserProvider>
           <SnackbarProvider>
             <ServiceWorkerUpdateListener />
+            <PullToRefreshIndicator />
             <DebugLoggingProvider>
               <div className={`${styles.container} print-content-root`}>
                 <CssBaseline enableColorScheme />
