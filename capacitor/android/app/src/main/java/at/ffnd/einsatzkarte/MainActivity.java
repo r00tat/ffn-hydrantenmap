@@ -129,6 +129,43 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    if (offlineOverlayShown) {
+                        runOnUiThread(() -> {
+                            offlineOverlayShown = false;
+                            retryHandler.removeCallbacksAndMessages(null);
+                            if (lastRequestedUrl != null) {
+                                bridge.getWebView().loadUrl(lastRequestedUrl);
+                            } else {
+                                bridge.getWebView().reload();
+                            }
+                        });
+                    }
+                }
+            };
+            cm.registerDefaultNetworkCallback(networkCallback);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (networkCallback != null) {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                try {
+                    cm.unregisterNetworkCallback(networkCallback);
+                } catch (IllegalArgumentException ignored) {
+                    // already unregistered
+                }
+            }
+            networkCallback = null;
+        }
+        retryHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     private void applyServerUrlOverride(String overrideUrl) {
@@ -184,6 +221,13 @@ public class MainActivity extends BridgeActivity {
             + "<p>" + getString(R.string.offline_overlay_message) + "</p>"
             + "<button onclick=\"window.location.reload()\">"
             + getString(R.string.offline_overlay_retry) + "</button></body></html>";
+        retryHandler.removeCallbacksAndMessages(null);
+        retryHandler.postDelayed(() -> {
+            if (offlineOverlayShown) {
+                offlineOverlayShown = false;
+                bridge.getWebView().loadUrl(url);
+            }
+        }, 5000);
         runOnUiThread(() -> {
             bridge.getWebView().loadDataWithBaseURL(
                 url, html, "text/html", "UTF-8", url
