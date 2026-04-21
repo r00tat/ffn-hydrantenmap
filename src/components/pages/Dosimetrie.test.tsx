@@ -130,4 +130,29 @@ describe('Dosimetrie', () => {
     render(<Dosimetrie />);
     expect(screen.getByText(/BLE denied/)).toBeInTheDocument();
   });
+
+  it('Settings-Button ist disabled wenn nicht verbunden', () => {
+    mockedUseRadiacode.mockReturnValue(fixture());
+    render(<Dosimetrie />);
+    expect(
+      screen.getByRole('button', { name: /einstellungen/i }),
+    ).toBeDisabled();
+  });
+
+  it('Settings-Button ist enabled wenn verbunden und oeffnet Dialog', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'id', name: 'RC-103', serial: 'SN' },
+      }),
+    );
+    render(<Dosimetrie />);
+    const btn = screen.getByRole('button', { name: /einstellungen/i });
+    expect(btn).toBeEnabled();
+    await user.click(btn);
+    expect(
+      await screen.findByText(/geräte-einstellungen/i),
+    ).toBeInTheDocument();
+  });
 });

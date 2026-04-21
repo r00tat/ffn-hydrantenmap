@@ -1,12 +1,15 @@
 'use client';
 
+import SettingsIcon from '@mui/icons-material/Settings';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { useMemo, useState } from 'react';
@@ -18,6 +21,7 @@ import {
 } from '../../common/doseFormat';
 import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
+import RadiacodeSettingsDialog from './RadiacodeSettingsDialog';
 
 const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
   normal: '#4caf50',
@@ -120,8 +124,13 @@ export default function Dosimetrie() {
     error,
     connect,
     disconnect,
+    readSettings,
+    writeSettings,
+    playSignal,
+    doseReset,
   } = useRadiacode();
   const [logScale, setLogScale] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const rateLevel = measurement
     ? doseRateLevel(measurement.dosisleistung)
@@ -172,6 +181,17 @@ export default function Dosimetrie() {
         >
           Trennen
         </Button>
+        <Tooltip title="Einstellungen">
+          <span>
+            <IconButton
+              aria-label="Einstellungen"
+              onClick={() => setSettingsOpen(true)}
+              disabled={status !== 'connected'}
+            >
+              <SettingsIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -311,6 +331,15 @@ export default function Dosimetrie() {
           </Stack>
         </Box>
       )}
+
+      <RadiacodeSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        readSettings={readSettings}
+        writeSettings={writeSettings}
+        playSignal={playSignal}
+        doseReset={doseReset}
+      />
     </Stack>
   );
 }
