@@ -110,6 +110,52 @@ function buildResponseChunks(
   return chunks;
 }
 
+function buildRareRecordBody(
+  realtime: { cps: number; doseRateSv: number },
+  rare: { doseSv: number; temperatureC: number; chargePct: number },
+): Uint8Array {
+  // retcode(4) + flen(4) + records
+  const records: number[] = [];
+  // Realtime record: seq(1)=0, eid(1)=0, gid(1)=0, tsOffset(4)=0, then 15B payload
+  // countRate f32, doseRate f32, countRateErrPct u16, doseRateErrPct u16, flags u16, realTimeFlags u8
+  const realtimeBuf = new ArrayBuffer(7 + 15);
+  const rv = new DataView(realtimeBuf);
+  rv.setUint8(0, 0); // seq
+  rv.setUint8(1, 0); // eid
+  rv.setUint8(2, 0); // gid
+  rv.setInt32(3, 0, true); // tsOffset
+  rv.setFloat32(7, realtime.cps, true);
+  rv.setFloat32(11, realtime.doseRateSv, true);
+  rv.setUint16(15, 0, true);
+  rv.setUint16(17, 0, true);
+  rv.setUint16(19, 0, true);
+  rv.setUint8(21, 0);
+  records.push(...new Uint8Array(realtimeBuf));
+
+  // Rare record: seq=1, eid=0, gid=3, tsOffset=0, then 14B payload
+  // duration u32, dose f32 (Sv), temperature u16 ((t*100)+2000), charge u16 (pct*100), flags u16
+  const rareBuf = new ArrayBuffer(7 + 14);
+  const rr = new DataView(rareBuf);
+  rr.setUint8(0, 1); // seq
+  rr.setUint8(1, 0); // eid
+  rr.setUint8(2, 3); // gid
+  rr.setInt32(3, 0, true);
+  rr.setUint32(7, 100, true); // duration
+  rr.setFloat32(11, rare.doseSv, true);
+  rr.setUint16(15, Math.round(rare.temperatureC * 100) + 2000, true);
+  rr.setUint16(17, Math.round(rare.chargePct * 100), true);
+  rr.setUint16(19, 0, true);
+  records.push(...new Uint8Array(rareBuf));
+
+  const bodyLen = 8 + records.length;
+  const body = new Uint8Array(bodyLen);
+  const bv = new DataView(body.buffer);
+  bv.setUint32(0, 0, true); // retcode = 0
+  bv.setUint32(4, records.length, true);
+  body.set(records, 8);
+  return body;
+}
+
 describe('RadiacodeClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -230,6 +276,48 @@ describe('RadiacodeClient', () => {
     expect(m.cps).toBeCloseTo(5.931, 2);
     expect(m.dosisleistung).toBeCloseTo(8.05e-6 * 10000, 3);
     expect(typeof m.timestamp).toBe('number');
+
+    await client.disconnect();
+  });
+
+  it('emits dose, temperature and charge when rare record is present', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const body = buildRareRecordBody(
+      { cps: 3.5, doseRateSv: 2e-7 },
+      { doseSv: 1.23e-4, temperatureC: 23.5, chargePct: 87.3 },
+    );
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      if (cmd === COMMAND.WR_VIRT_SFR)
+        return buildResponseChunks(cmd, seq, new Uint8Array([0x01, 0, 0, 0]));
+      if (cmd === COMMAND.RD_VIRT_STRING)
+        return buildResponseChunks(COMMAND.RD_VIRT_STRING, seq, body);
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const onMeasurement = vi.fn();
+    client.startPolling(onMeasurement, 500);
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(onMeasurement).toHaveBeenCalledTimes(1);
+    const m = onMeasurement.mock.calls[0][0];
+    expect(m.cps).toBeCloseTo(3.5, 2);
+    expect(m.dosisleistung).toBeCloseTo(2e-7 * 10000, 5); // 0.002 µSv/h
+    expect(m.dose).toBeCloseTo(1.23e-4 * 1e6, 1); // 123 µSv
+    expect(m.temperatureC).toBeCloseTo(23.5, 1);
+    expect(m.chargePct).toBeCloseTo(87.3, 1);
 
     await client.disconnect();
   });

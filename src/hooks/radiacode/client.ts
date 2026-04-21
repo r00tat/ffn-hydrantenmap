@@ -15,6 +15,7 @@ import {
 import { RadiacodeMeasurement } from './types';
 
 const DOSE_RATE_TO_USVH = 10000;
+const DOSE_SV_TO_USV = 1e6;
 
 interface InFlight {
   cmd: number;
@@ -169,9 +170,18 @@ function extractLatestMeasurement(
   const records = decodeDataBufRecords(payload);
   const rt = records.filter((r) => r.type === 'realtime').at(-1);
   if (!rt || rt.type !== 'realtime') return null;
+
+  const rare = records.filter((r) => r.type === 'rare').at(-1);
+  const rareValid = rare && rare.type === 'rare' ? rare : null;
+
   return {
     cps: rt.countRate,
     dosisleistung: rt.doseRate * DOSE_RATE_TO_USVH,
     timestamp: Date.now(),
+    ...(rareValid && {
+      dose: rareValid.dose * DOSE_SV_TO_USV,
+      temperatureC: rareValid.temperatureC,
+      chargePct: rareValid.chargePct,
+    }),
   };
 }
