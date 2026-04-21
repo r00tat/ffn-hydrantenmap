@@ -56,3 +56,14 @@ export interface RadiacodeSettings {
   countRateCpm: boolean;
   doseRateNSvh: boolean;
 }
+
+/**
+ * Result of reading the device settings. Firmwares may reject individual
+ * VSFRs (e.g. RC-103 has no LEDs → `LEDS_ON` fails); those fields are absent
+ * from `settings` and their VSFR IDs appear in `unsupportedVsfrs`.
+ */
+export interface RadiacodeSettingsReadResult {
+  settings: Partial<RadiacodeSettings>;
+  /** Keys from RadiacodeSettings that the firmware rejected. */
+  unsupportedFields: Array<keyof RadiacodeSettings>;
+}

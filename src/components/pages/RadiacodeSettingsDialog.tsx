@@ -15,16 +15,33 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState } from 'react';
-import { RadiacodeSettings } from '../../hooks/radiacode/types';
+import {
+  RadiacodeSettings,
+  RadiacodeSettingsReadResult,
+} from '../../hooks/radiacode/types';
 
 export interface RadiacodeSettingsDialogProps {
   open: boolean;
   onClose: () => void;
-  readSettings: () => Promise<RadiacodeSettings>;
+  readSettings: () => Promise<RadiacodeSettingsReadResult>;
   writeSettings: (patch: Partial<RadiacodeSettings>) => Promise<void>;
   playSignal: () => Promise<void>;
   doseReset: () => Promise<void>;
 }
+
+const FIELD_LABELS: Record<keyof RadiacodeSettings, string> = {
+  doseRateAlarm1uRh: 'Dosisleistung-Alarm Stufe 1',
+  doseRateAlarm2uRh: 'Dosisleistung-Alarm Stufe 2',
+  doseAlarm1uR: 'Dosis-Alarm Stufe 1',
+  doseAlarm2uR: 'Dosis-Alarm Stufe 2',
+  soundOn: 'Sound',
+  soundVolume: 'Lautstärke',
+  vibroOn: 'Vibration',
+  ledsOn: 'LEDs',
+  doseUnitsSv: 'Dosis-Einheit (Sv/R)',
+  countRateCpm: 'Zählraten-Einheit (cpm/cps)',
+  doseRateNSvh: 'Dosisleistungs-Einheit (nSv/µSv)',
+};
 
 function uRh_to_uSvh(uRh: number): number {
   return uRh / 100;
@@ -40,8 +57,8 @@ function uSv_to_uR(uSv: number): number {
 }
 
 function diff(
-  initial: RadiacodeSettings,
-  current: RadiacodeSettings,
+  initial: Partial<RadiacodeSettings>,
+  current: Partial<RadiacodeSettings>,
 ): Partial<RadiacodeSettings> {
   const out: Partial<RadiacodeSettings> = {};
   for (const k of Object.keys(current) as (keyof RadiacodeSettings)[]) {
@@ -63,8 +80,15 @@ export default function RadiacodeSettingsDialog({
 }: RadiacodeSettingsDialogProps) {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [initial, setInitial] = useState<RadiacodeSettings | null>(null);
-  const [current, setCurrent] = useState<RadiacodeSettings | null>(null);
+  const [initial, setInitial] = useState<Partial<RadiacodeSettings> | null>(
+    null,
+  );
+  const [current, setCurrent] = useState<Partial<RadiacodeSettings> | null>(
+    null,
+  );
+  const [unsupportedFields, setUnsupportedFields] = useState<
+    Array<keyof RadiacodeSettings>
+  >([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -76,11 +100,13 @@ export default function RadiacodeSettingsDialog({
     setSaveError(null);
     setInitial(null);
     setCurrent(null);
+    setUnsupportedFields([]);
     readSettings()
-      .then((s) => {
+      .then((r) => {
         if (cancelled) return;
-        setInitial(s);
-        setCurrent(s);
+        setInitial(r.settings);
+        setCurrent(r.settings);
+        setUnsupportedFields(r.unsupportedFields);
       })
       .catch((e: Error) => {
         if (cancelled) return;
@@ -136,138 +162,182 @@ export default function RadiacodeSettingsDialog({
         )}
         {canEdit && current && (
           <Stack spacing={3} sx={{ mt: 1 }}>
-            <Section title="Alarm-Schwellen">
-              <TextField
-                label="Dosisleistung Stufe 1 (µSv/h)"
-                type="number"
-                value={uRh_to_uSvh(current.doseRateAlarm1uRh)}
-                onChange={(e) =>
-                  setCurrent({
-                    ...current,
-                    doseRateAlarm1uRh: uSvh_to_uRh(Number(e.target.value)),
-                  })
-                }
-              />
-              <TextField
-                label="Dosisleistung Stufe 2 (µSv/h)"
-                type="number"
-                value={uRh_to_uSvh(current.doseRateAlarm2uRh)}
-                onChange={(e) =>
-                  setCurrent({
-                    ...current,
-                    doseRateAlarm2uRh: uSvh_to_uRh(Number(e.target.value)),
-                  })
-                }
-              />
-              <TextField
-                label="Gesamtdosis Stufe 1 (µSv)"
-                type="number"
-                value={uR_to_uSv(current.doseAlarm1uR)}
-                onChange={(e) =>
-                  setCurrent({
-                    ...current,
-                    doseAlarm1uR: uSv_to_uR(Number(e.target.value)),
-                  })
-                }
-              />
-              <TextField
-                label="Gesamtdosis Stufe 2 (µSv)"
-                type="number"
-                value={uR_to_uSv(current.doseAlarm2uR)}
-                onChange={(e) =>
-                  setCurrent({
-                    ...current,
-                    doseAlarm2uR: uSv_to_uR(Number(e.target.value)),
-                  })
-                }
-              />
-            </Section>
-            <Section title="Signalisierung">
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.soundOn}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, soundOn: v })
+            {(current.doseRateAlarm1uRh !== undefined ||
+              current.doseRateAlarm2uRh !== undefined ||
+              current.doseAlarm1uR !== undefined ||
+              current.doseAlarm2uR !== undefined) && (
+              <Section title="Alarm-Schwellen">
+                {current.doseRateAlarm1uRh !== undefined && (
+                  <TextField
+                    label="Dosisleistung Stufe 1 (µSv/h)"
+                    type="number"
+                    value={uRh_to_uSvh(current.doseRateAlarm1uRh)}
+                    onChange={(e) =>
+                      setCurrent({
+                        ...current,
+                        doseRateAlarm1uRh: uSvh_to_uRh(Number(e.target.value)),
+                      })
                     }
                   />
-                }
-                label="Sound"
-              />
-              <Box sx={{ px: 2, mb: 1 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Lautstärke: {current.soundVolume}
-                </Typography>
-                <Slider
-                  value={current.soundVolume}
-                  min={0}
-                  max={9}
-                  step={1}
-                  marks
-                  disabled={!current.soundOn}
-                  onChange={(_, v) =>
-                    setCurrent({ ...current, soundVolume: v as number })
-                  }
-                />
-              </Box>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.vibroOn}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, vibroOn: v })
+                )}
+                {current.doseRateAlarm2uRh !== undefined && (
+                  <TextField
+                    label="Dosisleistung Stufe 2 (µSv/h)"
+                    type="number"
+                    value={uRh_to_uSvh(current.doseRateAlarm2uRh)}
+                    onChange={(e) =>
+                      setCurrent({
+                        ...current,
+                        doseRateAlarm2uRh: uSvh_to_uRh(Number(e.target.value)),
+                      })
                     }
                   />
-                }
-                label="Vibration"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.ledsOn}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, ledsOn: v })
+                )}
+                {current.doseAlarm1uR !== undefined && (
+                  <TextField
+                    label="Gesamtdosis Stufe 1 (µSv)"
+                    type="number"
+                    value={uR_to_uSv(current.doseAlarm1uR)}
+                    onChange={(e) =>
+                      setCurrent({
+                        ...current,
+                        doseAlarm1uR: uSv_to_uR(Number(e.target.value)),
+                      })
                     }
                   />
-                }
-                label="LEDs"
-              />
-            </Section>
-            <Section title="Einheiten">
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.doseUnitsSv}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, doseUnitsSv: v })
+                )}
+                {current.doseAlarm2uR !== undefined && (
+                  <TextField
+                    label="Gesamtdosis Stufe 2 (µSv)"
+                    type="number"
+                    value={uR_to_uSv(current.doseAlarm2uR)}
+                    onChange={(e) =>
+                      setCurrent({
+                        ...current,
+                        doseAlarm2uR: uSv_to_uR(Number(e.target.value)),
+                      })
                     }
                   />
-                }
-                label="Dosis in Sv (statt R)"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.countRateCpm}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, countRateCpm: v })
+                )}
+              </Section>
+            )}
+            {(current.soundOn !== undefined ||
+              current.soundVolume !== undefined ||
+              current.vibroOn !== undefined ||
+              current.ledsOn !== undefined) && (
+              <Section title="Signalisierung">
+                {current.soundOn !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.soundOn}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, soundOn: v })
+                        }
+                      />
                     }
+                    label="Sound"
                   />
-                }
-                label="Zählrate in cpm (statt cps)"
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={current.doseRateNSvh}
-                    onChange={(_, v) =>
-                      setCurrent({ ...current, doseRateNSvh: v })
+                )}
+                {current.soundVolume !== undefined && (
+                  <Box sx={{ px: 2, mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Lautstärke: {current.soundVolume}
+                    </Typography>
+                    <Slider
+                      value={current.soundVolume}
+                      min={0}
+                      max={9}
+                      step={1}
+                      marks
+                      disabled={current.soundOn === false}
+                      onChange={(_, v) =>
+                        setCurrent({ ...current, soundVolume: v as number })
+                      }
+                    />
+                  </Box>
+                )}
+                {current.vibroOn !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.vibroOn}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, vibroOn: v })
+                        }
+                      />
                     }
+                    label="Vibration"
                   />
-                }
-                label="Dosisleistung in nSv/h (statt µSv/h)"
-              />
-            </Section>
+                )}
+                {current.ledsOn !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.ledsOn}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, ledsOn: v })
+                        }
+                      />
+                    }
+                    label="LEDs"
+                  />
+                )}
+              </Section>
+            )}
+            {(current.doseUnitsSv !== undefined ||
+              current.countRateCpm !== undefined ||
+              current.doseRateNSvh !== undefined) && (
+              <Section title="Einheiten">
+                {current.doseUnitsSv !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.doseUnitsSv}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, doseUnitsSv: v })
+                        }
+                      />
+                    }
+                    label="Dosis in Sv (statt R)"
+                  />
+                )}
+                {current.countRateCpm !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.countRateCpm}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, countRateCpm: v })
+                        }
+                      />
+                    }
+                    label="Zählrate in cpm (statt cps)"
+                  />
+                )}
+                {current.doseRateNSvh !== undefined && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={current.doseRateNSvh}
+                        onChange={(_, v) =>
+                          setCurrent({ ...current, doseRateNSvh: v })
+                        }
+                      />
+                    }
+                    label="Dosisleistung in nSv/h (statt µSv/h)"
+                  />
+                )}
+              </Section>
+            )}
+            {unsupportedFields.length > 0 && (
+              <Alert severity="info">
+                Dein Radiacode unterstützt{' '}
+                {unsupportedFields.length === 1 ? 'diese Einstellung' : 'diese Einstellungen'}
+                {' '}nicht:{' '}
+                {unsupportedFields.map((k) => FIELD_LABELS[k]).join(', ')}.
+              </Alert>
+            )}
           </Stack>
         )}
         <Section title="Aktionen">

@@ -28,6 +28,7 @@ import {
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
   RadiacodeSettings,
+  RadiacodeSettingsReadResult,
 } from '../../hooks/radiacode/types';
 import {
   RadiacodeStatus,
@@ -84,7 +85,7 @@ export interface RadiacodeContextValue {
   cpsHistory: CpsSample[];
   resetLiveSpectrum: () => Promise<void>;
   saveLiveSpectrum: (meta: SaveLiveSpectrumMeta) => Promise<string | null>;
-  readSettings: () => Promise<RadiacodeSettings>;
+  readSettings: () => Promise<RadiacodeSettingsReadResult>;
   writeSettings: (patch: Partial<RadiacodeSettings>) => Promise<void>;
   playSignal: () => Promise<void>;
   doseReset: () => Promise<void>;

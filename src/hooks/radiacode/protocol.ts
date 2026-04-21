@@ -210,19 +210,19 @@ export function encodeVsfrBatchRead(ids: readonly number[]): Uint8Array {
 }
 
 /**
- * Decode a `RD_VIRT_SFR_BATCH` response: `<I validity_mask><n*I values>`.
- * Returns one u32 per requested VSFR. Logical u8/bool callers take the low
- * byte / compare against 0. Throws if any bit in the mask is unset — partial
- * results are not supported (bitmask would ambiguously map to IDs).
+ * Decode a `RD_VIRT_SFR_BATCH` response: `<I validity_mask><k*I values>`,
+ * where `k = popcount(validity_mask)` — the firmware only sends values for
+ * successfully read VSFRs. The returned array has length `count` with `null`
+ * at positions of VSFRs the firmware rejected (invalid/unsupported id).
+ * Callers decide whether to fail loudly or substitute a default.
  */
 export function decodeVsfrBatchRead(
   payload: Uint8Array,
   count: number,
-): number[] {
-  const expectedLen = 4 + count * 4;
-  if (payload.length < expectedLen) {
+): (number | null)[] {
+  if (payload.length < 4) {
     throw new Error(
-      `VSFR batch response too short: ${payload.length} B (need ${expectedLen} for ${count} values)`,
+      `VSFR batch response too short: ${payload.length} B (need at least 4 for validity mask)`,
     );
   }
   const view = new DataView(
@@ -231,17 +231,25 @@ export function decodeVsfrBatchRead(
     payload.byteLength,
   );
   const mask = view.getUint32(0, true);
-  const expectedMask = count === 32 ? 0xffffffff : (1 << count) - 1;
-  if (mask !== expectedMask) {
+  let nValid = 0;
+  for (let i = 0; i < count; i++) {
+    if ((mask >>> i) & 1) nValid++;
+  }
+  const expectedLen = 4 + nValid * 4;
+  if (payload.length < expectedLen) {
     throw new Error(
-      `VSFR batch validity mask mismatch: got 0b${mask.toString(2)}, expected 0b${expectedMask.toString(2)}`,
+      `VSFR batch response too short: ${payload.length} B (need ${expectedLen} for ${nValid} valid values, mask=0b${mask.toString(2)})`,
     );
   }
-  const values: number[] = [];
+  const result: (number | null)[] = new Array(count).fill(null);
+  let valueIdx = 0;
   for (let i = 0; i < count; i++) {
-    values.push(view.getUint32(4 + i * 4, true));
+    if ((mask >>> i) & 1) {
+      result[i] = view.getUint32(4 + valueIdx * 4, true);
+      valueIdx++;
+    }
   }
-  return values;
+  return result;
 }
 
 export function buildRequest(

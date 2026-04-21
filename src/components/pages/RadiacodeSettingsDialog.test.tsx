@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { RadiacodeSettings } from '../../hooks/radiacode/types';
+import {
+  RadiacodeSettings,
+  RadiacodeSettingsReadResult,
+} from '../../hooks/radiacode/types';
 import RadiacodeSettingsDialog from './RadiacodeSettingsDialog';
 
 function makeSettings(partial: Partial<RadiacodeSettings> = {}): RadiacodeSettings {
@@ -21,9 +24,19 @@ function makeSettings(partial: Partial<RadiacodeSettings> = {}): RadiacodeSettin
   };
 }
 
+function makeResult(
+  overrides: Partial<RadiacodeSettingsReadResult> = {},
+): RadiacodeSettingsReadResult {
+  return {
+    settings: makeSettings(),
+    unsupportedFields: [],
+    ...overrides,
+  };
+}
+
 describe('RadiacodeSettingsDialog', () => {
   it('loads settings from the device when opened', async () => {
-    const readSettings = vi.fn(async () => makeSettings());
+    const readSettings = vi.fn(async () => makeResult());
     render(
       <RadiacodeSettingsDialog
         open
@@ -59,7 +72,7 @@ describe('RadiacodeSettingsDialog', () => {
 
   it('Speichern ruft writeSettings nur mit geaenderten Feldern', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
-    const readSettings = vi.fn(async () => makeSettings());
+    const readSettings = vi.fn(async () => makeResult());
     const writeSettings = vi.fn(async () => {});
     const onClose = vi.fn();
     render(
@@ -89,7 +102,7 @@ describe('RadiacodeSettingsDialog', () => {
       <RadiacodeSettingsDialog
         open
         onClose={onClose}
-        readSettings={vi.fn(async () => makeSettings())}
+        readSettings={vi.fn(async () => makeResult())}
         writeSettings={writeSettings}
         playSignal={vi.fn(async () => {})}
         doseReset={vi.fn(async () => {})}
@@ -110,7 +123,7 @@ describe('RadiacodeSettingsDialog', () => {
       <RadiacodeSettingsDialog
         open
         onClose={vi.fn()}
-        readSettings={vi.fn(async () => makeSettings())}
+        readSettings={vi.fn(async () => makeResult())}
         writeSettings={vi.fn(async () => {})}
         playSignal={vi.fn(async () => {})}
         doseReset={vi.fn(async () => {})}
@@ -131,7 +144,7 @@ describe('RadiacodeSettingsDialog', () => {
       <RadiacodeSettingsDialog
         open
         onClose={vi.fn()}
-        readSettings={vi.fn(async () => makeSettings())}
+        readSettings={vi.fn(async () => makeResult())}
         writeSettings={vi.fn(async () => {})}
         playSignal={playSignal}
         doseReset={vi.fn(async () => {})}
@@ -148,7 +161,7 @@ describe('RadiacodeSettingsDialog', () => {
       <RadiacodeSettingsDialog
         open
         onClose={vi.fn()}
-        readSettings={vi.fn(async () => makeSettings())}
+        readSettings={vi.fn(async () => makeResult())}
         writeSettings={vi.fn(async () => {})}
         playSignal={vi.fn(async () => {})}
         doseReset={doseReset}
@@ -170,7 +183,7 @@ describe('RadiacodeSettingsDialog', () => {
       <RadiacodeSettingsDialog
         open
         onClose={vi.fn()}
-        readSettings={vi.fn(async () => makeSettings())}
+        readSettings={vi.fn(async () => makeResult())}
         writeSettings={vi.fn(async () => {})}
         playSignal={vi.fn(async () => {})}
         doseReset={doseReset}
@@ -181,5 +194,36 @@ describe('RadiacodeSettingsDialog', () => {
     );
     await user.click(screen.getByRole('button', { name: /nein/i }));
     expect(doseReset).not.toHaveBeenCalled();
+  });
+
+  it('blendet nicht unterstützte Felder aus und zeigt einen Info-Hinweis', async () => {
+    const { ledsOn: _ledsOn, ...rest } = makeSettings();
+    void _ledsOn;
+    const readSettings = vi.fn(
+      async (): Promise<RadiacodeSettingsReadResult> => ({
+        settings: rest,
+        unsupportedFields: ['ledsOn'],
+      }),
+    );
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={vi.fn()}
+        readSettings={readSettings}
+        writeSettings={vi.fn(async () => {})}
+        playSignal={vi.fn(async () => {})}
+        doseReset={vi.fn(async () => {})}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('switch', { name: /vibration/i }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole('switch', { name: /^leds$/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/unterstützt/i)).toBeInTheDocument();
+    expect(screen.getByText(/LEDs/)).toBeInTheDocument();
   });
 });

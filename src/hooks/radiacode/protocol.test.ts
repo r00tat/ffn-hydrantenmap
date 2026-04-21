@@ -468,15 +468,19 @@ describe('VSFR batch codec', () => {
     expect(decodeVsfrBatchRead(payload, 3)).toEqual([42, 0, 7]);
   });
 
-  it('decodeVsfrBatchRead throws with the bitmask when not all VSFRs are valid', () => {
-    // n=3, mask=0b101 (middle VSFR failed)
-    const payload = new Uint8Array(4 + 3 * 4);
-    new DataView(payload.buffer).setUint32(0, 0b101, true);
-    expect(() => decodeVsfrBatchRead(payload, 3)).toThrow(/validity|101/i);
+  it('decodeVsfrBatchRead returns null at positions of VSFRs whose mask bit is 0', () => {
+    // n=3, mask=0b101 (middle VSFR failed). Firmware only sends 2 values,
+    // positionally for bits 0 and 2.
+    const payload = new Uint8Array(4 + 2 * 4);
+    const v = new DataView(payload.buffer);
+    v.setUint32(0, 0b101, true);
+    v.setUint32(4, 11, true);
+    v.setUint32(8, 99, true);
+    expect(decodeVsfrBatchRead(payload, 3)).toEqual([11, null, 99]);
   });
 
-  it('decodeVsfrBatchRead throws when the payload is too short for n values', () => {
-    // n=3 requested but only 2 values present
+  it('decodeVsfrBatchRead throws when payload is too short for the set of valid bits', () => {
+    // n=3 requested, mask=0b111 claims 3 valid, but only 2 values present.
     const payload = new Uint8Array(4 + 2 * 4);
     new DataView(payload.buffer).setUint32(0, 0b111, true);
     expect(() => decodeVsfrBatchRead(payload, 3)).toThrow(/too short/i);

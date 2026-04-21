@@ -30,7 +30,28 @@ import {
   RadiacodeDeviceInfo,
   RadiacodeMeasurement,
   RadiacodeSettings,
+  RadiacodeSettingsReadResult,
 } from './types';
+
+type SettingsVsfrEntry = [
+  id: number,
+  key: keyof RadiacodeSettings,
+  type: 'u32' | 'u8' | 'bool',
+];
+
+const SETTINGS_VSFRS: readonly SettingsVsfrEntry[] = [
+  [VSFR.DR_LEV1_uR_h, 'doseRateAlarm1uRh', 'u32'],
+  [VSFR.DR_LEV2_uR_h, 'doseRateAlarm2uRh', 'u32'],
+  [VSFR.DS_LEV1_uR, 'doseAlarm1uR', 'u32'],
+  [VSFR.DS_LEV2_uR, 'doseAlarm2uR', 'u32'],
+  [VSFR.SOUND_ON, 'soundOn', 'bool'],
+  [VSFR.SOUND_VOL, 'soundVolume', 'u8'],
+  [VSFR.VIBRO_ON, 'vibroOn', 'bool'],
+  [VSFR.LEDS_ON, 'ledsOn', 'bool'],
+  [VSFR.DS_UNITS, 'doseUnitsSv', 'bool'],
+  [VSFR.CR_UNITS, 'countRateCpm', 'bool'],
+  [VSFR.USE_nSv_h, 'doseRateNSvh', 'bool'],
+];
 
 const DOSE_RATE_TO_USVH = 10000;
 // RareData.dose kommt als Rohwert in mSv; für die App-Anzeige in µSv mit 1e3 skalieren.
@@ -234,9 +255,10 @@ export class RadiacodeClient {
    * Batch-read multiple VSFRs in one call (`RD_VIRT_SFR_BATCH` / 0x082A).
    * Required for u8/bool registers on firmwares that reject `RD_VIRT_SFR` for
    * non-u32 types — matches the official Radiacode app. Values are returned as
-   * u32; callers mask the low byte / compare against 0 for u8/bool.
+   * u32 (callers mask low byte / compare !=0 for u8/bool). `null` entries
+   * indicate VSFRs that the firmware rejected (invalid/unsupported id).
    */
-  async readSfrBatch(ids: readonly number[]): Promise<number[]> {
+  async readSfrBatch(ids: readonly number[]): Promise<(number | null)[]> {
     const rsp = await this.execute(
       COMMAND.RD_VIRT_SFR_BATCH,
       encodeVsfrBatchRead(ids),
@@ -244,46 +266,27 @@ export class RadiacodeClient {
     return decodeVsfrBatchRead(rsp.data, ids.length);
   }
 
-  async readSettings(): Promise<RadiacodeSettings> {
-    const ids = [
-      VSFR.DR_LEV1_uR_h,
-      VSFR.DR_LEV2_uR_h,
-      VSFR.DS_LEV1_uR,
-      VSFR.DS_LEV2_uR,
-      VSFR.SOUND_ON,
-      VSFR.SOUND_VOL,
-      VSFR.VIBRO_ON,
-      VSFR.LEDS_ON,
-      VSFR.DS_UNITS,
-      VSFR.CR_UNITS,
-      VSFR.USE_nSv_h,
-    ];
-    const [
-      dr1,
-      dr2,
-      ds1,
-      ds2,
-      soundOn,
-      soundVol,
-      vibroOn,
-      ledsOn,
-      dsUnits,
-      crUnits,
-      useNSvH,
-    ] = await this.readSfrBatch(ids);
-    return {
-      doseRateAlarm1uRh: dr1,
-      doseRateAlarm2uRh: dr2,
-      doseAlarm1uR: ds1,
-      doseAlarm2uR: ds2,
-      soundOn: soundOn !== 0,
-      soundVolume: soundVol & 0xff,
-      vibroOn: vibroOn !== 0,
-      ledsOn: ledsOn !== 0,
-      doseUnitsSv: dsUnits !== 0,
-      countRateCpm: crUnits !== 0,
-      doseRateNSvh: useNSvH !== 0,
-    };
+  async readSettings(): Promise<RadiacodeSettingsReadResult> {
+    const ids = SETTINGS_VSFRS.map(([id]) => id);
+    const values = await this.readSfrBatch(ids);
+    const settings: Partial<RadiacodeSettings> = {};
+    const unsupportedFields: Array<keyof RadiacodeSettings> = [];
+    for (let i = 0; i < SETTINGS_VSFRS.length; i++) {
+      const [, key, type] = SETTINGS_VSFRS[i];
+      const raw = values[i];
+      if (raw === null) {
+        unsupportedFields.push(key);
+        continue;
+      }
+      if (type === 'u32') {
+        (settings as Record<string, unknown>)[key] = raw;
+      } else if (type === 'u8') {
+        (settings as Record<string, unknown>)[key] = raw & 0xff;
+      } else {
+        (settings as Record<string, unknown>)[key] = raw !== 0;
+      }
+    }
+    return { settings, unsupportedFields };
   }
 
   async writeSettings(patch: Partial<RadiacodeSettings>): Promise<void> {

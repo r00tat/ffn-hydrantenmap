@@ -1286,19 +1286,22 @@ describe('RadiacodeClient', () => {
 
     const client = new RadiacodeClient(adapter, 'dev');
     await client.connect();
-    const settings = await client.readSettings();
-    expect(settings).toEqual({
-      doseRateAlarm1uRh: 100_000,
-      doseRateAlarm2uRh: 200_000,
-      doseAlarm1uR: 10_000_000,
-      doseAlarm2uR: 20_000_000,
-      soundOn: true,
-      soundVolume: 5,
-      vibroOn: false,
-      ledsOn: true,
-      doseUnitsSv: true,
-      countRateCpm: false,
-      doseRateNSvh: false,
+    const result = await client.readSettings();
+    expect(result).toEqual({
+      settings: {
+        doseRateAlarm1uRh: 100_000,
+        doseRateAlarm2uRh: 200_000,
+        doseAlarm1uR: 10_000_000,
+        doseAlarm2uR: 20_000_000,
+        soundOn: true,
+        soundVolume: 5,
+        vibroOn: false,
+        ledsOn: true,
+        doseUnitsSv: true,
+        countRateCpm: false,
+        doseRateNSvh: false,
+      },
+      unsupportedFields: [],
     });
     expect(batchRequestedIds).toEqual(expectedOrder);
     await client.disconnect();
