@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
 import { RadiacodeClient } from './client';
-import { COMMAND, VSFR } from './protocol';
+import { COMMAND, SpectrumSnapshot, VS, VSFR } from './protocol';
 
 function fromHex(s: string): Uint8Array {
   const clean = s.replace(/\s+/g, '');
@@ -578,5 +578,173 @@ describe('RadiacodeClient', () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(adapter.writes.length).toBe(writesBefore);
     expect(adapter.disconnect).toHaveBeenCalledWith('dev');
+  });
+
+  it('startSpectrumPolling invokes callback at the configured interval', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        // args start at offset 8 (after 4-byte length + 4-byte header)
+        const vsId = view.getUint32(8, true);
+        if (vsId === VS.SPECTRUM) {
+          return buildResponseChunks(
+            COMMAND.RD_VIRT_STRING,
+            seq,
+            fixtureBytes,
+          );
+        }
+        // Fallback for DATA_BUF or other VS ids: minimal body with retcode+flen=0.
+        const empty = new Uint8Array(8);
+        return buildResponseChunks(COMMAND.RD_VIRT_STRING, seq, empty);
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const received: SpectrumSnapshot[] = [];
+    client.startSpectrumPolling((s) => received.push(s), 2000);
+
+    // Before the first interval elapses, no callback should have fired.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(received.length).toBe(0);
+
+    // Advance to the first tick → readSpectrum resolves, callback fires.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(received.length).toBe(1);
+    expect(received[0].counts.length).toBe(1024);
+
+    // Advance to the next tick → second callback.
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(received.length).toBe(2);
+
+    client.stopSpectrumPolling();
+    await client.disconnect();
+  });
+
+  it('stopSpectrumPolling prevents further callbacks', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        return buildResponseChunks(
+          COMMAND.RD_VIRT_STRING,
+          seq,
+          fixtureBytes,
+        );
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const received: SpectrumSnapshot[] = [];
+    client.startSpectrumPolling((s) => received.push(s), 1000);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(received.length).toBe(1);
+
+    client.stopSpectrumPolling();
+    const afterStop = received.length;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(received.length).toBe(afterStop);
+
+    await client.disconnect();
+  });
+
+  it('disconnect stops spectrum polling', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        return buildResponseChunks(
+          COMMAND.RD_VIRT_STRING,
+          seq,
+          fixtureBytes,
+        );
+      }
+      return buildResponseChunks(cmd, seq, new Uint8Array(0));
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    const received: SpectrumSnapshot[] = [];
+    client.startSpectrumPolling((s) => received.push(s), 1000);
+
+    await client.disconnect();
+    const writesBefore = adapter.writes.length;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(adapter.writes.length).toBe(writesBefore);
   });
 });

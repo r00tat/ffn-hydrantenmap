@@ -68,6 +68,8 @@ export class RadiacodeClient {
   private unsubscribe: Unsubscribe | null = null;
   private polling = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private spectrumPolling = false;
+  private spectrumTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly adapter: BleAdapter,
@@ -128,12 +130,43 @@ export class RadiacodeClient {
     return decodeSpectrumResponse(rsp.data);
   }
 
+  startSpectrumPolling(
+    onSnapshot: (s: SpectrumSnapshot) => void,
+    intervalMs = 2000,
+    onError?: (e: Error) => void,
+  ): void {
+    if (this.spectrumPolling) return;
+    this.spectrumPolling = true;
+    const tick = async () => {
+      if (!this.spectrumPolling) return;
+      try {
+        const snap = await this.readSpectrum();
+        onSnapshot(snap);
+      } catch (e) {
+        onError?.(e instanceof Error ? e : new Error(String(e)));
+      }
+      if (this.spectrumPolling) {
+        this.spectrumTimer = setTimeout(tick, intervalMs);
+      }
+    };
+    this.spectrumTimer = setTimeout(tick, intervalMs);
+  }
+
+  stopSpectrumPolling(): void {
+    this.spectrumPolling = false;
+    if (this.spectrumTimer) {
+      clearTimeout(this.spectrumTimer);
+      this.spectrumTimer = null;
+    }
+  }
+
   async disconnect(): Promise<void> {
     this.polling = false;
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
+    this.stopSpectrumPolling();
     this.unsubscribe?.();
     this.unsubscribe = null;
     if (this.inFlight) {
