@@ -27,6 +27,7 @@ import {
   RadiacodeDeviceInfo,
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
+  RadiacodeSettings,
 } from '../../hooks/radiacode/types';
 import {
   RadiacodeStatus,
@@ -75,6 +76,10 @@ export interface RadiacodeContextValue {
   startSpectrumRecording: () => Promise<void>;
   stopSpectrumRecording: () => Promise<SpectrumSnapshot | null>;
   cancelSpectrumRecording: () => Promise<void>;
+  readSettings: () => Promise<RadiacodeSettings>;
+  writeSettings: (patch: Partial<RadiacodeSettings>) => Promise<void>;
+  playSignal: () => Promise<void>;
+  doseReset: () => Promise<void>;
 }
 
 const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
@@ -273,6 +278,33 @@ export function RadiacodeProvider({
     baselineRef.current = null;
   }, [stopSession]);
 
+  const readSettings = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) throw new Error('Kein Radiacode verbunden');
+    return client.readSettings();
+  }, [clientRef]);
+
+  const writeSettings = useCallback(
+    async (patch: Partial<RadiacodeSettings>) => {
+      const client = clientRef.current;
+      if (!client) throw new Error('Kein Radiacode verbunden');
+      await client.writeSettings(patch);
+    },
+    [clientRef],
+  );
+
+  const playSignal = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) throw new Error('Kein Radiacode verbunden');
+    await client.playSignal();
+  }, [clientRef]);
+
+  const doseReset = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client) throw new Error('Kein Radiacode verbunden');
+    await client.doseReset();
+  }, [clientRef]);
+
   // Clean up any active session subscription on unmount.
   useEffect(() => {
     return () => {
@@ -405,6 +437,10 @@ export function RadiacodeProvider({
       startSpectrumRecording,
       stopSpectrumRecording,
       cancelSpectrumRecording,
+      readSettings,
+      writeSettings,
+      playSignal,
+      doseReset,
     }),
     [
       status,
@@ -422,6 +458,10 @@ export function RadiacodeProvider({
       startSpectrumRecording,
       stopSpectrumRecording,
       cancelSpectrumRecording,
+      readSettings,
+      writeSettings,
+      playSignal,
+      doseReset,
     ],
   );
 

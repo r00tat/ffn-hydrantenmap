@@ -104,10 +104,87 @@ export const VSFR = {
   DEVICE_TIME: 0x0504,
   RAW_FILTER: 0x8006,
   SPEC_RESET: 0x0803,
+  // Signalisierung
+  SOUND_VOL: 0x0521,
+  SOUND_ON: 0x0522,
+  VIBRO_ON: 0x0531,
+  LEDS_ON: 0x0545,
+  PLAY_SIGNAL: 0x05e1,
+  // Alarm-Schwellen + Einheiten
+  DR_LEV1_uR_h: 0x8000,
+  DR_LEV2_uR_h: 0x8001,
+  DS_UNITS: 0x8004,
+  DOSE_RESET: 0x8007,
+  USE_nSv_h: 0x800c,
+  CR_UNITS: 0x8013,
+  DS_LEV1_uR: 0x8014,
+  DS_LEV2_uR: 0x8015,
 } as const;
 
 export const MAX_WRITE_CHUNK = 18;
 export const SEQ_MODULO = 32;
+
+export function encodeVsfrRead(id: number): Uint8Array {
+  const buf = new Uint8Array(4);
+  new DataView(buf.buffer).setUint32(0, id, true);
+  return buf;
+}
+
+export function encodeVsfrWriteU32(id: number, value: number): Uint8Array {
+  const buf = new Uint8Array(8);
+  const v = new DataView(buf.buffer);
+  v.setUint32(0, id, true);
+  v.setUint32(4, value, true);
+  return buf;
+}
+
+export function encodeVsfrWriteU8(id: number, value: number): Uint8Array {
+  const buf = new Uint8Array(5);
+  const v = new DataView(buf.buffer);
+  v.setUint32(0, id, true);
+  buf[4] = value & 0xff;
+  return buf;
+}
+
+export function encodeVsfrWriteBool(id: number, value: boolean): Uint8Array {
+  return encodeVsfrWriteU8(id, value ? 1 : 0);
+}
+
+function checkVsfrRetcode(payload: Uint8Array): DataView {
+  if (payload.length < 4) {
+    throw new Error('VSFR response too short: missing retcode');
+  }
+  const view = new DataView(
+    payload.buffer,
+    payload.byteOffset,
+    payload.byteLength,
+  );
+  const retcode = view.getUint32(0, true);
+  if (retcode !== 1) {
+    throw new Error(`VSFR retcode ${retcode} (expected 1)`);
+  }
+  return view;
+}
+
+export function decodeVsfrU32(payload: Uint8Array): number {
+  if (payload.length < 8) {
+    throw new Error(`VSFR U32 response too short: ${payload.length} B (need 8)`);
+  }
+  const view = checkVsfrRetcode(payload);
+  return view.getUint32(4, true);
+}
+
+export function decodeVsfrU8(payload: Uint8Array): number {
+  if (payload.length < 5) {
+    throw new Error(`VSFR U8 response too short: ${payload.length} B (need 5)`);
+  }
+  checkVsfrRetcode(payload);
+  return payload[4];
+}
+
+export function decodeVsfrBool(payload: Uint8Array): boolean {
+  return decodeVsfrU8(payload) !== 0;
+}
 
 export function buildRequest(
   cmd: number,

@@ -76,6 +76,22 @@ function fixture(
     startSpectrumRecording: vi.fn(async () => {}),
     stopSpectrumRecording: vi.fn(async () => null),
     cancelSpectrumRecording: vi.fn(async () => {}),
+    readSettings: vi.fn(async () => ({
+      doseRateAlarm1uRh: 0,
+      doseRateAlarm2uRh: 0,
+      doseAlarm1uR: 0,
+      doseAlarm2uR: 0,
+      soundOn: true,
+      soundVolume: 5,
+      vibroOn: true,
+      ledsOn: true,
+      doseUnitsSv: true,
+      countRateCpm: false,
+      doseRateNSvh: false,
+    })),
+    writeSettings: vi.fn(async () => {}),
+    playSignal: vi.fn(async () => {}),
+    doseReset: vi.fn(async () => {}),
     ...partial,
   };
 }

@@ -14,10 +14,21 @@ import {
   decodeSerial,
   decodeSpectrumResponse,
   decodeVersion,
+  decodeVsfrBool,
+  decodeVsfrU32,
+  decodeVsfrU8,
+  encodeVsfrRead,
+  encodeVsfrWriteBool,
+  encodeVsfrWriteU32,
+  encodeVsfrWriteU8,
   parseResponse,
   splitForWrite,
 } from './protocol';
-import { RadiacodeDeviceInfo, RadiacodeMeasurement } from './types';
+import {
+  RadiacodeDeviceInfo,
+  RadiacodeMeasurement,
+  RadiacodeSettings,
+} from './types';
 
 const DOSE_RATE_TO_USVH = 10000;
 const DOSE_SV_TO_USV = 1e6;
@@ -187,6 +198,82 @@ export class RadiacodeClient {
     v.setUint32(0, VSFR.SPEC_RESET, true);
     v.setUint32(4, 0, true);
     await this.execute(COMMAND.WR_VIRT_SFR, args);
+  }
+
+  async readSfrU32(id: number): Promise<number> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrU32(rsp.data);
+  }
+
+  async readSfrU8(id: number): Promise<number> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrU8(rsp.data);
+  }
+
+  async readSfrBool(id: number): Promise<boolean> {
+    const rsp = await this.execute(COMMAND.RD_VIRT_SFR, encodeVsfrRead(id));
+    return decodeVsfrBool(rsp.data);
+  }
+
+  async writeSfrU32(id: number, value: number): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteU32(id, value));
+  }
+
+  async writeSfrU8(id: number, value: number): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteU8(id, value));
+  }
+
+  async writeSfrBool(id: number, value: boolean): Promise<void> {
+    await this.execute(COMMAND.WR_VIRT_SFR, encodeVsfrWriteBool(id, value));
+  }
+
+  async readSettings(): Promise<RadiacodeSettings> {
+    return {
+      doseRateAlarm1uRh: await this.readSfrU32(VSFR.DR_LEV1_uR_h),
+      doseRateAlarm2uRh: await this.readSfrU32(VSFR.DR_LEV2_uR_h),
+      doseAlarm1uR: await this.readSfrU32(VSFR.DS_LEV1_uR),
+      doseAlarm2uR: await this.readSfrU32(VSFR.DS_LEV2_uR),
+      soundOn: await this.readSfrBool(VSFR.SOUND_ON),
+      soundVolume: await this.readSfrU8(VSFR.SOUND_VOL),
+      vibroOn: await this.readSfrBool(VSFR.VIBRO_ON),
+      ledsOn: await this.readSfrBool(VSFR.LEDS_ON),
+      doseUnitsSv: await this.readSfrBool(VSFR.DS_UNITS),
+      countRateCpm: await this.readSfrBool(VSFR.CR_UNITS),
+      doseRateNSvh: await this.readSfrBool(VSFR.USE_nSv_h),
+    };
+  }
+
+  async writeSettings(patch: Partial<RadiacodeSettings>): Promise<void> {
+    if (patch.doseRateAlarm1uRh !== undefined)
+      await this.writeSfrU32(VSFR.DR_LEV1_uR_h, patch.doseRateAlarm1uRh);
+    if (patch.doseRateAlarm2uRh !== undefined)
+      await this.writeSfrU32(VSFR.DR_LEV2_uR_h, patch.doseRateAlarm2uRh);
+    if (patch.doseAlarm1uR !== undefined)
+      await this.writeSfrU32(VSFR.DS_LEV1_uR, patch.doseAlarm1uR);
+    if (patch.doseAlarm2uR !== undefined)
+      await this.writeSfrU32(VSFR.DS_LEV2_uR, patch.doseAlarm2uR);
+    if (patch.soundOn !== undefined)
+      await this.writeSfrBool(VSFR.SOUND_ON, patch.soundOn);
+    if (patch.soundVolume !== undefined)
+      await this.writeSfrU8(VSFR.SOUND_VOL, patch.soundVolume);
+    if (patch.vibroOn !== undefined)
+      await this.writeSfrBool(VSFR.VIBRO_ON, patch.vibroOn);
+    if (patch.ledsOn !== undefined)
+      await this.writeSfrBool(VSFR.LEDS_ON, patch.ledsOn);
+    if (patch.doseUnitsSv !== undefined)
+      await this.writeSfrBool(VSFR.DS_UNITS, patch.doseUnitsSv);
+    if (patch.countRateCpm !== undefined)
+      await this.writeSfrBool(VSFR.CR_UNITS, patch.countRateCpm);
+    if (patch.doseRateNSvh !== undefined)
+      await this.writeSfrBool(VSFR.USE_nSv_h, patch.doseRateNSvh);
+  }
+
+  async playSignal(): Promise<void> {
+    await this.writeSfrU8(VSFR.PLAY_SIGNAL, 1);
+  }
+
+  async doseReset(): Promise<void> {
+    await this.writeSfrBool(VSFR.DOSE_RESET, true);
   }
 
   async readSpectrum(): Promise<SpectrumSnapshot> {

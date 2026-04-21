@@ -48,6 +48,22 @@ function fixture(
     startSpectrumRecording: vi.fn(async () => {}),
     stopSpectrumRecording: vi.fn(async () => null),
     cancelSpectrumRecording: vi.fn(async () => {}),
+    readSettings: vi.fn(async () => ({
+      doseRateAlarm1uRh: 0,
+      doseRateAlarm2uRh: 0,
+      doseAlarm1uR: 0,
+      doseAlarm2uR: 0,
+      soundOn: true,
+      soundVolume: 5,
+      vibroOn: true,
+      ledsOn: true,
+      doseUnitsSv: true,
+      countRateCpm: false,
+      doseRateNSvh: false,
+    })),
+    writeSettings: vi.fn(async () => {}),
+    playSignal: vi.fn(async () => {}),
+    doseReset: vi.fn(async () => {}),
     ...partial,
   };
 }
@@ -113,5 +129,30 @@ describe('Dosimetrie', () => {
     );
     render(<Dosimetrie />);
     expect(screen.getByText(/BLE denied/)).toBeInTheDocument();
+  });
+
+  it('Settings-Button ist disabled wenn nicht verbunden', () => {
+    mockedUseRadiacode.mockReturnValue(fixture());
+    render(<Dosimetrie />);
+    expect(
+      screen.getByRole('button', { name: /einstellungen/i }),
+    ).toBeDisabled();
+  });
+
+  it('Settings-Button ist enabled wenn verbunden und oeffnet Dialog', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'id', name: 'RC-103', serial: 'SN' },
+      }),
+    );
+    render(<Dosimetrie />);
+    const btn = screen.getByRole('button', { name: /einstellungen/i });
+    expect(btn).toBeEnabled();
+    await user.click(btn);
+    expect(
+      await screen.findByText(/geräte-einstellungen/i),
+    ).toBeInTheDocument();
   });
 });
