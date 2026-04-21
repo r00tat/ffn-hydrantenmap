@@ -8,6 +8,7 @@ import {
   VS,
   buildRequest,
   decodeDataBufRecords,
+  decodeSpectrumResponse,
   splitForWrite,
 } from './protocol';
 
@@ -231,6 +232,46 @@ describe('decodeDataBufRecords', () => {
       .at(-1);
     expect(rt).toBeDefined();
     expect(rt?.type).toBe('realtime');
+  });
+});
+
+describe('decodeSpectrumResponse', () => {
+  it('decodes the synthetic spectrum fixture', () => {
+    const raw = readFileSync(
+      join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+      'utf8',
+    ).trim();
+    const payload = new Uint8Array(Buffer.from(raw, 'hex'));
+    const snap = decodeSpectrumResponse(payload);
+
+    expect(snap.durationSec).toBe(60);
+    expect(snap.coefficients).toEqual([0, 2.5, 0]);
+    expect(snap.counts.length).toBe(1024);
+    expect(snap.counts.reduce((a, b) => a + b, 0)).toBeGreaterThan(1000);
+
+    let peak = 0;
+    for (let i = 1; i < snap.counts.length; i++) {
+      if (snap.counts[i] > snap.counts[peak]) peak = i;
+    }
+    expect(Math.abs(peak - 264)).toBeLessThanOrEqual(1);
+  });
+
+  it('throws on a payload that is too short', () => {
+    expect(() => decodeSpectrumResponse(new Uint8Array(10))).toThrow(
+      /spectrum payload/i,
+    );
+  });
+
+  it('throws when declared flen overflows the buffer', () => {
+    // 24 bytes = minimum (passes initial short-payload guard)
+    // retcode=1, flen=0xFFFFFFFF (way larger than buffer-8)
+    const payload = new Uint8Array(24);
+    const view = new DataView(payload.buffer);
+    view.setUint32(0, 1, true);
+    view.setUint32(4, 0xffffffff, true);
+    expect(() => decodeSpectrumResponse(payload)).toThrow(
+      /declared flen=.* but only .* B available/i,
+    );
   });
 });
 

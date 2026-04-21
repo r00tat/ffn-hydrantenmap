@@ -27,6 +27,7 @@ export const VS = {
 export const VSFR = {
   DEVICE_TIME: 0x0504,
   RAW_FILTER: 0x8006,
+  SPEC_RESET: 0x0803,
 } as const;
 
 export const MAX_WRITE_CHUNK = 18;
@@ -320,4 +321,54 @@ export function decodeDataBufRecords(data: Uint8Array): DataBufRecord[] {
     }
   }
   return records;
+}
+
+export interface SpectrumSnapshot {
+  durationSec: number;
+  coefficients: [number, number, number];
+  counts: number[];
+  timestamp: number;
+}
+
+/**
+ * Decodes a VS.SPECTRUM response payload. Layout:
+ *   <retcode:u32 LE> <flen:u32 LE>
+ *   <duration:u32 LE> <a0:f32 LE> <a1:f32 LE> <a2:f32 LE>
+ *   <counts: u32 LE * n>
+ */
+export function decodeSpectrumResponse(payload: Uint8Array): SpectrumSnapshot {
+  if (payload.length < 8 + 16) {
+    throw new Error(
+      `Spectrum payload too short: ${payload.length} B (need ≥ 24 for retcode+flen+header)`,
+    );
+  }
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const flen = view.getUint32(4, true);
+  if (8 + flen > payload.length) {
+    throw new Error(
+      `Spectrum payload too short: declared flen=${flen} but only ${payload.length - 8} B available`,
+    );
+  }
+  const inner = payload.subarray(8, 8 + flen);
+  if (inner.length < 16) {
+    throw new Error(
+      `Spectrum payload too short: inner ${inner.length} B (need ≥ 16 for duration+3×f32)`,
+    );
+  }
+  const innerView = new DataView(inner.buffer, inner.byteOffset, inner.byteLength);
+  const durationSec = innerView.getUint32(0, true);
+  const a0 = innerView.getFloat32(4, true);
+  const a1 = innerView.getFloat32(8, true);
+  const a2 = innerView.getFloat32(12, true);
+  const countCount = Math.floor((inner.length - 16) / 4);
+  const counts = new Array<number>(countCount);
+  for (let i = 0; i < countCount; i++) {
+    counts[i] = innerView.getUint32(16 + i * 4, true);
+  }
+  return {
+    durationSec,
+    coefficients: [a0, a1, a2],
+    counts,
+    timestamp: Date.now(),
+  };
 }
