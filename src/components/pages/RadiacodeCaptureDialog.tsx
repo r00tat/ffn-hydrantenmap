@@ -2,6 +2,7 @@
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -13,6 +14,7 @@ import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { useCallback, useState } from 'react';
+import type { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
 import { Spectrum } from '../firebase/firestore';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { runLiveIdentification } from '../../common/spectrumIdentification';
@@ -64,6 +66,46 @@ export default function RadiacodeCaptureDialog({ open, onClose }: Props) {
 
   const [logScale, setLogScale] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Hysterese: a candidate must be confirmed by two consecutive snapshots
+  // before the chip flips. Prevents flickering labels when a single noisy
+  // snapshot produces a spurious match. We react to each new snapshot by
+  // using the "adjusting state while rendering" pattern
+  // (https://react.dev/reference/react/useState#storing-information-from-previous-renders)
+  // — when the snapshot reference changes, we setState during render and
+  // React discards the render to re-run with the updated state.
+  const [displayedNuclide, setDisplayedNuclide] = useState<
+    { nuclide: string; confidence: number } | null
+  >(null);
+  const [lastCandidate, setLastCandidate] = useState<string | null>(null);
+  const [lastProcessedSpectrum, setLastProcessedSpectrum] =
+    useState<SpectrumSnapshot | null>(null);
+
+  if (spectrum && spectrum !== lastProcessedSpectrum) {
+    setLastProcessedSpectrum(spectrum);
+    const id = runLiveIdentification(spectrum.counts, spectrum.coefficients);
+    if (id.state !== 'match') {
+      if (lastCandidate !== null) setLastCandidate(null);
+      // intentional: we only *demote* the chip when the underlying source
+      // clearly drops below threshold; single misses keep the last stable label.
+      if (id.state === 'insufficient' && displayedNuclide !== null) {
+        setDisplayedNuclide(null);
+      }
+    } else {
+      if (lastCandidate === id.nuclide) {
+        if (
+          displayedNuclide?.nuclide !== id.nuclide ||
+          displayedNuclide.confidence !== id.confidence
+        ) {
+          setDisplayedNuclide({
+            nuclide: id.nuclide,
+            confidence: id.confidence,
+          });
+        }
+      }
+      if (lastCandidate !== id.nuclide) setLastCandidate(id.nuclide);
+    }
+  }
 
   const machineState: MachineState = (() => {
     if (saving) return 'saving';
@@ -182,8 +224,35 @@ export default function RadiacodeCaptureDialog({ open, onClose }: Props) {
       <DialogTitle>Radiacode Live-Aufnahme</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ position: 'relative' }}>
-          {/* Nuklid-Chip — placeholder for Task 11 */}
-          <Box sx={{ minHeight: 32 }} data-testid="nuclide-chip-slot" />
+          <Box sx={{ minHeight: 32 }} data-testid="nuclide-chip-slot">
+            {(() => {
+              if (!spectrum) return null;
+              const total = spectrum.counts.reduce((a, b) => a + b, 0);
+              if (total < 1000) {
+                return (
+                  <Chip
+                    color="default"
+                    label={`Sammle Daten… ${total} counts`}
+                  />
+                );
+              }
+              if (displayedNuclide) {
+                return (
+                  <Chip
+                    color={
+                      displayedNuclide.confidence >= 0.7
+                        ? 'success'
+                        : 'warning'
+                    }
+                    label={`${displayedNuclide.nuclide} · ${Math.round(
+                      displayedNuclide.confidence * 100,
+                    )} %`}
+                  />
+                );
+              }
+              return <Chip color="default" label="Kein Nuklid erkannt" />;
+            })()}
+          </Box>
 
           {spectrum ? (
             <Box sx={{ position: 'relative', minHeight: 300 }}>

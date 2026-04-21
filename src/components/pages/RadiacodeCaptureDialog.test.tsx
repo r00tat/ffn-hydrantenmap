@@ -26,6 +26,12 @@ vi.mock('../providers/SnackbarProvider', () => ({
   useSnackbar: () => mockShowSnackbar,
 }));
 
+const mockRunLiveIdentification = vi.fn();
+vi.mock('../../common/spectrumIdentification', () => ({
+  runLiveIdentification: (...args: unknown[]) =>
+    mockRunLiveIdentification(...args),
+}));
+
 // Mock MUI X LineChart — no canvas rendering in JSDOM.
 vi.mock('@mui/x-charts/LineChart', () => ({
   LineChart: ({ yAxis }: { yAxis?: { scaleType?: string }[] }) => (
@@ -76,6 +82,10 @@ function fixture(
 beforeEach(() => {
   mockAdd.mockClear();
   mockShowSnackbar.mockClear();
+  mockRunLiveIdentification.mockReset();
+  // Default: no identification so tests that don't care about the chip get
+  // a stable "none"-ish return. The hysterese tests override this.
+  mockRunLiveIdentification.mockReturnValue({ state: 'insufficient', total: 0 });
 });
 
 describe('RadiacodeCaptureDialog — Task 10', () => {
@@ -183,5 +193,181 @@ describe('RadiacodeCaptureDialog — Task 10', () => {
     );
     render(<RadiacodeCaptureDialog open onClose={() => {}} />);
     expect(screen.getByText(/verbinde erneut/i)).toBeInTheDocument();
+  });
+});
+
+describe('RadiacodeCaptureDialog — Task 11 (live-nuclide-chip)', () => {
+  it('shows "Sammle Daten" chip when total counts below threshold', () => {
+    const lowCountSpectrum = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 10 ? 5 : 0)),
+    });
+    mockRunLiveIdentification.mockReturnValue({
+      state: 'insufficient',
+      total: 50,
+    });
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: lowCountSpectrum,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 1,
+        },
+      }),
+    );
+    render(<RadiacodeCaptureDialog open onClose={() => {}} />);
+    expect(screen.getByText(/sammle daten/i)).toBeInTheDocument();
+  });
+
+  it('shows matched nuclide chip only after two consecutive confirming snapshots', async () => {
+    // Counts above threshold so the "Sammle Daten" branch doesn't short-circuit.
+    const highCountSpectrumA = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 100 ? 20 : 0)),
+      timestamp: 1_700_000_001_000,
+    });
+    const highCountSpectrumB = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 100 ? 21 : 0)),
+      timestamp: 1_700_000_002_000,
+    });
+    mockRunLiveIdentification.mockReturnValue({
+      state: 'match',
+      nuclide: 'Cs-137',
+      confidence: 0.85,
+      total: 2000,
+    });
+
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: highCountSpectrumA,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 1,
+        },
+      }),
+    );
+    const { rerender } = render(
+      <RadiacodeCaptureDialog open onClose={() => {}} />,
+    );
+
+    // After first snapshot, the chip should NOT yet show Cs-137 (hysterese).
+    expect(screen.queryByText(/Cs-137/)).not.toBeInTheDocument();
+    expect(screen.getByText(/kein nuklid erkannt/i)).toBeInTheDocument();
+
+    // Feed a second snapshot (new reference) confirming the same nuclide.
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: highCountSpectrumB,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 2,
+        },
+      }),
+    );
+    rerender(<RadiacodeCaptureDialog open onClose={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Cs-137/)).toBeInTheDocument(),
+    );
+  });
+
+  it('does not flip chip when different nuclide appears for only one snapshot', async () => {
+    const snapA = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 100 ? 20 : 0)),
+      timestamp: 1_700_000_001_000,
+    });
+    const snapB = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 100 ? 21 : 0)),
+      timestamp: 1_700_000_002_000,
+    });
+    const snapC = makeSnapshot({
+      counts: Array.from({ length: 1024 }, (_, i) => (i < 100 ? 22 : 0)),
+      timestamp: 1_700_000_003_000,
+    });
+
+    // snap A: Cs-137. snap B: Co-60 (different). snap C: Co-60 (same as B).
+    // Expected: after A → nothing (first sighting);
+    //           after B → nothing (Co-60 first sighting, different from A);
+    //           after C → Co-60 (two consecutive Co-60).
+    mockRunLiveIdentification
+      .mockReturnValueOnce({
+        state: 'match',
+        nuclide: 'Cs-137',
+        confidence: 0.8,
+        total: 2000,
+      })
+      .mockReturnValueOnce({
+        state: 'match',
+        nuclide: 'Co-60',
+        confidence: 0.8,
+        total: 2100,
+      })
+      .mockReturnValueOnce({
+        state: 'match',
+        nuclide: 'Co-60',
+        confidence: 0.8,
+        total: 2200,
+      });
+
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: snapA,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 1,
+        },
+      }),
+    );
+    const { rerender } = render(
+      <RadiacodeCaptureDialog open onClose={() => {}} />,
+    );
+    expect(screen.queryByText(/Cs-137/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Co-60/)).not.toBeInTheDocument();
+
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: snapB,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 2,
+        },
+      }),
+    );
+    rerender(<RadiacodeCaptureDialog open onClose={() => {}} />);
+
+    // After B: Co-60 seen only once, different from Cs-137 → no chip yet.
+    expect(screen.queryByText(/Cs-137/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Co-60/)).not.toBeInTheDocument();
+
+    // Third snapshot confirms Co-60.
+    mockedUseRadiacode.mockReturnValue(
+      fixture({
+        status: 'connected',
+        device: { id: 'x', name: 'RC-103', serial: 'SN1' },
+        spectrum: snapC,
+        spectrumSession: {
+          active: true,
+          startedAt: 1_700_000_000_000,
+          snapshotCount: 3,
+        },
+      }),
+    );
+    rerender(<RadiacodeCaptureDialog open onClose={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByText(/Co-60/)).toBeInTheDocument(),
+    );
   });
 });
