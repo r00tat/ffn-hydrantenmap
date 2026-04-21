@@ -22,6 +22,7 @@ import HeaderBar from '../site/HeaderBar';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import MapEditorProvider from './MapEditorProvider';
+import { RadiacodeProvider } from './RadiacodeProvider';
 import SnackbarProvider from './SnackbarProvider';
 
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
@@ -36,22 +37,24 @@ function LogedinApp({ children }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
     <FirecallProvider>
-      <DebugLoggingProvider>
-        <MapEditorProvider>
-          <FirecallLayerProvider>
-            <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+      <RadiacodeProvider>
+        <DebugLoggingProvider>
+          <MapEditorProvider>
+            <FirecallLayerProvider>
+              <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-            <HeaderBar
-              isDrawerOpen={isDrawerOpen}
-              setIsDrawerOpen={setIsDrawerOpen}
-            />
-            <ChatMessageDisplay />
-            <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              {children}
-            </Box>
-          </FirecallLayerProvider>
-        </MapEditorProvider>
-      </DebugLoggingProvider>
+              <HeaderBar
+                isDrawerOpen={isDrawerOpen}
+                setIsDrawerOpen={setIsDrawerOpen}
+              />
+              <ChatMessageDisplay />
+              <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                {children}
+              </Box>
+            </FirecallLayerProvider>
+          </MapEditorProvider>
+        </DebugLoggingProvider>
+      </RadiacodeProvider>
     </FirecallProvider>
   );
 }
