@@ -23,7 +23,6 @@ import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import SensorsIcon from '@mui/icons-material/Sensors';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -58,7 +57,6 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import RadiacodeCaptureDialog from './RadiacodeCaptureDialog';
 
 /** MUI default color palette for series */
 const SERIES_COLORS = [
@@ -153,7 +151,6 @@ interface EditDialogState {
 export default function EnergySpectrum() {
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [logScale, setLogScale] = useState(false);
-  const [captureOpen, setCaptureOpen] = useState(false);
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
   const [selectedNuclideNames, setSelectedNuclideNames] = useState<string[]>(
     [],
@@ -508,17 +505,6 @@ export default function EnergySpectrum() {
         >
           Datei(en) hochladen
         </Button>
-        <Button
-          variant="outlined"
-          startIcon={<SensorsIcon />}
-          onClick={() => setCaptureOpen(true)}
-        >
-          Aus Gerät aufnehmen
-        </Button>
-        <RadiacodeCaptureDialog
-          open={captureOpen}
-          onClose={() => setCaptureOpen(false)}
-        />
         {allSpectra.length > 0 && (
           <FormControlLabel
             control={
