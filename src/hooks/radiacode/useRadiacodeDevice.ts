@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BleAdapter, Unsubscribe } from './bleAdapter';
-import { parseRealtimeRateEvent } from './radiacodeProtocol';
+import { BleAdapter } from './bleAdapter';
+import { RadiacodeClient } from './client';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from './types';
 
 export type RadiacodeStatus =
@@ -20,33 +20,31 @@ export interface UseRadiacodeDeviceResult {
   disconnect: () => Promise<void>;
 }
 
-export type PacketParser = (bytes: Uint8Array) => RadiacodeMeasurement | null;
-
-function defaultParsePacket(bytes: Uint8Array): RadiacodeMeasurement | null {
-  const evt = parseRealtimeRateEvent(bytes);
-  if (!evt) return null;
-  return { dosisleistung: evt.dosisleistung, cps: evt.cps, timestamp: Date.now() };
+export interface UseRadiacodeDeviceOptions {
+  pollIntervalMs?: number;
+  clientFactory?: (adapter: BleAdapter, deviceId: string) => RadiacodeClient;
 }
 
 export function useRadiacodeDevice(
   adapter: BleAdapter,
-  parsePacket: PacketParser = defaultParsePacket,
+  options: UseRadiacodeDeviceOptions = {},
 ): UseRadiacodeDeviceResult {
+  const { pollIntervalMs = 500, clientFactory } = options;
   const [status, setStatus] = useState<RadiacodeStatus>('idle');
   const [device, setDevice] = useState<RadiacodeDeviceRef | null>(null);
-  const [measurement, setMeasurement] = useState<RadiacodeMeasurement | null>(null);
+  const [measurement, setMeasurement] =
+    useState<RadiacodeMeasurement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const cleanupRef = useRef<{
+  const stateRef = useRef<{
     adapter: BleAdapter;
-    unsub: Unsubscribe | null;
     device: RadiacodeDeviceRef | null;
-  }>({ adapter, unsub: null, device: null });
+    client: RadiacodeClient | null;
+  }>({ adapter, device: null, client: null });
 
   useEffect(() => {
-    cleanupRef.current.adapter = adapter;
-    cleanupRef.current.device = device;
-  });
+    stateRef.current.adapter = adapter;
+  }, [adapter]);
 
   const scan = useCallback(async (): Promise<RadiacodeDeviceRef | null> => {
     setError(null);
@@ -54,6 +52,7 @@ export function useRadiacodeDevice(
     try {
       const d = await adapter.requestDevice();
       setDevice(d);
+      stateRef.current.device = d;
       setStatus('idle');
       return d;
     } catch (e) {
@@ -64,23 +63,22 @@ export function useRadiacodeDevice(
   }, [adapter]);
 
   const disconnect = useCallback(async () => {
-    const current = cleanupRef.current;
-    current.unsub?.();
-    current.unsub = null;
-    if (current.device) {
+    const client = stateRef.current.client;
+    stateRef.current.client = null;
+    if (client) {
       try {
-        await adapter.disconnect(current.device.id);
+        await client.disconnect();
       } catch {
-        // already disconnected
+        // best-effort
       }
     }
     setStatus('idle');
     setMeasurement(null);
-  }, [adapter]);
+  }, []);
 
   const connect = useCallback(
     async (maybeDevice?: RadiacodeDeviceRef) => {
-      const target = maybeDevice ?? cleanupRef.current.device;
+      const target = maybeDevice ?? stateRef.current.device;
       if (!target) {
         setError('Kein Gerät ausgewählt');
         setStatus('error');
@@ -91,27 +89,29 @@ export function useRadiacodeDevice(
       try {
         await adapter.connect(target.id);
         setDevice(target);
-        cleanupRef.current.device = target;
-        const unsub = await adapter.onNotification(target.id, (packet) => {
-          const m = parsePacket(packet);
-          if (m) setMeasurement(m);
-        });
-        cleanupRef.current.unsub = unsub;
+        stateRef.current.device = target;
+        const client = clientFactory
+          ? clientFactory(adapter, target.id)
+          : new RadiacodeClient(adapter, target.id);
+        await client.connect();
+        client.startPolling((m) => setMeasurement(m), pollIntervalMs);
+        stateRef.current.client = client;
         setStatus('connected');
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setStatus('error');
       }
     },
-    [adapter, parsePacket],
+    [adapter, clientFactory, pollIntervalMs],
   );
 
   useEffect(() => {
-    const state = cleanupRef.current;
+    const state = stateRef.current;
     return () => {
-      state.unsub?.();
-      if (state.device) {
-        state.adapter.disconnect(state.device.id).catch(() => {
+      const client = state.client;
+      state.client = null;
+      if (client) {
+        client.disconnect().catch(() => {
           // best-effort
         });
       }

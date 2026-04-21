@@ -1,0 +1,10 @@
+# set_exchange_rsp (response)
+# cmd_code: 0x0007
+# seq: 0x80
+# reassembled length: 16 B
+
+## Raw BLE chunks (wire format, 18 B for writes / 20 B for notifications max):
+10000000070000800501dada2010001001020000
+
+## Reassembled payload (HEADER + DATA, what protocol.ts parseResponse consumes):
+070000800501dada2010001001020000

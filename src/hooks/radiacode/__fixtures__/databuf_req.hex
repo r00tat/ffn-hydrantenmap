@@ -1,0 +1,10 @@
+# databuf_req (request)
+# cmd_code: 0x0826
+# seq: 0x8f
+# reassembled length: 8 B
+
+## Raw BLE chunks (wire format, 18 B for writes / 20 B for notifications max):
+080000002608008f00010000
+
+## Reassembled payload (HEADER + DATA, what protocol.ts parseResponse consumes):
+2608008f00010000

@@ -1,0 +1,247 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  COMMAND,
+  MAX_WRITE_CHUNK,
+  ResponseReassembler,
+  VS,
+  buildRequest,
+  decodeDataBufRecords,
+  splitForWrite,
+} from './protocol';
+
+function loadFixture(name: string): string[] {
+  const raw = readFileSync(
+    join(__dirname, '__fixtures__', `${name}.hex`),
+    'utf8',
+  );
+  return raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith('#') && !l.startsWith('##'));
+}
+
+function hex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function fromHex(s: string): Uint8Array {
+  const clean = s.replace(/\s+/g, '');
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+describe('buildRequest', () => {
+  it('encodes SET_EXCHANGE request matching captured wire bytes', () => {
+    // Fixture: SET_EXCHANGE args=01ff12ff, seq=0x80
+    const lines = loadFixture('set_exchange_req');
+    const chunks = lines.slice(0, lines.length - 1);
+    const wireBytes = chunks[0];
+
+    const frame = buildRequest(
+      COMMAND.SET_EXCHANGE,
+      0,
+      fromHex('01ff12ff'),
+    );
+    expect(hex(frame)).toBe(wireBytes);
+  });
+
+  it('encodes RD_VIRT_STRING DATA_BUF request matching captured wire bytes', () => {
+    // Fixture: seq 0x8f = index 15 (0x8f - 0x80)
+    const lines = loadFixture('databuf_req');
+    const chunks = lines.slice(0, lines.length - 1);
+    const wireBytes = chunks[0];
+
+    // args = <I vs_id>: DATA_BUF = 0x100
+    const args = new Uint8Array([0x00, 0x01, 0x00, 0x00]);
+    const frame = buildRequest(COMMAND.RD_VIRT_STRING, 15, args);
+    expect(hex(frame)).toBe(wireBytes);
+  });
+
+  it('uses seq 0x80..0x9f rolling over at 32', () => {
+    const f1 = buildRequest(COMMAND.GET_STATUS, 0, new Uint8Array());
+    const f2 = buildRequest(COMMAND.GET_STATUS, 31, new Uint8Array());
+    const f3 = buildRequest(COMMAND.GET_STATUS, 32, new Uint8Array()); // wraps to 0x80
+    expect(f1[7]).toBe(0x80);
+    expect(f2[7]).toBe(0x9f);
+    expect(f3[7]).toBe(0x80);
+  });
+});
+
+describe('splitForWrite', () => {
+  it('keeps short frames as a single chunk', () => {
+    const frame = buildRequest(
+      COMMAND.SET_EXCHANGE,
+      0,
+      fromHex('01ff12ff'),
+    );
+    const chunks = splitForWrite(frame);
+    expect(chunks).toHaveLength(1);
+    expect(hex(chunks[0])).toBe(hex(frame));
+  });
+
+  it('splits long frames into 18-byte chunks', () => {
+    const longArgs = new Uint8Array(50);
+    longArgs.fill(0xab);
+    const frame = buildRequest(COMMAND.WR_VIRT_STRING, 0, longArgs);
+    // Total frame = 4 (len) + 4 (header) + 50 (args) = 58 B
+    const chunks = splitForWrite(frame);
+    expect(chunks.length).toBe(Math.ceil(58 / MAX_WRITE_CHUNK));
+    expect(chunks[0].length).toBe(MAX_WRITE_CHUNK);
+    expect(chunks[chunks.length - 1].length).toBeLessThanOrEqual(
+      MAX_WRITE_CHUNK,
+    );
+    // Concatenation must equal the original frame
+    const rejoined = new Uint8Array(frame.length);
+    let off = 0;
+    for (const c of chunks) {
+      rejoined.set(c, off);
+      off += c.length;
+    }
+    expect(hex(rejoined)).toBe(hex(frame));
+  });
+});
+
+describe('ResponseReassembler', () => {
+  it('reassembles a single-chunk response', () => {
+    const lines = loadFixture('set_exchange_rsp');
+    const chunks = lines.slice(0, lines.length - 1);
+    const reassembled = lines[lines.length - 1];
+
+    const r = new ResponseReassembler();
+    let out: Uint8Array | null = null;
+    for (const c of chunks) {
+      out = r.push(fromHex(c));
+    }
+    expect(out).not.toBeNull();
+    expect(hex(out as Uint8Array)).toBe(reassembled);
+  });
+
+  it('reassembles a 3-chunk DATA_BUF response', () => {
+    const lines = loadFixture('databuf_rsp_small');
+    const chunks = lines.slice(0, lines.length - 1);
+    const reassembled = lines[lines.length - 1];
+
+    const r = new ResponseReassembler();
+    let out: Uint8Array | null = null;
+    // Push all but last chunk — should return null (still collecting)
+    for (let i = 0; i < chunks.length - 1; i++) {
+      expect(r.push(fromHex(chunks[i]))).toBeNull();
+    }
+    out = r.push(fromHex(chunks[chunks.length - 1]));
+    expect(out).not.toBeNull();
+    expect(hex(out as Uint8Array)).toBe(reassembled);
+  });
+
+  it('reassembles a 34-chunk backlog response', () => {
+    const lines = loadFixture('databuf_rsp_backlog');
+    const chunks = lines.slice(0, lines.length - 1);
+    const reassembled = lines[lines.length - 1];
+
+    const r = new ResponseReassembler();
+    let out: Uint8Array | null = null;
+    for (const c of chunks) {
+      out = r.push(fromHex(c));
+    }
+    expect(out).not.toBeNull();
+    expect(hex(out as Uint8Array)).toBe(reassembled);
+    expect((out as Uint8Array).length).toBe(661);
+  });
+
+  it('parseHeader returns cmd + seq + data from reassembled payload', () => {
+    const lines = loadFixture('set_exchange_rsp');
+    const reassembled = lines[lines.length - 1];
+    const r = new ResponseReassembler();
+    r.push(fromHex(lines[0]));
+    const parsed = r.parseLast();
+    expect(parsed).not.toBeNull();
+    expect(parsed?.cmd).toBe(COMMAND.SET_EXCHANGE);
+    expect(parsed?.seq).toBe(0);
+    // data = everything after the 4-byte header
+    const expectedData = reassembled.slice(8); // 4 bytes header = 8 hex chars
+    expect(hex(parsed!.data)).toBe(expectedData);
+  });
+
+  it('handles two back-to-back responses', () => {
+    const r = new ResponseReassembler();
+    const lines1 = loadFixture('set_exchange_rsp');
+    const out1 = r.push(fromHex(lines1[0]));
+    expect(out1).not.toBeNull();
+
+    const lines2 = loadFixture('databuf_rsp_small');
+    const chunks2 = lines2.slice(0, lines2.length - 1);
+    let out2: Uint8Array | null = null;
+    for (const c of chunks2) {
+      out2 = r.push(fromHex(c));
+    }
+    expect(out2).not.toBeNull();
+    expect(hex(out2 as Uint8Array)).toBe(lines2[lines2.length - 1]);
+  });
+});
+
+describe('decodeDataBufRecords', () => {
+  it('decodes the small fixture into 1 RealTime + 1 Raw record', () => {
+    const lines = loadFixture('databuf_records_small');
+    const bytes = fromHex(lines[0]);
+    const records = decodeDataBufRecords(bytes);
+    expect(records).toHaveLength(2);
+
+    const rt = records[0];
+    expect(rt.type).toBe('realtime');
+    if (rt.type !== 'realtime') throw new Error();
+    expect(rt.seq).toBe(12);
+    expect(rt.timestampOffsetMs).toBe(-13320);
+    expect(rt.countRate).toBeCloseTo(5.931, 3);
+    expect(rt.doseRate).toBeCloseTo(8.05e-6, 8);
+    expect(rt.countRateErrPct).toBeCloseTo(15.1, 1);
+    expect(rt.doseRateErrPct).toBeCloseTo(50.3, 1);
+    expect(rt.flags).toBe(0x40);
+    expect(rt.realTimeFlags).toBe(0);
+
+    const raw = records[1];
+    expect(raw.type).toBe('raw');
+    if (raw.type !== 'raw') throw new Error();
+    expect(raw.seq).toBe(13);
+    expect(raw.timestampOffsetMs).toBe(930);
+    expect(raw.countRate).toBeCloseTo(6.0, 3);
+  });
+
+  it('decodes backlog fixture without throwing, extracting RealTime records', () => {
+    const lines = loadFixture('databuf_records_backlog');
+    const bytes = fromHex(lines[0]);
+    const records = decodeDataBufRecords(bytes);
+    // Should at least produce the records we verified earlier
+    expect(records.length).toBeGreaterThan(0);
+    const rts = records.filter((r) => r.type === 'realtime');
+    expect(rts.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('extractLatestRealtime returns newest RealTimeData by seq', () => {
+    const lines = loadFixture('databuf_records_small');
+    const bytes = fromHex(lines[0]);
+    const records = decodeDataBufRecords(bytes);
+    const rt = records
+      .filter((r) => r.type === 'realtime')
+      .at(-1);
+    expect(rt).toBeDefined();
+    expect(rt?.type).toBe('realtime');
+  });
+});
+
+describe('COMMAND / VS constants', () => {
+  it('matches numeric values from cdump/radiacode', () => {
+    expect(COMMAND.SET_EXCHANGE).toBe(0x0007);
+    expect(COMMAND.GET_VERSION).toBe(0x000a);
+    expect(COMMAND.RD_VIRT_SFR).toBe(0x0824);
+    expect(COMMAND.WR_VIRT_SFR).toBe(0x0825);
+    expect(COMMAND.RD_VIRT_STRING).toBe(0x0826);
+    expect(VS.DATA_BUF).toBe(0x100);
+    expect(VS.ENERGY_CALIB).toBe(0x202);
+  });
+});

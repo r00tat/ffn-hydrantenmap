@@ -1,0 +1,323 @@
+export const COMMAND = {
+  GET_STATUS: 0x0005,
+  SET_EXCHANGE: 0x0007,
+  GET_VERSION: 0x000a,
+  GET_SERIAL: 0x000b,
+  FW_SIGNATURE: 0x0101,
+  RD_VIRT_SFR: 0x0824,
+  WR_VIRT_SFR: 0x0825,
+  RD_VIRT_STRING: 0x0826,
+  WR_VIRT_STRING: 0x0827,
+  RD_VIRT_SFR_BATCH: 0x082a,
+  WR_VIRT_SFR_BATCH: 0x082b,
+  SET_TIME: 0x0a04,
+} as const;
+
+export const VS = {
+  CONFIGURATION: 2,
+  SERIAL_NUMBER: 8,
+  TEXT_MESSAGE: 0xf,
+  DATA_BUF: 0x100,
+  SFR_FILE: 0x101,
+  SPECTRUM: 0x200,
+  ENERGY_CALIB: 0x202,
+  SPEC_ACCUM: 0x205,
+} as const;
+
+export const VSFR = {
+  DEVICE_TIME: 0x0504,
+  RAW_FILTER: 0x8006,
+} as const;
+
+export const MAX_WRITE_CHUNK = 18;
+export const SEQ_MODULO = 32;
+
+export function buildRequest(
+  cmd: number,
+  seqIndex: number,
+  args: Uint8Array,
+): Uint8Array {
+  const seq = 0x80 + (seqIndex % SEQ_MODULO);
+  const payloadLen = 4 + args.length;
+  const frame = new Uint8Array(4 + payloadLen);
+  const view = new DataView(frame.buffer);
+  view.setUint32(0, payloadLen, true);
+  view.setUint16(4, cmd, true);
+  frame[6] = 0;
+  frame[7] = seq;
+  frame.set(args, 8);
+  return frame;
+}
+
+export function splitForWrite(
+  frame: Uint8Array,
+  maxChunk = MAX_WRITE_CHUNK,
+): Uint8Array[] {
+  const chunks: Uint8Array[] = [];
+  for (let off = 0; off < frame.length; off += maxChunk) {
+    chunks.push(frame.slice(off, Math.min(off + maxChunk, frame.length)));
+  }
+  return chunks;
+}
+
+export interface ParsedResponse {
+  cmd: number;
+  seq: number;
+  data: Uint8Array;
+}
+
+/**
+ * Reassembles fragmented BLE notifications into full response payloads.
+ * The first chunk of a response carries a 4-byte LE length prefix indicating
+ * how many HEADER+DATA bytes follow. push() returns the complete reassembled
+ * payload (header+data, without the length prefix) as soon as it has been
+ * fully received, otherwise null.
+ */
+export class ResponseReassembler {
+  private buf: Uint8Array = new Uint8Array(0);
+  private remaining = 0;
+  private last: Uint8Array | null = null;
+
+  push(chunk: Uint8Array): Uint8Array | null {
+    if (this.remaining === 0) {
+      if (chunk.length < 4) {
+        return null;
+      }
+      const view = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+      const declared = view.getUint32(0, true);
+      this.remaining = declared;
+      this.buf = new Uint8Array(declared);
+      const first = chunk.subarray(4);
+      const copyLen = Math.min(first.length, this.remaining);
+      this.buf.set(first.subarray(0, copyLen), 0);
+      this.remaining -= copyLen;
+      if (this.remaining === 0) {
+        this.last = this.buf;
+        this.buf = new Uint8Array(0);
+        return this.last;
+      }
+      return null;
+    }
+
+    const written = this.buf.length - this.remaining;
+    const copyLen = Math.min(chunk.length, this.remaining);
+    this.buf.set(chunk.subarray(0, copyLen), written);
+    this.remaining -= copyLen;
+    if (this.remaining === 0) {
+      this.last = this.buf;
+      this.buf = new Uint8Array(0);
+      return this.last;
+    }
+    return null;
+  }
+
+  parseLast(): ParsedResponse | null {
+    if (!this.last || this.last.length < 4) return null;
+    const view = new DataView(
+      this.last.buffer,
+      this.last.byteOffset,
+      this.last.byteLength,
+    );
+    return {
+      cmd: view.getUint16(0, true),
+      seq: this.last[3] & 0x1f,
+      data: this.last.subarray(4),
+    };
+  }
+}
+
+export function parseResponse(reassembled: Uint8Array): ParsedResponse {
+  if (reassembled.length < 4) {
+    throw new Error(
+      `Response too short: ${reassembled.length} B (need ≥ 4 for header)`,
+    );
+  }
+  const view = new DataView(
+    reassembled.buffer,
+    reassembled.byteOffset,
+    reassembled.byteLength,
+  );
+  return {
+    cmd: view.getUint16(0, true),
+    seq: reassembled[3] & 0x1f,
+    data: reassembled.subarray(4),
+  };
+}
+
+export type DataBufRecord =
+  | RealTimeRecord
+  | RawRecord
+  | DoseRateDbRecord
+  | RareRecord
+  | EventRecord
+  | UnknownRecord;
+
+export interface RealTimeRecord {
+  type: 'realtime';
+  seq: number;
+  timestampOffsetMs: number;
+  countRate: number;
+  doseRate: number;
+  countRateErrPct: number;
+  doseRateErrPct: number;
+  flags: number;
+  realTimeFlags: number;
+}
+
+export interface RawRecord {
+  type: 'raw';
+  seq: number;
+  timestampOffsetMs: number;
+  countRate: number;
+  doseRate: number;
+}
+
+export interface DoseRateDbRecord {
+  type: 'doseRateDb';
+  seq: number;
+  timestampOffsetMs: number;
+  count: number;
+  countRate: number;
+  doseRate: number;
+  doseRateErrPct: number;
+  flags: number;
+}
+
+export interface RareRecord {
+  type: 'rare';
+  seq: number;
+  timestampOffsetMs: number;
+  duration: number;
+  dose: number;
+  temperatureC: number;
+  chargePct: number;
+  flags: number;
+}
+
+export interface EventRecord {
+  type: 'event';
+  seq: number;
+  timestampOffsetMs: number;
+  event: number;
+  param1: number;
+  flags: number;
+}
+
+export interface UnknownRecord {
+  type: 'unknown';
+  seq: number;
+  timestampOffsetMs: number;
+  eid: number;
+  gid: number;
+}
+
+/**
+ * Decodes a DATA_BUF record stream. Follows the same layout as
+ * cdump/radiacode's decode_VS_DATA_BUF. Returns recognized records;
+ * stops at the first unknown (eid,gid) combination where the record
+ * length cannot be determined, matching the reference implementation's
+ * defensive behavior.
+ */
+export function decodeDataBufRecords(data: Uint8Array): DataBufRecord[] {
+  const records: DataBufRecord[] = [];
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let off = 0;
+
+  while (data.length - off >= 7) {
+    const seq = data[off];
+    const eid = data[off + 1];
+    const gid = data[off + 2];
+    const tsOffset = view.getInt32(off + 3, true);
+    const tsMs = tsOffset * 10;
+    off += 7;
+
+    if (eid === 0 && gid === 0) {
+      if (data.length - off < 15) break;
+      records.push({
+        type: 'realtime',
+        seq,
+        timestampOffsetMs: tsMs,
+        countRate: view.getFloat32(off, true),
+        doseRate: view.getFloat32(off + 4, true),
+        countRateErrPct: view.getUint16(off + 8, true) / 10,
+        doseRateErrPct: view.getUint16(off + 10, true) / 10,
+        flags: view.getUint16(off + 12, true),
+        realTimeFlags: data[off + 14],
+      });
+      off += 15;
+    } else if (eid === 0 && gid === 1) {
+      if (data.length - off < 8) break;
+      records.push({
+        type: 'raw',
+        seq,
+        timestampOffsetMs: tsMs,
+        countRate: view.getFloat32(off, true),
+        doseRate: view.getFloat32(off + 4, true),
+      });
+      off += 8;
+    } else if (eid === 0 && gid === 2) {
+      if (data.length - off < 16) break;
+      records.push({
+        type: 'doseRateDb',
+        seq,
+        timestampOffsetMs: tsMs,
+        count: view.getUint32(off, true),
+        countRate: view.getFloat32(off + 4, true),
+        doseRate: view.getFloat32(off + 8, true),
+        doseRateErrPct: view.getUint16(off + 12, true) / 10,
+        flags: view.getUint16(off + 14, true),
+      });
+      off += 16;
+    } else if (eid === 0 && gid === 3) {
+      if (data.length - off < 14) break;
+      const duration = view.getUint32(off, true);
+      const dose = view.getFloat32(off + 4, true);
+      const temperature = view.getUint16(off + 8, true);
+      const charge = view.getUint16(off + 10, true);
+      const flags = view.getUint16(off + 12, true);
+      records.push({
+        type: 'rare',
+        seq,
+        timestampOffsetMs: tsMs,
+        duration,
+        dose,
+        temperatureC: (temperature - 2000) / 100,
+        chargePct: charge / 100,
+        flags,
+      });
+      off += 14;
+    } else if (eid === 0 && gid === 7) {
+      if (data.length - off < 4) break;
+      records.push({
+        type: 'event',
+        seq,
+        timestampOffsetMs: tsMs,
+        event: data[off],
+        param1: data[off + 1],
+        flags: view.getUint16(off + 2, true),
+      });
+      off += 4;
+    } else if (eid === 1 && (gid === 1 || gid === 2 || gid === 3)) {
+      // Variable-length histogram-style records. Header is <H samples_num><I smpl_time_ms>,
+      // followed by samples_num × (8|16|14) bytes depending on gid.
+      if (data.length - off < 6) break;
+      const samplesNum = view.getUint16(off, true);
+      const perSample = gid === 1 ? 8 : gid === 2 ? 16 : 14;
+      const payloadLen = 6 + samplesNum * perSample;
+      if (data.length - off < payloadLen) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += payloadLen;
+    } else {
+      // Unrecognized record type — we can't know its length; stop here as the
+      // Python reference does, to avoid corrupting subsequent decodes.
+      break;
+    }
+  }
+  return records;
+}

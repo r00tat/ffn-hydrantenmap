@@ -2,17 +2,16 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { BleAdapter } from './bleAdapter';
+import { RadiacodeClient } from './client';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from './types';
 import { useRadiacodeDevice } from './useRadiacodeDevice';
 
 interface MockAdapter extends BleAdapter {
-  emit: (bytes: Uint8Array) => void;
   connectCalls: string[];
   disconnectCalls: string[];
 }
 
 function makeAdapter(overrides: Partial<BleAdapter> = {}): MockAdapter {
-  let handler: ((p: Uint8Array) => void) | null = null;
   const connectCalls: string[] = [];
   const disconnectCalls: string[] = [];
   const device: RadiacodeDeviceRef = { id: 'd1', name: 'RC-102', serial: 'SN1' };
@@ -25,19 +24,38 @@ function makeAdapter(overrides: Partial<BleAdapter> = {}): MockAdapter {
     disconnect: vi.fn(async (id: string) => {
       disconnectCalls.push(id);
     }),
-    onNotification: vi.fn(async (_id, h) => {
-      handler = h;
-      return () => {
-        handler = null;
-      };
-    }),
+    onNotification: vi.fn(async () => () => {}),
     write: vi.fn(async () => {}),
     ...overrides,
-    emit(bytes: Uint8Array) {
-      handler?.(bytes);
-    },
     connectCalls,
     disconnectCalls,
+  };
+}
+
+interface FakeClient extends RadiacodeClient {
+  emit: (m: RadiacodeMeasurement) => void;
+}
+
+function makeFakeClientFactory(): {
+  factory: (adapter: BleAdapter, deviceId: string) => RadiacodeClient;
+  latest: () => FakeClient | null;
+} {
+  let last: FakeClient | null = null;
+  return {
+    factory: () => {
+      let emitter: ((m: RadiacodeMeasurement) => void) | null = null;
+      const client = {
+        connect: vi.fn(async () => {}),
+        startPolling: vi.fn((cb: (m: RadiacodeMeasurement) => void) => {
+          emitter = cb;
+        }),
+        disconnect: vi.fn(async () => {}),
+        emit: (m: RadiacodeMeasurement) => emitter?.(m),
+      } as unknown as FakeClient;
+      last = client;
+      return client;
+    },
+    latest: () => last,
   };
 }
 
@@ -61,9 +79,12 @@ describe('useRadiacodeDevice', () => {
     expect(result.current.status).toBe('idle');
   });
 
-  it('connect after scan moves status to connected', async () => {
+  it('connect after scan runs client init and moves to connected', async () => {
     const adapter = makeAdapter();
-    const { result } = renderHook(() => useRadiacodeDevice(adapter));
+    const { factory, latest } = makeFakeClientFactory();
+    const { result } = renderHook(() =>
+      useRadiacodeDevice(adapter, { clientFactory: factory }),
+    );
     await act(async () => {
       await result.current.scan();
     });
@@ -72,52 +93,42 @@ describe('useRadiacodeDevice', () => {
     });
     expect(result.current.status).toBe('connected');
     expect(adapter.connectCalls).toEqual(['d1']);
+    expect(latest()?.connect).toHaveBeenCalled();
+    expect(latest()?.startPolling).toHaveBeenCalled();
   });
 
-  it('sets measurement when parser returns a value', async () => {
+  it('emits measurement from client callback', async () => {
     const adapter = makeAdapter();
-    const parser = vi.fn(
-      (_bytes: Uint8Array): RadiacodeMeasurement | null => ({
-        dosisleistung: 0.14,
-        cps: 5,
-        timestamp: 1234,
-      }),
+    const { factory, latest } = makeFakeClientFactory();
+    const { result } = renderHook(() =>
+      useRadiacodeDevice(adapter, { clientFactory: factory }),
     );
-    const { result } = renderHook(() => useRadiacodeDevice(adapter, parser));
     await act(async () => {
       await result.current.scan();
     });
     await act(async () => {
       await result.current.connect();
     });
+    const m: RadiacodeMeasurement = {
+      dosisleistung: 0.14,
+      cps: 5,
+      timestamp: 1234,
+    };
     await act(async () => {
-      adapter.emit(new Uint8Array([1, 2, 3]));
+      latest()?.emit(m);
     });
     expect(result.current.measurement).toMatchObject({
       dosisleistung: 0.14,
       cps: 5,
     });
-    expect(parser).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores null parser result (stub mode)', async () => {
+  it('disconnect stops client and resets state', async () => {
     const adapter = makeAdapter();
-    const { result } = renderHook(() => useRadiacodeDevice(adapter, () => null));
-    await act(async () => {
-      await result.current.scan();
-    });
-    await act(async () => {
-      await result.current.connect();
-    });
-    await act(async () => {
-      adapter.emit(new Uint8Array([1, 2, 3]));
-    });
-    expect(result.current.measurement).toBeNull();
-  });
-
-  it('disconnect resets status and calls adapter.disconnect', async () => {
-    const adapter = makeAdapter();
-    const { result } = renderHook(() => useRadiacodeDevice(adapter));
+    const { factory, latest } = makeFakeClientFactory();
+    const { result } = renderHook(() =>
+      useRadiacodeDevice(adapter, { clientFactory: factory }),
+    );
     await act(async () => {
       await result.current.scan();
     });
@@ -128,7 +139,7 @@ describe('useRadiacodeDevice', () => {
       await result.current.disconnect();
     });
     expect(result.current.status).toBe('idle');
-    expect(adapter.disconnectCalls).toEqual(['d1']);
+    expect(latest()?.disconnect).toHaveBeenCalled();
   });
 
   it('scan failure sets error status', async () => {
@@ -143,5 +154,28 @@ describe('useRadiacodeDevice', () => {
     });
     expect(result.current.status).toBe('error');
     expect(result.current.error).toBe('User cancelled');
+  });
+
+  it('connect failure sets error status', async () => {
+    const adapter = makeAdapter();
+    const failingFactory = () =>
+      ({
+        connect: vi.fn(async () => {
+          throw new Error('init failed');
+        }),
+        startPolling: vi.fn(),
+        disconnect: vi.fn(async () => {}),
+      }) as unknown as RadiacodeClient;
+    const { result } = renderHook(() =>
+      useRadiacodeDevice(adapter, { clientFactory: failingFactory }),
+    );
+    await act(async () => {
+      await result.current.scan();
+    });
+    await act(async () => {
+      await result.current.connect();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe('init failed');
   });
 });

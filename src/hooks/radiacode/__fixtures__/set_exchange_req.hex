@@ -1,0 +1,10 @@
+# set_exchange_req (request)
+# cmd_code: 0x0007
+# seq: 0x80
+# reassembled length: 8 B
+
+## Raw BLE chunks (wire format, 18 B for writes / 20 B for notifications max):
+080000000700008001ff12ff
+
+## Reassembled payload (HEADER + DATA, what protocol.ts parseResponse consumes):
+0700008001ff12ff
