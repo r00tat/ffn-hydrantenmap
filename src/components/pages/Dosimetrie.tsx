@@ -30,6 +30,7 @@ import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import RadiacodeSettingsDialog from './RadiacodeSettingsDialog';
+import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
   normal: '#4caf50',
@@ -188,11 +189,12 @@ export default function Dosimetrie() {
     return cpsHistory.map((s) => ({ x: (s.t - now) / 1000, y: s.cps }));
   }, [cpsHistory]);
 
-  const spectrumSeries = useMemo(() => {
+  const spectrumCounts = useMemo(() => {
     if (!spectrum || spectrum.counts.length === 0) return null;
-    return spectrum.counts.map((c) =>
-      spectrumLogScale ? Math.max(c, 0.5) : c,
-    );
+    // For log-scale guard: MUI log scale doesn't tolerate zero / negative.
+    return spectrumLogScale
+      ? spectrum.counts.map((c) => Math.max(c, 0.5))
+      : spectrum.counts;
   }, [spectrum, spectrumLogScale]);
 
   const handleOpenSave = useCallback(() => {
@@ -366,7 +368,7 @@ export default function Dosimetrie() {
         )}
       </Box>
 
-      {spectrumSeries && (
+      {spectrumCounts && spectrum && (
         <Box
           data-testid="spectrum-chart"
           sx={{ position: 'relative', minHeight: 320 }}
@@ -430,27 +432,11 @@ export default function Dosimetrie() {
               </Typography>
             )}
           </Typography>
-          <LineChart
+          <ZoomableSpectrumChart
+            counts={spectrumCounts}
+            coefficients={spectrum.coefficients}
+            logScale={spectrumLogScale}
             height={300}
-            xAxis={[
-              {
-                data: spectrum!.counts.map((_, i) => i),
-                scaleType: 'linear',
-                label: 'Kanal',
-              },
-            ]}
-            yAxis={[
-              {
-                scaleType: spectrumLogScale ? 'log' : 'linear',
-                label: 'Counts',
-              },
-            ]}
-            series={[
-              {
-                data: spectrumSeries,
-                showMark: false,
-              },
-            ]}
           />
         </Box>
       )}
