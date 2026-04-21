@@ -411,3 +411,23 @@ Die wichtigsten Erweiterungs-Kandidaten für den Einsatzkontext:
 2. **Alarm-Schwellen-UI** — Batch-Read/Write der `DR_LEV*`/`DS_LEV*`/`CR_LEV*`-Register.
 3. **Remote-Signal** — `PLAY_SIGNAL` + `LEDS_*` zur Aufmerksamkeitssteuerung beim Träger.
 4. **Fehlerbalken** — `countRateErrPct`/`doseRateErrPct` ins `RadiacodeMeasurement` übernehmen.
+
+## Android — Hintergrundbetrieb
+
+Die Capacitor-App startet einen Foreground Service
+(`RadiacodeForegroundService`) mit `foregroundServiceType="connectedDevice|location"`,
+sobald eine Radiacode-Session läuft. Der Service akquiriert einen
+`PARTIAL_WAKE_LOCK` (Tag `einsatzkarte:radiacode`), damit der CPU-Takt bei
+gesperrtem Bildschirm nicht gedrosselt wird und die BLE-GATT-Callbacks
+weiterlaufen.
+
+**Grenzen:** Auch mit WakeLock drosselt Chromium im WebView unter Umständen
+`setTimeout`/`setInterval` im Hintergrund. Falls Track-Samples bei
+längerer Lock-Phase einfrieren (empirisch über den „Letzte Messung vor …"-
+Hinweis im `RadiacodeLiveWidget` erkennbar), ist die nächste Stufe entweder
+ein WebWorker für den Polling-Loop oder eine native Polling-Implementierung
+im Service.
+
+**Diagnose im Feld:**
+`adb logcat | grep -iE "radiacode|wakelock|BluetoothGatt"` zeigt, ob
+GATT-Events weiter ankommen und der WakeLock gehalten wird.
