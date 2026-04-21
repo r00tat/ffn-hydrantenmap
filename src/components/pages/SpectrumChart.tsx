@@ -1,7 +1,5 @@
 'use client';
 
-import Box from '@mui/material/Box';
-import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import { useMemo } from 'react';
 import {
@@ -12,6 +10,7 @@ import {
   type NuclideMatch,
 } from '../../common/spectrumParser';
 import { type Spectrum } from '../firebase/firestore';
+import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 const SERIES_COLORS = [
   '#1976d2',
@@ -113,46 +112,32 @@ export default function SpectrumChart({
 
   if (!chartData) return null;
 
+  const overlays = Array.from(matchedPeakEnergies.entries()).map(
+    ([label, energy]) => (
+      <ChartsReferenceLine
+        key={label}
+        x={energy}
+        label={label}
+        lineStyle={{
+          stroke: '#d32f2f',
+          strokeWidth: 1.5,
+          strokeDasharray: '4 2',
+        }}
+        labelStyle={{
+          fontSize: 10,
+          fill: '#d32f2f',
+          fontWeight: 'bold',
+        }}
+      />
+    ),
+  );
+
   return (
-    <Box sx={{ width: '100%' }}>
-      <LineChart
-        height={height}
-        xAxis={[
-          {
-            id: 'energy',
-            data: chartData.energies,
-            label: 'Energie (keV)',
-            scaleType: 'linear',
-            valueFormatter: (v: number) => `${v} keV`,
-          },
-        ]}
-        yAxis={[{ label: 'Counts' }]}
-        series={chartData.series.map((s) => ({
-          ...s,
-          area: true,
-          showMark: false,
-          curve: 'linear' as const,
-        }))}
-        margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-      >
-        {Array.from(matchedPeakEnergies.entries()).map(([label, energy]) => (
-          <ChartsReferenceLine
-            key={label}
-            x={energy}
-            label={label}
-            lineStyle={{
-              stroke: '#d32f2f',
-              strokeWidth: 1.5,
-              strokeDasharray: '4 2',
-            }}
-            labelStyle={{
-              fontSize: 10,
-              fill: '#d32f2f',
-              fontWeight: 'bold',
-            }}
-          />
-        ))}
-      </LineChart>
-    </Box>
+    <ZoomableSpectrumChart
+      height={height}
+      energies={chartData.energies}
+      series={chartData.series.map((s) => ({ ...s, area: true }))}
+      overlays={overlays}
+    />
   );
 }

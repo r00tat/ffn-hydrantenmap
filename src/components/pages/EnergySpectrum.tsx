@@ -26,7 +26,6 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import {
   Fragment,
@@ -57,6 +56,7 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 /** MUI default color palette for series */
 const SERIES_COLORS = [
@@ -931,97 +931,68 @@ export default function EnergySpectrum() {
       {/* Chart */}
       {chartData && (
         <Box sx={{ width: '100%', mt: 2 }}>
-          <LineChart
+          <ZoomableSpectrumChart
             height={400}
-            xAxis={[
-              {
-                id: 'energy',
-                data: chartData.energies,
-                label: 'Energie (keV)',
-                scaleType: 'linear',
-                valueFormatter: (v: number) => `${v} keV`,
-              },
-            ]}
-            yAxis={[
-              {
-                label: logScale ? 'Counts (log)' : 'Counts',
-                valueFormatter: logScale
-                  ? (v: number | null) =>
-                      v != null
-                        ? Math.round(Math.pow(10, v) - 1).toString()
-                        : ''
-                  : undefined,
-              },
-            ]}
-            series={chartData.series.map((s) => ({
-              ...s,
-              data: logScale
-                ? s.data.map((v) => (v > 0 ? Math.log10(v + 1) : 0))
-                : s.data,
-              area: true,
-              showMark: false,
-              curve: 'linear' as const,
-              valueFormatter: (v: number | null) => {
-                const counts =
-                  logScale && v != null ? Math.round(Math.pow(10, v) - 1) : v;
-                return `${counts} cps`;
-              },
-            }))}
-            margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-          >
-            {Array.from(matchedPeakEnergies.entries())
-              .sort((a, b) => a[1] - b[1])
-              .map(([label, energy], idx) => (
-                <ChartsReferenceLine
-                  key={label}
-                  x={energy}
-                  label={label}
-                  labelAlign="start"
-                  spacing={{
-                    x: 5,
-                    y: PEAK_LABEL_DY_OFFSETS[
-                      idx % PEAK_LABEL_DY_OFFSETS.length
-                    ],
-                  }}
-                  lineStyle={{
-                    stroke: '#d32f2f',
-                    strokeWidth: 1.5,
-                    strokeDasharray: '4 2',
-                  }}
-                  labelStyle={{
-                    fontSize: 10,
-                    fill: '#d32f2f',
-                    fontWeight: 'bold',
-                  }}
-                />
-              ))}
-            {[...selectedPeakLines]
-              .sort((a, b) => a.energy - b.energy)
-              .map((line, idx) => (
-                <ChartsReferenceLine
-                  key={line.key}
-                  x={line.energy}
-                  label={line.label}
-                  labelAlign="start"
-                  spacing={{
-                    x: 5,
-                    y: PEAK_LABEL_DY_OFFSETS[
-                      idx % PEAK_LABEL_DY_OFFSETS.length
-                    ],
-                  }}
-                  lineStyle={{
-                    stroke: line.color,
-                    strokeWidth: 1.5,
-                    strokeDasharray: '2 3',
-                  }}
-                  labelStyle={{
-                    fontSize: 10,
-                    fill: line.color,
-                    fontWeight: 'bold',
-                  }}
-                />
-              ))}
-          </LineChart>
+            energies={chartData.energies}
+            series={chartData.series.map((s) => ({ ...s, area: true }))}
+            logScale={logScale}
+            overlays={
+              <>
+                {Array.from(matchedPeakEnergies.entries())
+                  .sort((a, b) => a[1] - b[1])
+                  .map(([label, energy], idx) => (
+                    <ChartsReferenceLine
+                      key={label}
+                      x={energy}
+                      label={label}
+                      labelAlign="start"
+                      spacing={{
+                        x: 5,
+                        y: PEAK_LABEL_DY_OFFSETS[
+                          idx % PEAK_LABEL_DY_OFFSETS.length
+                        ],
+                      }}
+                      lineStyle={{
+                        stroke: '#d32f2f',
+                        strokeWidth: 1.5,
+                        strokeDasharray: '4 2',
+                      }}
+                      labelStyle={{
+                        fontSize: 10,
+                        fill: '#d32f2f',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  ))}
+                {[...selectedPeakLines]
+                  .sort((a, b) => a.energy - b.energy)
+                  .map((line, idx) => (
+                    <ChartsReferenceLine
+                      key={line.key}
+                      x={line.energy}
+                      label={line.label}
+                      labelAlign="start"
+                      spacing={{
+                        x: 5,
+                        y: PEAK_LABEL_DY_OFFSETS[
+                          idx % PEAK_LABEL_DY_OFFSETS.length
+                        ],
+                      }}
+                      lineStyle={{
+                        stroke: line.color,
+                        strokeWidth: 1.5,
+                        strokeDasharray: '2 3',
+                      }}
+                      labelStyle={{
+                        fontSize: 10,
+                        fill: line.color,
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  ))}
+              </>
+            }
+          />
         </Box>
       )}
 
