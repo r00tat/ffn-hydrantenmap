@@ -31,6 +31,8 @@ interface MockAdapter extends BleAdapter {
   writes: Uint8Array[];
   emit: (chunk: Uint8Array) => void;
   setResponder: (fn: (frame: Uint8Array) => Uint8Array[] | null) => void;
+  simulateDisconnect: () => void;
+  disconnectHandlers: Array<() => void>;
 }
 
 function makeAdapter(): MockAdapter {
@@ -38,6 +40,7 @@ function makeAdapter(): MockAdapter {
   const writes: Uint8Array[] = [];
   let buffered = new Uint8Array(0);
   let responder: ((frame: Uint8Array) => Uint8Array[] | null) | null = null;
+  const disconnectHandlers: Array<() => void> = [];
 
   const adapter: MockAdapter = {
     isSupported: () => true,
@@ -54,6 +57,13 @@ function makeAdapter(): MockAdapter {
         notifyHandler = null;
       };
       return unsub;
+    }),
+    onDisconnect: vi.fn((_id, handler) => {
+      disconnectHandlers.push(handler);
+      return () => {
+        const idx = disconnectHandlers.indexOf(handler);
+        if (idx >= 0) disconnectHandlers.splice(idx, 1);
+      };
     }),
     write: vi.fn(async (_id, data) => {
       writes.push(data);
@@ -86,6 +96,10 @@ function makeAdapter(): MockAdapter {
     setResponder: (fn) => {
       responder = fn;
     },
+    simulateDisconnect: () => {
+      for (const h of [...disconnectHandlers]) h();
+    },
+    disconnectHandlers,
   };
   return adapter;
 }
@@ -700,6 +714,233 @@ describe('RadiacodeClient', () => {
     expect(received.length).toBe(afterStop);
 
     await client.disconnect();
+  });
+
+  it('registers onDisconnect during connect and emits reconnecting + connection-lost after 3 failed reconnects', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        return buildResponseChunks(
+          COMMAND.RD_VIRT_STRING,
+          seq,
+          fixtureBytes,
+        );
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const events: string[] = [];
+    client.onSessionEvent((e) => events.push(e));
+
+    const received: SpectrumSnapshot[] = [];
+    client.startSpectrumPolling((s) => received.push(s), 2000);
+
+    // Make future connect() calls fail → all 3 reconnects will throw
+    (adapter.connect as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        throw new Error('connect failed');
+      },
+    );
+
+    // Trigger the disconnect event
+    adapter.simulateDisconnect();
+
+    // Let the microtask queue flush, then advance timers for 3 attempts × 2s
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(2100);
+
+    expect(events).toContain('reconnecting');
+    expect(events).toContain('connection-lost');
+    // spectrum polling must be stopped after connection-lost
+    const writesAfter = adapter.writes.length;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(adapter.writes.length).toBe(writesAfter);
+  });
+
+  it('emits reconnected when a reconnect attempt succeeds', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        return buildResponseChunks(
+          COMMAND.RD_VIRT_STRING,
+          seq,
+          fixtureBytes,
+        );
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const events: string[] = [];
+    client.onSessionEvent((e) => events.push(e));
+
+    const received: SpectrumSnapshot[] = [];
+    client.startSpectrumPolling((s) => received.push(s), 2000);
+
+    // First attempt fails, second succeeds
+    let attempt = 0;
+    (adapter.connect as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        attempt += 1;
+        if (attempt === 1) throw new Error('first fail');
+      },
+    );
+
+    adapter.simulateDisconnect();
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2100);
+    await vi.advanceTimersByTimeAsync(2100);
+
+    expect(events).toContain('reconnecting');
+    expect(events).toContain('reconnected');
+    expect(events).not.toContain('connection-lost');
+
+    client.stopSpectrumPolling();
+    await client.disconnect();
+  });
+
+  it('does not reconnect if no spectrum session is active', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    const events: string[] = [];
+    client.onSessionEvent((e) => events.push(e));
+
+    // no startSpectrumPolling → disconnect should not trigger reconnect
+    adapter.simulateDisconnect();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(events).toEqual([]);
+  });
+
+  it('disconnect() clears onDisconnect so no reconnect fires after clean shutdown', async () => {
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    const fixtureBytes = fromHex(
+      readFileSync(
+        join(__dirname, '__fixtures__', 'spectrum_rsp.hex'),
+        'utf8',
+      ).trim(),
+    );
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      if (cmd === COMMAND.RD_VIRT_STRING) {
+        return buildResponseChunks(
+          COMMAND.RD_VIRT_STRING,
+          seq,
+          fixtureBytes,
+        );
+      }
+      return null;
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    client.startSpectrumPolling(() => {}, 2000);
+
+    const events: string[] = [];
+    client.onSessionEvent((e) => events.push(e));
+
+    await client.disconnect();
+
+    // adapter-side disconnect event arriving after clean shutdown must be a no-op
+    adapter.simulateDisconnect();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(events).toEqual([]);
   });
 
   it('disconnect stops spectrum polling', async () => {

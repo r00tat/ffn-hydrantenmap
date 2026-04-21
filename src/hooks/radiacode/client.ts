@@ -52,6 +52,8 @@ function u32le(value: number): Uint8Array {
   return buf;
 }
 
+export type SessionEvent = 'reconnecting' | 'reconnected' | 'connection-lost';
+
 /**
  * Orchestrates a single Radiacode BLE session: owns the sequence counter,
  * response reassembler, and a FIFO request queue. Request ordering is strictly
@@ -70,6 +72,9 @@ export class RadiacodeClient {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private spectrumPolling = false;
   private spectrumTimer: ReturnType<typeof setTimeout> | null = null;
+  private sessionListeners = new Set<(e: SessionEvent) => void>();
+  private disconnectUnsub: Unsubscribe | null = null;
+  private reconnecting = false;
 
   constructor(
     private readonly adapter: BleAdapter,
@@ -90,6 +95,55 @@ export class RadiacodeClient {
     const args = new Uint8Array(8);
     new DataView(args.buffer).setUint32(0, VSFR.DEVICE_TIME, true);
     await this.execute(COMMAND.WR_VIRT_SFR, args);
+
+    // Register disconnect watcher so we can auto-reconnect during an active
+    // spectrum session if the link drops unexpectedly.
+    this.disconnectUnsub =
+      this.adapter.onDisconnect?.(this.deviceId, () => {
+        void this.handleUnexpectedDisconnect();
+      }) ?? null;
+  }
+
+  onSessionEvent(handler: (e: SessionEvent) => void): Unsubscribe {
+    this.sessionListeners.add(handler);
+    return () => {
+      this.sessionListeners.delete(handler);
+    };
+  }
+
+  private emitSessionEvent(event: SessionEvent): void {
+    for (const h of this.sessionListeners) h(event);
+  }
+
+  private async handleUnexpectedDisconnect(): Promise<void> {
+    // Only reconnect if a spectrum session was active; otherwise stay idle.
+    if (!this.spectrumPolling || this.reconnecting) return;
+    this.reconnecting = true;
+    this.emitSessionEvent('reconnecting');
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (!this.spectrumPolling) {
+        // caller stopped the session during the backoff
+        this.reconnecting = false;
+        return;
+      }
+      try {
+        await this.adapter.connect(this.deviceId);
+        await this.execute(
+          COMMAND.SET_EXCHANGE,
+          new Uint8Array([0x01, 0xff, 0x12, 0xff]),
+        );
+        await this.execute(COMMAND.SET_TIME, encodeSetTime(new Date()));
+        this.reconnecting = false;
+        this.emitSessionEvent('reconnected');
+        return;
+      } catch {
+        // fall through to next attempt
+      }
+    }
+    this.reconnecting = false;
+    this.stopSpectrumPolling();
+    this.emitSessionEvent('connection-lost');
   }
 
   startPolling(
@@ -167,6 +221,9 @@ export class RadiacodeClient {
       this.pollTimer = null;
     }
     this.stopSpectrumPolling();
+    this.disconnectUnsub?.();
+    this.disconnectUnsub = null;
+    this.sessionListeners.clear();
     this.unsubscribe?.();
     this.unsubscribe = null;
     if (this.inFlight) {
