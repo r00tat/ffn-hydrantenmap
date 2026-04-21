@@ -6,12 +6,20 @@ import {
   MAX_WRITE_CHUNK,
   ResponseReassembler,
   VS,
+  VSFR,
   buildRequest,
   decodeDataBufRecords,
   decodeFwSignature,
   decodeSerial,
   decodeSpectrumResponse,
   decodeVersion,
+  decodeVsfrBool,
+  decodeVsfrU32,
+  decodeVsfrU8,
+  encodeVsfrRead,
+  encodeVsfrWriteBool,
+  encodeVsfrWriteU32,
+  encodeVsfrWriteU8,
   splitForWrite,
 } from './protocol';
 
@@ -355,5 +363,67 @@ describe('decodeFwSignature', () => {
     expect(result.signature).toBe(0xdeadbeef);
     expect(result.fileName).toBe('rc-103.bin');
     expect(result.idString).toBe('RadiaCode RC-103');
+  });
+});
+
+describe('VSFR encoders', () => {
+  it('encodeVsfrRead packs the id as u32 LE', () => {
+    const bytes = encodeVsfrRead(0x8000);
+    expect(Array.from(bytes)).toEqual([0x00, 0x80, 0x00, 0x00]);
+  });
+
+  it('encodeVsfrWriteU32 packs id + value as two u32 LE', () => {
+    const bytes = encodeVsfrWriteU32(VSFR.DR_LEV1_uR_h, 0x12345678);
+    expect(Array.from(bytes)).toEqual([
+      0x00, 0x80, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
+    ]);
+  });
+
+  it('encodeVsfrWriteU8 packs id (u32) + value (u8)', () => {
+    const bytes = encodeVsfrWriteU8(VSFR.SOUND_VOL, 7);
+    expect(Array.from(bytes)).toEqual([0x21, 0x05, 0x00, 0x00, 0x07]);
+  });
+
+  it('encodeVsfrWriteBool packs id (u32) + 0/1 (u8)', () => {
+    const on = encodeVsfrWriteBool(VSFR.SOUND_ON, true);
+    const off = encodeVsfrWriteBool(VSFR.SOUND_ON, false);
+    expect(Array.from(on)).toEqual([0x22, 0x05, 0x00, 0x00, 0x01]);
+    expect(Array.from(off)).toEqual([0x22, 0x05, 0x00, 0x00, 0x00]);
+  });
+});
+
+describe('VSFR decoders', () => {
+  it('decodeVsfrU32 returns the value after the retcode', () => {
+    const payload = new Uint8Array(8);
+    const v = new DataView(payload.buffer);
+    v.setUint32(0, 1, true);
+    v.setUint32(4, 4200, true);
+    expect(decodeVsfrU32(payload)).toBe(4200);
+  });
+
+  it('decodeVsfrU8 reads 1 byte after retcode', () => {
+    const payload = new Uint8Array(5);
+    const v = new DataView(payload.buffer);
+    v.setUint32(0, 1, true);
+    payload[4] = 7;
+    expect(decodeVsfrU8(payload)).toBe(7);
+  });
+
+  it('decodeVsfrBool returns true for non-zero, false for zero', () => {
+    const on = new Uint8Array([1, 0, 0, 0, 1]);
+    const off = new Uint8Array([1, 0, 0, 0, 0]);
+    expect(decodeVsfrBool(on)).toBe(true);
+    expect(decodeVsfrBool(off)).toBe(false);
+  });
+
+  it('throws when retcode is not 1', () => {
+    const payload = new Uint8Array(8);
+    new DataView(payload.buffer).setUint32(0, 5, true);
+    expect(() => decodeVsfrU32(payload)).toThrow(/retcode/i);
+  });
+
+  it('throws when payload is too short for the expected value type', () => {
+    expect(() => decodeVsfrU32(new Uint8Array(6))).toThrow(/too short/i);
+    expect(() => decodeVsfrU8(new Uint8Array(4))).toThrow(/too short/i);
   });
 });
