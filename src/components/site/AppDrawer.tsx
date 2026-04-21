@@ -25,6 +25,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PlaceIcon from '@mui/icons-material/Place';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
@@ -160,6 +161,12 @@ export default function AppDrawer({
           icon: <ShowChartIcon />,
           href: '/schadstoff/energiespektrum',
           einsatzSection: 'schadstoff/energiespektrum',
+        },
+        {
+          text: 'Dosimetrie',
+          icon: <SensorsIcon />,
+          href: '/schadstoff/dosimetrie',
+          einsatzSection: 'schadstoff/dosimetrie',
         },
       ],
     },
