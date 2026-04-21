@@ -13,9 +13,12 @@ export const RATE_CONFIG: Record<SampleRate, SampleRateConfig> = {
 };
 
 export interface RadiacodeMeasurement {
-  dosisleistung: number;
+  dosisleistung: number; // µSv/h
   cps: number;
   timestamp: number;
+  dose?: number; // µSv, Geräte-Akkumulator (optional)
+  temperatureC?: number; // °C (optional, aus RareRecord)
+  chargePct?: number; // 0..100 (optional, aus RareRecord)
 }
 
 export interface RadiacodeDeviceRef {
