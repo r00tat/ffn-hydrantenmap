@@ -530,4 +530,38 @@ describe('RadiacodeProvider', () => {
       });
     });
   });
+
+  describe('lastSampleTimestamp', () => {
+    it('ist null, solange keine messung eingetroffen ist', () => {
+      const adapter = nullAdapter();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      expect(values.at(-1)!.lastSampleTimestamp).toBeNull();
+    });
+
+    it('wird auf measurement.timestamp gesetzt, sobald eine messung eintrifft', async () => {
+      const adapter = nullAdapter();
+      const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider
+          adapter={adapter}
+          feedMeasurement={(fn) => feeds.push(fn)}
+        >
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      const now = 1_700_000_000_000;
+      act(() => {
+        feeds[0]({ cps: 12, dosisleistung: 0.15, timestamp: now });
+      });
+      await waitFor(() => {
+        expect(values.at(-1)!.lastSampleTimestamp).toBe(now);
+      });
+    });
+  });
 });
