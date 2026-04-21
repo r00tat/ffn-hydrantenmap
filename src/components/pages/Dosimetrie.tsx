@@ -15,6 +15,7 @@ import {
   formatDose,
   formatDoseRate,
 } from '../../common/doseFormat';
+import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 
 const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
@@ -72,10 +73,25 @@ function statusLabel(
     return `Verbunden — ${device.name} (${device.serial})`;
   }
   if (status === 'connecting') return 'Verbindet …';
+  if (status === 'reconnecting') return 'Verbinde neu …';
   if (status === 'scanning') return 'Scannen …';
+  if (status === 'unavailable') return 'Gerät nicht erreichbar';
   if (status === 'error') return 'Fehler';
   return 'Getrennt';
 }
+
+const STATUS_CHIP_COLOR: Record<
+  RadiacodeStatus,
+  'default' | 'success' | 'warning' | 'error'
+> = {
+  idle: 'default',
+  scanning: 'warning',
+  connecting: 'warning',
+  connected: 'success',
+  reconnecting: 'warning',
+  unavailable: 'error',
+  error: 'error',
+};
 
 export default function Dosimetrie() {
   const { status, device, measurement, history, error, connect, disconnect } =
@@ -115,7 +131,7 @@ export default function Dosimetrie() {
       >
         <Chip
           label={statusLabel(status, device)}
-          color={status === 'connected' ? 'success' : 'default'}
+          color={STATUS_CHIP_COLOR[status]}
         />
         <Button
           variant="contained"

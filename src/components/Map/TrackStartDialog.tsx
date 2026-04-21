@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -14,11 +15,13 @@ import RadioGroup from '@mui/material/RadioGroup';
 import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallLayer } from '../firebase/firestore';
 import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
+import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 
 export type TrackMode = 'gps' | 'radiacode';
 
@@ -40,7 +43,31 @@ export interface TrackStartDialogProps {
   existingRadiacodeLayers?: FirecallLayer[];
   defaultDevice?: RadiacodeDeviceRef | null;
   onRequestDevice?: () => void;
+  radiacodeStatus?: RadiacodeStatus;
 }
+
+const RADIACODE_STATUS_LABEL: Record<RadiacodeStatus, string> = {
+  idle: 'Nicht verbunden',
+  scanning: 'Suche Gerät…',
+  connecting: 'Verbinde…',
+  connected: 'Verbunden',
+  reconnecting: 'Verbinde neu…',
+  unavailable: 'Gerät nicht erreichbar',
+  error: 'Fehler',
+};
+
+const RADIACODE_STATUS_COLOR: Record<
+  RadiacodeStatus,
+  'default' | 'success' | 'warning' | 'error'
+> = {
+  idle: 'default',
+  scanning: 'warning',
+  connecting: 'warning',
+  connected: 'success',
+  reconnecting: 'warning',
+  unavailable: 'error',
+  error: 'error',
+};
 
 const NEW_LAYER_VALUE = '__new__';
 
@@ -51,6 +78,7 @@ export default function TrackStartDialog({
   existingRadiacodeLayers = [],
   defaultDevice = null,
   onRequestDevice,
+  radiacodeStatus = 'idle',
 }: TrackStartDialogProps) {
   const [mode, setMode] = useState<TrackMode>('gps');
 
@@ -189,6 +217,12 @@ export default function TrackStartDialog({
                       ? `${defaultDevice.name} (${defaultDevice.serial})`
                       : 'Kein Standardgerät'}
                   </Typography>
+                  <Chip
+                    size="small"
+                    sx={{ mt: 1 }}
+                    color={RADIACODE_STATUS_COLOR[radiacodeStatus]}
+                    label={RADIACODE_STATUS_LABEL[radiacodeStatus]}
+                  />
                 </Box>
                 <Button onClick={() => onRequestDevice?.()} variant="outlined">
                   Wechseln
@@ -200,9 +234,19 @@ export default function TrackStartDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Abbrechen</Button>
-        <Button onClick={handleStart} variant="contained">
-          Starten
-        </Button>
+        {mode === 'radiacode' && radiacodeStatus !== 'connected' ? (
+          <Tooltip title="Radiacode nicht verbunden — bitte zuerst verbinden">
+            <span>
+              <Button disabled variant="contained">
+                Starten
+              </Button>
+            </span>
+          </Tooltip>
+        ) : (
+          <Button onClick={handleStart} variant="contained">
+            Starten
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

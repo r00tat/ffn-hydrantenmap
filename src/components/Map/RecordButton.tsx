@@ -38,6 +38,7 @@ export default function RecordButton() {
   const gps = useGpsLineRecorder();
 
   const {
+    status: radiacodeStatus,
     measurement,
     device,
     scan,
@@ -176,6 +177,7 @@ export default function RecordButton() {
         existingRadiacodeLayers={existingRadiacodeLayers}
         defaultDevice={defaultDevice}
         onRequestDevice={handleRequestDevice}
+        radiacodeStatus={radiacodeStatus}
       />
     </>
   );

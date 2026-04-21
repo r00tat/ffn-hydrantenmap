@@ -8,6 +8,8 @@ export type RadiacodeStatus =
   | 'scanning'
   | 'connecting'
   | 'connected'
+  | 'reconnecting'
+  | 'unavailable'
   | 'error';
 
 export interface UseRadiacodeDeviceResult {
@@ -112,7 +114,10 @@ export function useRadiacodeDevice(
         setStatus('connected');
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
-        setStatus('error');
+        // 'unavailable' = Gerät wurde erwartet, ist aber aktuell nicht
+        // erreichbar (BLE-Connect fehlgeschlagen, Timeout etc.). 'error'
+        // bleibt für unerwartete JS-Fehler reserviert.
+        setStatus('unavailable');
       }
     },
     [adapter, clientFactory, pollIntervalMs],

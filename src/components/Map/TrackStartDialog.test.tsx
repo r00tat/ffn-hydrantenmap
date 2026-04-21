@@ -33,7 +33,12 @@ describe('TrackStartDialog — Grundgerüst + Mode-Radio', () => {
   it('switches to radiacode mode', () => {
     const onStart = vi.fn();
     render(
-      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
@@ -65,7 +70,12 @@ describe('TrackStartDialog — Layer-Auswahl', () => {
   it('defaults to new layer with generated name', () => {
     const onStart = vi.fn();
     render(
-      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
@@ -82,7 +92,12 @@ describe('TrackStartDialog — Layer-Auswahl', () => {
   it('uses custom name when user types it', () => {
     const onStart = vi.fn();
     render(
-      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.change(screen.getByLabelText('Name des neuen Layers'), {
@@ -103,6 +118,7 @@ describe('TrackStartDialog — Layer-Auswahl', () => {
         open={true}
         onClose={vi.fn()}
         onStart={onStart}
+        radiacodeStatus="connected"
         existingRadiacodeLayers={[
           {
             id: 'layer-1',
@@ -129,7 +145,12 @@ describe('TrackStartDialog — Sample-Rate + Device', () => {
   it('defaults sample rate to normal', () => {
     const onStart = vi.fn();
     render(
-      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
@@ -141,7 +162,12 @@ describe('TrackStartDialog — Sample-Rate + Device', () => {
   it('passes selected sample rate', () => {
     const onStart = vi.fn();
     render(
-      <TrackStartDialog open={true} onClose={vi.fn()} onStart={onStart} />,
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.click(screen.getByLabelText('Hoch'));
@@ -158,6 +184,7 @@ describe('TrackStartDialog — Sample-Rate + Device', () => {
         open={true}
         onClose={vi.fn()}
         onStart={onStart}
+        radiacodeStatus="connected"
         existingRadiacodeLayers={[
           {
             id: 'layer-1',
@@ -223,12 +250,80 @@ describe('TrackStartDialog — Sample-Rate + Device', () => {
         onClose={vi.fn()}
         onStart={onStart}
         defaultDevice={device}
+        radiacodeStatus="connected"
       />,
     );
     fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
     fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
     expect(onStart).toHaveBeenCalledWith(
       expect.objectContaining({ device }),
+    );
+  });
+});
+
+describe('TrackStartDialog — Radiacode-Status-Gate', () => {
+  it('zeigt Status-Chip im radiacode-Mode', () => {
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        radiacodeStatus="unavailable"
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    expect(screen.getByText('Gerät nicht erreichbar')).toBeInTheDocument();
+  });
+
+  it('disabled Start-Button wenn radiacode-mode und status !== connected', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="unavailable"
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    const startBtn = screen.getByRole('button', { name: 'Starten' });
+    expect(startBtn).toBeDisabled();
+    fireEvent.click(startBtn);
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
+  it('Start-Button aktiv, wenn status === connected', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="connected"
+      />,
+    );
+    fireEvent.click(screen.getByLabelText(/Strahlenmessung/));
+    const startBtn = screen.getByRole('button', { name: 'Starten' });
+    expect(startBtn).not.toBeDisabled();
+    fireEvent.click(startBtn);
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'radiacode' }),
+    );
+  });
+
+  it('Start-Button aktiv bei gps-mode, unabhängig von radiacode-status', () => {
+    const onStart = vi.fn();
+    render(
+      <TrackStartDialog
+        open={true}
+        onClose={vi.fn()}
+        onStart={onStart}
+        radiacodeStatus="unavailable"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'gps' }),
     );
   });
 });

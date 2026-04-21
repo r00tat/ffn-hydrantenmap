@@ -6,14 +6,21 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.net.ConnectivityManager;
+import android.net.Network;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -23,11 +30,26 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
     private boolean errorDialogShown = false;
     private boolean allowInsecureSsl = false;
+    private boolean offlineOverlayShown = false;
+    private String lastRequestedUrl = null;
+    private ConnectivityManager.NetworkCallback networkCallback = null;
+    private final Handler retryHandler = new Handler(Looper.getMainLooper());
+    private static final Set<Integer> TRANSIENT_ERRORS = new HashSet<>();
+    static {
+        TRANSIENT_ERRORS.add(WebViewClient.ERROR_CONNECT);
+        TRANSIENT_ERRORS.add(WebViewClient.ERROR_HOST_LOOKUP);
+        TRANSIENT_ERRORS.add(WebViewClient.ERROR_TIMEOUT);
+        TRANSIENT_ERRORS.add(WebViewClient.ERROR_IO);
+        TRANSIENT_ERRORS.add(WebViewClient.ERROR_PROXY_AUTHENTICATION);
+    }
+    private SwipeRefreshLayout swipeRefreshLayout = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -49,11 +71,31 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         WebView webView = this.bridge.getWebView();
+
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh);
+        if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
+            // Pull-to-Refresh triggert nur, wenn die WebView am oberen Rand
+            // gescrollt ist (Standardverhalten von SwipeRefreshLayout).
+        }
+
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 errorDialogShown = false;
+                if (url != null && !"about:blank".equals(url)) {
+                    lastRequestedUrl = url;
+                    offlineOverlayShown = false;
+                }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setRefreshing(false);
+                }
             }
 
             @Override
@@ -63,10 +105,15 @@ public class MainActivity extends BridgeActivity {
                 WebResourceError error
             ) {
                 super.onReceivedError(view, request, error);
-                if (request.isForMainFrame()) {
+                if (!request.isForMainFrame()) return;
+                int code = error.getErrorCode();
+                String url = request.getUrl().toString();
+                if (TRANSIENT_ERRORS.contains(code)) {
+                    showOfflineOverlay(url);
+                } else {
                     showLoadErrorDialog(
-                        request.getUrl().toString(),
-                        error.getDescription() + " (Code " + error.getErrorCode() + ")"
+                        url,
+                        error.getDescription() + " (Code " + code + ")"
                     );
                 }
             }
@@ -101,6 +148,43 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(Network network) {
+                    if (offlineOverlayShown) {
+                        runOnUiThread(() -> {
+                            offlineOverlayShown = false;
+                            retryHandler.removeCallbacksAndMessages(null);
+                            if (lastRequestedUrl != null) {
+                                bridge.getWebView().loadUrl(lastRequestedUrl);
+                            } else {
+                                bridge.getWebView().reload();
+                            }
+                        });
+                    }
+                }
+            };
+            cm.registerDefaultNetworkCallback(networkCallback);
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (networkCallback != null) {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                try {
+                    cm.unregisterNetworkCallback(networkCallback);
+                } catch (IllegalArgumentException ignored) {
+                    // already unregistered
+                }
+            }
+            networkCallback = null;
+        }
+        retryHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     private void applyServerUrlOverride(String overrideUrl) {
@@ -136,6 +220,38 @@ public class MainActivity extends BridgeActivity {
             }
             return out.toString("UTF-8");
         }
+    }
+
+    private void showOfflineOverlay(String url) {
+        if (offlineOverlayShown) return;
+        offlineOverlayShown = true;
+        lastRequestedUrl = url;
+        String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+            + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            + "<style>body{font-family:system-ui,-apple-system,sans-serif;"
+            + "background:#111;color:#eee;display:flex;flex-direction:column;"
+            + "align-items:center;justify-content:center;height:100vh;margin:0;"
+            + "padding:16px;text-align:center}"
+            + "h1{font-size:20px;margin:0 0 8px}"
+            + "p{margin:0 0 24px;opacity:.8}"
+            + "button{background:#d32f2f;color:#fff;border:0;border-radius:8px;"
+            + "padding:12px 24px;font-size:16px}</style></head><body>"
+            + "<h1>" + getString(R.string.offline_overlay_title) + "</h1>"
+            + "<p>" + getString(R.string.offline_overlay_message) + "</p>"
+            + "<button onclick=\"window.location.reload()\">"
+            + getString(R.string.offline_overlay_retry) + "</button></body></html>";
+        retryHandler.removeCallbacksAndMessages(null);
+        retryHandler.postDelayed(() -> {
+            if (offlineOverlayShown) {
+                offlineOverlayShown = false;
+                bridge.getWebView().loadUrl(url);
+            }
+        }, 5000);
+        runOnUiThread(() -> {
+            bridge.getWebView().loadDataWithBaseURL(
+                url, html, "text/html", "UTF-8", url
+            );
+        });
     }
 
     private void showLoadErrorDialog(String url, String details) {

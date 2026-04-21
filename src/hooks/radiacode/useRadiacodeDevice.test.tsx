@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BleAdapter } from './bleAdapter';
 import { RadiacodeClient } from './client';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from './types';
-import { useRadiacodeDevice } from './useRadiacodeDevice';
+import { RadiacodeStatus, useRadiacodeDevice } from './useRadiacodeDevice';
 
 interface MockAdapter extends BleAdapter {
   connectCalls: string[];
@@ -190,7 +190,7 @@ describe('useRadiacodeDevice', () => {
     expect(result.current.error).toBe('User cancelled');
   });
 
-  it('connect failure sets error status', async () => {
+  it('connect failure sets unavailable status', async () => {
     const adapter = makeAdapter();
     const failingFactory = () =>
       ({
@@ -209,7 +209,48 @@ describe('useRadiacodeDevice', () => {
     await act(async () => {
       await result.current.connect();
     });
-    expect(result.current.status).toBe('error');
+    expect(result.current.status).toBe('unavailable');
     expect(result.current.error).toBe('init failed');
+  });
+});
+
+describe('useRadiacodeDevice — unavailable/reconnecting', () => {
+  it('setzt Status auf "unavailable", wenn adapter.connect() fehlschlägt', async () => {
+    const adapter = makeAdapter({
+      connect: vi.fn(async () => {
+        throw new Error('timeout');
+      }),
+    });
+    const { result } = renderHook(() => useRadiacodeDevice(adapter));
+    await act(async () => {
+      await result.current.connect({
+        id: 'abc',
+        name: 'Test',
+        serial: 'SN-X',
+      });
+    });
+    expect(result.current.status).toBe('unavailable');
+    expect(result.current.error).toContain('timeout');
+  });
+
+  // Reconnect-Transition: BleAdapter hat aktuell keinen onDisconnect-Hook
+  // (siehe src/hooks/radiacode/bleAdapter.ts). Ein vollständiger
+  // Reconnect-Flow wird in einem Folge-Task ergänzt, sobald der Adapter
+  // Disconnect-Events liefert. Der Typ 'reconnecting' ist bereits vorgesehen.
+  it.skip('wechselt bei unerwartetem Disconnect in "reconnecting"', () => {
+    // TODO: implementieren, sobald BleAdapter einen onDisconnect-Hook hat.
+  });
+
+  it('akzeptiert den erweiterten Status-Type (compile-time contract)', () => {
+    const variants: RadiacodeStatus[] = [
+      'idle',
+      'scanning',
+      'connecting',
+      'connected',
+      'reconnecting',
+      'unavailable',
+      'error',
+    ];
+    expect(variants).toHaveLength(7);
   });
 });
