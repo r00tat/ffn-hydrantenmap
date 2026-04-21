@@ -3,6 +3,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { RadiacodeContextValue } from '../providers/RadiacodeProvider';
 
+vi.mock('../../hooks/useFirecallItemAdd', () => ({
+  default: () => vi.fn(async () => ({ id: 'mock-doc' })),
+}));
+
 vi.mock('../providers/RadiacodeProvider', async () => {
   const actual =
     await vi.importActual<typeof import('../providers/RadiacodeProvider')>(
@@ -44,10 +48,9 @@ function fixture(
     connectDevice: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
     spectrum: null,
-    spectrumSession: { active: false, startedAt: null, snapshotCount: 0 },
-    startSpectrumRecording: vi.fn(async () => {}),
-    stopSpectrumRecording: vi.fn(async () => null),
-    cancelSpectrumRecording: vi.fn(async () => {}),
+    cpsHistory: [],
+    resetLiveSpectrum: vi.fn(async () => {}),
+    saveLiveSpectrum: vi.fn(async () => 'new-doc'),
     readSettings: vi.fn(async () => ({
       doseRateAlarm1uRh: 0,
       doseRateAlarm2uRh: 0,

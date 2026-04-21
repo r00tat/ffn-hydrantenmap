@@ -33,6 +33,8 @@ import {
   RadiacodeStatus,
   useRadiacodeDevice,
 } from '../../hooks/radiacode/useRadiacodeDevice';
+import { Spectrum } from '../firebase/firestore';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 
 function titleForNotification(state: NotificationState): string {
   switch (state) {
@@ -54,11 +56,18 @@ function formatBodyForNotification(
   return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
 }
 
-export interface RadiacodeSpectrumSessionState {
-  active: boolean;
-  startedAt: number | null;
-  snapshotCount: number;
+export interface CpsSample {
+  t: number;
+  cps: number;
 }
+
+export interface SaveLiveSpectrumMeta {
+  name: string;
+  description?: string;
+  sampleName?: string;
+}
+
+const CPS_HISTORY_MAX = 300;
 
 export interface RadiacodeContextValue {
   status: RadiacodeStatus;
@@ -72,10 +81,9 @@ export interface RadiacodeContextValue {
   connectDevice: (device: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
   spectrum: SpectrumSnapshot | null;
-  spectrumSession: RadiacodeSpectrumSessionState;
-  startSpectrumRecording: () => Promise<void>;
-  stopSpectrumRecording: () => Promise<SpectrumSnapshot | null>;
-  cancelSpectrumRecording: () => Promise<void>;
+  cpsHistory: CpsSample[];
+  resetLiveSpectrum: () => Promise<void>;
+  saveLiveSpectrum: (meta: SaveLiveSpectrumMeta) => Promise<string | null>;
   readSettings: () => Promise<RadiacodeSettings>;
   writeSettings: (patch: Partial<RadiacodeSettings>) => Promise<void>;
   playSignal: () => Promise<void>;
@@ -139,7 +147,10 @@ export function RadiacodeProvider({
     clientRef,
   } = useRadiacodeDevice(adapter, { clientFactory });
 
+  const addItem = useFirecallItemAdd();
+
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
+  const [cpsHistory, setCpsHistory] = useState<CpsSample[]>([]);
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
   const measurement = overrideMeasurement ?? hookMeasurement;
@@ -189,6 +200,13 @@ export function RadiacodeProvider({
         measurement.timestamp,
       ),
     );
+    setCpsHistory((prev) => {
+      const next = [...prev, { t: measurement.timestamp, cps: measurement.cps }];
+      if (next.length > CPS_HISTORY_MAX) {
+        return next.slice(next.length - CPS_HISTORY_MAX);
+      }
+      return next;
+    });
   }
 
   // Testing feeder: sets override measurement (which also triggers history push
@@ -200,83 +218,136 @@ export function RadiacodeProvider({
     });
   }, []);
 
-  // Spectrum recording session state
+  // Live spectrum state: polled permanently once connected. No explicit
+  // start/stop — the provider owns the lifecycle. Baseline subtraction keeps
+  // the displayed spectrum relative to the last reset (or initial connect).
   const [spectrum, setSpectrum] = useState<SpectrumSnapshot | null>(null);
-  const [sessionActive, setSessionActive] = useState(false);
-  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
-  const [snapshotCount, setSnapshotCount] = useState(0);
   const [reconnecting, setReconnecting] = useState(false);
   const sessionUnsubRef = useRef<Unsubscribe | null>(null);
+  const pollingStartedRef = useRef(false);
   const spectrumRef = useRef<SpectrumSnapshot | null>(null);
   const baselineRef = useRef<SpectrumSnapshot | null>(null);
+  const latestRawSnapshotRef = useRef<SpectrumSnapshot | null>(null);
   useEffect(() => {
     spectrumRef.current = spectrum;
   }, [spectrum]);
 
-  const stopSession = useCallback(() => {
-    clientRef.current?.stopSpectrumPolling();
-    sessionUnsubRef.current?.();
-    sessionUnsubRef.current = null;
-  }, [clientRef]);
-
-  const startSpectrumRecording = useCallback(async () => {
-    const client = clientRef.current;
-    if (!client) throw new Error('Kein Radiacode verbunden');
-    // If a prior session is still active, stop it cleanly first.
-    if (sessionUnsubRef.current) {
-      stopSession();
-    }
-    await client.specReset();
-    // SPEC_RESET greift am echten Gerät nicht zuverlässig — das
-    // aktuelle Spektrum läuft weiter seit dem letzten Hard-Reset und
-    // zeigt sofort mehrere Stunden Dauer. Wir lesen daher direkt nach
-    // dem Reset-Versuch einen Baseline-Snapshot und ziehen ihn von
-    // jedem Session-Snapshot ab. Greift SPEC_RESET doch, ist die
-    // Baseline ≈ 0 und die Subtraktion ein No-op.
-    baselineRef.current = await client.readSpectrum();
-    setSpectrum(null);
-    setSnapshotCount(0);
-    setSessionStartedAt(Date.now());
-    setSessionActive(true);
-    setReconnecting(false);
-    const unsubEvt = client.onSessionEvent((e) => {
-      if (e === 'reconnecting') setReconnecting(true);
-      else setReconnecting(false);
-    });
-    sessionUnsubRef.current = unsubEvt;
-    client.startSpectrumPolling((s) => {
+  const applyBaseline = useCallback(
+    (raw: SpectrumSnapshot): SpectrumSnapshot => {
       const baseline = baselineRef.current;
-      const sessionSnap: SpectrumSnapshot = baseline
-        ? {
-            ...s,
-            durationSec: Math.max(0, s.durationSec - baseline.durationSec),
-            counts: s.counts.map((c, i) =>
-              Math.max(0, c - (baseline.counts[i] ?? 0)),
-            ),
-          }
-        : s;
-      setSpectrum(sessionSnap);
-      setSnapshotCount((c) => c + 1);
-    });
-  }, [clientRef, stopSession]);
+      if (!baseline) return raw;
+      return {
+        ...raw,
+        durationSec: Math.max(0, raw.durationSec - baseline.durationSec),
+        counts: raw.counts.map((c, i) =>
+          Math.max(0, c - (baseline.counts[i] ?? 0)),
+        ),
+      };
+    },
+    [],
+  );
 
-  const stopSpectrumRecording =
-    useCallback(async (): Promise<SpectrumSnapshot | null> => {
-      stopSession();
-      setSessionActive(false);
-      setReconnecting(false);
-      return spectrumRef.current;
-    }, [stopSession]);
+  // When rawStatus transitions to 'connected' and a client is available,
+  // kick off permanent spectrum polling + baseline capture. Only once per
+  // client instance — useRadiacodeDevice re-creates the client on reconnect
+  // so we use a ref flag keyed implicitly on clientRef.current.
+  const lastClientRef = useRef<RadiacodeClient | null>(null);
+  useEffect(() => {
+    if (rawStatus !== 'connected') {
+      pollingStartedRef.current = false;
+      lastClientRef.current = null;
+      return;
+    }
+    const client = clientRef.current;
+    if (!client) return;
+    if (lastClientRef.current === client && pollingStartedRef.current) return;
+    lastClientRef.current = client;
+    pollingStartedRef.current = true;
 
-  const cancelSpectrumRecording = useCallback(async () => {
-    stopSession();
-    setSessionActive(false);
-    setReconnecting(false);
-    setSpectrum(null);
-    setSessionStartedAt(null);
-    setSnapshotCount(0);
-    baselineRef.current = null;
-  }, [stopSession]);
+    let cancelled = false;
+    (async () => {
+      try {
+        await client.specReset();
+      } catch {
+        // best-effort — SPEC_RESET only matters when the device supports it.
+      }
+      if (cancelled) return;
+      // Baseline: see comment below — SPEC_RESET doesn't reliably clear the
+      // buffer on the real device, so we snapshot once and subtract from every
+      // subsequent tick. If SPEC_RESET did work, baseline ≈ 0 and subtraction
+      // is a no-op.
+      try {
+        baselineRef.current = await client.readSpectrum();
+      } catch {
+        baselineRef.current = null;
+      }
+      if (cancelled) return;
+      setSpectrum(null);
+
+      const unsubEvt = client.onSessionEvent((e) => {
+        if (e === 'reconnecting') setReconnecting(true);
+        else setReconnecting(false);
+      });
+      sessionUnsubRef.current = unsubEvt;
+
+      client.startSpectrumPolling((s) => {
+        latestRawSnapshotRef.current = s;
+        setSpectrum(applyBaseline(s));
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      sessionUnsubRef.current?.();
+      sessionUnsubRef.current = null;
+      client.stopSpectrumPolling();
+    };
+  }, [rawStatus, clientRef, applyBaseline]);
+
+  const resetLiveSpectrum = useCallback(async () => {
+    // Use the latest RAW snapshot as the new baseline. Polling continues
+    // uninterrupted; the displayed spectrum will reset to ~zero on the next
+    // tick.
+    const raw = latestRawSnapshotRef.current;
+    if (raw) {
+      baselineRef.current = raw;
+      setSpectrum(applyBaseline(raw));
+    } else {
+      // No snapshot seen yet — clear baseline so the next snapshot displays
+      // as-is.
+      baselineRef.current = null;
+      setSpectrum(null);
+    }
+    setCpsHistory([]);
+  }, [applyBaseline]);
+
+  const saveLiveSpectrum = useCallback(
+    async (meta: SaveLiveSpectrumMeta): Promise<string | null> => {
+      const snap = spectrumRef.current;
+      if (!snap) return null;
+      const deviceName = `${device?.name ?? 'Radiacode'}${
+        device?.serial ? ` ${device.serial}` : ''
+      }`.trim();
+      const now = new Date();
+      const startMs = now.getTime() - snap.durationSec * 1000;
+      const item: Spectrum = {
+        type: 'spectrum',
+        name: meta.name,
+        sampleName: meta.sampleName ?? meta.name,
+        deviceName,
+        measurementTime: snap.durationSec,
+        liveTime: snap.durationSec,
+        startTime: new Date(startMs).toISOString(),
+        endTime: now.toISOString(),
+        coefficients: snap.coefficients as unknown as number[],
+        counts: snap.counts,
+        description: meta.description,
+      };
+      const ref = await addItem(item);
+      return ref?.id ?? null;
+    },
+    [addItem, device],
+  );
 
   const readSettings = useCallback(async () => {
     const client = clientRef.current;
@@ -358,14 +429,12 @@ export function RadiacodeProvider({
   }, [adapter]);
 
   // Persistent notification driven by the foreground service. One source of
-  // truth for the lifecycle: derived purely from status / reconnect / recording.
+  // truth for the lifecycle: derived purely from status / reconnect.
   const notificationState: NotificationState | null = useMemo(() => {
-    if (status === 'connected') {
-      return sessionActive ? 'recording' : 'connected';
-    }
+    if (status === 'connected') return 'connected';
     if (status === 'connecting' && reconnecting) return 'reconnecting';
     return null;
-  }, [status, sessionActive, reconnecting]);
+  }, [status, reconnecting]);
 
   const notificationStateRef = useRef<NotificationState | null>(null);
   useEffect(() => {
@@ -411,15 +480,6 @@ export function RadiacodeProvider({
     return () => unsub();
   }, [adapter, disconnect]);
 
-  const spectrumSession = useMemo<RadiacodeSpectrumSessionState>(
-    () => ({
-      active: sessionActive,
-      startedAt: sessionStartedAt,
-      snapshotCount,
-    }),
-    [sessionActive, sessionStartedAt, snapshotCount],
-  );
-
   const value = useMemo<RadiacodeContextValue>(
     () => ({
       status,
@@ -433,10 +493,9 @@ export function RadiacodeProvider({
       connectDevice,
       disconnect,
       spectrum,
-      spectrumSession,
-      startSpectrumRecording,
-      stopSpectrumRecording,
-      cancelSpectrumRecording,
+      cpsHistory,
+      resetLiveSpectrum,
+      saveLiveSpectrum,
       readSettings,
       writeSettings,
       playSignal,
@@ -454,10 +513,9 @@ export function RadiacodeProvider({
       connectDevice,
       disconnect,
       spectrum,
-      spectrumSession,
-      startSpectrumRecording,
-      stopSpectrumRecording,
-      cancelSpectrumRecording,
+      cpsHistory,
+      resetLiveSpectrum,
+      saveLiveSpectrum,
       readSettings,
       writeSettings,
       playSignal,

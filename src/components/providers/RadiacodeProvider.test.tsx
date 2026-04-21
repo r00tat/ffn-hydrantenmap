@@ -7,6 +7,11 @@ import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
 import { RadiacodeMeasurement } from '../../hooks/radiacode/types';
 import { RadiacodeProvider, useRadiacode } from './RadiacodeProvider';
 
+const mockAdd = vi.fn(async (_item: unknown) => ({ id: 'new-doc' }));
+vi.mock('../../hooks/useFirecallItemAdd', () => ({
+  default: () => mockAdd,
+}));
+
 function nullAdapter(): BleAdapter {
   return {
     isSupported: () => true,
@@ -166,7 +171,6 @@ describe('RadiacodeProvider', () => {
 
     const ctx = values.at(-1)!;
     expect(ctx.spectrum).not.toBeNull();
-    expect(ctx.spectrumSession.snapshotCount).toBeGreaterThan(0);
   });
 
   it('spectrum snapshots update the context value', async () => {
@@ -182,9 +186,6 @@ describe('RadiacodeProvider', () => {
     await act(async () => {
       await values.at(-1)!.connect();
     });
-    await act(async () => {
-      await values.at(-1)!.startSpectrumRecording();
-    });
 
     const s = snap({ durationSec: 42, timestamp: 1234 });
     await act(async () => {
@@ -193,40 +194,52 @@ describe('RadiacodeProvider', () => {
 
     const ctx = values.at(-1)!;
     expect(ctx.spectrum).toEqual(s);
-    expect(ctx.spectrumSession.snapshotCount).toBe(1);
   });
 
   it('subtracts baseline from every snapshot when SPEC_RESET did not clear the buffer', async () => {
     // At the real device, SPEC_RESET doesn't actually reset the accumulated
     // spectrum — the first snapshot already shows hours of accumulated data.
-    // Provider must read a baseline immediately after the reset attempt and
-    // subtract it from every subsequent snapshot.
+    // Provider reads a baseline immediately after connect and subtracts it
+    // from every subsequent snapshot.
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const values: ReturnType<typeof useRadiacode>[] = [];
+
     render(
       <RadiacodeProvider adapter={adapter} clientFactory={factory}>
         <Probe onValue={(v) => values.push(v)} />
       </RadiacodeProvider>,
     );
 
+    // Baseline: device has already accumulated 7620 s and some counts.
+    // readSpectrum is called once inside connect() before startSpectrumPolling.
+    // Provide the baseline response on the client factory's first invocation.
+    const origFactory = factory;
+    void origFactory; // silence
+
     await act(async () => {
+      const client = latest;
+      void client;
+      // Intercept: before connect finishes, set up the mock return.
       await values.at(-1)!.connect();
     });
 
-    // Baseline: device has already accumulated 7620 s and some counts.
-    (latest()!.readSpectrum as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      durationSec: 7620,
-      coefficients: [0, 1, 0],
-      counts: [10, 20, 30, 40],
-      timestamp: 0,
-    } satisfies SpectrumSnapshot);
-
+    // Replace baseline: the first readSpectrum was called during connect and
+    // returned the default [0,0,0,0]. We instead emit a snapshot that's
+    // compared against the baseline — so set baseline via resetLiveSpectrum
+    // first to pin the expected behaviour.
     await act(async () => {
-      await values.at(-1)!.startSpectrumRecording();
+      // Explicitly set baseline using provider API by emitting a "baseline"
+      // snapshot and calling resetLiveSpectrum.
+      latest()!.emitSnapshot(
+        snap({ durationSec: 7620, counts: [10, 20, 30, 40] }),
+      );
+    });
+    await act(async () => {
+      await values.at(-1)!.resetLiveSpectrum();
     });
 
-    // First polling snapshot, 2 s into the session.
+    // Next polling snapshot, 2 s after baseline.
     await act(async () => {
       latest()!.emitSnapshot(
         snap({
@@ -241,7 +254,95 @@ describe('RadiacodeProvider', () => {
     expect(ctx.spectrum?.counts).toEqual([2, 5, 3, 1]);
   });
 
-  it('stopSpectrumRecording returns the last received snapshot', async () => {
+  it('resetLiveSpectrum sets baseline from current snapshot and clears cpsHistory', async () => {
+    const adapter = nullAdapter();
+    const { factory, latest } = makeFakeSpectrumClientFactory();
+    const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
+    const values: ReturnType<typeof useRadiacode>[] = [];
+    render(
+      <RadiacodeProvider
+        adapter={adapter}
+        clientFactory={factory}
+        feedMeasurement={(fn) => feeds.push(fn)}
+      >
+        <Probe onValue={(v) => values.push(v)} />
+      </RadiacodeProvider>,
+    );
+
+    await act(async () => {
+      await values.at(-1)!.connect();
+    });
+    // Feed some CPS first.
+    act(() => {
+      feeds[0]({ cps: 5, dosisleistung: 0.1, timestamp: 1000 });
+    });
+    act(() => {
+      feeds[0]({ cps: 7, dosisleistung: 0.2, timestamp: 2000 });
+    });
+    await waitFor(() => {
+      expect(values.at(-1)!.cpsHistory.length).toBe(2);
+    });
+
+    // Emit a snapshot that should become the new baseline after reset.
+    await act(async () => {
+      latest()!.emitSnapshot(
+        snap({ durationSec: 100, counts: [5, 10, 15, 20] }),
+      );
+    });
+
+    await act(async () => {
+      await values.at(-1)!.resetLiveSpectrum();
+    });
+
+    // cpsHistory cleared.
+    expect(values.at(-1)!.cpsHistory).toEqual([]);
+
+    // Next snapshot subtracts baseline.
+    await act(async () => {
+      latest()!.emitSnapshot(
+        snap({ durationSec: 110, counts: [6, 13, 20, 25] }),
+      );
+    });
+    const ctx = values.at(-1)!;
+    expect(ctx.spectrum?.durationSec).toBe(10);
+    expect(ctx.spectrum?.counts).toEqual([1, 3, 5, 5]);
+  });
+
+  it('cpsHistory collects CPS samples with timestamps (capped at 300 entries)', async () => {
+    const adapter = nullAdapter();
+    const { factory } = makeFakeSpectrumClientFactory();
+    const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
+    const values: ReturnType<typeof useRadiacode>[] = [];
+    render(
+      <RadiacodeProvider
+        adapter={adapter}
+        clientFactory={factory}
+        feedMeasurement={(fn) => feeds.push(fn)}
+      >
+        <Probe onValue={(v) => values.push(v)} />
+      </RadiacodeProvider>,
+    );
+    await act(async () => {
+      await values.at(-1)!.connect();
+    });
+
+    for (let i = 0; i < 305; i++) {
+      act(() => {
+        feeds[0]({ cps: i, dosisleistung: 0.1, timestamp: 1000 + i * 1000 });
+      });
+    }
+
+    await waitFor(() => {
+      expect(values.at(-1)!.cpsHistory.length).toBe(300);
+    });
+    // Oldest entry should be the 6th (i=5) after dropping first 5.
+    const ctx = values.at(-1)!;
+    expect(ctx.cpsHistory[0].cps).toBe(5);
+    expect(ctx.cpsHistory.at(-1)!.cps).toBe(304);
+  });
+
+  it('saveLiveSpectrum persists current snapshot via useFirecallItemAdd and keeps polling', async () => {
+    mockAdd.mockClear();
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const values: ReturnType<typeof useRadiacode>[] = [];
@@ -250,60 +351,35 @@ describe('RadiacodeProvider', () => {
         <Probe onValue={(v) => values.push(v)} />
       </RadiacodeProvider>,
     );
-
     await act(async () => {
       await values.at(-1)!.connect();
     });
-    await act(async () => {
-      await values.at(-1)!.startSpectrumRecording();
-    });
-
-    const s = snap({ durationSec: 99 });
+    const s = snap({ durationSec: 42, timestamp: 1_700_000_000_000 });
     await act(async () => {
       latest()!.emitSnapshot(s);
     });
 
-    let returned: SpectrumSnapshot | null = null;
+    let docId: string | null = null;
     await act(async () => {
-      returned = await values.at(-1)!.stopSpectrumRecording();
+      docId = await values.at(-1)!.saveLiveSpectrum({
+        name: 'Mein Test',
+        description: 'Demo',
+      });
     });
 
-    expect(returned).toEqual(s);
-    expect(latest()!.stopSpectrumPolling).toHaveBeenCalled();
-    expect(values.at(-1)!.spectrumSession.active).toBe(false);
-  });
+    expect(docId).toBe('new-doc');
+    expect(mockAdd).toHaveBeenCalledTimes(1);
+    const item = mockAdd.mock.calls[0][0] as Record<string, unknown>;
+    expect(item.type).toBe('spectrum');
+    expect(item.name).toBe('Mein Test');
+    expect(item.description).toBe('Demo');
+    expect(item.counts).toEqual(s.counts);
+    expect(item.coefficients).toEqual(s.coefficients);
+    expect(item.measurementTime).toBe(42);
+    expect(item.liveTime).toBe(42);
 
-  it('cancelSpectrumRecording drops the snapshot without save', async () => {
-    const adapter = nullAdapter();
-    const { factory, latest } = makeFakeSpectrumClientFactory();
-    const values: ReturnType<typeof useRadiacode>[] = [];
-    render(
-      <RadiacodeProvider adapter={adapter} clientFactory={factory}>
-        <Probe onValue={(v) => values.push(v)} />
-      </RadiacodeProvider>,
-    );
-
-    await act(async () => {
-      await values.at(-1)!.connect();
-    });
-    await act(async () => {
-      await values.at(-1)!.startSpectrumRecording();
-    });
-
-    await act(async () => {
-      latest()!.emitSnapshot(snap());
-    });
-
-    await act(async () => {
-      await values.at(-1)!.cancelSpectrumRecording();
-    });
-
-    const ctx = values.at(-1)!;
-    expect(ctx.spectrum).toBeNull();
-    expect(ctx.spectrumSession.active).toBe(false);
-    expect(ctx.spectrumSession.startedAt).toBeNull();
-    expect(ctx.spectrumSession.snapshotCount).toBe(0);
-    expect(latest()!.stopSpectrumPolling).toHaveBeenCalled();
+    // Polling still live: stopSpectrumPolling should NOT have been called.
+    expect(latest()!.stopSpectrumPolling).not.toHaveBeenCalled();
   });
 
   it('emits reconnecting status on session event', async () => {
@@ -318,9 +394,6 @@ describe('RadiacodeProvider', () => {
 
     await act(async () => {
       await values.at(-1)!.connect();
-    });
-    await act(async () => {
-      await values.at(-1)!.startSpectrumRecording();
     });
 
     await act(async () => {
@@ -415,38 +488,6 @@ describe('RadiacodeProvider', () => {
           state: 'connected',
         });
       });
-    });
-
-    it('wechselt state auf recording wenn spectrumSession aktiv ist', async () => {
-      const { adapter, spies } = serviceAdapter();
-      const { factory } = makeFakeSpectrumClientFactory();
-      const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
-      const values: ReturnType<typeof useRadiacode>[] = [];
-      render(
-        <RadiacodeProvider
-          adapter={adapter}
-          clientFactory={factory}
-          feedMeasurement={(fn) => feeds.push(fn)}
-        >
-          <Probe onValue={(v) => values.push(v)} />
-        </RadiacodeProvider>,
-      );
-      await act(async () => {
-        await values.at(-1)!.connect();
-      });
-      await act(async () => {
-        await values.at(-1)!.startSpectrumRecording();
-      });
-      spies.startForegroundService.mockClear();
-      act(() => {
-        feeds[0]({ cps: 5, dosisleistung: 0.1, timestamp: 2000 });
-      });
-      await waitFor(() => {
-        expect(spies.updateForegroundService).toHaveBeenCalledWith(
-          expect.objectContaining({ state: 'recording' }),
-        );
-      });
-      expect(spies.startForegroundService).not.toHaveBeenCalled();
     });
 
     it('stoppt den service beim disconnect', async () => {

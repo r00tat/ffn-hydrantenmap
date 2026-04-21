@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { ReactNode } from 'react';
 import { BleAdapter } from '../../hooks/radiacode/bleAdapter';
 import { RadiacodeMeasurement } from '../../hooks/radiacode/types';
+
+// RadiacodeProvider now calls useFirecallItemAdd which pulls in firestore.
+// Mock it so tests don't need a live Firebase app.
+vi.mock('../../hooks/useFirecallItemAdd', () => ({
+  default: () => vi.fn(async () => ({ id: 'mock-doc' })),
+}));
+
 import { RadiacodeProvider } from '../providers/RadiacodeProvider';
 import RadiacodeLiveWidget from './RadiacodeLiveWidget';
 
