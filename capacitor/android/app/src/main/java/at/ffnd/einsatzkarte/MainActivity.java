@@ -20,6 +20,8 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.CapConfig;
@@ -47,6 +49,7 @@ public class MainActivity extends BridgeActivity {
         TRANSIENT_ERRORS.add(WebViewClient.ERROR_IO);
         TRANSIENT_ERRORS.add(WebViewClient.ERROR_PROXY_AUTHENTICATION);
     }
+    private SwipeRefreshLayout swipeRefreshLayout = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,6 +71,14 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
 
         WebView webView = this.bridge.getWebView();
+
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh);
+        if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
+            // Pull-to-Refresh triggert nur, wenn die WebView am oberen Rand
+            // gescrollt ist (Standardverhalten von SwipeRefreshLayout).
+        }
+
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
@@ -76,6 +87,14 @@ public class MainActivity extends BridgeActivity {
                 if (url != null && !"about:blank".equals(url)) {
                     lastRequestedUrl = url;
                     offlineOverlayShown = false;
+                }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setRefreshing(false);
                 }
             }
 
