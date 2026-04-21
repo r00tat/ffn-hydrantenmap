@@ -129,6 +129,13 @@ export class RadiacodeClient {
       }
       try {
         await this.adapter.connect(this.deviceId);
+        // The previous notify characteristic died with the dropped GATT link.
+        // Re-subscribe before issuing any commands, otherwise execute() hangs.
+        this.unsubscribe?.();
+        this.unsubscribe = await this.adapter.onNotification(
+          this.deviceId,
+          (chunk) => this.handleNotification(chunk),
+        );
         await this.execute(
           COMMAND.SET_EXCHANGE,
           new Uint8Array([0x01, 0xff, 0x12, 0xff]),

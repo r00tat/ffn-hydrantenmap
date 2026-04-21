@@ -786,6 +786,52 @@ describe('RadiacodeClient', () => {
     expect(adapter.writes.length).toBe(writesAfter);
   });
 
+  it('re-subscribes to BLE notifications after a successful reconnect', async () => {
+    // Regression: without re-subscribing, the old characteristic's listener
+    // is dead after the GATT drop, so `handleUnexpectedDisconnect` would
+    // wedge on `execute(SET_EXCHANGE)` because the response notifications
+    // never reach the client.
+    const adapter = makeAdapter();
+    let seqCounter = 0;
+    adapter.setResponder((frame) => {
+      const view = new DataView(
+        frame.buffer,
+        frame.byteOffset,
+        frame.byteLength,
+      );
+      const cmd = view.getUint16(4, true);
+      const seq = seqCounter++;
+      if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME) {
+        return buildResponseChunks(cmd, seq, new Uint8Array(0));
+      }
+      if (cmd === COMMAND.WR_VIRT_SFR) {
+        return buildResponseChunks(
+          cmd,
+          seq,
+          new Uint8Array([0x01, 0, 0, 0]),
+        );
+      }
+      return buildResponseChunks(cmd, seq, new Uint8Array(0));
+    });
+
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+    expect(adapter.onNotification).toHaveBeenCalledTimes(1);
+
+    client.startSpectrumPolling(() => {}, 2000);
+    adapter.simulateDisconnect();
+
+    await vi.advanceTimersByTimeAsync(2100);
+
+    // Client must re-subscribe to notifications as part of the reconnect.
+    expect(
+      (adapter.onNotification as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBeGreaterThanOrEqual(2);
+
+    client.stopSpectrumPolling();
+    await client.disconnect();
+  });
+
   it('emits reconnected when a reconnect attempt succeeds', async () => {
     const adapter = makeAdapter();
     let seqCounter = 0;
