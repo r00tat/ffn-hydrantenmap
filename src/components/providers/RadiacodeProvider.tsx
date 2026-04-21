@@ -159,6 +159,7 @@ export function RadiacodeProvider({
   const [reconnecting, setReconnecting] = useState(false);
   const sessionUnsubRef = useRef<Unsubscribe | null>(null);
   const spectrumRef = useRef<SpectrumSnapshot | null>(null);
+  const baselineRef = useRef<SpectrumSnapshot | null>(null);
   useEffect(() => {
     spectrumRef.current = spectrum;
   }, [spectrum]);
@@ -177,6 +178,13 @@ export function RadiacodeProvider({
       stopSession();
     }
     await client.specReset();
+    // SPEC_RESET greift am echten Gerät nicht zuverlässig — das
+    // aktuelle Spektrum läuft weiter seit dem letzten Hard-Reset und
+    // zeigt sofort mehrere Stunden Dauer. Wir lesen daher direkt nach
+    // dem Reset-Versuch einen Baseline-Snapshot und ziehen ihn von
+    // jedem Session-Snapshot ab. Greift SPEC_RESET doch, ist die
+    // Baseline ≈ 0 und die Subtraktion ein No-op.
+    baselineRef.current = await client.readSpectrum();
     setSpectrum(null);
     setSnapshotCount(0);
     setSessionStartedAt(Date.now());
@@ -188,7 +196,17 @@ export function RadiacodeProvider({
     });
     sessionUnsubRef.current = unsubEvt;
     client.startSpectrumPolling((s) => {
-      setSpectrum(s);
+      const baseline = baselineRef.current;
+      const sessionSnap: SpectrumSnapshot = baseline
+        ? {
+            ...s,
+            durationSec: Math.max(0, s.durationSec - baseline.durationSec),
+            counts: s.counts.map((c, i) =>
+              Math.max(0, c - (baseline.counts[i] ?? 0)),
+            ),
+          }
+        : s;
+      setSpectrum(sessionSnap);
       setSnapshotCount((c) => c + 1);
     });
   }, [clientRef, stopSession]);
@@ -208,6 +226,7 @@ export function RadiacodeProvider({
     setSpectrum(null);
     setSessionStartedAt(null);
     setSnapshotCount(0);
+    baselineRef.current = null;
   }, [stopSession]);
 
   // Clean up any active session subscription on unmount.

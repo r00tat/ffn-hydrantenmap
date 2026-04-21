@@ -37,6 +37,15 @@ function makeFakeSpectrumClientFactory(): {
         startPolling: vi.fn(),
         disconnect: vi.fn(async () => {}),
         specReset: vi.fn(async () => {}),
+        readSpectrum: vi.fn(
+          async () =>
+            ({
+              durationSec: 0,
+              coefficients: [0, 1, 0] as [number, number, number],
+              counts: [0, 0, 0, 0],
+              timestamp: 0,
+            }) satisfies SpectrumSnapshot,
+        ),
         startSpectrumPolling: vi.fn(
           (cb: (s: SpectrumSnapshot) => void) => {
             snapshotCb = cb;
@@ -178,6 +187,51 @@ describe('RadiacodeProvider', () => {
     const ctx = values.at(-1)!;
     expect(ctx.spectrum).toEqual(s);
     expect(ctx.spectrumSession.snapshotCount).toBe(1);
+  });
+
+  it('subtracts baseline from every snapshot when SPEC_RESET did not clear the buffer', async () => {
+    // At the real device, SPEC_RESET doesn't actually reset the accumulated
+    // spectrum — the first snapshot already shows hours of accumulated data.
+    // Provider must read a baseline immediately after the reset attempt and
+    // subtract it from every subsequent snapshot.
+    const adapter = nullAdapter();
+    const { factory, latest } = makeFakeSpectrumClientFactory();
+    const values: ReturnType<typeof useRadiacode>[] = [];
+    render(
+      <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+        <Probe onValue={(v) => values.push(v)} />
+      </RadiacodeProvider>,
+    );
+
+    await act(async () => {
+      await values.at(-1)!.connect();
+    });
+
+    // Baseline: device has already accumulated 7620 s and some counts.
+    (latest()!.readSpectrum as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      durationSec: 7620,
+      coefficients: [0, 1, 0],
+      counts: [10, 20, 30, 40],
+      timestamp: 0,
+    } satisfies SpectrumSnapshot);
+
+    await act(async () => {
+      await values.at(-1)!.startSpectrumRecording();
+    });
+
+    // First polling snapshot, 2 s into the session.
+    await act(async () => {
+      latest()!.emitSnapshot(
+        snap({
+          durationSec: 7622,
+          counts: [12, 25, 33, 41],
+        }),
+      );
+    });
+
+    const ctx = values.at(-1)!;
+    expect(ctx.spectrum?.durationSec).toBe(2);
+    expect(ctx.spectrum?.counts).toEqual([2, 5, 3, 1]);
   });
 
   it('stopSpectrumRecording returns the last received snapshot', async () => {
