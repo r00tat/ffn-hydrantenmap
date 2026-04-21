@@ -41,6 +41,7 @@ function fixture(
     device: null,
     deviceInfo: null,
     measurement: null,
+    lastSampleTimestamp: null,
     history: [],
     error: null,
     scan: vi.fn(async () => null),
