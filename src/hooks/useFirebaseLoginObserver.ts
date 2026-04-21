@@ -283,9 +283,15 @@ export default function useFirebaseLoginObserver(): LoginStatus {
 
   const fbSignOut = useCallback(async () => {
     clearAuthFromSessionStorage();
-    await signOutJsClient();
+    // redirect: false — NextAuth server otherwise falls back to NEXTAUTH_URL
+    // when the callbackUrl origin doesn't match (Capacitor WebView, dev
+    // tunnels), which sends users to localhost.
+    await signOutJsClient({ redirect: false });
     await auth.signOut();
     console.info(`logout completed`);
+    if (typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
   }, []);
 
   const clearCredentialsRefreshed = useCallback(() => {
