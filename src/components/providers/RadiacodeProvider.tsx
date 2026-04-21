@@ -245,10 +245,22 @@ export function RadiacodeProvider({
     [connectRaw],
   );
 
-  // Load default device on mount (non-autoconnect, user must press Connect)
+  // Load default device on mount and auto-connect if present. Runs whenever
+  // the adapter changes (notably: NULL_ADAPTER → real adapter from
+  // getBleAdapter()) so the auto-connect happens once the real BLE stack is
+  // available. Failures surface via status='unavailable' from the hook.
   useEffect(() => {
-    loadDefaultDevice().catch(() => null);
-  }, []);
+    let cancelled = false;
+    (async () => {
+      const saved = await loadDefaultDevice().catch(() => null);
+      if (!saved || cancelled) return;
+      await connectRaw(saved).catch(() => null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adapter]);
 
   const startForegroundService = useMemo(
     () =>
