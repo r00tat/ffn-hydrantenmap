@@ -56,4 +56,130 @@ describe('RadiacodeSettingsDialog', () => {
     expect(await screen.findByText(/BLE timeout/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /signalton/i })).toBeEnabled();
   });
+
+  it('Speichern ruft writeSettings nur mit geaenderten Feldern', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const readSettings = vi.fn(async () => makeSettings());
+    const writeSettings = vi.fn(async () => {});
+    const onClose = vi.fn();
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={onClose}
+        readSettings={readSettings}
+        writeSettings={writeSettings}
+        playSignal={vi.fn(async () => {})}
+        doseReset={vi.fn(async () => {})}
+      />,
+    );
+    await waitFor(() => expect(readSettings).toHaveBeenCalled());
+    const vibroSwitch = screen.getByRole('switch', { name: /vibration/i });
+    await user.click(vibroSwitch);
+    await user.click(screen.getByRole('button', { name: /speichern/i }));
+    await waitFor(() => expect(writeSettings).toHaveBeenCalledTimes(1));
+    expect(writeSettings).toHaveBeenCalledWith({ vibroOn: false });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('Abbrechen ruft writeSettings nicht auf, onClose ja', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const writeSettings = vi.fn(async () => {});
+    const onClose = vi.fn();
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={onClose}
+        readSettings={vi.fn(async () => makeSettings())}
+        writeSettings={writeSettings}
+        playSignal={vi.fn(async () => {})}
+        doseReset={vi.fn(async () => {})}
+      />,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByRole('switch', { name: /vibration/i }),
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /abbrechen/i }));
+    expect(onClose).toHaveBeenCalled();
+    expect(writeSettings).not.toHaveBeenCalled();
+  });
+
+  it('Speichern ist disabled wenn nichts geaendert wurde', async () => {
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={vi.fn()}
+        readSettings={vi.fn(async () => makeSettings())}
+        writeSettings={vi.fn(async () => {})}
+        playSignal={vi.fn(async () => {})}
+        doseReset={vi.fn(async () => {})}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('switch', { name: /vibration/i }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /speichern/i })).toBeDisabled();
+  });
+
+  it('Signalton-Button ruft playSignal sofort', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const playSignal = vi.fn(async () => {});
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={vi.fn()}
+        readSettings={vi.fn(async () => makeSettings())}
+        writeSettings={vi.fn(async () => {})}
+        playSignal={playSignal}
+        doseReset={vi.fn(async () => {})}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /signalton/i }));
+    expect(playSignal).toHaveBeenCalledTimes(1);
+  });
+
+  it('Dosis-Reset verlangt Bestaetigung bevor doseReset aufgerufen wird', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const doseReset = vi.fn(async () => {});
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={vi.fn()}
+        readSettings={vi.fn(async () => makeSettings())}
+        writeSettings={vi.fn(async () => {})}
+        playSignal={vi.fn(async () => {})}
+        doseReset={doseReset}
+      />,
+    );
+    const resetBtn = screen.getByRole('button', {
+      name: /dosis zurücksetzen/i,
+    });
+    await user.click(resetBtn);
+    expect(doseReset).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /^ja$/i }));
+    await waitFor(() => expect(doseReset).toHaveBeenCalledTimes(1));
+  });
+
+  it('Dosis-Reset „Nein" bricht ohne doseReset-Aufruf ab', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup();
+    const doseReset = vi.fn(async () => {});
+    render(
+      <RadiacodeSettingsDialog
+        open
+        onClose={vi.fn()}
+        readSettings={vi.fn(async () => makeSettings())}
+        writeSettings={vi.fn(async () => {})}
+        playSignal={vi.fn(async () => {})}
+        doseReset={doseReset}
+      />,
+    );
+    await user.click(
+      screen.getByRole('button', { name: /dosis zurücksetzen/i }),
+    );
+    await user.click(screen.getByRole('button', { name: /nein/i }));
+    expect(doseReset).not.toHaveBeenCalled();
+  });
 });
