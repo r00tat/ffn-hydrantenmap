@@ -108,9 +108,18 @@ export default function SchadstoffDocsPage() {
       <Typography component="div">
         <ol>
           <li>Tab &quot;Strahlenschutz&quot; wählen</li>
-          <li>Berechnungen für Strahlenschutzmaßnahmen durchführen</li>
+          <li>
+            Quadratisches Abstandsgesetz, Schutzwert, Aufenthaltszeit,
+            Dosisleistung aus Nuklidaktivität oder Einheitenumrechnung
+            berechnen
+          </li>
         </ol>
       </Typography>
+      <Alert severity="info" sx={{ my: 2 }}>
+        Die vollständige Anleitung mit Formeln, Beispielen und Hinweisen zu den
+        Referenzwerten findest du unter{' '}
+        <Link href="/docs/strahlenschutz">Strahlenschutz</Link>.
+      </Alert>
 
       <Typography variant="h6" gutterBottom>
         5. Energiespektrum analysieren
