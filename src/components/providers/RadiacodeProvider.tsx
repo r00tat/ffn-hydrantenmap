@@ -75,6 +75,13 @@ export interface RadiacodeContextValue {
   device: RadiacodeDeviceRef | null;
   deviceInfo: RadiacodeDeviceInfo | null;
   measurement: RadiacodeMeasurement | null;
+  /**
+   * Timestamp (ms since epoch) der letzten eingetroffenen Messung. `null`
+   * solange noch keine Messung empfangen wurde. Wird für den
+   * „Letzte Messung vor Xs"-Indikator verwendet, um im Hintergrundbetrieb
+   * sichtbar zu machen, ob Samples durchkommen.
+   */
+  lastSampleTimestamp: number | null;
   history: RadiacodeSample[];
   error: string | null;
   scan: () => Promise<RadiacodeDeviceRef | null>;
@@ -91,7 +98,7 @@ export interface RadiacodeContextValue {
   doseReset: () => Promise<void>;
 }
 
-const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
+export const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
 
 export function useRadiacode(): RadiacodeContextValue {
   const ctx = useContext(RadiacodeContext);
@@ -155,6 +162,7 @@ export function RadiacodeProvider({
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
   const measurement = overrideMeasurement ?? hookMeasurement;
+  const lastSampleTimestamp = measurement?.timestamp ?? null;
   const [deviceInfo, setDeviceInfo] = useState<RadiacodeDeviceInfo | null>(null);
 
   // Fetch device info once we're connected and the client is ready. Clears on
@@ -487,6 +495,7 @@ export function RadiacodeProvider({
       device,
       deviceInfo,
       measurement,
+      lastSampleTimestamp,
       history,
       error,
       scan: scanAndSave,
@@ -507,6 +516,7 @@ export function RadiacodeProvider({
       device,
       deviceInfo,
       measurement,
+      lastSampleTimestamp,
       history,
       error,
       scanAndSave,
