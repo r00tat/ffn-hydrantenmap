@@ -22,6 +22,7 @@ import {
 } from '../../hooks/radiacode/devicePreference';
 import { pushAndPrune, RadiacodeSample } from '../../hooks/radiacode/history';
 import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
+import type { NotificationState } from '../../hooks/radiacode/radiacodeNotification';
 import {
   RadiacodeDeviceInfo,
   RadiacodeDeviceRef,
@@ -31,6 +32,26 @@ import {
   RadiacodeStatus,
   useRadiacodeDevice,
 } from '../../hooks/radiacode/useRadiacodeDevice';
+
+function titleForNotification(state: NotificationState): string {
+  switch (state) {
+    case 'connected':
+      return 'Radiacode verbunden';
+    case 'recording':
+      return 'Strahlenmessung läuft';
+    case 'reconnecting':
+      return 'Radiacode – Verbindung verloren';
+  }
+}
+
+function formatBodyForNotification(
+  m: { dosisleistung: number; cps: number } | null,
+  state: NotificationState,
+): string {
+  if (!m) return state === 'reconnecting' ? 'Letzter Wert unbekannt' : '…';
+  const body = `${m.dosisleistung.toFixed(2)} µSv/h · ${Math.round(m.cps)} CPS`;
+  return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
+}
 
 export interface RadiacodeSpectrumSessionState {
   active: boolean;
@@ -54,11 +75,6 @@ export interface RadiacodeContextValue {
   startSpectrumRecording: () => Promise<void>;
   stopSpectrumRecording: () => Promise<SpectrumSnapshot | null>;
   cancelSpectrumRecording: () => Promise<void>;
-  startForegroundService?: (opts: {
-    title: string;
-    body: string;
-  }) => Promise<void>;
-  stopForegroundService?: () => Promise<void>;
 }
 
 const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
@@ -309,21 +325,59 @@ export function RadiacodeProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
 
-  const startForegroundService = useMemo(
-    () =>
-      adapter.startForegroundService
-        ? (opts: { title: string; body: string }) =>
-            adapter.startForegroundService!(opts)
-        : undefined,
-    [adapter],
-  );
-  const stopForegroundService = useMemo(
-    () =>
-      adapter.stopForegroundService
-        ? () => adapter.stopForegroundService!()
-        : undefined,
-    [adapter],
-  );
+  // Persistent notification driven by the foreground service. One source of
+  // truth for the lifecycle: derived purely from status / reconnect / recording.
+  const notificationState: NotificationState | null = useMemo(() => {
+    if (status === 'connected') {
+      return sessionActive ? 'recording' : 'connected';
+    }
+    if (status === 'connecting' && reconnecting) return 'reconnecting';
+    return null;
+  }, [status, sessionActive, reconnecting]);
+
+  const notificationStateRef = useRef<NotificationState | null>(null);
+  useEffect(() => {
+    notificationStateRef.current = notificationState;
+  }, [notificationState]);
+
+  const serviceActive = notificationState !== null;
+  useEffect(() => {
+    if (!serviceActive) return;
+    const start = adapter.startForegroundService;
+    const stop = adapter.stopForegroundService;
+    if (!start) return;
+    const current = notificationStateRef.current ?? 'connected';
+    start({
+      title: titleForNotification(current),
+      body: formatBodyForNotification(measurement, current),
+    }).catch(() => {
+      // Service-Start darf BLE nicht blockieren.
+    });
+    return () => {
+      stop?.().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceActive, adapter]);
+
+  useEffect(() => {
+    if (!notificationState || !measurement) return;
+    const update = adapter.updateForegroundService;
+    if (!update) return;
+    update({
+      dosisleistung: measurement.dosisleistung,
+      cps: measurement.cps,
+      state: notificationState,
+    }).catch(() => {});
+  }, [measurement, notificationState, adapter]);
+
+  useEffect(() => {
+    const register = adapter.onDisconnectRequested;
+    if (!register) return;
+    const unsub = register(() => {
+      disconnect().catch(() => {});
+    });
+    return () => unsub();
+  }, [adapter, disconnect]);
 
   const spectrumSession = useMemo<RadiacodeSpectrumSessionState>(
     () => ({
@@ -351,8 +405,6 @@ export function RadiacodeProvider({
       startSpectrumRecording,
       stopSpectrumRecording,
       cancelSpectrumRecording,
-      startForegroundService,
-      stopForegroundService,
     }),
     [
       status,
@@ -370,8 +422,6 @@ export function RadiacodeProvider({
       startSpectrumRecording,
       stopSpectrumRecording,
       cancelSpectrumRecording,
-      startForegroundService,
-      stopForegroundService,
     ],
   );
 

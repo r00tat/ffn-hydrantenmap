@@ -44,8 +44,6 @@ export default function RecordButton() {
     scan,
     connectDevice,
     disconnect,
-    startForegroundService,
-    stopForegroundService,
   } = useRadiacode();
 
   useRadiacodePointRecorder({
@@ -56,18 +54,6 @@ export default function RecordButton() {
     measurement,
     position: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
     addItem: addFirecallItem,
-    onStart: useCallback(
-      () =>
-        startForegroundService?.({
-          title: 'Strahlenmessung läuft',
-          body: 'Live-Messpunkte werden aufgezeichnet',
-        }) ?? Promise.resolve(),
-      [startForegroundService],
-    ),
-    onStop: useCallback(
-      () => stopForegroundService?.() ?? Promise.resolve(),
-      [stopForegroundService],
-    ),
   });
 
   const existingRadiacodeLayers = useMemo(

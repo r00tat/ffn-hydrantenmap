@@ -331,4 +331,160 @@ describe('RadiacodeProvider', () => {
     });
     expect(values.at(-1)!.status).toBe('connected');
   });
+
+  describe('notification service', () => {
+    function serviceAdapter() {
+      const disconnectHandlers: Array<() => void> = [];
+      const base = nullAdapter();
+      const startForegroundService = vi.fn(async () => {});
+      const updateForegroundService = vi.fn(async () => {});
+      const stopForegroundService = vi.fn(async () => {});
+      const onDisconnectRequested = vi.fn((h: () => void) => {
+        disconnectHandlers.push(h);
+        return () => {
+          const i = disconnectHandlers.indexOf(h);
+          if (i >= 0) disconnectHandlers.splice(i, 1);
+        };
+      });
+      return {
+        adapter: {
+          ...base,
+          startForegroundService,
+          updateForegroundService,
+          stopForegroundService,
+          onDisconnectRequested,
+        } as BleAdapter,
+        spies: {
+          startForegroundService,
+          updateForegroundService,
+          stopForegroundService,
+          onDisconnectRequested,
+        },
+        triggerDisconnectRequest: () => {
+          disconnectHandlers.forEach((h) => h());
+        },
+      };
+    }
+
+    it('startet den foreground-service beim wechsel auf connected', async () => {
+      const { adapter, spies } = serviceAdapter();
+      const { factory } = makeFakeSpectrumClientFactory();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await act(async () => {
+        await values.at(-1)!.connect();
+      });
+      await waitFor(() => {
+        expect(spies.startForegroundService).toHaveBeenCalledTimes(1);
+      });
+      expect(spies.startForegroundService).toHaveBeenCalledWith(
+        expect.objectContaining({ title: expect.stringContaining('verbunden') }),
+      );
+    });
+
+    it('schickt updateForegroundService bei jeder neuen messung', async () => {
+      const { adapter, spies } = serviceAdapter();
+      const { factory } = makeFakeSpectrumClientFactory();
+      const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider
+          adapter={adapter}
+          clientFactory={factory}
+          feedMeasurement={(fn) => feeds.push(fn)}
+        >
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await act(async () => {
+        await values.at(-1)!.connect();
+      });
+      act(() => {
+        feeds[0]({ cps: 11, dosisleistung: 0.42, timestamp: 1000 });
+      });
+      await waitFor(() => {
+        expect(spies.updateForegroundService).toHaveBeenCalledWith({
+          dosisleistung: 0.42,
+          cps: 11,
+          state: 'connected',
+        });
+      });
+    });
+
+    it('wechselt state auf recording wenn spectrumSession aktiv ist', async () => {
+      const { adapter, spies } = serviceAdapter();
+      const { factory } = makeFakeSpectrumClientFactory();
+      const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider
+          adapter={adapter}
+          clientFactory={factory}
+          feedMeasurement={(fn) => feeds.push(fn)}
+        >
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await act(async () => {
+        await values.at(-1)!.connect();
+      });
+      await act(async () => {
+        await values.at(-1)!.startSpectrumRecording();
+      });
+      spies.startForegroundService.mockClear();
+      act(() => {
+        feeds[0]({ cps: 5, dosisleistung: 0.1, timestamp: 2000 });
+      });
+      await waitFor(() => {
+        expect(spies.updateForegroundService).toHaveBeenCalledWith(
+          expect.objectContaining({ state: 'recording' }),
+        );
+      });
+      expect(spies.startForegroundService).not.toHaveBeenCalled();
+    });
+
+    it('stoppt den service beim disconnect', async () => {
+      const { adapter, spies } = serviceAdapter();
+      const { factory } = makeFakeSpectrumClientFactory();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await act(async () => {
+        await values.at(-1)!.connect();
+      });
+      await act(async () => {
+        await values.at(-1)!.disconnect();
+      });
+      await waitFor(() => {
+        expect(spies.stopForegroundService).toHaveBeenCalled();
+      });
+    });
+
+    it('reagiert auf onDisconnectRequested durch disconnect-aufruf', async () => {
+      const { adapter, triggerDisconnectRequest } = serviceAdapter();
+      const { factory, latest } = makeFakeSpectrumClientFactory();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await act(async () => {
+        await values.at(-1)!.connect();
+      });
+      await act(async () => {
+        triggerDisconnectRequest();
+      });
+      await waitFor(() => {
+        expect(latest()!.disconnect).toHaveBeenCalled();
+      });
+    });
+  });
 });
