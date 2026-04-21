@@ -1,5 +1,6 @@
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
+import { RadiacodeNotification } from './radiacodeNotification';
 import { RadiacodeDeviceRef } from './types';
 
 export const RADIACODE_SERVICE_UUID = 'e63215e5-7003-49d8-96b0-b024798fb901';
@@ -121,6 +122,30 @@ export const capacitorAdapter: BleAdapter = {
       if (current === handler) {
         disconnectHandlers.delete(deviceId);
       }
+    };
+  },
+
+  async startForegroundService(opts) {
+    await RadiacodeNotification.start(opts);
+  },
+
+  async updateForegroundService(opts) {
+    await RadiacodeNotification.update(opts);
+  },
+
+  async stopForegroundService() {
+    await RadiacodeNotification.stop();
+  },
+
+  onDisconnectRequested(handler) {
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+    RadiacodeNotification.addListener('disconnectRequested', handler)
+      .then((h) => {
+        listenerHandle = h;
+      })
+      .catch(() => {});
+    return () => {
+      listenerHandle?.remove().catch(() => {});
     };
   },
 };
