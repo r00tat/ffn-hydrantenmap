@@ -11,6 +11,42 @@ export interface PullToRefreshState {
   distance: number;
 }
 
+/**
+ * Dead-zone bevor der Indikator erscheint. Vermeidet, dass der Indikator schon
+ * bei winzigen Abwärts-Bewegungen aufblitzt, die nichts mit Pull-to-refresh zu
+ * tun haben (z.B. kurzer Touch-Drift vor einem Tap).
+ */
+const PULL_DEAD_ZONE_PX = 30;
+
+/**
+ * Findet den nächsten scrollbaren Vorfahren eines Touch-Targets. Wichtig, weil
+ * das App-Layout den Content in einem inneren `<Box overflow="auto">` scrollt —
+ * nicht über das Dokument. `document.documentElement.scrollTop` wäre damit
+ * immer 0 und würde PTR auch mitten auf der Seite auslösen.
+ */
+function nearestScrollableAncestor(el: Element | null): Element | null {
+  let cur: Element | null = el;
+  while (cur && cur !== document.body && cur !== document.documentElement) {
+    const style = window.getComputedStyle(cur);
+    const oy = style.overflowY;
+    if (
+      (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+      cur.scrollHeight > cur.clientHeight
+    ) {
+      return cur;
+    }
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+function scrollContainerAtTop(target: EventTarget | null): boolean {
+  const el = target instanceof Element ? target : null;
+  const scrollable = nearestScrollableAncestor(el);
+  if (scrollable) return scrollable.scrollTop <= 0;
+  return (document.documentElement.scrollTop || window.scrollY) <= 0;
+}
+
 export function usePullToRefresh({
   onRefresh,
   threshold = 80,
@@ -29,7 +65,7 @@ export function usePullToRefresh({
     const onStart = (e: Event) => {
       const t = (e as TouchEvent).touches?.[0];
       if (!t) return;
-      if ((document.documentElement.scrollTop ?? window.scrollY) > 0) return;
+      if (!scrollContainerAtTop(e.target)) return;
       startY.current = t.clientY;
       distanceRef.current = 0;
     };
@@ -39,9 +75,15 @@ export function usePullToRefresh({
       const t = (e as TouchEvent).touches?.[0];
       if (!t) return;
       const dy = t.clientY - startY.current;
-      if (dy <= 0) return;
-      distanceRef.current = dy;
-      setState({ pulling: true, distance: dy });
+      if (dy <= PULL_DEAD_ZONE_PX) {
+        // Dead zone: startY behalten, aber noch keinen pulling-State setzen.
+        distanceRef.current = 0;
+        setState((prev) => (prev.pulling ? { pulling: false, distance: 0 } : prev));
+        return;
+      }
+      const effectiveDy = dy - PULL_DEAD_ZONE_PX;
+      distanceRef.current = effectiveDy;
+      setState({ pulling: true, distance: effectiveDy });
     };
 
     const onEnd = () => {
