@@ -249,6 +249,57 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'calculateStrahlenschutzAbstand',
+    description: 'Berechne fehlende Werte des quadratischen Abstandsgesetzes (D1² × R1 = D2² × R2). Gib genau 3 der 4 Parameter an.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        d1: { type: SchemaType.NUMBER, description: 'Abstand 1 in Metern' },
+        r1: { type: SchemaType.NUMBER, description: 'Dosisleistung 1 in µSv/h' },
+        d2: { type: SchemaType.NUMBER, description: 'Abstand 2 in Metern' },
+        r2: { type: SchemaType.NUMBER, description: 'Dosisleistung 2 in µSv/h' },
+      },
+    },
+  },
+  {
+    name: 'calculateStrahlenschutzSchutzwert',
+    description: 'Berechne Dosisleistung mit Abschirmung, Schutzwert oder Schichten (R = R₀ / S^n). Gib genau 3 der 4 Parameter an.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        r0: { type: SchemaType.NUMBER, description: 'Dosisleistung ohne Abschirmung' },
+        r: { type: SchemaType.NUMBER, description: 'Dosisleistung mit Abschirmung' },
+        s: { type: SchemaType.NUMBER, description: 'Schutzwert des Materials' },
+        n: { type: SchemaType.NUMBER, description: 'Anzahl der Schichten' },
+      },
+    },
+  },
+  {
+    name: 'calculateStrahlenschutzAufenthaltszeit',
+    description: 'Berechne Aufenthaltszeit, zulässige Dosis oder Dosisleistung (t = D / R). Gib genau 2 der 3 Parameter an.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        t: { type: SchemaType.NUMBER, description: 'Aufenthaltszeit in Stunden (h)' },
+        d: { type: SchemaType.NUMBER, description: 'Zulässige Dosis in mSv' },
+        r: { type: SchemaType.NUMBER, description: 'Dosisleistung in mSv/h' },
+      },
+    },
+  },
+  {
+    name: 'calculateStrahlenschutzNuklid',
+    description: 'Berechne Dosisleistung in 1m aus Aktivität oder umgekehrt für ein bestimmtes Nuklid (Ḣ = Γ × A). Gib entweder activity oder doseRate an.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        nuclide: { type: SchemaType.STRING, description: 'Name des Nuklids (z.B. Cs-137, Co-60, Am-241)' },
+        activity: { type: SchemaType.NUMBER, description: 'Aktivität in GBq' },
+        doseRate: { type: SchemaType.NUMBER, description: 'Dosisleistung in 1m in µSv/h' },
+      },
+      required: ['nuclide'],
+    },
+  },
+  {
     name: 'answerQuestion',
     description: 'Answer a question about the firecall data. Use this when the user asks a question rather than giving a command.',
     parameters: {
@@ -262,7 +313,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
 ];
 
 export const AI_SYSTEM_PROMPT = `Du bist ein Einsatz-Assistent für die Freiwillige Feuerwehr.
-Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte und beantwortest Fragen zum Einsatz.
+Du hilfst beim Erstellen und Verwalten von Elementen auf der Einsatzkarte und beantwortest Fragen zum Einsatz sowie zum Strahlenschutz.
 
 KRITISCH - Keine Halluzinationen:
 - Verwende AUSSCHLIESSLICH Informationen, die der Benutzer tatsächlich gesagt oder geschrieben hat.
@@ -273,9 +324,9 @@ KRITISCH - Keine Halluzinationen:
 Regeln:
 - Antworte kurz und präzise
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
-- Bei Fragen über den Einsatz: verwende answerQuestion mit einer kurzen Antwort
+- Bei Fragen über den Einsatz oder allgemeine Fragen: verwende answerQuestion mit einer kurzen Antwort
 - Bei Unklarheiten: verwende askClarification mit konkreten Optionen
-- Verwende die bereitgestellten Tools für alle Kartenaktionen
+- Verwende die bereitgestellten Tools für alle Kartenaktionen und Berechnungen
 - Positionen ohne Angabe: verwende mapCenter als position.type
 - "bei mir" / "hier" = userPosition als position.type
 - Referenzen wie "daneben", "neben dem X" = nearItem als position.type mit itemName
@@ -295,7 +346,12 @@ Verfügbare Elemente:
 Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
-- calculate: Berechnungen mit mathjs durchführen (z.B. Wasserverbrauch, Mannschaftsstärke, Flächen)
+- calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
+- Strahlenschutz-Berechnungen: Verwende die spezifischen Tools calculateStrahlenschutzAbstand, calculateStrahlenschutzSchutzwert, calculateStrahlenschutzAufenthaltszeit und calculateStrahlenschutzNuklid.
+  - Wenn ein Benutzer nach Dosisleistung in einem anderen Abstand fragt -> calculateStrahlenschutzAbstand
+  - Wenn nach Abschirmung/Schutzwert gefragt wird -> calculateStrahlenschutzSchutzwert
+  - Wenn nach Aufenthaltszeit bei einer bestimmten Dosis gefragt wird -> calculateStrahlenschutzAufenthaltszeit
+  - Wenn nach Dosisleistung eines Nuklids (Aktivität) gefragt wird -> calculateStrahlenschutzNuklid
 
 Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Details:
 - Fahrzeuge: Name, Feuerwehr (fw), Besatzung, ATS-Geräte, Alarmierung, Eintreffen, Abrücken

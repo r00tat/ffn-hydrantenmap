@@ -1,6 +1,6 @@
 import { useCallback, useContext, useRef, useState } from 'react';
 import { LeafletContext } from '@react-leaflet/core';
-import { GenerateContentRequest } from 'firebase/ai';
+import { GenerateContentRequest, Content } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
@@ -22,15 +22,29 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   const [position, isPositionSet] = usePositionContext();
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
+  
   const interactionsRef = useRef<AiInteraction[]>([]);
+  const chatHistoryRef = useRef<Content[]>([]);
+  const lastActivityRef = useRef<number>(0);
+  
   const [lastCreatedItem, setLastCreatedItem] = useState<{ id: string; type: string } | null>(null);
   const [processingStatus, setProcessingStatus] = useState<AiProcessingStatus>('idle');
 
-  const cleanupOldInteractions = useCallback(() => {
+  const cleanupHistory = useCallback(() => {
     const now = Date.now();
-    interactionsRef.current = interactionsRef.current.filter(
-      (i) => now - i.timestamp < MEMORY_TIMEOUT_MS
-    ).slice(-MAX_INTERACTIONS);
+    // Reset complete history if last activity was more than 3 minutes ago
+    if (now - lastActivityRef.current > MEMORY_TIMEOUT_MS) {
+      console.info('[AI] Memory timeout reached, resetting history');
+      chatHistoryRef.current = [];
+      interactionsRef.current = [];
+    }
+    
+    // Also limit the number of entries in the history to keep context window small
+    if (chatHistoryRef.current.length > MAX_INTERACTIONS * 2) {
+      chatHistoryRef.current = chatHistoryRef.current.slice(-MAX_INTERACTIONS * 2);
+    }
+    
+    lastActivityRef.current = now;
   }, []);
 
   const resolvePosition = useCallback(
@@ -88,7 +102,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
   const sendToGemini = useCallback(
     async (userParts: GenerateContentRequest['contents'][0]['parts']): Promise<AiAssistantResult> => {
-      cleanupOldInteractions();
+      cleanupHistory();
 
       const context = buildAiContext({
         map,
@@ -99,38 +113,75 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         interactions: interactionsRef.current,
       });
 
-      const request: GenerateContentRequest = {
-        systemInstruction: AI_SYSTEM_PROMPT,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              ...userParts,
-              { text: `Kontext:\n${JSON.stringify(context, null, 2)}` },
-            ],
-          },
-        ],
-        tools: [{ functionDeclarations: AI_TOOL_DECLARATIONS }],
-        toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
-      };
+      // Prepare current session contents
+      const currentContents: Content[] = [
+        ...chatHistoryRef.current,
+        {
+          role: 'user',
+          parts: [
+            ...userParts,
+            { text: `Aktueller Map-Kontext:\n${JSON.stringify(context, null, 2)}` },
+          ],
+        },
+      ];
 
-      console.info('[AI] Sending request with parts:', userParts.map((p) =>
-        'text' in p ? { text: p.text?.substring(0, 100) } : { type: 'inlineData', mimeType: (p as any).inlineData?.mimeType }
-      ));
+      console.info('[AI] Sending request with history length:', chatHistoryRef.current.length);
+      console.info('[AI] User input:', userParts.map((p) => 'text' in p ? p.text : '[Data]'));
 
       setProcessingStatus('analyzing');
+      
+      let iterations = 0;
+      const MAX_LOOP_ITERATIONS = 5;
+      let lastResult: AiAssistantResult | null = null;
+
       try {
-        const result = await geminiModel.generateContent(request);
-        const response = result.response;
-        const functionCalls = response.functionCalls();
-        let responseText = '';
-        try { responseText = response.text?.() || ''; } catch { /* text() throws when only function calls */ }
+        while (iterations < MAX_LOOP_ITERATIONS) {
+          iterations++;
+          
+          const request: GenerateContentRequest = {
+            systemInstruction: AI_SYSTEM_PROMPT,
+            contents: currentContents,
+            tools: [{ functionDeclarations: AI_TOOL_DECLARATIONS }],
+            toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+          };
 
-        console.info('[AI] Response text:', responseText);
-        console.info('[AI] Function calls:', functionCalls?.length ?? 0,
-          functionCalls?.map((fc) => ({ name: fc.name, args: fc.args })));
+          const result = await geminiModel.generateContent(request);
+          const response = result.response;
+          const candidate = response.candidates[0];
+          const modelContent = candidate.content;
+          
+          // Add model's response to session
+          currentContents.push(modelContent);
 
-        if (functionCalls && functionCalls.length > 0) {
+          const functionCalls = response.functionCalls();
+          let responseText = '';
+          try { responseText = response.text?.() || ''; } catch { /* ignore */ }
+
+          if (responseText) {
+            console.info('[AI] Model response text:', responseText);
+          }
+          if (functionCalls && functionCalls.length > 0) {
+            console.info('[AI] Model function calls:', functionCalls.map(fc => ({ name: fc.name, args: fc.args })));
+          }
+
+          if (!functionCalls || functionCalls.length === 0) {
+            // No more function calls, we are done
+            const text = responseText;
+            
+            // SAVE current session back to persistent history ref
+            chatHistoryRef.current = currentContents;
+            
+            setProcessingStatus('idle');
+            console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');
+            return { 
+              success: true, 
+              message: text || lastResult?.message || 'Aktion ausgeführt',
+              isAnswer: !!text,
+              createdItemId: lastResult?.createdItemId,
+            };
+          }
+
+          // Execute function calls
           const toolDeps = {
             resolvePosition,
             addFirecallItem,
@@ -142,15 +193,14 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             defaultPosition,
           };
 
-          const messages: string[] = [];
-          let lastResult: AiAssistantResult | null = null;
-
           setProcessingStatus('executing');
+          const functionResponseParts = [];
+
           for (const fc of functionCalls) {
             console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
             const execResult = await executeToolCall(fc, toolDeps);
-            console.info(`[AI] Tool result:`, { success: execResult.success, message: execResult.message });
-
+            console.info(`[AI] Tool result (${fc.name}):`, { success: execResult.success, message: execResult.message });
+            
             if (execResult.success) {
               interactionsRef.current.push({
                 timestamp: Date.now(),
@@ -160,31 +210,35 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               });
             }
 
-            messages.push(execResult.message);
+            functionResponseParts.push({
+              functionResponse: {
+                name: fc.name,
+                response: { result: execResult }
+              }
+            });
             lastResult = execResult;
           }
 
-          setProcessingStatus('idle');
-          return {
-            ...lastResult!,
-            message: messages.join(' | '),
-          };
+          // Add function responses to history and continue loop
+          currentContents.push({ role: 'function', parts: functionResponseParts });
+          setProcessingStatus('analyzing');
         }
 
-        const text = result.response.text();
         setProcessingStatus('idle');
-        return { success: false, message: text || 'Keine Aktion erkannt' };
+        console.warn('[AI] Max loop iterations reached');
+        return { success: false, message: 'Zu viele Verarbeitungsschritte' };
       } catch (error) {
-        console.error('AI processing error:', error);
+        console.error('[AI] Processing error:', error);
         setProcessingStatus('idle');
         return { success: false, message: 'Fehler bei der Verarbeitung' };
       }
     },
-    [cleanupOldInteractions, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem]
+    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem]
   );
 
   const transcribeAudio = useCallback(
     async (audioBase64: string): Promise<string | null> => {
+      console.info('[AI] Transcribing audio...');
       const request: GenerateContentRequest = {
         systemInstruction: 'Du bist ein Transkriptions-Assistent. Transkribiere die Audio-Eingabe wortgetreu auf Deutsch. Gib NUR den transkribierten Text zurück, keine Erklärungen oder Formatierung.',
         contents: [
@@ -200,7 +254,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
       const result = await geminiModel.generateContent(request);
       const text = result.response.text()?.trim();
-      console.info('[AI] Transcription:', text);
+      console.info('[AI] Transcription result:', text);
       return text || null;
     },
     []
@@ -217,7 +271,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         }
         return sendToGemini([{ text: transcription }]);
       } catch (error) {
-        console.error('Transcription error:', error);
+        console.error('[AI] Audio process error:', error);
         setProcessingStatus('idle');
         return { success: false, message: 'Fehler bei der Transkription' };
       }
@@ -238,6 +292,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     const item = existingItems.find((i) => i.id === lastCreatedItem.id);
     if (!item) return false;
 
+    console.info('[AI] Undoing last action:', lastCreatedItem);
     await updateFirecallItem({ ...item, deleted: true });
     setLastCreatedItem(null);
     return true;
