@@ -92,7 +92,13 @@ export async function signInWithGoogle(auth: Auth): Promise<UserCredential> {
     console.info(
       '[googleAuthAdapter] calling FirebaseAuthentication.signInWithGoogle'
     );
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    // skipNativeAuth=false überstimmt die globale Plugin-Config, damit nicht
+    // nur das JS-SDK, sondern auch die native Firebase-Auth-Instanz eine
+    // Session bekommt. Sonst schreiben Foreground-Services (Radiacode-
+    // Tracking) unauthenticated gegen Firestore → PERMISSION_DENIED.
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      skipNativeAuth: false,
+    });
     console.info('[googleAuthAdapter] native sign-in result', {
       hasCredential: !!result?.credential,
       hasIdToken: !!result?.credential?.idToken,

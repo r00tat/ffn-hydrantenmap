@@ -1,5 +1,7 @@
 'use client';
 
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { User } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { signOut as signOutJsClient, useSession } from 'next-auth/react';
@@ -288,6 +290,13 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     // tunnels), which sends users to localhost.
     await signOutJsClient({ redirect: false });
     await auth.signOut();
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await FirebaseAuthentication.signOut();
+      } catch (err) {
+        console.warn('native firebase signOut failed', err);
+      }
+    }
     console.info(`logout completed`);
     if (typeof window !== 'undefined') {
       window.location.assign('/login');
