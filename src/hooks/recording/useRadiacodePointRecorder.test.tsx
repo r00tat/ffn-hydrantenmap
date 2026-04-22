@@ -363,6 +363,59 @@ describe('useRadiacodePointRecorder', () => {
     });
   });
 
+  it('Custom-Rate: zweite Messung unter intervalSec-Threshold wird NICHT geschrieben', async () => {
+    const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
+      async () => ({ id: 'm1' }),
+    );
+    const isAvail = vi
+      .spyOn(nativeTrackBridge, 'isNativeTrackingAvailable')
+      .mockReturnValue(false);
+
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
+        useRadiacodePointRecorder(props),
+      {
+        initialProps: {
+          active: true,
+          layerId: 'l1',
+          sampleRate: { kind: 'custom', intervalSec: 10 } as const,
+          device: DEVICE,
+          measurement: meas(0.1, 5),
+          position: { lat: 48, lng: 16 },
+          addItem,
+          firecallId: 'fc1',
+          creatorEmail: 'u@x',
+          firestoreDb: '',
+        },
+      },
+    );
+    await vi.waitFor(() => expect(addItem).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    // second measurement quickly → below 10s interval, no distance change → no write
+    rerender({
+      active: true,
+      layerId: 'l1',
+      sampleRate: { kind: 'custom', intervalSec: 10 } as const,
+      device: DEVICE,
+      measurement: meas(0.11, 5),
+      position: { lat: 48, lng: 16 },
+      addItem,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(addItem).toHaveBeenCalledTimes(1);
+
+    isAvail.mockRestore();
+  });
+
   describe('native tracking', () => {
     it('delegates to nativeStartTrack/nativeStopTrack when native and skips addItem', async () => {
       const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import TrackStartDialog from './TrackStartDialog';
 
@@ -324,6 +325,57 @@ describe('TrackStartDialog — Radiacode-Status-Gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Starten' }));
     expect(onStart).toHaveBeenCalledWith(
       expect.objectContaining({ mode: 'gps' }),
+    );
+  });
+});
+
+describe('TrackStartDialog — Custom-Modus', () => {
+  it('blendet Dose-Feld im GPS-Mode aus', async () => {
+    const user = userEvent.setup();
+    render(<TrackStartDialog open onClose={vi.fn()} onStart={vi.fn()} />);
+    await user.click(screen.getByLabelText('Custom'));
+    expect(screen.getByLabelText(/Abstand \(m\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Zeitintervall \(s\)/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Dosisleistungs-Delta/)).toBeNull();
+  });
+
+  it('zeigt Dose-Feld im Radiacode-Mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrackStartDialog
+        open
+        onClose={vi.fn()}
+        onStart={vi.fn()}
+        defaultDevice={{ id: 'x', name: 'RC', serial: '1' }}
+        radiacodeStatus="connected"
+      />,
+    );
+    await user.click(screen.getByLabelText(/Strahlenmessung/));
+    await user.click(screen.getByLabelText('Custom'));
+    expect(screen.getByLabelText(/Dosisleistungs-Delta/)).toBeInTheDocument();
+  });
+
+  it('deaktiviert Start, wenn alle Custom-Felder leer', async () => {
+    const user = userEvent.setup();
+    render(<TrackStartDialog open onClose={vi.fn()} onStart={vi.fn()} />);
+    await user.click(screen.getByLabelText('Custom'));
+    const startBtn = screen.getByRole('button', { name: 'Starten' });
+    expect(startBtn).toBeDisabled();
+  });
+
+  it('emittiert custom-struct on Starten', async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    render(<TrackStartDialog open onClose={vi.fn()} onStart={onStart} />);
+    await user.click(screen.getByLabelText('Custom'));
+    await user.type(screen.getByLabelText(/Abstand \(m\)/), '7');
+    await user.type(screen.getByLabelText(/Zeitintervall \(s\)/), '20');
+    await user.click(screen.getByRole('button', { name: 'Starten' }));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'gps',
+        sampleRate: { kind: 'custom', distanceM: 7, intervalSec: 20 },
+      }),
     );
   });
 });

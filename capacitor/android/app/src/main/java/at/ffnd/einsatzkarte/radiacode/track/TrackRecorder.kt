@@ -10,7 +10,12 @@ class TrackRecorder(
     private val nowMs: () -> Long = System::currentTimeMillis,
     private val onWriteSuccess: (MarkerWriteResult) -> Unit = {},
 ) {
-    private data class LastSample(val lat: Double, val lng: Double, val time: Long)
+    private data class LastSample(
+        val lat: Double,
+        val lng: Double,
+        val time: Long,
+        val doseUSvH: Double,
+    )
 
     @Volatile private var last: LastSample? = null
     @Volatile private var stopped = false
@@ -18,6 +23,9 @@ class TrackRecorder(
     fun onMeasurement(measurement: Measurement, loc: LatLng?) {
         if (stopped) return
         if (loc == null) return
+        // Guard: ein einzelner NaN würde sonst bis zum Sitzungsende den Dose-Delta-Gate
+        // vergiften (NaN - x = NaN, abs(NaN) >= schwelle = false).
+        if (!measurement.dosisleistungUSvH.isFinite()) return
 
         val now = nowMs()
         val lastCopy = last
@@ -26,11 +34,12 @@ class TrackRecorder(
         } else {
             val distance = Haversine.distanceMeters(lastCopy.lat, lastCopy.lng, loc.lat, loc.lng)
             val dt = (now - lastCopy.time) / 1000.0
-            SampleGate.shouldSample(distance, dt, config.sampleRate)
+            val doseDelta = measurement.dosisleistungUSvH - lastCopy.doseUSvH
+            SampleGate.shouldSample(distance, dt, doseDelta, config.sampleRate)
         }
         if (!shouldWrite) return
 
-        last = LastSample(loc.lat, loc.lng, now)
+        last = LastSample(loc.lat, loc.lng, now, measurement.dosisleistungUSvH)
         writer.write(
             config = config, measurement = measurement, lat = loc.lat, lng = loc.lng,
             onSuccess = { onWriteSuccess(it) },

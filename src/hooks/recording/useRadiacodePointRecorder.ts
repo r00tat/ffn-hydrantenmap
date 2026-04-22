@@ -6,18 +6,17 @@ import {
   nativeStartTrack,
   nativeStopTrack,
 } from '../radiacode/nativeTrackBridge';
-import { shouldSamplePoint } from '../radiacode/sampling';
+import { decideShouldRecordPoint } from '../radiacode/sampleGate';
 import {
-  RATE_CONFIG,
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
-  SampleRate,
+  SampleRateSpec,
 } from '../radiacode/types';
 
 export interface UseRadiacodePointRecorderParams {
   active: boolean;
   layerId: string;
-  sampleRate: SampleRate;
+  sampleRate: SampleRateSpec;
   device: RadiacodeDeviceRef | null;
   measurement: RadiacodeMeasurement | null;
   position: { lat: number; lng: number } | null;
@@ -33,6 +32,7 @@ interface LastSample {
   lat: number;
   lng: number;
   time: number;
+  doseUSvH: number;
 }
 
 function deviceLabel(device: RadiacodeDeviceRef | null): string {
@@ -99,10 +99,11 @@ export function useRadiacodePointRecorder({
     if (native) return; // native schreibt im Foreground-Service
     if (!measurement || !position) return;
     if (writingRef.current) return;
+    // Guard non-finite dose so NaN/Infinity doesn't poison the delta gate.
+    if (!Number.isFinite(measurement.dosisleistung)) return;
 
     const now = Date.now();
     const last = lastSampleRef.current;
-    const config = RATE_CONFIG[sampleRate];
 
     let shouldWrite: boolean;
     if (!last) {
@@ -113,10 +114,12 @@ export function useRadiacodePointRecorder({
         { lat: position.lat, lng: position.lng },
       );
       const secondsSinceLast = (now - last.time) / 1000;
-      shouldWrite = shouldSamplePoint({
+      const doseRateDeltaUSvH = measurement.dosisleistung - last.doseUSvH;
+      shouldWrite = decideShouldRecordPoint({
         distanceMeters,
-        secondsSinceLast,
-        config,
+        dtSec: secondsSinceLast,
+        doseRateDeltaUSvH,
+        rate: sampleRate,
       });
     }
 
@@ -141,7 +144,12 @@ export function useRadiacodePointRecorder({
         device: deviceLabel(device),
       },
     };
-    lastSampleRef.current = { lat: position.lat, lng: position.lng, time: now };
+    lastSampleRef.current = {
+      lat: position.lat,
+      lng: position.lng,
+      time: now,
+      doseUSvH: measurement.dosisleistung,
+    };
 
     addItem(marker).finally(() => {
       writingRef.current = false;

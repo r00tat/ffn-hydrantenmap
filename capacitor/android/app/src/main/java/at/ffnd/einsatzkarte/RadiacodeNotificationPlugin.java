@@ -156,8 +156,8 @@ public class RadiacodeNotificationPlugin extends Plugin {
         String deviceLabel = call.getString("deviceLabel", "");
         String creator = call.getString("creator", "");
         String firestoreDb = call.getString("firestoreDb", "");
-        if (firecallId == null || layerId == null || sampleRate == null) {
-            call.reject("firecallId, layerId, sampleRate required");
+        if (firecallId == null || layerId == null || (sampleRate == null && call.getString("sampleRateKind") == null)) {
+            call.reject("firecallId, layerId, and (sampleRate or sampleRateKind) required");
             return;
         }
         Log.i(TAG, "plugin.startTrackRecording firecallId=" + firecallId + " layerId=" + layerId + " rate=" + sampleRate);
@@ -169,6 +169,18 @@ public class RadiacodeNotificationPlugin extends Plugin {
         intent.putExtra(RadiacodeForegroundService.EXTRA_DEVICE_LABEL, deviceLabel);
         intent.putExtra(RadiacodeForegroundService.EXTRA_CREATOR, creator);
         intent.putExtra(RadiacodeForegroundService.EXTRA_FIRESTORE_DB, firestoreDb);
+        String kind = call.getString("sampleRateKind");
+        if (kind != null) {
+            intent.putExtra(RadiacodeForegroundService.EXTRA_SAMPLE_RATE_KIND, kind);
+            if ("custom".equals(kind)) {
+                Double intv  = call.getDouble("customIntervalSec");
+                Double dist  = call.getDouble("customDistanceM");
+                Double ddose = call.getDouble("customDoseRateDeltaUSvH");
+                if (intv  != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_INTERVAL, intv.doubleValue());
+                if (dist  != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_DISTANCE, dist.doubleValue());
+                if (ddose != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_DOSE_DELTA, ddose.doubleValue());
+            }
+        }
         startService(intent);
         call.resolve();
     }
@@ -179,6 +191,50 @@ public class RadiacodeNotificationPlugin extends Plugin {
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_TRACK);
         // Kein startForegroundService — der Service läuft bereits (BLE aktiv).
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void startGpsTrack(PluginCall call) {
+        String firecallId = call.getString("firecallId");
+        String lineId     = call.getString("lineId");
+        String firestoreDb= call.getString("firestoreDb", "");
+        String creator    = call.getString("creator", "");
+        String kind       = call.getString("sampleRateKind", "normal");
+        Double initLat    = call.getDouble("initialLat");
+        Double initLng    = call.getDouble("initialLng");
+        if (firecallId == null || lineId == null) {
+            call.reject("firecallId, lineId required");
+            return;
+        }
+        Log.i(TAG, "plugin.startGpsTrack firecallId=" + firecallId + " lineId=" + lineId + " kind=" + kind);
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_START_GPS_TRACK);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRECALL_ID, firecallId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LINE_ID, lineId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRESTORE_DB, firestoreDb);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_CREATOR, creator);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_SAMPLE_RATE_KIND, kind);
+        if (initLat != null) intent.putExtra(RadiacodeForegroundService.EXTRA_INITIAL_LAT, initLat.doubleValue());
+        if (initLng != null) intent.putExtra(RadiacodeForegroundService.EXTRA_INITIAL_LNG, initLng.doubleValue());
+        if ("custom".equals(kind)) {
+            Double intv  = call.getDouble("customIntervalSec");
+            Double dist  = call.getDouble("customDistanceM");
+            Double ddose = call.getDouble("customDoseRateDeltaUSvH");
+            if (intv  != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_INTERVAL, intv.doubleValue());
+            if (dist  != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_DISTANCE, dist.doubleValue());
+            if (ddose != null) intent.putExtra(RadiacodeForegroundService.EXTRA_CUSTOM_DOSE_DELTA, ddose.doubleValue());
+        }
+        startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopGpsTrack(PluginCall call) {
+        Log.i(TAG, "plugin.stopGpsTrack");
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_STOP_GPS_TRACK);
         getContext().startService(intent);
         call.resolve();
     }

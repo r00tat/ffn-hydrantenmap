@@ -24,6 +24,10 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import at.ffnd.einsatzkarte.gpstrack.FirestoreLineUpdater
+import at.ffnd.einsatzkarte.gpstrack.GpsTrackConfig
+import at.ffnd.einsatzkarte.gpstrack.GpsTrackRecorder
+import at.ffnd.einsatzkarte.gpstrack.LineUpdater
 import at.ffnd.einsatzkarte.radiacode.Framing
 import at.ffnd.einsatzkarte.radiacode.GattSession
 import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
@@ -33,7 +37,7 @@ import at.ffnd.einsatzkarte.radiacode.SessionListener
 import at.ffnd.einsatzkarte.radiacode.parseResponse
 import at.ffnd.einsatzkarte.radiacode.track.FirestoreMarkerWriter
 import at.ffnd.einsatzkarte.radiacode.track.LatLng
-import at.ffnd.einsatzkarte.radiacode.track.SampleRateConfig
+import at.ffnd.einsatzkarte.radiacode.track.SampleRate
 import at.ffnd.einsatzkarte.radiacode.track.TrackConfig
 import at.ffnd.einsatzkarte.radiacode.track.TrackRecorder
 import java.util.Date
@@ -69,6 +73,8 @@ class RadiacodeForegroundService : Service() {
         const val ACTION_BLE_DISCONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_DISCONNECT"
         const val ACTION_START_TRACK = "at.ffnd.einsatzkarte.RADIACODE_START_TRACK"
         const val ACTION_STOP_TRACK = "at.ffnd.einsatzkarte.RADIACODE_STOP_TRACK"
+        const val ACTION_START_GPS_TRACK = "at.ffnd.einsatzkarte.GPS_TRACK_START"
+        const val ACTION_STOP_GPS_TRACK = "at.ffnd.einsatzkarte.GPS_TRACK_STOP"
 
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
@@ -80,6 +86,13 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_DEVICE_LABEL = "deviceLabel"
         const val EXTRA_CREATOR = "creator"
         const val EXTRA_FIRESTORE_DB = "firestoreDb"
+        const val EXTRA_LINE_ID = "lineId"
+        const val EXTRA_SAMPLE_RATE_KIND = "sampleRateKind"
+        const val EXTRA_CUSTOM_INTERVAL = "customIntervalSec"
+        const val EXTRA_CUSTOM_DISTANCE = "customDistanceM"
+        const val EXTRA_CUSTOM_DOSE_DELTA = "customDoseRateDeltaUSvH"
+        const val EXTRA_INITIAL_LAT = "initialLat"
+        const val EXTRA_INITIAL_LNG = "initialLng"
 
         private const val TAG = "RadiacodeFg"
         private const val POLL_INTERVAL_MS = 500L
@@ -122,6 +135,7 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var locationActive = false
     @Volatile private var lastLocation: android.location.Location? = null
     @Volatile private var trackRecorder: TrackRecorder? = null
+    @Volatile private var gpsTrackRecorder: GpsTrackRecorder? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -167,8 +181,8 @@ class RadiacodeForegroundService : Service() {
                 // hier stopSelf() rufen, killt Android den gesamten Service
                 // inklusive GATT-Session — siehe Bug-Analyse 2026-04-22.
                 // Session-Teardown ausschliesslich via ACTION_BLE_DISCONNECT.
-                if (session != null) {
-                    Log.w(TAG, "ACTION_STOP ignoriert — BLE-Session aktiv, Service bleibt laufen")
+                if (session != null || gpsTrackRecorder != null) {
+                    Log.w(TAG, "ACTION_STOP ignoriert — Session/GPS-Track aktiv, Service bleibt laufen")
                 } else {
                     Log.i(TAG, "ACTION_STOP — keine Session, Service wird beendet")
                     releaseWakeLock()
@@ -202,16 +216,21 @@ class RadiacodeForegroundService : Service() {
             ACTION_START_TRACK -> {
                 val firecallId = intent.getStringExtra(EXTRA_FIRECALL_ID)
                 val layerId = intent.getStringExtra(EXTRA_LAYER_ID)
-                val rate = intent.getStringExtra(EXTRA_SAMPLE_RATE)
+                val rateStr = intent.getStringExtra(EXTRA_SAMPLE_RATE)
+                val kindStr = intent.getStringExtra(EXTRA_SAMPLE_RATE_KIND)
                 val deviceLabel = intent.getStringExtra(EXTRA_DEVICE_LABEL) ?: ""
                 val creator = intent.getStringExtra(EXTRA_CREATOR) ?: ""
                 val firestoreDb = intent.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
-                if (firecallId.isNullOrBlank() || layerId.isNullOrBlank() || rate.isNullOrBlank()) {
+                if (firecallId.isNullOrBlank() || layerId.isNullOrBlank() ||
+                    (rateStr.isNullOrBlank() && kindStr.isNullOrBlank())
+                ) {
                     Log.w(TAG, "ACTION_START_TRACK rejected — missing required extras")
                 } else {
+                    val parsedRate: SampleRate = if (kindStr != null) parseSampleRate(intent)
+                        else SampleRate.fromString(rateStr!!)
                     val config = TrackConfig(
                         firecallId = firecallId, layerId = layerId,
-                        sampleRate = SampleRateConfig.of(rate),
+                        sampleRate = parsedRate,
                         deviceLabel = deviceLabel, creator = creator,
                         firestoreDb = firestoreDb,
                     )
@@ -226,13 +245,53 @@ class RadiacodeForegroundService : Service() {
                             )
                         },
                     )
-                    Log.i(TAG, "ACTION_START_TRACK firecallId=$firecallId layerId=$layerId rate=$rate")
+                    Log.i(TAG, "ACTION_START_TRACK firecallId=$firecallId layerId=$layerId rate=$parsedRate")
                 }
             }
             ACTION_STOP_TRACK -> {
                 Log.i(TAG, "ACTION_STOP_TRACK")
                 trackRecorder?.stop()
                 trackRecorder = null
+            }
+            ACTION_START_GPS_TRACK -> {
+                val firecallId = intent.getStringExtra(EXTRA_FIRECALL_ID)
+                val lineId     = intent.getStringExtra(EXTRA_LINE_ID)
+                val firestoreDb = intent.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
+                val creator     = intent.getStringExtra(EXTRA_CREATOR) ?: ""
+                if (firecallId.isNullOrBlank() || lineId.isNullOrBlank()) {
+                    Log.w(TAG, "ACTION_START_GPS_TRACK rejected — missing extras")
+                } else {
+                    val rate = parseSampleRate(intent)
+                    val cfg = GpsTrackConfig(
+                        firecallId = firecallId, lineId = lineId,
+                        sampleRate = rate, firestoreDb = firestoreDb, creator = creator,
+                    )
+                    gpsTrackRecorder?.stop()
+                    val fsUpdater = FirestoreLineUpdater(firestoreDb)
+                    gpsTrackRecorder = GpsTrackRecorder(cfg, fsUpdater)
+                    acquireWakeLock()
+                    startHighAccuracyLocation()
+                    val initLat = if (intent.hasExtra(EXTRA_INITIAL_LAT)) intent.getDoubleExtra(EXTRA_INITIAL_LAT, Double.NaN) else Double.NaN
+                    val initLng = if (intent.hasExtra(EXTRA_INITIAL_LNG)) intent.getDoubleExtra(EXTRA_INITIAL_LNG, Double.NaN) else Double.NaN
+                    if (!initLat.isNaN() && !initLng.isNaN()) {
+                        gpsTrackRecorder?.onLocation(initLat, initLng)
+                    }
+                    updateNotificationForState()
+                    Log.i(TAG, "GPS track started firecall=$firecallId line=$lineId rate=$rate")
+                }
+            }
+            ACTION_STOP_GPS_TRACK -> {
+                Log.i(TAG, "GPS track stop")
+                gpsTrackRecorder?.stop()
+                gpsTrackRecorder = null
+                if (session == null) {
+                    stopHighAccuracyLocation()
+                    releaseWakeLock()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                } else {
+                    updateNotificationForState()
+                }
             }
         }
         return START_NOT_STICKY
@@ -290,6 +349,8 @@ class RadiacodeForegroundService : Service() {
         teardownSession()
         trackRecorder?.stop()
         trackRecorder = null
+        gpsTrackRecorder?.stop()
+        gpsTrackRecorder = null
         stopHighAccuracyLocation()
         releaseWakeLock()
         super.onDestroy()
@@ -297,6 +358,17 @@ class RadiacodeForegroundService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.w(TAG, "onTaskRemoved — app swiped away")
+        if (gpsTrackRecorder != null) {
+            Log.i(TAG, "onTaskRemoved — stopping GPS track (user swiped)")
+            gpsTrackRecorder?.stop()
+            gpsTrackRecorder = null
+            if (session == null) {
+                stopHighAccuracyLocation()
+                releaseWakeLock()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
         super.onTaskRemoved(rootIntent)
     }
 
@@ -470,7 +542,10 @@ class RadiacodeForegroundService : Service() {
                 // WebView konsumiert die Position selbst. Wir merken zusätzlich
                 // den letzten Fix, damit TrackRecorder auch im Hintergrund weiss,
                 // wo der nächste Marker hinsoll.
-                result.lastLocation?.let { lastLocation = it }
+                result.lastLocation?.let { loc ->
+                    lastLocation = loc
+                    gpsTrackRecorder?.onLocation(loc.latitude, loc.longitude)
+                }
             }
         }
         locationCallback = cb
@@ -497,6 +572,29 @@ class RadiacodeForegroundService : Service() {
         }
         locationCallback = null
         locationActive = false
+    }
+
+    private fun parseSampleRate(intent: Intent): SampleRate {
+        val kind = intent.getStringExtra(EXTRA_SAMPLE_RATE_KIND) ?: "normal"
+        if (kind != "custom") return SampleRate.fromString(kind)
+        fun dbl(name: String): Double? =
+            if (intent.hasExtra(name)) intent.getDoubleExtra(name, Double.NaN).takeIf { !it.isNaN() }
+            else null
+        return SampleRate.Custom(
+            maxIntervalSec       = dbl(EXTRA_CUSTOM_INTERVAL),
+            minDistanceMeters    = dbl(EXTRA_CUSTOM_DISTANCE),
+            minDoseRateDeltaUSvH = dbl(EXTRA_CUSTOM_DOSE_DELTA),
+        )
+    }
+
+    private fun updateNotificationForState() {
+        val title = when {
+            session != null && gpsTrackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
+            gpsTrackRecorder != null -> "GPS-Aufzeichnung läuft"
+            else -> lastTitle
+        }
+        lastTitle = title
+        ensureForeground()
     }
 
     private fun encodeSetTime(d: Date): ByteArray {

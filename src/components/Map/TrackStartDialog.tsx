@@ -20,7 +20,13 @@ import Typography from '@mui/material/Typography';
 import { useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { FirecallLayer } from '../firebase/firestore';
-import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
+import {
+  CustomSampleRate,
+  isCustomSampleRate,
+  RadiacodeDeviceRef,
+  SampleRate,
+  SampleRateSpec,
+} from '../../hooks/radiacode/types';
 import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 
 export type TrackMode = 'gps' | 'radiacode';
@@ -32,7 +38,7 @@ export type LayerChoice =
 export interface TrackStartConfig {
   mode: TrackMode;
   layer: LayerChoice | null;
-  sampleRate: SampleRate;
+  sampleRate: SampleRateSpec;
   device: RadiacodeDeviceRef | null;
 }
 
@@ -71,6 +77,8 @@ const RADIACODE_STATUS_COLOR: Record<
 
 const NEW_LAYER_VALUE = '__new__';
 
+type RateKind = SampleRate | 'custom';
+
 export default function TrackStartDialog({
   open,
   onClose,
@@ -91,17 +99,80 @@ export default function TrackStartDialog({
   const [layerSelection, setLayerSelection] = useState<string>(NEW_LAYER_VALUE);
   const [newLayerName, setNewLayerName] = useState<string>(defaultNewLayerName);
   const [sampleRate, setSampleRate] = useState<SampleRate>('normal');
+  const [rateKind, setRateKind] = useState<RateKind>('normal');
+  const [customInterval, setCustomInterval] = useState<string>('');
+  const [customDistance, setCustomDistance] = useState<string>('');
+  const [customDose, setCustomDose] = useState<string>('');
+
+  const handleRateKindChange = (value: RateKind) => {
+    setRateKind(value);
+    if (value === 'custom') {
+      // Fresh start per plan: clear custom fields when switching to Custom mode.
+      setCustomInterval('');
+      setCustomDistance('');
+      setCustomDose('');
+    } else {
+      setSampleRate(value);
+    }
+  };
 
   const handleLayerChange = (value: string) => {
     setLayerSelection(value);
     if (value === NEW_LAYER_VALUE) {
       setSampleRate('normal');
+      setRateKind('normal');
+      setCustomInterval('');
+      setCustomDistance('');
+      setCustomDose('');
     } else {
       const chosen = existingRadiacodeLayers.find((l) => l.id === value);
       if (chosen?.sampleRate) {
-        setSampleRate(chosen.sampleRate);
+        if (isCustomSampleRate(chosen.sampleRate)) {
+          setRateKind('custom');
+          setCustomInterval(
+            chosen.sampleRate.intervalSec !== undefined
+              ? String(chosen.sampleRate.intervalSec)
+              : '',
+          );
+          setCustomDistance(
+            chosen.sampleRate.distanceM !== undefined
+              ? String(chosen.sampleRate.distanceM)
+              : '',
+          );
+          setCustomDose(
+            chosen.sampleRate.doseRateDeltaUSvH !== undefined
+              ? String(chosen.sampleRate.doseRateDeltaUSvH)
+              : '',
+          );
+        } else {
+          setSampleRate(chosen.sampleRate);
+          setRateKind(chosen.sampleRate);
+          setCustomInterval('');
+          setCustomDistance('');
+          setCustomDose('');
+        }
       }
     }
+  };
+
+  const parsePositive = (s: string): number | undefined => {
+    if (s.trim() === '') return undefined;
+    const n = Number(s);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  const buildSampleRate = (): SampleRateSpec => {
+    if (rateKind !== 'custom') return sampleRate;
+    const out: CustomSampleRate = { kind: 'custom' };
+    const i = parsePositive(customInterval);
+    const d = parsePositive(customDistance);
+    if (i !== undefined) out.intervalSec = i;
+    if (d !== undefined) out.distanceM = d;
+    if (mode === 'radiacode') {
+      const dose = parsePositive(customDose);
+      if (dose !== undefined) out.doseRateDeltaUSvH = dose;
+    }
+    return out;
   };
 
   const buildLayerChoice = (): LayerChoice | null => {
@@ -116,10 +187,24 @@ export default function TrackStartDialog({
     onStart({
       mode,
       layer: buildLayerChoice(),
-      sampleRate,
+      sampleRate: buildSampleRate(),
       device: mode === 'radiacode' ? defaultDevice : null,
     });
   };
+
+  const customEmpty =
+    rateKind === 'custom' &&
+    customInterval.trim() === '' &&
+    customDistance.trim() === '' &&
+    (mode !== 'radiacode' || customDose.trim() === '');
+  const radiacodeGate =
+    mode === 'radiacode' && radiacodeStatus !== 'connected';
+  const startDisabled = radiacodeGate || customEmpty;
+  const startDisabledTooltip = radiacodeGate
+    ? 'Radiacode nicht verbunden — bitte zuerst verbinden'
+    : customEmpty
+      ? 'Mindestens ein Schwellwert erforderlich'
+      : '';
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -173,69 +258,109 @@ export default function TrackStartDialog({
                   fullWidth
                 />
               )}
-
-              <FormControl>
-                <FormLabel id="track-rate-label">Messrate</FormLabel>
-                <RadioGroup
-                  aria-labelledby="track-rate-label"
-                  row
-                  value={sampleRate}
-                  onChange={(e) => setSampleRate(e.target.value as SampleRate)}
-                >
-                  <FormControlLabel
-                    value="niedrig"
-                    control={<Radio />}
-                    label="Niedrig"
-                  />
-                  <FormControlLabel
-                    value="normal"
-                    control={<Radio />}
-                    label="Normal"
-                  />
-                  <FormControlLabel
-                    value="hoch"
-                    control={<Radio />}
-                    label="Hoch"
-                  />
-                </RadioGroup>
-              </FormControl>
-
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 2,
-                }}
-              >
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Gerät
-                  </Typography>
-                  <Typography variant="body1">
-                    {defaultDevice
-                      ? `${defaultDevice.name} (${defaultDevice.serial})`
-                      : 'Kein Standardgerät'}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    sx={{ mt: 1 }}
-                    color={RADIACODE_STATUS_COLOR[radiacodeStatus]}
-                    label={RADIACODE_STATUS_LABEL[radiacodeStatus]}
-                  />
-                </Box>
-                <Button onClick={() => onRequestDevice?.()} variant="outlined">
-                  Wechseln
-                </Button>
-              </Box>
             </>
+          )}
+
+          <FormControl>
+            <FormLabel id="track-rate-label">Messrate</FormLabel>
+            <RadioGroup
+              aria-labelledby="track-rate-label"
+              row
+              value={rateKind}
+              onChange={(e) =>
+                handleRateKindChange(e.target.value as RateKind)
+              }
+            >
+              <FormControlLabel
+                value="niedrig"
+                control={<Radio />}
+                label="Niedrig"
+              />
+              <FormControlLabel
+                value="normal"
+                control={<Radio />}
+                label="Normal"
+              />
+              <FormControlLabel
+                value="hoch"
+                control={<Radio />}
+                label="Hoch"
+              />
+              <FormControlLabel
+                value="custom"
+                control={<Radio />}
+                label="Custom"
+              />
+            </RadioGroup>
+          </FormControl>
+
+          {rateKind === 'custom' && (
+            <Stack spacing={2}>
+              <TextField
+                label="Zeitintervall (s)"
+                type="number"
+                value={customInterval}
+                onChange={(e) => setCustomInterval(e.target.value)}
+                slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+                fullWidth
+              />
+              <TextField
+                label="Abstand (m)"
+                type="number"
+                value={customDistance}
+                onChange={(e) => setCustomDistance(e.target.value)}
+                slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+                fullWidth
+              />
+              {mode === 'radiacode' && (
+                <TextField
+                  label="Dosisleistungs-Delta (µSv/h)"
+                  type="number"
+                  value={customDose}
+                  onChange={(e) => setCustomDose(e.target.value)}
+                  slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+                  fullWidth
+                />
+              )}
+            </Stack>
+          )}
+
+          {mode === 'radiacode' && (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+              }}
+            >
+              <Box>
+                <Typography variant="body2" color="text.secondary">
+                  Gerät
+                </Typography>
+                <Typography variant="body1">
+                  {defaultDevice
+                    ? `${defaultDevice.name} (${defaultDevice.serial})`
+                    : 'Kein Standardgerät'}
+                </Typography>
+                <Chip
+                  size="small"
+                  sx={{ mt: 1 }}
+                  color={RADIACODE_STATUS_COLOR[radiacodeStatus]}
+                  label={RADIACODE_STATUS_LABEL[radiacodeStatus]}
+                />
+              </Box>
+              <Button onClick={() => onRequestDevice?.()} variant="outlined">
+                Wechseln
+              </Button>
+            </Box>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Abbrechen</Button>
-        {mode === 'radiacode' && radiacodeStatus !== 'connected' ? (
-          <Tooltip title="Radiacode nicht verbunden — bitte zuerst verbinden">
+        {startDisabled ? (
+          <Tooltip title={startDisabledTooltip}>
             <span>
               <Button disabled variant="contained">
                 Starten

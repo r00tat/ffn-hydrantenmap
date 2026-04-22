@@ -12,6 +12,42 @@ export const RATE_CONFIG: Record<SampleRate, SampleRateConfig> = {
   hoch: { minDistance: 2, minInterval: 1, maxInterval: 5 },
 };
 
+export type SampleRatePreset = SampleRate;
+
+export interface CustomSampleRate {
+  kind: 'custom';
+  intervalSec?: number;
+  distanceM?: number;
+  doseRateDeltaUSvH?: number;
+}
+
+export type SampleRateSpec = SampleRatePreset | CustomSampleRate;
+
+export function isCustomSampleRate(s: SampleRateSpec): s is CustomSampleRate {
+  return typeof s === 'object' && s !== null && s.kind === 'custom';
+}
+
+export interface BridgeSampleRatePayload {
+  sampleRateKind: SampleRatePreset | 'custom';
+  customIntervalSec?: number;
+  customDistanceM?: number;
+  customDoseRateDeltaUSvH?: number;
+}
+
+export function serializeSampleRateToBridge(s: SampleRateSpec): BridgeSampleRatePayload {
+  if (!isCustomSampleRate(s)) return { sampleRateKind: s };
+  const out: BridgeSampleRatePayload = { sampleRateKind: 'custom' };
+  if (s.intervalSec != null) out.customIntervalSec = s.intervalSec;
+  if (s.distanceM != null) out.customDistanceM = s.distanceM;
+  if (s.doseRateDeltaUSvH != null) out.customDoseRateDeltaUSvH = s.doseRateDeltaUSvH;
+  return out;
+}
+
+export function resolveCustomThresholds(s: SampleRateSpec): CustomSampleRate | null {
+  if (!isCustomSampleRate(s)) return null;
+  return s;
+}
+
 export interface RadiacodeMeasurement {
   dosisleistung: number; // µSv/h
   cps: number;

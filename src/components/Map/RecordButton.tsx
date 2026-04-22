@@ -8,7 +8,7 @@ import { useGpsLineRecorder } from '../../hooks/recording/useGpsLineRecorder';
 import { useRadiacodePointRecorder } from '../../hooks/recording/useRadiacodePointRecorder';
 import { loadDefaultDevice } from '../../hooks/radiacode/devicePreference';
 import { createRadiacodeLayer } from '../../hooks/radiacode/layerFactory';
-import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
+import { RadiacodeDeviceRef, SampleRateSpec } from '../../hooks/radiacode/types';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
@@ -31,7 +31,7 @@ export default function RecordButton() {
   const [radiacodeActive, setRadiacodeActive] = useState(false);
   const [radiacodeLayerId, setRadiacodeLayerId] = useState<string | null>(null);
   const [radiacodeSampleRate, setRadiacodeSampleRate] =
-    useState<SampleRate>('normal');
+    useState<SampleRateSpec>('normal');
   const [defaultDevice, setDefaultDevice] = useState<RadiacodeDeviceRef | null>(
     null,
   );
@@ -81,7 +81,7 @@ export default function RecordButton() {
     async (config: TrackStartConfig) => {
       setDialogOpen(false);
       if (config.mode === 'gps') {
-        gps.startRecording(L.latLng(position));
+        gps.startRecording(L.latLng(position), config.sampleRate);
         return;
       }
       // radiacode mode

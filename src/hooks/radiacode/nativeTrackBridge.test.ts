@@ -19,7 +19,7 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 describe('nativeTrackBridge', () => {
-  it('maps track opts 1:1 to the plugin call', async () => {
+  it('maps preset track opts to sampleRateKind', async () => {
     const { nativeStartTrack } = await import('./nativeTrackBridge');
     await nativeStartTrack({
       firecallId: 'fc1',
@@ -32,11 +32,32 @@ describe('nativeTrackBridge', () => {
     expect(mockStartTrack).toHaveBeenCalledWith({
       firecallId: 'fc1',
       layerId: 'l1',
-      sampleRate: 'normal',
+      deviceLabel: 'RC-103 (S1)',
+      creator: 'u@x',
+      firestoreDb: '',
+      sampleRateKind: 'normal',
+    });
+  });
+
+  it('maps custom track opts to sampleRateKind + custom fields', async () => {
+    const { nativeStartTrack } = await import('./nativeTrackBridge');
+    await nativeStartTrack({
+      firecallId: 'fc1',
+      layerId: 'l1',
+      sampleRate: { kind: 'custom', intervalSec: 5, doseRateDeltaUSvH: 0.2 },
       deviceLabel: 'RC-103 (S1)',
       creator: 'u@x',
       firestoreDb: '',
     });
+    expect(mockStartTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sampleRateKind: 'custom',
+        customIntervalSec: 5,
+        customDoseRateDeltaUSvH: 0.2,
+      }),
+    );
+    const payload = mockStartTrack.mock.calls[mockStartTrack.mock.calls.length - 1]![0] as Record<string, unknown>;
+    expect(payload.customDistanceM).toBeUndefined();
   });
 
   it('calls the plugin stop method', async () => {

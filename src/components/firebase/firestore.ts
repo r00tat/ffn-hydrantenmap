@@ -5,6 +5,7 @@
  */
 
 import { Hydrant } from '../../common/gis-objects';
+import type { SampleRateSpec } from '../../hooks/radiacode/types';
 
 /**
  * collection names
@@ -109,7 +110,7 @@ export interface FirecallLayer extends FirecallItem {
   dataSchema?: DataSchemaField[];
   heatmapConfig?: HeatmapConfig;
   layerType?: 'generic' | 'radiacode';
-  sampleRate?: 'niedrig' | 'normal' | 'hoch';
+  sampleRate?: SampleRateSpec;
 }
 
 export interface DrawingStroke {
