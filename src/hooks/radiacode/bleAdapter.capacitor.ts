@@ -1,5 +1,12 @@
 import { BleClient } from '@capacitor-community/bluetooth-le';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
+import {
+  isNativeAvailable,
+  nativeConnect,
+  nativeDisconnect,
+  nativeWrite,
+  onNativeNotification,
+} from './nativeBridge';
 import { RadiacodeNotification } from './radiacodeNotification';
 import { RadiacodeDeviceRef } from './types';
 
@@ -51,6 +58,15 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async connect(deviceId) {
+    if (isNativeAvailable()) {
+      // Der native Foreground-Service übernimmt die GATT-Session exklusiv
+      // (Phase 2, siehe docs/plans/2026-04-21-radiacode-native-polling.md).
+      // `@capacitor-community/bluetooth-le` darf daher nicht parallel
+      // connecten — sonst hält Android zwei GATT-Clients offen.
+      await nativeConnect(deviceId);
+      connectedDevices.add(deviceId);
+      return;
+    }
     const client = await ensureBleClient();
     await client.connect(deviceId, (id) => {
       const h = disconnectHandlers.get(id);
@@ -60,6 +76,11 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async disconnect(deviceId) {
+    if (isNativeAvailable()) {
+      await nativeDisconnect();
+      connectedDevices.delete(deviceId);
+      return;
+    }
     const client = await ensureBleClient();
     try {
       await client.stopNotifications(
@@ -75,6 +96,10 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async onNotification(deviceId, handler): Promise<Unsubscribe> {
+    if (isNativeAvailable()) {
+      // Notifications werden nativ gepusht (siehe RadiacodeForegroundService).
+      return onNativeNotification((bytes) => handler(bytes));
+    }
     const client = await ensureBleClient();
     await client.startNotifications(
       deviceId,
@@ -98,6 +123,10 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async write(deviceId, data) {
+    if (isNativeAvailable()) {
+      await nativeWrite(data);
+      return;
+    }
     const client = await ensureBleClient();
     for (let pos = 0; pos < data.length; pos += WRITE_CHUNK_SIZE) {
       const chunk = data.slice(pos, Math.min(pos + WRITE_CHUNK_SIZE, data.length));

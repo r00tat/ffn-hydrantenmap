@@ -1,4 +1,5 @@
 import { BleAdapter, Unsubscribe } from './bleAdapter';
+import { isNativeAvailable, onNativeMeasurement } from './nativeBridge';
 import {
   COMMAND,
   MAX_WRITE_CHUNK,
@@ -113,6 +114,7 @@ export class RadiacodeClient {
   private sessionListeners = new Set<(e: SessionEvent) => void>();
   private disconnectUnsub: Unsubscribe | null = null;
   private reconnecting = false;
+  private nativeMeasurementUnsub: Unsubscribe | null = null;
 
   constructor(
     private readonly adapter: BleAdapter,
@@ -124,15 +126,21 @@ export class RadiacodeClient {
       this.deviceId,
       (chunk) => this.handleNotification(chunk),
     );
-    await this.execute(
-      COMMAND.SET_EXCHANGE,
-      new Uint8Array([0x01, 0xff, 0x12, 0xff]),
-    );
-    await this.execute(COMMAND.SET_TIME, encodeSetTime(now));
-    // Write VSFR DEVICE_TIME = 0 (matches cdump init).
-    const args = new Uint8Array(8);
-    new DataView(args.buffer).setUint32(0, VSFR.DEVICE_TIME, true);
-    await this.execute(COMMAND.WR_VIRT_SFR, args);
+    if (isNativeAvailable()) {
+      // Auf Android übernimmt der native Foreground-Service Handshake +
+      // Polling. Wir müssen die Init-Frames nicht noch einmal rauswerfen —
+      // der Service hat SET_EXCHANGE/SET_TIME/DEVICE_TIME=0 bereits gesendet.
+    } else {
+      await this.execute(
+        COMMAND.SET_EXCHANGE,
+        new Uint8Array([0x01, 0xff, 0x12, 0xff]),
+      );
+      await this.execute(COMMAND.SET_TIME, encodeSetTime(now));
+      // Write VSFR DEVICE_TIME = 0 (matches cdump init).
+      const args = new Uint8Array(8);
+      new DataView(args.buffer).setUint32(0, VSFR.DEVICE_TIME, true);
+      await this.execute(COMMAND.WR_VIRT_SFR, args);
+    }
 
     // Register disconnect watcher so we can auto-reconnect during an active
     // spectrum session if the link drops unexpectedly.
@@ -197,6 +205,12 @@ export class RadiacodeClient {
   ): void {
     if (this.polling) return;
     this.polling = true;
+    if (isNativeAvailable()) {
+      // Nativer Pfad: Messwerte kommen per Plugin-Event, der Poll-Takt läuft
+      // in Kotlin im Foreground-Service (überlebt WebView-Drosselung).
+      this.nativeMeasurementUnsub = onNativeMeasurement(onMeasurement);
+      return;
+    }
     const tick = async () => {
       if (!this.polling) return;
       try {
@@ -393,6 +407,10 @@ export class RadiacodeClient {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
+    }
+    if (this.nativeMeasurementUnsub) {
+      this.nativeMeasurementUnsub();
+      this.nativeMeasurementUnsub = null;
     }
     this.stopSpectrumPolling();
     this.disconnectUnsub?.();
