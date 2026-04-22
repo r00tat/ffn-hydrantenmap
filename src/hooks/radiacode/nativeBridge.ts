@@ -108,18 +108,30 @@ export async function nativeDisconnect(): Promise<void> {
 }
 
 function toMeasurement(e: NativeMeasurementEvent): RadiacodeMeasurement {
+  // Rare-Record-Felder (dose, durationSec, temperatureC, chargePct) liefert
+  // der Foreground-Service nur alle paar Sekunden — ein Tick ohne Rare-Record
+  // kommt ohne diese Keys im Event an. Wir dürfen sie deshalb NICHT als
+  // `undefined` ins Ergebnis schreiben, sonst überschreibt der Spread in
+  // `useRadiacodeDevice` (`setMeasurement((prev) => ({...prev, ...m}))`) die
+  // zuletzt gesehenen Werte und die UI zeigt dauerhaft „—" für Gesamtdosis,
+  // Temperatur, Akku und Messdauer.
   return {
     dosisleistung: e.dosisleistungUSvH,
     cps: e.cps,
     timestamp: e.timestampMs,
-    dosisleistungErrPct: e.dosisleistungErrPct,
-    cpsErrPct: e.cpsErrPct,
-    dose: e.doseUSv,
-    durationSec: e.durationSec,
-    temperatureC: e.temperatureC,
-    chargePct: e.chargePct,
+    ...(e.dosisleistungErrPct !== undefined && {
+      dosisleistungErrPct: e.dosisleistungErrPct,
+    }),
+    ...(e.cpsErrPct !== undefined && { cpsErrPct: e.cpsErrPct }),
+    ...(e.doseUSv !== undefined && { dose: e.doseUSv }),
+    ...(e.durationSec !== undefined && { durationSec: e.durationSec }),
+    ...(e.temperatureC !== undefined && { temperatureC: e.temperatureC }),
+    ...(e.chargePct !== undefined && { chargePct: e.chargePct }),
   };
 }
+
+/** Testhook — exponiert den ansonsten modulprivaten Mapper. */
+export const toMeasurementForTest = toMeasurement;
 
 export function onNativeMeasurement(
   handler: (m: RadiacodeMeasurement) => void,
