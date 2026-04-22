@@ -12,6 +12,7 @@ import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useServerActionErrorDetection from '../../hooks/useServerActionErrorDetection';
 import useServiceWorkerUpdate from '../../hooks/useServiceWorkerUpdate';
+import { useCapacitorAppExit } from '../../hooks/useCapacitorAppExit';
 import styles from '../../styles/Home.module.css';
 import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
 import ChatMessageDisplay from '../chat/chat-message';
@@ -85,6 +86,7 @@ function ServiceWorkerUpdateListener() {
 
 export default function AppProviders({ children }: AppProps) {
   useFirebaseAppCheck();
+  useCapacitorAppExit();
 
   return (
     <Suspense
