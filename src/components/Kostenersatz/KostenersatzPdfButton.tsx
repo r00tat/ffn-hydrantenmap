@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { downloadBlob } from '../firebase/download';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 
 export interface KostenersatzPdfButtonProps {
   calculation: KostenersatzCalculation;
@@ -14,6 +15,7 @@ export interface KostenersatzPdfButtonProps {
   rates?: unknown[];
   variant?: 'text' | 'outlined' | 'contained';
   size?: 'small' | 'medium' | 'large';
+  onClick?: () => Promise<boolean | string | undefined>;
 }
 
 export default function KostenersatzPdfButton({
@@ -21,17 +23,47 @@ export default function KostenersatzPdfButton({
   firecall,
   variant = 'outlined',
   size = 'medium',
+  onClick,
 }: KostenersatzPdfButtonProps) {
   const [generating, setGenerating] = useState(false);
+  const { idToken } = useFirebaseLogin();
 
   const handleGeneratePdf = async () => {
     setGenerating(true);
     try {
+      let calcId = calculation.id;
+
+      // If an onClick handler is provided (e.g. to save the calculation first), call it
+      if (onClick) {
+        const result = await onClick();
+        if (result === false || result === undefined) {
+          setGenerating(false);
+          return;
+        }
+        // If result is a string, it's the (potentially new) calculation ID
+        if (typeof result === 'string') {
+          calcId = result;
+        }
+      }
+
+      // Re-check ID after potential save
+      if (!calcId) {
+        throw new Error('Calculation ID is missing');
+      }
+
       const params = new URLSearchParams({
         firecallId: firecall.id!,
-        calculationId: calculation.id!,
+        calculationId: calcId,
       });
-      const response = await fetch(`/api/kostenersatz/pdf?${params}`);
+      
+      const headers: HeadersInit = {};
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      }
+
+      const response = await fetch(`/api/kostenersatz/pdf?${params}`, {
+        headers,
+      });
 
       if (!response.ok) {
         throw new Error(`PDF generation failed: ${response.statusText}`);
@@ -55,7 +87,7 @@ export default function KostenersatzPdfButton({
       size={size}
       startIcon={generating ? <CircularProgress size={16} /> : <PictureAsPdfIcon />}
       onClick={handleGeneratePdf}
-      disabled={generating}
+      disabled={generating || (!calculation.id && !onClick)}
     >
       {generating ? 'Erstelle PDF...' : 'PDF herunterladen'}
     </Button>

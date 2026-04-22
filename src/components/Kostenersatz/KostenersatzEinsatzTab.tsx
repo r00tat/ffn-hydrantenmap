@@ -41,14 +41,14 @@ export default function KostenersatzEinsatzTab({
 
   // Use override values if set, otherwise fall back to firecall data
   const displayDescription =
-    calculation.nameOverride ||
+    calculation.nameOverride ??
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
 
   // Start/end date values for datetime-local inputs
   const displayStartDate =
-    calculation.startDateOverride || firecall.date;
+    calculation.startDateOverride ?? firecall.date;
   const startValue = toDateTimeLocalValue(displayStartDate);
-  const displayEndDate = calculation.endDateOverride || firecall.abruecken;
+  const displayEndDate = calculation.endDateOverride ?? firecall.abruecken;
   const endValue = toDateTimeLocalValue(displayEndDate);
 
   return (
