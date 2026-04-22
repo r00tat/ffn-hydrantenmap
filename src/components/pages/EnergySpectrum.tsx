@@ -570,6 +570,7 @@ export default function EnergySpectrum() {
         data: padded,
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
         color: colorForSpectrum(s, firestoreIdx),
+        liveTime: s.data.liveTime,
       };
     });
 

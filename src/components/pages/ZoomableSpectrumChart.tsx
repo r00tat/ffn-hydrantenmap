@@ -47,6 +47,8 @@ export interface ZoomableSpectrumChartProps {
     label?: string;
     color?: string;
     area?: boolean;
+    /** Live time in seconds, used to compute CPS in the hover popup. */
+    liveTime?: number;
   }[];
   height?: number;
   logScale?: boolean;
@@ -59,10 +61,19 @@ export interface ZoomableSpectrumChartProps {
 /** Minimum span (keV) to prevent degenerate zoom. */
 const MIN_SPAN = 5;
 
+/** Chart margins — must match the margin prop passed to <LineChart>. */
+const CHART_MARGIN = { top: 20, right: 20, bottom: 50, left: 60 } as const;
+
+/** Width of the actual plot area inside the container. */
+function plotWidth(containerWidth: number): number {
+  return Math.max(0, containerWidth - CHART_MARGIN.left - CHART_MARGIN.right);
+}
+
 /** Pan sensitivity: fraction of visible span per horizontal pixel. */
 function pixelsToKev(dxPixels: number, span: number, widthPx: number): number {
-  if (widthPx <= 0) return 0;
-  return -(dxPixels / widthPx) * span;
+  const plotPx = plotWidth(widthPx);
+  if (plotPx <= 0) return 0;
+  return -(dxPixels / plotPx) * span;
 }
 
 /** Convert a client X pixel inside the chart container to keV. */
@@ -71,8 +82,10 @@ function pixelToKev(
   containerWidth: number,
   xRange: Range,
 ): number {
-  if (containerWidth <= 0) return xRange[0];
-  const frac = Math.max(0, Math.min(1, pxWithinContainer / containerWidth));
+  const plotPx = plotWidth(containerWidth);
+  if (plotPx <= 0) return xRange[0];
+  const pxWithinPlot = pxWithinContainer - CHART_MARGIN.left;
+  const frac = Math.max(0, Math.min(1, pxWithinPlot / plotPx));
   return xRange[0] + frac * (xRange[1] - xRange[0]);
 }
 
@@ -337,6 +350,46 @@ export default function ZoomableSpectrumChart({
     [hover],
   );
 
+  // Per-series counts/CPS at the cursor position. Uses the nearest x-axis
+  // index to pick a bin from each series' `data` array.
+  const hoverSeriesValues = useMemo<
+    {
+      label: string;
+      color?: string;
+      counts: number;
+      cps: number | null;
+    }[]
+  >(() => {
+    if (!hover || !chartSeries || !xEnergies || xEnergies.length === 0) {
+      return [];
+    }
+    let idx = 0;
+    let bestDiff = Infinity;
+    for (let i = 0; i < xEnergies.length; i++) {
+      const diff = Math.abs(xEnergies[i] - hover.kev);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        idx = i;
+      }
+    }
+    return chartSeries.map((s, i) => {
+      const anyS = s as {
+        data: number[];
+        label?: string;
+        color?: string;
+        liveTime?: number;
+      };
+      const counts = anyS.data[idx] ?? 0;
+      const live = typeof anyS.liveTime === 'number' ? anyS.liveTime : null;
+      return {
+        label: anyS.label ?? `Serie ${i + 1}`,
+        color: anyS.color,
+        counts,
+        cps: live && live > 0 ? counts / live : null,
+      };
+    });
+  }, [hover, chartSeries, xEnergies]);
+
   // Virtual anchor element for the Popper so it tracks the cursor precisely.
   // Popper needs getBoundingClientRect; we build a minimal stub from the
   // hover state. When `hover` is null the anchor is null and the Popper stays
@@ -413,12 +466,17 @@ export default function ZoomableSpectrumChart({
             scaleType: logScale ? 'log' : 'linear',
           },
         ]}
-        series={chartSeries.map((s) => ({
-          ...s,
-          showMark: false,
-          curve: 'linear' as const,
-        }))}
-        margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
+        series={chartSeries.map((s) => {
+          // MUI LineChart doesn't know about our custom `liveTime` prop — strip it.
+          const { liveTime: _liveTime, ...rest } = s as typeof s & {
+            liveTime?: number;
+          };
+          void _liveTime;
+          return { ...rest, showMark: false, curve: 'linear' as const };
+        })}
+        margin={CHART_MARGIN}
+        axisHighlight={{ x: 'none', y: 'none' }}
+        slotProps={{ tooltip: { trigger: 'none' } }}
       >
         {overlays}
         {hover && (
@@ -486,6 +544,48 @@ export default function ZoomableSpectrumChart({
                   keV, I={(h.intensity * 100).toFixed(1)}%)
                 </Typography>
               ))
+            )}
+            {hoverSeriesValues.length > 0 && (
+              <Box
+                sx={{
+                  mt: 0.5,
+                  pt: 0.5,
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                {hoverSeriesValues.map((v) => (
+                  <Typography
+                    key={v.label}
+                    variant="caption"
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                    }}
+                  >
+                    {v.color && (
+                      <Box
+                        component="span"
+                        sx={{
+                          display: 'inline-block',
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: v.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    <span>
+                      <strong>{v.label}:</strong>{' '}
+                      {v.cps !== null
+                        ? `${v.cps.toFixed(2)} cps`
+                        : `${v.counts} counts`}
+                    </span>
+                  </Typography>
+                ))}
+              </Box>
             )}
           </Paper>
         )}

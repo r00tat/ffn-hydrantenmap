@@ -109,6 +109,7 @@ export default function SpectrumChart({
         data: padded,
         label: s.data.sampleName || `Spektrum ${idx + 1}`,
         color: SERIES_COLORS[idx % SERIES_COLORS.length],
+        liveTime: s.data.liveTime,
       };
     });
 
