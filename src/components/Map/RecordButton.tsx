@@ -43,7 +43,6 @@ export default function RecordButton() {
     device,
     scan,
     connectDevice,
-    disconnect,
   } = useRadiacode();
 
   useRadiacodePointRecorder({
@@ -102,16 +101,17 @@ export default function RecordButton() {
     [gps, position, connectDevice, addFirecallItem],
   );
 
-  const handleStop = useCallback(async () => {
+  const handleStop = useCallback(() => {
     if (gps.isRecording) {
       gps.stopRecording(L.latLng(position));
     }
     if (radiacodeActive) {
+      // Aufzeichnung stoppen, aber BLE-Verbindung zum Radiacode halten, damit
+      // die Live-Werte (Dosimetrie, Spektrum) weiter sichtbar bleiben.
       setRadiacodeActive(false);
       setRadiacodeLayerId(null);
-      await disconnect();
     }
-  }, [gps, position, radiacodeActive, disconnect]);
+  }, [gps, position, radiacodeActive]);
 
   const handleClick = useCallback(
     (event: React.MouseEvent) => {
