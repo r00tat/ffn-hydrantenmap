@@ -33,6 +33,13 @@ import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
 
+import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import android.graphics.Color;
+import android.view.Window;
+import android.view.WindowManager;
+
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
     private boolean errorDialogShown = false;
@@ -53,9 +60,27 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        SplashScreen.installSplashScreen(this);
+
         SharedPreferences prefs = getSharedPreferences("einsatzkarte", MODE_PRIVATE);
         String override = prefs.getString("server_url_override", null);
         allowInsecureSsl = prefs.getBoolean("allow_insecure_ssl", false);
+
+        // Edge-to-edge display
+        Window window = getWindow();
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
+        if (controller != null) {
+            controller.setAppearanceLightStatusBars(true);
+            controller.setAppearanceLightNavigationBars(true);
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
 
         // When a dev server URL is set via SettingsActivity, rewrite the
         // CapConfig before Bridge init so Capacitor registers the
