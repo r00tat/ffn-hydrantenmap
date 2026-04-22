@@ -231,11 +231,8 @@ export class RadiacodeClient {
   }
 
   async specReset(): Promise<void> {
-    const args = new Uint8Array(8);
-    const v = new DataView(args.buffer);
-    v.setUint32(0, VSFR.SPEC_RESET, true);
-    v.setUint32(4, 0, true);
-    await this.execute(COMMAND.WR_VIRT_SFR, args);
+    // Spectrum Reset via Virtual String Write (VS.SPECTRUM = 0x200)
+    await this.writeVirtualString(VS.SPECTRUM);
   }
 
   async readSfrU32(id: number): Promise<number> {
@@ -333,7 +330,19 @@ export class RadiacodeClient {
   }
 
   async doseReset(): Promise<void> {
-    await this.writeSfrBool(VSFR.DOSE_RESET, true);
+    // Dose Reset via Virtual String Write (VS.DOSE_RESET = 0x800)
+    await this.writeVirtualString(VS.DOSE_RESET);
+  }
+
+  private async writeVirtualString(id: number, data?: Uint8Array): Promise<void> {
+    const actualData = data ?? new Uint8Array(4); // Default to 4 zero bytes
+    const payloadLen = 4 + actualData.length;
+    const args = new Uint8Array(4 + payloadLen);
+    const v = new DataView(args.buffer);
+    v.setUint32(0, id, true);
+    v.setUint32(4, actualData.length, true);
+    args.set(actualData, 8);
+    await this.execute(COMMAND.WR_VIRT_STRING, args);
   }
 
   async readSpectrum(): Promise<SpectrumSnapshot> {

@@ -12,6 +12,12 @@ vi.mock('../../hooks/useFirecallItemAdd', () => ({
   default: () => mockAdd,
 }));
 
+vi.mock('../../hooks/radiacode/devicePreference', () => ({
+  loadDefaultDevice: vi.fn(async () => null),
+  saveDefaultDevice: vi.fn(async () => {}),
+  clearDefaultDevice: vi.fn(async () => {}),
+}));
+
 function nullAdapter(): BleAdapter {
   return {
     isSupported: () => true,
@@ -220,9 +226,11 @@ describe('RadiacodeProvider', () => {
     expect(latest()!.stopSpectrumPolling).toHaveBeenCalled();
     expect(values.at(-1)!.spectrum).toBeNull();
     expect(values.at(-1)!.liveRecording).toBe(false);
+    // Verified: auto-save on stop.
+    expect(mockAdd).toHaveBeenCalled();
   });
 
-  it('spectrum snapshots update the context value', async () => {
+  it('spectrum snapshots update the context value directly regardless of duration', async () => {
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const values: ReturnType<typeof useRadiacode>[] = [];
@@ -239,77 +247,17 @@ describe('RadiacodeProvider', () => {
       values.at(-1)!.startLiveRecording();
     });
 
-    const s = snap({ durationSec: 42, timestamp: 1234 });
+    const s = snap({ durationSec: 7622, counts: [12, 25, 33, 41] });
     await act(async () => {
       latest()!.emitSnapshot(s);
     });
 
     const ctx = values.at(-1)!;
     expect(ctx.spectrum).toEqual(s);
+    expect(ctx.spectrum?.durationSec).toBe(7622);
   });
 
-  it('subtracts baseline from every snapshot when SPEC_RESET did not clear the buffer', async () => {
-    // At the real device, SPEC_RESET doesn't actually reset the accumulated
-    // spectrum — the first snapshot already shows hours of accumulated data.
-    // Provider reads a baseline immediately after connect and subtracts it
-    // from every subsequent snapshot.
-    const adapter = nullAdapter();
-    const { factory, latest } = makeFakeSpectrumClientFactory();
-    const values: ReturnType<typeof useRadiacode>[] = [];
-
-    render(
-      <RadiacodeProvider adapter={adapter} clientFactory={factory}>
-        <Probe onValue={(v) => values.push(v)} />
-      </RadiacodeProvider>,
-    );
-
-    // Baseline: device has already accumulated 7620 s and some counts.
-    // readSpectrum is called once inside connect() before startSpectrumPolling.
-    // Provide the baseline response on the client factory's first invocation.
-    const origFactory = factory;
-    void origFactory; // silence
-
-    await act(async () => {
-      const client = latest;
-      void client;
-      // Intercept: before connect finishes, set up the mock return.
-      await values.at(-1)!.connect();
-    });
-    await act(async () => {
-      values.at(-1)!.startLiveRecording();
-    });
-
-    // Replace baseline: the first readSpectrum was called during connect and
-    // returned the default [0,0,0,0]. We instead emit a snapshot that's
-    // compared against the baseline — so set baseline via resetLiveSpectrum
-    // first to pin the expected behaviour.
-    await act(async () => {
-      // Explicitly set baseline using provider API by emitting a "baseline"
-      // snapshot and calling resetLiveSpectrum.
-      latest()!.emitSnapshot(
-        snap({ durationSec: 7620, counts: [10, 20, 30, 40] }),
-      );
-    });
-    await act(async () => {
-      await values.at(-1)!.resetLiveSpectrum();
-    });
-
-    // Next polling snapshot, 2 s after baseline.
-    await act(async () => {
-      latest()!.emitSnapshot(
-        snap({
-          durationSec: 7622,
-          counts: [12, 25, 33, 41],
-        }),
-      );
-    });
-
-    const ctx = values.at(-1)!;
-    expect(ctx.spectrum?.durationSec).toBe(2);
-    expect(ctx.spectrum?.counts).toEqual([2, 5, 3, 1]);
-  });
-
-  it('resetLiveSpectrum sets baseline from current snapshot and clears history', async () => {
+  it('resetLiveSpectrum calls client.specReset and clears state', async () => {
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
@@ -341,7 +289,6 @@ describe('RadiacodeProvider', () => {
       expect(values.at(-1)!.history.length).toBe(2);
     });
 
-    // Emit a snapshot that should become the new baseline after reset.
     await act(async () => {
       latest()!.emitSnapshot(
         snap({ durationSec: 100, counts: [5, 10, 15, 20] }),
@@ -352,18 +299,10 @@ describe('RadiacodeProvider', () => {
       await values.at(-1)!.resetLiveSpectrum();
     });
 
-    // history cleared.
+    // Hardware reset was called (startLiveRecording no longer calls it, so expect only 1 call from reset button)
+    expect(latest()!.specReset).toHaveBeenCalledTimes(1);
+    expect(values.at(-1)!.spectrum).toBeNull();
     expect(values.at(-1)!.history).toEqual([]);
-
-    // Next snapshot subtracts baseline.
-    await act(async () => {
-      latest()!.emitSnapshot(
-        snap({ durationSec: 110, counts: [6, 13, 20, 25] }),
-      );
-    });
-    const ctx = values.at(-1)!;
-    expect(ctx.spectrum?.durationSec).toBe(10);
-    expect(ctx.spectrum?.counts).toEqual([1, 3, 5, 5]);
   });
 
   it('history prunes samples older than 5 minutes from the latest sample', async () => {
@@ -414,7 +353,7 @@ describe('RadiacodeProvider', () => {
     await act(async () => {
       values.at(-1)!.startLiveRecording();
     });
-    const s = snap({ durationSec: 42, timestamp: 1_700_000_000_000 });
+    const s = snap({ durationSec: 5, timestamp: 1_700_000_000_000 });
     await act(async () => {
       latest()!.emitSnapshot(s);
     });
@@ -435,8 +374,8 @@ describe('RadiacodeProvider', () => {
     expect(item.description).toBe('Demo');
     expect(item.counts).toEqual(s.counts);
     expect(item.coefficients).toEqual(s.coefficients);
-    expect(item.measurementTime).toBe(42);
-    expect(item.liveTime).toBe(42);
+    expect(item.measurementTime).toBe(5);
+    expect(item.liveTime).toBe(5);
 
     // Polling still live: stopSpectrumPolling should NOT have been called.
     expect(latest()!.stopSpectrumPolling).not.toHaveBeenCalled();

@@ -98,6 +98,7 @@ export const VS = {
   SPECTRUM: 0x200,
   ENERGY_CALIB: 0x202,
   SPEC_ACCUM: 0x205,
+  DOSE_RESET: 0x800,
 } as const;
 
 export const VSFR = {
@@ -556,34 +557,121 @@ export interface SpectrumSnapshot {
  *   <counts: u32 LE * n>
  */
 export function decodeSpectrumResponse(payload: Uint8Array): SpectrumSnapshot {
-  if (payload.length < 8 + 16) {
-    throw new Error(
-      `Spectrum payload too short: ${payload.length} B (need ≥ 24 for retcode+flen+header)`,
-    );
-  }
   const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
-  const flen = view.getUint32(4, true);
-  if (8 + flen > payload.length) {
-    throw new Error(
-      `Spectrum payload too short: declared flen=${flen} but only ${payload.length - 8} B available`,
-    );
+
+  // Debug-Logging der ersten Bytes, um das Header-Layout im Feld zu verifizieren
+  const headHex = Array.from(payload.subarray(0, 32))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join(' ');
+  console.log(
+    `[RadiacodeProtocol] decodeSpectrumResponse len=${payload.length}, head=${headHex}`,
+  );
+
+  // Wir suchen nach dem Start der Spektrum-Daten (duration + 3 coefficients).
+  // Ein Virtual String Response sollte mit <retcode:u32><flen:u32> beginnen.
+  // Das Spektrum-Innere beginnt mit <duration:u32>.
+  
+  let inner: Uint8Array | null = null;
+
+  // Strategie 1: Standard Virtual String (8 Byte Header)
+  const maybeRetcode = view.getUint32(0, true);
+  const maybeFlen = view.getUint32(4, true);
+  if (maybeRetcode === 1 && maybeFlen > 0 && maybeFlen <= payload.length - 8) {
+    console.log(`[RadiacodeProtocol] Detected Virtual String Header (retcode=1, flen=${maybeFlen})`);
+    inner = payload.subarray(8, 8 + maybeFlen);
+  } else {
+    // Strategie 2: Versatzprüfung. Manchmal schickt das Gerät 4 extra Bytes oder gar keinen Header.
+    // Wir schauen uns die Koeffizienten an, um den richtigen Offset zu finden.
+    // Typischerweise ist a1 (Kanal-zu-keV) zwischen 1.0 und 5.0.
+    for (const offset of [0, 4, 8, 12]) {
+      if (payload.length < offset + 16) continue;
+      const a1 = view.getFloat32(offset + 8, true);
+      if (a1 > 0.5 && a1 < 10.0) {
+        console.log(`[RadiacodeProtocol] Found plausible calibration at offset ${offset} (a1=${a1.toFixed(4)})`);
+        inner = payload.subarray(offset);
+        break;
+      }
+    }
   }
-  const inner = payload.subarray(8, 8 + flen);
-  if (inner.length < 16) {
-    throw new Error(
-      `Spectrum payload too short: inner ${inner.length} B (need ≥ 16 for duration+3×f32)`,
-    );
+
+  if (!inner || inner.length < 16) {
+    console.error('[RadiacodeProtocol] Could not find valid spectrum header in payload');
+    // Fallback auf ursprüngliche Logik (8 Byte Header), falls nichts gefunden wurde
+    inner = payload.subarray(8);
   }
+
   const innerView = new DataView(inner.buffer, inner.byteOffset, inner.byteLength);
   const durationSec = innerView.getUint32(0, true);
   const a0 = innerView.getFloat32(4, true);
   const a1 = innerView.getFloat32(8, true);
   const a2 = innerView.getFloat32(12, true);
-  const countCount = Math.floor((inner.length - 16) / 4);
-  const counts = new Array<number>(countCount);
-  for (let i = 0; i < countCount; i++) {
-    counts[i] = innerView.getUint32(16 + i * 4, true);
+
+  console.log(`[RadiacodeProtocol] Spectrum decoded: duration=${durationSec}s, calib=[${a0.toFixed(2)}, ${a1.toFixed(4)}, ${a2.toExponential(2)}]`);
+
+  // Kanäle ab Byte 16.
+  // Es gibt zwei Formate laut cdump/radiacode:
+  // Version 0: Full (1024 * 4 Bytes, uint32 LE)
+  // Version 1: Delta-Compression (Variable Länge)
+  
+  const counts: number[] = [];
+  let pos = 16;
+  
+  if (inner.length - 16 === 1024 * 4) {
+    // Version 0: Full format
+    for (let i = 0; i < 1024; i++) {
+      counts.push(innerView.getUint32(pos, true));
+      pos += 4;
+    }
+  } else {
+    // Version 1: Delta-Compression (V1)
+    let last = 0;
+    while (pos < inner.length && counts.length < 1024) {
+      if (pos + 2 > inner.length) break;
+      const u16 = innerView.getUint16(pos, true);
+      pos += 2;
+      const cnt = (u16 >> 4) & 0x0FFF;
+      const vlen = u16 & 0x0F;
+      
+      for (let i = 0; i < cnt && counts.length < 1024; i++) {
+        let v = 0;
+        if (vlen === 0) {
+          v = 0;
+        } else if (vlen === 1) {
+          if (pos + 1 > inner.length) break;
+          v = innerView.getUint8(pos);
+          pos += 1;
+        } else if (vlen === 2) {
+          if (pos + 1 > inner.length) break;
+          v = last + innerView.getInt8(pos);
+          pos += 1;
+        } else if (vlen === 3) {
+          if (pos + 2 > inner.length) break;
+          v = last + innerView.getInt16(pos, true);
+          pos += 2;
+        } else if (vlen === 4) {
+          // int24 delta: <BBb>
+          if (pos + 3 > inner.length) break;
+          const a = innerView.getUint8(pos);
+          const b = innerView.getUint8(pos + 1);
+          const c = innerView.getInt8(pos + 2);
+          v = last + ((c << 16) | (b << 8) | a);
+          pos += 3;
+        } else if (vlen === 5) {
+          if (pos + 4 > inner.length) break;
+          v = last + innerView.getInt32(pos, true);
+          pos += 4;
+        } else {
+          // Unsupported vlen
+          break;
+        }
+        last = v;
+        counts.push(v);
+      }
+    }
+    // Pad to 1024 if necessary
+    while (counts.length < 1024) counts.push(0);
   }
+
   return {
     durationSec,
     coefficients: [a0, a1, a2],

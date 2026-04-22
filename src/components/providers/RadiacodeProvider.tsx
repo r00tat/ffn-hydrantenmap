@@ -90,7 +90,7 @@ export interface RadiacodeContextValue {
    */
   liveRecording: boolean;
   startLiveRecording: () => void;
-  stopLiveRecording: () => void;
+  stopLiveRecording: () => Promise<void>;
   resetLiveSpectrum: () => Promise<void>;
   saveLiveSpectrum: (meta: SaveLiveSpectrumMeta) => Promise<string | null>;
   readSettings: () => Promise<RadiacodeSettingsReadResult>;
@@ -229,29 +229,12 @@ export function RadiacodeProvider({
   const sessionUnsubRef = useRef<Unsubscribe | null>(null);
   const pollingStartedRef = useRef(false);
   const spectrumRef = useRef<SpectrumSnapshot | null>(null);
-  const baselineRef = useRef<SpectrumSnapshot | null>(null);
-  const latestRawSnapshotRef = useRef<SpectrumSnapshot | null>(null);
   useEffect(() => {
     spectrumRef.current = spectrum;
   }, [spectrum]);
 
-  const applyBaseline = useCallback(
-    (raw: SpectrumSnapshot): SpectrumSnapshot => {
-      const baseline = baselineRef.current;
-      if (!baseline) return raw;
-      return {
-        ...raw,
-        durationSec: Math.max(0, raw.durationSec - baseline.durationSec),
-        counts: raw.counts.map((c, i) =>
-          Math.max(0, c - (baseline.counts[i] ?? 0)),
-        ),
-      };
-    },
-    [],
-  );
-
   // When rawStatus transitions to 'connected' AND liveRecording === true,
-  // kick off spectrum polling + baseline capture. Polling stops when either
+  // kick off spectrum polling. Polling stops when either
   // condition drops. Only once per client instance — useRadiacodeDevice
   // re-creates the client on reconnect so we use a ref flag keyed implicitly
   // on clientRef.current.
@@ -268,44 +251,21 @@ export function RadiacodeProvider({
     lastClientRef.current = client;
     pollingStartedRef.current = true;
 
-    let cancelled = false;
-    (async () => {
-      try {
-        await client.specReset();
-      } catch {
-        // best-effort — SPEC_RESET only matters when the device supports it.
-      }
-      if (cancelled) return;
-      // Baseline: see comment below — SPEC_RESET doesn't reliably clear the
-      // buffer on the real device, so we snapshot once and subtract from every
-      // subsequent tick. If SPEC_RESET did work, baseline ≈ 0 and subtraction
-      // is a no-op.
-      try {
-        baselineRef.current = await client.readSpectrum();
-      } catch {
-        baselineRef.current = null;
-      }
-      if (cancelled) return;
-      setSpectrum(null);
+    setSpectrum(null);
 
-      client.startSpectrumPolling((s) => {
-        latestRawSnapshotRef.current = s;
-        setSpectrum(applyBaseline(s));
-      });
-    })();
+    client.startSpectrumPolling((s) => {
+      setSpectrum(s);
+    });
 
     return () => {
-      cancelled = true;
       client.stopSpectrumPolling();
       // Nach dem Stop: Flags so zurücksetzen, dass ein erneutes
       // startLiveRecording() das Polling sauber neu startet.
       pollingStartedRef.current = false;
       lastClientRef.current = null;
       setSpectrum(null);
-      baselineRef.current = null;
-      latestRawSnapshotRef.current = null;
     };
-  }, [rawStatus, clientRef, applyBaseline, liveRecording]);
+  }, [rawStatus, clientRef, liveRecording]);
 
   // Session-Events (`reconnecting` / `reconnected`) gelten für die BLE-Session,
   // nicht für das Spektrum-Polling. Deshalb in einem eigenen Effect, der nur
@@ -332,26 +292,6 @@ export function RadiacodeProvider({
       sessionUnsubRef.current = null;
     };
   }, [rawStatus, clientRef]);
-
-  const startLiveRecording = useCallback(() => setLiveRecording(true), []);
-  const stopLiveRecording = useCallback(() => setLiveRecording(false), []);
-
-  const resetLiveSpectrum = useCallback(async () => {
-    // Use the latest RAW snapshot as the new baseline. Polling continues
-    // uninterrupted; the displayed spectrum will reset to ~zero on the next
-    // tick.
-    const raw = latestRawSnapshotRef.current;
-    if (raw) {
-      baselineRef.current = raw;
-      setSpectrum(applyBaseline(raw));
-    } else {
-      // No snapshot seen yet — clear baseline so the next snapshot displays
-      // as-is.
-      baselineRef.current = null;
-      setSpectrum(null);
-    }
-    setHistory([]);
-  }, [applyBaseline]);
 
   const saveLiveSpectrum = useCallback(
     async (meta: SaveLiveSpectrumMeta): Promise<string | null> => {
@@ -380,6 +320,42 @@ export function RadiacodeProvider({
     },
     [addItem, device],
   );
+
+  const startLiveRecording = useCallback(() => setLiveRecording(true), []);
+  const stoppingRef = useRef(false);
+  const stopLiveRecording = useCallback(async () => {
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    try {
+      if (spectrumRef.current) {
+        await saveLiveSpectrum({
+          name: `Live-Messung ${new Date().toLocaleString('de-AT', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`,
+        });
+      }
+    } finally {
+      setLiveRecording(false);
+      stoppingRef.current = false;
+    }
+  }, [saveLiveSpectrum]);
+
+  const resetLiveSpectrum = useCallback(async () => {
+    const client = clientRef.current;
+    if (client) {
+      try {
+        await client.specReset();
+      } catch {
+        // ignore
+      }
+    }
+    setSpectrum(null);
+    setHistory([]);
+  }, [clientRef]);
 
   const readSettings = useCallback(async () => {
     const client = clientRef.current;

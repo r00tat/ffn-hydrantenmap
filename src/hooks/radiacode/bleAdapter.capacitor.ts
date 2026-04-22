@@ -142,7 +142,10 @@ export const capacitorAdapter: BleAdapter = {
     }
     const client = await ensureBleClient();
     for (let pos = 0; pos < data.length; pos += WRITE_CHUNK_SIZE) {
-      const chunk = data.slice(pos, Math.min(pos + WRITE_CHUNK_SIZE, data.length));
+      const chunk = data.slice(
+        pos,
+        Math.min(pos + WRITE_CHUNK_SIZE, data.length),
+      );
       await client.writeWithoutResponse(
         deviceId,
         RADIACODE_SERVICE_UUID,
@@ -173,7 +176,7 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async updateForegroundService(opts) {
-    console.debug('[Radiacode/bleAdapter] updateForegroundService', opts);
+    // console.debug('[Radiacode/bleAdapter] updateForegroundService', opts);
     await RadiacodeNotification.update(opts);
   },
 

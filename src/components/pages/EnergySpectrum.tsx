@@ -26,7 +26,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import SaveIcon from '@mui/icons-material/Save';
 import StopIcon from '@mui/icons-material/Stop';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -176,10 +175,6 @@ export default function EnergySpectrum() {
   const [expandedSpectrumId, setExpandedSpectrumId] = useState<string | null>(
     null,
   );
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [saveName, setSaveName] = useState('');
-  const [saveDescription, setSaveDescription] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const {
     status,
@@ -219,24 +214,28 @@ export default function EnergySpectrum() {
   });
 
   const liveSpectrum = useMemo<LoadedSpectrum | null>(() => {
-    if (!liveRecording || !spectrum || spectrum.counts.length === 0)
-      return null;
-    const coefficients: number[] = [...spectrum.coefficients];
-    const energies = spectrum.counts.map((_, ch) =>
-      channelToEnergy(ch, coefficients),
-    );
+    if (!liveRecording) return null;
+    
+    const counts = spectrum?.counts ?? new Array(1024).fill(0);
+    const coefficients: number[] = spectrum
+      ? [...spectrum.coefficients]
+      : [0, 1, 0]; // Default calibration until first snapshot
+
+    const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+    const duration = spectrum?.durationSec ?? 0;
+
     const data: SpectrumData = {
       sampleName: 'Live-Aufzeichnung',
       deviceName: device?.name ?? '',
-      measurementTime: spectrum.durationSec ?? 0,
-      liveTime: spectrum.durationSec ?? 0,
+      measurementTime: duration,
+      liveTime: duration,
       startTime: '',
       endTime: '',
       coefficients,
-      counts: spectrum.counts,
+      counts,
       energies,
     };
-    const peaks = findPeaks(spectrum.counts, energies);
+    const peaks = findPeaks(counts, energies);
     const matches = identifyNuclides(peaks);
     return {
       id: LIVE_ID,
@@ -283,43 +282,6 @@ export default function EnergySpectrum() {
       });
     return liveSpectrum ? [liveSpectrum, ...firestoreItems] : firestoreItems;
   }, [savedSpectra, hiddenIds, liveSpectrum]);
-
-  const handleOpenSave = useCallback(() => {
-    const defaultName = `Live-Messung ${new Date().toLocaleString('de-AT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`;
-    setSaveName(defaultName);
-    setSaveDescription('');
-    setSaveOpen(true);
-  }, []);
-
-  const handleConfirmSave = useCallback(async () => {
-    if (!saveName.trim()) return;
-    setSaving(true);
-    try {
-      const id = await saveLiveSpectrum({
-        name: saveName.trim(),
-        description: saveDescription.trim() || undefined,
-      });
-      if (id) {
-        showSnackbar('Spektrum gespeichert', 'success');
-        setSaveOpen(false);
-      } else {
-        showSnackbar('Kein Live-Spektrum verfügbar', 'warning');
-      }
-    } catch (e) {
-      showSnackbar(
-        `Speichern fehlgeschlagen: ${(e as Error).message}`,
-        'error',
-      );
-    } finally {
-      setSaving(false);
-    }
-  }, [saveName, saveDescription, saveLiveSpectrum, showSnackbar]);
 
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -607,14 +569,6 @@ export default function EnergySpectrum() {
             >
               Reset Live
             </Button>
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<SaveIcon />}
-              onClick={handleOpenSave}
-            >
-              Speichern
-            </Button>
           </>
         )}
       </Stack>
@@ -670,7 +624,7 @@ export default function EnergySpectrum() {
             </Button>
           </span>
         </Tooltip>
-        {allSpectra.length > 0 && (
+        {(allSpectra.length > 0 || liveRecording) && (
           <FormControlLabel
             control={
               <Switch
@@ -1172,51 +1126,8 @@ export default function EnergySpectrum() {
         </Box>
       )}
 
-      {/* Save Live Spectrum Dialog */}
-      <Dialog
-        open={saveOpen}
-        onClose={() => (saving ? undefined : setSaveOpen(false))}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Live-Spektrum speichern</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Name"
-            fullWidth
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            disabled={saving}
-          />
-          <TextField
-            margin="dense"
-            label="Beschreibung"
-            fullWidth
-            multiline
-            minRows={2}
-            value={saveDescription}
-            onChange={(e) => setSaveDescription(e.target.value)}
-            disabled={saving}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSaveOpen(false)} disabled={saving}>
-            Abbrechen
-          </Button>
-          <Button
-            onClick={handleConfirmSave}
-            variant="contained"
-            disabled={saving || !saveName.trim()}
-          >
-            Speichern
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Empty state */}
-      {allSpectra.length === 0 && (
+      {allSpectra.length === 0 && !liveRecording && (
         <Box
           sx={{
             mt: 4,
