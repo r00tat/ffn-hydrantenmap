@@ -1,10 +1,18 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadDefaultDevice, saveDefaultDevice, clearDefaultDevice } from './devicePreference';
 
 describe('devicePreference', () => {
+  let store: Record<string, string> = {};
+
   beforeEach(() => {
-    localStorage.clear();
+    store = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store[key] || null,
+      setItem: (key: string, value: string) => { store[key] = value; },
+      removeItem: (key: string) => { delete store[key]; },
+      clear: () => { store = {}; },
+    });
   });
 
   it('returns null when no device saved', async () => {

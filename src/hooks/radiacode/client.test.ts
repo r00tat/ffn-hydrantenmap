@@ -629,11 +629,11 @@ describe('RadiacodeClient', () => {
     expect((r2 as Error).message).toMatch(/disconnect/i);
   });
 
-  it('specReset sends WR_VIRT_SFR(SPEC_RESET, 0)', async () => {
+  it('specReset sends WR_VIRT_STRING(VS.SPECTRUM)', async () => {
     vi.useRealTimers();
     const adapter = makeAdapter();
     let seqCounter = 0;
-    const wrVirtSfrFrames: Uint8Array[] = [];
+    const wrVirtStringFrames: Uint8Array[] = [];
     adapter.setResponder((frame) => {
       const view = new DataView(
         frame.buffer,
@@ -646,33 +646,31 @@ describe('RadiacodeClient', () => {
         return buildResponseChunks(cmd, seq, new Uint8Array(0));
       }
       if (cmd === COMMAND.WR_VIRT_SFR) {
-        wrVirtSfrFrames.push(frame);
         return buildResponseChunks(
           cmd,
           seq,
           new Uint8Array([0x01, 0, 0, 0]),
         );
       }
+      if (cmd === COMMAND.WR_VIRT_STRING) {
+        wrVirtStringFrames.push(frame);
+        return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
+      }
       return null;
     });
 
     const client = new RadiacodeClient(adapter, 'dev');
     await client.connect();
-    // After connect, one WR_VIRT_SFR frame (DEVICE_TIME) was already sent.
-    const framesBefore = wrVirtSfrFrames.length;
 
     await client.specReset();
 
-    expect(wrVirtSfrFrames.length).toBe(framesBefore + 1);
-    const frame = wrVirtSfrFrames[wrVirtSfrFrames.length - 1];
+    expect(wrVirtStringFrames.length).toBe(1);
+    const frame = wrVirtStringFrames[0];
     const fv = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
     const cmd = fv.getUint16(4, true);
-    expect(cmd).toBe(COMMAND.WR_VIRT_SFR);
-    // args start at offset 8 (after 4-byte length + 4-byte header)
-    const arg0 = fv.getUint32(8, true);
-    const arg1 = fv.getUint32(12, true);
-    expect(arg0).toBe(VSFR.SPEC_RESET);
-    expect(arg1).toBe(0);
+    expect(cmd).toBe(COMMAND.WR_VIRT_STRING);
+    const vsId = fv.getUint32(8, true);
+    expect(vsId).toBe(VS.SPECTRUM);
 
     await client.disconnect();
   });
@@ -1367,7 +1365,7 @@ describe('RadiacodeClient', () => {
     vi.useRealTimers();
     const adapter = makeAdapter();
     let seqCounter = 0;
-    const wrLog: Array<{ id: number; v: number; payloadLen: number }> = [];
+    const wrLog: Array<{ cmd: number; id: number; v: number; payloadLen: number }> = [];
     adapter.setResponder((frame) => {
       const view = new DataView(
         frame.buffer,
@@ -1378,12 +1376,12 @@ describe('RadiacodeClient', () => {
       const seq = seqCounter++;
       if (cmd === COMMAND.SET_EXCHANGE || cmd === COMMAND.SET_TIME)
         return buildResponseChunks(cmd, seq, new Uint8Array(0));
-      if (cmd === COMMAND.WR_VIRT_SFR) {
+      
+      if (cmd === COMMAND.WR_VIRT_SFR || cmd === COMMAND.WR_VIRT_STRING) {
         const id = view.getUint32(8, true);
         const payloadLen = frame.byteLength - 8;
-        const v =
-          payloadLen >= 8 ? view.getUint32(12, true) : frame[12];
-        wrLog.push({ id, v, payloadLen });
+        const v = payloadLen >= 8 ? view.getUint32(12, true) : frame[12];
+        wrLog.push({ cmd, id, v, payloadLen });
         return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
       }
       return null;
@@ -1396,8 +1394,8 @@ describe('RadiacodeClient', () => {
     await client.doseReset();
 
     expect(wrLog).toEqual([
-      { id: VSFR.PLAY_SIGNAL, v: 1, payloadLen: 8 },
-      { id: VSFR.DOSE_RESET, v: 1, payloadLen: 5 },
+      { cmd: COMMAND.WR_VIRT_SFR, id: VSFR.PLAY_SIGNAL, v: 1, payloadLen: 8 },
+      { cmd: COMMAND.WR_VIRT_STRING, id: VS.DOSE_RESET, v: 4, payloadLen: 12 },
     ]);
     await client.disconnect();
   });

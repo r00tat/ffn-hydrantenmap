@@ -147,9 +147,18 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
           const result = await geminiModel.generateContent(request);
           const response = result.response;
+          
+          if (!response.candidates || response.candidates.length === 0) {
+            throw new Error('No candidates returned from AI model');
+          }
+
           const candidate = response.candidates[0];
           const modelContent = candidate.content;
           
+          if (!modelContent) {
+            throw new Error('Candidate content is missing');
+          }
+
           // Add model's response to session
           currentContents.push(modelContent);
 

@@ -271,7 +271,7 @@ describe('decodeSpectrumResponse', () => {
 
   it('throws on a payload that is too short', () => {
     expect(() => decodeSpectrumResponse(new Uint8Array(10))).toThrow(
-      /spectrum payload/i,
+      /spectrum header/i,
     );
   });
 

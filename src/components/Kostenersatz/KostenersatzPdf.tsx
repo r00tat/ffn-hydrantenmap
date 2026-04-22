@@ -5,6 +5,8 @@ import {
   View,
   StyleSheet,
   Image,
+  Svg,
+  Path,
 } from '@react-pdf/renderer';
 import moment from 'moment';
 import {
@@ -15,12 +17,28 @@ import {
 } from '../../common/kostenersatz';
 import { timeFormats } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
+import qrcodegen from 'nayuki-qr-code-generator';
 
 // Format date as dd.mm.YYYY
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
   const m = moment(dateStr, timeFormats, 'de');
   return m.isValid() ? m.format('DD.MM.YYYY') : dateStr;
+}
+
+/**
+ * Generate a SVG path string for a QR code
+ */
+function generateQrPath(qr: qrcodegen.QrCode): string {
+  const parts: string[] = [];
+  for (let y = 0; y < qr.size; y++) {
+    for (let x = 0; x < qr.size; x++) {
+      if (qr.getModule(x, y)) {
+        parts.push(`M${x},${y}h1v1h-1z`);
+      }
+    }
+  }
+  return parts.join(' ');
 }
 
 const styles = StyleSheet.create({
@@ -115,6 +133,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'right',
   },
+  paymentSection: {
+    marginTop: 20,
+    padding: 10,
+    border: 1,
+    borderColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   infoRow: {
     flexDirection: 'row',
     marginBottom: 3,
@@ -194,6 +221,31 @@ export default function KostenersatzPdf({
   const displayDescription =
     calculation.nameOverride ||
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
+
+  // Shorten name for payment reference (remove time and limit to 35 chars total)
+  const nameWithoutTime = firecall.name.replace(/\s\d{1,2}:\d{2}(:\d{2})?$/, '');
+  const paymentReference = `Kostenersatz ${nameWithoutTime}`.substring(0, 35);
+
+  // EPC QR Code (SEPA)
+  // Format: BCD\nVersion\nCharset\nIdentification\nBIC\nRecipient\nIBAN\nEURAmount\nPurposeCode\nReference\nRemittance\nHint
+  const epcData = [
+    'BCD',
+    '002',
+    '1',
+    'SCT',
+    'RLBBAT2E',
+    'Freiwillige Feuerwehr Neusiedl am See',
+    'AT403300000002020402',
+    `EUR${calculation.totalSum.toFixed(2)}`,
+    '', // Purpose Code (optional)
+    '', // Reference (Structured, optional, max 35)
+    paymentReference, // Remittance (Unstructured / Verwendungszweck, max 140)
+    '', // Hint (optional)
+  ].join('\n');
+
+  // Generate QR Code locally
+  const qr = qrcodegen.QrCode.encodeText(epcData, qrcodegen.QrCode.Ecc.MEDIUM);
+  const qrPath = generateQrPath(qr);
 
   return (
     <Document>
@@ -381,11 +433,32 @@ export default function KostenersatzPdf({
           </View>
         </View>
 
+        {/* Payment Section in Body */}
+        <View style={styles.paymentSection}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>Zahlungsinformationen</Text>
+            <Text style={{ marginBottom: 3 }}>Bitte überweisen Sie den Betrag auf:</Text>
+            <Text style={{ fontWeight: 'bold' }}>Freiwillige Feuerwehr Neusiedl am See</Text>
+            <Text>IBAN: AT40 3300 0000 0202 0402</Text>
+            <Text>BIC: RLBBAT2E</Text>
+            <Text style={{ marginTop: 5, fontSize: 8, color: '#666' }}>Verwendungszweck: {paymentReference}</Text>
+          </View>
+          <View style={{ alignItems: 'center', width: 100 }}>
+            <Text style={{ fontSize: 8, marginBottom: 4 }}>Bezahlen mit Code</Text>
+            <Svg viewBox={`0 0 ${qr.size} ${qr.size}`} style={{ width: 80, height: 80 }}>
+              <Path d={qrPath} fill="#000000" />
+            </Svg>
+          </View>
+        </View>
+
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Die Berechnung erfolgt laut Landesgesetzblatt Nr. 77/2023, siehe
             https://www.ris.bka.gv.at/eli/lgbl/BU/2023/77/20231107
+          </Text>
+          <Text style={styles.footerText}>
+            Bankverbindung: IBAN: AT40 3300 0000 0202 0402, BIC: RLBBAT2E
           </Text>
           <Text style={styles.footerText}>
             Freiwillige Feuerwehr Neusiedl/See, A-7100 Neusiedl/See Satzgasse 9,

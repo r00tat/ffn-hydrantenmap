@@ -567,6 +567,10 @@ export function decodeSpectrumResponse(payload: Uint8Array): SpectrumSnapshot {
     `[RadiacodeProtocol] decodeSpectrumResponse len=${payload.length}, head=${headHex}`,
   );
 
+  if (payload.length < 8) {
+    throw new Error(`Spectrum payload too short: ${payload.length} B`);
+  }
+
   // Wir suchen nach dem Start der Spektrum-Daten (duration + 3 coefficients).
   // Ein Virtual String Response sollte mit <retcode:u32><flen:u32> beginnen.
   // Das Spektrum-Innere beginnt mit <duration:u32>.
@@ -576,10 +580,17 @@ export function decodeSpectrumResponse(payload: Uint8Array): SpectrumSnapshot {
   // Strategie 1: Standard Virtual String (8 Byte Header)
   const maybeRetcode = view.getUint32(0, true);
   const maybeFlen = view.getUint32(4, true);
-  if (maybeRetcode === 1 && maybeFlen > 0 && maybeFlen <= payload.length - 8) {
-    console.log(`[RadiacodeProtocol] Detected Virtual String Header (retcode=1, flen=${maybeFlen})`);
-    inner = payload.subarray(8, 8 + maybeFlen);
-  } else {
+  if (maybeRetcode === 1) {
+    if (maybeFlen > payload.length - 8) {
+      throw new Error(`Invalid spectrum response: declared flen=${maybeFlen} but only ${payload.length - 8} B available`);
+    }
+    if (maybeFlen > 0) {
+      console.log(`[RadiacodeProtocol] Detected Virtual String Header (retcode=1, flen=${maybeFlen})`);
+      inner = payload.subarray(8, 8 + maybeFlen);
+    }
+  }
+  
+  if (!inner) {
     // Strategie 2: Versatzprüfung. Manchmal schickt das Gerät 4 extra Bytes oder gar keinen Header.
     // Wir schauen uns die Koeffizienten an, um den richtigen Offset zu finden.
     // Typischerweise ist a1 (Kanal-zu-keV) zwischen 1.0 und 5.0.
@@ -595,9 +606,7 @@ export function decodeSpectrumResponse(payload: Uint8Array): SpectrumSnapshot {
   }
 
   if (!inner || inner.length < 16) {
-    console.error('[RadiacodeProtocol] Could not find valid spectrum header in payload');
-    // Fallback auf ursprüngliche Logik (8 Byte Header), falls nichts gefunden wurde
-    inner = payload.subarray(8);
+    throw new Error('Could not find valid spectrum header in payload');
   }
 
   const innerView = new DataView(inner.buffer, inner.byteOffset, inner.byteLength);

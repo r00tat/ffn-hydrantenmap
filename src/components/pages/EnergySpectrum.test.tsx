@@ -138,9 +138,9 @@ describe('EnergySpectrum — Live-Spektrum', () => {
     expect(resetLiveSpectrum).toHaveBeenCalled();
   });
 
-  it('Speichern-Button öffnet Dialog und ruft saveLiveSpectrum mit Name auf', async () => {
+  it('Stoppen der Aufzeichnung ruft stopLiveRecording auf (was automatisch speichert)', async () => {
     const user = userEvent.setup();
-    const saveLiveSpectrum = vi.fn(async () => 'doc-1');
+    const stopLiveRecording = vi.fn(async () => {});
     mockedUseRadiacode.mockReturnValue(
       fixture({
         status: 'connected',
@@ -152,21 +152,12 @@ describe('EnergySpectrum — Live-Spektrum', () => {
           counts: [1, 2, 3, 4],
           timestamp: 1000,
         },
-        saveLiveSpectrum,
+        stopLiveRecording,
       }),
     );
     render(<EnergySpectrum />);
-    await user.click(screen.getByRole('button', { name: /^speichern$/i }));
-    const dialog = await screen.findByRole('dialog');
-    const nameField = within(dialog).getByLabelText(/^name$/i);
-    await user.clear(nameField);
-    await user.type(nameField, 'Testprobe');
-    await user.click(
-      within(dialog).getByRole('button', { name: /^speichern$/i }),
-    );
-    expect(saveLiveSpectrum).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Testprobe' }),
-    );
+    await user.click(screen.getByRole('button', { name: /aufzeichnung stoppen/i }));
+    expect(stopLiveRecording).toHaveBeenCalled();
   });
 
   it('Verbinden-Button ruft connect auf', async () => {
