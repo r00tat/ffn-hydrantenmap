@@ -60,7 +60,13 @@ export function isNativeAvailable(): boolean {
 }
 
 export async function nativeConnect(deviceAddress: string): Promise<void> {
-  await RadiacodeNative.connectNative({ deviceAddress });
+  console.log('[Radiacode/nativeBridge] nativeConnect', deviceAddress);
+  try {
+    await RadiacodeNative.connectNative({ deviceAddress });
+  } catch (err) {
+    console.warn('[Radiacode/nativeBridge] nativeConnect failed', err);
+    throw err;
+  }
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -82,11 +88,23 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 export async function nativeWrite(payload: Uint8Array): Promise<void> {
-  await RadiacodeNative.writeNative({ payload: bytesToBase64(payload) });
+  console.debug('[Radiacode/nativeBridge] nativeWrite bytes=', payload.length);
+  try {
+    await RadiacodeNative.writeNative({ payload: bytesToBase64(payload) });
+  } catch (err) {
+    console.warn('[Radiacode/nativeBridge] nativeWrite failed', err);
+    throw err;
+  }
 }
 
 export async function nativeDisconnect(): Promise<void> {
-  await RadiacodeNative.disconnectNative();
+  console.log('[Radiacode/nativeBridge] nativeDisconnect');
+  try {
+    await RadiacodeNative.disconnectNative();
+  } catch (err) {
+    console.warn('[Radiacode/nativeBridge] nativeDisconnect failed', err);
+    throw err;
+  }
 }
 
 function toMeasurement(e: NativeMeasurementEvent): RadiacodeMeasurement {
@@ -150,7 +168,10 @@ export function onNativeConnectionState(
 ): Unsubscribe {
   let listenerHandle: PluginListenerHandle | null = null;
   let unsubscribed = false;
-  RadiacodeNative.addListener('connectionState', (data) => handler(data.state))
+  RadiacodeNative.addListener('connectionState', (data) => {
+    console.log('[Radiacode/nativeBridge] connectionState event', data.state);
+    handler(data.state);
+  })
     .then((h) => {
       if (unsubscribed) {
         void h.remove();
@@ -158,7 +179,9 @@ export function onNativeConnectionState(
         listenerHandle = h;
       }
     })
-    .catch(() => {});
+    .catch((err) => {
+      console.warn('[Radiacode/nativeBridge] connectionState subscribe failed', err);
+    });
   return () => {
     unsubscribed = true;
     listenerHandle?.remove().catch(() => {});

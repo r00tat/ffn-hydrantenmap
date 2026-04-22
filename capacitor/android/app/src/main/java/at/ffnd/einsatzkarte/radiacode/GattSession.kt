@@ -74,6 +74,7 @@ class GattSession(
 
     fun disconnect() {
         handler.post {
+            Log.i(TAG, "disconnect() called — wantConnected=false")
             wantConnected = false
             writeQueue.clear()
             writeInFlight = false
@@ -82,6 +83,7 @@ class GattSession(
     }
 
     fun release() {
+        Log.i(TAG, "release() called")
         disconnect()
         handler.postDelayed({ thread.quitSafely() }, 500)
     }
@@ -89,6 +91,7 @@ class GattSession(
     fun sendWrite(frame: ByteArray) {
         handler.post {
             val chunks = Framing.splitForWrite(frame)
+            Log.d(TAG, "sendWrite frame=${frame.size}B chunks=${chunks.size} queueBefore=${writeQueue.size} inFlight=$writeInFlight connected=$connected")
             for (c in chunks) writeQueue.add(c)
             pumpWrite()
         }
@@ -114,12 +117,13 @@ class GattSession(
     }
 
     private fun closeGatt() {
+        Log.i(TAG, "closeGatt — wasConnected=$connected gatt=${gatt != null}")
         connected = false
         try {
             gatt?.disconnect()
             gatt?.close()
-        } catch (_: Exception) {
-            // ignore
+        } catch (e: Exception) {
+            Log.w(TAG, "closeGatt exception", e)
         }
         gatt = null
         writeChar = null
@@ -170,7 +174,10 @@ class GattSession(
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-            Log.i(TAG, "onConnectionStateChange status=$status state=$newState")
+            Log.i(
+                TAG,
+                "onConnectionStateChange status=$status state=$newState wantConnected=$wantConnected wasConnected=$connected",
+            )
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
                 // Request higher MTU first; service discovery wird danach angestossen.
                 g.requestMtu(Protocol.REQUESTED_MTU)
@@ -179,9 +186,11 @@ class GattSession(
                 writeInFlight = false
                 writeQueue.clear()
                 if (wantConnected) {
+                    Log.w(TAG, "Unexpected disconnect (status=$status) — scheduling reconnect")
                     listener.onDisconnected()
                     scheduleReconnect()
                 } else {
+                    Log.i(TAG, "Disconnect acknowledged (wantConnected=false)")
                     listener.onDisconnected()
                 }
             }
@@ -268,12 +277,16 @@ class GattSession(
             characteristic: BluetoothGattCharacteristic,
             status: Int,
         ) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                Log.w(TAG, "onCharacteristicWrite status=$status — continuing queue")
+            }
             writeInFlight = false
             pumpWrite()
         }
     }
 
     private fun onSubscribed() {
+        Log.i(TAG, "onSubscribed — notifications enabled, session ready")
         connected = true
         reconnectAttempt = 0
         listener.onConnected()

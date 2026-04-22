@@ -99,10 +99,16 @@ class RadiacodeForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(TAG, "onCreate pid=${android.os.Process.myPid()}")
         ensureChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(
+            TAG,
+            "onStartCommand action=${intent?.action} startId=$startId flags=$flags " +
+                "session=${if (session != null) "active" else "none"} deviceReady=$deviceReady",
+        )
         // Jede Action promoviert den Service in den Foreground-Status. Wurde er
         // via startForegroundService() gestartet, muss startForeground() sowieso
         // innerhalb von 10 s folgen; bei startService() (z.B. ACTION_UPDATE auf
@@ -163,7 +169,13 @@ class RadiacodeForegroundService : Service() {
     private fun ensureForeground() {
         val notif = buildNotification(lastTitle, lastBody)
         val type = resolveForegroundServiceType()
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, type)
+        Log.i(TAG, "ensureForeground type=0x${type.toString(16)}")
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, type)
+        } catch (t: Throwable) {
+            Log.e(TAG, "startForeground FAILED type=0x${type.toString(16)}", t)
+            throw t
+        }
     }
 
     /**
@@ -192,9 +204,30 @@ class RadiacodeForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        Log.w(
+            TAG,
+            "onDestroy — session=${if (session != null) "active" else "none"} " +
+                "deviceReady=$deviceReady. Stack trace for diagnosis:",
+            Throwable("onDestroy stack"),
+        )
         teardownSession()
         releaseWakeLock()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.w(TAG, "onTaskRemoved — app swiped away")
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onLowMemory() {
+        Log.w(TAG, "onLowMemory")
+        super.onLowMemory()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        Log.w(TAG, "onTrimMemory level=$level")
+        super.onTrimMemory(level)
     }
 
     private fun startBleSession(address: String) {
@@ -202,21 +235,24 @@ class RadiacodeForegroundService : Service() {
             Log.i(TAG, "BLE session already active — ignore reconnect request")
             return
         }
+        Log.i(TAG, "startBleSession address=$address")
         RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
         val listener = object : SessionListener {
             override fun onConnected() {
                 deviceReady = false
-                Log.i(TAG, "GATT connected — running handshake")
+                Log.i(TAG, "listener.onConnected — running handshake")
                 runHandshake()
             }
 
             override fun onDisconnected() {
+                Log.w(TAG, "listener.onDisconnected")
                 deviceReady = false
                 stopPollLoop()
                 RadiacodeNotificationPlugin.emitConnectionState("disconnected")
             }
 
             override fun onReconnecting() {
+                Log.i(TAG, "listener.onReconnecting")
                 RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
             }
 
@@ -291,6 +327,11 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun teardownSession() {
+        Log.w(
+            TAG,
+            "teardownSession — session=${if (session != null) "active" else "none"}",
+            Throwable("teardownSession stack"),
+        )
         stopPollLoop()
         session?.release()
         session = null

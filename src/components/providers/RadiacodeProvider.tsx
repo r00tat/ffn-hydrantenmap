@@ -327,6 +327,10 @@ export function RadiacodeProvider({
   // nicht für das Spektrum-Polling. Deshalb in einem eigenen Effect, der nur
   // am Connection-Status hängt und unabhängig von liveRecording läuft.
   useEffect(() => {
+    console.log(
+      '[RadiacodeProvider] session-event effect rawStatus=',
+      rawStatus,
+    );
     if (rawStatus !== 'connected') {
       setReconnecting(false);
       return;
@@ -334,6 +338,7 @@ export function RadiacodeProvider({
     const client = clientRef.current;
     if (!client) return;
     const unsub = client.onSessionEvent((e) => {
+      console.log('[RadiacodeProvider] sessionEvent', e);
       if (e === 'reconnecting') setReconnecting(true);
       else setReconnecting(false);
     });
@@ -486,6 +491,13 @@ export function RadiacodeProvider({
 
   const serviceActive = notificationState !== null;
   useEffect(() => {
+    console.log(
+      '[RadiacodeProvider] serviceActive effect',
+      'serviceActive=',
+      serviceActive,
+      'notificationState=',
+      notificationStateRef.current,
+    );
     if (!serviceActive) return;
     const start = adapter.startForegroundService;
     const stop = adapter.stopForegroundService;
@@ -494,11 +506,17 @@ export function RadiacodeProvider({
     start({
       title: titleForNotification(current),
       body: formatBodyForNotification(measurement, current),
-    }).catch(() => {
+    }).catch((err) => {
+      console.warn('[RadiacodeProvider] startForegroundService failed', err);
       // Service-Start darf BLE nicht blockieren.
     });
     return () => {
-      stop?.().catch(() => {});
+      console.warn(
+        '[RadiacodeProvider] serviceActive cleanup — stopping foreground service',
+      );
+      stop?.().catch((err) => {
+        console.warn('[RadiacodeProvider] stopForegroundService failed', err);
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceActive, adapter]);
@@ -518,7 +536,12 @@ export function RadiacodeProvider({
     const register = adapter.onDisconnectRequested;
     if (!register) return;
     const unsub = register(() => {
-      disconnect().catch(() => {});
+      console.warn(
+        '[RadiacodeProvider] disconnectRequested received from native',
+      );
+      disconnect().catch((err) => {
+        console.warn('[RadiacodeProvider] disconnect after request failed', err);
+      });
     });
     return () => unsub();
   }, [adapter, disconnect]);

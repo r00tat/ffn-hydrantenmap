@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Base64;
+import android.util.Log;
 
 import at.ffnd.einsatzkarte.radiacode.Measurement;
 
@@ -26,6 +27,8 @@ import java.util.Locale;
                         strings = { "android.permission.POST_NOTIFICATIONS" })
         })
 public class RadiacodeNotificationPlugin extends Plugin {
+
+    private static final String TAG = "RadiacodeFg";
 
     private static RadiacodeNotificationPlugin instance;
 
@@ -60,8 +63,10 @@ public class RadiacodeNotificationPlugin extends Plugin {
     public void start(PluginCall call) {
         String title = call.getString("title", "Radiacode verbunden");
         String body = call.getString("body", "");
+        Log.i(TAG, "plugin.start title=" + title + " body=" + body);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (getPermissionState("notifications") != PermissionState.GRANTED) {
+                Log.i(TAG, "plugin.start requesting POST_NOTIFICATIONS permission");
                 requestPermissionForAlias("notifications", call, "permissionCallback");
                 // Service wird trotzdem gestartet — ohne Permission bleibt die Notification stumm.
             }
@@ -80,12 +85,14 @@ public class RadiacodeNotificationPlugin extends Plugin {
         String state = call.getString("state", "connected");
         String title = titleForState(state);
         String body = formatBody(dose, cps, state);
+        Log.d(TAG, "plugin.update state=" + state + " dose=" + dose + " cps=" + cps);
         startService(RadiacodeForegroundService.Companion.updateIntent(getContext(), title, body));
         call.resolve();
     }
 
     @PluginMethod
     public void stop(PluginCall call) {
+        Log.i(TAG, "plugin.stop");
         // stop() setzt NICHT auf startForegroundService(): ACTION_STOP ruft
         // stopSelf() sofort auf, Android würde die 10-s-Regel verletzen.
         getContext().startService(RadiacodeForegroundService.Companion.stopIntent(getContext()));
@@ -95,7 +102,9 @@ public class RadiacodeNotificationPlugin extends Plugin {
     @PluginMethod
     public void connectNative(PluginCall call) {
         String address = call.getString("deviceAddress");
+        Log.i(TAG, "plugin.connectNative address=" + address);
         if (address == null || address.isEmpty()) {
+            Log.w(TAG, "plugin.connectNative rejected — missing deviceAddress");
             call.reject("deviceAddress required");
             return;
         }
@@ -110,6 +119,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     public void writeNative(PluginCall call) {
         String payloadB64 = call.getString("payload");
         if (payloadB64 == null) {
+            Log.w(TAG, "plugin.writeNative rejected — missing payload");
             call.reject("payload required (base64)");
             return;
         }
@@ -117,9 +127,11 @@ public class RadiacodeNotificationPlugin extends Plugin {
         try {
             payload = Base64.decode(payloadB64, Base64.NO_WRAP);
         } catch (IllegalArgumentException e) {
+            Log.w(TAG, "plugin.writeNative rejected — payload not base64", e);
             call.reject("payload is not valid base64");
             return;
         }
+        Log.d(TAG, "plugin.writeNative bytes=" + payload.length);
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_WRITE);
         intent.putExtra(RadiacodeForegroundService.EXTRA_PAYLOAD, payload);
@@ -129,6 +141,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
 
     @PluginMethod
     public void disconnectNative(PluginCall call) {
+        Log.i(TAG, "plugin.disconnectNative");
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_DISCONNECT);
         startService(intent);
@@ -142,6 +155,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
 
     static void onDisconnectRequested() {
         RadiacodeNotificationPlugin i = instance;
+        Log.i(TAG, "onDisconnectRequested hasInstance=" + (i != null));
         if (i != null) {
             i.notifyListeners("disconnectRequested", new JSObject());
         }
@@ -166,7 +180,10 @@ public class RadiacodeNotificationPlugin extends Plugin {
 
     public static void emitNotification(byte[] bytes) {
         RadiacodeNotificationPlugin i = instance;
-        if (i == null) return;
+        if (i == null) {
+            Log.w(TAG, "emitNotification — no plugin instance; dropping " + bytes.length + " bytes");
+            return;
+        }
         JSObject data = new JSObject();
         data.put("bytes", Base64.encodeToString(bytes, Base64.NO_WRAP));
         i.notifyListeners("notification", data);
@@ -174,6 +191,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
 
     public static void emitConnectionState(String state) {
         RadiacodeNotificationPlugin i = instance;
+        Log.i(TAG, "emitConnectionState state=" + state + " hasInstance=" + (i != null));
         if (i == null) return;
         JSObject data = new JSObject();
         data.put("state", state);

@@ -58,6 +58,12 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async connect(deviceId) {
+    console.log(
+      '[Radiacode/bleAdapter] connect',
+      deviceId,
+      'native=',
+      isNativeAvailable(),
+    );
     if (isNativeAvailable()) {
       // Der native Foreground-Service übernimmt die GATT-Session exklusiv
       // (Phase 2, siehe docs/plans/2026-04-21-radiacode-native-polling.md).
@@ -69,6 +75,7 @@ export const capacitorAdapter: BleAdapter = {
     }
     const client = await ensureBleClient();
     await client.connect(deviceId, (id) => {
+      console.warn('[Radiacode/bleAdapter] web-disconnect fired for', id);
       const h = disconnectHandlers.get(id);
       if (h) h();
     });
@@ -76,6 +83,12 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async disconnect(deviceId) {
+    console.log(
+      '[Radiacode/bleAdapter] disconnect',
+      deviceId,
+      'native=',
+      isNativeAvailable(),
+    );
     if (isNativeAvailable()) {
       await nativeDisconnect();
       connectedDevices.delete(deviceId);
@@ -155,14 +168,17 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async startForegroundService(opts) {
+    console.log('[Radiacode/bleAdapter] startForegroundService', opts);
     await RadiacodeNotification.start(opts);
   },
 
   async updateForegroundService(opts) {
+    console.debug('[Radiacode/bleAdapter] updateForegroundService', opts);
     await RadiacodeNotification.update(opts);
   },
 
   async stopForegroundService() {
+    console.log('[Radiacode/bleAdapter] stopForegroundService');
     await RadiacodeNotification.stop();
   },
 
