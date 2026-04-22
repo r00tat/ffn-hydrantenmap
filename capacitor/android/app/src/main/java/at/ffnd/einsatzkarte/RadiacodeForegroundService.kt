@@ -130,11 +130,11 @@ class RadiacodeForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(
-            TAG,
-            "onStartCommand action=${intent?.action} startId=$startId flags=$flags " +
-                "session=${if (session != null) "active" else "none"} deviceReady=$deviceReady",
-        )
+        val logAction = intent?.action
+        val isHotPath = logAction == ACTION_UPDATE || logAction == ACTION_BLE_WRITE
+        val logMsg = "onStartCommand action=$logAction startId=$startId flags=$flags " +
+            "session=${if (session != null) "active" else "none"} deviceReady=$deviceReady"
+        if (isHotPath) Log.d(TAG, logMsg) else Log.i(TAG, logMsg)
         // Jede Action promoviert den Service in den Foreground-Status. Wurde er
         // via startForegroundService() gestartet, muss startForeground() sowieso
         // innerhalb von 10 s folgen; bei startService() (z.B. ACTION_UPDATE auf
@@ -238,10 +238,15 @@ class RadiacodeForegroundService : Service() {
         return START_NOT_STICKY
     }
 
+    private var lastForegroundType: Int = 0
+
     private fun ensureForeground() {
         val notif = buildNotification(lastTitle, lastBody)
         val type = resolveForegroundServiceType()
-        Log.i(TAG, "ensureForeground type=0x${type.toString(16)}")
+        if (type != lastForegroundType) {
+            Log.i(TAG, "ensureForeground type=0x${type.toString(16)} (was 0x${lastForegroundType.toString(16)})")
+            lastForegroundType = type
+        }
         try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, type)
         } catch (t: Throwable) {

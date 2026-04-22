@@ -91,7 +91,6 @@ class GattSession(
     fun sendWrite(frame: ByteArray) {
         handler.post {
             val chunks = Framing.splitForWrite(frame)
-            Log.d(TAG, "sendWrite frame=${frame.size}B chunks=${chunks.size} queueBefore=${writeQueue.size} inFlight=$writeInFlight connected=$connected")
             for (c in chunks) writeQueue.add(c)
             pumpWrite()
         }

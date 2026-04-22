@@ -1,6 +1,5 @@
 import { isInternalEmail } from '../../common/internalDomains';
 import { auth } from '../../components/firebase/firebase';
-import { loginTimer } from '../../common/loginTiming';
 
 export { isInternalEmail };
 
@@ -14,21 +13,17 @@ export async function refreshTokenUntilClaimsMatch(
   maxRetries = 5,
   retryDelayMs = 1000
 ): Promise<boolean> {
-  const timer = loginTimer('refreshTokenUntilClaimsMatch');
   const sortedExpectedGroups = [...expectedGroups].sort().join(',');
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
-      timer.step(`delay before attempt ${attempt + 1}`);
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
 
-    timer.step(`getIdToken (attempt ${attempt + 1}/${maxRetries})`);
     await auth.currentUser?.getIdToken(true);
 
     const tokenResult = await auth.currentUser?.getIdTokenResult();
     if (!tokenResult) {
-      timer.done();
       return false;
     }
 
@@ -41,7 +36,6 @@ export async function refreshTokenUntilClaimsMatch(
       tokenAuthorized === expectedAuthorized &&
       tokenGroups === sortedExpectedGroups
     ) {
-      timer.done();
       return true;
     }
 
@@ -50,7 +44,6 @@ export async function refreshTokenUntilClaimsMatch(
     );
   }
 
-  timer.done();
   return false;
 }
 
@@ -64,17 +57,14 @@ export async function refreshTokenWithRetry(
   maxRetries = 5,
   retryDelayMs = 1000
 ): Promise<boolean> {
-  const timer = loginTimer('refreshTokenWithRetry');
   let claimsMatch = false;
 
   for (let attempt = 0; attempt < maxRetries && !claimsMatch; attempt++) {
     if (attempt > 0) {
-      timer.step(`delay before attempt ${attempt + 1}`);
       console.info(`retrying token refresh (attempt ${attempt + 1}/${maxRetries})`);
       await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
 
-    timer.step(`getIdToken (attempt ${attempt + 1}/${maxRetries})`);
     await auth.currentUser!.getIdToken(true);
 
     const tokenResult = await auth.currentUser!.getIdTokenResult();
@@ -94,6 +84,5 @@ export async function refreshTokenWithRetry(
     console.warn(`token claims still differ after ${maxRetries} retries, may need manual re-login`);
   }
 
-  timer.done();
   return claimsMatch;
 }

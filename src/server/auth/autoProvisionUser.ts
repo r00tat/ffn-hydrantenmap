@@ -5,7 +5,6 @@ import { isInternalEmail } from '../../common/internalDomains';
 import { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../firebase/admin';
-import { serverLoginTimer } from '../../common/loginTiming';
 import { userSessionCache } from './userSessionCache';
 
 const DEFAULT_INTERNAL_GROUP = 'ffnd';
@@ -71,21 +70,16 @@ export async function ensureUserProvisioned(
   email: string | null | undefined,
   displayName?: string | null
 ): Promise<void> {
-  const timer = serverLoginTimer('ensureUserProvisioned');
   // Only auto-provision internal users
   if (!isInternalEmail(email)) {
-    timer.done();
     return;
   }
 
   // Skip Firestore check for users we've already seen
   if (userSessionCache.isKnownUser(uid)) {
-    timer.step('known user (cached)');
-    timer.done();
     return;
   }
 
-  timer.step('fetchUserDoc');
   const userInfo = await firestore
     .collection(USER_COLLECTION_ID)
     .doc(uid)
@@ -94,14 +88,11 @@ export async function ensureUserProvisioned(
   // If user already exists, no need to provision
   if (userInfo.exists) {
     userSessionCache.markKnownUser(uid);
-    timer.done();
     return;
   }
 
-  timer.step('autoProvisionInternalUser');
   await autoProvisionInternalUser(uid, email!, displayName);
   userSessionCache.markKnownUser(uid);
-  timer.done();
 }
 
 /**
@@ -113,16 +104,11 @@ export async function getUserSessionData(
   email: string | null | undefined,
   displayName?: string | null
 ): Promise<AutoProvisionedUser | undefined> {
-  const timer = serverLoginTimer('getUserSessionData');
-
   const cached = userSessionCache.get(uid);
   if (cached) {
-    timer.step('cache hit');
-    timer.done();
     return cached;
   }
 
-  timer.step('fetchUserDoc');
   const userInfo = await firestore
     .collection(USER_COLLECTION_ID)
     .doc(uid)
@@ -137,19 +123,15 @@ export async function getUserSessionData(
       firecall: userData.firecall,
     };
     userSessionCache.set(uid, result);
-    timer.done();
     return result;
   }
 
   // Auto-provision internal users (fallback if not done in authorize)
   if (isInternalEmail(email)) {
-    timer.step('autoProvisionInternalUser');
     const result = await autoProvisionInternalUser(uid, email!, displayName);
     userSessionCache.set(uid, result);
-    timer.done();
     return result;
   }
 
-  timer.done();
   return undefined;
 }
