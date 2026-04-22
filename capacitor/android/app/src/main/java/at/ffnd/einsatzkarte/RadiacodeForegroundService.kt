@@ -7,11 +7,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import at.ffnd.einsatzkarte.radiacode.Framing
 import at.ffnd.einsatzkarte.radiacode.GattSession
 import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
@@ -80,6 +82,8 @@ class RadiacodeForegroundService : Service() {
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
+    private var lastTitle: String = "Radiacode verbunden"
+    private var lastBody: String = ""
 
     private var session: GattSession? = null
     private val reassembler = Reassembler()
@@ -96,18 +100,29 @@ class RadiacodeForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        // Jede Action promoviert den Service in den Foreground-Status. Wurde er
+        // via startForegroundService() gestartet, muss startForeground() sowieso
+        // innerhalb von 10 s folgen; bei startService() (z.B. ACTION_UPDATE auf
+        // laufendem Service) ist der Call idempotent und aktualisiert nur die
+        // Notification. Entscheidend: Ab Android 14 (API 34+) MUSS die 3-arg-
+        // Variante mit Service-Typ aufgerufen werden, sonst crasht der Service
+        // mit MissingForegroundServiceTypeException — und reisst unsere
+        // BLE-Session mit sich. Siehe Bug-Report vom 2026-04-22.
+        val action = intent?.action
+        if (action == ACTION_START || action == ACTION_UPDATE) {
+            intent.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
+            intent.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
+        }
+        if (action != null && action != ACTION_STOP && action != ACTION_DISCONNECT_REQUESTED) {
+            ensureForeground()
+        }
+
+        when (action) {
             ACTION_START -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Radiacode verbunden"
-                val body = intent.getStringExtra(EXTRA_BODY) ?: ""
-                startForeground(NOTIFICATION_ID, buildNotification(title, body))
                 acquireWakeLock()
             }
             ACTION_UPDATE -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Radiacode verbunden"
-                val body = intent.getStringExtra(EXTRA_BODY) ?: ""
-                val nm = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
-                nm?.notify(NOTIFICATION_ID, buildNotification(title, body))
+                // ensureForeground() oben aktualisiert die Notification bereits.
             }
             ACTION_STOP -> {
                 teardownSession()
@@ -123,6 +138,7 @@ class RadiacodeForegroundService : Service() {
                 if (address.isNullOrBlank()) {
                     Log.w(TAG, "ACTION_BLE_CONNECT without deviceAddress")
                 } else {
+                    acquireWakeLock()
                     startBleSession(address)
                 }
             }
@@ -139,6 +155,16 @@ class RadiacodeForegroundService : Service() {
             }
         }
         return START_NOT_STICKY
+    }
+
+    private fun ensureForeground() {
+        val notif = buildNotification(lastTitle, lastBody)
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        } else {
+            0
+        }
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, type)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -40,6 +40,22 @@ public class RadiacodeNotificationPlugin extends Plugin {
         super.handleOnDestroy();
     }
 
+    /**
+     * Starts RadiacodeForegroundService as a foreground-capable service on
+     * Android 8+. The service must call startForeground(..) from onStartCommand
+     * within 10 s or Android throws ForegroundServiceDidNotStartInTimeException.
+     * Our service does that eagerly via ensureForeground() for every action
+     * except ACTION_STOP/ACTION_DISCONNECT_REQUESTED.
+     */
+    private void startService(Intent intent) {
+        Context ctx = getContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ctx.startForegroundService(intent);
+        } else {
+            ctx.startService(intent);
+        }
+    }
+
     @PluginMethod
     public void start(PluginCall call) {
         String title = call.getString("title", "Radiacode verbunden");
@@ -50,13 +66,8 @@ public class RadiacodeNotificationPlugin extends Plugin {
                 // Service wird trotzdem gestartet — ohne Permission bleibt die Notification stumm.
             }
         }
-        Context ctx = getContext();
-        Intent intent = RadiacodeForegroundService.Companion.startIntent(ctx, title, body);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.startForegroundService(intent);
-        } else {
-            ctx.startService(intent);
-        }
+        Intent intent = RadiacodeForegroundService.Companion.startIntent(getContext(), title, body);
+        startService(intent);
         call.resolve();
     }
 
@@ -69,13 +80,14 @@ public class RadiacodeNotificationPlugin extends Plugin {
         String state = call.getString("state", "connected");
         String title = titleForState(state);
         String body = formatBody(dose, cps, state);
-        getContext().startService(
-                RadiacodeForegroundService.Companion.updateIntent(getContext(), title, body));
+        startService(RadiacodeForegroundService.Companion.updateIntent(getContext(), title, body));
         call.resolve();
     }
 
     @PluginMethod
     public void stop(PluginCall call) {
+        // stop() setzt NICHT auf startForegroundService(): ACTION_STOP ruft
+        // stopSelf() sofort auf, Android würde die 10-s-Regel verletzen.
         getContext().startService(RadiacodeForegroundService.Companion.stopIntent(getContext()));
         call.resolve();
     }
@@ -90,7 +102,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_CONNECT);
         intent.putExtra(RadiacodeForegroundService.EXTRA_DEVICE_ADDRESS, address);
-        getContext().startService(intent);
+        startService(intent);
         call.resolve();
     }
 
@@ -111,7 +123,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_WRITE);
         intent.putExtra(RadiacodeForegroundService.EXTRA_PAYLOAD, payload);
-        getContext().startService(intent);
+        startService(intent);
         call.resolve();
     }
 
@@ -119,7 +131,7 @@ public class RadiacodeNotificationPlugin extends Plugin {
     public void disconnectNative(PluginCall call) {
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_BLE_DISCONNECT);
-        getContext().startService(intent);
+        startService(intent);
         call.resolve();
     }
 
