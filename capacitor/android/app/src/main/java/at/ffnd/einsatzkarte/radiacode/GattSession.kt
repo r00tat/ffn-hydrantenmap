@@ -102,6 +102,7 @@ class GattSession(
         val adapter: BluetoothAdapter? = mgr?.adapter
         if (adapter == null) {
             Log.w(TAG, "BluetoothAdapter unavailable")
+            listener.onDisconnected()
             scheduleReconnect()
             return
         }

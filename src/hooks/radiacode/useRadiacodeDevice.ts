@@ -48,6 +48,19 @@ export function useRadiacodeDevice(
 
   useEffect(() => {
     stateRef.current.adapter = adapter;
+    const unsub = adapter.onConnectionStateChange?.((s) => {
+      console.log('[useRadiacodeDevice] adapter state change:', s);
+      // Wenn der native Teil von sich aus den Status ändert (z.B. Reconnect
+      // erfolgreich oder Link final verloren), ziehen wir das in den Hook-State
+      // nach. 'connected' wird hier nicht forciert, das macht connect() aktiv.
+      if (s === 'reconnecting') setStatus('reconnecting');
+      if (s === 'disconnected' && stateRef.current.client) {
+        // Wenn wir eigentlich ein Client-Objekt haben, aber der Adapter 'disconnected'
+        // meldet, ist der Link weg.
+        setStatus('unavailable');
+      }
+    });
+    return unsub;
   }, [adapter]);
 
   const scan = useCallback(async (): Promise<RadiacodeDeviceRef | null> => {
@@ -81,6 +94,7 @@ export function useRadiacodeDevice(
     setMeasurement(null);
   }, []);
 
+  const connectingRef = useRef<string | null>(null);
   const connect = useCallback(
     async (maybeDevice?: RadiacodeDeviceRef) => {
       const target = maybeDevice ?? stateRef.current.device;
@@ -89,15 +103,46 @@ export function useRadiacodeDevice(
         setStatus('error');
         return;
       }
+      if (connectingRef.current === target.id) return;
+      connectingRef.current = target.id;
+
       setError(null);
       setStatus('connecting');
       try {
+        // start connection
         await adapter.connect(target.id);
-        setDevice(target);
-        stateRef.current.device = target;
+
         const client = clientFactory
           ? clientFactory(adapter, target.id)
           : new RadiacodeClient(adapter, target.id);
+
+        // Bei nativem Adapter warten wir bis zu 10s auf das 'connected' Event,
+        // bevor wir den Status auf 'connected' setzen. Sonst zeigt die UI
+        // sofort "Verbunden", obwohl die GATT-Session noch gar nicht steht.
+        if (adapter.onConnectionStateChange) {
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              unsub();
+              reject(new Error('Verbindungs-Timeout (Gerät eingeschaltet?)'));
+            }, 10000);
+            const unsub = adapter.onConnectionStateChange!((s) => {
+              if (s === 'connected') {
+                clearTimeout(timeout);
+                unsub();
+                resolve();
+              } else if (s === 'disconnected') {
+                // Initialer connect schlug fehl (z.B. Device off)
+                clearTimeout(timeout);
+                unsub();
+                reject(new Error('Gerät nicht erreichbar'));
+              }
+            });
+          });
+        }
+
+        setDevice(target);
+        stateRef.current.device = target;
+
         await client.connect();
         client.startPolling(
           (m) =>
@@ -114,10 +159,9 @@ export function useRadiacodeDevice(
         setStatus('connected');
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
-        // 'unavailable' = Gerät wurde erwartet, ist aber aktuell nicht
-        // erreichbar (BLE-Connect fehlgeschlagen, Timeout etc.). 'error'
-        // bleibt für unerwartete JS-Fehler reserviert.
         setStatus('unavailable');
+      } finally {
+        connectingRef.current = null;
       }
     },
     [adapter, clientFactory, pollIntervalMs],

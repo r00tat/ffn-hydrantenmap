@@ -5,6 +5,7 @@ import {
   nativeConnect,
   nativeDisconnect,
   nativeWrite,
+  onNativeConnectionState,
   onNativeNotification,
 } from './nativeBridge';
 import { RadiacodeNotification } from './radiacodeNotification';
@@ -195,5 +196,12 @@ export const capacitorAdapter: BleAdapter = {
     return () => {
       listenerHandle?.remove().catch(() => {});
     };
+  },
+
+  onConnectionStateChange(handler) {
+    if (isNativeAvailable()) {
+      return onNativeConnectionState(handler);
+    }
+    return () => {};
   },
 };

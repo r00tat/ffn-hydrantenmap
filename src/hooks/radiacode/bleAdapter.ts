@@ -15,6 +15,9 @@ export interface BleAdapter {
   ): Promise<Unsubscribe>;
   write(deviceId: string, data: Uint8Array): Promise<void>;
   onDisconnect?(deviceId: string, handler: () => void): Unsubscribe;
+  onConnectionStateChange?(
+    handler: (state: 'connected' | 'disconnected' | 'reconnecting') => void,
+  ): Unsubscribe;
   startForegroundService?(opts: { title: string; body: string }): Promise<void>;
   updateForegroundService?(opts: {
     dosisleistung: number;
