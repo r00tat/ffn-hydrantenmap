@@ -12,11 +12,18 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import at.ffnd.einsatzkarte.radiacode.Framing
 import at.ffnd.einsatzkarte.radiacode.GattSession
 import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
@@ -96,6 +103,10 @@ class RadiacodeForegroundService : Service() {
 
     private var pollExecutor: ScheduledExecutorService? = null
     private var pollTask: ScheduledFuture<*>? = null
+
+    private var fusedLocation: FusedLocationProviderClient? = null
+    private var locationCallback: LocationCallback? = null
+    @Volatile private var locationActive = false
 
     override fun onCreate() {
         super.onCreate()
@@ -222,6 +233,7 @@ class RadiacodeForegroundService : Service() {
             Throwable("onDestroy stack"),
         )
         teardownSession()
+        stopHighAccuracyLocation()
         releaseWakeLock()
         super.onDestroy()
     }
@@ -283,6 +295,7 @@ class RadiacodeForegroundService : Service() {
         val s = GattSession(applicationContext, address, listener)
         session = s
         s.connect()
+        startHighAccuracyLocation()
     }
 
     private fun runHandshake() {
@@ -344,9 +357,79 @@ class RadiacodeForegroundService : Service() {
             Throwable("teardownSession stack"),
         )
         stopPollLoop()
+        // HIGH_ACCURACY-LocationRequest läuft bewusst weiter, bis der Service
+        // komplett terminiert (onDestroy). Solange der Service lebt, soll die
+        // App durchgängig präzise GPS-Fixes bekommen — unabhängig von der
+        // Radiacode-Session.
         session?.release()
         session = null
         deviceReady = false
+    }
+
+    /**
+     * Hält den GPS-Chip im PRIORITY_HIGH_ACCURACY-Modus, solange die Radiacode-
+     * Session läuft. Ohne aktiven LocationRequest drosselt Android 14+ den
+     * GPS-Fix nach einigen Minuten auf Balanced Power, obwohl der Service mit
+     * FOREGROUND_SERVICE_TYPE_LOCATION deklariert ist. Die WebView-
+     * `navigator.geolocation` piggybackt auf diesem Request — ihr Fix bleibt
+     * dadurch durchgehend präzise, auch bei gesperrtem Screen.
+     *
+     * Der LocationCallback ist bewusst leer: wir wollen nur den HW-Provider
+     * warm halten, nicht die Position selbst konsumieren (das macht die
+     * WebView).
+     */
+    private fun startHighAccuracyLocation() {
+        if (locationActive) return
+        val fine = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION,
+        )
+        val coarse = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+        if (fine != PackageManager.PERMISSION_GRANTED &&
+            coarse != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "startHighAccuracyLocation — no location permission, skipping")
+            return
+        }
+        val client = fusedLocation
+            ?: LocationServices.getFusedLocationProviderClient(applicationContext).also {
+                fusedLocation = it
+            }
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
+            .setMinUpdateIntervalMillis(500L)
+            .setWaitForAccurateLocation(false)
+            .build()
+        val cb = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                // Intentionally empty — WebView konsumiert die Position selbst,
+                // wir halten hier nur den Provider aktiv.
+            }
+        }
+        locationCallback = cb
+        try {
+            client.requestLocationUpdates(request, cb, Looper.getMainLooper()).addOnFailureListener { t ->
+                Log.w(TAG, "requestLocationUpdates failed", t)
+            }
+            locationActive = true
+            Log.i(TAG, "startHighAccuracyLocation — GPS-Chip im HIGH_ACCURACY-Mode")
+        } catch (e: SecurityException) {
+            Log.w(TAG, "requestLocationUpdates SecurityException", e)
+            locationCallback = null
+        }
+    }
+
+    private fun stopHighAccuracyLocation() {
+        val cb = locationCallback ?: return
+        val client = fusedLocation ?: return
+        try {
+            client.removeLocationUpdates(cb)
+            Log.i(TAG, "stopHighAccuracyLocation — GPS-Updates gestoppt")
+        } catch (t: Throwable) {
+            Log.w(TAG, "removeLocationUpdates failed", t)
+        }
+        locationCallback = null
+        locationActive = false
     }
 
     private fun encodeSetTime(d: Date): ByteArray {

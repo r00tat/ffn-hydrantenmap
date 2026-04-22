@@ -42,6 +42,11 @@ dependencies {
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
     implementation project(':capacitor-android')
+    // FusedLocationProviderClient — hält den GPS-Chip während einer
+    // Radiacode-Session im PRIORITY_HIGH_ACCURACY-Modus, damit das WebView
+    // `navigator.geolocation` nicht nach ein paar Minuten auf Netzwerk-Fix
+    // zurückfällt (Android 14+ drosselt sonst trotz FGS_TYPE_LOCATION).
+    implementation "com.google.android.gms:play-services-location:21.3.0"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
