@@ -121,8 +121,8 @@ export default function KostenersatzCalculationPage({
 
   // Calculate suggested duration considering overrides (after calculation state is available)
   const suggestedDuration = useMemo((): number => {
-    const start = calculation.startDateOverride || firecall.date;
-    const end = calculation.endDateOverride || firecall.abruecken;
+    const start = calculation.startDateOverride ?? firecall.date;
+    const end = calculation.endDateOverride ?? firecall.abruecken;
     return calculateDurationHours(start, end) || 1;
   }, [calculation.startDateOverride, calculation.endDateOverride, firecall.date, firecall.abruecken]);
 
@@ -455,7 +455,7 @@ export default function KostenersatzCalculationPage({
 
   // Save handlers
   const handleSave = useCallback(
-    async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<boolean> => {
+    async (status: 'draft' | 'completed', redirectAfterSave = true, showSuccessMessage = true): Promise<string | undefined> => {
       setIsSaving(true);
       try {
         const calcToSave = {
@@ -464,8 +464,10 @@ export default function KostenersatzCalculationPage({
           updatedAt: new Date().toISOString(),
         };
 
+        let savedId = existingCalculation?.id || calculation.id;
+
         // Check both existing calculation ID and local state ID (for subsequent saves of new calculations)
-        if (existingCalculation?.id || calculation.id) {
+        if (savedId) {
           await updateCalculation(calcToSave);
           // Update local status
           setCalculation((prev) => ({ ...prev, status }));
@@ -473,6 +475,7 @@ export default function KostenersatzCalculationPage({
           // Remove id field for new calculations (Firestore rejects undefined values)
           const { id: _id, ...calcWithoutId } = calcToSave;
           const newId = await addCalculation(calcWithoutId);
+          savedId = newId;
           // Update local state with the new ID and status so subsequent saves update instead of creating duplicates
           setCalculation((prev) => ({ ...prev, id: newId, status }));
           // Update URL so reload opens the saved calculation instead of creating a new one
@@ -484,11 +487,11 @@ export default function KostenersatzCalculationPage({
         } else if (showSuccessMessage) {
           setSuccessMessage('Gespeichert');
         }
-        return true;
+        return savedId;
       } catch (error) {
         console.error('Error saving calculation:', error);
         // TODO: Show error notification
-        return false;
+        return undefined;
       } finally {
         setIsSaving(false);
       }
@@ -692,6 +695,7 @@ export default function KostenersatzCalculationPage({
               firecall={firecall}
               rates={rates}
               variant="outlined"
+              onClick={() => handleSave('draft', false)}
             />
           </Box>
 

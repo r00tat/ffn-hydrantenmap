@@ -87,6 +87,8 @@ function buildCalculationFromTemplate(
   } as KostenersatzCalculation;
 }
 
+const EMPTY_RATES: KostenersatzRate[] = [];
+
 export default function KostenersatzTemplateDialog({
   open,
   onClose,
@@ -95,7 +97,7 @@ export default function KostenersatzTemplateDialog({
   calculationDefaultStunden,
   calculationVehicles,
   isAdmin = false,
-  rates = [],
+  rates = EMPTY_RATES,
 }: KostenersatzTemplateDialogProps) {
   const { vehiclesById } = useKostenersatzVehicles();
   const [name, setName] = useState('');

@@ -1,0 +1,24 @@
+{
+  "name": "ffn-einsatzkarte-capacitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor wrapper for FFN Einsatzkarte PWA (Android).",
+  "scripts": {
+    "sync": "cap sync android",
+    "build": "cap sync android && cd android && ./gradlew assembleRelease",
+    "build:debug": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.1.0",
+    "@capacitor-firebase/authentication": "^8.2.0",
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/share": "^8.0.1",
+    "firebase": "^12.12.1"
+  }
+}

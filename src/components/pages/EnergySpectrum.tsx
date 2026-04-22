@@ -1,5 +1,6 @@
 'use client';
 
+import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -13,19 +14,23 @@ import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
+import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Tooltip from '@mui/material/Tooltip';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import StopIcon from '@mui/icons-material/Stop';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
 import {
   Fragment,
@@ -46,15 +51,21 @@ import {
   type NuclideMatch,
 } from '../../common/spectrumParser';
 import { buildNuclidePeakLines } from '../../common/nuclidePeakLines';
+import { exportSpectrumXml } from '../../common/spectrumExporter';
 import { resolveSpectrumIdentification } from '../../common/spectrumIdentification';
 import {
   FIRECALL_COLLECTION_ID,
   Spectrum,
 } from '../../components/firebase/firestore';
+import { downloadText } from '../firebase/download';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import { useRadiacode } from '../providers/RadiacodeProvider';
+import { useSnackbar } from '../providers/SnackbarProvider';
+import RadiacodeConnectionControls from './RadiacodeConnectionControls';
+import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 /** MUI default color palette for series */
 const SERIES_COLORS = [
@@ -65,6 +76,14 @@ const SERIES_COLORS = [
   '#7b1fa2',
   '#0288d1',
 ];
+
+const LIVE_ID = 'live';
+const LIVE_COLOR = '#e91e63';
+
+function colorForSpectrum(s: LoadedSpectrum, firestoreIdx: number): string {
+  if (s.id === LIVE_ID) return LIVE_COLOR;
+  return SERIES_COLORS[firestoreIdx % SERIES_COLORS.length];
+}
 
 /**
  * Palette for manually selected nuclide peak lines. Intentionally distinct from
@@ -157,6 +176,19 @@ export default function EnergySpectrum() {
     null,
   );
 
+  const {
+    status,
+    device,
+    spectrum,
+    error: radiacodeError,
+    liveRecording,
+    startLiveRecording,
+    stopLiveRecording,
+    resetLiveSpectrum,
+    saveLiveSpectrum,
+  } = useRadiacode();
+  const showSnackbar = useSnackbar();
+
   const toggleNuclideSelection = useCallback((name: string) => {
     setSelectedNuclideNames((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
@@ -181,11 +213,43 @@ export default function EnergySpectrum() {
     filterFn,
   });
 
+  const liveSpectrum = useMemo<LoadedSpectrum | null>(() => {
+    if (!liveRecording) return null;
+    
+    const counts = spectrum?.counts ?? new Array(1024).fill(0);
+    const coefficients: number[] = spectrum
+      ? [...spectrum.coefficients]
+      : [0, 1, 0]; // Default calibration until first snapshot
+
+    const energies = counts.map((_, ch) => channelToEnergy(ch, coefficients));
+    const duration = spectrum?.durationSec ?? 0;
+
+    const data: SpectrumData = {
+      sampleName: 'Live-Aufzeichnung',
+      deviceName: device?.name ?? '',
+      measurementTime: duration,
+      liveTime: duration,
+      startTime: '',
+      endTime: '',
+      coefficients,
+      counts,
+      energies,
+    };
+    const peaks = findPeaks(counts, energies);
+    const matches = identifyNuclides(peaks);
+    return {
+      id: LIVE_ID,
+      firestoreId: undefined,
+      data,
+      matches,
+      visible: !hiddenIds.has(LIVE_ID),
+      description: 'Live-Daten vom Radiacode',
+    };
+  }, [spectrum, device, hiddenIds, liveRecording]);
+
   // Convert Firestore spectra into LoadedSpectrum format with visibility
   const allSpectra = useMemo<LoadedSpectrum[]>(() => {
-    if (!savedSpectra || savedSpectra.length === 0) return [];
-
-    return savedSpectra
+    const firestoreItems = (savedSpectra ?? [])
       .filter((saved) => saved.counts?.length > 0)
       .map((saved) => {
         const id = `firestore-${saved.id}`;
@@ -216,7 +280,8 @@ export default function EnergySpectrum() {
           manualNuclide: saved.manualNuclide,
         };
       });
-  }, [savedSpectra, hiddenIds]);
+    return liveSpectrum ? [liveSpectrum, ...firestoreItems] : firestoreItems;
+  }, [savedSpectra, hiddenIds, liveSpectrum]);
 
   const handleFileUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,6 +351,29 @@ export default function EnergySpectrum() {
     },
     [updateItem, allSpectra],
   );
+
+  const handleDownload = useCallback((spectrum: LoadedSpectrum) => {
+    const xml = exportSpectrumXml({
+      sampleName: spectrum.data.sampleName,
+      deviceName: spectrum.data.deviceName,
+      measurementTime: spectrum.data.measurementTime,
+      liveTime: spectrum.data.liveTime,
+      startTime: spectrum.data.startTime,
+      endTime: spectrum.data.endTime,
+      coefficients: spectrum.data.coefficients,
+      counts: spectrum.data.counts,
+    });
+    const sanitized = (spectrum.data.sampleName || 'spektrum').replace(
+      /[^A-Za-z0-9._-]+/g,
+      '_',
+    );
+    const datePart = spectrum.data.startTime?.slice(0, 10) || 'unbekannt';
+    void downloadText(
+      xml,
+      `Spectrum_${sanitized}_${datePart}.xml`,
+      'application/xml',
+    );
+  }, []);
 
   const openEditDialog = useCallback((spectrum: LoadedSpectrum) => {
     setEditDialog({
@@ -390,17 +478,29 @@ export default function EnergySpectrum() {
   const chartData = useMemo(() => {
     if (deferredVisibleSpectra.length === 0 || displayRange === 0) return null;
 
-    const energies = deferredVisibleSpectra[0].data.energies
-      .slice(0, displayRange)
-      .map((e) => Math.round(e * 10) / 10);
+    // Build x-axis from displayRange channels using first spectrum's
+    // calibration. Generating instead of slicing guarantees length ===
+    // displayRange even if the first spectrum has fewer channels than the
+    // longest one in the set.
+    const coefficients = deferredVisibleSpectra[0].data.coefficients;
+    const energies = Array.from(
+      { length: displayRange },
+      (_, ch) => Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
+    );
 
-    // Use original index for consistent colors
+    // Use original index for consistent colors — subtract 1 if a live item
+    // prefixes the list so Firestore items start at palette index 0.
+    const hasLive = allSpectra.length > 0 && allSpectra[0].id === LIVE_ID;
     const series = deferredVisibleSpectra.map((s) => {
       const originalIdx = allSpectra.indexOf(s);
+      const firestoreIdx = hasLive ? originalIdx - 1 : originalIdx;
+      const padded = s.data.counts.slice(0, displayRange);
+      while (padded.length < displayRange) padded.push(0);
       return {
-        data: s.data.counts.slice(0, displayRange),
+        data: padded,
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
-        color: SERIES_COLORS[originalIdx % SERIES_COLORS.length],
+        color: colorForSpectrum(s, firestoreIdx),
+        liveTime: s.data.liveTime,
       };
     });
 
@@ -453,6 +553,31 @@ export default function EnergySpectrum() {
         />
       </Box>
 
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 2 }}
+      >
+        <RadiacodeConnectionControls />
+        {liveRecording && liveSpectrum && (
+          <>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RestartAltIcon />}
+              onClick={() => resetLiveSpectrum()}
+            >
+              Reset Live
+            </Button>
+          </>
+        )}
+      </Stack>
+      {radiacodeError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {radiacodeError}
+        </Alert>
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -476,7 +601,30 @@ export default function EnergySpectrum() {
         >
           Datei(en) hochladen
         </Button>
-        {allSpectra.length > 0 && (
+        <Tooltip
+          title={
+            status !== 'connected'
+              ? 'Zuerst mit Radiacode verbinden'
+              : liveRecording
+                ? 'Live-Aufzeichnung stoppen'
+                : 'Live-Aufzeichnung starten'
+          }
+        >
+          <span>
+            <Button
+              variant={liveRecording ? 'outlined' : 'contained'}
+              color={liveRecording ? 'error' : 'primary'}
+              startIcon={liveRecording ? <StopIcon /> : <TimelineIcon />}
+              onClick={() =>
+                liveRecording ? stopLiveRecording() : startLiveRecording()
+              }
+              disabled={status !== 'connected'}
+            >
+              {liveRecording ? 'Aufzeichnung stoppen' : 'Live-Aufzeichnung'}
+            </Button>
+          </span>
+        </Tooltip>
+        {(allSpectra.length > 0 || liveRecording) && (
           <FormControlLabel
             control={
               <Switch
@@ -553,6 +701,8 @@ export default function EnergySpectrum() {
       {allSpectra.length > 0 && (
         <List dense>
           {allSpectra.map((s, idx) => {
+            const isLive = s.id === LIVE_ID;
+            const firestoreIdx = liveSpectrum ? idx - 1 : idx;
             const topMatch = s.matches[0];
             const identification = resolveSpectrumIdentification(
               s.manualNuclide,
@@ -573,251 +723,273 @@ export default function EnergySpectrum() {
             const isExpanded = expandedSpectrumId === s.id;
             return (
               <Fragment key={s.id}>
-              <ListItem
-                secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 0 }}>
-                    <IconButton
-                      aria-label="Bearbeiten"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        openEditDialog(s);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        toggleVisibility(s.id);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                    </IconButton>
-                    <IconButton
-                      edge="end"
-                      aria-label="Entfernen"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        removeSpectrum(s.id);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                }
-                sx={{
-                  opacity: s.visible ? 1 : 0.5,
-                  cursor: 'pointer',
-                  pr: '148px',
-                  '&:hover': { bgcolor: 'action.hover' },
-                }}
-                onClick={() => toggleVisibility(s.id)}
-              >
-                <Box
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    backgroundColor: SERIES_COLORS[idx % SERIES_COLORS.length],
-                    mr: 1,
-                    flexShrink: 0,
-                  }}
-                />
-                <ListItemText
-                  primary={
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        sx={{ fontWeight: 'bold' }}
+                <ListItem
+                  secondaryAction={
+                    <Box sx={{ display: 'flex', gap: 0 }}>
+                      {!isLive && (
+                        <Tooltip title="XML exportieren">
+                          <IconButton
+                            aria-label="XML exportieren"
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              handleDownload(s);
+                            }}
+                            size="small"
+                            sx={{ minWidth: 44, minHeight: 44 }}
+                          >
+                            <DownloadIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {!isLive && (
+                        <IconButton
+                          aria-label="Bearbeiten"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            openEditDialog(s);
+                          }}
+                          size="small"
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          toggleVisibility(s.id);
+                        }}
+                        size="small"
+                        sx={{ minWidth: 44, minHeight: 44 }}
                       >
-                        {s.data.sampleName || 'Unbekannt'}
-                      </Typography>
-                      {identification.source === 'manual' && (
-                        <Chip
-                          label={`${identification.displayName} (manuell)`}
-                          color="primary"
+                        {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
+                      </IconButton>
+                      {!isLive && (
+                        <IconButton
+                          edge="end"
+                          aria-label="Entfernen"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            removeSpectrum(s.id);
+                          }}
                           size="small"
-                          onClick={
-                            extraMatches.length > 0
-                              ? (e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  toggleExpanded(s.id);
-                                }
-                              : undefined
-                          }
-                        />
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
                       )}
-                      {identification.source === 'auto' && (
-                        <Chip
-                          label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
-                          color="success"
-                          size="small"
-                          onClick={
-                            extraMatches.length > 0
-                              ? (e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  toggleExpanded(s.id);
-                                }
-                              : undefined
-                          }
-                        />
-                      )}
-                      {identification.source === 'none' && (
-                        <Chip
-                          label="Nicht identifiziert"
-                          color="warning"
-                          size="small"
-                        />
-                      )}
-                      {identNuclide?.url && (
-                        <Chip
-                          label="RadiaCode"
-                          size="small"
-                          variant="outlined"
-                          component="a"
-                          href={identNuclide.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          clickable
-                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        />
-                      )}
-                      {dbLinks && (
-                        <>
-                          <Chip
-                            label="IAEA"
-                            size="small"
-                            variant="outlined"
-                            component="a"
-                            href={dbLinks.iaea}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            clickable
-                            onClick={(e: React.MouseEvent) =>
-                              e.stopPropagation()
-                            }
-                          />
-                          <Chip
-                            label="NNDC"
-                            size="small"
-                            variant="outlined"
-                            component="a"
-                            href={dbLinks.nndc}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            clickable
-                            onClick={(e: React.MouseEvent) =>
-                              e.stopPropagation()
-                            }
-                          />
-                        </>
-                      )}
-                      {identification.source === 'manual' &&
-                        identification.autoAlt && (
-                          <Chip
-                            label={`Auto: ${identification.autoAlt.name} (${Math.round(
-                              identification.autoAlt.confidence * 100,
-                            )}%)`}
-                            size="small"
-                            variant="outlined"
-                            color="default"
-                          />
-                        )}
                     </Box>
                   }
-                  secondary={
-                    <>
-                      {[
-                        s.data.deviceName,
-                        s.data.startTime
-                          ? new Date(s.data.startTime).toLocaleString('de-AT')
-                          : '',
-                        `Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                      {s.description && (
+                  sx={{
+                    opacity: s.visible ? 1 : 0.5,
+                    cursor: 'pointer',
+                    pr: '192px',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                  onClick={() => toggleVisibility(s.id)}
+                >
+                  <Box
+                    data-testid={`spectrum-color-${s.id}`}
+                    sx={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      backgroundColor: colorForSpectrum(s, firestoreIdx),
+                      mr: 1,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <ListItemText
+                    primary={
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         <Typography
                           component="span"
-                          variant="caption"
-                          sx={{ display: 'block' }}
-                          color="text.secondary"
+                          variant="body2"
+                          sx={{ fontWeight: 'bold' }}
                         >
-                          {s.description}
+                          {s.data.sampleName || 'Unbekannt'}
                         </Typography>
-                      )}
-                    </>
-                  }
-                />
-              </ListItem>
-              {extraMatches.length > 0 && (
-                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                  <Box sx={{ pl: 5, pr: '148px', pb: 1.5 }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 0.5 }}
-                    >
-                      Weitere Kandidaten – zum Einblenden anklicken:
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        gap: 0.5,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      {extraMatches.map((m) => {
-                        const selectedIdx = selectedNuclideNames.indexOf(
-                          m.nuclide.name,
-                        );
-                        const isSelected = selectedIdx >= 0;
-                        const color = isSelected
-                          ? SELECTED_PEAK_COLORS[
-                              selectedIdx % SELECTED_PEAK_COLORS.length
-                            ]
-                          : undefined;
-                        return (
+                        {identification.source === 'manual' && (
                           <Chip
-                            key={m.nuclide.name}
-                            label={`${m.nuclide.name} (${Math.round(
-                              m.confidence * 100,
-                            )}%)`}
+                            label={`${identification.displayName} (manuell)`}
+                            color="primary"
                             size="small"
-                            variant={isSelected ? 'filled' : 'outlined'}
-                            onClick={() =>
-                              toggleNuclideSelection(m.nuclide.name)
-                            }
-                            sx={
-                              color
-                                ? {
-                                    borderLeft: `4px solid ${color}`,
-                                    borderRadius: 1,
+                            onClick={
+                              extraMatches.length > 0
+                                ? (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    toggleExpanded(s.id);
                                   }
                                 : undefined
                             }
                           />
-                        );
-                      })}
+                        )}
+                        {identification.source === 'auto' && (
+                          <Chip
+                            label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
+                            color="success"
+                            size="small"
+                            onClick={
+                              extraMatches.length > 0
+                                ? (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    toggleExpanded(s.id);
+                                  }
+                                : undefined
+                            }
+                          />
+                        )}
+                        {identification.source === 'none' && (
+                          <Chip
+                            label="Nicht identifiziert"
+                            color="warning"
+                            size="small"
+                          />
+                        )}
+                        {identNuclide?.url && (
+                          <Chip
+                            label="RadiaCode"
+                            size="small"
+                            variant="outlined"
+                            component="a"
+                            href={identNuclide.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            clickable
+                            onClick={(e: React.MouseEvent) =>
+                              e.stopPropagation()
+                            }
+                          />
+                        )}
+                        {dbLinks && (
+                          <>
+                            <Chip
+                              label="IAEA"
+                              size="small"
+                              variant="outlined"
+                              component="a"
+                              href={dbLinks.iaea}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              clickable
+                              onClick={(e: React.MouseEvent) =>
+                                e.stopPropagation()
+                              }
+                            />
+                            <Chip
+                              label="NNDC"
+                              size="small"
+                              variant="outlined"
+                              component="a"
+                              href={dbLinks.nndc}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              clickable
+                              onClick={(e: React.MouseEvent) =>
+                                e.stopPropagation()
+                              }
+                            />
+                          </>
+                        )}
+                        {identification.source === 'manual' &&
+                          identification.autoAlt && (
+                            <Chip
+                              label={`Auto: ${identification.autoAlt.name} (${Math.round(
+                                identification.autoAlt.confidence * 100,
+                              )}%)`}
+                              size="small"
+                              variant="outlined"
+                              color="default"
+                            />
+                          )}
+                      </Box>
+                    }
+                    secondary={
+                      <>
+                        {[
+                          s.data.deviceName,
+                          s.data.startTime
+                            ? new Date(s.data.startTime).toLocaleString('de-AT')
+                            : '',
+                          `Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {s.description && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ display: 'block' }}
+                            color="text.secondary"
+                          >
+                            {s.description}
+                          </Typography>
+                        )}
+                      </>
+                    }
+                  />
+                </ListItem>
+                {extraMatches.length > 0 && (
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <Box sx={{ pl: 5, pr: '192px', pb: 1.5 }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mb: 0.5 }}
+                      >
+                        Weitere Kandidaten – zum Einblenden anklicken:
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          gap: 0.5,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {extraMatches.map((m) => {
+                          const selectedIdx = selectedNuclideNames.indexOf(
+                            m.nuclide.name,
+                          );
+                          const isSelected = selectedIdx >= 0;
+                          const color = isSelected
+                            ? SELECTED_PEAK_COLORS[
+                                selectedIdx % SELECTED_PEAK_COLORS.length
+                              ]
+                            : undefined;
+                          return (
+                            <Chip
+                              key={m.nuclide.name}
+                              label={`${m.nuclide.name} (${Math.round(
+                                m.confidence * 100,
+                              )}%)`}
+                              size="small"
+                              variant={isSelected ? 'filled' : 'outlined'}
+                              onClick={() =>
+                                toggleNuclideSelection(m.nuclide.name)
+                              }
+                              sx={
+                                color
+                                  ? {
+                                      borderLeft: `4px solid ${color}`,
+                                      borderRadius: 1,
+                                    }
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
+                      </Box>
                     </Box>
-                  </Box>
-                </Collapse>
-              )}
+                  </Collapse>
+                )}
               </Fragment>
             );
           })}
@@ -889,102 +1061,73 @@ export default function EnergySpectrum() {
       {/* Chart */}
       {chartData && (
         <Box sx={{ width: '100%', mt: 2 }}>
-          <LineChart
+          <ZoomableSpectrumChart
             height={400}
-            xAxis={[
-              {
-                id: 'energy',
-                data: chartData.energies,
-                label: 'Energie (keV)',
-                scaleType: 'linear',
-                valueFormatter: (v: number) => `${v} keV`,
-              },
-            ]}
-            yAxis={[
-              {
-                label: logScale ? 'Counts (log)' : 'Counts',
-                valueFormatter: logScale
-                  ? (v: number | null) =>
-                      v != null
-                        ? Math.round(Math.pow(10, v) - 1).toString()
-                        : ''
-                  : undefined,
-              },
-            ]}
-            series={chartData.series.map((s) => ({
-              ...s,
-              data: logScale
-                ? s.data.map((v) => (v > 0 ? Math.log10(v + 1) : 0))
-                : s.data,
-              area: true,
-              showMark: false,
-              curve: 'linear' as const,
-              valueFormatter: (v: number | null) => {
-                const counts =
-                  logScale && v != null ? Math.round(Math.pow(10, v) - 1) : v;
-                return `${counts} cps`;
-              },
-            }))}
-            margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
-          >
-            {Array.from(matchedPeakEnergies.entries())
-              .sort((a, b) => a[1] - b[1])
-              .map(([label, energy], idx) => (
-                <ChartsReferenceLine
-                  key={label}
-                  x={energy}
-                  label={label}
-                  labelAlign="start"
-                  spacing={{
-                    x: 5,
-                    y: PEAK_LABEL_DY_OFFSETS[
-                      idx % PEAK_LABEL_DY_OFFSETS.length
-                    ],
-                  }}
-                  lineStyle={{
-                    stroke: '#d32f2f',
-                    strokeWidth: 1.5,
-                    strokeDasharray: '4 2',
-                  }}
-                  labelStyle={{
-                    fontSize: 10,
-                    fill: '#d32f2f',
-                    fontWeight: 'bold',
-                  }}
-                />
-              ))}
-            {[...selectedPeakLines]
-              .sort((a, b) => a.energy - b.energy)
-              .map((line, idx) => (
-                <ChartsReferenceLine
-                  key={line.key}
-                  x={line.energy}
-                  label={line.label}
-                  labelAlign="start"
-                  spacing={{
-                    x: 5,
-                    y: PEAK_LABEL_DY_OFFSETS[
-                      idx % PEAK_LABEL_DY_OFFSETS.length
-                    ],
-                  }}
-                  lineStyle={{
-                    stroke: line.color,
-                    strokeWidth: 1.5,
-                    strokeDasharray: '2 3',
-                  }}
-                  labelStyle={{
-                    fontSize: 10,
-                    fill: line.color,
-                    fontWeight: 'bold',
-                  }}
-                />
-              ))}
-          </LineChart>
+            energies={chartData.energies}
+            series={chartData.series.map((s) => ({ ...s, area: true }))}
+            logScale={logScale}
+            overlays={
+              <>
+                {Array.from(matchedPeakEnergies.entries())
+                  .sort((a, b) => a[1] - b[1])
+                  .map(([label, energy], idx) => (
+                    <ChartsReferenceLine
+                      key={label}
+                      x={energy}
+                      label={label}
+                      labelAlign="start"
+                      spacing={{
+                        x: 5,
+                        y: PEAK_LABEL_DY_OFFSETS[
+                          idx % PEAK_LABEL_DY_OFFSETS.length
+                        ],
+                      }}
+                      lineStyle={{
+                        stroke: '#d32f2f',
+                        strokeWidth: 1.5,
+                        strokeDasharray: '4 2',
+                      }}
+                      labelStyle={{
+                        fontSize: 10,
+                        fill: '#d32f2f',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  ))}
+                {[...selectedPeakLines]
+                  .sort((a, b) => a.energy - b.energy)
+                  .map((line, idx) => (
+                    <ChartsReferenceLine
+                      key={line.key}
+                      x={line.energy}
+                      label={line.label}
+                      labelAlign="start"
+                      spacing={{
+                        x: 5,
+                        y: PEAK_LABEL_DY_OFFSETS[
+                          idx % PEAK_LABEL_DY_OFFSETS.length
+                        ],
+                      }}
+                      lineStyle={{
+                        stroke: line.color,
+                        strokeWidth: 1.5,
+                        strokeDasharray: '2 3',
+                      }}
+                      labelStyle={{
+                        fontSize: 10,
+                        fill: line.color,
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  ))}
+              </>
+            }
+          />
         </Box>
       )}
 
       {/* Empty state */}
-      {allSpectra.length === 0 && (
+      {allSpectra.length === 0 && !liveRecording && (
         <Box
           sx={{
             mt: 4,

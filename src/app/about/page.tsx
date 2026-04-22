@@ -16,6 +16,7 @@ export default function About() {
           alt="Logo FF Neusiedl am See"
           width={1921}
           height={378}
+          priority
           style={{ width: '100%', maxWidth: 400, height: 'auto' }}
         />
         <Typography variant="h3">About</Typography>

@@ -186,3 +186,8 @@ test-results/
 .skills
 .agents
 hydranten.csv
+
+# BLE captures (may contain peer MAC addresses)
+/captures/
+
+certificates

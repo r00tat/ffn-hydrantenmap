@@ -12,20 +12,18 @@ import {
   Auth,
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
-  GoogleAuthProvider,
   sendEmailVerification,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInWithEmailAndPassword,
   signInWithEmailLink,
-  signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-
-const googleProvider = new GoogleAuthProvider();
+import GoogleSignInButton from './GoogleSignInButton';
+import { isCapacitorNative, signInWithGoogle } from './googleAuthAdapter';
 
 export default function StyledLoginButton({
   firebaseAuth: auth,
@@ -46,11 +44,8 @@ export default function StyledLoginButton({
   const googleSignIn = useCallback(async () => {
     setError(undefined);
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      // This gives you a Google Access Token. You can use it to access the Google API.
-      // const credential = GoogleAuthProvider.credentialFromResult(result);
+      const result = await signInWithGoogle(auth);
       const user = result.user;
-
       const userInfo = getAdditionalUserInfo(result);
 
       console.info(`signin success`);
@@ -314,14 +309,18 @@ export default function StyledLoginButton({
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <Button
-              color="primary"
-              variant="contained"
-              onClick={googleSignIn}
-              style={{ marginTop: 20 }}
-            >
-              Mit Google einloggen
-            </Button>
+            {isCapacitorNative() ? (
+              <GoogleSignInButton onClick={googleSignIn} />
+            ) : (
+              <Button
+                color="primary"
+                variant="contained"
+                onClick={googleSignIn}
+                style={{ marginTop: 20 }}
+              >
+                Mit Google einloggen
+              </Button>
+            )}
           </Grid>
           <Grid size={{ xs: 12 }}>
             <Button

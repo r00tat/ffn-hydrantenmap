@@ -1,74 +1,96 @@
-/**
- * download a Blob in the browser
- * 
- * const blob = new Blob([JSON.stringify(firecallData)], {
-    type: 'application/json',
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
+function sanitizeFilename(name: string): string {
+  const base = name.split(/[\\/]/).pop() ?? name;
+  return base.replace(/\.\.+/g, '_').replace(/^\.+/, '_') || 'download';
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  if (typeof FileReader !== 'undefined') {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const comma = result.indexOf(',');
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'));
+      reader.readAsDataURL(blob);
+    });
+  }
+  const buffer = await blob.arrayBuffer();
+  // Last-resort fallback (non-browser envs). Buffer is available under Node.
+  return Buffer.from(new Uint8Array(buffer)).toString('base64');
+}
+
+async function nativeShare(blob: Blob, filename: string): Promise<void> {
+  const path = sanitizeFilename(filename);
+  const data = await blobToBase64(blob);
+  const { uri } = await Filesystem.writeFile({
+    path,
+    data,
+    directory: Directory.Cache,
   });
-  downloadBlob(blob, `firecall-export-${firecallId}.json`);
- * @param blob Blob to download
- * @param filename filename to present to the browser
- * @returns a HTMLAnchorelemnt used for the download
- */
-export function downloadBlob(blob: Blob | MediaSource, filename: string) {
-  // Create an object URL for the blob object
-  const url = URL.createObjectURL(blob);
+  try {
+    await Share.share({
+      url: uri,
+      title: path,
+      dialogTitle: path,
+    });
+  } catch {
+    // User cancelled the share sheet — not an error from our side.
+  }
+}
 
-  // Create a new anchor element
+function webDownload(blob: Blob | MediaSource, filename: string): void {
+  const url = URL.createObjectURL(blob as Blob);
   const a = document.createElement('a');
-
-  // Set the href and download attributes for the anchor element
-  // You can optionally set other attributes like `title`, etc
-  // Especially, if the anchor element will be attached to the DOM
   a.href = url;
   a.download = filename || 'download';
-
-  // Click handler that releases the object URL after the element has been clicked
-  // This is required for one-off downloads of the blob content
-  const clickHandler = () => {
+  const cleanup = () => {
     setTimeout(() => {
       URL.revokeObjectURL(url);
-      removeEventListener('click', clickHandler);
+      a.removeEventListener('click', cleanup);
     }, 150);
   };
-
-  // Add the click event listener on the anchor element
-  // Comment out this line if you don't want a one-off download of the blob content
-  a.addEventListener('click', clickHandler, false);
-
-  // Programmatically trigger a click on the anchor element
-  // Useful if you want the download to happen automatically
-  // Without attaching the anchor element to the DOM
-  // Comment out this line if you don't want an automatic download of the blob content
+  a.addEventListener('click', cleanup, false);
   a.click();
-
-  // Return the anchor element
-  // Useful if you want a reference to the element
-  // in order to attach it to the DOM or use it in some other way
-  return a;
 }
 
 /**
- * Download a string as file in the browser
- *
- * @param text file contents as string
- * @param filename filename to download
- * @param mimeType mimetype of the file
- * @returns HTMLAnchor element used for the download
+ * Download a Blob. On web this triggers a browser download; inside a Capacitor
+ * WebView (Android) the blob is written to the app cache and opened via the
+ * system Share sheet, since WebViews don't honour `<a download>`.
  */
-export function downloadText(text: string, filename: string, mimeType: string) {
-  const blob = new Blob([text], {
-    type: mimeType,
-  });
-  return downloadBlob(blob, filename);
+export async function downloadBlob(
+  blob: Blob | MediaSource,
+  filename: string,
+): Promise<void> {
+  if (Capacitor.isNativePlatform() && blob instanceof Blob) {
+    await nativeShare(blob, filename);
+    return;
+  }
+  webDownload(blob, filename);
 }
 
-export function downloadRowsAsCsv(rows: any[][], filename: string) {
-  return downloadText(
-    rows
-      .map((row) => row.map((v) => (v ? '' + v : '')))
-      .map((r) => JSON.stringify(r).replace(/^\[/, '').replace(/\]/, ''))
-      .join('\n'),
-    filename,
-    'text/csv'
-  );
+export async function downloadText(
+  text: string,
+  filename: string,
+  mimeType: string,
+): Promise<void> {
+  const blob = new Blob([text], { type: mimeType });
+  await downloadBlob(blob, filename);
+}
+
+export async function downloadRowsAsCsv(
+  rows: unknown[][],
+  filename: string,
+): Promise<void> {
+  const csv = rows
+    .map((row) => row.map((v) => (v ? '' + v : '')))
+    .map((r) => JSON.stringify(r).replace(/^\[/, '').replace(/\]$/, ''))
+    .join('\n');
+  await downloadText(csv, filename, 'text/csv');
 }

@@ -1,0 +1,70 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace = "at.ffnd.einsatzkarte"
+    compileSdk = rootProject.ext.compileSdkVersion
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+    defaultConfig {
+        applicationId "at.ffnd.einsatzkarte"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+    implementation project(':capacitor-android')
+    // FusedLocationProviderClient — hält den GPS-Chip während einer
+    // Radiacode-Session im PRIORITY_HIGH_ACCURACY-Modus, damit das WebView
+    // `navigator.geolocation` nicht nach ein paar Minuten auf Netzwerk-Fix
+    // zurückfällt (Android 14+ drosselt sonst trotz FGS_TYPE_LOCATION).
+    implementation "com.google.android.gms:play-services-location:21.3.0"
+    // Firebase Firestore + Auth — nativer Write-Pfad für Radiacode-Track-Marker
+    // (siehe docs/plans/2026-04-22-radiacode-native-firestore-design.md).
+    implementation platform("com.google.firebase:firebase-bom:33.3.0")
+    implementation "com.google.firebase:firebase-firestore-ktx"
+    implementation "com.google.firebase:firebase-auth-ktx"
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

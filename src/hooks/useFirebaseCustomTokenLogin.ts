@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -31,6 +33,25 @@ export function useFirebaseCustomTokenLogin() {
       }
       await signInWithCustomToken(auth, firebaseToken);
       console.info('signed in with custom token');
+
+      // Auf Android/iOS zusätzlich die native Firebase-Auth-Session herstellen,
+      // damit Firestore-Writes aus Foreground-Services (Radiacode-Tracking)
+      // authentifiziert sind. `skipNativeAuth: false` überstimmt die globale
+      // Config, die sonst für Google-Sign-In die native Session überspringt.
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await FirebaseAuthentication.signInWithCustomToken({
+            token: firebaseToken,
+            skipNativeAuth: false,
+          });
+          console.info('native firebase auth signed in with custom token');
+        } catch (nativeErr) {
+          console.error(
+            'native signInWithCustomToken failed (tracking may not work)',
+            nativeErr,
+          );
+        }
+      }
     };
 
     (async () => {

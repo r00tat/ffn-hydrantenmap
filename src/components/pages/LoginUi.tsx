@@ -13,9 +13,15 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Link from 'next/link';
 import { LoginStep } from '../../hooks/auth/types';
+import { useDebugLogging } from '../../hooks/useDebugging';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
 import { auth } from '../firebase/firebase';
+import {
+  getNativeDebugInfo,
+  NativeDebugInfo,
+} from '../firebase/googleAuthAdapter';
+import NativeLoginPanel from '../firebase/NativeLoginPanel';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
@@ -38,12 +44,22 @@ export default function LoginUi() {
     loginStep,
   } = useFirebaseLogin();
 
+  const { displayMessages } = useDebugLogging();
+
   const [autoLoginTimedOut, setAutoLoginTimedOut] = useState(false);
   useEffect(() => {
     if (isSignedIn) return;
     const timer = setTimeout(() => setAutoLoginTimedOut(true), 10000);
     return () => clearTimeout(timer);
   }, [isSignedIn]);
+
+  const [nativeDebug, setNativeDebug] = useState<NativeDebugInfo | null>(null);
+  useEffect(() => {
+    const info = getNativeDebugInfo();
+    console.info('[LoginUi] capacitor debug', info);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNativeDebug(info);
+  }, []);
 
   const [groupClaims, setGroupClaims] = useState('');
   useEffect(() => {
@@ -140,8 +156,35 @@ export default function LoginUi() {
               Für die Nutzung der Einsatzkarte ist eine Anmeldung und manuelle
               Freischaltung erforderlich. Bitte melde dich an.
             </Typography>
-            <FirebaseUiLogin />
+            {nativeDebug?.isCapacitorNative ? (
+              <NativeLoginPanel />
+            ) : (
+              <FirebaseUiLogin />
+            )}
           </Paper>
+          <Box sx={{ mx: 2 }}>
+            <DebugLoggingSwitch />
+          </Box>
+          {displayMessages && nativeDebug && (
+            <Paper sx={{ p: 2, m: 2, backgroundColor: 'action.hover' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                Capacitor Debug
+              </Typography>
+              <Typography
+                component="pre"
+                variant="caption"
+                sx={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  m: 0,
+                  mt: 1,
+                  fontFamily: 'monospace',
+                }}
+              >
+                {JSON.stringify(nativeDebug, null, 2)}
+              </Typography>
+            </Paper>
+          )}
         </>
       )}
 

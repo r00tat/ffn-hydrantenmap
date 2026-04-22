@@ -1,0 +1,3 @@
+# DATA_BUF record payload extracted from databuf_rsp_small
+# Total 37 B — decodes to 1 RealTimeData + 1 RawData
+0c0000ccfaffff09cbbd40150e07379700f7014000000d00015d0000000000c040b37bf236

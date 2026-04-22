@@ -198,10 +198,16 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
               </IconButton>
             </Tooltip>
           }
-          title={isEditing && editedItem ? editedItem.title() : itemInstance.title()}
-          titleTypographyProps={{ variant: 'subtitle1', noWrap: true }}
-          subheader={itemInstance.markerName()}
-          subheaderTypographyProps={{ variant: 'caption' }}
+          title={
+            <Typography variant="subtitle1" noWrap>
+              {isEditing && editedItem ? editedItem.title() : itemInstance.title()}
+            </Typography>
+          }
+          subheader={
+            <Typography variant="caption" color="text.secondary">
+              {itemInstance.markerName()}
+            </Typography>
+          }
           sx={{ pb: 0 }}
         />
         <CardContent sx={{ pt: 1, pb: 1 }}>

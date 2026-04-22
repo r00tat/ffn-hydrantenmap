@@ -25,6 +25,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PlaceIcon from '@mui/icons-material/Place';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
@@ -144,19 +145,25 @@ export default function AppDrawer({
       einsatzSection: 'schadstoff',
       children: [
         {
-          text: 'Schadstoffdatenbank',
+          text: 'Gefahrgut-Infos',
           icon: <BiotechIcon />,
           href: '/schadstoff/datenbank',
           einsatzSection: 'schadstoff/datenbank',
         },
         {
-          text: 'Strahlenschutz',
+          text: 'Strahlenschutz-Rechner',
           icon: <WarningIcon />,
           href: '/schadstoff/strahlenschutz',
           einsatzSection: 'schadstoff/strahlenschutz',
         },
         {
-          text: 'Energiespektrum',
+          text: 'Strahlenmessung',
+          icon: <SensorsIcon />,
+          href: '/schadstoff/dosimetrie',
+          einsatzSection: 'schadstoff/dosimetrie',
+        },
+        {
+          text: 'Nuklid-Identifikation',
           icon: <ShowChartIcon />,
           href: '/schadstoff/energiespektrum',
           einsatzSection: 'schadstoff/energiespektrum',

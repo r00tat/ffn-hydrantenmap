@@ -1,7 +1,6 @@
 import { collection } from 'firebase/firestore';
 import { addDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
-import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
 import {
   FIRECALL_COLLECTION_ID,
@@ -12,6 +11,20 @@ import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
 import { isAuthError } from './auth/ensureFreshAuth';
+
+// The item-class registry (`../components/FirecallItems/elements`) imports all
+// element classes at module top level — several of those (Marker, Area, Line …)
+// transitively depend on `leaflet`, which references `window` during import.
+// Loading that graph from the server bundle breaks SSR prerendering of pages
+// that only need AppProviders but never hit the hook at runtime. Import it
+// lazily from inside the callback so the heavy module graph stays in the
+// client-only chunk.
+async function getFirebaseCollectionName(type: string | undefined) {
+  const { getItemClass } = await import(
+    '../components/FirecallItems/elements'
+  );
+  return getItemClass(type).firebaseCollectionName();
+}
 
 export default function useFirecallItemAdd() {
   const firecallId = useFirecallId();
@@ -36,11 +49,9 @@ export default function useFirecallItemAdd() {
       if (!newData.zIndex) {
         newData.zIndex = Date.now();
       }
-      const itemClass = getItemClass(item?.type);
+      const itemCollection = await getFirebaseCollectionName(item?.type);
       console.info(
-        `add firecall ${itemClass.firebaseCollectionName()}: ${JSON.stringify(
-          item
-        )}`
+        `add firecall ${itemCollection}: ${JSON.stringify(item)}`
       );
 
       try {
@@ -49,7 +60,7 @@ export default function useFirecallItemAdd() {
             firestore,
             FIRECALL_COLLECTION_ID,
             firecallId,
-            itemClass.firebaseCollectionName()
+            itemCollection
           ),
           newData
         );

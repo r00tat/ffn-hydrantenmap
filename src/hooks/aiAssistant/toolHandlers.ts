@@ -4,6 +4,14 @@ import { FirecallItem } from '../../components/firebase/firestore';
 import { searchPlace } from '../../components/actions/maps/places';
 import { GeoPosition } from '../../common/geo';
 import { AiAssistantResult } from './types';
+import {
+  calculateInverseSquareLaw,
+  calculateSchutzwert,
+  calculateAufenthaltszeit,
+  calculateDosisleistungNuklid,
+  NUCLIDES,
+  ActivityUnit,
+} from '../../common/strahlenschutz';
 
 type ResolvePositionFn = (
   positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
@@ -21,6 +29,27 @@ export interface ToolHandlerDeps {
   setLastCreatedItem: (item: { id: string; type: string } | null) => void;
   map: { getCenter: () => { lat: number; lng: number }; panTo: (latlng: [number, number]) => void } | null;
   defaultPosition: { lat: number; lng: number };
+}
+
+function formatValue(value: number): string {
+  return value.toFixed(4).replace(/\.?0+$/, '');
+}
+
+/** Format hours as human-readable duration (e.g. "2 d 3 h 15 min 30 s") */
+function formatDuration(hours: number): string {
+  const totalSeconds = Math.round(hours * 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  const min = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} d`);
+  if (h > 0) parts.push(`${h} h`);
+  if (min > 0) parts.push(`${min} min`);
+  if (s > 0) parts.push(`${s} s`);
+
+  return parts.length > 0 ? parts.join(' ') : '0 s';
 }
 
 export async function executeToolCall(
@@ -225,10 +254,85 @@ export async function executeToolCall(
         const result = evaluate(expression);
         const resultStr = typeof result === 'object' && result.toString ? result.toString() : String(result);
         const message = desc ? `${desc}: ${resultStr}` : `Ergebnis: ${resultStr}`;
-        return { success: true, message, isAnswer: true };
+        return { success: true, message, isAnswer: true, data: { result } };
       } catch (e) {
         return { success: false, message: `Rechenfehler: ${(e as Error).message}` };
       }
+    }
+
+    case 'calculateStrahlenschutzAbstand': {
+      const result = calculateInverseSquareLaw({
+        d1: args.d1 as number ?? null,
+        r1: args.r1 as number ?? null,
+        d2: args.d2 as number ?? null,
+        r2: args.r2 as number ?? null,
+      });
+      if (!result) return { success: false, message: 'Ungültige Parameter für Abstandsgesetz' };
+      const labels: Record<string, string> = { d1: 'Abstand 1', r1: 'Dosisleistung 1', d2: 'Abstand 2', r2: 'Dosisleistung 2' };
+      const unit = result.field.startsWith('d') ? 'm' : 'µSv/h';
+      return { 
+        success: true, 
+        message: `Strahlenschutz (Abstandsgesetz): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+        isAnswer: true,
+        data: { field: result.field, value: result.value, unit }
+      };
+    }
+
+    case 'calculateStrahlenschutzSchutzwert': {
+      const result = calculateSchutzwert({
+        r0: args.r0 as number ?? null,
+        r: args.r as number ?? null,
+        s: args.s as number ?? null,
+        n: args.n as number ?? null,
+      });
+      if (!result) return { success: false, message: 'Ungültige Parameter für Schutzwert' };
+      const labels: Record<string, string> = { r0: 'DLR ohne Abschirmung', r: 'DLR mit Abschirmung', s: 'Schutzwert (S)', n: 'Anzahl Schichten' };
+      const unit = result.field.startsWith('r') ? 'µSv/h' : '';
+      return { 
+        success: true, 
+        message: `Strahlenschutz (Schutzwert): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`, 
+        isAnswer: true,
+        data: { field: result.field, value: result.value, unit }
+      };
+    }
+
+    case 'calculateStrahlenschutzAufenthaltszeit': {
+      const result = calculateAufenthaltszeit({
+        t: args.t as number ?? null,
+        d: args.d as number ?? null,
+        r: args.r as number ?? null,
+      });
+      if (!result) return { success: false, message: 'Ungültige Parameter für Aufenthaltszeit' };
+      const labels: Record<string, string> = { t: 'Aufenthaltszeit', d: 'Zulässige Dosis', r: 'Dosisleistung' };
+      const unit = result.field === 't' ? 'h' : result.field === 'd' ? 'mSv' : 'mSv/h';
+      let message = `Strahlenschutz (Aufenthaltszeit): ${labels[result.field]} = ${formatValue(result.value)} ${unit}`;
+      if (result.field === 't') message += ` (${formatDuration(result.value)})`;
+      return { 
+        success: true, 
+        message, 
+        isAnswer: true,
+        data: { field: result.field, value: result.value, unit, duration: result.field === 't' ? formatDuration(result.value) : undefined }
+      };
+    }
+
+    case 'calculateStrahlenschutzNuklid': {
+      const nuclideName = args.nuclide as string;
+      const nuclide = NUCLIDES.find(n => n.name.toLowerCase() === nuclideName.toLowerCase());
+      if (!nuclide) return { success: false, message: `Nuklid "${nuclideName}" nicht gefunden` };
+
+      const result = calculateDosisleistungNuklid(nuclide.gamma, {
+        activity: args.activity as number ?? null,
+        doseRate: args.doseRate as number ?? null,
+      });
+      if (!result) return { success: false, message: 'Ungültige Parameter für Nuklid-Berechnung' };
+      const label = result.field === 'activity' ? 'Aktivität' : 'Dosisleistung in 1m';
+      const unit = result.field === 'activity' ? 'GBq' : 'µSv/h';
+      return { 
+        success: true, 
+        message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
+        isAnswer: true,
+        data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
+      };
     }
 
     case 'searchAddress': {
