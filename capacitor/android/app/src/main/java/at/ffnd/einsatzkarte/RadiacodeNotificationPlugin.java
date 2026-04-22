@@ -148,6 +148,41 @@ public class RadiacodeNotificationPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void startTrackRecording(PluginCall call) {
+        String firecallId = call.getString("firecallId");
+        String layerId = call.getString("layerId");
+        String sampleRate = call.getString("sampleRate");
+        String deviceLabel = call.getString("deviceLabel", "");
+        String creator = call.getString("creator", "");
+        String firestoreDb = call.getString("firestoreDb", "");
+        if (firecallId == null || layerId == null || sampleRate == null) {
+            call.reject("firecallId, layerId, sampleRate required");
+            return;
+        }
+        Log.i(TAG, "plugin.startTrackRecording firecallId=" + firecallId + " layerId=" + layerId + " rate=" + sampleRate);
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_START_TRACK);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRECALL_ID, firecallId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LAYER_ID, layerId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_SAMPLE_RATE, sampleRate);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_DEVICE_LABEL, deviceLabel);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_CREATOR, creator);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRESTORE_DB, firestoreDb);
+        startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopTrackRecording(PluginCall call) {
+        Log.i(TAG, "plugin.stopTrackRecording");
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_STOP_TRACK);
+        // Kein startForegroundService — der Service läuft bereits (BLE aktiv).
+        getContext().startService(intent);
+        call.resolve();
+    }
+
     @PermissionCallback
     private void permissionCallback(PluginCall call) {
         // Notification-Permission ist best-effort — Ergebnis bewusst ignoriert.
@@ -196,6 +231,25 @@ public class RadiacodeNotificationPlugin extends Plugin {
         JSObject data = new JSObject();
         data.put("state", state);
         i.notifyListeners("connectionState", data);
+    }
+
+    public static void emitMarkerWritten(String docId, String layerId,
+                                         double lat, double lng, long timestampMs,
+                                         double dosisleistungUSvH, double cps) {
+        RadiacodeNotificationPlugin i = instance;
+        if (i == null) {
+            Log.w(TAG, "emitMarkerWritten — no plugin instance; dropping");
+            return;
+        }
+        JSObject data = new JSObject();
+        data.put("docId", docId);
+        data.put("layerId", layerId);
+        data.put("lat", lat);
+        data.put("lng", lng);
+        data.put("timestampMs", timestampMs);
+        data.put("dosisleistungUSvH", dosisleistungUSvH);
+        data.put("cps", cps);
+        i.notifyListeners("markerWritten", data);
     }
 
     private static String titleForState(String state) {

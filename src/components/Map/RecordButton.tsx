@@ -9,6 +9,8 @@ import { useRadiacodePointRecorder } from '../../hooks/recording/useRadiacodePoi
 import { loadDefaultDevice } from '../../hooks/radiacode/devicePreference';
 import { createRadiacodeLayer } from '../../hooks/radiacode/layerFactory';
 import { RadiacodeDeviceRef, SampleRate } from '../../hooks/radiacode/types';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useRadiacode } from '../providers/RadiacodeProvider';
@@ -21,6 +23,9 @@ export default function RecordButton() {
     usePositionContext();
   const sortedLayers = useFirecallLayersSorted();
   const addFirecallItem = useFirecallItemAdd();
+  const firecallId = useFirecallId();
+  const { email: creatorEmail } = useFirebaseLogin();
+  const firestoreDb = process.env.NEXT_PUBLIC_FIRESTORE_DB || '';
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [radiacodeActive, setRadiacodeActive] = useState(false);
@@ -53,6 +58,9 @@ export default function RecordButton() {
     measurement,
     position: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
     addItem: addFirecallItem,
+    firecallId: firecallId ?? '',
+    creatorEmail: creatorEmail ?? '',
+    firestoreDb,
   });
 
   const existingRadiacodeLayers = useMemo(

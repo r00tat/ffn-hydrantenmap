@@ -2,6 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FirecallItem } from '../../components/firebase/firestore';
+import * as nativeTrackBridge from '../radiacode/nativeTrackBridge';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from '../radiacode/types';
 import { useRadiacodePointRecorder } from './useRadiacodePointRecorder';
 
@@ -37,6 +38,9 @@ describe('useRadiacodePointRecorder', () => {
         measurement: meas(0.1, 5),
         position: { lat: 48.0, lng: 16.0 },
         addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
       }),
     );
     expect(addItem).not.toHaveBeenCalled();
@@ -55,6 +59,9 @@ describe('useRadiacodePointRecorder', () => {
         measurement: null,
         position: { lat: 48.0, lng: 16.0 },
         addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
       }),
     );
     expect(addItem).not.toHaveBeenCalled();
@@ -73,6 +80,9 @@ describe('useRadiacodePointRecorder', () => {
         measurement: meas(0.1, 5),
         position: null,
         addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
       }),
     );
     expect(addItem).not.toHaveBeenCalled();
@@ -91,6 +101,9 @@ describe('useRadiacodePointRecorder', () => {
         measurement: meas(0.15, 7),
         position: { lat: 48.0, lng: 16.0 },
         addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
       }),
     );
     await vi.waitFor(() => {
@@ -124,6 +137,9 @@ describe('useRadiacodePointRecorder', () => {
           measurement: meas(0.1, 5),
           position: { lat: 48.0, lng: 16.0 },
           addItem,
+          firecallId: 'fc1',
+          creatorEmail: 'u@x',
+          firestoreDb: '',
         },
       },
     );
@@ -141,6 +157,9 @@ describe('useRadiacodePointRecorder', () => {
       measurement: meas(0.2, 10),
       position: { lat: 48.0001, lng: 16.0001 },
       addItem,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
     });
     await act(async () => {
       vi.advanceTimersByTime(100);
@@ -164,6 +183,9 @@ describe('useRadiacodePointRecorder', () => {
           measurement: meas(0.1, 5),
           position: { lat: 48.0, lng: 16.0 },
           addItem,
+          firecallId: 'fc1',
+          creatorEmail: 'u@x',
+          firestoreDb: '',
         },
       },
     );
@@ -182,6 +204,9 @@ describe('useRadiacodePointRecorder', () => {
       measurement: meas(0.12, 6),
       position: { lat: 48.0001, lng: 16.0 },
       addItem,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
     });
     await vi.waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(2);
@@ -208,6 +233,9 @@ describe('useRadiacodePointRecorder', () => {
           addItem,
           onStart,
           onStop,
+          firecallId: 'fc1',
+          creatorEmail: 'u@x',
+          firestoreDb: '',
         },
       },
     );
@@ -222,6 +250,9 @@ describe('useRadiacodePointRecorder', () => {
       addItem,
       onStart,
       onStop,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
     });
     await vi.waitFor(() => {
       expect(onStart).toHaveBeenCalledTimes(1);
@@ -237,6 +268,9 @@ describe('useRadiacodePointRecorder', () => {
       addItem,
       onStart,
       onStop,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
     });
     await vi.waitFor(() => {
       expect(onStop).toHaveBeenCalledTimes(1);
@@ -259,6 +293,9 @@ describe('useRadiacodePointRecorder', () => {
           measurement: meas(0.1, 5),
           position: { lat: 48.0, lng: 16.0 },
           addItem,
+          firecallId: 'fc1',
+          creatorEmail: 'u@x',
+          firestoreDb: '',
         },
       },
     );
@@ -276,9 +313,81 @@ describe('useRadiacodePointRecorder', () => {
       measurement: meas(0.11, 5),
       position: { lat: 48.0, lng: 16.0 },
       addItem,
+      firecallId: 'fc1',
+      creatorEmail: 'u@x',
+      firestoreDb: '',
     });
     await vi.waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('native tracking', () => {
+    it('delegates to nativeStartTrack/nativeStopTrack when native and skips addItem', async () => {
+      const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
+        async () => ({ id: 'new' }),
+      );
+      const isAvail = vi
+        .spyOn(nativeTrackBridge, 'isNativeTrackingAvailable')
+        .mockReturnValue(true);
+      const start = vi
+        .spyOn(nativeTrackBridge, 'nativeStartTrack')
+        .mockResolvedValue(undefined);
+      const stop = vi
+        .spyOn(nativeTrackBridge, 'nativeStopTrack')
+        .mockResolvedValue(undefined);
+
+      const { rerender, unmount } = renderHook(
+        (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
+          useRadiacodePointRecorder(props),
+        {
+          initialProps: {
+            active: false,
+            layerId: 'l1',
+            sampleRate: 'normal',
+            device: DEVICE,
+            measurement: null,
+            position: null,
+            addItem,
+            firecallId: 'fc1',
+            creatorEmail: 'u@x',
+            firestoreDb: '',
+          },
+        },
+      );
+      rerender({
+        active: true,
+        layerId: 'l1',
+        sampleRate: 'normal',
+        device: DEVICE,
+        measurement: meas(0.1, 5),
+        position: { lat: 48, lng: 16 },
+        addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
+      });
+      await vi.waitFor(() => {
+        expect(start).toHaveBeenCalledTimes(1);
+      });
+      expect(start).toHaveBeenCalledWith({
+        firecallId: 'fc1',
+        layerId: 'l1',
+        sampleRate: 'normal',
+        deviceLabel: 'RC-102 (SN1)',
+        creator: 'u@x',
+        firestoreDb: '',
+      });
+      expect(addItem).not.toHaveBeenCalled();
+
+      unmount();
+      await vi.waitFor(() => {
+        expect(stop).toHaveBeenCalledTimes(1);
+      });
+
+      isAvail.mockRestore();
+      start.mockRestore();
+      stop.mockRestore();
     });
   });
 });

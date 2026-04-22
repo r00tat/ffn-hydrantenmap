@@ -31,6 +31,11 @@ import at.ffnd.einsatzkarte.radiacode.Protocol
 import at.ffnd.einsatzkarte.radiacode.Reassembler
 import at.ffnd.einsatzkarte.radiacode.SessionListener
 import at.ffnd.einsatzkarte.radiacode.parseResponse
+import at.ffnd.einsatzkarte.radiacode.track.FirestoreMarkerWriter
+import at.ffnd.einsatzkarte.radiacode.track.LatLng
+import at.ffnd.einsatzkarte.radiacode.track.SampleRateConfig
+import at.ffnd.einsatzkarte.radiacode.track.TrackConfig
+import at.ffnd.einsatzkarte.radiacode.track.TrackRecorder
 import java.util.Date
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -62,11 +67,19 @@ class RadiacodeForegroundService : Service() {
         const val ACTION_BLE_CONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_CONNECT"
         const val ACTION_BLE_WRITE = "at.ffnd.einsatzkarte.RADIACODE_BLE_WRITE"
         const val ACTION_BLE_DISCONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_DISCONNECT"
+        const val ACTION_START_TRACK = "at.ffnd.einsatzkarte.RADIACODE_START_TRACK"
+        const val ACTION_STOP_TRACK = "at.ffnd.einsatzkarte.RADIACODE_STOP_TRACK"
 
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
         const val EXTRA_DEVICE_ADDRESS = "deviceAddress"
         const val EXTRA_PAYLOAD = "payload"
+        const val EXTRA_FIRECALL_ID = "firecallId"
+        const val EXTRA_LAYER_ID = "layerId"
+        const val EXTRA_SAMPLE_RATE = "sampleRate"
+        const val EXTRA_DEVICE_LABEL = "deviceLabel"
+        const val EXTRA_CREATOR = "creator"
+        const val EXTRA_FIRESTORE_DB = "firestoreDb"
 
         private const val TAG = "RadiacodeFg"
         private const val POLL_INTERVAL_MS = 500L
@@ -107,6 +120,8 @@ class RadiacodeForegroundService : Service() {
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
     @Volatile private var locationActive = false
+    @Volatile private var lastLocation: android.location.Location? = null
+    @Volatile private var trackRecorder: TrackRecorder? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -184,6 +199,41 @@ class RadiacodeForegroundService : Service() {
             ACTION_BLE_DISCONNECT -> {
                 teardownSession()
             }
+            ACTION_START_TRACK -> {
+                val firecallId = intent.getStringExtra(EXTRA_FIRECALL_ID)
+                val layerId = intent.getStringExtra(EXTRA_LAYER_ID)
+                val rate = intent.getStringExtra(EXTRA_SAMPLE_RATE)
+                val deviceLabel = intent.getStringExtra(EXTRA_DEVICE_LABEL) ?: ""
+                val creator = intent.getStringExtra(EXTRA_CREATOR) ?: ""
+                val firestoreDb = intent.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
+                if (firecallId.isNullOrBlank() || layerId.isNullOrBlank() || rate.isNullOrBlank()) {
+                    Log.w(TAG, "ACTION_START_TRACK rejected — missing required extras")
+                } else {
+                    val config = TrackConfig(
+                        firecallId = firecallId, layerId = layerId,
+                        sampleRate = SampleRateConfig.of(rate),
+                        deviceLabel = deviceLabel, creator = creator,
+                        firestoreDb = firestoreDb,
+                    )
+                    trackRecorder?.stop()
+                    trackRecorder = TrackRecorder(
+                        config = config,
+                        writer = FirestoreMarkerWriter(firestoreDb),
+                        onWriteSuccess = { r ->
+                            RadiacodeNotificationPlugin.emitMarkerWritten(
+                                r.docId, r.layerId, r.lat, r.lng,
+                                r.timestampMs, r.dosisleistungUSvH, r.cps,
+                            )
+                        },
+                    )
+                    Log.i(TAG, "ACTION_START_TRACK firecallId=$firecallId layerId=$layerId rate=$rate")
+                }
+            }
+            ACTION_STOP_TRACK -> {
+                Log.i(TAG, "ACTION_STOP_TRACK")
+                trackRecorder?.stop()
+                trackRecorder = null
+            }
         }
         return START_NOT_STICKY
     }
@@ -233,6 +283,8 @@ class RadiacodeForegroundService : Service() {
             Throwable("onDestroy stack"),
         )
         teardownSession()
+        trackRecorder?.stop()
+        trackRecorder = null
         stopHighAccuracyLocation()
         releaseWakeLock()
         super.onDestroy()
@@ -288,7 +340,13 @@ class RadiacodeForegroundService : Service() {
                 val parsed = parseResponse(complete) ?: return
                 if (parsed.cmd == Protocol.Command.RD_VIRT_STRING && parsed.seq == pollSeq) {
                     val m = MeasurementDecoder.parse(parsed.data)
-                    if (m != null) RadiacodeNotificationPlugin.emitMeasurement(m)
+                    if (m != null) {
+                        RadiacodeNotificationPlugin.emitMeasurement(m)
+                        trackRecorder?.onMeasurement(
+                            m,
+                            lastLocation?.let { LatLng(it.latitude, it.longitude) },
+                        )
+                    }
                 }
             }
         }
@@ -357,6 +415,8 @@ class RadiacodeForegroundService : Service() {
             Throwable("teardownSession stack"),
         )
         stopPollLoop()
+        trackRecorder?.stop()
+        trackRecorder = null
         // HIGH_ACCURACY-LocationRequest läuft bewusst weiter, bis der Service
         // komplett terminiert (onDestroy). Solange der Service lebt, soll die
         // App durchgängig präzise GPS-Fixes bekommen — unabhängig von der
@@ -402,8 +462,10 @@ class RadiacodeForegroundService : Service() {
             .build()
         val cb = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                // Intentionally empty — WebView konsumiert die Position selbst,
-                // wir halten hier nur den Provider aktiv.
+                // WebView konsumiert die Position selbst. Wir merken zusätzlich
+                // den letzten Fix, damit TrackRecorder auch im Hintergrund weiss,
+                // wo der nächste Marker hinsoll.
+                result.lastLocation?.let { lastLocation = it }
             }
         }
         locationCallback = cb

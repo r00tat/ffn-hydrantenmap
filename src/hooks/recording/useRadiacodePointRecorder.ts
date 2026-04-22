@@ -1,6 +1,11 @@
 import haversine from 'haversine-distance';
 import { useEffect, useRef } from 'react';
 import { FcMarker, FirecallItem } from '../../components/firebase/firestore';
+import {
+  isNativeTrackingAvailable,
+  nativeStartTrack,
+  nativeStopTrack,
+} from '../radiacode/nativeTrackBridge';
 import { shouldSamplePoint } from '../radiacode/sampling';
 import {
   RATE_CONFIG,
@@ -17,6 +22,9 @@ export interface UseRadiacodePointRecorderParams {
   measurement: RadiacodeMeasurement | null;
   position: { lat: number; lng: number } | null;
   addItem: (item: FirecallItem) => Promise<{ id: string }>;
+  firecallId: string;
+  creatorEmail: string;
+  firestoreDb?: string;
   onStart?: () => void | Promise<void>;
   onStop?: () => void | Promise<void>;
 }
@@ -27,6 +35,11 @@ interface LastSample {
   time: number;
 }
 
+function deviceLabel(device: RadiacodeDeviceRef | null): string {
+  if (!device) return 'unknown';
+  return `${device.name} (${device.serial})`;
+}
+
 export function useRadiacodePointRecorder({
   active,
   layerId,
@@ -35,31 +48,55 @@ export function useRadiacodePointRecorder({
   measurement,
   position,
   addItem,
+  firecallId,
+  creatorEmail,
+  firestoreDb = '',
   onStart,
   onStop,
 }: UseRadiacodePointRecorderParams): void {
+  const native = isNativeTrackingAvailable();
   const lastSampleRef = useRef<LastSample | null>(null);
   const writingRef = useRef(false);
 
+  // Native-Pfad: Start/Stop via Foreground-Service. Der Measurement-getriebene
+  // Effekt unten bleibt ein No-Op (siehe Early-Return bei `native`).
   useEffect(() => {
-    if (active) {
-      Promise.resolve(onStart?.()).catch((err) =>
-        console.error('[RADIACODE] onStart failed', err),
+    if (!active) return;
+    if (native) {
+      nativeStartTrack({
+        firecallId,
+        layerId,
+        sampleRate,
+        deviceLabel: deviceLabel(device),
+        creator: creatorEmail,
+        firestoreDb,
+      }).catch((err) =>
+        console.error('[RADIACODE] nativeStartTrack failed', err),
       );
       return () => {
-        Promise.resolve(onStop?.()).catch((err) =>
-          console.error('[RADIACODE] onStop failed', err),
+        nativeStopTrack().catch((err) =>
+          console.error('[RADIACODE] nativeStopTrack failed', err),
         );
       };
     }
+    // Web-only: bestehendes onStart/onStop-Muster
+    Promise.resolve(onStart?.()).catch((err) =>
+      console.error('[RADIACODE] onStart failed', err),
+    );
+    return () => {
+      Promise.resolve(onStop?.()).catch((err) =>
+        console.error('[RADIACODE] onStop failed', err),
+      );
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, native]);
 
   useEffect(() => {
     if (!active) {
       lastSampleRef.current = null;
       return;
     }
+    if (native) return; // native schreibt im Foreground-Service
     if (!measurement || !position) return;
     if (writingRef.current) return;
 
@@ -95,7 +132,7 @@ export function useRadiacodePointRecorder({
       fieldData: {
         dosisleistung: measurement.dosisleistung,
         cps: measurement.cps,
-        device: device ? `${device.name} (${device.serial})` : 'unknown',
+        device: deviceLabel(device),
       },
     };
     lastSampleRef.current = { lat: position.lat, lng: position.lng, time: now };
@@ -103,5 +140,5 @@ export function useRadiacodePointRecorder({
     addItem(marker).finally(() => {
       writingRef.current = false;
     });
-  }, [active, layerId, sampleRate, device, measurement, position, addItem]);
+  }, [active, layerId, sampleRate, device, measurement, position, addItem, native]);
 }
