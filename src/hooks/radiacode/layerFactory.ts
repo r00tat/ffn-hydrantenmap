@@ -9,7 +9,14 @@ export function createRadiacodeLayer(name: string): FirecallLayer {
     sampleRate: 'normal',
     dataSchema: [
       { key: 'dosisleistung', label: 'Dosisleistung', unit: 'µSv/h', type: 'number' },
+      {
+        key: 'dosisleistungErrPct',
+        label: 'Unsicherheit Dosisleistung',
+        unit: '%',
+        type: 'number',
+      },
       { key: 'cps', label: 'Counts/s', unit: 'cps', type: 'number' },
+      { key: 'cpsErrPct', label: 'Unsicherheit Zählrate', unit: '%', type: 'number' },
       { key: 'device', label: 'Gerät', unit: '', type: 'text' },
     ],
     heatmapConfig: {

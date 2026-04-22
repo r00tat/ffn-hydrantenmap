@@ -131,7 +131,13 @@ export function useRadiacodePointRecorder({
       lng: position.lng,
       fieldData: {
         dosisleistung: measurement.dosisleistung,
+        ...(measurement.dosisleistungErrPct !== undefined && {
+          dosisleistungErrPct: measurement.dosisleistungErrPct,
+        }),
         cps: measurement.cps,
+        ...(measurement.cpsErrPct !== undefined && {
+          cpsErrPct: measurement.cpsErrPct,
+        }),
         device: deviceLabel(device),
       },
     };

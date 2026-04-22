@@ -24,17 +24,21 @@ class FirestoreMarkerWriter(dbName: String) : MarkerWriter {
         onFailure: (Throwable) -> Unit,
     ) {
         val nowIso = Instant.now().toString()
+        val fieldData = linkedMapOf<String, Any>(
+            "dosisleistung" to measurement.dosisleistungUSvH,
+        )
+        measurement.dosisleistungErrPct?.let { fieldData["dosisleistungErrPct"] = it }
+        fieldData["cps"] = measurement.cps
+        measurement.cpsErrPct?.let { fieldData["cpsErrPct"] = it }
+        fieldData["device"] = config.deviceLabel
+
         val data = linkedMapOf<String, Any>(
             "type" to "marker",
             "name" to String.format(Locale.US, "%.3f µSv/h", measurement.dosisleistungUSvH),
             "layer" to config.layerId,
             "lat" to lat,
             "lng" to lng,
-            "fieldData" to mapOf(
-                "dosisleistung" to measurement.dosisleistungUSvH,
-                "cps" to measurement.cps,
-                "device" to config.deviceLabel,
-            ),
+            "fieldData" to fieldData,
             "datum" to nowIso,
             "created" to nowIso,
             "creator" to config.creator,

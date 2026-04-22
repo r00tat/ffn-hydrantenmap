@@ -12,8 +12,18 @@ const DEVICE: RadiacodeDeviceRef = {
   serial: 'SN1',
 };
 
-function meas(dose: number, cps: number): RadiacodeMeasurement {
-  return { dosisleistung: dose, cps, timestamp: Date.now() };
+function meas(
+  dose: number,
+  cps: number,
+  err?: { doseErr?: number; cpsErr?: number },
+): RadiacodeMeasurement {
+  return {
+    dosisleistung: dose,
+    cps,
+    timestamp: Date.now(),
+    ...(err?.doseErr !== undefined && { dosisleistungErrPct: err.doseErr }),
+    ...(err?.cpsErr !== undefined && { cpsErrPct: err.cpsErr }),
+  };
 }
 
 describe('useRadiacodePointRecorder', () => {
@@ -117,6 +127,37 @@ describe('useRadiacodePointRecorder', () => {
     expect(item.fieldData).toEqual({
       dosisleistung: 0.15,
       cps: 7,
+      device: 'RC-102 (SN1)',
+    });
+  });
+
+  it('writes dosisleistungErrPct and cpsErrPct when present', async () => {
+    const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
+      async () => ({ id: 'new' }),
+    );
+    renderHook(() =>
+      useRadiacodePointRecorder({
+        active: true,
+        layerId: 'layer-1',
+        sampleRate: 'normal',
+        device: DEVICE,
+        measurement: meas(0.15, 7, { doseErr: 12.3, cpsErr: 4.5 }),
+        position: { lat: 48.0, lng: 16.0 },
+        addItem,
+        firecallId: 'fc1',
+        creatorEmail: 'u@x',
+        firestoreDb: '',
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(addItem).toHaveBeenCalledTimes(1);
+    });
+    const item = addItem.mock.calls[0]![0];
+    expect(item.fieldData).toEqual({
+      dosisleistung: 0.15,
+      dosisleistungErrPct: 12.3,
+      cps: 7,
+      cpsErrPct: 4.5,
       device: 'RC-102 (SN1)',
     });
   });

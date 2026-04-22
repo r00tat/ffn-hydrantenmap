@@ -10,13 +10,27 @@ describe('createRadiacodeLayer', () => {
     expect(layer.sampleRate).toBe('normal');
   });
 
-  it('includes dosisleistung, cps, device in dataSchema', () => {
+  it('includes dosisleistung, cps, uncertainties, device in dataSchema', () => {
     const layer = createRadiacodeLayer('Test');
     const keys = layer.dataSchema?.map((f) => f.key);
-    expect(keys).toEqual(['dosisleistung', 'cps', 'device']);
+    expect(keys).toEqual([
+      'dosisleistung',
+      'dosisleistungErrPct',
+      'cps',
+      'cpsErrPct',
+      'device',
+    ]);
     expect(layer.dataSchema?.[0]).toMatchObject({
       key: 'dosisleistung',
       unit: 'µSv/h',
+      type: 'number',
+    });
+    expect(layer.dataSchema?.find((f) => f.key === 'dosisleistungErrPct')).toMatchObject({
+      unit: '%',
+      type: 'number',
+    });
+    expect(layer.dataSchema?.find((f) => f.key === 'cpsErrPct')).toMatchObject({
+      unit: '%',
       type: 'number',
     });
   });
