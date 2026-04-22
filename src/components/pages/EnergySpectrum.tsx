@@ -436,7 +436,11 @@ export default function EnergySpectrum() {
       '_',
     );
     const datePart = spectrum.data.startTime?.slice(0, 10) || 'unbekannt';
-    void downloadText(xml, `Spectrum_${sanitized}_${datePart}.xml`, 'application/xml');
+    void downloadText(
+      xml,
+      `Spectrum_${sanitized}_${datePart}.xml`,
+      'application/xml',
+    );
   }, []);
 
   const openEditDialog = useCallback((spectrum: LoadedSpectrum) => {
@@ -547,8 +551,9 @@ export default function EnergySpectrum() {
     // displayRange even if the first spectrum has fewer channels than the
     // longest one in the set.
     const coefficients = deferredVisibleSpectra[0].data.coefficients;
-    const energies = Array.from({ length: displayRange }, (_, ch) =>
-      Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
+    const energies = Array.from(
+      { length: displayRange },
+      (_, ch) => Math.round(channelToEnergy(ch, coefficients) * 10) / 10,
     );
 
     // Use original index for consistent colors — subtract 1 if a live item
@@ -625,20 +630,23 @@ export default function EnergySpectrum() {
           label={statusLabel(status, device)}
           color={STATUS_CHIP_COLOR[status]}
         />
-        <Button
-          variant="contained"
-          onClick={() => connect()}
-          disabled={status === 'connecting' || status === 'scanning'}
-        >
-          Verbinden
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => disconnect()}
-          disabled={status !== 'connected'}
-        >
-          Trennen
-        </Button>
+        {status === 'connected' ? (
+          <Button variant="outlined" onClick={() => disconnect()}>
+            Trennen
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            onClick={() => connect()}
+            disabled={
+              status === 'connecting' ||
+              status === 'scanning' ||
+              status === 'reconnecting'
+            }
+          >
+            Verbinden
+          </Button>
+        )}
         {liveRecording && liveSpectrum && (
           <>
             <Button
@@ -811,271 +819,273 @@ export default function EnergySpectrum() {
             const isExpanded = expandedSpectrumId === s.id;
             return (
               <Fragment key={s.id}>
-              <ListItem
-                secondaryAction={
-                  <Box sx={{ display: 'flex', gap: 0 }}>
-                    {!isLive && (
-                      <Tooltip title="XML exportieren">
+                <ListItem
+                  secondaryAction={
+                    <Box sx={{ display: 'flex', gap: 0 }}>
+                      {!isLive && (
+                        <Tooltip title="XML exportieren">
+                          <IconButton
+                            aria-label="XML exportieren"
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              handleDownload(s);
+                            }}
+                            size="small"
+                            sx={{ minWidth: 44, minHeight: 44 }}
+                          >
+                            <DownloadIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {!isLive && (
                         <IconButton
-                          aria-label="XML exportieren"
+                          aria-label="Bearbeiten"
                           onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
-                            handleDownload(s);
+                            openEditDialog(s);
                           }}
                           size="small"
                           sx={{ minWidth: 44, minHeight: 44 }}
                         >
-                          <DownloadIcon fontSize="small" />
+                          <EditIcon fontSize="small" />
                         </IconButton>
-                      </Tooltip>
-                    )}
-                    {!isLive && (
+                      )}
                       <IconButton
-                        aria-label="Bearbeiten"
+                        aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          openEditDialog(s);
+                          toggleVisibility(s.id);
                         }}
                         size="small"
                         sx={{ minWidth: 44, minHeight: 44 }}
                       >
-                        <EditIcon fontSize="small" />
+                        {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
                       </IconButton>
-                    )}
-                    <IconButton
-                      aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        toggleVisibility(s.id);
-                      }}
-                      size="small"
-                      sx={{ minWidth: 44, minHeight: 44 }}
-                    >
-                      {s.visible ? <VisibilityIcon /> : <VisibilityOffIcon />}
-                    </IconButton>
-                    {!isLive && (
-                      <IconButton
-                        edge="end"
-                        aria-label="Entfernen"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          removeSpectrum(s.id);
-                        }}
-                        size="small"
-                        sx={{ minWidth: 44, minHeight: 44 }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    )}
-                  </Box>
-                }
-                sx={{
-                  opacity: s.visible ? 1 : 0.5,
-                  cursor: 'pointer',
-                  pr: '192px',
-                  '&:hover': { bgcolor: 'action.hover' },
-                }}
-                onClick={() => toggleVisibility(s.id)}
-              >
-                <Box
-                  data-testid={`spectrum-color-${s.id}`}
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    backgroundColor: colorForSpectrum(s, firestoreIdx),
-                    mr: 1,
-                    flexShrink: 0,
-                  }}
-                />
-                <ListItemText
-                  primary={
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {s.data.sampleName || 'Unbekannt'}
-                      </Typography>
-                      {identification.source === 'manual' && (
-                        <Chip
-                          label={`${identification.displayName} (manuell)`}
-                          color="primary"
+                      {!isLive && (
+                        <IconButton
+                          edge="end"
+                          aria-label="Entfernen"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            removeSpectrum(s.id);
+                          }}
                           size="small"
-                          onClick={
-                            extraMatches.length > 0
-                              ? (e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  toggleExpanded(s.id);
-                                }
-                              : undefined
-                          }
-                        />
+                          sx={{ minWidth: 44, minHeight: 44 }}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
                       )}
-                      {identification.source === 'auto' && (
-                        <Chip
-                          label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
-                          color="success"
-                          size="small"
-                          onClick={
-                            extraMatches.length > 0
-                              ? (e: React.MouseEvent) => {
-                                  e.stopPropagation();
-                                  toggleExpanded(s.id);
-                                }
-                              : undefined
-                          }
-                        />
-                      )}
-                      {identification.source === 'none' && (
-                        <Chip
-                          label="Nicht identifiziert"
-                          color="warning"
-                          size="small"
-                        />
-                      )}
-                      {identNuclide?.url && (
-                        <Chip
-                          label="RadiaCode"
-                          size="small"
-                          variant="outlined"
-                          component="a"
-                          href={identNuclide.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          clickable
-                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                        />
-                      )}
-                      {dbLinks && (
-                        <>
-                          <Chip
-                            label="IAEA"
-                            size="small"
-                            variant="outlined"
-                            component="a"
-                            href={dbLinks.iaea}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            clickable
-                            onClick={(e: React.MouseEvent) =>
-                              e.stopPropagation()
-                            }
-                          />
-                          <Chip
-                            label="NNDC"
-                            size="small"
-                            variant="outlined"
-                            component="a"
-                            href={dbLinks.nndc}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            clickable
-                            onClick={(e: React.MouseEvent) =>
-                              e.stopPropagation()
-                            }
-                          />
-                        </>
-                      )}
-                      {identification.source === 'manual' &&
-                        identification.autoAlt && (
-                          <Chip
-                            label={`Auto: ${identification.autoAlt.name} (${Math.round(
-                              identification.autoAlt.confidence * 100,
-                            )}%)`}
-                            size="small"
-                            variant="outlined"
-                            color="default"
-                          />
-                        )}
                     </Box>
                   }
-                  secondary={
-                    <>
-                      {[
-                        s.data.deviceName,
-                        s.data.startTime
-                          ? new Date(s.data.startTime).toLocaleString('de-AT')
-                          : '',
-                        `Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                      {s.description && (
+                  sx={{
+                    opacity: s.visible ? 1 : 0.5,
+                    cursor: 'pointer',
+                    pr: '192px',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                  onClick={() => toggleVisibility(s.id)}
+                >
+                  <Box
+                    data-testid={`spectrum-color-${s.id}`}
+                    sx={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      backgroundColor: colorForSpectrum(s, firestoreIdx),
+                      mr: 1,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <ListItemText
+                    primary={
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         <Typography
                           component="span"
-                          variant="caption"
-                          sx={{ display: 'block' }}
-                          color="text.secondary"
+                          variant="body2"
+                          sx={{ fontWeight: 'bold' }}
                         >
-                          {s.description}
+                          {s.data.sampleName || 'Unbekannt'}
                         </Typography>
-                      )}
-                    </>
-                  }
-                />
-              </ListItem>
-              {extraMatches.length > 0 && (
-                <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                  <Box sx={{ pl: 5, pr: '192px', pb: 1.5 }}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 0.5 }}
-                    >
-                      Weitere Kandidaten – zum Einblenden anklicken:
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        gap: 0.5,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      {extraMatches.map((m) => {
-                        const selectedIdx = selectedNuclideNames.indexOf(
-                          m.nuclide.name,
-                        );
-                        const isSelected = selectedIdx >= 0;
-                        const color = isSelected
-                          ? SELECTED_PEAK_COLORS[
-                              selectedIdx % SELECTED_PEAK_COLORS.length
-                            ]
-                          : undefined;
-                        return (
+                        {identification.source === 'manual' && (
                           <Chip
-                            key={m.nuclide.name}
-                            label={`${m.nuclide.name} (${Math.round(
-                              m.confidence * 100,
-                            )}%)`}
+                            label={`${identification.displayName} (manuell)`}
+                            color="primary"
                             size="small"
-                            variant={isSelected ? 'filled' : 'outlined'}
-                            onClick={() =>
-                              toggleNuclideSelection(m.nuclide.name)
-                            }
-                            sx={
-                              color
-                                ? {
-                                    borderLeft: `4px solid ${color}`,
-                                    borderRadius: 1,
+                            onClick={
+                              extraMatches.length > 0
+                                ? (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    toggleExpanded(s.id);
                                   }
                                 : undefined
                             }
                           />
-                        );
-                      })}
+                        )}
+                        {identification.source === 'auto' && (
+                          <Chip
+                            label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
+                            color="success"
+                            size="small"
+                            onClick={
+                              extraMatches.length > 0
+                                ? (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    toggleExpanded(s.id);
+                                  }
+                                : undefined
+                            }
+                          />
+                        )}
+                        {identification.source === 'none' && (
+                          <Chip
+                            label="Nicht identifiziert"
+                            color="warning"
+                            size="small"
+                          />
+                        )}
+                        {identNuclide?.url && (
+                          <Chip
+                            label="RadiaCode"
+                            size="small"
+                            variant="outlined"
+                            component="a"
+                            href={identNuclide.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            clickable
+                            onClick={(e: React.MouseEvent) =>
+                              e.stopPropagation()
+                            }
+                          />
+                        )}
+                        {dbLinks && (
+                          <>
+                            <Chip
+                              label="IAEA"
+                              size="small"
+                              variant="outlined"
+                              component="a"
+                              href={dbLinks.iaea}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              clickable
+                              onClick={(e: React.MouseEvent) =>
+                                e.stopPropagation()
+                              }
+                            />
+                            <Chip
+                              label="NNDC"
+                              size="small"
+                              variant="outlined"
+                              component="a"
+                              href={dbLinks.nndc}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              clickable
+                              onClick={(e: React.MouseEvent) =>
+                                e.stopPropagation()
+                              }
+                            />
+                          </>
+                        )}
+                        {identification.source === 'manual' &&
+                          identification.autoAlt && (
+                            <Chip
+                              label={`Auto: ${identification.autoAlt.name} (${Math.round(
+                                identification.autoAlt.confidence * 100,
+                              )}%)`}
+                              size="small"
+                              variant="outlined"
+                              color="default"
+                            />
+                          )}
+                      </Box>
+                    }
+                    secondary={
+                      <>
+                        {[
+                          s.data.deviceName,
+                          s.data.startTime
+                            ? new Date(s.data.startTime).toLocaleString('de-AT')
+                            : '',
+                          `Messzeit: ${s.data.measurementTime}s (Live: ${s.data.liveTime}s)`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {s.description && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ display: 'block' }}
+                            color="text.secondary"
+                          >
+                            {s.description}
+                          </Typography>
+                        )}
+                      </>
+                    }
+                  />
+                </ListItem>
+                {extraMatches.length > 0 && (
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <Box sx={{ pl: 5, pr: '192px', pb: 1.5 }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mb: 0.5 }}
+                      >
+                        Weitere Kandidaten – zum Einblenden anklicken:
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          gap: 0.5,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {extraMatches.map((m) => {
+                          const selectedIdx = selectedNuclideNames.indexOf(
+                            m.nuclide.name,
+                          );
+                          const isSelected = selectedIdx >= 0;
+                          const color = isSelected
+                            ? SELECTED_PEAK_COLORS[
+                                selectedIdx % SELECTED_PEAK_COLORS.length
+                              ]
+                            : undefined;
+                          return (
+                            <Chip
+                              key={m.nuclide.name}
+                              label={`${m.nuclide.name} (${Math.round(
+                                m.confidence * 100,
+                              )}%)`}
+                              size="small"
+                              variant={isSelected ? 'filled' : 'outlined'}
+                              onClick={() =>
+                                toggleNuclideSelection(m.nuclide.name)
+                              }
+                              sx={
+                                color
+                                  ? {
+                                      borderLeft: `4px solid ${color}`,
+                                      borderRadius: 1,
+                                    }
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
+                      </Box>
                     </Box>
-                  </Box>
-                </Collapse>
-              )}
+                  </Collapse>
+                )}
               </Fragment>
             );
           })}
