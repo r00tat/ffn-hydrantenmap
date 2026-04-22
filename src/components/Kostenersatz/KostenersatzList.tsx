@@ -20,6 +20,7 @@ import useFirecall from '../../hooks/useFirecall';
 import KostenersatzCard from './KostenersatzCard';
 import KostenersatzEmailDialog from './KostenersatzEmailDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import { downloadBlob } from '../firebase/download';
 
 export interface KostenersatzListProps {
   firecallId: string;
@@ -81,16 +82,8 @@ export default function KostenersatzList({
         throw new Error('Failed to generate PDF');
       }
 
-      // Create blob and download
       const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `Kostenersatz_${calculation.recipient.name || 'Berechnung'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      await downloadBlob(blob, `Kostenersatz_${calculation.recipient.name || 'Berechnung'}.pdf`);
     } catch (err) {
       console.error('Error generating PDF:', err);
     }

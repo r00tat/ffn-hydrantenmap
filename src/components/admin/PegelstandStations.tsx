@@ -38,6 +38,7 @@ import {
 } from '../../app/admin/PegelstandAdminAction';
 import { fetchPegelstandData } from '../Map/layers/PegelstandAction';
 import LocationMapPicker from '../Einsatzorte/LocationMapPicker';
+import { downloadText } from '../firebase/download';
 
 interface StationFormData {
   slug: string;
@@ -302,13 +303,7 @@ export default function PegelstandStations() {
       ].join(',');
     });
     const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'pegelstand_stations.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    void downloadText(csv, 'pegelstand_stations.csv', 'text/csv;charset=utf-8;');
   }, [stations]);
 
   const handleImportCsv = useCallback(

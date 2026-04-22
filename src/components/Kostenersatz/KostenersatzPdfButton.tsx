@@ -6,6 +6,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useState } from 'react';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
+import { downloadBlob } from '../firebase/download';
 
 export interface KostenersatzPdfButtonProps {
   calculation: KostenersatzCalculation;
@@ -37,19 +38,10 @@ export default function KostenersatzPdfButton({
       }
 
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
       const date = calculation.callDateOverride || firecall.date || new Date().toISOString();
       const dateStr = date.split('T')[0];
       const recipientName = calculation.recipient.name.replace(/[^a-zA-Z0-9]/g, '_') || 'Kostenersatz';
-      link.download = `Kostenersatz_${dateStr}_${recipientName}.pdf`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      await downloadBlob(blob, `Kostenersatz_${dateStr}_${recipientName}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {

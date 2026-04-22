@@ -58,6 +58,7 @@ import {
   FIRECALL_COLLECTION_ID,
   Spectrum,
 } from '../../components/firebase/firestore';
+import { downloadText } from '../firebase/download';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -430,20 +431,12 @@ export default function EnergySpectrum() {
       coefficients: spectrum.data.coefficients,
       counts: spectrum.data.counts,
     });
-    const blob = new Blob([xml], { type: 'application/xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
     const sanitized = (spectrum.data.sampleName || 'spektrum').replace(
       /[^A-Za-z0-9._-]+/g,
       '_',
     );
     const datePart = spectrum.data.startTime?.slice(0, 10) || 'unbekannt';
-    a.download = `Spectrum_${sanitized}_${datePart}.xml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    void downloadText(xml, `Spectrum_${sanitized}_${datePart}.xml`, 'application/xml');
   }, []);
 
   const openEditDialog = useCallback((spectrum: LoadedSpectrum) => {
