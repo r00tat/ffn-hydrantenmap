@@ -1,5 +1,6 @@
 package at.ffnd.einsatzkarte
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -14,6 +16,7 @@ import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import at.ffnd.einsatzkarte.radiacode.Framing
 import at.ffnd.einsatzkarte.radiacode.GattSession
 import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
@@ -159,12 +162,31 @@ class RadiacodeForegroundService : Service() {
 
     private fun ensureForeground() {
         val notif = buildNotification(lastTitle, lastBody)
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        } else {
-            0
-        }
+        val type = resolveForegroundServiceType()
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notif, type)
+    }
+
+    /**
+     * Kombiniert CONNECTED_DEVICE (für BLE) und LOCATION (damit
+     * `navigator.geolocation.watchPosition()` im WebView auch bei
+     * gesperrtem Screen weiterläuft). LOCATION wird nur addiert, wenn
+     * ACCESS_FINE_LOCATION tatsächlich runtime-granted ist — sonst
+     * wirft Android 14+ bei startForeground() SecurityException und
+     * killt den Service (und damit die BLE-Session).
+     */
+    private fun resolveForegroundServiceType(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        val fine = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION,
+        )
+        val coarse = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+        if (fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        }
+        return type
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

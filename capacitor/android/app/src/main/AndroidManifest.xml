@@ -45,7 +45,7 @@
             android:name=".RadiacodeForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|location" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -83,6 +83,7 @@
     <!-- Foreground service for continuous radiation measurement -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <!-- Post-notification permission for Android 13+ foreground-service notification -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
