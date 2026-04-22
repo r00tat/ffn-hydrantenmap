@@ -19,8 +19,11 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.view.Window;
 
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -32,13 +35,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
-
-import androidx.core.splashscreen.SplashScreen;
-import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsControllerCompat;
-import android.graphics.Color;
-import android.view.Window;
-import android.view.WindowManager;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
@@ -66,29 +62,6 @@ public class MainActivity extends BridgeActivity {
         String override = prefs.getString("server_url_override", null);
         allowInsecureSsl = prefs.getBoolean("allow_insecure_ssl", false);
 
-        // Edge-to-edge display
-        Window window = getWindow();
-        WindowCompat.setDecorFitsSystemWindows(window, false);
-        window.setStatusBarColor(Color.TRANSPARENT);
-        window.setNavigationBarColor(Color.TRANSPARENT);
-
-        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
-        if (controller != null) {
-            controller.setAppearanceLightStatusBars(true);
-            controller.setAppearanceLightNavigationBars(true);
-        }
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        }
-
-        // When a dev server URL is set via SettingsActivity, rewrite the
-        // CapConfig before Bridge init so Capacitor registers the
-        // document-start plugin script + URI matchers for that origin.
-        // Without this, modern WebViews (API 24+ with DOCUMENT_START_SCRIPT)
-        // only inject plugin headers for the baked-in server.url and every
-        // native plugin call from the override origin fails with
-        // "plugin is not implemented on android".
         if (override != null && !override.trim().isEmpty()) {
             applyServerUrlOverride(override.trim());
         }
@@ -97,13 +70,15 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
+        // Force edge-to-edge
+        Window window = getWindow();
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+
         WebView webView = this.bridge.getWebView();
 
         swipeRefreshLayout = findViewById(R.id.swipe_refresh);
         if (swipeRefreshLayout != null) {
             swipeRefreshLayout.setOnRefreshListener(() -> webView.reload());
-            // Pull-to-Refresh triggert nur, wenn die WebView am oberen Rand
-            // gescrollt ist (Standardverhalten von SwipeRefreshLayout).
         }
 
         webView.setWebViewClient(new BridgeWebViewClient(this.bridge) {
@@ -126,11 +101,7 @@ public class MainActivity extends BridgeActivity {
             }
 
             @Override
-            public void onReceivedError(
-                WebView view,
-                WebResourceRequest request,
-                WebResourceError error
-            ) {
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (!request.isForMainFrame()) return;
                 int code = error.getErrorCode();
@@ -138,34 +109,20 @@ public class MainActivity extends BridgeActivity {
                 if (TRANSIENT_ERRORS.contains(code)) {
                     showOfflineOverlay(url);
                 } else {
-                    showLoadErrorDialog(
-                        url,
-                        error.getDescription() + " (Code " + code + ")"
-                    );
+                    showLoadErrorDialog(url, error.getDescription() + " (Code " + code + ")");
                 }
             }
 
             @Override
-            public void onReceivedHttpError(
-                WebView view,
-                WebResourceRequest request,
-                WebResourceResponse errorResponse
-            ) {
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
                 super.onReceivedHttpError(view, request, errorResponse);
                 if (request.isForMainFrame()) {
-                    showLoadErrorDialog(
-                        request.getUrl().toString(),
-                        "HTTP " + errorResponse.getStatusCode() + " " + errorResponse.getReasonPhrase()
-                    );
+                    showLoadErrorDialog(request.getUrl().toString(), "HTTP " + errorResponse.getStatusCode() + " " + errorResponse.getReasonPhrase());
                 }
             }
 
             @Override
-            public void onReceivedSslError(
-                WebView view,
-                SslErrorHandler handler,
-                SslError error
-            ) {
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 if (allowInsecureSsl) {
                     handler.proceed();
                     return;
@@ -204,9 +161,7 @@ public class MainActivity extends BridgeActivity {
             if (cm != null) {
                 try {
                     cm.unregisterNetworkCallback(networkCallback);
-                } catch (IllegalArgumentException ignored) {
-                    // already unregistered
-                }
+                } catch (IllegalArgumentException ignored) {}
             }
             networkCallback = null;
         }
@@ -226,12 +181,9 @@ public class MainActivity extends BridgeActivity {
             }
             server.put("url", overrideUrl);
             server.put("cleartext", true);
-            // CapConfig(AssetManager, JSONObject) is @Deprecated but still
-            // the only supported way to hand in a pre-built JSON config.
             @SuppressWarnings("deprecation")
             CapConfig overridden = new CapConfig(assets, configJson);
             this.config = overridden;
-            Log.i(TAG, "Applied server.url override: " + overrideUrl);
         } catch (Exception ex) {
             Log.e(TAG, "Failed to apply server.url override " + overrideUrl, ex);
         }
@@ -275,9 +227,7 @@ public class MainActivity extends BridgeActivity {
             }
         }, 5000);
         runOnUiThread(() -> {
-            bridge.getWebView().loadDataWithBaseURL(
-                url, html, "text/html", "UTF-8", url
-            );
+            bridge.getWebView().loadDataWithBaseURL(url, html, "text/html", "UTF-8", url);
         });
     }
 
