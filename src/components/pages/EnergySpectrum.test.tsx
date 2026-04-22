@@ -57,7 +57,6 @@ function fixture(
     connectDevice: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
     spectrum: null,
-    cpsHistory: [],
     liveRecording: false,
     startLiveRecording: vi.fn(),
     stopLiveRecording: vi.fn(),

@@ -1,15 +1,10 @@
 'use client';
 
-import SettingsIcon from '@mui/icons-material/Settings';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
-import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { useMemo, useState } from 'react';
@@ -19,9 +14,8 @@ import {
   formatDoseRate,
   formatDuration,
 } from '../../common/doseFormat';
-import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
-import RadiacodeSettingsDialog from './RadiacodeSettingsDialog';
+import RadiacodeConnectionControls from './RadiacodeConnectionControls';
 
 const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
   normal: '#4caf50',
@@ -86,52 +80,9 @@ function formatErr(pct: number | undefined): string | undefined {
   return `± ${pct.toFixed(1)} %`;
 }
 
-function statusLabel(
-  status: ReturnType<typeof useRadiacode>['status'],
-  device: ReturnType<typeof useRadiacode>['device'],
-): string {
-  if (status === 'connected' && device) {
-    return `Verbunden — ${device.name} (${device.serial})`;
-  }
-  if (status === 'connecting') return 'Verbindet …';
-  if (status === 'reconnecting') return 'Verbinde neu …';
-  if (status === 'scanning') return 'Scannen …';
-  if (status === 'unavailable') return 'Gerät nicht erreichbar';
-  if (status === 'error') return 'Fehler';
-  return 'Getrennt';
-}
-
-const STATUS_CHIP_COLOR: Record<
-  RadiacodeStatus,
-  'default' | 'success' | 'warning' | 'error'
-> = {
-  idle: 'default',
-  scanning: 'warning',
-  connecting: 'warning',
-  connected: 'success',
-  reconnecting: 'warning',
-  unavailable: 'error',
-  error: 'error',
-};
-
 export default function Dosimetrie() {
-  const {
-    status,
-    device,
-    deviceInfo,
-    measurement,
-    history,
-    cpsHistory,
-    error,
-    connect,
-    disconnect,
-    readSettings,
-    writeSettings,
-    playSignal,
-    doseReset,
-  } = useRadiacode();
+  const { deviceInfo, measurement, history, error } = useRadiacode();
   const [logScale, setLogScale] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const rateLevel = measurement
     ? doseRateLevel(measurement.dosisleistung)
@@ -156,10 +107,10 @@ export default function Dosimetrie() {
   }, [history, logScale]);
 
   const cpsChart = useMemo(() => {
-    if (cpsHistory.length === 0) return [] as { x: number; y: number }[];
-    const now = cpsHistory[cpsHistory.length - 1].t;
-    return cpsHistory.map((s) => ({ x: (s.t - now) / 1000, y: s.cps }));
-  }, [cpsHistory]);
+    if (history.length === 0) return [] as { x: number; y: number }[];
+    const now = history[history.length - 1].t;
+    return history.map((s) => ({ x: (s.t - now) / 1000, y: s.cps }));
+  }, [history]);
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
@@ -170,35 +121,7 @@ export default function Dosimetrie() {
         spacing={1}
         sx={{ alignItems: 'center', flexWrap: 'wrap' }}
       >
-        <Chip
-          label={statusLabel(status, device)}
-          color={STATUS_CHIP_COLOR[status]}
-        />
-        <Button
-          variant="contained"
-          onClick={() => connect()}
-          disabled={status === 'connecting' || status === 'scanning'}
-        >
-          Verbinden
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={() => disconnect()}
-          disabled={status !== 'connected'}
-        >
-          Trennen
-        </Button>
-        <Tooltip title="Einstellungen">
-          <span>
-            <IconButton
-              aria-label="Einstellungen"
-              onClick={() => setSettingsOpen(true)}
-              disabled={status !== 'connected'}
-            >
-              <SettingsIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
+        <RadiacodeConnectionControls />
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -364,15 +287,6 @@ export default function Dosimetrie() {
           </Stack>
         </Box>
       )}
-
-      <RadiacodeSettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        readSettings={readSettings}
-        writeSettings={writeSettings}
-        playSignal={playSignal}
-        doseReset={doseReset}
-      />
     </Stack>
   );
 }

@@ -49,7 +49,6 @@ function fixture(
     connectDevice: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
     spectrum: null,
-    cpsHistory: [],
     liveRecording: false,
     startLiveRecording: vi.fn(),
     stopLiveRecording: vi.fn(),
@@ -83,7 +82,9 @@ describe('Dosimetrie', () => {
     mockedUseRadiacode.mockReturnValue(fixture());
     render(<Dosimetrie />);
     expect(screen.getByRole('button', { name: /verbinden/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /trennen/i })).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: /trennen/i }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/keine messdaten/i)).toBeInTheDocument();
   });
 
@@ -111,7 +112,7 @@ describe('Dosimetrie', () => {
     expect(screen.getByText(/456/)).toBeInTheDocument();
     expect(screen.getByText(/^7$/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /trennen/i })).toBeEnabled();
-    expect(screen.getByTestId('linechart')).toBeInTheDocument();
+    expect(screen.getAllByTestId('linechart').length).toBeGreaterThan(0);
   });
 
   it('toggles chart y-axis between linear and log', async () => {
@@ -125,10 +126,11 @@ describe('Dosimetrie', () => {
       }),
     );
     render(<Dosimetrie />);
-    const chart = screen.getByTestId('linechart');
+    // Dosisleistungs-Chart ist der erste linechart — CPS-Chart im cps-trend-Box hat immer linear scale.
+    const chart = screen.getAllByTestId('linechart')[0];
     expect(chart.getAttribute('data-scale')).toBe('linear');
     await user.click(screen.getByRole('checkbox', { name: /log/i }));
-    expect(screen.getByTestId('linechart').getAttribute('data-scale')).toBe(
+    expect(screen.getAllByTestId('linechart')[0].getAttribute('data-scale')).toBe(
       'log',
     );
   });

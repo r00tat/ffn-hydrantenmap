@@ -309,7 +309,7 @@ describe('RadiacodeProvider', () => {
     expect(ctx.spectrum?.counts).toEqual([2, 5, 3, 1]);
   });
 
-  it('resetLiveSpectrum sets baseline from current snapshot and clears cpsHistory', async () => {
+  it('resetLiveSpectrum sets baseline from current snapshot and clears history', async () => {
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
@@ -330,7 +330,7 @@ describe('RadiacodeProvider', () => {
     await act(async () => {
       values.at(-1)!.startLiveRecording();
     });
-    // Feed some CPS first.
+    // Feed some samples first.
     act(() => {
       feeds[0]({ cps: 5, dosisleistung: 0.1, timestamp: 1000 });
     });
@@ -338,7 +338,7 @@ describe('RadiacodeProvider', () => {
       feeds[0]({ cps: 7, dosisleistung: 0.2, timestamp: 2000 });
     });
     await waitFor(() => {
-      expect(values.at(-1)!.cpsHistory.length).toBe(2);
+      expect(values.at(-1)!.history.length).toBe(2);
     });
 
     // Emit a snapshot that should become the new baseline after reset.
@@ -352,8 +352,8 @@ describe('RadiacodeProvider', () => {
       await values.at(-1)!.resetLiveSpectrum();
     });
 
-    // cpsHistory cleared.
-    expect(values.at(-1)!.cpsHistory).toEqual([]);
+    // history cleared.
+    expect(values.at(-1)!.history).toEqual([]);
 
     // Next snapshot subtracts baseline.
     await act(async () => {
@@ -366,7 +366,7 @@ describe('RadiacodeProvider', () => {
     expect(ctx.spectrum?.counts).toEqual([1, 3, 5, 5]);
   });
 
-  it('cpsHistory collects CPS samples with timestamps (capped at 300 entries)', async () => {
+  it('history prunes samples older than 5 minutes from the latest sample', async () => {
     const adapter = nullAdapter();
     const { factory } = makeFakeSpectrumClientFactory();
     const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
@@ -384,19 +384,18 @@ describe('RadiacodeProvider', () => {
       await values.at(-1)!.connect();
     });
 
-    for (let i = 0; i < 305; i++) {
-      act(() => {
-        feeds[0]({ cps: i, dosisleistung: 0.1, timestamp: 1000 + i * 1000 });
-      });
-    }
+    // Sample within window, then jump past window → older sample must be pruned.
+    act(() => {
+      feeds[0]({ cps: 1, dosisleistung: 0.1, timestamp: 1000 });
+    });
+    act(() => {
+      feeds[0]({ cps: 2, dosisleistung: 0.2, timestamp: 1000 + 6 * 60_000 });
+    });
 
     await waitFor(() => {
-      expect(values.at(-1)!.cpsHistory.length).toBe(300);
+      expect(values.at(-1)!.history.length).toBe(1);
     });
-    // Oldest entry should be the 6th (i=5) after dropping first 5.
-    const ctx = values.at(-1)!;
-    expect(ctx.cpsHistory[0].cps).toBe(5);
-    expect(ctx.cpsHistory.at(-1)!.cps).toBe(304);
+    expect(values.at(-1)!.history[0].cps).toBe(2);
   });
 
   it('saveLiveSpectrum persists current snapshot via useFirecallItemAdd and keeps polling', async () => {

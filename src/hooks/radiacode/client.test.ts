@@ -1363,11 +1363,11 @@ describe('RadiacodeClient', () => {
     await client.disconnect();
   });
 
-  it('playSignal writes PLAY_SIGNAL=1, doseReset writes DOSE_RESET=1', async () => {
+  it('playSignal writes PLAY_SIGNAL=1 as u32, doseReset writes DOSE_RESET=1', async () => {
     vi.useRealTimers();
     const adapter = makeAdapter();
     let seqCounter = 0;
-    const wrLog: Array<{ id: number; v: number }> = [];
+    const wrLog: Array<{ id: number; v: number; payloadLen: number }> = [];
     adapter.setResponder((frame) => {
       const view = new DataView(
         frame.buffer,
@@ -1380,7 +1380,10 @@ describe('RadiacodeClient', () => {
         return buildResponseChunks(cmd, seq, new Uint8Array(0));
       if (cmd === COMMAND.WR_VIRT_SFR) {
         const id = view.getUint32(8, true);
-        wrLog.push({ id, v: frame[12] });
+        const payloadLen = frame.byteLength - 8;
+        const v =
+          payloadLen >= 8 ? view.getUint32(12, true) : frame[12];
+        wrLog.push({ id, v, payloadLen });
         return buildResponseChunks(cmd, seq, new Uint8Array([1, 0, 0, 0]));
       }
       return null;
@@ -1393,8 +1396,8 @@ describe('RadiacodeClient', () => {
     await client.doseReset();
 
     expect(wrLog).toEqual([
-      { id: VSFR.PLAY_SIGNAL, v: 1 },
-      { id: VSFR.DOSE_RESET, v: 1 },
+      { id: VSFR.PLAY_SIGNAL, v: 1, payloadLen: 8 },
+      { id: VSFR.DOSE_RESET, v: 1, payloadLen: 5 },
     ]);
     await client.disconnect();
   });

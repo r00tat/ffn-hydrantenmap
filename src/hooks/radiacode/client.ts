@@ -329,7 +329,7 @@ export class RadiacodeClient {
   }
 
   async playSignal(): Promise<void> {
-    await this.writeSfrU8(VSFR.PLAY_SIGNAL, 1);
+    await this.writeSfrU32(VSFR.PLAY_SIGNAL, 1);
   }
 
   async doseReset(): Promise<void> {

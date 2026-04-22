@@ -57,18 +57,11 @@ function formatBodyForNotification(
   return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
 }
 
-export interface CpsSample {
-  t: number;
-  cps: number;
-}
-
 export interface SaveLiveSpectrumMeta {
   name: string;
   description?: string;
   sampleName?: string;
 }
-
-const CPS_HISTORY_MAX = 300;
 
 export interface RadiacodeContextValue {
   status: RadiacodeStatus;
@@ -89,7 +82,6 @@ export interface RadiacodeContextValue {
   connectDevice: (device: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
   spectrum: SpectrumSnapshot | null;
-  cpsHistory: CpsSample[];
   /**
    * `true`, solange die Energiespektrum-Seite eine Live-Aufzeichnung angefordert
    * hat. Nur dann pollt der Provider aktiv das Spektrum vom Gerät. Ausserhalb
@@ -167,7 +159,6 @@ export function RadiacodeProvider({
   const addItem = useFirecallItemAdd();
 
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
-  const [cpsHistory, setCpsHistory] = useState<CpsSample[]>([]);
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
   const measurement = overrideMeasurement ?? hookMeasurement;
@@ -218,13 +209,6 @@ export function RadiacodeProvider({
         measurement.timestamp,
       ),
     );
-    setCpsHistory((prev) => {
-      const next = [...prev, { t: measurement.timestamp, cps: measurement.cps }];
-      if (next.length > CPS_HISTORY_MAX) {
-        return next.slice(next.length - CPS_HISTORY_MAX);
-      }
-      return next;
-    });
   }
 
   // Testing feeder: sets override measurement (which also triggers history push
@@ -366,7 +350,7 @@ export function RadiacodeProvider({
       baselineRef.current = null;
       setSpectrum(null);
     }
-    setCpsHistory([]);
+    setHistory([]);
   }, [applyBaseline]);
 
   const saveLiveSpectrum = useCallback(
@@ -580,7 +564,6 @@ export function RadiacodeProvider({
       connectDevice,
       disconnect,
       spectrum,
-      cpsHistory,
       liveRecording,
       startLiveRecording,
       stopLiveRecording,
@@ -604,7 +587,6 @@ export function RadiacodeProvider({
       connectDevice,
       disconnect,
       spectrum,
-      cpsHistory,
       liveRecording,
       startLiveRecording,
       stopLiveRecording,

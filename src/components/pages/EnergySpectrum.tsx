@@ -63,9 +63,9 @@ import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
-import { RadiacodeStatus } from '../../hooks/radiacode/useRadiacodeDevice';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import { useSnackbar } from '../providers/SnackbarProvider';
+import RadiacodeConnectionControls from './RadiacodeConnectionControls';
 import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 /** MUI default color palette for series */
@@ -80,34 +80,6 @@ const SERIES_COLORS = [
 
 const LIVE_ID = 'live';
 const LIVE_COLOR = '#e91e63';
-
-const STATUS_CHIP_COLOR: Record<
-  RadiacodeStatus,
-  'default' | 'success' | 'warning' | 'error'
-> = {
-  idle: 'default',
-  scanning: 'warning',
-  connecting: 'warning',
-  connected: 'success',
-  reconnecting: 'warning',
-  unavailable: 'error',
-  error: 'error',
-};
-
-function statusLabel(
-  status: RadiacodeStatus,
-  device: { name?: string; serial?: string } | null,
-): string {
-  if (status === 'connected' && device) {
-    return `Verbunden — ${device.name} (${device.serial})`;
-  }
-  if (status === 'connecting') return 'Verbindet …';
-  if (status === 'reconnecting') return 'Verbinde neu …';
-  if (status === 'scanning') return 'Scannen …';
-  if (status === 'unavailable') return 'Gerät nicht erreichbar';
-  if (status === 'error') return 'Fehler';
-  return 'Getrennt';
-}
 
 function colorForSpectrum(s: LoadedSpectrum, firestoreIdx: number): string {
   if (s.id === LIVE_ID) return LIVE_COLOR;
@@ -214,8 +186,6 @@ export default function EnergySpectrum() {
     device,
     spectrum,
     error: radiacodeError,
-    connect,
-    disconnect,
     liveRecording,
     startLiveRecording,
     stopLiveRecording,
@@ -626,27 +596,7 @@ export default function EnergySpectrum() {
         spacing={1}
         sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 2 }}
       >
-        <Chip
-          label={statusLabel(status, device)}
-          color={STATUS_CHIP_COLOR[status]}
-        />
-        {status === 'connected' ? (
-          <Button variant="outlined" onClick={() => disconnect()}>
-            Trennen
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            onClick={() => connect()}
-            disabled={
-              status === 'connecting' ||
-              status === 'scanning' ||
-              status === 'reconnecting'
-            }
-          >
-            Verbinden
-          </Button>
-        )}
+        <RadiacodeConnectionControls />
         {liveRecording && liveSpectrum && (
           <>
             <Button
