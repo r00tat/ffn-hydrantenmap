@@ -4,6 +4,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
 import { RadiacodeClient } from './client';
 import { COMMAND, SpectrumSnapshot, VS, VSFR } from './protocol';
+import { RadiacodeMeasurement } from './types';
+
+// `./nativeBridge` wird überall im Testfile als inaktiv gemockt —
+// Capacitor `isNativePlatform()` liefert in jsdom ohnehin false, aber der
+// Import zieht `@capacitor/core` rein und wir wollen in Tests keine echte
+// Plugin-Registrierung. Einzelne Tests überschreiben das Mock dynamisch.
+vi.mock('./nativeBridge', () => ({
+  isNativeAvailable: vi.fn(() => false),
+  onNativeMeasurement: vi.fn(() => () => {}),
+  onNativeNotification: vi.fn(() => () => {}),
+  onNativeConnectionState: vi.fn(() => () => {}),
+  nativeConnect: vi.fn(async () => {}),
+  nativeDisconnect: vi.fn(async () => {}),
+  nativeWrite: vi.fn(async () => {}),
+}));
 
 function fromHex(s: string): Uint8Array {
   const clean = s.replace(/\s+/g, '');
@@ -1382,6 +1397,51 @@ describe('RadiacodeClient', () => {
       { id: VSFR.DOSE_RESET, v: 1 },
     ]);
     await client.disconnect();
+  });
+
+  it('native path: connect skips handshake writes and startPolling subscribes to bridge', async () => {
+    vi.useRealTimers();
+    const nativeBridge = await import('./nativeBridge');
+    (nativeBridge.isNativeAvailable as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    const emitterRef: {
+      current: ((m: RadiacodeMeasurement) => void) | null;
+    } = { current: null };
+    (nativeBridge.onNativeMeasurement as ReturnType<typeof vi.fn>).mockImplementation(
+      (h: (m: RadiacodeMeasurement) => void) => {
+        emitterRef.current = h;
+        return () => {
+          emitterRef.current = null;
+        };
+      },
+    );
+
+    const adapter = makeAdapter();
+    const client = new RadiacodeClient(adapter, 'dev');
+    await client.connect();
+
+    // Im Native-Mode darf der Client keine Handshake-Frames schicken — der
+    // Foreground-Service hat das bereits erledigt.
+    expect(adapter.writes.length).toBe(0);
+
+    const seen: RadiacodeMeasurement[] = [];
+    client.startPolling((m) => seen.push(m), 500);
+
+    // Kein Poll-Write am TS-Layer — Messwerte kommen aus dem Plugin-Event.
+    expect(adapter.writes.length).toBe(0);
+    expect(emitterRef.current).not.toBeNull();
+
+    emitterRef.current?.({
+      dosisleistung: 0.123,
+      cps: 4.2,
+      timestamp: 42,
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0].dosisleistung).toBe(0.123);
+
+    await client.disconnect();
+    expect(emitterRef.current).toBeNull();
+
+    (nativeBridge.isNativeAvailable as ReturnType<typeof vi.fn>).mockReturnValue(false);
   });
 
   it('writeSfrBool sends WR_VIRT_SFR(id, 0/1)', async () => {
