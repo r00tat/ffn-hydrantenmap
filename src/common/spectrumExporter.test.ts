@@ -41,4 +41,20 @@ describe('exportSpectrumXml', () => {
     const parsed = parseSpectrumXml(xml);
     expect(parsed.sampleName).toBe('A&B<C>');
   });
+
+  it('does not crash when string fields are missing at runtime', () => {
+    // Older Firestore documents were saved with empty-string sampleName which
+    // `useFirecallItemAdd` strips out entirely — reading them back yields
+    // `undefined` despite the TypeScript type. The exporter must stay robust.
+    const broken = {
+      ...fixture,
+      sampleName: undefined as unknown as string,
+      deviceName: undefined as unknown as string,
+      startTime: undefined as unknown as string,
+      endTime: undefined as unknown as string,
+    };
+    expect(() => exportSpectrumXml(broken)).not.toThrow();
+    const xml = exportSpectrumXml(broken);
+    expect(xml).toContain('<ResultDataFile>');
+  });
 });

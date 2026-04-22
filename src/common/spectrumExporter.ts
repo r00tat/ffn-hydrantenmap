@@ -17,7 +17,8 @@ export interface ExportableSpectrum {
   counts: number[];
 }
 
-function escapeXml(s: string): string {
+function escapeXml(s: string | undefined | null): string {
+  if (!s) return '';
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
