@@ -134,10 +134,21 @@ class RadiacodeForegroundService : Service() {
                 // ensureForeground() oben aktualisiert die Notification bereits.
             }
             ACTION_STOP -> {
-                teardownSession()
-                releaseWakeLock()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                // ACTION_STOP darf NICHT die BLE-Session abbrechen. TS-Cleanup
+                // (z.B. React-Effekt-Reconciliation beim Status-Flip
+                // connected→connecting→connected) ruft stopForegroundService()
+                // auf, ohne dass der User wirklich disconnecten will. Wenn wir
+                // hier stopSelf() rufen, killt Android den gesamten Service
+                // inklusive GATT-Session — siehe Bug-Analyse 2026-04-22.
+                // Session-Teardown ausschliesslich via ACTION_BLE_DISCONNECT.
+                if (session != null) {
+                    Log.w(TAG, "ACTION_STOP ignoriert — BLE-Session aktiv, Service bleibt laufen")
+                } else {
+                    Log.i(TAG, "ACTION_STOP — keine Session, Service wird beendet")
+                    releaseWakeLock()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             }
             ACTION_DISCONNECT_REQUESTED -> {
                 RadiacodeNotificationPlugin.onDisconnectRequested()

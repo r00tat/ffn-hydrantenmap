@@ -489,37 +489,57 @@ export function RadiacodeProvider({
     notificationStateRef.current = notificationState;
   }, [notificationState]);
 
-  const serviceActive = notificationState !== null;
+  // Foreground-Service wird imperativ gesteuert — NICHT über useEffect-Cleanup,
+  // weil React den Effekt bei jedem Status-Flip (z.B. connected→connecting
+  // während Reconnect oder manuellem Connect) erneut evaluiert. Ein Cleanup
+  // würde dann fälschlich `stopForegroundService` rufen und damit den Service
+  // inkl. BLE-Session killen (Bug-Analyse 2026-04-22).
+  const notificationStartedRef = useRef(false);
   useEffect(() => {
-    console.log(
-      '[RadiacodeProvider] serviceActive effect',
-      'serviceActive=',
-      serviceActive,
-      'notificationState=',
-      notificationStateRef.current,
-    );
-    if (!serviceActive) return;
+    if (!notificationState) return;
+    if (notificationStartedRef.current) return;
     const start = adapter.startForegroundService;
-    const stop = adapter.stopForegroundService;
     if (!start) return;
-    const current = notificationStateRef.current ?? 'connected';
+    notificationStartedRef.current = true;
+    console.log('[RadiacodeProvider] startForegroundService', notificationState);
     start({
-      title: titleForNotification(current),
-      body: formatBodyForNotification(measurement, current),
+      title: titleForNotification(notificationState),
+      body: formatBodyForNotification(measurement, notificationState),
     }).catch((err) => {
       console.warn('[RadiacodeProvider] startForegroundService failed', err);
-      // Service-Start darf BLE nicht blockieren.
     });
+    // measurement bewusst nicht als Dependency — updateForegroundService läuft
+    // separat.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificationState, adapter]);
+
+  // Stop nur bei echten Offline-Zuständen. `connecting` / `reconnecting` sind
+  // Zwischenzustände und dürfen den Service nicht beenden.
+  useEffect(() => {
+    const offline =
+      rawStatus === 'idle' ||
+      rawStatus === 'unavailable' ||
+      rawStatus === 'error';
+    if (!offline) return;
+    if (!notificationStartedRef.current) return;
+    const stop = adapter.stopForegroundService;
+    if (!stop) return;
+    notificationStartedRef.current = false;
+    console.log('[RadiacodeProvider] stopForegroundService (rawStatus=', rawStatus, ')');
+    stop().catch((err) => {
+      console.warn('[RadiacodeProvider] stopForegroundService failed', err);
+    });
+  }, [rawStatus, adapter]);
+
+  useEffect(() => {
     return () => {
-      console.warn(
-        '[RadiacodeProvider] serviceActive cleanup — stopping foreground service',
-      );
-      stop?.().catch((err) => {
-        console.warn('[RadiacodeProvider] stopForegroundService failed', err);
-      });
+      if (!notificationStartedRef.current) return;
+      const stop = adapter.stopForegroundService;
+      notificationStartedRef.current = false;
+      stop?.().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceActive, adapter]);
+  }, []);
 
   useEffect(() => {
     if (!notificationState || !measurement) return;
