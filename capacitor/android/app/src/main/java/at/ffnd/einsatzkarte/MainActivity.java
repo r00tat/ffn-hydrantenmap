@@ -260,4 +260,18 @@ public class MainActivity extends BridgeActivity {
             default: return error.toString();
         }
     }
+
+    @Override
+    public void onBackPressed() {
+        Log.i(TAG, "onBackPressed — stopping service and exiting app");
+        try {
+            Intent stopIntent = new Intent(this, RadiacodeForegroundService.class);
+            stopService(stopIntent);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to stop service", e);
+        }
+        finishAndRemoveTask();
+        // Force process exit after a short delay to ensure clean state on next start
+        new Handler(Looper.getMainLooper()).postDelayed(() -> System.exit(0), 150);
+    }
 }
