@@ -145,28 +145,28 @@ export default function AppDrawer({
       einsatzSection: 'schadstoff',
       children: [
         {
-          text: 'Schadstoffdatenbank',
+          text: 'Gefahrgut-Infos',
           icon: <BiotechIcon />,
           href: '/schadstoff/datenbank',
           einsatzSection: 'schadstoff/datenbank',
         },
         {
-          text: 'Strahlenschutz',
+          text: 'Strahlenschutz-Rechner',
           icon: <WarningIcon />,
           href: '/schadstoff/strahlenschutz',
           einsatzSection: 'schadstoff/strahlenschutz',
         },
         {
-          text: 'Energiespektrum',
-          icon: <ShowChartIcon />,
-          href: '/schadstoff/energiespektrum',
-          einsatzSection: 'schadstoff/energiespektrum',
-        },
-        {
-          text: 'Dosimetrie',
+          text: 'Strahlenmessung',
           icon: <SensorsIcon />,
           href: '/schadstoff/dosimetrie',
           einsatzSection: 'schadstoff/dosimetrie',
+        },
+        {
+          text: 'Nuklid-Identifikation',
+          icon: <ShowChartIcon />,
+          href: '/schadstoff/energiespektrum',
+          einsatzSection: 'schadstoff/energiespektrum',
         },
       ],
     },
