@@ -114,7 +114,7 @@ export default function Dosimetrie() {
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Typography variant="h5">Dosimetrie</Typography>
+      <Typography variant="h5">Strahlenmessung</Typography>
 
       <Stack
         direction="row"
@@ -274,14 +274,23 @@ export default function Dosimetrie() {
                 <strong>Modell:</strong> {deviceInfo.model}
               </Typography>
             )}
-            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
               <strong>Firmware:</strong> {deviceInfo.firmwareVersion}
               {deviceInfo.firmwareDate ? ` (${deviceInfo.firmwareDate})` : ''}
             </Typography>
-            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
               <strong>Bootloader:</strong> {deviceInfo.bootVersion}
             </Typography>
-            <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+            <Typography
+              variant="body2"
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
               <strong>Seriennummer:</strong> {deviceInfo.hardwareSerial}
             </Typography>
           </Stack>
