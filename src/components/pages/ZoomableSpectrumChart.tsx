@@ -6,11 +6,13 @@ import Popper from '@mui/material/Popper';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
+import { useDrawingArea } from '@mui/x-charts/hooks';
 import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type WheelEvent as ReactWheelEvent,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -61,32 +63,58 @@ export interface ZoomableSpectrumChartProps {
 /** Minimum span (keV) to prevent degenerate zoom. */
 const MIN_SPAN = 5;
 
-/** Chart margins — must match the margin prop passed to <LineChart>. */
-const CHART_MARGIN = { top: 20, right: 20, bottom: 50, left: 60 } as const;
+/**
+ * Chart margins — additional padding around the (auto-sized) axes.
+ * Kept tight on the Y side so mobile viewports don't waste horizontal space.
+ */
+const CHART_MARGIN = { top: 10, right: 16, bottom: 4, left: 4 } as const;
 
-/** Width of the actual plot area inside the container. */
-function plotWidth(containerWidth: number): number {
-  return Math.max(0, containerWidth - CHART_MARGIN.left - CHART_MARGIN.right);
+/** Compact count-number formatter for Y-axis ticks (e.g. 12000 → "12k"). */
+function formatCountCompact(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return `${(v / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`;
+  if (abs >= 1_000) return `${(v / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`;
+  return `${v}`;
 }
 
+/** Plot area (left offset and width) within the container, in CSS pixels. */
+type PlotArea = { left: number; width: number };
+
 /** Pan sensitivity: fraction of visible span per horizontal pixel. */
-function pixelsToKev(dxPixels: number, span: number, widthPx: number): number {
-  const plotPx = plotWidth(widthPx);
-  if (plotPx <= 0) return 0;
-  return -(dxPixels / plotPx) * span;
+function pixelsToKev(dxPixels: number, span: number, area: PlotArea): number {
+  if (area.width <= 0) return 0;
+  return -(dxPixels / area.width) * span;
 }
 
 /** Convert a client X pixel inside the chart container to keV. */
 function pixelToKev(
   pxWithinContainer: number,
-  containerWidth: number,
+  area: PlotArea,
   xRange: Range,
 ): number {
-  const plotPx = plotWidth(containerWidth);
-  if (plotPx <= 0) return xRange[0];
-  const pxWithinPlot = pxWithinContainer - CHART_MARGIN.left;
-  const frac = Math.max(0, Math.min(1, pxWithinPlot / plotPx));
+  if (area.width <= 0) return xRange[0];
+  const pxWithinPlot = pxWithinContainer - area.left;
+  const frac = Math.max(0, Math.min(1, pxWithinPlot / area.width));
   return xRange[0] + frac * (xRange[1] - xRange[0]);
+}
+
+/**
+ * Helper rendered inside <LineChart> so it can consume MUI's chart context
+ * hooks. Reports the actual drawing area (after MUI auto-sizes the axes) back
+ * to the parent via the supplied callback — needed because MUI adds the
+ * computed axis label width on top of the caller's `margin`, which the parent
+ * cannot know just from its own DOM measurements.
+ */
+function DrawingAreaReporter({
+  onArea,
+}: {
+  onArea: (a: PlotArea) => void;
+}) {
+  const { left, width } = useDrawingArea();
+  useEffect(() => {
+    onArea({ left, width });
+  }, [left, width, onArea]);
+  return null;
 }
 
 /**
@@ -178,16 +206,29 @@ export default function ZoomableSpectrumChart({
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Latest plot-area coordinates reported by DrawingAreaReporter. Updated on
+  // every chart layout pass; read synchronously inside pointer handlers.
+  const plotAreaRef = useRef<PlotArea>({
+    left: CHART_MARGIN.left,
+    width: 0,
+  });
+  const handlePlotArea = useCallback((a: PlotArea) => {
+    plotAreaRef.current = a;
+  }, []);
   const panRef = useRef<{
     pointerId: number;
     startX: number;
     startRange: Range;
     moved: boolean;
   } | null>(null);
-  // Pinch gesture tracking (two active touches).
+  // Active touch pointers (pointerId -> current client position).
+  const activeTouchesRef = useRef<Map<number, { x: number; y: number }>>(
+    new Map(),
+  );
+  // Pinch gesture tracking (two active touches). Zooms via distance change and
+  // pans via midpoint translation so the pivot keV stays under the fingers.
   const pinchRef = useRef<{
     pointerIds: [number, number];
-    positions: Map<number, number>; // pointerId -> clientX
     startDistance: number;
     startRange: Range;
     pivotKev: number;
@@ -198,7 +239,11 @@ export default function ZoomableSpectrumChart({
       if (!containerRef.current) return;
       e.preventDefault();
       const rect = containerRef.current.getBoundingClientRect();
-      const pivot = pixelToKev(e.clientX - rect.left, rect.width, xRange);
+      const pivot = pixelToKev(
+        e.clientX - rect.left,
+        plotAreaRef.current,
+        xRange,
+      );
       // deltaY < 0 = wheel up = zoom in
       const next = applyWheelZoom(xRange, pivot, e.deltaY, 1.2);
       if (next[1] - next[0] >= MIN_SPAN) {
@@ -210,29 +255,56 @@ export default function ZoomableSpectrumChart({
 
   const handlePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      // Collect multi-pointer state for pinch handling.
-      if (panRef.current) {
-        // Transition pan → pinch when a second pointer touches down.
-        const first = panRef.current;
-        if (e.pointerId !== first.pointerId && containerRef.current) {
-          // Get the existing pointer's last known position (approx: use startX).
-          const positions = new Map<number, number>();
-          positions.set(first.pointerId, first.startX);
-          positions.set(e.pointerId, e.clientX);
-          const rect = containerRef.current.getBoundingClientRect();
-          const midPx =
-            (first.startX + e.clientX) / 2 - rect.left;
-          pinchRef.current = {
-            pointerIds: [first.pointerId, e.pointerId],
-            positions,
-            startDistance: Math.abs(first.startX - e.clientX),
-            startRange: xRange,
-            pivotKev: pixelToKev(midPx, rect.width, xRange),
-          };
-          panRef.current = null;
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      if (e.pointerType === 'touch') {
+        // Track this touch.
+        activeTouchesRef.current.set(e.pointerId, {
+          x: e.clientX,
+          y: e.clientY,
+        });
+        try {
+          (e.target as Element).setPointerCapture?.(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+
+        if (activeTouchesRef.current.size === 1) {
+          // Single-finger touch acts as a "probe": show the nuclide popup at
+          // the touch location (equivalent to desktop mouse hover). No pan.
+          const kev = pixelToKev(
+            e.clientX - rect.left,
+            plotAreaRef.current,
+            xRange,
+          );
+          setHover({ kev, clientX: e.clientX, clientY: e.clientY });
+          if (onPointerMove) onPointerMove(kev);
           return;
         }
+
+        if (activeTouchesRef.current.size === 2) {
+          // Second finger down → start pinch (zoom + pan).
+          const ids = Array.from(activeTouchesRef.current.keys()) as [
+            number,
+            number,
+          ];
+          const pa = activeTouchesRef.current.get(ids[0])!;
+          const pb = activeTouchesRef.current.get(ids[1])!;
+          const midPx = (pa.x + pb.x) / 2 - rect.left;
+          pinchRef.current = {
+            pointerIds: ids,
+            startDistance: Math.abs(pa.x - pb.x),
+            startRange: xRange,
+            pivotKev: pixelToKev(midPx, plotAreaRef.current, xRange),
+          };
+          setHover(null);
+          if (onPointerMove) onPointerMove(null);
+        }
+        return;
       }
+
+      // Mouse/pen: drag pans, unchanged behaviour.
       panRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
@@ -245,7 +317,7 @@ export default function ZoomableSpectrumChart({
         /* ignore */
       }
     },
-    [xRange],
+    [onPointerMove, xRange],
   );
 
   const handlePointerMove = useCallback(
@@ -253,43 +325,67 @@ export default function ZoomableSpectrumChart({
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
 
-      // Pinch update
-      const pinch = pinchRef.current;
-      if (pinch && pinch.positions.has(e.pointerId)) {
-        pinch.positions.set(e.pointerId, e.clientX);
-        const [a, b] = pinch.pointerIds;
-        const xa = pinch.positions.get(a);
-        const xb = pinch.positions.get(b);
-        if (xa !== undefined && xb !== undefined) {
-          const dist = Math.abs(xa - xb);
-          if (dist > 5 && pinch.startDistance > 5) {
-            const ratio = pinch.startDistance / dist; // pinch-out (dist bigger) → ratio<1 → zoom in
-            const startSpan = pinch.startRange[1] - pinch.startRange[0];
-            const newSpan = Math.max(MIN_SPAN, startSpan * ratio);
-            const leftFrac =
-              (pinch.pivotKev - pinch.startRange[0]) / startSpan;
-            const newA = pinch.pivotKev - newSpan * leftFrac;
-            setXRange([newA, newA + newSpan]);
+      if (e.pointerType === 'touch') {
+        const active = activeTouchesRef.current;
+        if (!active.has(e.pointerId)) return;
+        active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // Two-finger pinch: zoom by distance ratio, pan via midpoint.
+        const pinch = pinchRef.current;
+        if (pinch && active.size >= 2) {
+          const [a, b] = pinch.pointerIds;
+          const pa = active.get(a);
+          const pb = active.get(b);
+          if (pa && pb) {
+            const dist = Math.abs(pa.x - pb.x);
+            if (dist > 5 && pinch.startDistance > 5) {
+              const ratio = pinch.startDistance / dist;
+              const startSpan = pinch.startRange[1] - pinch.startRange[0];
+              const newSpan = Math.max(MIN_SPAN, startSpan * ratio);
+              // Place pivotKev under the current midpoint — this folds zoom
+              // and midpoint-pan into a single anchored transform.
+              const currentMidPx = (pa.x + pb.x) / 2;
+              const area = plotAreaRef.current;
+              const midWithinPlot = currentMidPx - rect.left - area.left;
+              const frac = area.width > 0 ? midWithinPlot / area.width : 0.5;
+              const newA = pinch.pivotKev - newSpan * frac;
+              setXRange([newA, newA + newSpan]);
+            }
           }
+          return;
         }
-        setHover(null);
+
+        // Single-finger probe: update hover popup.
+        if (active.size === 1) {
+          const kev = pixelToKev(
+            e.clientX - rect.left,
+            plotAreaRef.current,
+            xRange,
+          );
+          setHover({ kev, clientX: e.clientX, clientY: e.clientY });
+          if (onPointerMove) onPointerMove(kev);
+        }
         return;
       }
 
-      // Pan update
+      // Mouse/pen: drag pans.
       const pan = panRef.current;
       if (pan) {
         const dx = e.clientX - pan.startX;
         if (Math.abs(dx) > 2) pan.moved = true;
         const span = pan.startRange[1] - pan.startRange[0];
-        const deltaKev = pixelsToKev(dx, span, rect.width);
+        const deltaKev = pixelsToKev(dx, span, plotAreaRef.current);
         setXRange(applyPan(pan.startRange, deltaKev));
         setHover(null);
         return;
       }
 
       // Hover: cursor over chart, no active gesture.
-      const kev = pixelToKev(e.clientX - rect.left, rect.width, xRange);
+      const kev = pixelToKev(
+        e.clientX - rect.left,
+        plotAreaRef.current,
+        xRange,
+      );
       setHover({ kev, clientX: e.clientX, clientY: e.clientY });
       if (onPointerMove) onPointerMove(kev);
     },
@@ -297,46 +393,57 @@ export default function ZoomableSpectrumChart({
   );
 
   const endGesture = useCallback(
-    (pointerId: number) => {
-      if (pinchRef.current?.pointerIds.includes(pointerId)) {
-        // When one pointer lifts during pinch, remaining pointer takes over pan.
-        const other = pinchRef.current.pointerIds.find(
-          (id) => id !== pointerId,
-        );
-        const remainingX =
-          other !== undefined
-            ? pinchRef.current.positions.get(other)
-            : undefined;
-        pinchRef.current = null;
-        if (other !== undefined && remainingX !== undefined) {
-          panRef.current = {
-            pointerId: other,
-            startX: remainingX,
-            startRange: xRange,
-            moved: true,
-          };
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.pointerType === 'touch') {
+        activeTouchesRef.current.delete(e.pointerId);
+
+        if (pinchRef.current?.pointerIds.includes(e.pointerId)) {
+          pinchRef.current = null;
+          // If one finger remains, show its probe position.
+          if (
+            activeTouchesRef.current.size === 1 &&
+            containerRef.current
+          ) {
+            const [remaining] = activeTouchesRef.current.values();
+            const rect = containerRef.current.getBoundingClientRect();
+            const kev = pixelToKev(
+              remaining.x - rect.left,
+              plotAreaRef.current,
+              xRange,
+            );
+            setHover({ kev, clientX: remaining.x, clientY: remaining.y });
+            if (onPointerMove) onPointerMove(kev);
+          }
+        }
+
+        if (activeTouchesRef.current.size === 0) {
+          setHover(null);
+          if (onPointerMove) onPointerMove(null);
         }
         return;
       }
-      if (panRef.current?.pointerId === pointerId) {
+
+      if (panRef.current?.pointerId === e.pointerId) {
         panRef.current = null;
       }
     },
-    [xRange],
+    [onPointerMove, xRange],
   );
 
   const handlePointerUp = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      endGesture(e.pointerId);
+      endGesture(e);
     },
     [endGesture],
   );
 
   const handlePointerLeave = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      endGesture(e.pointerId);
-      setHover(null);
-      onPointerMove?.(null);
+      endGesture(e);
+      if (e.pointerType !== 'touch') {
+        setHover(null);
+        onPointerMove?.(null);
+      }
     },
     [endGesture, onPointerMove],
   );
@@ -462,8 +569,8 @@ export default function ZoomableSpectrumChart({
         ]}
         yAxis={[
           {
-            label: 'Counts',
             scaleType: logScale ? 'log' : 'linear',
+            valueFormatter: formatCountCompact,
           },
         ]}
         series={chartSeries.map((s) => {
@@ -472,12 +579,23 @@ export default function ZoomableSpectrumChart({
             liveTime?: number;
           };
           void _liveTime;
-          return { ...rest, showMark: false, curve: 'linear' as const };
+          // Log scale can't plot zeros — clamp to 0.5 so empty bins render
+          // just below the first visible tick instead of dropping the series.
+          const data = logScale
+            ? rest.data.map((c) => (c > 0 ? c : 0.5))
+            : rest.data;
+          return {
+            ...rest,
+            data,
+            showMark: false,
+            curve: 'linear' as const,
+          };
         })}
         margin={CHART_MARGIN}
         axisHighlight={{ x: 'none', y: 'none' }}
         slotProps={{ tooltip: { trigger: 'none' } }}
       >
+        <DrawingAreaReporter onArea={handlePlotArea} />
         {overlays}
         {hover && (
           <ChartsReferenceLine
