@@ -11,6 +11,7 @@ module.exports = async (phase) => {
   /** @type {import('next').NextConfig} */
   const nextConfig = {
     /* config options here */
+    output: 'standalone',
     // dest: 'public',
     // skipWaiting: true,
     transpilePackages: ['mui-color-input'],
