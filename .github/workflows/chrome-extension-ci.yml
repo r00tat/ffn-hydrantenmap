@@ -1,0 +1,49 @@
+name: "Chrome Extension CI"
+
+on:
+  pull_request:
+    paths:
+      - "chrome-extension/**"
+      - ".github/workflows/chrome-extension-ci.yml"
+
+jobs:
+  build-and-test:
+    name: "Build and test Chrome Extension"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            chrome-extension/package-lock.json
+
+      - name: Install dependencies
+        working-directory: chrome-extension
+        run: npm ci
+
+      - name: Run tests
+        working-directory: chrome-extension
+        run: npm test
+
+      - name: Build extension
+        working-directory: chrome-extension
+        run: npm run build
+
+      - name: Verify packaging (dry-run)
+        working-directory: chrome-extension
+        run: |
+          set -eo pipefail
+          # Generate dummy key for packaging test
+          openssl genrsa -out dist.pem 2048
+          # package.mjs expects OUTPUT_BASE or uses manifest version
+          node scripts/package.mjs
