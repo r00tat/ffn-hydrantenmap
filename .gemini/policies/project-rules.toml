@@ -5,3 +5,12 @@ commandPrefix = ["npm run extract", "npm run import", "npm run docs:screenshots"
 decision = "allow"
 priority = 20
 description = "Allow project-specific data processing and documentation scripts"
+allowRedirection = true
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["ls", "mkdir", "rm", "echo", "cat", "grep", "find"]
+decision = "allow"
+priority = 100
+allowRedirection = true
+description = "Allow standard file operations and complex command chains without confirmation"
