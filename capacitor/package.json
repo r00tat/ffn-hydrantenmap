@@ -13,15 +13,15 @@
     "@capacitor-firebase/authentication": "^8.2.0",
     "@capacitor/android": "^8.3.0",
     "@capacitor/app": "^8.1.0",
-    "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/geolocation": "^8.2.0",
-    "@capacitor/preferences": "^8.0.0",
+    "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
     "firebase": "^12.12.1"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@capacitor/cli": "^8.3.1",
+    "typescript": "^6.0.3"
   }
 }
