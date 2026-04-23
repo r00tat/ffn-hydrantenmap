@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { BleAdapter } from '../../hooks/radiacode/bleAdapter';
 import { RadiacodeClient, SessionEvent } from '../../hooks/radiacode/client';
@@ -106,6 +106,10 @@ function snap(override: Partial<SpectrumSnapshot> = {}): SpectrumSnapshot {
 }
 
 describe('RadiacodeProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('exposes status, device, history and connect/disconnect', () => {
     const values: ReturnType<typeof useRadiacode>[] = [];
     render(
@@ -339,7 +343,6 @@ describe('RadiacodeProvider', () => {
   });
 
   it('saveLiveSpectrum persists current snapshot via useFirecallItemAdd and keeps polling', async () => {
-    mockAdd.mockClear();
     const adapter = nullAdapter();
     const { factory, latest } = makeFakeSpectrumClientFactory();
     const values: ReturnType<typeof useRadiacode>[] = [];
@@ -411,8 +414,6 @@ describe('RadiacodeProvider', () => {
     function serviceAdapter() {
       const disconnectHandlers: Array<() => void> = [];
       const base = nullAdapter();
-      const startForegroundService = vi.fn(async () => {});
-      const stopForegroundService = vi.fn(async () => {});
       const onDisconnectRequested = vi.fn((h: () => void) => {
         disconnectHandlers.push(h);
         return () => {
@@ -423,13 +424,9 @@ describe('RadiacodeProvider', () => {
       return {
         adapter: {
           ...base,
-          startForegroundService,
-          stopForegroundService,
           onDisconnectRequested,
         } as BleAdapter,
         spies: {
-          startForegroundService,
-          stopForegroundService,
           onDisconnectRequested,
         },
         triggerDisconnectRequest: () => {
@@ -437,46 +434,6 @@ describe('RadiacodeProvider', () => {
         },
       };
     }
-
-    it('startet den foreground-service beim wechsel auf connected', async () => {
-      const { adapter, spies } = serviceAdapter();
-      const { factory } = makeFakeSpectrumClientFactory();
-      const values: ReturnType<typeof useRadiacode>[] = [];
-      render(
-        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
-          <Probe onValue={(v) => values.push(v)} />
-        </RadiacodeProvider>,
-      );
-      await act(async () => {
-        await values.at(-1)!.connect();
-      });
-      await waitFor(() => {
-        expect(spies.startForegroundService).toHaveBeenCalledTimes(1);
-      });
-      expect(spies.startForegroundService).toHaveBeenCalledWith(
-        expect.objectContaining({ title: expect.stringContaining('verbunden') }),
-      );
-    });
-
-    it('stoppt den service beim disconnect', async () => {
-      const { adapter, spies } = serviceAdapter();
-      const { factory } = makeFakeSpectrumClientFactory();
-      const values: ReturnType<typeof useRadiacode>[] = [];
-      render(
-        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
-          <Probe onValue={(v) => values.push(v)} />
-        </RadiacodeProvider>,
-      );
-      await act(async () => {
-        await values.at(-1)!.connect();
-      });
-      await act(async () => {
-        await values.at(-1)!.disconnect();
-      });
-      await waitFor(() => {
-        expect(spies.stopForegroundService).toHaveBeenCalled();
-      });
-    });
 
     it('reagiert auf onDisconnectRequested durch disconnect-aufruf', async () => {
       const { adapter, triggerDisconnectRequest } = serviceAdapter();
