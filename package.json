@@ -112,7 +112,7 @@
     "jsdom": "^29.0.2",
     "serwist": "^9.0.12",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },
   "overrides": {
@@ -124,6 +124,7 @@
     "minimatch": "10.2.4",
     "http-proxy-agent": "^7.0.0",
     "node-domexception": "npm:noop-package",
+    "typescript-eslint": "8.59.0",
     "mui-color-input": {
       "@mui/material": "$@mui/material"
     }
