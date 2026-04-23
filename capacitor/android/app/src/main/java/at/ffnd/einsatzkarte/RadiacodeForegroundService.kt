@@ -30,6 +30,7 @@ import at.ffnd.einsatzkarte.gpstrack.GpsTrackRecorder
 import at.ffnd.einsatzkarte.gpstrack.LineUpdater
 import at.ffnd.einsatzkarte.radiacode.Framing
 import at.ffnd.einsatzkarte.radiacode.GattSession
+import at.ffnd.einsatzkarte.radiacode.Measurement
 import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
 import at.ffnd.einsatzkarte.radiacode.Protocol
 import at.ffnd.einsatzkarte.radiacode.Reassembler
@@ -153,9 +154,9 @@ class RadiacodeForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val logAction = intent?.action
-        val isHotPath = logAction == ACTION_UPDATE || logAction == ACTION_BLE_WRITE
-        val logMsg = "onStartCommand action=$logAction startId=$startId flags=$flags " +
+        val action = intent?.action
+        val isHotPath = action == ACTION_UPDATE || action == ACTION_BLE_WRITE
+        val logMsg = "onStartCommand action=$action startId=$startId flags=$flags " +
             "session=${if (session != null) "active" else "none"} deviceReady=$deviceReady"
         if (isHotPath) Log.d(TAG, logMsg) else Log.i(TAG, logMsg)
         // Jede Action promoviert den Service in den Foreground-Status. Wurde er
@@ -166,11 +167,15 @@ class RadiacodeForegroundService : Service() {
         // Variante mit Service-Typ aufgerufen werden, sonst crasht der Service
         // mit MissingForegroundServiceTypeException — und reisst unsere
         // BLE-Session mit sich. Siehe Bug-Report vom 2026-04-22.
-        val action = intent?.action
-        if (action == ACTION_START || action == ACTION_UPDATE) {
-            intent.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
-            intent.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
+        if (action == ACTION_START) {
+            intent?.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
+            intent?.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
+        } else if (action == ACTION_UPDATE) {
+             // ACTION_UPDATE from plugin (WebView) can still override values
+             intent?.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
+             intent?.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
         }
+
         if (action != null && action != ACTION_STOP && action != ACTION_DISCONNECT_REQUESTED) {
             ensureForeground()
         }
@@ -180,7 +185,7 @@ class RadiacodeForegroundService : Service() {
                 acquireWakeLock()
             }
             ACTION_UPDATE -> {
-                // ensureForeground() oben aktualisiert die Notification bereits.
+                // Already updated titles and called ensureForeground()
             }
             ACTION_STOP -> {
                 // ACTION_STOP darf NICHT die BLE-Session abbrechen. TS-Cleanup
@@ -203,7 +208,7 @@ class RadiacodeForegroundService : Service() {
                 RadiacodeNotificationPlugin.onDisconnectRequested()
             }
             ACTION_BLE_CONNECT -> {
-                val address = intent.getStringExtra(EXTRA_DEVICE_ADDRESS)
+                val address = intent?.getStringExtra(EXTRA_DEVICE_ADDRESS)
                 if (address.isNullOrBlank()) {
                     Log.w(TAG, "ACTION_BLE_CONNECT without deviceAddress")
                 } else {
@@ -212,7 +217,7 @@ class RadiacodeForegroundService : Service() {
                 }
             }
             ACTION_BLE_WRITE -> {
-                val payload = intent.getByteArrayExtra(EXTRA_PAYLOAD)
+                val payload = intent?.getByteArrayExtra(EXTRA_PAYLOAD)
                 if (payload == null) {
                     Log.w(TAG, "ACTION_BLE_WRITE without payload")
                 } else {
@@ -221,21 +226,30 @@ class RadiacodeForegroundService : Service() {
             }
             ACTION_BLE_DISCONNECT -> {
                 teardownSession()
+                if (gpsTrackRecorder == null) {
+                    Log.i(TAG, "ACTION_BLE_DISCONNECT — no GPS track, stopping service")
+                    stopHighAccuracyLocation()
+                    releaseWakeLock()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                } else {
+                    updateNotificationForState()
+                }
             }
             ACTION_START_TRACK -> {
-                val firecallId = intent.getStringExtra(EXTRA_FIRECALL_ID)
-                val layerId = intent.getStringExtra(EXTRA_LAYER_ID)
-                val rateStr = intent.getStringExtra(EXTRA_SAMPLE_RATE)
-                val kindStr = intent.getStringExtra(EXTRA_SAMPLE_RATE_KIND)
-                val deviceLabel = intent.getStringExtra(EXTRA_DEVICE_LABEL) ?: ""
-                val creator = intent.getStringExtra(EXTRA_CREATOR) ?: ""
-                val firestoreDb = intent.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
+                val firecallId = intent?.getStringExtra(EXTRA_FIRECALL_ID)
+                val layerId = intent?.getStringExtra(EXTRA_LAYER_ID)
+                val rateStr = intent?.getStringExtra(EXTRA_SAMPLE_RATE)
+                val kindStr = intent?.getStringExtra(EXTRA_SAMPLE_RATE_KIND)
+                val deviceLabel = intent?.getStringExtra(EXTRA_DEVICE_LABEL) ?: ""
+                val creator = intent?.getStringExtra(EXTRA_CREATOR) ?: ""
+                val firestoreDb = intent?.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
                 if (firecallId.isNullOrBlank() || layerId.isNullOrBlank() ||
                     (rateStr.isNullOrBlank() && kindStr.isNullOrBlank())
                 ) {
                     Log.w(TAG, "ACTION_START_TRACK rejected — missing required extras")
                 } else {
-                    val parsedRate: SampleRate = if (kindStr != null) parseSampleRate(intent)
+                    val parsedRate: SampleRate = if (kindStr != null) parseSampleRate(intent!!)
                         else SampleRate.fromString(rateStr!!)
                     val config = TrackConfig(
                         firecallId = firecallId, layerId = layerId,
@@ -263,14 +277,14 @@ class RadiacodeForegroundService : Service() {
                 trackRecorder = null
             }
             ACTION_START_GPS_TRACK -> {
-                val firecallId = intent.getStringExtra(EXTRA_FIRECALL_ID)
-                val lineId     = intent.getStringExtra(EXTRA_LINE_ID)
-                val firestoreDb = intent.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
-                val creator     = intent.getStringExtra(EXTRA_CREATOR) ?: ""
+                val firecallId = intent?.getStringExtra(EXTRA_FIRECALL_ID)
+                val lineId     = intent?.getStringExtra(EXTRA_LINE_ID)
+                val firestoreDb = intent?.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
+                val creator     = intent?.getStringExtra(EXTRA_CREATOR) ?: ""
                 if (firecallId.isNullOrBlank() || lineId.isNullOrBlank()) {
                     Log.w(TAG, "ACTION_START_GPS_TRACK rejected — missing extras")
                 } else {
-                    val rate = parseSampleRate(intent)
+                    val rate = parseSampleRate(intent!!)
                     val cfg = GpsTrackConfig(
                         firecallId = firecallId, lineId = lineId,
                         sampleRate = rate, firestoreDb = firestoreDb, creator = creator,
@@ -280,8 +294,8 @@ class RadiacodeForegroundService : Service() {
                     gpsTrackRecorder = GpsTrackRecorder(cfg, fsUpdater)
                     acquireWakeLock()
                     startHighAccuracyLocation()
-                    val initLat = if (intent.hasExtra(EXTRA_INITIAL_LAT)) intent.getDoubleExtra(EXTRA_INITIAL_LAT, Double.NaN) else Double.NaN
-                    val initLng = if (intent.hasExtra(EXTRA_INITIAL_LNG)) intent.getDoubleExtra(EXTRA_INITIAL_LNG, Double.NaN) else Double.NaN
+                    val initLat = if (intent?.hasExtra(EXTRA_INITIAL_LAT) == true) intent.getDoubleExtra(EXTRA_INITIAL_LAT, Double.NaN) else Double.NaN
+                    val initLng = if (intent?.hasExtra(EXTRA_INITIAL_LNG) == true) intent.getDoubleExtra(EXTRA_INITIAL_LNG, Double.NaN) else Double.NaN
                     if (!initLat.isNaN() && !initLng.isNaN()) {
                         gpsTrackRecorder?.onLocation(initLat, initLng)
                     }
@@ -363,22 +377,23 @@ class RadiacodeForegroundService : Service() {
         gpsTrackRecorder = null
         stopHighAccuracyLocation()
         releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Log.w(TAG, "onTaskRemoved — app swiped away")
-        if (gpsTrackRecorder != null) {
-            Log.i(TAG, "onTaskRemoved — stopping GPS track (user swiped)")
-            gpsTrackRecorder?.stop()
-            gpsTrackRecorder = null
-            if (session == null) {
-                stopHighAccuracyLocation()
-                releaseWakeLock()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-            }
-        }
+        Log.w(TAG, "onTaskRemoved — app swiped away. Stopping all services.")
+
+        gpsTrackRecorder?.stop()
+        gpsTrackRecorder = null
+
+        teardownSession()
+
+        stopHighAccuracyLocation()
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+
         super.onTaskRemoved(rootIntent)
     }
 
@@ -391,6 +406,35 @@ class RadiacodeForegroundService : Service() {
         Log.w(TAG, "onTrimMemory level=$level")
         super.onTrimMemory(level)
     }
+
+    private fun onMeasurementReceived(m: Measurement) {
+        RadiacodeNotificationPlugin.emitMeasurement(m)
+        trackRecorder?.onMeasurement(
+            m,
+            lastLocation?.let { LatLng(it.latitude, it.longitude) },
+        )
+        updateNotificationWithMeasurement(m)
+    }
+
+    private fun updateNotificationWithMeasurement(m: Measurement) {
+        val dose = m.dosisleistungUSvH
+        val cps = m.cps
+        val doseErr = m.dosisleistungErrPct ?: -1.0
+        val cpsErr = m.cpsErrPct ?: -1.0
+
+        lastBody = formatBody(dose, cps, doseErr, cpsErr, deviceReady)
+        ensureForeground()
+    }
+
+    private fun formatBody(dose: Double, cps: Double, doseErr: Double, cpsErr: Double, connected: Boolean): String {
+        var body = String.format(java.util.Locale.GERMAN, "%.2f µSv/h %.1f imp/s", dose, cps)
+        if (doseErr >= 0) {
+            body += String.format(java.util.Locale.GERMAN, " ± %.0f%%", doseErr)
+        }
+        if (!connected) return body + " (letzter Wert)"
+        return body
+    }
+
 
     private fun startBleSession(address: String) {
         val activeSession = session
@@ -411,11 +455,13 @@ class RadiacodeForegroundService : Service() {
         }
         Log.i(TAG, "startBleSession address=$address")
         RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
+        updateNotificationForState()
         val listener = object : SessionListener {
             override fun onConnected() {
                 deviceReady = false
                 Log.i(TAG, "listener.onConnected — running handshake")
                 runHandshake()
+                updateNotificationForState()
             }
 
             override fun onDisconnected() {
@@ -423,11 +469,13 @@ class RadiacodeForegroundService : Service() {
                 deviceReady = false
                 stopPollLoop()
                 RadiacodeNotificationPlugin.emitConnectionState("disconnected")
+                updateNotificationForState()
             }
 
             override fun onReconnecting() {
                 Log.i(TAG, "listener.onReconnecting")
                 RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
+                updateNotificationForState()
             }
 
             override fun onNotification(bytes: ByteArray) {
@@ -440,11 +488,7 @@ class RadiacodeForegroundService : Service() {
                 if (parsed.cmd == Protocol.Command.RD_VIRT_STRING && parsed.seq == pollSeq) {
                     val m = MeasurementDecoder.parse(parsed.data)
                     if (m != null) {
-                        RadiacodeNotificationPlugin.emitMeasurement(m)
-                        trackRecorder?.onMeasurement(
-                            m,
-                            lastLocation?.let { LatLng(it.latitude, it.longitude) },
-                        )
+                        onMeasurementReceived(m)
                     }
                 }
             }
@@ -615,9 +659,12 @@ class RadiacodeForegroundService : Service() {
 
     private fun updateNotificationForState() {
         val title = when {
-            session != null && gpsTrackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
+            session == null -> "Radiacode getrennt"
+            !deviceReady -> "Radiacode – Verbindung verloren"
+            gpsTrackRecorder != null && trackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
+            trackRecorder != null -> "Strahlenmessung läuft"
             gpsTrackRecorder != null -> "GPS-Aufzeichnung läuft"
-            else -> lastTitle
+            else -> "Radiacode verbunden"
         }
         lastTitle = title
         ensureForeground()

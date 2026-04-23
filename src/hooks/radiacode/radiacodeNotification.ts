@@ -13,6 +13,8 @@ export interface RadiacodeNativeState {
 export interface RadiacodeNotificationUpdate {
   dosisleistung: number;
   cps: number;
+  dosisleistungErrPct?: number;
+  cpsErrPct?: number;
   state: NotificationState;
 }
 

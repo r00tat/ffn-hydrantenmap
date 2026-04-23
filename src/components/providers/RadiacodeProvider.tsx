@@ -53,11 +53,14 @@ function titleForNotification(state: NotificationState): string {
 }
 
 function formatBodyForNotification(
-  m: { dosisleistung: number; cps: number } | null,
+  m: RadiacodeMeasurement | null,
   state: NotificationState,
 ): string {
   if (!m) return state === 'reconnecting' ? 'Letzter Wert unbekannt' : '…';
-  const body = `${m.dosisleistung.toFixed(2)} µSv/h · ${Math.round(m.cps)} CPS`;
+  let body = `${m.dosisleistung.toFixed(2)} µSv/h ${m.cps.toFixed(1)} imp/s`;
+  if (m.dosisleistungErrPct !== undefined) {
+    body += ` ± ${Math.round(m.dosisleistungErrPct)}%`;
+  }
   return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
 }
 
@@ -392,15 +395,23 @@ export function RadiacodeProvider({
   // Clean up any active session subscription on unmount.
   useEffect(() => {
     // Try to sync with native state on mount if native is available
-    if (adapter.onConnectionStateChange && typeof RadiacodeNotification.getState === 'function') {
-      RadiacodeNotification.getState().then((state: RadiacodeNativeState) => {
-        if (state.connected && state.deviceAddress) {
-          // If native is already connected, we don't necessarily need to trigger
-          // a connectRaw here if the useEffect for auto-connect already handles it,
-          // but we can ensure the UI knows about the device.
-          console.log('[RadiacodeProvider] Native already connected to:', state.deviceAddress);
-        }
-      }).catch(() => {});
+    if (
+      adapter.onConnectionStateChange &&
+      typeof RadiacodeNotification.getState === 'function'
+    ) {
+      RadiacodeNotification.getState()
+        .then((state: RadiacodeNativeState) => {
+          if (state.connected && state.deviceAddress) {
+            // If native is already connected, we don't necessarily need to trigger
+            // a connectRaw here if the useEffect for auto-connect already handles it,
+            // but we can ensure the UI knows about the device.
+            console.log(
+              '[RadiacodeProvider] Native already connected to:',
+              state.deviceAddress,
+            );
+          }
+        })
+        .catch(() => {});
     }
 
     return () => {
@@ -458,7 +469,10 @@ export function RadiacodeProvider({
       // Check if we are currently connecting to avoid duplicate attempts
       if (status === 'connecting' || rawStatus === 'connecting') return;
 
-      console.log('[RadiacodeProvider] Auto-connecting to saved device:', saved.id);
+      console.log(
+        '[RadiacodeProvider] Auto-connecting to saved device:',
+        saved.id,
+      );
       await connectRaw(saved).catch(() => null);
     })();
     return () => {
@@ -466,82 +480,6 @@ export function RadiacodeProvider({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
-
-  // Persistent notification driven by the foreground service. One source of
-  // truth for the lifecycle: derived purely from status / reconnect.
-  const notificationState: NotificationState | null = useMemo(() => {
-    if (status === 'connected') return 'connected';
-    if (status === 'connecting' && reconnecting) return 'reconnecting';
-    return null;
-  }, [status, reconnecting]);
-
-  const notificationStateRef = useRef<NotificationState | null>(null);
-  useEffect(() => {
-    notificationStateRef.current = notificationState;
-  }, [notificationState]);
-
-  // Foreground-Service wird imperativ gesteuert — NICHT über useEffect-Cleanup,
-  // weil React den Effekt bei jedem Status-Flip (z.B. connected→connecting
-  // während Reconnect oder manuellem Connect) erneut evaluiert. Ein Cleanup
-  // würde dann fälschlich `stopForegroundService` rufen und damit den Service
-  // inkl. BLE-Session killen (Bug-Analyse 2026-04-22).
-  const notificationStartedRef = useRef(false);
-  useEffect(() => {
-    if (!notificationState) return;
-    if (notificationStartedRef.current) return;
-    const start = adapter.startForegroundService;
-    if (!start) return;
-    notificationStartedRef.current = true;
-    console.log('[RadiacodeProvider] startForegroundService', notificationState);
-    start({
-      title: titleForNotification(notificationState),
-      body: formatBodyForNotification(measurement, notificationState),
-    }).catch((err) => {
-      console.warn('[RadiacodeProvider] startForegroundService failed', err);
-    });
-    // measurement bewusst nicht als Dependency — updateForegroundService läuft
-    // separat.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationState, adapter]);
-
-  // Stop nur bei echten Offline-Zuständen. `connecting` / `reconnecting` sind
-  // Zwischenzustände und dürfen den Service nicht beenden.
-  useEffect(() => {
-    const offline =
-      rawStatus === 'idle' ||
-      rawStatus === 'unavailable' ||
-      rawStatus === 'error';
-    if (!offline) return;
-    if (!notificationStartedRef.current) return;
-    const stop = adapter.stopForegroundService;
-    if (!stop) return;
-    notificationStartedRef.current = false;
-    console.log('[RadiacodeProvider] stopForegroundService (rawStatus=', rawStatus, ')');
-    stop().catch((err) => {
-      console.warn('[RadiacodeProvider] stopForegroundService failed', err);
-    });
-  }, [rawStatus, adapter]);
-
-  useEffect(() => {
-    return () => {
-      if (!notificationStartedRef.current) return;
-      const stop = adapter.stopForegroundService;
-      notificationStartedRef.current = false;
-      stop?.().catch(() => {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!notificationState || !measurement) return;
-    const update = adapter.updateForegroundService;
-    if (!update) return;
-    update({
-      dosisleistung: measurement.dosisleistung,
-      cps: measurement.cps,
-      state: notificationState,
-    }).catch(() => {});
-  }, [measurement, notificationState, adapter]);
 
   useEffect(() => {
     const register = adapter.onDisconnectRequested;

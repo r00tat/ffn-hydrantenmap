@@ -80,12 +80,17 @@ public class RadiacodeNotificationPlugin extends Plugin {
     public void update(PluginCall call) {
         Double doseD = call.getDouble("dosisleistung");
         Double cpsD = call.getDouble("cps");
+        Double doseErrD = call.getDouble("dosisleistungErrPct");
+        Double cpsErrD = call.getDouble("cpsErrPct");
         double dose = doseD != null ? doseD : 0.0;
         double cps = cpsD != null ? cpsD : 0.0;
+        double doseErr = doseErrD != null ? doseErrD : -1.0;
+        double cpsErr = cpsErrD != null ? cpsErrD : -1.0;
+
         String state = call.getString("state", "connected");
         String title = titleForState(state);
-        String body = formatBody(dose, cps, state);
-        Log.d(TAG, "plugin.update state=" + state + " dose=" + dose + " cps=" + cps);
+        String body = formatBody(dose, cps, doseErr, cpsErr, state);
+        Log.d(TAG, "plugin.update state=" + state + " dose=" + dose + " cps=" + cps + " err=" + doseErr);
         startService(RadiacodeForegroundService.Companion.updateIntent(getContext(), title, body));
         call.resolve();
     }
@@ -332,8 +337,11 @@ public class RadiacodeNotificationPlugin extends Plugin {
         return "Radiacode verbunden";
     }
 
-    private static String formatBody(double dose, double cps, String state) {
-        String body = String.format(Locale.GERMAN, "%.2f µSv/h · %d CPS", dose, Math.round(cps));
+    private static String formatBody(double dose, double cps, double doseErr, double cpsErr, String state) {
+        String body = String.format(Locale.GERMAN, "%.2f µSv/h %.1f imp/s", dose, cps);
+        if (doseErr >= 0) {
+            body += String.format(Locale.GERMAN, " ± %.0f%%", doseErr);
+        }
         if ("reconnecting".equals(state)) return body + " (letzter Wert)";
         return body;
     }
