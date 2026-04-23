@@ -23,10 +23,17 @@ import HeaderBar from '../site/HeaderBar';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import MapEditorProvider from './MapEditorProvider';
-import { RadiacodeProvider } from './RadiacodeProvider';
 import SnackbarProvider from './SnackbarProvider';
-import { TrackingProvider } from './TrackingProvider';
 
+const PositionProvider = dynamic(() => import('./PositionProvider'), {
+  ssr: false,
+});
+const RadiacodeProvider = dynamic(() => import('./RadiacodeProvider'), {
+  ssr: false,
+});
+const GpsProvider = dynamic(() => import('./GpsProvider'), {
+  ssr: false,
+});
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
 });
@@ -39,26 +46,31 @@ function LogedinApp({ children }: AppProps) {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   return (
     <FirecallProvider>
-      <RadiacodeProvider>
-        <TrackingProvider>
-          <DebugLoggingProvider>
-            <MapEditorProvider>
-              <FirecallLayerProvider>
-                <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+      <PositionProvider>
+        <RadiacodeProvider>
+          <GpsProvider>
+            <DebugLoggingProvider>
+              <MapEditorProvider>
+                <FirecallLayerProvider>
+                  <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-                <HeaderBar
-                  isDrawerOpen={isDrawerOpen}
-                  setIsDrawerOpen={setIsDrawerOpen}
-                />
-                <ChatMessageDisplay />
-                <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-                  {children}
-                </Box>
-              </FirecallLayerProvider>
-            </MapEditorProvider>
-          </DebugLoggingProvider>
-        </TrackingProvider>
-      </RadiacodeProvider>
+                  <HeaderBar
+                    isDrawerOpen={isDrawerOpen}
+                    setIsDrawerOpen={setIsDrawerOpen}
+                  />
+                  <ChatMessageDisplay />
+                  <Box
+                    className="print-content-root"
+                    sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+                  >
+                    {children}
+                  </Box>
+                </FirecallLayerProvider>
+              </MapEditorProvider>
+            </DebugLoggingProvider>
+          </GpsProvider>
+        </RadiacodeProvider>
+      </PositionProvider>
     </FirecallProvider>
   );
 }

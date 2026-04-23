@@ -7,3 +7,4 @@ android/app/release/
 android/app/debug/
 *.keystore
 !debug.keystore
+.kotlin/sessions

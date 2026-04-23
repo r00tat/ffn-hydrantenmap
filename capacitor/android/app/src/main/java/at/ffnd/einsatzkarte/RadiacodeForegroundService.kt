@@ -167,15 +167,6 @@ class RadiacodeForegroundService : Service() {
         // Variante mit Service-Typ aufgerufen werden, sonst crasht der Service
         // mit MissingForegroundServiceTypeException — und reisst unsere
         // BLE-Session mit sich. Siehe Bug-Report vom 2026-04-22.
-        if (action == ACTION_START) {
-            intent?.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
-            intent?.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
-        } else if (action == ACTION_UPDATE) {
-             // ACTION_UPDATE from plugin (WebView) can still override values
-             intent?.getStringExtra(EXTRA_TITLE)?.let { lastTitle = it }
-             intent?.getStringExtra(EXTRA_BODY)?.let { lastBody = it }
-        }
-
         if (action != null && action != ACTION_STOP && action != ACTION_DISCONNECT_REQUESTED) {
             ensureForeground()
         }

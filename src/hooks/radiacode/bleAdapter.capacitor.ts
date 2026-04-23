@@ -202,21 +202,6 @@ export const capacitorAdapter: BleAdapter = {
     };
   },
 
-  async startForegroundService(opts) {
-    console.log('[Radiacode/bleAdapter] startForegroundService', opts);
-    await RadiacodeNotification.start(opts);
-  },
-
-  async updateForegroundService(opts) {
-    // console.debug('[Radiacode/bleAdapter] updateForegroundService', opts);
-    await RadiacodeNotification.update(opts);
-  },
-
-  async stopForegroundService() {
-    console.log('[Radiacode/bleAdapter] stopForegroundService');
-    await RadiacodeNotification.stop();
-  },
-
   onDisconnectRequested(handler) {
     let listenerHandle: { remove: () => Promise<void> } | null = null;
     RadiacodeNotification.addListener('disconnectRequested', handler)

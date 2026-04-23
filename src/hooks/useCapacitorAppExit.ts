@@ -33,9 +33,9 @@ export function useCapacitorAppExit() {
           pathname,
         );
 
-        // We exit if we are at root OR if native layer says we can't go back.
-        const isRoot = pathname === '/' || pathname === '/map';
-        const shouldExit = isRoot || !event.canGoBack;
+        // The user explicitly requested to exit the app instead of navigating back in history,
+        // as history navigation (e.g. via swipe) was found to be unhelpful.
+        const shouldExit = true;
 
         if (shouldExit) {
           console.log('[useCapacitorAppExit] Exiting app and stopping services');

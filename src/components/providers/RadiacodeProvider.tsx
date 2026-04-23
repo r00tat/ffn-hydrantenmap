@@ -41,29 +41,6 @@ import {
 import { Spectrum } from '../firebase/firestore';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 
-function titleForNotification(state: NotificationState): string {
-  switch (state) {
-    case 'connected':
-      return 'Radiacode verbunden';
-    case 'recording':
-      return 'Strahlenmessung läuft';
-    case 'reconnecting':
-      return 'Radiacode – Verbindung verloren';
-  }
-}
-
-function formatBodyForNotification(
-  m: RadiacodeMeasurement | null,
-  state: NotificationState,
-): string {
-  if (!m) return state === 'reconnecting' ? 'Letzter Wert unbekannt' : '…';
-  let body = `${m.dosisleistung.toFixed(2)} µSv/h ${m.cps.toFixed(1)} imp/s`;
-  if (m.dosisleistungErrPct !== undefined) {
-    body += ` ± ${Math.round(m.dosisleistungErrPct)}%`;
-  }
-  return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
-}
-
 export interface SaveLiveSpectrumMeta {
   name: string;
   description?: string;
@@ -105,6 +82,8 @@ export interface RadiacodeContextValue {
   playSignal: () => Promise<void>;
   doseReset: () => Promise<void>;
 }
+
+export default RadiacodeProvider;
 
 export const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
 
@@ -169,8 +148,10 @@ export function RadiacodeProvider({
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
-  const measurement = overrideMeasurement ?? hookMeasurement;
-  const lastSampleTimestamp = measurement?.timestamp ?? null;
+
+  const latest = overrideMeasurement ?? hookMeasurement;
+  const measurement = latest;
+  const lastSampleTimestamp = latest?.timestamp ?? null;
   const [deviceInfo, setDeviceInfo] = useState<RadiacodeDeviceInfo | null>(null);
 
   // Fetch device info once we're connected and the client is ready. Clears on
@@ -204,17 +185,17 @@ export function RadiacodeProvider({
   // render if the measurement changed — React will discard this render and
   // re-run with the updated state, avoiding the cascading-effect anti-pattern.
   const [lastAppendedTs, setLastAppendedTs] = useState<number | null>(null);
-  if (measurement && measurement.timestamp !== lastAppendedTs) {
-    setLastAppendedTs(measurement.timestamp);
+  if (latest && latest.timestamp !== lastAppendedTs) {
+    setLastAppendedTs(latest.timestamp);
     setHistory((prev) =>
       pushAndPrune(
         prev,
         {
-          t: measurement.timestamp,
-          dosisleistung: measurement.dosisleistung,
-          cps: measurement.cps,
+          t: latest.timestamp,
+          dosisleistung: latest.dosisleistung,
+          cps: latest.cps,
         },
-        measurement.timestamp,
+        latest.timestamp,
       ),
     );
   }

@@ -156,12 +156,19 @@ export function useRadiacodeDevice(
           (m) => {
             // Rare-Record-Felder (dose, durationSec, temperatureC, chargePct)
             // liefert das Gerät nur alle paar Sekunden. extractLatestMeasurement
-            // lässt diese Keys komplett weg, wenn kein Rare-Record im aktuellen
-            // Polling-Fenster lag — der Spread erhält dann die Werte aus dem
-            // letzten Rare-Record.
+            // und die native Bridge lassen diese Keys komplett weg, wenn kein 
+            // Rare-Record vorlag.
+            // Wir mergen hier: Nur Felder die in 'm' vorhanden sind und einen
+            // Wert haben (nicht null/undefined) überschreiben den alten State.
             setMeasurement((prev) => {
               if (!prev) return m;
-              return { ...prev, ...m };
+              const next = { ...prev };
+              for (const [key, val] of Object.entries(m)) {
+                if (val != null) {
+                  (next as any)[key] = val;
+                }
+              }
+              return next;
             });
           },
           pollIntervalMs,

@@ -19,13 +19,6 @@ export interface BleAdapter {
   onConnectionStateChange?(
     handler: (state: 'connected' | 'disconnected' | 'reconnecting') => void,
   ): Unsubscribe;
-  startForegroundService?(opts: { title: string; body: string }): Promise<void>;
-  updateForegroundService?(opts: {
-    dosisleistung: number;
-    cps: number;
-    state: NotificationState;
-  }): Promise<void>;
-  stopForegroundService?(): Promise<void>;
   onDisconnectRequested?(handler: () => void): Unsubscribe;
 }
 

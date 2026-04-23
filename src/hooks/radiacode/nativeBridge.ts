@@ -87,14 +87,14 @@ function toMeasurement(e: NativeMeasurementEvent): RadiacodeMeasurement {
     dosisleistung: e.dosisleistungUSvH,
     cps: e.cps,
     timestamp: e.timestampMs,
-    ...(e.dosisleistungErrPct !== undefined && {
+    ...(e.dosisleistungErrPct != null && {
       dosisleistungErrPct: e.dosisleistungErrPct,
     }),
-    ...(e.cpsErrPct !== undefined && { cpsErrPct: e.cpsErrPct }),
-    ...(e.doseUSv !== undefined && { dose: e.doseUSv }),
-    ...(e.durationSec !== undefined && { durationSec: e.durationSec }),
-    ...(e.temperatureC !== undefined && { temperatureC: e.temperatureC }),
-    ...(e.chargePct !== undefined && { chargePct: e.chargePct }),
+    ...(e.cpsErrPct != null && { cpsErrPct: e.cpsErrPct }),
+    ...(e.doseUSv != null && { dose: e.doseUSv }),
+    ...(e.durationSec != null && { durationSec: e.durationSec }),
+    ...(e.temperatureC != null && { temperatureC: e.temperatureC }),
+    ...(e.chargePct != null && { chargePct: e.chargePct }),
   };
 }
 

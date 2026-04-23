@@ -412,7 +412,6 @@ describe('RadiacodeProvider', () => {
       const disconnectHandlers: Array<() => void> = [];
       const base = nullAdapter();
       const startForegroundService = vi.fn(async () => {});
-      const updateForegroundService = vi.fn(async () => {});
       const stopForegroundService = vi.fn(async () => {});
       const onDisconnectRequested = vi.fn((h: () => void) => {
         disconnectHandlers.push(h);
@@ -425,13 +424,11 @@ describe('RadiacodeProvider', () => {
         adapter: {
           ...base,
           startForegroundService,
-          updateForegroundService,
           stopForegroundService,
           onDisconnectRequested,
         } as BleAdapter,
         spies: {
           startForegroundService,
-          updateForegroundService,
           stopForegroundService,
           onDisconnectRequested,
         },
@@ -459,35 +456,6 @@ describe('RadiacodeProvider', () => {
       expect(spies.startForegroundService).toHaveBeenCalledWith(
         expect.objectContaining({ title: expect.stringContaining('verbunden') }),
       );
-    });
-
-    it('schickt updateForegroundService bei jeder neuen messung', async () => {
-      const { adapter, spies } = serviceAdapter();
-      const { factory } = makeFakeSpectrumClientFactory();
-      const feeds: ((m: RadiacodeMeasurement) => void)[] = [];
-      const values: ReturnType<typeof useRadiacode>[] = [];
-      render(
-        <RadiacodeProvider
-          adapter={adapter}
-          clientFactory={factory}
-          feedMeasurement={(fn) => feeds.push(fn)}
-        >
-          <Probe onValue={(v) => values.push(v)} />
-        </RadiacodeProvider>,
-      );
-      await act(async () => {
-        await values.at(-1)!.connect();
-      });
-      act(() => {
-        feeds[0]({ cps: 11, dosisleistung: 0.42, timestamp: 1000 });
-      });
-      await waitFor(() => {
-        expect(spies.updateForegroundService).toHaveBeenCalledWith({
-          dosisleistung: 0.42,
-          cps: 11,
-          state: 'connected',
-        });
-      });
     });
 
     it('stoppt den service beim disconnect', async () => {

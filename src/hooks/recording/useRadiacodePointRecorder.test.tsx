@@ -1,12 +1,73 @@
 // @vitest-environment jsdom
+import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('server-only', () => ({}));
+vi.mock('next-auth', () => ({
+  default: vi.fn(() => ({
+    handlers: {},
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    auth: vi.fn(),
+  })),
+}));
+vi.mock('next-auth/react', () => ({
+  useSession: vi.fn(() => ({ data: null, status: 'unauthenticated' })),
+  SessionProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(),
+  ref: vi.fn(),
+  uploadBytesResumable: vi.fn(),
+  getDownloadURL: vi.fn(),
+}));
+vi.mock('firebase/app', () => ({
+  getApp: vi.fn(),
+  getApps: vi.fn(() => []),
+  initializeApp: vi.fn(),
+}));
+vi.mock('firebase/firestore', () => ({
+  getFirestore: vi.fn(),
+  collection: vi.fn(),
+  doc: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  onSnapshot: vi.fn(() => vi.fn()),
+}));
+vi.mock('firebase/auth', () => ({
+  getAuth: vi.fn(),
+}));
+
+// Mock Firebase related hooks
+vi.mock('../../hooks/useFirecallItemAdd', () => ({
+  default: vi.fn(() => vi.fn(async () => ({ id: 'new-doc' }))),
+}));
+vi.mock('../../hooks/useFirecall', () => ({
+  useFirecallId: vi.fn(() => 'fc-1'),
+}));
+vi.mock('../../hooks/useFirebaseLogin', () => ({
+  default: vi.fn(() => ({ email: 'test@example.com', isAuthorized: true })),
+}));
+vi.mock('../../hooks/useAuditLog', () => ({
+  useAuditLog: vi.fn(() => vi.fn()),
+}));
+vi.mock('../../components/firebase/firebase', () => ({
+  default: {},
+  app: {},
+  firebaseApp: {},
+  firestore: {},
+  db: {},
+  auth: {},
+}));
+
 import type { FirecallItem } from '../../components/firebase/firestore';
-import * as nativeTrackBridge from '../radiacode/nativeTrackBridge';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from '../radiacode/types';
 import { useRadiacodePointRecorder } from './useRadiacodePointRecorder';
-import { TrackingProvider } from '../../components/providers/TrackingProvider';
-import React from 'react';
+import { GpsProvider } from '../../components/providers/GpsProvider';
+import { PositionProvider } from '../../components/providers/PositionProvider';
+import { RadiacodeProvider } from '../../components/providers/RadiacodeProvider';
 
 const DEVICE: RadiacodeDeviceRef = {
   id: 'd1',
@@ -14,8 +75,25 @@ const DEVICE: RadiacodeDeviceRef = {
   serial: 'SN1',
 };
 
+// Mock RadiacodeNotification
+vi.mock('../../hooks/radiacode/radiacodeNotification', () => ({
+  RadiacodeNotification: {
+    getState: vi.fn().mockResolvedValue({
+      connected: false,
+      deviceAddress: null,
+      radiacodeTracking: false,
+      gpsTracking: false,
+    }),
+    addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
+  },
+}));
+
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <TrackingProvider>{children}</TrackingProvider>
+  <PositionProvider>
+    <RadiacodeProvider>
+      <GpsProvider>{children}</GpsProvider>
+    </RadiacodeProvider>
+  </PositionProvider>
 );
 
 function meas(
@@ -381,9 +459,6 @@ describe('useRadiacodePointRecorder', () => {
     const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
       async () => ({ id: 'm1' }),
     );
-    const isAvail = vi
-      .spyOn(nativeTrackBridge, 'isNativeTrackingAvailable')
-      .mockReturnValue(false);
 
     const { rerender } = renderHook(
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
@@ -427,77 +502,5 @@ describe('useRadiacodePointRecorder', () => {
       vi.advanceTimersByTime(100);
     });
     expect(addItem).toHaveBeenCalledTimes(1);
-
-    isAvail.mockRestore();
-  });
-
-  describe('native tracking', () => {
-    it('delegates to nativeStartTrack/nativeStopTrack when native and skips addItem', async () => {
-      const addItem = vi.fn<(item: FirecallItem) => Promise<{ id: string }>>(
-        async () => ({ id: 'new' }),
-      );
-      const isAvail = vi
-        .spyOn(nativeTrackBridge, 'isNativeTrackingAvailable')
-        .mockReturnValue(true);
-      const start = vi
-        .spyOn(nativeTrackBridge, 'nativeStartTrack')
-        .mockResolvedValue(undefined);
-      const stop = vi
-        .spyOn(nativeTrackBridge, 'nativeStopTrack')
-        .mockResolvedValue(undefined);
-
-      const { rerender, unmount } = renderHook(
-        (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
-          useRadiacodePointRecorder(props),
-        {
-          wrapper,
-          initialProps: {
-            active: false,
-            layerId: 'l1',
-            sampleRate: 'normal',
-            device: DEVICE,
-            measurement: null,
-            position: null,
-            addItem,
-            firecallId: 'fc1',
-            creatorEmail: 'u@x',
-            firestoreDb: '',
-          },
-        },
-      );
-      rerender({
-        active: true,
-        layerId: 'l1',
-        sampleRate: 'normal',
-        device: DEVICE,
-        measurement: meas(0.1, 5),
-        position: { lat: 48, lng: 16 },
-        addItem,
-        firecallId: 'fc1',
-        creatorEmail: 'u@x',
-        firestoreDb: '',
-      });
-      await vi.waitFor(() => {
-        expect(start).toHaveBeenCalledTimes(1);
-      });
-      expect(start).toHaveBeenCalledWith({
-        firecallId: 'fc1',
-        layerId: 'l1',
-        sampleRate: 'normal',
-        deviceLabel: 'RC-102 (SN1)',
-        creator: 'u@x',
-        firestoreDb: '',
-      });
-      expect(addItem).not.toHaveBeenCalled();
-
-      unmount();
-      await vi.waitFor(() => {
-        expect(stop).toHaveBeenCalledTimes(1);
-      });
-
-      isAvail.mockRestore();
-      start.mockRestore();
-      stop.mockRestore();
-    });
   });
 });

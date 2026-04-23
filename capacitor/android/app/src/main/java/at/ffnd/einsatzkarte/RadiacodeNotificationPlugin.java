@@ -60,47 +60,26 @@ public class RadiacodeNotificationPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void start(PluginCall call) {
-        String title = call.getString("title", "Radiacode verbunden");
-        String body = call.getString("body", "");
-        Log.i(TAG, "plugin.start title=" + title + " body=" + body);
+    public void connectNative(PluginCall call) {
+        String address = call.getString("deviceAddress");
+        Log.i(TAG, "plugin.connectNative address=" + address);
+        if (address == null || address.isEmpty()) {
+            Log.w(TAG, "plugin.connectNative rejected — missing deviceAddress");
+            call.reject("deviceAddress required");
+            return;
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (getPermissionState("notifications") != PermissionState.GRANTED) {
-                Log.i(TAG, "plugin.start requesting POST_NOTIFICATIONS permission");
+                Log.i(TAG, "plugin.connectNative requesting POST_NOTIFICATIONS permission");
                 requestPermissionForAlias("notifications", call, "permissionCallback");
-                // Service wird trotzdem gestartet — ohne Permission bleibt die Notification stumm.
             }
         }
-        Intent intent = RadiacodeForegroundService.Companion.startIntent(getContext(), title, body);
+
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_BLE_CONNECT);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_DEVICE_ADDRESS, address);
         startService(intent);
-        call.resolve();
-    }
-
-    @PluginMethod
-    public void update(PluginCall call) {
-        Double doseD = call.getDouble("dosisleistung");
-        Double cpsD = call.getDouble("cps");
-        Double doseErrD = call.getDouble("dosisleistungErrPct");
-        Double cpsErrD = call.getDouble("cpsErrPct");
-        double dose = doseD != null ? doseD : 0.0;
-        double cps = cpsD != null ? cpsD : 0.0;
-        double doseErr = doseErrD != null ? doseErrD : -1.0;
-        double cpsErr = cpsErrD != null ? cpsErrD : -1.0;
-
-        String state = call.getString("state", "connected");
-        String title = titleForState(state);
-        String body = formatBody(dose, cps, doseErr, cpsErr, state);
-        Log.d(TAG, "plugin.update state=" + state + " dose=" + dose + " cps=" + cps + " err=" + doseErr);
-        startService(RadiacodeForegroundService.Companion.updateIntent(getContext(), title, body));
-        call.resolve();
-    }
-
-    @PluginMethod
-    public void stop(PluginCall call) {
-        Log.i(TAG, "plugin.stop");
-        // stop() setzt NICHT auf startForegroundService(): ACTION_STOP ruft
-        // stopSelf() sofort auf, Android würde die 10-s-Regel verletzen.
-        getContext().startService(RadiacodeForegroundService.Companion.stopIntent(getContext()));
         call.resolve();
     }
 
@@ -120,22 +99,6 @@ public class RadiacodeNotificationPlugin extends Plugin {
             ret.put("gpsTracking", false);
         }
         call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void connectNative(PluginCall call) {
-        String address = call.getString("deviceAddress");
-        Log.i(TAG, "plugin.connectNative address=" + address);
-        if (address == null || address.isEmpty()) {
-            Log.w(TAG, "plugin.connectNative rejected — missing deviceAddress");
-            call.reject("deviceAddress required");
-            return;
-        }
-        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
-        intent.setAction(RadiacodeForegroundService.ACTION_BLE_CONNECT);
-        intent.putExtra(RadiacodeForegroundService.EXTRA_DEVICE_ADDRESS, address);
-        startService(intent);
-        call.resolve();
     }
 
     @PluginMethod
@@ -329,20 +292,5 @@ public class RadiacodeNotificationPlugin extends Plugin {
         data.put("dosisleistungUSvH", dosisleistungUSvH);
         data.put("cps", cps);
         i.notifyListeners("markerWritten", data);
-    }
-
-    private static String titleForState(String state) {
-        if ("recording".equals(state)) return "Strahlenmessung läuft";
-        if ("reconnecting".equals(state)) return "Radiacode – Verbindung verloren";
-        return "Radiacode verbunden";
-    }
-
-    private static String formatBody(double dose, double cps, double doseErr, double cpsErr, String state) {
-        String body = String.format(Locale.GERMAN, "%.2f µSv/h %.1f imp/s", dose, cps);
-        if (doseErr >= 0) {
-            body += String.format(Locale.GERMAN, " ± %.0f%%", doseErr);
-        }
-        if ("reconnecting".equals(state)) return body + " (letzter Wert)";
-        return body;
     }
 }

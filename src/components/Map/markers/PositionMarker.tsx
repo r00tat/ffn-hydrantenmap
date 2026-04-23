@@ -1,7 +1,7 @@
 'use client';
 
 import { Circle, Marker, Popup } from 'react-leaflet';
-import { usePositionContext } from '../Position';
+import { usePositionContext } from '../../providers/PositionProvider';
 
 export default function PositionMarker() {
   const [position, gotPosition, location] = usePositionContext();

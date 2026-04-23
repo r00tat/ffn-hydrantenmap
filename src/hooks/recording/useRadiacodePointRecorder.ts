@@ -1,14 +1,15 @@
+'use client';
+
 import haversine from 'haversine-distance';
 import { useEffect, useRef } from 'react';
 import { FcMarker, FirecallItem } from '../../components/firebase/firestore';
-import { isNativeTrackingAvailable } from '../radiacode/nativeTrackBridge';
 import { decideShouldRecordPoint } from '../radiacode/sampleGate';
 import {
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
   SampleRateSpec,
 } from '../radiacode/types';
-import { useTracking } from '../../components/providers/TrackingProvider';
+import { isNativeTrackingAvailable } from '../radiacode/nativeTrackBridge';
 
 export interface UseRadiacodePointRecorderParams {
   active: boolean;
@@ -45,39 +46,17 @@ export function useRadiacodePointRecorder({
   measurement,
   position,
   addItem,
-  firecallId,
-  creatorEmail,
-  firestoreDb = '',
   onStart,
   onStop,
 }: UseRadiacodePointRecorderParams): void {
   const native = isNativeTrackingAvailable();
-  const { startRadiacodeTracking, stopRadiacodeTracking } = useTracking();
   const lastSampleRef = useRef<LastSample | null>(null);
   const writingRef = useRef(false);
 
-  // Native-Pfad: Start/Stop via Foreground-Service. Der Measurement-getriebene
-  // Effekt unten bleibt ein No-Op (siehe Early-Return bei `native`).
+  // Management of onStart/onStop callbacks for web
   useEffect(() => {
-    if (!active) return;
-    if (native) {
-      startRadiacodeTracking({
-        firecallId,
-        layerId,
-        sampleRate,
-        deviceLabel: deviceLabel(device),
-        creator: creatorEmail,
-        firestoreDb,
-      }).catch((err) =>
-        console.error('[RADIACODE] startRadiacodeTracking failed', err),
-      );
-      return () => {
-        stopRadiacodeTracking().catch((err) =>
-          console.error('[RADIACODE] stopRadiacodeTracking failed', err),
-        );
-      };
-    }
-    // Web-only: bestehendes onStart/onStop-Muster
+    if (!active || native) return;
+    
     Promise.resolve(onStart?.()).catch((err) =>
       console.error('[RADIACODE] onStart failed', err),
     );
@@ -86,15 +65,15 @@ export function useRadiacodePointRecorder({
         console.error('[RADIACODE] onStop failed', err),
       );
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, native, startRadiacodeTracking, stopRadiacodeTracking, firecallId, layerId, sampleRate, device, creatorEmail, firestoreDb]);
+  }, [active, native, onStart, onStop]);
 
+  // Web-side recording logic
   useEffect(() => {
     if (!active) {
       lastSampleRef.current = null;
       return;
     }
-    if (native) return; // native schreibt im Foreground-Service
+    if (native) return; // native writes in Foreground-Service
     if (!measurement || !position) return;
     if (writingRef.current) return;
     // Guard non-finite dose so NaN/Infinity doesn't poison the delta gate.
