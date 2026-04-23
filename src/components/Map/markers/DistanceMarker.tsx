@@ -2,7 +2,7 @@ import L from 'leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { Marker, Popup, useMapEvent } from 'react-leaflet';
 import { defaultPosition } from '../../../hooks/constants';
-import { usePositionContext } from '../Position';
+import { usePositionContext } from '../../providers/PositionProvider';
 import { GeoPositionObject } from '../../../common/geo';
 
 export default function DistanceMarker() {

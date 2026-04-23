@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import L from 'leaflet';
-import { usePositionContext } from '../components/Map/Position';
+import { usePositionContext } from '../components/providers/PositionProvider';
 
 export const distanceColors: { [key: number]: string } = {
   50: 'red',

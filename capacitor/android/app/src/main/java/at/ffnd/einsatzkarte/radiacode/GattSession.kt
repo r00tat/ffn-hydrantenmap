@@ -39,7 +39,7 @@ interface SessionListener {
 @SuppressLint("MissingPermission")
 class GattSession(
     private val ctx: Context,
-    private val deviceAddress: String,
+    val deviceAddress: String,
     private val listener: SessionListener,
 ) {
     private companion object {

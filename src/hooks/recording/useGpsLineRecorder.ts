@@ -1,9 +1,10 @@
+'use client';
+
 import L, { LatLng } from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useMap } from 'react-leaflet';
 import { LatLngPosition } from '../../common/geo';
 import { formatTimestamp } from '../../common/time-format';
-import { usePositionContext } from '../../components/Map/Position';
+import { usePositionContext } from '../../components/providers/PositionProvider';
 import { calculateDistance } from '../../components/FirecallItems/elements/connection/distance';
 import { Line } from '../../components/firebase/firestore';
 import { toLatLng } from '../leafletFunctions';
@@ -19,14 +20,24 @@ import {
 import useFirebaseLogin from '../useFirebaseLogin';
 import { useFirecallId } from '../useFirecall';
 
+export interface UseGpsLineRecorderParams {
+  active: boolean;
+  layerId: string | null;
+  sampleRate: SampleRateSpec;
+  onStart?: () => void;
+  onStop?: () => void;
+}
+
 export interface UseGpsLineRecorderResult {
   isRecording: boolean;
   startRecording: (pos: LatLng, sampleRate?: SampleRateSpec) => Promise<void>;
   stopRecording: (pos: LatLng) => Promise<void>;
 }
 
-export function useGpsLineRecorder(): UseGpsLineRecorderResult {
-  const [isRecording, setIsRecording] = useState(false);
+export function useGpsLineRecorder({
+  active,
+  sampleRate,
+}: UseGpsLineRecorderParams): UseGpsLineRecorderResult {
   const [recordItem, setRecordItem] = useState<Line>();
   const [positions, setPositions] = useState<LatLngPosition[]>([]);
   const [timestamp, setTimestamp] = useState(new Date());
@@ -34,7 +45,6 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
   const backendRef = useRef<'native' | 'web' | null>(null);
 
   const [position, isPositionSet] = usePositionContext();
-  const map = useMap();
   const updateFirecallItem = useFirecallItemUpdate();
   const addFirecallItem = useFirecallItemAdd();
   const { info, warn } = useDebugLogging();
@@ -43,11 +53,13 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
   const { email: creatorEmail } = useFirebaseLogin();
   const firestoreDb = process.env.NEXT_PUBLIC_FIRESTORE_DB || '';
 
+  const isRecording = active;
+
   const addPos = useCallback(
     async (newPos: LatLngPosition, record: Line) => {
-      if (recordItem?.id) {
+      if (record.id) {
         info(`[TRACK] adding new position to track`, {
-          track: recordItem.id,
+          track: record.id,
           pos: newPos,
         });
         const allPos: LatLngPosition[] = [
@@ -68,13 +80,12 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
         warn(`[TRACK] tracking not possible, record id undefined`);
       }
     },
-    [recordItem, updateFirecallItem, info, warn],
+    [updateFirecallItem, info, warn],
   );
 
   const startRecording = useCallback(
-    async (pos: LatLng, sampleRate?: SampleRateSpec) => {
+    async (pos: LatLng, rate?: SampleRateSpec) => {
       if (isPositionSet) {
-        map.setView(position);
         const newRecord: Line = {
           type: 'line',
           name: `Track ${formatTimestamp(new Date())}`,
@@ -101,19 +112,18 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
               lineId: ref.id,
               firestoreDb,
               creator: creatorEmail ?? '',
-              sampleRate: sampleRate ?? 'normal',
+              sampleRate: rate ?? sampleRate,
               initialLat: pos.lat,
               initialLng: pos.lng,
             });
           } catch (err) {
-            warn('[TRACK] nativeStartGpsTrack failed, falling back to web', {
+            warn('[TRACK] startGpsTracking failed, falling back to web', {
               err,
             });
             backendRef.current = 'web';
           }
         }
 
-        setIsRecording(true);
         info(`[TRACK] starting track`, {
           trackTitle: newRecord.name,
           track: newRecord.id,
@@ -125,13 +135,12 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
     [
       addFirecallItem,
       isPositionSet,
-      map,
-      position,
       info,
       warn,
       firecallId,
       firestoreDb,
       creatorEmail,
+      sampleRate,
     ],
   );
 
@@ -142,7 +151,7 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
         try {
           await nativeStopGpsTrack();
         } catch (err) {
-          warn('[TRACK] nativeStopGpsTrack failed', { err });
+          warn('[TRACK] stopGpsTracking failed', { err });
         }
       } else if (recordItem) {
         await addPos([pos.lat, pos.lng], recordItem);
@@ -150,7 +159,6 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
       backendRef.current = null;
       setPositions([]);
       setRecordItem(undefined);
-      setIsRecording(false);
     },
     [addPos, recordItem, warn],
   );
@@ -163,7 +171,7 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
     return () => {
       clearInterval(interval);
     };
-  });
+  }, []);
 
   useEffect(() => {
     if (backendRef.current !== 'web') return;
@@ -179,7 +187,6 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
           track: recordItem.id,
           pos: position.toString(),
         });
-        map.setView(position);
         (async () => {
           setTimestamp(new Date());
           addPos([position.lat, position.lng], recordItem);
@@ -200,7 +207,6 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
     currentTime,
     isPositionSet,
     isRecording,
-    map,
     position,
     positions,
     recordItem,

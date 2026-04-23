@@ -58,6 +58,37 @@ export const capacitorAdapter: BleAdapter = {
     } satisfies RadiacodeDeviceRef;
   },
 
+  async getConnectedDevices() {
+    if (isNativeAvailable()) {
+      if (typeof RadiacodeNotification.getState !== 'function') {
+        console.warn('[Radiacode/bleAdapter.capacitor] getState not implemented on native side');
+        return [];
+      }
+      const state = await RadiacodeNotification.getState();
+      if (state.connected && state.deviceAddress) {
+        const name = deviceNames.get(state.deviceAddress) ?? 'Radiacode';
+        return [{
+          id: state.deviceAddress,
+          name,
+          serial: name,
+        }];
+      }
+      return [];
+    }
+    const client = await ensureBleClient();
+    const result: RadiacodeDeviceRef[] = [];
+    const connected = await client.getConnectedDevices([RADIACODE_SERVICE_UUID]);
+    for (const d of connected) {
+      const name = d.name ?? deviceNames.get(d.deviceId) ?? 'Radiacode';
+      result.push({
+        id: d.deviceId,
+        name,
+        serial: name,
+      });
+    }
+    return result;
+  },
+
   async connect(deviceId) {
     console.log(
       '[Radiacode/bleAdapter] connect',
@@ -169,21 +200,6 @@ export const capacitorAdapter: BleAdapter = {
         disconnectHandlers.delete(deviceId);
       }
     };
-  },
-
-  async startForegroundService(opts) {
-    console.log('[Radiacode/bleAdapter] startForegroundService', opts);
-    await RadiacodeNotification.start(opts);
-  },
-
-  async updateForegroundService(opts) {
-    // console.debug('[Radiacode/bleAdapter] updateForegroundService', opts);
-    await RadiacodeNotification.update(opts);
-  },
-
-  async stopForegroundService() {
-    console.log('[Radiacode/bleAdapter] stopForegroundService');
-    await RadiacodeNotification.stop();
   },
 
   onDisconnectRequested(handler) {

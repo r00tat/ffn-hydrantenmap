@@ -18,6 +18,7 @@ function makeAdapter(overrides: Partial<BleAdapter> = {}): MockAdapter {
   return {
     isSupported: () => true,
     requestDevice: vi.fn(async () => device),
+    getConnectedDevices: vi.fn(async () => []),
     connect: vi.fn(async (id: string) => {
       connectCalls.push(id);
     }),

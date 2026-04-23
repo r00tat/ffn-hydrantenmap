@@ -2,7 +2,7 @@
 
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
-import { usePositionContext } from '../components/Map/Position';
+import { usePositionContext } from '../components/providers/PositionProvider';
 
 export default function usePositionMarker(map: L.Map | undefined) {
   const [initialPositionSet, setInitialPositionSet] = useState(false);

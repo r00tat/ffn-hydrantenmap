@@ -1,12 +1,12 @@
 'use client';
 
 import Map from './Map';
-import Position from './Position';
+import { PositionProvider } from '../providers/PositionProvider';
 
 export default function PositionedMap() {
   return (
-    <Position>
+    <PositionProvider>
       <Map />
-    </Position>
+    </PositionProvider>
   );
 }

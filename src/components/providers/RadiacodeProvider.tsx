@@ -22,7 +22,11 @@ import {
 } from '../../hooks/radiacode/devicePreference';
 import { pushAndPrune, RadiacodeSample } from '../../hooks/radiacode/history';
 import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
-import type { NotificationState } from '../../hooks/radiacode/radiacodeNotification';
+import {
+  NotificationState,
+  RadiacodeNativeState,
+  RadiacodeNotification,
+} from '../../hooks/radiacode/radiacodeNotification';
 import {
   RadiacodeDeviceInfo,
   RadiacodeDeviceRef,
@@ -36,26 +40,6 @@ import {
 } from '../../hooks/radiacode/useRadiacodeDevice';
 import { Spectrum } from '../firebase/firestore';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
-
-function titleForNotification(state: NotificationState): string {
-  switch (state) {
-    case 'connected':
-      return 'Radiacode verbunden';
-    case 'recording':
-      return 'Strahlenmessung läuft';
-    case 'reconnecting':
-      return 'Radiacode – Verbindung verloren';
-  }
-}
-
-function formatBodyForNotification(
-  m: { dosisleistung: number; cps: number } | null,
-  state: NotificationState,
-): string {
-  if (!m) return state === 'reconnecting' ? 'Letzter Wert unbekannt' : '…';
-  const body = `${m.dosisleistung.toFixed(2)} µSv/h · ${Math.round(m.cps)} CPS`;
-  return state === 'reconnecting' ? `${body} (letzter Wert)` : body;
-}
 
 export interface SaveLiveSpectrumMeta {
   name: string;
@@ -99,6 +83,8 @@ export interface RadiacodeContextValue {
   doseReset: () => Promise<void>;
 }
 
+export default RadiacodeProvider;
+
 export const RadiacodeContext = createContext<RadiacodeContextValue | null>(null);
 
 export function useRadiacode(): RadiacodeContextValue {
@@ -123,6 +109,7 @@ const NULL_ADAPTER: BleAdapter = {
   requestDevice: async () => {
     throw new Error('BLE adapter not initialized');
   },
+  getConnectedDevices: async () => [],
   connect: async () => {
     throw new Error('BLE adapter not initialized');
   },
@@ -161,8 +148,10 @@ export function RadiacodeProvider({
   const [history, setHistory] = useState<RadiacodeSample[]>([]);
   const [overrideMeasurement, setOverrideMeasurement] =
     useState<RadiacodeMeasurement | null>(null);
-  const measurement = overrideMeasurement ?? hookMeasurement;
-  const lastSampleTimestamp = measurement?.timestamp ?? null;
+
+  const latest = overrideMeasurement ?? hookMeasurement;
+  const measurement = latest;
+  const lastSampleTimestamp = latest?.timestamp ?? null;
   const [deviceInfo, setDeviceInfo] = useState<RadiacodeDeviceInfo | null>(null);
 
   // Fetch device info once we're connected and the client is ready. Clears on
@@ -196,17 +185,17 @@ export function RadiacodeProvider({
   // render if the measurement changed — React will discard this render and
   // re-run with the updated state, avoiding the cascading-effect anti-pattern.
   const [lastAppendedTs, setLastAppendedTs] = useState<number | null>(null);
-  if (measurement && measurement.timestamp !== lastAppendedTs) {
-    setLastAppendedTs(measurement.timestamp);
+  if (latest && latest.timestamp !== lastAppendedTs) {
+    setLastAppendedTs(latest.timestamp);
     setHistory((prev) =>
       pushAndPrune(
         prev,
         {
-          t: measurement.timestamp,
-          dosisleistung: measurement.dosisleistung,
-          cps: measurement.cps,
+          t: latest.timestamp,
+          dosisleistung: latest.dosisleistung,
+          cps: latest.cps,
         },
-        measurement.timestamp,
+        latest.timestamp,
       ),
     );
   }
@@ -386,11 +375,31 @@ export function RadiacodeProvider({
 
   // Clean up any active session subscription on unmount.
   useEffect(() => {
+    // Try to sync with native state on mount if native is available
+    if (
+      adapter.onConnectionStateChange &&
+      typeof RadiacodeNotification.getState === 'function'
+    ) {
+      RadiacodeNotification.getState()
+        .then((state: RadiacodeNativeState) => {
+          if (state.connected && state.deviceAddress) {
+            // If native is already connected, we don't necessarily need to trigger
+            // a connectRaw here if the useEffect for auto-connect already handles it,
+            // but we can ensure the UI knows about the device.
+            console.log(
+              '[RadiacodeProvider] Native already connected to:',
+              state.deviceAddress,
+            );
+          }
+        })
+        .catch(() => {});
+    }
+
     return () => {
       sessionUnsubRef.current?.();
       sessionUnsubRef.current = null;
     };
-  }, []);
+  }, [adapter.onConnectionStateChange]);
 
   // Mask status while reconnecting — UI should show the "connecting…" state
   // during an auto-reconnect attempt rather than flipping to idle/error.
@@ -426,8 +435,25 @@ export function RadiacodeProvider({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // First check if already connected (important for Refresh)
+      const connected = await adapter.getConnectedDevices();
+      if (connected.length > 0 && !cancelled) {
+        console.log('[RadiacodeProvider] Already connected to:', connected[0].id);
+        // This will update the internal useRadiacodeDevice state
+        await connectRaw(connected[0]).catch(() => null);
+        return;
+      }
+
       const saved = await loadDefaultDevice().catch(() => null);
       if (!saved || cancelled) return;
+
+      // Check if we are currently connecting to avoid duplicate attempts
+      if (status === 'connecting' || rawStatus === 'connecting') return;
+
+      console.log(
+        '[RadiacodeProvider] Auto-connecting to saved device:',
+        saved.id,
+      );
       await connectRaw(saved).catch(() => null);
     })();
     return () => {
@@ -435,82 +461,6 @@ export function RadiacodeProvider({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter]);
-
-  // Persistent notification driven by the foreground service. One source of
-  // truth for the lifecycle: derived purely from status / reconnect.
-  const notificationState: NotificationState | null = useMemo(() => {
-    if (status === 'connected') return 'connected';
-    if (status === 'connecting' && reconnecting) return 'reconnecting';
-    return null;
-  }, [status, reconnecting]);
-
-  const notificationStateRef = useRef<NotificationState | null>(null);
-  useEffect(() => {
-    notificationStateRef.current = notificationState;
-  }, [notificationState]);
-
-  // Foreground-Service wird imperativ gesteuert — NICHT über useEffect-Cleanup,
-  // weil React den Effekt bei jedem Status-Flip (z.B. connected→connecting
-  // während Reconnect oder manuellem Connect) erneut evaluiert. Ein Cleanup
-  // würde dann fälschlich `stopForegroundService` rufen und damit den Service
-  // inkl. BLE-Session killen (Bug-Analyse 2026-04-22).
-  const notificationStartedRef = useRef(false);
-  useEffect(() => {
-    if (!notificationState) return;
-    if (notificationStartedRef.current) return;
-    const start = adapter.startForegroundService;
-    if (!start) return;
-    notificationStartedRef.current = true;
-    console.log('[RadiacodeProvider] startForegroundService', notificationState);
-    start({
-      title: titleForNotification(notificationState),
-      body: formatBodyForNotification(measurement, notificationState),
-    }).catch((err) => {
-      console.warn('[RadiacodeProvider] startForegroundService failed', err);
-    });
-    // measurement bewusst nicht als Dependency — updateForegroundService läuft
-    // separat.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificationState, adapter]);
-
-  // Stop nur bei echten Offline-Zuständen. `connecting` / `reconnecting` sind
-  // Zwischenzustände und dürfen den Service nicht beenden.
-  useEffect(() => {
-    const offline =
-      rawStatus === 'idle' ||
-      rawStatus === 'unavailable' ||
-      rawStatus === 'error';
-    if (!offline) return;
-    if (!notificationStartedRef.current) return;
-    const stop = adapter.stopForegroundService;
-    if (!stop) return;
-    notificationStartedRef.current = false;
-    console.log('[RadiacodeProvider] stopForegroundService (rawStatus=', rawStatus, ')');
-    stop().catch((err) => {
-      console.warn('[RadiacodeProvider] stopForegroundService failed', err);
-    });
-  }, [rawStatus, adapter]);
-
-  useEffect(() => {
-    return () => {
-      if (!notificationStartedRef.current) return;
-      const stop = adapter.stopForegroundService;
-      notificationStartedRef.current = false;
-      stop?.().catch(() => {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!notificationState || !measurement) return;
-    const update = adapter.updateForegroundService;
-    if (!update) return;
-    update({
-      dosisleistung: measurement.dosisleistung,
-      cps: measurement.cps,
-      state: notificationState,
-    }).catch(() => {});
-  }, [measurement, notificationState, adapter]);
 
   useEffect(() => {
     const register = adapter.onDisconnectRequested;

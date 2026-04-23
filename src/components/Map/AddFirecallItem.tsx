@@ -12,7 +12,7 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import { useDrawing } from './Drawing/DrawingContext';
 import useMapEditor from '../../hooks/useMapEditor';
-import { usePositionContext } from './Position';
+import { usePositionContext } from '../providers/PositionProvider';
 
 export interface MapActionButtonsOptions {
   map: L.Map;

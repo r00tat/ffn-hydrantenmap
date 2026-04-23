@@ -1,5 +1,5 @@
 import { Circle, LayerGroup, Popup } from 'react-leaflet';
-import { usePositionContext } from '../Position';
+import { usePositionContext } from '../../providers/PositionProvider';
 
 export const distanceColors: { [key: number]: string } = {
   50: 'red',

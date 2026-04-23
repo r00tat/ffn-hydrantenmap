@@ -7,6 +7,7 @@ export type Unsubscribe = () => void;
 export interface BleAdapter {
   isSupported(): boolean;
   requestDevice(): Promise<RadiacodeDeviceRef>;
+  getConnectedDevices(): Promise<RadiacodeDeviceRef[]>;
   connect(deviceId: string): Promise<void>;
   disconnect(deviceId: string): Promise<void>;
   onNotification(
@@ -18,13 +19,6 @@ export interface BleAdapter {
   onConnectionStateChange?(
     handler: (state: 'connected' | 'disconnected' | 'reconnecting') => void,
   ): Unsubscribe;
-  startForegroundService?(opts: { title: string; body: string }): Promise<void>;
-  updateForegroundService?(opts: {
-    dosisleistung: number;
-    cps: number;
-    state: NotificationState;
-  }): Promise<void>;
-  stopForegroundService?(): Promise<void>;
   onDisconnectRequested?(handler: () => void): Unsubscribe;
 }
 

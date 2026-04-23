@@ -6,8 +6,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
-import android.net.ConnectivityManager;
-import android.net.Network;
 import android.net.http.SslError;
 import android.os.Bundle;
 import android.os.Handler;
@@ -41,9 +39,6 @@ public class MainActivity extends BridgeActivity {
     private boolean errorDialogShown = false;
     private boolean allowInsecureSsl = false;
     private boolean offlineOverlayShown = false;
-    private String lastRequestedUrl = null;
-    private ConnectivityManager.NetworkCallback networkCallback = null;
-    private final Handler retryHandler = new Handler(Looper.getMainLooper());
     private static final Set<Integer> TRANSIENT_ERRORS = new HashSet<>();
     static {
         TRANSIENT_ERRORS.add(WebViewClient.ERROR_CONNECT);
@@ -87,7 +82,6 @@ public class MainActivity extends BridgeActivity {
                 super.onPageStarted(view, url, favicon);
                 errorDialogShown = false;
                 if (url != null && !"about:blank".equals(url)) {
-                    lastRequestedUrl = url;
                     offlineOverlayShown = false;
                 }
             }
@@ -131,42 +125,6 @@ public class MainActivity extends BridgeActivity {
                 showLoadErrorDialog(error.getUrl(), "SSL: " + describeSslError(error));
             }
         });
-
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        if (cm != null) {
-            networkCallback = new ConnectivityManager.NetworkCallback() {
-                @Override
-                public void onAvailable(Network network) {
-                    if (offlineOverlayShown) {
-                        runOnUiThread(() -> {
-                            offlineOverlayShown = false;
-                            retryHandler.removeCallbacksAndMessages(null);
-                            if (lastRequestedUrl != null) {
-                                bridge.getWebView().loadUrl(lastRequestedUrl);
-                            } else {
-                                bridge.getWebView().reload();
-                            }
-                        });
-                    }
-                }
-            };
-            cm.registerDefaultNetworkCallback(networkCallback);
-        }
-    }
-
-    @Override
-    public void onDestroy() {
-        if (networkCallback != null) {
-            ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-            if (cm != null) {
-                try {
-                    cm.unregisterNetworkCallback(networkCallback);
-                } catch (IllegalArgumentException ignored) {}
-            }
-            networkCallback = null;
-        }
-        retryHandler.removeCallbacksAndMessages(null);
-        super.onDestroy();
     }
 
     private void applyServerUrlOverride(String overrideUrl) {
@@ -204,7 +162,6 @@ public class MainActivity extends BridgeActivity {
     private void showOfflineOverlay(String url) {
         if (offlineOverlayShown) return;
         offlineOverlayShown = true;
-        lastRequestedUrl = url;
         String html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
             + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             + "<style>body{font-family:system-ui,-apple-system,sans-serif;"
@@ -219,13 +176,6 @@ public class MainActivity extends BridgeActivity {
             + "<p>" + getString(R.string.offline_overlay_message) + "</p>"
             + "<button onclick=\"window.location.reload()\">"
             + getString(R.string.offline_overlay_retry) + "</button></body></html>";
-        retryHandler.removeCallbacksAndMessages(null);
-        retryHandler.postDelayed(() -> {
-            if (offlineOverlayShown) {
-                offlineOverlayShown = false;
-                bridge.getWebView().loadUrl(url);
-            }
-        }, 5000);
         runOnUiThread(() -> {
             bridge.getWebView().loadDataWithBaseURL(url, html, "text/html", "UTF-8", url);
         });

@@ -14,24 +14,31 @@ import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import { useRadiacode } from '../providers/RadiacodeProvider';
-import { usePositionContext } from './Position';
+import { useGpsProvider } from '../providers/GpsProvider';
+import { usePositionContext } from '../providers/PositionProvider';
 import RadiacodeLiveWidget from './RadiacodeLiveWidget';
 import TrackStartDialog, { TrackStartConfig } from './TrackStartDialog';
 
 export default function RecordButton() {
   const [position, isPositionSet, , enableTracking, isPositionPending] =
     usePositionContext();
+  const {
+    isRecording,
+    mode,
+    layerId,
+    sampleRate,
+    startGpsRecording,
+    startRadiacodeRecording,
+    stopRecording,
+  } = useGpsProvider();
+
   const sortedLayers = useFirecallLayersSorted();
   const addFirecallItem = useFirecallItemAdd();
   const firecallId = useFirecallId();
   const { email: creatorEmail } = useFirebaseLogin();
-  const firestoreDb = process.env.NEXT_PUBLIC_FIRESTORE_DB || '';
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [radiacodeActive, setRadiacodeActive] = useState(false);
-  const [radiacodeLayerId, setRadiacodeLayerId] = useState<string | null>(null);
-  const [radiacodeSampleRate, setRadiacodeSampleRate] =
-    useState<SampleRateSpec>('normal');
+  const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
   const [defaultDevice, setDefaultDevice] = useState<RadiacodeDeviceRef | null>(
     null,
   );
@@ -40,35 +47,31 @@ export default function RecordButton() {
     loadDefaultDevice().then(setDefaultDevice);
   }, []);
 
-  const gps = useGpsLineRecorder();
+  // Automatically open the dialog once the position is available if the user
+  // clicked the button while it was still pending.
+  useEffect(() => {
+    if (pendingDialogOpen && isPositionSet) {
+      setTimeout(() => {
+        setPendingDialogOpen(false);
+        setDialogOpen(true);
+      }, 0);
+    } else if (pendingDialogOpen && !isPositionPending && !isPositionSet) {
+      setTimeout(() => {
+        setPendingDialogOpen(false);
+      }, 0);
+    }
+  }, [isPositionSet, pendingDialogOpen, isPositionPending]);
 
   const {
     status: radiacodeStatus,
-    measurement,
-    device,
     scan,
     connectDevice,
   } = useRadiacode();
-
-  useRadiacodePointRecorder({
-    active: radiacodeActive,
-    layerId: radiacodeLayerId ?? '',
-    sampleRate: radiacodeSampleRate,
-    device,
-    measurement,
-    position: isPositionSet ? { lat: position.lat, lng: position.lng } : null,
-    addItem: addFirecallItem,
-    firecallId: firecallId ?? '',
-    creatorEmail: creatorEmail ?? '',
-    firestoreDb,
-  });
 
   const existingRadiacodeLayers = useMemo(
     () => sortedLayers.filter((l) => l.layerType === 'radiacode'),
     [sortedLayers],
   );
-
-  const isRecording = gps.isRecording || radiacodeActive;
 
   const handleRequestDevice = useCallback(async () => {
     const scanned = await scan();
@@ -81,45 +84,36 @@ export default function RecordButton() {
     async (config: TrackStartConfig) => {
       setDialogOpen(false);
       if (config.mode === 'gps') {
-        gps.startRecording(L.latLng(position), config.sampleRate);
+        await startGpsRecording(config.layer?.type === 'existing' ? config.layer.id : '', config.sampleRate);
         return;
       }
       // radiacode mode
       if (!config.device) return;
-      let layerId: string;
+      let targetLayerId: string;
       if (config.layer?.type === 'new') {
         const layer = createRadiacodeLayer(config.layer.name);
         layer.sampleRate = config.sampleRate;
         const ref = await addFirecallItem(layer);
-        layerId = ref.id;
+        targetLayerId = ref.id;
       } else if (config.layer?.type === 'existing') {
-        layerId = config.layer.id;
+        targetLayerId = config.layer.id;
       } else {
         return;
       }
-      setRadiacodeLayerId(layerId);
-      setRadiacodeSampleRate(config.sampleRate);
+
       try {
         await connectDevice(config.device);
-        setRadiacodeActive(true);
+        await startRadiacodeRecording(config.device, targetLayerId, config.sampleRate);
       } catch (err) {
         console.error('[RADIACODE] connect failed', err);
       }
     },
-    [gps, position, connectDevice, addFirecallItem],
+    [connectDevice, addFirecallItem, startGpsRecording, startRadiacodeRecording],
   );
 
   const handleStop = useCallback(() => {
-    if (gps.isRecording) {
-      gps.stopRecording(L.latLng(position));
-    }
-    if (radiacodeActive) {
-      // Aufzeichnung stoppen, aber BLE-Verbindung zum Radiacode halten, damit
-      // die Live-Werte (Dosimetrie, Spektrum) weiter sichtbar bleiben.
-      setRadiacodeActive(false);
-      setRadiacodeLayerId(null);
-    }
-  }, [gps, position, radiacodeActive]);
+    stopRecording();
+  }, [stopRecording]);
 
   const handleClick = useCallback(
     (event: React.MouseEvent) => {
@@ -128,6 +122,7 @@ export default function RecordButton() {
         handleStop();
       } else if (!isPositionSet) {
         enableTracking();
+        setPendingDialogOpen(true);
       } else {
         setDialogOpen(true);
       }
@@ -163,7 +158,7 @@ export default function RecordButton() {
           </Fab>
         </Tooltip>
       </Box>
-      <RadiacodeLiveWidget visible={radiacodeActive} />
+      <RadiacodeLiveWidget visible={isRecording && mode === 'radiacode'} />
       <TrackStartDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

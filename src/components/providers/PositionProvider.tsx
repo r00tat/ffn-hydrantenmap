@@ -4,7 +4,7 @@ import React, { createContext, useContext } from 'react';
 import { defaultPosition } from '../../hooks/constants';
 import usePosition, { PositionInfo } from '../../hooks/usePosition';
 
-const PositionContext = createContext<PositionInfo>([
+export const PositionContext = createContext<PositionInfo>([
   defaultPosition,
   false,
   undefined,
@@ -12,7 +12,7 @@ const PositionContext = createContext<PositionInfo>([
   false,
 ]);
 
-export default function Position({ children }: { children: React.ReactNode }) {
+export function PositionProvider({ children }: { children: React.ReactNode }) {
   const positionInfo = usePosition();
   return (
     <PositionContext.Provider value={positionInfo}>
@@ -21,6 +21,12 @@ export default function Position({ children }: { children: React.ReactNode }) {
   );
 }
 
+export default PositionProvider;
+
 export const usePositionContext = (): PositionInfo => {
-  return useContext(PositionContext);
+  const ctx = useContext(PositionContext);
+  if (!ctx) {
+    throw new Error('usePositionContext must be used within a PositionProvider');
+  }
+  return ctx;
 };

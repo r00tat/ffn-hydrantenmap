@@ -1,53 +1,21 @@
-import { Capacitor, PluginListenerHandle, registerPlugin } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { RadiacodeMeasurement } from './types';
+import {
+  NativeConnectionState,
+  NativeConnectionStateEvent,
+  NativeMeasurementEvent,
+  NativeNotificationEvent,
+  RadiacodeNotification,
+} from './radiacodeNotification';
 
-export type NativeConnectionState = 'connected' | 'disconnected' | 'reconnecting';
-
-interface NativeMeasurementEvent {
-  timestampMs: number;
-  dosisleistungUSvH: number;
-  cps: number;
-  doseUSv?: number;
-  durationSec?: number;
-  temperatureC?: number;
-  chargePct?: number;
-  dosisleistungErrPct?: number;
-  cpsErrPct?: number;
-}
-
-interface NativeNotificationEvent {
-  bytes: string; // base64
-}
-
-interface NativeConnectionStateEvent {
-  state: NativeConnectionState;
-}
-
-interface RadiacodeNativePlugin {
-  connectNative(opts: { deviceAddress: string }): Promise<void>;
-  writeNative(opts: { payload: string }): Promise<void>;
-  disconnectNative(): Promise<void>;
-  addListener(
-    event: 'measurement',
-    listener: (data: NativeMeasurementEvent) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    event: 'notification',
-    listener: (data: NativeNotificationEvent) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    event: 'connectionState',
-    listener: (data: NativeConnectionStateEvent) => void,
-  ): Promise<PluginListenerHandle>;
-}
+export type { NativeConnectionState };
 
 /**
  * Das Plugin ist identisch zu `RadiacodeNotification` (Phase 1) — der native
- * Teil wurde nur um Methoden/Events erweitert. Wir registrieren es erneut
- * unter demselben Namen, um zusätzlich zur Notification-API die
- * BLE-Passthrough-Methoden typisiert zu haben.
+ * Teil wurde nur um Methoden/Events erweitert. Wir nutzen das zentral registrierte
+ * Plugin aus radiacodeNotification.ts.
  */
-const RadiacodeNative = registerPlugin<RadiacodeNativePlugin>('RadiacodeNotification');
+const RadiacodeNative = RadiacodeNotification;
 
 export type Unsubscribe = () => void;
 
@@ -119,14 +87,14 @@ function toMeasurement(e: NativeMeasurementEvent): RadiacodeMeasurement {
     dosisleistung: e.dosisleistungUSvH,
     cps: e.cps,
     timestamp: e.timestampMs,
-    ...(e.dosisleistungErrPct !== undefined && {
+    ...(e.dosisleistungErrPct != null && {
       dosisleistungErrPct: e.dosisleistungErrPct,
     }),
-    ...(e.cpsErrPct !== undefined && { cpsErrPct: e.cpsErrPct }),
-    ...(e.doseUSv !== undefined && { dose: e.doseUSv }),
-    ...(e.durationSec !== undefined && { durationSec: e.durationSec }),
-    ...(e.temperatureC !== undefined && { temperatureC: e.temperatureC }),
-    ...(e.chargePct !== undefined && { chargePct: e.chargePct }),
+    ...(e.cpsErrPct != null && { cpsErrPct: e.cpsErrPct }),
+    ...(e.doseUSv != null && { dose: e.doseUSv }),
+    ...(e.durationSec != null && { durationSec: e.durationSec }),
+    ...(e.temperatureC != null && { temperatureC: e.temperatureC }),
+    ...(e.chargePct != null && { chargePct: e.chargePct }),
   };
 }
 

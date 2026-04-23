@@ -4,7 +4,7 @@ import { GenerateContentRequest, Content } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
-import { usePositionContext } from '../../components/Map/Position';
+import { usePositionContext } from '../../components/providers/PositionProvider';
 import { searchPlace } from '../../components/actions/maps/places';
 import { GeoPosition } from '../../common/geo';
 import { defaultPosition } from '../constants';

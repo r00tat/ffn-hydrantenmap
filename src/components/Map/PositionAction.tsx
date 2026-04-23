@@ -5,7 +5,7 @@ import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import { useCallback, useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
-import { usePositionContext } from './Position';
+import { usePositionContext } from '../providers/PositionProvider';
 
 export default function PositionAction() {
   const map = useMap();

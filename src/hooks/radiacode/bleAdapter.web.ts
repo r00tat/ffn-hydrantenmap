@@ -40,11 +40,34 @@ export const webAdapter: BleAdapter = {
     return toDeviceRef(device);
   },
 
+  async getConnectedDevices() {
+    if (!this.isSupported() || !navigator.bluetooth.getDevices) {
+      return [];
+    }
+    const paired = await navigator.bluetooth.getDevices();
+    const result: RadiacodeDeviceRef[] = [];
+    for (const d of paired) {
+      if (!devices.has(d.id)) {
+        devices.set(d.id, { device: d });
+      }
+      if (d.gatt?.connected) {
+        result.push(toDeviceRef(d));
+      }
+    }
+    return result;
+  },
+
   async connect(deviceId) {
     const entry = devices.get(deviceId);
     if (!entry) {
       throw new Error(`Gerät ${deviceId} nicht vorhanden — erst requestDevice aufrufen`);
     }
+
+    if (entry.device.gatt?.connected && entry.writeChar && entry.notifyChar) {
+      console.log('[Radiacode/bleAdapter.web] connect: Device already connected and characteristics initialized');
+      return;
+    }
+
     const server = await entry.device.gatt?.connect();
     if (!server) throw new Error('GATT-Verbindung fehlgeschlagen');
     const service = await server.getPrimaryService(RADIACODE_SERVICE_UUID);
