@@ -25,6 +25,7 @@ import FirecallProvider from './FirecallProvider';
 import MapEditorProvider from './MapEditorProvider';
 import { RadiacodeProvider } from './RadiacodeProvider';
 import SnackbarProvider from './SnackbarProvider';
+import { TrackingProvider } from './TrackingProvider';
 
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
@@ -39,22 +40,24 @@ function LogedinApp({ children }: AppProps) {
   return (
     <FirecallProvider>
       <RadiacodeProvider>
-        <DebugLoggingProvider>
-          <MapEditorProvider>
-            <FirecallLayerProvider>
-              <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+        <TrackingProvider>
+          <DebugLoggingProvider>
+            <MapEditorProvider>
+              <FirecallLayerProvider>
+                <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-              <HeaderBar
-                isDrawerOpen={isDrawerOpen}
-                setIsDrawerOpen={setIsDrawerOpen}
-              />
-              <ChatMessageDisplay />
-              <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-                {children}
-              </Box>
-            </FirecallLayerProvider>
-          </MapEditorProvider>
-        </DebugLoggingProvider>
+                <HeaderBar
+                  isDrawerOpen={isDrawerOpen}
+                  setIsDrawerOpen={setIsDrawerOpen}
+                />
+                <ChatMessageDisplay />
+                <Box className="print-content-root" sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                  {children}
+                </Box>
+              </FirecallLayerProvider>
+            </MapEditorProvider>
+          </DebugLoggingProvider>
+        </TrackingProvider>
       </RadiacodeProvider>
     </FirecallProvider>
   );

@@ -22,6 +22,7 @@ function nullAdapter(): BleAdapter {
   return {
     isSupported: () => true,
     requestDevice: vi.fn(async () => ({ id: 'dev', name: 'RC-103', serial: 'SN' })),
+    getConnectedDevices: vi.fn(async () => []),
     connect: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
     onNotification: vi.fn(async () => () => {}),

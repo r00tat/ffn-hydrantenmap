@@ -13,11 +13,10 @@ import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { SampleRateSpec } from '../radiacode/types';
 import {
   isNativeGpsTrackingAvailable,
-  nativeStartGpsTrack,
-  nativeStopGpsTrack,
 } from './nativeGpsTrackBridge';
 import useFirebaseLogin from '../useFirebaseLogin';
 import { useFirecallId } from '../useFirecall';
+import { useTracking } from '../../components/providers/TrackingProvider';
 
 export interface UseGpsLineRecorderResult {
   isRecording: boolean;
@@ -26,7 +25,7 @@ export interface UseGpsLineRecorderResult {
 }
 
 export function useGpsLineRecorder(): UseGpsLineRecorderResult {
-  const [isRecording, setIsRecording] = useState(false);
+  const { isGpsTracking, startGpsTracking, stopGpsTracking } = useTracking();
   const [recordItem, setRecordItem] = useState<Line>();
   const [positions, setPositions] = useState<LatLngPosition[]>([]);
   const [timestamp, setTimestamp] = useState(new Date());
@@ -42,6 +41,8 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
   const firecallId = useFirecallId();
   const { email: creatorEmail } = useFirebaseLogin();
   const firestoreDb = process.env.NEXT_PUBLIC_FIRESTORE_DB || '';
+
+  const isRecording = isGpsTracking;
 
   const addPos = useCallback(
     async (newPos: LatLngPosition, record: Line) => {
@@ -96,7 +97,7 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
         backendRef.current = backend;
         if (backend === 'native') {
           try {
-            await nativeStartGpsTrack({
+            await startGpsTracking({
               firecallId: firecallId ?? '',
               lineId: ref.id,
               firestoreDb,
@@ -106,14 +107,13 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
               initialLng: pos.lng,
             });
           } catch (err) {
-            warn('[TRACK] nativeStartGpsTrack failed, falling back to web', {
+            warn('[TRACK] startGpsTracking failed, falling back to web', {
               err,
             });
             backendRef.current = 'web';
           }
         }
 
-        setIsRecording(true);
         info(`[TRACK] starting track`, {
           trackTitle: newRecord.name,
           track: newRecord.id,
@@ -132,6 +132,7 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
       firecallId,
       firestoreDb,
       creatorEmail,
+      startGpsTracking,
     ],
   );
 
@@ -140,9 +141,9 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
       const backend = backendRef.current;
       if (backend === 'native') {
         try {
-          await nativeStopGpsTrack();
+          await stopGpsTracking();
         } catch (err) {
-          warn('[TRACK] nativeStopGpsTrack failed', { err });
+          warn('[TRACK] stopGpsTracking failed', { err });
         }
       } else if (recordItem) {
         await addPos([pos.lat, pos.lng], recordItem);
@@ -150,9 +151,8 @@ export function useGpsLineRecorder(): UseGpsLineRecorderResult {
       backendRef.current = null;
       setPositions([]);
       setRecordItem(undefined);
-      setIsRecording(false);
     },
-    [addPos, recordItem, warn],
+    [addPos, recordItem, warn, stopGpsTracking],
   );
 
   useEffect(() => {

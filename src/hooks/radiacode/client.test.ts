@@ -64,6 +64,7 @@ function makeAdapter(): MockAdapter {
       name: 'RC-103',
       serial: 'TEST',
     })),
+    getConnectedDevices: vi.fn(async () => []),
     connect: vi.fn(async () => {}),
     disconnect: vi.fn(async () => {}),
     onNotification: vi.fn(async (_id, h) => {

@@ -1,5 +1,6 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 import { SampleRateSpec, serializeSampleRateToBridge } from '../radiacode/types';
+import { RadiacodeNotification } from '../radiacode/radiacodeNotification';
 
 export interface NativeGpsTrackOpts {
   firecallId: string;
@@ -11,12 +12,9 @@ export interface NativeGpsTrackOpts {
   initialLng?: number;
 }
 
-interface GpsTrackPlugin {
-  startGpsTrack(opts: Record<string, unknown>): Promise<void>;
-  stopGpsTrack(): Promise<void>;
-}
-
-const GpsTrack = registerPlugin<GpsTrackPlugin>('RadiacodeNotification');
+// Dasselbe Capacitor-Plugin wie nativeBridge — wir nutzen das zentral registrierte
+// Plugin aus radiacodeNotification.ts.
+const GpsTrack = RadiacodeNotification;
 
 export function isNativeGpsTrackingAvailable(): boolean {
   return (

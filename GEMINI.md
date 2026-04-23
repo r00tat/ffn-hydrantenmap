@@ -7,6 +7,7 @@ This document provides guidelines for AI assistants (like Gemini) to effectively
 This is a web application for the Neusiedl am See fire department (`Freiwillige Feuerwehr Neusiedl am See`). Its primary purpose is to display the locations of fire hydrants on an interactive map to assist during emergency operations.
 
 For authenticated users, the application offers advanced features, including:
+
 - Real-time situation management (`Lageführung`).
 - An operational diary (`Einsatztagebuch`).
 - Management of other resources and tactical information.
@@ -28,6 +29,7 @@ The application is designed to be mobile-first and is a Progressive Web App (PWA
 ## Architecture
 
 ### Directory Structure
+
 - `src/app/` - Next.js App Router pages and API routes.
 - `src/components/` - React components organized by feature (Map/, firebase/, providers/, pages/, FirecallItems/, Kostenersatz/).
 - `src/hooks/` - Custom React hooks for state management and side effects.
@@ -37,18 +39,22 @@ The application is designed to be mobile-first and is a Progressive Web App (PWA
 - `firebase/` - Firestore rules and indexes (separate dev/prod environments).
 
 ### Server Actions vs API Routes
+
 Prefer Next.js Server Actions (`'use server'`) over API route handlers for data mutations.
 **All server actions must be protected** with auth guards from `src/app/auth.ts`:
+
 - `actionAdminRequired()` — admin-only operations.
 - `actionUserRequired()` — any authorized user.
 - `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall.
 
 ### Key Patterns
+
 - **Firebase Integration**: Client-side in `src/components/firebase/firebase.ts`, Server-side Admin SDK in `src/server/firebase/admin.ts`.
 - **Authentication Flow**: Firebase Auth (client) → ID token → NextAuth Credentials provider (server verification) → Session with authorization flags.
 - **Map Architecture**: `PositionedMap` → `Map` (Leaflet config) → `Clusters` (marker clustering) + layer components.
 
 ### Firestore Collections
+
 - `call` - Emergency operations (Einsätze).
 - `item` - Items within firecalls (hydrants, vehicles, personnel).
 - `history` - Event history entries.
@@ -59,6 +65,7 @@ Prefer Next.js Server Actions (`'use server'`) over API route handlers for data 
 ## Development Workflow
 
 ### Commands
+
 ```bash
 npm run dev          # Development server
 npm run lint         # ESLint validation
@@ -69,26 +76,35 @@ npm run check        # Run all checks: tsc, lint, tests, build
 **TypeScript Policy**: `tsc --noEmit` errors must **NEVER** be ignored. Fix all type errors before committing.
 
 ### Testing (TDD)
+
 - **Write tests first** for all new features.
 - Place test files (`*.test.ts` / `*.test.tsx`) **directly next to** the source file.
 - Do **not** use `__tests__/` folders.
 
 ### Git Workflow
+
 - **Conventional Commits**: Use `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `ci:`.
 - **Pull Requests**: Description must be in **German**. Run `npm run check` successfully before creating a PR.
 - **Releases**: Semantic Versioning (`v<major>.<minor>.<patch>`). Descriptions in German.
+- Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching
+- When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues: `GITHUB_TOKEN= gh <command>`
 
 ## MUI Guidelines
+
 **Tooltip + disabled Button**: Wrap `disabled` buttons in a `<span>` to ensure the Tooltip receives events:
+
 ```tsx
 <Tooltip title="Help">
   <span>
-    <IconButton disabled={isLoading}><HelpIcon /></IconButton>
+    <IconButton disabled={isLoading}>
+      <HelpIcon />
+    </IconButton>
   </span>
 </Tooltip>
 ```
 
 ## German Terminology
+
 - **Einsatz/Firecall** - Emergency operation
 - **Einsatztagebuch** - Operational diary
 - **Fahrzeuge** - Vehicles
@@ -98,6 +114,7 @@ npm run check        # Run all checks: tsc, lint, tests, build
 - **Kostenersatz** - Cost recovery/billing
 
 ## Relevant Tools for Gemini
+
 - **`read_file`**: Read file contents.
 - **`write_file`**: Create new files.
 - **`replace`**: Modify existing files.

@@ -7,6 +7,7 @@ export type Unsubscribe = () => void;
 export interface BleAdapter {
   isSupported(): boolean;
   requestDevice(): Promise<RadiacodeDeviceRef>;
+  getConnectedDevices(): Promise<RadiacodeDeviceRef[]>;
   connect(deviceId: string): Promise<void>;
   disconnect(deviceId: string): Promise<void>;
   onNotification(

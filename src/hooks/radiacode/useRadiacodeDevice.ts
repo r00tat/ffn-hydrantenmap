@@ -109,49 +109,61 @@ export function useRadiacodeDevice(
       setError(null);
       setStatus('connecting');
       try {
-        // start connection
-        await adapter.connect(target.id);
+        // Check if already connected via adapter
+        const connected = await adapter.getConnectedDevices();
+        const isAlreadyConnected = connected.some(d => d.id === target.id);
+
+        if (!isAlreadyConnected) {
+          // start connection
+          await adapter.connect(target.id);
+
+          // Bei nativem Adapter warten wir bis zu 10s auf das 'connected' Event,
+          // bevor wir den Status auf 'connected' setzen. Sonst zeigt die UI
+          // sofort "Verbunden", obwohl die GATT-Session noch gar nicht steht.
+          if (adapter.onConnectionStateChange) {
+            await new Promise<void>((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                unsub();
+                reject(new Error('Verbindungs-Timeout (Gerät eingeschaltet?)'));
+              }, 10000);
+              const unsub = adapter.onConnectionStateChange!((s) => {
+                if (s === 'connected') {
+                  clearTimeout(timeout);
+                  unsub();
+                  resolve();
+                } else if (s === 'disconnected') {
+                  // Initialer connect schlug fehl (z.B. Device off)
+                  clearTimeout(timeout);
+                  unsub();
+                  reject(new Error('Gerät nicht erreichbar'));
+                }
+              });
+            });
+          }
+        } else {
+          console.log('[useRadiacodeDevice] Device already connected, skipping adapter.connect');
+        }
 
         const client = clientFactory
           ? clientFactory(adapter, target.id)
           : new RadiacodeClient(adapter, target.id);
-
-        // Bei nativem Adapter warten wir bis zu 10s auf das 'connected' Event,
-        // bevor wir den Status auf 'connected' setzen. Sonst zeigt die UI
-        // sofort "Verbunden", obwohl die GATT-Session noch gar nicht steht.
-        if (adapter.onConnectionStateChange) {
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-              unsub();
-              reject(new Error('Verbindungs-Timeout (Gerät eingeschaltet?)'));
-            }, 10000);
-            const unsub = adapter.onConnectionStateChange!((s) => {
-              if (s === 'connected') {
-                clearTimeout(timeout);
-                unsub();
-                resolve();
-              } else if (s === 'disconnected') {
-                // Initialer connect schlug fehl (z.B. Device off)
-                clearTimeout(timeout);
-                unsub();
-                reject(new Error('Gerät nicht erreichbar'));
-              }
-            });
-          });
-        }
 
         setDevice(target);
         stateRef.current.device = target;
 
         await client.connect();
         client.startPolling(
-          (m) =>
+          (m) => {
             // Rare-Record-Felder (dose, durationSec, temperatureC, chargePct)
             // liefert das Gerät nur alle paar Sekunden. extractLatestMeasurement
             // lässt diese Keys komplett weg, wenn kein Rare-Record im aktuellen
             // Polling-Fenster lag — der Spread erhält dann die Werte aus dem
             // letzten Rare-Record.
-            setMeasurement((prev) => ({ ...prev, ...m })),
+            setMeasurement((prev) => {
+              if (!prev) return m;
+              return { ...prev, ...m };
+            });
+          },
           pollIntervalMs,
         );
         stateRef.current.client = client;

@@ -1,17 +1,14 @@
 import haversine from 'haversine-distance';
 import { useEffect, useRef } from 'react';
 import { FcMarker, FirecallItem } from '../../components/firebase/firestore';
-import {
-  isNativeTrackingAvailable,
-  nativeStartTrack,
-  nativeStopTrack,
-} from '../radiacode/nativeTrackBridge';
+import { isNativeTrackingAvailable } from '../radiacode/nativeTrackBridge';
 import { decideShouldRecordPoint } from '../radiacode/sampleGate';
 import {
   RadiacodeDeviceRef,
   RadiacodeMeasurement,
   SampleRateSpec,
 } from '../radiacode/types';
+import { useTracking } from '../../components/providers/TrackingProvider';
 
 export interface UseRadiacodePointRecorderParams {
   active: boolean;
@@ -55,6 +52,7 @@ export function useRadiacodePointRecorder({
   onStop,
 }: UseRadiacodePointRecorderParams): void {
   const native = isNativeTrackingAvailable();
+  const { startRadiacodeTracking, stopRadiacodeTracking } = useTracking();
   const lastSampleRef = useRef<LastSample | null>(null);
   const writingRef = useRef(false);
 
@@ -63,7 +61,7 @@ export function useRadiacodePointRecorder({
   useEffect(() => {
     if (!active) return;
     if (native) {
-      nativeStartTrack({
+      startRadiacodeTracking({
         firecallId,
         layerId,
         sampleRate,
@@ -71,11 +69,11 @@ export function useRadiacodePointRecorder({
         creator: creatorEmail,
         firestoreDb,
       }).catch((err) =>
-        console.error('[RADIACODE] nativeStartTrack failed', err),
+        console.error('[RADIACODE] startRadiacodeTracking failed', err),
       );
       return () => {
-        nativeStopTrack().catch((err) =>
-          console.error('[RADIACODE] nativeStopTrack failed', err),
+        stopRadiacodeTracking().catch((err) =>
+          console.error('[RADIACODE] stopRadiacodeTracking failed', err),
         );
       };
     }
@@ -89,7 +87,7 @@ export function useRadiacodePointRecorder({
       );
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, native]);
+  }, [active, native, startRadiacodeTracking, stopRadiacodeTracking, firecallId, layerId, sampleRate, device, creatorEmail, firestoreDb]);
 
   useEffect(() => {
     if (!active) {

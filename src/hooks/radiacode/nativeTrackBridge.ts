@@ -1,5 +1,6 @@
-import { Capacitor, PluginListenerHandle, registerPlugin } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { SampleRatePreset, SampleRateSpec, serializeSampleRateToBridge } from './types';
+import { MarkerWrittenEvent, RadiacodeNotification } from './radiacodeNotification';
 
 export type NativeSampleRate = SampleRatePreset;
 
@@ -12,28 +13,9 @@ export interface NativeTrackOpts {
   firestoreDb: string;
 }
 
-export interface MarkerWrittenEvent {
-  docId: string;
-  layerId: string;
-  lat: number;
-  lng: number;
-  timestampMs: number;
-  dosisleistungUSvH: number;
-  cps: number;
-}
-
-interface RadiacodeTrackPlugin {
-  startTrackRecording(opts: Record<string, unknown>): Promise<void>;
-  stopTrackRecording(): Promise<void>;
-  addListener(
-    event: 'markerWritten',
-    listener: (data: MarkerWrittenEvent) => void,
-  ): Promise<PluginListenerHandle>;
-}
-
-// Dasselbe Capacitor-Plugin wie nativeBridge — wir erweitern nur das
-// TS-Interface, um die neuen Methoden typisiert zu haben.
-const RadiacodeTrack = registerPlugin<RadiacodeTrackPlugin>('RadiacodeNotification');
+// Dasselbe Capacitor-Plugin wie nativeBridge — wir nutzen das zentral registrierte
+// Plugin aus radiacodeNotification.ts.
+const RadiacodeTrack = RadiacodeNotification;
 
 export type Unsubscribe = () => void;
 

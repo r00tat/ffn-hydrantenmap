@@ -5,12 +5,18 @@ import type { FirecallItem } from '../../components/firebase/firestore';
 import * as nativeTrackBridge from '../radiacode/nativeTrackBridge';
 import { RadiacodeDeviceRef, RadiacodeMeasurement } from '../radiacode/types';
 import { useRadiacodePointRecorder } from './useRadiacodePointRecorder';
+import { TrackingProvider } from '../../components/providers/TrackingProvider';
+import React from 'react';
 
 const DEVICE: RadiacodeDeviceRef = {
   id: 'd1',
   name: 'RC-102',
   serial: 'SN1',
 };
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <TrackingProvider>{children}</TrackingProvider>
+);
 
 function meas(
   dose: number,
@@ -48,10 +54,10 @@ describe('useRadiacodePointRecorder', () => {
         measurement: meas(0.1, 5),
         position: { lat: 48.0, lng: 16.0 },
         addItem,
-        firecallId: 'fc1',
-        creatorEmail: 'u@x',
-        firestoreDb: '',
+        firecallId: 'fc-1',
+        creatorEmail: 'p@nd.at',
       }),
+      { wrapper },
     );
     expect(addItem).not.toHaveBeenCalled();
   });
@@ -73,6 +79,7 @@ describe('useRadiacodePointRecorder', () => {
         creatorEmail: 'u@x',
         firestoreDb: '',
       }),
+      { wrapper },
     );
     expect(addItem).not.toHaveBeenCalled();
   });
@@ -94,6 +101,7 @@ describe('useRadiacodePointRecorder', () => {
         creatorEmail: 'u@x',
         firestoreDb: '',
       }),
+      { wrapper },
     );
     expect(addItem).not.toHaveBeenCalled();
   });
@@ -115,6 +123,7 @@ describe('useRadiacodePointRecorder', () => {
         creatorEmail: 'u@x',
         firestoreDb: '',
       }),
+      { wrapper },
     );
     await vi.waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(1);
@@ -148,6 +157,7 @@ describe('useRadiacodePointRecorder', () => {
         creatorEmail: 'u@x',
         firestoreDb: '',
       }),
+      { wrapper },
     );
     await vi.waitFor(() => {
       expect(addItem).toHaveBeenCalledTimes(1);
@@ -170,6 +180,7 @@ describe('useRadiacodePointRecorder', () => {
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
         useRadiacodePointRecorder(props),
       {
+        wrapper,
         initialProps: {
           active: true,
           layerId: 'layer-1',
@@ -216,6 +227,7 @@ describe('useRadiacodePointRecorder', () => {
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
         useRadiacodePointRecorder(props),
       {
+        wrapper,
         initialProps: {
           active: true,
           layerId: 'layer-1',
@@ -264,6 +276,7 @@ describe('useRadiacodePointRecorder', () => {
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
         useRadiacodePointRecorder(props),
       {
+        wrapper,
         initialProps: {
           active: false,
           layerId: 'layer-1',
@@ -326,6 +339,7 @@ describe('useRadiacodePointRecorder', () => {
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
         useRadiacodePointRecorder(props),
       {
+        wrapper,
         initialProps: {
           active: true,
           layerId: 'layer-1',
@@ -375,6 +389,7 @@ describe('useRadiacodePointRecorder', () => {
       (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
         useRadiacodePointRecorder(props),
       {
+        wrapper,
         initialProps: {
           active: true,
           layerId: 'l1',
@@ -435,6 +450,7 @@ describe('useRadiacodePointRecorder', () => {
         (props: Parameters<typeof useRadiacodePointRecorder>[0]) =>
           useRadiacodePointRecorder(props),
         {
+          wrapper,
           initialProps: {
             active: false,
             layerId: 'l1',

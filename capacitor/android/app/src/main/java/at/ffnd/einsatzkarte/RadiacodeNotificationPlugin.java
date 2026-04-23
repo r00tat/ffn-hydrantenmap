@@ -100,6 +100,24 @@ public class RadiacodeNotificationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void getState(PluginCall call) {
+        RadiacodeForegroundService service = RadiacodeForegroundService.Companion.getInstance();
+        JSObject ret = new JSObject();
+        if (service != null) {
+            ret.put("connected", service.isBleConnected());
+            ret.put("deviceAddress", service.getDeviceAddress());
+            ret.put("radiacodeTracking", service.isRadiacodeTracking());
+            ret.put("gpsTracking", service.isGpsTracking());
+        } else {
+            ret.put("connected", false);
+            ret.put("deviceAddress", null);
+            ret.put("radiacodeTracking", false);
+            ret.put("gpsTracking", false);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void connectNative(PluginCall call) {
         String address = call.getString("deviceAddress");
         Log.i(TAG, "plugin.connectNative address=" + address);

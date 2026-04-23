@@ -60,6 +60,9 @@ import java.util.concurrent.atomic.AtomicInteger
 class RadiacodeForegroundService : Service() {
 
     companion object {
+        private var instance: RadiacodeForegroundService? = null
+        fun getInstance(): RadiacodeForegroundService? = instance
+
         const val CHANNEL_ID = "radiacode_connection"
         const val NOTIFICATION_ID = 4711
         const val WAKE_LOCK_TAG = "einsatzkarte:radiacode"
@@ -137,8 +140,14 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var trackRecorder: TrackRecorder? = null
     @Volatile private var gpsTrackRecorder: GpsTrackRecorder? = null
 
+    fun isBleConnected(): Boolean = deviceReady
+    fun getDeviceAddress(): String? = session?.deviceAddress
+    fun isRadiacodeTracking(): Boolean = trackRecorder != null
+    fun isGpsTracking(): Boolean = gpsTrackRecorder != null
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Log.i(TAG, "onCreate pid=${android.os.Process.myPid()}")
         ensureChannel()
     }
@@ -346,6 +355,7 @@ class RadiacodeForegroundService : Service() {
                 "deviceReady=$deviceReady. Stack trace for diagnosis:",
             Throwable("onDestroy stack"),
         )
+        if (instance == this) instance = null
         teardownSession()
         trackRecorder?.stop()
         trackRecorder = null
@@ -383,9 +393,21 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun startBleSession(address: String) {
-        if (session != null) {
-            Log.i(TAG, "BLE session already active — ignore reconnect request")
-            return
+        val activeSession = session
+        if (activeSession != null) {
+            if (activeSession.deviceAddress == address) {
+                Log.i(TAG, "BLE session already active for $address — re-emitting state")
+                if (deviceReady) {
+                    RadiacodeNotificationPlugin.emitConnectionState("connected")
+                    startPollLoop()
+                } else {
+                    RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
+                }
+                return
+            } else {
+                Log.i(TAG, "New address $address different from active session — tearing down old session")
+                teardownSession()
+            }
         }
         Log.i(TAG, "startBleSession address=$address")
         RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
@@ -427,9 +449,9 @@ class RadiacodeForegroundService : Service() {
                 }
             }
         }
-        val s = GattSession(applicationContext, address, listener)
-        session = s
-        s.connect()
+        val newSession = GattSession(applicationContext, address, listener)
+        session = newSession
+        newSession.connect()
         startHighAccuracyLocation()
     }
 
@@ -466,16 +488,20 @@ class RadiacodeForegroundService : Service() {
         val exec = Executors.newSingleThreadScheduledExecutor()
         pollExecutor = exec
         pollTask = exec.scheduleAtFixedRate({
-            try {
-                if (!deviceReady) return@scheduleAtFixedRate
-                pollSeq = writeCommand(
-                    Protocol.Command.RD_VIRT_STRING,
-                    Framing.u32le(Protocol.Vs.DATA_BUF),
-                )
-            } catch (t: Throwable) {
-                Log.w(TAG, "Poll tick failed", t)
-            }
-        }, POLL_INTERVAL_MS, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+            pollTick()
+        }, 0L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun pollTick() {
+        try {
+            if (!deviceReady) return
+            pollSeq = writeCommand(
+                Protocol.Command.RD_VIRT_STRING,
+                Framing.u32le(Protocol.Vs.DATA_BUF),
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "Poll tick failed", t)
+        }
     }
 
     private fun stopPollLoop() {
