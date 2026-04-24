@@ -1,5 +1,6 @@
 'use client';
 
+import EditIcon from '@mui/icons-material/Edit';
 import InfoIcon from '@mui/icons-material/Info';
 import ListIcon from '@mui/icons-material/List';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -8,11 +9,12 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import L from 'leaflet';
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { LayerGroup, useMap } from 'react-leaflet';
 import useFirecallLocations from '../../../hooks/useFirecallLocations';
+import EinsatzortEditDialog from '../../Einsatzorte/EinsatzortEditDialog';
 import FirecallElement from '../../FirecallItems/elements/FirecallElement';
-import { FcMarker, FirecallItem, LOCATION_STATUS_COLORS, LocationStatus } from '../../firebase/firestore';
+import { FirecallItem, FirecallLocation } from '../../firebase/firestore';
 
 export default function LocationsLayer() {
   const { locations } = useFirecallLocations();
@@ -24,6 +26,7 @@ export default function LocationsLayer() {
     left: number;
   }>();
   const [contextItem, setContextItem] = useState<FirecallItem>();
+  const [editLocation, setEditLocation] = useState<FirecallLocation>();
 
   const closeContextMenu = useCallback(() => {
     setContextMenuPos(undefined);
@@ -41,6 +44,19 @@ export default function LocationsLayer() {
     []
   );
 
+  const openLocationEditor = useCallback(
+    (item: FirecallItem) => {
+      const loc = locations.find((l) => l.id === item.id);
+      if (loc) setEditLocation(loc);
+    },
+    [locations]
+  );
+
+  const openEditFromMenu = useCallback(() => {
+    if (contextItem) openLocationEditor(contextItem);
+    closeContextMenu();
+  }, [contextItem, openLocationEditor, closeContextMenu]);
+
   return (
     <LayerGroup>
       {locations
@@ -50,20 +66,11 @@ export default function LocationsLayer() {
             item={
               {
                 ...location,
-                name: location.name || `${location.street} ${location.number}`.trim(),
-                type: 'marker',
-                color: LOCATION_STATUS_COLORS[location.status as LocationStatus] || 'red',
-                beschreibung: [
-                  `${location.street} ${location.number}, ${location.city}`,
-                  location.vehicles && typeof location.vehicles === 'object'
-                    ? `Fahrzeuge: ${Object.values(location.vehicles).join(', ')}`
-                    : location.vehicles && `Fahrzeuge: ${location.vehicles}`,
-                  location.description,
-                ].filter(Boolean).join('\n'),
+                type: 'location',
                 draggable: false,
-              } as FcMarker
+              } as FirecallItem
             }
-            selectItem={() => {}}
+            selectItem={openLocationEditor}
             key={location.id}
             options={{ onContextMenu: handleContextMenu }}
           />
@@ -75,11 +82,16 @@ export default function LocationsLayer() {
         anchorPosition={contextMenuPos}
         slotProps={{ list: { dense: true } }}
       >
+        <MenuItem onClick={openEditFromMenu}>
+          <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Bearbeiten</ListItemText>
+        </MenuItem>
         <MenuItem
           onClick={() => {
             if (contextItem?.lat && contextItem?.lng) {
+              const description = (contextItem as FirecallItem & { beschreibung?: string; description?: string }).beschreibung || (contextItem as FirecallItem & { description?: string }).description || '';
               map.openPopup(
-                `<b>${contextItem.name}</b><br/>${(contextItem.beschreibung || '').replace(/\n/g, '<br/>')}`,
+                `<b>${contextItem.name}</b><br/>${description.replace(/\n/g, '<br/>')}`,
                 L.latLng(contextItem.lat, contextItem.lng)
               );
             }
@@ -99,6 +111,10 @@ export default function LocationsLayer() {
           <ListItemText>Einsatzorte</ListItemText>
         </MenuItem>
       </Menu>
+      <EinsatzortEditDialog
+        location={editLocation}
+        onClose={() => setEditLocation(undefined)}
+      />
     </LayerGroup>
   );
 }

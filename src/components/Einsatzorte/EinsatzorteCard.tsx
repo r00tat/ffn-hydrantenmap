@@ -29,6 +29,8 @@ interface EinsatzorteCardProps {
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
   onMapVehicleSelected?: (vehicleId: string, vehicleName: string, location: FirecallLocation) => void;
   onCreateVehicle?: (name: string, fw: string, location: FirecallLocation) => void;
+  /** Debounce in ms before onChange fires for existing cards. 0 = synchronous. Default 500. */
+  debounceMs?: number;
 }
 
 export default function EinsatzorteCard({
@@ -42,6 +44,7 @@ export default function EinsatzorteCard({
   onKostenersatzVehicleSelected,
   onMapVehicleSelected,
   onCreateVehicle,
+  debounceMs = 500,
 }: EinsatzorteCardProps) {
   // Track a unique key for resetting the new card after add
   const [resetKey, setResetKey] = useState(0);
@@ -164,9 +167,9 @@ export default function EinsatzorteCard({
         clearTimeout(debounceRef.current);
       }
 
-      // For existing cards, debounce auto-save
+      // For existing cards, optionally debounce auto-save
       // Include auto-filled time fields when status changes
-      debounceRef.current = setTimeout(() => {
+      const fireChange = () => {
         const updates: Partial<FirecallLocation> = { [field]: value };
         if (field === 'status') {
           if (updated.startTime && updated.startTime !== local.startTime) {
@@ -177,9 +180,14 @@ export default function EinsatzorteCard({
           }
         }
         onChange(updates);
-      }, 500);
+      };
+      if (debounceMs <= 0) {
+        fireChange();
+      } else {
+        debounceRef.current = setTimeout(fireChange, debounceMs);
+      }
     },
-    [local, isNew, onChange]
+    [local, isNew, onChange, debounceMs]
   );
 
   const handleMapConfirm = useCallback(

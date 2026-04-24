@@ -12,6 +12,7 @@ import { FirecallHydrant } from './FirecallHydrant';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallItemLayer } from './FirecallItemLayer';
 import { FirecallItemMarker } from './FirecallItemMarker';
+import { FirecallItemLocation } from './FirecallItemLocation';
 import { FirecallLine } from './FirecallLine';
 import { FirecallRohr } from './FirecallRohr';
 import { FirecallSpectrum } from './FirecallSpectrum';
@@ -21,6 +22,7 @@ import { FirecallVehicle } from './FirecallVehicle';
 export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   fallback: FirecallItemBase,
   marker: FirecallItemMarker,
+  location: FirecallItemLocation,
   layer: FirecallItemLayer,
   vehicle: FirecallVehicle,
   tacticalUnit: FirecallTacticalUnit,
