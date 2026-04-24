@@ -1,7 +1,10 @@
 'use client';
 
+import CloseIcon from '@mui/icons-material/Close';
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import React, {
   createContext,
@@ -88,13 +91,23 @@ export default function SnackbarProvider({
           sx={{ width: '100%' }}
           action={
             state.action ? (
-              <Button
-                color="inherit"
-                size="small"
-                onClick={state.action.onClick}
-              >
-                {state.action.label}
-              </Button>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={state.action.onClick}
+                >
+                  {state.action.label}
+                </Button>
+                <IconButton
+                  aria-label="Close"
+                  color="inherit"
+                  size="small"
+                  onClick={handleClose}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
             ) : undefined
           }
         >
