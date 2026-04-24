@@ -85,4 +85,19 @@ describe('SnackbarProvider', () => {
     // After closing, the alert should start transitioning out
     // We don't wait for the full animation, just verify the close was triggered
   });
+
+  it('renders a close button alongside the action so snackbar stays dismissible', async () => {
+    const user = userEvent.setup();
+    render(
+      <SnackbarProvider>
+        <TestConsumer />
+      </SnackbarProvider>,
+    );
+
+    await user.click(screen.getByText('show-action'));
+    expect(screen.getByText('Neu laden')).toBeInTheDocument();
+
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+    expect(closeButton).toBeInTheDocument();
+  });
 });

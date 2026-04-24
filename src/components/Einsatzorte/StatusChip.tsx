@@ -25,7 +25,8 @@ const statusLabels: Record<LocationStatus, string> = {
 };
 
 export default function StatusChip({ status, onChange, readOnly }: StatusChipProps) {
-  const color = LOCATION_STATUS_COLORS[status] || 'grey';
+  const color = LOCATION_STATUS_COLORS[status] || '#9e9e9e';
+  const textColor = status === 'offen' ? 'black' : 'white';
 
   if (readOnly) {
     return (
@@ -34,7 +35,7 @@ export default function StatusChip({ status, onChange, readOnly }: StatusChipPro
         size="small"
         sx={{
           backgroundColor: color,
-          color: color === 'yellow' ? 'black' : 'white',
+          color: textColor,
         }}
       />
     );
@@ -47,9 +48,9 @@ export default function StatusChip({ status, onChange, readOnly }: StatusChipPro
         onChange={(e: SelectChangeEvent) => onChange(e.target.value as LocationStatus)}
         sx={{
           backgroundColor: color,
-          color: color === 'yellow' ? 'black' : 'white',
+          color: textColor,
           '& .MuiSelect-icon': {
-            color: color === 'yellow' ? 'black' : 'white',
+            color: textColor,
           },
         }}
       >

@@ -56,7 +56,7 @@ export interface FirecallItem {
   fieldData?: Record<string, string | number | boolean>;
 }
 
-export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback'];
+export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback', 'location'];
 
 export interface DataSchemaField {
   key: string;
@@ -346,11 +346,11 @@ export const LOCATION_STATUS_OPTIONS: LocationStatus[] = [
 ];
 
 export const LOCATION_STATUS_COLORS: Record<LocationStatus, string> = {
-  'offen': 'yellow',
-  'einsatz notwendig': 'red',
-  'in arbeit': 'orange',
-  'erledigt': 'green',
-  'kein einsatz': 'green',
+  'offen': '#fbc02d',
+  'einsatz notwendig': '#d32f2f',
+  'in arbeit': '#f57c00',
+  'erledigt': '#388e3c',
+  'kein einsatz': '#388e3c',
 };
 
 export interface FirecallLocation {
