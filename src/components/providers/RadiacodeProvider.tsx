@@ -81,6 +81,15 @@ export interface RadiacodeContextValue {
   writeSettings: (patch: Partial<RadiacodeSettings>) => Promise<void>;
   playSignal: () => Promise<void>;
   doseReset: () => Promise<void>;
+  /**
+   * Fragt den nativen BLE-Status ab und spiegelt ihn in den React-State.
+   * Wenn der native Service bereits verbunden ist und der Provider noch
+   * 'idle' ist, wird die Verbindung adoptiert (Listener registriert,
+   * Status auf 'connected' gesetzt). Kein neuer BLE-Verbindungsaufbau,
+   * kein Handshake. Wird auch beim Mount und beim Wechsel der Sichtbarkeit
+   * (App-Foreground) automatisch ausgeführt.
+   */
+  refreshConnectionState: () => Promise<void>;
 }
 
 export default RadiacodeProvider;
@@ -140,6 +149,7 @@ export function RadiacodeProvider({
     scan,
     connect: connectRaw,
     disconnect,
+    adoptExistingConnection,
     clientRef,
   } = useRadiacodeDevice(adapter, { clientFactory });
 
@@ -373,33 +383,86 @@ export function RadiacodeProvider({
     await client.doseReset();
   }, [clientRef]);
 
-  // Clean up any active session subscription on unmount.
-  useEffect(() => {
-    // Try to sync with native state on mount if native is available
-    if (
-      adapter.onConnectionStateChange &&
-      typeof RadiacodeNotification.getState === 'function'
-    ) {
-      RadiacodeNotification.getState()
-        .then((state: RadiacodeNativeState) => {
-          if (state.connected && state.deviceAddress) {
-            // If native is already connected, we don't necessarily need to trigger
-            // a connectRaw here if the useEffect for auto-connect already handles it,
-            // but we can ensure the UI knows about the device.
-            console.log(
-              '[RadiacodeProvider] Native already connected to:',
-              state.deviceAddress,
-            );
-          }
-        })
-        .catch(() => {});
-    }
+  // Refs auf den aktuellen Status / Device, damit syncFromNative stabil bleibt
+  // und Listener (visibilitychange, mount) die aktuellen Werte sehen, ohne dass
+  // der Effekt bei jeder Status-Änderung neu registriert.
+  const rawStatusRef = useRef(rawStatus);
+  rawStatusRef.current = rawStatus;
+  const deviceRef = useRef(device);
+  deviceRef.current = device;
 
+  /**
+   * Spiegelt den nativen BLE-Verbindungsstatus in den React-State.
+   * Wenn der Foreground-Service als verbunden meldet und der React-Status
+   * 'idle'/'unavailable'/'error' ist, wird die Verbindung adoptiert
+   * (Listener-Registrierung, Status-Setzen) — ohne neuen Verbindungsaufbau.
+   * Sicher idempotent: wenn bereits adoptiert oder gerade beim Connect,
+   * tut die Funktion nichts.
+   */
+  const syncFromNative = useCallback(async (): Promise<void> => {
+    if (typeof RadiacodeNotification.getState !== 'function') {
+      return;
+    }
+    let state: RadiacodeNativeState;
+    try {
+      state = await RadiacodeNotification.getState();
+    } catch (err) {
+      console.warn(
+        '[RadiacodeProvider] syncFromNative — getState failed',
+        err,
+      );
+      return;
+    }
+    if (!state.connected || !state.deviceAddress) {
+      // Kein nativer Connect — UI-Status nicht regeln, das macht der Hook
+      // über onConnectionStateChange.
+      return;
+    }
+    if (
+      rawStatusRef.current === 'connected' ||
+      rawStatusRef.current === 'connecting'
+    ) {
+      return;
+    }
+    const target: RadiacodeDeviceRef = {
+      id: state.deviceAddress,
+      name: deviceRef.current?.name ?? 'Radiacode',
+      serial: deviceRef.current?.serial ?? state.deviceAddress,
+    };
+    console.log('[RadiacodeProvider] syncFromNative — adopting', target.id);
+    try {
+      await adoptExistingConnection(target);
+    } catch (err) {
+      console.warn(
+        '[RadiacodeProvider] adoptExistingConnection failed',
+        err,
+      );
+    }
+  }, [adoptExistingConnection]);
+
+  // Beim Mount des Providers den nativen Status spiegeln, dann auf den
+  // visibilitychange-Listener verzweigen (App kommt aus dem Hintergrund).
+  // Cleanup: aktive Session-Subscription am Ende beenden.
+  useEffect(() => {
+    void syncFromNative();
     return () => {
       sessionUnsubRef.current?.();
       sessionUnsubRef.current = null;
     };
-  }, [adapter.onConnectionStateChange]);
+  }, [syncFromNative]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void syncFromNative();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [syncFromNative]);
 
   // Mask status while reconnecting — UI should show the "connecting…" state
   // during an auto-reconnect attempt rather than flipping to idle/error.
@@ -432,23 +495,36 @@ export function RadiacodeProvider({
   // the adapter changes (notably: NULL_ADAPTER → real adapter from
   // getBleAdapter()) so the auto-connect happens once the real BLE stack is
   // available. Failures surface via status='unavailable' from the hook.
+  //
+  // Bereits bestehende Verbindungen werden NICHT hier adoptiert — das macht
+  // syncFromNative() im Mount/visibilitychange-Effekt. Hier wird nur ein
+  // echter Connect zum gespeicherten Default-Device angestoßen, falls
+  // weder Native noch der Hook bereits verbunden sind.
   useEffect(() => {
     let cancelled = false;
+    const isAlreadyAdopted = (): boolean => {
+      const s: RadiacodeStatus = rawStatusRef.current;
+      return s === 'connected' || s === 'connecting';
+    };
     (async () => {
-      // First check if already connected (important for Refresh)
+      // syncFromNative hatte ggf. bereits adoptiert — dann nichts tun.
+      if (isAlreadyAdopted()) return;
+      // Falls Native bereits verbunden ist, übernimmt das syncFromNative.
       const connected = await adapter.getConnectedDevices();
-      if (connected.length > 0 && !cancelled) {
-        console.log('[RadiacodeProvider] Already connected to:', connected[0].id);
-        // This will update the internal useRadiacodeDevice state
-        await connectRaw(connected[0]).catch(() => null);
+      if (connected.length > 0) {
+        console.log(
+          '[RadiacodeProvider] adapter reports existing connection — leaving adoption to syncFromNative',
+        );
         return;
       }
+      if (cancelled) return;
 
       const saved = await loadDefaultDevice().catch(() => null);
       if (!saved || cancelled) return;
 
-      // Check if we are currently connecting to avoid duplicate attempts
-      if (status === 'connecting' || rawStatus === 'connecting') return;
+      // Doppel-Connect-Versuche vermeiden, falls der Status während des
+      // await schon nach 'connecting' gesprungen ist.
+      if (isAlreadyAdopted()) return;
 
       console.log(
         '[RadiacodeProvider] Auto-connecting to saved device:',
@@ -499,6 +575,7 @@ export function RadiacodeProvider({
       writeSettings,
       playSignal,
       doseReset,
+      refreshConnectionState: syncFromNative,
     }),
     [
       status,
@@ -522,6 +599,7 @@ export function RadiacodeProvider({
       writeSettings,
       playSignal,
       doseReset,
+      syncFromNative,
     ],
   );
 

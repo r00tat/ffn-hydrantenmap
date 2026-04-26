@@ -1,5 +1,6 @@
 'use client';
 
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -48,6 +49,7 @@ export default function RadiacodeConnectionControls() {
     writeSettings,
     playSignal,
     doseReset,
+    refreshConnectionState,
   } = useRadiacode();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -74,6 +76,19 @@ export default function RadiacodeConnectionControls() {
           Verbinden
         </Button>
       )}
+      <Tooltip title="Verbindungsstatus prüfen">
+        <span>
+          <IconButton
+            aria-label="Verbindungsstatus prüfen"
+            onClick={() => {
+              void refreshConnectionState();
+            }}
+            disabled={status === 'connecting' || status === 'reconnecting'}
+          >
+            <RefreshIcon />
+          </IconButton>
+        </span>
+      </Tooltip>
       <Tooltip title="Einstellungen">
         <span>
           <IconButton

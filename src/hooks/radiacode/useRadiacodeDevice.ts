@@ -20,6 +20,15 @@ export interface UseRadiacodeDeviceResult {
   scan: () => Promise<RadiacodeDeviceRef | null>;
   connect: (device?: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
+  /**
+   * Spiegelt eine bereits bestehende native BLE-Verbindung in den Hook-State,
+   * ohne einen neuen Verbindungsaufbau anzustoßen. Erwartet, dass der native
+   * Foreground-Service bereits verbunden ist (Caller stellt das via
+   * `RadiacodeNotification.getState()` sicher). Erzeugt einen
+   * `RadiacodeClient`, registriert den Polling-Listener und setzt den
+   * Status auf 'connected' — kein `adapter.connect`, kein Handshake.
+   */
+  adoptExistingConnection: (device: RadiacodeDeviceRef) => Promise<void>;
   clientRef: RefObject<RadiacodeClient | null>;
 }
 
@@ -186,6 +195,44 @@ export function useRadiacodeDevice(
     [adapter, clientFactory, pollIntervalMs],
   );
 
+  const adoptExistingConnection = useCallback(
+    async (target: RadiacodeDeviceRef): Promise<void> => {
+      if (stateRef.current.client) {
+        // Bereits adoptiert — nichts zu tun.
+        return;
+      }
+      setError(null);
+      const client = clientFactory
+        ? clientFactory(adapter, target.id)
+        : new RadiacodeClient(adapter, target.id);
+
+      // Auf nativem Pfad ist client.connect() ein No-Op-äquivalentes Setup
+      // (registriert nur Notification-Listener, kein Handshake — siehe
+      // client.ts). Auf Web ist Adoption ohnehin nicht möglich, weil eine
+      // bestehende GATT-Session zwischen Page-Loads nicht überlebt.
+      await client.connect();
+      client.startPolling((m) => {
+        setMeasurement((prev) => {
+          if (!prev) return m;
+          const next = { ...prev };
+          for (const [key, val] of Object.entries(m)) {
+            if (val != null) {
+              (next as Record<string, unknown>)[key] = val;
+            }
+          }
+          return next;
+        });
+      }, pollIntervalMs);
+
+      setDevice(target);
+      stateRef.current.device = target;
+      stateRef.current.client = client;
+      clientRef.current = client;
+      setStatus('connected');
+    },
+    [adapter, clientFactory, pollIntervalMs],
+  );
+
   useEffect(() => {
     const state = stateRef.current;
     return () => {
@@ -208,6 +255,7 @@ export function useRadiacodeDevice(
     scan,
     connect,
     disconnect,
+    adoptExistingConnection,
     clientRef,
   };
 }

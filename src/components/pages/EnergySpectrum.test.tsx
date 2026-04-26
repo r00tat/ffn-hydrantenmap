@@ -81,6 +81,7 @@ function fixture(
     writeSettings: vi.fn(async () => {}),
     playSignal: vi.fn(async () => {}),
     doseReset: vi.fn(async () => {}),
+    refreshConnectionState: vi.fn(async () => {}),
     ...partial,
   };
 }
