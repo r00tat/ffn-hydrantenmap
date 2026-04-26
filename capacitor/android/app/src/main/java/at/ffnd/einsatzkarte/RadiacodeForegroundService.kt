@@ -579,10 +579,26 @@ class RadiacodeForegroundService : Service() {
             .putInt(0)
             .array()
         val okDeviceTime = writeAndWaitForAck(Protocol.Command.WR_VIRT_SFR, args)
+
+        // Zusätzlicher Read von VS.CONFIGURATION analog radiacode-py: dort
+        // wird im RadiaCode.__init__ nach device_time(0) explizit
+        // configuration() gerufen. Hypothese: dieser Read aktiviert auf dem
+        // Gerät den vollständigen DATA_BUF-Stream inkl. gid=3 RareData. Ohne
+        // ihn kommen nach Late-Connect nur Realtime/Raw-Records (im Logcat
+        // 2026-04-26 durchgehend rare=0 trotz korrekt verarbeiteten
+        // DEVICE_TIME=0-ACK). TS sendet GET_VERSION über getDeviceInfo, aber
+        // configuration() macht weder TS noch Native — das könnte exakt der
+        // Trigger sein, der bei Disconnect+Reconnect implizit greift.
+        val okConfig = writeAndWaitForAck(
+            Protocol.Command.RD_VIRT_STRING,
+            Framing.u32le(Protocol.Vs.CONFIGURATION),
+        )
+
         Log.i(
             TAG,
             "handshake done — SET_EXCHANGE=$okExchange SET_TIME=$okSetTime " +
-                "WR_VIRT_SFR(DEVICE_TIME=0)=$okDeviceTime",
+                "WR_VIRT_SFR(DEVICE_TIME=0)=$okDeviceTime " +
+                "RD_VIRT_STRING(CONFIGURATION)=$okConfig",
         )
 
         deviceReady = true

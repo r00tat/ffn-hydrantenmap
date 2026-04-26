@@ -20,6 +20,7 @@ object Protocol {
     }
 
     object Vs {
+        const val CONFIGURATION = 0x002
         const val DATA_BUF = 0x100
     }
 
