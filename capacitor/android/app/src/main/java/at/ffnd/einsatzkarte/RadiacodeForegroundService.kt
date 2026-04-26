@@ -134,6 +134,14 @@ class RadiacodeForegroundService : Service() {
     private var pollExecutor: ScheduledExecutorService? = null
     private var pollTask: ScheduledFuture<*>? = null
 
+    // ACK-Tracking für synchrone Handshake-Writes. radiacode-py wartet bei
+    // jedem execute() auf die Response, bevor der nächste Befehl rausgeht
+    // (siehe transports/bluetooth.py). Wir spiegeln das nur für den
+    // Handshake — Polling bleibt asynchron, weil der ScheduledExecutor sonst
+    // gegen die WebView-Drosselung verlieren würde.
+    private val ackLock = Object()
+    @Volatile private var lastAckedSeq: Int = -1
+
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
     @Volatile private var locationActive = false
@@ -478,6 +486,12 @@ class RadiacodeForegroundService : Service() {
         val listener = object : SessionListener {
             override fun onConnected() {
                 deviceReady = false
+                // ACK-Tracking für die kommende Handshake-Sequenz frisch
+                // initialisieren, damit ein altes lastAckedSeq aus einer
+                // vorherigen Session nicht fälschlich einen ACK signalisiert.
+                synchronized(ackLock) {
+                    lastAckedSeq = -1
+                }
                 Log.i(TAG, "listener.onConnected — running handshake")
                 runHandshake()
                 updateNotificationForState()
@@ -512,6 +526,11 @@ class RadiacodeForegroundService : Service() {
                     "ack — cmd=0x${parsed.cmd.toString(16)} seq=${parsed.seq} " +
                         "len=${parsed.data.size}",
                 )
+                // ACK-Wartende (z.B. runHandshake) aufwecken.
+                synchronized(ackLock) {
+                    lastAckedSeq = parsed.seq
+                    (ackLock as Object).notifyAll()
+                }
                 if (parsed.cmd == Protocol.Command.RD_VIRT_STRING && parsed.seq == pollSeq) {
                     val m = MeasurementDecoder.parse(parsed.data)
                     if (m != null) {
@@ -527,29 +546,77 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun runHandshake() {
-        // SET_EXCHANGE: args [0x01, 0xff, 0x12, 0xff] (analog TS-Client).
-        val seqExchange = writeCommand(
+        // Synchrone Handshake-Sequenz analog radiacode-py
+        // (transports/bluetooth.py: execute() blockiert pro Befehl bis ACK).
+        // Jeder writeAndWait queued den Frame und wartet bis zu 2 s, bis das
+        // Gerät die Antwort mit identischer seq zurückschickt. So ist
+        // garantiert, dass DEVICE_TIME=0 verarbeitet wurde, bevor der erste
+        // DATA_BUF-Read rausgeht — sonst liefert das Gerät ab da nur
+        // Realtime-Records und keine gid=3 Rare-Daten mehr.
+        val okExchange = writeAndWaitForAck(
             Protocol.Command.SET_EXCHANGE,
             byteArrayOf(0x01, 0xff.toByte(), 0x12, 0xff.toByte()),
         )
-        val seqSetTime = writeCommand(Protocol.Command.SET_TIME, encodeSetTime(Date()))
-        // WR_VIRT_SFR(DEVICE_TIME=0): <id_u32_le><value_u32_le>.
+        val okSetTime = writeAndWaitForAck(
+            Protocol.Command.SET_TIME,
+            encodeSetTime(Date()),
+        )
         val args = java.nio.ByteBuffer
             .allocate(8)
             .order(java.nio.ByteOrder.LITTLE_ENDIAN)
             .putInt(Protocol.Vsfr.DEVICE_TIME)
             .putInt(0)
             .array()
-        val seqDeviceTime = writeCommand(Protocol.Command.WR_VIRT_SFR, args)
+        val okDeviceTime = writeAndWaitForAck(Protocol.Command.WR_VIRT_SFR, args)
         Log.i(
             TAG,
-            "handshake queued — SET_EXCHANGE seq=$seqExchange, " +
-                "SET_TIME seq=$seqSetTime, WR_VIRT_SFR(DEVICE_TIME=0) seq=$seqDeviceTime",
+            "handshake done — SET_EXCHANGE=$okExchange SET_TIME=$okSetTime " +
+                "WR_VIRT_SFR(DEVICE_TIME=0)=$okDeviceTime",
         )
 
         deviceReady = true
         RadiacodeNotificationPlugin.emitConnectionState("connected")
         startPollLoop()
+    }
+
+    /**
+     * Schickt einen Befehl raus und blockiert bis zu [timeoutMs] ms auf das
+     * passende ACK (Notification mit gleicher seq). Gibt `true` zurück, wenn
+     * das ACK rechtzeitig kam, `false` bei Timeout. Im Timeout-Fall wird
+     * weitergemacht — der Aufrufer entscheidet, ob das ein Hard-Fail ist.
+     *
+     * Achtung: läuft im aufrufenden Thread (typischerweise GATT-Callback
+     * via SessionListener.onConnected → runHandshake). Darf NICHT vom
+     * Main/UI-Thread gerufen werden.
+     */
+    private fun writeAndWaitForAck(
+        cmd: Int,
+        args: ByteArray,
+        timeoutMs: Long = 2000L,
+    ): Boolean {
+        val seq: Int
+        synchronized(ackLock) {
+            seq = writeCommand(cmd, args)
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (lastAckedSeq != seq) {
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0L) {
+                    Log.w(
+                        TAG,
+                        "writeAndWaitForAck — timeout cmd=0x${cmd.toString(16)} " +
+                            "seq=$seq lastAckedSeq=$lastAckedSeq",
+                    )
+                    return false
+                }
+                try {
+                    ackLock.wait(remaining)
+                } catch (ie: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return false
+                }
+            }
+        }
+        return true
     }
 
     private fun writeCommand(cmd: Int, args: ByteArray): Int {
