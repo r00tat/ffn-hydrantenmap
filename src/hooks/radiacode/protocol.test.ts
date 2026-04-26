@@ -247,6 +247,61 @@ describe('decodeDataBufRecords', () => {
     expect(rt?.type).toBe('realtime');
   });
 
+  it('bricht bei einem Sequenznummer-Sprung sauber ab (analog radiacode-py)', () => {
+    // Zwei aufeinanderfolgende Realtime-Records mit Sequenz-Sprung 5 → 9.
+    // Erwartung: erstes Record wird geparst, zweites wegen Seq-Mismatch verworfen.
+    const buf = new Uint8Array(2 * (7 + 15));
+    const view = new DataView(buf.buffer);
+    let off = 0;
+    const writeRealtime = (seq: number) => {
+      buf[off] = seq;
+      buf[off + 1] = 0;
+      buf[off + 2] = 0;
+      view.setInt32(off + 3, 0, true);
+      off += 7;
+      view.setFloat32(off, 1, true); // countRate
+      view.setFloat32(off + 4, 1e-6, true); // doseRate
+      view.setUint16(off + 8, 100, true); // cpsErr
+      view.setUint16(off + 10, 200, true); // drErr
+      view.setUint16(off + 12, 0, true); // flags
+      buf[off + 14] = 0; // realTimeFlags
+      off += 15;
+    };
+    writeRealtime(5);
+    writeRealtime(9); // Sprung statt 6 → muss break auslösen
+
+    const records = decodeDataBufRecords(buf);
+    expect(records).toHaveLength(1);
+    expect(records[0].type).toBe('realtime');
+    if (records[0].type !== 'realtime') throw new Error();
+    expect(records[0].seq).toBe(5);
+  });
+
+  it('akzeptiert den 8-bit-Wraparound der Sequenznummer (255 → 0)', () => {
+    const buf = new Uint8Array(2 * (7 + 15));
+    const view = new DataView(buf.buffer);
+    let off = 0;
+    const writeRealtime = (seq: number) => {
+      buf[off] = seq;
+      buf[off + 1] = 0;
+      buf[off + 2] = 0;
+      view.setInt32(off + 3, 0, true);
+      off += 7;
+      view.setFloat32(off, 1, true);
+      view.setFloat32(off + 4, 1e-6, true);
+      view.setUint16(off + 8, 0, true);
+      view.setUint16(off + 10, 0, true);
+      view.setUint16(off + 12, 0, true);
+      buf[off + 14] = 0;
+      off += 15;
+    };
+    writeRealtime(255);
+    writeRealtime(0); // (255 + 1) & 0xff = 0 → kein Sprung
+
+    const records = decodeDataBufRecords(buf);
+    expect(records).toHaveLength(2);
+  });
+
   it('skipt unbekannten/nicht-ausgewerteten Record-Type gid=4 und liest dahinter gid=3 (Rare) korrekt', () => {
     // Synthetischer Stream: 0:4 (UserData, 16 bytes) gefolgt von 0:3 (Rare, 14 bytes).
     // Vor dem Fix brach der Decoder beim ersten 0:4 ab und verlor die Rare-Daten —

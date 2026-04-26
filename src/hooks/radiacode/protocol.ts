@@ -443,11 +443,21 @@ export function decodeDataBufRecords(data: Uint8Array): DataBufRecord[] {
   const records: DataBufRecord[] = [];
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   let off = 0;
+  // Sequenznummer-Verifikation analog radiacode-py: pro Record um 1
+  // erhöhter Byte-Counter. Springt er, wurde der Cursor zwischen
+  // den Records verschoben (z.B. durch eine falsche Längen-Annahme bei
+  // einem unbekannten Record-Type). In dem Fall sauber abbrechen, statt
+  // Müll-Records zu produzieren.
+  let nextSeq: number | null = null;
 
   while (data.length - off >= 7) {
     const seq = data[off];
     const eid = data[off + 1];
     const gid = data[off + 2];
+    if (nextSeq !== null && nextSeq !== seq) {
+      break;
+    }
+    nextSeq = (seq + 1) & 0xff;
     const tsOffset = view.getInt32(off + 3, true);
     const tsMs = tsOffset * 10;
     off += 7;

@@ -94,10 +94,25 @@ object MeasurementDecoder {
         // (worauf der Decoder im else-Branch abbricht und damit alle dahinter
         // liegenden gid=3-Rare-Records verloren gehen würden).
         val seenTypes = ArrayList<String>()
+        // Sequenznummer-Verifikation analog radiacode-py: jeder Record führt
+        // einen byte-Counter mit, der pro Record um 1 steigt. Wenn der Counter
+        // springt, sind wir in unsicherem Territorium gelandet (z.B. weil
+        // ein Längen-Mismatch den Cursor verschoben hat) — sauber abbrechen,
+        // statt Müll zu parsen.
+        var nextSeq: Int? = null
         while (data.size - off >= 7) {
             // seq@off, eid@off+1, gid@off+2, tsOffset@off+3 (i32)
+            val seq = data[off].toInt() and 0xff
             val eid = data[off + 1].toInt() and 0xff
             val gid = data[off + 2].toInt() and 0xff
+            if (nextSeq != null && nextSeq != seq) {
+                android.util.Log.w(
+                    "MeasurementDecoder",
+                    "decode break — seq jump expected=$nextSeq got=$seq eid=$eid gid=$gid",
+                )
+                break
+            }
+            nextSeq = (seq + 1) and 0xff
             seenTypes.add("$eid:$gid")
             off += 7
             when {
