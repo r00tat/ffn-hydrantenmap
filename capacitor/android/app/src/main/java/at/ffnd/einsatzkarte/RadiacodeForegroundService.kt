@@ -99,7 +99,13 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_INITIAL_LNG = "initialLng"
 
         private const val TAG = "RadiacodeFg"
-        private const val POLL_INTERVAL_MS = 500L
+        // 1 s Poll-Takt: radiacode-py basic.py nutzt 2 s, unsere bisherige
+        // 500-ms-Frequenz hat das Gerät anscheinend so schnell entleert, dass
+        // gid=3 RareData (Akku/Temperatur, Gerät produziert sie nur alle paar
+        // Sekunden) zwischen den Reads landeten und nie in einer Antwort
+        // sichtbar wurden. 1 s ist die Mitte: deutlich näher an radiacode-py,
+        // aber schneller als die mobile Referenz-App, die in ~10 s reagiert.
+        private const val POLL_INTERVAL_MS = 1000L
 
         fun startIntent(ctx: Context, title: String, body: String): Intent =
             Intent(ctx, RadiacodeForegroundService::class.java).apply {
@@ -630,15 +636,15 @@ class RadiacodeForegroundService : Service() {
             .array()
         val okDeviceTime = writeAndWaitForAck(Protocol.Command.WR_VIRT_SFR, args)
 
-        // Zusätzlicher Read von VS.CONFIGURATION analog radiacode-py: dort
-        // wird im RadiaCode.__init__ nach device_time(0) explizit
-        // configuration() gerufen. Hypothese: dieser Read aktiviert auf dem
-        // Gerät den vollständigen DATA_BUF-Stream inkl. gid=3 RareData. Ohne
-        // ihn kommen nach Late-Connect nur Realtime/Raw-Records (im Logcat
-        // 2026-04-26 durchgehend rare=0 trotz korrekt verarbeiteten
-        // DEVICE_TIME=0-ACK). TS sendet GET_VERSION über getDeviceInfo, aber
-        // configuration() macht weder TS noch Native — das könnte exakt der
-        // Trigger sein, der bei Disconnect+Reconnect implizit greift.
+        // GET_VERSION + RD_VIRT_STRING(CONFIGURATION) analog radiacode-py
+        // RadiaCode.__init__ ([radiacode/radiacode.py:98-108]). Reihenfolge
+        // exakt wie in der Referenz, damit das Gerät den DATA_BUF-Stream
+        // inklusive gid=3 RareData freigibt. Ohne diesen kompletten Init
+        // kamen bei frisch eingeschaltetem Gerät nur Realtime-Records.
+        val okVersion = writeAndWaitForAck(
+            Protocol.Command.GET_VERSION,
+            ByteArray(0),
+        )
         val okConfig = writeAndWaitForAck(
             Protocol.Command.RD_VIRT_STRING,
             Framing.u32le(Protocol.Vs.CONFIGURATION),
@@ -648,6 +654,7 @@ class RadiacodeForegroundService : Service() {
             TAG,
             "handshake done — SET_EXCHANGE=$okExchange SET_TIME=$okSetTime " +
                 "WR_VIRT_SFR(DEVICE_TIME=0)=$okDeviceTime " +
+                "GET_VERSION=$okVersion " +
                 "RD_VIRT_STRING(CONFIGURATION)=$okConfig",
         )
 

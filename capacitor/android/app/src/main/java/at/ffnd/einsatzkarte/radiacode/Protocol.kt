@@ -13,6 +13,7 @@ object Protocol {
 
     object Command {
         const val SET_EXCHANGE = 0x0007
+        const val GET_VERSION = 0x000a
         const val RD_VIRT_SFR = 0x0824
         const val WR_VIRT_SFR = 0x0825
         const val RD_VIRT_STRING = 0x0826
