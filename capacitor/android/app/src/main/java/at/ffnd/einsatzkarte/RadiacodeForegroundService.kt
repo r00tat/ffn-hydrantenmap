@@ -492,9 +492,20 @@ class RadiacodeForegroundService : Service() {
                 synchronized(ackLock) {
                     lastAckedSeq = -1
                 }
-                Log.i(TAG, "listener.onConnected — running handshake")
-                runHandshake()
-                updateNotificationForState()
+                Log.i(TAG, "listener.onConnected — dispatching handshake to worker thread")
+                // WICHTIG: runHandshake darf NICHT auf dem GATT-Binder-Thread
+                // laufen, weil writeAndWaitForAck dort mit ackLock.wait() den
+                // selben Thread blockieren würde, der für onNotification
+                // (= ACK-Empfang) zuständig ist → klassischer Deadlock
+                // (Logcat-Befund vom 2026-04-26: alle drei Handshake-ACKs
+                // kamen erst 6 s später, exakt nach Rückkehr aus dem
+                // blockierenden onConnected). Daher den Handshake in einen
+                // dedizierten Worker-Thread auslagern. Der GATT-Thread
+                // bleibt frei und kann ACK-Notifications zustellen.
+                Thread({
+                    runHandshake()
+                    updateNotificationForState()
+                }, "RadiacodeHandshake").start()
             }
 
             override fun onDisconnected() {
@@ -630,18 +641,14 @@ class RadiacodeForegroundService : Service() {
         stopPollLoop()
         val exec = Executors.newSingleThreadScheduledExecutor()
         pollExecutor = exec
-        // Initial-Delay 1000 ms: runHandshake() queued SET_EXCHANGE / SET_TIME
-        // / WR_VIRT_SFR(DEVICE_TIME, 0) asynchron via session.sendWrite und
-        // setzt deviceReady=true sofort danach — ohne auf das ACK des Geräts
-        // zu warten. Ein vorheriger Versuch mit 200 ms reichte nicht aus, das
-        // Logcat zeigte weiterhin durchgängig rare=0 nach Late-Connect. 1 s
-        // gibt dem Gerät genug Spielraum, den DEVICE_TIME=0-Cursor-Reset zu
-        // verarbeiten, bevor der erste DATA_BUF-Read rausgeht.
-        // Sauberer wäre, auf das ACK des WR_VIRT_SFR-Frames zu warten — falls
-        // der 1-s-Delay nicht reicht, ist das der nächste Schritt.
+        // Initial-Delay 100 ms: minimale Reserve, falls das Gerät nach dem
+        // WR_VIRT_SFR(DEVICE_TIME=0)-ACK noch ein paar Millisekunden internal
+        // state benötigt. runHandshake() wartet inzwischen synchron auf alle
+        // drei Handshake-ACKs (Wait-for-ACK auf Worker-Thread), sodass der
+        // Cursor-Reset garantiert verarbeitet ist, bevor wir hier landen.
         pollTask = exec.scheduleAtFixedRate({
             pollTick()
-        }, 1000L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }, 100L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun pollTick() {
