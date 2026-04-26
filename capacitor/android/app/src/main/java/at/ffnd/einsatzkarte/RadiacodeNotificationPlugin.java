@@ -245,10 +245,34 @@ public class RadiacodeNotificationPlugin extends Plugin {
         data.put("timestampMs", m.getTimestampMs());
         data.put("dosisleistungUSvH", m.getDosisleistungUSvH());
         data.put("cps", m.getCps());
-        if (m.getDoseUSv() != null) data.put("doseUSv", m.getDoseUSv());
-        if (m.getDurationSec() != null) data.put("durationSec", m.getDurationSec());
-        if (m.getTemperatureC() != null) data.put("temperatureC", m.getTemperatureC());
-        if (m.getChargePct() != null) data.put("chargePct", m.getChargePct());
+
+        // Rare-Felder fallen alle paar Sekunden vom Gerät runter, nicht jeden
+        // Poll-Tick. Damit die UI nach Late-Connect oder Adoption nicht
+        // dauerhaft '—' anzeigt, fällt das Plugin auf den im Service
+        // gehaltenen Cache zurück, falls der aktuelle Tick keinen frischen
+        // Wert mitbringt. Frische Werte aus `m` haben Vorrang.
+        RadiacodeForegroundService svc = RadiacodeForegroundService.Companion.getInstance();
+
+        Double dose = m.getDoseUSv() != null
+            ? m.getDoseUSv()
+            : (svc != null ? svc.getCachedDoseUSv() : null);
+        if (dose != null) data.put("doseUSv", dose);
+
+        Integer duration = m.getDurationSec() != null
+            ? m.getDurationSec()
+            : (svc != null ? svc.getCachedDurationSec() : null);
+        if (duration != null) data.put("durationSec", duration);
+
+        Double temp = m.getTemperatureC() != null
+            ? m.getTemperatureC()
+            : (svc != null ? svc.getCachedTemperatureC() : null);
+        if (temp != null) data.put("temperatureC", temp);
+
+        Double chg = m.getChargePct() != null
+            ? m.getChargePct()
+            : (svc != null ? svc.getCachedChargePct() : null);
+        if (chg != null) data.put("chargePct", chg);
+
         if (m.getDosisleistungErrPct() != null)
             data.put("dosisleistungErrPct", m.getDosisleistungErrPct());
         if (m.getCpsErrPct() != null) data.put("cpsErrPct", m.getCpsErrPct());

@@ -141,10 +141,23 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var trackRecorder: TrackRecorder? = null
     @Volatile private var gpsTrackRecorder: GpsTrackRecorder? = null
 
+    // Letzte gesehene Rare-Felder für Late-Connect / leere Ticks. Werden in
+    // `onMeasurementReceived` aktualisiert und bei `teardownSession` gelöscht,
+    // damit kein veralteter Wert in eine neue Session eingespielt wird.
+    @Volatile private var cachedDoseUSv: Double? = null
+    @Volatile private var cachedDurationSec: Int? = null
+    @Volatile private var cachedTemperatureC: Double? = null
+    @Volatile private var cachedChargePct: Double? = null
+
     fun isBleConnected(): Boolean = deviceReady
     fun getDeviceAddress(): String? = session?.deviceAddress
     fun isRadiacodeTracking(): Boolean = trackRecorder != null
     fun isGpsTracking(): Boolean = gpsTrackRecorder != null
+
+    fun getCachedDoseUSv(): Double? = cachedDoseUSv
+    fun getCachedDurationSec(): Int? = cachedDurationSec
+    fun getCachedTemperatureC(): Double? = cachedTemperatureC
+    fun getCachedChargePct(): Double? = cachedChargePct
 
     override fun onCreate() {
         super.onCreate()
@@ -399,6 +412,21 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun onMeasurementReceived(m: Measurement) {
+        // Diagnose-Log für Rare-Felder: dose/charge/temperature/duration
+        // sollten regelmäßig (alle paar Sekunden) Werte != null haben. Wenn
+        // sie dauerhaft null bleiben, liefert das Gerät keine Rare-Records
+        // aus, obwohl die Verbindung steht — siehe Bug-Analyse 2026-04-26.
+        Log.d(
+            TAG,
+            "measurement dose=${m.doseUSv} chg=${m.chargePct} temp=${m.temperatureC} dur=${m.durationSec}",
+        )
+        // Rare-Felder cachen, damit das Plugin sie auch in Ticks ohne
+        // frischen Rare-Record an die UI weiterreichen kann.
+        m.doseUSv?.let { cachedDoseUSv = it }
+        m.durationSec?.let { cachedDurationSec = it }
+        m.temperatureC?.let { cachedTemperatureC = it }
+        m.chargePct?.let { cachedChargePct = it }
+
         RadiacodeNotificationPlugin.emitMeasurement(m)
         trackRecorder?.onMeasurement(
             m,
@@ -522,9 +550,16 @@ class RadiacodeForegroundService : Service() {
         stopPollLoop()
         val exec = Executors.newSingleThreadScheduledExecutor()
         pollExecutor = exec
+        // Initial-Delay 200 ms: gibt dem Gerät Zeit, den DEVICE_TIME=0-Reset
+        // aus dem Handshake (runHandshake → WR_VIRT_SFR(DEVICE_TIME, 0)) zu
+        // verarbeiten, bevor der erste DATA_BUF-Read rausgeht. Ohne den Delay
+        // sieht das Gerät den Reset möglicherweise erst nach dem ersten
+        // Read und liefert anschließend nur Realtime-Records — Rare-Records
+        // (Dosis, Akku, Temperatur, Messdauer) bleiben dann dauerhaft aus,
+        // bis die Session per Disconnect+Reconnect frisch aufgebaut wird.
         pollTask = exec.scheduleAtFixedRate({
             pollTick()
-        }, 0L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }, 200L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun pollTick() {
@@ -562,6 +597,13 @@ class RadiacodeForegroundService : Service() {
         session?.release()
         session = null
         deviceReady = false
+        // Rare-Cache leeren — er soll nur innerhalb derselben Session gelten,
+        // damit nach einem expliziten Disconnect+Reconnect keine veralteten
+        // Werte aus einer früheren Session zurückkommen.
+        cachedDoseUSv = null
+        cachedDurationSec = null
+        cachedTemperatureC = null
+        cachedChargePct = null
     }
 
     /**

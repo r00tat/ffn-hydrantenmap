@@ -39,6 +39,17 @@ object MeasurementDecoder {
         if (data.size < 8) return null
         val records = decodeRecords(data, 8)
 
+        // Diagnose-Log: Rare-Records sollen regelmäßig auftauchen, sobald das
+        // Gerät verbunden ist. Wenn `rare=0` über lange Zeit dauerhaft bleibt,
+        // liefert das Gerät keine Akku-/Dosis-/Temperatur-Snapshots aus —
+        // das deutet auf ein Handshake-/DEVICE_TIME-Cursor-Problem hin.
+        val realtimeCount = records.count { it is Record.Realtime }
+        val rareCount = records.count { it is Record.Rare }
+        android.util.Log.d(
+            "MeasurementDecoder",
+            "parse — realtime=$realtimeCount rare=$rareCount totalRecords=${records.size}",
+        )
+
         val realtime = records.lastOrNull { it is Record.Realtime } as? Record.Realtime
             ?: return null
         val rare = records.lastOrNull { it is Record.Rare } as? Record.Rare
