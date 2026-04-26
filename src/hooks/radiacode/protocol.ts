@@ -507,6 +507,42 @@ export function decodeDataBufRecords(data: Uint8Array): DataBufRecord[] {
         flags,
       });
       off += 14;
+    } else if (eid === 0 && gid === 4) {
+      // GRP_UserData (radiacode-py decoders/databuf.py): <I f f H H> = 16 bytes.
+      // Inhalt wird derzeit nicht ausgewertet (radiacode-py macht TODO ebenfalls);
+      // wichtig ist nur, die Bytes korrekt zu überspringen, damit nachfolgende
+      // Records (insb. gid=3 RareData) nicht verloren gehen.
+      if (data.length - off < 16) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += 16;
+    } else if (eid === 0 && gid === 5) {
+      // GRP_SheduleData: <I f f H H> = 16 bytes
+      if (data.length - off < 16) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += 16;
+    } else if (eid === 0 && gid === 6) {
+      // GRP_AccelData: <H H H> = 6 bytes
+      if (data.length - off < 6) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += 6;
     } else if (eid === 0 && gid === 7) {
       if (data.length - off < 4) break;
       records.push({
@@ -518,6 +554,28 @@ export function decodeDataBufRecords(data: Uint8Array): DataBufRecord[] {
         flags: view.getUint16(off + 2, true),
       });
       off += 4;
+    } else if (eid === 0 && gid === 8) {
+      // GRP_RawCountRate: <f H> = 6 bytes
+      if (data.length - off < 6) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += 6;
+    } else if (eid === 0 && gid === 9) {
+      // GRP_RawDoseRate: <f H> = 6 bytes
+      if (data.length - off < 6) break;
+      records.push({
+        type: 'unknown',
+        seq,
+        timestampOffsetMs: tsMs,
+        eid,
+        gid,
+      });
+      off += 6;
     } else if (eid === 1 && (gid === 1 || gid === 2 || gid === 3)) {
       // Variable-length histogram-style records. Header is <H samples_num><I smpl_time_ms>,
       // followed by samples_num × (8|16|14) bytes depending on gid.

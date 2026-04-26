@@ -143,9 +143,39 @@ object MeasurementDecoder {
                     )
                     off += 14
                 }
+                eid == 0 && gid == 4 -> {
+                    // GRP_UserData (radiacode-py): <I f f H H> = 16 bytes
+                    if (data.size - off < 16) break
+                    off += 16
+                    out.add(Record.Other)
+                }
+                eid == 0 && gid == 5 -> {
+                    // GRP_SheduleData: <I f f H H> = 16 bytes
+                    if (data.size - off < 16) break
+                    off += 16
+                    out.add(Record.Other)
+                }
+                eid == 0 && gid == 6 -> {
+                    // GRP_AccelData: <H H H> = 6 bytes
+                    if (data.size - off < 6) break
+                    off += 6
+                    out.add(Record.Other)
+                }
                 eid == 0 && gid == 7 -> {
                     if (data.size - off < 4) break
                     off += 4
+                    out.add(Record.Other)
+                }
+                eid == 0 && gid == 8 -> {
+                    // GRP_RawCountRate: <f H> = 6 bytes
+                    if (data.size - off < 6) break
+                    off += 6
+                    out.add(Record.Other)
+                }
+                eid == 0 && gid == 9 -> {
+                    // GRP_RawDoseRate: <f H> = 6 bytes
+                    if (data.size - off < 6) break
+                    off += 6
                     out.add(Record.Other)
                 }
                 eid == 1 && (gid == 1 || gid == 2 || gid == 3) -> {
