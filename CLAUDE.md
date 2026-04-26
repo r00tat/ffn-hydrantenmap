@@ -32,6 +32,19 @@ Run them in order and fix errors before moving on to the next step. Only run `np
 
 **WICHTIG: TypeScript-Fehler (`tsc --noEmit`) dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
 
+## Android-Build (Capacitor)
+
+Der native Android-Build läuft im Verzeichnis `capacitor/android/` über Gradle. Aktuell: **AGP 8.13.0**, **Gradle 8.14.3**.
+
+**Wichtig: Build-JDK muss JDK 21 sein.** AGP 8.x unterstützt JDK 26 nicht — ein Build mit JDK 26 schlägt mit `JdkImageTransform`-Fehler beim Transformieren von `core-for-system-modules.jar` fehl.
+
+```bash
+cd capacitor/android
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
+```
+
+Bei Aufrufen aus Tools (z.B. Capacitor Sync, Android Studio) muss `JAVA_HOME` ebenfalls auf JDK 21 zeigen. Wenn AGP/Gradle/Kotlin später aktualisiert werden, ist die JDK-Pinning-Anforderung in einem separaten Branch zu prüfen.
+
 Data import scripts (require `GOOGLE_APPLICATION_CREDENTIALS` env var):
 
 ```bash
