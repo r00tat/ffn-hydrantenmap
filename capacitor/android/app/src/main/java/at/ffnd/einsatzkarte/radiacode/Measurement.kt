@@ -95,10 +95,13 @@ object MeasurementDecoder {
         // liegenden gid=3-Rare-Records verloren gehen würden).
         val seenTypes = ArrayList<String>()
         // Sequenznummer-Verifikation analog radiacode-py: jeder Record führt
-        // einen byte-Counter mit, der pro Record um 1 steigt. Wenn der Counter
-        // springt, sind wir in unsicherem Territorium gelandet (z.B. weil
-        // ein Längen-Mismatch den Cursor verschoben hat) — sauber abbrechen,
-        // statt Müll zu parsen.
+        // einen byte-Counter mit, der pro Record um 1 steigt. radiacode-py
+        // bricht bei einem Sprung ab. Wir versuchen es defensiv: bei einem
+        // Sprung loggen wir den Sprung + den nächsten Buffer-Bereich als hex
+        // (Diagnose) und parsen weiter mit dem aktuellen Record als neuen
+        // Counter-Anker. Wenn das Gerät einen segmentierten DATA_BUF-Stream
+        // schickt (z.B. "Realtime-Block" + "Rare-Block" mit je eigenem
+        // seq-Counter), bekommen wir damit den Rare-Block trotzdem.
         var nextSeq: Int? = null
         while (data.size - off >= 7) {
             // seq@off, eid@off+1, gid@off+2, tsOffset@off+3 (i32)
@@ -106,11 +109,17 @@ object MeasurementDecoder {
             val eid = data[off + 1].toInt() and 0xff
             val gid = data[off + 2].toInt() and 0xff
             if (nextSeq != null && nextSeq != seq) {
+                val rest = data.copyOfRange(off, minOf(off + 32, data.size))
+                val hex = rest.joinToString(" ") { String.format("%02x", it) }
                 android.util.Log.w(
                     "MeasurementDecoder",
-                    "decode break — seq jump expected=$nextSeq got=$seq eid=$eid gid=$gid",
+                    "seq jump expected=$nextSeq got=$seq eid=$eid gid=$gid — " +
+                        "weiterparsen mit neuem Anker. nextBytes=$hex",
                 )
-                break
+                // Counter neu verankern; wenn es sich tatsächlich um einen
+                // sauberen Block-Boundary handelt, läuft der Decoder dahinter
+                // korrekt weiter. Wenn nicht (Müll), bricht spätestens der
+                // nächste Schritt im else-Branch sauber ab.
             }
             nextSeq = (seq + 1) and 0xff
             seenTypes.add("$eid:$gid")
