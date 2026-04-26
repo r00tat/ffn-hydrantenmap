@@ -142,6 +142,15 @@ class RadiacodeForegroundService : Service() {
     private val ackLock = Object()
     @Volatile private var lastAckedSeq: Int = -1
 
+    // Self-Healing-Counter: wenn der GattSession-interne Reconnect (status=147)
+    // greift, behandelt das Gerät den nachfolgenden Connect anders als einen
+    // frischen — DATA_BUF enthält nur Backlog-Events, nie gid=3 RareData
+    // (Logcat-Befund vom 2026-04-26: Test 1 = internal reconnect, kein 0:3;
+    // Test 2 = frischer Connect, sofort 0:3 mit Akku/Temp/Dosis). Lösung:
+    // genau einmal pro Connect-Sequenz teardownSession + startBleSession,
+    // damit das Gerät einen sauberen Disconnect+Reconnect sieht.
+    @Volatile private var selfHealAttempts: Int = 0
+
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
     @Volatile private var locationActive = false
@@ -237,6 +246,10 @@ class RadiacodeForegroundService : Service() {
                 }
             }
             ACTION_BLE_DISCONNECT -> {
+                // Self-Heal-Counter resetten: bei manueller User-Disconnect
+                // beginnt die nächste Connect-Sequenz wieder mit erlaubtem
+                // self-heal.
+                selfHealAttempts = 0
                 teardownSession()
                 if (gpsTrackRecorder == null) {
                     Log.i(TAG, "ACTION_BLE_DISCONNECT — no GPS track, stopping service")
@@ -483,8 +496,41 @@ class RadiacodeForegroundService : Service() {
         Log.i(TAG, "startBleSession address=$address")
         RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
         updateNotificationForState()
+        val sessionWasReconnected = java.util.concurrent.atomic.AtomicBoolean(false)
         val listener = object : SessionListener {
             override fun onConnected() {
+                // Wenn die GattSession während dieses Aufbaus einen
+                // status=147-internen-Reconnect erlebt hat, sieht das Gerät
+                // den Client nicht als frisch — DATA_BUF enthält dann nur
+                // Backlog-Events ohne RareData. Einmal self-heal: vollständig
+                // teardown und neu starten, dann ist der Connect für das
+                // Gerät frisch (attempt=0).
+                if (sessionWasReconnected.get() && selfHealAttempts == 0) {
+                    selfHealAttempts++
+                    Log.w(
+                        TAG,
+                        "self-heal — internal reconnect detected, performing full session restart " +
+                            "for clean device state",
+                    )
+                    RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
+                    Thread({
+                        try {
+                            // Kleine Pause: das Gerät / Android-BLE-Stack soll
+                            // den vorherigen GATT-Socket vollständig schließen.
+                            Thread.sleep(500)
+                            teardownSession()
+                            Thread.sleep(500)
+                            startBleSession(address)
+                        } catch (t: Throwable) {
+                            Log.e(TAG, "self-heal failed", t)
+                        }
+                    }, "RadiacodeSelfHeal").start()
+                    return
+                }
+
+                // Normaler Pfad: frischer Connect (attempt=0) oder bereits
+                // einmal self-healed.
+                selfHealAttempts = 0
                 deviceReady = false
                 // ACK-Tracking für die kommende Handshake-Sequenz frisch
                 // initialisieren, damit ein altes lastAckedSeq aus einer
@@ -518,6 +564,10 @@ class RadiacodeForegroundService : Service() {
 
             override fun onReconnecting() {
                 Log.i(TAG, "listener.onReconnecting")
+                // Markiert die laufende Session als "hat intern reconnected" —
+                // löst beim nachfolgenden onConnected einmalig den Self-Heal
+                // aus.
+                sessionWasReconnected.set(true)
                 RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
                 updateNotificationForState()
             }
