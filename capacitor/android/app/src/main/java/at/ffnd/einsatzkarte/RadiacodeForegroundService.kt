@@ -550,16 +550,18 @@ class RadiacodeForegroundService : Service() {
         stopPollLoop()
         val exec = Executors.newSingleThreadScheduledExecutor()
         pollExecutor = exec
-        // Initial-Delay 200 ms: gibt dem Gerät Zeit, den DEVICE_TIME=0-Reset
-        // aus dem Handshake (runHandshake → WR_VIRT_SFR(DEVICE_TIME, 0)) zu
-        // verarbeiten, bevor der erste DATA_BUF-Read rausgeht. Ohne den Delay
-        // sieht das Gerät den Reset möglicherweise erst nach dem ersten
-        // Read und liefert anschließend nur Realtime-Records — Rare-Records
-        // (Dosis, Akku, Temperatur, Messdauer) bleiben dann dauerhaft aus,
-        // bis die Session per Disconnect+Reconnect frisch aufgebaut wird.
+        // Initial-Delay 1000 ms: runHandshake() queued SET_EXCHANGE / SET_TIME
+        // / WR_VIRT_SFR(DEVICE_TIME, 0) asynchron via session.sendWrite und
+        // setzt deviceReady=true sofort danach — ohne auf das ACK des Geräts
+        // zu warten. Ein vorheriger Versuch mit 200 ms reichte nicht aus, das
+        // Logcat zeigte weiterhin durchgängig rare=0 nach Late-Connect. 1 s
+        // gibt dem Gerät genug Spielraum, den DEVICE_TIME=0-Cursor-Reset zu
+        // verarbeiten, bevor der erste DATA_BUF-Read rausgeht.
+        // Sauberer wäre, auf das ACK des WR_VIRT_SFR-Frames zu warten — falls
+        // der 1-s-Delay nicht reicht, ist das der nächste Schritt.
         pollTask = exec.scheduleAtFixedRate({
             pollTick()
-        }, 200L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }, 1000L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun pollTick() {

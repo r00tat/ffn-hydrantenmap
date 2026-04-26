@@ -464,6 +464,24 @@ export function RadiacodeProvider({
     };
   }, [syncFromNative]);
 
+  // Wenn der native Service eine Verbindung als 'connected' meldet, ohne dass
+  // wir gerade aktiv aus connect()/connectRaw() warten (z.B. weil das
+  // Auto-Connect-Promise schon mit unavailable rejected war und der Service
+  // den Link erst danach aufgebaut hat), spiegelt syncFromNative den Status
+  // automatisch in den React-State. Ohne diesen Pfad bleibt die UI auf
+  // 'unavailable' hängen, obwohl die GATT-Session steht — der User müsste
+  // dann manuell Refresh klicken.
+  useEffect(() => {
+    const register = adapter.onConnectionStateChange;
+    if (!register) return;
+    const unsub = register((s) => {
+      if (s === 'connected' && rawStatusRef.current !== 'connected') {
+        void syncFromNative();
+      }
+    });
+    return unsub;
+  }, [adapter, syncFromNative]);
+
   // Mask status while reconnecting — UI should show the "connecting…" state
   // during an auto-reconnect attempt rather than flipping to idle/error.
   const status: RadiacodeStatus = reconnecting ? 'connecting' : rawStatus;

@@ -89,10 +89,16 @@ object MeasurementDecoder {
         val out = ArrayList<Record>()
         val bb = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         var off = startOffset
+        // Diagnose: alle (eid,gid)-Kombinationen, die wir im Stream sehen.
+        // Hilft zu erkennen, ob das Gerät einen unbekannten Record-Type schickt
+        // (worauf der Decoder im else-Branch abbricht und damit alle dahinter
+        // liegenden gid=3-Rare-Records verloren gehen würden).
+        val seenTypes = ArrayList<String>()
         while (data.size - off >= 7) {
             // seq@off, eid@off+1, gid@off+2, tsOffset@off+3 (i32)
             val eid = data[off + 1].toInt() and 0xff
             val gid = data[off + 2].toInt() and 0xff
+            seenTypes.add("$eid:$gid")
             off += 7
             when {
                 eid == 0 && gid == 0 -> {
@@ -155,9 +161,20 @@ object MeasurementDecoder {
                     off += payloadLen
                     out.add(Record.Other)
                 }
-                else -> break
+                else -> {
+                    android.util.Log.w(
+                        "MeasurementDecoder",
+                        "decode break — unbekannter record-type eid=$eid gid=$gid; " +
+                            "vorher gesehen: ${seenTypes.joinToString(",")}",
+                    )
+                    break
+                }
             }
         }
+        android.util.Log.d(
+            "MeasurementDecoder",
+            "records — ${seenTypes.joinToString(",")}",
+        )
         return out
     }
 }
