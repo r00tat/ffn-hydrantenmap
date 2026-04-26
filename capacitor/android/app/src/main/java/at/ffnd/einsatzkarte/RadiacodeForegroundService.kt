@@ -504,6 +504,14 @@ class RadiacodeForegroundService : Service() {
                 RadiacodeNotificationPlugin.emitNotification(bytes)
                 val complete = reassembler.push(bytes) ?: return
                 val parsed = parseResponse(complete) ?: return
+                // Diagnose: jede vom Gerät bestätigte Antwort loggen
+                // (cmd + seq), damit man Handshake-ACKs und Poll-ACKs im
+                // Logcat zuordnen kann.
+                Log.d(
+                    TAG,
+                    "ack — cmd=0x${parsed.cmd.toString(16)} seq=${parsed.seq} " +
+                        "len=${parsed.data.size}",
+                )
                 if (parsed.cmd == Protocol.Command.RD_VIRT_STRING && parsed.seq == pollSeq) {
                     val m = MeasurementDecoder.parse(parsed.data)
                     if (m != null) {
@@ -520,11 +528,11 @@ class RadiacodeForegroundService : Service() {
 
     private fun runHandshake() {
         // SET_EXCHANGE: args [0x01, 0xff, 0x12, 0xff] (analog TS-Client).
-        writeCommand(
+        val seqExchange = writeCommand(
             Protocol.Command.SET_EXCHANGE,
             byteArrayOf(0x01, 0xff.toByte(), 0x12, 0xff.toByte()),
         )
-        writeCommand(Protocol.Command.SET_TIME, encodeSetTime(Date()))
+        val seqSetTime = writeCommand(Protocol.Command.SET_TIME, encodeSetTime(Date()))
         // WR_VIRT_SFR(DEVICE_TIME=0): <id_u32_le><value_u32_le>.
         val args = java.nio.ByteBuffer
             .allocate(8)
@@ -532,7 +540,12 @@ class RadiacodeForegroundService : Service() {
             .putInt(Protocol.Vsfr.DEVICE_TIME)
             .putInt(0)
             .array()
-        writeCommand(Protocol.Command.WR_VIRT_SFR, args)
+        val seqDeviceTime = writeCommand(Protocol.Command.WR_VIRT_SFR, args)
+        Log.i(
+            TAG,
+            "handshake queued — SET_EXCHANGE seq=$seqExchange, " +
+                "SET_TIME seq=$seqSetTime, WR_VIRT_SFR(DEVICE_TIME=0) seq=$seqDeviceTime",
+        )
 
         deviceReady = true
         RadiacodeNotificationPlugin.emitConnectionState("connected")
