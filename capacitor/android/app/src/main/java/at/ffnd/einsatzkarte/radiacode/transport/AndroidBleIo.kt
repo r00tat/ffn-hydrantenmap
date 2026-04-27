@@ -14,6 +14,7 @@ import android.os.Build
 import android.util.Log
 import at.ffnd.einsatzkarte.radiacode.Protocol
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -41,6 +42,7 @@ internal class AndroidBleIo(
     @Volatile private var setupFailure: Throwable? = null
     @Volatile private var notificationListener: ((ByteArray) -> Unit)? = null
     @Volatile private var connectionLostListener: (() -> Unit)? = null
+    private val lostNotified = AtomicBoolean(false)
 
     override fun connect(
         notificationListener: (ByteArray) -> Unit,
@@ -63,26 +65,31 @@ internal class AndroidBleIo(
         Log.i(TAG, "Connecting GATT to $deviceAddress")
         gatt = device.connectGatt(ctx, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
 
-        lock.withLock {
+        // Failure innerhalb des Locks ermitteln, Cleanup + Throw außerhalb —
+        // gatt.disconnect() kann auf manchen Android-Stacks synchron
+        // onConnectionStateChange triggern und würde den Lock reentrant
+        // akquirieren.
+        val failure: Throwable? = lock.withLock {
             val deadline = System.nanoTime() + connectTimeoutMs * 1_000_000L
             while (!connected && setupFailure == null) {
                 val rem = deadline - System.nanoTime()
                 if (rem <= 0L) {
-                    cleanupOnFailure()
-                    throw DeviceNotFound("Connect timeout after ${connectTimeoutMs}ms")
+                    return@withLock DeviceNotFound("Connect timeout after ${connectTimeoutMs}ms")
                 }
                 try {
                     ready.awaitNanos(rem)
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt()
-                    cleanupOnFailure()
-                    throw DeviceNotFound("Interrupted during connect", ie)
+                    return@withLock DeviceNotFound("Interrupted during connect", ie)
                 }
             }
-            setupFailure?.let { f ->
-                cleanupOnFailure()
-                throw if (f is DeviceNotFound) f else DeviceNotFound("Connect failed", f)
-            }
+            setupFailure
+        }
+
+        if (failure != null) {
+            cleanupOnFailure()
+            throw if (failure is DeviceNotFound) failure
+            else DeviceNotFound("Connect failed", failure)
         }
     }
 
@@ -101,10 +108,11 @@ internal class AndroidBleIo(
             g.writeCharacteristic(ch)
         }
         if (!ok) {
+            // Mitten in einem Frame würde ein verschluckter Fehler den
+            // Reassembler des Geräts wedgen — fail-fast, damit der Aufrufer
+            // einen frischen Transport aufbauen kann.
             Log.w(TAG, "writeCharacteristic returned false")
-            // Wir werfen hier nicht — der Aufrufer (BluetoothTransport.execute)
-            // läuft danach in den Response-Wait und timeoutet sauber, falls
-            // die Antwort tatsächlich ausbleibt.
+            throw ConnectionClosed("writeCharacteristic returned false")
         }
     }
 
@@ -155,8 +163,10 @@ internal class AndroidBleIo(
             } else {
                 if (!connected) {
                     signalFailure(DeviceNotFound("connect state change status=$status newState=$newState"))
-                } else {
-                    // Disconnect nach erfolgreichem Connect → Aufrufer benachrichtigen.
+                } else if (lostNotified.compareAndSet(false, true)) {
+                    // Disconnect nach erfolgreichem Connect → Aufrufer genau einmal
+                    // benachrichtigen (Android-Stacks liefern oft mehrere
+                    // STATE_DISCONNECTED-Callbacks für ein Disconnect-Event).
                     connectionLostListener?.invoke()
                 }
             }
