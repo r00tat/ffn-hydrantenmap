@@ -105,6 +105,17 @@ class RadiacodeForegroundService : Service() {
         // aber schneller als die mobile Referenz-App, die in ~10 s reagiert.
         private const val POLL_INTERVAL_MS = 1000L
 
+        // Nach so vielen aufeinanderfolgenden Timeouts wird die Session als
+        // tot betrachtet und ein Reconnect-Versuch gestartet. Bei 10 s
+        // execute-Default ist das = 20 s Erkennungszeit, ein guter Kompromiss
+        // zwischen Schnelligkeit und Stabilität bei kurzen BLE-Aussetzern.
+        private const val MAX_CONSECUTIVE_TIMEOUTS = 2
+
+        // Pause zwischen Teardown der toten Session und neuem Connect-Versuch.
+        // Gibt dem Android-BLE-Stack Zeit, den GATT-Socket vollständig
+        // freizugeben — sonst kommt der nächste connectGatt mit status=147.
+        private const val RECONNECT_DELAY_MS = 1500L
+
         fun startIntent(ctx: Context, title: String, body: String): Intent =
             Intent(ctx, RadiacodeForegroundService::class.java).apply {
                 action = ACTION_START
@@ -139,6 +150,13 @@ class RadiacodeForegroundService : Service() {
 
     private var pollExecutor: ScheduledExecutorService? = null
     private var pollTask: ScheduledFuture<*>? = null
+
+    // Aufeinanderfolgende `TransportTimeout` im Polling — Indikator für eine
+    // halb-tote BLE-Session (Gerät hat im Standby den Link gedroppt, Android
+    // sieht den Disconnect aber noch nicht). Nach zwei in Folge wird die
+    // Session forciert geschlossen + ein Reconnect angestoßen, sonst hängt
+    // der Service ewig in 10-Sekunden-Timeout-Loops.
+    @Volatile private var consecutiveTimeouts: Int = 0
 
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
@@ -567,18 +585,64 @@ class RadiacodeForegroundService : Service() {
         if (!deviceReady) return
         try {
             val records = rc.dataBuf()
+            consecutiveTimeouts = 0
             val measurement = MeasurementMapper.map(records)
             if (measurement != null) onMeasurementReceived(measurement)
         } catch (e: ConnectionClosed) {
             Log.w(TAG, "Poll tick — connection closed", e)
-            handleConnectionLost()
+            scheduleReconnect("connection closed")
         } catch (e: TransportTimeout) {
-            // Einzelner Timeout: warten auf nächsten Tick. Wenn das Gerät
-            // dauerhaft schweigt, sammelt das BluetoothTransport seinen
-            // eigenen Disconnect-Pfad ein.
-            Log.w(TAG, "Poll tick — transport timeout (skip this tick)", e)
+            consecutiveTimeouts++
+            Log.w(TAG, "Poll tick — transport timeout #$consecutiveTimeouts", e)
+            if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+                // Halb-tote Session: Android sieht den Disconnect nicht (kein
+                // STATE_DISCONNECTED, weil Writes weiter „erfolgreich" auf
+                // L2CAP-Ebene durchgehen), aber das Gerät antwortet nicht mehr.
+                // Forciert teardown + reconnect mit der zuletzt verwendeten
+                // Adresse.
+                scheduleReconnect("$consecutiveTimeouts consecutive timeouts")
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "Poll tick failed", t)
+        }
+    }
+
+    /**
+     * Schließt die aktuelle Session und stößt — falls noch eine
+     * `currentAddress` vorhanden ist — nach kurzer Pause einen Reconnect über
+     * den `bleWorker` an. Wird aus [pollTick] bei Dead-Link-Detection und aus
+     * [executeRawRequest]-Fehlerpfaden gerufen.
+     */
+    private fun scheduleReconnect(reason: String) {
+        val address = currentAddress
+        Log.w(TAG, "scheduleReconnect — reason: $reason, address=$address")
+        consecutiveTimeouts = 0
+        handleConnectionLost()
+        if (address == null) return
+        val worker = bleWorker ?: return
+        if (worker.isShutdown) return
+        worker.execute {
+            try {
+                Thread.sleep(RECONNECT_DELAY_MS)
+            } catch (ie: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return@execute
+            }
+            // Wurde die Session in der Zwischenzeit explizit beendet
+            // (ACTION_BLE_DISCONNECT → teardownSession → currentAddress=null),
+            // dann nicht reconnecten.
+            if (currentAddress != address) {
+                Log.i(TAG, "scheduleReconnect — aborted, currentAddress changed (was=$address now=$currentAddress)")
+                return@execute
+            }
+            // Falls währenddessen jemand schon eine neue Session aufgebaut hat,
+            // ebenfalls abbrechen.
+            if (radiaCode != null) {
+                Log.i(TAG, "scheduleReconnect — aborted, session already active")
+                return@execute
+            }
+            Log.i(TAG, "scheduleReconnect — attempting reconnect to $address")
+            startBleSession(address)
         }
     }
 

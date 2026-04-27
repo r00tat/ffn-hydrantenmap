@@ -184,6 +184,14 @@ internal class AndroidBleIo(
                 signalFailure(DeviceNotFound("Service discovery failed status=$status"))
                 return
             }
+            // CONNECTION_PRIORITY_HIGH = ~7.5–11.25 ms Connection-Interval. Ohne
+            // dieses Setting drosselt Android im Standby den Default-Interval so
+            // weit, dass das Radiacode-Gerät eigene Supervision-Timeouts trifft
+            // und den Link einseitig droppt — ohne dass Android einen
+            // STATE_DISCONNECTED feuert. Für ein 1Hz-Polling ist HIGH genau
+            // richtig; LOW_POWER würde das Problem nur verschieben.
+            val priorityOk = g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+            Log.i(TAG, "requestConnectionPriority HIGH ok=$priorityOk")
             val service = g.getService(SERVICE_UUID)
                 ?: return signalFailure(DeviceNotFound("Service $SERVICE_UUID not found"))
             writeChar = service.getCharacteristic(WRITE_UUID)
