@@ -246,6 +246,111 @@ describe('decodeDataBufRecords', () => {
     expect(rt).toBeDefined();
     expect(rt?.type).toBe('realtime');
   });
+
+  it('bricht bei einem Sequenznummer-Sprung sauber ab (analog radiacode-py)', () => {
+    // Zwei aufeinanderfolgende Realtime-Records mit Sequenz-Sprung 5 → 9.
+    // Erwartung: erstes Record wird geparst, zweites wegen Seq-Mismatch verworfen.
+    const buf = new Uint8Array(2 * (7 + 15));
+    const view = new DataView(buf.buffer);
+    let off = 0;
+    const writeRealtime = (seq: number) => {
+      buf[off] = seq;
+      buf[off + 1] = 0;
+      buf[off + 2] = 0;
+      view.setInt32(off + 3, 0, true);
+      off += 7;
+      view.setFloat32(off, 1, true); // countRate
+      view.setFloat32(off + 4, 1e-6, true); // doseRate
+      view.setUint16(off + 8, 100, true); // cpsErr
+      view.setUint16(off + 10, 200, true); // drErr
+      view.setUint16(off + 12, 0, true); // flags
+      buf[off + 14] = 0; // realTimeFlags
+      off += 15;
+    };
+    writeRealtime(5);
+    writeRealtime(9); // Sprung statt 6 → muss break auslösen
+
+    const records = decodeDataBufRecords(buf);
+    expect(records).toHaveLength(1);
+    expect(records[0].type).toBe('realtime');
+    if (records[0].type !== 'realtime') throw new Error();
+    expect(records[0].seq).toBe(5);
+  });
+
+  it('akzeptiert den 8-bit-Wraparound der Sequenznummer (255 → 0)', () => {
+    const buf = new Uint8Array(2 * (7 + 15));
+    const view = new DataView(buf.buffer);
+    let off = 0;
+    const writeRealtime = (seq: number) => {
+      buf[off] = seq;
+      buf[off + 1] = 0;
+      buf[off + 2] = 0;
+      view.setInt32(off + 3, 0, true);
+      off += 7;
+      view.setFloat32(off, 1, true);
+      view.setFloat32(off + 4, 1e-6, true);
+      view.setUint16(off + 8, 0, true);
+      view.setUint16(off + 10, 0, true);
+      view.setUint16(off + 12, 0, true);
+      buf[off + 14] = 0;
+      off += 15;
+    };
+    writeRealtime(255);
+    writeRealtime(0); // (255 + 1) & 0xff = 0 → kein Sprung
+
+    const records = decodeDataBufRecords(buf);
+    expect(records).toHaveLength(2);
+  });
+
+  it('skipt unbekannten/nicht-ausgewerteten Record-Type gid=4 und liest dahinter gid=3 (Rare) korrekt', () => {
+    // Synthetischer Stream: 0:4 (UserData, 16 bytes) gefolgt von 0:3 (Rare, 14 bytes).
+    // Vor dem Fix brach der Decoder beim ersten 0:4 ab und verlor die Rare-Daten —
+    // genau das Verhalten, das im Logcat 'records — 0:7,0:0,0:7,1:1,0:7,0:4' (break)
+    // beobachtet wurde.
+    const buf = new Uint8Array(7 + 16 + 7 + 14);
+    const view = new DataView(buf.buffer);
+    let off = 0;
+    // gid=4 record header
+    buf[off] = 1; // seq
+    buf[off + 1] = 0; // eid
+    buf[off + 2] = 4; // gid
+    view.setInt32(off + 3, 0, true); // tsOffset
+    off += 7;
+    // gid=4 payload: <I f f H H> = 16 bytes (Inhalt egal, Daten werden geskipt)
+    view.setUint32(off, 0, true);
+    view.setFloat32(off + 4, 0, true);
+    view.setFloat32(off + 8, 0, true);
+    view.setUint16(off + 12, 0, true);
+    view.setUint16(off + 14, 0, true);
+    off += 16;
+    // gid=3 record header
+    buf[off] = 2; // seq
+    buf[off + 1] = 0; // eid
+    buf[off + 2] = 3; // gid
+    view.setInt32(off + 3, 1234, true); // tsOffset (12340 ms)
+    off += 7;
+    // gid=3 payload: <I f H H H> = 14 bytes
+    view.setUint32(off, 600, true); // duration = 600 sec
+    view.setFloat32(off + 4, 0.012345, true); // dose
+    view.setUint16(off + 8, 4234, true); // temperature raw → (4234-2000)/100 = 22.34 °C
+    view.setUint16(off + 10, 7500, true); // charge raw → 7500/100 = 75 %
+    view.setUint16(off + 12, 0, true); // flags
+
+    const records = decodeDataBufRecords(buf);
+    expect(records).toHaveLength(2);
+    const unknown = records[0];
+    expect(unknown.type).toBe('unknown');
+    if (unknown.type !== 'unknown') throw new Error();
+    expect(unknown.eid).toBe(0);
+    expect(unknown.gid).toBe(4);
+    const rare = records[1];
+    expect(rare.type).toBe('rare');
+    if (rare.type !== 'rare') throw new Error();
+    expect(rare.duration).toBe(600);
+    expect(rare.dose).toBeCloseTo(0.012345, 6);
+    expect(rare.temperatureC).toBeCloseTo(22.34, 2);
+    expect(rare.chargePct).toBeCloseTo(75, 1);
+  });
 });
 
 describe('decodeSpectrumResponse', () => {

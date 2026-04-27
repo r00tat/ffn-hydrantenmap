@@ -28,35 +28,34 @@ import at.ffnd.einsatzkarte.gpstrack.FirestoreLineUpdater
 import at.ffnd.einsatzkarte.gpstrack.GpsTrackConfig
 import at.ffnd.einsatzkarte.gpstrack.GpsTrackRecorder
 import at.ffnd.einsatzkarte.gpstrack.LineUpdater
-import at.ffnd.einsatzkarte.radiacode.Framing
-import at.ffnd.einsatzkarte.radiacode.GattSession
 import at.ffnd.einsatzkarte.radiacode.Measurement
-import at.ffnd.einsatzkarte.radiacode.MeasurementDecoder
-import at.ffnd.einsatzkarte.radiacode.Protocol
-import at.ffnd.einsatzkarte.radiacode.Reassembler
-import at.ffnd.einsatzkarte.radiacode.SessionListener
-import at.ffnd.einsatzkarte.radiacode.parseResponse
+import at.ffnd.einsatzkarte.radiacode.MeasurementMapper
+import at.ffnd.einsatzkarte.radiacode.RadiaCode
+import at.ffnd.einsatzkarte.radiacode.RadiaCodeException
+import at.ffnd.einsatzkarte.radiacode.transport.BluetoothTransport
+import at.ffnd.einsatzkarte.radiacode.transport.ConnectionClosed
+import at.ffnd.einsatzkarte.radiacode.transport.DeviceNotFound
+import at.ffnd.einsatzkarte.radiacode.transport.TransportTimeout
 import at.ffnd.einsatzkarte.radiacode.track.FirestoreMarkerWriter
 import at.ffnd.einsatzkarte.radiacode.track.LatLng
 import at.ffnd.einsatzkarte.radiacode.track.SampleRate
 import at.ffnd.einsatzkarte.radiacode.track.TrackConfig
 import at.ffnd.einsatzkarte.radiacode.track.TrackRecorder
-import java.util.Date
 import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Foreground-Service + nativer Radiacode-BLE-Owner. Läuft solange mindestens
  * ein Client verbunden ist und hält CPU/Notification am Leben (siehe Phase 1).
  *
  * Neu gegenüber Phase 1: Wenn ACTION_BLE_CONNECT reinkommt, übernimmt der
- * Service exklusiv die BLE-Session (GattSession) und pollt DATA_BUF im
- * nativen Code. Measurements + Notifications gehen per Plugin-Event an den
- * WebView. Passthrough-Writes (ACTION_BLE_WRITE) erlauben dem TS-Client
- * weiterhin Spektrum/Settings-Zugriff über denselben GATT-Kanal.
+ * Service exklusiv die BLE-Session ([BluetoothTransport]+[RadiaCode]) und
+ * pollt DATA_BUF im nativen Code. Measurements gehen per Plugin-Event an
+ * den WebView. Direct-Execute-Calls ([executeRawRequest]) erlauben dem
+ * TS-Client weiterhin Spektrum/Settings-Zugriff über denselben GATT-Kanal.
  */
 class RadiacodeForegroundService : Service() {
 
@@ -73,7 +72,6 @@ class RadiacodeForegroundService : Service() {
         const val ACTION_STOP = "at.ffnd.einsatzkarte.RADIACODE_STOP"
         const val ACTION_DISCONNECT_REQUESTED = "at.ffnd.einsatzkarte.RADIACODE_DISCONNECT_REQUESTED"
         const val ACTION_BLE_CONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_CONNECT"
-        const val ACTION_BLE_WRITE = "at.ffnd.einsatzkarte.RADIACODE_BLE_WRITE"
         const val ACTION_BLE_DISCONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_DISCONNECT"
         const val ACTION_START_TRACK = "at.ffnd.einsatzkarte.RADIACODE_START_TRACK"
         const val ACTION_STOP_TRACK = "at.ffnd.einsatzkarte.RADIACODE_STOP_TRACK"
@@ -83,7 +81,6 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
         const val EXTRA_DEVICE_ADDRESS = "deviceAddress"
-        const val EXTRA_PAYLOAD = "payload"
         const val EXTRA_FIRECALL_ID = "firecallId"
         const val EXTRA_LAYER_ID = "layerId"
         const val EXTRA_SAMPLE_RATE = "sampleRate"
@@ -99,7 +96,40 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_INITIAL_LNG = "initialLng"
 
         private const val TAG = "RadiacodeFg"
-        private const val POLL_INTERVAL_MS = 500L
+        // 2 s Poll-Takt — angeglichen an radiacode-python `basic.py`. Bei 1 s
+        // sehen wir nach dem ersten Read keine weiteren `gid=3 RareData`-Records
+        // (Dose/Akku/Temperatur) mehr. Vermutung: Geräte-FIFO oder interner
+        // Producer-Tick wird durch zu schnelles Lesen lahmgelegt. Die mobile
+        // Referenz-App reagiert in ~10 s, 2 s ist konservativer und bewiesen
+        // (radiacode-py läuft so).
+        private const val POLL_INTERVAL_MS = 2000L
+
+        // Nach so vielen aufeinanderfolgenden Timeouts wird die Session als
+        // tot betrachtet und ein Reconnect-Versuch gestartet. Bei 2.5 s
+        // poll-Timeout ist das = ca. 5 s Erkennungszeit.
+        private const val MAX_CONSECUTIVE_TIMEOUTS = 2
+
+        // Per-Tick Timeout für `radiaCode.dataBuf()`. Deutlich kürzer als der
+        // 10s-Default des BluetoothTransport, damit ein halb-toter BLE-Link
+        // (Standby-Drop ohne Android-STATE_DISCONNECTED) schnell erkannt wird.
+        // Ein normaler DATA_BUF-Read schließt in deutlich unter 1 s ab — 2.5 s
+        // sind großzügig genug, dass kurze Connection-Interval-Schwankungen
+        // keinen falschen Timeout auslösen.
+        private const val POLL_TIMEOUT_MS = 2_500L
+
+        // Backoff zwischen Reconnect-Versuchen. Erste paar Versuche schnell
+        // (typisches Standby-Wedge erholt sich nach kurzer Pause), dann
+        // länger werdend bis 30 s, danach Cap. Reconnect läuft persistent —
+        // nur ACTION_BLE_DISCONNECT (User) oder ein Service-Tod stoppt ihn.
+        private val RECONNECT_BACKOFF_MS = longArrayOf(1_500L, 5_000L, 15_000L, 30_000L)
+
+        // Wenn nach so vielen Millisekunden seit Session-Start kein Rare-Record
+        // (Dose/Akku/Temperatur) gekommen ist, einmaligen Force-Reconnect mit
+        // frischem GATT triggern. 30 s ist konservativ — auf einem
+        // bereits-eingeschalteten Gerät kommen Rare-Records typisch innerhalb
+        // weniger Sekunden, sodass dieses Timeout ausschließlich den
+        // "Gerät-erst-nach-Connect-eingeschaltet"-Fall trifft.
+        private const val RARE_BOOTSTRAP_TIMEOUT_MS = 30_000L
 
         fun startIntent(ctx: Context, title: String, body: String): Intent =
             Intent(ctx, RadiacodeForegroundService::class.java).apply {
@@ -125,14 +155,43 @@ class RadiacodeForegroundService : Service() {
     private var lastTitle: String = "Radiacode verbunden"
     private var lastBody: String = ""
 
-    private var session: GattSession? = null
-    private val reassembler = Reassembler()
-    private val seqIndex = AtomicInteger(0)
-    private var pollSeq: Int = -1
+    private var transport: BluetoothTransport? = null
+    private var radiaCode: RadiaCode? = null
+    @Volatile private var currentAddress: String? = null
     @Volatile private var deviceReady = false
+
+    /** Single-thread worker für blockierende BLE-Calls (Connect-Handshake + execute). */
+    private var bleWorker: ExecutorService? = null
 
     private var pollExecutor: ScheduledExecutorService? = null
     private var pollTask: ScheduledFuture<*>? = null
+
+    // Aufeinanderfolgende `TransportTimeout` im Polling — Indikator für eine
+    // halb-tote BLE-Session (Gerät hat im Standby den Link gedroppt, Android
+    // sieht den Disconnect aber noch nicht). Nach zwei in Folge wird die
+    // Session forciert geschlossen + ein Reconnect angestoßen, sonst hängt
+    // der Service ewig in 10-Sekunden-Timeout-Loops.
+    @Volatile private var consecutiveTimeouts: Int = 0
+
+    // Counter für Reconnect-Versuche; bestimmt das Backoff-Delay. Wird
+    // bei erfolgreichem Tick UND bei erfolgreichem Reconnect-Handshake
+    // auf 0 zurückgesetzt.
+    @Volatile private var reconnectAttempt: Int = 0
+
+    // Bootstrap-State für `gid=3 RareData` (Akku/Dose/Temperatur). Beobachtung:
+    // Wenn das Gerät beim Connect AUS war und erst danach eingeschaltet wird,
+    // liefert die bestehende GATT-Verbindung NIE Rare-Records — auch wenn
+    // Realtime-Records munter fließen. Der einzige bekannte Workaround ist
+    // ein **frischer GATT-Reconnect** (User klickt manuell trennen+verbinden).
+    // Wir reproduzieren das automatisch: wenn nach `RARE_BOOTSTRAP_TIMEOUT_MS`
+    // kein Rare-Record gesehen wurde, einmaliger Force-Reconnect. Wenn auch
+    // der nichts bringt, geben wir auf — ein Loop wäre schlimmer als kein
+    // Akku-Wert. Reset des `rareBootstrapAttempted`-Flags geschieht nur bei
+    // User-Disconnect (`teardownSession`), damit ein erneutes Manual-Connect
+    // wieder einen Bootstrap-Versuch erlaubt.
+    @Volatile private var sessionReadyMs: Long = 0L
+    @Volatile private var rareSeenThisSession: Boolean = false
+    @Volatile private var rareBootstrapAttempted: Boolean = false
 
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
@@ -141,10 +200,43 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var trackRecorder: TrackRecorder? = null
     @Volatile private var gpsTrackRecorder: GpsTrackRecorder? = null
 
+    // Letzte gesehene Rare-Felder für Late-Connect / leere Ticks. Werden in
+    // `onMeasurementReceived` aktualisiert und bei `teardownSession` gelöscht,
+    // damit kein veralteter Wert in eine neue Session eingespielt wird.
+    @Volatile private var cachedDoseUSv: Double? = null
+    @Volatile private var cachedDurationSec: Int? = null
+    @Volatile private var cachedTemperatureC: Double? = null
+    @Volatile private var cachedChargePct: Double? = null
+
     fun isBleConnected(): Boolean = deviceReady
-    fun getDeviceAddress(): String? = session?.deviceAddress
+    fun getDeviceAddress(): String? = currentAddress
     fun isRadiacodeTracking(): Boolean = trackRecorder != null
     fun isGpsTracking(): Boolean = gpsTrackRecorder != null
+
+    /**
+     * Synchroner Wire-Level-Execute für den TS-Plugin-Pfad. Schreibt einen
+     * komplett geframten Request (mit `<I>`-Längen-Prefix) über den
+     * gehaltenen [BluetoothTransport] und gibt die wieder zusammengesetzte
+     * Response-Body (ohne Prefix) zurück. Wird aus
+     * [RadiacodeNotificationPlugin.executeNative] aufgerufen — darf NICHT
+     * vom Main/UI-Thread laufen, weil [BluetoothTransport.execute]
+     * blockiert bis zur Antwort oder zum Timeout.
+     *
+     * @throws IllegalStateException wenn keine BLE-Session aktiv ist
+     * @throws ConnectionClosed wenn die Verbindung während der Anfrage abreißt
+     * @throws TransportTimeout wenn das Gerät nicht innerhalb des Default-Timeouts antwortet
+     */
+    @Throws(ConnectionClosed::class, TransportTimeout::class)
+    fun executeRawRequest(framedRequest: ByteArray): ByteArray {
+        val t = transport ?: throw IllegalStateException("No active BLE session")
+        val response = t.execute(framedRequest)
+        return response.remaining()
+    }
+
+    fun getCachedDoseUSv(): Double? = cachedDoseUSv
+    fun getCachedDurationSec(): Int? = cachedDurationSec
+    fun getCachedTemperatureC(): Double? = cachedTemperatureC
+    fun getCachedChargePct(): Double? = cachedChargePct
 
     override fun onCreate() {
         super.onCreate()
@@ -155,9 +247,9 @@ class RadiacodeForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-        val isHotPath = action == ACTION_UPDATE || action == ACTION_BLE_WRITE
+        val isHotPath = action == ACTION_UPDATE
         val logMsg = "onStartCommand action=$action startId=$startId flags=$flags " +
-            "session=${if (session != null) "active" else "none"} deviceReady=$deviceReady"
+            "session=${if (radiaCode != null) "active" else "none"} deviceReady=$deviceReady"
         if (isHotPath) Log.d(TAG, logMsg) else Log.i(TAG, logMsg)
         // Jede Action promoviert den Service in den Foreground-Status. Wurde er
         // via startForegroundService() gestartet, muss startForeground() sowieso
@@ -186,7 +278,7 @@ class RadiacodeForegroundService : Service() {
                 // hier stopSelf() rufen, killt Android den gesamten Service
                 // inklusive GATT-Session — siehe Bug-Analyse 2026-04-22.
                 // Session-Teardown ausschliesslich via ACTION_BLE_DISCONNECT.
-                if (session != null || gpsTrackRecorder != null) {
+                if (radiaCode != null || gpsTrackRecorder != null) {
                     Log.w(TAG, "ACTION_STOP ignoriert — Session/GPS-Track aktiv, Service bleibt laufen")
                 } else {
                     Log.i(TAG, "ACTION_STOP — keine Session, Service wird beendet")
@@ -205,14 +297,6 @@ class RadiacodeForegroundService : Service() {
                 } else {
                     acquireWakeLock()
                     startBleSession(address)
-                }
-            }
-            ACTION_BLE_WRITE -> {
-                val payload = intent?.getByteArrayExtra(EXTRA_PAYLOAD)
-                if (payload == null) {
-                    Log.w(TAG, "ACTION_BLE_WRITE without payload")
-                } else {
-                    session?.sendWrite(payload) ?: Log.w(TAG, "ACTION_BLE_WRITE but no session")
                 }
             }
             ACTION_BLE_DISCONNECT -> {
@@ -298,7 +382,7 @@ class RadiacodeForegroundService : Service() {
                 Log.i(TAG, "GPS track stop")
                 gpsTrackRecorder?.stop()
                 gpsTrackRecorder = null
-                if (session == null) {
+                if (radiaCode == null) {
                     stopHighAccuracyLocation()
                     releaseWakeLock()
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -354,11 +438,10 @@ class RadiacodeForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        Log.w(
+        Log.i(
             TAG,
-            "onDestroy — session=${if (session != null) "active" else "none"} " +
-                "deviceReady=$deviceReady. Stack trace for diagnosis:",
-            Throwable("onDestroy stack"),
+            "onDestroy — session=${if (radiaCode != null) "active" else "none"} " +
+                "deviceReady=$deviceReady",
         )
         if (instance == this) instance = null
         teardownSession()
@@ -368,6 +451,8 @@ class RadiacodeForegroundService : Service() {
         gpsTrackRecorder = null
         stopHighAccuracyLocation()
         releaseWakeLock()
+        bleWorker?.shutdown()
+        bleWorker = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
@@ -399,6 +484,24 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun onMeasurementReceived(m: Measurement) {
+        // Diagnose-Log für Rare-Felder: dose/charge/temperature/duration
+        // sollten regelmäßig (alle paar Sekunden) Werte != null haben. Wenn
+        // sie dauerhaft null bleiben, liefert das Gerät keine Rare-Records
+        // aus, obwohl die Verbindung steht — siehe Bug-Analyse 2026-04-26.
+        Log.d(
+            TAG,
+            "measurement dl=${"%.3f".format(java.util.Locale.ROOT, m.dosisleistungUSvH)} µSv/h " +
+                "cps=${"%.3f".format(java.util.Locale.ROOT, m.cps)} " +
+                "dlErr=${m.dosisleistungErrPct} cpsErr=${m.cpsErrPct} " +
+                "dose=${m.doseUSv} chg=${m.chargePct} temp=${m.temperatureC} dur=${m.durationSec}",
+        )
+        // Rare-Felder cachen, damit das Plugin sie auch in Ticks ohne
+        // frischen Rare-Record an die UI weiterreichen kann.
+        m.doseUSv?.let { cachedDoseUSv = it }
+        m.durationSec?.let { cachedDurationSec = it }
+        m.temperatureC?.let { cachedTemperatureC = it }
+        m.chargePct?.let { cachedChargePct = it }
+
         RadiacodeNotificationPlugin.emitMeasurement(m)
         trackRecorder?.onMeasurement(
             m,
@@ -428,114 +531,218 @@ class RadiacodeForegroundService : Service() {
 
 
     private fun startBleSession(address: String) {
-        val activeSession = session
-        if (activeSession != null) {
-            if (activeSession.deviceAddress == address) {
-                Log.i(TAG, "BLE session already active for $address — re-emitting state")
-                if (deviceReady) {
-                    RadiacodeNotificationPlugin.emitConnectionState("connected")
-                    startPollLoop()
-                } else {
-                    RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
-                }
-                return
+        val active = radiaCode
+        if (active != null && currentAddress == address) {
+            Log.i(TAG, "BLE session already active for $address — re-emitting state")
+            if (deviceReady) {
+                RadiacodeNotificationPlugin.emitConnectionState("connected")
+                startPollLoop()
             } else {
-                Log.i(TAG, "New address $address different from active session — tearing down old session")
-                teardownSession()
+                RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
             }
+            return
+        }
+        if (active != null) {
+            Log.i(TAG, "New address $address different from active session — tearing down old session")
+            teardownSession()
         }
         Log.i(TAG, "startBleSession address=$address")
+        currentAddress = address
         RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
         updateNotificationForState()
-        val listener = object : SessionListener {
-            override fun onConnected() {
-                deviceReady = false
-                Log.i(TAG, "listener.onConnected — running handshake")
-                runHandshake()
-                updateNotificationForState()
-            }
+        startHighAccuracyLocation()
 
-            override fun onDisconnected() {
-                Log.w(TAG, "listener.onDisconnected")
-                deviceReady = false
-                stopPollLoop()
-                RadiacodeNotificationPlugin.emitConnectionState("disconnected")
-                updateNotificationForState()
-            }
-
-            override fun onReconnecting() {
-                Log.i(TAG, "listener.onReconnecting")
-                RadiacodeNotificationPlugin.emitConnectionState("reconnecting")
-                updateNotificationForState()
-            }
-
-            override fun onNotification(bytes: ByteArray) {
-                // Alle Notifications gehen 1:1 an den TS-Client (für
-                // Spektrum/Settings-Antworten). Parallel füttert der
-                // native Reassembler seine Poll-Antwort.
-                RadiacodeNotificationPlugin.emitNotification(bytes)
-                val complete = reassembler.push(bytes) ?: return
-                val parsed = parseResponse(complete) ?: return
-                if (parsed.cmd == Protocol.Command.RD_VIRT_STRING && parsed.seq == pollSeq) {
-                    val m = MeasurementDecoder.parse(parsed.data)
-                    if (m != null) {
-                        onMeasurementReceived(m)
-                    }
+        val worker = bleWorker ?: Executors.newSingleThreadExecutor { r ->
+            Thread(r, "RadiacodeBleWorker")
+        }.also { bleWorker = it }
+        worker.execute {
+            try {
+                // BluetoothTransport-Konstruktor blockiert bis CCCD-Subscription steht.
+                // RadiaCode-Konstruktor blockiert bis Init-Handshake durch ist
+                // (SET_EXCHANGE → SET_TIME → DEVICE_TIME=0 → GET_VERSION → CONFIGURATION).
+                val t = BluetoothTransport(applicationContext, address)
+                val rc = RadiaCode(t, ignoreFirmwareCompatibilityCheck = false)
+                if (currentAddress != address) {
+                    // Session-Wechsel während des Aufbaus → frisch geöffneten Transport gleich wieder schließen.
+                    Log.w(TAG, "startBleSession aborted — currentAddress changed during init")
+                    rc.close()
+                    return@execute
                 }
+                transport = t
+                radiaCode = rc
+                deviceReady = true
+                consecutiveTimeouts = 0
+                reconnectAttempt = 0
+                sessionReadyMs = System.currentTimeMillis()
+                rareSeenThisSession = false
+                // `rareBootstrapAttempted` bleibt across reconnects gesetzt,
+                // damit wir nach einem fehlgeschlagenen Bootstrap nicht in
+                // eine Endlos-Schleife laufen. Reset nur in `teardownSession`.
+                RadiacodeNotificationPlugin.emitConnectionState("connected")
+                updateNotificationForState()
+                startPollLoop()
+            } catch (e: DeviceNotFound) {
+                Log.w(TAG, "startBleSession — device not found / connect failed", e)
+                handleConnectionLost()
+                scheduleReconnect("DeviceNotFound: ${e.message}")
+            } catch (e: ConnectionClosed) {
+                Log.w(TAG, "startBleSession — connection closed during init", e)
+                handleConnectionLost()
+                scheduleReconnect("ConnectionClosed during init")
+            } catch (e: TransportTimeout) {
+                Log.w(TAG, "startBleSession — handshake timed out", e)
+                handleConnectionLost()
+                scheduleReconnect("TransportTimeout during init")
+            } catch (e: RadiaCodeException) {
+                Log.w(TAG, "startBleSession — protocol error", e)
+                handleConnectionLost()
+                scheduleReconnect("RadiaCodeException: ${e.message}")
+            } catch (t: Throwable) {
+                Log.e(TAG, "startBleSession — unexpected error", t)
+                handleConnectionLost()
+                scheduleReconnect("unexpected error: ${t.message}")
             }
         }
-        val newSession = GattSession(applicationContext, address, listener)
-        session = newSession
-        newSession.connect()
-        startHighAccuracyLocation()
     }
 
-    private fun runHandshake() {
-        // SET_EXCHANGE: args [0x01, 0xff, 0x12, 0xff] (analog TS-Client).
-        writeCommand(
-            Protocol.Command.SET_EXCHANGE,
-            byteArrayOf(0x01, 0xff.toByte(), 0x12, 0xff.toByte()),
-        )
-        writeCommand(Protocol.Command.SET_TIME, encodeSetTime(Date()))
-        // WR_VIRT_SFR(DEVICE_TIME=0): <id_u32_le><value_u32_le>.
-        val args = java.nio.ByteBuffer
-            .allocate(8)
-            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
-            .putInt(Protocol.Vsfr.DEVICE_TIME)
-            .putInt(0)
-            .array()
-        writeCommand(Protocol.Command.WR_VIRT_SFR, args)
-
-        deviceReady = true
-        RadiacodeNotificationPlugin.emitConnectionState("connected")
-        startPollLoop()
-    }
-
-    private fun writeCommand(cmd: Int, args: ByteArray): Int {
-        val seq = seqIndex.getAndIncrement() % Protocol.SEQ_MODULO
-        val frame = Framing.buildRequest(cmd, seq, args)
-        session?.sendWrite(frame)
-        return seq
+    private fun handleConnectionLost() {
+        deviceReady = false
+        stopPollLoop()
+        try { radiaCode?.close() } catch (_: Throwable) { /* best effort */ }
+        radiaCode = null
+        transport = null
+        RadiacodeNotificationPlugin.emitConnectionState("disconnected")
+        updateNotificationForState()
     }
 
     private fun startPollLoop() {
         stopPollLoop()
-        val exec = Executors.newSingleThreadScheduledExecutor()
+        val exec = Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "RadiacodePoll")
+        }
         pollExecutor = exec
         pollTask = exec.scheduleAtFixedRate({
             pollTick()
-        }, 0L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        }, 100L, POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun pollTick() {
+        val rc = radiaCode ?: return
+        if (!deviceReady) return
         try {
-            if (!deviceReady) return
-            pollSeq = writeCommand(
-                Protocol.Command.RD_VIRT_STRING,
-                Framing.u32le(Protocol.Vs.DATA_BUF),
-            )
+            val records = rc.dataBuf(POLL_TIMEOUT_MS)
+            consecutiveTimeouts = 0
+            reconnectAttempt = 0
+            val measurement = MeasurementMapper.map(records)
+            if (measurement != null) {
+                if (measurement.doseUSv != null) {
+                    rareSeenThisSession = true
+                }
+                onMeasurementReceived(measurement)
+            }
+            maybeBootstrapRareStream()
+        } catch (e: ConnectionClosed) {
+            Log.w(TAG, "Poll tick — connection closed", e)
+            handleConnectionLost()
+            scheduleReconnect("connection closed")
+        } catch (e: TransportTimeout) {
+            consecutiveTimeouts++
+            Log.w(TAG, "Poll tick — transport timeout #$consecutiveTimeouts", e)
+            if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+                // Halb-tote Session: Android sieht den Disconnect nicht (kein
+                // STATE_DISCONNECTED, weil Writes weiter „erfolgreich" auf
+                // L2CAP-Ebene durchgehen), aber das Gerät antwortet nicht mehr.
+                // Forciert teardown + reconnect mit der zuletzt verwendeten
+                // Adresse.
+                handleConnectionLost()
+                scheduleReconnect("$consecutiveTimeouts consecutive timeouts")
+            }
         } catch (t: Throwable) {
             Log.w(TAG, "Poll tick failed", t)
+        }
+    }
+
+    /**
+     * Wenn nach `RARE_BOOTSTRAP_TIMEOUT_MS` seit Session-Start kein Rare-Record
+     * (Dose/Akku/Temperatur) gekommen ist, einmaligen Force-Reconnect mit
+     * frischem GATT auslösen — exakt das, was beim manuellen Trennen+Verbinden
+     * passiert und nachweislich den Rare-Stream startet, wenn das Gerät erst
+     * nach dem App-Connect eingeschaltet wurde.
+     *
+     * Triggert pro Adresse höchstens einmal: gibt es nach dem Bootstrap immer
+     * noch keine Rare-Records, ist die Schleife schlimmer als der Defekt.
+     * Reset des Flags nur in `teardownSession` (User-Disconnect).
+     */
+    private fun maybeBootstrapRareStream() {
+        if (rareSeenThisSession) return
+        if (rareBootstrapAttempted) return
+        if (sessionReadyMs == 0L) return
+        val elapsed = System.currentTimeMillis() - sessionReadyMs
+        if (elapsed < RARE_BOOTSTRAP_TIMEOUT_MS) return
+        rareBootstrapAttempted = true
+        Log.w(
+            TAG,
+            "rare-bootstrap — kein Rare-Record nach ${elapsed}ms, erzwinge frischen GATT-Reconnect",
+        )
+        handleConnectionLost()
+        scheduleReconnect("rare-bootstrap (frischer GATT)")
+    }
+
+    /**
+     * Plant einen Reconnect-Versuch über den `bleWorker` mit exponentiellem
+     * Backoff. Persistent — versucht weiter, bis der User explizit
+     * disconnected (ACTION_BLE_DISCONNECT → teardownSession → currentAddress=null)
+     * oder eine neue Session schon aktiv ist. Erhöht [reconnectAttempt]; das
+     * nächste Backoff-Intervall richtet sich nach diesem Counter.
+     *
+     * Setzt selbst KEIN `handleConnectionLost` — der Aufrufer muss vorher die
+     * Session sauber abbauen.
+     */
+    private fun scheduleReconnect(reason: String) {
+        val address = currentAddress
+        if (address == null) {
+            Log.i(TAG, "scheduleReconnect — no address (user disconnected), giving up")
+            reconnectAttempt = 0
+            return
+        }
+        val worker = bleWorker
+        if (worker == null || worker.isShutdown) {
+            Log.w(TAG, "scheduleReconnect — bleWorker not available, giving up")
+            reconnectAttempt = 0
+            return
+        }
+        val delayIdx = reconnectAttempt.coerceAtMost(RECONNECT_BACKOFF_MS.size - 1)
+        val delay = RECONNECT_BACKOFF_MS[delayIdx]
+        reconnectAttempt++
+        Log.w(
+            TAG,
+            "scheduleReconnect — reason: $reason, attempt=$reconnectAttempt, delay=${delay}ms, address=$address",
+        )
+        consecutiveTimeouts = 0
+        worker.execute {
+            try {
+                Thread.sleep(delay)
+            } catch (ie: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return@execute
+            }
+            // Wurde die Session in der Zwischenzeit explizit beendet
+            // (ACTION_BLE_DISCONNECT → teardownSession → currentAddress=null),
+            // dann nicht reconnecten.
+            if (currentAddress != address) {
+                Log.i(TAG, "scheduleReconnect — aborted, currentAddress changed (was=$address now=$currentAddress)")
+                reconnectAttempt = 0
+                return@execute
+            }
+            // Falls währenddessen jemand schon eine neue Session aufgebaut hat,
+            // ebenfalls abbrechen.
+            if (radiaCode != null) {
+                Log.i(TAG, "scheduleReconnect — aborted, session already active")
+                reconnectAttempt = 0
+                return@execute
+            }
+            Log.i(TAG, "scheduleReconnect — attempting reconnect to $address (attempt=$reconnectAttempt)")
+            startBleSession(address)
         }
     }
 
@@ -547,10 +754,9 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun teardownSession() {
-        Log.w(
+        Log.i(
             TAG,
-            "teardownSession — session=${if (session != null) "active" else "none"}",
-            Throwable("teardownSession stack"),
+            "teardownSession — session=${if (radiaCode != null) "active" else "none"}",
         )
         stopPollLoop()
         trackRecorder?.stop()
@@ -559,9 +765,29 @@ class RadiacodeForegroundService : Service() {
         // komplett terminiert (onDestroy). Solange der Service lebt, soll die
         // App durchgängig präzise GPS-Fixes bekommen — unabhängig von der
         // Radiacode-Session.
-        session?.release()
-        session = null
+        try { radiaCode?.close() } catch (_: Throwable) { /* best effort */ }
+        radiaCode = null
+        transport = null
+        currentAddress = null
         deviceReady = false
+        // Reconnect-Counter zurücksetzen — beim nächsten manuellen Connect
+        // soll der Backoff wieder beim kürzesten Delay anfangen. Der laufende
+        // Reconnect-Worker (falls einer geplant ist) stoppt sich selbst, weil
+        // er `currentAddress = null` sieht.
+        consecutiveTimeouts = 0
+        reconnectAttempt = 0
+        // Bootstrap-State zurücksetzen — neuer User-initiierter Connect soll
+        // wieder einen Rare-Bootstrap-Versuch erlauben können.
+        rareSeenThisSession = false
+        rareBootstrapAttempted = false
+        sessionReadyMs = 0L
+        // Rare-Cache leeren — er soll nur innerhalb derselben Session gelten,
+        // damit nach einem expliziten Disconnect+Reconnect keine veralteten
+        // Werte aus einer früheren Session zurückkommen.
+        cachedDoseUSv = null
+        cachedDurationSec = null
+        cachedTemperatureC = null
+        cachedChargePct = null
     }
 
     /**
@@ -650,7 +876,7 @@ class RadiacodeForegroundService : Service() {
 
     private fun updateNotificationForState() {
         val title = when {
-            session == null -> "Radiacode getrennt"
+            radiaCode == null -> "Radiacode getrennt"
             !deviceReady -> "Radiacode – Verbindung verloren"
             gpsTrackRecorder != null && trackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
             trackRecorder != null -> "Strahlenmessung läuft"
@@ -659,20 +885,6 @@ class RadiacodeForegroundService : Service() {
         }
         lastTitle = title
         ensureForeground()
-    }
-
-    private fun encodeSetTime(d: Date): ByteArray {
-        val cal = java.util.Calendar.getInstance().apply { time = d }
-        return byteArrayOf(
-            cal.get(java.util.Calendar.DAY_OF_MONTH).toByte(),
-            (cal.get(java.util.Calendar.MONTH) + 1).toByte(),
-            (cal.get(java.util.Calendar.YEAR) - 2000).toByte(),
-            0,
-            cal.get(java.util.Calendar.SECOND).toByte(),
-            cal.get(java.util.Calendar.MINUTE).toByte(),
-            cal.get(java.util.Calendar.HOUR_OF_DAY).toByte(),
-            0,
-        )
     }
 
     private fun acquireWakeLock() {

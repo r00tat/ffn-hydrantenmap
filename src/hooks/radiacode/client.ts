@@ -455,6 +455,18 @@ export class RadiacodeClient {
   }
 
   private execute(cmd: number, args: Uint8Array): Promise<ParsedResponse> {
+    // Native (capacitor) Pfad: der Adapter bietet eine synchrone
+    // Wire-Level-Execute, die bereits chunked + assembled. Kein FIFO-Queue
+    // hier — die native Seite serialisiert über
+    // `BluetoothTransport.executeLock`.
+    if (typeof this.adapter.execute === 'function') {
+      const seq = this.seqIndex;
+      this.seqIndex = (this.seqIndex + 1) % SEQ_MODULO;
+      const frame = buildRequest(cmd, seq, args);
+      return this.adapter
+        .execute(this.deviceId, frame)
+        .then((body) => parseResponse(body));
+    }
     return new Promise<ParsedResponse>((resolve, reject) => {
       this.queue.push({ cmd, args, resolve, reject });
       this.pumpQueue();

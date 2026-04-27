@@ -4,7 +4,6 @@ import {
   NativeConnectionState,
   NativeConnectionStateEvent,
   NativeMeasurementEvent,
-  NativeNotificationEvent,
   RadiacodeNotification,
 } from './radiacodeNotification';
 
@@ -55,12 +54,23 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-export async function nativeWrite(payload: Uint8Array): Promise<void> {
-  console.debug('[Radiacode/nativeBridge] nativeWrite bytes=', payload.length);
+/**
+ * One-shot Wire-Level-Execute: schickt einen kompletten geframten Request an
+ * den nativen Foreground-Service und wartet auf die wieder zusammengesetzte
+ * Response (ohne 4-Byte-Längen-Prefix). Ersetzt den vorherigen
+ * `nativeWrite`-Pfad, der rohe Notifications einzeln an die JS-Seite
+ * weitergereicht hat — der native Stack assembliert jetzt die Frames
+ * vollständig, bevor JS sie sieht.
+ */
+export async function nativeExecute(payload: Uint8Array): Promise<Uint8Array> {
+  console.debug('[Radiacode/nativeBridge] nativeExecute bytes=', payload.length);
   try {
-    await RadiacodeNative.writeNative({ payload: bytesToBase64(payload) });
+    const result = await RadiacodeNative.executeNative({
+      payload: bytesToBase64(payload),
+    });
+    return base64ToBytes(result.response);
   } catch (err) {
-    console.warn('[Radiacode/nativeBridge] nativeWrite failed', err);
+    console.warn('[Radiacode/nativeBridge] nativeExecute failed', err);
     throw err;
   }
 }
@@ -117,26 +127,6 @@ export function onNativeMeasurement(
     .catch(() => {
       // plugin not available — silently ignore
     });
-  return () => {
-    unsubscribed = true;
-    listenerHandle?.remove().catch(() => {});
-  };
-}
-
-export function onNativeNotification(
-  handler: (bytes: Uint8Array) => void,
-): Unsubscribe {
-  let listenerHandle: PluginListenerHandle | null = null;
-  let unsubscribed = false;
-  RadiacodeNative.addListener('notification', (data) => handler(base64ToBytes(data.bytes)))
-    .then((h) => {
-      if (unsubscribed) {
-        void h.remove();
-      } else {
-        listenerHandle = h;
-      }
-    })
-    .catch(() => {});
   return () => {
     unsubscribed = true;
     listenerHandle?.remove().catch(() => {});

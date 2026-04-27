@@ -101,11 +101,19 @@ public class RadiacodeNotificationPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Synchroner Wire-Level-Execute: schreibt einen kompletten geframten
+     * Request über den nativen [BluetoothTransport] und gibt die wieder
+     * zusammengesetzte Response-Body (ohne Längen-Prefix) zurück. Ersetzt
+     * den vorherigen `writeNative`-Pfad, der rohe Notifications einzeln
+     * an die JS-Seite weitergereicht hat — der native Stack assembliert
+     * jetzt die Frames vollständig, bevor JS sie sieht.
+     */
     @PluginMethod
-    public void writeNative(PluginCall call) {
+    public void executeNative(PluginCall call) {
         String payloadB64 = call.getString("payload");
         if (payloadB64 == null) {
-            Log.w(TAG, "plugin.writeNative rejected — missing payload");
+            Log.w(TAG, "plugin.executeNative rejected — missing payload");
             call.reject("payload required (base64)");
             return;
         }
@@ -113,16 +121,29 @@ public class RadiacodeNotificationPlugin extends Plugin {
         try {
             payload = Base64.decode(payloadB64, Base64.NO_WRAP);
         } catch (IllegalArgumentException e) {
-            Log.w(TAG, "plugin.writeNative rejected — payload not base64", e);
+            Log.w(TAG, "plugin.executeNative rejected — payload not base64", e);
             call.reject("payload is not valid base64");
             return;
         }
-        Log.d(TAG, "plugin.writeNative bytes=" + payload.length);
-        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
-        intent.setAction(RadiacodeForegroundService.ACTION_BLE_WRITE);
-        intent.putExtra(RadiacodeForegroundService.EXTRA_PAYLOAD, payload);
-        startService(intent);
-        call.resolve();
+        Log.d(TAG, "plugin.executeNative bytes=" + payload.length);
+        RadiacodeForegroundService svc = RadiacodeForegroundService.Companion.getInstance();
+        if (svc == null) {
+            call.reject("no active radiacode service");
+            return;
+        }
+        // BluetoothTransport.execute() blockiert bis zur Antwort — auf
+        // Worker-Thread auslagern, damit der WebView-Bridge-Thread nicht steht.
+        new Thread(() -> {
+            try {
+                byte[] response = svc.executeRawRequest(payload);
+                JSObject ret = new JSObject();
+                ret.put("response", Base64.encodeToString(response, Base64.NO_WRAP));
+                call.resolve(ret);
+            } catch (Throwable t) {
+                Log.w(TAG, "plugin.executeNative failed", t);
+                call.reject(t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+            }
+        }, "RadiacodeExecute").start();
     }
 
     @PluginMethod
@@ -245,25 +266,38 @@ public class RadiacodeNotificationPlugin extends Plugin {
         data.put("timestampMs", m.getTimestampMs());
         data.put("dosisleistungUSvH", m.getDosisleistungUSvH());
         data.put("cps", m.getCps());
-        if (m.getDoseUSv() != null) data.put("doseUSv", m.getDoseUSv());
-        if (m.getDurationSec() != null) data.put("durationSec", m.getDurationSec());
-        if (m.getTemperatureC() != null) data.put("temperatureC", m.getTemperatureC());
-        if (m.getChargePct() != null) data.put("chargePct", m.getChargePct());
+
+        // Rare-Felder fallen alle paar Sekunden vom Gerät runter, nicht jeden
+        // Poll-Tick. Damit die UI nach Late-Connect oder Adoption nicht
+        // dauerhaft '—' anzeigt, fällt das Plugin auf den im Service
+        // gehaltenen Cache zurück, falls der aktuelle Tick keinen frischen
+        // Wert mitbringt. Frische Werte aus `m` haben Vorrang.
+        RadiacodeForegroundService svc = RadiacodeForegroundService.Companion.getInstance();
+
+        Double dose = m.getDoseUSv() != null
+            ? m.getDoseUSv()
+            : (svc != null ? svc.getCachedDoseUSv() : null);
+        if (dose != null) data.put("doseUSv", dose);
+
+        Integer duration = m.getDurationSec() != null
+            ? m.getDurationSec()
+            : (svc != null ? svc.getCachedDurationSec() : null);
+        if (duration != null) data.put("durationSec", duration);
+
+        Double temp = m.getTemperatureC() != null
+            ? m.getTemperatureC()
+            : (svc != null ? svc.getCachedTemperatureC() : null);
+        if (temp != null) data.put("temperatureC", temp);
+
+        Double chg = m.getChargePct() != null
+            ? m.getChargePct()
+            : (svc != null ? svc.getCachedChargePct() : null);
+        if (chg != null) data.put("chargePct", chg);
+
         if (m.getDosisleistungErrPct() != null)
             data.put("dosisleistungErrPct", m.getDosisleistungErrPct());
         if (m.getCpsErrPct() != null) data.put("cpsErrPct", m.getCpsErrPct());
         i.notifyListeners("measurement", data);
-    }
-
-    public static void emitNotification(byte[] bytes) {
-        RadiacodeNotificationPlugin i = instance;
-        if (i == null) {
-            Log.w(TAG, "emitNotification — no plugin instance; dropping " + bytes.length + " bytes");
-            return;
-        }
-        JSObject data = new JSObject();
-        data.put("bytes", Base64.encodeToString(bytes, Base64.NO_WRAP));
-        i.notifyListeners("notification", data);
     }
 
     public static void emitConnectionState(String state) {

@@ -20,6 +20,15 @@ export interface UseRadiacodeDeviceResult {
   scan: () => Promise<RadiacodeDeviceRef | null>;
   connect: (device?: RadiacodeDeviceRef) => Promise<void>;
   disconnect: () => Promise<void>;
+  /**
+   * Spiegelt eine bereits bestehende native BLE-Verbindung in den Hook-State,
+   * ohne einen neuen Verbindungsaufbau anzustoßen. Erwartet, dass der native
+   * Foreground-Service bereits verbunden ist (Caller stellt das via
+   * `RadiacodeNotification.getState()` sicher). Erzeugt einen
+   * `RadiacodeClient`, registriert den Polling-Listener und setzt den
+   * Status auf 'connected' — kein `adapter.connect`, kein Handshake.
+   */
+  adoptExistingConnection: (device: RadiacodeDeviceRef) => Promise<void>;
   clientRef: RefObject<RadiacodeClient | null>;
 }
 
@@ -50,11 +59,17 @@ export function useRadiacodeDevice(
     stateRef.current.adapter = adapter;
     const unsub = adapter.onConnectionStateChange?.((s) => {
       console.log('[useRadiacodeDevice] adapter state change:', s);
-      // Wenn der native Teil von sich aus den Status ändert (z.B. Reconnect
-      // erfolgreich oder Link final verloren), ziehen wir das in den Hook-State
-      // nach. 'connected' wird hier nicht forciert, das macht connect() aktiv.
+      // Wenn der native Teil von sich aus den Status ändert, ziehen wir das
+      // in den Hook-State nach. 'connected' wird ohne aktiven Client (initialer
+      // Connect-Flow) ignoriert — diesen Fall steuert connect() selbst.
       if (s === 'reconnecting') setStatus('reconnecting');
-      if (s === 'disconnected' && stateRef.current.client) {
+      else if (s === 'connected' && stateRef.current.client) {
+        // Auto-Reconnect erfolgreich (nativer Foreground-Service hat die
+        // GATT-Session erneuert): Status aus 'reconnecting' zurück auf
+        // 'connected' setzen, sonst bleibt die UI hängen.
+        setError(null);
+        setStatus('connected');
+      } else if (s === 'disconnected' && stateRef.current.client) {
         // Wenn wir eigentlich ein Client-Objekt haben, aber der Adapter 'disconnected'
         // meldet, ist der Link weg.
         setStatus('unavailable');
@@ -186,6 +201,44 @@ export function useRadiacodeDevice(
     [adapter, clientFactory, pollIntervalMs],
   );
 
+  const adoptExistingConnection = useCallback(
+    async (target: RadiacodeDeviceRef): Promise<void> => {
+      if (stateRef.current.client) {
+        // Bereits adoptiert — nichts zu tun.
+        return;
+      }
+      setError(null);
+      const client = clientFactory
+        ? clientFactory(adapter, target.id)
+        : new RadiacodeClient(adapter, target.id);
+
+      // Auf nativem Pfad ist client.connect() ein No-Op-äquivalentes Setup
+      // (registriert nur Notification-Listener, kein Handshake — siehe
+      // client.ts). Auf Web ist Adoption ohnehin nicht möglich, weil eine
+      // bestehende GATT-Session zwischen Page-Loads nicht überlebt.
+      await client.connect();
+      client.startPolling((m) => {
+        setMeasurement((prev) => {
+          if (!prev) return m;
+          const next = { ...prev };
+          for (const [key, val] of Object.entries(m)) {
+            if (val != null) {
+              (next as Record<string, unknown>)[key] = val;
+            }
+          }
+          return next;
+        });
+      }, pollIntervalMs);
+
+      setDevice(target);
+      stateRef.current.device = target;
+      stateRef.current.client = client;
+      clientRef.current = client;
+      setStatus('connected');
+    },
+    [adapter, clientFactory, pollIntervalMs],
+  );
+
   useEffect(() => {
     const state = stateRef.current;
     return () => {
@@ -208,6 +261,7 @@ export function useRadiacodeDevice(
     scan,
     connect,
     disconnect,
+    adoptExistingConnection,
     clientRef,
   };
 }

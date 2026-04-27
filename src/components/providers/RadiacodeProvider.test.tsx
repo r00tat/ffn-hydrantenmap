@@ -6,6 +6,7 @@ import { RadiacodeClient, SessionEvent } from '../../hooks/radiacode/client';
 import { SpectrumSnapshot } from '../../hooks/radiacode/protocol';
 import { RadiacodeMeasurement } from '../../hooks/radiacode/types';
 import { RadiacodeProvider, useRadiacode } from './RadiacodeProvider';
+import { RadiacodeNotification } from '../../hooks/radiacode/radiacodeNotification';
 
 const mockAdd = vi.fn(async (_item: unknown) => ({ id: 'new-doc' }));
 vi.mock('../../hooks/useFirecallItemAdd', () => ({
@@ -16,6 +17,28 @@ vi.mock('../../hooks/radiacode/devicePreference', () => ({
   loadDefaultDevice: vi.fn(async () => null),
   saveDefaultDevice: vi.fn(async () => {}),
   clearDefaultDevice: vi.fn(async () => {}),
+}));
+
+vi.mock('../../hooks/radiacode/radiacodeNotification', () => ({
+  RadiacodeNotification: {
+    getState: vi.fn(async () => ({
+      connected: false,
+      deviceAddress: null,
+      radiacodeTracking: false,
+      gpsTracking: false,
+    })),
+    connectNative: vi.fn(async () => {}),
+    disconnectNative: vi.fn(async () => {}),
+    writeNative: vi.fn(async () => {}),
+    start: vi.fn(async () => {}),
+    update: vi.fn(async () => {}),
+    stop: vi.fn(async () => {}),
+    startTrackRecording: vi.fn(async () => {}),
+    stopTrackRecording: vi.fn(async () => {}),
+    startGpsTrack: vi.fn(async () => {}),
+    stopGpsTrack: vi.fn(async () => {}),
+    addListener: vi.fn(async () => ({ remove: vi.fn(async () => {}) })),
+  },
 }));
 
 function nullAdapter(): BleAdapter {
@@ -453,6 +476,65 @@ describe('RadiacodeProvider', () => {
       await waitFor(() => {
         expect(latest()!.disconnect).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('syncFromNative / adoption', () => {
+    it('adoptiert eine bestehende Native-Verbindung beim Mount, ohne adapter.connect aufzurufen', async () => {
+      (RadiacodeNotification.getState as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        connected: true,
+        deviceAddress: 'aa:bb:cc:dd:ee:ff',
+        radiacodeTracking: false,
+        gpsTracking: false,
+      });
+      const adapter = nullAdapter();
+      const { factory, latest } = makeFakeSpectrumClientFactory();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter} clientFactory={factory}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      await waitFor(() => {
+        expect(values.at(-1)!.status).toBe('connected');
+      });
+      expect(adapter.connect).not.toHaveBeenCalled();
+      expect(values.at(-1)!.device?.id).toBe('aa:bb:cc:dd:ee:ff');
+      // Polling-Listener wurde registriert (kein Handshake-connect, aber startPolling).
+      expect(latest()!.startPolling).toHaveBeenCalled();
+    });
+
+    it('bleibt idle, wenn Native disconnect meldet', async () => {
+      (RadiacodeNotification.getState as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        connected: false,
+        deviceAddress: null,
+        radiacodeTracking: false,
+        gpsTracking: false,
+      });
+      const adapter = nullAdapter();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      // Mount-Effekt durchlaufen lassen
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(values.at(-1)!.status).toBe('idle');
+      expect(adapter.connect).not.toHaveBeenCalled();
+    });
+
+    it('refreshConnectionState ist via Context verfügbar', () => {
+      const adapter = nullAdapter();
+      const values: ReturnType<typeof useRadiacode>[] = [];
+      render(
+        <RadiacodeProvider adapter={adapter}>
+          <Probe onValue={(v) => values.push(v)} />
+        </RadiacodeProvider>,
+      );
+      expect(typeof values.at(-1)!.refreshConnectionState).toBe('function');
     });
   });
 

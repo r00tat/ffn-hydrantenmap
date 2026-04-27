@@ -30,12 +30,13 @@ export interface NativeMeasurementEvent {
   cpsErrPct?: number;
 }
 
-export interface NativeNotificationEvent {
-  bytes: string; // base64
-}
-
 export interface NativeConnectionStateEvent {
   state: NativeConnectionState;
+}
+
+export interface NativeExecuteResult {
+  /** Base64-encoded response body (without the 4-byte length prefix). */
+  response: string;
 }
 
 export interface MarkerWrittenEvent {
@@ -57,7 +58,13 @@ export interface RadiacodeNotificationPlugin {
 
   // Phase 2: BLE Passthrough
   connectNative(opts: { deviceAddress: string }): Promise<void>;
-  writeNative(opts: { payload: string }): Promise<void>;
+  /**
+   * Schickt einen kompletten geframten Request an den nativen
+   * Foreground-Service und wartet auf die wieder zusammengesetzte Response
+   * (base64, ohne 4-Byte-Längen-Prefix). Ersetzt das vorherige `writeNative`,
+   * das Notifications einzeln durchgereicht hat.
+   */
+  executeNative(opts: { payload: string }): Promise<NativeExecuteResult>;
   disconnectNative(): Promise<void>;
 
   // Phase 3: Track Recording (Radiacode Points)
@@ -76,10 +83,6 @@ export interface RadiacodeNotificationPlugin {
   addListener(
     event: 'measurement',
     listener: (data: NativeMeasurementEvent) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    event: 'notification',
-    listener: (data: NativeNotificationEvent) => void,
   ): Promise<PluginListenerHandle>;
   addListener(
     event: 'connectionState',

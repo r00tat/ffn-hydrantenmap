@@ -191,3 +191,5 @@ hydranten.csv
 /captures/
 
 certificates
+/radiacode-python/
+.claude/scheudled_tasks.lock

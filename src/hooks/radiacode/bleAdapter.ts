@@ -15,6 +15,15 @@ export interface BleAdapter {
     handler: (packet: Uint8Array) => void,
   ): Promise<Unsubscribe>;
   write(deviceId: string, data: Uint8Array): Promise<void>;
+  /**
+   * Optional one-shot Wire-Level-Execute: schreibt einen kompletten geframten
+   * Request und gibt die wieder zusammengesetzte Response-Body (ohne 4-Byte-
+   * Längen-Prefix) zurück. Wenn vorhanden, sollte der `RadiacodeClient` diesen
+   * Pfad bevorzugt benutzen — er ersetzt den klassischen
+   * `write` + `onNotification`-Reassembly-Pattern. Heute nur vom
+   * Capacitor-Adapter implementiert.
+   */
+  execute?(deviceId: string, framedRequest: Uint8Array): Promise<Uint8Array>;
   onDisconnect?(deviceId: string, handler: () => void): Unsubscribe;
   onConnectionStateChange?(
     handler: (state: 'connected' | 'disconnected' | 'reconnecting') => void,
