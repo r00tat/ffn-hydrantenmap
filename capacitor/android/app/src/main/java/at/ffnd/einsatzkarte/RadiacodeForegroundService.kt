@@ -106,15 +106,23 @@ class RadiacodeForegroundService : Service() {
         private const val POLL_INTERVAL_MS = 1000L
 
         // Nach so vielen aufeinanderfolgenden Timeouts wird die Session als
-        // tot betrachtet und ein Reconnect-Versuch gestartet. Bei 10 s
-        // execute-Default ist das = 20 s Erkennungszeit, ein guter Kompromiss
-        // zwischen Schnelligkeit und Stabilität bei kurzen BLE-Aussetzern.
+        // tot betrachtet und ein Reconnect-Versuch gestartet. Bei 2.5 s
+        // poll-Timeout ist das = ca. 5 s Erkennungszeit.
         private const val MAX_CONSECUTIVE_TIMEOUTS = 2
 
-        // Pause zwischen Teardown der toten Session und neuem Connect-Versuch.
-        // Gibt dem Android-BLE-Stack Zeit, den GATT-Socket vollständig
-        // freizugeben — sonst kommt der nächste connectGatt mit status=147.
-        private const val RECONNECT_DELAY_MS = 1500L
+        // Per-Tick Timeout für `radiaCode.dataBuf()`. Deutlich kürzer als der
+        // 10s-Default des BluetoothTransport, damit ein halb-toter BLE-Link
+        // (Standby-Drop ohne Android-STATE_DISCONNECTED) schnell erkannt wird.
+        // Ein normaler DATA_BUF-Read schließt in deutlich unter 1 s ab — 2.5 s
+        // sind großzügig genug, dass kurze Connection-Interval-Schwankungen
+        // keinen falschen Timeout auslösen.
+        private const val POLL_TIMEOUT_MS = 2_500L
+
+        // Backoff zwischen Reconnect-Versuchen. Erste paar Versuche schnell
+        // (typisches Standby-Wedge erholt sich nach kurzer Pause), dann
+        // länger werdend bis 30 s, danach Cap. Reconnect läuft persistent —
+        // nur ACTION_BLE_DISCONNECT (User) oder ein Service-Tod stoppt ihn.
+        private val RECONNECT_BACKOFF_MS = longArrayOf(1_500L, 5_000L, 15_000L, 30_000L)
 
         fun startIntent(ctx: Context, title: String, body: String): Intent =
             Intent(ctx, RadiacodeForegroundService::class.java).apply {
@@ -157,6 +165,11 @@ class RadiacodeForegroundService : Service() {
     // Session forciert geschlossen + ein Reconnect angestoßen, sonst hängt
     // der Service ewig in 10-Sekunden-Timeout-Loops.
     @Volatile private var consecutiveTimeouts: Int = 0
+
+    // Counter für Reconnect-Versuche; bestimmt das Backoff-Delay. Wird
+    // bei erfolgreichem Tick UND bei erfolgreichem Reconnect-Handshake
+    // auf 0 zurückgesetzt.
+    @Volatile private var reconnectAttempt: Int = 0
 
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
@@ -537,24 +550,31 @@ class RadiacodeForegroundService : Service() {
                 transport = t
                 radiaCode = rc
                 deviceReady = true
+                consecutiveTimeouts = 0
+                reconnectAttempt = 0
                 RadiacodeNotificationPlugin.emitConnectionState("connected")
                 updateNotificationForState()
                 startPollLoop()
             } catch (e: DeviceNotFound) {
                 Log.w(TAG, "startBleSession — device not found / connect failed", e)
                 handleConnectionLost()
+                scheduleReconnect("DeviceNotFound: ${e.message}")
             } catch (e: ConnectionClosed) {
                 Log.w(TAG, "startBleSession — connection closed during init", e)
                 handleConnectionLost()
+                scheduleReconnect("ConnectionClosed during init")
             } catch (e: TransportTimeout) {
                 Log.w(TAG, "startBleSession — handshake timed out", e)
                 handleConnectionLost()
+                scheduleReconnect("TransportTimeout during init")
             } catch (e: RadiaCodeException) {
                 Log.w(TAG, "startBleSession — protocol error", e)
                 handleConnectionLost()
+                scheduleReconnect("RadiaCodeException: ${e.message}")
             } catch (t: Throwable) {
                 Log.e(TAG, "startBleSession — unexpected error", t)
                 handleConnectionLost()
+                scheduleReconnect("unexpected error: ${t.message}")
             }
         }
     }
@@ -584,12 +604,14 @@ class RadiacodeForegroundService : Service() {
         val rc = radiaCode ?: return
         if (!deviceReady) return
         try {
-            val records = rc.dataBuf()
+            val records = rc.dataBuf(POLL_TIMEOUT_MS)
             consecutiveTimeouts = 0
+            reconnectAttempt = 0
             val measurement = MeasurementMapper.map(records)
             if (measurement != null) onMeasurementReceived(measurement)
         } catch (e: ConnectionClosed) {
             Log.w(TAG, "Poll tick — connection closed", e)
+            handleConnectionLost()
             scheduleReconnect("connection closed")
         } catch (e: TransportTimeout) {
             consecutiveTimeouts++
@@ -600,6 +622,7 @@ class RadiacodeForegroundService : Service() {
                 // L2CAP-Ebene durchgehen), aber das Gerät antwortet nicht mehr.
                 // Forciert teardown + reconnect mit der zuletzt verwendeten
                 // Adresse.
+                handleConnectionLost()
                 scheduleReconnect("$consecutiveTimeouts consecutive timeouts")
             }
         } catch (t: Throwable) {
@@ -608,22 +631,39 @@ class RadiacodeForegroundService : Service() {
     }
 
     /**
-     * Schließt die aktuelle Session und stößt — falls noch eine
-     * `currentAddress` vorhanden ist — nach kurzer Pause einen Reconnect über
-     * den `bleWorker` an. Wird aus [pollTick] bei Dead-Link-Detection und aus
-     * [executeRawRequest]-Fehlerpfaden gerufen.
+     * Plant einen Reconnect-Versuch über den `bleWorker` mit exponentiellem
+     * Backoff. Persistent — versucht weiter, bis der User explizit
+     * disconnected (ACTION_BLE_DISCONNECT → teardownSession → currentAddress=null)
+     * oder eine neue Session schon aktiv ist. Erhöht [reconnectAttempt]; das
+     * nächste Backoff-Intervall richtet sich nach diesem Counter.
+     *
+     * Setzt selbst KEIN `handleConnectionLost` — der Aufrufer muss vorher die
+     * Session sauber abbauen.
      */
     private fun scheduleReconnect(reason: String) {
         val address = currentAddress
-        Log.w(TAG, "scheduleReconnect — reason: $reason, address=$address")
+        if (address == null) {
+            Log.i(TAG, "scheduleReconnect — no address (user disconnected), giving up")
+            reconnectAttempt = 0
+            return
+        }
+        val worker = bleWorker
+        if (worker == null || worker.isShutdown) {
+            Log.w(TAG, "scheduleReconnect — bleWorker not available, giving up")
+            reconnectAttempt = 0
+            return
+        }
+        val delayIdx = reconnectAttempt.coerceAtMost(RECONNECT_BACKOFF_MS.size - 1)
+        val delay = RECONNECT_BACKOFF_MS[delayIdx]
+        reconnectAttempt++
+        Log.w(
+            TAG,
+            "scheduleReconnect — reason: $reason, attempt=$reconnectAttempt, delay=${delay}ms, address=$address",
+        )
         consecutiveTimeouts = 0
-        handleConnectionLost()
-        if (address == null) return
-        val worker = bleWorker ?: return
-        if (worker.isShutdown) return
         worker.execute {
             try {
-                Thread.sleep(RECONNECT_DELAY_MS)
+                Thread.sleep(delay)
             } catch (ie: InterruptedException) {
                 Thread.currentThread().interrupt()
                 return@execute
@@ -633,15 +673,17 @@ class RadiacodeForegroundService : Service() {
             // dann nicht reconnecten.
             if (currentAddress != address) {
                 Log.i(TAG, "scheduleReconnect — aborted, currentAddress changed (was=$address now=$currentAddress)")
+                reconnectAttempt = 0
                 return@execute
             }
             // Falls währenddessen jemand schon eine neue Session aufgebaut hat,
             // ebenfalls abbrechen.
             if (radiaCode != null) {
                 Log.i(TAG, "scheduleReconnect — aborted, session already active")
+                reconnectAttempt = 0
                 return@execute
             }
-            Log.i(TAG, "scheduleReconnect — attempting reconnect to $address")
+            Log.i(TAG, "scheduleReconnect — attempting reconnect to $address (attempt=$reconnectAttempt)")
             startBleSession(address)
         }
     }
@@ -671,6 +713,12 @@ class RadiacodeForegroundService : Service() {
         transport = null
         currentAddress = null
         deviceReady = false
+        // Reconnect-Counter zurücksetzen — beim nächsten manuellen Connect
+        // soll der Backoff wieder beim kürzesten Delay anfangen. Der laufende
+        // Reconnect-Worker (falls einer geplant ist) stoppt sich selbst, weil
+        // er `currentAddress = null` sieht.
+        consecutiveTimeouts = 0
+        reconnectAttempt = 0
         // Rare-Cache leeren — er soll nur innerhalb derselben Session gelten,
         // damit nach einem expliziten Disconnect+Reconnect keine veralteten
         // Werte aus einer früheren Session zurückkommen.

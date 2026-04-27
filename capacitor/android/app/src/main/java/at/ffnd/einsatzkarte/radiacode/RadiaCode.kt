@@ -75,7 +75,7 @@ class RadiaCode internal constructor(
      * Wraps the request in `<I>(len) <HBB>(cmd, 0, seq)` framing, sends it,
      * and asserts that the 4-byte echo header in the response matches.
      */
-    fun execute(reqType: Command, args: ByteArray? = null): BytesBuffer {
+    fun execute(reqType: Command, args: ByteArray? = null, timeoutMs: Long = 10_000L): BytesBuffer {
         val reqSeqNo = 0x80 + seq
         seq = (seq + 1) % 32
         val header = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).apply {
@@ -85,7 +85,7 @@ class RadiaCode internal constructor(
         }.array()
         val request = header + (args ?: ByteArray(0))
         val full = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(request.size).array() + request
-        val response = transport.execute(full)
+        val response = transport.execute(full, timeoutMs)
         val respHeader = response.bytes(4)
         if (!header.contentEquals(respHeader)) {
             throw RadiaCodeException.HeaderMismatch(header.toHexLower(), respHeader.toHexLower())
@@ -94,8 +94,8 @@ class RadiaCode internal constructor(
     }
 
     /** Issue an `RD_VIRT_STRING` for the given command/VS/VSFR identifier. */
-    fun readRequest(commandId: Int): BytesBuffer {
-        val r = execute(Command.RD_VIRT_STRING, u32leArr(commandId))
+    fun readRequest(commandId: Int, timeoutMs: Long = 10_000L): BytesBuffer {
+        val r = execute(Command.RD_VIRT_STRING, u32leArr(commandId), timeoutMs)
         val retcode = r.u32Le()
         val flen = r.u32Le().toInt()
         if (retcode != 1L) throw RadiaCodeException.BadRetcode("commandId=$commandId", retcode)
@@ -108,8 +108,8 @@ class RadiaCode internal constructor(
         }
         return BytesBuffer(data)
     }
-    fun readRequest(vs: Vs): BytesBuffer = readRequest(vs.value)
-    fun readRequest(vsfr: Vsfr): BytesBuffer = readRequest(vsfr.value)
+    fun readRequest(vs: Vs, timeoutMs: Long = 10_000L): BytesBuffer = readRequest(vs.value, timeoutMs)
+    fun readRequest(vsfr: Vsfr, timeoutMs: Long = 10_000L): BytesBuffer = readRequest(vsfr.value, timeoutMs)
 
     /** Issue a `WR_VIRT_SFR` to the given identifier. */
     fun writeRequest(commandId: Int, data: ByteArray? = null) {
@@ -212,8 +212,14 @@ class RadiaCode internal constructor(
     /** Set the device-side time counter. Called with `0` after init. */
     fun deviceTime(v: Int) = writeRequest(Vsfr.DEVICE_TIME, u32leArr(v))
 
-    /** Read the buffered measurement records since the last call. */
-    fun dataBuf(): List<DataBufRecord> = DataBufDecoder.decode(readRequest(Vs.DATA_BUF), baseTime)
+    /**
+     * Read the buffered measurement records since the last call. Polling
+     * callers should pass a tighter [timeoutMs] than the default 10s so that
+     * a half-dead BLE link is detected within the polling cadence rather
+     * than after a full default timeout.
+     */
+    fun dataBuf(timeoutMs: Long = 10_000L): List<DataBufRecord> =
+        DataBufDecoder.decode(readRequest(Vs.DATA_BUF, timeoutMs), baseTime)
 
     /** Current spectrum (resets on `spectrumReset`). */
     fun spectrum(): Spectrum = SpectrumDecoder.decode(readRequest(Vs.SPECTRUM), spectrumFormatVersion)
