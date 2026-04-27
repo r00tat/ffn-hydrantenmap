@@ -124,6 +124,13 @@ class RadiacodeForegroundService : Service() {
         // nur ACTION_BLE_DISCONNECT (User) oder ein Service-Tod stoppt ihn.
         private val RECONNECT_BACKOFF_MS = longArrayOf(1_500L, 5_000L, 15_000L, 30_000L)
 
+        // Wenn länger als so viele Millisekunden kein Rare-Record (Dose/Akku/
+        // Temperatur) gesehen wurde, schicken wir einen DEVICE_TIME=0 als
+        // Cursor-Reset-Nudge. Original-App reagiert nach ~10 s — wir spiegeln
+        // das. Min-Abstand zwischen Nudges: derselbe Wert, damit das Gerät
+        // Zeit bekommt, nach dem Nudge tatsächlich Rare-Records zu liefern.
+        private const val RARE_NUDGE_THRESHOLD_MS = 10_000L
+
         fun startIntent(ctx: Context, title: String, body: String): Intent =
             Intent(ctx, RadiacodeForegroundService::class.java).apply {
                 action = ACTION_START
@@ -170,6 +177,15 @@ class RadiacodeForegroundService : Service() {
     // bei erfolgreichem Tick UND bei erfolgreichem Reconnect-Handshake
     // auf 0 zurückgesetzt.
     @Volatile private var reconnectAttempt: Int = 0
+
+    // Zeitstempel des letzten gesehenen Rare-Records (Dose/Akku/Temperatur).
+    // Wenn das Gerät beim Connect im Standby war und erst danach aufwacht,
+    // hat es den Cursor-Reset (DEVICE_TIME=0 aus dem Init-Handshake) verpasst
+    // und liefert nur Realtime-Records, keine Rare-Records (siehe alter
+    // runHandshake-Kommentar). Wir nudgern das Gerät reaktiv mit einem
+    // erneuten DEVICE_TIME=0, wenn längere Zeit kein Rare-Record kam.
+    @Volatile private var lastRareSeenMs: Long = 0L
+    @Volatile private var lastRareNudgeMs: Long = 0L
 
     private var fusedLocation: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
@@ -552,6 +568,12 @@ class RadiacodeForegroundService : Service() {
                 deviceReady = true
                 consecutiveTimeouts = 0
                 reconnectAttempt = 0
+                // Rare-Tracking auf "frisch verbunden" setzen — wenn nach
+                // RARE_NUDGE_THRESHOLD_MS noch keine Rare-Records ankommen,
+                // schicken wir einen DEVICE_TIME=0-Nudge.
+                val now = System.currentTimeMillis()
+                lastRareSeenMs = now
+                lastRareNudgeMs = now
                 RadiacodeNotificationPlugin.emitConnectionState("connected")
                 updateNotificationForState()
                 startPollLoop()
@@ -608,7 +630,15 @@ class RadiacodeForegroundService : Service() {
             consecutiveTimeouts = 0
             reconnectAttempt = 0
             val measurement = MeasurementMapper.map(records)
-            if (measurement != null) onMeasurementReceived(measurement)
+            if (measurement != null) {
+                // Rare-Records erkennen wir an einem nicht-null doseUSv (oder
+                // einem der anderen Rare-Felder). Reset des Idle-Timers.
+                if (measurement.doseUSv != null) {
+                    lastRareSeenMs = System.currentTimeMillis()
+                }
+                onMeasurementReceived(measurement)
+            }
+            maybeNudgeRareStream(rc)
         } catch (e: ConnectionClosed) {
             Log.w(TAG, "Poll tick — connection closed", e)
             handleConnectionLost()
@@ -627,6 +657,38 @@ class RadiacodeForegroundService : Service() {
             }
         } catch (t: Throwable) {
             Log.w(TAG, "Poll tick failed", t)
+        }
+    }
+
+    /**
+     * Wenn länger als [RARE_NUDGE_THRESHOLD_MS] kein Rare-Record gesehen
+     * wurde (z.B. weil das Gerät beim Connect noch im Standby war und den
+     * Cursor-Reset des Init-Handshakes verpasst hat), schicken wir
+     * `WR_VIRT_SFR(DEVICE_TIME=0)` nach. Der alte
+     * [RadiacodeForegroundService] machte das implizit über den vollen
+     * Handshake, hier triggern wir nur den entscheidenden Befehl.
+     *
+     * Läuft auf dem `pollExecutor` — der nächste Tick wird durch den (kleinen)
+     * write-request kurz blockiert, das ist akzeptabel.
+     */
+    private fun maybeNudgeRareStream(rc: RadiaCode) {
+        val now = System.currentTimeMillis()
+        if (now - lastRareSeenMs <= RARE_NUDGE_THRESHOLD_MS) return
+        if (now - lastRareNudgeMs <= RARE_NUDGE_THRESHOLD_MS) return
+        Log.i(
+            TAG,
+            "rare-nudge — no rare record for ${now - lastRareSeenMs}ms, sending DEVICE_TIME=0",
+        )
+        try {
+            rc.deviceTime(0)
+            lastRareNudgeMs = now
+        } catch (e: TransportTimeout) {
+            // Beim Nudge-Timeout NICHT in den Reconnect-Loop wechseln — der
+            // Hauptindikator für tot ist `consecutiveTimeouts` aus normalen
+            // dataBuf-Calls, und der Nudge ist optional.
+            Log.w(TAG, "rare-nudge timed out", e)
+        } catch (t: Throwable) {
+            Log.w(TAG, "rare-nudge failed", t)
         }
     }
 
