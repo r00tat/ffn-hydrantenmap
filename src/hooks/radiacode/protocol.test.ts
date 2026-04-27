@@ -491,11 +491,15 @@ describe('VSFR encoders', () => {
     expect(Array.from(bytes)).toEqual([0x21, 0x05, 0x00, 0x00, 0x07]);
   });
 
-  it('encodeVsfrWriteBool packs id (u32) + 0/1 (u8)', () => {
+  it('encodeVsfrWriteBool packs id (u32) + 0/1 (u32)', () => {
     const on = encodeVsfrWriteBool(VSFR.SOUND_ON, true);
     const off = encodeVsfrWriteBool(VSFR.SOUND_ON, false);
-    expect(Array.from(on)).toEqual([0x22, 0x05, 0x00, 0x00, 0x01]);
-    expect(Array.from(off)).toEqual([0x22, 0x05, 0x00, 0x00, 0x00]);
+    expect(Array.from(on)).toEqual([
+      0x22, 0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ]);
+    expect(Array.from(off)).toEqual([
+      0x22, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ]);
   });
 });
 

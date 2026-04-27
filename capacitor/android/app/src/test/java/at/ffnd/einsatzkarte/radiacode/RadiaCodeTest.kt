@@ -825,13 +825,12 @@ class RadiaCodeTest {
     }
 
     @Test
-    fun `setVibroOn writes to SOUND_ON (Python parity)`() {
-        // Mirrors the Python bug: set_vibro_on writes VSFR.SOUND_ON, not VIBRO_ON.
+    fun `setVibroOn writes to VIBRO_ON`() {
         val ft = FakeTransport()
         val rc = setupRadiaCode(ft)
         ft.enqueueResponseFor(Command.WR_VIRT_SFR.value, 0x80 + 5, payload = u32le(1))
         rc.setVibroOn(true)
-        assertArrayEquals(u32le(Vsfr.SOUND_ON.value) + u32le(1), argsOf(ft.requests[5]))
+        assertArrayEquals(u32le(Vsfr.VIBRO_ON.value) + u32le(1), argsOf(ft.requests[5]))
     }
 
     // =====================================================================
