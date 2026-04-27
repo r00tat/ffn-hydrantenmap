@@ -21,7 +21,7 @@
     "build:android:release": "capacitor/build.sh release",
     "install:android": "npm run build:android && adb install -r capacitor/android/app/build/outputs/apk/debug/app-debug.apk",
     "install:android:release": "npm run build:android:release && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
-    "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V  RadiacodeFg:V RadiacodeGatt:V RadiacodeTrack:* MeasurementDecoder:* Firestore:W Firestore:E FirebaseAuth:W *:S"
+    "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V RadiacodeFg:V RadiacodeBT:V RadiacodeBTIo:V DataBufDecoder:* RadiacodeTrack:* Firestore:W Firestore:E FirebaseAuth:W *:S"
   },
   "dependencies": {
     "@auth/core": "^0.41.2",
