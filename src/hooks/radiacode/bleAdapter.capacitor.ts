@@ -4,9 +4,8 @@ import {
   isNativeAvailable,
   nativeConnect,
   nativeDisconnect,
-  nativeWrite,
+  nativeExecute,
   onNativeConnectionState,
-  onNativeNotification,
 } from './nativeBridge';
 import { RadiacodeNotification } from './radiacodeNotification';
 import { RadiacodeDeviceRef } from './types';
@@ -142,8 +141,13 @@ export const capacitorAdapter: BleAdapter = {
 
   async onNotification(deviceId, handler): Promise<Unsubscribe> {
     if (isNativeAvailable()) {
-      // Notifications werden nativ gepusht (siehe RadiacodeForegroundService).
-      return onNativeNotification((bytes) => handler(bytes));
+      // Auf dem nativen Pfad gehen Notifications nicht mehr durch — der
+      // Foreground-Service verbraucht sie intern für die Wire-Level-
+      // Reassembly. Der `RadiacodeClient` greift stattdessen auf
+      // `adapter.execute` zurück (BleAdapter.execute). Diese Funktion bleibt
+      // als no-op, damit bestehender Code, der `onNotification` für die
+      // Verbindungs-Vorbereitung aufruft, nicht fehlschlägt.
+      return () => {};
     }
     const client = await ensureBleClient();
     await client.startNotifications(
@@ -169,7 +173,11 @@ export const capacitorAdapter: BleAdapter = {
 
   async write(deviceId, data) {
     if (isNativeAvailable()) {
-      await nativeWrite(data);
+      // Auf nativem Pfad gibt es keinen reinen Write mehr — alle
+      // Operationen laufen über `execute` (siehe unten). Falls jemand doch
+      // `write` aufruft, schicken wir die Bytes durch und verwerfen die
+      // Response, damit ältere Call-Sites nicht hängen bleiben.
+      await nativeExecute(data);
       return;
     }
     const client = await ensureBleClient();
@@ -185,6 +193,13 @@ export const capacitorAdapter: BleAdapter = {
         bytesToDataView(chunk),
       );
     }
+  },
+
+  async execute(deviceId, framedRequest): Promise<Uint8Array> {
+    if (!isNativeAvailable()) {
+      throw new Error('execute() is only supported on the native (capacitor) adapter');
+    }
+    return nativeExecute(framedRequest);
   },
 
   onDisconnect(deviceId, handler): Unsubscribe {

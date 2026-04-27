@@ -34,7 +34,7 @@ class BluetoothTransport private constructor(
     private val maxChunk: Int,
     private val defaultTimeoutMs: Long,
     connectTimeoutMs: Long,
-) {
+) : Transport {
     /** Outer mutex — serialisiert komplette execute()-Calls. */
     private val executeLock = ReentrantLock()
 
@@ -80,7 +80,7 @@ class BluetoothTransport private constructor(
     )
 
     @Throws(ConnectionClosed::class, TransportTimeout::class)
-    fun execute(req: ByteArray, timeoutMs: Long = defaultTimeoutMs): BytesBuffer {
+    override fun execute(req: ByteArray, timeoutMs: Long): BytesBuffer {
         executeLock.withLock {
             if (closing) throw ConnectionClosed("Transport is closing")
             if (connectionLost) throw ConnectionClosed("Connection lost")
@@ -134,7 +134,16 @@ class BluetoothTransport private constructor(
         }
     }
 
-    fun close() {
+    /**
+     * Convenience overload that uses the per-instance [defaultTimeoutMs] configured
+     * via the constructor. The [Transport] interface inherits its own default
+     * (10_000L) — this overload preserves the per-instance default at concrete
+     * call sites typed as `BluetoothTransport`. At call sites typed as `Transport`,
+     * Kotlin picks the interface default instead.
+     */
+    fun execute(req: ByteArray): BytesBuffer = execute(req, defaultTimeoutMs)
+
+    override fun close() {
         stateLock.withLock {
             if (closing) return
             closing = true

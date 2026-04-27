@@ -12,7 +12,6 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import at.ffnd.einsatzkarte.radiacode.Protocol
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
@@ -26,10 +25,13 @@ internal class AndroidBleIo(
 
     private companion object {
         private const val TAG = "RadiacodeBTIo"
-        private val SERVICE_UUID: UUID = UUID.fromString(Protocol.SERVICE_UUID)
-        private val WRITE_UUID: UUID = UUID.fromString(Protocol.WRITE_CHAR_UUID)
-        private val NOTIFY_UUID: UUID = UUID.fromString(Protocol.NOTIFY_CHAR_UUID)
+        // Radiacode-Service-/Char-UUIDs (proprietäres Protokoll, dokumentiert in
+        // `radiacode-python/src/radiacode/transports/bluetooth.py`).
+        private val SERVICE_UUID: UUID = UUID.fromString("e63215e5-7003-49d8-96b0-b024798fb901")
+        private val WRITE_UUID: UUID = UUID.fromString("e63215e6-7003-49d8-96b0-b024798fb901")
+        private val NOTIFY_UUID: UUID = UUID.fromString("e63215e7-7003-49d8-96b0-b024798fb901")
         private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val REQUESTED_MTU: Int = 250
     }
 
     private val lock = ReentrantLock()
@@ -159,7 +161,7 @@ internal class AndroidBleIo(
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             Log.i(TAG, "onConnectionStateChange status=$status newState=$newState")
             if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
-                g.requestMtu(Protocol.REQUESTED_MTU)
+                g.requestMtu(REQUESTED_MTU)
             } else {
                 if (!connected) {
                     signalFailure(DeviceNotFound("connect state change status=$status newState=$newState"))
