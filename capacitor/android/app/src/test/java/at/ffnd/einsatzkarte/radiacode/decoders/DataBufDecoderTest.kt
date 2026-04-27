@@ -2,9 +2,7 @@ package at.ffnd.einsatzkarte.radiacode.decoders
 
 import at.ffnd.einsatzkarte.radiacode.protocol.BytesBuffer
 import at.ffnd.einsatzkarte.radiacode.types.EventId
-import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -16,11 +14,8 @@ class DataBufDecoderTest {
 
     private val baseTime: Instant = Instant.parse("2024-01-01T00:00:00Z")
 
-    @After
-    fun tearDown() {
-        // Reset the internal logger to a no-op so other tests don't pull android.util.Log.
-        logger = noopLogger
-    }
+    /** No-op logger used by tests that exercise logger-emitting branches. */
+    private val noopLogger: (String) -> Unit = {}
 
     // -----------------------------------------------------------------
     // Helpers
@@ -372,7 +367,7 @@ class DataBufDecoderTest {
     @Test fun `seq jump with ignoreErrors=false returns previous records and does not throw`() {
         val data = rec(0, 0, 1, 0, payloadFF(1.0f, 2.0f)) +
             rec(2, 0, 1, 0, payloadFF(3.0f, 4.0f))
-        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = false)
+        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = false, logger = noopLogger)
         assertEquals(1, out.size)
     }
 
@@ -390,7 +385,7 @@ class DataBufDecoderTest {
     @Test fun `unknown (2,0) with ignoreErrors=false preserves prior records and breaks (no throw)`() {
         val data = rec(0, 0, 1, 0, payloadFF(1.0f, 2.0f)) +
             rec(1, 2, 0, 0, ByteArray(0))
-        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = false)
+        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = false, logger = noopLogger)
         assertEquals(1, out.size)
     }
 
@@ -401,7 +396,7 @@ class DataBufDecoderTest {
     @Test fun `truncated (0,0) record with ignoreErrors=true breaks cleanly with no record`() {
         // header for (0,0) requires 15 bytes; provide 5
         val truncated = rec(0, 0, 0, 0, ByteArray(5))
-        val out = DataBufDecoder.decode(BytesBuffer(truncated), baseTime, ignoreErrors = true)
+        val out = DataBufDecoder.decode(BytesBuffer(truncated), baseTime, ignoreErrors = true, logger = noopLogger)
         assertEquals(0, out.size)
     }
 
@@ -421,7 +416,7 @@ class DataBufDecoderTest {
 
     @Test fun `(0,7) Event with invalid EventId 99 ignoreErrors=true breaks no record`() {
         val data = rec(0, 0, 7, 0, payloadEvent(99, 0, 0))
-        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = true)
+        val out = DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = true, logger = noopLogger)
         assertEquals(0, out.size)
     }
 
@@ -457,11 +452,15 @@ class DataBufDecoderTest {
 
     @Test fun `capturing logger receives seq jump message`() {
         val captured = mutableListOf<String>()
-        logger = { captured.add(it) }
-
         val data = rec(0, 0, 1, 0, payloadFF(1.0f, 2.0f)) +
             rec(2, 0, 1, 0, payloadFF(3.0f, 4.0f))
-        DataBufDecoder.decode(BytesBuffer(data), baseTime, ignoreErrors = false)
+
+        DataBufDecoder.decode(
+            BytesBuffer(data),
+            baseTime,
+            ignoreErrors = false,
+            logger = { captured.add(it) },
+        )
 
         assertTrue(
             "expected a 'seq jump' message in captured logs, got: $captured",
@@ -469,7 +468,3 @@ class DataBufDecoderTest {
         )
     }
 }
-
-// A reusable no-op logger reference so the @After tearDown can reset state without
-// touching android.util.Log on the JVM-only test classpath.
-private val noopLogger: (String) -> Unit = { /* no-op */ }

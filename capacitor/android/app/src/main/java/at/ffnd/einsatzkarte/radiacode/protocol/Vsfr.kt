@@ -8,6 +8,12 @@ package at.ffnd.einsatzkarte.radiacode.protocol
  * registered format. Format strings use Python `struct` semantics, e.g.
  * `"3xB"` = skip 3 bytes, then unsigned byte.
  *
+ * The [format] property has no consumer in this module yet — it is kept as
+ * opaque metadata to make a future VSFR read/write path easier to implement
+ * faithfully. **Do not write a runtime parser for these strings.** When a
+ * consumer materializes, replace [format] with typed reader/writer fields so
+ * the schema lives in one place.
+ *
  * NOTE: `SYS_FW_VER_BT` keeps the Python literal `0xFFFF010` (7 hex digits) as
  * written in the source — do NOT pad to `0xFFFFF010`.
  */

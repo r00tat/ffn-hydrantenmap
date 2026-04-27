@@ -31,17 +31,15 @@ enum class EventId(val value: Int) {
     COUNT_RATE_OFFSCALE(22);
 
     companion object {
+        private val byValue: Map<Int, EventId> = values().associateBy { it.value }
+
         /**
          * Look up an [EventId] by its wire value. Mirrors Python's
          * `EventId(v)` which raises `ValueError` for unknown values.
          *
          * @throws IllegalArgumentException if [v] is not a known event id.
          */
-        fun fromValue(v: Int): EventId {
-            for (e in values()) {
-                if (e.value == v) return e
-            }
-            throw IllegalArgumentException("Unknown EventId value: $v")
-        }
+        fun fromValue(v: Int): EventId =
+            byValue[v] ?: throw IllegalArgumentException("Unknown EventId value: $v")
     }
 }

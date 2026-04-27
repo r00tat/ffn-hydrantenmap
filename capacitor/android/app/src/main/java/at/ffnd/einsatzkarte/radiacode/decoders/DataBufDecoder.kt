@@ -10,19 +10,6 @@ import at.ffnd.einsatzkarte.radiacode.types.RealTimeData
 import java.time.Instant
 
 /**
- * Internal logger seam. Defaults to `android.util.Log.w("DataBufDecoder", …)` on Android.
- *
- * Unit tests run on a plain JVM (no Robolectric), so calling `android.util.Log` would throw
- * `RuntimeException("Method w in android.util.Log not mocked.")`. Tests reassign this property
- * to a capturing lambda (and reset it via `@After`) to keep the production wiring intact.
- *
- * Kept `internal` so it is not part of the public API.
- */
-internal var logger: (String) -> Unit = { msg ->
-    android.util.Log.w("DataBufDecoder", msg)
-}
-
-/**
  * Port of `radiacode-python/src/radiacode/decoders/databuf.py`
  * (`decode_VS_DATA_BUF`).
  *
@@ -35,18 +22,40 @@ internal var logger: (String) -> Unit = { msg ->
  * Python only catches `ValueError` in the `(0,4)` branch. We extend that
  * pattern to all branches — under-reads (`IllegalStateException`) and
  * unknown EventIds (`IllegalArgumentException`) inside any per-branch
- * read are caught when [ignoreErrors] is true and the loop breaks
- * cleanly with the records collected so far. With [ignoreErrors] = false
- * the exceptions propagate.
+ * read are caught when [decode]'s `ignoreErrors` is true and the loop
+ * breaks cleanly with the records collected so far. With `ignoreErrors`
+ * = false the exceptions propagate.
  *
  * Sequence-jumps and unknown `(eid, gid)` combinations never throw —
  * they always break the loop (matching Python's `print + break`).
  */
 object DataBufDecoder {
+
+    // Sample sizes for the (eid=1, gid=1..3) record families. The record formats
+    // themselves are unknown (Python source: "# ???"), but the per-sample byte
+    // counts are observed and used here only to advance the buffer cursor.
+    private const val EID1_GID1_BYTES_PER_SAMPLE = 8
+    private const val EID1_GID2_BYTES_PER_SAMPLE = 16
+    private const val EID1_GID3_BYTES_PER_SAMPLE = 14
+
+    /**
+     * Decode `DATA_BUF` records from [buffer].
+     *
+     * @param buffer source positioned at the first record header.
+     * @param baseTime reference timestamp for the `ts_offset` ticks.
+     * @param ignoreErrors when true, errors break the loop and return the
+     *   records collected so far; when false, under-read and invalid
+     *   EventId errors are rethrown.
+     * @param logger receives a single line for each non-fatal anomaly
+     *   (sequence jump, unknown record type, swallowed under-read). The
+     *   default routes to `android.util.Log.w("DataBufDecoder", …)`.
+     *   Pass a no-op or capturing lambda in unit tests.
+     */
     fun decode(
         buffer: BytesBuffer,
         baseTime: Instant,
         ignoreErrors: Boolean = true,
+        logger: (String) -> Unit = { msg -> android.util.Log.w("DataBufDecoder", msg) },
     ): List<DataBufRecord> {
         val out = mutableListOf<DataBufRecord>()
         var nextSeq: Int? = null
@@ -147,27 +156,14 @@ object DataBufDecoder {
                         )
                     }
                     eid == 0 && gid == 4 -> {
-                        // GRP_UserData: <IffHH> (16 bytes) — Python wraps this in try/except,
-                        // and on under-read prints a hex dump before continuing. We preserve
-                        // the spirit by special-casing the diagnostic before the generic
-                        // catch ladder takes over below.
-                        try {
-                            buffer.u32Le() // count
-                            buffer.f32Le() // count_rate
-                            buffer.f32Le() // dose_rate
-                            buffer.u16Le() // dose_rate_err
-                            buffer.u16Le() // flags
-                        } catch (e: IllegalStateException) {
-                            if (ignoreErrors) {
-                                logger(
-                                    "BytesBuffer error while decoding eid=0/gid=4 " +
-                                        "[remaining=${buffer.size()}]",
-                                )
-                            }
-                            // rethrow so the outer catch ladder applies the uniform policy
-                            throw e
-                        }
-                        // No record emitted — even on success.
+                        // GRP_UserData: <IffHH> (16 bytes); no record. Under-read here is
+                        // diagnosed by the outer catch ladder ("under-read while decoding
+                        // eid=0 gid=4 …"), matching Python's silent skip semantics.
+                        buffer.u32Le() // count
+                        buffer.f32Le() // count_rate
+                        buffer.f32Le() // dose_rate
+                        buffer.u16Le() // dose_rate_err
+                        buffer.u16Le() // flags
                     }
                     eid == 0 && gid == 5 -> {
                         // GRP_SheduleData: <IffHH> (16 bytes); no record.
@@ -210,22 +206,22 @@ object DataBufDecoder {
                         buffer.u16Le()
                     }
                     eid == 1 && gid == 1 -> {
-                        // ??? <HI> + samples_num * 8 bytes; no record.
+                        // ??? <HI> + samples_num * EID1_GID1_BYTES_PER_SAMPLE; no record.
                         val samplesNum = buffer.u16Le()
                         buffer.u32Le() // sample_time_ms
-                        buffer.skip(samplesNum * 8)
+                        buffer.skip(samplesNum * EID1_GID1_BYTES_PER_SAMPLE)
                     }
                     eid == 1 && gid == 2 -> {
-                        // ??? <HI> + samples_num * 16 bytes; no record.
+                        // ??? <HI> + samples_num * EID1_GID2_BYTES_PER_SAMPLE; no record.
                         val samplesNum = buffer.u16Le()
                         buffer.u32Le()
-                        buffer.skip(samplesNum * 16)
+                        buffer.skip(samplesNum * EID1_GID2_BYTES_PER_SAMPLE)
                     }
                     eid == 1 && gid == 3 -> {
-                        // ??? <HI> + samples_num * 14 bytes; no record.
+                        // ??? <HI> + samples_num * EID1_GID3_BYTES_PER_SAMPLE; no record.
                         val samplesNum = buffer.u16Le()
                         buffer.u32Le()
-                        buffer.skip(samplesNum * 14)
+                        buffer.skip(samplesNum * EID1_GID3_BYTES_PER_SAMPLE)
                     }
                     else -> {
                         if (!ignoreErrors) {
