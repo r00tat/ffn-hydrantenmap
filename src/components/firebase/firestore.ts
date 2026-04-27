@@ -56,7 +56,16 @@ export interface FirecallItem {
   fieldData?: Record<string, string | number | boolean>;
 }
 
-export const NON_DISPLAYABLE_ITEMS = ['gb', 'diary', 'layer', 'fallback', 'location'];
+export const NON_DISPLAYABLE_ITEMS = [
+  'gb',
+  'diary',
+  'layer',
+  'fallback',
+  'location',
+  'spectrum',
+];
+
+export const NON_CREATE_ITEMS = ['spectrum', 'fallback'];
 
 export interface DataSchemaField {
   key: string;
@@ -148,8 +157,15 @@ export interface Fzg extends FirecallItem {
 }
 
 export const TACTICAL_UNIT_TYPES = [
-  'einheit', 'trupp', 'gruppe', 'zug',
-  'bereitschaft', 'abschnitt', 'bezirk', 'lfv', 'oebfv',
+  'einheit',
+  'trupp',
+  'gruppe',
+  'zug',
+  'bereitschaft',
+  'abschnitt',
+  'bezirk',
+  'lfv',
+  'oebfv',
 ] as const;
 
 export type TacticalUnitType = (typeof TACTICAL_UNIT_TYPES)[number];
@@ -207,6 +223,7 @@ export interface GeschaeftsbuchEintrag extends FirecallItem {
 }
 
 export interface Spectrum extends FirecallItem {
+  type: 'spectrum';
   sampleName: string;
   deviceName: string;
   measurementTime: number;
@@ -335,7 +352,12 @@ export interface FirecallHistory {
 
 export const FIRECALL_LOCATIONS_COLLECTION_ID = 'location';
 
-export type LocationStatus = 'offen' | 'einsatz notwendig' | 'in arbeit' | 'erledigt' | 'kein einsatz';
+export type LocationStatus =
+  | 'offen'
+  | 'einsatz notwendig'
+  | 'in arbeit'
+  | 'erledigt'
+  | 'kein einsatz';
 
 export const LOCATION_STATUS_OPTIONS: LocationStatus[] = [
   'offen',
@@ -346,10 +368,10 @@ export const LOCATION_STATUS_OPTIONS: LocationStatus[] = [
 ];
 
 export const LOCATION_STATUS_COLORS: Record<LocationStatus, string> = {
-  'offen': '#fbc02d',
+  offen: '#fbc02d',
   'einsatz notwendig': '#d32f2f',
   'in arbeit': '#f57c00',
-  'erledigt': '#388e3c',
+  erledigt: '#388e3c',
   'kein einsatz': '#388e3c',
 };
 

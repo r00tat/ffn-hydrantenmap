@@ -21,7 +21,13 @@ import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { StorageReference } from 'firebase/storage';
 import { arrayUnion, doc, where } from 'firebase/firestore';
 import { setDoc } from '../../lib/firestoreClient';
@@ -42,6 +48,7 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   HeatmapConfig,
+  NON_CREATE_ITEMS,
   filterDisplayableItems,
 } from '../firebase/firestore';
 import { fcItemNames, getItemInstance } from './elements';
@@ -149,9 +156,7 @@ export default function FirecallItemDialog({
     () =>
       siblings
         .filter(
-          (s) =>
-            s.type === 'vehicle' &&
-            (s as any).fw === 'Neusiedl am See',
+          (s) => s.type === 'vehicle' && (s as any).fw === 'Neusiedl am See',
         )
         .map((s) => s.name),
     [siblings],
@@ -167,13 +172,16 @@ export default function FirecallItemDialog({
 
   const handleQuickAddSubmit = useCallback(() => {
     if (quickAddSelected.length === 0 || !onCloseMultiple) return;
-    const items: FirecallItem[] = quickAddSelected.map((name) => ({
-      type: 'vehicle',
-      name,
-      fw: 'Neusiedl am See',
-      datum: new Date().toISOString(),
-      layer: item.layer || '',
-    } as FirecallItem));
+    const items: FirecallItem[] = quickAddSelected.map(
+      (name) =>
+        ({
+          type: 'vehicle',
+          name,
+          fw: 'Neusiedl am See',
+          datum: new Date().toISOString(),
+          layer: item.layer || '',
+        }) as FirecallItem,
+    );
     setOpen(false);
     onCloseMultiple(items);
   }, [quickAddSelected, onCloseMultiple, item.layer]);
@@ -307,7 +315,7 @@ export default function FirecallItemDialog({
                 onChange={handleChange}
               >
                 {Object.entries(fcItemNames)
-                  .filter(([key]) => key !== 'fallback')
+                  .filter(([key]) => !NON_CREATE_ITEMS.includes(key))
                   .map(([key, name]) => (
                     <MenuItem key={key} value={key}>
                       {name}
@@ -392,18 +400,14 @@ export default function FirecallItemDialog({
               {item.type === 'layer' && (
                 <>
                   <DataSchemaEditor
-                    dataSchema={
-                      item.get<DataSchemaField[]>('dataSchema') || []
-                    }
+                    dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
                     onChange={(schema: DataSchemaField[]) =>
                       setItemField('dataSchema', schema)
                     }
                   />
                   <HeatmapSettings
                     config={item.get<HeatmapConfig>('heatmapConfig')}
-                    dataSchema={
-                      item.get<DataSchemaField[]>('dataSchema') || []
-                    }
+                    dataSchema={item.get<DataSchemaField[]>('dataSchema') || []}
                     onChange={onHeatmapChange}
                   />
                 </>
@@ -468,7 +472,11 @@ export default function FirecallItemDialog({
                 {quickAddSelected.length} Fahrzeuge hinzufügen
               </Button>
             )}
-            {!(isNewVehicle && quickAddSelected.length > 0 && onCloseMultiple) && (
+            {!(
+              isNewVehicle &&
+              quickAddSelected.length > 0 &&
+              onCloseMultiple
+            ) && (
               <Button
                 color="primary"
                 disabled={!canSave}
