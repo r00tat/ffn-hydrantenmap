@@ -50,7 +50,7 @@ jobs:
     steps:
       # Checkout the repository to the GitHub Actions runner
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -120,7 +120,7 @@ jobs:
       #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -135,7 +135,7 @@ jobs:
         run: npm test
 
       - name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v2"
+        uses: "google-github-actions/auth@v3"
         if: ${{ env.workload_identity_provider != '' }}
         with:
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # this is the output provider_name from the TF module
@@ -143,20 +143,20 @@ jobs:
           export_environment_variables: "true"
 
       - name: "Set up Cloud SDK"
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Configure Docker for Artifact Registry
         if: ${{ env.workload_identity_provider != '' }}
         run: gcloud auth configure-docker ${RUN_REGION}-docker.pkg.dev --quiet
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver: docker
 
       - id: image
         name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ env.workload_identity_provider != '' }}
