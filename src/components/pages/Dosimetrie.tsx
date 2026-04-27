@@ -13,16 +13,10 @@ import {
   formatDose,
   formatDoseRate,
   formatDuration,
+  LEVEL_COLOR,
 } from '../../common/doseFormat';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import RadiacodeConnectionControls from './RadiacodeConnectionControls';
-
-const LEVEL_COLOR: Record<ReturnType<typeof doseRateLevel>, string> = {
-  normal: '#4caf50',
-  elevated: '#ffeb3b',
-  high: '#ff9800',
-  critical: '#f44336',
-};
 
 function MetricTile({
   label,

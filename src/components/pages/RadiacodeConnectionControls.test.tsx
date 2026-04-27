@@ -76,30 +76,13 @@ describe('RadiacodeConnectionControls — Refresh-Button', () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it('ist deaktiviert während connecting', () => {
-    const ctx = makeCtx({ status: 'connecting' });
-    render(
-      <RadiacodeContext.Provider value={ctx}>
-        <RadiacodeConnectionControls />
-      </RadiacodeContext.Provider>,
-    );
-    const btn = screen.getByRole('button', { name: 'Verbindungsstatus prüfen' });
-    expect(btn).toBeDisabled();
-  });
-
-  it('ist deaktiviert während reconnecting', () => {
-    const ctx = makeCtx({ status: 'reconnecting' });
-    render(
-      <RadiacodeContext.Provider value={ctx}>
-        <RadiacodeConnectionControls />
-      </RadiacodeContext.Provider>,
-    );
-    const btn = screen.getByRole('button', { name: 'Verbindungsstatus prüfen' });
-    expect(btn).toBeDisabled();
-  });
-
-  it('ist aktiv während idle und connected', () => {
-    for (const status of ['idle', 'connected'] as const) {
+  it('ist in allen Status aktiv', () => {
+    for (const status of [
+      'idle',
+      'connecting',
+      'reconnecting',
+      'connected',
+    ] as const) {
       const ctx = makeCtx({ status });
       const { unmount } = render(
         <RadiacodeContext.Provider value={ctx}>
@@ -110,5 +93,121 @@ describe('RadiacodeConnectionControls — Refresh-Button', () => {
       expect(btn).not.toBeDisabled();
       unmount();
     }
+  });
+});
+
+describe('RadiacodeConnectionControls — Status-Chips', () => {
+  it('zeigt keine Status-Chips, wenn keine Messung vorliegt', () => {
+    const ctx = makeCtx({ measurement: null });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    expect(screen.queryByTestId('radiacode-chip-battery')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('radiacode-chip-temperature')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('radiacode-chip-doserate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('radiacode-chip-cps')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Akku/Temperatur/Dosisleistung/CPS, wenn Messung vorliegt', () => {
+    const ctx = makeCtx({
+      measurement: {
+        dosisleistung: 0.15,
+        cps: 18,
+        timestamp: Date.now(),
+        chargePct: 73,
+        temperatureC: 24.3,
+      },
+    });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    expect(screen.getByTestId('radiacode-chip-battery')).toHaveTextContent('73');
+    expect(screen.getByTestId('radiacode-chip-battery')).toHaveTextContent('%');
+    expect(screen.getByTestId('radiacode-chip-temperature')).toHaveTextContent('24.3');
+    expect(screen.getByTestId('radiacode-chip-temperature')).toHaveTextContent('°C');
+    expect(screen.getByTestId('radiacode-chip-doserate')).toHaveTextContent('0.15');
+    expect(screen.getByTestId('radiacode-chip-doserate')).toHaveTextContent('µSv/h');
+    expect(screen.getByTestId('radiacode-chip-cps')).toHaveTextContent('18');
+    expect(screen.getByTestId('radiacode-chip-cps')).toHaveTextContent('cps');
+  });
+
+  it('blendet Akku- und Temperatur-Chip aus, wenn die Felder fehlen', () => {
+    const ctx = makeCtx({
+      measurement: {
+        dosisleistung: 0.15,
+        cps: 18,
+        timestamp: Date.now(),
+      },
+    });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    expect(screen.queryByTestId('radiacode-chip-battery')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('radiacode-chip-temperature')).not.toBeInTheDocument();
+    expect(screen.getByTestId('radiacode-chip-doserate')).toBeInTheDocument();
+    expect(screen.getByTestId('radiacode-chip-cps')).toBeInTheDocument();
+  });
+
+  it('Akku-Chip ist rot bei niedrigem Ladestand (<20 %)', () => {
+    const ctx = makeCtx({
+      measurement: {
+        dosisleistung: 0.1,
+        cps: 5,
+        timestamp: Date.now(),
+        chargePct: 15,
+      },
+    });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    expect(screen.getByTestId('radiacode-chip-battery').className).toMatch(
+      /colorError/,
+    );
+  });
+
+  it('Akku-Chip ist warnend bei mittlerem Ladestand (<50 %)', () => {
+    const ctx = makeCtx({
+      measurement: {
+        dosisleistung: 0.1,
+        cps: 5,
+        timestamp: Date.now(),
+        chargePct: 35,
+      },
+    });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    expect(screen.getByTestId('radiacode-chip-battery').className).toMatch(
+      /colorWarning/,
+    );
+  });
+
+  it('Akku-Chip ist neutral bei vollem Akku (>=50 %)', () => {
+    const ctx = makeCtx({
+      measurement: {
+        dosisleistung: 0.1,
+        cps: 5,
+        timestamp: Date.now(),
+        chargePct: 80,
+      },
+    });
+    render(
+      <RadiacodeContext.Provider value={ctx}>
+        <RadiacodeConnectionControls />
+      </RadiacodeContext.Provider>,
+    );
+    const chip = screen.getByTestId('radiacode-chip-battery');
+    expect(chip.className).not.toMatch(/colorError/);
+    expect(chip.className).not.toMatch(/colorWarning/);
   });
 });

@@ -108,8 +108,8 @@ describe('Dosimetrie', () => {
     );
     render(<Dosimetrie />);
     expect(screen.getByText(/RC-103/)).toBeInTheDocument();
-    expect(screen.getByText(/0\.25/)).toBeInTheDocument();
-    expect(screen.getByText(/µSv\/h/)).toBeInTheDocument();
+    expect(screen.getAllByText(/0\.25/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/µSv\/h/).length).toBeGreaterThan(0);
     expect(screen.getByText(/456/)).toBeInTheDocument();
     expect(screen.getByText(/^7$/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /trennen/i })).toBeEnabled();

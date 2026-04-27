@@ -59,11 +59,17 @@ export function useRadiacodeDevice(
     stateRef.current.adapter = adapter;
     const unsub = adapter.onConnectionStateChange?.((s) => {
       console.log('[useRadiacodeDevice] adapter state change:', s);
-      // Wenn der native Teil von sich aus den Status ändert (z.B. Reconnect
-      // erfolgreich oder Link final verloren), ziehen wir das in den Hook-State
-      // nach. 'connected' wird hier nicht forciert, das macht connect() aktiv.
+      // Wenn der native Teil von sich aus den Status ändert, ziehen wir das
+      // in den Hook-State nach. 'connected' wird ohne aktiven Client (initialer
+      // Connect-Flow) ignoriert — diesen Fall steuert connect() selbst.
       if (s === 'reconnecting') setStatus('reconnecting');
-      if (s === 'disconnected' && stateRef.current.client) {
+      else if (s === 'connected' && stateRef.current.client) {
+        // Auto-Reconnect erfolgreich (nativer Foreground-Service hat die
+        // GATT-Session erneuert): Status aus 'reconnecting' zurück auf
+        // 'connected' setzen, sonst bleibt die UI hängen.
+        setError(null);
+        setStatus('connected');
+      } else if (s === 'disconnected' && stateRef.current.client) {
         // Wenn wir eigentlich ein Client-Objekt haben, aber der Adapter 'disconnected'
         // meldet, ist der Link weg.
         setStatus('unavailable');

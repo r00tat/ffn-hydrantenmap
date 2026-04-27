@@ -1,5 +1,12 @@
 export type DoseRateLevel = 'normal' | 'elevated' | 'high' | 'critical';
 
+export const LEVEL_COLOR: Record<DoseRateLevel, string> = {
+  normal: '#4caf50',
+  elevated: '#ffeb3b',
+  high: '#ff9800',
+  critical: '#f44336',
+};
+
 export interface FormattedValue {
   value: string;
   unit: string;
