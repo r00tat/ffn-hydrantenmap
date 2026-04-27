@@ -438,7 +438,9 @@ class RadiacodeForegroundService : Service() {
         // aus, obwohl die Verbindung steht — siehe Bug-Analyse 2026-04-26.
         Log.d(
             TAG,
-            "measurement dose=${m.doseUSv} chg=${m.chargePct} temp=${m.temperatureC} dur=${m.durationSec}",
+            "measurement dl=${m.dosisleistungUSvH} µSv/h cps=${m.cps} " +
+                "dlErr=${m.dosisleistungErrPct} cpsErr=${m.cpsErrPct} " +
+                "dose=${m.doseUSv} chg=${m.chargePct} temp=${m.temperatureC} dur=${m.durationSec}",
         )
         // Rare-Felder cachen, damit das Plugin sie auch in Ticks ohne
         // frischen Rare-Record an die UI weiterreichen kann.
