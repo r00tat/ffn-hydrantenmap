@@ -438,7 +438,8 @@ class RadiacodeForegroundService : Service() {
         // aus, obwohl die Verbindung steht — siehe Bug-Analyse 2026-04-26.
         Log.d(
             TAG,
-            "measurement dl=${m.dosisleistungUSvH} µSv/h cps=${m.cps} " +
+            "measurement dl=${"%.3f".format(java.util.Locale.ROOT, m.dosisleistungUSvH)} µSv/h " +
+                "cps=${"%.3f".format(java.util.Locale.ROOT, m.cps)} " +
                 "dlErr=${m.dosisleistungErrPct} cpsErr=${m.cpsErrPct} " +
                 "dose=${m.doseUSv} chg=${m.chargePct} temp=${m.temperatureC} dur=${m.durationSec}",
         )
