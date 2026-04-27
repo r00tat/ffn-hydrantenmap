@@ -1,5 +1,6 @@
 'use client';
 
+import { Capacitor } from '@capacitor/core';
 import {
   createContext,
   ReactNode,
@@ -400,7 +401,10 @@ export function RadiacodeProvider({
    * tut die Funktion nichts.
    */
   const syncFromNative = useCallback(async (): Promise<void> => {
-    if (typeof RadiacodeNotification.getState !== 'function') {
+    // Capacitor's registerPlugin returns a Proxy where every method exists
+    // as a function but throws "not implemented on web" when invoked. So we
+    // can't typeof-guard the call — use the platform check instead.
+    if (!Capacitor.isNativePlatform()) {
       return;
     }
     let state: RadiacodeNativeState;
