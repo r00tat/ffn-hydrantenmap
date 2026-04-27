@@ -1357,7 +1357,7 @@ describe('RadiacodeClient', () => {
     expect(wrArgs).toHaveLength(3);
     const byId = Object.fromEntries(wrArgs.map((w) => [w.id, w.bytes]));
     expect(byId[VSFR.DR_LEV1_uR_h]).toEqual(new Uint8Array([0xf4, 0x01, 0, 0]));
-    expect(byId[VSFR.SOUND_ON]).toEqual(new Uint8Array([0x00]));
+    expect(byId[VSFR.SOUND_ON]).toEqual(new Uint8Array([0x00, 0, 0, 0]));
     expect(byId[VSFR.SOUND_VOL]).toEqual(new Uint8Array([0x03]));
     await client.disconnect();
   });
@@ -1473,7 +1473,9 @@ describe('RadiacodeClient', () => {
     await client.writeSfrBool(VSFR.SOUND_ON, true);
     expect(wrFrames.length).toBe(framesBefore + 1);
     const args = wrFrames[wrFrames.length - 1].slice(8);
-    expect(Array.from(args)).toEqual([0x22, 0x05, 0x00, 0x00, 0x01]);
+    expect(Array.from(args)).toEqual([
+      0x22, 0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ]);
     await client.disconnect();
   });
 });

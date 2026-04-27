@@ -44,12 +44,6 @@ module.exports = async (phase) => {
     images: {
       localPatterns: [
         {
-          pathname: '/api/icons/**',
-        },
-        {
-          pathname: '/api/fzg',
-        },
-        {
           pathname: '/icons/**',
         },
         {

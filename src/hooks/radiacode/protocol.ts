@@ -148,7 +148,7 @@ export function encodeVsfrWriteU8(id: number, value: number): Uint8Array {
 }
 
 export function encodeVsfrWriteBool(id: number, value: boolean): Uint8Array {
-  return encodeVsfrWriteU8(id, value ? 1 : 0);
+  return encodeVsfrWriteU32(id, value ? 1 : 0);
 }
 
 function checkVsfrRetcode(payload: Uint8Array): DataView {

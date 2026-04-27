@@ -266,9 +266,7 @@ class RadiaCode internal constructor(
 
     fun setDeviceOn(on: Boolean) = writeRequest(Vsfr.DEVICE_ON, u32leArr(if (on) 1 else 0))
     fun setSoundOn(on: Boolean) = writeRequest(Vsfr.SOUND_ON, u32leArr(if (on) 1 else 0))
-    /** NOTE: Python writes to `SOUND_ON` instead of `VIBRO_ON`. We mirror this 1:1.
-     *  This looks like a bug in the Python source but we keep parity until upstream fixes. */
-    fun setVibroOn(on: Boolean) = writeRequest(Vsfr.SOUND_ON, u32leArr(if (on) 1 else 0))
+    fun setVibroOn(on: Boolean) = writeRequest(Vsfr.VIBRO_ON, u32leArr(if (on) 1 else 0))
 
     fun setSoundCtrl(ctrls: List<Ctrl>) {
         var flags = 0

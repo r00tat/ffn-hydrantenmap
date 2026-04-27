@@ -1,5 +1,6 @@
 import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
+import { vehicleIconDataUrl } from '../../../common/markerSvg';
 import { formatTimestamp } from '../../../common/time-format';
 import { getEffectiveBesatzung } from '../../../common/vehicle-utils';
 import { Fzg } from '../../firebase/firestore';
@@ -121,9 +122,10 @@ export class FirecallVehicle extends FirecallItemBase {
   }
   public icon(): Icon<IconOptions> {
     return L.icon({
-      iconUrl: `/api/fzg?name=${encodeURIComponent(
-        this.name || ''
-      )}&fw=${encodeURIComponent(this.fw || '')}`,
+      iconUrl: vehicleIconDataUrl({
+        name: this.name || '',
+        fw: this.fw || '',
+      }),
       iconSize: [45, 20],
       iconAnchor: [20, 0],
       popupAnchor: [0, 0],

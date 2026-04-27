@@ -19,6 +19,15 @@ vi.mock('../../hooks/radiacode/devicePreference', () => ({
   clearDefaultDevice: vi.fn(async () => {}),
 }));
 
+vi.mock('@capacitor/core', () => ({
+  Capacitor: {
+    isNativePlatform: () => true,
+    getPlatform: () => 'android',
+    isPluginAvailable: () => true,
+  },
+  registerPlugin: () => ({}),
+}));
+
 vi.mock('../../hooks/radiacode/radiacodeNotification', () => ({
   RadiacodeNotification: {
     getState: vi.fn(async () => ({

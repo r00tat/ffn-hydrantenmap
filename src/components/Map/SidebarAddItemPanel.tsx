@@ -47,7 +47,9 @@ export default function SidebarAddItemPanel() {
             {displayableItems.map(([key, FcClass]) => {
               const instance = FcClass.factory();
               const icon = instance.icon();
-              const isApiIcon = icon.options.iconUrl.indexOf('/api') > -1;
+              const [iw, ih] = icon.options.iconSize as [number, number];
+              const isSquare = iw === ih;
+              const renderHeight = Math.round((24 * ih) / iw);
 
               return (
                 <Tooltip key={key} title={instance.markerName()}>
@@ -64,7 +66,7 @@ export default function SidebarAddItemPanel() {
                       },
                     }}
                   >
-                    {!isApiIcon && (
+                    {isSquare && (
                       <Image
                         src={icon.options.iconUrl}
                         alt={key}
@@ -72,9 +74,14 @@ export default function SidebarAddItemPanel() {
                         height={24}
                       />
                     )}
-                    {isApiIcon && (
+                    {!isSquare && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={icon.options.iconUrl} alt={key} width={24} />
+                      <img
+                        src={icon.options.iconUrl}
+                        alt={key}
+                        width={24}
+                        height={renderHeight}
+                      />
                     )}
                     <Typography
                       variant="caption"
