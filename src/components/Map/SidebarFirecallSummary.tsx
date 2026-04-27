@@ -27,7 +27,8 @@ interface TypeSummary {
   type: string;
   label: string;
   iconUrl: string;
-  isApiIcon: boolean;
+  iconHeight: number;
+  isSquareIcon: boolean;
   count: number;
 }
 
@@ -73,11 +74,13 @@ export default function SidebarFirecallSummary() {
       const instance = new cls();
       const icon = instance.icon();
       const iconUrl = icon.options.iconUrl;
+      const [iw, ih] = icon.options.iconSize as [number, number];
       result.push({
         type,
         label: fcItemNames[type] || type,
         iconUrl,
-        isApiIcon: iconUrl.indexOf('/api') > -1,
+        iconHeight: Math.round((16 * ih) / iw),
+        isSquareIcon: iw === ih,
         count,
       });
     }
@@ -90,7 +93,8 @@ export default function SidebarFirecallSummary() {
         type: `marker:${zeichen}`,
         label: zeichen.replace(/_/g, ' '),
         iconUrl,
-        isApiIcon: false,
+        iconHeight: 16,
+        isSquareIcon: true,
         count,
       });
     }
@@ -130,7 +134,7 @@ export default function SidebarFirecallSummary() {
               }}
             >
               <Box sx={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {!entry.isApiIcon && (
+                {entry.isSquareIcon && (
                   <Image
                     src={entry.iconUrl}
                     alt={entry.label}
@@ -138,14 +142,13 @@ export default function SidebarFirecallSummary() {
                     height={16}
                   />
                 )}
-                {entry.isApiIcon && (
+                {!entry.isSquareIcon && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={entry.iconUrl}
                     alt={entry.label}
                     width={16}
-                    height={16}
-                    style={{ objectFit: 'contain' }}
+                    height={entry.iconHeight}
                   />
                 )}
               </Box>
