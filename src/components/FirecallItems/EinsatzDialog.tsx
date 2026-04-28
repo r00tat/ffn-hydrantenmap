@@ -88,7 +88,8 @@ export default function EinsatzDialog({
     }));
   }, []);
 
-  // Load which groups have BlaulichtSMS credentials (once on dialog mount)
+  // Load which groups have BlaulichtSMS credentials (once on dialog mount).
+  // The server filters this list by the caller's group membership.
   useEffect(() => {
     getGroupsWithBlaulichtsmsConfig()
       .then(setConfiguredGroups)
@@ -97,15 +98,41 @@ export default function EinsatzDialog({
       );
   }, []);
 
-  // Fetch alarms when selected group changes and has credentials
+  // For new Einsätze: default the group to the first one the user is a
+  // member of as soon as `myGroups` is available. Avoids a hardcoded
+  // default that may not match the user's permissions.
+  useEffect(() => {
+    if (!isNewEinsatz) return;
+    if (einsatz.group) return;
+    if (myGroups.length === 0) return;
+    const defaultGroup = myGroups[0].id;
+    if (!defaultGroup) return;
+    setEinsatz((prev) =>
+      prev.group ? prev : { ...prev, group: defaultGroup },
+    );
+    setSelectedGroup((prev) => prev || defaultGroup);
+  }, [isNewEinsatz, einsatz.group, myGroups]);
+
+  // Fetch alarms when selected group changes and has credentials.
+  // Whenever no fresh alarm gets auto-applied (group has no credentials,
+  // or returned 0 alarms), clear any previously applied alarm data so the
+  // dialog never carries stale BlaulichtSMS info from a different group.
   useEffect(() => {
     const shouldFetch =
       selectedGroup && configuredGroups.includes(selectedGroup);
 
+    const clearStaleAlarmData = () => {
+      if (!isNewEinsatz) return;
+      setSelectedAlarmId('');
+      setEinsatz((prev) =>
+        prev.blaulichtSmsAlarmId ? resetEinsatzToManual(prev) : prev,
+      );
+    };
+
     const fetchAlarms = async () => {
       if (!shouldFetch) {
         setAlarms([]);
-        if (isNewEinsatz) setSelectedAlarmId('');
+        clearStaleAlarmData();
         return;
       }
       setAlarmsLoading(true);
@@ -116,9 +143,13 @@ export default function EinsatzDialog({
             new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime()
         );
         setAlarms(sorted);
-        if (isNewEinsatz && sorted.length > 0) {
-          setSelectedAlarmId(sorted[0].alarmId);
-          applyAlarm(sorted[0]);
+        if (isNewEinsatz) {
+          if (sorted.length > 0) {
+            setSelectedAlarmId(sorted[0].alarmId);
+            applyAlarm(sorted[0]);
+          } else {
+            clearStaleAlarmData();
+          }
         }
       } catch (err) {
         console.error('Failed to fetch BlaulichtSMS alarms:', err);
@@ -274,6 +305,16 @@ export default function EinsatzDialog({
             onChange={handleChange}
             required
           >
+            {einsatz.group &&
+              !myGroups.some((g) => g.id === einsatz.group) && (
+                <MenuItem
+                  key={`group-${einsatz.group}-readonly`}
+                  value={einsatz.group}
+                  disabled
+                >
+                  {einsatz.group} (keine Berechtigung)
+                </MenuItem>
+              )}
             {myGroups.map((group) => (
               <MenuItem key={`group-${group.id}`} value={group.id}>
                 {group.name}

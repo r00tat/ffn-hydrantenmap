@@ -19,6 +19,7 @@
     "check": "npx tsc --noEmit && npx eslint && vitest run && next build --webpack",
     "build:android": "capacitor/build.sh",
     "build:android:release": "capacitor/build.sh release",
+    "build:android:bundle": "capacitor/build.sh bundle",
     "install:android": "npm run build:android && adb install -r capacitor/android/app/build/outputs/apk/debug/app-debug.apk",
     "install:android:release": "npm run build:android:release && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
     "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V RadiacodeFg:V RadiacodeBT:V RadiacodeBTIo:V DataBufDecoder:* RadiacodeTrack:* Firestore:W Firestore:E FirebaseAuth:W *:S"

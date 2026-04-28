@@ -5,6 +5,7 @@ import {
 } from '../../components/firebase/firestore';
 import { firestore } from '../../server/firebase/admin';
 import { Group, KNOWN_GROUPS } from './groupTypes';
+import { sortGroupsForUser } from './groupSort';
 
 // Re-export for backwards compatibility
 export type { Group };
@@ -27,7 +28,6 @@ export async function getMyGroups(userId: string): Promise<Group[]> {
         await firestore.collection(USER_COLLECTION_ID).doc(userId).get()
       ).data() as UserRecordExtended
     ).groups || [];
-  return allGropus
-    .filter((g) => g.id && myGroupIds.includes(g.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const mine = allGropus.filter((g) => g.id && myGroupIds.includes(g.id));
+  return sortGroupsForUser(mine);
 }

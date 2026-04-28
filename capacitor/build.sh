@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Build the Android APK for sideloading.
+# Build the Android APK or AAB.
 #
 # Usage:
-#   ./build.sh            # debug build (default)
-#   ./build.sh release    # release build (needs signing config in android/app)
+#   ./build.sh            # debug APK (default, for sideloading)
+#   ./build.sh release    # release APK (needs signing config in android/app)
+#   ./build.sh bundle     # release AAB for Google Play (needs signing config)
 #
-# The produced APK path is printed at the end.
+# The produced artifact path is printed at the end.
 
 set -euo pipefail
 
@@ -17,14 +18,21 @@ BUILD_TYPE="${1:-debug}"
 case "$BUILD_TYPE" in
   debug)
     GRADLE_TASK="assembleDebug"
-    APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+    ARTIFACT_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+    ARTIFACT_LABEL="APK"
     ;;
   release)
     GRADLE_TASK="assembleRelease"
-    APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+    ARTIFACT_PATH="android/app/build/outputs/apk/release/app-release.apk"
+    ARTIFACT_LABEL="APK"
+    ;;
+  bundle)
+    GRADLE_TASK="bundleRelease"
+    ARTIFACT_PATH="android/app/build/outputs/bundle/release/app-release.aab"
+    ARTIFACT_LABEL="AAB"
     ;;
   *)
-    echo "Unknown build type: $BUILD_TYPE (use 'debug' or 'release')" >&2
+    echo "Unknown build type: $BUILD_TYPE (use 'debug', 'release', or 'bundle')" >&2
     exit 1
     ;;
 esac
@@ -37,11 +45,15 @@ cd android
 ./gradlew "$GRADLE_TASK"
 cd "$SCRIPT_DIR"
 
-if [[ -f "$APK_PATH" ]]; then
+if [[ -f "$ARTIFACT_PATH" ]]; then
   echo ""
-  echo "APK built: $APK_PATH"
-  echo "Sideload: adb install -r \"$APK_PATH\""
+  echo "$ARTIFACT_LABEL built: $ARTIFACT_PATH"
+  if [[ "$ARTIFACT_LABEL" == "APK" ]]; then
+    echo "Sideload: adb install -r \"$ARTIFACT_PATH\""
+  else
+    echo "Upload to Google Play Console: https://play.google.com/console"
+  fi
 else
-  echo "Build finished but expected APK not found at: $APK_PATH" >&2
+  echo "Build finished but expected $ARTIFACT_LABEL not found at: $ARTIFACT_PATH" >&2
   exit 1
 fi

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   createDefaultEinsatz,
   DEFAULT_EINSATZ_FW,
-  DEFAULT_EINSATZ_GROUP,
   resetEinsatzToManual,
 } from './einsatzDefaults';
 import { Firecall } from '../firebase/firestore';
@@ -12,7 +11,9 @@ describe('createDefaultEinsatz', () => {
     const now = new Date('2026-04-18T12:34:56.000Z');
     const einsatz = createDefaultEinsatz(now);
 
-    expect(einsatz.group).toBe(DEFAULT_EINSATZ_GROUP);
+    // group is unset by default — the dialog assigns it from the
+    // user's group memberships so we never default to a foreign group.
+    expect(einsatz.group).toBeUndefined();
     expect(einsatz.fw).toBe(DEFAULT_EINSATZ_FW);
     expect(einsatz.description).toBe('');
     expect(einsatz.deleted).toBe(false);

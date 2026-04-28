@@ -76,10 +76,12 @@ describe('RadiacodeLiveWidget', () => {
   it('shows cps', () => {
     renderWithMeasurement(
       <RadiacodeLiveWidget />,
-      { dosisleistung: 0.14, cps: 42, timestamp: 1 },
+      { dosisleistung: 0.14, cps: 42.5, timestamp: 1 },
     );
-    expect(screen.getByText(/42/)).toBeInTheDocument();
-    expect(screen.getByText(/cps/i)).toBeInTheDocument();
+    // Zahl + "cps" zusammen matchen, damit der stale-Age-Hinweis
+    // ("Letzte Messung vor …s") mit ggf. enthaltener Ziffernfolge "42"
+    // nicht ungewollt mitmatcht. Float wird mitberücksichtigt.
+    expect(screen.getByText(/42(\.\d+)?\s*cps/i)).toBeInTheDocument();
   });
 
   it('has green background for low dose (< 1 µSv/h)', () => {

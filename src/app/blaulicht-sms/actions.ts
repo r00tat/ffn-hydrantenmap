@@ -94,7 +94,14 @@ async function loadCredentials(
 export async function getBlaulichtSmsAlarms(
   groupId: string
 ): Promise<BlaulichtSmsAlarm[]> {
-  await actionUserRequired();
+  const session = await actionUserRequired();
+
+  const userGroups = session.user.groups ?? [];
+  if (!session.user.isAdmin && !userGroups.includes(groupId)) {
+    // User is not a member of this group — refuse to load alarms.
+    // Return an empty list (instead of throwing) so the dialog stays usable.
+    return [];
+  }
 
   const creds = await loadCredentials(groupId);
   if (!creds) return [];
