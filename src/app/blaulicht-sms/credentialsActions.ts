@@ -86,11 +86,18 @@ export async function hasBlaulichtsmsConfig(
   return doc.exists;
 }
 
-// User-accessible: returns group IDs that have credentials configured.
+// User-accessible: returns group IDs that have credentials configured AND
+// the calling user is a member of. Admins receive the full list (no filter).
 // Used by EinsatzDialog to decide whether to show the alarm dropdown.
 export async function getGroupsWithBlaulichtsmsConfig(): Promise<string[]> {
-  await actionUserRequired();
+  const session = await actionUserRequired();
   const { appendLegacyGroup } = await import('./legacyGroup');
+  const { filterGroupsByMembership } = await import('./groupFilter');
   const snapshot = await firestore.collection(COLLECTION).get();
-  return appendLegacyGroup(snapshot.docs.map((d) => d.id));
+  const all = appendLegacyGroup(snapshot.docs.map((d) => d.id));
+  return filterGroupsByMembership(
+    all,
+    session.user.groups ?? [],
+    session.user.isAdmin,
+  );
 }

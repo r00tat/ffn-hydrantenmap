@@ -88,7 +88,8 @@ export default function EinsatzDialog({
     }));
   }, []);
 
-  // Load which groups have BlaulichtSMS credentials (once on dialog mount)
+  // Load which groups have BlaulichtSMS credentials (once on dialog mount).
+  // The server filters this list by the caller's group membership.
   useEffect(() => {
     getGroupsWithBlaulichtsmsConfig()
       .then(setConfiguredGroups)
@@ -96,6 +97,21 @@ export default function EinsatzDialog({
         console.error('Failed to load BlaulichtSMS configured groups:', err)
       );
   }, []);
+
+  // For new Einsätze: default the group to the first one the user is a
+  // member of as soon as `myGroups` is available. Avoids a hardcoded
+  // default that may not match the user's permissions.
+  useEffect(() => {
+    if (!isNewEinsatz) return;
+    if (einsatz.group) return;
+    if (myGroups.length === 0) return;
+    const defaultGroup = myGroups[0].id;
+    if (!defaultGroup) return;
+    setEinsatz((prev) =>
+      prev.group ? prev : { ...prev, group: defaultGroup },
+    );
+    setSelectedGroup((prev) => prev || defaultGroup);
+  }, [isNewEinsatz, einsatz.group, myGroups]);
 
   // Fetch alarms when selected group changes and has credentials
   useEffect(() => {
@@ -274,6 +290,16 @@ export default function EinsatzDialog({
             onChange={handleChange}
             required
           >
+            {einsatz.group &&
+              !myGroups.some((g) => g.id === einsatz.group) && (
+                <MenuItem
+                  key={`group-${einsatz.group}-readonly`}
+                  value={einsatz.group}
+                  disabled
+                >
+                  {einsatz.group} (keine Berechtigung)
+                </MenuItem>
+              )}
             {myGroups.map((group) => (
               <MenuItem key={`group-${group.id}`} value={group.id}>
                 {group.name}
