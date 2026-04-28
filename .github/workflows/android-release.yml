@@ -1,0 +1,127 @@
+name: "Android Release"
+
+on:
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      alpha:
+        description: "Alpha-Nummer (für manuellen Build, hängt -alpha<N> an den letzten Tag)"
+        required: true
+        default: "0"
+
+concurrency:
+  group: android-release-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: "Build & Publish AAB"
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # WIF
+      contents: write # GitHub Release Asset upload
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # für git rev-list / git describe
+
+      - name: Determine versionCode, versionName, track
+        id: version
+        env:
+          ALPHA: ${{ inputs.alpha }}
+        run: |
+          set -euo pipefail
+          VERSION_CODE=$(git rev-list --count HEAD)
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+            TRACK="production"
+          else
+            if ! [[ "${ALPHA}" =~ ^[0-9]+$ ]]; then
+              echo "Invalid alpha input: ${ALPHA}" >&2
+              exit 1
+            fi
+            LATEST_TAG=$(git describe --tags --abbrev=0 --match='v*')
+            VERSION_NAME="${LATEST_TAG#v}-alpha${ALPHA}"
+            TRACK="internal"
+          fi
+          {
+            echo "VERSION_CODE=${VERSION_CODE}"
+            echo "VERSION_NAME=${VERSION_NAME}"
+            echo "TRACK=${TRACK}"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: capacitor/package-lock.json
+
+      - name: Install Capacitor dependencies
+        working-directory: capacitor
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+          cache: "gradle"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Authenticate to Google (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PLAY_UPLOAD_SA_EMAIL }}
+
+      - name: Decode keystore + write keystore.properties
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "${KEYSTORE_BASE64}" | base64 -d > capacitor/android/release.keystore
+          umask 077
+          {
+            echo "storeFile=release.keystore"
+            echo "storePassword=${KEYSTORE_PASSWORD}"
+            echo "keyAlias=ffn-einsatzkarte"
+            echo "keyPassword=${KEY_PASSWORD}"
+          } > capacitor/android/keystore.properties
+
+      - name: Capacitor sync
+        working-directory: capacitor
+        run: npx cap sync android
+
+      - name: Build & publish bundle to Play Store
+        working-directory: capacitor/android
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.VERSION_CODE }}
+          VERSION_NAME: ${{ steps.version.outputs.VERSION_NAME }}
+          TRACK: ${{ steps.version.outputs.TRACK }}
+        run: |
+          ./gradlew publishBundle \
+            "-PappVersionCode=${VERSION_CODE}" \
+            "-PappVersionName=${VERSION_NAME}" \
+            "--track=${TRACK}"
+
+      - name: Attach AAB to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: capacitor/android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Cleanup keystore
+        if: always()
+        run: |
+          rm -f capacitor/android/release.keystore capacitor/android/keystore.properties
