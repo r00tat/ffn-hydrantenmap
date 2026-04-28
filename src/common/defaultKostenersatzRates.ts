@@ -1254,6 +1254,12 @@ export const DEFAULT_VEHICLES: Omit<KostenersatzVehicle, 'id'>[] = [
     description: 'Ölsperranhänger',
     sortOrder: 16,
   },
+  {
+    name: 'MZB',
+    rateId: '8.01',
+    description: 'Mehrzweckboot Neusiedl am See',
+    sortOrder: 17,
+  },
 ];
 
 /**

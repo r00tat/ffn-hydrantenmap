@@ -32,10 +32,26 @@ internal class AndroidBleIo(
         private val NOTIFY_UUID: UUID = UUID.fromString("e63215e7-7003-49d8-96b0-b024798fb901")
         private val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val REQUESTED_MTU: Int = 250
+        // Pro Chunk haben wir reichlich Kopfraum: ein WRITE_TYPE_NO_RESPONSE
+        // an einem 7.5–11.25 ms Connection-Interval drained typisch in <50 ms.
+        // 2 s ist eine großzügige Obergrenze, ab der wir die Session als
+        // halb-tot betrachten und den Aufrufer fail-fast lassen.
+        private const val WRITE_CALLBACK_TIMEOUT_MS: Long = 2_000L
     }
 
     private val lock = ReentrantLock()
     private val ready = lock.newCondition()
+
+    // Flow-Control für `WRITE_TYPE_NO_RESPONSE`: Android serialisiert
+    // intern, mehrere sofortige Writes überlasten das GATT-Backend und das
+    // 2./3. `writeCharacteristic` liefert dann `ERROR_GATT_WRITE_REQUEST_BUSY`
+    // (Bug 2026-04-27 — Settings-Read mit 4 Chunks ist betroffen, 1-Chunk-
+    // Polling nicht). Wir warten daher auf `onCharacteristicWrite`, bevor der
+    // nächste Chunk rausgeht — analog zum vorherigen `GattSession.pumpWrite`.
+    private val writeLock = ReentrantLock()
+    private val writeCompleted = writeLock.newCondition()
+    @Volatile private var writePending: Boolean = false
+    @Volatile private var writeAborted: Boolean = false
 
     @Volatile private var gatt: BluetoothGatt? = null
     @Volatile private var writeChar: BluetoothGattCharacteristic? = null
@@ -98,6 +114,27 @@ internal class AndroidBleIo(
     override fun write(bytes: ByteArray) {
         val g = gatt ?: throw ConnectionClosed("No GATT")
         val ch = writeChar ?: throw ConnectionClosed("No writeChar")
+
+        // Auf Abschluss des vorherigen Chunks warten — sonst liefert Android
+        // beim nächsten `writeCharacteristic` `ERROR_GATT_WRITE_REQUEST_BUSY`.
+        writeLock.withLock {
+            val deadline = System.nanoTime() + WRITE_CALLBACK_TIMEOUT_MS * 1_000_000L
+            while (writePending && !writeAborted) {
+                val rem = deadline - System.nanoTime()
+                if (rem <= 0L) {
+                    throw ConnectionClosed("Timeout waiting for previous onCharacteristicWrite")
+                }
+                try {
+                    writeCompleted.awaitNanos(rem)
+                } catch (ie: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    throw ConnectionClosed("Interrupted while waiting for write completion", ie)
+                }
+            }
+            if (writeAborted) throw ConnectionClosed("Write aborted (transport closing)")
+            writePending = true
+        }
+
         val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             g.writeCharacteristic(ch, bytes, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) ==
                 BluetoothGatt.GATT_SUCCESS
@@ -110,6 +147,13 @@ internal class AndroidBleIo(
             g.writeCharacteristic(ch)
         }
         if (!ok) {
+            // Synchroner Fehler vom GATT-Stack → kein onCharacteristicWrite
+            // wird mehr kommen, also Pending-Flag selbst clearen, sonst
+            // hängt der nächste write() im await.
+            writeLock.withLock {
+                writePending = false
+                writeCompleted.signalAll()
+            }
             // Mitten in einem Frame würde ein verschluckter Fehler den
             // Reassembler des Geräts wedgen — fail-fast, damit der Aufrufer
             // einen frischen Transport aufbauen kann.
@@ -131,6 +175,7 @@ internal class AndroidBleIo(
         notifyChar = null
         notificationListener = null
         connectionLostListener = null
+        abortPendingWrite()
     }
 
     private fun cleanupOnFailure() {
@@ -141,6 +186,19 @@ internal class AndroidBleIo(
         gatt = null
         writeChar = null
         notifyChar = null
+        abortPendingWrite()
+    }
+
+    /**
+     * Weckt einen ggf. im `write()`-await blockierten Caller, damit
+     * Disconnect/Close die Session sauber teardownen kann statt 2 s zu warten.
+     */
+    private fun abortPendingWrite() {
+        writeLock.withLock {
+            writeAborted = true
+            writePending = false
+            writeCompleted.signalAll()
+        }
     }
 
     private fun signalReady() {
@@ -224,6 +282,23 @@ internal class AndroidBleIo(
                 signalReady()
             } else {
                 signalFailure(DeviceNotFound("CCCD write failed status=$status"))
+            }
+        }
+
+        override fun onCharacteristicWrite(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
+            if (characteristic.uuid != WRITE_UUID) return
+            // Status ignorieren wir bewusst — selbst ein Fehler-Status hier
+            // muss den Pending-Slot freigeben, sonst wartet der nächste
+            // write() auf einen Callback, der nicht mehr kommt. Der eigentliche
+            // Übertragungsfehler wird beim Antwort-Timeout im
+            // BluetoothTransport sichtbar.
+            writeLock.withLock {
+                writePending = false
+                writeCompleted.signalAll()
             }
         }
 

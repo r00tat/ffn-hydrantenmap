@@ -2,6 +2,7 @@
 import Typography from '@mui/material/Typography';
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import React, { ReactNode } from 'react';
+import { markerIconDataUrl } from '../../../common/markerSvg';
 import {
   FirecallItem,
   LOCATION_STATUS_COLORS,
@@ -112,9 +113,8 @@ export class FirecallItemLocation extends FirecallItemBase {
   }
 
   public icon(_heatmapColor?: string): LeafletIcon<IconOptions> {
-    const iconColor = this.color;
     return L.icon({
-      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + iconColor)}&v=${this.id}`,
+      iconUrl: markerIconDataUrl('' + this.color),
       iconSize: [30, 30],
       iconAnchor: [15, 30],
       popupAnchor: [0, -25],

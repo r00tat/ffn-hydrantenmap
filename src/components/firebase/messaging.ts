@@ -2,6 +2,10 @@ import app from './firebase';
 import { Messaging, getMessaging, getToken } from 'firebase/messaging';
 
 export async function requestPermission(): Promise<boolean> {
+  if (typeof Notification === 'undefined') {
+    return false;
+  }
+
   if (Notification.permission === 'granted') {
     return true;
   }

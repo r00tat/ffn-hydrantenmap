@@ -2,6 +2,7 @@ import Typography from '@mui/material/Typography';
 import L, { IconOptions, Icon as LeafletIcon } from 'leaflet';
 import React, { ReactNode } from 'react';
 import { Tooltip } from 'react-leaflet';
+import { markerIconDataUrl } from '../../../common/markerSvg';
 import {
   FcItemAttachment,
   FcMarker,
@@ -152,7 +153,7 @@ export class FirecallItemMarker extends FirecallItemBase {
 
     const color = heatmapColor || this.color;
     return L.icon({
-      iconUrl: `/api/icons/marker?fill=${encodeURIComponent('' + color)}`,
+      iconUrl: markerIconDataUrl('' + color),
       iconSize: [30, 30],
       iconAnchor: [15, 30],
       popupAnchor: [0, -25],
