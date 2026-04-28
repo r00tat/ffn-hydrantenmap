@@ -10,24 +10,80 @@ Die Applikation ist [Open Source](LICENSE) und kann auch von anderen Feuerwehren
 
 ## Features
 
-- **Hydrantenkarte** - Anzeige von Hydranten und Saugstellen auf einer interaktiven Karte
-- **Lageführung** - Situationsmanagement für Einsätze
-- **Einsatztagebuch** - Dokumentation von Einsatzereignissen
-- **Fahrzeugtracking** - Verfolgung von Einsatzfahrzeugen
+### Karte & Geodaten
+
+- **Hydrantenkarte** - Hydranten, Saugstellen, Löschteiche, Risiko- und Gefahrobjekte auf einer interaktiven Karte
+- **Geohash-Clustering** - Effizientes Laden großer Datenmengen via Firestore-Cluster (Präzision 6)
+- **Eigene Layer** - Distanzmessung, Zeichnen (Drawing), Leitungen, FirecallItems-Layer pro Einsatz
+- **Externe Layer** - Pegelstände (Hydrographischer Dienst), Stromausfälle (Netz Burgenland), Wetterstationen
+- **Heatmap & Interpolation** - Visualisierung von Messwerten (z.B. Strahlung) als Heatmap oder interpolierte Fläche
+
+### Einsatzführung
+
+- **Lageführung** - Situationsmanagement mit eigenen Einsatz-Layern und Items
+- **Einsatztagebuch** - Dokumentation von Einsatzereignissen mit Druckansicht
+- **Geschäftsbuch** - Übersicht und Druck aller Einsätze
+- **Einsatzorte** - Verwaltung mit Status-Markern und Karten-Edit-Dialog
+- **Fahrzeugtracking** - Live-Position und Tracks von Einsatzfahrzeugen
+- **Crew-Assignment** - Drag-and-Drop-Zuteilung von Personal zu Fahrzeugen
+- **Audit Log** - Nachvollziehbare Änderungshistorie
+
+### Spezialmodule
+
+- **Strahlenschutz / Radiacode** - Live-Messung via Bluetooth LE (Android) inkl. Energy-Spectrum, Dosimetrie und Track-Aufzeichnung
 - **Schadstoffdatenbank** - Informationen zu Gefahrstoffen
-- **Kostenersatz** - Berechnung und PDF-Generierung für Kostenersatz nach Tarifordnung (LGBl. Nr. 77/2023)
-- **PWA** - Installation als App auf Mobilgeräten möglich
+- **Kostenersatz** - Berechnung und PDF-Generierung nach Tarifordnung (LGBl. Nr. 77/2023)
+- **AI-Assistent** - Vertex AI / Gemini-gestützte Aktionen auf der Karte
+- **Wetter & Chat** - Wetterdaten und einsatzinterner Chat
+- **Druckansichten** - Einsatztagebuch, Geschäftsbuch, Fahrzeuge als druckbare PDFs
+
+### Plattform
+
+- **PWA** - Installation auf Mobilgeräten via Serwist Service Worker
+- **Native Android-App** - Capacitor-Wrapper für Bluetooth-Funktionen (Radiacode)
 - **Push-Benachrichtigungen** - via Firebase Cloud Messaging
+- **Blaulicht-SMS-Integration** - Annahme eingehender Alarmierungen
+
+### Screenshots
+
+![Einsatzkarte](docs/screenshots/Einsatzkarte.png 'Einsatzkarte')
+
+![Map Layers](docs/screenshots/Map-Layer.png 'Externe Layer')
+
+![Spektrum](docs/screenshots/Nuklid-Spektrum.png 'Nuklid Spektrum')
 
 ## Tech Stack
 
-- **Next.js 16** mit App Router
-- **React 19** + **TypeScript**
-- **Material-UI (MUI)** für UI-Komponenten
-- **Leaflet** + **React Leaflet** für Karten
+### Frontend
+
+- **Next.js 16** mit App Router und Server Actions
+- **React 19** + **TypeScript 6**
+- **Material-UI (MUI) v9** inkl. X-Charts und X-Date-Pickers
+- **Leaflet** + **React Leaflet** für Karten, MarkerCluster, Heatmap, RotatedMarker
+- **@dnd-kit** für Drag-and-Drop (Crew-Zuteilung)
+- **@react-pdf/renderer** und **html2pdf.js** für PDF-Erzeugung
+- **Turf**, **proj4**, **geofire-common** für Geodaten-Operationen
+
+### Backend & Daten
+
 - **Firebase**: Firestore (Datenbank), Storage (Dateien), Auth, Cloud Messaging
-- **NextAuth.js** für Session-Management
-- **Serwist** für PWA/Service Worker
+- **Firebase Admin SDK** für serverseitige Operationen
+- **NextAuth.js v5** für Session-Management
+- **Google Cloud**: Vertex AI (Gemini), Text-to-Speech, Secret Manager
+- **Serwist** für PWA / Service Worker mit FCM-Integration
+
+### Mobile
+
+- **Capacitor 8** als nativer Android-Wrapper
+- **@capacitor-community/bluetooth-le** für Radiacode-Anbindung
+- **@capacitor-firebase/authentication** für Native-Auth
+
+### Tooling
+
+- **Vitest** + **@testing-library/react** für Unit- und Component-Tests
+- **Playwright** für Screenshots und E2E
+- **ESLint 9** + **eslint-config-next**
+- **Turbopack** (dev) / **Webpack** (build)
 
 ## Development
 
