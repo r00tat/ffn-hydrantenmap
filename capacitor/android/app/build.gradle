@@ -1,6 +1,5 @@
 apply plugin: 'com.android.application'
 apply plugin: 'org.jetbrains.kotlin.android'
-apply plugin: 'com.github.triplet.play'
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
@@ -79,17 +78,6 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
-}
-
-// Triple-T play-publisher 3.x kennt kein automatisches ADC-Fallback,
-// daher den GOOGLE_APPLICATION_CREDENTIALS-Pfad (gesetzt von
-// google-github-actions/auth) manuell durchreichen. Ohne env var
-// (lokal) bleibt die Config leer und publishBundle ist nicht nutzbar.
-def gappCreds = System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if (gappCreds != null && file(gappCreds).exists()) {
-    play {
-        serviceAccountCredentials.set(file(gappCreds))
-    }
 }
 
 apply from: 'capacitor.build.gradle'
