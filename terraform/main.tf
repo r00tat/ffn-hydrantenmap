@@ -50,6 +50,8 @@ locals {
     "texttospeech.googleapis.com",
     "picker.googleapis.com",
     "firebasevertexai.googleapis.com",
+    "androidpublisher.googleapis.com",
+    "chromewebstore.googleapis.com",
   ]
 }
 resource "google_project_service" "apis" {
