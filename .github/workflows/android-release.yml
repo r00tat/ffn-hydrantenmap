@@ -1,10 +1,6 @@
 name: "Android Release"
 
 on:
-  # TEMPORÄR: für initiales Testen auf dem Feature-Branch.
-  # VOR DEM MERGE IN MAIN ENTFERNEN.
-  push:
-    branches: [feat/android-release-workflow]
   release:
     types: [ published ]
   workflow_dispatch:
