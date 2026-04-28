@@ -1,6 +1,10 @@
 name: "Android Release"
 
 on:
+  # TEMPORÄR: für initiales Testen auf dem Feature-Branch.
+  # VOR DEM MERGE IN MAIN ENTFERNEN.
+  push:
+    branches: [feat/android-release-workflow]
   release:
     types: [ published ]
   workflow_dispatch:
@@ -34,7 +38,7 @@ jobs:
       - name: Determine versionCode, versionName, track
         id: version
         env:
-          ALPHA: ${{ inputs.alpha }}
+          ALPHA: ${{ inputs.alpha || '0' }}
         run: |
           set -euo pipefail
           VERSION_CODE=$(git rev-list --count HEAD)
