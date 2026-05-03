@@ -74,6 +74,9 @@ dependencies {
     implementation platform("com.google.firebase:firebase-bom:33.3.0")
     implementation "com.google.firebase:firebase-firestore-ktx"
     implementation "com.google.firebase:firebase-auth-ktx"
+    // Firebase Crashlytics — meldet native Android-Crashes an Firebase,
+    // damit Play-Store-Rejections nicht ohne Stack-Trace bleiben.
+    implementation "com.google.firebase:firebase-crashlytics-ktx"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
@@ -86,7 +89,8 @@ try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {
         apply plugin: 'com.google.gms.google-services'
+        apply plugin: 'com.google.firebase.crashlytics'
     }
 } catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.info("google-services.json not found, google-services + crashlytics plugins not applied.")
 }
