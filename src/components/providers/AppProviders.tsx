@@ -10,6 +10,7 @@ import React, { Suspense } from 'react';
 import About from '../../app/about/page';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useGlobalErrorReporter from '../../hooks/useGlobalErrorReporter';
 import useServerActionErrorDetection from '../../hooks/useServerActionErrorDetection';
 import useServiceWorkerUpdate from '../../hooks/useServiceWorkerUpdate';
 import { useCapacitorAppExit } from '../../hooks/useCapacitorAppExit';
@@ -20,6 +21,7 @@ import FirebaseUserProvider from '../firebase/FirebaseUserProvider';
 import DynamicLogin from '../pages/LoginUi';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
+import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
 import MapEditorProvider from './MapEditorProvider';
@@ -102,6 +104,7 @@ function ServiceWorkerUpdateListener() {
 export default function AppProviders({ children }: AppProps) {
   useFirebaseAppCheck();
   useCapacitorAppExit();
+  useGlobalErrorReporter();
 
   return (
     <Suspense
@@ -111,21 +114,23 @@ export default function AppProviders({ children }: AppProps) {
         </Typography>
       }
     >
-      <SessionProvider>
-        <FirebaseUserProvider>
-          <SnackbarProvider>
-            <ServiceWorkerUpdateListener />
-            <DebugLoggingProvider>
-              <div className={`${styles.container} print-content-root`}>
-                <CssBaseline enableColorScheme />
-                <SingedOutOneTapLogin />
+      <ErrorBoundary>
+        <SessionProvider>
+          <FirebaseUserProvider>
+            <SnackbarProvider>
+              <ServiceWorkerUpdateListener />
+              <DebugLoggingProvider>
+                <div className={`${styles.container} print-content-root`}>
+                  <CssBaseline enableColorScheme />
+                  <SingedOutOneTapLogin />
 
-                <AuthorizationApp>{children}</AuthorizationApp>
-              </div>
-            </DebugLoggingProvider>
-          </SnackbarProvider>
-        </FirebaseUserProvider>
-      </SessionProvider>
+                  <AuthorizationApp>{children}</AuthorizationApp>
+                </div>
+              </DebugLoggingProvider>
+            </SnackbarProvider>
+          </FirebaseUserProvider>
+        </SessionProvider>
+      </ErrorBoundary>
     </Suspense>
   );
 }

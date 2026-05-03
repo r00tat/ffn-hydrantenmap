@@ -3,6 +3,7 @@
 // see https://nextjs.org/docs/app/building-your-application/routing/error-handling#uncaught-exceptions
 
 import { useEffect } from 'react';
+import { recordError } from '../components/firebase/crashlytics';
 
 export default function Error({
   error,
@@ -12,21 +13,16 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Failed to render: ', error);
+    void recordError(error, {
+      source: 'next-error-page',
+      ...(error.digest ? { digest: error.digest } : {}),
+    });
   }, [error]);
 
   return (
     <div>
-      <h2>Something went wrong!</h2>
-      <button
-        onClick={
-          // Attempt to recover by trying to re-render the segment
-          () => reset()
-        }
-      >
-        Try again
-      </button>
+      <h2>Etwas ist schiefgelaufen</h2>
+      <button onClick={() => reset()}>Erneut versuchen</button>
     </div>
   );
 }
