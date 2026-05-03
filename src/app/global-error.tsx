@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { recordError } from '../components/firebase/crashlytics';
 
 // Error boundaries must be Client Components
 // see https://nextjs.org/docs/app/building-your-application/routing/error-handling#uncaught-exceptions
@@ -12,16 +13,18 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Global Error: ', error);
+    void recordError(error, {
+      source: 'next-global-error',
+      ...(error.digest ? { digest: error.digest } : {}),
+    });
   }, [error]);
 
   return (
     // global-error must include html and body tags
-    <html>
+    <html lang="de">
       <body>
-        <h2>Something went wrong!</h2>
-        <button onClick={() => reset()}>Try again</button>
+        <h2>Etwas ist schiefgelaufen</h2>
+        <button onClick={() => reset()}>Erneut versuchen</button>
       </body>
     </html>
   );

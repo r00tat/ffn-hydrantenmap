@@ -7,10 +7,12 @@ import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.net.http.SslError;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -19,6 +21,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.view.Window;
 
+import androidx.annotation.RequiresApi;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.WindowCompat;
@@ -26,6 +29,7 @@ import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.CapConfig;
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 
 import org.json.JSONObject;
 
@@ -123,6 +127,40 @@ public class MainActivity extends BridgeActivity {
                 }
                 handler.cancel();
                 showLoadErrorDialog(error.getUrl(), "SSL: " + describeSslError(error));
+            }
+
+            // onRenderProcessGone gibt es erst ab API 26 (Android 8.0). minSdk ist 24,
+            // daher zur Sicherheit per SDK_INT-Check absichern, auch wenn der Callback
+            // vor API 26 gar nicht aufgerufen werden kann.
+            @Override
+            @RequiresApi(Build.VERSION_CODES.O)
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    return super.onRenderProcessGone(view, detail);
+                }
+                Log.e(TAG, "WebView renderer process gone, didCrash=" + detail.didCrash());
+                try {
+                    FirebaseCrashlytics.getInstance().recordException(
+                        new RuntimeException("WebView renderer process gone (didCrash=" + detail.didCrash() + ")")
+                    );
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to report renderer crash to Crashlytics", t);
+                }
+                // Android-Vertrag: tote WebView muss aus dem View-Tree entfernt und
+                // mit destroy() freigegeben werden, sonst kann ein späterer Zugriff
+                // einen IllegalStateException werfen.
+                try {
+                    android.view.ViewParent parent = view.getParent();
+                    if (parent instanceof android.view.ViewGroup) {
+                        ((android.view.ViewGroup) parent).removeView(view);
+                    }
+                    view.destroy();
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to remove/destroy dead WebView", t);
+                }
+                Log.i(TAG, "Recreating activity after renderer crash");
+                recreate();
+                return true; // wir haben den Crash behandelt, App nicht killen
             }
         });
     }

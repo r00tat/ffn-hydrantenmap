@@ -3,6 +3,7 @@
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import React, { createContext } from 'react';
+import useCrashlyticsUserSync from '../../hooks/useCrashlyticsUserSync';
 import useFirebaseLoginObserver, {
   LoginStatus,
 } from '../../hooks/useFirebaseLoginObserver';
@@ -28,6 +29,7 @@ export default function FirebaseUserProvider({
 }) {
   useFirebaseCustomTokenLogin();
   const authInfo = useFirebaseLoginObserver();
+  useCrashlyticsUserSync(authInfo.uid);
   return (
     <FirebaseLoginContext.Provider value={authInfo}>
       {children}
