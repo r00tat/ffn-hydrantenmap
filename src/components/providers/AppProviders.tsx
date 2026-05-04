@@ -39,6 +39,14 @@ const GpsProvider = dynamic(() => import('./GpsProvider'), {
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
 });
+const PermissionOnboardingProvider = dynamic(
+  () => import('../permissions/PermissionOnboardingProvider'),
+  { ssr: false }
+);
+const SettingsRedirectDialogProvider = dynamic(
+  () => import('../permissions/SettingsRedirectDialogProvider'),
+  { ssr: false }
+);
 
 interface AppProps {
   children: React.ReactNode;
@@ -123,8 +131,11 @@ export default function AppProviders({ children }: AppProps) {
                 <div className={`${styles.container} print-content-root`}>
                   <CssBaseline enableColorScheme />
                   <SingedOutOneTapLogin />
-
-                  <AuthorizationApp>{children}</AuthorizationApp>
+                  <SettingsRedirectDialogProvider>
+                    <PermissionOnboardingProvider>
+                      <AuthorizationApp>{children}</AuthorizationApp>
+                    </PermissionOnboardingProvider>
+                  </SettingsRedirectDialogProvider>
                 </div>
               </DebugLoggingProvider>
             </SnackbarProvider>
