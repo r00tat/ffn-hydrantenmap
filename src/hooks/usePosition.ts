@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GeoPositionObject } from '../common/geo';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
+import { ensureLocation } from '../lib/permissions';
 import { defaultPosition } from './constants';
 
 export type PositionInfo = [
@@ -28,8 +29,12 @@ export default function usePosition(): PositionInfo {
   const lastErrorCodeRef = useRef<number | undefined>(undefined);
   const showSnackbar = useSnackbar();
 
-  const startWatching = useCallback(() => {
+  const startWatching = useCallback(async () => {
     if (watchIdRef.current !== undefined) {
+      return;
+    }
+    if (!(await ensureLocation())) {
+      setIsPending(false);
       return;
     }
     if (!navigator.geolocation) {
