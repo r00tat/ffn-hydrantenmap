@@ -185,7 +185,7 @@ jobs:
 
       - name: Attach AAB to GitHub Release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: capacitor/android/app/build/outputs/bundle/release/app-release.aab
 
