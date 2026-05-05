@@ -1,15 +1,18 @@
-import app from './firebase';
+import { Capacitor } from '@capacitor/core';
 import { Messaging, getMessaging, getToken } from 'firebase/messaging';
+import { ensureNotifications } from '../../lib/permissions';
+import app from './firebase';
 
 export async function requestPermission(): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    return ensureNotifications();
+  }
   if (typeof Notification === 'undefined') {
     return false;
   }
-
   if (Notification.permission === 'granted') {
     return true;
   }
-
   console.log('Requesting notification permission...');
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {

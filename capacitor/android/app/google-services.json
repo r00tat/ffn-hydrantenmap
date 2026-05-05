@@ -22,6 +22,22 @@
           }
         },
         {
+          "client_id": "429163084278-p0u6h36oer1u3c3sn4kbvr5maoqno862.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "at.ffnd.einsatzkarte",
+            "certificate_hash": "8851e200ba51d7e1c3d2370e8baf8b0d9a5b71fb"
+          }
+        },
+        {
+          "client_id": "429163084278-qgt6fkcnltt97cbil5p6s7gh8a46ecmd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "at.ffnd.einsatzkarte",
+            "certificate_hash": "433c2b61ab492b2b4740e7a986114ffdeddf76e2"
+          }
+        },
+        {
           "client_id": "429163084278-q0ft241066jqadh3tv9cv0djcs1e7534.apps.googleusercontent.com",
           "client_type": 3
         }

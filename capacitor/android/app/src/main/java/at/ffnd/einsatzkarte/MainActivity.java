@@ -66,6 +66,7 @@ public class MainActivity extends BridgeActivity {
         }
 
         registerPlugin(RadiacodeNotificationPlugin.class);
+        registerPlugin(AppPermissionsPlugin.class);
 
         super.onCreate(savedInstanceState);
 
