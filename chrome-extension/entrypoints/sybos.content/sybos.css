@@ -137,3 +137,19 @@
   color: #666;
   padding-left: 8px;
 }
+
+#einsatzkarte-widget .ek-firecall-select {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  color: #333;
+  cursor: pointer;
+}
+
+#einsatzkarte-widget .ek-firecall-select:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
