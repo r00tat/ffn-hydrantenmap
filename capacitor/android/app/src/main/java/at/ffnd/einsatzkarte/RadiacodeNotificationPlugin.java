@@ -9,23 +9,14 @@ import android.util.Log;
 import at.ffnd.einsatzkarte.radiacode.Measurement;
 
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.Locale;
 
-@CapacitorPlugin(
-        name = "RadiacodeNotification",
-        permissions = {
-                @Permission(
-                        alias = "notifications",
-                        strings = { "android.permission.POST_NOTIFICATIONS" })
-        })
+@CapacitorPlugin(name = "RadiacodeNotification")
 public class RadiacodeNotificationPlugin extends Plugin {
 
     private static final String TAG = "RadiacodeFg";
@@ -67,13 +58,6 @@ public class RadiacodeNotificationPlugin extends Plugin {
             Log.w(TAG, "plugin.connectNative rejected — missing deviceAddress");
             call.reject("deviceAddress required");
             return;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (getPermissionState("notifications") != PermissionState.GRANTED) {
-                Log.i(TAG, "plugin.connectNative requesting POST_NOTIFICATIONS permission");
-                requestPermissionForAlias("notifications", call, "permissionCallback");
-            }
         }
 
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
@@ -244,11 +228,6 @@ public class RadiacodeNotificationPlugin extends Plugin {
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_GPS_TRACK);
         getContext().startService(intent);
         call.resolve();
-    }
-
-    @PermissionCallback
-    private void permissionCallback(PluginCall call) {
-        // Notification-Permission ist best-effort — Ergebnis bewusst ignoriert.
     }
 
     static void onDisconnectRequested() {

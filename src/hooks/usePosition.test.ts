@@ -8,6 +8,10 @@ vi.mock('../components/providers/SnackbarProvider', () => ({
   useSnackbar: () => mockShowSnackbar,
 }));
 
+vi.mock('../lib/permissions', () => ({
+  ensureLocation: vi.fn(() => Promise.resolve(true)),
+}));
+
 import usePosition from './usePosition';
 
 type WatchCb = (pos: GeolocationPosition) => void;
@@ -48,10 +52,10 @@ describe('usePosition', () => {
     expect(isPending).toBe(false);
   });
 
-  it('isPending is true after enableTracking, false after first fix', () => {
+  it('isPending is true after enableTracking, false after first fix', async () => {
     const { result } = renderHook(() => usePosition());
 
-    act(() => {
+    await act(async () => {
       result.current[3]();
     });
     expect(result.current[4]).toBe(true);
@@ -74,10 +78,10 @@ describe('usePosition', () => {
     expect(result.current[1]).toBe(true);
   });
 
-  it('isPending is false after error', () => {
+  it('isPending is false after error', async () => {
     const { result } = renderHook(() => usePosition());
 
-    act(() => {
+    await act(async () => {
       result.current[3]();
     });
     expect(result.current[4]).toBe(true);
@@ -95,9 +99,9 @@ describe('usePosition', () => {
     expect(mockShowSnackbar).toHaveBeenCalled();
   });
 
-  it('exposes GeolocationPosition including accuracy via third tuple slot', () => {
+  it('exposes GeolocationPosition including accuracy via third tuple slot', async () => {
     const { result } = renderHook(() => usePosition());
-    act(() => {
+    await act(async () => {
       result.current[3]();
     });
     act(() => {

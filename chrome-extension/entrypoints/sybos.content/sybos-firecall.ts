@@ -1,4 +1,8 @@
 import { el, renderContent, showStatus } from './sybos-widget';
+import {
+  renderFirecallSelect,
+  type FirecallListEntry,
+} from './sybos-firecall-select';
 import { renderPersonnelSection } from './sybos-section-personnel';
 import { renderVehicleTableSection } from './sybos-section-vehicle-table';
 import { renderMannschaftEditSection } from './sybos-section-mannschaft-edit';
@@ -13,12 +17,24 @@ interface Firecall {
   date?: string;
 }
 
-function showFirecall(content: HTMLElement, fc: Firecall): void {
-  // Einsatz name
-  const nameField = el('div', { className: 'ek-field' });
-  nameField.appendChild(el('label', {}, 'Einsatz'));
-  nameField.appendChild(el('strong', {}, fc.name || '\u2013'));
-  content.appendChild(nameField);
+function showFirecall(
+  content: HTMLElement,
+  fc: Firecall,
+  firecallList: FirecallListEntry[] | null,
+): void {
+  // Einsatz selector (or fallback to read-only name on list error)
+  if (firecallList) {
+    renderFirecallSelect(content, firecallList, fc.id, async (newId) => {
+      if (newId === fc.id) return;
+      await chrome.storage.local.set({ selectedFirecallId: newId });
+      await loadFirecall();
+    });
+  } else {
+    const nameField = el('div', { className: 'ek-field' });
+    nameField.appendChild(el('label', {}, 'Einsatz'));
+    nameField.appendChild(el('strong', {}, fc.name || '–'));
+    content.appendChild(nameField);
+  }
 
   // Description (optional)
   if (fc.description) {
@@ -33,7 +49,7 @@ function showFirecall(content: HTMLElement, fc: Firecall): void {
   dateField.appendChild(el('label', {}, 'Datum'));
   const dateText = fc.date
     ? new Date(fc.date).toLocaleString('de-AT')
-    : '\u2013';
+    : '–';
   dateField.appendChild(document.createTextNode(dateText));
   content.appendChild(dateField);
 
@@ -46,7 +62,7 @@ function showFirecall(content: HTMLElement, fc: Firecall): void {
       target: '_blank',
       rel: 'noopener noreferrer',
     },
-    'In Einsatzkarte \u00f6ffnen \u2197'
+    'In Einsatzkarte öffnen ↗'
   );
   content.appendChild(link);
 
@@ -57,7 +73,7 @@ function showFirecall(content: HTMLElement, fc: Firecall): void {
   renderVehicleListSection(content);
 }
 
-/** Load the current firecall from the service worker and render it. */
+/** Load the current firecall + list from the service worker and render. */
 export async function loadFirecall(): Promise<void> {
   try {
     const authState = await chrome.runtime.sendMessage({
@@ -65,25 +81,35 @@ export async function loadFirecall(): Promise<void> {
     });
 
     if (!authState.isLoggedIn) {
-      showStatus('Nicht angemeldet. Bitte \u00fcber die Extension anmelden.');
+      showStatus('Nicht angemeldet. Bitte über die Extension anmelden.');
       return;
     }
 
-    const response = await chrome.runtime.sendMessage({
-      type: 'GET_CURRENT_FIRECALL',
-    });
+    const [listResp, fcResp] = await Promise.all([
+      chrome.runtime
+        .sendMessage({ type: 'GET_FIRECALL_LIST' })
+        .catch(() => ({ error: 'list-failed' })),
+      chrome.runtime.sendMessage({ type: 'GET_CURRENT_FIRECALL' }),
+    ]);
 
-    if (response.error) {
-      showStatus(response.error);
+    if (fcResp.error) {
+      showStatus(fcResp.error);
       return;
     }
 
-    if (!response.firecall) {
+    if (!fcResp.firecall) {
       showStatus('Kein aktiver Einsatz');
       return;
     }
 
-    renderContent((content) => showFirecall(content, response.firecall));
+    const firecallList: FirecallListEntry[] | null =
+      listResp && !listResp.error && Array.isArray(listResp.firecalls)
+        ? listResp.firecalls
+        : null;
+
+    renderContent((content) =>
+      showFirecall(content, fcResp.firecall, firecallList),
+    );
   } catch (err) {
     showStatus('Fehler beim Laden');
     console.error('[EK] error loading firecall:', err);

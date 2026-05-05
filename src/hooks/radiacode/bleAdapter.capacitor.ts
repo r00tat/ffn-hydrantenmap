@@ -1,4 +1,5 @@
 import { BleClient } from '@capacitor-community/bluetooth-le';
+import { ensureBluetooth, ensureNotifications } from '../../lib/permissions';
 import { BleAdapter, Unsubscribe } from './bleAdapter';
 import {
   isNativeAvailable,
@@ -44,6 +45,9 @@ export const capacitorAdapter: BleAdapter = {
   },
 
   async requestDevice() {
+    if (!(await ensureBluetooth())) {
+      throw new Error('Bluetooth-Berechtigung erforderlich');
+    }
     const client = await ensureBleClient();
     const device = await client.requestDevice({
       services: [RADIACODE_SERVICE_UUID],
@@ -96,6 +100,11 @@ export const capacitorAdapter: BleAdapter = {
       isNativeAvailable(),
     );
     if (isNativeAvailable()) {
+      if (!(await ensureNotifications())) {
+        throw new Error(
+          'Mitteilungen erforderlich für Radiacode-Hintergrundaufzeichnung',
+        );
+      }
       // Der native Foreground-Service übernimmt die GATT-Session exklusiv
       // (Phase 2, siehe docs/plans/2026-04-21-radiacode-native-polling.md).
       // `@capacitor-community/bluetooth-le` darf daher nicht parallel

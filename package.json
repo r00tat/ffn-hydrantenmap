@@ -22,6 +22,7 @@
     "build:android:bundle": "capacitor/build.sh bundle",
     "install:android": "npm run build:android && adb install -r capacitor/android/app/build/outputs/apk/debug/app-debug.apk",
     "install:android:release": "npm run build:android:release && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
+    "install:android:prod": "(cd capacitor && npx cap sync android) && (cd capacitor/android && ./gradlew assembleRelease -PappVersionCode=$(git rev-list --count HEAD) -PappVersionName=$(git describe --tags --abbrev=0 --match='v*' | sed 's/^v//')) && adb install -r capacitor/android/app/build/outputs/apk/release/app-release.apk",
     "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V RadiacodeFg:V RadiacodeBT:V RadiacodeBTIo:V DataBufDecoder:* RadiacodeTrack:* Firestore:W Firestore:E FirebaseAuth:W *:S"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.3.1",
     "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
