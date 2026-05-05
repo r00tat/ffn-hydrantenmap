@@ -180,7 +180,7 @@ jobs:
           done
 
           echo "==> Committing edit"
-          gcall -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" "${API}/edits/${EDIT_ID}:commit" >/dev/null
+          gcall -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" "${API}/edits/${EDIT_ID}:commit?changesNotSentForReview=true" >/dev/null
           echo "Done — versionName=${VERSION_NAME} versionCode=${UPLOADED_VC} tracks=${TRACKS}"
 
       - name: Attach AAB to GitHub Release
