@@ -84,11 +84,19 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    if (!uid) return;
+  const refresh = useCallback(async (refreshUid?: string) => {
+    // Allow caller (e.g. onAuthStateChanged) to pass uid directly to bypass
+    // a React state race: setUid triggers a render, but if all subsequent
+    // awaits resolve from cache (Firebase token), React may not commit before
+    // refresh runs — leaving the captured `uid` from this closure stale.
+    const effectiveUid = refreshUid ?? uid;
+    if (!effectiveUid) return;
 
     try {
-      const groups = await getMyGroupsFromServer().catch(() => [] as Group[]);
+      const groups = await getMyGroupsFromServer().catch((err) => {
+        console.error('getMyGroupsFromServer failed:', err);
+        return [] as Group[];
+      });
       setMyGroups(groups);
 
       const hasSessionData = session?.user?.isAuthorized !== undefined;
@@ -109,7 +117,11 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           isRefreshing: false,
         }));
       } else {
-        await handleFirestoreBasedRefresh(uid, setNeedsReLogin, setLoginStatus);
+        await handleFirestoreBasedRefresh(
+          effectiveUid,
+          setNeedsReLogin,
+          setLoginStatus
+        );
       }
     } catch (err) {
       console.error(`failed to refresh user data`, err);
@@ -171,7 +183,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           };
 
           setLoginStatus((prev) => ({ ...prev, ...authData }));
-          await refreshRef.current();
+          await refreshRef.current(user.uid);
           setLoginStatus((prev) => ({ ...prev, loginStep: 'done' }));
           console.info(`login completed for ${user.email}`);
         } else {
