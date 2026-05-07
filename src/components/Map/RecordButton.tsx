@@ -2,20 +2,16 @@ import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
-import L from 'leaflet';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useGpsLineRecorder } from '../../hooks/recording/useGpsLineRecorder';
-import { useRadiacodePointRecorder } from '../../hooks/recording/useRadiacodePointRecorder';
 import { loadDefaultDevice } from '../../hooks/radiacode/devicePreference';
 import { createRadiacodeLayer } from '../../hooks/radiacode/layerFactory';
-import { RadiacodeDeviceRef, SampleRateSpec } from '../../hooks/radiacode/types';
-import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { RadiacodeDeviceRef } from '../../hooks/radiacode/types';
 import { useFirecallId } from '../../hooks/useFirecall';
-import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
-import { useRadiacode } from '../providers/RadiacodeProvider';
+import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import { useGpsProvider } from '../providers/GpsProvider';
 import { usePositionContext } from '../providers/PositionProvider';
+import { useRadiacode } from '../providers/RadiacodeProvider';
 import RadiacodeLiveWidget from './RadiacodeLiveWidget';
 import TrackStartDialog, { TrackStartConfig } from './TrackStartDialog';
 
@@ -25,8 +21,6 @@ export default function RecordButton() {
   const {
     isRecording,
     mode,
-    layerId,
-    sampleRate,
     startGpsRecording,
     startRadiacodeRecording,
     stopRecording,
@@ -35,7 +29,6 @@ export default function RecordButton() {
   const sortedLayers = useFirecallLayersSorted();
   const addFirecallItem = useFirecallItemAdd();
   const firecallId = useFirecallId();
-  const { email: creatorEmail } = useFirebaseLogin();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingDialogOpen, setPendingDialogOpen] = useState(false);
@@ -62,11 +55,7 @@ export default function RecordButton() {
     }
   }, [isPositionSet, pendingDialogOpen, isPositionPending]);
 
-  const {
-    status: radiacodeStatus,
-    scan,
-    connectDevice,
-  } = useRadiacode();
+  const { status: radiacodeStatus, scan, connectDevice } = useRadiacode();
 
   const existingRadiacodeLayers = useMemo(
     () => sortedLayers.filter((l) => l.layerType === 'radiacode'),
@@ -84,7 +73,10 @@ export default function RecordButton() {
     async (config: TrackStartConfig) => {
       setDialogOpen(false);
       if (config.mode === 'gps') {
-        await startGpsRecording(config.layer?.type === 'existing' ? config.layer.id : '', config.sampleRate);
+        await startGpsRecording(
+          config.layer?.type === 'existing' ? config.layer.id : '',
+          config.sampleRate,
+        );
         return;
       }
       // radiacode mode
@@ -103,12 +95,21 @@ export default function RecordButton() {
 
       try {
         await connectDevice(config.device);
-        await startRadiacodeRecording(config.device, targetLayerId, config.sampleRate);
+        await startRadiacodeRecording(
+          config.device,
+          targetLayerId,
+          config.sampleRate,
+        );
       } catch (err) {
         console.error('[RADIACODE] connect failed', err);
       }
     },
-    [connectDevice, addFirecallItem, startGpsRecording, startRadiacodeRecording],
+    [
+      connectDevice,
+      addFirecallItem,
+      startGpsRecording,
+      startRadiacodeRecording,
+    ],
   );
 
   const handleStop = useCallback(() => {
@@ -135,7 +136,7 @@ export default function RecordButton() {
       <Box
         sx={{
           position: 'absolute',
-          bottom: 120,
+          bottom: 176,
           left: 16,
         }}
       >
