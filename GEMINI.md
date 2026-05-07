@@ -1,123 +1,135 @@
 # GEMINI Guidelines for the Hydranten-Map Project
 
-This document provides guidelines for AI assistants (like Gemini) to effectively understand and contribute to this project.
+This document provides foundational mandates and expert workflows for contributing to the Hydranten-Map project. These instructions take absolute precedence over general defaults.
 
 ## Project Overview
 
-This is a web application for the Neusiedl am See fire department (`Freiwillige Feuerwehr Neusiedl am See`). Its primary purpose is to display the locations of fire hydrants on an interactive map to assist during emergency operations.
+Interactive map and operations management system for the Neusiedl am See fire department (`Freiwillige Feuerwehr Neusiedl am See`).
 
-For authenticated users, the application offers advanced features, including:
-
-- Real-time situation management (`Lageführung`).
-- An operational diary (`Einsatztagebuch`).
-- Management of other resources and tactical information.
-
-The application is designed to be mobile-first and is a Progressive Web App (PWA) for offline accessibility.
+- **Public**: Fire hydrant locations.
+- **Authenticated**: Situation management (`Lageführung`), operational diary (`Einsatztagebuch`), vehicle tracking, hazardous materials database, and billing (`Kostenersatz`).
+- **Platform**: PWA (Progressive Web App) with native Android build via Capacitor.
 
 ## Tech Stack
 
-- **Framework**: [Next.js](https://nextjs.org/) (v16+) with the App Router.
-- **Language**: [TypeScript](https://www.typescriptlang.org/).
-- **UI Library**: [React](https://react.dev/) (v19+).
-- **UI Components**: [Material-UI (MUI)](https://mui.com/).
-- **Mapping**: [Leaflet](https://leafletjs.com/) via [React Leaflet](https://react-leaflet.js.org/).
-- **Authentication**: [NextAuth.js](https://next-auth.js.org/) and [Firebase Authentication](https://firebase.google.com/docs/auth).
-- **Backend & Database**: [Firebase](https://firebase.google.com/) (Firestore for data, Storage for files).
-- **PWA**: [Serwist](https://serwist.pages.dev/) for service worker management.
-- **Styling**: [Emotion](https://emotion.sh/).
-
-## Architecture
-
-### Directory Structure
-
-- `src/app/` - Next.js App Router pages and API routes.
-- `src/components/` - React components organized by feature (Map/, firebase/, providers/, pages/, FirecallItems/, Kostenersatz/).
-- `src/hooks/` - Custom React hooks for state management and side effects.
-- `src/common/` - Shared utilities and type definitions.
-- `src/server/` - Server-side utilities (Firebase admin, data import/export).
-- `src/worker/` - Service worker with FCM integration.
-- `firebase/` - Firestore rules and indexes (separate dev/prod environments).
-
-### Server Actions vs API Routes
-
-Prefer Next.js Server Actions (`'use server'`) over API route handlers for data mutations.
-**All server actions must be protected** with auth guards from `src/app/auth.ts`:
-
-- `actionAdminRequired()` — admin-only operations.
-- `actionUserRequired()` — any authorized user.
-- `actionUserAuthorizedForFirecall(firecallId)` — user authorized for a specific firecall.
-
-### Key Patterns
-
-- **Firebase Integration**: Client-side in `src/components/firebase/firebase.ts`, Server-side Admin SDK in `src/server/firebase/admin.ts`.
-- **Authentication Flow**: Firebase Auth (client) → ID token → NextAuth Credentials provider (server verification) → Session with authorization flags.
-- **Map Architecture**: `PositionedMap` → `Map` (Leaflet config) → `Clusters` (marker clustering) + layer components.
-
-### Firestore Collections
-
-- `call` - Emergency operations (Einsätze).
-- `item` - Items within firecalls (hydrants, vehicles, personnel).
-- `history` - Event history entries.
-- `layer` - Map layers per firecall.
-- `user` - User profiles with authorization.
-- `clusters6` - Geohashed hydrant clusters.
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router).
+- **Language**: [TypeScript 6](https://www.typescriptlang.org/).
+- **UI**: [React 19](https://react.dev/) + [Material-UI (MUI) 9](https://mui.com/).
+- **Mapping**: [Leaflet](https://leafletjs.com/) + [React Leaflet 5](https://react-leaflet.js.org/).
+- **Database/Auth**: [Firebase 12](https://firebase.google.com/) (Firestore, Auth, Storage, Messaging).
+- **Session**: [NextAuth.js 5 (Beta)](https://next-auth.js.org/).
+- **PWA**: [Serwist](https://serwist.pages.dev/).
+- **Testing**: [Vitest](https://vitest.dev/).
+- **AI**: Google Vertex AI integration.
 
 ## Development Workflow
 
-### Commands
+### Core Commands
 
 ```bash
-npm run dev          # Development server
-npm run lint         # ESLint validation
+npm run dev          # Development server (Webpack/Turbopack)
+npm run lint         # ESLint 9 validation
 npm run test         # Run Vitest tests once
-npm run check        # Run all checks: tsc, lint, tests, build
+npm run check        # Full validation: tsc, lint, tests, build
 ```
 
-**TypeScript Policy**: `tsc --noEmit` errors must **NEVER** be ignored. Fix all type errors before committing.
+### Technical Integrity (Crucial)
+
+1. **TypeScript Policy**: `tsc --noEmit` errors must **NEVER** be ignored. Fix all errors before committing.
+2. **Individual Checks**: After features/fixes, run checks individually for better debugging:
+   - `npx tsc --noEmit`
+   - `npx eslint`
+   - `npx vitest run`
+   - `npx next build --webpack`
 
 ### Testing (TDD)
 
-- **Write tests first** for all new features.
-- Place test files (`*.test.ts` / `*.test.tsx`) **directly next to** the source file.
-- Do **not** use `__tests__/` folders.
+- **Mandatory TDD**: Write failing tests _before_ implementation code.
+- **Location**: Place `*.test.ts/tsx` files **directly next to** the source file.
+- **Tools**: Vitest + `@testing-library/react`.
 
-### Git Workflow
+## Git & PR Workflow
 
-- **Conventional Commits**: Use `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `ci:`.
-- **Pull Requests**: Description must be in **German**. Run `npm run check` successfully before creating a PR.
-- **Releases**: Semantic Versioning (`v<major>.<minor>.<patch>`). Descriptions in German.
-- Before committing, reset `next-env.d.ts` to avoid noise from dev/build path switching
-- When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues: `GITHUB_TOKEN= gh <command>`
+### Git Worktrees
 
-## MUI Guidelines
+- Use the hidden `.worktrees/` directory for isolation.
+- **Wichtig**: Copy `.env.local` into new worktrees manually (`cp .env.local .worktrees/<branch>/`).
 
-**Tooltip + disabled Button**: Wrap `disabled` buttons in a `<span>` to ensure the Tooltip receives events:
+### Commit Standards
 
-```tsx
-<Tooltip title="Help">
-  <span>
-    <IconButton disabled={isLoading}>
-      <HelpIcon />
-    </IconButton>
-  </span>
-</Tooltip>
+- **Conventional Commits**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `ci:`.
+- **Pre-commit**: Reset `next-env.d.ts` (`git checkout -- next-env.d.ts`) to prevent noisy diffs.
+- **CLI**: When using `gh`, always unset `GITHUB_TOKEN` (`GITHUB_TOKEN= gh <command>`).
+
+### Pull Requests
+
+- **Validation**: `npm run check` must pass before creation.
+- **Language**: PR titles in English (Conventional Commits), but **Descriptions must be in German**.
+- **Labels**:
+  - `feat:` -> `feature`
+  - `fix:` -> `bug`
+  - `docs:` -> `documentation`
+  - `chore(deps):` -> `dependencies`
+
+### Releases
+
+- **Versioning**: Semantic Versioning (`v<major>.<minor>.<patch>`).
+- **Automation**: Use `gh release create` with summaries in **German**.
+
+## Android Build (Capacitor)
+
+The native build resides in `capacitor/android/`.
+
+- **Versions**: AGP 8.13.0, Gradle 8.14.3.
+- **Critical Restriction**: **MUST use JDK 21**. Higher versions (like JDK 26) cause `JdkImageTransform` failures.
+
+```bash
+cd capacitor/android
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 ```
 
-## German Terminology
+## Architecture & Patterns
 
-- **Einsatz/Firecall** - Emergency operation
-- **Einsatztagebuch** - Operational diary
-- **Fahrzeuge** - Vehicles
-- **Schadstoff** - Hazardous materials
-- **Lageführung** - Situation management
-- **Hydranten** - Fire hydrants
-- **Kostenersatz** - Cost recovery/billing
+### Directory Structure
 
-## Relevant Tools for Gemini
+- `src/app/` - App Router pages & server-side logic.
+- `src/components/` - Organized by feature (Map/, Kostenersatz/, FirecallItems/).
+- `src/hooks/` - Feature-specific custom hooks (30+ for Firebase, map logic).
+- `src/server/` - Admin SDK and data processing.
 
-- **`read_file`**: Read file contents.
-- **`write_file`**: Create new files.
-- **`replace`**: Modify existing files.
-- **`run_shell_command`**: Execute `npm` scripts, tests, or data imports.
-- **`grep_search`**: Find code snippets or configurations.
-- **`codebase_investigator`**: Analyze codebase, dependencies, and architecture.
+### Data Security
+
+**Server Actions over API Routes**. All mutations must use guards from `src/app/auth.ts`:
+
+- `actionAdminRequired()`
+- `actionUserRequired()`
+- `actionUserAuthorizedForFirecall(firecallId)`
+
+### Firebase & Environments
+
+- **Projects**: `ffndev` (development) vs. production. Controlled via `NEXT_PUBLIC_FIRESTORE_DB`.
+- **Auth Flow**: Firebase Auth (client) -> ID Token -> NextAuth Credentials -> Session Flags (`isAdmin`, `isAuthorized`).
+
+### Map Architecture
+
+`PositionedMap` -> `Map` -> `Clusters` + specialized layers in `src/components/Map/layers/`.
+
+### Terminology
+
+- **Einsatz/Firecall**: Emergency operation.
+- **Einsatztagebuch**: Operational diary.
+- **Lageführung**: Situation management.
+- **Kostenersatz**: Billing/Cost recovery.
+- **Geschäftsbuch**: Business logbook.
+
+## Data Management Scripts
+
+- `npm run extract <har>`: Parse HAR files.
+- `npm run import <type> <csv>`: Firestore import.
+- `npm run clusterHydrants`: Generate geohashes.
+- `npm run updateClusters`: Sync cluster data.
+
+## MUI & UI Guidelines
+
+- **Tooltip + disabled Button**: Wrap disabled buttons in a `<span>` to ensure Tooltip receives events.
+- **Styling**: Use Emotion (via MUI `sx` or `styled`).
