@@ -76,7 +76,7 @@ export default function LiveLocationFab() {
       <Box
         sx={{
           position: 'absolute',
-          bottom: 120,
+          bottom: 112,
           left: 16,
         }}
       >

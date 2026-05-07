@@ -136,7 +136,7 @@ export default function RecordButton() {
       <Box
         sx={{
           position: 'absolute',
-          bottom: 176,
+          bottom: 160,
           left: 16,
         }}
       >
