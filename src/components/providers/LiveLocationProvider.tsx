@@ -151,9 +151,13 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
 
   // Auto-resume on mount: if localStorage says we were sharing for the
   // current (firecallId, uid) and the recorded session is recent enough,
-  // restart sharing without re-confirming. Survives page reloads.
+  // restart sharing without re-confirming. Survives page reloads, Fast
+  // Refresh, and the soft remounts that auth-token rotation triggers.
   // Stale docs are cleaned by the Firestore TTL (1 h) and the 5-min UI hide,
   // so we deliberately do NOT delete the doc on unmount/beforeunload.
+  // queueMicrotask survives an effect re-run (no cancel-on-cleanup race like
+  // setTimeout has), so we still fire exactly once even if `start`'s identity
+  // changes mid-flight (e.g. when settings or firecall.name resolve).
   const resumedRef = useRef(false);
   useEffect(() => {
     if (resumedRef.current) return;
@@ -167,10 +171,9 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
       return;
     }
     resumedRef.current = true;
-    const t = setTimeout(() => {
+    queueMicrotask(() => {
       void start();
-    }, 0);
-    return () => clearTimeout(t);
+    });
   }, [uid, firecallId, start]);
 
   const canShare = isPositionSet && !!uid && firecallId !== 'unknown';
