@@ -13,6 +13,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallLayersSorted } from '../../hooks/useFirecallLayers';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import { useGpsProvider } from '../providers/GpsProvider';
 import { usePositionContext } from '../providers/PositionProvider';
@@ -132,6 +133,7 @@ export default function RecordButton() {
 
   return (
     <>
+      <LiveLocationFab />
       <Box
         sx={{
           position: 'absolute',

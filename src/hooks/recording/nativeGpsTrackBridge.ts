@@ -43,3 +43,43 @@ export async function nativeStopGpsTrack(): Promise<void> {
   console.log('[GpsTrack/native] stopGpsTrack');
   await GpsTrack.stopGpsTrack();
 }
+
+export interface NativeLiveShareOpts {
+  firecallId: string;
+  uid: string;
+  name: string;
+  email: string;
+  intervalMs: number;
+  distanceM: number;
+  firecallName: string;
+}
+
+export async function nativeStartLiveShare(
+  opts: NativeLiveShareOpts,
+): Promise<void> {
+  const payload: Record<string, unknown> = {
+    firecallId: opts.firecallId,
+    uid: opts.uid,
+    name: opts.name,
+    email: opts.email,
+    intervalMs: opts.intervalMs,
+    distanceM: opts.distanceM,
+    firecallName: opts.firecallName,
+    firestoreDb: process.env.NEXT_PUBLIC_FIRESTORE_DB || '(default)',
+  };
+  console.log('[GpsTrack/native] startLiveShare', payload);
+  await GpsTrack.startLiveShare(payload);
+}
+
+export async function nativeStopLiveShare(): Promise<void> {
+  console.log('[GpsTrack/native] stopLiveShare');
+  await GpsTrack.stopLiveShare();
+}
+
+export async function nativeUpdateLiveShareSettings(opts: {
+  intervalMs: number;
+  distanceM: number;
+}): Promise<void> {
+  console.log('[GpsTrack/native] updateLiveShareSettings', opts);
+  await GpsTrack.updateLiveShareSettings(opts as Record<string, unknown>);
+}

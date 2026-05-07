@@ -28,6 +28,9 @@ import at.ffnd.einsatzkarte.gpstrack.FirestoreLineUpdater
 import at.ffnd.einsatzkarte.gpstrack.GpsTrackConfig
 import at.ffnd.einsatzkarte.gpstrack.GpsTrackRecorder
 import at.ffnd.einsatzkarte.gpstrack.LineUpdater
+import at.ffnd.einsatzkarte.livelocation.FirestoreLiveLocationDocWriter
+import at.ffnd.einsatzkarte.livelocation.LiveLocationConfig
+import at.ffnd.einsatzkarte.livelocation.LiveLocationPusher
 import at.ffnd.einsatzkarte.radiacode.Measurement
 import at.ffnd.einsatzkarte.radiacode.MeasurementMapper
 import at.ffnd.einsatzkarte.radiacode.RadiaCode
@@ -77,6 +80,9 @@ class RadiacodeForegroundService : Service() {
         const val ACTION_STOP_TRACK = "at.ffnd.einsatzkarte.RADIACODE_STOP_TRACK"
         const val ACTION_START_GPS_TRACK = "at.ffnd.einsatzkarte.GPS_TRACK_START"
         const val ACTION_STOP_GPS_TRACK = "at.ffnd.einsatzkarte.GPS_TRACK_STOP"
+        const val ACTION_START_LIVE_SHARE  = "at.ffnd.einsatzkarte.LIVE_SHARE_START"
+        const val ACTION_STOP_LIVE_SHARE   = "at.ffnd.einsatzkarte.LIVE_SHARE_STOP"
+        const val ACTION_UPDATE_LIVE_SHARE = "at.ffnd.einsatzkarte.LIVE_SHARE_UPDATE"
 
         const val EXTRA_TITLE = "title"
         const val EXTRA_BODY = "body"
@@ -94,6 +100,12 @@ class RadiacodeForegroundService : Service() {
         const val EXTRA_CUSTOM_DOSE_DELTA = "customDoseRateDeltaUSvH"
         const val EXTRA_INITIAL_LAT = "initialLat"
         const val EXTRA_INITIAL_LNG = "initialLng"
+        const val EXTRA_LIVE_UID = "liveUid"
+        const val EXTRA_LIVE_NAME = "liveName"
+        const val EXTRA_LIVE_EMAIL = "liveEmail"
+        const val EXTRA_LIVE_INTERVAL_MS = "liveIntervalMs"
+        const val EXTRA_LIVE_DISTANCE_M = "liveDistanceM"
+        const val EXTRA_LIVE_FIRECALL_NAME = "liveFirecallName"
 
         private const val TAG = "RadiacodeFg"
         // 2 s Poll-Takt — angeglichen an radiacode-python `basic.py`. Bei 1 s
@@ -199,6 +211,8 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var lastLocation: android.location.Location? = null
     @Volatile private var trackRecorder: TrackRecorder? = null
     @Volatile private var gpsTrackRecorder: GpsTrackRecorder? = null
+    @Volatile private var liveLocationPusher: LiveLocationPusher? = null
+    @Volatile private var liveShareFirecallName: String = ""
 
     // Letzte gesehene Rare-Felder für Late-Connect / leere Ticks. Werden in
     // `onMeasurementReceived` aktualisiert und bei `teardownSession` gelöscht,
@@ -212,6 +226,7 @@ class RadiacodeForegroundService : Service() {
     fun getDeviceAddress(): String? = currentAddress
     fun isRadiacodeTracking(): Boolean = trackRecorder != null
     fun isGpsTracking(): Boolean = gpsTrackRecorder != null
+    fun isLiveShareActive(): Boolean = liveLocationPusher != null
 
     /**
      * Synchroner Wire-Level-Execute für den TS-Plugin-Pfad. Schreibt einen
@@ -278,8 +293,8 @@ class RadiacodeForegroundService : Service() {
                 // hier stopSelf() rufen, killt Android den gesamten Service
                 // inklusive GATT-Session — siehe Bug-Analyse 2026-04-22.
                 // Session-Teardown ausschliesslich via ACTION_BLE_DISCONNECT.
-                if (radiaCode != null || gpsTrackRecorder != null) {
-                    Log.w(TAG, "ACTION_STOP ignoriert — Session/GPS-Track aktiv, Service bleibt laufen")
+                if (radiaCode != null || gpsTrackRecorder != null || liveLocationPusher != null) {
+                    Log.w(TAG, "ACTION_STOP ignoriert — Session/GPS-Track/Live-Share aktiv, Service bleibt laufen")
                 } else {
                     Log.i(TAG, "ACTION_STOP — keine Session, Service wird beendet")
                     releaseWakeLock()
@@ -301,8 +316,8 @@ class RadiacodeForegroundService : Service() {
             }
             ACTION_BLE_DISCONNECT -> {
                 teardownSession()
-                if (gpsTrackRecorder == null) {
-                    Log.i(TAG, "ACTION_BLE_DISCONNECT — no GPS track, stopping service")
+                if (gpsTrackRecorder == null && liveLocationPusher == null) {
+                    Log.i(TAG, "ACTION_BLE_DISCONNECT — no GPS track / live-share, stopping service")
                     stopHighAccuracyLocation()
                     releaseWakeLock()
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -382,13 +397,90 @@ class RadiacodeForegroundService : Service() {
                 Log.i(TAG, "GPS track stop")
                 gpsTrackRecorder?.stop()
                 gpsTrackRecorder = null
-                if (radiaCode == null) {
+                if (radiaCode == null && liveLocationPusher == null) {
                     stopHighAccuracyLocation()
                     releaseWakeLock()
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 } else {
                     updateNotificationForState()
+                }
+            }
+            ACTION_START_LIVE_SHARE -> {
+                val firecallId = intent?.getStringExtra(EXTRA_FIRECALL_ID)
+                val uid        = intent?.getStringExtra(EXTRA_LIVE_UID)
+                val nm         = intent?.getStringExtra(EXTRA_LIVE_NAME) ?: ""
+                val email      = intent?.getStringExtra(EXTRA_LIVE_EMAIL) ?: ""
+                val intervalMs = intent?.getLongExtra(EXTRA_LIVE_INTERVAL_MS, 5_000L) ?: 5_000L
+                val distanceM  = intent?.getDoubleExtra(EXTRA_LIVE_DISTANCE_M, 25.0) ?: 25.0
+                val firecallNm = intent?.getStringExtra(EXTRA_LIVE_FIRECALL_NAME) ?: ""
+                val firestoreDb = intent?.getStringExtra(EXTRA_FIRESTORE_DB) ?: ""
+                if (firecallId.isNullOrBlank() || uid.isNullOrBlank()) {
+                    Log.w(TAG, "ACTION_START_LIVE_SHARE rejected — missing firecallId/uid")
+                } else {
+                    val cfg = LiveLocationConfig(
+                        firecallId = firecallId, uid = uid, name = nm, email = email,
+                    )
+                    // Existierenden Pusher (anderer Firecall/UID) sauber abdrehen.
+                    liveLocationPusher?.let { prev ->
+                        prev.stop()
+                        prev.deleteDoc()
+                    }
+                    val sink = FirestoreLiveLocationDocWriter(firestoreDb)
+                    val pusher = LiveLocationPusher(cfg, sink, intervalMs, distanceM)
+                    liveLocationPusher = pusher
+                    liveShareFirecallName = firecallNm
+                    acquireWakeLock()
+                    startHighAccuracyLocation()
+                    // Wenn schon ein Fix vorliegt, sofort einen ersten Sample
+                    // schreiben — analog zu ACTION_START_GPS_TRACK.
+                    lastLocation?.let { loc ->
+                        pusher.onLocation(
+                            loc.latitude, loc.longitude,
+                            accuracy = loc.accuracy.toDouble().takeIf { loc.hasAccuracy() },
+                            heading  = loc.bearing.toDouble().takeIf { loc.hasBearing() },
+                            speed    = loc.speed.toDouble().takeIf { loc.hasSpeed() },
+                        )
+                    }
+                    updateNotificationForState()
+                    Log.i(
+                        TAG,
+                        "live-share started firecall=$firecallId uid=$uid intervalMs=$intervalMs distanceM=$distanceM",
+                    )
+                }
+            }
+            ACTION_STOP_LIVE_SHARE -> {
+                Log.i(TAG, "live-share stop")
+                liveLocationPusher?.let { p ->
+                    p.stop()
+                    // Best-effort delete — der Service darf darauf nicht warten,
+                    // sondern teardown'd asynchron. Wenn der Service direkt
+                    // danach beendet wird, holt die Firestore-TTL (~1 h) den
+                    // Doc-Cleanup nach.
+                    p.deleteDoc()
+                }
+                liveLocationPusher = null
+                liveShareFirecallName = ""
+                if (radiaCode == null && gpsTrackRecorder == null) {
+                    stopHighAccuracyLocation()
+                    releaseWakeLock()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                } else {
+                    updateNotificationForState()
+                }
+            }
+            ACTION_UPDATE_LIVE_SHARE -> {
+                val intervalMs = intent?.getLongExtra(EXTRA_LIVE_INTERVAL_MS, -1L) ?: -1L
+                val distanceM  = intent?.getDoubleExtra(EXTRA_LIVE_DISTANCE_M, -1.0) ?: -1.0
+                val pusher = liveLocationPusher
+                if (pusher == null) {
+                    Log.i(TAG, "ACTION_UPDATE_LIVE_SHARE ignored — pusher not running")
+                } else if (intervalMs <= 0L || distanceM < 0.0) {
+                    Log.w(TAG, "ACTION_UPDATE_LIVE_SHARE rejected — invalid intervalMs=$intervalMs distanceM=$distanceM")
+                } else {
+                    pusher.updateSettings(intervalMs, distanceM)
+                    Log.i(TAG, "live-share settings updated intervalMs=$intervalMs distanceM=$distanceM")
                 }
             }
         }
@@ -449,6 +541,12 @@ class RadiacodeForegroundService : Service() {
         trackRecorder = null
         gpsTrackRecorder?.stop()
         gpsTrackRecorder = null
+        liveLocationPusher?.let { p ->
+            p.stop()
+            p.deleteDoc()
+        }
+        liveLocationPusher = null
+        liveShareFirecallName = ""
         stopHighAccuracyLocation()
         releaseWakeLock()
         bleWorker?.shutdown()
@@ -462,6 +560,13 @@ class RadiacodeForegroundService : Service() {
 
         gpsTrackRecorder?.stop()
         gpsTrackRecorder = null
+
+        liveLocationPusher?.let { p ->
+            p.stop()
+            p.deleteDoc()
+        }
+        liveLocationPusher = null
+        liveShareFirecallName = ""
 
         teardownSession()
 
@@ -832,6 +937,12 @@ class RadiacodeForegroundService : Service() {
                 result.lastLocation?.let { loc ->
                     lastLocation = loc
                     gpsTrackRecorder?.onLocation(loc.latitude, loc.longitude)
+                    liveLocationPusher?.onLocation(
+                        loc.latitude, loc.longitude,
+                        accuracy = loc.accuracy.toDouble().takeIf { loc.hasAccuracy() },
+                        heading  = loc.bearing.toDouble().takeIf { loc.hasBearing() },
+                        speed    = loc.speed.toDouble().takeIf { loc.hasSpeed() },
+                    )
                 }
             }
         }
@@ -875,13 +986,27 @@ class RadiacodeForegroundService : Service() {
     }
 
     private fun updateNotificationForState() {
+        val track = gpsTrackRecorder != null || trackRecorder != null
+        val liveShare = liveLocationPusher != null
         val title = when {
-            radiaCode == null -> "Radiacode getrennt"
-            !deviceReady -> "Radiacode – Verbindung verloren"
-            gpsTrackRecorder != null && trackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
-            trackRecorder != null -> "Strahlenmessung läuft"
-            gpsTrackRecorder != null -> "GPS-Aufzeichnung läuft"
-            else -> "Radiacode verbunden"
+            radiaCode != null && !deviceReady -> "Radiacode – Verbindung verloren"
+            radiaCode != null && trackRecorder != null && gpsTrackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
+            radiaCode != null && trackRecorder != null -> "Strahlenmessung läuft"
+            radiaCode != null && gpsTrackRecorder != null -> "Radiacode + GPS-Aufzeichnung"
+            radiaCode != null -> "Radiacode verbunden"
+            // Kein Radiacode aktiv — Modi nur GPS-Track / Live-Share
+            track && liveShare -> {
+                val name = liveShareFirecallName
+                if (name.isBlank()) "Standort wird aufgezeichnet & geteilt"
+                else "Standort wird aufgezeichnet & geteilt — $name"
+            }
+            liveShare -> {
+                val name = liveShareFirecallName
+                if (name.isBlank()) "Live-Standort wird geteilt"
+                else "Live-Standort wird geteilt — $name"
+            }
+            track -> "GPS-Aufzeichnung läuft"
+            else -> "Radiacode getrennt"
         }
         lastTitle = title
         ensureForeground()

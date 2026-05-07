@@ -75,6 +75,11 @@ export interface RadiacodeNotificationPlugin {
   startGpsTrack(opts: Record<string, unknown>): Promise<void>;
   stopGpsTrack(): Promise<void>;
 
+  // Phase 5: Live Location Sharing
+  startLiveShare(opts: Record<string, unknown>): Promise<void>;
+  stopLiveShare(): Promise<void>;
+  updateLiveShareSettings(opts: Record<string, unknown>): Promise<void>;
+
   // Common Listeners
   addListener(
     event: 'disconnectRequested',

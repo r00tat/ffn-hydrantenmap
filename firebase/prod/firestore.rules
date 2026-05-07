@@ -64,6 +64,20 @@ service cloud.firestore {
         // No update or delete allowed for audit log entries
       }
 
+      // Live location sharing: read for any firecall-authorized user,
+      // write/delete only for the doc owner whose UID equals the doc id.
+      match /livelocation/{userId} {
+        allow read: if callAuthorized();
+        allow create: if callAuthorized()
+          && userId == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+        allow update: if callAuthorized()
+          && userId == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if callAuthorized()
+          && userId == request.auth.uid;
+      }
+
       match /{subitem=**} {
         allow read, write: if callAuthorized()
       }
