@@ -5,6 +5,7 @@ This document provides foundational mandates and expert workflows for contributi
 ## Project Overview
 
 Interactive map and operations management system for the Neusiedl am See fire department (`Freiwillige Feuerwehr Neusiedl am See`).
+
 - **Public**: Fire hydrant locations.
 - **Authenticated**: Situation management (`Lageführung`), operational diary (`Einsatztagebuch`), vehicle tracking, hazardous materials database, and billing (`Kostenersatz`).
 - **Platform**: PWA (Progressive Web App) with native Android build via Capacitor.
@@ -24,6 +25,7 @@ Interactive map and operations management system for the Neusiedl am See fire de
 ## Development Workflow
 
 ### Core Commands
+
 ```bash
 npm run dev          # Development server (Webpack/Turbopack)
 npm run lint         # ESLint 9 validation
@@ -32,6 +34,7 @@ npm run check        # Full validation: tsc, lint, tests, build
 ```
 
 ### Technical Integrity (Crucial)
+
 1. **TypeScript Policy**: `tsc --noEmit` errors must **NEVER** be ignored. Fix all errors before committing.
 2. **Individual Checks**: After features/fixes, run checks individually for better debugging:
    - `npx tsc --noEmit`
@@ -40,22 +43,26 @@ npm run check        # Full validation: tsc, lint, tests, build
    - `npx next build --webpack`
 
 ### Testing (TDD)
-- **Mandatory TDD**: Write failing tests *before* implementation code.
+
+- **Mandatory TDD**: Write failing tests _before_ implementation code.
 - **Location**: Place `*.test.ts/tsx` files **directly next to** the source file.
 - **Tools**: Vitest + `@testing-library/react`.
 
 ## Git & PR Workflow
 
 ### Git Worktrees
+
 - Use the hidden `.worktrees/` directory for isolation.
 - **Wichtig**: Copy `.env.local` into new worktrees manually (`cp .env.local .worktrees/<branch>/`).
 
 ### Commit Standards
+
 - **Conventional Commits**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `perf:`, `ci:`.
 - **Pre-commit**: Reset `next-env.d.ts` (`git checkout -- next-env.d.ts`) to prevent noisy diffs.
 - **CLI**: When using `gh`, always unset `GITHUB_TOKEN` (`GITHUB_TOKEN= gh <command>`).
 
 ### Pull Requests
+
 - **Validation**: `npm run check` must pass before creation.
 - **Language**: PR titles in English (Conventional Commits), but **Descriptions must be in German**.
 - **Labels**:
@@ -65,14 +72,17 @@ npm run check        # Full validation: tsc, lint, tests, build
   - `chore(deps):` -> `dependencies`
 
 ### Releases
+
 - **Versioning**: Semantic Versioning (`v<major>.<minor>.<patch>`).
 - **Automation**: Use `gh release create` with summaries in **German**.
 
 ## Android Build (Capacitor)
 
 The native build resides in `capacitor/android/`.
+
 - **Versions**: AGP 8.13.0, Gradle 8.14.3.
 - **Critical Restriction**: **MUST use JDK 21**. Higher versions (like JDK 26) cause `JdkImageTransform` failures.
+
 ```bash
 cd capacitor/android
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
@@ -81,25 +91,31 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 ## Architecture & Patterns
 
 ### Directory Structure
+
 - `src/app/` - App Router pages & server-side logic.
 - `src/components/` - Organized by feature (Map/, Kostenersatz/, FirecallItems/).
 - `src/hooks/` - Feature-specific custom hooks (30+ for Firebase, map logic).
 - `src/server/` - Admin SDK and data processing.
 
 ### Data Security
+
 **Server Actions over API Routes**. All mutations must use guards from `src/app/auth.ts`:
+
 - `actionAdminRequired()`
 - `actionUserRequired()`
 - `actionUserAuthorizedForFirecall(firecallId)`
 
 ### Firebase & Environments
+
 - **Projects**: `ffndev` (development) vs. production. Controlled via `NEXT_PUBLIC_FIRESTORE_DB`.
 - **Auth Flow**: Firebase Auth (client) -> ID Token -> NextAuth Credentials -> Session Flags (`isAdmin`, `isAuthorized`).
 
 ### Map Architecture
+
 `PositionedMap` -> `Map` -> `Clusters` + specialized layers in `src/components/Map/layers/`.
 
 ### Terminology
+
 - **Einsatz/Firecall**: Emergency operation.
 - **Einsatztagebuch**: Operational diary.
 - **Lageführung**: Situation management.
@@ -107,11 +123,13 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew :app:assembleDebug
 - **Geschäftsbuch**: Business logbook.
 
 ## Data Management Scripts
+
 - `npm run extract <har>`: Parse HAR files.
 - `npm run import <type> <csv>`: Firestore import.
 - `npm run clusterHydrants`: Generate geohashes.
 - `npm run updateClusters`: Sync cluster data.
 
 ## MUI & UI Guidelines
+
 - **Tooltip + disabled Button**: Wrap disabled buttons in a `<span>` to ensure Tooltip receives events.
 - **Styling**: Use Emotion (via MUI `sx` or `styled`).
