@@ -24,6 +24,7 @@ import {
 import { useLeitungen } from './Leitungen/context';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
+import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import InputDialog from '../dialogs/InputDialog';
 import { formatTimestamp } from '../../common/time-format';
 import AddFirecallItem from './AddFirecallItem';
@@ -45,6 +46,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const firecallItems = useFirecallItems();
   return (
     <>
+      <LiveLocationFab />
       <Box
         sx={{
           // '& > :not(style)': { m: 1 },
