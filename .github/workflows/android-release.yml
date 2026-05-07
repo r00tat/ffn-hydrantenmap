@@ -180,7 +180,32 @@ jobs:
           done
 
           echo "==> Committing edit"
-          gcall -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" "${API}/edits/${EDIT_ID}:commit?changesNotSentForReview=true" >/dev/null
+          commit_resp=$(mktemp)
+          commit_code=$(curl -sS -o "${commit_resp}" -w "%{http_code}" \
+            -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "${API}/edits/${EDIT_ID}:commit")
+          if [[ "${commit_code}" =~ ^2[0-9]{2}$ ]]; then
+            echo "Edit committed (auto-submitted for review)"
+          elif [[ "${commit_code}" == "400" ]] && grep -q "changesNotSentForReview" "${commit_resp}"; then
+            echo "Auto-review unavailable for this edit, retrying with changesNotSentForReview=true"
+            cat "${commit_resp}" >&2
+            retry_code=$(curl -sS -o "${commit_resp}" -w "%{http_code}" \
+              -X POST -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+              "${API}/edits/${EDIT_ID}:commit?changesNotSentForReview=true")
+            if [[ ! "${retry_code}" =~ ^2[0-9]{2}$ ]]; then
+              echo "HTTP ${retry_code} from commit retry" >&2
+              cat "${commit_resp}" >&2
+              rm -f "${commit_resp}"
+              exit 1
+            fi
+            echo "::warning::Edit committed without auto-review. Submit manually in the Play Console."
+          else
+            echo "HTTP ${commit_code} from commit" >&2
+            cat "${commit_resp}" >&2
+            rm -f "${commit_resp}"
+            exit 1
+          fi
+          rm -f "${commit_resp}"
           echo "Done — versionName=${VERSION_NAME} versionCode=${UPLOADED_VC} tracks=${TRACKS}"
 
       - name: Attach AAB to GitHub Release
