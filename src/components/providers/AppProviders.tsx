@@ -39,6 +39,9 @@ const GpsProvider = dynamic(() => import('./GpsProvider'), {
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
 });
+const LiveLocationProvider = dynamic(() => import('./LiveLocationProvider'), {
+  ssr: false,
+});
 const PermissionOnboardingProvider = dynamic(
   () => import('../permissions/PermissionOnboardingProvider'),
   { ssr: false }
@@ -59,25 +62,27 @@ function LogedinApp({ children }: AppProps) {
       <PositionProvider>
         <RadiacodeProvider>
           <GpsProvider>
-            <DebugLoggingProvider>
-              <MapEditorProvider>
-                <FirecallLayerProvider>
-                  <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+            <LiveLocationProvider>
+              <DebugLoggingProvider>
+                <MapEditorProvider>
+                  <FirecallLayerProvider>
+                    <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
 
-                  <HeaderBar
-                    isDrawerOpen={isDrawerOpen}
-                    setIsDrawerOpen={setIsDrawerOpen}
-                  />
-                  <ChatMessageDisplay />
-                  <Box
-                    className="print-content-root"
-                    sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
-                  >
-                    {children}
-                  </Box>
-                </FirecallLayerProvider>
-              </MapEditorProvider>
-            </DebugLoggingProvider>
+                    <HeaderBar
+                      isDrawerOpen={isDrawerOpen}
+                      setIsDrawerOpen={setIsDrawerOpen}
+                    />
+                    <ChatMessageDisplay />
+                    <Box
+                      className="print-content-root"
+                      sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+                    >
+                      {children}
+                    </Box>
+                  </FirecallLayerProvider>
+                </MapEditorProvider>
+              </DebugLoggingProvider>
+            </LiveLocationProvider>
           </GpsProvider>
         </RadiacodeProvider>
       </PositionProvider>

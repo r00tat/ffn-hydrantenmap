@@ -76,11 +76,13 @@ public class RadiacodeNotificationPlugin extends Plugin {
             ret.put("deviceAddress", service.getDeviceAddress());
             ret.put("radiacodeTracking", service.isRadiacodeTracking());
             ret.put("gpsTracking", service.isGpsTracking());
+            ret.put("liveShareActive", service.isLiveShareActive());
         } else {
             ret.put("connected", false);
             ret.put("deviceAddress", null);
             ret.put("radiacodeTracking", false);
             ret.put("gpsTracking", false);
+            ret.put("liveShareActive", false);
         }
         call.resolve(ret);
     }
@@ -226,6 +228,70 @@ public class RadiacodeNotificationPlugin extends Plugin {
         Log.i(TAG, "plugin.stopGpsTrack");
         Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
         intent.setAction(RadiacodeForegroundService.ACTION_STOP_GPS_TRACK);
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void startLiveShare(PluginCall call) {
+        String firecallId   = call.getString("firecallId");
+        String uid          = call.getString("uid");
+        String name         = call.getString("name", "");
+        String email        = call.getString("email", "");
+        Integer intervalMs  = call.getInt("intervalMs");
+        Double  distanceM   = call.getDouble("distanceM");
+        String  firecallNm  = call.getString("firecallName", "");
+        String  firestoreDb = call.getString("firestoreDb", "");
+        if (firecallId == null || firecallId.isEmpty()
+            || uid == null || uid.isEmpty()
+            || intervalMs == null
+            || distanceM == null) {
+            Log.w(TAG, "plugin.startLiveShare rejected — missing firecallId/uid/intervalMs/distanceM");
+            call.reject("firecallId, uid, intervalMs, distanceM required");
+            return;
+        }
+        Log.i(TAG, "plugin.startLiveShare firecallId=" + firecallId + " uid=" + uid
+            + " intervalMs=" + intervalMs + " distanceM=" + distanceM);
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_START_LIVE_SHARE);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRECALL_ID, firecallId);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_UID, uid);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_NAME, name);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_EMAIL, email);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_INTERVAL_MS, intervalMs.longValue());
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_DISTANCE_M, distanceM.doubleValue());
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_FIRECALL_NAME, firecallNm == null ? "" : firecallNm);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_FIRESTORE_DB, firestoreDb == null ? "" : firestoreDb);
+        startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopLiveShare(PluginCall call) {
+        Log.i(TAG, "plugin.stopLiveShare");
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_STOP_LIVE_SHARE);
+        getContext().startService(intent);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void updateLiveShareSettings(PluginCall call) {
+        Integer intervalMs = call.getInt("intervalMs");
+        Double  distanceM  = call.getDouble("distanceM");
+        if (intervalMs == null || distanceM == null) {
+            Log.w(TAG, "plugin.updateLiveShareSettings rejected — intervalMs/distanceM required");
+            call.reject("intervalMs and distanceM required");
+            return;
+        }
+        Log.i(TAG, "plugin.updateLiveShareSettings intervalMs=" + intervalMs + " distanceM=" + distanceM);
+        Intent intent = new Intent(getContext(), RadiacodeForegroundService.class);
+        intent.setAction(RadiacodeForegroundService.ACTION_UPDATE_LIVE_SHARE);
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_INTERVAL_MS, intervalMs.longValue());
+        intent.putExtra(RadiacodeForegroundService.EXTRA_LIVE_DISTANCE_M, distanceM.doubleValue());
+        // Service läuft bereits, wenn diese Action sinnvoll ist — kein
+        // startForegroundService() nötig. Wenn der Service nicht läuft, ist
+        // der Update sowieso ein No-op.
         getContext().startService(intent);
         call.resolve();
     }

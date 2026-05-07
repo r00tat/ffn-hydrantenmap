@@ -28,6 +28,7 @@ import FitBoundsToItems from './FitBoundsToItems';
 import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
+import LiveLocationLayer from './layers/LiveLocationLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PowerOutageLayer from './layers/PowerOutageLayer';
@@ -128,6 +129,9 @@ export default function Map() {
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Position" checked>
             <PositionMarker />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="Live-Standorte" checked>
+            <LiveLocationLayer />
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Stromausfälle">
             <PowerOutageLayer />
