@@ -129,9 +129,11 @@ service cloud.firestore {
       allow write: if adminUser();
     }
 
-    // Kostenersatz vehicles - read for kostenersatz group, write for admin
+    // Kostenersatz vehicles - read for any authorized user (the vehicle
+    // list powers einsatz-side autocomplete via EinsatzortEditDialog and
+    // is needed by every FF member), write for admin.
     match /kostenersatzVehicles/{doc=**} {
-      allow read: if kostenersatzUser();
+      allow read: if authorizedUser();
       allow write: if adminUser();
     }
 
