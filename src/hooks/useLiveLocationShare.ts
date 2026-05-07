@@ -90,18 +90,28 @@ export function useLiveLocationShare(
         LIVE_LOCATION_COLLECTION_ID,
         identity.uid
       );
-      await setDoc(ref, {
+      const payload: Record<string, unknown> = {
         uid: identity.uid,
         name: identity.name,
         email: identity.email,
         lat: pos.lat,
         lng: pos.lng,
-        accuracy: location?.coords.accuracy,
-        heading: location?.coords.heading ?? undefined,
-        speed: location?.coords.speed ?? undefined,
         updatedAt: serverTimestamp(),
         expiresAt: Timestamp.fromMillis(Date.now() + TTL_EXPIRY_MS),
-      });
+      };
+      const accuracy = location?.coords.accuracy;
+      if (typeof accuracy === 'number' && Number.isFinite(accuracy)) {
+        payload.accuracy = accuracy;
+      }
+      const heading = location?.coords.heading;
+      if (typeof heading === 'number' && Number.isFinite(heading)) {
+        payload.heading = heading;
+      }
+      const speed = location?.coords.speed;
+      if (typeof speed === 'number' && Number.isFinite(speed)) {
+        payload.speed = speed;
+      }
+      await setDoc(ref, payload);
       lastSentMsRef.current = now;
       lastPosRef.current = { lat: pos.lat, lng: pos.lng };
     },
