@@ -23,6 +23,45 @@ import {
 } from '../../hooks/useLiveLocationSettings';
 import { usePositionContext } from './PositionProvider';
 
+const ACTIVE_STORAGE_KEY = 'liveLocationActive/v1';
+// Auto-resume on reload only if the recorded session is recent enough.
+const MAX_RESUME_AGE_MS = 12 * 60 * 60 * 1000;
+
+interface PersistedActive {
+  firecallId: string;
+  uid: string;
+  startedAt: number;
+}
+
+function loadActive(): PersistedActive | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_STORAGE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as PersistedActive;
+    if (
+      typeof v.firecallId !== 'string' ||
+      typeof v.uid !== 'string' ||
+      typeof v.startedAt !== 'number'
+    ) {
+      return null;
+    }
+    if (Date.now() - v.startedAt > MAX_RESUME_AGE_MS) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+function saveActive(v: PersistedActive | null): void {
+  if (typeof window === 'undefined') return;
+  if (v) {
+    window.localStorage.setItem(ACTIVE_STORAGE_KEY, JSON.stringify(v));
+  } else {
+    window.localStorage.removeItem(ACTIVE_STORAGE_KEY);
+  }
+}
+
 export interface LiveLocationContextValue {
   isSharing: boolean;
   settings: LiveLocationSettings;
@@ -71,6 +110,7 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (previousFirecallRef.current !== firecallId && isSharing) {
       void deleteOwn();
+      saveActive(null);
       // External state change (firecall switch) requires reactive teardown.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsSharing(false);
@@ -81,25 +121,10 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
     previousFirecallRef.current = firecallId;
   }, [firecallId, isSharing, deleteOwn]);
 
-  // Best-effort cleanup on unmount + beforeunload.
-  // NOTE: This unconditionally deletes the doc on unmount. Task 10 will
-  // refine this so we keep the doc alive while a native foreground service
-  // is still pushing updates.
-  useEffect(() => {
-    if (!isSharing) return;
-    const handler = () => {
-      void deleteOwn();
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => {
-      window.removeEventListener('beforeunload', handler);
-      void deleteOwn();
-    };
-  }, [isSharing, deleteOwn]);
-
   const start = useCallback(async () => {
     if (!uid || !firecallId || firecallId === 'unknown') return;
     setIsSharing(true);
+    saveActive({ firecallId, uid, startedAt: Date.now() });
     if (isNativeGpsTrackingAvailable()) {
       await nativeStartLiveShare({
         firecallId,
@@ -117,11 +142,36 @@ export function LiveLocationProvider({ children }: { children: React.ReactNode }
 
   const stop = useCallback(async () => {
     setIsSharing(false);
+    saveActive(null);
     await deleteOwn();
     if (isNativeGpsTrackingAvailable()) {
       await nativeStopLiveShare().catch(() => {});
     }
   }, [deleteOwn]);
+
+  // Auto-resume on mount: if localStorage says we were sharing for the
+  // current (firecallId, uid) and the recorded session is recent enough,
+  // restart sharing without re-confirming. Survives page reloads.
+  // Stale docs are cleaned by the Firestore TTL (1 h) and the 5-min UI hide,
+  // so we deliberately do NOT delete the doc on unmount/beforeunload.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current) return;
+    if (!uid || !firecallId || firecallId === 'unknown') return;
+    const persisted = loadActive();
+    if (!persisted) return;
+    if (persisted.uid !== uid) return;
+    if (persisted.firecallId !== firecallId) {
+      // Drop entries from a different firecall.
+      saveActive(null);
+      return;
+    }
+    resumedRef.current = true;
+    const t = setTimeout(() => {
+      void start();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [uid, firecallId, start]);
 
   const canShare = isPositionSet && !!uid && firecallId !== 'unknown';
 
