@@ -39,6 +39,10 @@ const GpsProvider = dynamic(() => import('./GpsProvider'), {
 const DebugLoggingProvider = dynamic(() => import('./DebugLoggingProvider'), {
   ssr: false,
 });
+const BugReportProvider = dynamic(
+  () => import('../bugReport/BugReportProvider'),
+  { ssr: false }
+);
 const LiveLocationProvider = dynamic(() => import('./LiveLocationProvider'), {
   ssr: false,
 });
@@ -64,23 +68,28 @@ function LogedinApp({ children }: AppProps) {
           <GpsProvider>
             <LiveLocationProvider>
               <DebugLoggingProvider>
-                <MapEditorProvider>
-                  <FirecallLayerProvider>
-                    <AppDrawer isOpen={isDrawerOpen} setIsOpen={setIsDrawerOpen} />
+                <BugReportProvider>
+                  <MapEditorProvider>
+                    <FirecallLayerProvider>
+                      <AppDrawer
+                        isOpen={isDrawerOpen}
+                        setIsOpen={setIsDrawerOpen}
+                      />
 
-                    <HeaderBar
-                      isDrawerOpen={isDrawerOpen}
-                      setIsDrawerOpen={setIsDrawerOpen}
-                    />
-                    <ChatMessageDisplay />
-                    <Box
-                      className="print-content-root"
-                      sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
-                    >
-                      {children}
-                    </Box>
-                  </FirecallLayerProvider>
-                </MapEditorProvider>
+                      <HeaderBar
+                        isDrawerOpen={isDrawerOpen}
+                        setIsDrawerOpen={setIsDrawerOpen}
+                      />
+                      <ChatMessageDisplay />
+                      <Box
+                        className="print-content-root"
+                        sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+                      >
+                        {children}
+                      </Box>
+                    </FirecallLayerProvider>
+                  </MapEditorProvider>
+                </BugReportProvider>
               </DebugLoggingProvider>
             </LiveLocationProvider>
           </GpsProvider>

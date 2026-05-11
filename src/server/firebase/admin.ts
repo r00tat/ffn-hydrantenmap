@@ -2,6 +2,7 @@ import 'server-only';
 
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { getStorage } from 'firebase-admin/storage';
 import { getApp, getApps, initializeApp } from 'firebase-admin/app';
 
 // let serviceAccount: process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -26,6 +27,10 @@ try {
   // Settings already applied on a previous import of this module
 }
 export const firebaseAuth = getAuth(firebaseApp);
+
+export function getAdminStorage() {
+  return getStorage(firebaseApp);
+}
 
 // Helper functions to get specific database instances
 export function getProdFirestore() {
