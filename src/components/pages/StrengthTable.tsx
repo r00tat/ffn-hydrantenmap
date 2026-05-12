@@ -8,6 +8,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useContext, useMemo } from 'react';
 import { FirecallItem } from '../firebase/firestore';
 import { formatTimestamp } from '../../common/time-format';
@@ -15,6 +16,7 @@ import { FirecallContext } from '../../hooks/useFirecall';
 import { calculateStrength } from './fahrzeuge-utils';
 
 export default function StrengthTable({ items }: { items: FirecallItem[] }) {
+  const t = useTranslations('einsatzmittel');
   const { crewAssignments } = useContext(FirecallContext);
   const { rows, totalMann, totalAts, totalFw, typCounts } = useMemo(
     () => calculateStrength(items, crewAssignments),
@@ -28,14 +30,14 @@ export default function StrengthTable({ items }: { items: FirecallItem[] }) {
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Bezeichnung</TableCell>
-            <TableCell>FW</TableCell>
-            <TableCell>Typ</TableCell>
-            <TableCell align="right">Stärke</TableCell>
-            <TableCell align="right">ATS</TableCell>
-            <TableCell>Alarmierung</TableCell>
-            <TableCell>Eintreffen</TableCell>
-            <TableCell>Abrücken</TableCell>
+            <TableCell>{t('cols.name')}</TableCell>
+            <TableCell>{t('cols.fwShort')}</TableCell>
+            <TableCell>{t('cols.type')}</TableCell>
+            <TableCell align="right">{t('cols.strength')}</TableCell>
+            <TableCell align="right">{t('cols.ats')}</TableCell>
+            <TableCell>{t('cols.alarmierung')}</TableCell>
+            <TableCell>{t('cols.eintreffen')}</TableCell>
+            <TableCell>{t('cols.abruecken')}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -52,8 +54,8 @@ export default function StrengthTable({ items }: { items: FirecallItem[] }) {
             </TableRow>
           ))}
           <TableRow sx={{ '& td': { fontWeight: 'bold' } }}>
-            <TableCell>Gesamt</TableCell>
-            <TableCell>{totalFw} FW</TableCell>
+            <TableCell>{t('total')}</TableCell>
+            <TableCell>{t('totalFw', { count: totalFw })}</TableCell>
             <TableCell>
               {Object.entries(typCounts).map(([typ, count]) => (
                 <Typography variant="body2" sx={{ fontWeight: "bold" }} key={typ}>

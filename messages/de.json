@@ -207,6 +207,63 @@
     "algorithm": "Algorithmus",
     "opacity": "Deckkraft: {percent}%"
   },
+  "einsatzorte": {
+    "placeholderNew": "Neue Adresse...",
+    "placeholderName": "Bezeichnung",
+    "placeholderStreet": "Straße",
+    "placeholderNumber": "Nr.",
+    "placeholderCity": "Ort",
+    "placeholderDescription": "Beschreibung",
+    "pickOnMap": "Auf Karte wählen",
+    "vehicles": "Fahrzeuge:",
+    "alerted": "Alarmiert",
+    "start": "Start",
+    "done": "Erledigt",
+    "noCoords": "Keine Koordinaten",
+    "status": {
+      "offen": "offen",
+      "einsatz notwendig": "einsatz notwendig",
+      "in arbeit": "in arbeit",
+      "erledigt": "erledigt",
+      "kein einsatz": "kein einsatz"
+    }
+  },
+  "einsatzmittel": {
+    "count": "{count} Einsatzmittel",
+    "downloadCsvTooltip": "Einsatzmittel als CSV herunterladen",
+    "csvFilename": "Einsatzmittel.csv",
+    "unassigned": "Nicht zugeordnet",
+    "cols": {
+      "name": "Bezeichnung",
+      "fw": "Feuerwehr",
+      "fwShort": "FW",
+      "type": "Typ",
+      "strength": "Stärke",
+      "ats": "ATS",
+      "description": "Beschreibung",
+      "alarmierung": "Alarmierung",
+      "eintreffen": "Eintreffen",
+      "abruecken": "Abrücken"
+    },
+    "total": "Gesamt",
+    "totalFw": "{count} FW"
+  },
+  "einsaetze": {
+    "title": "Einsätze",
+    "groupFilter": "Gruppenfilter",
+    "allGroups": "Alle Gruppen",
+    "active": "(aktiv)",
+    "activate": "Als aktiven Einsatz in der Anzeige setzen",
+    "activateButton": "Aktivieren",
+    "detailsTooltip": "Einsatz-Details und Anhänge",
+    "shareTooltip": "Link für anonymen Zugriff erstellen",
+    "kostenersatzTooltip": "Kostenersatz-Berechnungen",
+    "deleteTitle": "Einsatz {name} {date} löschen",
+    "deleteConfirm": "Einsatz {name} {date} wirklich löschen?",
+    "tokenCreateError": "Token konnte nicht erstellt werden: {error}",
+    "linkCopied": "Link in Zwischenablage kopiert",
+    "linkCopyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:"
+  },
   "geschaeftsbuch": {
     "title": "Geschäftsbuch",
     "downloadCsvTooltip": "Geschäftsbuch als CSV herunterladen",

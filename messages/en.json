@@ -207,6 +207,63 @@
     "algorithm": "Algorithm",
     "opacity": "Opacity: {percent}%"
   },
+  "einsatzorte": {
+    "placeholderNew": "New address...",
+    "placeholderName": "Name",
+    "placeholderStreet": "Street",
+    "placeholderNumber": "No.",
+    "placeholderCity": "City",
+    "placeholderDescription": "Description",
+    "pickOnMap": "Pick on map",
+    "vehicles": "Vehicles:",
+    "alerted": "Alerted",
+    "start": "Start",
+    "done": "Done",
+    "noCoords": "No coordinates",
+    "status": {
+      "offen": "open",
+      "einsatz notwendig": "operation needed",
+      "in arbeit": "in progress",
+      "erledigt": "done",
+      "kein einsatz": "no operation"
+    }
+  },
+  "einsatzmittel": {
+    "count": "{count} resources",
+    "downloadCsvTooltip": "Download resources as CSV",
+    "csvFilename": "resources.csv",
+    "unassigned": "Unassigned",
+    "cols": {
+      "name": "Name",
+      "fw": "Fire department",
+      "fwShort": "FD",
+      "type": "Type",
+      "strength": "Strength",
+      "ats": "BA",
+      "description": "Description",
+      "alarmierung": "Alerted at",
+      "eintreffen": "Arrived at",
+      "abruecken": "Departed at"
+    },
+    "total": "Total",
+    "totalFw": "{count} FDs"
+  },
+  "einsaetze": {
+    "title": "Operations",
+    "groupFilter": "Group filter",
+    "allGroups": "All groups",
+    "active": "(active)",
+    "activate": "Set as the active operation",
+    "activateButton": "Activate",
+    "detailsTooltip": "Operation details and attachments",
+    "shareTooltip": "Create anonymous-access link",
+    "kostenersatzTooltip": "Cost recovery calculations",
+    "deleteTitle": "Delete operation {name} {date}",
+    "deleteConfirm": "Really delete operation {name} {date}?",
+    "tokenCreateError": "Token could not be created: {error}",
+    "linkCopied": "Link copied to clipboard",
+    "linkCopyFallback": "Link could not be copied. Please copy manually:"
+  },
   "geschaeftsbuch": {
     "title": "Business log",
     "downloadCsvTooltip": "Download business log as CSV",
