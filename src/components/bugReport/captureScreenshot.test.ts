@@ -40,8 +40,13 @@ describe('captureScreenshot', () => {
         skipFonts: true,
         filter: expect.any(Function),
         imagePlaceholder: expect.stringMatching(/^data:image\/png;base64,/),
+        width: expect.any(Number),
+        height: expect.any(Number),
       }),
     );
+    const opts = toBlobMock.mock.calls[0][1];
+    // longest output dimension is capped at 1280
+    expect(Math.max(opts.width, opts.height)).toBeLessThanOrEqual(1280);
   });
 
   it('filters out googleusercontent avatars and data-skip-screenshot nodes', async () => {
@@ -65,8 +70,9 @@ describe('captureScreenshot', () => {
     expect(filter(ordinaryDiv)).toBe(true);
 
     expect(filter(document.createElement('script'))).toBe(false);
-    expect(filter(document.createElement('style'))).toBe(false);
-    expect(filter(document.createElement('link'))).toBe(false);
+    // <style> and <link> stay in so MUI/Emotion CSS-in-JS keeps working.
+    expect(filter(document.createElement('style'))).toBe(true);
+    expect(filter(document.createElement('link'))).toBe(true);
   });
 
   it('returns null when html-to-image fails to produce a blob', async () => {

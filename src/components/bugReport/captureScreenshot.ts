@@ -14,14 +14,12 @@ const EXCLUDED_IMAGE_HOSTS = [
 ];
 
 // Tags that bring no visual content but can break the SVG/foreignObject
-// serialisation html-to-image uses (script bodies confuse the XML parser,
-// <link> cross-origin stylesheets cannot be inlined, ...).
+// serialisation html-to-image uses. <style>/<link> stay in, otherwise
+// CSS-in-JS injected by Emotion/MUI disappears and the screenshot has
+// no styling.
 const EXCLUDED_TAGS = new Set([
   'SCRIPT',
-  'STYLE',
-  'LINK',
   'NOSCRIPT',
-  'META',
   'TEMPLATE',
 ]);
 
@@ -54,13 +52,32 @@ export async function captureScreenshot(): Promise<Blob | null> {
   // Lazy-load html-to-image so it stays out of the main bundle.
   const { toBlob } = await import('html-to-image');
 
+  // The captured SVG is loaded back into an <img> via a data: URL; browsers
+  // (especially the data-URL → foreignObject path) start to fail silently
+  // above ~2 MB of payload. On wide / high-DPI screens (2560+ px) we must
+  // scale the source down before serialising, otherwise toBlob rejects
+  // with an opaque image-load-error.
+  const MAX_DIM = 1280;
+  const body = document.body;
+  const srcW = body.scrollWidth || body.clientWidth || window.innerWidth;
+  const srcH = body.scrollHeight || body.clientHeight || window.innerHeight;
+  const scale = Math.min(1, MAX_DIM / srcW, MAX_DIM / srcH);
+  const outW = Math.max(1, Math.ceil(srcW * scale));
+  const outH = Math.max(1, Math.ceil(srcH * scale));
+
   try {
-    return await toBlob(document.body, {
+    return await toBlob(body, {
       cacheBust: true,
-      // pixelRatio 1 keeps the resulting SVG payload small enough for the
-      // <img> tag to load reliably; higher ratios can overflow the data
-      // URL limit and trigger an opaque image-load-error.
       pixelRatio: 1,
+      width: outW,
+      height: outH,
+      style:
+        scale < 1
+          ? {
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+            }
+          : {},
       backgroundColor: '#ffffff',
       // Cross-origin stylesheets (Google Fonts, Material Icons) cannot be
       // serialised via cssRules; skip the font-embed step.
