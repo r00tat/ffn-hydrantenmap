@@ -5,17 +5,17 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import DynamicLogin from '../../components/pages/LoginUi';
+import ProfileUi from '../../components/pages/ProfileUi';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 
-export default function Login() {
-  const t = useTranslations('login');
+export default function ProfilePage() {
+  const t = useTranslations('profile');
   const router = useRouter();
   const { isSignedIn, isAuthLoading } = useFirebaseLogin();
 
   useEffect(() => {
-    if (!isAuthLoading && isSignedIn) {
-      router.replace('/profile');
+    if (!isAuthLoading && !isSignedIn) {
+      router.replace('/login');
     }
   }, [isAuthLoading, isSignedIn, router]);
 
@@ -24,7 +24,7 @@ export default function Login() {
       <Typography variant="h3" gutterBottom>
         {t('pageTitle')}
       </Typography>
-      <DynamicLogin />
+      <ProfileUi />
     </Box>
   );
 }

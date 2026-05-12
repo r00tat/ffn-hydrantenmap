@@ -29,6 +29,7 @@ import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
 import WavesIcon from '@mui/icons-material/Waves';
@@ -40,6 +41,7 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
@@ -51,6 +53,7 @@ interface DrawerItem {
   icon: React.ReactNode;
   href: string;
   admin?: boolean;
+  signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
   children?: DrawerItem[];
@@ -91,107 +94,114 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const { isAdmin } = useFirebaseLogin();
+  const { isAdmin, isSignedIn } = useFirebaseLogin();
   const firecallId = useFirecallId();
   const pathname = usePathname();
+  const t = useTranslations('drawer');
 
   const drawerItems: DrawerItem[] = [
-    { text: 'Karte', icon: <MapIcon />, href: '/', einsatzSection: '' },
-    { text: 'Details', icon: <InfoIcon />, href: '/', einsatzSection: 'details' },
+    { text: t('map'), icon: <MapIcon />, href: '/', einsatzSection: '' },
+    { text: t('details'), icon: <InfoIcon />, href: '/', einsatzSection: 'details' },
     {
-      text: 'Einsätze',
+      text: t('firecalls'),
       icon: <LocalFireDepartmentIcon />,
       href: '/einsaetze',
     },
-    { text: 'Ebenen', icon: <LayersIcon />, href: '/ebenen', einsatzSection: 'ebenen' },
-    { text: 'Einsatzmittel', icon: <DirectionsCarIcon />, href: '/einsatzmittel', einsatzSection: 'einsatzmittel' },
+    { text: t('layers'), icon: <LayersIcon />, href: '/ebenen', einsatzSection: 'ebenen' },
+    { text: t('units'), icon: <DirectionsCarIcon />, href: '/einsatzmittel', einsatzSection: 'einsatzmittel' },
     {
-      text: 'Einsatz Tagebuch',
+      text: t('diary'),
       icon: <LibraryBooksIcon />,
       href: '/tagebuch',
       einsatzSection: 'tagebuch',
     },
     // { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
     {
-      text: 'Einsatzorte',
+      text: t('locations'),
       icon: <PlaceIcon />,
       href: '/einsatzorte',
       einsatzSection: 'einsatzorte',
     },
     {
-      text: 'Blaulicht-SMS',
+      text: t('blaulichtSms'),
       icon: <SmsIcon />,
       href: '/blaulicht-sms',
     },
     {
-      text: 'Geschäftsbuch',
+      text: t('geschaeftsbuch'),
       icon: <MenuBookIcon />,
       href: '/geschaeftsbuch',
       einsatzSection: 'geschaeftsbuch',
     },
     {
-      text: 'Kostenersatz',
+      text: t('kostenersatz'),
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',
       einsatzSection: 'kostenersatz',
     },
-    { text: 'Chat', icon: <ChatIcon />, href: '/chat', einsatzSection: 'chat' },
-    { text: 'KI', icon: <AutoAwesomeIcon />, href: '/ai' },
-    { text: 'Drucken', icon: <PrintIcon />, href: '/print', einsatzSection: 'print' },
+    { text: t('chat'), icon: <ChatIcon />, href: '/chat', einsatzSection: 'chat' },
+    { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },
+    { text: t('print'), icon: <PrintIcon />, href: '/print', einsatzSection: 'print' },
     {
-      text: 'Schadstoff',
+      text: t('hazmat'),
       icon: <Icon path={mdiBiohazard} size={1} />,
       href: '/schadstoff',
       einsatzSection: 'schadstoff',
       children: [
         {
-          text: 'Gefahrgut-Infos',
+          text: t('hazmatDatabase'),
           icon: <BiotechIcon />,
           href: '/schadstoff/datenbank',
           einsatzSection: 'schadstoff/datenbank',
         },
         {
-          text: 'Strahlenschutz-Rechner',
+          text: t('radiationCalculator'),
           icon: <WarningIcon />,
           href: '/schadstoff/strahlenschutz',
           einsatzSection: 'schadstoff/strahlenschutz',
         },
         {
-          text: 'Strahlenmessung',
+          text: t('radiationMeasurement'),
           icon: <SensorsIcon />,
           href: '/schadstoff/dosimetrie',
           einsatzSection: 'schadstoff/dosimetrie',
         },
         {
-          text: 'Nuklid-Identifikation',
+          text: t('nuclideIdentification'),
           icon: <ShowChartIcon />,
           href: '/schadstoff/energiespektrum',
           einsatzSection: 'schadstoff/energiespektrum',
         },
       ],
     },
-    { text: 'Tokens', icon: <ApiIcon />, href: '/tokens' },
-    { text: 'Audit Log', icon: <HistoryIcon />, href: '/auditlog', admin: true },
-    { text: 'Users', icon: <UserIcon />, href: '/users', admin: true },
-    { text: 'Groups', icon: <GroupIcon />, href: '/groups', admin: true },
+    { text: t('tokens'), icon: <ApiIcon />, href: '/tokens' },
+    { text: t('auditLog'), icon: <HistoryIcon />, href: '/auditlog', admin: true },
+    { text: t('users'), icon: <UserIcon />, href: '/users', admin: true },
+    { text: t('groups'), icon: <GroupIcon />, href: '/groups', admin: true },
     {
-      text: 'Admin',
+      text: t('admin'),
       icon: <AdminPanelSettingsIcon />,
       href: '/admin',
       admin: true,
       children: [
-        { text: 'Admin Actions', icon: <BuildIcon />, href: '/admin/actions' },
-        { text: 'GIS Data Pipeline', icon: <StorageIcon />, href: '/admin/gis-data' },
-        { text: 'Hydrant Clusters', icon: <HubIcon />, href: '/admin/hydrant-clusters' },
-        { text: 'Kostenersatz', icon: <ReceiptLongIcon />, href: '/admin/kostenersatz' },
-        { text: 'Pegelstände', icon: <WavesIcon />, href: '/admin/pegelstaende' },
-        { text: 'Deleted Items', icon: <DeleteIcon />, href: '/admin/deleted-items' },
-        { text: 'Hydranten CSV Import', icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },
+        { text: t('adminActions'), icon: <BuildIcon />, href: '/admin/actions' },
+        { text: t('gisDataPipeline'), icon: <StorageIcon />, href: '/admin/gis-data' },
+        { text: t('hydrantClusters'), icon: <HubIcon />, href: '/admin/hydrant-clusters' },
+        { text: t('adminKostenersatz'), icon: <ReceiptLongIcon />, href: '/admin/kostenersatz' },
+        { text: t('pegelstaende'), icon: <WavesIcon />, href: '/admin/pegelstaende' },
+        { text: t('deletedItems'), icon: <DeleteIcon />, href: '/admin/deleted-items' },
+        { text: t('hydrantCsvImport'), icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },
       ],
     },
-    { text: 'Dokumentation', icon: <HelpOutlineIcon />, href: '/docs' },
-    { text: 'Login', icon: <LoginIcon />, href: '/login' },
-    { text: 'About', icon: <InfoIcon />, href: '/about' },
+    { text: t('documentation'), icon: <HelpOutlineIcon />, href: '/docs' },
+    { text: t('login'), icon: <LoginIcon />, href: '/login' },
+    {
+      text: t('profile'),
+      icon: <AccountCircleIcon />,
+      href: '/profile',
+      signedInOnly: true,
+    },
+    { text: t('about'), icon: <InfoIcon />, href: '/about' },
   ];
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => {
@@ -227,6 +237,7 @@ export default function AppDrawer({
           <List>
             {drawerItems
               .filter((item) => isAdmin || !item.admin)
+              .filter((item) => isSignedIn || !item.signedInOnly)
               .map((item) => {
                 if (item.children) {
                   const open = !!openMenus[item.text];

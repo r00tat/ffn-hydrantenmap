@@ -15,6 +15,7 @@ export const FIRECALL_ITEMS_COLLECTION_ID = 'item';
 export const FIRECALL_HISTORY_COLLECTION_ID = 'history';
 export const FIRECALL_LAYERS_COLLECTION_ID = 'layer';
 export const USER_COLLECTION_ID = 'user';
+export const USER_SETTINGS_COLLECTION_ID = 'userSettings';
 export const GROUP_COLLECTION_ID = 'groups';
 export const CLUSTER_COLLECTION_ID = 'clusters6';
 export const FIRECALL_AUDITLOG_COLLECTION_ID = 'auditlog';

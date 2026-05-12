@@ -1,5 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import React from 'react';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
@@ -48,7 +50,7 @@ export const viewport: Viewport = {
   themeColor: '#1976d2',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   // Layouts must accept a children prop.
   // This will be populated with nested layouts or pages
   children,
@@ -57,8 +59,11 @@ export default function RootLayout({
 }) {
   /* eslint-disable @next/next/no-page-custom-font */
 
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="de">
+    <html lang={locale}>
       <head>
         <title>Einsatzkarte</title>
         <meta
@@ -80,7 +85,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AppProviders>{children}</AppProviders>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <AppProviders>{children}</AppProviders>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

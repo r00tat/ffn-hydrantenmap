@@ -9,6 +9,7 @@ import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -25,6 +26,7 @@ function HeaderBar({
   isDrawerOpen: boolean;
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
+  const t = useTranslations('header');
   const { isSignedIn, displayName, photoURL, isAuthorized } =
     useFirebaseLogin();
   const firecall = useFirecall();
@@ -50,7 +52,7 @@ function HeaderBar({
                 size="large"
                 edge="start"
                 color="inherit"
-                aria-label="menu"
+                aria-label={t('menuAria')}
                 sx={{ mr: 2 }}
                 onClick={() => setIsDrawerOpen(!isDrawerOpen)}
               >
@@ -79,7 +81,7 @@ function HeaderBar({
                   paddingRight: 4,
                 }}
               >
-                Einsatzkarte{' '}
+                {t('appTitle')}{' '}
               </Typography>
               <Typography
                 variant="h6"
@@ -100,8 +102,8 @@ function HeaderBar({
                 ) : (
                   firecall?.name || ''
                 )}
-                {!isSignedIn && 'Anmeldung erforderlich'}
-                {isSignedIn && !isAuthorized && 'Freischaltung erforderlich'}
+                {!isSignedIn && t('loginRequired')}
+                {isSignedIn && !isAuthorized && t('authorizationRequired')}
               </Typography>
 
               {selectedHistory && (
@@ -119,7 +121,7 @@ function HeaderBar({
             </Box>
 
             {isSignedIn && (
-              <Tooltip title="Neuer Einsatz">
+              <Tooltip title={t('newFirecallTooltip')}>
                 <Button
                   color={'info'}
                   style={{
@@ -137,7 +139,7 @@ function HeaderBar({
             )}
 
             {isSignedIn && (
-              <Tooltip title="Historie aufrufen">
+              <Tooltip title={t('historyTooltip')}>
                 <Button
                   color={historyModeActive ? 'error' : 'info'}
                   style={{
@@ -155,11 +157,11 @@ function HeaderBar({
             )}
             {!isSignedIn && (
               <Link href="/login" passHref>
-                <Button color="inherit">Login</Button>
+                <Button color="inherit">{t('loginButton')}</Button>
               </Link>
             )}
             {isSignedIn && (
-              <Link href="/login" passHref>
+              <Link href="/profile" passHref>
                 <Avatar alt={displayName} src={photoURL} />
               </Link>
             )}
