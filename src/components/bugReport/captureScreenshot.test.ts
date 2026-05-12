@@ -36,6 +36,7 @@ describe('captureScreenshot', () => {
       expect.objectContaining({
         cacheBust: true,
         backgroundColor: '#ffffff',
+        skipFonts: true,
       }),
     );
   });
@@ -44,5 +45,13 @@ describe('captureScreenshot', () => {
     toBlobMock.mockResolvedValueOnce(null);
     const result = await captureScreenshot();
     expect(result).toBeNull();
+  });
+
+  it('returns null and does not throw when html-to-image rejects', async () => {
+    toBlobMock.mockRejectedValueOnce(new Error('SecurityError'));
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await captureScreenshot();
+    expect(result).toBeNull();
+    consoleSpy.mockRestore();
   });
 });
