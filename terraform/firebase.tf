@@ -37,6 +37,27 @@ resource "google_firebaserules_ruleset" "dev" {
 }
 
 # ============================================================================
+# Storage Rules
+# ============================================================================
+
+resource "google_firebaserules_ruleset" "storage" {
+  project = var.project
+
+  source {
+    files {
+      content = file("../storage.rules")
+      name    = "storage.rules"
+    }
+  }
+}
+
+resource "google_firebaserules_release" "storage" {
+  name         = "firebase.storage/${var.project}.appspot.com"
+  project      = var.project
+  ruleset_name = "projects/${var.project}/rulesets/${google_firebaserules_ruleset.storage.name}"
+}
+
+# ============================================================================
 # Firestore Index Locals
 # ============================================================================
 
