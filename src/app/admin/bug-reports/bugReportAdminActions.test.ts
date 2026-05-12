@@ -28,6 +28,15 @@ vi.mock('../../../server/firebase/admin', () => ({
 
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { serverTimestamp: () => 'SERVER_TS' },
+  Timestamp: class {
+    constructor(
+      public seconds: number,
+      public nanoseconds: number,
+    ) {}
+    toDate(): Date {
+      return new Date(this.seconds * 1000 + this.nanoseconds / 1e6);
+    }
+  },
 }));
 
 const actionAdminRequiredMock = vi.fn();

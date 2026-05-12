@@ -1,9 +1,29 @@
 'use server';
 import 'server-only';
 
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { actionAdminRequired } from '../../auth';
 import { firestore, getAdminStorage } from '../../../server/firebase/admin';
+
+function serializeFirestoreData<T>(data: unknown): T {
+  if (data instanceof Timestamp) {
+    return data.toDate().toISOString() as unknown as T;
+  }
+  if (data instanceof Date) {
+    return data.toISOString() as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => serializeFirestoreData(item)) as unknown as T;
+  }
+  if (data && typeof data === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      out[k] = serializeFirestoreData(v);
+    }
+    return out as T;
+  }
+  return data as T;
+}
 import {
   APP_CONFIG_COLLECTION,
   BUG_REPORT_COLLECTION,
@@ -38,7 +58,7 @@ export async function listBugReportsAction(): Promise<BugReport[]> {
     .get();
   return snap.docs.map(
     (d: { id: string; data: () => Record<string, unknown> }) =>
-      ({ id: d.id, ...d.data() }) as BugReport,
+      serializeFirestoreData<BugReport>({ id: d.id, ...d.data() }),
   );
 }
 
@@ -52,7 +72,10 @@ export async function getBugReportAction(id: string): Promise<{
   if (!doc.exists) {
     throw new Error(`Bug report ${id} not found`);
   }
-  const report = { id: doc.id, ...doc.data() } as BugReport;
+  const report = serializeFirestoreData<BugReport>({
+    id: doc.id,
+    ...doc.data(),
+  });
 
   const bucket = getAdminStorage().bucket();
   const sign = async (path: string): Promise<string> => {
@@ -94,7 +117,7 @@ export async function getBugReportConfigAction(): Promise<BugReportConfig> {
   if (!snap.exists) {
     return DEFAULT_BUG_REPORT_CONFIG;
   }
-  return snap.data() as BugReportConfig;
+  return serializeFirestoreData<BugReportConfig>(snap.data());
 }
 
 export async function updateBugReportConfigAction(
