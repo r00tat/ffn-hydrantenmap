@@ -207,6 +207,122 @@
     "algorithm": "Algorithm",
     "opacity": "Opacity: {percent}%"
   },
+  "ai": {
+    "title": "AI Assistant",
+    "mode": "Mode",
+    "modeAssistant": "Operation assistant",
+    "questionLabel": "Question or command",
+    "questionPlaceholder": "e.g. 'How many vehicles are deployed?' or 'Create section North'",
+    "questionGeneric": "Question",
+    "questionGenericPlaceholder": "Ask questions or assign tasks about the operation",
+    "send": "Send"
+  },
+  "blaulichtSms": {
+    "title": "BlaulichtSMS alarms",
+    "noActive": "No active operation selected.",
+    "noCredentials": "No BlaulichtSMS credentials configured for this group. Please add them in the admin settings.",
+    "activeAlarms": "Active alarms",
+    "pastAlarms": "Past alarms",
+    "noAlarms": "No alarms found."
+  },
+  "about": {
+    "title": "About",
+    "intro": "This website shows the hydrants around Neusiedl am See to make them easy to locate during operations.",
+    "impressum": "Imprint",
+    "responsible": "Responsible for the content",
+    "copyright": "Copyright",
+    "copyrightBody": "Texts, images and graphics are protected by copyright and other protective laws unless otherwise stated.",
+    "liability": "Liability",
+    "liabilityBody": "Despite careful editorial review we assume no liability for the content of external links. The operators of the linked pages are solely responsible for their content.",
+    "privacy": "Privacy",
+    "privacyIntro": "Information about the processing of personal data can be found in our ",
+    "privacyLink": "privacy policy",
+    "version": "Version",
+    "buildId": "Build id: {id}"
+  },
+  "datenschutz": {
+    "backToAbout": "← Back to About"
+  },
+  "users": {
+    "title": "Users",
+    "filter": "Filter...",
+    "filterByGroups": "Filter by groups",
+    "authorize": "Authorize",
+    "deauthorize": "De-authorize",
+    "editUser": "Edit {name}",
+    "unverified": "unverified",
+    "cols": {
+      "name": "Name",
+      "email": "Email",
+      "feuerwehr": "Fire department",
+      "groups": "Groups"
+    },
+    "pagination": "{from}-{to} of {count}",
+    "paginationOf": "{from}-{to} of {count} ({total} total)"
+  },
+  "groups": {
+    "title": "Groups",
+    "createKnown": "Create standard groups",
+    "createKnownTooltip": "Create missing groups: {names}",
+    "edit": "Edit {name}",
+    "delete": "Delete {name}",
+    "deleteTitle": "Delete {name}",
+    "deleteConfirm": "Really delete {name} {description}?",
+    "cols": {
+      "id": "ID",
+      "name": "Name",
+      "description": "Description"
+    }
+  },
+  "tokens": {
+    "title": "API tokens",
+    "intro": "A token can be used for API access to GeoJSON (e.g. <link>lagekarte.info</link>). The endpoint is at https://{host}/api/geojson and accepts the token as an HTTP GET parameter or Authorization Bearer token.",
+    "dialogTitle": "Token",
+    "tokenLabel": "Token: {id}",
+    "descriptionLabel": "Description",
+    "expiresLabel": "Expiry date (optional)",
+    "expired": "(expired on {date})",
+    "validUntil": "(valid until {date})",
+    "showApiKey": "Show API key",
+    "editApiKey": "Edit API key",
+    "deleteApiKey": "Delete API key",
+    "apiKey": "API key:",
+    "newTokenTitle": "New token",
+    "newTokenCreated": "A new token {description} was created:",
+    "deleteTitle": "Delete token {description}",
+    "deleteConfirm": "Really delete token {description}?"
+  },
+  "auditlog": {
+    "title": "Audit log",
+    "loading": "Loading...",
+    "loadMore": "Load more",
+    "noEntries": "No audit log entries found.",
+    "downloadCsvTooltip": "Download audit log as CSV",
+    "csvFilename": "audit-log.csv",
+    "search": "Search",
+    "searchPlaceholder": "User, element, type...",
+    "filterAction": "Action",
+    "filterType": "Type",
+    "filterAll": "All",
+    "showingOf": "{count} of {total} entries",
+    "elementId": "Element ID",
+    "user": "User",
+    "cols": {
+      "timestamp": "Time",
+      "user": "User",
+      "action": "Action",
+      "elementType": "Type",
+      "elementName": "Element",
+      "elementId": "Element ID"
+    },
+    "action": {
+      "create": "Created",
+      "update": "Updated",
+      "delete": "Deleted"
+    },
+    "previousValue": "Previous value",
+    "newValue": "New value"
+  },
   "einsatzorte": {
     "placeholderNew": "New address...",
     "placeholderName": "Name",

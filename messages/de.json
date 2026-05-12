@@ -207,6 +207,122 @@
     "algorithm": "Algorithmus",
     "opacity": "Deckkraft: {percent}%"
   },
+  "ai": {
+    "title": "KI-Assistent",
+    "mode": "Modus",
+    "modeAssistant": "Einsatz-Assistent",
+    "questionLabel": "Frage oder Befehl",
+    "questionPlaceholder": "z.B. 'Wie viele Fahrzeuge sind im Einsatz?' oder 'Erstelle Abschnitt Nord'",
+    "questionGeneric": "Frage",
+    "questionGenericPlaceholder": "Stelle Fragen oder Aufgaben zum Einsatz",
+    "send": "Senden"
+  },
+  "blaulichtSms": {
+    "title": "BlaulichtSMS Einsätze",
+    "noActive": "Kein aktiver Einsatz ausgewählt.",
+    "noCredentials": "Keine BlaulichtSMS-Zugangsdaten für diese Gruppe konfiguriert. Bitte in den Admin-Einstellungen hinterlegen.",
+    "activeAlarms": "Aktive Einsätze",
+    "pastAlarms": "Vergangene Alarme",
+    "noAlarms": "Keine Alarme gefunden."
+  },
+  "about": {
+    "title": "Über",
+    "intro": "Diese Webseite zeigt Hydranten im Raum Neusiedl am See an, um diese im Einsatzfall einfach zu lokalisieren.",
+    "impressum": "Impressum",
+    "responsible": "Für den Inhalt verantwortlich",
+    "copyright": "Urheberrechte",
+    "copyrightBody": "Texte, Bilder und Grafiken unterliegen dem Schutz des Urheberrechts und anderen Schutzgesetzen, soweit nicht anders angegeben.",
+    "liability": "Haftung",
+    "liabilityBody": "Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.",
+    "privacy": "Datenschutz",
+    "privacyIntro": "Informationen zur Verarbeitung personenbezogener Daten finden Sie in unserer ",
+    "privacyLink": "Datenschutzerklärung",
+    "version": "Version",
+    "buildId": "Build-ID: {id}"
+  },
+  "datenschutz": {
+    "backToAbout": "← Zurück zu Über"
+  },
+  "users": {
+    "title": "Benutzer",
+    "filter": "Filter...",
+    "filterByGroups": "Nach Gruppen filtern",
+    "authorize": "Freischalten",
+    "deauthorize": "Sperren",
+    "editUser": "{name} bearbeiten",
+    "unverified": "unbestätigt",
+    "cols": {
+      "name": "Name",
+      "email": "Email",
+      "feuerwehr": "Feuerwehr",
+      "groups": "Gruppen"
+    },
+    "pagination": "{from}-{to} von {count}",
+    "paginationOf": "{from}-{to} von {count} ({total} gesamt)"
+  },
+  "groups": {
+    "title": "Gruppen",
+    "createKnown": "Standardgruppen anlegen",
+    "createKnownTooltip": "Fehlende Gruppen anlegen: {names}",
+    "edit": "{name} bearbeiten",
+    "delete": "{name} löschen",
+    "deleteTitle": "{name} löschen",
+    "deleteConfirm": "{name} {description} wirklich löschen?",
+    "cols": {
+      "id": "ID",
+      "name": "Name",
+      "description": "Beschreibung"
+    }
+  },
+  "tokens": {
+    "title": "API Token",
+    "intro": "Ein Token kann für den API-Zugriff auf GeoJSON (z.B. <link>lagekarte.info</link>) verwendet werden. Die Schnittstelle ist unter https://{host}/api/geojson erreichbar. Der Token kann als HTTP-GET-Parameter oder Authorization-Bearer-Token verwendet werden.",
+    "dialogTitle": "Token",
+    "tokenLabel": "Token: {id}",
+    "descriptionLabel": "Beschreibung",
+    "expiresLabel": "Ablaufdatum (optional)",
+    "expired": "(abgelaufen am {date})",
+    "validUntil": "(gültig bis {date})",
+    "showApiKey": "API-Schlüssel anzeigen",
+    "editApiKey": "API-Schlüssel bearbeiten",
+    "deleteApiKey": "API-Schlüssel löschen",
+    "apiKey": "API Key:",
+    "newTokenTitle": "Neuer Token",
+    "newTokenCreated": "Ein neuer Token {description} wurde erstellt:",
+    "deleteTitle": "Token {description} löschen",
+    "deleteConfirm": "Token {description} wirklich löschen?"
+  },
+  "auditlog": {
+    "title": "Audit Log",
+    "loading": "Wird geladen...",
+    "loadMore": "Mehr laden",
+    "noEntries": "Keine Audit Log Einträge gefunden.",
+    "downloadCsvTooltip": "Audit Log als CSV herunterladen",
+    "csvFilename": "AuditLog.csv",
+    "search": "Suche",
+    "searchPlaceholder": "Benutzer, Element, Typ...",
+    "filterAction": "Aktion",
+    "filterType": "Typ",
+    "filterAll": "Alle",
+    "showingOf": "{count} von {total} Einträgen",
+    "elementId": "Element-ID",
+    "user": "Benutzer",
+    "cols": {
+      "timestamp": "Zeitpunkt",
+      "user": "Benutzer",
+      "action": "Aktion",
+      "elementType": "Typ",
+      "elementName": "Element",
+      "elementId": "Element-ID"
+    },
+    "action": {
+      "create": "Erstellt",
+      "update": "Geändert",
+      "delete": "Gelöscht"
+    },
+    "previousValue": "Vorheriger Wert",
+    "newValue": "Neuer Wert"
+  },
   "einsatzorte": {
     "placeholderNew": "Neue Adresse...",
     "placeholderName": "Bezeichnung",

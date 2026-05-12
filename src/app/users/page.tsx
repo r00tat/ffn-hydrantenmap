@@ -18,6 +18,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import AdminGuard from '../../components/site/AdminGuard';
@@ -33,9 +34,10 @@ interface UserRowButtonParams {
   editFn: (user: UserRecordExtended) => void;
 }
 function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
+  const t = useTranslations('users');
   return (
     <>
-      <Tooltip title={row.authorized ? 'De-Authorize' : 'Authorize'}>
+      <Tooltip title={row.authorized ? t('deauthorize') : t('authorize')}>
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -49,7 +51,11 @@ function UserRowButtons({ row, authorizeFn, editFn }: UserRowButtonParams) {
           )}
         </IconButton>
       </Tooltip>
-      <Tooltip title={`Edit ${row.displayName || row.email} ${row.uid}`}>
+      <Tooltip
+        title={t('editUser', {
+          name: `${row.displayName || row.email} ${row.uid}`,
+        })}
+      >
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -72,6 +78,7 @@ export default function UsersPage() {
 }
 
 function Users() {
+  const t = useTranslations('users');
   const [showEditUserDialog, setShowEditUserDialog] = useState(false);
   const [editUser, setEditUser] = useState<UserRecordExtended>();
   const [users, fetchUsers] = useUserList();
@@ -203,7 +210,7 @@ function Users() {
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
-          Users{' '}
+          {t('title')}{' '}
           <IconButton onClick={() => fetchUsers()}>
             <RefreshIcon />
           </IconButton>
@@ -211,10 +218,10 @@ function Users() {
         <Grid container>
           <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>
           <Grid size={{ xs: 5, md: 6, lg: 2 }}>
-            <b>Name</b>
+            <b>{t('cols.name')}</b>
             <TextField
               size="small"
-              placeholder="Filter..."
+              placeholder={t('filter')}
               value={filters.name}
               onChange={handleFilterChange('name')}
               fullWidth
@@ -223,10 +230,10 @@ function Users() {
             />
           </Grid>
           <Grid size={{ xs: 5, md: 6, lg: 2 }}>
-            <b>Email</b>
+            <b>{t('cols.email')}</b>
             <TextField
               size="small"
-              placeholder="Filter..."
+              placeholder={t('filter')}
               value={filters.email}
               onChange={handleFilterChange('email')}
               fullWidth
@@ -236,10 +243,10 @@ function Users() {
           </Grid>
 
           <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-            <b>Feuerwehr</b>
+            <b>{t('cols.feuerwehr')}</b>
             <TextField
               size="small"
-              placeholder="Filter..."
+              placeholder={t('filter')}
               value={filters.feuerwehr}
               onChange={handleFilterChange('feuerwehr')}
               fullWidth
@@ -248,9 +255,9 @@ function Users() {
             />
           </Grid>
           <Grid size={{ xs: 6, md: 4, lg: 3 }}>
-            <b>Gruppen</b>
+            <b>{t('cols.groups')}</b>
             <Box sx={{ mt: 0.5 }}>
-              <Tooltip title="Filter by groups">
+              <Tooltip title={t('filterByGroups')}>
                 <IconButton
                   size="small"
                   onClick={(e) => setGroupsMenuAnchor(e.currentTarget)}
@@ -303,7 +310,7 @@ function Users() {
               <Grid size={{ xs: 5, md: 6, lg: 2 }}>
                 {user.email}{' '}
                 <Typography color="error">
-                  {!user.emailVerified && 'unverified'}
+                  {!user.emailVerified && t('unverified')}
                 </Typography>
               </Grid>
 
@@ -331,7 +338,9 @@ function Users() {
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[10, 25, 50, 100]}
           labelDisplayedRows={({ from, to, count }) =>
-            `${from}-${to} of ${count}${count !== users.length ? ` (${users.length} total)` : ''}`
+            count !== users.length
+              ? t('paginationOf', { from, to, count, total: users.length })
+              : t('pagination', { from, to, count })
           }
         />
       </Box>

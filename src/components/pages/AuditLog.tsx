@@ -15,6 +15,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -30,11 +31,7 @@ type AuditSortField =
   | 'elementType'
   | 'elementName';
 
-const ACTION_LABELS: Record<string, string> = {
-  create: 'Erstellt',
-  update: 'Geändert',
-  delete: 'Gelöscht',
-};
+const ACTION_KEYS = ['create', 'update', 'delete'] as const;
 
 const ACTION_COLORS: Record<string, 'success' | 'warning' | 'error'> = {
   create: 'success',
@@ -108,6 +105,16 @@ function compareField(
   return direction === 'asc' ? result : -result;
 }
 
+function actionLabel(
+  action: string,
+  t: ReturnType<typeof useTranslations<'auditlog'>>,
+): string {
+  if (action === 'create' || action === 'update' || action === 'delete') {
+    return t(`action.${action}`);
+  }
+  return action;
+}
+
 function ValueDisplay({ data }: { data?: Record<string, any> }) {
   if (!data) return <Typography variant="body2" color="text.secondary">-</Typography>;
 
@@ -124,22 +131,33 @@ function ValueDisplay({ data }: { data?: Record<string, any> }) {
   );
 }
 
-function downloadAuditLog(entries: AuditLogEntry[]) {
+function downloadAuditLog(
+  entries: AuditLogEntry[],
+  t: ReturnType<typeof useTranslations<'auditlog'>>,
+) {
   const rows: any[][] = [
-    ['Zeitpunkt', 'Benutzer', 'Aktion', 'Typ', 'Element', 'Element-ID'],
+    [
+      t('cols.timestamp'),
+      t('cols.user'),
+      t('cols.action'),
+      t('cols.elementType'),
+      t('cols.elementName'),
+      t('cols.elementId'),
+    ],
     ...entries.map((e) => [
       formatTimestamp(e.timestamp),
       e.user,
-      ACTION_LABELS[e.action] || e.action,
+      actionLabel(e.action, t),
       e.elementType,
       e.elementName,
       e.elementId,
     ]),
   ];
-  downloadRowsAsCsv(rows, 'AuditLog.csv');
+  downloadRowsAsCsv(rows, t('csvFilename'));
 }
 
 export default function AuditLog() {
+  const t = useTranslations('auditlog');
   const firecallId = useFirecallId();
   const entries = useAuditLogEntries();
 
@@ -177,18 +195,18 @@ export default function AuditLog() {
             (e.user || '').toLowerCase().includes(search) ||
             (e.elementName || '').toLowerCase().includes(search) ||
             (e.elementType || '').toLowerCase().includes(search) ||
-            (ACTION_LABELS[e.action] || e.action).toLowerCase().includes(search)
+            actionLabel(e.action, t).toLowerCase().includes(search)
           );
         }
         return true;
       })
       .sort((a, b) => compareField(a, b, sortField, sortDirection));
-  }, [entries, searchText, filterAction, filterType, sortField, sortDirection]);
+  }, [entries, searchText, filterAction, filterType, sortField, sortDirection, t]);
 
   if (firecallId === 'unknown') {
     return (
       <Typography variant="h4" gutterBottom sx={{ p: 2, m: 2 }}>
-        Audit Log
+        {t('title')}
       </Typography>
     );
   }
@@ -196,51 +214,53 @@ export default function AuditLog() {
   return (
     <Box sx={{ p: 2, m: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Audit Log{' '}
+        {t('title')}{' '}
         <DownloadButton
-          onClick={() => downloadAuditLog(filteredAndSorted)}
-          tooltip="Audit Log als CSV herunterladen"
+          onClick={() => downloadAuditLog(filteredAndSorted, t)}
+          tooltip={t('downloadCsvTooltip')}
         />
       </Typography>
 
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <TextField
-            label="Suche"
+            label={t('search')}
             size="small"
             fullWidth
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Benutzer, Element, Typ..."
+            placeholder={t('searchPlaceholder')}
           />
         </Grid>
         <Grid size={{ xs: 6, md: 2 }}>
           <FormControl size="small" fullWidth>
-            <InputLabel>Aktion</InputLabel>
+            <InputLabel>{t('filterAction')}</InputLabel>
             <Select
               value={filterAction}
-              label="Aktion"
+              label={t('filterAction')}
               onChange={(e) => setFilterAction(e.target.value)}
             >
-              <MenuItem value="">Alle</MenuItem>
-              <MenuItem value="create">Erstellt</MenuItem>
-              <MenuItem value="update">Geändert</MenuItem>
-              <MenuItem value="delete">Gelöscht</MenuItem>
+              <MenuItem value="">{t('filterAll')}</MenuItem>
+              {ACTION_KEYS.map((key) => (
+                <MenuItem key={key} value={key}>
+                  {t(`action.${key}`)}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
         </Grid>
         <Grid size={{ xs: 6, md: 2 }}>
           <FormControl size="small" fullWidth>
-            <InputLabel>Typ</InputLabel>
+            <InputLabel>{t('filterType')}</InputLabel>
             <Select
               value={filterType}
-              label="Typ"
+              label={t('filterType')}
               onChange={(e) => setFilterType(e.target.value)}
             >
-              <MenuItem value="">Alle</MenuItem>
-              {elementTypes.map((t) => (
-                <MenuItem key={t} value={t}>
-                  {t}
+              <MenuItem value="">{t('filterAll')}</MenuItem>
+              {elementTypes.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {type}
                 </MenuItem>
               ))}
             </Select>
@@ -248,7 +268,10 @@ export default function AuditLog() {
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
           <Typography variant="body2" color="text.secondary" sx={{ pt: 1 }}>
-            {filteredAndSorted.length} von {entries.length} Einträgen
+            {t('showingOf', {
+              count: filteredAndSorted.length,
+              total: entries.length,
+            })}
           </Typography>
         </Grid>
       </Grid>
@@ -256,7 +279,7 @@ export default function AuditLog() {
       <Grid container>
         <Grid size={{ xs: 6, md: 3, lg: 2 }}>
           <SortableHeader
-            label="Zeitpunkt"
+            label={t('cols.timestamp')}
             field="timestamp"
             activeField={sortField}
             direction={sortDirection}
@@ -265,7 +288,7 @@ export default function AuditLog() {
         </Grid>
         <Grid size={{ xs: 6, md: 2, lg: 2 }}>
           <SortableHeader
-            label="Benutzer"
+            label={t('cols.user')}
             field="user"
             activeField={sortField}
             direction={sortDirection}
@@ -274,7 +297,7 @@ export default function AuditLog() {
         </Grid>
         <Grid size={{ xs: 4, md: 1, lg: 1 }}>
           <SortableHeader
-            label="Aktion"
+            label={t('cols.action')}
             field="action"
             activeField={sortField}
             direction={sortDirection}
@@ -283,7 +306,7 @@ export default function AuditLog() {
         </Grid>
         <Grid size={{ xs: 4, md: 2, lg: 1 }}>
           <SortableHeader
-            label="Typ"
+            label={t('cols.elementType')}
             field="elementType"
             activeField={sortField}
             direction={sortDirection}
@@ -292,7 +315,7 @@ export default function AuditLog() {
         </Grid>
         <Grid size={{ xs: 4, md: 4, lg: 6 }}>
           <SortableHeader
-            label="Element"
+            label={t('cols.elementName')}
             field="elementName"
             activeField={sortField}
             direction={sortDirection}
@@ -324,7 +347,7 @@ export default function AuditLog() {
               </Grid>
               <Grid size={{ xs: 4, md: 1, lg: 1 }}>
                 <Chip
-                  label={ACTION_LABELS[entry.action] || entry.action}
+                  label={actionLabel(entry.action, t)}
                   color={ACTION_COLORS[entry.action] || 'default'}
                   size="small"
                 />
@@ -343,13 +366,13 @@ export default function AuditLog() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Element-ID
+                  {t('elementId')}
                 </Typography>
                 <Typography variant="body2" sx={{ fontFamily: 'monospace', mb: 1 }}>
                   {entry.elementId}
                 </Typography>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Benutzer
+                  {t('user')}
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   {entry.user}
@@ -358,7 +381,7 @@ export default function AuditLog() {
               {entry.previousValue && (
                 <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Vorheriger Wert
+                    {t('previousValue')}
                   </Typography>
                   <ValueDisplay data={entry.previousValue} />
                 </Grid>
@@ -366,7 +389,7 @@ export default function AuditLog() {
               {entry.newValue && (
                 <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary">
-                    Neuer Wert
+                    {t('newValue')}
                   </Typography>
                   <ValueDisplay data={entry.newValue} />
                 </Grid>
@@ -378,7 +401,7 @@ export default function AuditLog() {
 
       {filteredAndSorted.length === 0 && (
         <Typography sx={{ py: 4, textAlign: 'center' }} color="text.secondary">
-          Keine Audit Log Einträge gefunden.
+          {t('noEntries')}
         </Typography>
       )}
     </Box>
