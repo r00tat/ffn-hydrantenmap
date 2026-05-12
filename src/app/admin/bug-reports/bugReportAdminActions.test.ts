@@ -16,7 +16,7 @@ vi.mock('../../../server/firebase/admin', () => ({
     collection: (...args: unknown[]) => mockCollection(...args),
   },
   getAdminStorage: () => ({
-    bucket: () => ({
+    bucket: (_name?: string) => ({
       file: (path: string) => ({
         getSignedUrl: vi
           .fn()
@@ -24,6 +24,10 @@ vi.mock('../../../server/firebase/admin', () => ({
       }),
     }),
   }),
+}));
+
+vi.mock('../../../server/firebase/project', () => ({
+  getGcpProjectId: () => Promise.resolve('ffn-utils'),
 }));
 
 vi.mock('firebase-admin/firestore', () => ({

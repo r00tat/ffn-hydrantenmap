@@ -4,6 +4,7 @@ import 'server-only';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { actionAdminRequired } from '../../auth';
 import { firestore, getAdminStorage } from '../../../server/firebase/admin';
+import { getGcpProjectId } from '../../../server/firebase/project';
 
 function serializeFirestoreData<T>(data: unknown): T {
   if (data instanceof Timestamp) {
@@ -77,7 +78,11 @@ export async function getBugReportAction(id: string): Promise<{
     ...doc.data(),
   });
 
-  const bucket = getAdminStorage().bucket();
+  // initializeApp() is called without storageBucket, so getStorage().bucket()
+  // ohne expliziten Namen wirft "Bucket name not specified". Wir leiten den
+  // Standard-Bucket aus der GCP Project ID ab: {projectId}.appspot.com.
+  const projectId = await getGcpProjectId();
+  const bucket = getAdminStorage().bucket(`${projectId}.appspot.com`);
   const sign = async (path: string): Promise<string> => {
     const file = bucket.file(path.replace(/^\//, ''));
     const [url] = await file.getSignedUrl({
