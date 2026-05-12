@@ -57,6 +57,11 @@ resource "google_firebaserules_release" "storage" {
   ruleset_name = "projects/${var.project}/rulesets/${google_firebaserules_ruleset.storage.name}"
 }
 
+import {
+  to = google_firebaserules_release.storage
+  id = "projects/${var.project}/releases/firebase.storage/${var.project}.appspot.com"
+}
+
 # ============================================================================
 # Firestore Index Locals
 # ============================================================================
