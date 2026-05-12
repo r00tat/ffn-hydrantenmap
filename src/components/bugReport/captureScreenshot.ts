@@ -1,27 +1,20 @@
-// 1x1 transparent PNG. Used as fallback for any image html-to-image cannot
-// fetch (cross-origin without CORS, blocked, etc). Without this the entire
-// screenshot rejects on the first image error.
+// 1x1 transparent PNG used as fallback for any image that fails to load
+// during capture (cross-origin without CORS, rate-limited tiles, ...).
 const TRANSPARENT_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-// Origins that are known to either rate-limit (Google avatar CDN responds
-// with HTML 429 pages) or otherwise break html-to-image. Their content is
-// not relevant for a bug report and is silently dropped from the capture.
+// Origins that respond with HTML error pages (e.g. Google avatar CDN's 429)
+// and thus poison the DOM-to-image pipeline.
 const EXCLUDED_IMAGE_HOSTS = [
   'googleusercontent.com',
   'lh3.googleusercontent.com',
   'gravatar.com',
 ];
 
-// Tags that bring no visual content but can break the SVG/foreignObject
-// serialisation html-to-image uses. <style>/<link> stay in, otherwise
-// CSS-in-JS injected by Emotion/MUI disappears and the screenshot has
-// no styling.
-const EXCLUDED_TAGS = new Set([
-  'SCRIPT',
-  'NOSCRIPT',
-  'TEMPLATE',
-]);
+// Tags that bring no visual content and risk confusing the SVG/foreignObject
+// serialiser used internally by modern-screenshot. <style>/<link> stay in so
+// MUI/Emotion CSS-in-JS still resolves.
+const EXCLUDED_TAGS = new Set(['SCRIPT', 'NOSCRIPT', 'TEMPLATE']);
 
 function isExcludedImage(node: HTMLElement): boolean {
   if (node.tagName !== 'IMG') return false;
@@ -49,43 +42,27 @@ export function isScreenshotSupported(): boolean {
 export async function captureScreenshot(): Promise<Blob | null> {
   if (!isScreenshotSupported()) return null;
 
-  // Lazy-load html-to-image so it stays out of the main bundle.
-  const { toBlob } = await import('html-to-image');
+  // Lazy-load modern-screenshot so it stays out of the main bundle.
+  const { domToBlob } = await import('modern-screenshot');
 
-  // The captured SVG is loaded back into an <img> via a data: URL; browsers
-  // (especially the data-URL → foreignObject path) start to fail silently
-  // above ~2 MB of payload. On wide / high-DPI screens (2560+ px) we must
-  // scale the source down before serialising, otherwise toBlob rejects
-  // with an opaque image-load-error.
+  // Downscale very large layouts so the intermediate SVG/data URL stays
+  // small enough for the browser to load.
   const MAX_DIM = 1280;
   const body = document.body;
   const srcW = body.scrollWidth || body.clientWidth || window.innerWidth;
   const srcH = body.scrollHeight || body.clientHeight || window.innerHeight;
   const scale = Math.min(1, MAX_DIM / srcW, MAX_DIM / srcH);
-  const outW = Math.max(1, Math.ceil(srcW * scale));
-  const outH = Math.max(1, Math.ceil(srcH * scale));
 
   try {
-    return await toBlob(body, {
-      cacheBust: true,
-      pixelRatio: 1,
-      width: outW,
-      height: outH,
-      style:
-        scale < 1
-          ? {
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            }
-          : {},
+    return await domToBlob(body, {
+      type: 'image/png',
+      scale,
       backgroundColor: '#ffffff',
-      // Cross-origin stylesheets (Google Fonts, Material Icons) cannot be
-      // serialised via cssRules; skip the font-embed step.
-      skipFonts: true,
-      // Drop elements that either have no visual content but bloat / break
-      // the SVG (scripts, link tags, ...), known-bad cross-origin images
-      // (Google avatars), or which the page explicitly opts out via
-      // data-skip-screenshot.
+      // Don't try to embed cross-origin webfonts; they fail with SecurityError
+      // when the stylesheet origin doesn't allow cssRules access.
+      font: false,
+      // Drop elements that either bloat the SVG (scripts), are known to fail
+      // (Google avatars), or are explicitly opted out via data-skip-screenshot.
       filter: (node) => {
         if (!(node instanceof HTMLElement)) return true;
         if (EXCLUDED_TAGS.has(node.tagName)) return false;
@@ -93,10 +70,11 @@ export async function captureScreenshot(): Promise<Blob | null> {
         if (isExcludedImage(node)) return false;
         return true;
       },
-      // Last-resort fallback for any image whose fetch fails outright.
-      // Map tiles from CORS-less providers will appear as transparent
-      // pixels, but the rest of the page still renders.
-      imagePlaceholder: TRANSPARENT_PIXEL,
+      // Tiles or external avatars that fail to fetch fall back to a 1x1
+      // transparent pixel instead of crashing the entire capture.
+      fetch: {
+        placeholderImage: TRANSPARENT_PIXEL,
+      },
     });
   } catch (err) {
     console.warn('bug-report: screenshot failed', describeScreenshotError(err));
