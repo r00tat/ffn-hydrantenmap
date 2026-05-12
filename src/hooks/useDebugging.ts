@@ -58,6 +58,20 @@ export const useLoggingError = () => {
   return useDebugLogging().error;
 };
 
+const MAX_CONSOLE_BUFFER = 500;
+
+const consoleSerialize = (args: unknown[]): string =>
+  args
+    .map((a) => {
+      if (typeof a === 'string') return a;
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    })
+    .join(' ');
+
 export const useFirebaseDebugging = (): DebugLogging => {
   const [messages, setMessages] = useState<DebugMessage[]>([]);
   const [displayMessages, setDisplayMessagesState] = useState(() => {
@@ -77,6 +91,53 @@ export const useFirebaseDebugging = (): DebugLogging => {
     },
     [],
   );
+
+  // While debug logging is enabled, mirror native console.* calls into the
+  // in-memory message buffer so bug reports actually contain useful context.
+  useEffect(() => {
+    if (!displayMessages || typeof window === 'undefined') return;
+
+    const originals = {
+      log: console.log,
+      info: console.info,
+      warn: console.warn,
+      error: console.error,
+    };
+
+    const capture = (level: 'INFO' | 'WARN' | 'ERROR') =>
+      (...args: unknown[]) => {
+        const msg = consoleSerialize(args);
+        setMessages((old) => {
+          const next: DebugMessage = {
+            id: uuid(),
+            message: msg,
+            properties: { level, source: 'console' },
+          };
+          const trimmed =
+            old.length >= MAX_CONSOLE_BUFFER
+              ? old.slice(-(MAX_CONSOLE_BUFFER - 1))
+              : old;
+          return [...trimmed, next];
+        });
+      };
+
+    const logCapture = capture('INFO');
+    const infoCapture = capture('INFO');
+    const warnCapture = capture('WARN');
+    const errorCapture = capture('ERROR');
+
+    console.log = (...args) => { originals.log(...args); logCapture(...args); };
+    console.info = (...args) => { originals.info(...args); infoCapture(...args); };
+    console.warn = (...args) => { originals.warn(...args); warnCapture(...args); };
+    console.error = (...args) => { originals.error(...args); errorCapture(...args); };
+
+    return () => {
+      console.log = originals.log;
+      console.info = originals.info;
+      console.warn = originals.warn;
+      console.error = originals.error;
+    };
+  }, [displayMessages]);
 
   return useMemo((): DebugLogging => {
     const analytics = getAnalytics(app);
