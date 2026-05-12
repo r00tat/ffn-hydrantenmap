@@ -32,9 +32,10 @@ describe('captureScreenshot', () => {
     expect(result).toBe(blob);
     expect(toBlobMock).toHaveBeenCalledTimes(1);
     expect(toBlobMock).toHaveBeenCalledWith(
-      document.documentElement,
+      document.body,
       expect.objectContaining({
         cacheBust: true,
+        pixelRatio: 1,
         backgroundColor: '#ffffff',
         skipFonts: true,
         filter: expect.any(Function),
@@ -62,6 +63,10 @@ describe('captureScreenshot', () => {
 
     const ordinaryDiv = document.createElement('div');
     expect(filter(ordinaryDiv)).toBe(true);
+
+    expect(filter(document.createElement('script'))).toBe(false);
+    expect(filter(document.createElement('style'))).toBe(false);
+    expect(filter(document.createElement('link'))).toBe(false);
   });
 
   it('returns null when html-to-image fails to produce a blob', async () => {

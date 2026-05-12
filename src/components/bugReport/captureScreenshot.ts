@@ -13,6 +13,18 @@ const EXCLUDED_IMAGE_HOSTS = [
   'gravatar.com',
 ];
 
+// Tags that bring no visual content but can break the SVG/foreignObject
+// serialisation html-to-image uses (script bodies confuse the XML parser,
+// <link> cross-origin stylesheets cannot be inlined, ...).
+const EXCLUDED_TAGS = new Set([
+  'SCRIPT',
+  'STYLE',
+  'LINK',
+  'NOSCRIPT',
+  'META',
+  'TEMPLATE',
+]);
+
 function isExcludedImage(node: HTMLElement): boolean {
   if (node.tagName !== 'IMG') return false;
   const src = (node as HTMLImageElement).src || '';
@@ -43,18 +55,23 @@ export async function captureScreenshot(): Promise<Blob | null> {
   const { toBlob } = await import('html-to-image');
 
   try {
-    return await toBlob(document.documentElement, {
+    return await toBlob(document.body, {
       cacheBust: true,
-      pixelRatio: window.devicePixelRatio || 1,
+      // pixelRatio 1 keeps the resulting SVG payload small enough for the
+      // <img> tag to load reliably; higher ratios can overflow the data
+      // URL limit and trigger an opaque image-load-error.
+      pixelRatio: 1,
       backgroundColor: '#ffffff',
       // Cross-origin stylesheets (Google Fonts, Material Icons) cannot be
       // serialised via cssRules; skip the font-embed step.
       skipFonts: true,
-      // Drop elements that we either know to break the capture (avatars
-      // from rate-limited Google CDNs) or that the page explicitly opts
-      // out via data-skip-screenshot.
+      // Drop elements that either have no visual content but bloat / break
+      // the SVG (scripts, link tags, ...), known-bad cross-origin images
+      // (Google avatars), or which the page explicitly opts out via
+      // data-skip-screenshot.
       filter: (node) => {
         if (!(node instanceof HTMLElement)) return true;
+        if (EXCLUDED_TAGS.has(node.tagName)) return false;
         if (node.dataset?.skipScreenshot === 'true') return false;
         if (isExcludedImage(node)) return false;
         return true;
