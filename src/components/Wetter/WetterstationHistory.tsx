@@ -9,6 +9,7 @@ import Switch from '@mui/material/Switch';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TawesStation, HistoryDataPoint, TimeRange, AggregationInterval } from './weatherChartConfig';
@@ -25,6 +26,7 @@ export default function WetterstationHistory({
 }: {
   stationId: string;
 }) {
+  const t = useTranslations('wetter');
   const [station, setStation] = useState<TawesStation | null>(null);
   const [data, setData] = useState<HistoryDataPoint[]>([]);
   const [range, setRange] = useState<TimeRange>('24h');
@@ -83,7 +85,7 @@ export default function WetterstationHistory({
   return (
     <Box sx={{ p: 2, maxWidth: 900, mx: 'auto' }}>
       <Link href="/map" style={{ textDecoration: 'none' }}>
-        &larr; Zurück zur Karte
+        {t('backToMap')}
       </Link>
 
       <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>
@@ -91,11 +93,11 @@ export default function WetterstationHistory({
           <>
             {station.name}{' '}
             <Typography component="span" variant="body1" color="text.secondary">
-              ({station.altitude} m)
+              {t('altitudeMeters', { meters: station.altitude })}
             </Typography>
           </>
         ) : (
-          `Station ${stationId}`
+          t('stationFallback', { id: stationId })
         )}
       </Typography>
 
@@ -134,7 +136,7 @@ export default function WetterstationHistory({
                 size="small"
               />
             }
-            label="Min/Max"
+            label={t('minMax')}
           />
         )}
       </Box>
@@ -145,7 +147,7 @@ export default function WetterstationHistory({
         </Box>
       ) : data.length === 0 ? (
         <Typography color="text.secondary">
-          Keine Daten für den gewählten Zeitraum verfügbar.
+          {t('noData')}
         </Typography>
       ) : (
         <WetterstationHistoryMuiCharts
@@ -157,7 +159,7 @@ export default function WetterstationHistory({
       )}
 
       <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-        Datenquelle:{' '}
+        {t('dataSource')}{' '}
         <a
           href="https://data.hub.geosphere.at"
           target="_blank"

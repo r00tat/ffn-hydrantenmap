@@ -207,6 +207,20 @@
     "algorithm": "Algorithmus",
     "opacity": "Deckkraft: {percent}%"
   },
+  "wetter": {
+    "backToMap": "← Zurück zur Karte",
+    "stationFallback": "Station {id}",
+    "altitudeMeters": "({meters} m)",
+    "noData": "Keine Daten für den gewählten Zeitraum verfügbar.",
+    "dataSource": "Datenquelle:",
+    "minMax": "Min/Max"
+  },
+  "chat": {
+    "title": "Chat",
+    "notifications": "Chat Benachrichtigungen",
+    "messageLabel": "Chat-Nachricht",
+    "sendAria": "Senden"
+  },
   "ai": {
     "title": "KI-Assistent",
     "mode": "Modus",

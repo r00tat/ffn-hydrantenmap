@@ -207,6 +207,20 @@
     "algorithm": "Algorithm",
     "opacity": "Opacity: {percent}%"
   },
+  "wetter": {
+    "backToMap": "← Back to map",
+    "stationFallback": "Station {id}",
+    "altitudeMeters": "({meters} m)",
+    "noData": "No data available for the selected period.",
+    "dataSource": "Data source:",
+    "minMax": "Min/Max"
+  },
+  "chat": {
+    "title": "Chat",
+    "notifications": "Chat notifications",
+    "messageLabel": "Chat message",
+    "sendAria": "Send"
+  },
   "ai": {
     "title": "AI Assistant",
     "mode": "Mode",
