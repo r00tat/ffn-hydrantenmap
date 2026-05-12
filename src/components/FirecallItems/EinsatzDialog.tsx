@@ -19,6 +19,7 @@ import {
   collection,
   doc,
 } from 'firebase/firestore';
+import { useFormatter, useTranslations } from 'next-intl';
 import { addDoc, setDoc } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
 import { useCallback, useEffect, useState } from 'react';
@@ -60,6 +61,8 @@ export default function EinsatzDialog({
   const setFirecallId = useFirecallSelect();
   const showSnackbar = useSnackbar();
   const [saving, setSaving] = useState(false);
+  const t = useTranslations();
+  const format = useFormatter();
 
   const isNewEinsatz = !einsatzDefault;
 
@@ -252,32 +255,42 @@ export default function EinsatzDialog({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Einsatz hinzuf&uuml;gen</DialogTitle>
+      <DialogTitle>{t('einsatzDialog.title')}</DialogTitle>
       <DialogContent>
-        <DialogContentText>Neuer Einsatz</DialogContentText>
+        <DialogContentText>{t('einsatzDialog.subtitleNew')}</DialogContentText>
         {alarmsLoading && (
           <DialogContentText
             sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 1 }}
           >
             <CircularProgress size={20} />
-            Blaulicht-SMS Alarme werden geladen...
+            {t('firecall.alarmsLoading')}
           </DialogContentText>
         )}
         {!alarmsLoading && alarms.length > 0 && (
           <FormControl fullWidth variant="standard" sx={{ mb: 1 }}>
-            <InputLabel id="alarm-select-label">Blaulicht-SMS Alarm</InputLabel>
+            <InputLabel id="alarm-select-label">
+              {t('firecall.alarmSelect')}
+            </InputLabel>
             <Select
               labelId="alarm-select-label"
               id="alarm-select"
               value={selectedAlarmId}
-              label="Blaulicht-SMS Alarm"
+              label={t('firecall.alarmSelect')}
               onChange={handleAlarmChange}
             >
-              <MenuItem value="">{isNewEinsatz ? 'Manuell eingeben' : 'Keine Zuordnung'}</MenuItem>
+              <MenuItem value="">
+                {isNewEinsatz
+                  ? t('firecall.manualEntry')
+                  : t('firecall.noAssignment')}
+              </MenuItem>
               {alarms.map((alarm) => (
                 <MenuItem key={alarm.alarmId} value={alarm.alarmId}>
                   {alarm.alarmText} (
-                  {new Date(alarm.alarmDate).toLocaleString('de-AT')})
+                  {format.dateTime(new Date(alarm.alarmDate), {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}
+                  )
                 </MenuItem>
               ))}
             </Select>
@@ -287,7 +300,7 @@ export default function EinsatzDialog({
           autoFocus
           margin="dense"
           id="name"
-          label="Bezeichnung"
+          label={t('firecall.fields.name')}
           type="text"
           fullWidth
           variant="standard"
@@ -296,12 +309,14 @@ export default function EinsatzDialog({
           required
         />
         <FormControl fullWidth variant="standard">
-          <InputLabel id="firecall-group-label">Gruppe</InputLabel>
+          <InputLabel id="firecall-group-label">
+            {t('firecall.fields.group')}
+          </InputLabel>
           <Select
             labelId="firecall-group-label"
             id="firecall-item-type"
             value={einsatz.group || ''}
-            label="Art"
+            label={t('firecall.fields.group')}
             onChange={handleChange}
             required
           >
@@ -312,7 +327,7 @@ export default function EinsatzDialog({
                   value={einsatz.group}
                   disabled
                 >
-                  {einsatz.group} (keine Berechtigung)
+                  {t('firecall.noPermission', { group: einsatz.group })}
                 </MenuItem>
               )}
             {myGroups.map((group) => (
@@ -325,7 +340,7 @@ export default function EinsatzDialog({
         <TextField
           margin="dense"
           id="fw"
-          label="Feuerwehr"
+          label={t('firecall.fields.fw')}
           type="text"
           fullWidth
           variant="standard"
@@ -333,7 +348,7 @@ export default function EinsatzDialog({
           value={einsatz.fw}
         />
         <MyDateTimePicker
-          label="Alarmierung"
+          label={t('firecall.fields.alarmierung')}
           value={parseTimestamp(einsatz.date) || null}
           setValue={(newValue) => {
             setEinsatz({ ...einsatz, date: newValue?.toISOString() });
@@ -342,7 +357,7 @@ export default function EinsatzDialog({
         <TextField
           margin="dense"
           id="description"
-          label="Beschreibung"
+          label={t('firecall.fields.description')}
           type="text"
           fullWidth
           variant="standard"
@@ -350,14 +365,14 @@ export default function EinsatzDialog({
           value={einsatz.description}
         />
         <MyDateTimePicker
-          label="Eintreffen"
+          label={t('firecall.fields.eintreffen')}
           setValue={(newValue) => {
             setEinsatz({ ...einsatz, eintreffen: newValue?.toISOString() });
           }}
           value={parseTimestamp(einsatz.eintreffen) || null}
         />
         <MyDateTimePicker
-          label="Abrücken"
+          label={t('firecall.fields.abruecken')}
           setValue={(newValue) => {
             setEinsatz({ ...einsatz, abruecken: newValue?.toISOString() });
           }}
@@ -372,7 +387,7 @@ export default function EinsatzDialog({
         {einsatz.id && (
           <>
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-              Anhänge
+              {t('firecall.fields.attachments')}
             </Typography>
             <FileUploader onFileUploadComplete={handleFileUploadComplete} />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
@@ -411,7 +426,7 @@ export default function EinsatzDialog({
             onClose();
           }}
         >
-          Abbrechen
+          {t('common.cancel')}
         </Button>
         <Button
           disabled={!einsatz.name || !einsatz.group || saving}
@@ -423,16 +438,17 @@ export default function EinsatzDialog({
               onClose(einsatz);
             } catch (err) {
               console.error('Failed to save Einsatz:', err);
-              showSnackbar(
-                'Einsatz konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen.',
-                'error',
-              );
+              showSnackbar(t('einsatzDialog.saveError'), 'error');
             } finally {
               setSaving(false);
             }
           }}
         >
-          {saving ? 'Speichern...' : einsatz.id ? 'Aktualisieren' : 'Hinzufügen'}
+          {saving
+            ? t('common.saving')
+            : einsatz.id
+              ? t('common.update')
+              : t('common.add')}
         </Button>
       </DialogActions>
     </Dialog>

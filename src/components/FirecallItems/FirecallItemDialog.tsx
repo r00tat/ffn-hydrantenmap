@@ -30,6 +30,7 @@ import React, {
 } from 'react';
 import { StorageReference } from 'firebase/storage';
 import { arrayUnion, doc, where } from 'firebase/firestore';
+import { useTranslations } from 'next-intl';
 import { setDoc } from '../../lib/firestoreClient';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -81,6 +82,7 @@ export default function FirecallItemDialog({
   const firecallId = useFirecallId();
   const layers = useFirecallLayers();
   const showSnackbar = useSnackbar();
+  const t = useTranslations();
   const [open, setOpen] = useState(true);
   const [uploadedRefs, setUploadedRefs] = useState<StorageReference[]>([]);
   const dataFieldsRef = useRef<ItemDataFieldsHandle>(null);
@@ -197,16 +199,18 @@ export default function FirecallItemDialog({
         );
         setUploadedRefs((prev) => [...prev, ...refs]);
         showSnackbar(
-          `${refs.length} Datei${refs.length > 1 ? 'en' : ''} hochgeladen`,
+          refs.length > 1
+            ? t('firecallItem.filesUploadedPlural', { count: refs.length })
+            : t('firecallItem.filesUploaded', { count: refs.length }),
           'success',
         );
         setCountdown(5);
       } catch (err) {
         console.error('Failed to save attachments', err);
-        showSnackbar('Fehler beim Speichern der Anhänge', 'error');
+        showSnackbar(t('firecallItem.attachmentSaveError'), 'error');
       }
     },
-    [firecallId, showSnackbar],
+    [firecallId, showSnackbar, t],
   );
 
   useEffect(() => {
@@ -280,14 +284,14 @@ export default function FirecallItemDialog({
       >
         <DialogTitle sx={{ pr: 4 }}>
           {isUpload ? (
-            <>Datei zum Einsatz hochladen</>
+            <>{t('firecallItem.uploadTitle')}</>
           ) : item.id ? (
-            <>{item.markerName()} bearbeiten</>
+            <>{t('firecallItem.editTitle', { name: item.markerName() })}</>
           ) : (
-            <>Neu: {item.markerName()} hinzufügen</>
+            <>{t('firecallItem.addTitle', { name: item.markerName() })}</>
           )}
           <IconButton
-            aria-label="Abbrechen"
+            aria-label={t('common.cancel')}
             onClick={() => {
               setOpen(false);
               onClose();
@@ -301,17 +305,19 @@ export default function FirecallItemDialog({
         <DialogContent>
           <DialogContentText>
             {isUpload
-              ? 'Datei oder Foto direkt zum Einsatz hochladen.'
+              ? t('firecallItem.uploadDescription')
               : item.dialogText()}
           </DialogContentText>
           {allowTypeChange && (
             <FormControl fullWidth variant="standard">
-              <InputLabel id="firecall-item-type-label">Element Typ</InputLabel>
+              <InputLabel id="firecall-item-type-label">
+                {t('firecallItem.elementType')}
+              </InputLabel>
               <Select
                 labelId="firecall-item-type-label"
                 id="firecall-item-type"
                 value={item.type}
-                label="Art"
+                label={t('common.type')}
                 onChange={handleChange}
               >
                 {Object.entries(fcItemNames)
@@ -336,7 +342,7 @@ export default function FirecallItemDialog({
               )}
               {countdown !== null && (
                 <Typography sx={{ mt: 2 }} color="text.secondary">
-                  Schließe in {countdown}...
+                  {t('firecallItem.closeIn', { seconds: countdown })}
                 </Typography>
               )}
             </Box>
@@ -373,24 +379,24 @@ export default function FirecallItemDialog({
                       color: 'text.secondary',
                     }}
                   >
-                    Reihenfolge:
+                    {t('firecallItem.order')}
                   </Box>
-                  <Tooltip title="Ganz nach hinten">
+                  <Tooltip title={t('firecallItem.orderToBack')}>
                     <IconButton size="small" onClick={handleSendToBack}>
                       <VerticalAlignBottomIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Nach hinten">
+                  <Tooltip title={t('firecallItem.orderBackward')}>
                     <IconButton size="small" onClick={handleSendBackward}>
                       <ArrowDownwardIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Nach vorne">
+                  <Tooltip title={t('firecallItem.orderForward')}>
                     <IconButton size="small" onClick={handleBringForward}>
                       <ArrowUpwardIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Ganz nach vorne">
+                  <Tooltip title={t('firecallItem.orderToFront')}>
                     <IconButton size="small" onClick={handleBringToFront}>
                       <VerticalAlignTopIcon fontSize="small" />
                     </IconButton>
@@ -436,7 +442,7 @@ export default function FirecallItemDialog({
         {!isUpload && (
           <DialogActions>
             {item.id && (
-              <Tooltip title="Kopieren">
+              <Tooltip title={t('firecallItem.copy')}>
                 <IconButton
                   onClick={async () => {
                     await copyAndSaveFirecallItems(
@@ -452,7 +458,7 @@ export default function FirecallItemDialog({
               </Tooltip>
             )}
             {item.id && (
-              <Tooltip title="Löschen">
+              <Tooltip title={t('common.delete')}>
                 <IconButton
                   onClick={() => setConfirmDelete(true)}
                   color="error"
@@ -469,7 +475,7 @@ export default function FirecallItemDialog({
                 variant="contained"
                 onClick={handleQuickAddSubmit}
               >
-                {quickAddSelected.length} Fahrzeuge hinzufügen
+                {t('firecallItem.addVehicles', { count: quickAddSelected.length })}
               </Button>
             )}
             {!(
@@ -484,7 +490,7 @@ export default function FirecallItemDialog({
                 variant="contained"
                 onClick={handleSave}
               >
-                {item.id ? 'Speichern' : 'Hinzufügen'}
+                {item.id ? t('common.save') : t('common.add')}
               </Button>
             )}
           </DialogActions>
@@ -492,8 +498,8 @@ export default function FirecallItemDialog({
       </Dialog>
       {confirmDelete && (
         <ConfirmDialog
-          title={`${item.title()} löschen`}
-          text={`${item.title()} wirklich löschen?`}
+          title={t('firecallItem.deleteTitle', { name: item.title() })}
+          text={t('firecallItem.deleteConfirm', { name: item.title() })}
           onConfirm={(result) => {
             setConfirmDelete(false);
             if (result) {
