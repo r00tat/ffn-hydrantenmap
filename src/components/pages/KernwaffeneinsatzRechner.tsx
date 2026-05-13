@@ -3,499 +3,199 @@
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
 import {
   calculateFallout,
   calculateFalloutR1,
   FALLOUT_DECAY_EXPONENT,
-  FalloutHistoryEntry,
-  FalloutR1HistoryEntry,
   FalloutR1Values,
   FalloutValues,
+  formatDuration,
+  parseDuration,
 } from '../../common/strahlenschutz';
 import KernwaffenNomogramm from './KernwaffenNomogramm';
 
-function parseInput(value: string): number | null {
-  if (value.trim() === '') return null;
-  const num = parseFloat(value.replace(',', '.'));
-  return isNaN(num) ? null : num;
+function parseNumber(value: string): number | null {
+  const s = value.trim();
+  if (s === '') return null;
+  const num = parseFloat(s.replace(',', '.'));
+  if (isNaN(num) || num <= 0) return null;
+  return num;
 }
 
 function formatValue(value: number): string {
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
-/** Combine hours + minutes string inputs into decimal hours, or null if both empty. */
-function combineHm(hStr: string, mStr: string): number | null {
-  const h = parseInput(hStr);
-  const m = parseInput(mStr);
-  if (h === null && m === null) return null;
-  return (h ?? 0) + (m ?? 0) / 60;
+interface ResultBlockProps {
+  label: string;
+  formula: string;
+  substituted: string;
 }
 
-/** Split decimal hours into integer hours and remaining minutes. */
-function splitHm(decHours: number): { h: number; m: number } {
-  const totalSec = Math.round(decHours * 3600);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.round((totalSec - h * 3600) / 60);
-  if (m === 60) return { h: h + 1, m: 0 };
-  return { h, m };
-}
-
-function formatHm(decHours: number): string {
-  const { h, m } = splitHm(decHours);
-  if (h > 0 && m > 0) return `${h} h ${m} min`;
-  if (h > 0) return `${h} h`;
-  return `${m} min`;
-}
-
-// ============ Main Kernwaffeneinsatz Rechner ============
-
-interface MainInputs {
-  teH: string;
-  teMin: string;
-  tsH: string;
-  tsMin: string;
-  r1: string;
-  d: string;
-}
-
-function getFalloutFormulaDisplay(
-  field: keyof FalloutValues,
-  values: { r1: number; te: number; ts: number; d: number }
-) {
-  const v = formatValue;
-  switch (field) {
-    case 'd':
-      return {
-        formula: 'D = 5 · R₁ · ( Te^(-0,2) − (Te+Ts)^(-0,2) )',
-        substituted: `D = 5 · ${v(values.r1)} · ( ${v(values.te)}^(-0,2) − ${v(values.te + values.ts)}^(-0,2) ) = ${v(values.d)} mSv`,
-      };
-    case 'r1':
-      return {
-        formula: 'R₁ = D / ( 5 · ( Te^(-0,2) − (Te+Ts)^(-0,2) ) )',
-        substituted: `R₁ = ${v(values.d)} / ( 5 · ( ${v(values.te)}^(-0,2) − ${v(values.te + values.ts)}^(-0,2) ) ) = ${v(values.r1)} mSv/h`,
-      };
-    case 'ts':
-      return {
-        formula: 'Ts = ( Te^(-0,2) − D/(5·R₁) )^(-5) − Te',
-        substituted: `Ts = ( ${v(values.te)}^(-0,2) − ${v(values.d)}/(5·${v(values.r1)}) )^(-5) − ${v(values.te)} = ${v(values.ts)} h`,
-      };
-    case 'te':
-      return {
-        formula: 'Te numerisch aus  5·R₁·( Te^(-0,2) − (Te+Ts)^(-0,2) ) = D',
-        substituted: `5·${v(values.r1)}·( Te^(-0,2) − (Te+${v(values.ts)})^(-0,2) ) = ${v(values.d)}  →  Te = ${v(values.te)} h`,
-      };
-  }
-}
-
-export function KernwaffeneinsatzRechner() {
-  const tShared = useTranslations('schadstoff');
-  const t = useTranslations('schadstoff.kernwaffen');
-  const [inputs, setInputs] = useState<MainInputs>({
-    teH: '',
-    teMin: '',
-    tsH: '',
-    tsMin: '',
-    r1: '',
-    d: '',
-  });
-  const [history, setHistory] = useState<FalloutHistoryEntry[]>([]);
-
-  const te = useMemo(() => combineHm(inputs.teH, inputs.teMin), [inputs]);
-  const ts = useMemo(() => combineHm(inputs.tsH, inputs.tsMin), [inputs]);
-  const r1 = useMemo(() => parseInput(inputs.r1), [inputs.r1]);
-  const d = useMemo(() => parseInput(inputs.d), [inputs.d]);
-
-  const values: FalloutValues = useMemo(
-    () => ({ r1, te, ts, d }),
-    [r1, te, ts, d],
-  );
-
-  const result = useMemo(() => calculateFallout(values), [values]);
-  const nullCount = Object.values(values).filter((v) => v === null).length;
-
-  const handleChange = useCallback(
-    (field: keyof MainInputs) =>
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        setInputs((prev) => ({ ...prev, [field]: event.target.value }));
-      },
-    [],
-  );
-
-  const handleCalculate = useCallback(() => {
-    if (!result) return;
-    const final = {
-      r1: result.field === 'r1' ? result.value : r1!,
-      te: result.field === 'te' ? result.value : te!,
-      ts: result.field === 'ts' ? result.value : ts!,
-      d: result.field === 'd' ? result.value : d!,
-    };
-    const entry: FalloutHistoryEntry = {
-      ...final,
-      calculatedField: result.field,
-      timestamp: new Date(),
-    };
-    setHistory((prev) => [entry, ...prev]);
-
-    // Update inputs to reflect the computed value
-    if (result.field === 'd') {
-      setInputs((prev) => ({ ...prev, d: formatValue(result.value) }));
-    } else if (result.field === 'r1') {
-      setInputs((prev) => ({ ...prev, r1: formatValue(result.value) }));
-    } else if (result.field === 'te') {
-      const { h, m } = splitHm(result.value);
-      setInputs((prev) => ({ ...prev, teH: String(h), teMin: String(m) }));
-    } else if (result.field === 'ts') {
-      const { h, m } = splitHm(result.value);
-      setInputs((prev) => ({ ...prev, tsH: String(h), tsMin: String(m) }));
-    }
-  }, [result, r1, te, ts, d]);
-
-  const handleClear = useCallback(() => {
-    setInputs({ teH: '', teMin: '', tsH: '', tsMin: '', r1: '', d: '' });
-  }, []);
-
-  const handleDeleteHistoryEntry = useCallback((index: number) => {
-    setHistory((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  // Live values for nomogram preview (use computed result if available)
-  const nomR1 = result && result.field === 'r1' ? result.value : r1;
-  const nomTe = result && result.field === 'te' ? result.value : te;
-  const nomTs = result && result.field === 'ts' ? result.value : ts;
-
+function ResultBlock({ label, formula, substituted }: ResultBlockProps) {
   return (
-    <Box>
-      <Typography variant="h5" gutterBottom>
-        {t('title')}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('instructions')}
-      </Typography>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-          gap: 2,
-        }}
-      >
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            {t('te')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <TextField
-              label={t('hours')}
-              value={inputs.teH}
-              onChange={handleChange('teH')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label={t('minutes')}
-              value={inputs.teMin}
-              onChange={handleChange('teMin')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-          </Box>
-        </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            {t('ts')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <TextField
-              label={t('hours')}
-              value={inputs.tsH}
-              onChange={handleChange('tsH')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label={t('minutes')}
-              value={inputs.tsMin}
-              onChange={handleChange('tsMin')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-          </Box>
-        </Box>
-        <TextField
-          label={t('r1')}
-          value={inputs.r1}
-          onChange={handleChange('r1')}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          label={t('d')}
-          value={inputs.d}
-          onChange={handleChange('d')}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-        <Button
-          variant="contained"
-          onClick={handleCalculate}
-          disabled={!result}
-        >
-          {tShared('calculate')}
-        </Button>
-        <Button variant="outlined" onClick={handleClear}>
-          {tShared('clear')}
-        </Button>
-      </Box>
-
-      {result &&
-        (() => {
-          const final = {
-            r1: result.field === 'r1' ? result.value : r1!,
-            te: result.field === 'te' ? result.value : te!,
-            ts: result.field === 'ts' ? result.value : ts!,
-            d: result.field === 'd' ? result.value : d!,
-          };
-          const fd = getFalloutFormulaDisplay(result.field, final);
-          const v = formatValue(result.value);
-          const hm = formatHm(result.value);
-          const label =
-            result.field === 'd'
-              ? t('resultD', { value: v })
-              : result.field === 'r1'
-                ? t('resultR1', { value: v })
-                : result.field === 'te'
-                  ? t('resultTe', { value: v, hm })
-                  : t('resultTs', { value: v, hm });
-          return (
-            <Box
-              sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: 'success.main',
-                color: 'success.contrastText',
-                borderRadius: 1,
-              }}
-            >
-              <Typography variant="h6">{label}</Typography>
-              <Box sx={{ mt: 1, fontFamily: 'monospace' }}>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                  {fd.formula}
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                  {fd.substituted}
-                </Typography>
-              </Box>
-            </Box>
-          );
-        })()}
-
-      {nullCount !== 1 && nullCount > 0 && (
-        <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-          {t('tooFewValues', { actual: 4 - nullCount })}
+    <Box
+      sx={{
+        mt: 2,
+        p: 2,
+        bgcolor: 'success.main',
+        color: 'success.contrastText',
+        borderRadius: 1,
+      }}
+    >
+      <Typography variant="h6">{label}</Typography>
+      <Box sx={{ mt: 1, fontFamily: 'monospace' }}>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+          {formula}
         </Typography>
-      )}
-      {nullCount === 0 && (
-        <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
-          {tShared('allFilled')}
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+          {substituted}
         </Typography>
-      )}
-
-      <KernwaffenNomogramm r1={nomR1} te={nomTe} ts={nomTs} />
-
-      {history.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Divider sx={{ mb: 1 }} />
-          <Typography variant="h6" gutterBottom>
-            {tShared('history')}
-          </Typography>
-          <List dense>
-            {history.map((entry, index) => {
-              const fd = getFalloutFormulaDisplay(entry.calculatedField, {
-                r1: entry.r1,
-                te: entry.te,
-                ts: entry.ts,
-                d: entry.d,
-              });
-              const primary =
-                entry.calculatedField === 'd'
-                  ? t('resultD', { value: formatValue(entry.d) })
-                  : entry.calculatedField === 'r1'
-                    ? t('resultR1', { value: formatValue(entry.r1) })
-                    : entry.calculatedField === 'te'
-                      ? t('resultTe', {
-                          value: formatValue(entry.te),
-                          hm: formatHm(entry.te),
-                        })
-                      : t('resultTs', {
-                          value: formatValue(entry.ts),
-                          hm: formatHm(entry.ts),
-                        });
-              return (
-                <ListItem
-                  key={index}
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      aria-label={tShared('deleteAria')}
-                      onClick={() => handleDeleteHistoryEntry(index)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText
-                    primary={primary}
-                    secondary={
-                      <>
-                        {fd.formula}
-                        <br />
-                        {fd.substituted}
-                        <br />
-                        {entry.timestamp.toLocaleTimeString()}
-                      </>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
-        </Box>
-      )}
+      </Box>
     </Box>
   );
 }
 
-// ============ R₁ aus Messung Rechner ============
+// ===== Section 1: R₁ (Bezugsdosisleistung) =====
 
 interface R1Inputs {
-  rt: string;
-  tH: string;
-  tMin: string;
   r1: string;
+  rt: string;
+  t: string;
 }
 
-function getR1FormulaDisplay(
+function describeR1Result(
   field: keyof FalloutR1Values,
-  values: { r1: number; rt: number; t: number }
+  r1: number,
+  rt: number,
+  t: number,
 ) {
   const v = formatValue;
   switch (field) {
     case 'r1':
       return {
         formula: 'R₁ = R(t) · t^1,2',
-        substituted: `R₁ = ${v(values.rt)} · ${v(values.t)}^1,2 = ${v(values.r1)} mSv/h`,
+        substituted: `R₁ = ${v(rt)} · ${v(t)}^1,2 = ${v(r1)} mSv/h`,
       };
     case 'rt':
       return {
         formula: 'R(t) = R₁ · t^(-1,2)',
-        substituted: `R(t) = ${v(values.r1)} · ${v(values.t)}^(-1,2) = ${v(values.rt)} mSv/h`,
+        substituted: `R(t) = ${v(r1)} · ${v(t)}^(-1,2) = ${v(rt)} mSv/h`,
       };
     case 't':
       return {
         formula: 't = ( R₁ / R(t) )^(1/1,2)',
-        substituted: `t = ( ${v(values.r1)} / ${v(values.rt)} )^(1/1,2) = ${v(values.t)} h`,
+        substituted: `t = ( ${v(r1)} / ${v(rt)} )^(1/1,2) = ${v(t)} h`,
       };
   }
 }
 
-export function BezugsdosisleistungRechner() {
+// ===== Main Workflow =====
+
+export function KernwaffeneinsatzRechner() {
   const tShared = useTranslations('schadstoff');
-  const t = useTranslations('schadstoff.bezugsdosisleistung');
-  const [inputs, setInputs] = useState<R1Inputs>({
-    rt: '',
-    tH: '',
-    tMin: '',
-    r1: '',
-  });
-  const [history, setHistory] = useState<FalloutR1HistoryEntry[]>([]);
+  const t = useTranslations('schadstoff.kernwaffen');
 
-  const rt = useMemo(() => parseInput(inputs.rt), [inputs.rt]);
-  const tVal = useMemo(() => combineHm(inputs.tH, inputs.tMin), [inputs]);
-  const r1 = useMemo(() => parseInput(inputs.r1), [inputs.r1]);
+  // Section 1: R₁ inputs
+  const [s1, setS1] = useState<R1Inputs>({ r1: '', rt: '', t: '' });
 
-  const values: FalloutR1Values = useMemo(
-    () => ({ r1, rt, t: tVal }),
-    [r1, rt, tVal],
+  // Section 2: dose rate at other time
+  const [s2, setS2] = useState({ tPrime: '', rPrime: '' });
+
+  // Section 3: total dose
+  const [s3, setS3] = useState({ te: '', ts: '', d: '' });
+
+  // === Parse & compute ===
+
+  const s1Parsed: FalloutR1Values = useMemo(
+    () => ({
+      r1: parseNumber(s1.r1),
+      rt: parseNumber(s1.rt),
+      t: parseDuration(s1.t),
+    }),
+    [s1],
   );
 
-  const result = useMemo(() => calculateFalloutR1(values), [values]);
-  const nullCount = Object.values(values).filter((v) => v === null).length;
+  const s1Result = useMemo(
+    () => calculateFalloutR1(s1Parsed),
+    [s1Parsed],
+  );
 
-  const handleChange = useCallback(
+  // Effective R₁: either entered directly, or computed from rt+t
+  const r1Effective = useMemo<number | null>(() => {
+    if (s1Parsed.r1 !== null) return s1Parsed.r1;
+    if (s1Result && s1Result.field === 'r1') return s1Result.value;
+    return null;
+  }, [s1Parsed.r1, s1Result]);
+
+  const s2Parsed: FalloutR1Values = useMemo(
+    () => ({
+      r1: r1Effective,
+      rt: parseNumber(s2.rPrime),
+      t: parseDuration(s2.tPrime),
+    }),
+    [r1Effective, s2],
+  );
+
+  const s2Result = useMemo(
+    () => calculateFalloutR1(s2Parsed),
+    [s2Parsed],
+  );
+
+  const s3Parsed: FalloutValues = useMemo(
+    () => ({
+      r1: r1Effective,
+      te: parseDuration(s3.te),
+      ts: parseDuration(s3.ts),
+      d: parseNumber(s3.d),
+    }),
+    [r1Effective, s3],
+  );
+
+  const s3Result = useMemo(() => calculateFallout(s3Parsed), [s3Parsed]);
+
+  // === Handlers ===
+
+  const onChange1 = useCallback(
     (field: keyof R1Inputs) =>
-      (event: React.ChangeEvent<HTMLInputElement>) => {
-        setInputs((prev) => ({ ...prev, [field]: event.target.value }));
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setS1((p) => ({ ...p, [field]: e.target.value }));
+      },
+    [],
+  );
+  const onChange2 = useCallback(
+    (field: 'tPrime' | 'rPrime') =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setS2((p) => ({ ...p, [field]: e.target.value }));
+      },
+    [],
+  );
+  const onChange3 = useCallback(
+    (field: 'te' | 'ts' | 'd') =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setS3((p) => ({ ...p, [field]: e.target.value }));
       },
     [],
   );
 
-  const handleCalculate = useCallback(() => {
-    if (!result) return;
-    const final = {
-      r1: result.field === 'r1' ? result.value : r1!,
-      rt: result.field === 'rt' ? result.value : rt!,
-      t: result.field === 't' ? result.value : tVal!,
-    };
-    const entry: FalloutR1HistoryEntry = {
-      ...final,
-      calculatedField: result.field,
-      timestamp: new Date(),
-    };
-    setHistory((prev) => [entry, ...prev]);
-
-    if (result.field === 'r1') {
-      setInputs((prev) => ({ ...prev, r1: formatValue(result.value) }));
-    } else if (result.field === 'rt') {
-      setInputs((prev) => ({ ...prev, rt: formatValue(result.value) }));
-    } else if (result.field === 't') {
-      const { h, m } = splitHm(result.value);
-      setInputs((prev) => ({ ...prev, tH: String(h), tMin: String(m) }));
-    }
-  }, [result, r1, rt, tVal]);
-
-  const handleClear = useCallback(() => {
-    setInputs({ rt: '', tH: '', tMin: '', r1: '' });
+  const handleClearAll = useCallback(() => {
+    setS1({ r1: '', rt: '', t: '' });
+    setS2({ tPrime: '', rPrime: '' });
+    setS3({ te: '', ts: '', d: '' });
   }, []);
 
-  const handleDeleteHistoryEntry = useCallback((index: number) => {
-    setHistory((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  // === Live nomogram values (use computed if input field empty) ===
+  const nomR1 = r1Effective;
+  const nomTe =
+    s3Parsed.te ??
+    (s3Result && s3Result.field === 'te' ? s3Result.value : null);
+  const nomTs =
+    s3Parsed.ts ??
+    (s3Result && s3Result.field === 'ts' ? s3Result.value : null);
 
   return (
     <Box>
@@ -503,183 +203,280 @@ export function BezugsdosisleistungRechner() {
         {t('title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('instructions', { exp: FALLOUT_DECAY_EXPONENT })}
+        {t('workflowIntro')}
       </Typography>
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' },
-          gap: 2,
-        }}
-      >
-        <TextField
-          label={t('rt')}
-          value={inputs.rt}
-          onChange={handleChange('rt')}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            {t('t')}
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-            <TextField
-              label={t('hours')}
-              value={inputs.tH}
-              onChange={handleChange('tH')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-            <TextField
-              label={t('minutes')}
-              value={inputs.tMin}
-              onChange={handleChange('tMin')}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-              sx={{ flex: 1 }}
-            />
-          </Box>
+      {/* ===== Section 1: R₁ from measurement or direct ===== */}
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          {t('section1Title')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {t('section1Instructions', { exp: FALLOUT_DECAY_EXPONENT })}
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label={t('rt')}
+            value={s1.rt}
+            onChange={onChange1('rt')}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            label={t('tDuration')}
+            value={s1.t}
+            onChange={onChange1('t')}
+            type="text"
+            placeholder={t('durationPlaceholder')}
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText={
+              s1Parsed.t !== null ? formatDuration(s1Parsed.t) : undefined
+            }
+          />
+          <TextField
+            label={t('r1')}
+            value={s1.r1}
+            onChange={onChange1('r1')}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
         </Box>
-        <TextField
-          label={t('r1')}
-          value={inputs.r1}
-          onChange={handleChange('r1')}
-          type="text"
-          inputMode="decimal"
-          variant="outlined"
-          size="small"
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+
+        {s1Result &&
+          (() => {
+            const r1Val =
+              s1Result.field === 'r1' ? s1Result.value : s1Parsed.r1!;
+            const rtVal =
+              s1Result.field === 'rt' ? s1Result.value : s1Parsed.rt!;
+            const tVal =
+              s1Result.field === 't' ? s1Result.value : s1Parsed.t!;
+            const fd = describeR1Result(s1Result.field, r1Val, rtVal, tVal);
+            const label =
+              s1Result.field === 'r1'
+                ? t('resultR1', { value: formatValue(s1Result.value) })
+                : s1Result.field === 'rt'
+                  ? t('resultRt', { value: formatValue(s1Result.value) })
+                  : t('resultT', {
+                      value: formatValue(s1Result.value),
+                      hm: formatDuration(s1Result.value),
+                    });
+            return (
+              <ResultBlock
+                label={label}
+                formula={fd.formula}
+                substituted={fd.substituted}
+              />
+            );
+          })()}
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-        <Button
-          variant="contained"
-          onClick={handleCalculate}
-          disabled={!result}
+      <Divider sx={{ my: 3 }} />
+
+      {/* ===== Section 2: Dose rate at other time ===== */}
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          {t('section2Title')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {r1Effective !== null
+            ? t('section2Instructions', { r1: formatValue(r1Effective) })
+            : t('section2NoR1')}
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+            gap: 2,
+          }}
         >
-          {tShared('calculate')}
-        </Button>
-        <Button variant="outlined" onClick={handleClear}>
+          <TextField
+            label={t('tPrimeDuration')}
+            value={s2.tPrime}
+            onChange={onChange2('tPrime')}
+            type="text"
+            placeholder={t('durationPlaceholder')}
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText={
+              s2Parsed.t !== null ? formatDuration(s2Parsed.t) : undefined
+            }
+            disabled={r1Effective === null}
+          />
+          <TextField
+            label={t('rPrime')}
+            value={s2.rPrime}
+            onChange={onChange2('rPrime')}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={r1Effective === null}
+          />
+        </Box>
+
+        {s2Result &&
+          r1Effective !== null &&
+          (() => {
+            const rt =
+              s2Result.field === 'rt' ? s2Result.value : s2Parsed.rt!;
+            const tv =
+              s2Result.field === 't' ? s2Result.value : s2Parsed.t!;
+            const fd = describeR1Result(s2Result.field, r1Effective, rt, tv);
+            const label =
+              s2Result.field === 'rt'
+                ? t('resultRt', { value: formatValue(s2Result.value) })
+                : t('resultT', {
+                    value: formatValue(s2Result.value),
+                    hm: formatDuration(s2Result.value),
+                  });
+            return (
+              <ResultBlock
+                label={label}
+                formula={fd.formula}
+                substituted={fd.substituted}
+              />
+            );
+          })()}
+      </Box>
+
+      <Divider sx={{ my: 3 }} />
+
+      {/* ===== Section 3: Total dose ===== */}
+      <Box>
+        <Typography variant="subtitle1" gutterBottom>
+          {t('section3Title')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {r1Effective !== null
+            ? t('section3Instructions', { r1: formatValue(r1Effective) })
+            : t('section3NoR1')}
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label={t('te')}
+            value={s3.te}
+            onChange={onChange3('te')}
+            type="text"
+            placeholder={t('durationPlaceholder')}
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText={
+              s3Parsed.te !== null ? formatDuration(s3Parsed.te) : undefined
+            }
+            disabled={r1Effective === null}
+          />
+          <TextField
+            label={t('ts')}
+            value={s3.ts}
+            onChange={onChange3('ts')}
+            type="text"
+            placeholder={t('durationPlaceholder')}
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText={
+              s3Parsed.ts !== null ? formatDuration(s3Parsed.ts) : undefined
+            }
+            disabled={r1Effective === null}
+          />
+          <TextField
+            label={t('d')}
+            value={s3.d}
+            onChange={onChange3('d')}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            disabled={r1Effective === null}
+          />
+        </Box>
+
+        {s3Result &&
+          r1Effective !== null &&
+          (() => {
+            const teV =
+              s3Result.field === 'te' ? s3Result.value : s3Parsed.te!;
+            const tsV =
+              s3Result.field === 'ts' ? s3Result.value : s3Parsed.ts!;
+            const dV =
+              s3Result.field === 'd' ? s3Result.value : s3Parsed.d!;
+            const v = formatValue;
+            const formula =
+              s3Result.field === 'd'
+                ? {
+                    formula: 'D = 5 · R₁ · ( Te^(-0,2) − (Te+Ts)^(-0,2) )',
+                    substituted: `D = 5 · ${v(r1Effective)} · ( ${v(teV)}^(-0,2) − ${v(teV + tsV)}^(-0,2) ) = ${v(dV)} mSv`,
+                  }
+                : s3Result.field === 'ts'
+                  ? {
+                      formula: 'Ts = ( Te^(-0,2) − D/(5·R₁) )^(-5) − Te',
+                      substituted: `Ts = ( ${v(teV)}^(-0,2) − ${v(dV)}/(5·${v(r1Effective)}) )^(-5) − ${v(teV)} = ${v(tsV)} h`,
+                    }
+                  : s3Result.field === 'te'
+                    ? {
+                        formula:
+                          'Te numerisch aus  5·R₁·( Te^(-0,2) − (Te+Ts)^(-0,2) ) = D',
+                        substituted: `5·${v(r1Effective)}·( Te^(-0,2) − (Te+${v(tsV)})^(-0,2) ) = ${v(dV)}  →  Te = ${v(teV)} h`,
+                      }
+                    : {
+                        formula:
+                          'R₁ = D / ( 5 · ( Te^(-0,2) − (Te+Ts)^(-0,2) ) )',
+                        substituted: `R₁ = ${v(dV)} / ( 5 · ( ${v(teV)}^(-0,2) − ${v(teV + tsV)}^(-0,2) ) ) = ${v(r1Effective)} mSv/h`,
+                      };
+            const label =
+              s3Result.field === 'd'
+                ? t('resultD', { value: formatValue(s3Result.value) })
+                : s3Result.field === 'te'
+                  ? t('resultTe', {
+                      value: formatValue(s3Result.value),
+                      hm: formatDuration(s3Result.value),
+                    })
+                  : t('resultTs', {
+                      value: formatValue(s3Result.value),
+                      hm: formatDuration(s3Result.value),
+                    });
+            return (
+              <ResultBlock
+                label={label}
+                formula={formula.formula}
+                substituted={formula.substituted}
+              />
+            );
+          })()}
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+        <Button variant="outlined" onClick={handleClearAll}>
           {tShared('clear')}
         </Button>
       </Box>
 
-      {result &&
-        (() => {
-          const final = {
-            r1: result.field === 'r1' ? result.value : r1!,
-            rt: result.field === 'rt' ? result.value : rt!,
-            t: result.field === 't' ? result.value : tVal!,
-          };
-          const fd = getR1FormulaDisplay(result.field, final);
-          const v = formatValue(result.value);
-          const label =
-            result.field === 'r1'
-              ? t('resultR1', { value: v })
-              : result.field === 'rt'
-                ? t('resultRt', { value: v })
-                : t('resultT', { value: v, hm: formatHm(result.value) });
-          return (
-            <Box
-              sx={{
-                mt: 2,
-                p: 2,
-                bgcolor: 'success.main',
-                color: 'success.contrastText',
-                borderRadius: 1,
-              }}
-            >
-              <Typography variant="h6">{label}</Typography>
-              <Box sx={{ mt: 1, fontFamily: 'monospace' }}>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                  {fd.formula}
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                  {fd.substituted}
-                </Typography>
-              </Box>
-            </Box>
-          );
-        })()}
-
-      {nullCount !== 1 && nullCount > 0 && (
-        <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-          {t('tooFewValues', { actual: 3 - nullCount })}
-        </Typography>
-      )}
-      {nullCount === 0 && (
-        <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
-          {tShared('allFilled')}
-        </Typography>
-      )}
-
-      {history.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Divider sx={{ mb: 1 }} />
-          <Typography variant="h6" gutterBottom>
-            {tShared('history')}
-          </Typography>
-          <List dense>
-            {history.map((entry, index) => {
-              const fd = getR1FormulaDisplay(entry.calculatedField, {
-                r1: entry.r1,
-                rt: entry.rt,
-                t: entry.t,
-              });
-              const primary =
-                entry.calculatedField === 'r1'
-                  ? t('resultR1', { value: formatValue(entry.r1) })
-                  : entry.calculatedField === 'rt'
-                    ? t('resultRt', { value: formatValue(entry.rt) })
-                    : t('resultT', {
-                        value: formatValue(entry.t),
-                        hm: formatHm(entry.t),
-                      });
-              return (
-                <ListItem
-                  key={index}
-                  secondaryAction={
-                    <IconButton
-                      edge="end"
-                      aria-label={tShared('deleteAria')}
-                      onClick={() => handleDeleteHistoryEntry(index)}
-                      size="small"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  }
-                >
-                  <ListItemText
-                    primary={primary}
-                    secondary={
-                      <>
-                        {fd.formula}
-                        <br />
-                        {fd.substituted}
-                        <br />
-                        {entry.timestamp.toLocaleTimeString()}
-                      </>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
-          </List>
-        </Box>
-      )}
+      {/* Nomogramm (live preview) */}
+      <KernwaffenNomogramm r1={nomR1} te={nomTe} ts={nomTs} />
     </Box>
   );
 }

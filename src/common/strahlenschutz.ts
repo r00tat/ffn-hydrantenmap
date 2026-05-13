@@ -578,6 +578,48 @@ export function calculateDosisleistungNuklid(
  *     = 5 · R₁ · ( Te^(-0.2) − (Te + Ts)^(-0.2) )   [mSv]
  */
 
+/**
+ * Parse a duration string into decimal hours. Supports:
+ *   "2", "2.5", "2,5"      → hours as decimal
+ *   "2h", "2 h"            → 2 hours
+ *   "15min", "15 min"      → 0.25 hours
+ *   "2h 15min", "1h30min"  → combined
+ *
+ * Returns null on invalid input or non-positive values.
+ */
+export function parseDuration(input: string): number | null {
+  const s = input.trim().toLowerCase();
+  if (s === '') return null;
+  if (s.startsWith('-')) return null;
+
+  const hMatch = s.match(/(\d+(?:[.,]\d+)?)\s*h(?![a-z])/);
+  const minMatch = s.match(/(\d+(?:[.,]\d+)?)\s*min/);
+
+  if (hMatch || minMatch) {
+    const h = hMatch ? parseFloat(hMatch[1].replace(',', '.')) : 0;
+    const m = minMatch ? parseFloat(minMatch[1].replace(',', '.')) : 0;
+    if (isNaN(h) || isNaN(m)) return null;
+    const total = h + m / 60;
+    return total > 0 ? total : null;
+  }
+
+  const direct = parseFloat(s.replace(',', '.'));
+  if (isNaN(direct) || direct <= 0) return null;
+  return direct;
+}
+
+/**
+ * Format decimal hours as "2 h 15 min" / "30 min" / "2 h" (rounded to whole minutes).
+ */
+export function formatDuration(decHours: number): string {
+  const totalMin = Math.round(decHours * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0 && m > 0) return `${h} h ${m} min`;
+  if (h > 0) return `${h} h`;
+  return `${m} min`;
+}
+
 export const FALLOUT_DECAY_EXPONENT = 1.2;
 
 /** Dosisleistung R(t) = R₁ · t^(-1.2). t in Stunden nach Detonation. */

@@ -11,10 +11,12 @@ import {
   FALLOUT_DECAY_EXPONENT,
   falloutDose,
   falloutDoseRate,
+  formatDuration,
   getCompatibleUnits,
   isDoseUnit,
   isDoseRateUnit,
   NUCLIDES,
+  parseDuration,
   StrahlenschutzValues,
 } from './strahlenschutz';
 
@@ -456,6 +458,87 @@ describe('calculateDosisleistungNuklid', () => {
       doseRate: 0,
     });
     expect(result).toBeNull();
+  });
+});
+
+describe('parseDuration', () => {
+  it('returns null for empty input', () => {
+    expect(parseDuration('')).toBeNull();
+    expect(parseDuration('   ')).toBeNull();
+  });
+
+  it('returns null for invalid input', () => {
+    expect(parseDuration('abc')).toBeNull();
+    expect(parseDuration('h')).toBeNull();
+    expect(parseDuration('min')).toBeNull();
+  });
+
+  it('parses pure decimal as hours', () => {
+    expect(parseDuration('2')).toBe(2);
+    expect(parseDuration('2.5')).toBe(2.5);
+    expect(parseDuration('0.25')).toBe(0.25);
+  });
+
+  it('accepts comma as decimal separator', () => {
+    expect(parseDuration('2,5')).toBe(2.5);
+    expect(parseDuration('0,25')).toBe(0.25);
+  });
+
+  it('parses hours with h suffix', () => {
+    expect(parseDuration('2h')).toBe(2);
+    expect(parseDuration('2 h')).toBe(2);
+    expect(parseDuration('2.5h')).toBe(2.5);
+  });
+
+  it('parses minutes with min suffix', () => {
+    expect(parseDuration('15min')).toBeCloseTo(0.25);
+    expect(parseDuration('30 min')).toBeCloseTo(0.5);
+    expect(parseDuration('90min')).toBeCloseTo(1.5);
+  });
+
+  it('parses combined h+min', () => {
+    expect(parseDuration('2h 15min')).toBeCloseTo(2.25);
+    expect(parseDuration('1h30min')).toBeCloseTo(1.5);
+    expect(parseDuration('2h 0min')).toBe(2);
+    expect(parseDuration('0h 45min')).toBeCloseTo(0.75);
+  });
+
+  it('handles case-insensitive', () => {
+    expect(parseDuration('2H 15MIN')).toBeCloseTo(2.25);
+    expect(parseDuration('2H 15Min')).toBeCloseTo(2.25);
+  });
+
+  it('returns null for negative values', () => {
+    expect(parseDuration('-1')).toBeNull();
+    expect(parseDuration('-1h')).toBeNull();
+  });
+
+  it('returns null for zero', () => {
+    expect(parseDuration('0')).toBeNull();
+    expect(parseDuration('0h')).toBeNull();
+    expect(parseDuration('0h 0min')).toBeNull();
+  });
+});
+
+describe('formatDuration', () => {
+  it('formats whole hours', () => {
+    expect(formatDuration(2)).toBe('2 h');
+    expect(formatDuration(1)).toBe('1 h');
+  });
+
+  it('formats whole minutes only', () => {
+    expect(formatDuration(0.25)).toBe('15 min');
+    expect(formatDuration(0.5)).toBe('30 min');
+  });
+
+  it('formats h+min combinations', () => {
+    expect(formatDuration(2.25)).toBe('2 h 15 min');
+    expect(formatDuration(1.5)).toBe('1 h 30 min');
+  });
+
+  it('rounds to nearest minute', () => {
+    expect(formatDuration(0.1)).toBe('6 min');
+    expect(formatDuration(2.0167)).toBe('2 h 1 min');
   });
 });
 

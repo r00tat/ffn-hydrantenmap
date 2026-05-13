@@ -16,8 +16,7 @@ Note: The calculators provide a quick situational estimate. For real operation d
 - **Shielding factor** Reduction of the dose rate through several layers of shielding
 - **Stay time** Permissible deployment time at a given dose rate and dose limit
 - **Dose rate from nuclide activity** Dose rate at 1 m distance from activity and the nuclide-specific gamma constant
-- **Nuclear weapon / fallout** Way-Wigner decay, total dose during stay in the fallout area, visualised as an FM 3-3-1 nomogram (Austrian STS silver competition)
-- **Reference dose rate from measurement** Backcalculate R₁ at H+1 from a current measurement R(t)
+- **Nuclear weapon / fallout** Backcalculate the reference dose rate R₁ from a measurement, decay at arbitrary times, total dose during stay in the fallout area, visualised as an FM 3-3-1 nomogram (Austrian STS silver competition)
 - **Unit conversion** Sv / mSv / µSv / nSv, Gy, R and dose rates
 - **Calculation history** Every calculator keeps the latest results including formula and values for documentation during the operation
 
@@ -91,31 +90,47 @@ R(t) = R₁ · t^(-1.2)
 
 R₁ = reference dose rate at H+1 hour (mSv/h), t = hours after burst. Rule of thumb (7:10): after a sevenfold time the dose rate drops to roughly a tenth.
 
+The calculator is split into three steps that all share the same R₁:
+
+### Step 1 — Determine the reference dose rate R₁
+
+R₁ is either entered directly or backcalculated from a current measurement:
+
+```
+R₁ = R(t) · t^1.2
+```
+
+If R(t) and t are entered, the calculator yields R₁ automatically. If R₁ is entered directly, R(t) or t can be derived if the other value is known. The empty field is computed.
+
+Example: a measurement 4 hours after the burst yields 50 mSv/h → R₁ = 50 · 4^1.2 ≈ 264 mSv/h.
+
+### Step 2 — Dose rate at any later time
+
+Using R₁ from step 1, the dose rate R(t') at any other time t' after burst is computed — or vice versa, from a target R(t') the time t' at which it occurs.
+
+### Step 3 — Total dose during stay
+
 The accumulated dose during a stay starting at entry time Te for duration Ts is the integral:
 
 ```
 D = 5 · R₁ · ( Te^(-0.2) − (Te + Ts)^(-0.2) )
 ```
 
-Te and Ts are entered as separate hours and minutes fields (internally converted to decimal hours). Enter any three of the four quantities R₁, Te, Ts, D — the fourth is computed (Te via numerical bisection in log space).
+With R₁ from step 1 and any two of Te, Ts, D the missing fourth is computed (Te via numerical bisection in log space).
 
 :::info
-FM 3-3-1 example: R₁ = 300 mSv/h, Te = 2 h, Ts = 1 h → D ≈ 101.7 mSv. Input: R₁ = 300, Te = 2 h 0 min, Ts = 1 h 0 min, dose field empty → Calculate.
+Durations are entered as text and accept several formats: `2.5` (decimal), `2h 15min`, `1h30min` or `45min`. Comma is allowed as decimal separator.
 :::
+
+:::info
+FM 3-3-1 example: R₁ = 300 mSv/h, Te = 2h, Ts = 1h → D ≈ 101.7 mSv.
+:::
+
+### Nomogram
 
 The nomogram visualises the calculation as in FM 3-3-1: the Te scale on the left, the Tₐ = Te + Ts scale on the right and the dose multiplier M = D / R₁ in the middle. A line between Te (left) and Tₐ (right) crosses the middle scale at the value of the multiplier. The total dose is D = R₁ · M.
 
-## 6. Reference dose rate R₁ from measurement
-
-If a dose rate R(t) is measured at time t after the burst, the reference dose rate R₁ at H+1 needed for the nomogram can be backcalculated:
-
-```
-R₁ = R(t) · t^1.2
-```
-
-Example: a measurement 4 hours after the burst yields 50 mSv/h → R₁ = 50 · 4^1.2 ≈ 264 mSv/h. With this R₁ the expected dose for a deployment can then be computed in the nuclear weapon calculator.
-
-## 7. Unit conversion
+## 6. Unit conversion
 
 Quick conversion between common dose and dose rate units. The target unit is restricted to units of the same type (dose or dose rate); incompatible combinations are hidden automatically.
 
