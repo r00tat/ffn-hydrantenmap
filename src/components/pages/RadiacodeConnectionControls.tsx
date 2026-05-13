@@ -10,6 +10,7 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
   doseRateLevel,
@@ -33,19 +34,25 @@ const STATUS_CHIP_COLOR: Record<
   error: 'error',
 };
 
-function statusLabel(
-  status: RadiacodeStatus,
-  device: { name?: string; serial?: string } | null,
-): string {
-  if (status === 'connected' && device) {
-    return `Verbunden — ${device.name} (${device.serial})`;
-  }
-  if (status === 'connecting') return 'Verbindet …';
-  if (status === 'reconnecting') return 'Verbinde neu …';
-  if (status === 'scanning') return 'Scannen …';
-  if (status === 'unavailable') return 'Gerät nicht erreichbar';
-  if (status === 'error') return 'Fehler';
-  return 'Getrennt';
+function useStatusLabel() {
+  const t = useTranslations('radiacode');
+  return (
+    status: RadiacodeStatus,
+    device: { name?: string; serial?: string } | null,
+  ): string => {
+    if (status === 'connected' && device) {
+      return t('connected', {
+        name: device.name ?? '',
+        serial: device.serial ?? '',
+      });
+    }
+    if (status === 'connecting') return t('connecting');
+    if (status === 'reconnecting') return t('reconnecting');
+    if (status === 'scanning') return t('scanning');
+    if (status === 'unavailable') return t('unavailable');
+    if (status === 'error') return t('error');
+    return t('disconnected');
+  };
 }
 
 function batteryColor(pct: number): 'default' | 'warning' | 'error' {
@@ -55,6 +62,8 @@ function batteryColor(pct: number): 'default' | 'warning' | 'error' {
 }
 
 export default function RadiacodeConnectionControls() {
+  const t = useTranslations('radiacode');
+  const statusLabel = useStatusLabel();
   const {
     status,
     device,
@@ -82,7 +91,7 @@ export default function RadiacodeConnectionControls() {
       />
       {status === 'connected' ? (
         <Button variant="outlined" onClick={() => disconnect()}>
-          Trennen
+          {t('disconnect')}
         </Button>
       ) : (
         <Button
@@ -94,12 +103,12 @@ export default function RadiacodeConnectionControls() {
             status === 'reconnecting'
           }
         >
-          Verbinden
+          {t('connect')}
         </Button>
       )}
-      <Tooltip title="Verbindungsstatus prüfen">
+      <Tooltip title={t('refreshStatus')}>
         <IconButton
-          aria-label="Verbindungsstatus prüfen"
+          aria-label={t('refreshStatus')}
           onClick={() => {
             void refreshConnectionState();
           }}
@@ -107,10 +116,10 @@ export default function RadiacodeConnectionControls() {
           <RefreshIcon />
         </IconButton>
       </Tooltip>
-      <Tooltip title="Einstellungen">
+      <Tooltip title={t('settings')}>
         <span>
           <IconButton
-            aria-label="Einstellungen"
+            aria-label={t('settings')}
             onClick={() => setSettingsOpen(true)}
             disabled={status !== 'connected'}
           >
@@ -121,7 +130,7 @@ export default function RadiacodeConnectionControls() {
       {measurement && (
         <>
           {measurement.chargePct !== undefined && (
-            <Tooltip title="Akku">
+            <Tooltip title={t('battery')}>
               <Chip
                 size="small"
                 icon={<Battery5BarIcon />}
@@ -132,7 +141,7 @@ export default function RadiacodeConnectionControls() {
             </Tooltip>
           )}
           {measurement.temperatureC !== undefined && (
-            <Tooltip title="Gerätetemperatur">
+            <Tooltip title={t('deviceTemperature')}>
               <Chip
                 size="small"
                 icon={<DeviceThermostatIcon />}
@@ -142,7 +151,7 @@ export default function RadiacodeConnectionControls() {
             </Tooltip>
           )}
           {rateFmt && (
-            <Tooltip title="Dosisleistung">
+            <Tooltip title={t('doseRate')}>
               <Chip
                 size="small"
                 icon={<BoltIcon />}
@@ -156,7 +165,7 @@ export default function RadiacodeConnectionControls() {
               />
             </Tooltip>
           )}
-          <Tooltip title="Zählrate">
+          <Tooltip title={t('countRate')}>
             <Chip
               size="small"
               icon={<SpeedIcon />}

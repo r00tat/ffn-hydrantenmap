@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 import { RadiacodeContextValue } from '../providers/RadiacodeProvider';
 
 vi.mock('../../hooks/useFirecallItemAdd', () => ({
