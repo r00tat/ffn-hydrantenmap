@@ -78,7 +78,7 @@ export default function EinsaetzeDocsPage() {
         </ListItem>
         <ListItem>
           <ListItemText
-            primary="Blaulicht-SMS Integration"
+            primary="Alarm-SMS-Integration"
             secondary="Beim Erstellen eines Einsatzes aktuelle Alarme automatisch übernehmen"
           />
         </ListItem>
@@ -135,19 +135,19 @@ export default function EinsaetzeDocsPage() {
       </Typography>
 
       <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-        Blaulicht-SMS beim Erstellen nutzen
+        Alarm SMS beim Erstellen nutzen
       </Typography>
       <Typography sx={{ mb: 2 }}>
-        Wenn für deine Gruppe Zugangsdaten für die Blaulicht-SMS hinterlegt
-        sind, kannst du beim Erstellen eines Einsatzes aktuelle Alarme direkt
+        Wenn für deine Gruppe Zugangsdaten für die Alarm SMS hinterlegt sind,
+        kannst du beim Erstellen eines Einsatzes aktuelle Alarme direkt
         übernehmen.
       </Typography>
       <Typography component="div">
         <ol>
           <li>Öffne den Dialog zum Erstellen eines neuen Einsatzes</li>
           <li>
-            Wenn für die gewählte Gruppe Blaulicht-SMS Zugangsdaten vorhanden
-            sind, erscheint ein Alarm-Dropdown
+            Wenn für die gewählte Gruppe Alarm-SMS-Zugangsdaten vorhanden sind,
+            erscheint ein Alarm-Dropdown
           </li>
           <li>Wähle den gewünschten Alarm aus der Liste aus</li>
           <li>
@@ -162,7 +162,7 @@ export default function EinsaetzeDocsPage() {
       </Typography>
 
       <Alert severity="info" sx={{ my: 2 }}>
-        Die Blaulicht-SMS Integration lädt automatisch aktuelle Alarme, wenn für
+        Die Alarm-SMS-Integration lädt automatisch aktuelle Alarme, wenn für
         die Gruppe Zugangsdaten hinterlegt sind. Kontaktiere einen Admin, falls
         die Integration für deine Gruppe eingerichtet werden soll.
       </Alert>

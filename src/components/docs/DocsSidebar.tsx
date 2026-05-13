@@ -21,7 +21,7 @@ const docPages = [
   { label: 'Ebenen', href: '/docs/ebenen' },
   { label: 'Chat', href: '/docs/chat' },
   { label: 'KI-Assistent', href: '/docs/ki' },
-  { label: 'Blaulicht-SMS', href: '/docs/blaulicht-sms' },
+  { label: 'Alarm SMS', href: '/docs/blaulicht-sms' },
   { label: 'Schadstoff', href: '/docs/schadstoff' },
   { label: 'Strahlenschutz', href: '/docs/strahlenschutz' },
   { label: 'Energiespektrum', href: '/docs/energiespektrum' },

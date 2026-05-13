@@ -202,7 +202,7 @@ export default function GroupDialogg({
           <>
             <Divider sx={{ mt: 3, mb: 1 }} />
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-              BlaulichtSMS Zugangsdaten
+              Alarm-SMS-Zugangsdaten
             </Typography>
             {blsConfig && (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>

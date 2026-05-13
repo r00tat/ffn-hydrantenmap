@@ -149,8 +149,8 @@
     "jumpToKostenersatz": "Jump to cost recovery",
     "linkCopied": "Link copied to clipboard",
     "linkCopyFallback": "Link could not be copied. Please copy manually:",
-    "blaulichtSmsTitle": "BlaulichtSMS",
-    "blaulichtSmsLoadError": "BlaulichtSMS alarm could not be loaded (alarm id: {id}). The BlaulichtSMS credentials may not be configured or the alarm may no longer be available.",
+    "blaulichtSmsTitle": "Alarm SMS",
+    "blaulichtSmsLoadError": "Alarm SMS could not be loaded (alarm id: {id}). The Alarm SMS credentials may not be configured or the alarm may no longer be available.",
     "attachments": "Attachments",
     "noAttachments": "No attachments yet",
     "tokenCreateError": "Token could not be created: {error}",
@@ -273,7 +273,7 @@
     "units": "Resources",
     "diary": "Operation log",
     "locations": "Operation sites",
-    "blaulichtSms": "Blue-light SMS",
+    "blaulichtSms": "Alarm SMS",
     "geschaeftsbuch": "Business log",
     "kostenersatz": "Cost recovery",
     "chat": "Chat",
@@ -361,8 +361,8 @@
     "noPermission": "{group} (no permission)",
     "manualEntry": "Manual entry",
     "noAssignment": "No assignment",
-    "alarmSelect": "Blue-light SMS alarm",
-    "alarmsLoading": "Loading blue-light SMS alarms..."
+    "alarmSelect": "Alarm SMS",
+    "alarmsLoading": "Loading alarm SMS messages..."
   },
   "einsatzDialog": {
     "title": "Add operation",
@@ -390,7 +390,13 @@
     "filesUploaded": "{count} file uploaded",
     "filesUploadedPlural": "{count} files uploaded",
     "attachmentSaveError": "Failed to save attachments",
-    "addVehicles": "Add {count} vehicles"
+    "addVehicles": "Add {count} vehicles",
+    "fields": {
+      "name": "Name",
+      "beschreibung": "Description",
+      "showLabel": "Show label",
+      "showLabels": "Show labels"
+    }
   },
   "heatmap": {
     "enable": "Enable heatmap colouring",
@@ -418,6 +424,19 @@
     "blur": "Blur: {percent}%",
     "algorithm": "Algorithm",
     "opacity": "Opacity: {percent}%"
+  },
+  "hazmatDb": {
+    "pageTitle": "Hazmat",
+    "title": "Hazmat database",
+    "unNumberLabel": "UN number",
+    "materialNameLabel": "Material name",
+    "searchEricards": "Search Ericards for the current input",
+    "instructions": "Enter the UN number or material name to get information about the substance.",
+    "suitParameters": "Protective suit parameters",
+    "resistanceClass": "Resistance class: {value}",
+    "resistanceTime": "Resistance time: {value}",
+    "damage": "Damage: {value}",
+    "ericards": "Ericards"
   },
   "schadstoff": {
     "title": "Radiation protection calculations",
@@ -861,9 +880,9 @@
     "send": "Send"
   },
   "blaulichtSms": {
-    "title": "BlaulichtSMS alarms",
+    "title": "Alarm SMS",
     "noActive": "No active operation selected.",
-    "noCredentials": "No BlaulichtSMS credentials configured for this group. Please add them in the admin settings.",
+    "noCredentials": "No Alarm SMS credentials configured for this group. Please add them in the admin settings.",
     "activeAlarms": "Active alarms",
     "pastAlarms": "Past alarms",
     "noAlarms": "No alarms found."

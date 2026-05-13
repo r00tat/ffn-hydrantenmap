@@ -82,7 +82,7 @@ export default function AdminDocsPage() {
           <li>Im Menü auf &quot;Groups&quot; klicken</li>
           <li>Gruppen erstellen/bearbeiten/löschen</li>
           <li>
-            Blaulicht-SMS Zugangsdaten pro Gruppe hinterlegen
+            Alarm-SMS-Zugangsdaten pro Gruppe hinterlegen
           </li>
         </ol>
       </Typography>

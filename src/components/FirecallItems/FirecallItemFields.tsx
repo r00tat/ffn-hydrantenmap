@@ -41,6 +41,13 @@ export default function FirecallItemFields({
 }: FirecallItemFieldsProps) {
   const layers = useFirecallLayers();
   const t = useTranslations();
+  const translateLabel = useCallback(
+    (key: string, fallback: string) => {
+      const translationKey = `firecallItem.fields.${key}` as Parameters<typeof t>[0];
+      return t.has(translationKey) ? t(translationKey) : fallback;
+    },
+    [t]
+  );
 
   // Find the first text-like field that should receive autoFocus
   const firstTextFieldKey = useMemo(() => {
@@ -109,7 +116,9 @@ export default function FirecallItemFields({
       )}
 
       {/* Dynamic fields from item.fields() */}
-      {Object.entries(item.fields()).map(([key, label]) => (
+      {Object.entries(item.fields()).map(([key, rawLabel]) => {
+        const label = translateLabel(key, rawLabel);
+        return (
         <React.Fragment key={key}>
           {/* Date fields */}
           {item.dateFields().includes(key) && (
@@ -273,7 +282,8 @@ export default function FirecallItemFields({
               />
             )}
         </React.Fragment>
-      ))}
+        );
+      })}
 
       {/* Layer selector */}
       {showLayerSelect && NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (

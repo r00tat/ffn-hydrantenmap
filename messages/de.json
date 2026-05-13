@@ -149,8 +149,8 @@
     "jumpToKostenersatz": "Zu Kostenersatz springen",
     "linkCopied": "Link in Zwischenablage kopiert",
     "linkCopyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:",
-    "blaulichtSmsTitle": "BlaulichtSMS",
-    "blaulichtSmsLoadError": "BlaulichtSMS-Alarm konnte nicht geladen werden (Alarm-ID: {id}). Möglicherweise sind die BlaulichtSMS-Zugangsdaten nicht konfiguriert oder der Alarm ist nicht mehr verfügbar.",
+    "blaulichtSmsTitle": "Alarm SMS",
+    "blaulichtSmsLoadError": "Alarm SMS konnte nicht geladen werden (Alarm-ID: {id}). Möglicherweise sind die Alarm-SMS-Zugangsdaten nicht konfiguriert oder der Alarm ist nicht mehr verfügbar.",
     "attachments": "Anhänge",
     "noAttachments": "Keine Anhänge vorhanden",
     "tokenCreateError": "Token konnte nicht erstellt werden: {error}",
@@ -273,7 +273,7 @@
     "units": "Einsatzmittel",
     "diary": "Einsatz Tagebuch",
     "locations": "Einsatzorte",
-    "blaulichtSms": "Blaulicht-SMS",
+    "blaulichtSms": "Alarm SMS",
     "geschaeftsbuch": "Geschäftsbuch",
     "kostenersatz": "Kostenersatz",
     "chat": "Chat",
@@ -361,8 +361,8 @@
     "noPermission": "{group} (keine Berechtigung)",
     "manualEntry": "Manuell eingeben",
     "noAssignment": "Keine Zuordnung",
-    "alarmSelect": "Blaulicht-SMS Alarm",
-    "alarmsLoading": "Blaulicht-SMS Alarme werden geladen..."
+    "alarmSelect": "Alarm SMS",
+    "alarmsLoading": "Alarm-SMS-Alarme werden geladen..."
   },
   "einsatzDialog": {
     "title": "Einsatz hinzufügen",
@@ -390,7 +390,13 @@
     "filesUploaded": "{count} Datei hochgeladen",
     "filesUploadedPlural": "{count} Dateien hochgeladen",
     "attachmentSaveError": "Fehler beim Speichern der Anhänge",
-    "addVehicles": "{count} Fahrzeuge hinzufügen"
+    "addVehicles": "{count} Fahrzeuge hinzufügen",
+    "fields": {
+      "name": "Bezeichnung",
+      "beschreibung": "Beschreibung",
+      "showLabel": "Label anzeigen",
+      "showLabels": "Labels anzeigen"
+    }
   },
   "heatmap": {
     "enable": "Heatmap-Färbung aktivieren",
@@ -418,6 +424,19 @@
     "blur": "Weichzeichner: {percent}%",
     "algorithm": "Algorithmus",
     "opacity": "Deckkraft: {percent}%"
+  },
+  "hazmatDb": {
+    "pageTitle": "Schadstoff",
+    "title": "Schadstoffdatenbank",
+    "unNumberLabel": "Stoffnummer (UN Nummer)",
+    "materialNameLabel": "Stoff Name",
+    "searchEricards": "Suche in den Ericards nach aktuellen Eingaben",
+    "instructions": "Gib die Stoffnummer oder den Stoffnamen ein, um Informationen zu dem Stoff zu erhalten.",
+    "suitParameters": "Schutzanzug Parameter",
+    "resistanceClass": "Resistenzgrad: Klasse {value}",
+    "resistanceTime": "Zeitliche Resistenz: {value}",
+    "damage": "Beschädigung: {value}",
+    "ericards": "Ericards"
   },
   "schadstoff": {
     "title": "Strahlenschutz Berechnungen",
@@ -861,9 +880,9 @@
     "send": "Senden"
   },
   "blaulichtSms": {
-    "title": "BlaulichtSMS Einsätze",
+    "title": "Alarm-SMS-Einsätze",
     "noActive": "Kein aktiver Einsatz ausgewählt.",
-    "noCredentials": "Keine BlaulichtSMS-Zugangsdaten für diese Gruppe konfiguriert. Bitte in den Admin-Einstellungen hinterlegen.",
+    "noCredentials": "Keine Alarm-SMS-Zugangsdaten für diese Gruppe konfiguriert. Bitte in den Admin-Einstellungen hinterlegen.",
     "activeAlarms": "Aktive Einsätze",
     "pastAlarms": "Vergangene Alarme",
     "noAlarms": "Keine Alarme gefunden."

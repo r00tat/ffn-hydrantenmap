@@ -8,11 +8,11 @@ export default function BlaulichtSmsDocsPage() {
   return (
     <>
       <Typography variant="h3" gutterBottom>
-        Blaulicht-SMS
+        Alarm SMS
       </Typography>
       <Typography sx={{ mb: 2 }}>
-        Die Blaulicht-SMS Integration zeigt eingehende Alarmierungen der
-        Feuerwehr an. Du siehst aktive und vergangene Alarme mit Details zu den
+        Die Alarm-SMS-Integration zeigt eingehende Alarmierungen der Feuerwehr
+        an. Du siehst aktive und vergangene Alarme mit Details zu den
         alarmierten Funktionen und Teilnehmern.
       </Typography>
 
@@ -44,7 +44,7 @@ export default function BlaulichtSmsDocsPage() {
         <ListItem>
           <ListItemText
             primary="Integration beim Erstellen neuer Einsätze"
-            secondary="Automatische Datenübernahme aus Blaulicht-SMS Alarmen"
+            secondary="Automatische Datenübernahme aus Alarm-SMS-Alarmen"
           />
         </ListItem>
       </List>
@@ -58,7 +58,7 @@ export default function BlaulichtSmsDocsPage() {
       </Typography>
       <Typography component="div">
         <ol>
-          <li>Im Menü auf &quot;Blaulicht-SMS&quot; klicken</li>
+          <li>Im Menü auf &quot;Alarm SMS&quot; klicken</li>
           <li>
             Seite zeigt &quot;Aktive Einsätze&quot; und &quot;Vergangene
             Alarme&quot;
@@ -112,7 +112,7 @@ export default function BlaulichtSmsDocsPage() {
         <ol>
           <li>
             Beim Anlegen eines neuen Einsatzes: wenn die Gruppe
-            Blaulicht-SMS-Zugangsdaten hat, erscheint ein Dropdown mit aktuellen
+            Alarm-SMS-Zugangsdaten hat, erscheint ein Dropdown mit aktuellen
             Alarmen
           </li>
           <li>
@@ -122,7 +122,7 @@ export default function BlaulichtSmsDocsPage() {
       </Typography>
 
       <Alert severity="info" sx={{ my: 2 }}>
-        Tipp: Die Blaulicht-SMS Zugangsdaten werden pro Gruppe im
+        Tipp: Die Alarm-SMS-Zugangsdaten werden pro Gruppe im
         Admin-Bereich konfiguriert.
       </Alert>
 

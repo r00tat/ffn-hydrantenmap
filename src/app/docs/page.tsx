@@ -66,7 +66,7 @@ export default function DocsPage() {
           <Link href="/docs/einsaetze" style={linkStyle}>
             <ListItemText
               primary="Einsätze"
-              secondary="Einsätze erstellen, bearbeiten, teilen, filtern und mit Blaulicht-SMS verknüpfen"
+              secondary="Einsätze erstellen, bearbeiten, teilen, filtern und mit Alarm SMS verknüpfen"
             />
           </Link>
         </ListItem>
@@ -129,7 +129,7 @@ export default function DocsPage() {
         <ListItem>
           <Link href="/docs/blaulicht-sms" style={linkStyle}>
             <ListItemText
-              primary="Blaulicht-SMS"
+              primary="Alarm SMS"
               secondary="Alarmierungen anzeigen, Funktionen und Teilnehmer, Alarm-Integration"
             />
           </Link>
