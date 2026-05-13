@@ -2,6 +2,7 @@
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { formatTimestamp } from '../../common/time-format';
 import useVehicles from '../../hooks/useVehicles';
 import { getItemInstance } from '../FirecallItems/elements';
@@ -34,41 +35,42 @@ function FcItemRow({ item }: FcItemRowProps) {
 }
 
 export default function FahrzeugePrint() {
+  const t = useTranslations('print');
   const { vehicles, rohre, otherItems: others } = useVehicles();
   const { crewAssignments } = useContext(FirecallContext);
   const layers = useFirecallLayers();
   const otherItems = [...rohre, ...others];
 
+  const totalCrew = vehicles
+    .map((v) => {
+      const crewCount = crewAssignments.filter((c) => c.vehicleId === v.id).length;
+      return getEffectiveBesatzung(v.besatzung, crewCount) + 1;
+    })
+    .reduce((p, c) => p + c, 0);
+
   return (
     <Box sx={{ p: 2, m: 2 }}>
       <Typography variant="h3" gutterBottom>
-        {vehicles.length} Fahrzeuge im Einsatz mit{' '}
-        {vehicles
-          .map((v) => {
-            const crewCount = crewAssignments.filter((c) => c.vehicleId === v.id).length;
-            return getEffectiveBesatzung(v.besatzung, crewCount) + 1;
-          })
-          .reduce((p, c) => p + c, 0)}{' '}
-        Besatzung
+        {t('sectionVehiclesHeading', { count: vehicles.length, crew: totalCrew })}
       </Typography>
       <table>
         <thead>
           <tr>
-            <th>Feuerwehr</th>
-            <th>Fahrzeug</th>
-            <th>Besatzung (ATS)</th>
-            <th>Beschreibung</th>
-            <th>Alarmierung</th>
-            <th>Eintreffen</th>
-            <th>abruecken</th>
-            <th>GPS Position</th>
+            <th>{t('cols.fw')}</th>
+            <th>{t('cols.vehicleLabel')}</th>
+            <th>{t('cols.crewAts')}</th>
+            <th>{t('cols.description')}</th>
+            <th>{t('cols.alarmierung')}</th>
+            <th>{t('cols.eintreffen')}</th>
+            <th>{t('cols.abruecken')}</th>
+            <th>{t('cols.gps')}</th>
           </tr>
         </thead>
         <tbody>
           {[
             {
               id: undefined,
-              name: 'nicht zugeordnet',
+              name: t('unassignedShort'),
             },
             ...Object.values(layers),
           ].map((layer) => (
@@ -113,16 +115,16 @@ export default function FahrzeugePrint() {
       </table>
 
       <Typography variant="h3" gutterBottom>
-        {otherItems.length} weitere Einsatzmarker
+        {t('sectionMoreMarkers', { count: otherItems.length })}
       </Typography>
       <table>
         <thead>
           <tr>
-            <th>Typ</th>
-            <th>Name</th>
-            <th>Beschreibung</th>
-            <th>Datum</th>
-            <th>Koordinaten</th>
+            <th>{t('cols.type')}</th>
+            <th>{t('cols.plainName')}</th>
+            <th>{t('cols.description')}</th>
+            <th>{t('cols.date')}</th>
+            <th>{t('cols.coordinates')}</th>
           </tr>
         </thead>
         <tbody>

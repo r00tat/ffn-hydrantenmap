@@ -54,6 +54,7 @@ const SidebarBox = styled(Box, {
 
 function FirecallItemDisplay({ item }: { item: FirecallItem }) {
   const t = useTranslations('common');
+  const tSidebar = useTranslations('sidebar');
   const itemInstance = getItemInstance(item);
   const { editable, selectFirecallItem } = useMapEditor();
   const [displayUpdateDialog, setDisplayUpdateDialog] = React.useState(false);
@@ -241,7 +242,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 color="text.secondary"
                 sx={{ display: 'block', mt: 2, textAlign: 'center' }}
               >
-                Enter = Speichern · Escape = Abbrechen
+                {tSidebar('editHint')}
               </Typography>
             </Box>
           )}
@@ -310,8 +311,11 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         )}
         {confirmDelete && (
           <ConfirmDialog
-            title={`${itemInstance.title()} löschen`}
-            text={`${itemInstance.markerName()} "${itemInstance.title()}" wirklich löschen?`}
+            title={tSidebar('deleteTitle', { name: itemInstance.title() })}
+            text={tSidebar('deleteConfirm', {
+              markerName: itemInstance.markerName(),
+              name: itemInstance.title(),
+            })}
             onConfirm={handleDelete}
           />
         )}
@@ -328,6 +332,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
 }
 
 export default function MapSidebar() {
+  const t = useTranslations('sidebar');
   const { editable, setEditable, selectedFirecallItem, historyModeActive } =
     useMapEditor();
 
@@ -337,8 +342,7 @@ export default function MapSidebar() {
         {!editable && !selectedFirecallItem && (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Klicke auf ein Element auf der Karte, um Details anzuzeigen.
-              Aktiviere den Bearbeitungsmodus, um Elemente hinzuzufügen.
+              {t('emptyHint')}
             </Typography>
             {!historyModeActive && (
               <Button
@@ -347,7 +351,7 @@ export default function MapSidebar() {
                 onClick={() => setEditable(true)}
                 fullWidth
               >
-                Bearbeiten aktivieren
+                {t('enableEditing')}
               </Button>
             )}
           </Box>
