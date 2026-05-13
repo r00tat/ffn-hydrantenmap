@@ -935,6 +935,29 @@
   "datenschutz": {
     "backToAbout": "← Zurück zu Über"
   },
+  "docsNav": {
+    "heading": "Dokumentation",
+    "overview": "Übersicht",
+    "quickstart": "Schnellstart",
+    "karte": "Karte",
+    "einsaetze": "Einsätze",
+    "tagebuch": "Tagebuch",
+    "fahrzeuge": "Fahrzeuge",
+    "einsatzmittel": "Einsatzmittel",
+    "einsatzorte": "Einsatzorte",
+    "ebenen": "Ebenen",
+    "chat": "Chat",
+    "ki": "KI-Assistent",
+    "blaulichtSms": "Alarm SMS",
+    "schadstoff": "Schadstoff",
+    "strahlenschutz": "Strahlenschutz",
+    "energiespektrum": "Energiespektrum",
+    "kostenersatz": "Kostenersatz",
+    "geschaeftsbuch": "Geschäftsbuch",
+    "wetter": "Wetter",
+    "drucken": "Drucken",
+    "admin": "Administration"
+  },
   "users": {
     "title": "Benutzer",
     "filter": "Filter...",

@@ -935,6 +935,29 @@
   "datenschutz": {
     "backToAbout": "← Back to About"
   },
+  "docsNav": {
+    "heading": "Documentation",
+    "overview": "Overview",
+    "quickstart": "Quick start",
+    "karte": "Map",
+    "einsaetze": "Operations",
+    "tagebuch": "Operation log",
+    "fahrzeuge": "Vehicles",
+    "einsatzmittel": "Resources",
+    "einsatzorte": "Operation sites",
+    "ebenen": "Layers",
+    "chat": "Chat",
+    "ki": "AI assistant",
+    "blaulichtSms": "Alarm SMS",
+    "schadstoff": "Hazmat",
+    "strahlenschutz": "Radiation protection",
+    "energiespektrum": "Energy spectrum",
+    "kostenersatz": "Cost recovery",
+    "geschaeftsbuch": "Business log",
+    "wetter": "Weather",
+    "drucken": "Printing",
+    "admin": "Administration"
+  },
   "users": {
     "title": "Users",
     "filter": "Filter...",
