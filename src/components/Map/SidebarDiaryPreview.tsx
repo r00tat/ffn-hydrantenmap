@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import moment from 'moment';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import React, { useCallback, useState } from 'react';
 import { Diary, FirecallItem } from '../firebase/firestore';
@@ -65,6 +66,7 @@ interface DiaryEntryRowProps {
 }
 
 function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowProps) {
+  const t = useTranslations('common');
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -145,7 +147,7 @@ function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowPro
 
             {canEdit && (
               <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                <Tooltip title="Bearbeiten">
+                <Tooltip title={t('edit')}>
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -156,7 +158,7 @@ function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowPro
                     <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Löschen">
+                <Tooltip title={t('delete')}>
                   <IconButton
                     size="small"
                     color="error"
@@ -200,6 +202,7 @@ function getInitialAccordionState(): boolean {
 }
 
 export default function SidebarDiaryPreview() {
+  const t = useTranslations('sidebar');
   const { entries, totalCount, diaryCounter } = useDiaryEntries(DISPLAY_LIMIT);
   const canEdit = useMapEditorCanEdit();
   const addFirecallItem = useFirecallItemAdd();
@@ -243,10 +246,10 @@ export default function SidebarDiaryPreview() {
             max={99}
             sx={{ '& .MuiBadge-badge': { right: -16, top: 10 } }}
           >
-            <Typography variant="subtitle2">Tagebuch</Typography>
+            <Typography variant="subtitle2">{t('diary')}</Typography>
           </Badge>
           {canEdit && (
-            <Tooltip title="Tagebuch Eintrag hinzufügen">
+            <Tooltip title={t('addDiaryEntry')}>
               <Box
                 component="span"
                 role="button"

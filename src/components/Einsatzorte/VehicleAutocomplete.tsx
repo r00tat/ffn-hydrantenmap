@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
 import { Fzg } from '../firebase/firestore';
 
@@ -47,6 +48,7 @@ export default function VehicleAutocomplete({
   onMapVehicleSelected,
   onCreateVehicle,
 }: VehicleAutocompleteProps) {
+  const t = useTranslations('einsatzorte');
   const [inputValue, setInputValue] = useState('');
 
   // Build suggestion options, excluding already-selected vehicles
@@ -248,7 +250,7 @@ export default function VehicleAutocomplete({
             variant="standard"
             fullWidth
             size="small"
-            placeholder="Fahrzeug hinzufügen..."
+            placeholder={t('addVehicle')}
           />
         )}
       />

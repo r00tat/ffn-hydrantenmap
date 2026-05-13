@@ -42,7 +42,153 @@
     "select": "Auswählen",
     "selected": "Ausgewählt",
     "all": "Alle",
-    "none": "Keine"
+    "none": "Keine",
+    "saved": "Gespeichert"
+  },
+  "mapUi": {
+    "addElement": "Neues Element hinzufügen",
+    "editMap": "Einsatzkarte bearbeiten",
+    "disableEdit": "Bearbeiten deaktivieren",
+    "historyLockedEdit": "Historie geladen, kein Bearbeiten möglich"
+  },
+  "drawing": {
+    "undoLast": "Letzten Strich rückgängig",
+    "redoLast": "Letzten Strich wiederherstellen",
+    "done": "Fertig",
+    "colors": {
+      "red": "Rot",
+      "orange": "Orange",
+      "yellow": "Gelb",
+      "green": "Grün",
+      "blue": "Blau",
+      "white": "Weiß",
+      "black": "Schwarz",
+      "magenta": "Magenta"
+    },
+    "widths": {
+      "thin": "Dünn",
+      "medium": "Mittel",
+      "thick": "Dick"
+    }
+  },
+  "sidebar": {
+    "diary": "Tagebuch",
+    "addDiaryEntry": "Tagebuch Eintrag hinzufügen"
+  },
+  "einsatzDetails": {
+    "notFound": "Einsatz nicht gefunden",
+    "openMap": "Karte öffnen",
+    "openMapButton": "Karte",
+    "createShareLink": "Link für anonymen Zugriff erstellen",
+    "jumpToKostenersatz": "Zu Kostenersatz springen",
+    "linkCopied": "Link in Zwischenablage kopiert",
+    "linkCopyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:",
+    "blaulichtSmsTitle": "BlaulichtSMS",
+    "blaulichtSmsLoadError": "BlaulichtSMS-Alarm konnte nicht geladen werden (Alarm-ID: {id}). Möglicherweise sind die BlaulichtSMS-Zugangsdaten nicht konfiguriert oder der Alarm ist nicht mehr verfügbar.",
+    "attachments": "Anhänge",
+    "noAttachments": "Keine Anhänge vorhanden",
+    "tokenCreateError": "Token konnte nicht erstellt werden: {error}",
+    "labels": {
+      "group": "Gruppe",
+      "fw": "Feuerwehr",
+      "alarmierung": "Alarmierung",
+      "eintreffen": "Eintreffen",
+      "abruecken": "Abrücken",
+      "description": "Beschreibung",
+      "einsatzmittel": "Einsatzmittel"
+    }
+  },
+  "crew": {
+    "title": "Besatzung",
+    "addPerson": "Person hinzufügen",
+    "cols": {
+      "name": "Name",
+      "function": "Funktion",
+      "vehicle": "Fahrzeug"
+    }
+  },
+  "einsatzorte": {
+    "placeholderNew": "Neue Adresse...",
+    "placeholderName": "Bezeichnung",
+    "placeholderStreet": "Straße",
+    "placeholderNumber": "Nr.",
+    "placeholderCity": "Ort",
+    "placeholderDescription": "Beschreibung",
+    "pickOnMap": "Auf Karte wählen",
+    "vehicles": "Fahrzeuge:",
+    "alerted": "Alarmiert",
+    "start": "Start",
+    "done": "Erledigt",
+    "noCoords": "Keine Koordinaten",
+    "addVehicle": "Fahrzeug hinzufügen...",
+    "title": "Einsatzorte - {name}",
+    "noFirecall": "Kein Einsatz ausgewählt",
+    "checkEmails": "E-Mails prüfen",
+    "status": {
+      "offen": "offen",
+      "einsatz notwendig": "einsatz notwendig",
+      "in arbeit": "in arbeit",
+      "erledigt": "erledigt",
+      "kein einsatz": "kein einsatz"
+    }
+  },
+  "admin": {
+    "csvImport": {
+      "selectFile": "CSV Datei auswählen",
+      "cols": {
+        "status": "Status",
+        "city": "Ortschaft",
+        "hydrantNo": "Hydranten-Nr.",
+        "type": "Typ",
+        "dimension": "Dimension",
+        "staticPressure": "Stat. Druck",
+        "dynamicPressure": "Dyn. Druck",
+        "duplicate": "Duplikat",
+        "map": "Karte"
+      },
+      "filter": {
+        "all": "Alle ({count})",
+        "new": "Neu ({count})",
+        "update": "Update ({count})",
+        "duplicate": "Duplikate ({count})"
+      }
+    },
+    "pegelstand": {
+      "title": "Pegelstand Stationen",
+      "actions": "Aktionen",
+      "pickPosition": "Position auf Karte wählen",
+      "type": "Typ",
+      "river": "Fluss",
+      "lake": "See"
+    },
+    "cluster": {
+      "search": "Suchen...",
+      "actions": "Aktionen",
+      "openLink": "Link öffnen",
+      "pickPosition": "Position wählen"
+    }
+  },
+  "firecallElements": {
+    "addPoint": "Einen Punkt hinzufügen",
+    "editLine": "Linie bearbeiten",
+    "removePoint": "Punkt entfernen"
+  },
+  "fileDisplay": {
+    "download": "Herunterladen",
+    "deleteAttachment": "Anhang löschen"
+  },
+  "userDialog": {
+    "title": "Benutzer {name} bearbeiten",
+    "newPassword": "Neues Passwort",
+    "copyPassword": "Passwort kopieren",
+    "resetLink": "Reset-Link",
+    "copyLink": "Link kopieren",
+    "resetPassword": "Passwort zurücksetzen",
+    "feuerwehr": "Feuerwehr",
+    "groups": "Gruppen",
+    "groupLabel": "Group",
+    "authorized": "Authorized",
+    "admin": "Admin"
   },
   "header": {
     "appTitle": "Einsatzkarte",
@@ -404,6 +550,7 @@
       "loadTemplate": "Vorlage laden",
       "saveAsTemplate": "Als Vorlage speichern",
       "save": "Speichern",
+      "saveDraft": "Als Entwurf speichern",
       "complete": "Abschließen",
       "saveRecipient": "Empfänger speichern",
       "copy": "Kopieren",
@@ -752,27 +899,6 @@
     },
     "previousValue": "Vorheriger Wert",
     "newValue": "Neuer Wert"
-  },
-  "einsatzorte": {
-    "placeholderNew": "Neue Adresse...",
-    "placeholderName": "Bezeichnung",
-    "placeholderStreet": "Straße",
-    "placeholderNumber": "Nr.",
-    "placeholderCity": "Ort",
-    "placeholderDescription": "Beschreibung",
-    "pickOnMap": "Auf Karte wählen",
-    "vehicles": "Fahrzeuge:",
-    "alerted": "Alarmiert",
-    "start": "Start",
-    "done": "Erledigt",
-    "noCoords": "Keine Koordinaten",
-    "status": {
-      "offen": "offen",
-      "einsatz notwendig": "einsatz notwendig",
-      "in arbeit": "in arbeit",
-      "erledigt": "erledigt",
-      "kein einsatz": "kein einsatz"
-    }
   },
   "einsatzmittel": {
     "count": "{count} Einsatzmittel",

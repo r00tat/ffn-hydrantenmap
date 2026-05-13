@@ -8,6 +8,7 @@ import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
+import { useTranslations } from 'next-intl';
 import useMapEditor from '../../hooks/useMapEditor';
 import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import { useFirecallItems } from '../firebase/firestoreHooks';
@@ -21,6 +22,7 @@ export interface MapActionButtonsOptions {
 }
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
+  const t = useTranslations('mapUi');
   const {
     editable,
     setEditable,
@@ -41,7 +43,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         }}
       >
         {editable && (
-          <Tooltip title="Neues Element hinzufügen">
+          <Tooltip title={t('addElement')}>
             <Fab
               color="primary"
               aria-label="add"
@@ -57,11 +59,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         )}
 
         {historyId === undefined && (
-          <Tooltip
-            title={
-              editable ? 'Bearbeiten deaktiveren' : 'Einsatzkarte bearbeiten'
-            }
-          >
+          <Tooltip title={editable ? t('disableEdit') : t('editMap')}>
             <Fab
               color={editable ? 'default' : 'primary'}
               aria-label="edit"
@@ -79,7 +77,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
         )}
 
         {historyId && (
-          <Tooltip title="Historie geladen, kein Bearbeiten möglich">
+          <Tooltip title={t('historyLockedEdit')}>
             <Fab
               color="error"
               aria-label="edit"

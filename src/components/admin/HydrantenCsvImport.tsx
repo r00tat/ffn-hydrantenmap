@@ -15,6 +15,7 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import MapIcon from '@mui/icons-material/Map';
+import { useTranslations } from 'next-intl';
 import { useState, useCallback, useMemo } from 'react';
 import FileUpload from './FileUpload';
 import ProgressStepper, { type StepStatus } from './ProgressStepper';
@@ -65,6 +66,7 @@ async function readCsvHeaders(file: File): Promise<string[]> {
 }
 
 export default function HydrantenCsvImport() {
+  const t = useTranslations('admin.csvImport');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
@@ -184,7 +186,7 @@ export default function HydrantenCsvImport() {
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
         <FileUpload
           accept=".csv"
-          label="CSV Datei auswählen"
+          label={t('selectFile')}
           onFileSelect={handleFileSelect}
           selectedFile={csvFile}
           disabled={isRunning}
@@ -252,11 +254,11 @@ export default function HydrantenCsvImport() {
             size="small"
             sx={{ mb: 2 }}
           >
-            <ToggleButton value="all">Alle ({matches.length})</ToggleButton>
-            <ToggleButton value="new">Neu ({newCount})</ToggleButton>
-            <ToggleButton value="update">Update ({updateCount})</ToggleButton>
+            <ToggleButton value="all">{t('filter.all', { count: matches.length })}</ToggleButton>
+            <ToggleButton value="new">{t('filter.new', { count: newCount })}</ToggleButton>
+            <ToggleButton value="update">{t('filter.update', { count: updateCount })}</ToggleButton>
             {duplicateCount > 0 && (
-              <ToggleButton value="duplicate">Duplikate ({duplicateCount})</ToggleButton>
+              <ToggleButton value="duplicate">{t('filter.duplicate', { count: duplicateCount })}</ToggleButton>
             )}
           </ToggleButtonGroup>
 
@@ -264,15 +266,15 @@ export default function HydrantenCsvImport() {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Ortschaft</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Hydranten-Nr.</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Typ</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Dimension</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Stat. Druck</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Dyn. Druck</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Duplikat</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Karte</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.status')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.city')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.hydrantNo')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.type')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.dimension')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.staticPressure')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.dynamicPressure')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.duplicate')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('cols.map')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

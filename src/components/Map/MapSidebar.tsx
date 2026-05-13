@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import Paper from '@mui/material/Paper';
 import { styled } from '@mui/material/styles';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import React from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
@@ -52,6 +53,7 @@ const SidebarBox = styled(Box, {
 }));
 
 function FirecallItemDisplay({ item }: { item: FirecallItem }) {
+  const t = useTranslations('common');
   const itemInstance = getItemInstance(item);
   const { editable, selectFirecallItem } = useMapEditor();
   const [displayUpdateDialog, setDisplayUpdateDialog] = React.useState(false);
@@ -183,7 +185,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
             </Box>
           }
           action={
-            <Tooltip title="Schließen">
+            <Tooltip title={t('close')}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -246,7 +248,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         </CardContent>
         {editable && item.editable !== false && !isEditing && (
           <CardActions sx={{ pt: 0 }}>
-            <Tooltip title="Bearbeiten">
+            <Tooltip title={t('edit')}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -257,7 +259,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Löschen">
+            <Tooltip title={t('delete')}>
               <IconButton
                 size="small"
                 color="error"
@@ -279,7 +281,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         )}
         {isEditing && (
           <CardActions sx={{ pt: 0 }}>
-            <Tooltip title="Löschen">
+            <Tooltip title={t('delete')}>
               <IconButton
                 size="small"
                 color="error"
@@ -318,7 +320,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         open={snackbarOpen}
         autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
-        message="Gespeichert"
+        message={t('saved')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />
     </>

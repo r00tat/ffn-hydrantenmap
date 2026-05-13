@@ -42,7 +42,153 @@
     "select": "Select",
     "selected": "Selected",
     "all": "All",
-    "none": "None"
+    "none": "None",
+    "saved": "Saved"
+  },
+  "mapUi": {
+    "addElement": "Add new element",
+    "editMap": "Edit operations map",
+    "disableEdit": "Disable editing",
+    "historyLockedEdit": "History loaded, editing disabled"
+  },
+  "drawing": {
+    "undoLast": "Undo last stroke",
+    "redoLast": "Redo last stroke",
+    "done": "Done",
+    "colors": {
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "blue": "Blue",
+      "white": "White",
+      "black": "Black",
+      "magenta": "Magenta"
+    },
+    "widths": {
+      "thin": "Thin",
+      "medium": "Medium",
+      "thick": "Thick"
+    }
+  },
+  "sidebar": {
+    "diary": "Diary",
+    "addDiaryEntry": "Add diary entry"
+  },
+  "einsatzDetails": {
+    "notFound": "Operation not found",
+    "openMap": "Open map",
+    "openMapButton": "Map",
+    "createShareLink": "Create anonymous-access link",
+    "jumpToKostenersatz": "Jump to cost recovery",
+    "linkCopied": "Link copied to clipboard",
+    "linkCopyFallback": "Link could not be copied. Please copy manually:",
+    "blaulichtSmsTitle": "BlaulichtSMS",
+    "blaulichtSmsLoadError": "BlaulichtSMS alarm could not be loaded (alarm id: {id}). The BlaulichtSMS credentials may not be configured or the alarm may no longer be available.",
+    "attachments": "Attachments",
+    "noAttachments": "No attachments yet",
+    "tokenCreateError": "Token could not be created: {error}",
+    "labels": {
+      "group": "Group",
+      "fw": "Fire department",
+      "alarmierung": "Alerted at",
+      "eintreffen": "Arrived at",
+      "abruecken": "Departed at",
+      "description": "Description",
+      "einsatzmittel": "Resources"
+    }
+  },
+  "crew": {
+    "title": "Crew",
+    "addPerson": "Add person",
+    "cols": {
+      "name": "Name",
+      "function": "Function",
+      "vehicle": "Vehicle"
+    }
+  },
+  "einsatzorte": {
+    "placeholderNew": "New address...",
+    "placeholderName": "Name",
+    "placeholderStreet": "Street",
+    "placeholderNumber": "No.",
+    "placeholderCity": "City",
+    "placeholderDescription": "Description",
+    "pickOnMap": "Pick on map",
+    "vehicles": "Vehicles:",
+    "alerted": "Alerted",
+    "start": "Start",
+    "done": "Done",
+    "noCoords": "No coordinates",
+    "addVehicle": "Add vehicle...",
+    "title": "Operation sites - {name}",
+    "noFirecall": "No operation selected",
+    "checkEmails": "Check emails",
+    "status": {
+      "offen": "open",
+      "einsatz notwendig": "operation needed",
+      "in arbeit": "in progress",
+      "erledigt": "done",
+      "kein einsatz": "no operation"
+    }
+  },
+  "admin": {
+    "csvImport": {
+      "selectFile": "Select CSV file",
+      "cols": {
+        "status": "Status",
+        "city": "City",
+        "hydrantNo": "Hydrant no.",
+        "type": "Type",
+        "dimension": "Dimension",
+        "staticPressure": "Static pressure",
+        "dynamicPressure": "Dynamic pressure",
+        "duplicate": "Duplicate",
+        "map": "Map"
+      },
+      "filter": {
+        "all": "All ({count})",
+        "new": "New ({count})",
+        "update": "Update ({count})",
+        "duplicate": "Duplicates ({count})"
+      }
+    },
+    "pegelstand": {
+      "title": "Water-level stations",
+      "actions": "Actions",
+      "pickPosition": "Pick position on map",
+      "type": "Type",
+      "river": "River",
+      "lake": "Lake"
+    },
+    "cluster": {
+      "search": "Search...",
+      "actions": "Actions",
+      "openLink": "Open link",
+      "pickPosition": "Pick position"
+    }
+  },
+  "firecallElements": {
+    "addPoint": "Add a point",
+    "editLine": "Edit line",
+    "removePoint": "Remove point"
+  },
+  "fileDisplay": {
+    "download": "Download",
+    "deleteAttachment": "Delete attachment"
+  },
+  "userDialog": {
+    "title": "Edit user {name}",
+    "newPassword": "New password",
+    "copyPassword": "Copy password",
+    "resetLink": "Reset link",
+    "copyLink": "Copy link",
+    "resetPassword": "Reset password",
+    "feuerwehr": "Fire department",
+    "groups": "Groups",
+    "groupLabel": "Group",
+    "authorized": "Authorized",
+    "admin": "Admin"
   },
   "header": {
     "appTitle": "Operations Map",
@@ -404,6 +550,7 @@
       "loadTemplate": "Load template",
       "saveAsTemplate": "Save as template",
       "save": "Save",
+      "saveDraft": "Save as draft",
       "complete": "Complete",
       "saveRecipient": "Save recipient",
       "copy": "Copy",
@@ -752,27 +899,6 @@
     },
     "previousValue": "Previous value",
     "newValue": "New value"
-  },
-  "einsatzorte": {
-    "placeholderNew": "New address...",
-    "placeholderName": "Name",
-    "placeholderStreet": "Street",
-    "placeholderNumber": "No.",
-    "placeholderCity": "City",
-    "placeholderDescription": "Description",
-    "pickOnMap": "Pick on map",
-    "vehicles": "Vehicles:",
-    "alerted": "Alerted",
-    "start": "Start",
-    "done": "Done",
-    "noCoords": "No coordinates",
-    "status": {
-      "offen": "open",
-      "einsatz notwendig": "operation needed",
-      "in arbeit": "in progress",
-      "erledigt": "done",
-      "kein einsatz": "no operation"
-    }
   },
   "einsatzmittel": {
     "count": "{count} resources",

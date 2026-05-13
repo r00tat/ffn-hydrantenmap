@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -29,6 +30,8 @@ export default function ClusterItemEditDialog({
   editingId,
   initialData,
 }: ClusterItemEditDialogProps) {
+  const t = useTranslations('admin.cluster');
+  const tCommon = useTranslations('common');
   const [formData, setFormData] = useState<Record<string, string>>(initialData);
   const [saving, setSaving] = useState(false);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
@@ -141,7 +144,7 @@ export default function ClusterItemEditDialog({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{tCommon('cancel')}</Button>
           <Button
             onClick={handleSave}
             variant="contained"
@@ -157,7 +160,7 @@ export default function ClusterItemEditDialog({
         onClose={() => setMapPickerOpen(false)}
         onConfirm={handleMapConfirm}
         showFirecallLayers={false}
-        title="Position wählen"
+        title={t('pickPosition')}
         initialLat={
           formData.lat && !isNaN(parseFloat(formData.lat))
             ? parseFloat(formData.lat)

@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { setDoc } from '../../lib/firestoreClient';
 import { StorageReference } from 'firebase/storage';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { createCustomFirebaseTokenForFirecall } from '../../app/actions/auth';
@@ -51,6 +52,8 @@ import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
 import StrengthTable from './StrengthTable';
 
 export default function EinsatzDetails() {
+  const t = useTranslations('einsatzDetails');
+  const tCommon = useTranslations('common');
   const firecallId = useFirecallId();
   const setFirecallId = useFirecallSelect();
   const { isAdmin, email, myGroups } = useFirebaseLogin();
@@ -138,10 +141,10 @@ export default function EinsatzDetails() {
         setCopied(false);
       }
     } else {
-      setError(`Token konnte nicht erstellt werden: ${token.error}`);
+      setError(t('tokenCreateError', { error: token.error ?? '' }));
     }
     setCreatingLink(false);
-  }, []);
+  }, [t]);
 
   const handleFileUploadComplete = useCallback(
     async (refs: StorageReference[]) => {
@@ -187,7 +190,7 @@ export default function EinsatzDetails() {
   );
 
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
-  if (!firecall) return <Typography sx={{ m: 2 }}>Einsatz nicht gefunden</Typography>;
+  if (!firecall) return <Typography sx={{ m: 2 }}>{t('notFound')}</Typography>;
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
@@ -197,7 +200,7 @@ export default function EinsatzDetails() {
 
       {/* Action buttons */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-        <Tooltip title="Karte öffnen">
+        <Tooltip title={t('openMap')}>
           <Button
             size="small"
             variant="contained"
@@ -210,17 +213,17 @@ export default function EinsatzDetails() {
               }
             }}
           >
-            Karte
+            {t('openMapButton')}
           </Button>
         </Tooltip>
         {firecall.id && <FirecallExport firecallId={firecall.id} />}
-        <Tooltip title="Bearbeiten">
+        <Tooltip title={tCommon('edit')}>
           <IconButton size="small" onClick={() => setDisplayUpdateDialog(true)}>
             <EditIcon />
           </IconButton>
         </Tooltip>
         {isAdmin && (
-          <Tooltip title="Löschen">
+          <Tooltip title={tCommon('delete')}>
             <IconButton
               size="small"
               onClick={() => setIsConfirmOpen(true)}
@@ -233,7 +236,7 @@ export default function EinsatzDetails() {
         {creatingLink ? (
           <CircularProgress size={24} sx={{ mx: 1 }} />
         ) : (
-          <Tooltip title="Link für anonymen Zugriff erstellen">
+          <Tooltip title={t('createShareLink')}>
             <IconButton
               size="small"
               onClick={() => {
@@ -244,7 +247,7 @@ export default function EinsatzDetails() {
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title="Zu Kostenersatz springen">
+        <Tooltip title={t('jumpToKostenersatz')}>
           <IconButton
             size="small"
             onClick={() => document.getElementById('kostenersatz-section')?.scrollIntoView({ behavior: 'smooth' })}
@@ -259,11 +262,11 @@ export default function EinsatzDetails() {
         <Box sx={{ mb: 2 }}>
           {copied ? (
             <Typography variant="body2" color="success.main">
-              Link in Zwischenablage kopiert
+              {t('linkCopied')}
             </Typography>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Link konnte nicht kopiert werden. Bitte manuell kopieren:
+              {t('linkCopyFallback')}
             </Typography>
           )}
           <Link href={tokenLink} target="_blank">
@@ -282,7 +285,7 @@ export default function EinsatzDetails() {
         {firecall.group && (
           <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
-              Gruppe
+              {t('labels.group')}
             </Typography>
             <Typography>
               {myGroups.find((g) => g.id === firecall.group)?.name || firecall.group}
@@ -292,7 +295,7 @@ export default function EinsatzDetails() {
         {firecall.fw && (
           <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
-              Feuerwehr
+              {t('labels.fw')}
             </Typography>
             <Typography>{firecall.fw}</Typography>
           </Grid>
@@ -300,7 +303,7 @@ export default function EinsatzDetails() {
         {firecall.date && (
           <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
-              Alarmierung
+              {t('labels.alarmierung')}
             </Typography>
             <Typography>{formatTimestamp(firecall.date)}</Typography>
           </Grid>
@@ -308,7 +311,7 @@ export default function EinsatzDetails() {
         {firecall.eintreffen && (
           <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
-              Eintreffen
+              {t('labels.eintreffen')}
             </Typography>
             <Typography>{formatTimestamp(firecall.eintreffen)}</Typography>
           </Grid>
@@ -316,7 +319,7 @@ export default function EinsatzDetails() {
         {firecall.abruecken && (
           <Grid size={{ xs: 12, sm: 6 }}>
             <Typography variant="body2" color="text.secondary">
-              Abrücken
+              {t('labels.abruecken')}
             </Typography>
             <Typography>{formatTimestamp(firecall.abruecken)}</Typography>
           </Grid>
@@ -324,7 +327,7 @@ export default function EinsatzDetails() {
         {firecall.description && (
           <Grid size={{ xs: 12 }}>
             <Typography variant="body2" color="text.secondary">
-              Beschreibung
+              {t('labels.description')}
             </Typography>
             <Typography>{firecall.description}</Typography>
           </Grid>
@@ -335,7 +338,7 @@ export default function EinsatzDetails() {
       {firecall.blaulichtSmsAlarmId && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" gutterBottom>
-            BlaulichtSMS
+            {t('blaulichtSmsTitle')}
           </Typography>
           {alarm === undefined ? (
             <CircularProgress size={24} />
@@ -343,10 +346,9 @@ export default function EinsatzDetails() {
             <AlarmCard alarm={alarm} defaultExpandRecipients={false} />
           ) : (
             <Typography color="text.secondary">
-              BlaulichtSMS-Alarm konnte nicht geladen werden (Alarm-ID:{' '}
-              {firecall.blaulichtSmsAlarmId}). Möglicherweise sind die
-              BlaulichtSMS-Zugangsdaten nicht konfiguriert oder der Alarm ist
-              nicht mehr verfügbar.
+              {t('blaulichtSmsLoadError', {
+                id: firecall.blaulichtSmsAlarmId ?? '',
+              })}
             </Typography>
           )}
         </Box>
@@ -355,7 +357,7 @@ export default function EinsatzDetails() {
       {/* Attachments */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography variant="h5" gutterBottom>
-          Anhänge
+          {t('attachments')}
         </Typography>
         {firecall.attachments && firecall.attachments.length > 0 && (
           <DownloadAllButton urls={firecall.attachments} />
@@ -389,7 +391,7 @@ export default function EinsatzDetails() {
         </Box>
       ) : (
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Keine Anhänge vorhanden
+          {t('noAttachments')}
         </Typography>
       )}
 
@@ -402,7 +404,7 @@ export default function EinsatzDetails() {
       {displayItems.length > 0 && (
         <>
           <Typography variant="h5" gutterBottom sx={{ mt: 3 }}>
-            Einsatzmittel
+            {t('labels.einsatzmittel')}
           </Typography>
           <StrengthTable items={displayItems} />
         </>

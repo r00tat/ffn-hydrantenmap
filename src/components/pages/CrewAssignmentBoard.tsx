@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import React, {
   useCallback,
   useEffect,
@@ -189,6 +190,7 @@ function CrewRow({
 export default function CrewAssignmentBoard({
   alarm,
 }: CrewAssignmentBoardProps) {
+  const t = useTranslations('crew');
   const {
     crewAssignments,
     syncFromAlarm,
@@ -335,10 +337,10 @@ export default function CrewAssignmentBoard({
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Typography variant="h5">Besatzung</Typography>
+        <Typography variant="h5">{t('title')}</Typography>
         <TextField
           size="small"
-          placeholder="Person hinzufügen"
+          placeholder={t('addPerson')}
           value={newPersonName}
           onChange={(e) => setNewPersonName(e.target.value)}
           onKeyDown={(e) => {
@@ -349,7 +351,7 @@ export default function CrewAssignmentBoard({
           }}
           sx={{ ml: 'auto', maxWidth: 220 }}
         />
-        <Tooltip title="Person hinzufügen">
+        <Tooltip title={t('addPerson')}>
           <span>
             <IconButton
               color="primary"
@@ -379,9 +381,9 @@ export default function CrewAssignmentBoard({
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ width: 32, p: 0.5 }} />
-                  <TableCell sx={{ p: 0.5 }}>Name</TableCell>
-                  <TableCell sx={{ p: 0.5, minWidth: 60 }}>Funktion</TableCell>
-                  <TableCell sx={{ p: 0.5, minWidth: 60 }}>Fahrzeug</TableCell>
+                  <TableCell sx={{ p: 0.5 }}>{t('cols.name')}</TableCell>
+                  <TableCell sx={{ p: 0.5, minWidth: 60 }}>{t('cols.function')}</TableCell>
+                  <TableCell sx={{ p: 0.5, minWidth: 60 }}>{t('cols.vehicle')}</TableCell>
                 </TableRow>
               </TableHead>
               <DroppableTableBody droppableId="unassigned">

@@ -21,6 +21,7 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useState } from 'react';
 import {
   sendPasswordResetEmailAction,
@@ -58,6 +59,7 @@ function generatePassword() {
 }
 
 function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
+  const t = useTranslations('userDialog');
   const [resetLink, setResetLink] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -120,7 +122,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
         <TextField
           fullWidth
           size="small"
-          label="Neues Passwort"
+          label={t('newPassword')}
           value={generatedPassword}
           slotProps={{
             input: {
@@ -132,7 +134,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
                       navigator.clipboard.writeText(generatedPassword)
                     }
                     size="small"
-                    title="Passwort kopieren"
+                    title={t('copyPassword')}
                   >
                     <ContentCopyIcon fontSize="small" />
                   </IconButton>
@@ -147,7 +149,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
         <TextField
           fullWidth
           size="small"
-          label="Reset-Link"
+          label={t('resetLink')}
           value={resetLink}
           slotProps={{
             input: {
@@ -157,7 +159,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
                   <IconButton
                     onClick={() => navigator.clipboard.writeText(resetLink)}
                     size="small"
-                    title="Link kopieren"
+                    title={t('copyLink')}
                   >
                     <ContentCopyIcon fontSize="small" />
                   </IconButton>
@@ -186,7 +188,7 @@ function PasswordResetSection({ uid, email }: { uid: string; email: string }) {
       </Button>
       {showConfirm && (
         <ConfirmDialog
-          title="Passwort zurücksetzen"
+          title={t('resetPassword')}
           text={`Soll das Passwort für ${email} wirklich zurückgesetzt werden?`}
           onConfirm={(confirmed) => {
             setShowConfirm(false);
@@ -205,6 +207,7 @@ export default function UserRecordExtendedDialog({
   user: userDefault,
   groups,
 }: UserRecordExtendedDialogOptions) {
+  const t = useTranslations('userDialog');
   const [open, setOpen] = useState(true);
   const [user, setUserRecordExtended] =
     useState<UserRecordExtended>(userDefault);
@@ -250,7 +253,7 @@ export default function UserRecordExtendedDialog({
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Benutzer {user.displayName} bearbeiten</DialogTitle>
+      <DialogTitle>{t('title', { name: user.displayName ?? '' })}</DialogTitle>
       <DialogContent>
         <DialogContentText>
           UID: {user.uid}
@@ -262,12 +265,12 @@ export default function UserRecordExtendedDialog({
           Abschnitt: {feuerwehren[user.feuerwehr || 'fallback']?.abschnitt}
         </DialogContentText>
         <FormControl fullWidth variant="standard">
-          <InputLabel id="fw-label">Feuerwehr</InputLabel>
+          <InputLabel id="fw-label">{t('feuerwehr')}</InputLabel>
           <Select
             labelId="fw-label"
             id="user-fw"
             value={user.feuerwehr || 'neusiedl'}
-            label="Feuerwehr"
+            label={t('feuerwehr')}
             onChange={onChange('feuerwehr')}
           >
             {Object.entries(feuerwehren)
@@ -294,14 +297,14 @@ export default function UserRecordExtendedDialog({
           />
         ))}
         <FormControl sx={{ m: 1, width: 300 }}>
-          <InputLabel id="user-group-checkbox-label">Gruppen</InputLabel>
+          <InputLabel id="user-group-checkbox-label">{t('groups')}</InputLabel>
           <Select
             labelId="user-group-checkbox-label"
             id="user-group-checkbox"
             multiple
             value={user.groups || []}
             onChange={handleGroupChange}
-            input={<OutlinedInput label="Group" />}
+            input={<OutlinedInput label={t('groupLabel')} />}
             renderValue={(selected) =>
               selected
                 .map((key) => groups[key])
@@ -326,7 +329,7 @@ export default function UserRecordExtendedDialog({
                 onChange={onChangeSwitch('authorized')}
               />
             }
-            label="Authorized"
+            label={t('authorized')}
           />
           <FormControlLabel
             control={
@@ -335,7 +338,7 @@ export default function UserRecordExtendedDialog({
                 onChange={onChangeSwitch('isAdmin')}
               />
             }
-            label="Admin"
+            label={t('admin')}
           />
         </FormGroup>
 

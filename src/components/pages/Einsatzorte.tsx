@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import EmailIcon from '@mui/icons-material/Email';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
@@ -42,6 +43,7 @@ function getLocationDisplayName(location: Partial<FirecallLocation>): string {
 }
 
 export default function Einsatzorte() {
+  const t = useTranslations('einsatzorte');
   const firecall = useFirecall();
   const { locations, addLocation, updateLocation, deleteLocation } =
     useFirecallLocations();
@@ -443,7 +445,7 @@ export default function Einsatzorte() {
   if (!firecall || firecall.id === 'unknown') {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography>Kein Einsatz ausgewählt</Typography>
+        <Typography>{t('noFirecall')}</Typography>
       </Box>
     );
   }
@@ -464,7 +466,7 @@ export default function Einsatzorte() {
           mb: 2,
         }}
       >
-        <Typography variant="h5">Einsatzorte - {firecall.name}</Typography>
+        <Typography variant="h5">{t('title', { name: firecall.name })}</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {isGroupFfn && lastResult && lastResult.added > 0 && (
             <Chip
@@ -474,7 +476,7 @@ export default function Einsatzorte() {
             />
           )}
           {isGroupFfn && (
-            <Tooltip title="E-Mails prüfen">
+            <Tooltip title={t('checkEmails')}>
               <span>
                 <IconButton
                   onClick={importFromEmail}

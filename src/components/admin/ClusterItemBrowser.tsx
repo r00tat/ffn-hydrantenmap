@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, useCallback, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -33,6 +34,8 @@ import { deleteClusterItem } from '../../app/admin/ClusterItemAdminAction';
 import ClusterItemEditDialog from './ClusterItemEditDialog';
 
 export default function ClusterItemBrowser() {
+  const t = useTranslations('admin.cluster');
+  const tCommon = useTranslations('common');
   const [selectedTab, setSelectedTab] = useState(0);
   const selectedCollection: ClusterCollectionType = collectionConfigs[selectedTab].collection;
   const config = getCollectionConfig(selectedCollection);
@@ -162,7 +165,7 @@ export default function ClusterItemBrowser() {
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <TextField
-          placeholder="Suchen..."
+          placeholder={t('search')}
           value={searchText}
           onChange={(e) => {
             setSearchText(e.target.value);
@@ -209,7 +212,7 @@ export default function ClusterItemBrowser() {
                   Lng
                 </TableSortLabel>
               </TableCell>
-              <TableCell>Aktionen</TableCell>
+              <TableCell>{t('actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -234,17 +237,17 @@ export default function ClusterItemBrowser() {
                   <TableCell>{typeof item.lat === 'number' ? item.lat.toFixed(4) : '-'}</TableCell>
                   <TableCell>{typeof item.lng === 'number' ? item.lng.toFixed(4) : '-'}</TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => handleEdit(item)} title="Bearbeiten">
+                    <IconButton size="small" onClick={() => handleEdit(item)} title={tCommon('edit')}>
                       <EditIcon fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" onClick={() => handleDelete(item)} title="Löschen">
+                    <IconButton size="small" onClick={() => handleDelete(item)} title={tCommon('delete')}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                     {typeof (item as Record<string, unknown>).link === 'string' &&
                       (item as Record<string, string>).link !== '' && (
                         <IconButton
                           size="small"
-                          title="Link öffnen"
+                          title={t('openLink')}
                           onClick={() =>
                             window.open(
                               (item as Record<string, string>).link,
