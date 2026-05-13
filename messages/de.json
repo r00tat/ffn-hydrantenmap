@@ -143,7 +143,11 @@
     "summary": "Zusammenfassung",
     "elements": "Elemente",
     "tacticalSigns": "Taktische Zeichen",
-    "layer": "Ebene"
+    "layer": "Ebene",
+    "showMore": "Mehr anzeigen →",
+    "noEntries": "Keine Einträge",
+    "diaryDescription": "Beschreibung:",
+    "diaryDone": "Erledigt: {value}"
   },
   "versionUpdate": {
     "available": "Neue Version verfügbar",

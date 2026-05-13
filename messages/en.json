@@ -143,7 +143,11 @@
     "summary": "Summary",
     "elements": "Elements",
     "tacticalSigns": "Tactical signs",
-    "layer": "Layer"
+    "layer": "Layer",
+    "showMore": "Show more →",
+    "noEntries": "No entries",
+    "diaryDescription": "Description:",
+    "diaryDone": "Done: {value}"
   },
   "versionUpdate": {
     "available": "New version available",

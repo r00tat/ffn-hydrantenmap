@@ -67,6 +67,7 @@ interface DiaryEntryRowProps {
 
 function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowProps) {
   const t = useTranslations('common');
+  const tSidebar = useTranslations('sidebar');
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -131,7 +132,7 @@ function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowPro
             {diary.beschreibung && (
               <Box sx={{ mb: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  Beschreibung:
+                  {tSidebar('diaryDescription')}
                 </Typography>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                   {diary.beschreibung}
@@ -141,7 +142,7 @@ function DiaryEntryRow({ diary, isExpanded, onClick, canEdit }: DiaryEntryRowPro
 
             {diary.erledigt && (
               <Typography variant="caption" color="text.secondary">
-                Erledigt: {diary.erledigt}
+                {tSidebar('diaryDone', { value: diary.erledigt })}
               </Typography>
             )}
 
@@ -286,7 +287,7 @@ export default function SidebarDiaryPreview() {
 
           {entries.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-              Keine Einträge
+              {t('noEntries')}
             </Typography>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -309,7 +310,7 @@ export default function SidebarDiaryPreview() {
               variant="body2"
               sx={{ textDecoration: 'none' }}
             >
-              Mehr anzeigen →
+              {t('showMore')}
             </MuiLink>
           </Box>
         </AccordionDetails>
