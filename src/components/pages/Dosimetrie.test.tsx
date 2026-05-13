@@ -130,7 +130,7 @@ describe('Dosimetrie', () => {
     // Dosisleistungs-Chart ist der erste linechart — CPS-Chart im cps-trend-Box hat immer linear scale.
     const chart = screen.getAllByTestId('linechart')[0];
     expect(chart.getAttribute('data-scale')).toBe('linear');
-    await user.click(screen.getByRole('checkbox', { name: /log/i }));
+    await user.click(screen.getByRole('switch', { name: /log/i }));
     expect(screen.getAllByTestId('linechart')[0].getAttribute('data-scale')).toBe(
       'log',
     );
