@@ -293,6 +293,20 @@
       "statusFailed": "failed",
       "statusExpired": "expired"
     },
+    "emailDialog": {
+      "title": "Send email",
+      "from": "From",
+      "to": "To",
+      "cc": "CC",
+      "ccPlaceholder": "Add email address...",
+      "subject": "Subject",
+      "body": "Message",
+      "invalidEmail": "Invalid email address",
+      "attachmentHint": "The PDF invoice is automatically attached.",
+      "send": "Send",
+      "sending": "Sending...",
+      "errorGeneric": "Could not send email"
+    },
     "berechnungTab": {
       "customItemsHeader": "Other items (not in tariff)",
       "description": "Description",

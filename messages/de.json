@@ -293,6 +293,20 @@
       "statusFailed": "fehlgeschlagen",
       "statusExpired": "abgelaufen"
     },
+    "emailDialog": {
+      "title": "E-Mail senden",
+      "from": "Von",
+      "to": "An",
+      "cc": "CC",
+      "ccPlaceholder": "E-Mail-Adresse hinzufügen...",
+      "subject": "Betreff",
+      "body": "Nachricht",
+      "invalidEmail": "Ungültige E-Mail-Adresse",
+      "attachmentHint": "Die PDF-Rechnung wird automatisch als Anhang beigefügt.",
+      "send": "Senden",
+      "sending": "Wird gesendet...",
+      "errorGeneric": "E-Mail konnte nicht gesendet werden"
+    },
     "berechnungTab": {
       "customItemsHeader": "Sonstige Positionen (nicht im Tarif)",
       "description": "Beschreibung",
