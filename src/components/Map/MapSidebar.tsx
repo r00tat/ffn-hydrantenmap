@@ -55,7 +55,12 @@ const SidebarBox = styled(Box, {
 function FirecallItemDisplay({ item }: { item: FirecallItem }) {
   const t = useTranslations('common');
   const tSidebar = useTranslations('sidebar');
+  const tMarkerNames = useTranslations('firecallItem.markerNames');
   const itemInstance = getItemInstance(item);
+  const translatedMarkerName = (() => {
+    const key = (item.type || 'fallback') as Parameters<typeof tMarkerNames>[0];
+    return tMarkerNames.has(key) ? tMarkerNames(key) : itemInstance.markerName();
+  })();
   const { editable, selectFirecallItem } = useMapEditor();
   const [displayUpdateDialog, setDisplayUpdateDialog] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -208,7 +213,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
           }
           subheader={
             <Typography variant="caption" color="text.secondary">
-              {itemInstance.markerName()}
+              {translatedMarkerName}
             </Typography>
           }
           sx={{ pb: 0 }}
@@ -313,7 +318,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
           <ConfirmDialog
             title={tSidebar('deleteTitle', { name: itemInstance.title() })}
             text={tSidebar('deleteConfirm', {
-              markerName: itemInstance.markerName(),
+              markerName: translatedMarkerName,
               name: itemInstance.title(),
             })}
             onConfirm={handleDelete}

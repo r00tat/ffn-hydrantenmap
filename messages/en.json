@@ -139,7 +139,15 @@
     "enableEditing": "Enable editing",
     "editHint": "Enter = Save · Escape = Cancel",
     "deleteTitle": "Delete {name}",
-    "deleteConfirm": "Really delete {markerName} \"{name}\"?"
+    "deleteConfirm": "Really delete {markerName} \"{name}\"?",
+    "summary": "Summary",
+    "elements": "Elements",
+    "tacticalSigns": "Tactical signs",
+    "layer": "Layer"
+  },
+  "versionUpdate": {
+    "available": "New version available",
+    "reload": "Reload"
   },
   "einsatzDetails": {
     "notFound": "Operation not found",
@@ -396,6 +404,28 @@
       "beschreibung": "Description",
       "showLabel": "Show label",
       "showLabels": "Show labels"
+    },
+    "markerNames": {
+      "fallback": "Item",
+      "marker": "Marker",
+      "location": "Operation site",
+      "layer": "Layer",
+      "vehicle": "Vehicle",
+      "tacticalUnit": "Tactical unit",
+      "line": "Line",
+      "circle": "Circle",
+      "area": "Area",
+      "rohr": "Hose",
+      "connection": "Connection",
+      "assp": "BA staging area",
+      "el": "Command post",
+      "hydrant": "Hydrant",
+      "diary": "Operation log",
+      "drawing": "Drawing",
+      "gb": "Business log",
+      "spectrum": "Energy spectrum",
+      "multiPoint": "MultiPoint",
+      "upload": "Photo / File"
     }
   },
   "heatmap": {

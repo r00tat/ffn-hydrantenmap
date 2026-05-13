@@ -139,7 +139,15 @@
     "enableEditing": "Bearbeiten aktivieren",
     "editHint": "Enter = Speichern · Escape = Abbrechen",
     "deleteTitle": "{name} löschen",
-    "deleteConfirm": "{markerName} \"{name}\" wirklich löschen?"
+    "deleteConfirm": "{markerName} \"{name}\" wirklich löschen?",
+    "summary": "Zusammenfassung",
+    "elements": "Elemente",
+    "tacticalSigns": "Taktische Zeichen",
+    "layer": "Ebene"
+  },
+  "versionUpdate": {
+    "available": "Neue Version verfügbar",
+    "reload": "Neu laden"
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",
@@ -396,6 +404,28 @@
       "beschreibung": "Beschreibung",
       "showLabel": "Label anzeigen",
       "showLabels": "Labels anzeigen"
+    },
+    "markerNames": {
+      "fallback": "Element",
+      "marker": "Marker",
+      "location": "Einsatzort",
+      "layer": "Ebene",
+      "vehicle": "Fahrzeug",
+      "tacticalUnit": "Taktische Einheit",
+      "line": "Linie",
+      "circle": "Kreis",
+      "area": "Fläche",
+      "rohr": "Rohr",
+      "connection": "Leitung",
+      "assp": "Atemschutzsammelplatz",
+      "el": "Einsatzleitung",
+      "hydrant": "Hydrant",
+      "diary": "Einsatztagebuch",
+      "drawing": "Zeichnung",
+      "gb": "Geschäftsbuch",
+      "spectrum": "Energiespektrum",
+      "multiPoint": "MultiPoint",
+      "upload": "Foto / Datei"
     }
   },
   "heatmap": {
