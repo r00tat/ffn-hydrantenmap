@@ -35,6 +35,10 @@ import {
   DosisleistungNuklidValues,
   NUCLIDES,
 } from '../../common/strahlenschutz';
+import {
+  BezugsdosisleistungRechner,
+  KernwaffeneinsatzRechner,
+} from './KernwaffeneinsatzRechner';
 
 function parseInput(value: string): number | null {
   if (value.trim() === '') return null;
@@ -1227,6 +1231,10 @@ export default function Strahlenschutz() {
         <AufenthaltszeitRechner />
         <Divider />
         <DosisleistungNuklidRechner />
+        <Divider />
+        <KernwaffeneinsatzRechner />
+        <Divider />
+        <BezugsdosisleistungRechner />
         <Divider />
         <Einheitenumrechnung />
       </Box>

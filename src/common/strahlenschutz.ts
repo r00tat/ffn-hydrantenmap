@@ -563,3 +563,198 @@ export function calculateDosisleistungNuklid(
     return { field: 'doseRate', value: gamma * activity };
   }
 }
+
+/**
+ * Radioaktiver Fallout nach Kernwaffeneinsatz (Way-Wigner Zerfallsgesetz).
+ * Grundlage: FM 3-3-1 "Nuclear Contamination Avoidance", STS Silber.
+ *
+ * Dosisleistung zur Zeit t (h nach Detonation):
+ *   R(t) = R₁ · t^(-1.2)
+ *
+ *   R₁ = Bezugsdosisleistung bei H+1 Stunde (mSv/h)
+ *
+ * Akkumulierte Dosis bei Aufenthalt von Eintrittszeit Te für die Dauer Ts:
+ *   D = ∫[Te → Te+Ts] R₁ · t^(-1.2) dt
+ *     = 5 · R₁ · ( Te^(-0.2) − (Te + Ts)^(-0.2) )   [mSv]
+ */
+
+export const FALLOUT_DECAY_EXPONENT = 1.2;
+
+/** Dosisleistung R(t) = R₁ · t^(-1.2). t in Stunden nach Detonation. */
+export function falloutDoseRate(r1: number, t: number): number {
+  return r1 * Math.pow(t, -FALLOUT_DECAY_EXPONENT);
+}
+
+/** Gesamtdosis D = 5·R₁·(Te^(-0.2) - (Te+Ts)^(-0.2)). */
+export function falloutDose(r1: number, te: number, ts: number): number {
+  return 5 * r1 * (Math.pow(te, -0.2) - Math.pow(te + ts, -0.2));
+}
+
+export interface FalloutValues {
+  r1: number | null; // Bezugsdosisleistung bei H+1 (mSv/h)
+  te: number | null; // Eintrittszeit (h nach Detonation)
+  ts: number | null; // Aufenthaltsdauer (h)
+  d: number | null; // Gesamtdosis (mSv)
+}
+
+export interface FalloutResult {
+  field: keyof FalloutValues;
+  value: number;
+}
+
+export interface FalloutHistoryEntry {
+  r1: number;
+  te: number;
+  ts: number;
+  d: number;
+  calculatedField: keyof FalloutValues;
+  timestamp: Date;
+}
+
+/**
+ * Calculate the missing fallout value using D = 5·R₁·(Te^(-0.2) - (Te+Ts)^(-0.2)).
+ * Exactly one field must be null; the other three must be positive numbers.
+ * Te uses numerical bisection (log-space) since it appears in both terms.
+ */
+export function calculateFallout(
+  values: FalloutValues
+): FalloutResult | null {
+  const entries = Object.entries(values) as [
+    keyof FalloutValues,
+    number | null,
+  ][];
+  const nullFields = entries.filter(([, v]) => v === null);
+  if (nullFields.length !== 1) return null;
+
+  const [field] = nullFields[0];
+  const filled = Object.fromEntries(
+    entries.filter(([, v]) => v !== null)
+  ) as Record<string, number>;
+
+  if (Object.values(filled).some((v) => v <= 0)) return null;
+
+  let result: number;
+
+  switch (field) {
+    case 'd': {
+      result =
+        5 *
+        filled.r1 *
+        (Math.pow(filled.te, -0.2) -
+          Math.pow(filled.te + filled.ts, -0.2));
+      break;
+    }
+    case 'r1': {
+      const factor =
+        Math.pow(filled.te, -0.2) - Math.pow(filled.te + filled.ts, -0.2);
+      if (factor <= 0) return null;
+      result = filled.d / (5 * factor);
+      break;
+    }
+    case 'ts': {
+      // (Te+Ts)^(-0.2) = Te^(-0.2) - D/(5·R₁)
+      const tePow = Math.pow(filled.te, -0.2);
+      const taPow = tePow - filled.d / (5 * filled.r1);
+      if (taPow <= 0) return null; // Dosis übersteigt maximal erreichbaren Wert
+      const ta = Math.pow(taPow, -5);
+      result = ta - filled.te;
+      if (result <= 0) return null;
+      break;
+    }
+    case 'te': {
+      // f(Te) = 5·R₁·(Te^(-0.2) − (Te+Ts)^(-0.2)) − D = 0
+      // monoton fallend in Te → log-space Bisektion
+      const r1 = filled.r1;
+      const ts = filled.ts;
+      const target = filled.d;
+      const f = (te: number) =>
+        5 * r1 * (Math.pow(te, -0.2) - Math.pow(te + ts, -0.2)) - target;
+
+      let loL = Math.log(1e-6);
+      let hiL = Math.log(1e10);
+      if (f(Math.exp(hiL)) > 0) return null;
+      if (f(Math.exp(loL)) < 0) return null;
+      let mid = Math.exp((loL + hiL) / 2);
+      for (let i = 0; i < 100; i++) {
+        const midL = (loL + hiL) / 2;
+        mid = Math.exp(midL);
+        const fm = f(mid);
+        if (Math.abs(fm) < 1e-9 * Math.max(1, target)) break;
+        if (fm > 0) loL = midL;
+        else hiL = midL;
+        if (hiL - loL < 1e-12) break;
+      }
+      result = mid;
+      break;
+    }
+    default:
+      return null;
+  }
+
+  if (!isFinite(result) || result <= 0) return null;
+  return { field, value: result };
+}
+
+/**
+ * Bezugsdosisleistung R₁ aus Messung zur Zeit t nach Detonation.
+ *
+ *   R₁ = R(t) · t^1.2
+ *
+ * t in Stunden nach Detonation; R(t) und R₁ in mSv/h.
+ */
+
+export interface FalloutR1Values {
+  r1: number | null; // Bezugsdosisleistung bei H+1 (mSv/h)
+  rt: number | null; // gemessene Dosisleistung zur Zeit t (mSv/h)
+  t: number | null; // Zeit nach Detonation (h)
+}
+
+export interface FalloutR1Result {
+  field: keyof FalloutR1Values;
+  value: number;
+}
+
+export interface FalloutR1HistoryEntry {
+  r1: number;
+  rt: number;
+  t: number;
+  calculatedField: keyof FalloutR1Values;
+  timestamp: Date;
+}
+
+export function calculateFalloutR1(
+  values: FalloutR1Values
+): FalloutR1Result | null {
+  const entries = Object.entries(values) as [
+    keyof FalloutR1Values,
+    number | null,
+  ][];
+  const nullFields = entries.filter(([, v]) => v === null);
+  if (nullFields.length !== 1) return null;
+
+  const [field] = nullFields[0];
+  const filled = Object.fromEntries(
+    entries.filter(([, v]) => v !== null)
+  ) as Record<string, number>;
+
+  if (Object.values(filled).some((v) => v <= 0)) return null;
+
+  let result: number;
+  switch (field) {
+    case 'r1':
+      result = filled.rt * Math.pow(filled.t, FALLOUT_DECAY_EXPONENT);
+      break;
+    case 'rt':
+      result = filled.r1 * Math.pow(filled.t, -FALLOUT_DECAY_EXPONENT);
+      break;
+    case 't':
+      // R₁ = Rt · t^1.2 → t = (R₁/Rt)^(1/1.2)
+      result = Math.pow(filled.r1 / filled.rt, 1 / FALLOUT_DECAY_EXPONENT);
+      break;
+    default:
+      return null;
+  }
+
+  if (!isFinite(result) || result <= 0) return null;
+  return { field, value: result };
+}

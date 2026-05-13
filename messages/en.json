@@ -526,6 +526,44 @@
       "from": "From",
       "to": "To",
       "convert": "Convert"
+    },
+    "kernwaffen": {
+      "title": "Nuclear weapon / fallout",
+      "instructions": "Way-Wigner decay: D = 5 · R₁ · ( Te^(-0.2) − (Te+Ts)^(-0.2) ). Enter 3 values, the 4th is computed. Leave the field to be calculated empty (for Te/Ts leave both hours and minutes empty).",
+      "te": "Entry time Te (after burst)",
+      "ts": "Stay duration Ts",
+      "hours": "Hours",
+      "minutes": "Minutes",
+      "r1": "Reference dose rate R₁ at H+1 (mSv/h)",
+      "d": "Total dose D (mSv)",
+      "resultD": "D = {value} mSv",
+      "resultR1": "R₁ = {value} mSv/h",
+      "resultTe": "Te = {value} h ({hm})",
+      "resultTs": "Ts = {value} h ({hm})",
+      "tooFewValues": "Please enter exactly 3 of the 4 quantities (R₁, Te, Ts, D) — currently {actual} of 3."
+    },
+    "bezugsdosisleistung": {
+      "title": "Reference dose rate R₁ from measurement",
+      "instructions": "Backcalculate the reference dose rate R₁ at H+1 from a current measurement R(t) at time t after burst (factor: t^{exp}). Leave the field to be calculated empty.",
+      "rt": "Measurement R(t) (mSv/h)",
+      "t": "Time t after burst",
+      "hours": "Hours",
+      "minutes": "Minutes",
+      "r1": "R₁ at H+1 (mSv/h)",
+      "resultR1": "R₁ = {value} mSv/h",
+      "resultRt": "R(t) = {value} mSv/h",
+      "resultT": "t = {value} h ({hm})",
+      "tooFewValues": "Please enter exactly 2 of the 3 quantities (R(t), t, R₁) — currently {actual} of 2."
+    },
+    "nomogramm": {
+      "title": "Nomogram (FM 3-3-1)",
+      "description": "Connect Te (left) with Tₐ = Te + Ts (right); the line crosses the middle scale at the dose multiplier M = D / R₁.",
+      "axisTe": "Entry Te",
+      "axisTeSub": "(h after burst)",
+      "axisM": "M = D / R₁",
+      "axisMSub": "(dose multiplier)",
+      "axisTa": "Exit Tₐ",
+      "axisTaSub": "= Te + Ts (h)"
     }
   },
   "dosimetrie": {

@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateAufenthaltszeit,
   calculateDosisleistungNuklid,
+  calculateFallout,
+  calculateFalloutR1,
   calculateInverseSquareLaw,
   calculateSchutzwert,
   convertActivityToGBq,
   convertRadiationUnit,
+  FALLOUT_DECAY_EXPONENT,
+  falloutDose,
+  falloutDoseRate,
   getCompatibleUnits,
   isDoseUnit,
   isDoseRateUnit,
@@ -451,5 +456,231 @@ describe('calculateDosisleistungNuklid', () => {
       doseRate: 0,
     });
     expect(result).toBeNull();
+  });
+});
+
+describe('Kernwaffeneinsatz / Fallout (Way-Wigner)', () => {
+  describe('FALLOUT_DECAY_EXPONENT', () => {
+    it('is 1.2 (FM 3-3-1)', () => {
+      expect(FALLOUT_DECAY_EXPONENT).toBe(1.2);
+    });
+  });
+
+  describe('falloutDoseRate', () => {
+    it('returns R₁ at t=1h (reference time)', () => {
+      expect(falloutDoseRate(100, 1)).toBeCloseTo(100);
+    });
+
+    it('decays as t^(-1.2)', () => {
+      // R₁=100, t=2 → 100 · 2^(-1.2) ≈ 43.53
+      expect(falloutDoseRate(100, 2)).toBeCloseTo(100 * Math.pow(2, -1.2));
+    });
+
+    it('matches the 7-10 rule: after 7-fold time, ~1/10 dose rate', () => {
+      // R(7)/R₁ = 7^(-1.2) ≈ 0.0968 ≈ 1/10.3
+      const ratio = falloutDoseRate(1, 7);
+      expect(ratio).toBeCloseTo(Math.pow(7, -1.2));
+      expect(ratio).toBeCloseTo(0.097, 2);
+    });
+
+    it('handles times before H+1 (t < 1)', () => {
+      // At t=0.5: R = R₁ · 0.5^(-1.2) ≈ 2.297 · R₁
+      expect(falloutDoseRate(100, 0.5)).toBeCloseTo(100 * Math.pow(0.5, -1.2));
+    });
+  });
+
+  describe('falloutDose', () => {
+    it('returns 0 for zero stay duration', () => {
+      expect(falloutDose(100, 1, 0)).toBe(0);
+    });
+
+    it('integrates Way-Wigner over [Te, Te+Ts]', () => {
+      // R₁=100, Te=1, Ts=1 → D = 5·100·(1 - 2^(-0.2)) ≈ 64.72
+      const expected = 500 * (1 - Math.pow(2, -0.2));
+      expect(falloutDose(100, 1, 1)).toBeCloseTo(expected);
+    });
+
+    it('FM 3-3-1 Beispiel: R₁=300, Te=2h, Ts=1h', () => {
+      // D = 5·300·(2^(-0.2) - 3^(-0.2)) ≈ 101.7 mSv
+      const expected = 1500 * (Math.pow(2, -0.2) - Math.pow(3, -0.2));
+      expect(falloutDose(300, 2, 1)).toBeCloseTo(expected);
+      expect(falloutDose(300, 2, 1)).toBeCloseTo(101.7, 1);
+    });
+
+    it('grows monotonically with Ts', () => {
+      const d1 = falloutDose(100, 1, 1);
+      const d2 = falloutDose(100, 1, 2);
+      const d3 = falloutDose(100, 1, 10);
+      expect(d2).toBeGreaterThan(d1);
+      expect(d3).toBeGreaterThan(d2);
+    });
+
+    it('shrinks with later entry time Te (same Ts)', () => {
+      const early = falloutDose(100, 1, 1);
+      const late = falloutDose(100, 10, 1);
+      expect(late).toBeLessThan(early);
+    });
+  });
+
+  describe('calculateFallout', () => {
+    it('calculates D from R₁, Te, Ts', () => {
+      const result = calculateFallout({ r1: 100, te: 1, ts: 1, d: null });
+      expect(result!.field).toBe('d');
+      expect(result!.value).toBeCloseTo(500 * (1 - Math.pow(2, -0.2)));
+    });
+
+    it('calculates R₁ from D, Te, Ts (Bezugsdosisleistung)', () => {
+      const d = 500 * (1 - Math.pow(2, -0.2)); // ≈ 64.72 from R₁=100
+      const result = calculateFallout({ r1: null, te: 1, ts: 1, d });
+      expect(result!.field).toBe('r1');
+      expect(result!.value).toBeCloseTo(100, 4);
+    });
+
+    it('calculates Ts from R₁, Te, D', () => {
+      const d = 500 * (1 - Math.pow(2, -0.2));
+      const result = calculateFallout({ r1: 100, te: 1, ts: null, d });
+      expect(result!.field).toBe('ts');
+      expect(result!.value).toBeCloseTo(1, 3);
+    });
+
+    it('calculates Te from R₁, Ts, D (numerical)', () => {
+      const d = 500 * (1 - Math.pow(2, -0.2));
+      const result = calculateFallout({ r1: 100, te: null, ts: 1, d });
+      expect(result!.field).toBe('te');
+      expect(result!.value).toBeCloseTo(1, 3);
+    });
+
+    it('FM 3-3-1 Beispiel: R₁=300 mSv/h, Te=2h, Ts=1h → D ≈ 101.7 mSv', () => {
+      const result = calculateFallout({ r1: 300, te: 2, ts: 1, d: null });
+      expect(result!.field).toBe('d');
+      expect(result!.value).toBeCloseTo(101.7, 1);
+    });
+
+    it('STS Beispiel: D=50 mSv, Te=4h, Ts=2h → R₁ ≈ ?', () => {
+      // R₁ = D / (5·(Te^(-0.2) − (Te+Ts)^(-0.2)))
+      const factor = Math.pow(4, -0.2) - Math.pow(6, -0.2);
+      const expectedR1 = 50 / (5 * factor);
+      const result = calculateFallout({ r1: null, te: 4, ts: 2, d: 50 });
+      expect(result!.field).toBe('r1');
+      expect(result!.value).toBeCloseTo(expectedR1, 4);
+    });
+
+    it('round-trips: calculate D, then back to R₁', () => {
+      const r1 = 250;
+      const te = 3;
+      const ts = 4;
+      const dResult = calculateFallout({ r1, te, ts, d: null });
+      const r1Result = calculateFallout({
+        r1: null,
+        te,
+        ts,
+        d: dResult!.value,
+      });
+      expect(r1Result!.value).toBeCloseTo(r1, 4);
+    });
+
+    it('round-trips: calculate D, then back to Te', () => {
+      const r1 = 200;
+      const te = 5;
+      const ts = 2;
+      const dResult = calculateFallout({ r1, te, ts, d: null });
+      const teResult = calculateFallout({
+        r1,
+        te: null,
+        ts,
+        d: dResult!.value,
+      });
+      expect(teResult!.value).toBeCloseTo(te, 3);
+    });
+
+    it('returns null when two fields are null', () => {
+      expect(
+        calculateFallout({ r1: 100, te: null, ts: null, d: 50 }),
+      ).toBeNull();
+    });
+
+    it('returns null when no field is null', () => {
+      expect(calculateFallout({ r1: 100, te: 1, ts: 1, d: 65 })).toBeNull();
+    });
+
+    it('returns null when a filled value is zero', () => {
+      expect(calculateFallout({ r1: 0, te: 1, ts: 1, d: null })).toBeNull();
+    });
+
+    it('returns null when a filled value is negative', () => {
+      expect(
+        calculateFallout({ r1: 100, te: -1, ts: 1, d: null }),
+      ).toBeNull();
+    });
+
+    it('returns null for Ts when dose exceeds maximum reachable', () => {
+      // Max D from Te=1 with R₁=100 (Ts→∞): 5·100·1^(-0.2) = 500 mSv
+      // Asking for 600 mSv is impossible
+      expect(
+        calculateFallout({ r1: 100, te: 1, ts: null, d: 600 }),
+      ).toBeNull();
+    });
+  });
+
+  describe('calculateFalloutR1 (Bezugsdosisleistung aus Messung)', () => {
+    it('calculates R₁ from R(t) and t: R₁ = R · t^1.2', () => {
+      // R(2)=50 → R₁ = 50 · 2^1.2 ≈ 114.87
+      const result = calculateFalloutR1({ r1: null, rt: 50, t: 2 });
+      expect(result!.field).toBe('r1');
+      expect(result!.value).toBeCloseTo(50 * Math.pow(2, 1.2));
+    });
+
+    it('calculates R(t) from R₁ and t (decay forward)', () => {
+      const result = calculateFalloutR1({ r1: 100, rt: null, t: 2 });
+      expect(result!.field).toBe('rt');
+      expect(result!.value).toBeCloseTo(100 * Math.pow(2, -1.2));
+    });
+
+    it('calculates t from R₁ and R(t)', () => {
+      // R₁=100, R(t)=50 → t = (100/50)^(1/1.2) = 2^(1/1.2) ≈ 1.781
+      const result = calculateFalloutR1({ r1: 100, rt: 50, t: null });
+      expect(result!.field).toBe('t');
+      expect(result!.value).toBeCloseTo(Math.pow(2, 1 / 1.2));
+    });
+
+    it('round-trips: R₁→R(t)→R₁', () => {
+      const r1 = 250;
+      const t = 4;
+      const rtResult = calculateFalloutR1({ r1, rt: null, t });
+      const r1Result = calculateFalloutR1({
+        r1: null,
+        rt: rtResult!.value,
+        t,
+      });
+      expect(r1Result!.value).toBeCloseTo(r1);
+    });
+
+    it('handles t < 1 (before H+1, dose rate exceeds R₁)', () => {
+      // At t=0.5h with R₁=100: R(0.5) = 100 · 0.5^(-1.2) ≈ 229.7
+      const result = calculateFalloutR1({ r1: 100, rt: null, t: 0.5 });
+      expect(result!.value).toBeCloseTo(100 * Math.pow(0.5, -1.2));
+    });
+
+    it('returns null when more than one field is null', () => {
+      expect(
+        calculateFalloutR1({ r1: null, rt: null, t: 2 }),
+      ).toBeNull();
+    });
+
+    it('returns null when no field is null', () => {
+      expect(calculateFalloutR1({ r1: 100, rt: 50, t: 2 })).toBeNull();
+    });
+
+    it('returns null when a filled value is zero', () => {
+      expect(
+        calculateFalloutR1({ r1: null, rt: 0, t: 2 }),
+      ).toBeNull();
+    });
+
+    it('returns null when a filled value is negative', () => {
+      expect(
+        calculateFalloutR1({ r1: -10, rt: null, t: 2 }),
+      ).toBeNull();
+    });
   });
 });

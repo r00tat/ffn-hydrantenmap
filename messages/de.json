@@ -526,6 +526,44 @@
       "from": "Von",
       "to": "Nach",
       "convert": "Umrechnen"
+    },
+    "kernwaffen": {
+      "title": "Kernwaffeneinsatz / Fallout",
+      "instructions": "Way-Wigner-Zerfall: D = 5 · R₁ · ( Te^(-0,2) − (Te+Ts)^(-0,2) ). Gib 3 Werte ein, der 4. wird berechnet. Lasse das zu berechnende Feld leer (bei Te/Ts beide Felder Stunden+Minuten leer).",
+      "te": "Eintrittszeit Te (nach Detonation)",
+      "ts": "Aufenthaltsdauer Ts",
+      "hours": "Stunden",
+      "minutes": "Minuten",
+      "r1": "Bezugsdosisleistung R₁ bei H+1 (mSv/h)",
+      "d": "Gesamtdosis D (mSv)",
+      "resultD": "D = {value} mSv",
+      "resultR1": "R₁ = {value} mSv/h",
+      "resultTe": "Te = {value} h ({hm})",
+      "resultTs": "Ts = {value} h ({hm})",
+      "tooFewValues": "Bitte genau 3 der 4 Größen (R₁, Te, Ts, D) eingeben — aktuell {actual} von 3."
+    },
+    "bezugsdosisleistung": {
+      "title": "Bezugsdosisleistung R₁ aus Messung",
+      "instructions": "Aus einer aktuellen Messung R(t) zur Zeit t nach Detonation die Bezugsdosisleistung R₁ bei H+1 rückrechnen (Faktor: t^{exp}). Lasse das zu berechnende Feld leer.",
+      "rt": "Messwert R(t) (mSv/h)",
+      "t": "Zeit t nach Detonation",
+      "hours": "Stunden",
+      "minutes": "Minuten",
+      "r1": "R₁ bei H+1 (mSv/h)",
+      "resultR1": "R₁ = {value} mSv/h",
+      "resultRt": "R(t) = {value} mSv/h",
+      "resultT": "t = {value} h ({hm})",
+      "tooFewValues": "Bitte genau 2 der 3 Größen (R(t), t, R₁) eingeben — aktuell {actual} von 2."
+    },
+    "nomogramm": {
+      "title": "Nomogramm (FM 3-3-1)",
+      "description": "Verbindungslinie von Te (links) nach Tₐ = Te + Ts (rechts); Schnittpunkt mit Mittelskala liefert den Dosis-Multiplikator M = D / R₁.",
+      "axisTe": "Eintritt Te",
+      "axisTeSub": "(h nach Detonation)",
+      "axisM": "M = D / R₁",
+      "axisMSub": "(Dosis-Multiplikator)",
+      "axisTa": "Austritt Tₐ",
+      "axisTaSub": "= Te + Ts (h)"
     }
   },
   "dosimetrie": {
