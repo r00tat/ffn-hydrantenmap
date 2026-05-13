@@ -293,6 +293,37 @@
       "statusFailed": "fehlgeschlagen",
       "statusExpired": "abgelaufen"
     },
+    "vehicleTab": {
+      "title": "Fahrzeuge",
+      "loadDefaults": "Standard-Fahrzeuge laden",
+      "addVehicle": "Fahrzeug hinzufügen",
+      "defaultsHint": "Zeigt Standard-Fahrzeuge. Klicken Sie \"Standard-Fahrzeuge laden\" um sie in die Datenbank zu übernehmen.",
+      "noVehicles": "Keine Fahrzeuge vorhanden.",
+      "cols": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "rate": "Tarif",
+        "actions": "Aktionen"
+      },
+      "edit": "Fahrzeug bearbeiten",
+      "add": "Fahrzeug hinzufügen",
+      "namePlaceholder": "z.B. RLFA 3000",
+      "descriptionPlaceholder": "z.B. RüstLösch Neusiedl am See",
+      "descriptionLabel": "Beschreibung (optional)",
+      "seedTitle": "Standard-Fahrzeuge laden",
+      "seedConfirm": "Möchten Sie die Standard-Fahrzeuge der FF Neusiedl am See in die Datenbank laden?",
+      "seedDetail": "Bestehende Fahrzeuge mit gleicher ID werden überschrieben.",
+      "seedAction": "Laden"
+    },
+    "templateDialog": {
+      "editTitle": "Vorlage bearbeiten",
+      "saveTitle": "Vorlage speichern",
+      "name": "Name der Vorlage",
+      "description": "Beschreibung (optional)",
+      "defaultHours": "Standarddauer (Stunden)",
+      "shareWithAll": "Für alle Benutzer freigeben (gemeinsame Vorlage)",
+      "total": "Gesamt: {amount}"
+    },
     "templateSelector": {
       "title": "Vorlage auswählen",
       "loading": "Laden...",

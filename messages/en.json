@@ -293,6 +293,37 @@
       "statusFailed": "failed",
       "statusExpired": "expired"
     },
+    "vehicleTab": {
+      "title": "Vehicles",
+      "loadDefaults": "Load standard vehicles",
+      "addVehicle": "Add vehicle",
+      "defaultsHint": "Showing standard vehicles. Click \"Load standard vehicles\" to import them into the database.",
+      "noVehicles": "No vehicles yet.",
+      "cols": {
+        "name": "Name",
+        "description": "Description",
+        "rate": "Tariff",
+        "actions": "Actions"
+      },
+      "edit": "Edit vehicle",
+      "add": "Add vehicle",
+      "namePlaceholder": "e.g. RLFA 3000",
+      "descriptionPlaceholder": "e.g. RüstLösch Neusiedl am See",
+      "descriptionLabel": "Description (optional)",
+      "seedTitle": "Load standard vehicles",
+      "seedConfirm": "Load the standard vehicles of FF Neusiedl am See into the database?",
+      "seedDetail": "Existing vehicles with the same ID will be overwritten.",
+      "seedAction": "Load"
+    },
+    "templateDialog": {
+      "editTitle": "Edit template",
+      "saveTitle": "Save template",
+      "name": "Template name",
+      "description": "Description (optional)",
+      "defaultHours": "Default duration (hours)",
+      "shareWithAll": "Share with all users (shared template)",
+      "total": "Total: {amount}"
+    },
     "templateSelector": {
       "title": "Select template",
       "loading": "Loading...",
