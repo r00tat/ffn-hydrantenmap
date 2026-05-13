@@ -7,8 +7,10 @@ import {
   Alert,
 } from '@mui/material';
 import { signInWithGoogle } from '@shared/auth';
+import { useTranslations } from '@shared/i18n';
 
 export default function Login() {
+  const t = useTranslations();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +21,7 @@ export default function Login() {
       await signInWithGoogle();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen'
+        err instanceof Error ? err.message : t('login.failed'),
       );
     } finally {
       setLoading(false);
@@ -39,10 +41,10 @@ export default function Login() {
       }}
     >
       <Typography variant="h5" gutterBottom>
-        Einsatzkarte
+        {t('app.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-        Melde dich an, um auf Einsatzdaten und das Tagebuch zuzugreifen.
+        {t('login.intro')}
       </Typography>
       {error && (
         <Alert severity="error" sx={{ width: '100%' }}>
@@ -56,7 +58,7 @@ export default function Login() {
         startIcon={loading ? <CircularProgress size={20} /> : null}
         sx={{ mt: 2 }}
       >
-        {loading ? 'Anmelden...' : 'Mit Google anmelden'}
+        {loading ? t('login.signingIn') : t('login.signInGoogle')}
       </Button>
     </Box>
   );

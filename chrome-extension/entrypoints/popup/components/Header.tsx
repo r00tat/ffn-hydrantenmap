@@ -9,19 +9,21 @@ import Logout from '@mui/icons-material/Logout';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import { signOut } from '@shared/auth';
 import { EINSATZKARTE_URL } from '@shared/config';
+import { useTranslations } from '@shared/i18n';
 
 interface HeaderProps {
   email: string;
 }
 
 export default function Header({ email }: HeaderProps) {
+  const t = useTranslations('app');
   return (
     <AppBar position="static" color="primary" elevation={1}>
       <Toolbar variant="dense" sx={{ gap: 1 }}>
         <Typography variant="subtitle1" sx={{ flex: 1, fontWeight: 'bold' }}>
-          Einsatzkarte
+          {t('title')}
         </Typography>
-        <Tooltip title="In Einsatzkarte öffnen">
+        <Tooltip title={t('openInTab')}>
           <IconButton
             size="small"
             color="inherit"
@@ -30,7 +32,7 @@ export default function Header({ email }: HeaderProps) {
             <OpenInNew fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title={`Abmelden (${email})`}>
+        <Tooltip title={t('signOut', { email })}>
           <IconButton size="small" color="inherit" onClick={signOut}>
             <Logout fontSize="small" />
           </IconButton>

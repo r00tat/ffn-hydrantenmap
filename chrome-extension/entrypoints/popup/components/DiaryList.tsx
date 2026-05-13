@@ -8,14 +8,12 @@ import {
   Skeleton,
 } from '@mui/material';
 import { Diary } from '@shared/types';
+import { useLocale, useTranslations } from '@shared/i18n';
 
-const ART_LABELS: Record<
-  string,
-  { label: string; color: 'info' | 'warning' | 'success' }
-> = {
-  M: { label: 'Meldung', color: 'info' },
-  B: { label: 'Befehl', color: 'warning' },
-  F: { label: 'Frage', color: 'success' },
+const ART_COLORS: Record<string, 'info' | 'warning' | 'success'> = {
+  M: 'info',
+  B: 'warning',
+  F: 'success',
 };
 
 interface DiaryListProps {
@@ -24,6 +22,9 @@ interface DiaryListProps {
 }
 
 export default function DiaryList({ diaries, loading }: DiaryListProps) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const dateLocale = locale === 'en' ? 'en-GB' : 'de-AT';
   if (loading) {
     return (
       <Box sx={{ p: 1 }}>
@@ -38,7 +39,7 @@ export default function DiaryList({ diaries, loading }: DiaryListProps) {
     return (
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Typography variant="body2" color="text.secondary">
-          Keine Tagebucheinträge vorhanden.
+          {t('diary.empty')}
         </Typography>
       </Box>
     );
@@ -47,9 +48,10 @@ export default function DiaryList({ diaries, loading }: DiaryListProps) {
   return (
     <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
       {diaries.map((entry) => {
-        const artInfo = entry.art ? ART_LABELS[entry.art] : undefined;
+        const artColor = entry.art ? ART_COLORS[entry.art] : undefined;
+        const artLabel = entry.art ? t(`diaryForm.${entry.art}`) : undefined;
         const timestamp = entry.datum
-          ? new Date(entry.datum).toLocaleString('de-AT', {
+          ? new Date(entry.datum).toLocaleString(dateLocale, {
               hour: '2-digit',
               minute: '2-digit',
               day: '2-digit',
@@ -68,10 +70,10 @@ export default function DiaryList({ diaries, loading }: DiaryListProps) {
                   >
                     #{entry.nummer}
                   </Typography>
-                  {artInfo && (
+                  {artLabel && artColor && (
                     <Chip
-                      label={artInfo.label}
-                      color={artInfo.color}
+                      label={artLabel}
+                      color={artColor}
                       size="small"
                       sx={{ height: 20, fontSize: '0.7rem' }}
                     />
@@ -84,8 +86,8 @@ export default function DiaryList({ diaries, loading }: DiaryListProps) {
               secondary={
                 <Typography variant="caption" color="text.secondary">
                   {timestamp}
-                  {entry.von && ` \u2014 Von: ${entry.von}`}
-                  {entry.an && ` \u2192 An: ${entry.an}`}
+                  {entry.von && ` \u2014 ${t('diary.from', { value: entry.von })}`}
+                  {entry.an && ` \u2192 ${t('diary.to', { value: entry.an })}`}
                 </Typography>
               }
             />

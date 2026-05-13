@@ -20,6 +20,7 @@ import {
   funktionAbkuerzung,
 } from '@shared/types';
 import { EINSATZKARTE_URL } from '@shared/config';
+import { useLocale, useTranslations } from '@shared/i18n';
 
 interface FirecallOverviewProps {
   firecall: Firecall | undefined;
@@ -42,9 +43,13 @@ export default function FirecallOverview({
   crew,
   loading,
 }: FirecallOverviewProps) {
+  const t = useTranslations('overview');
+  const locale = useLocale();
   if (loading || !firecall) {
     return <Skeleton variant="rectangular" height={200} />;
   }
+
+  const dateLocale = locale === 'en' ? 'en-GB' : 'de-AT';
 
   const vehicles = items.filter((i): i is Fzg => i.type === 'vehicle');
   const isActive = !!firecall.eintreffen && !firecall.abruecken;
@@ -91,7 +96,7 @@ export default function FirecallOverview({
           </Typography>
         )}
         <Chip
-          label={isActive ? 'Aktiv' : 'Beendet'}
+          label={isActive ? t('active') : t('ended')}
           color={isActive ? 'error' : 'default'}
           size="small"
         />
@@ -110,20 +115,24 @@ export default function FirecallOverview({
           <AccessTime fontSize="small" color="action" />
           <Typography variant="body2">
             {firecall.date
-              ? new Date(firecall.date).toLocaleString('de-AT')
+              ? new Date(firecall.date).toLocaleString(dateLocale)
               : '\u2013'}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <DirectionsCar fontSize="small" color="action" />
           <Typography variant="body2">
-            {vehicles.length} Fahrzeug{vehicles.length !== 1 ? 'e' : ''}
+            {vehicles.length === 1
+              ? t('vehiclesSingular', { count: vehicles.length })
+              : t('vehiclesPlural', { count: vehicles.length })}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <People fontSize="small" color="action" />
           <Typography variant="body2">
-            {crew.length} Person{crew.length !== 1 ? 'en' : ''}
+            {crew.length === 1
+              ? t('personsSingular', { count: crew.length })
+              : t('personsPlural', { count: crew.length })}
           </Typography>
         </Box>
       </Box>
@@ -171,7 +180,7 @@ export default function FirecallOverview({
                         color="text.secondary"
                         sx={{ fontStyle: 'italic' }}
                       >
-                        Keine Mannschaft zugeordnet
+                        {t('noCrew')}
                       </Typography>
                     </ListItem>
                   )}
@@ -188,7 +197,7 @@ export default function FirecallOverview({
                     sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
                   >
                     <People fontSize="small" />
-                    <strong>Ohne Fahrzeug</strong>
+                    <strong>{t('noVehicle')}</strong>
                   </Box>
                 </ListSubheader>
                 {unassignedCrew.map((member) => (
