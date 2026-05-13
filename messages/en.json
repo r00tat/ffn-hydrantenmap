@@ -207,6 +207,70 @@
     "algorithm": "Algorithm",
     "opacity": "Opacity: {percent}%"
   },
+  "kostenersatz": {
+    "title": "Cost recovery",
+    "titleForCall": "Cost recovery - {name}",
+    "loginRequired": "Please sign in.",
+    "noPermission": "You do not have permission for this feature. Please contact an administrator to obtain access to the \"Cost recovery\" group.",
+    "noFirecall": "No operation selected.",
+    "calculations": "Cost-recovery calculations",
+    "newCalculation": "New calculation",
+    "noEntries": "No calculations yet",
+    "noEntriesHint": "Create a new cost-recovery calculation for this operation.",
+    "createFirst": "Create first calculation",
+    "deleteTitle": "Delete calculation",
+    "deleteConfirm": "Do you really want to delete the calculation for \"{name}\"? This action cannot be undone.",
+    "unnamed": "Unnamed",
+    "noRecipient": "No recipient",
+    "emailSent": "Email sent successfully",
+    "loadError": "Failed to load calculations: {message}",
+    "pdfFilenamePrefix": "CostRecovery",
+    "pdfDefaultName": "Calculation",
+    "card": {
+      "positions": "{count} items • {hours}h",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "pdf": "Create PDF",
+      "sendEmail": "Send via email",
+      "delete": "Delete"
+    },
+    "calculation": {
+      "back": "Back",
+      "editTitle": "Edit cost recovery",
+      "newTitle": "New cost-recovery calculation",
+      "loadTemplate": "Load template",
+      "saveAsTemplate": "Save as template",
+      "save": "Save",
+      "complete": "Complete",
+      "saveRecipient": "Save recipient",
+      "copy": "Copy",
+      "email": "Email",
+      "completeTitle": "Complete calculation",
+      "completeConfirm": "After completion no further changes are possible. Continue?",
+      "unsavedTitle": "Unsaved changes",
+      "unsavedConfirm": "There are unsaved changes. Save before leaving?",
+      "discard": "Discard",
+      "templateLoaded": "Template \"{name}\" loaded",
+      "templateSaved": "Template saved"
+    },
+    "tabs": {
+      "operation": "Operation",
+      "calculation": "Calculation",
+      "recipient": "Recipient"
+    },
+    "status": {
+      "draft": "Draft",
+      "completed": "Completed",
+      "sent": "Sent"
+    },
+    "payment": {
+      "sumupApp": "Card payment (SumUp)",
+      "paid": "Amount collected",
+      "failed": "Payment failed",
+      "expired": "Payment expired",
+      "pending": "Amount pending"
+    }
+  },
   "wetter": {
     "backToMap": "← Back to map",
     "stationFallback": "Station {id}",

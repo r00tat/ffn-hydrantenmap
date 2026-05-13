@@ -3,12 +3,14 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import KostenersatzList from '../../components/Kostenersatz/KostenersatzList';
 import { KOSTENERSATZ_GROUP } from '../../common/kostenersatz';
 
 export default function KostenersatzPage() {
+  const t = useTranslations('kostenersatz');
   const { isAuthorized, groups } = useFirebaseLogin();
   const firecall = useFirecall();
   const firecallId = useFirecallId();
@@ -16,7 +18,7 @@ export default function KostenersatzPage() {
   if (!isAuthorized) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
-        <Typography>Bitte melden Sie sich an.</Typography>
+        <Typography>{t('loginRequired')}</Typography>
       </Container>
     );
   }
@@ -25,13 +27,9 @@ export default function KostenersatzPage() {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Kostenersatz
+          {t('title')}
         </Typography>
-        <Typography>
-          Sie haben keine Berechtigung für diese Funktion. Bitte kontaktieren
-          Sie einen Administrator, um Zugang zur Gruppe &quot;Kostenersatz&quot;
-          zu erhalten.
-        </Typography>
+        <Typography>{t('noPermission')}</Typography>
       </Container>
     );
   }
@@ -40,9 +38,9 @@ export default function KostenersatzPage() {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Kostenersatz
+          {t('title')}
         </Typography>
-        <Typography>Kein Einsatz ausgewählt.</Typography>
+        <Typography>{t('noFirecall')}</Typography>
       </Container>
     );
   }
@@ -50,7 +48,7 @@ export default function KostenersatzPage() {
   return (
     <Box sx={{ p: 2, m: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Kostenersatz - {firecall.name}
+        {t('titleForCall', { name: firecall.name })}
       </Typography>
       <KostenersatzList firecallId={firecallId} />
     </Box>

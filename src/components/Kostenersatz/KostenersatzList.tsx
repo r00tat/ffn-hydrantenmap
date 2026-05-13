@@ -7,6 +7,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
@@ -29,6 +30,8 @@ export interface KostenersatzListProps {
 export default function KostenersatzList({
   firecallId,
 }: KostenersatzListProps) {
+  const t = useTranslations('kostenersatz');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const firecall = useFirecall();
   const { calculations, loading, error } = useFirecallKostenersatz(firecallId);
@@ -83,7 +86,10 @@ export default function KostenersatzList({
       }
 
       const blob = await response.blob();
-      await downloadBlob(blob, `Kostenersatz_${calculation.recipient.name || 'Berechnung'}.pdf`);
+      await downloadBlob(
+        blob,
+        `${t('pdfFilenamePrefix')}_${calculation.recipient.name || t('pdfDefaultName')}.pdf`,
+      );
     } catch (err) {
       console.error('Error generating PDF:', err);
     }
@@ -113,8 +119,8 @@ export default function KostenersatzList({
   }, []);
 
   const handleEmailSuccess = useCallback(() => {
-    setEmailSuccessMessage('E-Mail wurde erfolgreich gesendet');
-  }, []);
+    setEmailSuccessMessage(t('emailSent'));
+  }, [t]);
 
   if (loading) {
     return (
@@ -135,7 +141,7 @@ export default function KostenersatzList({
     return (
       <Box sx={{ py: 2 }}>
         <Typography color="error">
-          Fehler beim Laden der Berechnungen: {error.message}
+          {t('loadError', { message: error.message })}
         </Typography>
       </Box>
     );
@@ -151,13 +157,13 @@ export default function KostenersatzList({
           mb: 2,
         }}
       >
-        <Typography variant="h6">Kostenersatz-Berechnungen</Typography>
+        <Typography variant="h6">{t('calculations')}</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleOpenNew}
         >
-          Neue Berechnung
+          {t('newCalculation')}
         </Button>
       </Box>
 
@@ -173,17 +179,17 @@ export default function KostenersatzList({
         >
           <ReceiptLongIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" gutterBottom>
-            Noch keine Berechnungen
+            {t('noEntries')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Erstellen Sie eine neue Kostenersatz-Berechnung für diesen Einsatz.
+            {t('noEntriesHint')}
           </Typography>
           <Button
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={handleOpenNew}
           >
-            Erste Berechnung erstellen
+            {t('createFirst')}
           </Button>
         </Box>
       ) : (
@@ -205,11 +211,13 @@ export default function KostenersatzList({
       {deleteConfirmOpen && (
         <ConfirmDialog
           open={deleteConfirmOpen}
-          title="Berechnung löschen"
-          text={`Möchten Sie die Berechnung für "${calculationToDelete?.recipient.name || 'Unbenannt'}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+          title={t('deleteTitle')}
+          text={t('deleteConfirm', {
+            name: calculationToDelete?.recipient.name || t('unnamed'),
+          })}
           onConfirm={handleDeleteConfirm}
-          yes="Löschen"
-          no="Abbrechen"
+          yes={t('card.delete')}
+          no={tCommon('cancel')}
         />
       )}
 

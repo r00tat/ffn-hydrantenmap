@@ -207,6 +207,70 @@
     "algorithm": "Algorithmus",
     "opacity": "Deckkraft: {percent}%"
   },
+  "kostenersatz": {
+    "title": "Kostenersatz",
+    "titleForCall": "Kostenersatz - {name}",
+    "loginRequired": "Bitte melden Sie sich an.",
+    "noPermission": "Sie haben keine Berechtigung für diese Funktion. Bitte kontaktieren Sie einen Administrator, um Zugang zur Gruppe \"Kostenersatz\" zu erhalten.",
+    "noFirecall": "Kein Einsatz ausgewählt.",
+    "calculations": "Kostenersatz-Berechnungen",
+    "newCalculation": "Neue Berechnung",
+    "noEntries": "Noch keine Berechnungen",
+    "noEntriesHint": "Erstellen Sie eine neue Kostenersatz-Berechnung für diesen Einsatz.",
+    "createFirst": "Erste Berechnung erstellen",
+    "deleteTitle": "Berechnung löschen",
+    "deleteConfirm": "Möchten Sie die Berechnung für \"{name}\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "unnamed": "Unbenannt",
+    "noRecipient": "Kein Empfänger",
+    "emailSent": "E-Mail wurde erfolgreich gesendet",
+    "loadError": "Fehler beim Laden der Berechnungen: {message}",
+    "pdfFilenamePrefix": "Kostenersatz",
+    "pdfDefaultName": "Berechnung",
+    "card": {
+      "positions": "{count} Positionen • {hours}h",
+      "edit": "Bearbeiten",
+      "duplicate": "Duplizieren",
+      "pdf": "PDF erstellen",
+      "sendEmail": "Per E-Mail senden",
+      "delete": "Löschen"
+    },
+    "calculation": {
+      "back": "Zurück",
+      "editTitle": "Kostenersatz bearbeiten",
+      "newTitle": "Neue Kostenersatz-Berechnung",
+      "loadTemplate": "Vorlage laden",
+      "saveAsTemplate": "Als Vorlage speichern",
+      "save": "Speichern",
+      "complete": "Abschließen",
+      "saveRecipient": "Empfänger speichern",
+      "copy": "Kopieren",
+      "email": "E-Mail",
+      "completeTitle": "Berechnung abschließen",
+      "completeConfirm": "Nach dem Abschließen sind keine Änderungen mehr möglich. Möchten Sie fortfahren?",
+      "unsavedTitle": "Ungespeicherte Änderungen",
+      "unsavedConfirm": "Es gibt ungespeicherte Änderungen. Möchten Sie vor dem Verlassen speichern?",
+      "discard": "Verwerfen",
+      "templateLoaded": "Vorlage \"{name}\" geladen",
+      "templateSaved": "Vorlage wurde gespeichert"
+    },
+    "tabs": {
+      "operation": "Einsatz",
+      "calculation": "Berechnung",
+      "recipient": "Empfänger"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "completed": "Abgeschlossen",
+      "sent": "Gesendet"
+    },
+    "payment": {
+      "sumupApp": "Kartenzahlung (SumUp)",
+      "paid": "Betrag eingehoben",
+      "failed": "Zahlung fehlgeschlagen",
+      "expired": "Zahlung abgelaufen",
+      "pending": "Betrag ausständig"
+    }
+  },
   "wetter": {
     "backToMap": "← Zurück zur Karte",
     "stationFallback": "Station {id}",

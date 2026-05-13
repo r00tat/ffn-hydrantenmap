@@ -15,10 +15,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import EmailIcon from '@mui/icons-material/Email';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { useTranslations } from 'next-intl';
 import { useState, MouseEvent } from 'react';
 import {
   formatCurrency,
-  formatStatus,
   getStatusColor,
   KostenersatzCalculation,
 } from '../../common/kostenersatz';
@@ -41,6 +41,7 @@ export default function KostenersatzCard({
   onGeneratePdf,
   onSendEmail,
 }: KostenersatzCardProps) {
+  const t = useTranslations('kostenersatz');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const menuOpen = Boolean(anchorEl);
 
@@ -111,7 +112,7 @@ export default function KostenersatzCard({
           >
             <Box sx={{ flex: 1 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                {calculation.recipient.name || 'Kein Empfänger'}
+                {calculation.recipient.name || t('noRecipient')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {formattedDate}
@@ -119,7 +120,7 @@ export default function KostenersatzCard({
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 4 }}>
               <Chip
-                label={formatStatus(calculation.status)}
+                label={t(`status.${calculation.status}`)}
                 size="small"
                 color={getStatusColor(calculation.status)}
               />
@@ -149,8 +150,10 @@ export default function KostenersatzCard({
             }}
           >
             <Typography variant="body2" color="text.secondary">
-              {calculation.items.length} Positionen •{' '}
-              {calculation.defaultStunden}h
+              {t('card.positions', {
+                count: calculation.items.length,
+                hours: calculation.defaultStunden,
+              })}
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               {formatCurrency(calculation.totalSum)}
@@ -168,16 +171,16 @@ export default function KostenersatzCard({
       >
         <MenuItem onClick={handleEdit}>
           <EditIcon fontSize="small" sx={{ mr: 1 }} />
-          Bearbeiten
+          {t('card.edit')}
         </MenuItem>
         <MenuItem onClick={handleDuplicate}>
           <ContentCopyIcon fontSize="small" sx={{ mr: 1 }} />
-          Duplizieren
+          {t('card.duplicate')}
         </MenuItem>
         {onGeneratePdf && (
           <MenuItem onClick={handleGeneratePdf}>
             <PictureAsPdfIcon fontSize="small" sx={{ mr: 1 }} />
-            PDF erstellen
+            {t('card.pdf')}
           </MenuItem>
         )}
         {onSendEmail && (
@@ -186,12 +189,12 @@ export default function KostenersatzCard({
             disabled={!calculation.recipient.email || calculation.status === 'draft'}
           >
             <EmailIcon fontSize="small" sx={{ mr: 1 }} />
-            Per E-Mail senden
+            {t('card.sendEmail')}
           </MenuItem>
         )}
         <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
           <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-          Löschen
+          {t('card.delete')}
         </MenuItem>
       </Menu>
     </Card>
