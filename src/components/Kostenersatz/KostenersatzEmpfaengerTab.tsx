@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -46,15 +47,16 @@ export interface KostenersatzEmpfaengerTabProps {
 const PAYMENT_METHODS: PaymentMethod[] = ['bar', 'kreditkarte', 'rechnung', 'sumup_online', 'sumup_app'];
 
 function PaymentStatusChip({ status }: { status: string }) {
+  const t = useTranslations('kostenersatz.empfaengerTab');
   switch (status) {
     case 'pending':
-      return <Chip color="warning" label="Zahlung ausstehend" size="small" />;
+      return <Chip color="warning" label={t('chipPending')} size="small" />;
     case 'paid':
-      return <Chip color="success" label="Bezahlt" size="small" />;
+      return <Chip color="success" label={t('chipPaid')} size="small" />;
     case 'failed':
-      return <Chip color="error" label="Zahlung fehlgeschlagen" size="small" />;
+      return <Chip color="error" label={t('chipFailed')} size="small" />;
     case 'expired':
-      return <Chip color="error" label="Zahlung abgelaufen" size="small" />;
+      return <Chip color="error" label={t('chipExpired')} size="small" />;
     default:
       return null;
   }
@@ -69,6 +71,8 @@ export default function KostenersatzEmpfaengerTab({
   sumupPaymentStatus,
   onSaveBeforePayment,
 }: KostenersatzEmpfaengerTabProps) {
+  const t = useTranslations('kostenersatz.empfaengerTab');
+  const tCommon = useTranslations('common');
   const [loadingAction, setLoadingAction] = useState<'online' | 'app' | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,11 +90,19 @@ export default function KostenersatzEmpfaengerTab({
     }
   }, [sumupPaymentStatus, firecallId, calculationId]);
 
-  const statusLabels: Record<string, string> = {
-    pending: 'ausstehend',
-    paid: 'bezahlt',
-    failed: 'fehlgeschlagen',
-    expired: 'abgelaufen',
+  const statusLabel = (status: string): string => {
+    switch (status) {
+      case 'pending':
+        return t('statusPending');
+      case 'paid':
+        return t('statusPaid');
+      case 'failed':
+        return t('statusFailed');
+      case 'expired':
+        return t('statusExpired');
+      default:
+        return status;
+    }
   };
 
   const handleCheckStatus = async () => {
@@ -101,13 +113,14 @@ export default function KostenersatzEmpfaengerTab({
     try {
       const result = await checkSumupPaymentStatus(firecallId, calculationId);
       if (result.success && result.status) {
-        const label = statusLabels[result.status] || result.status;
-        setStatusMessage(`Zahlungsstatus: ${label}`);
+        setStatusMessage(
+          t('paymentStatus', { status: statusLabel(result.status) }),
+        );
       } else if (!result.success) {
-        setError(result.error || 'Fehler beim Prüfen des Status');
+        setError(result.error || t('statusCheckError'));
       }
     } catch {
-      setError('Fehler beim Prüfen des Zahlungsstatus');
+      setError(t('statusCheckErrorGeneric'));
     } finally {
       setIsCheckingStatus(false);
     }
@@ -143,7 +156,7 @@ export default function KostenersatzEmpfaengerTab({
       if (!calcId && onSaveBeforePayment) {
         calcId = await onSaveBeforePayment();
         if (!calcId) {
-          setError('Berechnung konnte nicht gespeichert werden');
+          setError(t('paymentSaveError'));
           return;
         }
       }
@@ -153,10 +166,10 @@ export default function KostenersatzEmpfaengerTab({
         setCheckoutUrl(result.checkoutUrl);
         setShowPaymentDialog(true);
       } else {
-        setError(result.error || 'Fehler beim Erstellen der Zahlung');
+        setError(result.error || t('paymentCreateError'));
       }
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Erstellen der Zahlung');
+      setError(err.message || t('paymentCreateError'));
     } finally {
       setLoadingAction(null);
     }
@@ -166,9 +179,9 @@ export default function KostenersatzEmpfaengerTab({
     if (!checkoutUrl) return;
     try {
       await navigator.clipboard.writeText(checkoutUrl);
-      setStatusMessage('Link kopiert');
+      setStatusMessage(t('linkCopied'));
     } catch {
-      setError('Link konnte nicht kopiert werden');
+      setError(t('linkCopyFailed'));
     }
   };
 
@@ -185,7 +198,7 @@ export default function KostenersatzEmpfaengerTab({
       if (!calcId && onSaveBeforePayment) {
         calcId = await onSaveBeforePayment();
         if (!calcId) {
-          setError('Berechnung konnte nicht gespeichert werden');
+          setError(t('paymentSaveError'));
           return;
         }
       }
@@ -194,10 +207,10 @@ export default function KostenersatzEmpfaengerTab({
       if (result.success && result.deepLinkUrl) {
         window.location.href = result.deepLinkUrl;
       } else {
-        setError(result.error || 'Fehler beim Erstellen des Deep Links');
+        setError(result.error || t('deepLinkError'));
       }
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Erstellen des Deep Links');
+      setError(err.message || t('deepLinkError'));
     } finally {
       setLoadingAction(null);
     }
@@ -208,52 +221,52 @@ export default function KostenersatzEmpfaengerTab({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="subtitle2" color="text.secondary">
-        Empf&auml;ngerdaten f&uuml;r die Rechnung
+        {t('header')}
       </Typography>
 
       <TextField
-        label="Name"
+        label={t('name')}
         value={recipient.name}
         onChange={handleFieldChange('name')}
         fullWidth
         required
-        placeholder="Vor- und Nachname oder Firmenname"
+        placeholder={t('namePlaceholder')}
       />
 
       <TextField
-        label="Adresse"
+        label={t('address')}
         value={recipient.address}
         onChange={handleFieldChange('address')}
         fullWidth
         multiline
         rows={3}
-        placeholder="Stra&szlig;e, Hausnummer&#10;PLZ Ort"
+        placeholder={t('addressPlaceholder')}
       />
 
       <TextField
-        label="Telefonnummer"
+        label={t('phone')}
         value={recipient.phone}
         onChange={handleFieldChange('phone')}
         fullWidth
         type="tel"
-        placeholder="+43 ..."
+        placeholder={t('phonePlaceholder')}
       />
 
       <TextField
-        label="E-Mail"
+        label={t('email')}
         value={recipient.email}
         onChange={handleFieldChange('email')}
         fullWidth
         type="email"
-        placeholder="email@example.com"
+        placeholder={t('emailPlaceholder')}
       />
 
       <FormControl fullWidth disabled={disabled}>
-        <InputLabel id="payment-method-label">Bezahlung via</InputLabel>
+        <InputLabel id="payment-method-label">{t('paymentMethod')}</InputLabel>
         <Select
           labelId="payment-method-label"
           value={recipient.paymentMethod}
-          label="Bezahlung via"
+          label={t('paymentMethod')}
           onChange={handlePaymentMethodChange}
         >
           {PAYMENT_METHODS.map((method) => (
@@ -271,7 +284,7 @@ export default function KostenersatzEmpfaengerTab({
           onClick={handleOnlinePayment}
           disabled={sumupButtonDisabled}
         >
-          Onlinezahlung erstellen
+          {t('createOnlinePayment')}
         </Button>
         {/* TODO: SumUp app deep link does not support NFC payments, disabled until resolved
         <Button
@@ -286,7 +299,7 @@ export default function KostenersatzEmpfaengerTab({
         {sumupPaymentStatus && (
           <>
             <PaymentStatusChip status={sumupPaymentStatus} />
-            <Tooltip title="Status prüfen">
+            <Tooltip title={t('checkStatus')}>
               <span>
                 <IconButton size="small" onClick={handleCheckStatus} disabled={isCheckingStatus}>
                   {isCheckingStatus ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
@@ -304,11 +317,11 @@ export default function KostenersatzEmpfaengerTab({
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Zahlungslink</DialogTitle>
+        <DialogTitle>{t('paymentLinkTitle')}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, pt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center" }}>
-              QR-Code scannen oder Link teilen, um die Zahlung durchzuf&uuml;hren
+              {t('paymentLinkScan')}
             </Typography>
             {checkoutUrl && (
               <Box sx={{ p: 2, bgcolor: 'white', borderRadius: 1 }}>
@@ -322,7 +335,7 @@ export default function KostenersatzEmpfaengerTab({
                 onClick={handleCopyLink}
                 fullWidth
               >
-                Link kopieren
+                {t('copyLink')}
               </Button>
               <Button
                 variant="outlined"
@@ -330,14 +343,14 @@ export default function KostenersatzEmpfaengerTab({
                 onClick={() => { if (checkoutUrl) window.open(checkoutUrl, '_blank'); }}
                 fullWidth
               >
-                Im Browser &ouml;ffnen
+                {t('openInBrowser')}
               </Button>
             </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowPaymentDialog(false)}>
-            Schlie&szlig;en
+            {tCommon('close')}
           </Button>
         </DialogActions>
       </Dialog>

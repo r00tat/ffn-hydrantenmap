@@ -4,14 +4,12 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { parseTimestamp } from '../../common/time-format';
 
-/**
- * Convert a date string (ISO or other supported format) to datetime-local input value (YYYY-MM-DDTHH:mm)
- */
 function toDateTimeLocalValue(dateStr?: string): string {
   if (!dateStr) return '';
   const m = parseTimestamp(dateStr);
@@ -36,36 +34,36 @@ export default function KostenersatzEinsatzTab({
   onDefaultStundenChange,
   disabled = false,
 }: KostenersatzEinsatzTabProps) {
-  // Local state for duration input to allow intermediate editing states (null = not editing)
+  const t = useTranslations('kostenersatz.einsatzTab');
   const [durationInput, setDurationInput] = useState<string | null>(null);
 
-  // Use override values if set, otherwise fall back to firecall data
   const displayDescription =
     calculation.nameOverride ??
     `${firecall.name}${firecall.description ? ` - ${firecall.description}` : ''}`;
 
-  // Start/end date values for datetime-local inputs
-  const displayStartDate =
-    calculation.startDateOverride ?? firecall.date;
+  const displayStartDate = calculation.startDateOverride ?? firecall.date;
   const startValue = toDateTimeLocalValue(displayStartDate);
   const displayEndDate = calculation.endDateOverride ?? firecall.abruecken;
   const endValue = toDateTimeLocalValue(displayEndDate);
 
+  const originalText = (raw: string | undefined) =>
+    raw ? parseTimestamp(raw)?.format('DD.MM.YYYY HH:mm') || t('invalid') : t('notSet');
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="subtitle2" color="text.secondary">
-        Einsatzdaten (können überschrieben werden)
+        {t('header')}
       </Typography>
 
       <TextField
-        label="Titel"
+        label={t('title')}
         value={displayDescription}
         onChange={(e) => onChange('nameOverride', e.target.value)}
         fullWidth
         multiline
         rows={2}
         disabled={disabled}
-        helperText={calculation.nameOverride ? 'Überschrieben' : undefined}
+        helperText={calculation.nameOverride ? t('overridden') : undefined}
       />
 
       <Box
@@ -76,7 +74,7 @@ export default function KostenersatzEinsatzTab({
         }}
       >
         <TextField
-          label="Alarmierung"
+          label={t('alarmierung')}
           type="datetime-local"
           value={startValue}
           onChange={(e) => onChange('startDateOverride', e.target.value)}
@@ -85,17 +83,12 @@ export default function KostenersatzEinsatzTab({
           slotProps={{ inputLabel: { shrink: true } }}
           helperText={
             calculation.startDateOverride
-              ? 'Überschrieben - Original: ' +
-                (firecall.date
-                  ? parseTimestamp(firecall.date)?.format(
-                      'DD.MM.YYYY HH:mm',
-                    ) || 'ungültig'
-                  : 'nicht gesetzt')
+              ? t('overriddenOriginal', { value: originalText(firecall.date) })
               : undefined
           }
         />
         <TextField
-          label="Endzeit (Abrücken)"
+          label={t('endTime')}
           type="datetime-local"
           value={endValue}
           onChange={(e) => onChange('endDateOverride', e.target.value)}
@@ -104,31 +97,26 @@ export default function KostenersatzEinsatzTab({
           slotProps={{ inputLabel: { shrink: true } }}
           helperText={
             calculation.endDateOverride
-              ? 'Überschrieben - Original: ' +
-                (firecall.abruecken
-                  ? parseTimestamp(firecall.abruecken)?.format(
-                      'DD.MM.YYYY HH:mm',
-                    ) || 'ungültig'
-                  : 'nicht gesetzt')
+              ? t('overriddenOriginal', { value: originalText(firecall.abruecken) })
               : undefined
           }
         />
       </Box>
 
       <TextField
-        label="Kommentar"
+        label={t('comment')}
         value={calculation.comment}
         onChange={(e) => onChange('comment', e.target.value)}
         fullWidth
         multiline
         rows={2}
         disabled={disabled}
-        placeholder="Zusätzliche Anmerkungen zur Berechnung..."
+        placeholder={t('commentPlaceholder')}
       />
 
       <Box sx={{ mt: 2 }}>
         <TextField
-          label="Einsatzdauer in Stunden"
+          label={t('duration')}
           type="number"
           value={
             durationInput !== null ? durationInput : calculation.defaultStunden
@@ -151,8 +139,8 @@ export default function KostenersatzEinsatzTab({
           slotProps={{ htmlInput: { min: 1, step: 0.5 } }}
           helperText={
             suggestedDuration > 1
-              ? `Vorgeschlagen basierend auf Alarmierung/Abrücken: ${suggestedDuration} Stunden. Halbe Stunden erlaubt (z.B. 2.5)`
-              : 'Wird als Standard für alle Positionen verwendet. Halbe Stunden erlaubt (z.B. 2.5)'
+              ? t('durationSuggestedHint', { hours: suggestedDuration })
+              : t('durationDefaultHint')
           }
         />
       </Box>
@@ -160,8 +148,10 @@ export default function KostenersatzEinsatzTab({
       {suggestedDuration > 1 &&
         calculation.defaultStunden !== suggestedDuration && (
           <Alert severity="info" sx={{ mt: 1 }}>
-            Die Einsatzdauer ({calculation.defaultStunden}h) weicht von der
-            berechneten Dauer ({suggestedDuration}h) ab.
+            {t('durationMismatch', {
+              actual: calculation.defaultStunden,
+              suggested: suggestedDuration,
+            })}
           </Alert>
         )}
     </Box>
