@@ -11,6 +11,7 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
+import { useTranslations } from 'next-intl';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecall from '../../hooks/useFirecall';
@@ -34,6 +35,7 @@ const SpectrumChart = dynamic(() => import('./SpectrumChart'), {
 import StrengthTable from './StrengthTable';
 
 export default function PrintPage() {
+  const t = useTranslations('print');
   const firecall = useFirecall();
   const { vehicles, tacticalUnits, displayItems, firecallItems } =
     useVehicles();
@@ -57,7 +59,7 @@ export default function PrintPage() {
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       const html2canvas = (await import('html2canvas')).default;
-      const filename = `Einsatz_${firecall.name || 'Bericht'}.pdf`
+      const filename = `${t('pdfFilenamePrefix')}_${firecall.name || t('pdfFilenameFallback')}.pdf`
         .replace(/[^a-zA-Z0-9äöüÄÖÜß._-]/g, '_');
 
       // Capture the Leaflet map as a static image before PDF generation
@@ -98,7 +100,7 @@ export default function PrintPage() {
     } finally {
       setPdfLoading(false);
     }
-  }, [firecall.name]);
+  }, [firecall.name, t]);
 
   const [hiddenSpectra, setHiddenSpectra] = useState<Set<string>>(new Set());
 
@@ -154,7 +156,7 @@ export default function PrintPage() {
       const key = layerId || '_default';
       if (!groups[key]) {
         groups[key] = {
-          name: layerId ? layers[layerId]?.name || layerId : 'Nicht zugeordnet',
+          name: layerId ? layers[layerId]?.name || layerId : t('unassigned'),
           layerId: layerId || undefined,
           items: [],
         };
@@ -162,7 +164,7 @@ export default function PrintPage() {
       groups[key].items.push(item);
     }
     return groups;
-  }, [displayItems, layers]);
+  }, [displayItems, layers, t]);
 
   return (
     <>
@@ -174,14 +176,14 @@ export default function PrintPage() {
           onClick={handleDownloadPdf}
           disabled={pdfLoading}
         >
-          {pdfLoading ? 'PDF wird erstellt...' : 'PDF herunterladen'}
+          {pdfLoading ? t('pdfCreating') : t('pdfDownload')}
         </Button>
         <Button
           variant="outlined"
           startIcon={<PrintIcon />}
           onClick={() => window.print()}
         >
-          Drucken
+          {t('print')}
         </Button>
       </Box>
 
@@ -192,12 +194,12 @@ export default function PrintPage() {
         </Typography>
         {firecall.date && (
           <Typography variant="subtitle1">
-            Datum: {formatTimestamp(firecall.date)}
+            {t('headerDate', { date: formatTimestamp(firecall.date) })}
           </Typography>
         )}
         {firecall.fw && (
           <Typography variant="subtitle1">
-            Feuerwehr: {firecall.fw}
+            {t('headerFw', { fw: firecall.fw })}
           </Typography>
         )}
         {firecall.description && (
@@ -212,7 +214,7 @@ export default function PrintPage() {
       {displayItems.length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
-            Einsatzmittel
+            {t('sectionEinsatzmittel')}
           </Typography>
           <StrengthTable items={displayItems} />
           {(timeline.ersteAlarmierung ||
@@ -220,15 +222,15 @@ export default function PrintPage() {
             timeline.letztesAbruecken) && (
             <Typography variant="body2" sx={{ mt: 1 }}>
               {timeline.ersteAlarmierung &&
-                `Erste Alarmierung: ${formatTimestamp(timeline.ersteAlarmierung)}`}
+                t('timeline.firstAlarm', { time: formatTimestamp(timeline.ersteAlarmierung) })}
               {timeline.ersteAlarmierung && timeline.erstesEintreffen && ' | '}
               {timeline.erstesEintreffen &&
-                `Erstes Eintreffen: ${formatTimestamp(timeline.erstesEintreffen)}`}
+                t('timeline.firstArrival', { time: formatTimestamp(timeline.erstesEintreffen) })}
               {(timeline.ersteAlarmierung || timeline.erstesEintreffen) &&
                 timeline.letztesAbruecken &&
                 ' | '}
               {timeline.letztesAbruecken &&
-                `Letztes Abrücken: ${formatTimestamp(timeline.letztesAbruecken)}`}
+                t('timeline.lastDeparture', { time: formatTimestamp(timeline.letztesAbruecken) })}
             </Typography>
           )}
         </Box>
@@ -238,15 +240,15 @@ export default function PrintPage() {
       {Object.keys(groupedByLayer).length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
-            Einsatzmittel Details
+            {t('sectionEinsatzmittelDetails')}
           </Typography>
           <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Typ</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Bezeichnung</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Details</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Position</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.type')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.name')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.details')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.position')}</th>
               </tr>
             </thead>
             <tbody>
@@ -267,7 +269,7 @@ export default function PrintPage() {
                           fontSize: '1.1em',
                         }}
                       >
-                        {group.name} ({group.items.length})
+                        {t('groupCount', { name: group.name, count: group.items.length })}
                       </th>
                     </tr>
                     {group.items.map((item) => {
@@ -307,18 +309,18 @@ export default function PrintPage() {
       {locations.length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
-            Einsatzorte
+            {t('sectionEinsatzorte')}
           </Typography>
           <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Name</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Adresse</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Status</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Alarmzeit</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Start</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Ende</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Fahrzeuge</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.plainName')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.address')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.status')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.alarmTime')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.start')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.end')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.vehicles')}</th>
               </tr>
             </thead>
             <tbody>
@@ -346,19 +348,19 @@ export default function PrintPage() {
       {spectra.length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
-            Messungen
+            {t('sectionMessungen')}
           </Typography>
           <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <th className="no-print" style={{ borderBottom: '2px solid #333', padding: '4px 8px' }} />
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Probe</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Gerät</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Nuklid</th>
-                <th style={{ textAlign: 'right', borderBottom: '2px solid #333', padding: '4px 8px' }}>Konfidenz</th>
-                <th style={{ textAlign: 'right', borderBottom: '2px solid #333', padding: '4px 8px' }}>Messzeit (s)</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Start</th>
-                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Ende</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.sample')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.device')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.nuclide')}</th>
+                <th style={{ textAlign: 'right', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.confidence')}</th>
+                <th style={{ textAlign: 'right', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.measurementSec')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.start')}</th>
+                <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.end')}</th>
               </tr>
             </thead>
             <tbody>
@@ -406,7 +408,7 @@ export default function PrintPage() {
       {firecall.attachments && firecall.attachments.length > 0 && (
         <Box sx={{ p: 2 }}>
           <Typography variant="h4" className="print-section">
-            Anhänge
+            {t('sectionAttachments')}
           </Typography>
           {firecall.attachments.map((url) => (
             <PrintAttachment key={url} url={url} />

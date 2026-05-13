@@ -22,6 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { where } from 'firebase/firestore';
 import moment from 'moment';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   dateTimeFormat,
@@ -55,6 +56,7 @@ interface GbDisplay extends GeschaeftsbuchEintrag {
 
 export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
+  const t = useTranslations('geschaeftsbuch');
 
   const [eintraege, setGeschaeftsbuchEintraege] = useState<GbDisplay[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
@@ -92,13 +94,13 @@ export function useGeschaeftsbuchEintraege(sortAscending: boolean = false) {
         ...a,
         datum: moment(a.datum).format(dateTimeFormat),
         editable: true,
-        einaus: a.ausgehend ? 'ausgehend' : 'eingehend',
+        einaus: a.ausgehend ? t('outgoing') : t('incoming'),
       }));
     (async () => {
       setGeschaeftsbuchEintraege(diaries);
       setDiaryCounter(diaries.length + 1);
     })();
-  }, [firecallItems, sortAscending]);
+  }, [firecallItems, sortAscending, t]);
   return { eintraege, diaryCounter };
 }
 
@@ -109,6 +111,7 @@ export function DiaryButtons({
   diary: GeschaeftsbuchEintrag;
   funktion?: string;
 }) {
+  const t = useTranslations('geschaeftsbuch');
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const updateItem = useFirecallItemUpdate();
@@ -126,13 +129,13 @@ export function DiaryButtons({
           {funktion && (
             <>
               {isGelesen && (
-                <Tooltip title="gelesen">
+                <Tooltip title={t('read')}>
                   <CheckBoxIcon color="success" />
                 </Tooltip>
               )}
 
               {!isGelesen && (
-                <Tooltip title="Als gelesen markieren">
+                <Tooltip title={t('markRead')}>
                   <IconButton
                     onClick={() => {
                       updateItem({
@@ -150,7 +153,7 @@ export function DiaryButtons({
               )}
             </>
           )}
-          <Tooltip title={`${diary.name} bearbeiten`}>
+          <Tooltip title={t('edit', { name: diary.name })}>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
@@ -160,7 +163,7 @@ export function DiaryButtons({
               <EditIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title={`${diary.name} löschen`}>
+          <Tooltip title={t('delete', { name: diary.name })}>
             <IconButton
               color="warning"
               onClick={(e) => {
@@ -195,19 +198,22 @@ export function DiaryButtons({
   );
 }
 
-async function downloadGb(eintraege: GbDisplay[]) {
+function downloadGb(
+  eintraege: GbDisplay[],
+  t: ReturnType<typeof useTranslations<'geschaeftsbuch'>>,
+) {
   const rows: any[][] = [
     [
-      'Nummer',
-      'Datum',
-      'Ein/Aus',
-      'Von',
-      'An',
-      'Art',
-      'Information',
-      'Anmerkung',
-      'Auszeichnung',
-      'Erledigt',
+      t('col.number'),
+      t('col.date'),
+      t('col.inOut'),
+      t('col.from'),
+      t('col.to'),
+      t('col.type'),
+      t('col.info'),
+      t('col.comment'),
+      t('col.marking'),
+      t('col.done'),
     ],
     ...eintraege.map((d) => [
       d.nummer,
@@ -225,7 +231,7 @@ async function downloadGb(eintraege: GbDisplay[]) {
         : '',
     ]),
   ];
-  downloadRowsAsCsv(rows, 'Geschaeftsbuch.csv');
+  downloadRowsAsCsv(rows, t('csvFilename'));
 }
 
 type GbSortField =
@@ -320,6 +326,7 @@ function GbEntries({
   sortDirection: 'asc' | 'desc';
   onSortClick: (field: GbSortField) => void;
 }) {
+  const t = useTranslations('geschaeftsbuch.col');
   const sortedEintraege = useMemo(
     () =>
       [...eintraege].sort((a, b) =>
@@ -331,22 +338,22 @@ function GbEntries({
   return (
     <Grid container>
       <Grid size={{ xs: 3, md: 2, lg: 1 }}>
-        <GbSortableHeader label="Nummer" field="nummer" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('number')} field="nummer" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 6, md: 4, lg: 2 }}>
-        <GbSortableHeader label="Datum" field="datum" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('date')} field="datum" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 4, lg: 2 }}>
-        <GbSortableHeader label="von -> an" field="einaus" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('fromTo')} field="einaus" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-        <GbSortableHeader label="Name" field="name" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('name')} field="name" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-        <GbSortableHeader label="Beschreibung" field="beschreibung" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('description')} field="beschreibung" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 2, lg: 1 }}>
-        <GbSortableHeader label="Erledigt" field="erledigt" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
+        <GbSortableHeader label={t('done')} field="erledigt" activeField={sortField} direction={sortDirection} onClick={onSortClick} />
       </Grid>
       <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
       {sortedEintraege.map((e, index) => (
@@ -428,14 +435,7 @@ function GbEntries({
   );
 }
 
-const sFunktionen: { [key: string]: string } = {
-  S1: 'Personal',
-  S2: 'Lage',
-  S3: 'Einsatz',
-  S4: 'Versorgung',
-  S5: 'Öffentlichkeitsarbeit',
-  S6: 'Kommunikation',
-};
+const sFunktionKeys = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'] as const;
 
 export interface GeschaeftsbuchOptions {
   showEditButton?: boolean;
@@ -445,6 +445,7 @@ export default function Geschaeftsbuch({
   showEditButton = true,
   sortAscending = false,
 }: GeschaeftsbuchOptions) {
+  const t = useTranslations('geschaeftsbuch');
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
   const { eintraege, diaryCounter } = useGeschaeftsbuchEintraege(sortAscending);
   const canEdit = useMapEditorCanEdit();
@@ -528,10 +529,10 @@ export default function Geschaeftsbuch({
     <>
       <Box sx={{ p: 2, m: 2 }}>
         <Typography variant="h4" gutterBottom>
-          Geschäftsbuch{' '}
+          {t('title')}{' '}
           <DownloadButton
-            onClick={() => downloadGb(eintraege)}
-            tooltip="Geschäftsbuch als CSV herunterladen"
+            onClick={() => downloadGb(eintraege, t)}
+            tooltip={t('downloadCsvTooltip')}
           />
         </Typography>
         {/* <GeschaeftsbuchAdd /> */}
@@ -562,13 +563,13 @@ export default function Geschaeftsbuch({
                     }
                   }}
                 >
-                  <MenuItem value="ein">Ein</MenuItem>
-                  <MenuItem value="aus">Aus</MenuItem>
+                  <MenuItem value="ein">{t('in')}</MenuItem>
+                  <MenuItem value="aus">{t('out')}</MenuItem>
                 </Select>
               </FormControl>
               <TextField
                 size="small"
-                placeholder="von"
+                placeholder={t('placeholder.from')}
                 value={inlineVon}
                 onChange={(e) => setInlineVon(e.target.value)}
                 sx={{ flex: 1, minWidth: 60 }}
@@ -581,7 +582,7 @@ export default function Geschaeftsbuch({
               />
               <TextField
                 size="small"
-                placeholder="an"
+                placeholder={t('placeholder.to')}
                 value={inlineAn}
                 onChange={(e) => setInlineAn(e.target.value)}
                 sx={{ flex: 1, minWidth: 60 }}
@@ -599,7 +600,7 @@ export default function Geschaeftsbuch({
             >
               <TextField
                 size="small"
-                placeholder="Information"
+                placeholder={t('placeholder.info')}
                 value={inlineName}
                 onChange={(e) => setInlineName(e.target.value)}
                 fullWidth
@@ -617,7 +618,7 @@ export default function Geschaeftsbuch({
             >
               <TextField
                 size="small"
-                placeholder="Anmerkung"
+                placeholder={t('placeholder.comment')}
                 value={inlineBeschreibung}
                 onChange={(e) => setInlineBeschreibung(e.target.value)}
                 fullWidth
@@ -635,7 +636,7 @@ export default function Geschaeftsbuch({
             >
               <TextField
                 size="small"
-                placeholder="Auszeichnung"
+                placeholder={t('placeholder.marking')}
                 value={inlineWeiterleitung}
                 onChange={(e) => setInlineWeiterleitung(e.target.value)}
                 fullWidth
@@ -651,7 +652,7 @@ export default function Geschaeftsbuch({
               size={{ xs: 4, md: 2, lg: 1 }}
               sx={{ py: 1 }}
             >
-              <Tooltip title="Eintrag hinzufügen">
+              <Tooltip title={t('addEntry')}>
                 <span>
                   <IconButton
                     color="primary"
@@ -670,13 +671,13 @@ export default function Geschaeftsbuch({
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <TabList
               onChange={handleTabSelect}
-              aria-label="Nachrichten für S-Funktionen"
+              aria-label={t('tabAria')}
               variant="fullWidth"
             >
-              <Tab label="Alle Einträge" value="all" />
-              {Object.entries(sFunktionen).map(([key, value]) => (
+              <Tab label={t('tabAll')} value="all" />
+              {sFunktionKeys.map((key) => (
                 <Tab
-                  label={`${key} ${value}`}
+                  label={`${key} ${t(`sFunctions.${key}`)}`}
                   value={key}
                   key={`s-function-tab-${key}`}
                 />
@@ -693,7 +694,7 @@ export default function Geschaeftsbuch({
               onSortClick={handleSortClick}
             />
           </TabPanel>
-          {Object.entries(sFunktionen).map(([key, title]) => (
+          {sFunktionKeys.map((key) => (
             <TabPanel value={key} key={key}>
               <GbEntries
                 eintraege={eintraege.filter(

@@ -12,6 +12,7 @@ import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
@@ -32,9 +33,10 @@ interface UserRowButtonParams {
   deleteFn: (group: Group) => void;
 }
 function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
+  const t = useTranslations('groups');
   return (
     <>
-      <Tooltip title={`Edit ${row.name}`}>
+      <Tooltip title={t('edit', { name: row.name })}>
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -44,7 +46,7 @@ function GroupRowButtons({ row, editFn, deleteFn }: UserRowButtonParams) {
           <EditIcon />
         </IconButton>
       </Tooltip>
-      <Tooltip title={`Delete ${row.name}`}>
+      <Tooltip title={t('delete', { name: row.name })}>
         <IconButton
           onClick={(e) => {
             e.stopPropagation();
@@ -92,6 +94,7 @@ export default function GroupsPage() {
 }
 
 function Groups() {
+  const t = useTranslations('groups');
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<Group>();
@@ -136,13 +139,15 @@ function Groups() {
     <>
       <Box sx={{ p: 2, height: '70vh' }}>
         <Typography variant="h3" gutterBottom>
-          Groups
+          {t('title')}
           <IconButton onClick={() => getGroups()}>
             <RefreshIcon />
           </IconButton>
           {missingKnownGroups.length > 0 && (
             <Tooltip
-              title={`Fehlende Gruppen anlegen: ${missingKnownGroups.map((g) => g.name).join(', ')}`}
+              title={t('createKnownTooltip', {
+                names: missingKnownGroups.map((g) => g.name).join(', '),
+              })}
             >
               <Button
                 variant="outlined"
@@ -151,7 +156,7 @@ function Groups() {
                 onClick={createKnownGroups}
                 sx={{ ml: 2 }}
               >
-                Standardgruppen anlegen
+                {t('createKnown')}
               </Button>
             </Tooltip>
           )}
@@ -159,14 +164,14 @@ function Groups() {
         <Grid container>
           <Grid size={{ xs: 2, md: 2, lg: 2 }}></Grid>
           <Grid size={{ xs: 5, md: 3, lg: 3 }}>
-            <b>ID</b>
+            <b>{t('cols.id')}</b>
           </Grid>
           <Grid size={{ xs: 5, md: 3, lg: 3 }}>
-            <b>Name</b>
+            <b>{t('cols.name')}</b>
           </Grid>
 
           <Grid size={{ xs: 12, md: 4, lg: 4 }}>
-            <b>Description</b>
+            <b>{t('cols.description')}</b>
           </Grid>
           <Grid size={{ xs: 12 }}>
             <hr />
@@ -210,8 +215,11 @@ function Groups() {
 
       {isConfirmOpen && editGroup && (
         <ConfirmDialog
-          title={`${editGroup?.name} löschen`}
-          text={`${editGroup?.name} ${editGroup?.description} wirklich löschen?`}
+          title={t('deleteTitle', { name: editGroup?.name || '' })}
+          text={t('deleteConfirm', {
+            name: editGroup?.name || '',
+            description: editGroup?.description || '',
+          })}
           onConfirm={(confirmed) => {
             if (confirmed) {
               deleteAction(editGroup);

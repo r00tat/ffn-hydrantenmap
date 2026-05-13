@@ -1,5 +1,6 @@
 import NextAuth, { DefaultSession, Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import { getTranslations } from 'next-intl/server';
 import { isTruthy } from '../common/boolish';
 import { isInternalEmail } from '../common/internalDomains';
 import {
@@ -7,7 +8,9 @@ import {
   FIRECALL_COLLECTION_ID,
   USER_COLLECTION_ID,
 } from '../components/firebase/firestore';
+import { isLocale, Locale } from '../i18n/config';
 import { firestore, firebaseAuth } from '../server/firebase/admin';
+import { fetchUserLanguage } from '../server/userSettings/fetchUserLanguage';
 import { ApiException } from './api/errors';
 import {
   ensureUserProvisioned,
@@ -49,12 +52,25 @@ declare module 'next-auth' {
       groups: string[];
       firecall?: string;
       /**
+       * Preferred UI language from `userSettings/{uid}`. Undefined when the
+       * user has not configured one yet — callers fall back to cookie /
+       * Accept-Language detection.
+       */
+      language?: Locale;
+      /**
        * By default, TypeScript merges new interface properties and overwrites existing ones.
        * In this case, the default session user properties will be overwritten,
        * with the new ones defined above. To keep the default session user properties,
        * you need to add them back into the newly declared interface.
        */
     } & DefaultSession['user'];
+  }
+}
+
+declare module '@auth/core/jwt' {
+  interface JWT {
+    id?: string;
+    language?: Locale;
   }
 }
 
@@ -131,13 +147,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         console.error(`session callback: failed to fetch user data`, err);
       }
 
+      if (isLocale(token.language)) {
+        session.user.language = token.language;
+      }
+
       return session;
     },
-    jwt: ({ token, user }) => {
+    jwt: async ({ token, user, trigger, session: updatedSession }) => {
       if (user) {
-        // User is available during sign-in
+        // User is available during sign-in — load persisted language once
+        // and stash it on the JWT so subsequent requests don't hit Firestore.
         token.id = user.id;
+        try {
+          token.language = await fetchUserLanguage(user.id as string);
+        } catch (err) {
+          console.error(`jwt callback: failed to fetch user language`, err);
+        }
       }
+
+      // Allow the client to push a language update into the JWT via
+      // `useSession().update({ language })` after a successful save.
+      if (
+        trigger === 'update' &&
+        updatedSession &&
+        typeof updatedSession === 'object' &&
+        'language' in updatedSession &&
+        isLocale((updatedSession as { language?: string }).language)
+      ) {
+        token.language = (updatedSession as { language: Locale }).language;
+      }
+
       return token;
     },
   },
@@ -147,7 +186,8 @@ export async function actionUserRequired() {
   const session = await auth();
   // console.info(`session info: ${JSON.stringify(session)}`);
   if (!session?.user || !session.user.isAuthorized) {
-    throw new ApiException('User not authorized', { status: 403 });
+    const t = await getTranslations('auth');
+    throw new ApiException(t('userNotAuthorized'), { status: 403 });
   }
   return session;
 }
@@ -156,15 +196,13 @@ export async function actionAdminRequired() {
   const session = await actionUserRequired();
   // console.info(`session: ${JSON.stringify(session)}`);
 
+  const t = await getTranslations('auth');
+
   if (!session.user?.id) {
-    throw new ApiException('User not authorized, no id set', { status: 403 });
+    throw new ApiException(t('userIdMissing'), { status: 403 });
   }
-  // const userDoc = await firestore
-  //   .collection(USER_COLLECTION_ID)
-  //   .doc(session.user?.id)
-  //   .get();
   if (!session.user.isAdmin) {
-    throw new ApiException('Admin required, not authorized', { status: 403 });
+    throw new ApiException(t('adminRequired'), { status: 403 });
   }
 
   return session;

@@ -6,6 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
+import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Marker, Polygon, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
@@ -33,6 +34,7 @@ export interface AreaMarkerProps {
 }
 
 export default function AreaMarker({ record, selectItem, pane, onContextMenu }: AreaMarkerProps) {
+  const t = useTranslations('firecallElements');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [showMarkers, setShowMarkers] = useState(false);
@@ -143,7 +145,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Tooltip title="Einen Punkt hinzufügen">
+            <Tooltip title={t('addPoint')}>
               <IconButton
                 color="primary"
                 aria-label="add a point on the line"

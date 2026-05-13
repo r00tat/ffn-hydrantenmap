@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   doseRateLevel,
@@ -75,6 +76,7 @@ function formatErr(pct: number | undefined): string | undefined {
 }
 
 export default function Dosimetrie() {
+  const t = useTranslations('dosimetrie');
   const { deviceInfo, measurement, history, error } = useRadiacode();
   const [logScale, setLogScale] = useState(false);
 
@@ -108,7 +110,7 @@ export default function Dosimetrie() {
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
-      <Typography variant="h5">Strahlenmessung</Typography>
+      <Typography variant="h5">{t('title')}</Typography>
 
       <Stack
         direction="row"
@@ -122,24 +124,26 @@ export default function Dosimetrie() {
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
         <MetricTile
-          label="Dosisleistung"
+          label={t('doseRate')}
           value={rateFmt.value}
           unit={rateFmt.unit}
           color={rateColor}
           footer={formatErr(measurement?.dosisleistungErrPct)}
         />
         <MetricTile
-          label="Gesamtdosis (akkumuliert)"
+          label={t('totalDose')}
           value={doseFmt.value}
           unit={doseFmt.unit}
           footer={
             measurement?.durationSec !== undefined
-              ? `über ${formatDuration(measurement.durationSec)}`
+              ? t('totalDoseFooter', {
+                  duration: formatDuration(measurement.durationSec),
+                })
               : undefined
           }
         />
         <MetricTile
-          label="Zählrate"
+          label={t('countRate')}
           value={measurement ? String(Math.round(measurement.cps)) : '—'}
           unit={measurement ? 'cps' : undefined}
           footer={formatErr(measurement?.cpsErrPct)}
@@ -148,7 +152,7 @@ export default function Dosimetrie() {
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
         <MetricTile
-          label="Temperatur"
+          label={t('temperature')}
           value={
             measurement?.temperatureC !== undefined
               ? measurement.temperatureC.toFixed(1)
@@ -157,7 +161,7 @@ export default function Dosimetrie() {
           unit={measurement?.temperatureC !== undefined ? '°C' : undefined}
         />
         <MetricTile
-          label="Akku"
+          label={t('battery')}
           value={
             measurement?.chargePct !== undefined
               ? Math.round(measurement.chargePct).toString()
@@ -166,7 +170,7 @@ export default function Dosimetrie() {
           unit={measurement?.chargePct !== undefined ? '%' : undefined}
         />
         <MetricTile
-          label="Messdauer"
+          label={t('duration')}
           value={
             measurement?.durationSec !== undefined
               ? formatDuration(measurement.durationSec)
@@ -182,14 +186,14 @@ export default function Dosimetrie() {
             <Switch
               checked={logScale}
               onChange={(_, v) => setLogScale(v)}
-              slotProps={{ input: { 'aria-label': 'Log' } }}
+              slotProps={{ input: { 'aria-label': t('log') } }}
             />
           }
-          label="Log"
+          label={t('log')}
         />
         {chartData.length === 0 ? (
           <Typography sx={{ mt: 4 }} color="text.secondary">
-            Keine Messdaten — Gerät verbinden
+            {t('noData')}
           </Typography>
         ) : (
           <LineChart
@@ -204,7 +208,7 @@ export default function Dosimetrie() {
             xAxis={[
               {
                 data: chartData.map((d) => d.x),
-                label: 'Sekunden',
+                label: t('seconds'),
                 scaleType: 'linear',
               },
             ]}
@@ -221,7 +225,7 @@ export default function Dosimetrie() {
       {cpsChart.length > 0 && (
         <Box data-testid="cps-trend" sx={{ minHeight: 180 }}>
           <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-            CPS-Trend (letzte 5 min)
+            {t('cpsTrend')}
           </Typography>
           <LineChart
             height={160}
@@ -235,7 +239,7 @@ export default function Dosimetrie() {
             xAxis={[
               {
                 data: cpsChart.map((d) => d.x),
-                label: 'Sekunden',
+                label: t('seconds'),
                 scaleType: 'linear',
               },
             ]}
@@ -256,7 +260,7 @@ export default function Dosimetrie() {
           }}
         >
           <Typography variant="caption" color="text.secondary">
-            Geräteinformation
+            {t('deviceInfo')}
           </Typography>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -265,27 +269,27 @@ export default function Dosimetrie() {
           >
             {deviceInfo.model && (
               <Typography variant="body2">
-                <strong>Modell:</strong> {deviceInfo.model}
+                <strong>{t('model')}</strong> {deviceInfo.model}
               </Typography>
             )}
             <Typography
               variant="body2"
               sx={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              <strong>Firmware:</strong> {deviceInfo.firmwareVersion}
+              <strong>{t('firmware')}</strong> {deviceInfo.firmwareVersion}
               {deviceInfo.firmwareDate ? ` (${deviceInfo.firmwareDate})` : ''}
             </Typography>
             <Typography
               variant="body2"
               sx={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              <strong>Bootloader:</strong> {deviceInfo.bootVersion}
+              <strong>{t('bootloader')}</strong> {deviceInfo.bootVersion}
             </Typography>
             <Typography
               variant="body2"
               sx={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              <strong>Seriennummer:</strong> {deviceInfo.hardwareSerial}
+              <strong>{t('serial')}</strong> {deviceInfo.hardwareSerial}
             </Typography>
           </Stack>
         </Box>

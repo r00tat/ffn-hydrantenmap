@@ -32,6 +32,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { ChartsReferenceLine } from '@mui/x-charts/ChartsReferenceLine';
+import { useTranslations } from 'next-intl';
 import {
   Fragment,
   useCallback,
@@ -166,6 +167,8 @@ interface EditDialogState {
 }
 
 export default function EnergySpectrum() {
+  const t = useTranslations('spectrum');
+  const tCommon = useTranslations('common');
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [logScale, setLogScale] = useState(false);
   const [editDialog, setEditDialog] = useState<EditDialogState | null>(null);
@@ -510,16 +513,14 @@ export default function EnergySpectrum() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Nuklid Energiespektrum
+        {t('title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Lade eine oder mehrere Dateien eines RadiaCode Spektrometers hoch (XML,
-        rcspg, zrcspg, JSON oder CSV), um das Energiespektrum darzustellen und
-        das Nuklid automatisch zu identifizieren.
+        {t('intro')}
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <Chip
-          label="RadiaCode Spektren"
+          label={t('tabs.radiacode')}
           icon={<OpenInNewIcon />}
           component="a"
           href="https://www.radiacode.com/spectrum-isotopes-library"
@@ -530,7 +531,7 @@ export default function EnergySpectrum() {
           variant="outlined"
         />
         <Chip
-          label="IAEA Nuklidkarte"
+          label={t('tabs.iaea')}
           icon={<OpenInNewIcon />}
           component="a"
           href="https://www-nds.iaea.org/relnsd/vcharthtml/VChartHTML.html"
@@ -541,7 +542,7 @@ export default function EnergySpectrum() {
           variant="outlined"
         />
         <Chip
-          label="NNDC NuDat 3"
+          label={t('tabs.nndc')}
           icon={<OpenInNewIcon />}
           component="a"
           href="https://www.nndc.bnl.gov/nudat3/"
@@ -633,14 +634,14 @@ export default function EnergySpectrum() {
                 size="small"
               />
             }
-            label="Logarithmisch"
+            label={t('log')}
           />
         )}
         <Tooltip
           title={
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                Erkennbare Nuklide ({MATCHABLE_NUCLIDES.length})
+                {t('recognizable', { count: MATCHABLE_NUCLIDES.length })}
               </Typography>
               {MATCHABLE_NUCLIDES.map((n) => (
                 <Typography
@@ -688,9 +689,9 @@ export default function EnergySpectrum() {
           renderInput={(params) => (
             <TextField
               {...params}
-              label="Peaks von Nukliden einblenden"
+              label={t('showPeaks')}
               placeholder={
-                selectedNuclideNames.length === 0 ? 'Nuklide wählen' : ''
+                selectedNuclideNames.length === 0 ? t('pickNuclides') : ''
               }
             />
           )}
@@ -727,9 +728,9 @@ export default function EnergySpectrum() {
                   secondaryAction={
                     <Box sx={{ display: 'flex', gap: 0 }}>
                       {!isLive && (
-                        <Tooltip title="XML exportieren">
+                        <Tooltip title={t('exportXml')}>
                           <IconButton
-                            aria-label="XML exportieren"
+                            aria-label={t('exportXml')}
                             onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               handleDownload(s);
@@ -743,7 +744,7 @@ export default function EnergySpectrum() {
                       )}
                       {!isLive && (
                         <IconButton
-                          aria-label="Bearbeiten"
+                          aria-label={t('edit')}
                           onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             openEditDialog(s);
@@ -755,7 +756,7 @@ export default function EnergySpectrum() {
                         </IconButton>
                       )}
                       <IconButton
-                        aria-label={s.visible ? 'Ausblenden' : 'Einblenden'}
+                        aria-label={s.visible ? t('hide') : t('show')}
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
                           toggleVisibility(s.id);
@@ -768,7 +769,7 @@ export default function EnergySpectrum() {
                       {!isLive && (
                         <IconButton
                           edge="end"
-                          aria-label="Entfernen"
+                          aria-label={t('remove')}
                           onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             removeSpectrum(s.id);
@@ -815,11 +816,13 @@ export default function EnergySpectrum() {
                           variant="body2"
                           sx={{ fontWeight: 'bold' }}
                         >
-                          {s.data.sampleName || 'Unbekannt'}
+                          {s.data.sampleName || t('unknownSample')}
                         </Typography>
                         {identification.source === 'manual' && (
                           <Chip
-                            label={`${identification.displayName} (manuell)`}
+                            label={t('manualSuffix', {
+                              name: identification.displayName,
+                            })}
                             color="primary"
                             size="small"
                             onClick={
@@ -834,7 +837,12 @@ export default function EnergySpectrum() {
                         )}
                         {identification.source === 'auto' && (
                           <Chip
-                            label={`${identification.displayName} (${Math.round(identification.confidence * 100)}%)`}
+                            label={t('autoSuffix', {
+                              name: identification.displayName,
+                              percent: Math.round(
+                                identification.confidence * 100,
+                              ),
+                            })}
                             color="success"
                             size="small"
                             onClick={
@@ -849,14 +857,14 @@ export default function EnergySpectrum() {
                         )}
                         {identification.source === 'none' && (
                           <Chip
-                            label="Nicht identifiziert"
+                            label={t('unidentified')}
                             color="warning"
                             size="small"
                           />
                         )}
                         {identNuclide?.url && (
                           <Chip
-                            label="RadiaCode"
+                            label={t('radiacodeLabel')}
                             size="small"
                             variant="outlined"
                             component="a"
@@ -872,7 +880,7 @@ export default function EnergySpectrum() {
                         {dbLinks && (
                           <>
                             <Chip
-                              label="IAEA"
+                              label={t('iaeaLabel')}
                               size="small"
                               variant="outlined"
                               component="a"
@@ -885,7 +893,7 @@ export default function EnergySpectrum() {
                               }
                             />
                             <Chip
-                              label="NNDC"
+                              label={t('nndcLabel')}
                               size="small"
                               variant="outlined"
                               component="a"
@@ -1003,12 +1011,12 @@ export default function EnergySpectrum() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Messung bearbeiten</DialogTitle>
+        <DialogTitle>{t('editDialogTitle')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Titel / Probenname"
+            label={t('titleField')}
             fullWidth
             value={editDialog?.sampleName ?? ''}
             onChange={(e) =>
@@ -1030,15 +1038,15 @@ export default function EnergySpectrum() {
               <TextField
                 {...params}
                 margin="dense"
-                label="Nuklid (manuell zugeordnet)"
-                placeholder="Leer lassen, um Auto-Erkennung zu nutzen"
-                helperText="Überschreibt die automatische Erkennung in der Liste."
+                label={t('manualNuclide')}
+                placeholder={t('manualNuclidePlaceholder')}
+                helperText={t('manualNuclideHelp')}
               />
             )}
           />
           <TextField
             margin="dense"
-            label="Beschreibung"
+            label={t('descriptionField')}
             fullWidth
             multiline
             minRows={2}
@@ -1051,9 +1059,9 @@ export default function EnergySpectrum() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditDialog(null)}>Abbrechen</Button>
+          <Button onClick={() => setEditDialog(null)}>{tCommon('cancel')}</Button>
           <Button onClick={handleEditSave} variant="contained">
-            Speichern
+            {tCommon('save')}
           </Button>
         </DialogActions>
       </Dialog>

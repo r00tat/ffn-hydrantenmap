@@ -10,6 +10,7 @@ import Collapse from '@mui/material/Collapse';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useContext, useMemo, useState } from 'react';
 import { SimpleMap } from '../../common/types';
 import { formatTimestamp } from '../../common/time-format';
@@ -26,11 +27,25 @@ import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import StrengthTable from './StrengthTable';
 import { calculateStrength } from './fahrzeuge-utils';
 
-function downloadEinsatzmittel(items: FirecallItem[], crewAssignments: CrewAssignment[]) {
+function downloadEinsatzmittel(
+  items: FirecallItem[],
+  crewAssignments: CrewAssignment[],
+  t: ReturnType<typeof useTranslations<'einsatzmittel'>>,
+) {
   const { rows } = calculateStrength(items, crewAssignments);
   downloadRowsAsCsv(
     [
-      ['Bezeichnung', 'Feuerwehr', 'Typ', 'Stärke', 'ATS', 'Beschreibung', 'Alarmierung', 'Eintreffen', 'Abrücken'],
+      [
+        t('cols.name'),
+        t('cols.fw'),
+        t('cols.type'),
+        t('cols.strength'),
+        t('cols.ats'),
+        t('cols.description'),
+        t('cols.alarmierung'),
+        t('cols.eintreffen'),
+        t('cols.abruecken'),
+      ],
       ...rows.map((r) => {
         const item = items.find((i) => i.name === r.name);
         return [
@@ -46,7 +61,7 @@ function downloadEinsatzmittel(items: FirecallItem[], crewAssignments: CrewAssig
         ];
       }),
     ],
-    'Einsatzmittel.csv',
+    t('csvFilename'),
   );
 }
 
@@ -208,9 +223,10 @@ function LayerGroup({
 }
 
 export default function Fahrzeuge() {
+  const t = useTranslations('einsatzmittel');
   const { isAuthorized } = useFirebaseLogin();
   const { crewAssignments } = useContext(FirecallContext);
-  const { vehicles, displayItems } = useVehicles();
+  const { displayItems } = useVehicles();
   const layers = useFirecallLayers();
 
   const groupedByLayer = useMemo(() => {
@@ -251,10 +267,12 @@ export default function Fahrzeuge() {
   return (
     <Box sx={{ p: 2, m: 2 }}>
       <Typography variant="h4" gutterBottom>
-        {totalItems} Einsatzmittel{' '}
+        {t('count', { count: totalItems })}{' '}
         <DownloadButton
-          tooltip="Einsatzmittel als CSV herunterladen"
-          onClick={() => downloadEinsatzmittel(displayItems, crewAssignments)}
+          tooltip={t('downloadCsvTooltip')}
+          onClick={() =>
+            downloadEinsatzmittel(displayItems, crewAssignments, t)
+          }
         />
       </Typography>
 
@@ -275,7 +293,7 @@ export default function Fahrzeuge() {
 
       {groupedByLayer['default'] && groupedByLayer['default'].length > 0 && (
         <LayerGroup
-          layerName="Nicht zugeordnet"
+          layerName={t('unassigned')}
           items={groupedByLayer['default']}
           defaultExpanded={true}
         />

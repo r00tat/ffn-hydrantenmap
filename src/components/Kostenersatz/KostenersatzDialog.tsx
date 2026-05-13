@@ -8,6 +8,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import { useTranslations } from 'next-intl';
 import { SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   calculateDurationHours,
@@ -73,6 +74,8 @@ export default function KostenersatzDialog({
   firecallId,
   existingCalculation,
 }: KostenersatzDialogProps) {
+  const t = useTranslations('kostenersatz');
+  const tCommon = useTranslations('common');
   const [tabValue, setTabValue] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const { email } = useFirebaseLogin();
@@ -278,14 +281,16 @@ export default function KostenersatzDialog({
       }}
     >
       <DialogTitle>
-        {existingCalculation ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
+        {existingCalculation
+          ? t('calculation.editTitle')
+          : t('calculation.newTitle')}
       </DialogTitle>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="kostenersatz tabs" variant="scrollable" scrollButtons="auto">
-          <Tab label="Einsatz" {...a11yProps(0)} />
-          <Tab label="Berechnung" {...a11yProps(1)} />
-          <Tab label="Empfänger" {...a11yProps(2)} />
+          <Tab label={t('tabs.operation')} {...a11yProps(0)} />
+          <Tab label={t('tabs.calculation')} {...a11yProps(1)} />
+          <Tab label={t('tabs.recipient')} {...a11yProps(2)} />
         </Tabs>
       </Box>
 
@@ -325,7 +330,7 @@ export default function KostenersatzDialog({
 
       <DialogActions>
         <Button color="inherit" onClick={() => onClose()} disabled={isSaving}>
-          Abbrechen
+          {tCommon('cancel')}
         </Button>
         {isEditable && (
           <>
@@ -333,14 +338,14 @@ export default function KostenersatzDialog({
               onClick={() => handleSave('draft')}
               disabled={isSaving}
             >
-              Als Entwurf speichern
+              {t('calculation.saveDraft')}
             </Button>
             <Button
               variant="contained"
               onClick={() => handleSave('completed')}
               disabled={isSaving || !calculation.recipient.name}
             >
-              Abschließen
+              {t('calculation.complete')}
             </Button>
           </>
         )}

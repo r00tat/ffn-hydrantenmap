@@ -11,27 +11,33 @@ import {
   ToggleButtonGroup,
   Tooltip,
 } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import React, { useCallback, useState } from 'react';
 import { useDrawing } from './DrawingContext';
 
-const PRESET_COLORS = [
-  { label: 'Rot', value: '#e53935' },
-  { label: 'Orange', value: '#fb8c00' },
-  { label: 'Gelb', value: '#fdd835' },
-  { label: 'Grün', value: '#43a047' },
-  { label: 'Blau', value: '#1e88e5' },
-  { label: 'Weiß', value: '#ffffff' },
-  { label: 'Schwarz', value: '#212121' },
-  { label: 'Magenta', value: '#e91e63' },
+type ColorKey = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'white' | 'black' | 'magenta';
+type WidthKey = 'thin' | 'medium' | 'thick';
+
+const PRESET_COLORS: { key: ColorKey; value: string }[] = [
+  { key: 'red', value: '#e53935' },
+  { key: 'orange', value: '#fb8c00' },
+  { key: 'yellow', value: '#fdd835' },
+  { key: 'green', value: '#43a047' },
+  { key: 'blue', value: '#1e88e5' },
+  { key: 'white', value: '#ffffff' },
+  { key: 'black', value: '#212121' },
+  { key: 'magenta', value: '#e91e63' },
 ];
 
-const PRESET_WIDTHS = [
-  { label: 'Dünn', value: 2 },
-  { label: 'Mittel', value: 5 },
-  { label: 'Dick', value: 10 },
+const PRESET_WIDTHS: { key: WidthKey; value: number }[] = [
+  { key: 'thin', value: 2 },
+  { key: 'medium', value: 5 },
+  { key: 'thick', value: 10 },
 ];
 
 export default function DrawingToolbar() {
+  const t = useTranslations('drawing');
+  const tCommon = useTranslations('common');
   const drawing = useDrawing();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -67,7 +73,7 @@ export default function DrawingToolbar() {
         {/* Color swatches */}
         <Stack direction="row" spacing={0.5}>
           {PRESET_COLORS.map((c) => (
-            <Tooltip key={c.value} title={c.label}>
+            <Tooltip key={c.value} title={t(`colors.${c.key}`)}>
               <Box
                 onClick={() => drawing.setColor(c.value)}
                 sx={{
@@ -95,13 +101,13 @@ export default function DrawingToolbar() {
         >
           {PRESET_WIDTHS.map((w) => (
             <ToggleButton key={w.value} value={w.value}>
-              {w.label}
+              {t(`widths.${w.key}`)}
             </ToggleButton>
           ))}
         </ToggleButtonGroup>
 
         {/* Undo */}
-        <Tooltip title="Letzten Strich rückgängig">
+        <Tooltip title={t('undoLast')}>
           <span>
             <IconButton
               size="small"
@@ -114,7 +120,7 @@ export default function DrawingToolbar() {
         </Tooltip>
 
         {/* Redo */}
-        <Tooltip title="Letzten Strich wiederherstellen">
+        <Tooltip title={t('redoLast')}>
           <span>
             <IconButton
               size="small"
@@ -138,7 +144,7 @@ export default function DrawingToolbar() {
             setIsSaving(false);
           }}
         >
-          Fertig
+          {t('done')}
         </Button>
 
         {/* Cancel */}
@@ -148,7 +154,7 @@ export default function DrawingToolbar() {
           size="small"
           onClick={drawing.cancel}
         >
-          Abbrechen
+          {tCommon('cancel')}
         </Button>
       </Stack>
     </Box>

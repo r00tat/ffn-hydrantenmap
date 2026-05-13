@@ -1,10 +1,12 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
 
 export default function useServiceWorkerUpdate() {
   const showSnackbar = useSnackbar();
+  const t = useTranslations('versionUpdate');
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
@@ -13,10 +15,10 @@ export default function useServiceWorkerUpdate() {
 
     const handleControllerChange = () => {
       showSnackbar(
-        'Neue Version verfügbar',
+        t('available'),
         'info',
         {
-          label: 'Neu laden',
+          label: t('reload'),
           onClick: () => window.location.reload(),
         },
       );
@@ -33,5 +35,5 @@ export default function useServiceWorkerUpdate() {
         handleControllerChange,
       );
     };
-  }, [showSnackbar]);
+  }, [showSnackbar, t]);
 }

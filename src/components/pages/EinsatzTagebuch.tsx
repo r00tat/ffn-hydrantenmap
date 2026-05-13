@@ -18,6 +18,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import moment from 'moment';
+import { useTranslations } from 'next-intl';
 import React, {
   useCallback,
   useContext,
@@ -60,6 +61,7 @@ import {
 
 export function useDiaries(sortAscending: boolean = false) {
   const firecallId = useFirecallId();
+  const t = useTranslations('tagebuch');
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [diaryCounter, setDiaryCounter] = useState(1);
   const historyPathSegments = useHistoryPathSegments();
@@ -100,6 +102,12 @@ export function useDiaries(sortAscending: boolean = false) {
       return bes > 0 ? '1:' + bes : '';
     };
 
+    const fmtBesatzung = (item: Fzg) => {
+      const bt = getBesatzungText(item);
+      return bt ? 'Besatzung ' + bt : '';
+    };
+    const fmtAts = (item: Fzg) => (item.ats ? 'ATS ' + item.ats : '');
+
     const firecallEntries: Diary[] = [
       cars
         .filter((item) => item.alarmierung)
@@ -109,27 +117,32 @@ export function useDiaries(sortAscending: boolean = false) {
               id: 'alarmierung' + item.id,
               datum: item.alarmierung,
               type: 'diary',
-              name: `${item.name} ${item.fw || ''} alarmiert`,
+              name: t('vehicleAlerted', {
+                name: item.name,
+                fw: item.fw || '',
+              }),
               beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
-              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
-              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
-                item.alarmierung
-                  ? 'alarmiert ' + formatTimestamp(item.alarmierung)
-                  : ''
-              } ${
-                item.eintreffen
-                  ? 'eintreffen ' + formatTimestamp(item.eintreffen)
-                  : ''
-              } ${
-                item.abruecken
-                  ? 'abruecken ' + formatTimestamp(item.abruecken)
-                  : ''
-              } Position ${item.lat},${item.lng}`,
+              textRepresenation: t('vehicleTextAlerted', {
+                name: item.name,
+                fw: item.fw || '',
+                besatzung: fmtBesatzung(item),
+                ats: fmtAts(item),
+                alarmiert: item.alarmierung
+                  ? formatTimestamp(item.alarmierung)
+                  : '',
+                eintreffen: item.eintreffen
+                  ? formatTimestamp(item.eintreffen)
+                  : '',
+                abruecken: item.abruecken
+                  ? formatTimestamp(item.abruecken)
+                  : '',
+                lat: item.lat ?? '',
+                lng: item.lng ?? '',
+              }),
             } as Diary)
         ),
       cars
@@ -140,19 +153,26 @@ export function useDiaries(sortAscending: boolean = false) {
               id: 'eintreffen' + item.id,
               datum: item.eintreffen,
               type: 'diary',
-              name: `${item.name} ${item.fw || ''} eingetroffen`,
+              name: t('vehicleArrived', {
+                name: item.name,
+                fw: item.fw || '',
+              }),
               beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
-              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
-              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''}  ${
-                item.eintreffen
-                  ? 'eintreffen ' + formatTimestamp(item.eintreffen)
-                  : ''
-              } Position ${item.lat},${item.lng}`,
+              textRepresenation: t('vehicleTextArrived', {
+                name: item.name,
+                fw: item.fw || '',
+                besatzung: fmtBesatzung(item),
+                ats: fmtAts(item),
+                eintreffen: item.eintreffen
+                  ? formatTimestamp(item.eintreffen)
+                  : '',
+                lat: item.lat ?? '',
+                lng: item.lng ?? '',
+              }),
             } as Diary)
         ),
       cars
@@ -163,19 +183,26 @@ export function useDiaries(sortAscending: boolean = false) {
               id: 'abruecken' + item.id,
               datum: item.abruecken,
               type: 'diary',
-              name: `${item.name} ${item.fw || ''} abgerückt`,
+              name: t('vehicleDeparted', {
+                name: item.name,
+                fw: item.fw || '',
+              }),
               beschreibung: `${getBesatzungText(item)} ${
                 item.ats ? 'ATS ' + item.ats : ''
               }`,
               editable: false,
               original: item,
-              textRepresenation: `Fahrzeug ${item.name} ${item.fw} ${
-                getBesatzungText(item) ? 'Besatzung ' + getBesatzungText(item) : ''
-              } ${item.ats ? 'Atemschutzträger ' + item.ats : ''} ${
-                item.abruecken
-                  ? 'abruecken ' + formatTimestamp(item.abruecken)
-                  : ''
-              } Position ${item.lat},${item.lng}`,
+              textRepresenation: t('vehicleTextDeparted', {
+                name: item.name,
+                fw: item.fw || '',
+                besatzung: fmtBesatzung(item),
+                ats: fmtAts(item),
+                abruecken: item.abruecken
+                  ? formatTimestamp(item.abruecken)
+                  : '',
+                lat: item.lat ?? '',
+                lng: item.lng ?? '',
+              }),
             } as Diary)
         ),
       // firecallItems
@@ -203,10 +230,10 @@ export function useDiaries(sortAscending: boolean = false) {
               editable: true,
               textRepresenation: `${formatTimestamp(item.datum)} ${
                 item.art === 'B'
-                  ? 'Befehl'
+                  ? t('type.B')
                   : item.art === 'F'
-                  ? 'Frage'
-                  : 'Meldung'
+                    ? t('type.F')
+                    : t('type.M')
               } ${item.von ? 'von ' + item.von : ''} ${
                 item.an ? 'an ' + item.an : ''
               }: ${item.name} ${item.beschreibung} ${
@@ -250,21 +277,24 @@ export function useDiaries(sortAscending: boolean = false) {
       setDiaries(diaries);
       setDiaryCounter(diaries.length + 1);
     })();
-  }, [firecallItems, sortAscending, crewAssignments]);
+  }, [firecallItems, sortAscending, crewAssignments, t]);
   return { diaries, diaryCounter };
 }
 
-async function downloadDiaries(diaries: Diary[]) {
+function downloadDiaries(
+  diaries: Diary[],
+  t: ReturnType<typeof useTranslations<'tagebuch'>>,
+) {
   const rows: any[][] = [
     [
-      'Nummer',
-      'Datum',
-      'Von',
-      'An',
-      'Art',
-      'Information',
-      'Anmerkung',
-      'erledigt',
+      t('col.number'),
+      t('col.date'),
+      t('col.from'),
+      t('col.to'),
+      t('col.type'),
+      t('col.info'),
+      t('col.comment'),
+      t('col.done'),
     ],
     ...diaries.map((d) => [
       d.nummer,
@@ -277,10 +307,11 @@ async function downloadDiaries(diaries: Diary[]) {
       d.erledigt ? formatTimestamp(d.erledigt) : '',
     ]),
   ];
-  downloadRowsAsCsv(rows, 'Einsatztagebuch.csv');
+  downloadRowsAsCsv(rows, t('csvFilename'));
 }
 
 export function DiaryButtons({ diary }: { diary: Diary }) {
+  const t = useTranslations('tagebuch');
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
 
@@ -288,7 +319,7 @@ export function DiaryButtons({ diary }: { diary: Diary }) {
     <>
       {diary.editable && (
         <>
-          <Tooltip title={`${diary.name} bearbeiten`}>
+          <Tooltip title={t('editEntry', { name: diary.name })}>
             <IconButton
               onClick={(e) => {
                 e.stopPropagation();
@@ -298,7 +329,7 @@ export function DiaryButtons({ diary }: { diary: Diary }) {
               <EditIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title={`${diary.name} löschen`}>
+          <Tooltip title={t('deleteEntry', { name: diary.name })}>
             <IconButton
               color="warning"
               onClick={(e) => {
@@ -409,6 +440,7 @@ export function EinsatzTagebuch({
   showEditButton = true,
   sortAscending = false,
 }: EinsatzTagebuchOptions) {
+  const t = useTranslations('tagebuch');
   const firecall = useFirecall();
   const [tagebuchDialogIsOpen, setTagebuchDialogIsOpen] = useState(false);
   const { diaries, diaryCounter } = useDiaries(sortAscending);
@@ -478,14 +510,15 @@ export function EinsatzTagebuch({
   ]);
 
   const updateDescription = useCallback(async () => {
-    const prompt = `Die Nachfolgenden Zeilen sind Einträge aus dem Einsatztagebuch des Feuerwehr Einsatzes ${
-      firecall.name
-    } ${firecall.description || ''} am ${formatTimestamp(
-      firecall.date
-    )}. Fasse den Einsatz und dessen Letztstand zusammen.\n\n${diaries
-      .filter((d) => d.textRepresenation)
-      .map((d) => d.textRepresenation)
-      .join(`\n`)}`;
+    const prompt = t('summaryPrompt', {
+      name: firecall.name,
+      description: firecall.description || '',
+      date: formatTimestamp(firecall.date),
+      entries: diaries
+        .filter((d) => d.textRepresenation)
+        .map((d) => d.textRepresenation)
+        .join('\n'),
+    });
     query(prompt);
   }, [
     diaries,
@@ -493,6 +526,7 @@ export function EinsatzTagebuch({
     firecall.description,
     firecall.name,
     query,
+    t,
   ]);
 
   const diaryClose = useCallback(
@@ -518,19 +552,19 @@ export function EinsatzTagebuch({
             mb: 2,
           }}
         >
-          <Typography variant="h4">Einsatz Tagebuch</Typography>
+          <Typography variant="h4">{t('title')}</Typography>
           {showEditButton && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <DownloadButton
-                onClick={() => downloadDiaries(diaries)}
-                tooltip="Einsatz Tagebuch als CSV herunterladen"
+                onClick={() => downloadDiaries(diaries, t)}
+                tooltip={t('downloadCsvTooltip')}
               />
               <Button
                 onClick={updateDescription}
                 variant="outlined"
                 disabled={isQuerying}
               >
-                Zusammenfassung{' '}
+                {t('summary')}{' '}
                 {isQuerying && <CircularProgress color="primary" size={20} />}
               </Button>
               <Button
@@ -538,7 +572,7 @@ export function EinsatzTagebuch({
                 startIcon={<AddIcon />}
                 onClick={() => setTagebuchDialogIsOpen(true)}
               >
-                Neuer Eintrag
+                {t('newEntry')}
               </Button>
             </Box>
           )}
@@ -552,19 +586,19 @@ export function EinsatzTagebuch({
 
         <Grid container>
           <Grid size={{ xs: 3, md: 2, lg: 1 }}>
-            <SortableHeader label="Nummer" field="nummer" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
+            <SortableHeader label={t('col.number')} field="nummer" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 6, md: 5, lg: 2 }}>
-            <SortableHeader label="Datum" field="datum" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
+            <SortableHeader label={t('col.date')} field="datum" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 2 }}>
-            <SortableHeader label="typ von -> an" field="art" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
+            <SortableHeader label={t('col.typeFromTo')} field="art" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-            <SortableHeader label="Eintrag" field="name" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
+            <SortableHeader label={t('col.entry')} field="name" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 5, lg: 3 }}>
-            <SortableHeader label="Beschreibung" field="beschreibung" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
+            <SortableHeader label={t('col.description')} field="beschreibung" activeField={sortField} direction={sortDirection} onClick={handleSortClick} />
           </Grid>
           <Grid size={{ xs: 12, md: 2, lg: 1 }}></Grid>
 
@@ -581,7 +615,7 @@ export function EinsatzTagebuch({
                 sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
               >
                 <Typography variant="body2" color="text.secondary">
-                  jetzt
+                  {t('now')}
                 </Typography>
               </Grid>
               <Grid
@@ -603,14 +637,14 @@ export function EinsatzTagebuch({
                 </FormControl>
                 <TextField
                   size="small"
-                  placeholder="von"
+                  placeholder={t('placeholder.from')}
                   value={inlineVon}
                   onChange={(e) => setInlineVon(e.target.value)}
                   sx={{ flex: 1, minWidth: 60 }}
                 />
                 <TextField
                   size="small"
-                  placeholder="an"
+                  placeholder={t('placeholder.to')}
                   value={inlineAn}
                   onChange={(e) => setInlineAn(e.target.value)}
                   sx={{ flex: 1, minWidth: 60 }}
@@ -622,7 +656,7 @@ export function EinsatzTagebuch({
               >
                 <TextField
                   size="small"
-                  placeholder="Information"
+                  placeholder={t('placeholder.info')}
                   value={inlineName}
                   onChange={(e) => setInlineName(e.target.value)}
                   fullWidth
@@ -643,7 +677,7 @@ export function EinsatzTagebuch({
               >
                 <TextField
                   size="small"
-                  placeholder="Anmerkung"
+                  placeholder={t('placeholder.comment')}
                   value={inlineBeschreibung}
                   onChange={(e) => setInlineBeschreibung(e.target.value)}
                   fullWidth
@@ -662,7 +696,7 @@ export function EinsatzTagebuch({
                 size={{ md: 2, lg: 1 }}
                 sx={{ display: { xs: 'none', md: 'block' }, py: 1 }}
               >
-                <Tooltip title="Eintrag hinzufügen">
+                <Tooltip title={t('addEntry')}>
                   <span>
                     <IconButton
                       color="primary"
@@ -785,11 +819,12 @@ export default function Tagebuch({
 }: EinsatzTagebuchOptions) {
   const firecallId = useFirecallId();
   const canEdit = useMapEditorCanEdit();
+  const t = useTranslations('tagebuch');
 
   if (firecallId === 'unknown') {
     return (
       <Typography variant="h4" gutterBottom>
-        Einsatz Tagebuch
+        {t('title')}
       </Typography>
     );
   }

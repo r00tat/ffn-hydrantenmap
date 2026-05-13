@@ -41,6 +41,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
   KostenersatzRate,
@@ -70,6 +71,7 @@ function SortableTableRow({
   onDelete,
   disabled,
 }: SortableTableRowProps) {
+  const tCommon = useTranslations('common');
   const {
     attributes,
     listeners,
@@ -113,7 +115,7 @@ function SortableTableRow({
         <IconButton
           size="small"
           onClick={() => onEdit(vehicle)}
-          title="Bearbeiten"
+          title={tCommon('edit')}
         >
           <EditIcon fontSize="small" />
         </IconButton>
@@ -121,7 +123,7 @@ function SortableTableRow({
           size="small"
           color="error"
           onClick={() => onDelete(vehicle)}
-          title="Löschen"
+          title={tCommon('delete')}
         >
           <DeleteIcon fontSize="small" />
         </IconButton>
@@ -137,6 +139,8 @@ interface KostenersatzVehicleTabProps {
 export default function KostenersatzVehicleTab({
   rates,
 }: KostenersatzVehicleTabProps) {
+  const t = useTranslations('kostenersatz.vehicleTab');
+  const tCommon = useTranslations('common');
   const { vehicles, loading, isUsingDefaults } = useKostenersatzVehicles();
   const upsertVehicle = useKostenersatzVehicleUpsert();
   const deleteVehicle = useKostenersatzVehicleDelete();
@@ -280,29 +284,28 @@ export default function KostenersatzVehicleTab({
           alignItems: 'center',
         }}
       >
-        <Typography variant="h6">Fahrzeuge</Typography>
+        <Typography variant="h6">{t('title')}</Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             startIcon={<RefreshIcon />}
             onClick={() => setSeedDialogOpen(true)}
             variant="outlined"
           >
-            Standard-Fahrzeuge laden
+            {t('loadDefaults')}
           </Button>
           <Button
             startIcon={<AddIcon />}
             onClick={handleOpenAdd}
             variant="contained"
           >
-            Fahrzeug hinzufügen
+            {t('addVehicle')}
           </Button>
         </Box>
       </Box>
 
       {isUsingDefaults && (
         <Typography variant="body2" color="text.secondary">
-          Zeigt Standard-Fahrzeuge. Klicken Sie &quot;Standard-Fahrzeuge
-          laden&quot; um sie in die Datenbank zu übernehmen.
+          {t('defaultsHint')}
         </Typography>
       )}
 
@@ -315,11 +318,11 @@ export default function KostenersatzVehicleTab({
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40 }} />
-              <TableCell>Name</TableCell>
-              <TableCell>Beschreibung</TableCell>
-              <TableCell>Tarif</TableCell>
+              <TableCell>{t('cols.name')}</TableCell>
+              <TableCell>{t('cols.description')}</TableCell>
+              <TableCell>{t('cols.rate')}</TableCell>
               <TableCell align="center" sx={{ width: 100 }}>
-                Aktionen
+                {t('cols.actions')}
               </TableCell>
             </TableRow>
           </TableHead>
@@ -342,7 +345,7 @@ export default function KostenersatzVehicleTab({
               <TableRow>
                 <TableCell colSpan={5} align="center">
                   <Typography color="text.secondary">
-                    Keine Fahrzeuge vorhanden.
+                    {t('noVehicles')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -359,32 +362,32 @@ export default function KostenersatzVehicleTab({
         fullWidth
       >
         <DialogTitle>
-          {editingVehicle ? 'Fahrzeug bearbeiten' : 'Fahrzeug hinzufügen'}
+          {editingVehicle ? t('edit') : t('add')}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
-              label="Name"
+              label={t('cols.name')}
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               fullWidth
               required
               autoFocus
-              placeholder="z.B. RLFA 3000"
+              placeholder={t('namePlaceholder')}
             />
             <TextField
-              label="Beschreibung (optional)"
+              label={t('descriptionLabel')}
               value={formDescription}
               onChange={(e) => setFormDescription(e.target.value)}
               fullWidth
-              placeholder="z.B. RüstLösch Neusiedl am See"
+              placeholder={t('descriptionPlaceholder')}
             />
             <FormControl fullWidth required>
-              <InputLabel>Tarif</InputLabel>
+              <InputLabel>{t('cols.rate')}</InputLabel>
               <Select
                 value={formRateId}
                 onChange={(e) => setFormRateId(e.target.value)}
-                label="Tarif"
+                label={t('cols.rate')}
               >
                 {vehicleRates.map((rate) => (
                   <MenuItem key={rate.id} value={rate.id}>
@@ -397,40 +400,37 @@ export default function KostenersatzVehicleTab({
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog} disabled={saving}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="contained"
             onClick={handleSave}
             disabled={saving || !formName.trim() || !formRateId}
           >
-            {saving ? <CircularProgress size={20} /> : 'Speichern'}
+            {saving ? <CircularProgress size={20} /> : tCommon('save')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Seed Dialog */}
       <Dialog open={seedDialogOpen} onClose={() => setSeedDialogOpen(false)}>
-        <DialogTitle>Standard-Fahrzeuge laden</DialogTitle>
+        <DialogTitle>{t('seedTitle')}</DialogTitle>
         <DialogContent>
-          <Typography>
-            Möchten Sie die Standard-Fahrzeuge der FF Neusiedl am See in die
-            Datenbank laden?
-          </Typography>
+          <Typography>{t('seedConfirm')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Bestehende Fahrzeuge mit gleicher ID werden überschrieben.
+            {t('seedDetail')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSeedDialogOpen(false)} disabled={seeding}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="contained"
             onClick={handleSeedVehicles}
             disabled={seeding}
           >
-            {seeding ? <CircularProgress size={20} /> : 'Laden'}
+            {seeding ? <CircularProgress size={20} /> : t('seedAction')}
           </Button>
         </DialogActions>
       </Dialog>

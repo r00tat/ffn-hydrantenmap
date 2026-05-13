@@ -10,6 +10,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import useMapEditor from '../../hooks/useMapEditor';
 import { fcItemClasses } from '../FirecallItems/elements';
@@ -18,6 +19,14 @@ import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
 
 export default function SidebarAddItemPanel() {
   const { openFirecallItemDialog, editable } = useMapEditor();
+  const tSidebar = useTranslations('sidebar');
+  const tMarkerNames = useTranslations('firecallItem.markerNames');
+  const markerLabel = (key: string, fallback: string) => {
+    const translationKey = key as Parameters<typeof tMarkerNames>[0];
+    return tMarkerNames.has(translationKey)
+      ? tMarkerNames(translationKey)
+      : fallback;
+  };
 
   if (!editable) {
     return null;
@@ -34,7 +43,7 @@ export default function SidebarAddItemPanel() {
           expandIcon={<ExpandMoreIcon />}
           sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0.75 } }}
         >
-          <Typography variant="subtitle2">Elemente</Typography>
+          <Typography variant="subtitle2">{tSidebar('elements')}</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 1, pt: 0.5 }}>
           <Box
@@ -50,9 +59,10 @@ export default function SidebarAddItemPanel() {
               const [iw, ih] = icon.options.iconSize as [number, number];
               const isSquare = iw === ih;
               const renderHeight = Math.round((24 * ih) / iw);
+              const label = markerLabel(key, instance.markerName());
 
               return (
-                <Tooltip key={key} title={instance.markerName()}>
+                <Tooltip key={key} title={label}>
                   <IconButton
                     onClick={() => openFirecallItemDialog({ type: key } as any)}
                     sx={{
@@ -95,13 +105,13 @@ export default function SidebarAddItemPanel() {
                         textOverflow: 'ellipsis',
                       }}
                     >
-                      {instance.markerName()}
+                      {label}
                     </Typography>
                   </IconButton>
                 </Tooltip>
               );
             })}
-            <Tooltip title="Ebene">
+            <Tooltip title={tSidebar('layer')}>
               <IconButton
                 onClick={() => openFirecallItemDialog({ type: 'layer' } as any)}
                 sx={{
@@ -133,7 +143,7 @@ export default function SidebarAddItemPanel() {
                     textOverflow: 'ellipsis',
                   }}
                 >
-                  Ebene
+                  {tSidebar('layer')}
                 </Typography>
               </IconButton>
             </Tooltip>
@@ -146,7 +156,7 @@ export default function SidebarAddItemPanel() {
           expandIcon={<ExpandMoreIcon />}
           sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 0.75 } }}
         >
-          <Typography variant="subtitle2">Taktische Zeichen</Typography>
+          <Typography variant="subtitle2">{tSidebar('tacticalSigns')}</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 0 }}>
           {Object.entries(icons).map(([group, groupIcons]) => (

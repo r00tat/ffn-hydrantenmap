@@ -17,6 +17,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import PersonIcon from '@mui/icons-material/Person';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { KostenersatzTemplate } from '../../common/kostenersatz';
 import { useKostenersatzRates, useKostenersatzTemplates } from '../../hooks/useKostenersatz';
@@ -35,6 +36,8 @@ export default function KostenersatzTemplateSelector({
   onClose,
   onSelect,
 }: KostenersatzTemplateSelectorProps) {
+  const t = useTranslations('kostenersatz.templateSelector');
+  const tCommon = useTranslations('common');
   const { sharedTemplates, personalTemplates, loading } = useKostenersatzTemplates();
   const { rates } = useKostenersatzRates();
   const { email, isAdmin } = useFirebaseLogin();
@@ -69,10 +72,10 @@ export default function KostenersatzTemplateSelector({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Vorlage auswählen</DialogTitle>
+      <DialogTitle>{t('title')}</DialogTitle>
       <DialogContent dividers>
         {loading ? (
-          <Typography>Laden...</Typography>
+          <Typography>{t('loading')}</Typography>
         ) : (
           <>
             {/* Personal Templates */}
@@ -81,7 +84,7 @@ export default function KostenersatzTemplateSelector({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <PersonIcon color="action" />
                   <Typography variant="subtitle2" color="text.secondary">
-                    Meine Vorlagen
+                    {t('myTemplates')}
                   </Typography>
                 </Box>
                 <List dense>
@@ -99,7 +102,7 @@ export default function KostenersatzTemplateSelector({
                                 e.stopPropagation();
                                 setEditingTemplate(template);
                               }}
-                              title="Bearbeiten"
+                              title={t('edit')}
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>
@@ -110,7 +113,7 @@ export default function KostenersatzTemplateSelector({
                                 e.stopPropagation();
                                 setDeletingTemplate(template);
                               }}
-                              title="Löschen"
+                              title={t('delete')}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
@@ -123,7 +126,11 @@ export default function KostenersatzTemplateSelector({
                           primary={template.name}
                           secondary={
                             template.description ||
-                            `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
+                            t('secondary', {
+                              count: template.items.length,
+                              withDefault: template.defaultStunden ? 'true' : 'false',
+                              hours: template.defaultStunden || 0,
+                            })
                           }
                         />
                       </ListItemButton>
@@ -140,7 +147,7 @@ export default function KostenersatzTemplateSelector({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <FolderSharedIcon color="action" />
                   <Typography variant="subtitle2" color="text.secondary">
-                    Gemeinsame Vorlagen
+                    {t('sharedTemplates')}
                   </Typography>
                 </Box>
                 <List dense>
@@ -158,7 +165,7 @@ export default function KostenersatzTemplateSelector({
                                 e.stopPropagation();
                                 setEditingTemplate(template);
                               }}
-                              title="Bearbeiten"
+                              title={t('edit')}
                             >
                               <EditIcon fontSize="small" />
                             </IconButton>
@@ -169,7 +176,7 @@ export default function KostenersatzTemplateSelector({
                                 e.stopPropagation();
                                 setDeletingTemplate(template);
                               }}
-                              title="Löschen"
+                              title={t('delete')}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
@@ -182,7 +189,11 @@ export default function KostenersatzTemplateSelector({
                           primary={template.name}
                           secondary={
                             template.description ||
-                            `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h` : ''}`
+                            t('secondary', {
+                              count: template.items.length,
+                              withDefault: template.defaultStunden ? 'true' : 'false',
+                              hours: template.defaultStunden || 0,
+                            })
                           }
                         />
                       </ListItemButton>
@@ -195,10 +206,10 @@ export default function KostenersatzTemplateSelector({
             {personalTemplates.length === 0 && sharedTemplates.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography color="text.secondary">
-                  Keine Vorlagen vorhanden
+                  {t('noTemplates')}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Speichern Sie eine Berechnung als Vorlage, um sie hier zu sehen.
+                  {t('noTemplatesHint')}
                 </Typography>
               </Box>
             )}
@@ -206,7 +217,7 @@ export default function KostenersatzTemplateSelector({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Abbrechen</Button>
+        <Button onClick={onClose}>{tCommon('cancel')}</Button>
       </DialogActions>
 
       {/* Edit Template Dialog */}
@@ -222,16 +233,16 @@ export default function KostenersatzTemplateSelector({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingTemplate} onClose={() => setDeletingTemplate(null)}>
-        <DialogTitle>Vorlage löschen?</DialogTitle>
+        <DialogTitle>{t('deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Möchten Sie die Vorlage &quot;{deletingTemplate?.name}&quot; wirklich löschen?
+            {t('deleteConfirm', { name: deletingTemplate?.name || '' })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeletingTemplate(null)}>Abbrechen</Button>
+          <Button onClick={() => setDeletingTemplate(null)}>{tCommon('cancel')}</Button>
           <Button onClick={handleDelete} color="error" variant="contained">
-            Löschen
+            {tCommon('delete')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -11,6 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ALL_RADIATION_UNITS,
@@ -174,14 +175,9 @@ function getAufenthaltszeitFormulaDisplay(
 
 // --- Abstandsgesetz ---
 
-const abstandLabels: Record<keyof StrahlenschutzValues, string> = {
-  d1: 'Abstand 1 (m)',
-  r1: 'Dosisleistung 1 (µSv/h)',
-  d2: 'Abstand 2 (m)',
-  r2: 'Dosisleistung 2 (µSv/h)',
-};
-
 function Abstandsgesetz() {
+  const t = useTranslations('schadstoff');
+  const tAbstand = useTranslations('schadstoff.abstand.labels');
   const [inputs, setInputs] = useState<
     Record<keyof StrahlenschutzValues, string>
   >({
@@ -204,6 +200,8 @@ function Abstandsgesetz() {
 
   const result = useMemo(() => calculateInverseSquareLaw(values), [values]);
   const nullCount = Object.values(values).filter((v) => v === null).length;
+
+  const fieldKeys: (keyof StrahlenschutzValues)[] = ['d1', 'r1', 'd2', 'r2'];
 
   const handleChange = useCallback(
     (field: keyof StrahlenschutzValues) =>
@@ -241,29 +239,26 @@ function Abstandsgesetz() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Quadratisches Abstandsgesetz
+        {t('abstand.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        D1² × R1 = D2² × R2 — Gib 3 Werte ein, der 4. wird berechnet. Lasse das
-        zu berechnende Feld leer.
+        {t('abstand.instructions')}
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        {(Object.keys(abstandLabels) as (keyof StrahlenschutzValues)[]).map(
-          (field) => (
-            <TextField
-              key={field}
-              label={abstandLabels[field]}
-              value={inputs[field]}
-              onChange={handleChange(field)}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          ),
-        )}
+        {fieldKeys.map((field) => (
+          <TextField
+            key={field}
+            label={tAbstand(field)}
+            value={inputs[field]}
+            onChange={handleChange(field)}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        ))}
       </Box>
 
       <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
@@ -272,10 +267,10 @@ function Abstandsgesetz() {
           onClick={handleCalculate}
           disabled={!result}
         >
-          Berechnen
+          {t('calculate')}
         </Button>
         <Button variant="outlined" onClick={handleClear}>
-          Löschen
+          {t('clear')}
         </Button>
       </Box>
 
@@ -297,7 +292,7 @@ function Abstandsgesetz() {
               }}
             >
               <Typography variant="h6">
-                {abstandLabels[result.field]} = {formatValue(result.value)}
+                {tAbstand(result.field)} = {formatValue(result.value)}
               </Typography>
               <FormulaDisplay
                 formula={formulaDisplay.formula}
@@ -309,13 +304,12 @@ function Abstandsgesetz() {
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-          Bitte genau 3 Werte eingeben (aktuell {4 - nullCount} von 3).
+          {t('tooFewValues', { required: 3, actual: 4 - nullCount })}
         </Typography>
       )}
       {nullCount === 0 && (
         <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
-          Alle Felder sind ausgefüllt. Lösche ein Feld um eine Berechnung
-          durchzuführen.
+          {t('allFilled')}
         </Typography>
       )}
 
@@ -323,7 +317,7 @@ function Abstandsgesetz() {
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            Berechnungsverlauf
+            {t('history')}
           </Typography>
           <List dense>
             {history.map((entry, index) => {
@@ -338,7 +332,7 @@ function Abstandsgesetz() {
                   secondaryAction={
                     <IconButton
                       edge="end"
-                      aria-label="Löschen"
+                      aria-label={t('deleteAria')}
                       onClick={() => handleDeleteHistoryEntry(index)}
                       size="small"
                     >
@@ -347,7 +341,7 @@ function Abstandsgesetz() {
                   }
                 >
                   <ListItemText
-                    primary={`${abstandLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    primary={`${tAbstand(entry.calculatedField)} = ${formatValue(entry[entry.calculatedField])}`}
                     secondary={
                       <>
                         {fd.formula}
@@ -370,14 +364,9 @@ function Abstandsgesetz() {
 
 // --- Schutzwert ---
 
-const schutzwertLabels: Record<keyof SchutzwertValues, string> = {
-  r0: 'Dosisleistung ohne Abschirmung (µSv/h)',
-  r: 'Dosisleistung mit Abschirmung (µSv/h)',
-  s: 'Schutzwert (S)',
-  n: 'Anzahl der Schichten (n)',
-};
-
 function SchutzwertRechner() {
+  const t = useTranslations('schadstoff');
+  const tLabels = useTranslations('schadstoff.schutzwert.labels');
   const [inputs, setInputs] = useState<Record<keyof SchutzwertValues, string>>({
     r0: '',
     r: '',
@@ -398,6 +387,8 @@ function SchutzwertRechner() {
 
   const result = useMemo(() => calculateSchutzwert(values), [values]);
   const nullCount = Object.values(values).filter((v) => v === null).length;
+
+  const fieldKeys: (keyof SchutzwertValues)[] = ['r0', 'r', 's', 'n'];
 
   const handleChange = useCallback(
     (field: keyof SchutzwertValues) =>
@@ -435,29 +426,26 @@ function SchutzwertRechner() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Schutzwert (Abschirmung)
+        {t('schutzwert.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        R = R₀ / S^n — Gib 3 Werte ein, der 4. wird berechnet. Lasse das zu
-        berechnende Feld leer.
+        {t('schutzwert.instructions')}
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        {(Object.keys(schutzwertLabels) as (keyof SchutzwertValues)[]).map(
-          (field) => (
-            <TextField
-              key={field}
-              label={schutzwertLabels[field]}
-              value={inputs[field]}
-              onChange={handleChange(field)}
-              type="text"
-              inputMode="decimal"
-              variant="outlined"
-              size="small"
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-          ),
-        )}
+        {fieldKeys.map((field) => (
+          <TextField
+            key={field}
+            label={tLabels(field)}
+            value={inputs[field]}
+            onChange={handleChange(field)}
+            type="text"
+            inputMode="decimal"
+            variant="outlined"
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        ))}
       </Box>
 
       <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
@@ -466,10 +454,10 @@ function SchutzwertRechner() {
           onClick={handleCalculate}
           disabled={!result}
         >
-          Berechnen
+          {t('calculate')}
         </Button>
         <Button variant="outlined" onClick={handleClear}>
-          Löschen
+          {t('clear')}
         </Button>
       </Box>
 
@@ -491,7 +479,7 @@ function SchutzwertRechner() {
               }}
             >
               <Typography variant="h6">
-                {schutzwertLabels[result.field]} = {formatValue(result.value)}
+                {tLabels(result.field)} = {formatValue(result.value)}
               </Typography>
               <FormulaDisplay
                 formula={formulaDisplay.formula}
@@ -503,13 +491,12 @@ function SchutzwertRechner() {
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-          Bitte genau 3 Werte eingeben (aktuell {4 - nullCount} von 3).
+          {t('tooFewValues', { required: 3, actual: 4 - nullCount })}
         </Typography>
       )}
       {nullCount === 0 && (
         <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
-          Alle Felder sind ausgefüllt. Lösche ein Feld um eine Berechnung
-          durchzuführen.
+          {t('allFilled')}
         </Typography>
       )}
 
@@ -517,7 +504,7 @@ function SchutzwertRechner() {
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            Berechnungsverlauf
+            {t('history')}
           </Typography>
           <List dense>
             {history.map((entry, index) => {
@@ -532,7 +519,7 @@ function SchutzwertRechner() {
                   secondaryAction={
                     <IconButton
                       edge="end"
-                      aria-label="Löschen"
+                      aria-label={t('deleteAria')}
                       onClick={() => handleDeleteHistoryEntry(index)}
                       size="small"
                     >
@@ -541,7 +528,7 @@ function SchutzwertRechner() {
                   }
                 >
                   <ListItemText
-                    primary={`${schutzwertLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}`}
+                    primary={`${tLabels(entry.calculatedField)} = ${formatValue(entry[entry.calculatedField])}`}
                     secondary={
                       <>
                         {fd.formula}
@@ -564,13 +551,9 @@ function SchutzwertRechner() {
 
 // --- Aufenthaltszeit ---
 
-const aufenthaltszeitLabels: Record<keyof AufenthaltszeitValues, string> = {
-  t: 'Aufenthaltszeit (h)',
-  d: 'Zulässige Dosis (mSv)',
-  r: 'Dosisleistung (mSv/h)',
-};
-
 function AufenthaltszeitRechner() {
+  const t = useTranslations('schadstoff');
+  const tLabels = useTranslations('schadstoff.aufenthalt.labels');
   const [inputs, setInputs] = useState<
     Record<keyof AufenthaltszeitValues, string>
   >({
@@ -591,6 +574,8 @@ function AufenthaltszeitRechner() {
 
   const result = useMemo(() => calculateAufenthaltszeit(values), [values]);
   const nullCount = Object.values(values).filter((v) => v === null).length;
+
+  const fieldKeys: (keyof AufenthaltszeitValues)[] = ['t', 'd', 'r'];
 
   const handleChange = useCallback(
     (field: keyof AufenthaltszeitValues) =>
@@ -627,20 +612,17 @@ function AufenthaltszeitRechner() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Aufenthaltszeit
+        {t('aufenthalt.title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        t = D / R — Gib 2 Werte ein, der 3. wird berechnet. Lasse das zu
-        berechnende Feld leer.
+        {t('aufenthalt.instructions')}
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-        {(
-          Object.keys(aufenthaltszeitLabels) as (keyof AufenthaltszeitValues)[]
-        ).map((field) => (
+        {fieldKeys.map((field) => (
           <TextField
             key={field}
-            label={aufenthaltszeitLabels[field]}
+            label={tLabels(field)}
             value={inputs[field]}
             onChange={handleChange(field)}
             type="text"
@@ -658,10 +640,10 @@ function AufenthaltszeitRechner() {
           onClick={handleCalculate}
           disabled={!result}
         >
-          Berechnen
+          {t('calculate')}
         </Button>
         <Button variant="outlined" onClick={handleClear}>
-          Löschen
+          {t('clear')}
         </Button>
       </Box>
 
@@ -683,8 +665,7 @@ function AufenthaltszeitRechner() {
               }}
             >
               <Typography variant="h6">
-                {aufenthaltszeitLabels[result.field]} ={' '}
-                {formatValue(result.value)}
+                {tLabels(result.field)} = {formatValue(result.value)}
                 {result.field === 't' && ` (${formatDuration(result.value)})`}
               </Typography>
               <FormulaDisplay
@@ -697,13 +678,12 @@ function AufenthaltszeitRechner() {
 
       {nullCount !== 1 && nullCount > 0 && (
         <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
-          Bitte genau 2 Werte eingeben (aktuell {3 - nullCount} von 2).
+          {t('tooFewValues', { required: 2, actual: 3 - nullCount })}
         </Typography>
       )}
       {nullCount === 0 && (
         <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
-          Alle Felder sind ausgefüllt. Lösche ein Feld um eine Berechnung
-          durchzuführen.
+          {t('allFilled')}
         </Typography>
       )}
 
@@ -711,7 +691,7 @@ function AufenthaltszeitRechner() {
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            Berechnungsverlauf
+            {t('history')}
           </Typography>
           <List dense>
             {history.map((entry, index) => {
@@ -726,7 +706,7 @@ function AufenthaltszeitRechner() {
                   secondaryAction={
                     <IconButton
                       edge="end"
-                      aria-label="Löschen"
+                      aria-label={t('deleteAria')}
                       onClick={() => handleDeleteHistoryEntry(index)}
                       size="small"
                     >
@@ -735,7 +715,7 @@ function AufenthaltszeitRechner() {
                   }
                 >
                   <ListItemText
-                    primary={`${aufenthaltszeitLabels[entry.calculatedField]} = ${formatValue(entry[entry.calculatedField])}${entry.calculatedField === 't' ? ` (${formatDuration(entry.t)})` : ''}`}
+                    primary={`${tLabels(entry.calculatedField)} = ${formatValue(entry[entry.calculatedField])}${entry.calculatedField === 't' ? ` (${formatDuration(entry.t)})` : ''}`}
                     secondary={
                       <>
                         {fd.formula}
@@ -783,6 +763,8 @@ function getDosisleistungNuklidFormulaDisplay(
 }
 
 function DosisleistungNuklidRechner() {
+  const t = useTranslations('schadstoff');
+  const tNuklid = useTranslations('schadstoff.nuklid');
   const [selectedNuclide, setSelectedNuclide] = useState<string>(
     NUCLIDES[0].name,
   );
@@ -869,17 +851,16 @@ function DosisleistungNuklidRechner() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Dosisleistung aus Nuklidaktivität
+        {tNuklid('title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Ḣ = Γ × A — Berechne Dosisleistung in 1m Abstand aus Aktivität oder
-        umgekehrt. Lasse das zu berechnende Feld leer.
+        {tNuklid('instructions')}
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
         <TextField
           select
-          label="Nuklid"
+          label={tNuklid('nuclide')}
           value={selectedNuclide}
           onChange={(e) => setSelectedNuclide(e.target.value)}
           variant="outlined"
@@ -896,7 +877,7 @@ function DosisleistungNuklidRechner() {
           color="text.secondary"
           sx={{ alignSelf: 'center' }}
         >
-          Γ = {nuclide.gamma} µSv·m²/(h·GBq)
+          {tNuklid('gamma', { gamma: nuclide.gamma })}
         </Typography>
       </Box>
 
@@ -909,7 +890,7 @@ function DosisleistungNuklidRechner() {
         }}
       >
         <TextField
-          label={`Aktivität (${activityUnit})`}
+          label={tNuklid('activity', { unit: activityUnit })}
           value={activityInput}
           onChange={(e) => setActivityInput(e.target.value)}
           type="text"
@@ -920,7 +901,7 @@ function DosisleistungNuklidRechner() {
         />
         <TextField
           select
-          label="Einheit"
+          label={tNuklid('unit')}
           value={activityUnit}
           onChange={(e) => setActivityUnit(e.target.value as ActivityUnit)}
           variant="outlined"
@@ -934,7 +915,7 @@ function DosisleistungNuklidRechner() {
           ))}
         </TextField>
         <TextField
-          label="Dosisleistung in 1m (µSv/h)"
+          label={tNuklid('doseRate')}
           value={doseRateInput}
           onChange={(e) => setDoseRateInput(e.target.value)}
           type="text"
@@ -951,10 +932,10 @@ function DosisleistungNuklidRechner() {
           onClick={handleCalculate}
           disabled={!result}
         >
-          Berechnen
+          {t('calculate')}
         </Button>
         <Button variant="outlined" onClick={handleClear}>
-          Löschen
+          {t('clear')}
         </Button>
       </Box>
 
@@ -978,8 +959,11 @@ function DosisleistungNuklidRechner() {
           );
           const resultLabel =
             result.field === 'doseRate'
-              ? `Dosisleistung in 1m = ${formatValue(result.value)} µSv/h`
-              : `Aktivität = ${formatValue(actInUnit)} ${activityUnit}`;
+              ? tNuklid('doseRateResult', { value: formatValue(result.value) })
+              : tNuklid('activityResult', {
+                  value: formatValue(actInUnit),
+                  unit: activityUnit,
+                });
           return (
             <Box
               sx={{
@@ -1003,7 +987,7 @@ function DosisleistungNuklidRechner() {
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            Berechnungsverlauf
+            {t('history')}
           </Typography>
           <List dense>
             {history.map((entry, index) => {
@@ -1025,7 +1009,7 @@ function DosisleistungNuklidRechner() {
                   secondaryAction={
                     <IconButton
                       edge="end"
-                      aria-label="Löschen"
+                      aria-label={t('deleteAria')}
                       onClick={() => handleDeleteHistoryEntry(index)}
                       size="small"
                     >
@@ -1066,6 +1050,8 @@ interface ConversionHistoryEntry {
 }
 
 function Einheitenumrechnung() {
+  const t = useTranslations('schadstoff');
+  const tEinheiten = useTranslations('schadstoff.einheiten');
   const [inputValue, setInputValue] = useState('');
   const [fromUnit, setFromUnit] = useState<RadiationUnit>('mSv');
   const [toUnit, setToUnit] = useState<RadiationUnit>('µSv');
@@ -1110,18 +1096,17 @@ function Einheitenumrechnung() {
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
-        Einheitenumrechnung
+        {tEinheiten('title')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Dosis und Dosisleistung umrechnen. 1 R ≈ 0,01 Sv (Gamma,
-        Weichteilgewebe).
+        {tEinheiten('instructions')}
       </Typography>
 
       <Box
         sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}
       >
         <TextField
-          label="Wert"
+          label={tEinheiten('value')}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           type="text"
@@ -1133,7 +1118,7 @@ function Einheitenumrechnung() {
         />
         <TextField
           select
-          label="Von"
+          label={tEinheiten('from')}
           value={fromUnit}
           onChange={(e) => setFromUnit(e.target.value as RadiationUnit)}
           variant="outlined"
@@ -1149,7 +1134,7 @@ function Einheitenumrechnung() {
         <Typography variant="body1">=</Typography>
         <TextField
           select
-          label="Nach"
+          label={tEinheiten('to')}
           value={effectiveToUnit}
           onChange={(e) => setToUnit(e.target.value as RadiationUnit)}
           variant="outlined"
@@ -1170,7 +1155,7 @@ function Einheitenumrechnung() {
           onClick={handleConvert}
           disabled={result === null}
         >
-          Umrechnen
+          {tEinheiten('convert')}
         </Button>
       </Box>
 
@@ -1195,7 +1180,7 @@ function Einheitenumrechnung() {
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 1 }} />
           <Typography variant="h6" gutterBottom>
-            Umrechnungsverlauf
+            {t('conversionHistory')}
           </Typography>
           <List dense>
             {history.map((entry, index) => (
@@ -1204,7 +1189,7 @@ function Einheitenumrechnung() {
                 secondaryAction={
                   <IconButton
                     edge="end"
-                    aria-label="Löschen"
+                    aria-label={t('deleteAria')}
                     onClick={() => handleDeleteHistoryEntry(index)}
                     size="small"
                   >
@@ -1228,10 +1213,11 @@ function Einheitenumrechnung() {
 // --- Main component ---
 
 export default function Strahlenschutz() {
+  const t = useTranslations('schadstoff');
   return (
     <>
       <Typography variant="h5" gutterBottom>
-        Strahlenschutz Berechnungen
+        {t('title')}
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <Abstandsgesetz />

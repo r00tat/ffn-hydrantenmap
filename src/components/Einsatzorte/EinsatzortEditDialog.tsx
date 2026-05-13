@@ -9,6 +9,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
@@ -72,6 +73,7 @@ export default function EinsatzortEditDialog({
   location,
   onClose,
 }: EinsatzortEditDialogProps) {
+  const tCommon = useTranslations('common');
   const firecall = useFirecall();
   const { updateLocation, deleteLocation } = useFirecallLocations();
   const { vehicles: firecallVehicles } = useVehicles();
@@ -288,7 +290,7 @@ export default function EinsatzortEditDialog({
       <DialogTitle sx={{ pr: 6 }}>
         Einsatzort bearbeiten
         <IconButton
-          aria-label="Schließen"
+          aria-label={tCommon('close')}
           onClick={onClose}
           sx={{ position: 'absolute', right: 8, top: 8 }}
         >

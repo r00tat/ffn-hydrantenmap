@@ -8,6 +8,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import {
   calculateCustomItemSum,
@@ -47,7 +48,7 @@ export default function KostenersatzBerechnungTab({
   selectedVehicleIds = [],
   disabled = false,
 }: KostenersatzBerechnungTabProps) {
-  // Get category list for rendering accordions
+  const t = useTranslations('kostenersatz.berechnungTab');
   const categories = useMemo(() => getCategoryList(rates), [rates]);
 
   // Group rates by category
@@ -136,7 +137,7 @@ export default function KostenersatzBerechnungTab({
               {/* Custom items section within Category 12 */}
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                Sonstige Positionen (nicht im Tarif)
+                {t('customItemsHeader')}
               </Typography>
 
               {/* Custom item rows */}
@@ -156,7 +157,7 @@ export default function KostenersatzBerechnungTab({
                 >
                   <TextField
                     size="small"
-                    label="Beschreibung"
+                    label={t('description')}
                     value={item.description}
                     onChange={(e) =>
                       handleCustomItemFieldChange(index, 'description', e.target.value)
@@ -168,7 +169,7 @@ export default function KostenersatzBerechnungTab({
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'space-between' }}>
                     <TextField
                       size="small"
-                      label="Preis"
+                      label={t('price')}
                       type="number"
                       value={item.pricePerUnit || ''}
                       onChange={(e) =>
@@ -180,7 +181,7 @@ export default function KostenersatzBerechnungTab({
                     />
                     <TextField
                       size="small"
-                      label="Anzahl"
+                      label={t('quantity')}
                       type="number"
                       value={item.quantity || ''}
                       onChange={(e) =>
@@ -219,7 +220,7 @@ export default function KostenersatzBerechnungTab({
                 disabled={disabled}
                 size="small"
               >
-                Position hinzufügen
+                {t('addPosition')}
               </Button>
             </KostenersatzCategoryAccordion>
           );

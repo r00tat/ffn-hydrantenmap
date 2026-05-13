@@ -23,6 +23,7 @@ import Select from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { doc, orderBy, where } from 'firebase/firestore';
+import { useTranslations } from 'next-intl';
 import { setDoc } from '../../lib/firestoreClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -75,11 +76,12 @@ function EinsatzCard({
   einsatz: Firecall;
   firecallId?: string;
 }) {
+  const t = useTranslations();
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [kostenersatzOpen, setKostenersatzOpen] = useState(false);
   const updateFirecall = useFirecallUpdate();
-  const { isAdmin, groups } = useFirebaseLogin();
+  const { isAdmin } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
   const [tokenLink, setTokenLink] = useState<string>();
@@ -121,11 +123,11 @@ function EinsatzCard({
         setCopied(false);
       }
     } else {
-      setError(`Token konnte nicht erstellt werden: ${token.error}`);
+      setError(t('einsaetze.tokenCreateError', { error: token.error ?? '' }));
       console.warn(`unable to create token: ${token.error}\n${token.details}`);
     }
     setCreatingLink(false);
-  }, []);
+  }, [t]);
 
   return (
     <Grid size={{ xs: 12, md: 6, lg: 4 }}>
@@ -134,7 +136,7 @@ function EinsatzCard({
           <Typography variant="h5" component="div">
             <Link href={`/einsatz/${einsatz.id}/details`} style={{ textDecoration: 'none', color: 'inherit' }}>
               {einsatz.name} {einsatz.fw}{' '}
-              {firecallId === einsatz.id ? '(aktiv)' : ''}
+              {firecallId === einsatz.id ? t('einsaetze.active') : ''}
             </Link>
           </Typography>
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
@@ -145,12 +147,12 @@ function EinsatzCard({
             <>
               {copied && (
                 <Typography variant="body2" color="success.main">
-                  Link in Zwischenablage kopiert
+                  {t('einsaetze.linkCopied')}
                 </Typography>
               )}
               {!copied && (
                 <Typography variant="body2" color="text.secondary">
-                  Link konnte nicht kopiert werden. Bitte manuell kopieren:
+                  {t('einsaetze.linkCopyFallback')}
                 </Typography>
               )}
               <Link href={tokenLink} target="_blank">
@@ -161,7 +163,7 @@ function EinsatzCard({
           {error && <Typography color="error">{error}</Typography>}
         </CardContent>
         <CardActions>
-          <Tooltip title="Als aktiven Einsatz in der Anzeige setzten">
+          <Tooltip title={t('einsaetze.activate')}>
             <Button
               size="small"
               onClick={() => {
@@ -171,10 +173,10 @@ function EinsatzCard({
                 router.push(`/einsatz/${einsatz.id}`);
               }}
             >
-              Aktivieren
+              {t('einsaetze.activateButton')}
             </Button>
           </Tooltip>
-          <Tooltip title="Einsatz-Details und Anhänge">
+          <Tooltip title={t('einsaetze.detailsTooltip')}>
             <IconButton
               size="small"
               component={Link}
@@ -185,7 +187,7 @@ function EinsatzCard({
           </Tooltip>
           {einsatz.id && <FirecallExport firecallId={einsatz.id} />}
 
-          <Tooltip title="Bearbeiten">
+          <Tooltip title={t('common.edit')}>
             <IconButton
               size="small"
               onClick={() => setDisplayUpdateDialog(true)}
@@ -194,7 +196,7 @@ function EinsatzCard({
             </IconButton>
           </Tooltip>
           {isAdmin && (
-            <Tooltip title="Löschen">
+            <Tooltip title={t('common.delete')}>
               <IconButton
                 size="small"
                 onClick={() => setIsConfirmOpen(true)}
@@ -207,7 +209,7 @@ function EinsatzCard({
           {creatingLink ? (
             <CircularProgress size={24} sx={{ mx: 1 }} />
           ) : (
-            <Tooltip title="Link für anonymen Zugriff erstellen">
+            <Tooltip title={t('einsaetze.shareTooltip')}>
               <IconButton
                 size="small"
                 onClick={() => {
@@ -220,7 +222,7 @@ function EinsatzCard({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Kostenersatz-Berechnungen">
+          <Tooltip title={t('einsaetze.kostenersatzTooltip')}>
             <IconButton
               size="small"
               onClick={() => setKostenersatzOpen(true)}
@@ -236,10 +238,14 @@ function EinsatzCard({
       )}
       {isConfirmOpen && (
         <ConfirmDialog
-          title={`Einsatz ${einsatz.name} ${einsatz.date || ''} löschen`}
-          text={`Einsatz ${einsatz.name} ${
-            einsatz.date || ''
-          } wirklich löschen?`}
+          title={t('einsaetze.deleteTitle', {
+            name: einsatz.name,
+            date: einsatz.date || '',
+          })}
+          text={t('einsaetze.deleteConfirm', {
+            name: einsatz.name,
+            date: einsatz.date || '',
+          })}
           onConfirm={deleteFn}
         />
       )}
@@ -251,7 +257,9 @@ function EinsatzCard({
       >
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">{einsatz.name}</Typography>
-          <Button onClick={() => setKostenersatzOpen(false)}>Schließen</Button>
+          <Button onClick={() => setKostenersatzOpen(false)}>
+            {t('common.close')}
+          </Button>
         </Box>
         {einsatz.id && (
           <KostenersatzList firecallId={einsatz.id} />
@@ -262,6 +270,7 @@ function EinsatzCard({
 }
 
 export default function Einsaetze() {
+  const t = useTranslations();
   const { isAuthorized, groups, myGroups } = useFirebaseLogin();
   const [einsatzDialog, setEinsatzDialog] = useState(false);
   const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -298,7 +307,7 @@ export default function Einsaetze() {
     <>
       <Box sx={{ p: 2, m: 2 }}>
         <Typography variant="h4" gutterBottom>
-          Einsätze
+          {t('einsaetze.title')}
         </Typography>
         <Grid container spacing={2}>
           <Grid size={{ xs: 6 }}>
@@ -307,16 +316,16 @@ export default function Einsaetze() {
           <Grid size={{ xs: 6 }}>
             <FormControl fullWidth variant="standard">
               <InputLabel id="firecall-group-label-choose">
-                Gruppenfilter
+                {t('einsaetze.groupFilter')}
               </InputLabel>
               <Select
                 labelId="firecall-group-label-choose"
                 id="firecall-item-type-choose"
                 value={groupFilter}
-                label="Art"
+                label={t('einsaetze.groupFilter')}
                 onChange={(e) => setGroupFilter(e.target.value)}
               >
-                <MenuItem value={'all'}>Alle Gruppen</MenuItem>
+                <MenuItem value={'all'}>{t('einsaetze.allGroups')}</MenuItem>
                 {myGroups.map((group) => (
                   <MenuItem key={`group-${group.id}`} value={group.id}>
                     {group.name}

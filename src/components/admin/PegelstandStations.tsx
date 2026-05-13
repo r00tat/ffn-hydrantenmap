@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, useCallback, useMemo, useRef } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -90,6 +91,8 @@ function parseCsvLine(line: string): string[] {
 }
 
 export default function PegelstandStations() {
+  const t = useTranslations('admin.pegelstand');
+  const tCommon = useTranslations('common');
   const stations = useFirebaseCollection<PegelstandStation>({
     collectionName: 'pegelstand_stations',
   });
@@ -397,7 +400,7 @@ export default function PegelstandStations() {
           mb: 2,
         }}
       >
-        <Typography variant="h5">Pegelstand Stationen</Typography>
+        <Typography variant="h5">{t('title')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
@@ -477,7 +480,7 @@ export default function PegelstandStations() {
                   </TableSortLabel>
                 </TableCell>
               ))}
-              <TableCell>Aktionen</TableCell>
+              <TableCell>{t('actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -505,21 +508,21 @@ export default function PegelstandStations() {
                     <IconButton
                       size="small"
                       onClick={() => handleEdit(station)}
-                      title="Bearbeiten"
+                      title={tCommon('edit')}
                     >
                       <EditIcon fontSize="small" />
                     </IconButton>
                     <IconButton
                       size="small"
                       onClick={() => setMapPickerStation(station)}
-                      title="Position auf Karte wählen"
+                      title={t('pickPosition')}
                     >
                       <MapIcon fontSize="small" />
                     </IconButton>
                     <IconButton
                       size="small"
                       onClick={() => handleDelete(station)}
-                      title="Löschen"
+                      title={tCommon('delete')}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -573,7 +576,7 @@ export default function PegelstandStations() {
               fullWidth
             />
             <TextField
-              label="Typ"
+              label={t('type')}
               value={formData.type}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -584,8 +587,8 @@ export default function PegelstandStations() {
               select
               fullWidth
             >
-              <MenuItem value="river">Fluss</MenuItem>
-              <MenuItem value="lake">See</MenuItem>
+              <MenuItem value="river">{t('river')}</MenuItem>
+              <MenuItem value="lake">{t('lake')}</MenuItem>
             </TextField>
             <TextField
               label="HZBNR"
@@ -638,7 +641,7 @@ export default function PegelstandStations() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDialogClose}>Abbrechen</Button>
+          <Button onClick={handleDialogClose}>{tCommon('cancel')}</Button>
           <Button
             onClick={handleSave}
             variant="contained"

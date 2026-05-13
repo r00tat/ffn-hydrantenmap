@@ -7,10 +7,12 @@ import CardContent from '@mui/material/CardContent';
 import CircularProgress from '@mui/material/CircularProgress';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import useHazmatDb from '../../hooks/useHazmatDb';
 
 export default function Schadstoffdatenbank() {
+  const t = useTranslations('hazmatDb');
   const [unNumber, setUnNumber] = useState('');
   const [materialName, setMaterialName] = useState('');
   const [hazmatRecords, isInProgress] = useHazmatDb(unNumber, materialName);
@@ -42,13 +44,13 @@ export default function Schadstoffdatenbank() {
   return (
     <>
       <Typography variant="h5" gutterBottom>
-        Schadstoffdatenbank
+        {t('title')}
       </Typography>
       <TextField
         autoFocus
         margin="dense"
         id="unNumber"
-        label="Stoffnummer (UN Nummer)"
+        label={t('unNumberLabel')}
         type="text"
         fullWidth
         variant="standard"
@@ -61,7 +63,7 @@ export default function Schadstoffdatenbank() {
       <TextField
         margin="dense"
         id="materialName"
-        label="Stoff Name"
+        label={t('materialNameLabel')}
         type="text"
         fullWidth
         variant="standard"
@@ -79,13 +81,10 @@ export default function Schadstoffdatenbank() {
           openEricards(unNumber, materialName);
         }}
       >
-        Suche in den Ericards nach aktuellen Eingaben
+        {t('searchEricards')}
       </Button>
       {unNumber === '' && materialName === '' && (
-        <Typography variant="body1">
-          Gib die Stoffnummer oder den Stoffnamen ein, um Informationen zu dem
-          Stoff zu erhalten.
-        </Typography>
+        <Typography variant="body1">{t('instructions')}</Typography>
       )}
       {(unNumber !== '' || materialName !== '') && (
         <>
@@ -94,13 +93,13 @@ export default function Schadstoffdatenbank() {
               <CardContent>
                 <Typography color="text.secondary">{r.unNumber}</Typography>
                 <Typography>{r.name}</Typography>
-                <Typography variant="caption">Schutzanzug Parameter</Typography>
+                <Typography variant="caption">{t('suitParameters')}</Typography>
                 <Typography variant="body2">
-                  Resistenzgrad: Klasse {r.resistanceTemperature}
+                  {t('resistanceClass', { value: r.resistanceTemperature ?? '' })}
                   <br />
-                  Zeitliche Resistenz: {r.resistanceTime}
+                  {t('resistanceTime', { value: r.resistanceTime ?? '' })}
                   <br />
-                  Beschädigung: {r.damage}
+                  {t('damage', { value: r.damage ?? '' })}
                 </Typography>
               </CardContent>
               <CardActions>
@@ -110,7 +109,7 @@ export default function Schadstoffdatenbank() {
                     openEricards(r.unNumber, '');
                   }}
                 >
-                  Ericards
+                  {t('ericards')}
                 </Button>
               </CardActions>
             </Card>

@@ -17,6 +17,7 @@ import {
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
 } from '@shared/types';
+import { useTranslations } from '@shared/i18n';
 
 interface DiaryFormProps {
   firecallId: string;
@@ -29,6 +30,7 @@ export default function DiaryForm({
   onClose,
   onSaved,
 }: DiaryFormProps) {
+  const t = useTranslations('diaryForm');
   const [art, setArt] = useState<'M' | 'B' | 'F'>('M');
   const [name, setName] = useState('');
   const [von, setVon] = useState('');
@@ -72,7 +74,7 @@ export default function DiaryForm({
       setError(
         err instanceof Error
           ? err.message
-          : 'Eintrag konnte nicht gespeichert werden'
+          : t('saveError'),
       );
     } finally {
       setSaving(false);
@@ -94,9 +96,9 @@ export default function DiaryForm({
           onChange={(_, v) => v && setArt(v)}
           size="small"
         >
-          <ToggleButton value="M">Meldung</ToggleButton>
-          <ToggleButton value="B">Befehl</ToggleButton>
-          <ToggleButton value="F">Frage</ToggleButton>
+          <ToggleButton value="M">{t('M')}</ToggleButton>
+          <ToggleButton value="B">{t('B')}</ToggleButton>
+          <ToggleButton value="F">{t('F')}</ToggleButton>
         </ToggleButtonGroup>
         <IconButton onClick={onClose} size="small">
           <Close />
@@ -104,7 +106,7 @@ export default function DiaryForm({
       </Box>
 
       <TextField
-        label="Nachricht"
+        label={t('message')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
@@ -116,14 +118,14 @@ export default function DiaryForm({
 
       <Box sx={{ display: 'flex', gap: 1 }}>
         <TextField
-          label="Von"
+          label={t('fromLabel')}
           value={von}
           onChange={(e) => setVon(e.target.value)}
           size="small"
           fullWidth
         />
         <TextField
-          label="An"
+          label={t('toLabel')}
           value={an}
           onChange={(e) => setAn(e.target.value)}
           size="small"
@@ -132,7 +134,7 @@ export default function DiaryForm({
       </Box>
 
       <TextField
-        label="Beschreibung"
+        label={t('description')}
         value={beschreibung}
         onChange={(e) => setBeschreibung(e.target.value)}
         size="small"
@@ -147,7 +149,7 @@ export default function DiaryForm({
         disabled={saving || !name.trim()}
         startIcon={saving ? <CircularProgress size={20} /> : null}
       >
-        {saving ? 'Speichern...' : 'Eintrag erstellen'}
+        {saving ? t('saving') : t('create')}
       </Button>
     </Box>
   );

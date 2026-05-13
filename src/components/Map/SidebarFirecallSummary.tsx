@@ -10,6 +10,7 @@ import {
   Box,
   Typography,
 } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useFirecallId } from '../../hooks/useFirecall';
@@ -35,6 +36,8 @@ interface TypeSummary {
 export default function SidebarFirecallSummary() {
   const firecallId = useFirecallId();
   const historyPathSegments = useHistoryPathSegments();
+  const tSidebar = useTranslations('sidebar');
+  const tMarkerNames = useTranslations('firecallItem.markerNames');
 
   const filterFn = useMemo(
     () => (e: FirecallItem) =>
@@ -75,9 +78,13 @@ export default function SidebarFirecallSummary() {
       const icon = instance.icon();
       const iconUrl = icon.options.iconUrl;
       const [iw, ih] = icon.options.iconSize as [number, number];
+      const translationKey = type as Parameters<typeof tMarkerNames>[0];
+      const label = tMarkerNames.has(translationKey)
+        ? tMarkerNames(translationKey)
+        : fcItemNames[type] || type;
       result.push({
         type,
-        label: fcItemNames[type] || type,
+        label,
         iconUrl,
         iconHeight: Math.round((16 * ih) / iw),
         isSquareIcon: iw === ih,
@@ -100,7 +107,7 @@ export default function SidebarFirecallSummary() {
     }
 
     return result.sort((a, b) => b.count - a.count);
-  }, [records]);
+  }, [records, tMarkerNames]);
 
   if (firecallId === 'unknown' || summary.length === 0) {
     return null;
@@ -119,7 +126,7 @@ export default function SidebarFirecallSummary() {
             max={999}
             sx={{ '& .MuiBadge-badge': { right: -20, top: 10 } }}
           >
-            <Typography variant="subtitle2">Zusammenfassung</Typography>
+            <Typography variant="subtitle2">{tSidebar('summary')}</Typography>
           </Badge>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 1, pt: 0 }}>

@@ -29,6 +29,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import {
   formatCurrency,
@@ -60,6 +61,8 @@ import KostenersatzVehicleTab from './KostenersatzVehicleTab';
 import Alert from '@mui/material/Alert';
 
 export default function KostenersatzAdminSettings() {
+  const t = useTranslations('kostenersatz.admin');
+  const tCommon = useTranslations('common');
   const { versions, activeVersion, loading: versionsLoading } = useKostenersatzVersions();
   const { rates, loading: ratesLoading } = useKostenersatzRates(activeVersion?.id);
   const { sharedTemplates, loading: templatesLoading } = useKostenersatzTemplates();
@@ -329,15 +332,15 @@ export default function KostenersatzAdminSettings() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Typography variant="h5">Kostenersatz Einstellungen</Typography>
+      <Typography variant="h5">{t('title')}</Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
-          <Tab label="Tarife" />
-          <Tab label="Fahrzeuge" />
-          <Tab label="Vorlagen" />
-          <Tab label="E-Mail" />
-          <Tab label="SumUp" />
+          <Tab label={t('tabRates')} />
+          <Tab label={t('tabVehicles')} />
+          <Tab label={t('tabTemplates')} />
+          <Tab label={t('tabEmail')} />
+          <Tab label={t('tabSumup')} />
         </Tabs>
       </Box>
 
@@ -348,20 +351,18 @@ export default function KostenersatzAdminSettings() {
           <Card>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Tarif-Versionen</Typography>
+            <Typography variant="h6">{t('versions')}</Typography>
             <Button
               startIcon={<RefreshIcon />}
               onClick={() => setSeedDialogOpen(true)}
               variant="outlined"
             >
-              Standard-Tarife laden
+              {t('loadDefaults')}
             </Button>
           </Box>
 
           {versions.length === 0 ? (
-            <Typography color="text.secondary">
-              Keine Versionen vorhanden. Laden Sie die Standard-Tarife.
-            </Typography>
+            <Typography color="text.secondary">{t('noVersions')}</Typography>
           ) : (
             <List>
               {versions.map((version) => (
@@ -373,7 +374,7 @@ export default function KostenersatzAdminSettings() {
                         size="small"
                         onClick={() => handleSetVersionActive(version.id)}
                       >
-                        Aktivieren
+                        {t('activate')}
                       </Button>
                     )
                   }
@@ -385,14 +386,14 @@ export default function KostenersatzAdminSettings() {
                         {version.isActive && (
                           <Chip
                             icon={<CheckCircleIcon />}
-                            label="Aktiv"
+                            label={t('active')}
                             size="small"
                             color="success"
                           />
                         )}
                       </Box>
                     }
-                    secondary={`Gültig ab: ${version.validFrom}`}
+                    secondary={t('validFrom', { date: version.validFrom })}
                   />
                 </ListItem>
               ))}
@@ -405,7 +406,9 @@ export default function KostenersatzAdminSettings() {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Aktuelle Tarife ({activeVersion?.name || 'Standard'})
+            {t('currentRates', {
+              version: activeVersion?.name || t('standard'),
+            })}
           </Typography>
 
           {categories.map((category) => {
@@ -420,11 +423,11 @@ export default function KostenersatzAdminSettings() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Nr.</TableCell>
-                      <TableCell>Beschreibung</TableCell>
-                      <TableCell>Einheit</TableCell>
-                      <TableCell align="right">Preis/h</TableCell>
-                      <TableCell align="right">Pauschal</TableCell>
+                      <TableCell>{t('ratesCols.no')}</TableCell>
+                      <TableCell>{t('ratesCols.description')}</TableCell>
+                      <TableCell>{t('ratesCols.unit')}</TableCell>
+                      <TableCell align="right">{t('ratesCols.pricePerHour')}</TableCell>
+                      <TableCell align="right">{t('ratesCols.flatPrice')}</TableCell>
                       <TableCell align="center" sx={{ width: 50 }}></TableCell>
                     </TableRow>
                   </TableHead>
@@ -442,7 +445,7 @@ export default function KostenersatzAdminSettings() {
                           <IconButton
                             size="small"
                             onClick={() => handleEditRate(rate)}
-                            title="Tarif bearbeiten"
+                            title={t('rateEditTooltip')}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
@@ -450,7 +453,7 @@ export default function KostenersatzAdminSettings() {
                             size="small"
                             color="error"
                             onClick={() => handleDeleteRate(rate)}
-                            title="Tarif löschen"
+                            title={t('rateDeleteTooltip')}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -466,7 +469,7 @@ export default function KostenersatzAdminSettings() {
                     size="small"
                     onClick={() => handleOpenCustomItemDialog(category)}
                   >
-                    Eigenen Tarif hinzufügen
+                    {t('addCustomRate')}
                   </Button>
                 </Box>
               </Box>
@@ -485,14 +488,14 @@ export default function KostenersatzAdminSettings() {
         <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Gemeinsame Vorlagen
+            {t('sharedTemplates')}
           </Typography>
 
           {templatesLoading ? (
             <CircularProgress size={20} />
           ) : sharedTemplates.length === 0 ? (
             <Typography color="text.secondary">
-              Keine gemeinsamen Vorlagen vorhanden.
+              {t('noSharedTemplates')}
             </Typography>
           ) : (
             <List>
@@ -521,7 +524,11 @@ export default function KostenersatzAdminSettings() {
                     primary={template.name}
                     secondary={
                       template.description ||
-                      `${template.items.length} Positionen${template.defaultStunden ? `, ${template.defaultStunden}h Standard` : ''}`
+                      t('templateSecondary', {
+                        count: template.items.length,
+                        withDefault: template.defaultStunden ? 'true' : 'false',
+                        hours: template.defaultStunden || 0,
+                      })
                     }
                   />
                 </ListItem>
@@ -537,7 +544,7 @@ export default function KostenersatzAdminSettings() {
         <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            E-Mail Einstellungen
+            {t('emailTitle')}
           </Typography>
 
           {emailConfigLoading ? (
@@ -545,32 +552,32 @@ export default function KostenersatzAdminSettings() {
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {emailConfigSaved && (
-                <Alert severity="success">E-Mail-Einstellungen gespeichert!</Alert>
+                <Alert severity="success">{t('emailSaved')}</Alert>
               )}
               {emailConfigError && (
                 <Alert severity="error">{emailConfigError}</Alert>
               )}
 
               <TextField
-                label="Absender E-Mail"
+                label={t('emailFrom')}
                 value={emailFromEdit}
                 onChange={(e) => setEmailFromEdit(e.target.value)}
                 fullWidth
                 size="small"
-                helperText="Diese Adresse wird als Reply-To verwendet"
+                helperText={t('emailFromHelp')}
               />
 
               <TextField
-                label="CC E-Mail (Standard)"
+                label={t('emailCc')}
                 value={emailCcEdit}
                 onChange={(e) => setEmailCcEdit(e.target.value)}
                 fullWidth
                 size="small"
-                helperText="Diese Adresse erhält immer eine Kopie"
+                helperText={t('emailCcHelp')}
               />
 
               <TextField
-                label="Betreff-Vorlage"
+                label={t('emailSubject')}
                 value={emailSubjectEdit}
                 onChange={(e) => setEmailSubjectEdit(e.target.value)}
                 fullWidth
@@ -578,7 +585,7 @@ export default function KostenersatzAdminSettings() {
               />
 
               <TextField
-                label="Text-Vorlage"
+                label={t('emailBody')}
                 value={emailBodyEdit}
                 onChange={(e) => setEmailBodyEdit(e.target.value)}
                 fullWidth
@@ -588,13 +595,13 @@ export default function KostenersatzAdminSettings() {
 
               <Box sx={{ backgroundColor: 'action.hover', p: 2, borderRadius: 1 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  Verfügbare Variablen:
+                  {t('availableVars')}
                 </Typography>
                 <Typography variant="body2" component="div" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                  {'{{ recipient.name }}'} - Name des Empfängers<br />
-                  {'{{ firecall.name }}'} - Name des Einsatzes<br />
-                  {'{{ firecall.date }}'} - Datum (DD.MM.YYYY)<br />
-                  {'{{ calculation.totalSum }}'} - Gesamtbetrag
+                  {'{{ recipient.name }}'} - {t('varRecipientName')}<br />
+                  {'{{ firecall.name }}'} - {t('varFirecallName')}<br />
+                  {'{{ firecall.date }}'} - {t('varFirecallDate')}<br />
+                  {'{{ calculation.totalSum }}'} - {t('varCalcTotal')}
                 </Typography>
               </Box>
 
@@ -604,7 +611,7 @@ export default function KostenersatzAdminSettings() {
                   onClick={handleSaveEmailConfig}
                   disabled={savingEmailConfig}
                 >
-                  {savingEmailConfig ? <CircularProgress size={20} /> : 'Speichern'}
+                  {savingEmailConfig ? <CircularProgress size={20} /> : t('save')}
                 </Button>
               </Box>
             </Box>
@@ -618,26 +625,23 @@ export default function KostenersatzAdminSettings() {
 
       {/* Seed Dialog */}
       <Dialog open={seedDialogOpen} onClose={() => setSeedDialogOpen(false)}>
-        <DialogTitle>Standard-Tarife laden</DialogTitle>
+        <DialogTitle>{t('seedTitle')}</DialogTitle>
         <DialogContent>
-          <Typography>
-            Möchten Sie die Standard-Tarife (LGBl. Nr. 77/2023) in die Datenbank laden?
-          </Typography>
+          <Typography>{t('seedConfirm')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Dies erstellt eine neue Version &quot;{DEFAULT_VERSION.name}&quot; mit allen
-            Standard-Tarifsätzen. Bestehende Versionen bleiben erhalten.
+            {t('seedDetail', { name: DEFAULT_VERSION.name })}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSeedDialogOpen(false)} disabled={seeding}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="contained"
             onClick={handleSeedRates}
             disabled={seeding}
           >
-            {seeding ? <CircularProgress size={20} /> : 'Laden'}
+            {seeding ? <CircularProgress size={20} /> : t('load')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -658,7 +662,7 @@ export default function KostenersatzAdminSettings() {
 
       {/* Rate Edit Dialog */}
       <Dialog open={rateDialogOpen} onClose={handleCloseRateDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Tarif bearbeiten</DialogTitle>
+        <DialogTitle>{t('rateEditTitle')}</DialogTitle>
         <DialogContent>
           {editingRate && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
@@ -667,7 +671,7 @@ export default function KostenersatzAdminSettings() {
               </Typography>
               <Divider />
               <TextField
-                label="Preis pro Stunde (€)"
+                label={t('ratePrice')}
                 type="number"
                 value={editedPrice}
                 onChange={(e) => setEditedPrice(e.target.value)}
@@ -675,27 +679,27 @@ export default function KostenersatzAdminSettings() {
                 fullWidth
               />
               <TextField
-                label="Pauschalpreis 12h (€)"
+                label={t('rateFlatPrice')}
                 type="number"
                 value={editedPricePauschal}
                 onChange={(e) => setEditedPricePauschal(e.target.value)}
                 slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
                 fullWidth
-                helperText="Leer lassen wenn kein Pauschalpreis gilt"
+                helperText={t('rateFlatHint')}
               />
             </Box>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseRateDialog} disabled={savingRate}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="contained"
             onClick={handleSaveRate}
             disabled={savingRate}
           >
-            {savingRate ? <CircularProgress size={20} /> : 'Speichern'}
+            {savingRate ? <CircularProgress size={20} /> : t('save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -703,31 +707,35 @@ export default function KostenersatzAdminSettings() {
       {/* Custom Item Dialog (any category) */}
       <Dialog open={customItemDialogOpen} onClose={handleCloseCustomItemDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Eigenen Tarif hinzufügen
-          {customItemCategory && ` (${customItemCategory.number}. ${customItemCategory.name})`}
+          {customItemCategory
+            ? t('customItemTitleCategory', {
+                number: customItemCategory.number,
+                name: customItemCategory.name,
+              })
+            : t('customItemTitle')}
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Fügen Sie einen eigenen Tarif zur Kategorie &quot;{customItemCategory?.name || ''}&quot; hinzu.
+              {t('customItemIntro', { name: customItemCategory?.name || '' })}
             </Typography>
             <TextField
-              label="Beschreibung"
+              label={t('customItemDescription')}
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
               fullWidth
               required
-              placeholder="z.B. Spezialgerät XY"
+              placeholder={t('customItemDescriptionPlaceholder')}
             />
             <TextField
-              label="Einheit"
+              label={t('customItemUnit')}
               value={customUnit}
               onChange={(e) => setCustomUnit(e.target.value)}
               fullWidth
-              placeholder="pauschal"
+              placeholder={t('customItemUnitPlaceholder')}
             />
             <TextField
-              label="Preis pro Stunde (€)"
+              label={t('ratePrice')}
               type="number"
               value={customPrice}
               onChange={(e) => setCustomPrice(e.target.value)}
@@ -736,26 +744,26 @@ export default function KostenersatzAdminSettings() {
               required
             />
             <TextField
-              label="Pauschalpreis 12h (€)"
+              label={t('rateFlatPrice')}
               type="number"
               value={customPricePauschal}
               onChange={(e) => setCustomPricePauschal(e.target.value)}
               slotProps={{ htmlInput: { min: 0, step: 0.01 } }}
               fullWidth
-              helperText="Leer lassen wenn kein Pauschalpreis gilt"
+              helperText={t('rateFlatHint')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseCustomItemDialog} disabled={savingCustomItem}>
-            Abbrechen
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="contained"
             onClick={handleSaveCustomItem}
             disabled={savingCustomItem || !customDescription.trim() || !customPrice}
           >
-            {savingCustomItem ? <CircularProgress size={20} /> : 'Hinzufügen'}
+            {savingCustomItem ? <CircularProgress size={20} /> : tCommon('add')}
           </Button>
         </DialogActions>
       </Dialog>

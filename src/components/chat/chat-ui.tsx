@@ -12,6 +12,7 @@ import InputLabel from '@mui/material/InputLabel';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useRegisterMessaging, {
   useFirebaseMessagingToken,
@@ -21,7 +22,7 @@ import useSendMessage from '../../hooks/useSendMessage';
 import ChatMessages from './messages';
 
 export default function ChatUi() {
-  // const [result, setResult] = useState<UserRecordExtended>();
+  const t = useTranslations('chat');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { messagingTokens } = useFirebaseLogin();
   const messagingToken = useFirebaseMessagingToken();
@@ -59,14 +60,14 @@ export default function ChatUi() {
 
   return (
     <>
-      <Typography variant="h3">Chat</Typography>
+      <Typography variant="h3">{t('title')}</Typography>
       <Grid container>
         <Grid size={{ xs: 12 }}>
           <FormControlLabel
             control={
               <Switch
                 checked={notificationsEnabled}
-                onChange={async (ev) => {
+                onChange={async () => {
                   await (notificationsEnabled
                     ? unregisterMessaging()
                     : registerMessaging());
@@ -74,31 +75,29 @@ export default function ChatUi() {
                 }}
               />
             }
-            label="Chat Benachrichtigungen"
+            label={t('notifications')}
           />
         </Grid>
         <Grid size={{ xs: 11 }}>
           <FormControl sx={{ m: 2 }} variant="outlined" fullWidth>
             <InputLabel htmlFor="outlined-adornment-password">
-              Chat Message
+              {t('messageLabel')}
             </InputLabel>
             <OutlinedInput
               margin="dense"
               id="chatmessage"
-              label="Chat Message"
+              label={t('messageLabel')}
               type="text"
               fullWidth
-              // variant="standard"
               onChange={(ev) => setText(ev.target.value)}
               value={text}
               onKeyDown={(ev) => {
-                // console.info(`key down: ${ev.key} ${ev.key.charCodeAt(0)}`);
-                ev.key === 'Enter' && sendChatMessage(text);
+                if (ev.key === 'Enter') sendChatMessage(text);
               }}
               endAdornment={
                 <InputAdornment position="end">
                   <IconButton
-                    aria-label="snd"
+                    aria-label={t('sendAria')}
                     onClick={() => sendChatMessage(text)}
                     edge="end"
                   >

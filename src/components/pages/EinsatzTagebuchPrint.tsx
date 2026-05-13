@@ -2,10 +2,12 @@
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { useDiaries } from './EinsatzTagebuch';
+import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
+import { useDiaries } from './EinsatzTagebuch';
 
 export default function EinsatzTagebuchPrint() {
+  const t = useTranslations('print');
   const { diaries } = useDiaries(true);
 
   const diariesSorted = useMemo(
@@ -17,18 +19,18 @@ export default function EinsatzTagebuchPrint() {
     <>
       <Box sx={{ p: 2, m: 2 }}>
         <Typography variant="h4" className="print-section">
-          Einsatztagebuch
+          {t('sectionTagebuch')}
         </Typography>
         <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Nummer</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Datum</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Von</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>An</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Information</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Anmerkung</th>
-              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>Erledigt</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.number')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.date')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.from')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.to')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.info')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.comment')}</th>
+              <th style={{ textAlign: 'left', borderBottom: '2px solid #333', padding: '4px 8px' }}>{t('cols.done')}</th>
             </tr>
           </thead>
           <tbody>

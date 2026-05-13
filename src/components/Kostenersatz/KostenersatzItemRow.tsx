@@ -9,6 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
   formatCurrency,
@@ -51,6 +52,7 @@ export default function KostenersatzItemRow({
   onItemChange,
   disabled = false,
 }: KostenersatzItemRowProps) {
+  const t = useTranslations('kostenersatz.itemRow');
   const einheiten = item?.einheiten || 0;
   const stunden = item?.anzahlStunden || defaultStunden;
   const stundenOverridden = item?.stundenOverridden || false;
@@ -132,10 +134,15 @@ export default function KostenersatzItemRow({
 
   // Format price display based on whether it's hourly or per-unit
   const priceDisplay = showHours
-    ? `${formatCurrency(rate.price)}/h${rate.pricePauschal ? ` • ${formatCurrency(rate.pricePauschal)} pauschal` : ''}`
+    ? rate.pricePauschal
+      ? t('pricePerHourFlat', {
+          price: formatCurrency(rate.price),
+          flat: formatCurrency(rate.pricePauschal),
+        })
+      : t('pricePerHour', { price: formatCurrency(rate.price) })
     : rate.price > 0
       ? formatCurrency(rate.price)
-      : 'nach Aufwand';
+      : t('byEffort');
 
   return (
     <Box
@@ -171,7 +178,7 @@ export default function KostenersatzItemRow({
         {/* Einheiten/Anzahl input with +/- buttons */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' }, mr: 0.5 }}>
-            Anz:
+            {t('amountShort')}
           </Typography>
           <IconButton
             size="small"
@@ -205,7 +212,7 @@ export default function KostenersatzItemRow({
         {showHours ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', sm: 'none' } }}>
-              h:
+              {t('hoursShort')}
             </Typography>
             <TextField
               size="small"
@@ -223,9 +230,7 @@ export default function KostenersatzItemRow({
             />
             <Tooltip
               title={
-                stundenOverridden
-                  ? 'Individuelle Stunden - Klicken zum Zurücksetzen'
-                  : 'Standard-Stunden verwenden - Klicken für individuelle Stunden'
+                stundenOverridden ? t('overrideTooltipOn') : t('overrideTooltipOff')
               }
             >
               <Box component="span" sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>

@@ -14,6 +14,7 @@ import {
   ref,
 } from 'firebase/storage';
 import { downloadBlob } from '../firebase/download';
+import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import app from '../firebase/firebase';
@@ -50,6 +51,7 @@ export default function FileDisplay({
   onDeleteCallback,
   imageSize = 80,
 }: FileDisplayProps) {
+  const t = useTranslations('fileDisplay');
   const [metadata, setMetadata] = useState<FullMetadata>();
   const [imageUrl, setImageUrl] = useState<string>();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -88,7 +90,7 @@ export default function FileDisplay({
         )}
       </Link>
 
-      <Tooltip title="Herunterladen">
+      <Tooltip title={t('download')}>
         <IconButton
           aria-label="download"
           size="small"
@@ -113,7 +115,7 @@ export default function FileDisplay({
       )}
       {confirmDelete && (
         <ConfirmDialog
-          title="Anhang löschen"
+          title={t('deleteAttachment')}
           text={`Anhang ${fileRef.name.substring(37)} löschen?`}
           onConfirm={async (confirmed) => {
             if (confirmed) {

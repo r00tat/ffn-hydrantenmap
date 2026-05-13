@@ -13,7 +13,8 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useState } from 'react';
 import { getAlgorithm, getAlgorithmList } from '../../common/interpolation';
 import { DataSchemaField, HeatmapConfig } from '../firebase/firestore';
 
@@ -73,6 +74,7 @@ export default function HeatmapSettings({
   dataSchema,
   onChange,
 }: HeatmapSettingsProps) {
+  const t = useTranslations('heatmap');
   const current = config || defaultConfig;
   const numericFields = dataSchema.filter((f) => f.type === 'number' || f.type === 'computed');
 
@@ -140,12 +142,12 @@ export default function HeatmapSettings({
             onChange={(e) => update({ enabled: e.target.checked })}
           />
         }
-        label="Heatmap-Färbung aktivieren"
+        label={t('enable')}
       />
       {current.enabled && (
         <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
-            label="Aktives Feld"
+            label={t('activeField')}
             size="small"
             select
             required
@@ -155,9 +157,9 @@ export default function HeatmapSettings({
             error={!current.activeKey}
             helperText={
               numericFields.length === 0
-                ? 'Zuerst ein numerisches Datenfeld hinzufügen'
+                ? t('addNumericFirst')
                 : !current.activeKey
-                  ? 'Bitte ein Feld auswählen'
+                  ? t('selectField')
                   : undefined
             }
           >
@@ -168,20 +170,20 @@ export default function HeatmapSettings({
             ))}
           </TextField>
           <TextField
-            label="Farbskala"
+            label={t('colorScale')}
             size="small"
             select
             value={current.colorScale || 'linear'}
             onChange={(e) => update({ colorScale: e.target.value as HeatmapConfig['colorScale'] })}
             fullWidth
           >
-            <MenuItem value="linear">Linear</MenuItem>
-            <MenuItem value="log">Logarithmisch</MenuItem>
-            <MenuItem value="sqrt">Wurzel (√)</MenuItem>
-            <MenuItem value="quantile">Quantile</MenuItem>
+            <MenuItem value="linear">{t('scaleLinear')}</MenuItem>
+            <MenuItem value="log">{t('scaleLog')}</MenuItem>
+            <MenuItem value="sqrt">{t('scaleSqrt')}</MenuItem>
+            <MenuItem value="quantile">{t('scaleQuantile')}</MenuItem>
           </TextField>
           <Typography variant="body2" gutterBottom>
-            Darstellung
+            {t('display')}
           </Typography>
           <ToggleButtonGroup
             value={current.visualizationMode || 'heatmap'}
@@ -190,8 +192,8 @@ export default function HeatmapSettings({
             size="small"
             sx={{ mb: 1 }}
           >
-            <ToggleButton value="heatmap">Heatmap</ToggleButton>
-            <ToggleButton value="interpolation">Interpolation</ToggleButton>
+            <ToggleButton value="heatmap">{t('modeHeatmap')}</ToggleButton>
+            <ToggleButton value="interpolation">{t('modeInterpolation')}</ToggleButton>
           </ToggleButtonGroup>
           <ToggleButtonGroup
             value={current.colorMode}
@@ -199,8 +201,8 @@ export default function HeatmapSettings({
             onChange={(_, val) => val && update({ colorMode: val })}
             size="small"
           >
-            <ToggleButton value="auto">Auto</ToggleButton>
-            <ToggleButton value="manual">Manuell</ToggleButton>
+            <ToggleButton value="auto">{t('modeAuto')}</ToggleButton>
+            <ToggleButton value="manual">{t('modeManual')}</ToggleButton>
           </ToggleButtonGroup>
           {current.colorMode === 'auto' && (
             <FormControlLabel
@@ -210,14 +212,14 @@ export default function HeatmapSettings({
                   onChange={(e) => update({ invertAutoColor: e.target.checked })}
                 />
               }
-              label={current.invertAutoColor ? 'Mehr ist grün' : 'Weniger ist grün'}
+              label={current.invertAutoColor ? t('moreIsGreen') : t('lessIsGreen')}
             />
           )}
           {current.colorMode === 'manual' && (
             <Box>
               <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
                 <TextField
-                  label="Min"
+                  label={t('min')}
                   type="number"
                   size="small"
                   value={current.min ?? ''}
@@ -226,7 +228,7 @@ export default function HeatmapSettings({
                   }
                 />
                 <TextField
-                  label="Max"
+                  label={t('max')}
                   type="number"
                   size="small"
                   value={current.max ?? ''}
@@ -236,7 +238,7 @@ export default function HeatmapSettings({
                 />
               </Box>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Farbstops
+                {t('colorStops')}
               </Typography>
               {(current.colorStops || []).map((stop, index) => (
                 <Box
@@ -244,7 +246,7 @@ export default function HeatmapSettings({
                   sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'center' }}
                 >
                   <TextField
-                    label="Wert"
+                    label={t('value')}
                     type="number"
                     size="small"
                     value={stop.value}
@@ -277,7 +279,7 @@ export default function HeatmapSettings({
                 onClick={addColorStop}
                 size="small"
               >
-                Farbstop hinzufügen
+                {t('addColorStop')}
               </Button>
             </Box>
           )}
@@ -285,7 +287,7 @@ export default function HeatmapSettings({
             <>
               <Box>
                 <Typography variant="body2" gutterBottom>
-                  Radius: {current.radius ?? 30}m
+                  {t('radiusMeters', { meters: current.radius ?? 30 })}
                 </Typography>
                 <Slider
                   value={current.radius ?? 30}
@@ -299,7 +301,9 @@ export default function HeatmapSettings({
               </Box>
               <Box>
                 <Typography variant="body2" gutterBottom>
-                  Weichzeichner: {Math.round(((current.blur ?? 15) / 25) * 100)}%
+                  {t('blur', {
+                    percent: Math.round(((current.blur ?? 15) / 25) * 100),
+                  })}
                 </Typography>
                 <Slider
                   value={current.blur ?? 15}
@@ -316,7 +320,7 @@ export default function HeatmapSettings({
             <>
               <Box>
                 <Typography variant="body2" gutterBottom>
-                  Algorithmus
+                  {t('algorithm')}
                 </Typography>
                 <ToggleButtonGroup
                   value={current.interpolationAlgorithm ?? 'idw'}
@@ -428,7 +432,9 @@ export default function HeatmapSettings({
               </Box>
               <Box>
                 <Typography variant="body2" gutterBottom>
-                  Radius: {current.interpolationRadius ?? 30}m
+                  {t('radiusMeters', {
+                    meters: current.interpolationRadius ?? 30,
+                  })}
                 </Typography>
                 <Slider
                   value={current.interpolationRadius ?? 30}
@@ -442,7 +448,11 @@ export default function HeatmapSettings({
               </Box>
               <Box>
                 <Typography variant="body2" gutterBottom>
-                  Deckkraft: {Math.round((current.interpolationOpacity ?? 0.6) * 100)}%
+                  {t('opacity', {
+                    percent: Math.round(
+                      (current.interpolationOpacity ?? 0.6) * 100,
+                    ),
+                  })}
                 </Typography>
                 <Slider
                   value={current.interpolationOpacity ?? 0.6}

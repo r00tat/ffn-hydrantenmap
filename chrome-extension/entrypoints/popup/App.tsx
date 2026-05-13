@@ -10,6 +10,8 @@ import {
 } from '@mui/material';
 import Add from '@mui/icons-material/Add';
 import { onAuthChange } from '@shared/auth';
+import { useTranslations } from '@shared/i18n';
+import { syncLocaleFromUserSettings } from '@shared/i18n/firestore-sync';
 import Login from './components/Login';
 import Header from './components/Header';
 import FirecallSelect from './components/FirecallSelect';
@@ -24,6 +26,7 @@ import { useUserClaims } from './hooks/useUserClaims';
 
 
 function MainContent({ email }: { email: string }) {
+  const t = useTranslations('app');
   const { groups, firecall: firecallClaim, loading: claimsLoading } = useUserClaims();
   const { firecalls, loading: firecallsLoading } = useFirecalls(groups, firecallClaim);
   const [selectedFirecallId, setSelectedFirecallId] = useState<string | null>(
@@ -83,8 +86,8 @@ function MainContent({ email }: { email: string }) {
         />
       </Box>
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth">
-        <Tab label="Übersicht" />
-        <Tab label="Tagebuch" />
+        <Tab label={t('tabOverview')} />
+        <Tab label={t('tabDiary')} />
       </Tabs>
       {tab === 0 && (
         <FirecallOverview
@@ -130,6 +133,9 @@ export default function App() {
     const unsubscribe = onAuthChange((u) => {
       setUser(u);
       setLoading(false);
+      if (u?.uid) {
+        void syncLocaleFromUserSettings(u.uid);
+      }
     });
     return unsubscribe;
   }, []);

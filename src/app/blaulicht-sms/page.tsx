@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -19,6 +20,7 @@ import { Firecall } from '../../components/firebase/firestore';
 import useFirecall from '../../hooks/useFirecall';
 
 const BlaulichtSmsPage = () => {
+  const t = useTranslations('blaulichtSms');
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [loading, setLoading] = useState(true);
   const [noCredentials, setNoCredentials] = useState(false);
@@ -95,7 +97,7 @@ const BlaulichtSmsPage = () => {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom>
-        BlaulichtSMS Einsätze
+        {t('title')}
       </Typography>
 
       {loading ? (
@@ -104,19 +106,18 @@ const BlaulichtSmsPage = () => {
         </Box>
       ) : !groupId ? (
         <Typography variant="body1" sx={{ mt: 4 }}>
-          Kein aktiver Einsatz ausgewählt.
+          {t('noActive')}
         </Typography>
       ) : noCredentials ? (
         <Typography variant="body1" sx={{ mt: 4 }}>
-          Keine BlaulichtSMS-Zugangsdaten für diese Gruppe konfiguriert. Bitte
-          in den Admin-Einstellungen hinterlegen.
+          {t('noCredentials')}
         </Typography>
       ) : (
         <>
           {currentAlarm && (
             <Box sx={{ my: 4 }}>
               <Typography variant="h5" component="h2" gutterBottom>
-                Aktive Einsätze
+                {t('activeAlarms')}
               </Typography>
               <AlarmCard
                 alarm={currentAlarm}
@@ -129,7 +130,7 @@ const BlaulichtSmsPage = () => {
           {recentAlarms.length > 0 && (
             <Box sx={{ my: 4 }}>
               <Typography variant="h5" component="h2" gutterBottom>
-                Vergangene Alarme
+                {t('pastAlarms')}
               </Typography>
               {recentAlarms.map((alarm) => (
                 <AlarmCard
@@ -144,7 +145,7 @@ const BlaulichtSmsPage = () => {
 
           {!currentAlarm && !recentAlarms.length && (
             <Typography variant="body1" sx={{ mt: 4 }}>
-              Keine Alarme gefunden.
+              {t('noAlarms')}
             </Typography>
           )}
         </>

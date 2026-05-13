@@ -4,6 +4,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
+import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
 import { LatLngPosition, latLngPosition } from '../../../../common/geo';
@@ -36,6 +37,7 @@ export default function ConnectionMarker({
   pane,
   onContextMenu,
 }: ConnectionMarkerProps) {
+  const t = useTranslations('firecallElements');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [point, setPoint] = useState(defaultPosition);
@@ -98,7 +100,7 @@ export default function ConnectionMarker({
                   <PopupNavigateButton lat={p[0]} lng={p[1]} />
                   {editable && (
                     <>
-                      <Tooltip title="Linie bearbeiten">
+                      <Tooltip title={t('editLine')}>
                         <IconButton
                           sx={{ marginLeft: 'auto', float: 'right' }}
                           onClick={() => selectItem(record)}
@@ -106,7 +108,7 @@ export default function ConnectionMarker({
                           <EditIcon />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Punkt entfernen">
+                      <Tooltip title={t('removePoint')}>
                         <IconButton
                           sx={{ marginLeft: 'auto', float: 'right' }}
                           onClick={() =>
@@ -163,7 +165,7 @@ export default function ConnectionMarker({
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Tooltip title="Einen Punkt hinzufügen">
+            <Tooltip title={t('addPoint')}>
               <IconButton
                 color="primary"
                 aria-label="add a point on the line"

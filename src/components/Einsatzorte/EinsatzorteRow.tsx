@@ -8,6 +8,7 @@ import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NavigateButton from '../common/NavigateButton';
 import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
@@ -41,6 +42,7 @@ export default function EinsatzorteRow({
   onMapVehicleSelected,
   onCreateVehicle,
 }: EinsatzorteRowProps) {
+  const t = useTranslations();
   // Track a unique key for resetting the new row after add
   const [resetKey, setResetKey] = useState(0);
 
@@ -288,7 +290,7 @@ export default function EinsatzorteRow({
             onChange={(e) => handleFieldChange('name', e.target.value)}
             size="small"
             fullWidth
-            placeholder={isNew ? 'Neue Adresse...' : ''}
+            placeholder={isNew ? t('einsatzorte.placeholderNew') : ''}
             variant="standard"
           />
         </TableCell>
@@ -298,7 +300,7 @@ export default function EinsatzorteRow({
               value={local.street || ''}
               onChange={(e) => handleFieldChange('street', e.target.value)}
               size="small"
-              placeholder="Straße"
+              placeholder={t('einsatzorte.placeholderStreet')}
               variant="standard"
               sx={{ flex: 2, minWidth: 150, mr: 1 }}
             />
@@ -306,7 +308,7 @@ export default function EinsatzorteRow({
               value={local.number || ''}
               onChange={(e) => handleFieldChange('number', e.target.value)}
               size="small"
-              placeholder="Nr."
+              placeholder={t('einsatzorte.placeholderNumber')}
               variant="standard"
               sx={{ width: 50, mr: 1 }}
             />
@@ -314,7 +316,7 @@ export default function EinsatzorteRow({
               value={local.city || ''}
               onChange={(e) => handleFieldChange('city', e.target.value)}
               size="small"
-              placeholder="Ort"
+              placeholder={t('einsatzorte.placeholderCity')}
               variant="standard"
               sx={{ flex: 1, minWidth: 100 }}
             />
@@ -345,7 +347,7 @@ export default function EinsatzorteRow({
             fullWidth
             multiline
             maxRows={3}
-            placeholder="Beschreibung"
+            placeholder={t('einsatzorte.placeholderDescription')}
             variant="standard"
           />
         </TableCell>
@@ -390,7 +392,7 @@ export default function EinsatzorteRow({
               endAdornment: (
                 <>
                   {!isNew && <NavigateButton lat={local.lat} lng={local.lng} />}
-                  <Tooltip title="Auf Karte wählen">
+                  <Tooltip title={t('einsatzorte.pickOnMap')}>
                     <IconButton size="small" onClick={() => setMapOpen(true)}>
                       <MyLocationIcon fontSize="small" />
                     </IconButton>
@@ -402,7 +404,7 @@ export default function EinsatzorteRow({
         </TableCell>
         <TableCell>
           {!isNew && onDelete && (
-            <Tooltip title="Löschen">
+            <Tooltip title={t('common.delete')}>
               <IconButton size="small" onClick={onDelete} color="error">
                 <DeleteIcon fontSize="small" />
               </IconButton>

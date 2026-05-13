@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NavigateButton from '../common/NavigateButton';
 import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
@@ -46,6 +47,7 @@ export default function EinsatzorteCard({
   onCreateVehicle,
   debounceMs = 500,
 }: EinsatzorteCardProps) {
+  const t = useTranslations('einsatzorte');
   // Track a unique key for resetting the new card after add
   const [resetKey, setResetKey] = useState(0);
 
@@ -255,7 +257,7 @@ export default function EinsatzorteCard({
             onChange={(e) => handleFieldChange('name', e.target.value)}
             size="small"
             fullWidth
-            placeholder={isNew ? 'Neue Adresse...' : 'Bezeichnung'}
+            placeholder={isNew ? t('placeholderNew') : t('placeholderName')}
             variant="outlined"
             sx={{ mb: 2 }}
           />
@@ -265,14 +267,14 @@ export default function EinsatzorteCard({
               value={local.street || ''}
               onChange={(e) => handleFieldChange('street', e.target.value)}
               size="small"
-              placeholder="Straße"
+              placeholder={t('placeholderStreet')}
               sx={{ flex: 2 }}
             />
             <TextField
               value={local.number || ''}
               onChange={(e) => handleFieldChange('number', e.target.value)}
               size="small"
-              placeholder="Nr."
+              placeholder={t('placeholderNumber')}
               sx={{ flex: 0.5 }}
             />
           </Stack>
@@ -282,13 +284,13 @@ export default function EinsatzorteCard({
             onChange={(e) => handleFieldChange('city', e.target.value)}
             size="small"
             fullWidth
-            placeholder="Ort"
+            placeholder={t('placeholderCity')}
             sx={{ mb: 2 }}
           />
 
           <Box sx={{ mb: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-              Fahrzeuge:
+              {t('vehicles')}
             </Typography>
             <VehicleAutocomplete
               value={(local.vehicles as Record<string, string>) || {}}
@@ -306,7 +308,7 @@ export default function EinsatzorteCard({
           <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
             <Box>
               <Typography variant="caption" color="text.secondary">
-                Alarmiert
+                {t('alerted')}
               </Typography>
               <TextField
                 type="time"
@@ -318,7 +320,7 @@ export default function EinsatzorteCard({
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">
-                Start
+                {t('start')}
               </Typography>
               <TextField
                 type="time"
@@ -330,7 +332,7 @@ export default function EinsatzorteCard({
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">
-                Erledigt
+                {t('done')}
               </Typography>
               <TextField
                 type="time"
@@ -349,7 +351,7 @@ export default function EinsatzorteCard({
             fullWidth
             multiline
             rows={2}
-            placeholder="Beschreibung"
+            placeholder={t('placeholderDescription')}
             sx={{ mb: 2 }}
           />
 
@@ -363,7 +365,7 @@ export default function EinsatzorteCard({
             <Typography variant="body2" color="text.secondary">
               {local.lat && local.lng
                 ? `${local.lat.toFixed(5)}, ${local.lng.toFixed(5)}`
-                : 'Keine Koordinaten'}
+                : t('noCoords')}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {!isNew && <NavigateButton lat={local.lat} lng={local.lng} size="medium" />}

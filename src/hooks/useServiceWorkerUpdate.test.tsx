@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import { type ReactNode } from 'react';
+import deMessages from '../../messages/de.json';
 
 const mockShowSnackbar = vi.fn();
 
@@ -9,6 +12,14 @@ vi.mock('../components/providers/SnackbarProvider', () => ({
 }));
 
 import useServiceWorkerUpdate from './useServiceWorkerUpdate';
+
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <NextIntlClientProvider locale="de" messages={deMessages}>
+      {children}
+    </NextIntlClientProvider>
+  );
+}
 
 describe('useServiceWorkerUpdate', () => {
   let listeners: Record<string, EventListener>;
@@ -34,12 +45,12 @@ describe('useServiceWorkerUpdate', () => {
   });
 
   it('registers a controllerchange listener', () => {
-    renderHook(() => useServiceWorkerUpdate());
+    renderHook(() => useServiceWorkerUpdate(), { wrapper });
     expect(listeners['controllerchange']).toBeDefined();
   });
 
   it('shows snackbar with reload action on controllerchange', () => {
-    renderHook(() => useServiceWorkerUpdate());
+    renderHook(() => useServiceWorkerUpdate(), { wrapper });
 
     listeners['controllerchange'](new Event('controllerchange'));
 
@@ -51,7 +62,7 @@ describe('useServiceWorkerUpdate', () => {
   });
 
   it('removes listener on unmount', () => {
-    const { unmount } = renderHook(() => useServiceWorkerUpdate());
+    const { unmount } = renderHook(() => useServiceWorkerUpdate(), { wrapper });
     unmount();
 
     expect(navigator.serviceWorker.removeEventListener).toHaveBeenCalledWith(

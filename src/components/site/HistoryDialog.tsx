@@ -5,6 +5,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import useMapEditor from '../../hooks/useMapEditor';
 import { FirecallHistory, FIRECALL_COLLECTION_ID } from '../firebase/firestore';
@@ -23,6 +24,7 @@ interface HistoryDialogOptions {
 }
 
 export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
+  const t = useTranslations();
   const [open, setOpen] = useState(true);
   const { history, historyId } = useMapEditor();
   const [selectedHistory, setSelectedHistory] = useState<
@@ -36,12 +38,12 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
     setSelectedHistory(selected);
   };
   const [historyTitle, setHistoryTitle] = useState(
-    `Einsatzstatus ${formatTimestamp()}`
+    t('history.defaultTitle', { timestamp: formatTimestamp() }),
   );
 
   return (
     <Dialog open={open} onClose={() => onClose()}>
-      <DialogTitle>Historie</DialogTitle>
+      <DialogTitle>{t('history.title')}</DialogTitle>
       <DialogContent>
         <AutoSnapshotIntervalSelect
           value={firecall.autoSnapshotInterval}
@@ -56,19 +58,16 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
           }}
         />
         <hr />
-        <Typography>
-          Wähle den gewünschten Stand aus der Historie. Wird &quot;letzten Stand
-          laden&quot; ausgewählt, so befindet man sich wieder im live Modus.
-        </Typography>
+        <Typography>{t('history.instructionLoad')}</Typography>
         <Select
           labelId="history-select-label"
           id="history-select"
           value={selectedHistory?.id || ''}
-          label="Historie"
+          label={t('history.select')}
           onChange={handleChange}
           fullWidth
         >
-          <MenuItem value="">letzten Stand laden</MenuItem>
+          <MenuItem value="">{t('history.loadLatest')}</MenuItem>
           {history.map((item) => (
             <MenuItem value={item.id} key={item.id}>
               {item.description}
@@ -77,13 +76,12 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
         </Select>
         <hr />
         <Typography sx={{ marginTop: 4 }}>
-          Speichere den aktuellen Einsatzstatus in der Historie, so dass dieser
-          später wieder aufgerufen werden kann.
+          {t('history.instructionSave')}
         </Typography>
         <TextField
           margin="dense"
           id="history-name"
-          label="Bezeichnung des neuen Zeitstempels"
+          label={t('history.newTimestampLabel')}
           type="text"
           fullWidth
           variant="standard"
@@ -98,12 +96,12 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
             onClose();
           }}
         >
-          Zeitpunkt speichern
+          {t('history.saveTimestamp')}
         </Button>
       </DialogContent>
       <DialogActions>
         <Button color="secondary" onClick={() => onClose()}>
-          Zurück zum Live Modus
+          {t('history.backToLive')}
         </Button>
 
         <Button
@@ -117,7 +115,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
             );
           }}
         >
-          Abbrechen
+          {t('common.cancel')}
         </Button>
         <Button
           color="primary"
@@ -128,7 +126,7 @@ export default function HistoryDialog({ onClose }: HistoryDialogOptions) {
           }}
           // disabled={!selectedHistory}
         >
-          OK
+          {t('common.ok')}
         </Button>
       </DialogActions>
     </Dialog>

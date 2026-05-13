@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 
 // Side-effect-Imports der RadiacodeProvider-Kette mocken, damit der Test
 // nicht über die Firebase-Initialisierung in useFirecallItemAdd stolpert.

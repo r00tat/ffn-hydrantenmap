@@ -9,6 +9,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import { StorageReference } from 'firebase/storage';
 import { MuiColorInput } from 'mui-color-input';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import React, { useCallback, useMemo } from 'react';
 import { parseTimestamp } from '../../common/time-format';
@@ -39,6 +40,14 @@ export default function FirecallItemFields({
   autoFocusField,
 }: FirecallItemFieldsProps) {
   const layers = useFirecallLayers();
+  const t = useTranslations();
+  const translateLabel = useCallback(
+    (key: string, fallback: string) => {
+      const translationKey = `firecallItem.fields.${key}` as Parameters<typeof t>[0];
+      return t.has(translationKey) ? t(translationKey) : fallback;
+    },
+    [t]
+  );
 
   // Find the first text-like field that should receive autoFocus
   const firstTextFieldKey = useMemo(() => {
@@ -88,7 +97,7 @@ export default function FirecallItemFields({
           <TextField
             margin="dense"
             id="lat"
-            label="Latitude"
+            label={t('firecall.fields.latitude')}
             variant="standard"
             onChange={onChange('lat')}
             value={item.lat || ''}
@@ -97,7 +106,7 @@ export default function FirecallItemFields({
           <TextField
             margin="dense"
             id="lng"
-            label="Longitude"
+            label={t('firecall.fields.longitude')}
             variant="standard"
             onChange={onChange('lng')}
             value={item.lng || ''}
@@ -107,7 +116,9 @@ export default function FirecallItemFields({
       )}
 
       {/* Dynamic fields from item.fields() */}
-      {Object.entries(item.fields()).map(([key, label]) => (
+      {Object.entries(item.fields()).map(([key, rawLabel]) => {
+        const label = translateLabel(key, rawLabel);
+        return (
         <React.Fragment key={key}>
           {/* Date fields */}
           {item.dateFields().includes(key) && (
@@ -148,19 +159,19 @@ export default function FirecallItemFields({
           {item.fieldTypes()[key] === 'TaktischesZeichen' && (
             <FormControl fullWidth sx={{ mt: 1 }}>
               <InputLabel htmlFor={`${key}-select`}>
-                Taktisches Zeichen
+                {t('firecallItem.tactical')}
               </InputLabel>
               <Select
                 defaultValue=""
                 id={`${key}-select`}
-                label="Taktisches Zeichen"
+                label={t('firecallItem.tactical')}
                 value={(item as any)[key] || ''}
                 onChange={(event): void => {
                   setItemField(key, event.target.value as string);
                 }}
               >
                 <MenuItem value="">
-                  <em>Kein taktisches Zeichen</em>
+                  <em>{t('firecallItem.tacticalNone')}</em>
                 </MenuItem>
                 {Object.entries(icons).map(([group, groupEntries]) => [
                   <ListSubheader key={group}>
@@ -271,22 +282,25 @@ export default function FirecallItemFields({
               />
             )}
         </React.Fragment>
-      ))}
+        );
+      })}
 
       {/* Layer selector */}
       {showLayerSelect && NON_DISPLAYABLE_ITEMS.indexOf(item.type) < 0 && (
         <FormControl fullWidth variant="standard">
-          <InputLabel id="firecall-item-layer-label">Ebene</InputLabel>
+          <InputLabel id="firecall-item-layer-label">
+            {t('firecall.fields.layer')}
+          </InputLabel>
           <Select
             labelId="firecall-item-layer-label"
             id="firecall-item-layer"
             value={item.layer || ''}
-            label="Ebene"
+            label={t('firecall.fields.layer')}
             onChange={(event): void => {
               setItemField('layer', event.target.value as string);
             }}
           >
-            <MenuItem key="">Einsatz</MenuItem>
+            <MenuItem key="">{t('firecallItem.operationLayer')}</MenuItem>
             {Object.entries(layers)
               .filter(([key]) => key !== 'fallback')
               .map(([key, layer]) => (

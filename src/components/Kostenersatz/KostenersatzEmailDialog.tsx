@@ -18,6 +18,7 @@ import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
+import { useTranslations } from 'next-intl';
 import { KostenersatzCalculation } from '../../common/kostenersatz';
 import {
   buildTemplateContext,
@@ -46,6 +47,8 @@ export default function KostenersatzEmailDialog({
   firecall,
   firecallId,
 }: KostenersatzEmailDialogProps) {
+  const t = useTranslations('kostenersatz.emailDialog');
+  const tCommon = useTranslations('common');
   const { config, loading: configLoading } = useKostenersatzEmailConfig();
 
   // Form state
@@ -131,19 +134,18 @@ export default function KostenersatzEmailDialog({
       const result = await sendKostenersatzEmailAction(requestBody);
 
       if (!result.success) {
-        throw new Error(result.details || result.error || 'Failed to send email');
+        throw new Error(result.details || result.error || t('errorGeneric'));
       }
 
-      // Success
       onSuccess?.();
       onClose();
     } catch (err: any) {
       console.error('Error sending email:', err);
-      setError(err.message || 'Failed to send email');
+      setError(err.message || t('errorGeneric'));
     } finally {
       setSending(false);
     }
-  }, [isValid, firecallId, calculation.id, to, ccList, subject, body, onSuccess, onClose]);
+  }, [isValid, firecallId, calculation.id, to, ccList, subject, body, onSuccess, onClose, t]);
 
   return (
     <Dialog
@@ -155,7 +157,7 @@ export default function KostenersatzEmailDialog({
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h6">E-Mail senden</Typography>
+          <Typography variant="h6">{t('title')}</Typography>
           <IconButton onClick={onClose} disabled={sending} size="small">
             <CloseIcon />
           </IconButton>
@@ -177,7 +179,7 @@ export default function KostenersatzEmailDialog({
 
             {/* From (read-only) */}
             <TextField
-              label="Von"
+              label={t('from')}
               value={config.fromEmail}
               disabled
               fullWidth
@@ -191,28 +193,28 @@ export default function KostenersatzEmailDialog({
 
             {/* To */}
             <TextField
-              label="An"
+              label={t('to')}
               value={to}
               onChange={(e) => setTo(e.target.value)}
               fullWidth
               size="small"
               required
               error={to !== '' && !isValidEmail(to)}
-              helperText={to !== '' && !isValidEmail(to) ? 'Ungültige E-Mail-Adresse' : ''}
+              helperText={to !== '' && !isValidEmail(to) ? t('invalidEmail') : ''}
               disabled={sending}
             />
 
             {/* CC */}
             <Box>
               <TextField
-                label="CC"
+                label={t('cc')}
                 value={newCc}
                 onChange={(e) => setNewCc(e.target.value)}
                 onKeyPress={handleCcKeyPress}
                 fullWidth
                 size="small"
                 disabled={sending}
-                placeholder="E-Mail-Adresse hinzufügen..."
+                placeholder={t('ccPlaceholder')}
                 slotProps={{
                   input: {
                     endAdornment: (
@@ -245,7 +247,7 @@ export default function KostenersatzEmailDialog({
 
             {/* Subject */}
             <TextField
-              label="Betreff"
+              label={t('subject')}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               fullWidth
@@ -257,7 +259,7 @@ export default function KostenersatzEmailDialog({
 
             {/* Body */}
             <TextField
-              label="Nachricht"
+              label={t('body')}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               fullWidth
@@ -269,7 +271,7 @@ export default function KostenersatzEmailDialog({
             />
 
             <Typography variant="caption" color="text.secondary">
-              Die PDF-Rechnung wird automatisch als Anhang beigefügt.
+              {t('attachmentHint')}
             </Typography>
           </Stack>
         )}
@@ -277,7 +279,7 @@ export default function KostenersatzEmailDialog({
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={onClose} disabled={sending} color="inherit">
-          Abbrechen
+          {tCommon('cancel')}
         </Button>
         <Button
           onClick={handleSend}
@@ -285,7 +287,7 @@ export default function KostenersatzEmailDialog({
           variant="contained"
           startIcon={sending ? <CircularProgress size={16} /> : <SendIcon />}
         >
-          {sending ? 'Wird gesendet...' : 'Senden'}
+          {sending ? t('sending') : t('send')}
         </Button>
       </DialogActions>
     </Dialog>

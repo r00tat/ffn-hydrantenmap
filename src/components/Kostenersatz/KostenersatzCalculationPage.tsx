@@ -7,6 +7,7 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useTranslations } from 'next-intl';
 import { SyntheticEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -85,6 +86,8 @@ export default function KostenersatzCalculationPage({
   firecallId,
   existingCalculation,
 }: KostenersatzCalculationPageProps) {
+  const t = useTranslations('kostenersatz');
+  const tCommon = useTranslations('common');
   const router = useRouter();
   const [tabValue, setTabValue] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -586,17 +589,17 @@ export default function KostenersatzCalculationPage({
         defaultStunden: template.defaultStunden || prev.defaultStunden,
       }));
 
-      setSuccessMessage(`Vorlage "${template.name}" geladen`);
+      setSuccessMessage(t('calculation.templateLoaded', { name: template.name }));
     },
-    [ratesById, vehiclesById, calculation.defaultStunden]
+    [ratesById, vehiclesById, calculation.defaultStunden, t]
   );
 
   const handleTemplateSaved = useCallback((saved?: boolean) => {
     setTemplateSaveDialogOpen(false);
     if (saved) {
-      setSuccessMessage('Vorlage wurde gespeichert');
+      setSuccessMessage(t('calculation.templateSaved'));
     }
-  }, []);
+  }, [t]);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -607,10 +610,12 @@ export default function KostenersatzCalculationPage({
           color="inherit"
           size="small"
         >
-          Zurück
+          {t('calculation.back')}
         </Button>
         <Typography variant="h6" sx={{ flex: 1, minWidth: { xs: '100%', sm: 'auto' }, order: { xs: -1, sm: 0 } }}>
-          {existingCalculation || calculation.id ? 'Kostenersatz bearbeiten' : 'Neue Kostenersatz-Berechnung'}
+          {existingCalculation || calculation.id
+            ? t('calculation.editTitle')
+            : t('calculation.newTitle')}
         </Typography>
         {isEditable && (
           <Button
@@ -618,7 +623,7 @@ export default function KostenersatzCalculationPage({
             onClick={() => setTemplateLoadDialogOpen(true)}
             size="small"
           >
-            Vorlage laden
+            {t('calculation.loadTemplate')}
           </Button>
         )}
       </Box>
@@ -626,9 +631,9 @@ export default function KostenersatzCalculationPage({
       <Paper sx={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="kostenersatz tabs" variant="scrollable" scrollButtons="auto">
-            <Tab label="Einsatz" {...a11yProps(0)} />
-            <Tab label="Berechnung" {...a11yProps(1)} />
-            <Tab label="Empfänger" {...a11yProps(2)} />
+            <Tab label={t('tabs.operation')} {...a11yProps(0)} />
+            <Tab label={t('tabs.calculation')} {...a11yProps(1)} />
+            <Tab label={t('tabs.recipient')} {...a11yProps(2)} />
           </Tabs>
         </Box>
 
@@ -687,7 +692,7 @@ export default function KostenersatzCalculationPage({
                 onClick={() => setTemplateSaveDialogOpen(true)}
                 size="small"
               >
-                Als Vorlage speichern
+                {t('calculation.saveAsTemplate')}
               </Button>
             )}
             <KostenersatzPdfButton
@@ -702,7 +707,7 @@ export default function KostenersatzCalculationPage({
           {/* Right side: Actions */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
             <Button color="inherit" onClick={handleBack} disabled={isSaving} size="small">
-              Abbrechen
+              {t('calculation.back')}
             </Button>
             {isEditable && (
               <>
@@ -711,7 +716,7 @@ export default function KostenersatzCalculationPage({
                   disabled={isSaving}
                   size="small"
                 >
-                  Speichern
+                  {t('calculation.save')}
                 </Button>
                 <Button
                   variant="contained"
@@ -719,7 +724,7 @@ export default function KostenersatzCalculationPage({
                   disabled={isSaving || !calculation.recipient.name}
                   size="small"
                 >
-                  Abschließen
+                  {t('calculation.complete')}
                 </Button>
               </>
             )}
@@ -731,7 +736,7 @@ export default function KostenersatzCalculationPage({
                   disabled={isSaving || !hasUnsavedChanges}
                   size="small"
                 >
-                  Empfänger speichern
+                  {t('calculation.saveRecipient')}
                 </Button>
                 <Button
                   variant="outlined"
@@ -740,7 +745,7 @@ export default function KostenersatzCalculationPage({
                   disabled={isSaving}
                   size="small"
                 >
-                  Kopieren
+                  {t('calculation.copy')}
                 </Button>
               </>
             )}
@@ -751,7 +756,7 @@ export default function KostenersatzCalculationPage({
               disabled={!calculation.recipient.email || isSaving}
               size="small"
             >
-              E-Mail
+              {t('calculation.email')}
             </Button>
           </Box>
         </Box>
@@ -762,7 +767,7 @@ export default function KostenersatzCalculationPage({
         <KostenersatzEmailDialog
           open={emailDialogOpen}
           onClose={() => setEmailDialogOpen(false)}
-          onSuccess={() => setSuccessMessage('E-Mail wurde erfolgreich gesendet')}
+          onSuccess={() => setSuccessMessage(t('emailSent'))}
           calculation={calculation as KostenersatzCalculation}
           firecall={firecall}
           firecallId={firecallId}
@@ -789,10 +794,10 @@ export default function KostenersatzCalculationPage({
       {/* Confirm Complete Dialog */}
       {confirmCompleteOpen && (
         <ConfirmDialog
-          title="Berechnung abschließen"
-          text="Nach dem Abschließen sind keine Änderungen mehr möglich. Möchten Sie fortfahren?"
-          yes="Abschließen"
-          no="Abbrechen"
+          title={t('calculation.completeTitle')}
+          text={t('calculation.completeConfirm')}
+          yes={t('calculation.complete')}
+          no={tCommon('cancel')}
           onConfirm={(confirmed) => {
             setConfirmCompleteOpen(false);
             if (confirmed) {
@@ -805,10 +810,10 @@ export default function KostenersatzCalculationPage({
       {/* Unsaved Changes Dialog */}
       {confirmBackOpen && (
         <ConfirmDialog
-          title="Ungespeicherte Änderungen"
-          text="Es gibt ungespeicherte Änderungen. Möchten Sie vor dem Verlassen speichern?"
-          yes="Speichern"
-          no="Verwerfen"
+          title={t('calculation.unsavedTitle')}
+          text={t('calculation.unsavedConfirm')}
+          yes={t('calculation.save')}
+          no={t('calculation.discard')}
           onConfirm={(confirmed) => {
             setConfirmBackOpen(false);
             if (confirmed) {

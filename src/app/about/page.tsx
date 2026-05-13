@@ -3,11 +3,13 @@ import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import NextLink from 'next/link';
 import DebugLoggingSwitch from '../../components/logging/DebugLoggingSwitch';
 
 export default function About() {
+  const t = useTranslations('about');
   return (
     <Paper sx={{ p: 2, m: 2 }}>
       <Box sx={{ mb: 2 }}>
@@ -19,17 +21,14 @@ export default function About() {
           priority
           style={{ width: '100%', maxWidth: 400, height: 'auto' }}
         />
-        <Typography variant="h3">About</Typography>
+        <Typography variant="h3">{t('title')}</Typography>
       </Box>
-      <Typography>
-        Diese Webseite zeigt Hydranten im Raum Neusiedl am See an, um diese im
-        Einsatzfall einfach zu lokalisieren.
-      </Typography>
+      <Typography>{t('intro')}</Typography>
       <Typography variant="h4" gutterBottom>
-        Impressum
+        {t('impressum')}
       </Typography>
       <Typography variant="h5">
-        <b>Für den Inhalt verantwortlich</b>
+        <b>{t('responsible')}</b>
       </Typography>
       <Typography>
         Feuerwehr Neusiedl am See
@@ -47,31 +46,27 @@ export default function About() {
           http://www.ff-neusiedlamsee.at/
         </a>
       </Typography>
-      <Typography variant="h5">Urheberrechte</Typography>
+      <Typography variant="h5">{t('copyright')}</Typography>
       <Typography>
-        Texte, Bilder und Grafiken unterliegen dem Schutz des Urheberrechts und
-        anderen Schutzgesetzen, soweit nicht anders angegeben.
+        {t('copyrightBody')}
         <br />
       </Typography>
-      <Typography variant="h5">Haftung</Typography>
-      <Typography>
-        Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung
-        für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten
-        sind ausschließlich deren Betreiber verantwortlich.
-      </Typography>
+      <Typography variant="h5">{t('liability')}</Typography>
+      <Typography>{t('liabilityBody')}</Typography>
 
-      <Typography variant="h5">Datenschutz</Typography>
+      <Typography variant="h5">{t('privacy')}</Typography>
       <Typography>
-        Informationen zur Verarbeitung personenbezogener Daten finden Sie in
-        unserer{' '}
+        {t('privacyIntro')}
         <Link component={NextLink} href="/datenschutz">
-          Datenschutzerklärung
+          {t('privacyLink')}
         </Link>
         .
       </Typography>
 
-      <Typography variant="h5">Version</Typography>
-      <Typography>Build id: {process.env.NEXT_PUBLIC_BUILD_ID}</Typography>
+      <Typography variant="h5">{t('version')}</Typography>
+      <Typography>
+        {t('buildId', { id: process.env.NEXT_PUBLIC_BUILD_ID || '' })}
+      </Typography>
 
       <DebugLoggingSwitch />
     </Paper>

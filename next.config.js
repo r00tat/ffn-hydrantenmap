@@ -4,6 +4,9 @@ const {
   PHASE_DEVELOPMENT_SERVER,
   PHASE_PRODUCTION_BUILD,
 } = require('next/constants');
+const createNextIntlPlugin = require('next-intl/plugin');
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /** @type {(phase: string, defaultConfig: import("next").NextConfig) => Promise<import("next").NextConfig>} */
 module.exports = async (phase) => {
@@ -72,8 +75,8 @@ module.exports = async (phase) => {
       swDest: 'public/firebase-messaging-sw.js',
       swUrl: 'firebase-messaging-sw.js',
     });
-    return withSerwist(nextConfig);
+    return withNextIntl(withSerwist(nextConfig));
   }
 
-  return nextConfig;
+  return withNextIntl(nextConfig);
 };

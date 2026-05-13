@@ -26,6 +26,7 @@ import {
 import { addDoc, deleteDoc, updateDoc } from '../../lib/firestoreClient';
 import moment, { Moment } from 'moment';
 import 'moment/locale/de';
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { Token } from '../../common/token';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -51,6 +52,7 @@ export function TokenDialog({
   token,
   onClose: onDialogClose,
 }: TokenDialogOptions) {
+  const t = useTranslations();
   const user = useFirebaseLogin();
   const [open, setOpen] = useState(true);
   const [description, setDescription] = useState(token?.description || '');
@@ -110,28 +112,28 @@ export function TokenDialog({
       onClose={() => handleClose(false)}
       aria-labelledby="token-dialog-title"
     >
-      <DialogTitle id="token-dialog-title">Token</DialogTitle>
+      <DialogTitle id="token-dialog-title">{t('tokens.dialogTitle')}</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          {token?.id && <>Token: {token.id}</>}
-          Ein Token kann für den API Zugriff auf Geojson (z.B.{' '}
-          <a
-            href="https://lagekarte.info"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            lagekarte.info
-          </a>
-          ) verwendet werden. Die Schnittstelle ist unter https://
-          {window?.location?.hostname}/api/geojson erreichbar. Der Token kann
-          als HTTP GET Parameter oder Authorization Bearer Token verwendet
-          werden.
+          {token?.id && <>{t('tokens.tokenLabel', { id: token.id })}</>}
+          {t.rich('tokens.intro', {
+            host: window?.location?.hostname || '',
+            link: (chunks) => (
+              <a
+                href="https://lagekarte.info"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {chunks}
+              </a>
+            ),
+          })}
         </DialogContentText>
         <TextField
           autoFocus
           margin="dense"
           id="description"
-          label="Beschreibung"
+          label={t('tokens.descriptionLabel')}
           type="text"
           fullWidth
           variant="standard"
@@ -146,7 +148,7 @@ export function TokenDialog({
         />
         <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale="de-DE">
           <DatePicker
-            label="Ablaufdatum (optional)"
+            label={t('tokens.expiresLabel')}
             value={expiresAt}
             onChange={(newValue) => setExpiresAt(newValue)}
             slotProps={{
@@ -157,14 +159,14 @@ export function TokenDialog({
         </LocalizationProvider>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => handleClose(false)}>Abbrechen</Button>
+        <Button onClick={() => handleClose(false)}>{t('common.cancel')}</Button>
         <Button
           onClick={() => handleClose(true)}
           color="primary"
           variant="contained"
           disabled={!description}
         >
-          Ok
+          {t('common.ok')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -176,11 +178,13 @@ async function deleteToken(id: string) {
 }
 
 function TokenExpiration({ expiresAt }: { expiresAt?: string }) {
+  const t = useTranslations('tokens');
   if (!expiresAt) {
     return null;
   }
   const expirationDate = moment(expiresAt);
   const isExpired = expirationDate.isBefore(moment());
+  const formatted = expirationDate.format('DD.MM.YYYY');
   return (
     <Typography
       component="span"
@@ -188,13 +192,14 @@ function TokenExpiration({ expiresAt }: { expiresAt?: string }) {
       sx={{ color: isExpired ? 'error.main' : 'text.secondary', ml: 1 }}
     >
       {isExpired
-        ? `(abgelaufen am ${expirationDate.format('DD.MM.YYYY')})`
-        : `(gültig bis ${expirationDate.format('DD.MM.YYYY')})`}
+        ? t('expired', { date: formatted })
+        : t('validUntil', { date: formatted })}
     </Typography>
   );
 }
 
 export function TokenDisplay({ token }: { token: Token }) {
+  const t = useTranslations('tokens');
   const [display, setDisplay] = useState(false);
   const [edit, setEdit] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
@@ -205,31 +210,31 @@ export function TokenDisplay({ token }: { token: Token }) {
         {token.description}
         <TokenExpiration expiresAt={token.expiresAt} />{' '}
         <IconButton
-          aria-label="show api key"
+          aria-label={t('showApiKey')}
           onClick={() => setDisplay(!display)}
         >
           <VisibilityIcon />
         </IconButton>
-        <IconButton aria-label="edit api key" onClick={() => setEdit(true)}>
+        <IconButton aria-label={t('editApiKey')} onClick={() => setEdit(true)}>
           <EditIcon />
         </IconButton>
         <IconButton
-          aria-label="delete api key"
+          aria-label={t('deleteApiKey')}
           onClick={() => setDeleteDialog(true)}
         >
           <DeleteIcon />
         </IconButton>
         {display && (
           <>
-            API Key: <Typography variant="caption">{token.id}</Typography>
+            {t('apiKey')} <Typography variant="caption">{token.id}</Typography>
           </>
         )}
       </Typography>
       {edit && <TokenDialog onClose={() => setEdit(false)} token={token} />}
       {deleteDialog && (
         <ConfirmDialog
-          title={`Token ${token.description} löschen`}
-          text={`Token ${token.description}  wirklich löschen?`}
+          title={t('deleteTitle', { description: token.description })}
+          text={t('deleteConfirm', { description: token.description })}
           onConfirm={(confirmed: boolean) => {
             if (confirmed && token?.id) {
               deleteToken(token.id);
@@ -243,6 +248,7 @@ export function TokenDisplay({ token }: { token: Token }) {
 }
 
 export default function Tokens() {
+  const t = useTranslations();
   const tokens = useTokens();
   const [addToken, setAddToken] = useState(false);
   const [token, setToken] = useState<Token>();
@@ -250,20 +256,20 @@ export default function Tokens() {
     <>
       <Grid container spacing={2} sx={{ padding: 2 }}>
         <Grid size={{ xs: 12 }}>
-          <Typography variant="h4">API Token</Typography>
+          <Typography variant="h4">{t('tokens.title')}</Typography>
           <Typography>
-            Ein Token kann für den API Zugriff auf Geojson (z.B.{' '}
-            <a
-              href="https://lagekarte.info"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              lagekarte.info
-            </a>
-            ) verwendet werden. Die Schnittstelle ist unter https://
-            {window?.location?.hostname}/api/geojson erreichbar. Der Token kann
-            als HTTP GET Parameter oder Authorization Bearer Token verwendet
-            werden.
+            {t.rich('tokens.intro', {
+              host: window?.location?.hostname || '',
+              link: (chunks) => (
+                <a
+                  href="https://lagekarte.info"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {chunks}
+                </a>
+              ),
+            })}
           </Typography>
         </Grid>
         {tokens.map((token) => (
@@ -292,8 +298,11 @@ export default function Tokens() {
       )}
 
       {token && (
-        <InfoDialog title="Neuer Token" onConfirm={() => setToken(undefined)}>
-          Ein neuer Token {token.description} wurde erstellt:{' '}
+        <InfoDialog
+          title={t('tokens.newTokenTitle')}
+          onConfirm={() => setToken(undefined)}
+        >
+          {t('tokens.newTokenCreated', { description: token.description })}{' '}
           <Typography variant="caption">{token.id}</Typography>
         </InfoDialog>
       )}

@@ -10,6 +10,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 import {
@@ -99,6 +100,8 @@ export default function KostenersatzTemplateDialog({
   isAdmin = false,
   rates = EMPTY_RATES,
 }: KostenersatzTemplateDialogProps) {
+  const t = useTranslations('kostenersatz.templateDialog');
+  const tCommon = useTranslations('common');
   const { vehiclesById } = useKostenersatzVehicles();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -291,12 +294,12 @@ export default function KostenersatzTemplateDialog({
   return (
     <Dialog open={open} onClose={() => onClose()} maxWidth="md" fullWidth>
       <DialogTitle>
-        {existingTemplate?.id ? 'Vorlage bearbeiten' : 'Vorlage speichern'}
+        {existingTemplate?.id ? t('editTitle') : t('saveTitle')}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
-            label="Name der Vorlage"
+            label={t('name')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             fullWidth
@@ -304,7 +307,7 @@ export default function KostenersatzTemplateDialog({
             autoFocus
           />
           <TextField
-            label="Beschreibung (optional)"
+            label={t('description')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             fullWidth
@@ -312,7 +315,7 @@ export default function KostenersatzTemplateDialog({
             rows={2}
           />
           <TextField
-            label="Standarddauer (Stunden)"
+            label={t('defaultHours')}
             type="number"
             value={calculation.defaultStunden}
             onChange={(e) => {
@@ -345,7 +348,7 @@ export default function KostenersatzTemplateDialog({
                   onChange={(e) => setIsShared(e.target.checked)}
                 />
               }
-              label="Für alle Benutzer freigeben (gemeinsame Vorlage)"
+              label={t('shareWithAll')}
             />
           )}
 
@@ -365,7 +368,7 @@ export default function KostenersatzTemplateDialog({
           {calculation.totalSum > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
               <Typography variant="h6">
-                Gesamt: {formatCurrency(calculation.totalSum)}
+                {t('total', { amount: formatCurrency(calculation.totalSum) })}
               </Typography>
             </Box>
           )}
@@ -373,14 +376,14 @@ export default function KostenersatzTemplateDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={() => onClose()} disabled={isSaving}>
-          Abbrechen
+          {tCommon('cancel')}
         </Button>
         <Button
           variant="contained"
           onClick={handleSave}
           disabled={isSaving || !name.trim()}
         >
-          Speichern
+          {tCommon('save')}
         </Button>
       </DialogActions>
     </Dialog>

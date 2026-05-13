@@ -86,6 +86,7 @@
     "nayuki-qr-code-generator": "^1.8.0",
     "next": "16.2.6",
     "next-auth": "^5.0.0-beta.31",
+    "next-intl": "^4.11.2",
     "proj4": "^2.20.6",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.6",
@@ -93,9 +94,13 @@
     "react-firebase-hooks": "^5.1.1",
     "react-google-one-tap-login": "^0.1.1",
     "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-directive": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
-    "simplify-js": "^1.2.4"
+    "simplify-js": "^1.2.4",
+    "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",

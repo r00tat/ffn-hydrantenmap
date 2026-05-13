@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import Paper from '@mui/material/Paper';
 import { styled } from '@mui/material/styles';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import React from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
@@ -52,7 +53,14 @@ const SidebarBox = styled(Box, {
 }));
 
 function FirecallItemDisplay({ item }: { item: FirecallItem }) {
+  const t = useTranslations('common');
+  const tSidebar = useTranslations('sidebar');
+  const tMarkerNames = useTranslations('firecallItem.markerNames');
   const itemInstance = getItemInstance(item);
+  const translatedMarkerName = (() => {
+    const key = (item.type || 'fallback') as Parameters<typeof tMarkerNames>[0];
+    return tMarkerNames.has(key) ? tMarkerNames(key) : itemInstance.markerName();
+  })();
   const { editable, selectFirecallItem } = useMapEditor();
   const [displayUpdateDialog, setDisplayUpdateDialog] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -183,7 +191,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
             </Box>
           }
           action={
-            <Tooltip title="Schließen">
+            <Tooltip title={t('close')}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -205,7 +213,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
           }
           subheader={
             <Typography variant="caption" color="text.secondary">
-              {itemInstance.markerName()}
+              {translatedMarkerName}
             </Typography>
           }
           sx={{ pb: 0 }}
@@ -239,14 +247,14 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 color="text.secondary"
                 sx={{ display: 'block', mt: 2, textAlign: 'center' }}
               >
-                Enter = Speichern · Escape = Abbrechen
+                {tSidebar('editHint')}
               </Typography>
             </Box>
           )}
         </CardContent>
         {editable && item.editable !== false && !isEditing && (
           <CardActions sx={{ pt: 0 }}>
-            <Tooltip title="Bearbeiten">
+            <Tooltip title={t('edit')}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -257,7 +265,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Löschen">
+            <Tooltip title={t('delete')}>
               <IconButton
                 size="small"
                 color="error"
@@ -279,7 +287,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         )}
         {isEditing && (
           <CardActions sx={{ pt: 0 }}>
-            <Tooltip title="Löschen">
+            <Tooltip title={t('delete')}>
               <IconButton
                 size="small"
                 color="error"
@@ -308,8 +316,11 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         )}
         {confirmDelete && (
           <ConfirmDialog
-            title={`${itemInstance.title()} löschen`}
-            text={`${itemInstance.markerName()} "${itemInstance.title()}" wirklich löschen?`}
+            title={tSidebar('deleteTitle', { name: itemInstance.title() })}
+            text={tSidebar('deleteConfirm', {
+              markerName: translatedMarkerName,
+              name: itemInstance.title(),
+            })}
             onConfirm={handleDelete}
           />
         )}
@@ -318,7 +329,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
         open={snackbarOpen}
         autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
-        message="Gespeichert"
+        message={t('saved')}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       />
     </>
@@ -326,6 +337,7 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
 }
 
 export default function MapSidebar() {
+  const t = useTranslations('sidebar');
   const { editable, setEditable, selectedFirecallItem, historyModeActive } =
     useMapEditor();
 
@@ -335,8 +347,7 @@ export default function MapSidebar() {
         {!editable && !selectedFirecallItem && (
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Klicke auf ein Element auf der Karte, um Details anzuzeigen.
-              Aktiviere den Bearbeitungsmodus, um Elemente hinzuzufügen.
+              {t('emptyHint')}
             </Typography>
             {!historyModeActive && (
               <Button
@@ -345,7 +356,7 @@ export default function MapSidebar() {
                 onClick={() => setEditable(true)}
                 fullWidth
               >
-                Bearbeiten aktivieren
+                {t('enableEditing')}
               </Button>
             )}
           </Box>

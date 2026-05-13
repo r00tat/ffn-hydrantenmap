@@ -11,6 +11,7 @@ import Select from '@mui/material/Select';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
@@ -23,14 +24,8 @@ import { FirecallItem } from '../../components/firebase/firestore';
 
 type AiMode = 'assistant' | string;
 
-const AI_MODES: { value: AiMode; label: string }[] = [
-  { value: 'assistant', label: 'Einsatz-Assistent' },
-  ...Object.keys(instructionSet)
-    .filter((key) => key !== 'Standard')
-    .map((key) => ({ value: key, label: key })),
-];
-
 function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
+  const t = useTranslations('ai');
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AiAssistantResult | null>(null);
@@ -66,12 +61,12 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
     <>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
         <TextField
-          label="Frage oder Befehl"
+          label={t('questionLabel')}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           fullWidth
           variant="outlined"
-          placeholder="z.B. 'Wie viele Fahrzeuge sind im Einsatz?' oder 'Erstelle Abschnitt Nord'"
+          placeholder={t('questionPlaceholder')}
           onKeyDown={(e) => {
             if (!isLoading && e.key === 'Enter') {
               askQuestion();
@@ -85,7 +80,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
           disabled={isLoading || !question.trim()}
           sx={{ minWidth: 100, height: 56 }}
         >
-          {isLoading ? <CircularProgress size={24} /> : 'Senden'}
+          {isLoading ? <CircularProgress size={24} /> : t('send')}
         </Button>
       </Stack>
 
@@ -119,6 +114,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
 }
 
 function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string }) {
+  const t = useTranslations('ai');
   const [question, setQuestion] = useState('');
   const {
     resultHtml: answer,
@@ -135,12 +131,12 @@ function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string
     <>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
         <TextField
-          label="Frage"
+          label={t('questionGeneric')}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           fullWidth
           variant="outlined"
-          placeholder="Stelle Fragen oder Aufgaben zum Einsatz"
+          placeholder={t('questionGenericPlaceholder')}
           onKeyDown={(e) => {
             if (!isLoading && e.key === 'Enter') {
               askQuestion();
@@ -154,7 +150,7 @@ function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string
           disabled={isLoading || !question.trim()}
           sx={{ minWidth: 100, height: 56 }}
         >
-          {isLoading ? <CircularProgress size={24} /> : 'Senden'}
+          {isLoading ? <CircularProgress size={24} /> : t('send')}
         </Button>
       </Stack>
 
@@ -171,27 +167,35 @@ function TextGenerationQuery({ systemInstruction }: { systemInstruction?: string
 }
 
 export default function AiAssistantPage() {
+  const t = useTranslations('ai');
   const firecallId = useFirecallId();
   const firecallItems = useFirecallItems();
   const [mode, setMode] = useState<AiMode>('assistant');
 
+  const aiModes: { value: AiMode; label: string }[] = [
+    { value: 'assistant', label: t('modeAssistant') },
+    ...Object.keys(instructionSet)
+      .filter((key) => key !== 'Standard')
+      .map((key) => ({ value: key, label: key })),
+  ];
+
   return (
     <Paper sx={{ p: 2, m: 2 }}>
       <Typography variant="h3" gutterBottom>
-        AI Assistant
+        {t('title')}
       </Typography>
 
       {firecallId != 'unknown' && (
         <>
           <FormControl sx={{ mb: 2, minWidth: 200 }}>
-            <InputLabel id="ai-mode-label">Modus</InputLabel>
+            <InputLabel id="ai-mode-label">{t('mode')}</InputLabel>
             <Select
               labelId="ai-mode-label"
               value={mode}
-              label="Modus"
+              label={t('mode')}
               onChange={(e) => setMode(e.target.value)}
             >
-              {AI_MODES.map((m) => (
+              {aiModes.map((m) => (
                 <MenuItem value={m.value} key={m.value}>
                   {m.label}
                 </MenuItem>

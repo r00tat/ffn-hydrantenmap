@@ -14,6 +14,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import {
   RadiacodeSettings,
@@ -29,19 +30,6 @@ export interface RadiacodeSettingsDialogProps {
   doseReset: () => Promise<void>;
 }
 
-const FIELD_LABELS: Record<keyof RadiacodeSettings, string> = {
-  doseRateAlarm1uRh: 'Dosisleistung-Alarm Stufe 1',
-  doseRateAlarm2uRh: 'Dosisleistung-Alarm Stufe 2',
-  doseAlarm1uR: 'Dosis-Alarm Stufe 1',
-  doseAlarm2uR: 'Dosis-Alarm Stufe 2',
-  soundOn: 'Sound',
-  soundVolume: 'Lautstärke',
-  vibroOn: 'Vibration',
-  ledsOn: 'LEDs',
-  doseUnitsSv: 'Dosis-Einheit (Sv/R)',
-  countRateCpm: 'Zählraten-Einheit (cpm/cps)',
-  doseRateNSvh: 'Dosisleistungs-Einheit (nSv/µSv)',
-};
 
 function uRh_to_uSvh(uRh: number): number {
   return uRh / 100;
@@ -78,6 +66,9 @@ export default function RadiacodeSettingsDialog({
   playSignal,
   doseReset,
 }: RadiacodeSettingsDialogProps) {
+  const t = useTranslations('radiacode.settingsDialog');
+  const tCommon = useTranslations('common');
+  const tFields = useTranslations('radiacode.settingsDialog.fieldLabels');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initial, setInitial] = useState<Partial<RadiacodeSettings> | null>(
@@ -143,7 +134,7 @@ export default function RadiacodeSettingsDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Geräte-Einstellungen</DialogTitle>
+      <DialogTitle>{t('title')}</DialogTitle>
       <DialogContent>
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
@@ -166,10 +157,10 @@ export default function RadiacodeSettingsDialog({
               current.doseRateAlarm2uRh !== undefined ||
               current.doseAlarm1uR !== undefined ||
               current.doseAlarm2uR !== undefined) && (
-              <Section title="Alarm-Schwellen">
+              <Section title={t('alarmThresholds')}>
                 {current.doseRateAlarm1uRh !== undefined && (
                   <TextField
-                    label="Dosisleistung Stufe 1 (µSv/h)"
+                    label={t('doseRateLevel1')}
                     type="number"
                     value={uRh_to_uSvh(current.doseRateAlarm1uRh)}
                     onChange={(e) =>
@@ -182,7 +173,7 @@ export default function RadiacodeSettingsDialog({
                 )}
                 {current.doseRateAlarm2uRh !== undefined && (
                   <TextField
-                    label="Dosisleistung Stufe 2 (µSv/h)"
+                    label={t('doseRateLevel2')}
                     type="number"
                     value={uRh_to_uSvh(current.doseRateAlarm2uRh)}
                     onChange={(e) =>
@@ -195,7 +186,7 @@ export default function RadiacodeSettingsDialog({
                 )}
                 {current.doseAlarm1uR !== undefined && (
                   <TextField
-                    label="Gesamtdosis Stufe 1 (µSv)"
+                    label={t('doseLevel1')}
                     type="number"
                     value={uR_to_uSv(current.doseAlarm1uR)}
                     onChange={(e) =>
@@ -208,7 +199,7 @@ export default function RadiacodeSettingsDialog({
                 )}
                 {current.doseAlarm2uR !== undefined && (
                   <TextField
-                    label="Gesamtdosis Stufe 2 (µSv)"
+                    label={t('doseLevel2')}
                     type="number"
                     value={uR_to_uSv(current.doseAlarm2uR)}
                     onChange={(e) =>
@@ -225,7 +216,7 @@ export default function RadiacodeSettingsDialog({
               current.soundVolume !== undefined ||
               current.vibroOn !== undefined ||
               current.ledsOn !== undefined) && (
-              <Section title="Signalisierung">
+              <Section title={t('signaling')}>
                 {current.soundOn !== undefined && (
                   <FormControlLabel
                     control={
@@ -236,13 +227,13 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="Sound"
+                    label={t('sound')}
                   />
                 )}
                 {current.soundVolume !== undefined && (
                   <Box sx={{ px: 2, mb: 1 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Lautstärke: {current.soundVolume}
+                      {t('volume', { value: current.soundVolume })}
                     </Typography>
                     <Slider
                       value={current.soundVolume}
@@ -267,7 +258,7 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="Vibration"
+                    label={t('vibration')}
                   />
                 )}
                 {current.ledsOn !== undefined && (
@@ -280,7 +271,7 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="LEDs"
+                    label={t('leds')}
                   />
                 )}
               </Section>
@@ -288,7 +279,7 @@ export default function RadiacodeSettingsDialog({
             {(current.doseUnitsSv !== undefined ||
               current.countRateCpm !== undefined ||
               current.doseRateNSvh !== undefined) && (
-              <Section title="Einheiten">
+              <Section title={t('units')}>
                 {current.doseUnitsSv !== undefined && (
                   <FormControlLabel
                     control={
@@ -299,7 +290,7 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="Dosis in Sv (statt R)"
+                    label={t('doseInSv')}
                   />
                 )}
                 {current.countRateCpm !== undefined && (
@@ -312,7 +303,7 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="Zählrate in cpm (statt cps)"
+                    label={t('countRateCpm')}
                   />
                 )}
                 {current.doseRateNSvh !== undefined && (
@@ -325,38 +316,41 @@ export default function RadiacodeSettingsDialog({
                         }
                       />
                     }
-                    label="Dosisleistung in nSv/h (statt µSv/h)"
+                    label={t('doseRateNSvh')}
                   />
                 )}
               </Section>
             )}
             {unsupportedFields.length > 0 && (
               <Alert severity="info">
-                Dein Radiacode unterstützt{' '}
-                {unsupportedFields.length === 1 ? 'diese Einstellung' : 'diese Einstellungen'}
-                {' '}nicht:{' '}
-                {unsupportedFields.map((k) => FIELD_LABELS[k]).join(', ')}.
+                {unsupportedFields.length === 1
+                  ? t('unsupportedSingle', {
+                      fields: unsupportedFields.map((k) => tFields(k)).join(', '),
+                    })
+                  : t('unsupportedMulti', {
+                      fields: unsupportedFields.map((k) => tFields(k)).join(', '),
+                    })}
               </Alert>
             )}
           </Stack>
         )}
-        <Section title="Aktionen">
+        <Section title={t('actions')}>
           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
             <Button onClick={() => void playSignal()}>
-              Signalton abspielen
+              {t('playSignal')}
             </Button>
             <ConfirmDoseResetButton doseReset={doseReset} />
           </Stack>
         </Section>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Abbrechen</Button>
+        <Button onClick={onClose}>{tCommon('cancel')}</Button>
         <Button
           variant="contained"
           disabled={!hasChanges || saving}
           onClick={handleSave}
         >
-          Speichern
+          {tCommon('save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -385,17 +379,18 @@ function ConfirmDoseResetButton({
 }: {
   doseReset: () => Promise<void>;
 }) {
+  const t = useTranslations('radiacode.settingsDialog');
   const [confirming, setConfirming] = useState(false);
   if (!confirming) {
     return (
       <Button color="warning" onClick={() => setConfirming(true)}>
-        Dosis zurücksetzen
+        {t('doseReset')}
       </Button>
     );
   }
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-      <Typography variant="body2">Wirklich zurücksetzen?</Typography>
+      <Typography variant="body2">{t('doseResetConfirm')}</Typography>
       <Button
         color="warning"
         variant="contained"
@@ -404,9 +399,9 @@ function ConfirmDoseResetButton({
           setConfirming(false);
         }}
       >
-        Ja
+        {t('yes')}
       </Button>
-      <Button onClick={() => setConfirming(false)}>Nein</Button>
+      <Button onClick={() => setConfirming(false)}>{t('no')}</Button>
     </Stack>
   );
 }
