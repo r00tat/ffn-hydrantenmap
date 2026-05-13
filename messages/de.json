@@ -293,6 +293,34 @@
       "statusFailed": "fehlgeschlagen",
       "statusExpired": "abgelaufen"
     },
+    "templateSelector": {
+      "title": "Vorlage auswählen",
+      "loading": "Laden...",
+      "myTemplates": "Meine Vorlagen",
+      "sharedTemplates": "Gemeinsame Vorlagen",
+      "noTemplates": "Keine Vorlagen vorhanden",
+      "noTemplatesHint": "Speichern Sie eine Berechnung als Vorlage, um sie hier zu sehen.",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "secondary": "{count} Positionen{withDefault, select, true {, {hours}h} other {}}",
+      "deleteTitle": "Vorlage löschen?",
+      "deleteConfirm": "Möchten Sie die Vorlage \"{name}\" wirklich löschen?"
+    },
+    "itemRow": {
+      "amountShort": "Anz:",
+      "hoursShort": "h:",
+      "byEffort": "nach Aufwand",
+      "pricePerHour": "{price}/h",
+      "pricePerHourFlat": "{price}/h • {flat} pauschal",
+      "overrideTooltipOn": "Individuelle Stunden - Klicken zum Zurücksetzen",
+      "overrideTooltipOff": "Standard-Stunden verwenden - Klicken für individuelle Stunden"
+    },
+    "accordion": {
+      "position": "Position",
+      "amount": "Anzahl",
+      "hours": "Stunden",
+      "sum": "Summe"
+    },
     "admin": {
       "title": "Kostenersatz Einstellungen",
       "tabRates": "Tarife",

@@ -293,6 +293,34 @@
       "statusFailed": "failed",
       "statusExpired": "expired"
     },
+    "templateSelector": {
+      "title": "Select template",
+      "loading": "Loading...",
+      "myTemplates": "My templates",
+      "sharedTemplates": "Shared templates",
+      "noTemplates": "No templates yet",
+      "noTemplatesHint": "Save a calculation as a template to see it here.",
+      "edit": "Edit",
+      "delete": "Delete",
+      "secondary": "{count} items{withDefault, select, true {, {hours}h} other {}}",
+      "deleteTitle": "Delete template?",
+      "deleteConfirm": "Really delete template \"{name}\"?"
+    },
+    "itemRow": {
+      "amountShort": "Qty:",
+      "hoursShort": "h:",
+      "byEffort": "by effort",
+      "pricePerHour": "{price}/h",
+      "pricePerHourFlat": "{price}/h • {flat} flat",
+      "overrideTooltipOn": "Custom hours - click to reset",
+      "overrideTooltipOff": "Use default hours - click for custom hours"
+    },
+    "accordion": {
+      "position": "Position",
+      "amount": "Quantity",
+      "hours": "Hours",
+      "sum": "Total"
+    },
     "admin": {
       "title": "Cost recovery settings",
       "tabRates": "Tariffs",

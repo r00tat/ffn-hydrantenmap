@@ -6,6 +6,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import {
   formatCurrency,
@@ -53,6 +54,7 @@ export default function KostenersatzCategoryAccordion({
   customItemsTotal = 0,
   children,
 }: KostenersatzCategoryAccordionProps) {
+  const t = useTranslations('kostenersatz.accordion');
   // Calculate subtotal for this category (including custom items if provided)
   const rateSubtotal = calculation.subtotals[String(categoryNumber)] || 0;
   const subtotal = rateSubtotal + customItemsTotal;
@@ -148,14 +150,14 @@ export default function KostenersatzCategoryAccordion({
               color="text.secondary"
               sx={{ flex: 2 }}
             >
-              Position
+              {t('position')}
             </Typography>
             <Typography
               variant="caption"
               color="text.secondary"
               sx={{ width: 70, textAlign: 'right' }}
             >
-              Anzahl
+              {t('amount')}
             </Typography>
             {hasHourlyRates && (
               <Typography
@@ -163,7 +165,7 @@ export default function KostenersatzCategoryAccordion({
                 color="text.secondary"
                 sx={{ width: 90, textAlign: 'right' }}
               >
-                Stunden
+                {t('hours')}
               </Typography>
             )}
             <Typography
@@ -171,7 +173,7 @@ export default function KostenersatzCategoryAccordion({
               color="text.secondary"
               sx={{ width: 80, textAlign: 'right' }}
             >
-              Summe
+              {t('sum')}
             </Typography>
           </Box>
 
