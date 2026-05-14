@@ -556,7 +556,7 @@
     },
     "dosisNomogramm": {
       "title": "Dosis-Nomogramm (FM 3-3-1)",
-      "description": "Fünf Skalen: D, R₁, Bezugslinie M, Ts, Te. Schritt 1 (Te→Bezugslinie→Ts) ermittelt den Multiplikator M; Schritt 2 (Bezugslinie→R₁→D) liefert die Gesamtdosis D = R₁ · M.",
+      "description": "Fünf Skalen: D, R₁, Bezugslinie M, Ts (Kurve), Te (Diagonale). Schritt 1 (gerade Linie Te → Ts → Bezugslinie) ermittelt den Multiplikator M; Schritt 2 (gerade Linie Bezugslinie → R₁ → D) liefert die Gesamtdosis D = R₁ · M.",
       "axisD": "Dosis D",
       "axisDSub": "(mSv)",
       "axisR1": "R₁",
@@ -569,8 +569,8 @@
       "axisTeSub": "Eintritt (h)",
       "legendInput": "Eingabe",
       "legendComputed": "Berechnet",
-      "legendStep1": "Schritt 1: Te → M → Ts",
-      "legendStep2": "Schritt 2: M → R₁ → D"
+      "legendStep1": "Schritt 1: Te → Ts → Bezugslinie",
+      "legendStep2": "Schritt 2: Bezugslinie → R₁ → D"
     },
     "dosisleistungsNomogramm": {
       "title": "Dosisleistungs-Nomogramm",

@@ -556,7 +556,7 @@
     },
     "dosisNomogramm": {
       "title": "Dose nomogram (FM 3-3-1)",
-      "description": "Five scales: D, R₁, reference line M, Ts, Te. Step 1 (Te → reference line → Ts) reads the multiplier M; step 2 (reference line → R₁ → D) yields the total dose D = R₁ · M.",
+      "description": "Five scales: D, R₁, reference line M, Ts (curve), Te (diagonal). Step 1 (straight line Te → Ts → reference line) reads the multiplier M; step 2 (straight line reference line → R₁ → D) yields the total dose D = R₁ · M.",
       "axisD": "Dose D",
       "axisDSub": "(mSv)",
       "axisR1": "R₁",
@@ -569,8 +569,8 @@
       "axisTeSub": "Entry (h)",
       "legendInput": "Input",
       "legendComputed": "Computed",
-      "legendStep1": "Step 1: Te → M → Ts",
-      "legendStep2": "Step 2: M → R₁ → D"
+      "legendStep1": "Step 1: Te → Ts → reference line",
+      "legendStep2": "Step 2: reference line → R₁ → D"
     },
     "dosisleistungsNomogramm": {
       "title": "Dose-rate nomogram",

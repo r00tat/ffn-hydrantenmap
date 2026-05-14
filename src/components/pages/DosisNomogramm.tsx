@@ -9,17 +9,22 @@ import {
   inRangeD,
   inRangeM,
   inRangeR1,
-  inRangeTime,
+  inRangeTe,
+  inRangeTs,
   mFromDoseAndR1,
   mFromTeTs,
   TOP,
   VB_H,
   VB_W,
   X_D,
-  X_PIVOT,
+  X_M,
   X_R1,
-  X_TE,
-  X_TS,
+  X_TE_BOTTOM,
+  X_TE_TOP,
+  xTe,
+  xTs,
+  Y_TE_BOTTOM,
+  Y_TE_TOP,
   yD,
   yPivot,
   yR1,
@@ -42,12 +47,13 @@ export interface DosisNomogrammProps {
   dIsComputed: boolean;
 }
 
-const D_TICKS = [0.01, 0.1, 1, 10, 100, 1000, 10000];
-const R1_TICKS = [0.01, 0.1, 1, 10, 100, 1000, 10000];
-const M_TICKS = [0.001, 0.01, 0.1, 1, 10];
-const T_TICKS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 100, 1000];
+const D_TICKS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+const R1_TICKS = [1, 10, 100, 1000, 10000, 100000];
+const M_TICKS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
+const TE_TICKS = [0.5, 1, 2, 5, 10, 24, 48, 120, 240, 720];
+const TS_TICKS = [0.5, 1, 2, 4, 6, 8, 12, 16, 24];
 
-function fmtNum(v: number): string {
+function fmtTick(v: number): string {
   if (v >= 1000) return `${v / 1000}k`;
   if (v >= 1) return v.toString();
   return v.toString();
@@ -106,31 +112,38 @@ export default function DosisNomogramm({
   const grid = theme.palette.divider;
   const inputCol = theme.palette.primary.main;
   const computedCol = theme.palette.warning.main;
-  const stepCol1 = theme.palette.primary.main;
-  const stepCol2 = theme.palette.secondary.main;
+  // Schritt 1: blau (Te → Ts → Bezugslinie)
+  const stepCol1 = '#2962ff';
+  // Schritt 2: rot (Bezugslinie → R₁ → D)
+  const stepCol2 = '#d32f2f';
   const pointStroke = theme.palette.background.paper;
 
   function colorFor(isComputed: boolean): string {
     return isComputed ? computedCol : inputCol;
   }
 
-  // Compute M from each path (if data sufficient)
   const mFromTime =
-    inRangeTime(te) && inRangeTime(ts) ? mFromTeTs(te, ts) : null;
+    inRangeTe(te) && inRangeTs(ts) ? mFromTeTs(te, ts) : null;
   const mFromDose =
     inRangeD(d) && inRangeR1(r1) ? mFromDoseAndR1(d, r1) : null;
 
-  // Step 1 construction line: Te ↔ Pivot ↔ Ts (when both Te and Ts known)
+  // Schritt 1: gerade Linie von Te über Ts zur Bezugslinie
   const showStep1 =
-    inRangeTime(te) && inRangeTime(ts) && mFromTime !== null && inRangeM(mFromTime);
+    inRangeTe(te) &&
+    inRangeTs(ts) &&
+    mFromTime !== null &&
+    inRangeM(mFromTime);
 
-  // Step 2 construction line: Pivot ↔ R₁ ↔ D
+  // Schritt 2: gerade Linie von Bezugslinie über R₁ zur Dosis
   const mForStep2 = mFromDose ?? mFromTime;
   const showStep2 =
     inRangeD(d) &&
     inRangeR1(r1) &&
     mForStep2 !== null &&
     inRangeM(mForStep2);
+
+  // M-Punkt: gemeinsamer Punkt beider Konstruktionslinien
+  const mPoint = mForStep2 ?? mFromTime;
 
   return (
     <Box sx={{ mt: 2 }}>
@@ -157,39 +170,109 @@ export default function DosisNomogramm({
           xmlns="http://www.w3.org/2000/svg"
           style={{ width: '100%', height: 'auto', display: 'block' }}
         >
-          {/* Titles */}
-          {[
-            { x: X_D, label: t('axisD'), sub: t('axisDSub') },
-            { x: X_R1, label: t('axisR1'), sub: t('axisR1Sub') },
-            { x: X_PIVOT, label: t('axisPivot'), sub: t('axisPivotSub') },
-            { x: X_TS, label: t('axisTs'), sub: t('axisTsSub') },
-            { x: X_TE, label: t('axisTe'), sub: t('axisTeSub') },
-          ].map(({ x, label, sub }) => (
-            <g key={`title-${x}`}>
-              <text
-                x={x}
-                y={TOP - 40}
-                textAnchor="middle"
-                fill={fg}
-                fontSize="13"
-                fontWeight="bold"
-              >
-                {label}
-              </text>
-              <text
-                x={x}
-                y={TOP - 24}
-                textAnchor="middle"
-                fill={fgSub}
-                fontSize="10"
-              >
-                {sub}
-              </text>
-            </g>
-          ))}
+          {/* === Titel der Skalen === */}
+          <text
+            x={X_D}
+            y={TOP - 40}
+            textAnchor="middle"
+            fill={fg}
+            fontSize="13"
+            fontWeight="bold"
+          >
+            {t('axisD')}
+          </text>
+          <text
+            x={X_D}
+            y={TOP - 24}
+            textAnchor="middle"
+            fill={fgSub}
+            fontSize="10"
+          >
+            {t('axisDSub')}
+          </text>
 
-          {/* Vertical axes */}
-          {[X_D, X_R1, X_PIVOT, X_TS, X_TE].map((x) => (
+          <text
+            x={X_R1}
+            y={TOP - 40}
+            textAnchor="middle"
+            fill={fg}
+            fontSize="13"
+            fontWeight="bold"
+          >
+            {t('axisR1')}
+          </text>
+          <text
+            x={X_R1}
+            y={TOP - 24}
+            textAnchor="middle"
+            fill={fgSub}
+            fontSize="10"
+          >
+            {t('axisR1Sub')}
+          </text>
+
+          <text
+            x={X_M}
+            y={TOP - 40}
+            textAnchor="middle"
+            fill={fg}
+            fontSize="13"
+            fontWeight="bold"
+          >
+            {t('axisPivot')}
+          </text>
+          <text
+            x={X_M}
+            y={TOP - 24}
+            textAnchor="middle"
+            fill={fgSub}
+            fontSize="10"
+          >
+            {t('axisPivotSub')}
+          </text>
+
+          <text
+            x={xTs(8)}
+            y={TOP - 40}
+            textAnchor="middle"
+            fill={fg}
+            fontSize="13"
+            fontWeight="bold"
+          >
+            {t('axisTs')}
+          </text>
+          <text
+            x={xTs(8)}
+            y={TOP - 24}
+            textAnchor="middle"
+            fill={fgSub}
+            fontSize="10"
+          >
+            {t('axisTsSub')}
+          </text>
+
+          <text
+            x={X_TE_TOP}
+            y={TOP - 40}
+            textAnchor="middle"
+            fill={fg}
+            fontSize="13"
+            fontWeight="bold"
+          >
+            {t('axisTe')}
+          </text>
+          <text
+            x={X_TE_TOP}
+            y={TOP - 24}
+            textAnchor="middle"
+            fill={fgSub}
+            fontSize="10"
+          >
+            {t('axisTeSub')}
+          </text>
+
+          {/* === Vertikale Achsen (D, R₁, M) === */}
+          {[X_D, X_R1, X_M].map((x) => (
             <line
               key={`axis-${x}`}
               x1={x}
@@ -201,7 +284,25 @@ export default function DosisNomogramm({
             />
           ))}
 
-          {/* D ticks */}
+          {/* === Diagonale Te-Achse === */}
+          <line
+            x1={X_TE_TOP}
+            y1={Y_TE_TOP}
+            x2={X_TE_BOTTOM}
+            y2={Y_TE_BOTTOM}
+            stroke={fg}
+            strokeWidth="1.5"
+          />
+
+          {/* === Gekrümmte Ts-Achse (als Polyline durch die Tick-Werte) === */}
+          <polyline
+            points={TS_TICKS.map((v) => `${xTs(v)},${yTs(v)}`).join(' ')}
+            fill="none"
+            stroke={fg}
+            strokeWidth="1.5"
+          />
+
+          {/* === D-Ticks === */}
           {D_TICKS.map((v) => {
             const y = yD(v);
             return (
@@ -221,13 +322,13 @@ export default function DosisNomogramm({
                   fill={fg}
                   fontSize="10"
                 >
-                  {fmtNum(v)}
+                  {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* R₁ ticks */}
+          {/* === R₁-Ticks === */}
           {R1_TICKS.map((v) => {
             const y = yR1(v);
             return (
@@ -247,138 +348,128 @@ export default function DosisNomogramm({
                   fill={fg}
                   fontSize="10"
                 >
-                  {fmtNum(v)}
+                  {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* Pivot ticks */}
+          {/* === M-Ticks (Bezugslinie) === */}
           {M_TICKS.map((v) => {
             const y = yPivot(v);
             return (
               <g key={`m-${v}`}>
                 <line
-                  x1={X_PIVOT - 5}
+                  x1={X_M - 5}
                   y1={y}
-                  x2={X_PIVOT + 5}
+                  x2={X_M + 5}
                   y2={y}
                   stroke={fg}
                   strokeWidth="1"
                 />
                 <text
-                  x={X_PIVOT - 8}
+                  x={X_M - 8}
                   y={y + 4}
                   textAnchor="end"
                   fill={fg}
                   fontSize="10"
                 >
-                  {fmtNum(v)}
+                  {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* Ts ticks */}
-          {T_TICKS.map((v) => {
+          {/* === Ts-Ticks (entlang der Kurve) === */}
+          {TS_TICKS.map((v) => {
+            const x = xTs(v);
             const y = yTs(v);
             return (
               <g key={`ts-${v}`}>
                 <line
-                  x1={X_TS - 5}
+                  x1={x - 5}
                   y1={y}
-                  x2={X_TS + 5}
+                  x2={x + 5}
                   y2={y}
                   stroke={fg}
                   strokeWidth="1"
                 />
                 <text
-                  x={X_TS + 8}
+                  x={x + 8}
                   y={y + 4}
                   textAnchor="start"
                   fill={fg}
                   fontSize="10"
                 >
-                  {fmtNum(v)}
+                  {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* Te ticks */}
-          {T_TICKS.map((v) => {
+          {/* === Te-Ticks (entlang der Diagonalen) === */}
+          {TE_TICKS.map((v) => {
+            const x = xTe(v);
             const y = yTe(v);
+            // Senkrechte Tickmarken zur Diagonalen
+            const dx = X_TE_BOTTOM - X_TE_TOP;
+            const dy = Y_TE_BOTTOM - Y_TE_TOP;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const nx = -dy / len;
+            const ny = dx / len;
+            const tickLen = 5;
             return (
               <g key={`te-${v}`}>
                 <line
-                  x1={X_TE - 5}
-                  y1={y}
-                  x2={X_TE + 5}
-                  y2={y}
+                  x1={x - nx * tickLen}
+                  y1={y - ny * tickLen}
+                  x2={x + nx * tickLen}
+                  y2={y + ny * tickLen}
                   stroke={fg}
                   strokeWidth="1"
                 />
                 <text
-                  x={X_TE + 8}
-                  y={y + 4}
+                  x={x + nx * (tickLen + 4)}
+                  y={y + ny * (tickLen + 4) + 4}
                   textAnchor="start"
                   fill={fg}
                   fontSize="10"
                 >
-                  {fmtNum(v)}
+                  {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* === Construction lines === */}
-          {/* Step 1: Te → Pivot → Ts (V-Shape through pivot at M_time) */}
+          {/* === Konstruktionslinien (gerade Linien) === */}
+
+          {/* Schritt 1 (blau): Te → Ts → Bezugslinie M */}
           {showStep1 && (
-            <>
-              <line
-                x1={X_TE}
-                y1={yTe(te)}
-                x2={X_PIVOT}
-                y2={yPivot(mFromTime)}
-                stroke={stepCol1}
-                strokeWidth="2"
-              />
-              <line
-                x1={X_PIVOT}
-                y1={yPivot(mFromTime)}
-                x2={X_TS}
-                y2={yTs(ts)}
-                stroke={stepCol1}
-                strokeWidth="2"
-              />
-            </>
+            <line
+              x1={xTe(te)}
+              y1={yTe(te)}
+              x2={X_M}
+              y2={yPivot(mFromTime)}
+              stroke={stepCol1}
+              strokeWidth="2"
+              strokeDasharray="6,3"
+            />
           )}
 
-          {/* Step 2: Pivot → R₁ → D */}
+          {/* Schritt 2 (rot): Bezugslinie M → R₁ → D */}
           {showStep2 && (
-            <>
-              <line
-                x1={X_PIVOT}
-                y1={yPivot(mForStep2)}
-                x2={X_R1}
-                y2={yR1(r1)}
-                stroke={stepCol2}
-                strokeWidth="2"
-                strokeDasharray="6,3"
-              />
-              <line
-                x1={X_R1}
-                y1={yR1(r1)}
-                x2={X_D}
-                y2={yD(d)}
-                stroke={stepCol2}
-                strokeWidth="2"
-                strokeDasharray="6,3"
-              />
-            </>
+            <line
+              x1={X_M}
+              y1={yPivot(mForStep2)}
+              x2={X_D}
+              y2={yD(d)}
+              stroke={stepCol2}
+              strokeWidth="2"
+              strokeDasharray="6,3"
+            />
           )}
 
-          {/* === Points (with labels) === */}
+          {/* === Punkte === */}
           {inRangeD(d) && (
             <>
               <ScalePoint
@@ -423,40 +514,39 @@ export default function DosisNomogramm({
             </>
           )}
 
-          {/* Pivot point — drawn if M from either path is in range */}
-          {mForStep2 !== null && inRangeM(mForStep2) && (
+          {mPoint !== null && inRangeM(mPoint) && (
             <>
               <ScalePoint
-                cx={X_PIVOT}
-                cy={yPivot(mForStep2)}
+                cx={X_M}
+                cy={yPivot(mPoint)}
                 fill={computedCol}
                 stroke={pointStroke}
                 isComputed={true}
               />
               <text
-                x={X_PIVOT + 14}
-                y={yPivot(mForStep2) - 8}
+                x={X_M + 14}
+                y={yPivot(mPoint) - 8}
                 textAnchor="start"
                 fill={computedCol}
                 fontSize="11"
                 fontWeight="bold"
               >
-                M = {fmtVal(mForStep2, 3)}
+                M = {fmtVal(mPoint, 3)}
               </text>
             </>
           )}
 
-          {inRangeTime(ts) && (
+          {inRangeTs(ts) && (
             <>
               <ScalePoint
-                cx={X_TS}
+                cx={xTs(ts)}
                 cy={yTs(ts)}
                 fill={colorFor(tsIsComputed)}
                 stroke={pointStroke}
                 isComputed={tsIsComputed}
               />
               <text
-                x={X_TS + 18}
+                x={xTs(ts) + 18}
                 y={yTs(ts) - 8}
                 textAnchor="start"
                 fill={colorFor(tsIsComputed)}
@@ -468,17 +558,17 @@ export default function DosisNomogramm({
             </>
           )}
 
-          {inRangeTime(te) && (
+          {inRangeTe(te) && (
             <>
               <ScalePoint
-                cx={X_TE}
+                cx={xTe(te)}
                 cy={yTe(te)}
                 fill={colorFor(teIsComputed)}
                 stroke={pointStroke}
                 isComputed={teIsComputed}
               />
               <text
-                x={X_TE + 18}
+                x={xTe(te) + 18}
                 y={yTe(te) - 8}
                 textAnchor="start"
                 fill={colorFor(teIsComputed)}
@@ -490,7 +580,7 @@ export default function DosisNomogramm({
             </>
           )}
 
-          {/* Legend */}
+          {/* === Legende === */}
           <g transform={`translate(20, ${VB_H - 40})`}>
             <circle cx={8} cy={6} r={5} fill={inputCol} stroke={pointStroke} />
             <text x={20} y={10} fill={fg} fontSize="11">
@@ -512,20 +602,21 @@ export default function DosisNomogramm({
               y2={6}
               stroke={stepCol1}
               strokeWidth="2"
+              strokeDasharray="6,3"
             />
             <text x={230} y={10} fill={fg} fontSize="11">
               {t('legendStep1')}
             </text>
             <line
-              x1={330}
+              x1={380}
               y1={6}
-              x2={354}
+              x2={404}
               y2={6}
               stroke={stepCol2}
               strokeWidth="2"
               strokeDasharray="6,3"
             />
-            <text x={360} y={10} fill={fg} fontSize="11">
+            <text x={410} y={10} fill={fg} fontSize="11">
               {t('legendStep2')}
             </text>
           </g>
