@@ -23,6 +23,7 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import {
   ChangeEvent,
@@ -62,6 +63,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
   const firecall = useFirecall();
   const { messages, displayMessages, setDisplayMessages } = useDebugLogging();
   const showSnackbar = useSnackbar();
+  const t = useTranslations('bugReport');
 
   const [kind, setKind] = useState<BugReportKind>('bug');
   const [title, setTitle] = useState('');
@@ -194,12 +196,12 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
         attachments: attachmentResults,
       });
 
-      showSnackbar('Danke! Dein Report wurde gesendet.', 'success');
+      showSnackbar(t('submitSuccess'), 'success');
       onClose();
     } catch (err) {
       console.error('Bug report submit failed', err);
-      showSnackbar('Senden fehlgeschlagen', 'error', {
-        label: 'Nochmal',
+      showSnackbar(t('submitFailed'), 'error', {
+        label: t('retry'),
         onClick: () => handleSubmit(),
       });
     } finally {
@@ -215,6 +217,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
     description,
     showSnackbar,
     onClose,
+    t,
   ]);
 
   return (
@@ -230,7 +233,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
       <DialogTitle>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <BugReportIcon />
-          <span>Feedback / Bug melden</span>
+          <span>{t('dialogTitle')}</span>
         </Stack>
       </DialogTitle>
       <DialogContent>
@@ -241,45 +244,42 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
             onChange={(_e, next) => {
               if (next === 'bug' || next === 'feature') setKind(next);
             }}
-            aria-label="Art des Reports"
+            aria-label={t('kindAriaLabel')}
             size="small"
           >
-            <ToggleButton value="bug" aria-label="Bug">
-              Bug
+            <ToggleButton value="bug" aria-label={t('kindBug')}>
+              {t('kindBug')}
             </ToggleButton>
-            <ToggleButton value="feature" aria-label="Feature Request">
-              Feature Request
+            <ToggleButton value="feature" aria-label={t('kindFeature')}>
+              {t('kindFeature')}
             </ToggleButton>
           </ToggleButtonGroup>
 
           {kind === 'bug' && !displayMessages && (
             <Alert severity="info">
               <Stack spacing={1}>
-                <Typography variant="body2">
-                  Für eine bessere Analyse hilft es, Debug-Logging zu
-                  aktivieren und den Fehler dann nochmal zu reproduzieren.
-                </Typography>
+                <Typography variant="body2">{t('debugHint')}</Typography>
                 <FormControlLabel
                   control={
                     <Switch
                       checked={false}
                       onChange={(_e, checked) => setDisplayMessages(checked)}
                       slotProps={{
-                        input: { 'aria-label': 'Debug-Logging aktivieren' },
+                        input: { 'aria-label': t('enableDebugLogging') },
                       }}
                     />
                   }
-                  label="Debug-Logging aktivieren"
+                  label={t('enableDebugLogging')}
                 />
               </Stack>
             </Alert>
           )}
           {kind === 'bug' && displayMessages && (
-            <Alert severity="success">Debug-Logging ist aktiv.</Alert>
+            <Alert severity="success">{t('debugLoggingActive')}</Alert>
           )}
 
           <TextField
-            label="Titel"
+            label={t('titleLabel')}
             required
             autoFocus
             fullWidth
@@ -288,7 +288,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
             slotProps={{ htmlInput: { maxLength: 200 } }}
           />
           <TextField
-            label="Beschreibung"
+            label={t('descriptionLabel')}
             required
             fullWidth
             multiline
@@ -299,7 +299,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
 
           <Box>
             <Typography variant="subtitle2" gutterBottom>
-              Anhänge
+              {t('attachments')}
             </Typography>
             <Stack
               direction="row"
@@ -315,7 +315,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                   onClick={handleCaptureScreenshot}
                   disabled={submitting}
                 >
-                  Bildschirmaufnahme machen
+                  {t('captureScreenshot')}
                 </Button>
               )}
               <Button
@@ -325,7 +325,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                 component="label"
                 disabled={submitting}
               >
-                Bilder hinzufügen
+                {t('addImages')}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -367,7 +367,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                     />
                     <IconButton
                       size="small"
-                      aria-label="Screenshot entfernen"
+                      aria-label={t('removeScreenshot')}
                       onClick={() => removeScreenshot(idx)}
                       sx={{
                         position: 'absolute',
@@ -402,7 +402,7 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
                     />
                     <IconButton
                       size="small"
-                      aria-label="Anhang entfernen"
+                      aria-label={t('removeAttachment')}
                       onClick={() => removeAttachment(idx)}
                       sx={{
                         position: 'absolute',
@@ -421,25 +421,25 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
 
           <Accordion disableGutters elevation={0}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="body2">Erfasste Kontextdaten</Typography>
+              <Typography variant="body2">{t('capturedContext')}</Typography>
             </AccordionSummary>
             <AccordionDetails>
               {snapshot ? (
                 <Box>
                   <Typography variant="caption" component="div">
-                    URL: {snapshot.context.url}
+                    {t('urlLabel')}: {snapshot.context.url}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    Build: {snapshot.context.buildId || '-'}
+                    {t('buildLabel')}: {snapshot.context.buildId || '-'}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    Plattform: {snapshot.context.platform}
+                    {t('platformLabel')}: {snapshot.context.platform}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    Firecall: {snapshot.context.firecallName ?? '-'}
+                    {t('firecallLabel')}: {snapshot.context.firecallName ?? '-'}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    Log-Einträge: {snapshot.logs.length}
+                    {t('logEntriesLabel')}: {snapshot.logs.length}
                   </Typography>
                   <Box
                     component="pre"
@@ -467,14 +467,14 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={submitting}>
-          Abbrechen
+          {t('cancel')}
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={!isValid || submitting}
         >
-          Senden
+          {t('submit')}
         </Button>
       </DialogActions>
     </Dialog>

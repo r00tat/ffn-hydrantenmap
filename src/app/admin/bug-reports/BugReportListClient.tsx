@@ -16,6 +16,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import {
   type BugReport,
   type BugReportConfig,
@@ -45,17 +46,17 @@ const STATUS_COLOR: Record<
   wontfix: 'default',
 };
 
-const STATUS_LABEL: Record<BugReportStatus, string> = {
-  open: 'Offen',
-  in_progress: 'In Arbeit',
-  closed: 'Geschlossen',
-  wontfix: 'Wontfix',
-};
+const STATUS_KEY = {
+  open: 'statusOpen',
+  in_progress: 'statusInProgress',
+  closed: 'statusClosed',
+  wontfix: 'statusWontfix',
+} as const satisfies Record<BugReportStatus, string>;
 
-const KIND_LABEL: Record<BugReportKind, string> = {
-  bug: 'Bug',
-  feature: 'Feature',
-};
+const KIND_KEY = {
+  bug: 'kindBug',
+  feature: 'kindFeatureShort',
+} as const satisfies Record<BugReportKind, string>;
 
 interface SerializedTimestamp {
   _seconds?: number;
@@ -102,6 +103,7 @@ export default function BugReportListClient({
   initialConfig,
 }: BugReportListClientProps) {
   const showSnackbar = useSnackbar();
+  const t = useTranslations('bugReport');
   const [reports, setReports] = useState<BugReport[]>(initialReports);
   const [refreshing, setRefreshing] = useState(false);
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
@@ -116,13 +118,13 @@ export default function BugReportListClient({
       setReports(next);
     } catch (err) {
       showSnackbar(
-        `Fehler beim Laden: ${err instanceof Error ? err.message : String(err)}`,
+        `${t('loadFailed')}: ${err instanceof Error ? err.message : String(err)}`,
         'error',
       );
     } finally {
       setRefreshing(false);
     }
-  }, [showSnackbar]);
+  }, [showSnackbar, t]);
 
   useEffect(() => {
     setReports(initialReports);
@@ -163,7 +165,7 @@ export default function BugReportListClient({
   return (
     <Box>
       <Typography variant="h5" sx={{ mb: 2 }}>
-        Bug Reports / Feature Requests
+        {t('pageTitle')}
       </Typography>
 
       <BugReportConfigSection initialConfig={initialConfig} />
@@ -171,37 +173,37 @@ export default function BugReportListClient({
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
-            label="Typ"
+            label={t('filterKind')}
             size="small"
             select
             value={kindFilter}
             onChange={(e) => setKindFilter(e.target.value as KindFilter)}
             sx={{ minWidth: 140 }}
           >
-            <MenuItem value="all">Alle</MenuItem>
-            <MenuItem value="bug">Bug</MenuItem>
-            <MenuItem value="feature">Feature</MenuItem>
+            <MenuItem value="all">{t('filterAll')}</MenuItem>
+            <MenuItem value="bug">{t('kindBug')}</MenuItem>
+            <MenuItem value="feature">{t('kindFeatureShort')}</MenuItem>
           </TextField>
           <TextField
-            label="Status"
+            label={t('filterStatus')}
             size="small"
             select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             sx={{ minWidth: 160 }}
           >
-            <MenuItem value="all">Alle</MenuItem>
-            <MenuItem value="open">{STATUS_LABEL.open}</MenuItem>
-            <MenuItem value="in_progress">{STATUS_LABEL.in_progress}</MenuItem>
-            <MenuItem value="closed">{STATUS_LABEL.closed}</MenuItem>
-            <MenuItem value="wontfix">{STATUS_LABEL.wontfix}</MenuItem>
+            <MenuItem value="all">{t('filterAll')}</MenuItem>
+            <MenuItem value="open">{t('statusOpen')}</MenuItem>
+            <MenuItem value="in_progress">{t('statusInProgress')}</MenuItem>
+            <MenuItem value="closed">{t('statusClosed')}</MenuItem>
+            <MenuItem value="wontfix">{t('statusWontfix')}</MenuItem>
           </TextField>
           <TextField
-            label="Suche"
+            label={t('searchLabel')}
             size="small"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Titel, Beschreibung, User, Build..."
+            placeholder={t('searchPlaceholder')}
             sx={{ flex: 1, minWidth: 200 }}
           />
         </Box>
@@ -211,13 +213,13 @@ export default function BugReportListClient({
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Datum</TableCell>
-              <TableCell>Typ</TableCell>
-              <TableCell>Titel</TableCell>
-              <TableCell>User</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right"># Anhänge</TableCell>
-              <TableCell>Build</TableCell>
+              <TableCell>{t('colDate')}</TableCell>
+              <TableCell>{t('colType')}</TableCell>
+              <TableCell>{t('colTitle')}</TableCell>
+              <TableCell>{t('colUser')}</TableCell>
+              <TableCell>{t('colStatus')}</TableCell>
+              <TableCell align="right">{t('colAttachments')}</TableCell>
+              <TableCell>{t('colBuild')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -232,7 +234,7 @@ export default function BugReportListClient({
               <TableRow>
                 <TableCell colSpan={7} align="center">
                   <Typography variant="body2" sx={{ py: 2 }}>
-                    Keine Reports vorhanden.
+                    {t('noReports')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -261,7 +263,7 @@ export default function BugReportListClient({
                             <LightbulbIcon />
                           )
                         }
-                        label={KIND_LABEL[report.kind]}
+                        label={t(KIND_KEY[report.kind])}
                         color={report.kind === 'bug' ? 'error' : 'primary'}
                         variant="outlined"
                       />
@@ -271,7 +273,7 @@ export default function BugReportListClient({
                     <TableCell>
                       <Chip
                         size="small"
-                        label={STATUS_LABEL[report.status] ?? report.status}
+                        label={t(STATUS_KEY[report.status])}
                         color={STATUS_COLOR[report.status] ?? 'default'}
                       />
                     </TableCell>

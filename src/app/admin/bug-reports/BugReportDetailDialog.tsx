@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
@@ -44,12 +45,12 @@ interface DetailData {
   attachmentUrls: string[];
 }
 
-const STATUS_OPTIONS: { value: BugReportStatus; label: string }[] = [
-  { value: 'open', label: 'Offen' },
-  { value: 'in_progress', label: 'In Arbeit' },
-  { value: 'closed', label: 'Geschlossen' },
-  { value: 'wontfix', label: 'Wontfix' },
-];
+const STATUS_OPTIONS = [
+  { value: 'open', tKey: 'statusOpen' },
+  { value: 'in_progress', tKey: 'statusInProgress' },
+  { value: 'closed', tKey: 'statusClosed' },
+  { value: 'wontfix', tKey: 'statusWontfix' },
+] as const satisfies readonly { value: BugReportStatus; tKey: string }[];
 
 interface SerializedTimestamp {
   _seconds?: number;
@@ -118,6 +119,7 @@ export default function BugReportDetailDialog({
   onStatusChanged,
 }: BugReportDetailDialogProps) {
   const showSnackbar = useSnackbar();
+  const t = useTranslations('bugReport');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DetailData | null>(null);
@@ -160,18 +162,18 @@ export default function BugReportDetailDialog({
           ...data,
           report: { ...data.report, status },
         });
-        showSnackbar('Status aktualisiert', 'success');
+        showSnackbar(t('statusUpdated'), 'success');
         onStatusChanged();
       } catch (err) {
         showSnackbar(
-          `Status-Update fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`,
+          `${t('statusUpdateFailed')}: ${err instanceof Error ? err.message : String(err)}`,
           'error',
         );
       } finally {
         setStatusSaving(false);
       }
     },
-    [data, reportId, onStatusChanged, showSnackbar],
+    [data, reportId, onStatusChanged, showSnackbar, t],
   );
 
   return (
@@ -182,7 +184,7 @@ export default function BugReportDetailDialog({
         ) : (
           <BugReportIcon color="error" />
         )}
-        <span>{data?.report?.title ?? 'Bug Report'}</span>
+        <span>{data?.report?.title ?? t('detailFallbackTitle')}</span>
       </DialogTitle>
 
       <DialogContent dividers>
@@ -203,18 +205,22 @@ export default function BugReportDetailDialog({
             {/* Metadata */}
             <Box>
               <MetadataRow
-                label="Typ"
+                label={t('filterKind')}
                 value={
                   <Chip
                     size="small"
-                    label={data.report.kind === 'bug' ? 'Bug' : 'Feature'}
+                    label={t(
+                      data.report.kind === 'bug'
+                        ? 'kindBug'
+                        : 'kindFeatureShort',
+                    )}
                     color={data.report.kind === 'bug' ? 'error' : 'primary'}
                     variant="outlined"
                   />
                 }
               />
               <MetadataRow
-                label="Status"
+                label={t('filterStatus')}
                 value={
                   <TextField
                     select
@@ -230,31 +236,34 @@ export default function BugReportDetailDialog({
                   >
                     {STATUS_OPTIONS.map((o) => (
                       <MenuItem key={o.value} value={o.value}>
-                        {o.label}
+                        {t(o.tKey)}
                       </MenuItem>
                     ))}
                   </TextField>
                 }
               />
               <MetadataRow
-                label="Datum"
+                label={t('metaDate')}
                 value={formatDate(data.report.createdAt)}
               />
               <MetadataRow
-                label="User"
+                label={t('metaUser')}
                 value={
                   data.report.createdBy?.displayName
                     ? `${data.report.createdBy.displayName} <${data.report.createdBy.email}>`
                     : (data.report.createdBy?.email ?? '-')
                 }
               />
-              <MetadataRow label="URL" value={data.report.context?.url ?? '-'} />
               <MetadataRow
-                label="Pfad"
+                label={t('metaUrl')}
+                value={data.report.context?.url ?? '-'}
+              />
+              <MetadataRow
+                label={t('metaPath')}
                 value={data.report.context?.pathname ?? '-'}
               />
               <MetadataRow
-                label="Build"
+                label={t('metaBuild')}
                 value={`${data.report.context?.buildId ?? '-'}${
                   data.report.context?.database
                     ? ` (${data.report.context.database})`
@@ -262,18 +271,18 @@ export default function BugReportDetailDialog({
                 }`}
               />
               <MetadataRow
-                label="Plattform"
+                label={t('metaPlatform')}
                 value={`${data.report.context?.platform ?? '-'}${
                   data.report.context?.isNative ? ' (native)' : ''
                 }`}
               />
               <MetadataRow
-                label="User-Agent"
+                label={t('metaUserAgent')}
                 value={data.report.context?.userAgent ?? '-'}
               />
               {data.report.context?.firecallName && (
                 <MetadataRow
-                  label="Firecall"
+                  label={t('metaFirecall')}
                   value={`${data.report.context.firecallName}${
                     data.report.context.firecallId
                       ? ` (${data.report.context.firecallId})`
@@ -283,7 +292,7 @@ export default function BugReportDetailDialog({
               )}
               {data.report.notificationError && (
                 <Alert severity="warning" sx={{ mt: 1 }}>
-                  Notification-Fehler: {data.report.notificationError}
+                  {t('notificationErrorLabel')}: {data.report.notificationError}
                 </Alert>
               )}
             </Box>
@@ -293,7 +302,7 @@ export default function BugReportDetailDialog({
             {/* Description */}
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Beschreibung
+                {t('descriptionHeader')}
               </Typography>
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                 {data.report.description}
@@ -307,7 +316,7 @@ export default function BugReportDetailDialog({
                   variant="subtitle1"
                   sx={{ fontWeight: 600, mb: 1 }}
                 >
-                  Screenshots ({data.screenshotUrls.length})
+                  {t('screenshotsHeader')} ({data.screenshotUrls.length})
                 </Typography>
                 <Box
                   sx={{
@@ -327,7 +336,7 @@ export default function BugReportDetailDialog({
                       <Box
                         component="img"
                         src={url}
-                        alt="Screenshot"
+                        alt={t('screenshotAlt')}
                         sx={{
                           width: '100%',
                           height: 120,
@@ -350,7 +359,7 @@ export default function BugReportDetailDialog({
                   variant="subtitle1"
                   sx={{ fontWeight: 600, mb: 1 }}
                 >
-                  Anhänge ({data.attachmentUrls.length})
+                  {t('attachmentsHeader')} ({data.attachmentUrls.length})
                 </Typography>
                 <Box
                   sx={{
@@ -370,7 +379,7 @@ export default function BugReportDetailDialog({
                       <Box
                         component="img"
                         src={url}
-                        alt="Anhang"
+                        alt={t('attachmentAlt')}
                         sx={{
                           width: '100%',
                           height: 120,
@@ -390,13 +399,13 @@ export default function BugReportDetailDialog({
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Logs ({data.report.logs?.length ?? 0})
+                  {t('logsHeader')} ({data.report.logs?.length ?? 0})
                 </Typography>
               </AccordionSummary>
               <AccordionDetails>
                 {!data.report.logs || data.report.logs.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    Keine Logs erfasst.
+                    {t('logsEmpty')}
                   </Typography>
                 ) : (
                   <Box
@@ -432,7 +441,7 @@ export default function BugReportDetailDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Schließen</Button>
+        <Button onClick={onClose}>{t('close')}</Button>
       </DialogActions>
     </Dialog>
   );

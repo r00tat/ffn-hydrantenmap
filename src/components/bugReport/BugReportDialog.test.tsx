@@ -2,10 +2,10 @@
 import {
   act,
   fireEvent,
-  render,
   screen,
   waitFor,
 } from '@testing-library/react';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 import {
   afterEach,
   beforeEach,
