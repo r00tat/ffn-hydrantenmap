@@ -37,6 +37,27 @@ resource "google_firebaserules_ruleset" "dev" {
 }
 
 # ============================================================================
+# Storage Rules
+# ============================================================================
+
+resource "google_firebaserules_ruleset" "storage" {
+  project = var.project
+
+  source {
+    files {
+      content = file("../storage.rules")
+      name    = "storage.rules"
+    }
+  }
+}
+
+resource "google_firebaserules_release" "storage" {
+  name         = "firebase.storage/${var.project}.appspot.com"
+  project      = var.project
+  ruleset_name = "projects/${var.project}/rulesets/${google_firebaserules_ruleset.storage.name}"
+}
+
+# ============================================================================
 # Firestore Index Locals
 # ============================================================================
 
@@ -66,52 +87,6 @@ locals {
   }
 }
 
-# ============================================================================
-# Imports for existing Firestore field overrides
-# ============================================================================
-
-# sumupCheckoutId field override - already exists in both databases
-import {
-  to = google_firestore_field.dev["kostenersatz-sumupCheckoutId"]
-  id = "projects/${var.project}/databases/ffndev/collectionGroups/kostenersatz/fields/sumupCheckoutId"
-}
-
-import {
-  to = google_firestore_field.prod["kostenersatz-sumupCheckoutId"]
-  id = "projects/${var.project}/databases/(default)/collectionGroups/kostenersatz/fields/sumupCheckoutId"
-}
-
-# Dev composite indexes
-import {
-  to = google_firestore_index.dev["call-COLLECTION--deleted-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgOjXh4EK"
-}
-
-import {
-  to = google_firestore_index.dev["call-COLLECTION--group-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgJiUpoMJ"
-}
-
-import {
-  to = google_firestore_index.dev["call-COLLECTION--deleted-ASCENDING-group-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/ffndev/collectionGroups/call/indexes/CICAgJim14AK"
-}
-
-# Prod composite indexes
-import {
-  to = google_firestore_index.prod["call-COLLECTION--deleted-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJiUpoMK"
-}
-
-import {
-  to = google_firestore_index.prod["call-COLLECTION--group-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJim14AK"
-}
-
-import {
-  to = google_firestore_index.prod["call-COLLECTION--deleted-ASCENDING-group-ASCENDING-date-DESCENDING-"]
-  id = "projects/${var.project}/databases/(default)/collectionGroups/call/indexes/CICAgJjF9oIK"
-}
 
 # ============================================================================
 # Dev Firestore Database + Indexes

@@ -18,6 +18,10 @@ vi.mock('../../hooks/useFirebaseLogin', () => ({
 vi.mock('../../hooks/useFirecall', () => ({
   useFirecallId: () => 'unknown',
 }));
+vi.mock('../bugReport/BugReportProvider', () => ({
+  useBugReport: () => ({ open: vi.fn() }),
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 import AppDrawer from './AppDrawer';
 

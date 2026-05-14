@@ -2,6 +2,7 @@ import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BiotechIcon from '@mui/icons-material/Biotech';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import BuildIcon from '@mui/icons-material/Build';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -47,6 +48,7 @@ import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { useBugReport } from '../bugReport/BugReportProvider';
 
 interface DrawerItem {
   text: string;
@@ -57,6 +59,8 @@ interface DrawerItem {
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
   children?: DrawerItem[];
+  /** When set, render as a non-link clickable that invokes this handler. */
+  onClick?: () => void;
 }
 
 function resolveHref(
@@ -98,6 +102,7 @@ export default function AppDrawer({
   const firecallId = useFirecallId();
   const pathname = usePathname();
   const t = useTranslations('drawer');
+  const bugReport = useBugReport();
 
   const drawerItems: DrawerItem[] = [
     { text: t('map'), icon: <MapIcon />, href: '/', einsatzSection: '' },
@@ -191,7 +196,14 @@ export default function AppDrawer({
         { text: t('pegelstaende'), icon: <WavesIcon />, href: '/admin/pegelstaende' },
         { text: t('deletedItems'), icon: <DeleteIcon />, href: '/admin/deleted-items' },
         { text: t('hydrantCsvImport'), icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },
+        { text: t('bugReports'), icon: <BugReportIcon />, href: '/admin/bug-reports' },
       ],
+    },
+    {
+      text: t('feedbackBugReport'),
+      icon: <BugReportIcon />,
+      href: '#',
+      onClick: () => bugReport.open(),
     },
     { text: t('documentation'), icon: <HelpOutlineIcon />, href: '/docs' },
     { text: t('login'), icon: <LoginIcon />, href: '/login' },
@@ -267,6 +279,21 @@ export default function AppDrawer({
                         </List>
                       </Collapse>
                     </React.Fragment>
+                  );
+                }
+
+                if (item.onClick) {
+                  return (
+                    <ListItemButton
+                      key={item.text}
+                      onClick={() => {
+                        item.onClick!();
+                        setIsOpen(false);
+                      }}
+                    >
+                      <ListItemIcon>{item.icon}</ListItemIcon>
+                      <ListItemText primary={item.text} />
+                    </ListItemButton>
                   );
                 }
 

@@ -51,18 +51,27 @@ export function MessageSnack({
 }
 
 export default function DebugMessageDisplay() {
-  const { messages, removeMessage, displayMessages } = useDebugLogging();
+  const { messages, displayMessages } = useDebugLogging();
+  // Dismissed-IDs werden lokal getrackt; der zentrale Messages-Buffer
+  // bleibt erhalten, damit Bug Reports die Logs noch lesen koennen.
+  const [dismissed, setDismissed] = useState<Record<string, true>>({});
 
   return (
     <>
       {displayMessages &&
-        messages.map((m) => (
-          <MessageSnack
-            msg={m}
-            key={m.id}
-            onClose={() => removeMessage(m.id)}
-          />
-        ))}
+        messages
+          .filter((m) => !dismissed[m.id])
+          .map((m) => (
+            <MessageSnack
+              msg={m}
+              key={m.id}
+              onClose={() =>
+                setDismissed((prev) =>
+                  prev[m.id] ? prev : { ...prev, [m.id]: true },
+                )
+              }
+            />
+          ))}
     </>
   );
 }

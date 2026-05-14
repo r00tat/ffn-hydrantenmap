@@ -17,7 +17,12 @@ service firebase.storage {
   	match /firecall/{firecallId}/files/{fileName} {
     	allow read, write: if authorizedUser();
     }
-  
+
+    match /bugReports/{reportId}/{fileName} {
+      allow create: if authorizedUser();
+      allow read: if false;  // nur Admin SDK liest Anhänge (Admin-UI lädt signed URLs server-seitig)
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

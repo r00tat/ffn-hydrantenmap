@@ -155,6 +155,23 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Bug reports: any authorized user may create their own report (createdBy
+    // must match the auth token). Reads and modifications are admin-only.
+    match /bugReport/{doc} {
+      allow create: if authorizedUser()
+        && request.resource.data.createdBy.uid == request.auth.uid
+        && request.resource.data.createdBy.email == request.auth.token.email
+        && request.resource.data.kind in ['bug', 'feature']
+        && request.resource.data.status == 'open';
+      allow read, update, delete: if adminUser();
+    }
+
+    // Application configuration documents (e.g. bug report recipient list).
+    // Access is only through server-side Admin SDK actions.
+    match /appConfig/{doc=**} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
