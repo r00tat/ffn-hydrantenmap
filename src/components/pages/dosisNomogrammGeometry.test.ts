@@ -195,6 +195,20 @@ describe('Dosis-Nomogramm geometry (FM 3-3-1 mit geraden Linien)', () => {
       const d = falloutDose(r1, te, ts);
       expect(d).toBeCloseTo(10.62, 1);
     });
+    it('Te=48, Ts=1, R₁=282.58 → D=2.68 (M innerhalb des Skalenbereichs)', () => {
+      const r1 = 282.5798;
+      const te = 48;
+      const ts = 1;
+      const d = falloutDose(r1, te, ts);
+      expect(d).toBeCloseTo(2.68, 1);
+      const m = mFromTeTs(te, ts);
+      expect(m).toBeGreaterThan(M_MIN);
+      expect(m).toBeLessThan(M_MAX);
+    });
+    it('Te=240, Ts=1, R₁=282.58: M sehr klein aber sichtbar (≥ M_MIN)', () => {
+      const m = mFromTeTs(240, 1);
+      expect(m).toBeGreaterThan(M_MIN);
+    });
     it('Ts-Punkt liegt innerhalb akzeptablen Abstands zur M-Te-Linie für Te=6', () => {
       const te = 6;
       const ts = 1 / 3;

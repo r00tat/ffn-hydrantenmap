@@ -39,11 +39,12 @@ export const BOTTOM = 490;
 export const CHART_H = BOTTOM - TOP;
 
 // === Wertebereiche (D, R₁, M abgestimmt für exakte Parallel-Skala) ===
+// Bedingung: R1_MIN·M_MAX = D_MIN und R1_MAX·M_MIN = D_MAX (mit α = 0.5).
 export const D_MIN = 1;
 export const D_MAX = 1000;
 export const R1_MIN = 1;
-export const R1_MAX = 100000;
-export const M_MIN = 0.01;
+export const R1_MAX = 1000000;
+export const M_MIN = 0.001;
 export const M_MAX = 1;
 
 // Zeitachsen (Stunden nach Detonation bzw. Aufenthaltsdauer)
