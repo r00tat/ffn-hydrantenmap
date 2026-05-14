@@ -554,15 +554,23 @@
       "resultTe": "Te = {value} h ({hm})",
       "resultTs": "Ts = {value} h ({hm})"
     },
-    "nomogramm": {
-      "title": "Nomogram (FM 3-3-1)",
-      "description": "Connect Te (left) with Tₐ = Te + Ts (right); the line crosses the middle scale at the dose multiplier M = D / R₁.",
-      "axisTe": "Entry Te",
-      "axisTeSub": "(h after burst)",
-      "axisM": "M = D / R₁",
-      "axisMSub": "(dose multiplier)",
-      "axisTa": "Exit Tₐ",
-      "axisTaSub": "= Te + Ts (h)"
+    "dosisNomogramm": {
+      "title": "Dose nomogram (FM 3-3-1)",
+      "description": "Five scales: D, R₁, reference line M, Ts, Te. Step 1 (Te → reference line → Ts) reads the multiplier M; step 2 (reference line → R₁ → D) yields the total dose D = R₁ · M.",
+      "axisD": "Dose D",
+      "axisDSub": "(mSv)",
+      "axisR1": "R₁",
+      "axisR1Sub": "(mSv/h)",
+      "axisPivot": "Reference line",
+      "axisPivotSub": "M = D / R₁",
+      "axisTs": "Ts",
+      "axisTsSub": "Stay (h)",
+      "axisTe": "Te",
+      "axisTeSub": "Entry (h)",
+      "legendInput": "Input",
+      "legendComputed": "Computed",
+      "legendStep1": "Step 1: Te → M → Ts",
+      "legendStep2": "Step 2: M → R₁ → D"
     },
     "dosisleistungsNomogramm": {
       "title": "Dose-rate nomogram",

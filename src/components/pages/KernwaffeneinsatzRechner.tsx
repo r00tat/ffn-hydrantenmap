@@ -17,7 +17,7 @@ import {
   parseDuration,
 } from '../../common/strahlenschutz';
 import DosisleistungsNomogramm from './DosisleistungsNomogramm';
-import KernwaffenNomogramm from './KernwaffenNomogramm';
+import DosisNomogramm from './DosisNomogramm';
 
 function parseNumber(value: string): number | null {
   const s = value.trim();
@@ -231,11 +231,30 @@ export function KernwaffeneinsatzRechner() {
     s2Parsed.t === null && s2Result?.field === 't';
 
   const nomTe =
-    s3Parsed.te ??
-    (s3Result && s3Result.field === 'te' ? s3Result.value : null);
+    s3Parsed.te !== null
+      ? s3Parsed.te
+      : s3Result?.field === 'te'
+        ? s3Result.value
+        : null;
+  const nomTeIsComputed =
+    s3Parsed.te === null && s3Result?.field === 'te';
+
   const nomTs =
-    s3Parsed.ts ??
-    (s3Result && s3Result.field === 'ts' ? s3Result.value : null);
+    s3Parsed.ts !== null
+      ? s3Parsed.ts
+      : s3Result?.field === 'ts'
+        ? s3Result.value
+        : null;
+  const nomTsIsComputed =
+    s3Parsed.ts === null && s3Result?.field === 'ts';
+
+  const nomD =
+    s3Parsed.d !== null
+      ? s3Parsed.d
+      : s3Result?.field === 'd'
+        ? s3Result.value
+        : null;
+  const nomDIsComputed = s3Parsed.d === null && s3Result?.field === 'd';
 
   return (
     <Box>
@@ -516,20 +535,38 @@ export function KernwaffeneinsatzRechner() {
       </Box>
 
       {/* Nomogramm (live preview) */}
-      {/* Live-Nomogramme (Phase 2: rechtes Dosis-Nomogramm wird später überarbeitet) */}
-      <DosisleistungsNomogramm
-        r1={nomR1}
-        r1IsComputed={nomR1IsComputed}
-        rtMeas={nomRtMeas}
-        rtMeasIsComputed={nomRtMeasIsComputed}
-        tMeas={nomTMeas}
-        tMeasIsComputed={nomTMeasIsComputed}
-        rtPrime={nomRtPrime}
-        rtPrimeIsComputed={nomRtPrimeIsComputed}
-        tPrime={nomTPrime}
-        tPrimeIsComputed={nomTPrimeIsComputed}
-      />
-      <KernwaffenNomogramm r1={nomR1} te={nomTe} ts={nomTs} />
+      {/* Side-by-side Nomogramme (auf Mobile gestapelt) */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+          gap: 2,
+          mt: 2,
+        }}
+      >
+        <DosisleistungsNomogramm
+          r1={nomR1}
+          r1IsComputed={nomR1IsComputed}
+          rtMeas={nomRtMeas}
+          rtMeasIsComputed={nomRtMeasIsComputed}
+          tMeas={nomTMeas}
+          tMeasIsComputed={nomTMeasIsComputed}
+          rtPrime={nomRtPrime}
+          rtPrimeIsComputed={nomRtPrimeIsComputed}
+          tPrime={nomTPrime}
+          tPrimeIsComputed={nomTPrimeIsComputed}
+        />
+        <DosisNomogramm
+          r1={nomR1}
+          r1IsComputed={nomR1IsComputed}
+          te={nomTe}
+          teIsComputed={nomTeIsComputed}
+          ts={nomTs}
+          tsIsComputed={nomTsIsComputed}
+          d={nomD}
+          dIsComputed={nomDIsComputed}
+        />
+      </Box>
     </Box>
   );
 }

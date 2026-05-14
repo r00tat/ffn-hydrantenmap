@@ -554,15 +554,23 @@
       "resultTe": "Te = {value} h ({hm})",
       "resultTs": "Ts = {value} h ({hm})"
     },
-    "nomogramm": {
-      "title": "Nomogramm (FM 3-3-1)",
-      "description": "Verbindungslinie von Te (links) nach Tₐ = Te + Ts (rechts); Schnittpunkt mit Mittelskala liefert den Dosis-Multiplikator M = D / R₁.",
-      "axisTe": "Eintritt Te",
-      "axisTeSub": "(h nach Detonation)",
-      "axisM": "M = D / R₁",
-      "axisMSub": "(Dosis-Multiplikator)",
-      "axisTa": "Austritt Tₐ",
-      "axisTaSub": "= Te + Ts (h)"
+    "dosisNomogramm": {
+      "title": "Dosis-Nomogramm (FM 3-3-1)",
+      "description": "Fünf Skalen: D, R₁, Bezugslinie M, Ts, Te. Schritt 1 (Te→Bezugslinie→Ts) ermittelt den Multiplikator M; Schritt 2 (Bezugslinie→R₁→D) liefert die Gesamtdosis D = R₁ · M.",
+      "axisD": "Dosis D",
+      "axisDSub": "(mSv)",
+      "axisR1": "R₁",
+      "axisR1Sub": "(mSv/h)",
+      "axisPivot": "Bezugslinie",
+      "axisPivotSub": "M = D / R₁",
+      "axisTs": "Ts",
+      "axisTsSub": "Aufenthalt (h)",
+      "axisTe": "Te",
+      "axisTeSub": "Eintritt (h)",
+      "legendInput": "Eingabe",
+      "legendComputed": "Berechnet",
+      "legendStep1": "Schritt 1: Te → M → Ts",
+      "legendStep2": "Schritt 2: M → R₁ → D"
     },
     "dosisleistungsNomogramm": {
       "title": "Dosisleistungs-Nomogramm",
