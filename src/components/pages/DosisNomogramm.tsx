@@ -51,7 +51,7 @@ const D_TICKS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
 const R1_TICKS = [1, 10, 100, 1000, 10000, 100000];
 const M_TICKS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
 const TE_TICKS = [0.5, 1, 2, 5, 10, 24, 48, 120, 240, 720];
-const TS_TICKS = [0.5, 1, 2, 4, 6, 8, 12, 16, 24];
+const TS_TICKS = [0.1, 0.2, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24];
 
 function fmtTick(v: number): string {
   if (v >= 1000) return `${v / 1000}k`;

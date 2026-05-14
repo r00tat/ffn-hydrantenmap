@@ -49,7 +49,8 @@ export const M_MAX = 1;
 // Zeitachsen (Stunden nach Detonation bzw. Aufenthaltsdauer)
 export const TE_MIN = 0.5;
 export const TE_MAX = 1000;
-export const TS_MIN = 0.5;
+// Ts erlaubt sub-hour Werte (Minutenbereich). Untergrenze 0.05h ≈ 3 min.
+export const TS_MIN = 0.05;
 export const TS_MAX = 48;
 
 const LOG_D_RANGE = Math.log10(D_MAX / D_MIN); // 3
@@ -79,9 +80,14 @@ export const X_TE_BOTTOM = 760;
 export const Y_TE_BOTTOM = BOTTOM + 30;
 
 // === Ts-Kurve (gekrümmte Skala) ===
-// Bezugswert für die Kalibrierung der Ts-Position
-const TE_REF = 24; // Stunden (= 1 Tag, mittlerer Wert)
-const TS_LINE_FRACTION = 0.62; // Position entlang M→Te-Linie
+// Zwei-Anker-Kalibrierung: Die Ts-Position liegt am Schnittpunkt
+// zweier Strahlen, jeweils von der M-Skala durch eine Anker-Te-Position.
+// Für andere Te-Werte ist die Konstruktion näherungsweise gerade.
+// 5 h (untere Grenze des FM-3-3-1 Te-Bereichs) und 240 h (= 10 Tage,
+// obere Grenze). Innerhalb dieses Bereichs liegt die Konstruktion
+// nahezu exakt; außerhalb steigt der Fehler.
+export const TS_ANCHOR_TE_LOW = 5;
+export const TS_ANCHOR_TE_HIGH = 240;
 
 // Kompatibilität (bisherige Importnamen)
 export const X_PIVOT = X_M;
@@ -131,20 +137,51 @@ export function yTe(te: number): number {
 // === Ts-Kurve ===
 
 /**
- * Position auf der Ts-Kurve. Kalibriert so, dass die Gerade von M
- * (Bezugslinie) durch Te (=TE_REF) genau die Ts-Markierung trifft.
+ * yPivot ohne Begrenzung — extrapoliert linear in log-Raum,
+ * auch für M-Werte außerhalb [M_MIN, M_MAX]. Wird nur für die
+ * Ts-Kurven-Kalibrierung verwendet.
+ */
+function yPivotExtrapolated(m: number): number {
+  return TOP + K_M * Math.log10(M_MAX / m);
+}
+
+/** Schnittpunkt zweier durch je zwei Punkte definierter Geraden. */
+function lineLineIntersection(
+  a1: { x: number; y: number },
+  a2: { x: number; y: number },
+  b1: { x: number; y: number },
+  b2: { x: number; y: number },
+): { x: number; y: number } {
+  const dx1 = a2.x - a1.x;
+  const dy1 = a2.y - a1.y;
+  const dx2 = b2.x - b1.x;
+  const dy2 = b2.y - b1.y;
+  const denom = dx1 * dy2 - dy1 * dx2;
+  if (Math.abs(denom) < 1e-9) {
+    // parallel — Fallback auf Mittelwert
+    return { x: (a1.x + b1.x) / 2, y: (a1.y + b1.y) / 2 };
+  }
+  const t = ((b1.x - a1.x) * dy2 - (b1.y - a1.y) * dx2) / denom;
+  return { x: a1.x + t * dx1, y: a1.y + t * dy1 };
+}
+
+/**
+ * Position auf der Ts-Kurve. Berechnet als Schnittpunkt der Linien
+ * (M_low → Te_low) und (M_high → Te_high), wobei M_low/high die aus
+ * der Way-Wigner-Formel für (Te_anchor, ts) berechneten M-Werte sind.
+ *
+ * Damit liegt die Ts-Markierung für die beiden Anker-Te-Werte exakt
+ * auf der Geraden M ↔ Te und für andere Te-Werte näherungsweise
+ * (analog zum FM-3-3-1 Original).
  */
 export function tsPosition(ts: number): { x: number; y: number } {
-  const m = 5 * (Math.pow(TE_REF, -0.2) - Math.pow(TE_REF + ts, -0.2));
-  const mClamped = Math.min(M_MAX, Math.max(M_MIN, m));
-  const xm = X_M;
-  const ym = yPivot(mClamped);
-  const xte = xTe(TE_REF);
-  const yte = yTe(TE_REF);
-  return {
-    x: xm + TS_LINE_FRACTION * (xte - xm),
-    y: ym + TS_LINE_FRACTION * (yte - ym),
-  };
+  const mLow = mFromTeTs(TS_ANCHOR_TE_LOW, ts);
+  const mHigh = mFromTeTs(TS_ANCHOR_TE_HIGH, ts);
+  const pmLow = { x: X_M, y: yPivotExtrapolated(mLow) };
+  const pmHigh = { x: X_M, y: yPivotExtrapolated(mHigh) };
+  const pteLow = { x: xTe(TS_ANCHOR_TE_LOW), y: yTe(TS_ANCHOR_TE_LOW) };
+  const pteHigh = { x: xTe(TS_ANCHOR_TE_HIGH), y: yTe(TS_ANCHOR_TE_HIGH) };
+  return lineLineIntersection(pmLow, pteLow, pmHigh, pteHigh);
 }
 
 export function xTs(ts: number): number {
