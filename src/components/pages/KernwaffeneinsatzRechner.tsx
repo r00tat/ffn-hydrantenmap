@@ -16,6 +16,7 @@ import {
   formatDuration,
   parseDuration,
 } from '../../common/strahlenschutz';
+import DosisleistungsNomogramm from './DosisleistungsNomogramm';
 import KernwaffenNomogramm from './KernwaffenNomogramm';
 
 function parseNumber(value: string): number | null {
@@ -190,6 +191,45 @@ export function KernwaffeneinsatzRechner() {
 
   // === Live nomogram values (use computed if input field empty) ===
   const nomR1 = r1Effective;
+  const nomR1IsComputed =
+    s1Parsed.r1 === null && s1Result?.field === 'r1';
+
+  const nomRtMeas =
+    s1Parsed.rt !== null
+      ? s1Parsed.rt
+      : s1Result?.field === 'rt'
+        ? s1Result.value
+        : null;
+  const nomRtMeasIsComputed =
+    s1Parsed.rt === null && s1Result?.field === 'rt';
+
+  const nomTMeas =
+    s1Parsed.t !== null
+      ? s1Parsed.t
+      : s1Result?.field === 't'
+        ? s1Result.value
+        : null;
+  const nomTMeasIsComputed =
+    s1Parsed.t === null && s1Result?.field === 't';
+
+  const nomRtPrime =
+    s2Parsed.rt !== null
+      ? s2Parsed.rt
+      : s2Result?.field === 'rt'
+        ? s2Result.value
+        : null;
+  const nomRtPrimeIsComputed =
+    s2Parsed.rt === null && s2Result?.field === 'rt';
+
+  const nomTPrime =
+    s2Parsed.t !== null
+      ? s2Parsed.t
+      : s2Result?.field === 't'
+        ? s2Result.value
+        : null;
+  const nomTPrimeIsComputed =
+    s2Parsed.t === null && s2Result?.field === 't';
+
   const nomTe =
     s3Parsed.te ??
     (s3Result && s3Result.field === 'te' ? s3Result.value : null);
@@ -476,6 +516,19 @@ export function KernwaffeneinsatzRechner() {
       </Box>
 
       {/* Nomogramm (live preview) */}
+      {/* Live-Nomogramme (Phase 2: rechtes Dosis-Nomogramm wird später überarbeitet) */}
+      <DosisleistungsNomogramm
+        r1={nomR1}
+        r1IsComputed={nomR1IsComputed}
+        rtMeas={nomRtMeas}
+        rtMeasIsComputed={nomRtMeasIsComputed}
+        tMeas={nomTMeas}
+        tMeasIsComputed={nomTMeasIsComputed}
+        rtPrime={nomRtPrime}
+        rtPrimeIsComputed={nomRtPrimeIsComputed}
+        tPrime={nomTPrime}
+        tPrimeIsComputed={nomTPrimeIsComputed}
+      />
       <KernwaffenNomogramm r1={nomR1} te={nomTe} ts={nomTs} />
     </Box>
   );

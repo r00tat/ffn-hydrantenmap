@@ -563,6 +563,20 @@
       "axisMSub": "(dose multiplier)",
       "axisTa": "Exit Tₐ",
       "axisTaSub": "= Te + Ts (h)"
+    },
+    "dosisleistungsNomogramm": {
+      "title": "Dose-rate nomogram",
+      "description": "Three scales: R(t) left, time t middle, R₁ right. Entered values are circles; computed values diamonds in a different colour. The line illustrates R(t) = R₁ · t^(-1.2).",
+      "axisR": "R(t)",
+      "axisRSub": "dose rate (mSv/h)",
+      "axisT": "Time t",
+      "axisTSub": "(h after burst)",
+      "axisR1": "R₁",
+      "axisR1Sub": "at H+1 (mSv/h)",
+      "legendInput": "Input",
+      "legendComputed": "Computed",
+      "legendMeasLine": "Step 1 (measurement)",
+      "legendPrimeLine": "Step 2 (other time)"
     }
   },
   "dosimetrie": {

@@ -563,6 +563,20 @@
       "axisMSub": "(Dosis-Multiplikator)",
       "axisTa": "Austritt Tₐ",
       "axisTaSub": "= Te + Ts (h)"
+    },
+    "dosisleistungsNomogramm": {
+      "title": "Dosisleistungs-Nomogramm",
+      "description": "Drei Skalen: R(t) links, Zeit t Mitte, R₁ rechts. Eingegebene Werte als Punkte; berechnete Werte als Rauten in anderer Farbe. Die Verbindungslinie illustriert R(t) = R₁ · t^(-1,2).",
+      "axisR": "R(t)",
+      "axisRSub": "Dosisleistung (mSv/h)",
+      "axisT": "Zeit t",
+      "axisTSub": "(h nach Detonation)",
+      "axisR1": "R₁",
+      "axisR1Sub": "bei H+1 (mSv/h)",
+      "legendInput": "Eingabe",
+      "legendComputed": "Berechnet",
+      "legendMeasLine": "Schritt 1 (Messung)",
+      "legendPrimeLine": "Schritt 2 (andere Zeit)"
     }
   },
   "dosimetrie": {
