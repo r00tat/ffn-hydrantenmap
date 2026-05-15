@@ -1,6 +1,6 @@
 # Strahlenschutz
 
-Der Strahlenschutz-Rechner vereint fünf Werkzeuge zur Abschätzung von Dosisleistung, Abschirmung, Aufenthaltszeit, Nuklidaktivität und Einheitenumrechnung. Alle Berechnungen laufen rein clientseitig im Browser.
+Der Strahlenschutz-Rechner vereint Werkzeuge zur Abschätzung von Dosisleistung, Abschirmung, Aufenthaltszeit, Nuklidaktivität, Fallout-Dosis nach Kernwaffeneinsatz und Einheitenumrechnung. Alle Berechnungen laufen rein clientseitig im Browser.
 
 :::info
 Die Seite erreichst du über **Schadstoff → Strahlenschutz**. Für die Gamma-Spektroskopie und Nuklid-Identifikation aus RadiaCode-Messungen siehe [Energiespektrum](/docs/energiespektrum).
@@ -16,6 +16,7 @@ Hinweis: Die Rechner liefern eine schnelle Lage-Abschätzung. Für reale Einsatz
 - **Schutzwert (Abschirmung)** Reduktion der Dosisleistung durch mehrere Schichten Abschirmung
 - **Aufenthaltszeit** Zulässige Einsatzdauer bei gegebener Dosisleistung und Grenzdosis
 - **Dosisleistung aus Nuklidaktivität** Dosisleistung in 1 m Abstand aus Aktivität und Nuklid-Gamma-Konstante
+- **Kernwaffeneinsatz / Fallout** Bezugsdosisleistung R₁ aus Messung, Zerfall zu beliebiger Zeit, Gesamtdosis bei Aufenthalt im Fallout-Gebiet, Visualisierung als FM-3-3-1-Nomogramm (STS Silber)
 - **Einheitenumrechnung** Sv / mSv / µSv / nSv, Gy, R und Dosisleistungen
 - **Berechnungsverlauf** Jeder Rechner merkt sich die letzten Ergebnisse inkl. Formel und Werte für die Dokumentation im Einsatz
 
@@ -79,7 +80,57 @@ Aus der Aktivität einer Quelle und der nuklidspezifischen Gamma-Konstante Γ l�
 Beispiel: Cs-137-Quelle mit 10 MBq, wie hoch ist die Dosisleistung in 1 m? Nuklid: Cs-137, Aktivität: 10 MBq, Dosisleistung leer → Ergebnis in µSv/h. Für andere Abstände das Ergebnis über das *Quadratische Abstandsgesetz* umrechnen.
 :::
 
-## 5. Einheitenumrechnung
+## 5. Kernwaffeneinsatz / Fallout (STS Silber)
+
+Nach einer Kernwaffendetonation folgt die Dosisleistung im Fallout-Gebiet näherungsweise dem Way-Wigner-Zerfallsgesetz (FM 3-3-1 "Nuclear Contamination Avoidance"):
+
+```
+R(t) = R₁ · t^(-1,2)
+```
+
+R₁ = Bezugsdosisleistung bei H+1 Stunde (mSv/h), t = Stunden nach Detonation. Faustregel (7:10): nach 7-facher Zeit fällt die Dosisleistung auf etwa ein Zehntel ab.
+
+Der Rechner gliedert sich in drei Schritte, die alle dieselbe R₁ teilen:
+
+### Schritt 1 — Bezugsdosisleistung R₁ ermitteln
+
+R₁ wird entweder direkt eingegeben oder aus einer aktuellen Messung zurückgerechnet:
+
+```
+R₁ = R(t) · t^1,2
+```
+
+Wird R(t) und t eingegeben, liefert der Rechner R₁ automatisch. Wird R₁ direkt eingegeben, kann umgekehrt R(t) oder t berechnet werden, falls der andere Wert bekannt ist. Das jeweils leere Feld wird berechnet.
+
+Beispiel: Messung 4 Stunden nach Detonation ergibt 50 mSv/h → R₁ = 50 · 4^1,2 ≈ 264 mSv/h.
+
+### Schritt 2 — Dosisleistung zu beliebiger Zeit
+
+Mit dem in Schritt 1 ermittelten R₁ lässt sich die Dosisleistung R(t') zu jeder anderen Zeit t' nach Detonation berechnen — oder umgekehrt aus R(t') die Zeit t', zu der dieser Wert auftritt.
+
+### Schritt 3 — Gesamtdosis bei Aufenthalt
+
+Die akkumulierte Dosis bei Aufenthalt von der Eintrittszeit Te über die Dauer Ts ergibt sich aus dem Integral:
+
+```
+D = 5 · R₁ · ( Te^(-0,2) − (Te + Ts)^(-0,2) )
+```
+
+Mit dem R₁ aus Schritt 1 und beliebigen zwei der drei Größen Te, Ts, D wird die fehlende vierte berechnet (Te über numerische Bisektion in Log-Space).
+
+:::info
+Dauern werden als Textfeld eingegeben und akzeptieren mehrere Formate: `2.5` (dezimal), `2h 15min`, `1h30min` oder `45min`. Komma als Dezimaltrenner ist erlaubt.
+:::
+
+:::info
+FM-3-3-1-Beispiel: R₁ = 300 mSv/h, Te = 2h, Ts = 1h → D ≈ 101,7 mSv.
+:::
+
+### Nomogramm
+
+Das Nomogramm visualisiert die Berechnung wie in FM 3-3-1: links die Te-Skala, rechts die Tₐ = Te + Ts-Skala, in der Mitte der Dosis-Multiplikator M = D / R₁. Eine Verbindungslinie zwischen Te (links) und Tₐ (rechts) schneidet die Mittelskala an der Stelle des Multiplikators. Die Gesamtdosis ist D = R₁ · M.
+
+## 6. Einheitenumrechnung
 
 Schnelle Umrechnung zwischen gängigen Dosis- und Dosisleistungseinheiten. Die Zieleinheit ist auf Einheiten des gleichen Typs beschränkt (Dosis oder Dosisleistung), inkompatible Kombinationen werden automatisch ausgeblendet.
 
