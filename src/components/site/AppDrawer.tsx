@@ -154,16 +154,18 @@ export default function AppDrawer({
       einsatzSection: 'schadstoff',
       children: [
         {
+          // Schadstoffdatenbank ist einsatzunabhängig — immer globaler Link.
+          // Die einsatz-skopierte URL bleibt direkt erreichbar.
           text: t('hazmatDatabase'),
           icon: <BiotechIcon />,
           href: '/schadstoff/datenbank',
-          einsatzSection: 'schadstoff/datenbank',
         },
         {
+          // Strahlenschutzberechnung ist einsatzunabhängig — immer globaler Link.
+          // Die einsatz-skopierte URL bleibt direkt erreichbar.
           text: t('radiationCalculator'),
           icon: <WarningIcon />,
           href: '/schadstoff/strahlenschutz',
-          einsatzSection: 'schadstoff/strahlenschutz',
         },
         {
           text: t('radiationMeasurement'),
