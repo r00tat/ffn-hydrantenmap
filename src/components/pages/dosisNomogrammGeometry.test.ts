@@ -23,8 +23,6 @@ import {
   TE_MAX,
   TE_MIN,
   TOP,
-  TS_ANCHOR_TE_HIGH,
-  TS_ANCHOR_TE_LOW,
   TS_MAX,
   TS_MIN,
   X_D,
@@ -39,10 +37,23 @@ import {
   yD,
   yM,
   yPivot,
+  yPivotExtrapolated,
   yR1,
   yTe,
   yTs,
 } from './dosisNomogrammGeometry';
+
+/** Orthogonal pixel distance from a point to the line through (a, b). */
+function distancePointToLine(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
+}
 
 describe('Dosis-Nomogramm geometry (FM 3-3-1 mit geraden Linien)', () => {
   describe('D-Skala', () => {
@@ -133,6 +144,15 @@ describe('Dosis-Nomogramm geometry (FM 3-3-1 mit geraden Linien)', () => {
     it('Monoton: größere Te oben, kleinere unten', () => {
       expect(yTe(TE_MAX)).toBeLessThan(yTe(TE_MIN));
     });
+    it('Te^(-0.2)-Parametrisierung: gleiche Te^(-0.2)-Differenz = gleicher y-Abstand', () => {
+      // Mit u = Te^(-0.2) ist die Position linear in u. Zwei Te-Paare mit
+      // gleicher u-Differenz sollten gleichen geometrischen Abstand haben.
+      const yDiff1 = yTe(1) - yTe(10);
+      const uDiff1 = Math.pow(1, -0.2) - Math.pow(10, -0.2);
+      const yDiff2 = yTe(100) - yTe(1000);
+      const uDiff2 = Math.pow(100, -0.2) - Math.pow(1000, -0.2);
+      expect(yDiff1 / uDiff1).toBeCloseTo(yDiff2 / uDiff2, 5);
+    });
   });
 
   describe('Ts-Kurve', () => {
@@ -143,87 +163,156 @@ describe('Dosis-Nomogramm geometry (FM 3-3-1 mit geraden Linien)', () => {
     it('Größere Ts hat andere Position als kleinere Ts', () => {
       expect(yTs(0.5)).not.toBeCloseTo(yTs(24), 1);
     });
-  });
-
-  describe('Blaue Linie (Te-Ts-M) ist exakt bei beiden Anker-Te-Werten', () => {
-    const tsValues = [0.1, 0.5, 1, 2, 4, 8, 16, 24];
-    [TS_ANCHOR_TE_LOW, TS_ANCHOR_TE_HIGH].forEach((teRef) => {
-      tsValues.forEach((ts) => {
-        it(`Ts=${ts}, Te=${teRef}: drei Punkte (M, Ts, Te) sind kollinear`, () => {
-          const m = mFromTeTs(teRef, ts);
-          if (m < M_MIN || m > M_MAX) {
-            // Außerhalb des sichtbaren M-Bereichs — Berechnungen weiterhin
-            // sinnvoll für die Kalibrierung, aber visuell irrelevant.
-          }
-          const pM = { x: X_M, y: yPivot(m) };
-          const pTs = { x: xTs(ts), y: yTs(ts) };
-          const pTe = { x: xTe(teRef), y: yTe(teRef) };
-
-          // Kreuzprodukt: Ts liegt auf der Linie M ↔ Te
-          // (innerhalb des Bildbereichs; bei extrapoliertem M aufgrund von
-          // Skalenüberschreitung kann der Fehler größer werden — daher
-          // großzügigere Toleranz von 2 px).
-          const dxMTe = pTe.x - pM.x;
-          const dyMTe = pTe.y - pM.y;
-          const lenMTe = Math.sqrt(dxMTe * dxMTe + dyMTe * dyMTe);
-          const cross =
-            (pTs.x - pM.x) * dyMTe - (pTs.y - pM.y) * dxMTe;
-          const distance = Math.abs(cross) / lenMTe;
-          expect(distance).toBeLessThan(2);
-        });
-      });
-    });
-  });
-
-  describe('Ts-Kurve ist tatsächlich gekrümmt', () => {
-    it('xTs variiert mit Ts (keine Vertikale Linie)', () => {
+    it('xTs variiert mit Ts (keine vertikale Linie)', () => {
       const xs = [0.1, 0.5, 1, 2, 4, 8, 16, 24].map((ts) => xTs(ts));
       const range = Math.max(...xs) - Math.min(...xs);
       expect(range).toBeGreaterThan(2);
     });
-    it('Größeres Ts liegt höher (kleineres y) als kleineres Ts', () => {
-      expect(yTs(0.5)).toBeGreaterThan(yTs(24));
-      expect(yTs(1)).toBeGreaterThan(yTs(8));
+    it('Größeres Ts liegt höher (kleineres y) als kleineres Ts (monoton)', () => {
+      const tsVals = [0.1, 0.5, 1, 2, 4, 8, 16, 24];
+      for (let i = 1; i < tsVals.length; i++) {
+        expect(yTs(tsVals[i])).toBeLessThan(yTs(tsVals[i - 1]));
+      }
+    });
+    it('Ts-Punkte liegen zwischen M-Achse und Te-Diagonale', () => {
+      for (const ts of [0.1, 0.5, 1, 2, 8, 24]) {
+        const x = xTs(ts);
+        expect(x).toBeGreaterThan(X_M);
+        expect(x).toBeLessThan(X_TE_BOTTOM);
+      }
     });
   });
 
-  describe('FM-3-3-1 Beispiel des Benutzers', () => {
+  describe('Blaue Linie (Te-Ts-M): LSQ-kalibrierte Genauigkeit', () => {
+    // Mit LSQ-Kalibrierung über 128 log-verteilte Te-Anker ist die
+    // Konstruktion nicht exakt, aber der maximale Fehler ist klein (~8 px).
+    const tsValues = [0.1, 0.2, 0.5, 1, 2, 4, 8, 16, 24];
+    const teValues = [0.5, 1, 2, 5, 10, 24, 48, 120, 240, 480, 720];
+
+    it('Maximaler Ts-Abstand zur Te-M-Linie über alle (Te, Ts)-Paare < 10 px', () => {
+      let maxDist = 0;
+      let worst = '';
+      for (const ts of tsValues) {
+        for (const te of teValues) {
+          const m = mFromTeTs(te, ts);
+          const pM = { x: X_M, y: yPivotExtrapolated(m) };
+          const pTs = { x: xTs(ts), y: yTs(ts) };
+          const pTe = { x: xTe(te), y: yTe(te) };
+          const d = distancePointToLine(pTs, pM, pTe);
+          if (d > maxDist) {
+            maxDist = d;
+            worst = `Te=${te}, Ts=${ts}, d=${d.toFixed(2)}`;
+          }
+        }
+      }
+      expect(maxDist, `worst case: ${worst}`).toBeLessThan(10);
+    });
+
+    it('Durchschnittlicher Ts-Abstand zur Te-M-Linie < 4 px', () => {
+      let sum = 0;
+      let count = 0;
+      for (const ts of tsValues) {
+        for (const te of teValues) {
+          const m = mFromTeTs(te, ts);
+          const pM = { x: X_M, y: yPivotExtrapolated(m) };
+          const pTs = { x: xTs(ts), y: yTs(ts) };
+          const pTe = { x: xTe(te), y: yTe(te) };
+          sum += distancePointToLine(pTs, pM, pTe);
+          count++;
+        }
+      }
+      expect(sum / count).toBeLessThan(4);
+    });
+  });
+
+  describe('FM-3-3-1 Beispiele des Benutzers', () => {
     it('Te=6, Ts=1/3, R₁=282.58 → D=10.62', () => {
-      const r1 = 282.5798;
-      const te = 6;
-      const ts = 1 / 3;
-      const d = falloutDose(r1, te, ts);
-      expect(d).toBeCloseTo(10.62, 1);
+      expect(falloutDose(282.5798, 6, 1 / 3)).toBeCloseTo(10.62, 1);
     });
-    it('Te=48, Ts=1, R₁=282.58 → D=2.68 (M innerhalb des Skalenbereichs)', () => {
-      const r1 = 282.5798;
-      const te = 48;
-      const ts = 1;
-      const d = falloutDose(r1, te, ts);
+    it('Te=48, Ts=1, R₁=282.58 → D=2.68', () => {
+      const d = falloutDose(282.5798, 48, 1);
       expect(d).toBeCloseTo(2.68, 1);
+    });
+    it('Te=48, Ts=1/3, R₁=282.58 → D=0.901', () => {
+      const d = falloutDose(282.5798, 48, 1 / 3);
+      expect(d).toBeCloseTo(0.901, 2);
+    });
+
+    // Mit der neuen LSQ-Kalibrierung sollte die blaue Linie auch für
+    // diese Mittelfeld-Te-Werte sehr nahe durch Ts gehen.
+    const constructionCases: Array<{ te: number; ts: number; label: string }> =
+      [
+        { te: 6, ts: 1 / 3, label: 'Te=6, Ts=20min' },
+        { te: 24, ts: 1, label: 'Te=24h, Ts=1h' },
+        { te: 48, ts: 1, label: 'Te=48h, Ts=1h' },
+        { te: 48, ts: 1 / 3, label: 'Te=48h, Ts=20min' },
+        { te: 120, ts: 2, label: 'Te=120h, Ts=2h' },
+        { te: 240, ts: 4, label: 'Te=240h, Ts=4h' },
+      ];
+
+    constructionCases.forEach(({ te, ts, label }) => {
+      it(`${label}: Ts-Punkt innerhalb 5 px der Te-M-Linie`, () => {
+        const m = mFromTeTs(te, ts);
+        const pM = { x: X_M, y: yPivotExtrapolated(m) };
+        const pTs = { x: xTs(ts), y: yTs(ts) };
+        const pTe = { x: xTe(te), y: yTe(te) };
+        const d = distancePointToLine(pTs, pM, pTe);
+        expect(d, `Abstand für ${label}: ${d.toFixed(2)} px`).toBeLessThan(5);
+      });
+    });
+  });
+
+  describe('Sichtbarkeit bei hohen Te-Werten (kleine M)', () => {
+    it('yPivotExtrapolated extrapoliert linear für M < M_MIN', () => {
+      // Eine Dekade kleiner M entspricht K_M Pixel weiter unten.
+      const y1 = yPivotExtrapolated(M_MIN);
+      const y2 = yPivotExtrapolated(M_MIN / 10);
+      expect(y2 - y1).toBeCloseTo(K_M, 5);
+      // yPivotExtrapolated bei M_MIN entspricht der Chart-Unterkante.
+      expect(y1).toBeCloseTo(BOTTOM, 5);
+    });
+    it('Te=720, Ts=1: M ist sehr klein, Konstruktion bleibt definiert', () => {
+      const te = 720;
+      const ts = 1;
       const m = mFromTeTs(te, ts);
-      expect(m).toBeGreaterThan(M_MIN);
-      expect(m).toBeLessThan(M_MAX);
+      expect(m).toBeGreaterThan(0);
+      expect(m).toBeLessThan(M_MIN); // M außerhalb des Standard-Bereichs
+      const y = yPivotExtrapolated(m);
+      // Linie geht über die Chart-Unterkante hinaus, aber bleibt eine endliche Zahl
+      expect(Number.isFinite(y)).toBe(true);
+      expect(y).toBeGreaterThan(BOTTOM);
     });
-    it('Te=240, Ts=1, R₁=282.58: M sehr klein aber sichtbar (≥ M_MIN)', () => {
-      const m = mFromTeTs(240, 1);
-      expect(m).toBeGreaterThan(M_MIN);
+  });
+
+  describe('Sichtbarkeit bei kleinen Dosen (D < D_MIN)', () => {
+    it('yD extrapoliert linear für D < D_MIN', () => {
+      // Eine Dekade kleinere Dosis liegt K_D Pixel höher.
+      const y1 = yD(D_MIN);
+      const y2 = yD(D_MIN / 10);
+      expect(y1 - y2).toBeCloseTo(K_D, 5);
+      expect(y1).toBeCloseTo(TOP, 5);
     });
-    it('Ts-Punkt liegt innerhalb akzeptablen Abstands zur M-Te-Linie für Te=6', () => {
-      const te = 6;
+    it('Te=72h, Ts=20min, R₁=282.58: D≈0,55 mSv liegt unter D_MIN', () => {
+      const r1 = 282.5798;
+      const te = 72;
       const ts = 1 / 3;
+      const d = falloutDose(r1, te, ts);
+      expect(d).toBeCloseTo(0.5546, 3);
+      expect(d).toBeLessThan(D_MIN);
+      // Beide Endpunkte der roten Linie sind endlich; yD extrapoliert
+      // oberhalb des Chart-Bereichs (kleines y), aber bleibt definiert.
       const m = mFromTeTs(te, ts);
-      const pM = { x: X_M, y: yPivot(m) };
-      const pTs = { x: xTs(ts), y: yTs(ts) };
-      const pTe = { x: xTe(te), y: yTe(te) };
-      const dxMTe = pTe.x - pM.x;
-      const dyMTe = pTe.y - pM.y;
-      const lenMTe = Math.sqrt(dxMTe * dxMTe + dyMTe * dyMTe);
-      const cross =
-        (pTs.x - pM.x) * dyMTe - (pTs.y - pM.y) * dxMTe;
-      const distance = Math.abs(cross) / lenMTe;
-      // Te=6 liegt nahe TS_ANCHOR_TE_LOW=5; Abweichung sollte klein sein
-      expect(distance).toBeLessThan(10);
+      expect(Number.isFinite(yD(d))).toBe(true);
+      expect(Number.isFinite(yPivotExtrapolated(m))).toBe(true);
+    });
+    it('Kollinearität M-R₁-D bleibt erhalten auch bei D < D_MIN', () => {
+      // Für D = 0,5546, R₁ = 282,58, M = D/R₁ ≈ 0,001962 muss
+      // y_R1(R₁) = (1−α)·yD(D) + α·yPivot(M) gelten.
+      const d = 0.5546;
+      const r1 = 282.5798;
+      const m = d / r1;
+      const yLine = (1 - ALPHA_R1) * yD(d) + ALPHA_R1 * yPivotExtrapolated(m);
+      expect(yR1(r1)).toBeCloseTo(yLine, 3);
     });
   });
 

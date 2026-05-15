@@ -27,6 +27,7 @@ import {
   Y_TE_TOP,
   yD,
   yPivot,
+  yPivotExtrapolated,
   yR1,
   yTe,
   yTs,
@@ -124,23 +125,34 @@ export default function DosisNomogramm({
 
   const mFromTime =
     inRangeTe(te) && inRangeTs(ts) ? mFromTeTs(te, ts) : null;
+  // mFromDose ist auch dann gültig, wenn D außerhalb [D_MIN, D_MAX] liegt
+  // (z.B. sehr kleine Dosis < 1 mSv). Nur positive Werte werden akzeptiert.
   const mFromDose =
-    inRangeD(d) && inRangeR1(r1) ? mFromDoseAndR1(d, r1) : null;
+    d !== null && d > 0 && r1 !== null && r1 > 0
+      ? mFromDoseAndR1(d, r1)
+      : null;
 
-  // Schritt 1: gerade Linie von Te über Ts zur Bezugslinie
+  // Schritt 1: gerade Linie von Te über Ts zur Bezugslinie.
+  // Die Linie wird auch dann gezeichnet, wenn M außerhalb [M_MIN, M_MAX]
+  // liegt (sehr hohe Te-Werte erzeugen M < M_MIN). In dem Fall wird der
+  // Endpunkt linear im log-Raum extrapoliert (yPivotExtrapolated); das
+  // SVG-Viewbox-Clipping schneidet die Linie an der Chart-Kante ab.
   const showStep1 =
-    inRangeTe(te) &&
-    inRangeTs(ts) &&
-    mFromTime !== null &&
-    inRangeM(mFromTime);
+    inRangeTe(te) && inRangeTs(ts) && mFromTime !== null && mFromTime > 0;
 
-  // Schritt 2: gerade Linie von Bezugslinie über R₁ zur Dosis
+  // Schritt 2: gerade Linie von Bezugslinie über R₁ zur Dosis.
+  // Wie bei Schritt 1 wird die Linie auch gezeichnet, wenn D oder M
+  // außerhalb der sichtbaren Skalenbereiche liegen — die yD-/yPivot-Funktionen
+  // extrapolieren im log-Raum, und clipPath schneidet die Linie an der
+  // Chart-Kante ab.
   const mForStep2 = mFromDose ?? mFromTime;
   const showStep2 =
-    inRangeD(d) &&
-    inRangeR1(r1) &&
+    d !== null &&
+    d > 0 &&
     mForStep2 !== null &&
-    inRangeM(mForStep2);
+    mForStep2 > 0 &&
+    r1 !== null &&
+    r1 > 0;
 
   // M-Punkt: gemeinsamer Punkt beider Konstruktionslinien
   const mPoint = mForStep2 ?? mFromTime;
@@ -168,8 +180,18 @@ export default function DosisNomogramm({
         <svg
           viewBox={`0 0 ${VB_W} ${VB_H}`}
           xmlns="http://www.w3.org/2000/svg"
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+          style={{
+            width: '100%',
+            height: 'auto',
+            display: 'block',
+            overflow: 'hidden',
+          }}
         >
+          <defs>
+            <clipPath id="chartArea">
+              <rect x={0} y={0} width={VB_W} height={VB_H} />
+            </clipPath>
+          </defs>
           {/* === Titel der Skalen === */}
           <text
             x={X_D}
@@ -449,10 +471,11 @@ export default function DosisNomogramm({
               x1={xTe(te)}
               y1={yTe(te)}
               x2={X_M}
-              y2={yPivot(mFromTime)}
+              y2={yPivotExtrapolated(mFromTime)}
               stroke={stepCol1}
               strokeWidth="2"
               strokeDasharray="6,3"
+              clipPath="url(#chartArea)"
             />
           )}
 
@@ -460,12 +483,13 @@ export default function DosisNomogramm({
           {showStep2 && (
             <line
               x1={X_M}
-              y1={yPivot(mForStep2)}
+              y1={yPivotExtrapolated(mForStep2)}
               x2={X_D}
               y2={yD(d)}
               stroke={stepCol2}
               strokeWidth="2"
               strokeDasharray="6,3"
+              clipPath="url(#chartArea)"
             />
           )}
 

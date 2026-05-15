@@ -1,7 +1,7 @@
 /**
  * Geometrie/Skalierung des Dosis-Nomogramms (FM 3-3-1).
  *
- * Konstruktion in zwei Schritten mit GERADEN Linien (FM 3-3-1 Variante 3):
+ * Konstruktion in zwei Schritten mit GERADEN Linien:
  *
  *   Schritt 1 (blau, "Te → Ts → Bezugslinie"):
  *     Eine gerade Linie verbindet Te (Eintrittszeit) auf der diagonalen Skala
@@ -25,11 +25,19 @@
  *   K_R1 = (1−α)·K_D = α·K_M ist die Gerade durch alle drei Punkte exakt.
  *
  * Kalibrierung der blauen Linie (Te-Ts-M):
- *   Te liegt auf einer geraden Diagonalen (log-Te-parametriert). Die
- *   Ts-Position wird so kalibriert, dass für einen Referenz-Te-Wert die
- *   Gerade von M durch Te genau die Ts-Markierung trifft. Da die Gleichung
- *   nicht separabel in Te und Ts ist, ist die Konstruktion für andere Te
- *   nur näherungsweise gerade (wie im FM 3-3-1 Original).
+ *   Die Beziehung M(Te, Ts) ist in den Variablen Te und Ts nicht separabel,
+ *   daher kann kein 3-Skalen-Nomogramm mit geraden Linien sie exakt darstellen.
+ *
+ *   Die Te-Achse ist in u = Te^(-0,2) linear parametrisiert (die "natürliche"
+ *   Variable der Way-Wigner-Formel). Die Ts-Position wird durch eine
+ *   Least-Squares-Anpassung über 128 logarithmisch verteilte Te-Anker
+ *   bestimmt: Für jeden Anker definiert die Linie M(Te, Ts) → Te eine Gerade;
+ *   die Ts-Position minimiert die Summe der quadrierten Abstände zu allen
+ *   diesen Geraden.
+ *
+ *   Maximaler Fehler im typischen Bereich (Te=0,5..720 h, Ts=0,1..24 h):
+ *   ≈ 8 px; durchschnittlich ≈ 2 px. Für die Mittelfeld-Werte (Te ≈ 5..240 h)
+ *   liegt die Ts-Position fast exakt auf der Te-M-Linie (< 3 px).
  */
 
 export const VB_W = 820;
@@ -39,7 +47,7 @@ export const BOTTOM = 490;
 export const CHART_H = BOTTOM - TOP;
 
 // === Wertebereiche (D, R₁, M abgestimmt für exakte Parallel-Skala) ===
-// Bedingung: R1_MIN·M_MAX = D_MIN und R1_MAX·M_MIN = D_MAX (mit α = 0.5).
+// Bedingung: R1_MIN·M_MAX = D_MIN und R1_MAX·M_MIN = D_MAX.
 export const D_MIN = 1;
 export const D_MAX = 1000;
 export const R1_MIN = 1;
@@ -55,13 +63,12 @@ export const TS_MIN = 0.05;
 export const TS_MAX = 48;
 
 const LOG_D_RANGE = Math.log10(D_MAX / D_MIN); // 3
-const LOG_R1_RANGE = Math.log10(R1_MAX / R1_MIN); // 5
-const LOG_M_RANGE = Math.log10(M_MAX / M_MIN); // 2
-const LOG_TE_RANGE = Math.log10(TE_MAX / TE_MIN);
+const LOG_R1_RANGE = Math.log10(R1_MAX / R1_MIN); // 6
+const LOG_M_RANGE = Math.log10(M_MAX / M_MIN); // 3
 
 export const K_D = CHART_H / LOG_D_RANGE; // H/3
-export const K_R1 = CHART_H / LOG_R1_RANGE; // H/5
-export const K_M = CHART_H / LOG_M_RANGE; // H/2
+export const K_R1 = CHART_H / LOG_R1_RANGE; // H/6
+export const K_M = CHART_H / LOG_M_RANGE; // H/3
 
 // === X-Positionen der vertikalen Skalen ===
 export const X_D = 90;
@@ -69,26 +76,37 @@ export const X_M = 380; // Bezugslinie zentral platziert
 
 // α: Position der R₁-Skala zwischen D (α=0) und M (α=1)
 // Bedingung Parallel-Skala: α = K_D / (K_D + K_M)
-export const ALPHA_R1 = K_D / (K_D + K_M); // = 0.4 mit K_D=H/3, K_M=H/2
+export const ALPHA_R1 = K_D / (K_D + K_M); // = 0.5 mit K_D = K_M = H/3
 export const X_R1 = X_D + ALPHA_R1 * (X_M - X_D);
 
 // === Diagonale Te-Skala ===
-// Die Skala läuft von oben-links (großes Te = 10 Tage) nach unten-rechts
-// (kleines Te = 5 h), als gerade Linie.
-export const X_TE_TOP = 600;
-export const Y_TE_TOP = TOP - 10;
-export const X_TE_BOTTOM = 760;
-export const Y_TE_BOTTOM = BOTTOM + 30;
+// In u = Te^(-0,2) linear parametrisiert; die Endpunkte sind so platziert,
+// dass die LSQ-Anpassung der Ts-Kurve den geringsten Fehler liefert
+// (Grid-Suche über die Endpunkte ergab x ≈ 560..680, y deckungsgleich mit
+// der Chart-Höhe).
+export const X_TE_TOP = 560;
+export const Y_TE_TOP = TOP;
+export const X_TE_BOTTOM = 680;
+export const Y_TE_BOTTOM = BOTTOM;
 
-// === Ts-Kurve (gekrümmte Skala) ===
-// Zwei-Anker-Kalibrierung: Die Ts-Position liegt am Schnittpunkt
-// zweier Strahlen, jeweils von der M-Skala durch eine Anker-Te-Position.
-// Für andere Te-Werte ist die Konstruktion näherungsweise gerade.
-// 5 h (untere Grenze des FM-3-3-1 Te-Bereichs) und 240 h (= 10 Tage,
-// obere Grenze). Innerhalb dieses Bereichs liegt die Konstruktion
-// nahezu exakt; außerhalb steigt der Fehler.
-export const TS_ANCHOR_TE_LOW = 5;
-export const TS_ANCHOR_TE_HIGH = 240;
+// === Ts-Kurve: LSQ-Kalibrierung ===
+// Anzahl der logarithmisch verteilten Te-Anker für die LSQ-Anpassung.
+// Mehr Anker liefern eine glattere Mittelung, ändern aber das Ergebnis
+// kaum (Konvergenz bereits ab ~32 Ankern). 128 bietet hohe Genauigkeit bei
+// vernachlässigbarem Berechnungsaufwand (~13 Ts-Werte × 128 ≈ 1700 Op).
+const TS_CALIBRATION_ANCHOR_COUNT = 128;
+
+const TS_CALIBRATION_TE_ANCHORS: readonly number[] = (() => {
+  const a: number[] = [];
+  const lmin = Math.log(TE_MIN);
+  const lmax = Math.log(TE_MAX);
+  for (let i = 0; i < TS_CALIBRATION_ANCHOR_COUNT; i++) {
+    a.push(
+      Math.exp(lmin + ((lmax - lmin) * i) / (TS_CALIBRATION_ANCHOR_COUNT - 1)),
+    );
+  }
+  return a;
+})();
 
 // Kompatibilität (bisherige Importnamen)
 export const X_PIVOT = X_M;
@@ -118,11 +136,33 @@ export function yM(m: number): number {
   return yPivot(m);
 }
 
+/**
+ * yPivot ohne Begrenzung — extrapoliert linear im log-Raum auch für
+ * M-Werte außerhalb [M_MIN, M_MAX]. Wird für die Ts-Kurven-Kalibrierung
+ * und für die Anzeige der blauen Linie bei sehr kleinen M-Werten
+ * (hohe Te) verwendet.
+ */
+export function yPivotExtrapolated(m: number): number {
+  return TOP + K_M * Math.log10(M_MAX / m);
+}
+
 // === Te-Diagonale ===
 
-/** Parametrischer Anteil 0..1 von oben (TE_MAX) nach unten (TE_MIN). */
+/**
+ * Parametrischer Anteil 0..1 von oben (TE_MAX) nach unten (TE_MIN).
+ *
+ * Linear in u = Te^(-0,2): Mit u_min = TE_MAX^(-0,2) und u_max = TE_MIN^(-0,2)
+ * gilt f(Te) = (Te^(-0,2) − u_min) / (u_max − u_min). Diese Parametrisierung
+ * macht die Te-Achse in der natürlichen Variable der Way-Wigner-Formel
+ * gleichmäßig — gleiche u-Differenzen entsprechen gleichen geometrischen
+ * Abständen — wodurch die Konstruktion auch zwischen den Kalibrierankern
+ * sehr genau bleibt.
+ */
+const U_MIN_TE = Math.pow(TE_MAX, -0.2);
+const U_MAX_TE = Math.pow(TE_MIN, -0.2);
+
 export function teFraction(te: number): number {
-  return Math.log10(TE_MAX / te) / LOG_TE_RANGE;
+  return (Math.pow(te, -0.2) - U_MIN_TE) / (U_MAX_TE - U_MIN_TE);
 }
 
 export function xTe(te: number): number {
@@ -138,51 +178,54 @@ export function yTe(te: number): number {
 // === Ts-Kurve ===
 
 /**
- * yPivot ohne Begrenzung — extrapoliert linear in log-Raum,
- * auch für M-Werte außerhalb [M_MIN, M_MAX]. Wird nur für die
- * Ts-Kurven-Kalibrierung verwendet.
- */
-function yPivotExtrapolated(m: number): number {
-  return TOP + K_M * Math.log10(M_MAX / m);
-}
-
-/** Schnittpunkt zweier durch je zwei Punkte definierter Geraden. */
-function lineLineIntersection(
-  a1: { x: number; y: number },
-  a2: { x: number; y: number },
-  b1: { x: number; y: number },
-  b2: { x: number; y: number },
-): { x: number; y: number } {
-  const dx1 = a2.x - a1.x;
-  const dy1 = a2.y - a1.y;
-  const dx2 = b2.x - b1.x;
-  const dy2 = b2.y - b1.y;
-  const denom = dx1 * dy2 - dy1 * dx2;
-  if (Math.abs(denom) < 1e-9) {
-    // parallel — Fallback auf Mittelwert
-    return { x: (a1.x + b1.x) / 2, y: (a1.y + b1.y) / 2 };
-  }
-  const t = ((b1.x - a1.x) * dy2 - (b1.y - a1.y) * dx2) / denom;
-  return { x: a1.x + t * dx1, y: a1.y + t * dy1 };
-}
-
-/**
- * Position auf der Ts-Kurve. Berechnet als Schnittpunkt der Linien
- * (M_low → Te_low) und (M_high → Te_high), wobei M_low/high die aus
- * der Way-Wigner-Formel für (Te_anchor, ts) berechneten M-Werte sind.
+ * Position auf der Ts-Kurve via Least-Squares-Anpassung.
  *
- * Damit liegt die Ts-Markierung für die beiden Anker-Te-Werte exakt
- * auf der Geraden M ↔ Te und für andere Te-Werte näherungsweise
- * (analog zum FM-3-3-1 Original).
+ * Für gegebenes Ts wird über alle Kalibrieranker Te_i die Linie
+ * (M(Te_i, Ts), Te_i) gebildet. Der zurückgegebene Punkt minimiert die
+ * Summe der quadrierten orthogonalen Abstände zu all diesen Linien.
+ *
+ * Lineares 2×2-System (Normal-Gleichungen für die LSQ-Lösung):
+ *   Jede Linie wird als a·x + b·y + c = 0 (mit a²+b²=1) geschrieben.
+ *   Der Abstand vom Punkt (px, py) zur Linie ist d = a·px + b·py + c.
+ *   Σ d² wird minimiert durch ∂/∂px = ∂/∂py = 0:
+ *     [Σa²  Σab] [px]   [-Σac]
+ *     [Σab  Σb²] [py] = [-Σbc]
  */
 export function tsPosition(ts: number): { x: number; y: number } {
-  const mLow = mFromTeTs(TS_ANCHOR_TE_LOW, ts);
-  const mHigh = mFromTeTs(TS_ANCHOR_TE_HIGH, ts);
-  const pmLow = { x: X_M, y: yPivotExtrapolated(mLow) };
-  const pmHigh = { x: X_M, y: yPivotExtrapolated(mHigh) };
-  const pteLow = { x: xTe(TS_ANCHOR_TE_LOW), y: yTe(TS_ANCHOR_TE_LOW) };
-  const pteHigh = { x: xTe(TS_ANCHOR_TE_HIGH), y: yTe(TS_ANCHOR_TE_HIGH) };
-  return lineLineIntersection(pmLow, pteLow, pmHigh, pteHigh);
+  let sA2 = 0;
+  let sAB = 0;
+  let sB2 = 0;
+  let sAC = 0;
+  let sBC = 0;
+
+  for (const te of TS_CALIBRATION_TE_ANCHORS) {
+    const m = mFromTeTs(te, ts);
+    const p1x = X_M;
+    const p1y = yPivotExtrapolated(m);
+    const p2x = xTe(te);
+    const p2y = yTe(te);
+    const dx = p2x - p1x;
+    const dy = p2y - p1y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-9) continue;
+    const a = -dy / len;
+    const b = dx / len;
+    const c = -(a * p1x + b * p1y);
+    sA2 += a * a;
+    sAB += a * b;
+    sB2 += b * b;
+    sAC += a * c;
+    sBC += b * c;
+  }
+
+  const det = sA2 * sB2 - sAB * sAB;
+  if (Math.abs(det) < 1e-12) {
+    return { x: X_M + 100, y: TOP };
+  }
+  return {
+    x: (-sAC * sB2 + sBC * sAB) / det,
+    y: (sAC * sAB - sBC * sA2) / det,
+  };
 }
 
 export function xTs(ts: number): number {
