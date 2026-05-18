@@ -117,7 +117,7 @@
     "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^6.0.1",
     "baseline-browser-mapping": "^2.10.29",
-    "eslint": "^9.39.4",
+    "eslint": "^10.4.0",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
     "serwist": "^9.0.12",
