@@ -11,10 +11,10 @@ export interface TaktischeZeichen {
 export const icons: TaktischeZeichen = {
   'Einrichtungen_und_Führung': {
     Ständige_ortsfeste_Einrichtung: {
-      url: '/icons/taktische_zeichen/Einrichtungen/Ständige_ortsfeste_Einrichtung.png',
+      url: '/icons/taktische_zeichen/Einrichtungen/Staendige_ortsfeste_Einrichtung.png',
     },
     Vorübergehende_anlassbezogene_Einrichtung: {
-      url: '/icons/taktische_zeichen/Einrichtungen/Vorübergehende_anlassbezogene_Einrichtung.png',
+      url: '/icons/taktische_zeichen/Einrichtungen/Voruebergehende_anlassbezogene_Einrichtung.png',
     },
     Befehls_Führungs_Leitstelle: {
       url: '/icons/taktische_zeichen/Fuehrungsstelle/BefehlsFuehrungsLeitstelle.png',
@@ -63,7 +63,7 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Personen/Person_tot.png',
     },
     'Person_unter_Atem-_oder_Körperschutz': {
-      url: '/icons/taktische_zeichen/Personen/Person_unter_Atem-_oder_Körperschutz.png',
+      url: '/icons/taktische_zeichen/Personen/Person_unter_Atem-_oder_Koerperschutz.png',
     },
     Person_verletzt: {
       url: '/icons/taktische_zeichen/Personen/Person_verletzt.png',
@@ -92,7 +92,7 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Gefahren/Gefahr_allgemein.png',
     },
     Gefahr_durch_Elektrizität: {
-      url: '/icons/taktische_zeichen/Gefahren/Gefahr_durch_Elektrizität.png',
+      url: '/icons/taktische_zeichen/Gefahren/Gefahr_durch_Elektrizitaet.png',
     },
     Gefahr_durch_Verrauchung: {
       url: '/icons/taktische_zeichen/Gefahren/Gefahr_durch_Verrauchung.png',
@@ -104,51 +104,51 @@ export const icons: TaktischeZeichen = {
       url: '/icons/taktische_zeichen/Gefahren/Strahlengefahr.png',
     },
     Überflutungsgefahr: {
-      url: '/icons/taktische_zeichen/Gefahren/Überflutungsgefahr.png',
+      url: '/icons/taktische_zeichen/Gefahren/Ueberflutungsgefahr.png',
     },
   },
   Schäden: {
     Beschädigt: {
-      url: '/icons/taktische_zeichen/Schäden/Beschädigt.png',
+      url: '/icons/taktische_zeichen/Schaeden/Beschaedigt.png',
     },
     Chemieaustritt: {
-      url: '/icons/taktische_zeichen/Schäden/Chemieaustritt.png',
+      url: '/icons/taktische_zeichen/Schaeden/Chemieaustritt.png',
     },
     'Entstehungsbrand,_Schwelbrand': {
-      url: '/icons/taktische_zeichen/Schäden/Entstehungsbrand_Schwelbrand.png',
+      url: '/icons/taktische_zeichen/Schaeden/Entstehungsbrand_Schwelbrand.png',
     },
     Entwickelter_Brand: {
-      url: '/icons/taktische_zeichen/Schäden/Entwickelter_Brand.png',
+      url: '/icons/taktische_zeichen/Schaeden/Entwickelter_Brand.png',
     },
     Gasaustritt: {
-      url: '/icons/taktische_zeichen/Schäden/Gasaustritt.png',
+      url: '/icons/taktische_zeichen/Schaeden/Gasaustritt.png',
     },
     'Lawine,_Mure,_Felssturz': {
-      url: '/icons/taktische_zeichen/Schäden/Lawine_Mure_Felssturz.png',
+      url: '/icons/taktische_zeichen/Schaeden/Lawine_Mure_Felssturz.png',
     },
     Schaden_allgemein: {
-      url: '/icons/taktische_zeichen/Schäden/Schaden_allgemein.png',
+      url: '/icons/taktische_zeichen/Schaeden/Schaden_allgemein.png',
     },
     Strahlung_oder_radioaktive_Kontamination: {
-      url: '/icons/taktische_zeichen/Schäden/Strahlung_oder_radioaktive_Kontamination.png',
+      url: '/icons/taktische_zeichen/Schaeden/Strahlung_oder_radioaktive_Kontamination.png',
     },
     Teilzerstört: {
-      url: '/icons/taktische_zeichen/Schäden/Teilzerstört.png',
+      url: '/icons/taktische_zeichen/Schaeden/Teilzerstoert.png',
     },
     Überflutung: {
-      url: '/icons/taktische_zeichen/Schäden/Überflutung.png',
+      url: '/icons/taktische_zeichen/Schaeden/Ueberflutung.png',
     },
     'Unterbrochen,_blockiert,_gesperrt': {
-      url: '/icons/taktische_zeichen/Schäden/unterbrochen_blockiert_gesperrt.png',
+      url: '/icons/taktische_zeichen/Schaeden/unterbrochen_blockiert_gesperrt.png',
     },
     Verseuchung: {
-      url: '/icons/taktische_zeichen/Schäden/Verseuchung.png',
+      url: '/icons/taktische_zeichen/Schaeden/Verseuchung.png',
     },
     Vollbrand: {
-      url: '/icons/taktische_zeichen/Schäden/Vollbrand.png',
+      url: '/icons/taktische_zeichen/Schaeden/Vollbrand.png',
     },
     Zerstört: {
-      url: '/icons/taktische_zeichen/Schäden/Zerstört.png',
+      url: '/icons/taktische_zeichen/Schaeden/Zerstoert.png',
     },
   },
   'Schiene,Wasser,Luft': {
