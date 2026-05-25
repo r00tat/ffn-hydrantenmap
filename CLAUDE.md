@@ -68,12 +68,6 @@ cp .env.local .worktrees/<branch-name>/
 
 `next-env.d.ts` is gitignored — Next.js regenerates it on every `dev`/`build` and there's no need to stage or reset it.
 
-When using `gh` CLI, unset `GITHUB_TOKEN` first to avoid authentication issues:
-
-```bash
-GITHUB_TOKEN= gh <command>
-```
-
 **Wichtig:** `gh push` existiert nicht. Zum Pushen immer `git push` verwenden.
 
 ### Conventional Commits
@@ -153,7 +147,7 @@ Releases folgen **Semantic Versioning** mit Tag-Format `v<major>.<minor>.<patch>
 4. Titel: `v<version> <Kurzbeschreibung auf Deutsch>`
 
 ```bash
-GITHUB_TOKEN= gh release create v<version> --title "v<version> <Kurzbeschreibung>" --notes "$(cat <<'EOF'
+gh release create v<version> --title "v<version> <Kurzbeschreibung>" --notes "$(cat <<'EOF'
 ## Zusammenfassung
 <Beschreibung auf Deutsch>
 
