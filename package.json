@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@auth/core": "^0.41.2",
-    "@capacitor-community/bluetooth-le": "^8.1.0",
+    "@capacitor-community/bluetooth-le": "^8.2.0",
     "@capacitor-firebase/authentication": "^8.2.0",
     "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor/app": "^8.1.0",
