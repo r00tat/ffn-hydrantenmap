@@ -14,7 +14,7 @@ vi.mock('../../hooks/useFirecallItemUpdate', () => ({
 }));
 
 vi.mock('../../hooks/useFirebaseCollection', () => ({
-  default: () => [],
+  default: vi.fn(() => []),
 }));
 
 vi.mock('../../hooks/useFirecall', () => ({
@@ -32,15 +32,29 @@ vi.mock('../providers/RadiacodeProvider', async () => {
   };
 });
 
-// Ersetzt den Chart durch ein stummes Div — JSDOM hat kein Canvas.
+// Captures the props passed to the (mocked) chart so tests can inspect the
+// series the page builds. JSDOM has no canvas, so the chart itself is stubbed.
+const chartMock = vi.hoisted(() => ({
+  lastProps: null as {
+    series?: { id?: string; label?: string }[];
+    energies?: number[];
+  } | null,
+}));
+
 vi.mock('./ZoomableSpectrumChart', () => ({
-  default: () => <div data-testid="zoomable-spectrum-chart" />,
+  default: (props: { series?: { id?: string; label?: string }[] }) => {
+    chartMock.lastProps = props;
+    return <div data-testid="zoomable-spectrum-chart" />;
+  },
 }));
 
 import { useRadiacode } from '../providers/RadiacodeProvider';
+import useFirebaseCollection from '../../hooks/useFirebaseCollection';
+import type { Spectrum } from '../firebase/firestore';
 import EnergySpectrum from './EnergySpectrum';
 
 const mockedUseRadiacode = vi.mocked(useRadiacode);
+const mockedUseFirebaseCollection = vi.mocked(useFirebaseCollection);
 
 function fixture(
   partial: Partial<RadiacodeContextValue> = {},
@@ -236,5 +250,54 @@ describe('EnergySpectrum — Live-Spektrum', () => {
     expect(
       screen.queryByRole('button', { name: /^speichern$/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('EnergySpectrum — Serien-IDs', () => {
+  function savedSpectrum(id: string, sampleName: string): Spectrum {
+    const counts = new Array<number>(300).fill(100);
+    return {
+      id,
+      type: 'spectrum',
+      name: sampleName,
+      sampleName,
+      deviceName: 'RC-103',
+      measurementTime: 100,
+      liveTime: 100,
+      startTime: '',
+      endTime: '',
+      coefficients: [0, 2.5, 0],
+      counts,
+    } as unknown as Spectrum;
+  }
+
+  beforeEach(() => {
+    mockedUseRadiacode.mockReturnValue(fixture());
+    mockedUseFirebaseCollection.mockReturnValue([] as never);
+    chartMock.lastProps = null;
+  });
+
+  it('nutzt eindeutige Firestore-IDs als Serien-ID, auch bei gleichem Titel', () => {
+    // Zwei Spektren mit identischem sampleName (Timestamp) — früher führte das
+    // zu doppelten React-Keys, weil der Titel als Key diente.
+    mockedUseFirebaseCollection.mockReturnValue([
+      savedSpectrum('a', '2026-04-19 20-15-08'),
+      savedSpectrum('b', '2026-04-19 20-15-08'),
+    ] as never);
+
+    render(<EnergySpectrum />);
+
+    const series = chartMock.lastProps?.series ?? [];
+    expect(series).toHaveLength(2);
+
+    const ids = series.map((s) => s.id);
+    expect(new Set(ids).size).toBe(2); // eindeutig trotz gleichem Titel
+    expect(ids).toEqual(['firestore-a', 'firestore-b']);
+
+    // Der kollidierende Titel bleibt das Label, dient aber nicht als ID.
+    expect(series.map((s) => s.label)).toEqual([
+      '2026-04-19 20-15-08',
+      '2026-04-19 20-15-08',
+    ]);
   });
 });
