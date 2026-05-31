@@ -76,6 +76,12 @@
     <!-- Keep CPU awake while recording -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Microphone access for the AI assistant voice input (getUserMedia in the WebView).
+         Capacitor's BridgeWebChromeClient requests these at runtime before granting the
+         WebView's AUDIO_CAPTURE request; without them the request is auto-denied. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
     <!-- Declare Bluetooth LE feature; make it optional so the app still installs on non-BLE devices -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 </manifest>
