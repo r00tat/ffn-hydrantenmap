@@ -66,6 +66,7 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import { useRadiacode } from '../providers/RadiacodeProvider';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import RadiacodeConnectionControls from './RadiacodeConnectionControls';
+import { getDisplayRange } from './spectrumDisplay';
 import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 /** MUI default color palette for series */
@@ -118,23 +119,6 @@ interface LoadedSpectrum {
   visible: boolean;
   description?: string;
   manualNuclide?: string;
-}
-
-/**
- * Trim trailing zero-count channels.
- * Returns the last meaningful index across all spectra + padding.
- */
-function getDisplayRange(spectra: LoadedSpectrum[]): number {
-  let maxIndex = 0;
-  for (const s of spectra) {
-    for (let i = s.data.counts.length - 1; i >= 0; i--) {
-      if (s.data.counts[i] > 0) {
-        maxIndex = Math.max(maxIndex, i);
-        break;
-      }
-    }
-  }
-  return Math.min(maxIndex + 20, 1024);
 }
 
 /** Nuclides that have peak energies defined for matching. */
@@ -417,7 +401,7 @@ export default function EnergySpectrum() {
   const displayRange = useMemo(
     () =>
       deferredVisibleSpectra.length > 0
-        ? getDisplayRange(deferredVisibleSpectra)
+        ? getDisplayRange(deferredVisibleSpectra.map((s) => s.data.counts))
         : 0,
     [deferredVisibleSpectra],
   );
@@ -500,6 +484,7 @@ export default function EnergySpectrum() {
       const padded = s.data.counts.slice(0, displayRange);
       while (padded.length < displayRange) padded.push(0);
       return {
+        id: s.id,
         data: padded,
         label: s.data.sampleName || `Spektrum ${originalIdx + 1}`,
         color: colorForSpectrum(s, firestoreIdx),

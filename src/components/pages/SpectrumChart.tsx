@@ -10,6 +10,7 @@ import {
   type NuclideMatch,
 } from '../../common/spectrumParser';
 import { type Spectrum } from '../firebase/firestore';
+import { getDisplayRange } from './spectrumDisplay';
 import ZoomableSpectrumChart from './ZoomableSpectrumChart';
 
 const SERIES_COLORS = [
@@ -22,25 +23,10 @@ const SERIES_COLORS = [
 ];
 
 interface LoadedSpectrum {
+  /** Stable unique id (Firestore document id) — used as series id / React key. */
+  id: string;
   data: SpectrumData;
   matches: NuclideMatch[];
-}
-
-/**
- * Trim trailing zero-count channels.
- * Returns the last meaningful index across all spectra + padding.
- */
-function getDisplayRange(data: { counts: number[] }[]): number {
-  let maxIndex = 0;
-  for (const s of data) {
-    for (let i = s.counts.length - 1; i >= 0; i--) {
-      if (s.counts[i] > 0) {
-        maxIndex = Math.max(maxIndex, i);
-        break;
-      }
-    }
-  }
-  return Math.min(maxIndex + 20, 1024);
 }
 
 export interface SpectrumChartProps {
@@ -55,7 +41,7 @@ export default function SpectrumChart({
   const loadedSpectra = useMemo<LoadedSpectrum[]>(() => {
     return spectra
       .filter((s) => s.counts?.length > 0)
-      .map((saved) => {
+      .map((saved, idx) => {
         const energies = saved.counts.map((_, ch) =>
           channelToEnergy(ch, saved.coefficients)
         );
@@ -72,12 +58,15 @@ export default function SpectrumChart({
         };
         const peaks = findPeaks(dataWithEnergies.counts, energies);
         const matches = identifyNuclides(peaks);
-        return { data: dataWithEnergies, matches };
+        return { id: saved.id ?? `spectrum-${idx}`, data: dataWithEnergies, matches };
       });
   }, [spectra]);
 
   const displayRange = useMemo(
-    () => (loadedSpectra.length > 0 ? getDisplayRange(loadedSpectra.map((s) => s.data)) : 0),
+    () =>
+      loadedSpectra.length > 0
+        ? getDisplayRange(loadedSpectra.map((s) => s.data.counts))
+        : 0,
     [loadedSpectra]
   );
 
@@ -106,6 +95,7 @@ export default function SpectrumChart({
       const padded = s.data.counts.slice(0, displayRange);
       while (padded.length < displayRange) padded.push(0);
       return {
+        id: s.id,
         data: padded,
         label: s.data.sampleName || `Spektrum ${idx + 1}`,
         color: SERIES_COLORS[idx % SERIES_COLORS.length],

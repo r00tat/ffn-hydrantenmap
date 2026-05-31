@@ -22,6 +22,7 @@ import {
   type NuclideAtEnergy,
 } from '../../common/nuclidesAtEnergy';
 import { channelToEnergy } from '../../common/spectrumParser';
+import { dropOverflowBin } from './spectrumDisplay';
 import {
   applyPan,
   applyWheelZoom,
@@ -45,6 +46,12 @@ export interface ZoomableSpectrumChartProps {
   energies?: number[];
   /** Multi-spectrum input: caller-supplied series (same length as energies). */
   series?: {
+    /**
+     * Stable, unique series id (e.g. the Firestore document id). Used as the
+     * MUI series id and as React keys — must not be the sample name/title,
+     * which can collide between spectra recorded at the same timestamp.
+     */
+    id?: string;
     data: number[];
     label?: string;
     color?: string;
@@ -162,27 +169,36 @@ export default function ZoomableSpectrumChart({
   overlays,
   onPointerMove,
 }: ZoomableSpectrumChartProps) {
+  // Channel counts with the trailing overflow bin removed (the last channel on
+  // RadiaCode devices collects all over-range events as one huge spike — not a
+  // real measurement, so it is kept out of the displayed data). The multi-
+  // series (`series`/`energies`) path is already trimmed by its caller.
+  const displayCounts = useMemo(
+    () => (counts && counts.length > 0 ? dropOverflowBin(counts) : counts),
+    [counts],
+  );
+
   // Compute X-axis energies once per input change.
   const xEnergies = useMemo<number[] | null>(() => {
     if (energiesProp && energiesProp.length > 0) return energiesProp;
-    if (counts && counts.length > 0 && coefficients) {
-      return counts.map((_, ch) => channelToEnergy(ch, coefficients));
+    if (displayCounts && displayCounts.length > 0 && coefficients) {
+      return displayCounts.map((_, ch) => channelToEnergy(ch, coefficients));
     }
     return null;
-  }, [energiesProp, counts, coefficients]);
+  }, [energiesProp, displayCounts, coefficients]);
 
   // Compute series once per input change.
   const chartSeries = useMemo(() => {
     if (seriesProp && seriesProp.length > 0) return seriesProp;
-    if (counts && counts.length > 0) {
-      return [{ data: counts, showMark: false } as const];
+    if (displayCounts && displayCounts.length > 0) {
+      return [{ data: displayCounts, showMark: false } as const];
     }
     return null;
-  }, [seriesProp, counts]);
+  }, [seriesProp, displayCounts]);
 
   const defaultXRange = useMemo<Range>(
-    () => computeDefaultXRange(counts, coefficients, xEnergies ?? undefined),
-    [counts, coefficients, xEnergies],
+    () => computeDefaultXRange(displayCounts, coefficients, xEnergies ?? undefined),
+    [displayCounts, coefficients, xEnergies],
   );
 
   const [xRange, setXRange] = useState<Range>(defaultXRange);
@@ -461,6 +477,7 @@ export default function ZoomableSpectrumChart({
   // index to pick a bin from each series' `data` array.
   const hoverSeriesValues = useMemo<
     {
+      key: string;
       label: string;
       color?: string;
       counts: number;
@@ -481,6 +498,7 @@ export default function ZoomableSpectrumChart({
     }
     return chartSeries.map((s, i) => {
       const anyS = s as {
+        id?: string;
         data: number[];
         label?: string;
         color?: string;
@@ -489,6 +507,9 @@ export default function ZoomableSpectrumChart({
       const counts = anyS.data[idx] ?? 0;
       const live = typeof anyS.liveTime === 'number' ? anyS.liveTime : null;
       return {
+        // Prefer the stable series id; fall back to the index so the React key
+        // stays unique even when two series share a label (sample name).
+        key: anyS.id ?? `series-${i}`,
         label: anyS.label ?? `Serie ${i + 1}`,
         color: anyS.color,
         counts,
@@ -674,7 +695,7 @@ export default function ZoomableSpectrumChart({
               >
                 {hoverSeriesValues.map((v) => (
                   <Typography
-                    key={v.label}
+                    key={v.key}
                     variant="caption"
                     sx={{
                       display: 'flex',
