@@ -116,14 +116,14 @@
     "@types/react": "19.2.15",
     "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^6.0.1",
-    "baseline-browser-mapping": "^2.10.32",
+    "baseline-browser-mapping": "^2.10.33",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
     "serwist": "^9.0.12",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   },
   "overrides": {
     "firebase": "12.14.0",
