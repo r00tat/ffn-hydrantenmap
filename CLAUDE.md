@@ -298,6 +298,40 @@ Call the guard at the top of every server action before any logic. For API route
 - `layer` - Map layers per firecall
 - `user` - User profiles with authorization
 - `clusters6` - Geohashed hydrant clusters
+- `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)
+- `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
+
+## Bug Reports / Feedback
+
+In-App-Bug-Reports und Feature-Requests werden über den Bug-Report-Dialog
+([src/components/bugReport/](src/components/bugReport/)) in die Firestore-Collection
+`bugReport` geschrieben. Der TypeScript-Typ liegt in [src/common/bugReport.ts](src/common/bugReport.ts)
+(`BugReport`: u.a. `kind` `'bug' | 'feature'`, `title`, `description`,
+`status` `'open' | 'in_progress' | 'closed' | 'wontfix'`, `createdAt`, `createdBy`,
+`context` mit `url`/`buildId`/`database`/`platform`/`firecallId`, `logs`, `screenshots`).
+
+**Wichtig:** Produktive Bug-Reports liegen in der **Default-Datenbank `(default)`** des
+Projekts `ffn-utils` — NICHT in `ffndev`. Das Feld `context.database` zeigt, aus welcher
+Umgebung der Report stammt (`""` = prod, `ffndev` = dev).
+
+**Reports abrufen (Firebase MCP, neueste zuerst):**
+
+```jsonc
+// Tool: firestore_query_collection
+{
+  "collection_path": "bugReport",
+  "database": "(default)",            // prod; für Dev: "ffndev"
+  "filters": [],                       // optional, z.B. status == "open"
+  "order": { "orderBy": "createdAt", "orderByDirection": "DESCENDING" },
+  "limit": 15
+}
+```
+
+Nur offene Reports: `filters: [{ field: "status", op: "EQUAL", compare_value: { string_value: "open" } }]`.
+
+Alternativ im Admin-Panel unter `/admin/bug-reports`
+([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
+Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
 ## German Terminology
 

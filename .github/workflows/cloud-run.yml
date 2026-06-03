@@ -73,8 +73,8 @@ jobs:
             export SUMUP_SECRET_SUFFIX=""
           fi
 
-          if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" ]]; then
-            # set to empty string
+          if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" || "${NEXT_PUBLIC_FIRESTORE_DB}" == "(default)" ]]; then
+            # '(default)' / 'default' sentinel -> empty string selects the default DB
             export NEXT_PUBLIC_FIRESTORE_DB=""
           fi
 

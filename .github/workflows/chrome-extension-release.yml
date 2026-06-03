@@ -26,10 +26,11 @@ jobs:
     name: "Build and upload Chrome Extension"
     runs-on: ubuntu-latest
     # Release events publish a prod artifact (CWS) and run on a `v*` tag ref, so
-    # they map to the `prod` environment (NEXT_PUBLIC_FIRESTORE_DB=default, prod
-    # CHROME_OAUTH_CLIENT_ID). Branch pushes / manual dispatch run on `main` and
-    # build a dev test artifact. The environment-level vars override the
-    # repo-level dev defaults.
+    # they map to the `prod` environment (NEXT_PUBLIC_FIRESTORE_DB=(default),
+    # prod CHROME_OAUTH_CLIENT_ID). Branch pushes / manual dispatch run on `main`
+    # and build a dev test artifact. The environment-level vars override the
+    # repo-level dev defaults. The `(default)` sentinel is normalised to an
+    # empty string below (GitHub forbids empty variable values).
     environment: ${{ github.event_name == 'release' && 'prod' || 'main' }}
     permissions:
       id-token: write # required for Workload Identity Federation
@@ -164,13 +165,21 @@ jobs:
         run: |
           set -eo pipefail
           umask 077
-          # 'default' is the prod sentinel for the (default) Firestore database.
-          # The extension expects an empty string to fall back to
-          # getFirestore(app) (see chrome-extension/src/shared/config.ts).
+          # '(default)' (and the legacy 'default') is the prod sentinel for the
+          # (default) Firestore database. The extension expects an empty string
+          # to fall back to getFirestore(app) (see
+          # chrome-extension/src/shared/config.ts).
           DB="${NEXT_PUBLIC_FIRESTORE_DB}"
-          if [[ "${DB}" == "default" ]]; then
+          if [[ "${DB}" == "default" || "${DB}" == "(default)" ]]; then
             DB=""
           fi
+          # Re-export the sanitised value so the later "Build extension" step
+          # sees the clean value in process.env. Vite resolves
+          # import.meta.env from envDir=ROOT_DIR (no .env file in CI) and falls
+          # back to process.env, so the raw sentinel from the job-level env would
+          # otherwise be baked into the bundle, breaking Firestore with
+          # "Database '(default)' not found". Mirrors cloud-run.yml for the web app.
+          echo "NEXT_PUBLIC_FIRESTORE_DB=${DB}" >> "$GITHUB_ENV"
           echo "Firestore DB: '${DB:-<default>}'  OAuth client: ${CHROME_OAUTH_CLIENT_ID%%-*}-…"
           cat > chrome-extension/.env.production.local <<EOF
           NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
