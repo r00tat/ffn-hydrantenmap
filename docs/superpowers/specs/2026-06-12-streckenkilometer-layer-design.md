@@ -19,11 +19,26 @@ liefert er 0 Treffer. Das Burgenland-GIS (`gisenterprise.bgld.gv.at`) bietet
 keine Autobahn-Kilometrierung an. Ein öffentlicher FeatureServer mit
 österreichischer Kilometrierung existiert nach Recherche nicht.
 
-**Gewählte Quelle:** GIP.at-OGD-Export „C – GeoPackage GIP Referenz"
+**Gewählte Quelle:** GIP.at-OGD-Export
 ([data.gv.at](https://www.data.gv.at/katalog/dataset/intermodales-verkehrsreferenzsystem-osterreich-gip-at-beta)),
-Layer `Bezugspunkte` (= Kilometertafeln), Lizenz **CC BY 4.0**, Aktualisierung
-alle 2 Monate (für diesen Anwendungsfall irrelevant, da sich die
-Kilometrierung praktisch nie ändert).
+Lizenz **CC BY 4.0** (Attribution: „Datenquelle: gip.gv.at", verlinkt auf
+`www.gip.gv.at`), Aktualisierung alle 2 Monate (für diesen Anwendungsfall
+irrelevant, da sich die Kilometrierung praktisch nie ändert).
+
+**Wichtige Einschränkung (bei der Umsetzung festgestellt):** Der Layer
+`Bezugspunkte` (`BEPU_OGD`) im GeoPackage „C – GIP Referenz" enthält **keine**
+Kilometertafeln für Autobahnen/Schnellstraßen — ASFINAG publiziert seine
+Bezugspunkte nicht im OGD-Export (0 von 252.814 Punkten liegen auf
+EDGECAT-'A'-Kanten). Die Kilometrierung der Autobahnen ist aber als
+kilometrierte Richtungsfahrbahn-Routen in der Tabelle `LinkEdgeRoute` des
+Routingexports enthalten (`ROUTE_NAME` z.B. „A4 - Ost Autobahn rechte
+Fahrbahn (Hauptrichtung) kilometriert E", `SUBROUTE_STARTKM`/`SUBROUTE_ENDKM`).
+Die km-Punkte werden daher **abgeleitet**: Die Link-Geometrien jeder Route
+werden in Traversierungsreihenfolge abgegangen und alle 500 m wird ein Punkt
+linear interpoliert. Validierung: Die Geometrie-Längen weichen nur 0,0–0,2 %
+von der offiziellen Kilometrierung ab (Ausnahme S4 Gegenrichtung: 1,9 %
+wegen Fehlkilometrierung — dort können einzelne Tafeln um bis zu ~200 m
+versetzt sein).
 
 ## Umfang
 
@@ -43,15 +58,17 @@ Richtungsfahrbahn), als GeoJSON ~150–350 KB unkomprimiert, ~20–50 KB gzipped
 
 ### 1. Datenbeschaffung (einmalig, Script)
 
-- Extraktions-Script neben den bestehenden Import-Scripts. Eingabe: Pfad zum
-  lokal heruntergeladenen GIP-GeoPackage (der mehrere 100 MB große Download
-  landet **nicht** im Repo).
-- Filtert den Layer `Bezugspunkte` auf die o.g. Straßenbezeichnungen,
-  projiziert nach WGS84, rundet Koordinaten und schreibt
-  `public/data/streckenkilometer.geojson` mit minimalen Properties:
-  `strasse`, `km`, `richtung`.
-- Das erzeugte GeoJSON wird **ins Repo committed**; das Script bleibt für
-  spätere Aktualisierungen dokumentiert.
+- Extraktions-Script `src/server/streckenkilometer-extract.ts`
+  (`npm run extractStreckenkilometer`). Eingaben: `LinkEdgeRoute.txt` aus
+  `A_routingexport_ogd_split.zip` sowie `gip_network_ogd.gpkg` aus
+  `B_gip_network_ogd.zip` (die GB-großen Downloads landen **nicht** im Repo).
+- Filtert die kilometrierten Hauptfahrbahn-Routen der o.g. Straßen, geht die
+  Link-Geometrien (WGS84) in Traversierungsreihenfolge ab und interpoliert
+  alle 500 m einen Punkt; schreibt `public/data/streckenkilometer.geojson`
+  mit minimalen Properties: `strasse`, `km`, `richtung`
+  (`Hauptrichtung`/`Gegenrichtung`).
+- Das erzeugte GeoJSON (738 Punkte, ~110 KB) wird **ins Repo committed**;
+  das Script bleibt für spätere Aktualisierungen dokumentiert.
 
 ### 2. Layer-Komponente
 
@@ -95,8 +112,9 @@ Neue UI-Strings (Layer-Name, Popup-Beschriftungen) in `messages/de.json` und
 - Schlägt der `fetch` des GeoJSON fehl, bleibt der Layer leer; der Fehler wird
   über das bestehende Error-Reporting geloggt. Beim nächsten Aktivieren wird
   erneut geladen.
-- Das Extraktions-Script bricht mit klarer Fehlermeldung ab, wenn das
-  GeoPackage fehlt oder der `Bezugspunkte`-Layer nicht gefunden wird.
+- Das Extraktions-Script bricht mit klarer Fehlermeldung ab, wenn die
+  Eingabedateien fehlen oder keine kilometrierten Routen gefunden werden,
+  und warnt bei Geometrie-Lücken (>100 m) innerhalb einer Route.
 
 ## Tests (TDD)
 

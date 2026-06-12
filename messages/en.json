@@ -692,6 +692,9 @@
     "manualNuclideHelp": "Overrides the automatic detection in the list.",
     "descriptionField": "Description"
   },
+  "streckenkilometer": {
+    "direction": "Direction"
+  },
   "kostenersatz": {
     "title": "Cost recovery",
     "titleForCall": "Cost recovery - {name}",

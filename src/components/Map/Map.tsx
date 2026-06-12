@@ -33,6 +33,9 @@ import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
 import PowerOutageLayer from './layers/PowerOutageLayer';
 import PegelstandLayer from './layers/PegelstandLayer';
+import StreckenkilometerLayer, {
+  STRECKENKILOMETER_LAYER_NAME,
+} from './layers/StreckenkilometerLayer';
 import WetterstationLayer from './layers/WetterstationLayer';
 import PositionMarker from './markers/PositionMarker';
 import { availableLayers, overlayLayers } from './tiles';
@@ -141,6 +144,9 @@ export default function Map() {
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Wetterstationen">
             <WetterstationLayer />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name={STRECKENKILOMETER_LAYER_NAME}>
+            <StreckenkilometerLayer />
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
             .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')
