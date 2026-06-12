@@ -3,7 +3,6 @@ export interface StreckenkilometerPoint {
   km: number;
   lat: number;
   lng: number;
-  richtung?: string;
 }
 
 export interface SimpleBounds {

@@ -1,7 +1,6 @@
 'use client';
 
 import L from 'leaflet';
-import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
 import {
@@ -17,7 +16,7 @@ const BOUNDS_PADDING = 0.2;
 
 interface StreckenkilometerFeature {
   geometry: { coordinates: [number, number] };
-  properties: { strasse: string; km: number; richtung?: string };
+  properties: { strasse: string; km: number };
 }
 
 const iconCache = new Map<string, L.DivIcon>();
@@ -109,7 +108,6 @@ function useStreckenkilometerData(
           (geojson.features as StreckenkilometerFeature[]).map((feature) => ({
             strasse: feature.properties.strasse,
             km: feature.properties.km,
-            richtung: feature.properties.richtung,
             lng: feature.geometry.coordinates[0],
             lat: feature.geometry.coordinates[1],
           }))
@@ -127,7 +125,6 @@ function useStreckenkilometerData(
 }
 
 export default function StreckenkilometerLayer() {
-  const t = useTranslations('streckenkilometer');
   const visible = useLayerVisible();
   const points = useStreckenkilometerData(visible);
   const { zoom, bounds } = useViewport();
@@ -145,18 +142,12 @@ export default function StreckenkilometerLayer() {
           <Marker
             position={[point.lat, point.lng]}
             icon={getKmTafelIcon(label)}
-            key={`${point.strasse}-${point.km}-${point.richtung || ''}`}
+            key={`${point.strasse}-${point.km}`}
           >
             <Popup>
               <b>
                 {point.strasse} km {formatKm(point.km)}
               </b>
-              {point.richtung && (
-                <>
-                  <br />
-                  {t('direction')}: {point.richtung}
-                </>
-              )}
             </Popup>
           </Marker>
         );

@@ -692,9 +692,6 @@
     "manualNuclideHelp": "Überschreibt die automatische Erkennung in der Liste.",
     "descriptionField": "Beschreibung"
   },
-  "streckenkilometer": {
-    "direction": "Richtung"
-  },
   "kostenersatz": {
     "title": "Kostenersatz",
     "titleForCall": "Kostenersatz - {name}",

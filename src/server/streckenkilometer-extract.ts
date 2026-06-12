@@ -8,7 +8,9 @@
  * liegt aber als kilometrierte Richtungsfahrbahn-Routen in der Tabelle
  * LinkEdgeRoute des Routingexports vor (SUBROUTE_STARTKM/ENDKM je Route).
  * Dieses Script geht die Link-Geometrien jeder Route entlang und
- * interpoliert alle 500 m einen km-Punkt.
+ * interpoliert alle 500 m einen km-Punkt. Die beiden Richtungsfahrbahnen
+ * werden anschließend je km-Wert zu einem Punkt in der Mitte zusammengeführt
+ * (eine Tafel pro km-Wert reicht auf der Karte).
  *
  * Benötigte Downloads (https://www.data.gv.at, Datensatz GIP.at Österreich):
  *   https://open.gip.gv.at/ogd/A_routingexport_ogd_split.zip → LinkEdgeRoute.txt
@@ -310,9 +312,29 @@ async function main() {
   console.log(`Lade ${linkIds.length} Link-Geometrien…`);
   const geometries = loadLinkGeometries(gpkg, linkIds);
 
-  const points = subroutes.flatMap((subroute) =>
+  const directionalPoints = subroutes.flatMap((subroute) =>
     interpolateKmPoints(subroute, buildRouteLine(subroute, geometries))
   );
+
+  // Beide Richtungsfahrbahnen je km-Wert zu einem Punkt in der Mitte
+  // zusammenführen — eine Tafel pro km-Wert reicht auf der Karte.
+  const merged = new Map<string, KmPoint[]>();
+  directionalPoints.forEach((point) => {
+    const key = `${point.strasse}-${point.km}`;
+    merged.set(key, [...(merged.get(key) || []), point]);
+  });
+  const points = Array.from(merged.values()).map((group) => ({
+    strasse: group[0].strasse,
+    km: group[0].km,
+    lng:
+      Math.round(
+        (group.reduce((sum, p) => sum + p.lng, 0) / group.length) * 1e6
+      ) / 1e6,
+    lat:
+      Math.round(
+        (group.reduce((sum, p) => sum + p.lat, 0) / group.length) * 1e6
+      ) / 1e6,
+  }));
 
   const counts: Record<string, number> = {};
   points.forEach((point) => {
@@ -328,7 +350,6 @@ async function main() {
       properties: {
         strasse: point.strasse,
         km: point.km,
-        richtung: point.richtung,
       },
     })),
   };

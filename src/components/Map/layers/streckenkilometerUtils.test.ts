@@ -9,9 +9,8 @@ const point = (
   strasse: string,
   km: number,
   lat: number,
-  lng: number,
-  richtung?: string
-): StreckenkilometerPoint => ({ strasse, km, lat, lng, richtung });
+  lng: number
+): StreckenkilometerPoint => ({ strasse, km, lat, lng });
 
 describe('formatKm', () => {
   it('formatiert ganze Kilometer mit einer Nachkommastelle und Komma', () => {

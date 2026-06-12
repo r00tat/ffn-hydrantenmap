@@ -35,7 +35,9 @@ Routingexports enthalten (`ROUTE_NAME` z.B. „A4 - Ost Autobahn rechte
 Fahrbahn (Hauptrichtung) kilometriert E", `SUBROUTE_STARTKM`/`SUBROUTE_ENDKM`).
 Die km-Punkte werden daher **abgeleitet**: Die Link-Geometrien jeder Route
 werden in Traversierungsreihenfolge abgegangen und alle 500 m wird ein Punkt
-linear interpoliert. Validierung: Die Geometrie-Längen weichen nur 0,0–0,2 %
+linear interpoliert. Die beiden Richtungsfahrbahnen werden je km-Wert zu
+einem Punkt in der Fahrbahnmitte zusammengeführt — eine Tafel pro km-Wert
+reicht auf der Karte (Benutzer-Feedback nach erstem Test). Validierung: Die Geometrie-Längen weichen nur 0,0–0,2 %
 von der offiziellen Kilometrierung ab (Ausnahme S4 Gegenrichtung: 1,9 %
 wegen Fehlkilometrierung — dort können einzelne Tafeln um bis zu ~200 m
 versetzt sein).
@@ -63,11 +65,11 @@ Richtungsfahrbahn), als GeoJSON ~150–350 KB unkomprimiert, ~20–50 KB gzipped
   `A_routingexport_ogd_split.zip` sowie `gip_network_ogd.gpkg` aus
   `B_gip_network_ogd.zip` (die GB-großen Downloads landen **nicht** im Repo).
 - Filtert die kilometrierten Hauptfahrbahn-Routen der o.g. Straßen, geht die
-  Link-Geometrien (WGS84) in Traversierungsreihenfolge ab und interpoliert
-  alle 500 m einen Punkt; schreibt `public/data/streckenkilometer.geojson`
-  mit minimalen Properties: `strasse`, `km`, `richtung`
-  (`Hauptrichtung`/`Gegenrichtung`).
-- Das erzeugte GeoJSON (738 Punkte, ~110 KB) wird **ins Repo committed**;
+  Link-Geometrien (WGS84) in Traversierungsreihenfolge ab, interpoliert
+  alle 500 m einen Punkt und führt die beiden Richtungsfahrbahnen je km-Wert
+  zu einem Punkt zusammen; schreibt `public/data/streckenkilometer.geojson`
+  mit minimalen Properties: `strasse`, `km`.
+- Das erzeugte GeoJSON (~370 Punkte, ~50 KB) wird **ins Repo committed**;
   das Script bleibt für spätere Aktualisierungen dokumentiert.
 
 ### 2. Layer-Komponente
@@ -81,7 +83,7 @@ registriert als Overlay „Streckenkilometer" in der `LayersControl` in
   (`overlayadd`-Event). Danach bleibt es im Speicher.
 - **Darstellung:** km-Tafel-Labels als `L.divIcon` im Stil der blauen
   Autobahntafeln (weiße Schrift auf blauem Grund, z.B. „A4 43,0").
-- **Popup** beim Antippen: Straße, Kilometer, Richtung.
+- **Popup** beim Antippen: Straße und Kilometer.
 - **Attribution:** „GIP.at / CC BY 4.0" am Layer.
 
 ### 3. Performance
@@ -93,9 +95,8 @@ DOM-Elemente. Daher wird nur die sichtbare Teilmenge gerendert:
   `map.getBounds()` (+ Puffer) gerendert — O(n)-Filter über ≤1.600 Punkte,
   typisch 20–40 Marker im DOM.
 - **Zoom-Staffelung:** unter Zoom 13 keine Tafeln, Zoom 13–14 nur ganze
-  Kilometer, ab Zoom 15 alle Tafeln (inkl. 0,5er und beide
-  Richtungsfahrbahnen).
-- **Stabile Keys + Icon-Cache:** React-Keys wie `A4-43.0-+`, `L.divIcon`-
+  Kilometer, ab Zoom 15 alle Tafeln (inkl. 0,5er).
+- **Stabile Keys + Icon-Cache:** React-Keys wie `A4-43`, `L.divIcon`-
   Instanzen gecacht (Muster wie `iconCache` im `PegelstandLayer`).
 
 Clustering ist bewusst nicht vorgesehen — zusammengefasste km-Tafeln hätten
