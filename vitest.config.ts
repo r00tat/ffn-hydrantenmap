@@ -10,6 +10,15 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    server: {
+      deps: {
+        // @mui/material@9.1+ ships Transition.mjs with a directory import
+        // (`react-transition-group/TransitionGroupContext`) that Node's native
+        // ESM loader cannot resolve when the module is externalized. Inlining
+        // lets Vite transform and resolve it instead.
+        inline: ['@mui/material'],
+      },
+    },
     exclude: [
       '**/node_modules/**',
       '**/playwright/**',
