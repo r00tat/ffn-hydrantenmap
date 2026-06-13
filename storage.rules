@@ -1,10 +1,10 @@
 rules_version = '2';
 
 function authorizedUser() {
-  return request.auth != null && ( 
+  return request.auth != null && (
 
-    request.auth.token.email.matches(".*@ff-neusiedlamsee.at") || 
-    get(/databases/default/documents/user/$(request.auth.uid)).data.authorized in [true, 'on', 'yes', 'y']
+    (request.auth.token.email_verified == true && request.auth.token.email.matches(".*@ff-neusiedlamsee\\.at")) ||
+    request.auth.token.authorized == true
     );
 }
 

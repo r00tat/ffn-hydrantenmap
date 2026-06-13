@@ -3,14 +3,10 @@ import { DataMessagePayload, getMessaging } from 'firebase-admin/messaging';
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatMessage } from '../../../common/chat';
 import userRequired from '../../../server/auth/userRequired';
+import { verifyUserAuthorizedForFirecall } from '../../../server/auth/verifyUserAuthorizedForFirecall';
 import { firestore } from '../../../server/firebase/admin';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
-import {
-  Firecall,
-  FIRECALL_COLLECTION_ID,
-  USER_COLLECTION_ID,
-} from '../../../components/firebase/firestore';
-import { FirebaseUserInfo } from '../../../common/users';
+import { FIRECALL_COLLECTION_ID } from '../../../components/firebase/firestore';
 import { ApiException } from '../errors';
 
 export interface UsersResponse {
@@ -53,45 +49,6 @@ async function newChatMessage(
   console.info(`posted message to topic chat: ${resp}`);
 
   return { ...newMessage, id: newDoc.id };
-}
-
-async function verifyUserAuthorizedForFirecall(
-  user: DecodedIdToken,
-  firecallId: string
-): Promise<void> {
-  const firecallDoc = await firestore
-    .collection(FIRECALL_COLLECTION_ID)
-    .doc(firecallId)
-    .get();
-  if (!firecallDoc.exists) {
-    throw new ApiException(`firecall ${firecallId} does not exist`, {
-      status: 404,
-    });
-  }
-  const firecallData = firecallDoc.data() as Firecall;
-  if (!firecallData || !firecallData.group) {
-    throw new ApiException(`firecall ${firecallId} has no group`, {
-      status: 403,
-    });
-  }
-
-  const userDoc = await firestore
-    .collection(USER_COLLECTION_ID)
-    .doc(user.uid)
-    .get();
-  const userData = userDoc.data() as FirebaseUserInfo | undefined;
-  const userGroups: string[] = userData?.groups || [];
-  const userFirecall: string | undefined = userData?.firecall;
-
-  if (
-    !userGroups.includes(firecallData.group) &&
-    userFirecall !== firecallId
-  ) {
-    throw new ApiException(
-      `user ${user.uid} is not authorized for firecall ${firecallId}`,
-      { status: 403 }
-    );
-  }
 }
 
 export async function POST(req: NextRequest) {
