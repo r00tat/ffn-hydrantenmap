@@ -18,6 +18,9 @@ import { buildBugReportEmail } from './buildBugReportEmail';
 
 const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 interface SubmitResult {
   reportId: string;
 }
@@ -32,6 +35,13 @@ export async function submitBugReportAction(
   }
   if (input.kind !== 'bug' && input.kind !== 'feature') {
     throw new Error('Invalid kind');
+  }
+  // The report id is client-generated (needed up front for screenshot upload
+  // paths). Restrict it to a UUID v4 so it cannot point at an arbitrary
+  // document path, and create the doc with `.create()` below so a caller can
+  // never overwrite an existing report by supplying its id.
+  if (!UUID_V4_REGEX.test(input.reportId ?? '')) {
+    throw new Error('Invalid reportId');
   }
 
   const createdBy = {
@@ -56,7 +66,20 @@ export async function submitBugReportAction(
   const docRef = firestore
     .collection(BUG_REPORT_COLLECTION)
     .doc(input.reportId);
-  await docRef.set(data);
+  // `.create()` fails with ALREADY_EXISTS if a report with this id already
+  // exists, preventing an authorized user from overwriting another report.
+  try {
+    await docRef.create(data);
+  } catch (err: unknown) {
+    if (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as { code?: number }).code === 6 // ALREADY_EXISTS
+    ) {
+      throw new Error('Report already exists');
+    }
+    throw err;
+  }
 
   // Best-effort notification mail
   try {
