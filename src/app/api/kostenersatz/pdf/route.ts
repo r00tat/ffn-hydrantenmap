@@ -3,6 +3,7 @@ import path from 'path';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { isDynamicServerError } from 'next/dist/client/components/hooks-server-context';
 import userRequired from '../../../../server/auth/userRequired';
+import { verifyUserAuthorizedForFirecall } from '../../../../server/auth/verifyUserAuthorizedForFirecall';
 import { firestore } from '../../../../server/firebase/admin';
 import KostenersatzPdf from '../../../../components/Kostenersatz/KostenersatzPdf';
 import {
@@ -11,7 +12,7 @@ import {
   KOSTENERSATZ_RATES_COLLECTION,
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../../../../common/kostenersatz';
-import { FIRECALL_COLLECTION_ID, Firecall } from '../../../../components/firebase/firestore';
+import { FIRECALL_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { getDefaultRatesWithVersion } from '../../../../common/defaultKostenersatzRates';
 
 const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
@@ -19,7 +20,7 @@ const logoPath = path.join(process.cwd(), 'public', 'FFND_logo.png');
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    await userRequired(request);
+    const authData = await userRequired(request);
 
     // Get parameters from URL
     const { searchParams } = new URL(request.url);
@@ -33,20 +34,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Load firecall
-    const firecallDoc = await firestore
-      .collection(FIRECALL_COLLECTION_ID)
-      .doc(firecallId)
-      .get();
-
-    if (!firecallDoc.exists) {
-      return NextResponse.json(
-        { error: 'Firecall not found' },
-        { status: 404 }
-      );
-    }
-
-    const firecall = { id: firecallDoc.id, ...firecallDoc.data() } as Firecall;
+    // Verify the caller is authorized for this specific firecall (prevents
+    // IDOR: the calculation contains the recipient's name, address and contact
+    // details, which must not be readable across firecalls/groups).
+    const firecall = await verifyUserAuthorizedForFirecall(
+      authData,
+      firecallId
+    );
 
     // Load calculation
     const calculationDoc = await firestore

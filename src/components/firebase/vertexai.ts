@@ -10,6 +10,7 @@ import {
   VertexAIBackend,
 } from 'firebase/ai';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { GEMINI_MODEL } from '../../common/ai';
 
 // Initialize the Vertex AI service
@@ -99,7 +100,11 @@ export function useAiQueryHook() {
         console.log(chunkText);
         text += chunkText;
         setResultText(text);
-        setResultHtml(await marked(text));
+        // Sanitize the rendered markdown: the model output is derived from
+        // user-entered firecall/diary text and is injected via
+        // dangerouslySetInnerHTML, so unsanitized HTML would be a stored XSS
+        // sink. resultHtml is therefore always sanitized at the source.
+        setResultHtml(DOMPurify.sanitize(await marked(text)));
       }
       setIsQuerying(false);
       console.info(`final gemini result: ${text}`);

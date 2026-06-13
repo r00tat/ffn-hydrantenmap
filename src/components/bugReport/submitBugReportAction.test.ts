@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const mockSet = vi.fn().mockResolvedValue(undefined);
+const mockCreate = vi.fn().mockResolvedValue(undefined);
 const mockGet = vi.fn();
 const mockUpdate = vi.fn().mockResolvedValue(undefined);
-const mockDoc = vi.fn(() => ({ set: mockSet, get: mockGet, update: mockUpdate }));
+const mockDoc = vi.fn(() => ({
+  create: mockCreate,
+  get: mockGet,
+  update: mockUpdate,
+}));
 const mockCollection = vi.fn((..._args: unknown[]) => ({ doc: mockDoc }));
 
 vi.mock('../../server/firebase/admin', () => ({
@@ -34,8 +38,10 @@ vi.mock('../../server/auth/workspace', () => ({
 
 import { submitBugReportAction } from './submitBugReportAction';
 
+const VALID_UUID = '11111111-1111-4111-8111-111111111111';
+
 const baseInput = {
-  reportId: 'r1',
+  reportId: VALID_UUID,
   kind: 'bug' as const,
   title: 'T',
   description: 'D',
@@ -74,13 +80,27 @@ describe('submitBugReportAction', () => {
     await submitBugReportAction(baseInput);
 
     expect(actionUserRequiredMock).toHaveBeenCalled();
-    const written = mockSet.mock.calls[0][0];
+    const written = mockCreate.mock.calls[0][0];
     expect(written.createdBy).toEqual({
       uid: 'uid1',
       email: 'me@ff-neusiedlamsee.at',
       displayName: 'Me',
     });
     expect(written.status).toBe('open');
+  });
+
+  it('rejects an invalid (non-UUID) reportId without writing', async () => {
+    await expect(
+      submitBugReportAction({ ...baseInput, reportId: 'r1' }),
+    ).rejects.toThrow('Invalid reportId');
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects overwriting an existing report (ALREADY_EXISTS)', async () => {
+    mockCreate.mockRejectedValueOnce({ code: 6 });
+    await expect(submitBugReportAction(baseInput)).rejects.toThrow(
+      'Report already exists',
+    );
   });
 
   it('skips email when config disabled', async () => {
@@ -109,7 +129,7 @@ describe('submitBugReportAction', () => {
     sendMock.mockRejectedValueOnce(new Error('SMTP down'));
 
     await expect(submitBugReportAction(baseInput)).resolves.toEqual({
-      reportId: 'r1',
+      reportId: VALID_UUID,
     });
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ notificationError: 'SMTP down' }),
