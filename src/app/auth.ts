@@ -18,20 +18,30 @@ import {
 } from '../server/auth/autoProvisionUser';
 
 export async function checkFirebaseToken(token: string) {
-  const decodedToken = await firebaseAuth.verifyIdToken(token);
+  // checkRevoked: reject tokens of disabled/revoked users immediately
+  // instead of letting them work until the token expires (~1h).
+  const decodedToken = await firebaseAuth.verifyIdToken(token, true);
 
-  if (!isInternalEmail(decodedToken.email)) {
-    const userDoc = await firestore
-      .collection(USER_COLLECTION_ID)
-      .doc(decodedToken.sub)
-      .get();
+  const userDoc = await firestore
+    .collection(USER_COLLECTION_ID)
+    .doc(decodedToken.sub)
+    .get();
 
+  if (userDoc.exists) {
+    // An existing user doc is authoritative for everyone (including internal
+    // users), so de-authorizing a user in Firestore takes effect.
     console.info(`user authorization check: ${userDoc.data()?.authorized}`);
-    if (!(userDoc.exists && isTruthy(userDoc.data()?.authorized))) {
+    if (!isTruthy(userDoc.data()?.authorized)) {
       throw new ApiException('your user is not authorized', {
         status: 403,
       });
     }
+  } else if (!isInternalEmail(decodedToken.email)) {
+    // No user doc yet and not an internal user: not authorized. Internal users
+    // without a doc are allowed here and auto-provisioned right after sign-in.
+    throw new ApiException('your user is not authorized', {
+      status: 403,
+    });
   }
   console.info(`user ${decodedToken.sub} verified`);
   return decodedToken;

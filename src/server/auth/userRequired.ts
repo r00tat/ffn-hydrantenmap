@@ -17,21 +17,30 @@ const userRequired = async (req: NextRequest): Promise<DecodedIdToken> => {
   }
   const token = authorization.replace('Bearer ', '');
   try {
-    const decodedToken = await firebaseAuth.verifyIdToken(token);
+    // checkRevoked: reject tokens of disabled/revoked users immediately
+    // instead of letting them work until the token expires (~1h).
+    const decodedToken = await firebaseAuth.verifyIdToken(token, true);
     // console.log(`decoded token: ${JSON.stringify(decodedToken)}`);
-    if (isInternalEmail(decodedToken.email)) {
-      // allow all internal users
-      return decodedToken;
-    }
+
     // fetch the user and check if this is an active user
     const userDoc = await firestore
       .collection(USER_COLLECTION_ID)
       .doc(decodedToken.sub)
       .get();
-    if (!(userDoc.exists && userDoc.data()?.authorized === true)) {
-      throw new ApiException('your user is not authorized', { status: 403 });
+    if (userDoc.exists) {
+      // An existing user doc is authoritative for everyone (including internal
+      // users), so de-authorizing a user in Firestore takes effect.
+      if (userDoc.data()?.authorized !== true) {
+        throw new ApiException('your user is not authorized', { status: 403 });
+      }
+      return decodedToken;
     }
-    return decodedToken;
+    // No user doc yet: internal users are auto-provisioned on first login,
+    // so allow them through. Everyone else is unauthorized.
+    if (isInternalEmail(decodedToken.email)) {
+      return decodedToken;
+    }
+    throw new ApiException('your user is not authorized', { status: 403 });
   } catch (err: any) {
     console.warn(`invalid token received: ${err} ${err.stack}`);
     throw new ApiException('invalid token');

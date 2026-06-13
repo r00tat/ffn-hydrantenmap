@@ -15,7 +15,9 @@ const adminRequired = async (req: NextRequest) => {
   }
   const token = authorization.replace('Bearer ', '');
   try {
-    const decodedToken = await firebaseAuth.verifyIdToken(token);
+    // checkRevoked: reject tokens of disabled/revoked users immediately
+    // instead of letting them work until the token expires (~1h).
+    const decodedToken = await firebaseAuth.verifyIdToken(token, true);
 
     const userDoc = await firestore
       .collection(USER_COLLECTION_ID)
