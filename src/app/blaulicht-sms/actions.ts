@@ -4,6 +4,7 @@ import 'server-only';
 import { actionUserRequired } from '../auth';
 import { firestore } from '../../server/firebase/admin';
 import { decryptPassword } from '../../server/blaulichtsms/encryption';
+import { isAuthorizedForFirecall } from './groupFilter';
 
 const COLLECTION = 'blaulichtsmsConfig';
 
@@ -167,9 +168,13 @@ export async function getBlaulichtSmsAlarmById(
 export async function getFirecallsByAlarmIds(
   alarmIds: string[]
 ): Promise<Record<string, { id: string; name: string }>> {
-  await actionUserRequired();
+  const session = await actionUserRequired();
 
   if (alarmIds.length === 0) return {};
+
+  const userGroups = session.user.groups ?? [];
+  const userFirecall = session.user.firecall;
+  const isAdmin = session.user.isAdmin;
 
   const results: Record<string, { id: string; name: string }> = {};
   const chunks: string[][] = [];
@@ -185,6 +190,19 @@ export async function getFirecallsByAlarmIds(
       .get();
     for (const doc of snapshot.docs) {
       const data = doc.data();
+      // Only expose firecalls the user is authorized for; otherwise this leaks
+      // ids/names of firecalls from other groups.
+      if (
+        !isAuthorizedForFirecall(
+          data.group,
+          doc.id,
+          userGroups,
+          userFirecall,
+          isAdmin
+        )
+      ) {
+        continue;
+      }
       results[data.blaulichtSmsAlarmId] = { id: doc.id, name: data.name };
     }
   }

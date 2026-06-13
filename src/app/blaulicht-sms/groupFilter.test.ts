@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { filterGroupsByMembership } from './groupFilter';
+import {
+  filterGroupsByMembership,
+  isAuthorizedForFirecall,
+} from './groupFilter';
 
 describe('filterGroupsByMembership', () => {
   it('returns all groups for admin even if not member', () => {
@@ -40,5 +43,37 @@ describe('filterGroupsByMembership', () => {
     const result = filterGroupsByMembership(input, [], true);
     expect(result).not.toBe(input);
     expect(result).toEqual(input);
+  });
+});
+
+describe('isAuthorizedForFirecall', () => {
+  it('allows admins for any firecall', () => {
+    expect(isAuthorizedForFirecall('other', 'fc1', [], undefined, true)).toBe(
+      true,
+    );
+  });
+
+  it('allows users that are members of the firecall group', () => {
+    expect(
+      isAuthorizedForFirecall('einsatz', 'fc1', ['einsatz'], undefined, false),
+    ).toBe(true);
+  });
+
+  it('allows a single-firecall guest claim', () => {
+    expect(isAuthorizedForFirecall('einsatz', 'fc1', [], 'fc1', false)).toBe(
+      true,
+    );
+  });
+
+  it('denies users outside the group without a matching claim', () => {
+    expect(
+      isAuthorizedForFirecall('einsatz', 'fc1', ['other'], 'fc2', false),
+    ).toBe(false);
+  });
+
+  it('denies when the firecall has no group and no claim matches', () => {
+    expect(
+      isAuthorizedForFirecall(undefined, 'fc1', ['einsatz'], undefined, false),
+    ).toBe(false);
   });
 });
