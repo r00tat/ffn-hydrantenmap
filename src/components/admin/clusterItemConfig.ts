@@ -34,6 +34,7 @@ export const collectionConfigs: CollectionConfig[] = [
     fields: [
       { key: 'name', label: 'Name', type: 'text', required: true, tableColumn: true },
       { key: 'ortschaft', label: 'Ortschaft', type: 'text', tableColumn: true },
+      { key: 'adresse', label: 'Adresse', type: 'text', tableColumn: true },
       { key: 'typ', label: 'Typ', type: 'text', tableColumn: true },
       { key: 'hydranten_nummer', label: 'Hydranten Nr.', type: 'text', tableColumn: true },
       { key: 'fuellhydrant', label: 'Füllhydrant', type: 'text' },

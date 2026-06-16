@@ -24,6 +24,7 @@ export const GEOHASH_PRECISION = 6;
 // Name,ortschaft,Typ,Hydranten Nummer,Fuellhydrant,Dimension,Leitungsart,Statischer Druck,Dynamischer Druck,DRUCKMESSUNG_DATUM,Meereshoehe,c_x,c_y,
 export interface Hydrant {
   ortschaft: string;
+  adresse?: string;
   typ: string;
   hydranten_nummer: string;
   fuellhydrant: string;
