@@ -50,6 +50,11 @@ interface LocationMapPickerProps {
   showFirecallLayers?: boolean;
   /** Custom dialog title. Default: "Position auf Karte wählen" */
   title?: string;
+  /**
+   * Pre-fills the search field when the dialog opens. If no initial position
+   * (lat/lng) is set, the query is geocoded automatically on open.
+   */
+  initialSearchQuery?: string;
 }
 
 function ClickHandler({
@@ -86,6 +91,7 @@ export default function LocationMapPicker({
   center = { lat: 47.9485, lng: 16.8452 }, // Neusiedl am See default
   showFirecallLayers = true,
   title = 'Position auf Karte wählen',
+  initialSearchQuery,
 }: LocationMapPickerProps) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(
     initialLat && initialLng ? { lat: initialLat, lng: initialLng } : null
@@ -93,17 +99,6 @@ export default function LocationMapPicker({
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number } | null>(null);
-
-  // Reset state when the dialog opens
-  useEffect(() => {
-    if (open) {
-      const initial =
-        initialLat && initialLng ? { lat: initialLat, lng: initialLng } : null;
-      setPosition(initial);
-      setFlyTarget(initial);
-      setSearchQuery('');
-    }
-  }, [open, initialLat, initialLng]);
 
   const handleClick = useCallback((lat: number, lng: number) => {
     setPosition({ lat, lng });
@@ -116,8 +111,8 @@ export default function LocationMapPicker({
     onClose();
   }, [position, onConfirm, onClose]);
 
-  const handleSearch = useCallback(async () => {
-    const q = searchQuery.trim();
+  const geocode = useCallback(async (query: string) => {
+    const q = query.trim();
     if (!q) return;
     setSearching(true);
     try {
@@ -136,13 +131,34 @@ export default function LocationMapPicker({
         const lat = parseFloat(data[0].lat);
         const lng = parseFloat(data[0].lon);
         setFlyTarget({ lat, lng });
+        setPosition({ lat, lng });
       }
     } catch (err) {
       console.error('Geocoding failed:', err);
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    geocode(searchQuery);
+  }, [geocode, searchQuery]);
+
+  // Reset state when the dialog opens
+  useEffect(() => {
+    if (open) {
+      const initial =
+        initialLat && initialLng ? { lat: initialLat, lng: initialLng } : null;
+      setPosition(initial);
+      setFlyTarget(initial);
+      const query = initialSearchQuery ?? '';
+      setSearchQuery(query);
+      // No position yet but an address to search → geocode automatically
+      if (!initial && query.trim()) {
+        geocode(query);
+      }
+    }
+  }, [open, initialLat, initialLng, initialSearchQuery, geocode]);
 
   const mapCenter = position || center;
 
