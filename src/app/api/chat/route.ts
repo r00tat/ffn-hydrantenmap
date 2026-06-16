@@ -1,5 +1,5 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { DataMessagePayload, getMessaging } from 'firebase-admin/messaging';
+import { getMessaging } from 'firebase-admin/messaging';
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatMessage } from '../../../common/chat';
 import userRequired from '../../../server/auth/userRequired';
@@ -44,7 +44,7 @@ async function newChatMessage(
   const messaging = getMessaging();
   const resp = await messaging.send({
     topic: 'chat',
-    data: newMessage as unknown as DataMessagePayload,
+    data: newMessage as unknown as { [key: string]: string },
   });
   console.info(`posted message to topic chat: ${resp}`);
 
