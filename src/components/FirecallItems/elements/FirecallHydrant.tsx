@@ -7,6 +7,7 @@ import { FirecallItemBase } from './FirecallItemBase';
 
 export class FirecallHydrant extends FirecallItemBase {
   ortschaft: string;
+  adresse: string;
   typ: string;
   hydranten_nummer: string;
   fuellhydrant: string;
@@ -25,6 +26,7 @@ export class FirecallHydrant extends FirecallItemBase {
     this.editable = true;
     ({
       ortschaft: this.ortschaft = '',
+      adresse: this.adresse = '',
       typ: this.typ = 'Überflurhydrant',
       hydranten_nummer: this.hydranten_nummer = '',
       fuellhydrant: this.fuellhydrant = '',
@@ -47,6 +49,7 @@ export class FirecallHydrant extends FirecallItemBase {
     return {
       ...super.data(),
       ortschaft: this.ortschaft,
+      adresse: this.adresse,
       typ: this.typ,
       hydranten_nummer: this.hydranten_nummer,
       fuellhydrant: this.fuellhydrant,
@@ -65,6 +68,7 @@ export class FirecallHydrant extends FirecallItemBase {
     return {
       name: 'Name',
       ortschaft: 'Ortschaft',
+      adresse: 'Adresse',
       typ: 'Typ',
       hydranten_nummer: 'Hydrantennummer',
       fuellhydrant: 'Füllhydrant',
@@ -119,6 +123,12 @@ export class FirecallHydrant extends FirecallItemBase {
           <br />
           {this.leistung ? this.leistung + ' l/min ' : ''} ({this.dimension}mm)
         </b>
+        {this.adresse && (
+          <>
+            <br />
+            {this.adresse}
+          </>
+        )}
         <br />
         dynamisch: {this.dynamischer_druck} bar
         <br />

@@ -171,6 +171,10 @@ export default function ClusterItemEditDialog({
             ? parseFloat(formData.lng)
             : undefined
         }
+        initialSearchQuery={[formData.adresse, formData.ortschaft]
+          .map((s) => s?.trim())
+          .filter(Boolean)
+          .join(', ')}
       />
     </>
   );

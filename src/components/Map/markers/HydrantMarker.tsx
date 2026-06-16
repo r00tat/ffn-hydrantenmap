@@ -69,6 +69,12 @@ export default function HydrantMarker({
           {hydrant.leistung ? hydrant.leistung + ' l/min ' : ''} (
           {hydrant.dimension}mm)
         </b>
+        {hydrant.adresse && (
+          <>
+            <br />
+            {hydrant.adresse}
+          </>
+        )}
         <br />
         dynamisch: {hydrant.dynamischer_druck} bar
         <br />
