@@ -137,6 +137,7 @@
     "http-proxy-agent": "^7.0.0",
     "node-domexception": "npm:noop-package",
     "typescript-eslint": "8.59.0",
+    "eslint-plugin-react-hooks": "7.0.1",
     "mui-color-input": {
       "@mui/material": "$@mui/material"
     }
