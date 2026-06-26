@@ -149,6 +149,10 @@
     "available": "Neue Version verfügbar",
     "reload": "Neu laden"
   },
+  "networkStatus": {
+    "offlineTitle": "Keine Verbindung",
+    "offline": "Das Gerät ist offline. Änderungen werden nicht gespeichert, bis die Verbindung wiederhergestellt ist."
+  },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",
     "openMap": "Karte öffnen",

@@ -149,6 +149,10 @@
     "available": "New version available",
     "reload": "Reload"
   },
+  "networkStatus": {
+    "offlineTitle": "No connection",
+    "offline": "The device is offline. Changes will not be saved until the connection is restored."
+  },
   "einsatzDetails": {
     "notFound": "Operation not found",
     "openMap": "Open map",
