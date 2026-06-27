@@ -201,6 +201,38 @@ export function roundHoursForBilling(hours: number): number {
 }
 
 /**
+ * Check if a rate uses hourly pricing (the sum scales with the number of
+ * hours) vs. per-unit pricing such as Verbrauchsmaterial ("pro Sack",
+ * "pro Stück"). Per-unit rates are independent of the operation duration
+ * (defaultStunden) and must NOT be multiplied by the hours.
+ *
+ * Hourly rates either have both a per-hour price and a pauschal price, or
+ * their unit contains an hourly indicator ("je Std", "pro Person & h", "/h").
+ */
+export function isHourlyRate(rate: KostenersatzRate): boolean {
+  // If it has pricePauschal and an hourly rate, it's an hourly rate
+  if (rate.pricePauschal && rate.price > 0) {
+    return true;
+  }
+  // Check unit for hourly indicators
+  const hourlyUnits = ['je Std', 'pro Person & h', '/h'];
+  return hourlyUnits.some((u) => rate.unit.includes(u));
+}
+
+/**
+ * Effective billable hours for a rate. Per-unit rates (Verbrauchsmaterial)
+ * are always billed with 1 hour regardless of the operation duration, so that
+ * e.g. a single bag of oil binder stays at its unit price even when the
+ * default hours of the calculation are increased.
+ */
+export function effectiveStundenForRate(
+  rate: KostenersatzRate,
+  anzahlStunden: number,
+): number {
+  return isHourlyRate(rate) ? anzahlStunden : 1;
+}
+
+/**
  * Calculate the sum for a single line item based on hours and units
  *
  * Logic:
@@ -311,11 +343,13 @@ export function recalculateLineItem(
   defaultStunden: number,
 ): KostenersatzLineItem {
   const stunden = item.stundenOverridden ? item.anzahlStunden : defaultStunden;
+  // Verbrauchsmaterial (per-unit rates) is independent of the hours.
+  const effectiveStunden = effectiveStundenForRate(rate, stunden);
   return {
     ...item,
-    anzahlStunden: stunden,
+    anzahlStunden: effectiveStunden,
     sum: calculateItemSum(
-      stunden,
+      effectiveStunden,
       item.einheiten,
       rate.price,
       rate.pricePauschal,

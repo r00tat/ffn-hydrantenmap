@@ -24,6 +24,7 @@ import {
   calculateTotalSum,
   calculateSubtotals,
   createLineItem,
+  effectiveStundenForRate,
   formatCurrency,
 } from '../../common/kostenersatz';
 import {
@@ -57,13 +58,17 @@ function buildCalculationFromTemplate(
   const ratesById = new Map(rates.map((r) => [r.id, r]));
   const lineItems: KostenersatzLineItem[] = items.map((item) => {
     const rate = ratesById.get(item.rateId);
+    // Verbrauchsmaterial (per-unit rates) is independent of the hours.
+    const effectiveStunden = rate
+      ? effectiveStundenForRate(rate, defaultStunden)
+      : defaultStunden;
     return {
       rateId: item.rateId,
       einheiten: item.einheiten,
-      anzahlStunden: defaultStunden,
+      anzahlStunden: effectiveStunden,
       stundenOverridden: false,
       sum: rate
-        ? calculateItemSum(defaultStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
+        ? calculateItemSum(effectiveStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
         : 0,
     };
   });
@@ -324,12 +329,13 @@ export default function KostenersatzTemplateDialog({
                 const newItems = prev.items.map((item) => {
                   if (item.stundenOverridden) return item;
                   const rate = ratesById.get(item.rateId);
+                  if (!rate) return item;
+                  // Verbrauchsmaterial (per-unit rates) is independent of the hours.
+                  const effectiveStunden = effectiveStundenForRate(rate, newStunden);
                   return {
                     ...item,
-                    anzahlStunden: newStunden,
-                    sum: rate
-                      ? calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours)
-                      : item.sum,
+                    anzahlStunden: effectiveStunden,
+                    sum: calculateItemSum(effectiveStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
                   };
                 });
                 const subtotals = calculateSubtotals(newItems, rates);
