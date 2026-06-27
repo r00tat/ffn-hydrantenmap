@@ -151,7 +151,8 @@
   },
   "networkStatus": {
     "offlineTitle": "No connection",
-    "offline": "The device is offline. Changes will not be saved until the connection is restored."
+    "offline": "The device is offline. Changes are cached and will be synced once the connection is restored.",
+    "synced": "Changes have been synced"
   },
   "einsatzDetails": {
     "notFound": "Operation not found",

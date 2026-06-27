@@ -5,6 +5,7 @@ import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Snackbar from '@mui/material/Snackbar';
 import { useTranslations } from 'next-intl';
+import useOfflineSync from '../../hooks/useOfflineSync';
 import useOnline from '../../hooks/useOnline';
 
 /**
@@ -17,6 +18,9 @@ import useOnline from '../../hooks/useOnline';
 export default function OfflineWarning() {
   const online = useOnline();
   const t = useTranslations('networkStatus');
+
+  // Confirm once offline changes have synced back to the backend.
+  useOfflineSync();
 
   return (
     <Snackbar

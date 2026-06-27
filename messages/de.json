@@ -151,7 +151,8 @@
   },
   "networkStatus": {
     "offlineTitle": "Keine Verbindung",
-    "offline": "Das Gerät ist offline. Änderungen werden nicht gespeichert, bis die Verbindung wiederhergestellt ist."
+    "offline": "Das Gerät ist offline. Änderungen werden zwischengespeichert und synchronisiert, sobald die Verbindung wiederhergestellt ist.",
+    "synced": "Änderungen wurden synchronisiert"
   },
   "einsatzDetails": {
     "notFound": "Einsatz nicht gefunden",

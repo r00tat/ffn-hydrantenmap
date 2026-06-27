@@ -1,8 +1,20 @@
 // @vitest-environment jsdom
 import { act, screen, waitForElementToBeRemoved } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import deMessages from '../../../messages/de.json';
+
+// OfflineWarning pulls in useOfflineSync -> firebase; mock the Firebase layer
+// so the component test stays focused on the offline banner rendering.
+vi.mock('../firebase/firebase', () => ({
+  default: {},
+  firestore: { type: 'mock-firestore' },
+}));
+
+vi.mock('firebase/firestore', () => ({
+  waitForPendingWrites: vi.fn(() => Promise.resolve()),
+}));
+
 import OfflineWarning from './OfflineWarning';
 
 function setNavigatorOnLine(value: boolean) {
