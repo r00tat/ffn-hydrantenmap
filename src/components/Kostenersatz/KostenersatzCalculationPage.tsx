@@ -667,7 +667,6 @@ export default function KostenersatzCalculationPage({
             <KostenersatzEmpfaengerTab
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
-              disabled={!isEditable}
               firecallId={firecallId}
               calculationId={existingCalculation?.id || calculation.id}
               sumupPaymentStatus={calculation.sumupPaymentStatus}

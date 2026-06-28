@@ -323,7 +323,6 @@ export default function KostenersatzDialog({
             <KostenersatzEmpfaengerTab
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
-              disabled={!isEditable}
             />
           </TabPanel>
         </Box>
