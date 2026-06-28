@@ -15,6 +15,7 @@ import {
   type WriteBatch,
 } from 'firebase/firestore';
 import { withFreshAuth } from '../hooks/auth/withFreshAuth';
+import { trackPendingWrite } from './pendingWrites';
 
 /**
  * Central Firestore write client. All mutation calls are routed through
@@ -52,14 +53,16 @@ export function setDoc(
   data: unknown,
   options?: SetOptions,
 ): Promise<void> {
-  return withFreshAuth(() =>
-    options === undefined
-      ? fsSetDoc(reference as DocumentReference<unknown>, data as WithFieldValue<unknown>)
-      : fsSetDoc(
-          reference as DocumentReference<unknown>,
-          data as PartialWithFieldValue<unknown>,
-          options,
-        ),
+  return trackPendingWrite(
+    withFreshAuth(() =>
+      options === undefined
+        ? fsSetDoc(reference as DocumentReference<unknown>, data as WithFieldValue<unknown>)
+        : fsSetDoc(
+            reference as DocumentReference<unknown>,
+            data as PartialWithFieldValue<unknown>,
+            options,
+          ),
+    ),
   );
 }
 
@@ -67,14 +70,14 @@ export function updateDoc<AppModelType, DbModelType extends DocumentData>(
   reference: DocumentReference<AppModelType, DbModelType>,
   data: UpdateData<DbModelType>,
 ): Promise<void> {
-  return withFreshAuth(() => fsUpdateDoc(reference, data));
+  return trackPendingWrite(withFreshAuth(() => fsUpdateDoc(reference, data)));
 }
 
 export function addDoc<AppModelType, DbModelType extends DocumentData>(
   reference: CollectionReference<AppModelType, DbModelType>,
   data: WithFieldValue<AppModelType>,
 ): Promise<DocumentReference<AppModelType, DbModelType>> {
-  return withFreshAuth(() => fsAddDoc(reference, data));
+  return trackPendingWrite(withFreshAuth(() => fsAddDoc(reference, data)));
 }
 
 export function deleteDoc<
@@ -83,7 +86,7 @@ export function deleteDoc<
 >(
   reference: DocumentReference<AppModelType, DbModelType>,
 ): Promise<void> {
-  return withFreshAuth(() => fsDeleteDoc(reference));
+  return trackPendingWrite(withFreshAuth(() => fsDeleteDoc(reference)));
 }
 
 /**
@@ -93,5 +96,5 @@ export function deleteDoc<
  * wrapper.
  */
 export function commitBatch(batch: WriteBatch): Promise<void> {
-  return withFreshAuth(() => batch.commit());
+  return trackPendingWrite(withFreshAuth(() => batch.commit()));
 }
