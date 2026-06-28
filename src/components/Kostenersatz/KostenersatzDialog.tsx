@@ -15,6 +15,7 @@ import {
   calculateSubtotals,
   calculateTotalSum,
   createEmptyCalculation,
+  effectiveStundenForRate,
   KostenersatzCalculation,
   KostenersatzLineItem,
   KostenersatzCustomItem,
@@ -154,10 +155,12 @@ export default function KostenersatzDialog({
             const rate = ratesById.get(item.rateId);
             if (rate) {
               const { calculateItemSum } = require('../../common/kostenersatz');
+              // Verbrauchsmaterial (per-unit rates) is independent of the hours.
+              const effectiveStunden = effectiveStundenForRate(rate, newStunden);
               return {
                 ...item,
-                anzahlStunden: newStunden,
-                sum: calculateItemSum(newStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
+                anzahlStunden: effectiveStunden,
+                sum: calculateItemSum(effectiveStunden, item.einheiten, rate.price, rate.pricePauschal, rate.pauschalHours),
               };
             }
           }

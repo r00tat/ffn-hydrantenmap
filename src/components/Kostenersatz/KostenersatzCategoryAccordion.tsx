@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
 import {
   formatCurrency,
+  isHourlyRate,
   KostenersatzCalculation,
   KostenersatzRate,
 } from '../../common/kostenersatz';
@@ -30,17 +31,6 @@ export interface KostenersatzCategoryAccordionProps {
   defaultExpanded?: boolean;
   customItemsTotal?: number;
   children?: React.ReactNode;
-}
-
-/**
- * Check if a rate uses hourly pricing
- */
-function isHourlyRate(rate: KostenersatzRate): boolean {
-  if (rate.pricePauschal && rate.price > 0) {
-    return true;
-  }
-  const hourlyUnits = ['je Std', 'pro Person & h', '/h'];
-  return hourlyUnits.some((u) => rate.unit.includes(u));
 }
 
 export default function KostenersatzCategoryAccordion({

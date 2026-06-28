@@ -13,6 +13,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import {
   formatCurrency,
+  isHourlyRate,
   KostenersatzLineItem,
   KostenersatzRate,
 } from '../../common/kostenersatz';
@@ -28,21 +29,6 @@ export interface KostenersatzItemRowProps {
     stundenOverridden: boolean
   ) => void;
   disabled?: boolean;
-}
-
-/**
- * Check if a rate uses hourly pricing (with optional pauschal) vs per-unit pricing
- * Hourly rates have pricePauschal and their unit contains "Std" or "h"
- * Per-unit rates (like "pro Stück", "pro Sack") don't use hours in calculation
- */
-function isHourlyRate(rate: KostenersatzRate): boolean {
-  // If it has pricePauschal and hourly rate, it's an hourly rate
-  if (rate.pricePauschal && rate.price > 0) {
-    return true;
-  }
-  // Check unit for hourly indicators
-  const hourlyUnits = ['je Std', 'pro Person & h', '/h'];
-  return hourlyUnits.some((u) => rate.unit.includes(u));
 }
 
 export default function KostenersatzItemRow({
