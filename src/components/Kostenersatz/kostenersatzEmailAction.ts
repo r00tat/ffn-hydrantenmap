@@ -138,13 +138,9 @@ export async function sendKostenersatzEmailAction(
       ...calculationDoc.data(),
     } as KostenersatzCalculation;
 
-    // Check calculation status - only allow sending for completed or sent
-    if (calculation.status === 'draft') {
-      return {
-        success: false,
-        error: 'Cannot send email for draft calculations. Please complete the calculation first.',
-      };
-    }
+    // A calculation stays editable (draft) until the invoice is actually sent or it
+    // is completed manually. Sending the invoice is therefore allowed from any status
+    // and is the action that closes the calculation (see status update below).
 
     // Load rates for the calculation's version
     let rates: KostenersatzRate[] = [];
@@ -212,10 +208,10 @@ export async function sendKostenersatzEmailAction(
       },
     });
 
-    // Update calculation status
+    // Update calculation status: sending the invoice closes the calculation.
     const emailSentAt = new Date().toISOString();
     await calculationRef.update({
-      status: 'sent',
+      status: 'completed',
       emailSentAt,
       updatedAt: emailSentAt,
     });
