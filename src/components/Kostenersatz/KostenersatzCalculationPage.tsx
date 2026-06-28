@@ -429,8 +429,10 @@ export default function KostenersatzCalculationPage({
     }
   }, [existingCalculation?.id, calculation.id, calculation.recipient, firecallId]);
 
-  // Save before SumUp payment — saves as draft and returns the new calculationId
-  const handleSaveBeforePayment = useCallback(async (): Promise<string | undefined> => {
+  // Persist the current calculation while preserving its status, returning the
+  // calculationId. Used before a SumUp payment and before sending the invoice
+  // email so the server always works with the latest data.
+  const persistCalculation = useCallback(async (): Promise<string | undefined> => {
     setIsSaving(true);
     try {
       const calcToSave = {
@@ -505,20 +507,23 @@ export default function KostenersatzCalculationPage({
     [calculation, existingCalculation, addCalculation, updateCalculation, router, firecallId]
   );
 
-  // Email button handler - completes the calculation first if needed, then opens email dialog
+  // Email button handler - opens the email dialog. The calculation stays an
+  // editable draft until the invoice is actually sent; sending it (in the dialog)
+  // is what closes the calculation.
+  //
+  // The current calculation is always persisted first (preserving its status):
+  // the email's PDF is rendered server-side from the Firestore document, so any
+  // unsaved local edits (e.g. a changed Verrechnungsart) must be saved before
+  // sending — otherwise the invoice would reflect stale data. This also gives a
+  // brand-new calculation an id to send from.
   const handleEmailClick = useCallback(async () => {
-    const isNewOrDraft = !existingCalculation?.id && !calculation.id || calculation.status === 'draft';
-
-    if (isNewOrDraft) {
-      // Save and complete the calculation first
-      const success = await handleSave('completed', false, false);
-      if (!success) {
-        return; // Save failed, don't open email dialog
-      }
+    const savedId = await persistCalculation();
+    if (!savedId) {
+      return; // Save failed, don't open email dialog
     }
 
     setEmailDialogOpen(true);
-  }, [existingCalculation?.id, calculation.id, calculation.status, handleSave]);
+  }, [persistCalculation]);
 
   // Copy button handler - creates a draft copy and navigates to it
   const handleCopy = useCallback(async () => {
@@ -667,11 +672,10 @@ export default function KostenersatzCalculationPage({
             <KostenersatzEmpfaengerTab
               recipient={calculation.recipient}
               onChange={handleRecipientChange}
-              disabled={!isEditable}
               firecallId={firecallId}
               calculationId={existingCalculation?.id || calculation.id}
               sumupPaymentStatus={calculation.sumupPaymentStatus}
-              onSaveBeforePayment={handleSaveBeforePayment}
+              onSaveBeforePayment={persistCalculation}
             />
           </TabPanel>
         </Box>
@@ -770,7 +774,11 @@ export default function KostenersatzCalculationPage({
         <KostenersatzEmailDialog
           open={emailDialogOpen}
           onClose={() => setEmailDialogOpen(false)}
-          onSuccess={() => setSuccessMessage(t('emailSent'))}
+          onSuccess={() => {
+            // Sending the invoice closes the calculation.
+            setCalculation((prev) => ({ ...prev, status: 'completed' }));
+            setSuccessMessage(t('emailSent'));
+          }}
           calculation={calculation as KostenersatzCalculation}
           firecall={firecall}
           firecallId={firecallId}

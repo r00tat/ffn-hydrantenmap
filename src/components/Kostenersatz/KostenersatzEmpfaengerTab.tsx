@@ -36,7 +36,6 @@ import { createSumupCheckout, getSumupDeepLink, checkSumupPaymentStatus } from '
 export interface KostenersatzEmpfaengerTabProps {
   recipient: KostenersatzRecipient;
   onChange: (recipient: KostenersatzRecipient) => void;
-  disabled?: boolean;
   firecallId?: string;
   calculationId?: string;
   sumupPaymentStatus?: string;
@@ -65,7 +64,6 @@ function PaymentStatusChip({ status }: { status: string }) {
 export default function KostenersatzEmpfaengerTab({
   recipient,
   onChange,
-  disabled = false,
   firecallId,
   calculationId,
   sumupPaymentStatus,
@@ -261,7 +259,7 @@ export default function KostenersatzEmpfaengerTab({
         placeholder={t('emailPlaceholder')}
       />
 
-      <FormControl fullWidth disabled={disabled}>
+      <FormControl fullWidth>
         <InputLabel id="payment-method-label">{t('paymentMethod')}</InputLabel>
         <Select
           labelId="payment-method-label"

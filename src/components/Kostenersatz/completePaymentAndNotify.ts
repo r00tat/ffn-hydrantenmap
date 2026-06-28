@@ -151,12 +151,18 @@ function buildEmailMessage(
 // ============================================================================
 
 /**
- * Idempotently close a paid Kostenersatz calculation and send an email notification.
+ * Idempotently send the invoice email for a paid Kostenersatz calculation and,
+ * once the email has actually gone out, close the calculation (status `completed`).
  *
  * Called from: SumUp webhook, poll action, and redirect page.
  *
- * Returns `true` if the calculation was newly completed (or was already completed),
- * `false` if it was already in a terminal state (completed/sent) -- i.e. no work was done.
+ * The calculation is ONLY closed when the invoice email was sent successfully.
+ * If no email can be sent (no recipient/cc address, email service not configured,
+ * or the send fails), the calculation stays an editable draft and is NOT closed
+ * automatically — a paid SumUp checkout alone never locks the calculation.
+ *
+ * Returns `true` if the invoice was sent and the calculation was closed,
+ * `false` otherwise (already terminal, nothing sent, or send failed).
  */
 export async function completePaymentAndNotify(
   firecallId: string,
@@ -191,15 +197,8 @@ export async function completePaymentAndNotify(
     return false;
   }
 
-  // 3. Set status to 'completed'
-  const now = new Date().toISOString();
-  await calculationRef.update({
-    status: 'completed',
-    updatedAt: now,
-  });
-  calculation.status = 'completed';
-
-  // 4. Load firecall, email config, and rates
+  // 3. Load firecall, email config, and rates (needed to decide whether an
+  //    invoice email can be sent — the calculation is only closed if it can).
   const firecallDoc = await firestore
     .collection(FIRECALL_COLLECTION_ID)
     .doc(firecallId)
@@ -207,9 +206,9 @@ export async function completePaymentAndNotify(
 
   if (!firecallDoc.exists) {
     console.error(
-      `[completePaymentAndNotify] Firecall ${firecallId} not found`
+      `[completePaymentAndNotify] Firecall ${firecallId} not found. Calculation ${calculationId} stays a draft.`
     );
-    return true; // Calculation was still closed
+    return false; // No email possible -> do not close.
   }
 
   const firecall = {
@@ -222,7 +221,7 @@ export async function completePaymentAndNotify(
     loadRatesForVersion(calculation.rateVersion),
   ]);
 
-  // 5. Determine email recipient
+  // 4. Determine email recipient
   const recipientEmail = calculation.recipient?.email;
   const ccEmail = emailConfig.ccEmail;
 
@@ -239,31 +238,31 @@ export async function completePaymentAndNotify(
     ccAddresses = undefined;
   } else {
     console.warn(
-      `[completePaymentAndNotify] No recipient email and no ccEmail configured for calculation ${calculationId}. Calculation closed without email.`
+      `[completePaymentAndNotify] No recipient email and no ccEmail configured for calculation ${calculationId}. Calculation stays an editable draft (not closed).`
     );
-    return true;
+    return false; // No email possible -> do not close.
   }
 
-  // 6. Check that email service is configured
+  // 5. Check that email service is configured
   if (!process.env.GOOGLE_SERVICE_ACCOUNT || !process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT) {
     console.warn(
-      `[completePaymentAndNotify] Email service not configured (missing GOOGLE_SERVICE_ACCOUNT or EINSATZMAPPE_IMPERSONATION_ACCOUNT). Calculation ${calculationId} closed without email.`
+      `[completePaymentAndNotify] Email service not configured (missing GOOGLE_SERVICE_ACCOUNT or EINSATZMAPPE_IMPERSONATION_ACCOUNT). Calculation ${calculationId} stays an editable draft (not closed).`
     );
-    return true;
+    return false; // No email possible -> do not close.
   }
 
   try {
-    // 7. Render email subject and body using templates
+    // 6. Render email subject and body using templates
     const templateContext = buildTemplateContext(calculation, firecall);
     const { subject, body } = renderEmailTemplates(emailConfig, templateContext);
 
-    // 8. Generate PDF
+    // 7. Generate PDF
     const pdfBuffer = await generatePdfBuffer(calculation, rates, firecall);
 
     // Create filename for attachment
     const filename = `Kostenersatz_${firecall.name.replace(/[^a-zA-Z0-9]/g, '_')}_${calculation.recipient.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
 
-    // 9. Build RFC 2822 email and send via Gmail API
+    // 8. Build RFC 2822 email and send via Gmail API
     const impersonationAccount = process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT!;
     const rawMessage = buildEmailMessage(
       toAddress,
@@ -298,24 +297,26 @@ export async function completePaymentAndNotify(
       },
     });
 
-    // 10. Update status to 'sent' with timestamp
+    // 9. Email sent successfully -> close the calculation as 'completed'.
     const emailSentAt = new Date().toISOString();
     await calculationRef.update({
-      status: 'sent',
+      status: 'completed',
       emailSentAt,
       updatedAt: emailSentAt,
     });
 
     console.log(
-      `[completePaymentAndNotify] Email sent for calculation ${calculationId} to ${toAddress}`
+      `[completePaymentAndNotify] Email sent for calculation ${calculationId} to ${toAddress}; calculation closed.`
     );
+
+    return true;
   } catch (error: any) {
-    // 11. Email failure: log but don't throw. Calculation stays 'completed'.
+    // 10. Email failure: log but don't throw. The calculation stays an editable
+    //     draft (NOT closed) so it can be retried / sent manually.
     console.error(
-      `[completePaymentAndNotify] Failed to send email for calculation ${calculationId}:`,
+      `[completePaymentAndNotify] Failed to send email for calculation ${calculationId}; calculation stays a draft:`,
       error?.message || error
     );
+    return false;
   }
-
-  return true;
 }
