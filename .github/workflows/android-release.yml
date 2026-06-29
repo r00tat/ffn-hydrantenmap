@@ -1,6 +1,11 @@
 name: "Android Release"
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - "capacitor/**"
+      - ".github/workflows/android-release.yml"
   release:
     types: [ published ]
   workflow_dispatch:
@@ -47,6 +52,11 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
             VERSION_NAME="${GITHUB_REF_NAME#v}"
             TRACKS="internal production"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            # Automatisches Test-Release auf main: nur an die Test-User (Internal Testing)
+            LATEST_TAG=$(git describe --tags --abbrev=0 --match='v*')
+            VERSION_NAME="${LATEST_TAG#v}-test${VERSION_CODE}"
+            TRACKS="internal"
           else
             if ! [[ "${ALPHA}" =~ ^[0-9]+$ ]]; then
               echo "Invalid alpha input: ${ALPHA}" >&2
