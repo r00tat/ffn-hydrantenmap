@@ -172,6 +172,17 @@ class RadiacodeForegroundService : Service() {
     @Volatile private var currentAddress: String? = null
     @Volatile private var deviceReady = false
 
+    // True, sobald eine Radiacode-BLE-Verbindung angefordert wurde und bis der
+    // User explizit trennt (ACTION_BLE_DISCONNECT → teardownSession) oder der
+    // Service stirbt. NUR in diesem Zustand darf der Foreground-Service den Typ
+    // CONNECTED_DEVICE führen. Reine GPS-Track-/Live-Share-Modi (kein Gerät
+    // verbunden) laufen als reiner LOCATION-Service — sonst deklariert der
+    // Service connectedDevice für einen Use-Case, der kein Gerät verbindet, was
+    // gegen die Play-FGS-Policy verstößt (Reject 2026-06, version code 1319).
+    // Bleibt über Reconnect-Versuche hinweg gesetzt (handleConnectionLost lässt
+    // es unberührt), damit der Typ während eines Reconnects nicht kippt.
+    @Volatile private var bleSessionActive = false
+
     /** Single-thread worker für blockierende BLE-Calls (Connect-Handshake + execute). */
     private var bleWorker: ExecutorService? = null
 
@@ -274,6 +285,13 @@ class RadiacodeForegroundService : Service() {
         // Variante mit Service-Typ aufgerufen werden, sonst crasht der Service
         // mit MissingForegroundServiceTypeException — und reisst unsere
         // BLE-Session mit sich. Siehe Bug-Report vom 2026-04-22.
+        // CONNECTED_DEVICE-Typ ab dem Connect-Request aktivieren — der gemeinsame
+        // ensureForeground()-Aufruf unten läuft VOR dem when-Block, also muss das
+        // Flag hier gesetzt sein, damit der erste startForeground() den Typ schon
+        // korrekt führt.
+        if (action == ACTION_BLE_CONNECT) {
+            bleSessionActive = true
+        }
         if (action != null && action != ACTION_STOP && action != ACTION_DISCONNECT_REQUESTED) {
             ensureForeground()
         }
@@ -514,7 +532,13 @@ class RadiacodeForegroundService : Service() {
      */
     private fun resolveForegroundServiceType(): Int {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
-        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        var type = 0
+        // CONNECTED_DEVICE nur bei aktiver Radiacode-BLE-Session — sonst würde
+        // der Service den Typ auch für reine GPS-Track-/Live-Share-Läufe führen,
+        // bei denen kein Gerät verbunden ist (Play-FGS-Policy-Verstoß).
+        if (bleSessionActive) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+        }
         val fine = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION,
         )
@@ -875,6 +899,10 @@ class RadiacodeForegroundService : Service() {
         transport = null
         currentAddress = null
         deviceReady = false
+        // BLE-Session beendet → CONNECTED_DEVICE-Typ darf nicht weiter geführt
+        // werden. Ein evtl. noch laufender GPS-Track/Live-Share-Modus stuft den
+        // Service beim nächsten ensureForeground() auf reines LOCATION zurück.
+        bleSessionActive = false
         // Reconnect-Counter zurücksetzen — beim nächsten manuellen Connect
         // soll der Backoff wieder beim kürzesten Delay anfangen. Der laufende
         // Reconnect-Worker (falls einer geplant ist) stoppt sich selbst, weil
