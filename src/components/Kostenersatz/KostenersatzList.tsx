@@ -10,7 +10,10 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KostenersatzCalculation } from '../../common/kostenersatz';
+import {
+  KostenersatzCalculation,
+  kostenersatzShareLink,
+} from '../../common/kostenersatz';
 import { useFirecallKostenersatz } from '../../hooks/useKostenersatz';
 import {
   useKostenersatzDelete,
@@ -47,7 +50,7 @@ export default function KostenersatzList({
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [calculationToEmail, setCalculationToEmail] =
     useState<KostenersatzCalculation | null>(null);
-  const [emailSuccessMessage, setEmailSuccessMessage] = useState<string | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
 
   const handleOpenNew = () => {
     router.push(`/einsatz/${firecallId}/kostenersatz/neu`);
@@ -119,8 +122,26 @@ export default function KostenersatzList({
   }, []);
 
   const handleEmailSuccess = useCallback(() => {
-    setEmailSuccessMessage(t('emailSent'));
+    setSnackbarMessage(t('emailSent'));
   }, [t]);
+
+  const handleShareLink = useCallback(
+    async (calculation: KostenersatzCalculation) => {
+      if (!calculation.id) return;
+      const link = kostenersatzShareLink(
+        window.location.origin,
+        firecallId,
+        calculation.id,
+      );
+      try {
+        await navigator.clipboard.writeText(link);
+        setSnackbarMessage(t('linkCopied'));
+      } catch {
+        setSnackbarMessage(t('linkCopyFailed'));
+      }
+    },
+    [firecallId, t],
+  );
 
   if (loading) {
     return (
@@ -203,6 +224,7 @@ export default function KostenersatzList({
               onDelete={handleDeleteClick}
               onGeneratePdf={handleGeneratePdf}
               onSendEmail={handleSendEmail}
+              onShareLink={handleShareLink}
             />
           ))}
         </Box>
@@ -235,10 +257,10 @@ export default function KostenersatzList({
 
       {/* Success Snackbar */}
       <Snackbar
-        open={!!emailSuccessMessage}
+        open={!!snackbarMessage}
         autoHideDuration={4000}
-        onClose={() => setEmailSuccessMessage(null)}
-        message={emailSuccessMessage}
+        onClose={() => setSnackbarMessage(null)}
+        message={snackbarMessage}
       />
     </Box>
   );

@@ -8,6 +8,7 @@ import {
   isHourlyRate,
   effectiveStundenForRate,
   recalculateLineItem,
+  kostenersatzShareLink,
   KostenersatzRate,
   KostenersatzLineItem,
 } from './kostenersatz';
@@ -197,5 +198,19 @@ describe('calculateTotalSum', () => {
 
   it('returns 0 for empty arrays', () => {
     expect(calculateTotalSum([], [])).toBe(0);
+  });
+});
+
+describe('kostenersatzShareLink', () => {
+  it('builds an absolute link from the given origin', () => {
+    expect(
+      kostenersatzShareLink('https://example.com', 'fc1', 'calc1')
+    ).toBe('https://example.com/einsatz/fc1/kostenersatz/calc1');
+  });
+
+  it('returns a relative path when origin is empty', () => {
+    expect(kostenersatzShareLink('', 'fc1', 'calc1')).toBe(
+      '/einsatz/fc1/kostenersatz/calc1'
+    );
   });
 });

@@ -15,6 +15,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import EmailIcon from '@mui/icons-material/Email';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import ShareIcon from '@mui/icons-material/Share';
 import { useTranslations } from 'next-intl';
 import { useState, MouseEvent } from 'react';
 import {
@@ -31,6 +32,7 @@ export interface KostenersatzCardProps {
   onDelete: (calculation: KostenersatzCalculation) => void;
   onGeneratePdf?: (calculation: KostenersatzCalculation) => void;
   onSendEmail?: (calculation: KostenersatzCalculation) => void;
+  onShareLink?: (calculation: KostenersatzCalculation) => void;
 }
 
 export default function KostenersatzCard({
@@ -40,6 +42,7 @@ export default function KostenersatzCard({
   onDelete,
   onGeneratePdf,
   onSendEmail,
+  onShareLink,
 }: KostenersatzCardProps) {
   const t = useTranslations('kostenersatz');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -77,6 +80,11 @@ export default function KostenersatzCard({
   const handleSendEmail = () => {
     handleMenuClose();
     onSendEmail?.(calculation);
+  };
+
+  const handleShareLink = () => {
+    handleMenuClose();
+    onShareLink?.(calculation);
   };
 
   const createdDate = parseTimestamp(calculation.createdAt);
@@ -177,6 +185,12 @@ export default function KostenersatzCard({
           <ContentCopyIcon fontSize="small" sx={{ mr: 1 }} />
           {t('card.duplicate')}
         </MenuItem>
+        {onShareLink && (
+          <MenuItem onClick={handleShareLink}>
+            <ShareIcon fontSize="small" sx={{ mr: 1 }} />
+            {t('card.shareLink')}
+          </MenuItem>
+        )}
         {onGeneratePdf && (
           <MenuItem onClick={handleGeneratePdf}>
             <PictureAsPdfIcon fontSize="small" sx={{ mr: 1 }} />
