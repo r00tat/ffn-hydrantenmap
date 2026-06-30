@@ -84,7 +84,9 @@ vi.mock('../../hooks/radiacode/radiacodeNotification', () => ({
       radiacodeTracking: false,
       gpsTracking: false,
     }),
-    addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
+    addListener: vi
+      .fn()
+      .mockResolvedValue({ remove: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 

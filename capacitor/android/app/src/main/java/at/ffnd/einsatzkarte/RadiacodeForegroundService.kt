@@ -74,6 +74,10 @@ class RadiacodeForegroundService : Service() {
         const val ACTION_UPDATE = "at.ffnd.einsatzkarte.RADIACODE_UPDATE"
         const val ACTION_STOP = "at.ffnd.einsatzkarte.RADIACODE_STOP"
         const val ACTION_DISCONNECT_REQUESTED = "at.ffnd.einsatzkarte.RADIACODE_DISCONNECT_REQUESTED"
+        // User hat die „Beenden"-Action der Notification getippt. Beendet ALLE
+        // aktuell aktiven Hintergrund-Modi (Radiacode/GPS-Track/Live-Share) über
+        // die JS-Owner — der Service stoppt sich nach dem letzten Modus selbst.
+        const val ACTION_STOP_REQUESTED = "at.ffnd.einsatzkarte.RADIACODE_STOP_REQUESTED"
         const val ACTION_BLE_CONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_CONNECT"
         const val ACTION_BLE_DISCONNECT = "at.ffnd.einsatzkarte.RADIACODE_BLE_DISCONNECT"
         const val ACTION_START_TRACK = "at.ffnd.einsatzkarte.RADIACODE_START_TRACK"
@@ -292,7 +296,9 @@ class RadiacodeForegroundService : Service() {
         if (action == ACTION_BLE_CONNECT) {
             bleSessionActive = true
         }
-        if (action != null && action != ACTION_STOP && action != ACTION_DISCONNECT_REQUESTED) {
+        if (action != null && action != ACTION_STOP &&
+            action != ACTION_DISCONNECT_REQUESTED && action != ACTION_STOP_REQUESTED
+        ) {
             ensureForeground()
         }
 
@@ -322,6 +328,14 @@ class RadiacodeForegroundService : Service() {
             }
             ACTION_DISCONNECT_REQUESTED -> {
                 RadiacodeNotificationPlugin.onDisconnectRequested()
+            }
+            ACTION_STOP_REQUESTED -> {
+                // Generische „Beenden"-Action: JS-Owner beenden jeden aktiven
+                // Modus über ihren regulären Stop-Pfad (hält den React-Status
+                // konsistent). Der Service stoppt sich nach dem letzten Modus
+                // selbst — kein nativer Teardown hier, um die ACTION_STOP-Races
+                // (siehe oben) nicht zu reaktivieren.
+                RadiacodeNotificationPlugin.onStopRequested()
             }
             ACTION_BLE_CONNECT -> {
                 val address = intent?.getStringExtra(EXTRA_DEVICE_ADDRESS)
@@ -1037,6 +1051,14 @@ class RadiacodeForegroundService : Service() {
             else -> "Radiacode getrennt"
         }
         lastTitle = title
+        // Bei reinen GPS-/Live-Share-Modi (kein Radiacode) trägt der Body keinen
+        // Messwert — stattdessen ein klarer Hinweis, dass die Funktion im
+        // Hintergrund weiterläuft und über die Notification beendet werden kann
+        // (Play-FGS-Wahrnehmbarkeit). Bei aktivem Radiacode bleibt der
+        // Live-Messwert-Body erhalten.
+        if (radiaCode == null && (track || liveShare)) {
+            lastBody = getString(R.string.radiacode_notification_background_hint)
+        }
         ensureForeground()
     }
 
@@ -1062,11 +1084,16 @@ class RadiacodeForegroundService : Service() {
             this, 0, tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val disconnectIntent = Intent(this, RadiacodeForegroundService::class.java).apply {
-            action = ACTION_DISCONNECT_REQUESTED
+        val stop = resolveStopAction()
+        val stopIntent = Intent(this, RadiacodeForegroundService::class.java).apply {
+            action = stop.action
         }
-        val disconnectPending = PendingIntent.getService(
-            this, 1, disconnectIntent,
+        // request code je Action, damit der CONNECTED_DEVICE-Pfad
+        // (ACTION_DISCONNECT_REQUESTED) und der generische Stop-Pfad
+        // (ACTION_STOP_REQUESTED) sich nicht denselben PendingIntent teilen.
+        val stopRequestCode = if (stop.action == ACTION_DISCONNECT_REQUESTED) 1 else 2
+        val stopPending = PendingIntent.getService(
+            this, stopRequestCode, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -1076,14 +1103,48 @@ class RadiacodeForegroundService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(tapPending)
-            .addAction(
-                0,
-                getString(R.string.radiacode_notification_action_disconnect),
-                disconnectPending,
-            )
+            .addAction(0, getString(stop.labelRes), stopPending)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
+    }
+
+    private data class StopAction(val labelRes: Int, val action: String)
+
+    /**
+     * Wählt Label und Intent-Action der Notification-„Beenden"-Action passend
+     * zu den aktuell laufenden Modi:
+     * - Radiacode aktiv (ggf. + weitere) → „Trennen" (trennt die BLE-Session
+     *   über den bestehenden disconnectRequested-Pfad).
+     * - sonst nur Live-Share → „Teilen beenden".
+     * - sonst nur GPS-/Track-Aufzeichnung → „Aufzeichnung beenden".
+     * - sonst mehrere Nicht-Radiacode-Modi → „Im Hintergrund beenden".
+     */
+    private fun resolveStopAction(): StopAction {
+        val track = gpsTrackRecorder != null || trackRecorder != null
+        val liveShare = liveLocationPusher != null
+        return when {
+            radiaCode != null -> StopAction(
+                R.string.radiacode_notification_action_disconnect,
+                ACTION_DISCONNECT_REQUESTED,
+            )
+            track && liveShare -> StopAction(
+                R.string.radiacode_notification_action_stop_background,
+                ACTION_STOP_REQUESTED,
+            )
+            liveShare -> StopAction(
+                R.string.radiacode_notification_action_stop_share,
+                ACTION_STOP_REQUESTED,
+            )
+            track -> StopAction(
+                R.string.radiacode_notification_action_stop_track,
+                ACTION_STOP_REQUESTED,
+            )
+            else -> StopAction(
+                R.string.radiacode_notification_action_disconnect,
+                ACTION_DISCONNECT_REQUESTED,
+            )
+        }
     }
 
     private fun ensureChannel() {

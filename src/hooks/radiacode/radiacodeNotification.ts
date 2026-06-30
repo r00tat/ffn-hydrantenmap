@@ -86,6 +86,10 @@ export interface RadiacodeNotificationPlugin {
     listener: () => void,
   ): Promise<PluginListenerHandle>;
   addListener(
+    event: 'stopRequested',
+    listener: () => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
     event: 'measurement',
     listener: (data: NativeMeasurementEvent) => void,
   ): Promise<PluginListenerHandle>;

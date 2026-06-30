@@ -304,6 +304,14 @@ public class RadiacodeNotificationPlugin extends Plugin {
         }
     }
 
+    static void onStopRequested() {
+        RadiacodeNotificationPlugin i = instance;
+        Log.i(TAG, "onStopRequested hasInstance=" + (i != null));
+        if (i != null) {
+            i.notifyListeners("stopRequested", new JSObject());
+        }
+    }
+
     public static void emitMeasurement(Measurement m) {
         RadiacodeNotificationPlugin i = instance;
         if (i == null) return;
