@@ -41,14 +41,53 @@ jobs:
         with:
           fetch-depth: 0 # für git rev-list / git describe
 
+      - name: Authenticate to Google (WIF)
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.PLAY_UPLOAD_SA_EMAIL }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
       - name: Determine versionCode, versionName, tracks
         id: version
         env:
           ALPHA: ${{ inputs.alpha || '0' }}
           PROMOTE_TO_PRODUCTION: ${{ inputs.promote_to_production || 'false' }}
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: at.ffnd.einsatzkarte
         run: |
           set -euo pipefail
-          VERSION_CODE=$(git rev-list --count HEAD)
+
+          # Der Commit-Zähler allein genügt nicht als versionCode: derselbe
+          # Commit kann mehrfach gebaut werden (z.B. Push-Test-Release auf den
+          # internal-Track und später ein Release-Event am selben Commit für
+          # production). Beide bekämen denselben versionCode und der zweite
+          # Upload schlägt mit "Version code N has already been used" fehl.
+          # Daher den höchsten bereits im Play Store vorhandenen versionCode
+          # abfragen und sicherstellen, dass wir strikt darüber liegen.
+          BASE_CODE=$(git rev-list --count HEAD)
+          API="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE_NAME}"
+          PROBE_EDIT_ID=$(curl -fsS -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "${API}/edits" | jq -r '.id')
+          MAX_PLAY_CODE=$(curl -fsS \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "${API}/edits/${PROBE_EDIT_ID}/bundles" \
+            | jq '[.bundles[]?.versionCode] | max // 0')
+          # Probe-Edit wieder verwerfen — der eigentliche Upload legt einen
+          # frischen Edit an.
+          curl -fsS -X DELETE \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "${API}/edits/${PROBE_EDIT_ID}" || true
+          if (( MAX_PLAY_CODE + 1 > BASE_CODE )); then
+            VERSION_CODE=$(( MAX_PLAY_CODE + 1 ))
+          else
+            VERSION_CODE="${BASE_CODE}"
+          fi
+          echo "git rev-list count=${BASE_CODE}, höchster Play versionCode=${MAX_PLAY_CODE} -> versionCode=${VERSION_CODE}"
+
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
             VERSION_NAME="${GITHUB_REF_NAME#v}"
             TRACKS="internal production"
@@ -96,15 +135,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-
-      - name: Authenticate to Google (WIF)
-        id: auth
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.PLAY_UPLOAD_SA_EMAIL }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
 
       - name: Decode keystore + write keystore.properties
         env:
