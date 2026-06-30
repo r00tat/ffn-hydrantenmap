@@ -17,6 +17,7 @@ import {
   getBleAdapter,
 } from '../../hooks/radiacode/bleAdapter';
 import { RadiacodeClient } from '../../hooks/radiacode/client';
+import { useNotificationStopListener } from '../../hooks/radiacode/useNotificationStopListener';
 import {
   loadDefaultDevice,
   saveDefaultDevice,
@@ -573,6 +574,14 @@ export function RadiacodeProvider({
     });
     return () => unsub();
   }, [adapter, disconnect]);
+
+  // „Beenden"-Action der FGS-Notification: trennt die Radiacode-Verbindung
+  // über den regulären disconnect()-Pfad (hält den React-Status synchron).
+  useNotificationStopListener(() => {
+    disconnect().catch((err) => {
+      console.warn('[RadiacodeProvider] disconnect after stopRequested failed', err);
+    });
+  });
 
   const value = useMemo<RadiacodeContextValue>(
     () => ({

@@ -25,6 +25,7 @@ import {
   NativeGpsTrackOpts,
 } from '../../hooks/recording/nativeGpsTrackBridge';
 import { RadiacodeNotification } from '../../hooks/radiacode/radiacodeNotification';
+import { useNotificationStopListener } from '../../hooks/radiacode/useNotificationStopListener';
 import { SampleRateSpec } from '../../hooks/radiacode/types';
 import { RadiacodeDeviceRef } from '../../hooks/radiacode/types';
 import { useRadiacode } from './RadiacodeProvider';
@@ -175,6 +176,16 @@ const startGpsRecording = useCallback(async (lId: string, rate: SampleRateSpec) 
       await nativeStopGpsTrack().catch(() => null);
     }
   }, [gpsRecorder, isPositionSet, mode, position]);
+
+  // „Beenden"-Action der FGS-Notification: stoppt eine laufende
+  // GPS-/Radiacode-Aufzeichnung über den regulären stopRecording()-Pfad.
+  useNotificationStopListener(() => {
+    if (mode !== null || isRadiacodeTracking || isGpsTracking) {
+      stopRecording().catch((err) =>
+        console.warn('[GpsProvider] stopRecording after stopRequested failed', err),
+      );
+    }
+  });
 
   const value = useMemo(() => ({
     isRecording,
