@@ -259,6 +259,8 @@ export interface Area extends MultiPointItem {
   type: 'area';
   opacity?: number;
   alwaysShowMarker?: string;
+  /** polygon area in square meters (persisted, derived from positions) */
+  area?: number;
 }
 
 export interface Line extends MultiPointItem {

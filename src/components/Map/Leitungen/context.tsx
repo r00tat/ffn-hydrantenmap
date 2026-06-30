@@ -5,17 +5,20 @@ import { useFirecallId } from '../../../hooks/useFirecall';
 import { addDoc } from '../../../lib/firestoreClient';
 import { firestore } from '../../firebase/firebase';
 import {
-  Connection,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
+  MultiPointItem,
 } from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
+import { calculateArea } from '../../FirecallItems/elements/area/area';
 
 interface Leitungen {
   isDrawing: boolean;
   setIsDrawing: React.Dispatch<React.SetStateAction<boolean>>;
-  firecallItem?: Connection;
-  setFirecallItem: React.Dispatch<React.SetStateAction<Connection | undefined>>;
+  firecallItem?: MultiPointItem;
+  setFirecallItem: React.Dispatch<
+    React.SetStateAction<MultiPointItem | undefined>
+  >;
   complete: (positions: L.LatLng[]) => void;
 }
 
@@ -29,13 +32,16 @@ export interface LeitungsProviderProps {
 
 export const useLeitungsProvider = (): Leitungen => {
   const [isDrawing, setIsDrawing] = useState(false);
-  const [firecallItem, setFirecallItem] = useState<Connection>();
+  const [firecallItem, setFirecallItem] = useState<MultiPointItem>();
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
 
   const complete = useCallback(
     (positions: L.LatLng[]) => {
       if (firecallItem) {
+        const latLngPositions = positions.map(
+          (p) => [p.lat, p.lng] as [number, number]
+        );
         addDoc(
           collection(
             firestore,
@@ -49,10 +55,11 @@ export const useLeitungsProvider = (): Leitungen => {
             lng: positions[0].lng,
             user: email,
             created: new Date().toISOString(),
-            positions: JSON.stringify(positions.map((p) => [p.lat, p.lng])),
-            distance: Math.round(
-              calculateDistance(positions.map((p) => [p.lat, p.lng]))
-            ),
+            positions: JSON.stringify(latLngPositions),
+            distance: Math.round(calculateDistance(latLngPositions)),
+            ...(firecallItem.type === 'area'
+              ? { area: Math.round(calculateArea(latLngPositions)) }
+              : {}),
             destLat: positions[positions.length - 1].lat,
             destLng: positions[positions.length - 1].lng,
           }

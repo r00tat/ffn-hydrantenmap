@@ -1,10 +1,12 @@
 import { Icon, IconOptions } from 'leaflet';
-import { ReactNode } from 'react';
+import { Fragment, ReactNode } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import { Area, FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import { FirecallItemBase } from './FirecallItemBase';
 import AreaMarker from './area/AreaComponent';
+import { calculateArea, formatArea } from './area/area';
+import { getConnectionPositions } from './connection/distance';
 import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class FirecallArea extends FirecallItemBase {
@@ -16,6 +18,8 @@ export class FirecallArea extends FirecallItemBase {
   color?: string;
   opacity?: number;
   alwaysShowMarker?: string;
+  /** polygon area in square meters */
+  area?: number;
 
   public constructor(firecallItem?: Area) {
     super(firecallItem);
@@ -27,7 +31,20 @@ export class FirecallArea extends FirecallItemBase {
       color: this.color = 'blue',
       opacity: this.opacity = 50,
       alwaysShowMarker: this.alwaysShowMarker,
+      area: this.area,
     } = firecallItem || {});
+  }
+
+  /**
+   * Return the polygon area in square meters. Uses the persisted value when
+   * available and falls back to computing it from the positions (e.g. for
+   * areas drawn before the area was persisted).
+   */
+  public areaValue(): number {
+    if (typeof this.area === 'number') {
+      return this.area;
+    }
+    return calculateArea(getConnectionPositions(this.data()));
   }
 
   public copy(): FirecallArea {
@@ -44,6 +61,7 @@ export class FirecallArea extends FirecallItemBase {
       color: this.color,
       opacity: this.opacity,
       alwaysShowMarker: this.alwaysShowMarker,
+      area: this.area,
     } as Area;
   }
 
@@ -54,14 +72,17 @@ export class FirecallArea extends FirecallItemBase {
   // public title(): string {
   //   return `Marker ${this.name}`;
   // }
-  // public info(): string {
-  //   return `Länge ${this.distance}m`;
-  // }
+
+  public info(): string {
+    return `Fläche: ${formatArea(this.areaValue())}`;
+  }
 
   public body(): ReactNode {
     return (
       <>
         {super.body()}
+        Fläche: {formatArea(this.areaValue())}
+        <br />
         {this.lat},{this.lng} =&gt; {this.destLat},{this.destLng}
       </>
     );
@@ -102,6 +123,15 @@ export class FirecallArea extends FirecallItemBase {
     return (
       <>
         <b>Fläche {this.name}</b>
+        <br />
+        {this.beschreibung &&
+          this.beschreibung.split('\n').map((s, index) => (
+            <Fragment key={`${index}-${s}`}>
+              {s}
+              <br />
+            </Fragment>
+          ))}
+        {formatArea(this.areaValue())}
       </>
     );
   }
