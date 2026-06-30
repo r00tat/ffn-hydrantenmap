@@ -152,6 +152,23 @@ export const KOSTENERSATZ_VEHICLES_COLLECTION = 'kostenersatzVehicles';
 // Group key for kostenersatz authorization
 export const KOSTENERSATZ_GROUP = 'kostenersatz';
 
+/**
+ * Build the link to a single Kostenersatz calculation. The target route is
+ * already protected by the existing auth (authorized user + Kostenersatz
+ * group), so the link is only usable by authenticated and authorized users.
+ *
+ * @param origin Absolute origin (e.g. `window.location.origin`). When empty a
+ *   relative path is returned.
+ */
+export function kostenersatzShareLink(
+  origin: string,
+  firecallId: string,
+  calculationId: string
+): string {
+  const path = `/einsatz/${firecallId}/kostenersatz/${calculationId}`;
+  return origin ? `${origin}${path}` : path;
+}
+
 // ============================================================================
 // Vehicle Types
 // ============================================================================

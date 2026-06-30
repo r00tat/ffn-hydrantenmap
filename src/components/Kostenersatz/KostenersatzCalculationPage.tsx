@@ -22,6 +22,7 @@ import {
   KostenersatzCustomItem,
   KostenersatzRecipient,
   KostenersatzVehicle,
+  kostenersatzShareLink,
 } from '../../common/kostenersatz';
 import { Firecall } from '../firebase/firestore';
 import { useKostenersatzRates, useKostenersatzVersions } from '../../hooks/useKostenersatz';
@@ -45,6 +46,9 @@ import EmailIcon from '@mui/icons-material/Email';
 import SaveIcon from '@mui/icons-material/Save';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ShareIcon from '@mui/icons-material/Share';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { KostenersatzTemplate, calculateItemSum } from '../../common/kostenersatz';
@@ -538,6 +542,25 @@ export default function KostenersatzCalculationPage({
     }
   }, [calculation, duplicateCalculation, router, firecallId]);
 
+  // Share button handler - copies the link to this calculation. The target
+  // route is protected by the existing auth (authorized user + Kostenersatz
+  // group), so the link is only usable by authenticated, authorized users.
+  const calculationId = existingCalculation?.id || calculation.id;
+  const handleShareLink = useCallback(async () => {
+    if (!calculationId) return;
+    const link = kostenersatzShareLink(
+      window.location.origin,
+      firecallId,
+      calculationId,
+    );
+    try {
+      await navigator.clipboard.writeText(link);
+      setSuccessMessage(t('linkCopied'));
+    } catch {
+      setSuccessMessage(t('linkCopyFailed'));
+    }
+  }, [calculationId, firecallId, t]);
+
   // Check local state status (which is updated after saves) to determine if editable
   const isEditable = calculation.status === 'draft';
 
@@ -625,6 +648,13 @@ export default function KostenersatzCalculationPage({
             ? t('calculation.editTitle')
             : t('calculation.newTitle')}
         </Typography>
+        {calculationId && (
+          <Tooltip title={t('calculation.shareLink')}>
+            <IconButton onClick={handleShareLink} size="small">
+              <ShareIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         {isEditable && (
           <Button
             startIcon={<FolderOpenIcon />}
