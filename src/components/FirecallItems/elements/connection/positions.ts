@@ -11,6 +11,7 @@ import {
   MultiPointItem,
 } from '../../../firebase/firestore';
 import { logAuditChange } from '../../../../hooks/useAuditLog';
+import { calculateArea } from '../area/area';
 import { calculateDistance, getConnectionPositions } from './distance';
 
 export async function updateFirecallPositions(
@@ -86,6 +87,9 @@ const updateConnectionInFirestore = async (
     const newValue = {
       positions: JSON.stringify(positions),
       distance: Math.round(calculateDistance(positions)),
+      ...(fcItem.type === 'area'
+        ? { area: Math.round(calculateArea(positions)) }
+        : {}),
     };
     await setDoc(
       doc(
