@@ -1,5 +1,5 @@
 import { Icon, IconOptions } from 'leaflet';
-import { ReactNode } from 'react';
+import { Fragment, ReactNode } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import { Area, FirecallItem } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
@@ -124,6 +124,13 @@ export class FirecallArea extends FirecallItemBase {
       <>
         <b>Fläche {this.name}</b>
         <br />
+        {this.beschreibung &&
+          this.beschreibung.split('\n').map((s, index) => (
+            <Fragment key={`${index}-${s}`}>
+              {s}
+              <br />
+            </Fragment>
+          ))}
         {formatArea(this.areaValue())}
       </>
     );
