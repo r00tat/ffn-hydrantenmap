@@ -3,6 +3,7 @@ import {
   serializeForm,
   parseHtml,
   postForm,
+  getDocument,
   findEinsatzId,
   detectError,
 } from './sybos-post';
@@ -176,6 +177,41 @@ describe('postForm', () => {
     await expect(
       postForm('https://sybos.lfv-bgld.at/some/action', new URLSearchParams())
     ).rejects.toThrow(/500/);
+  });
+});
+
+describe('getDocument', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('GETs the url with credentials and returns the parsed response document', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '<html><body><div id="ok">loaded</div></body></html>',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const doc = await getDocument('https://sybos.lfv-bgld.at/some/page');
+
+    expect(fetchMock).toHaveBeenCalledWith('https://sybos.lfv-bgld.at/some/page', {
+      credentials: 'include',
+    });
+    expect(doc.getElementById('ok')?.textContent).toBe('loaded');
+  });
+
+  it('throws an error including the status when the response is not ok', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => 'Not Found',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      getDocument('https://sybos.lfv-bgld.at/missing')
+    ).rejects.toThrow(/404/);
   });
 });
 

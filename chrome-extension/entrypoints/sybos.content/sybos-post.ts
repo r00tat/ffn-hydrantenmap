@@ -95,6 +95,26 @@ export async function postForm(
 }
 
 /**
+ * GET a SYBOS `url` and parse the HTML response — the read-only counterpart
+ * of {@link postForm}.
+ *
+ * Used to fetch the step-1 selection popups (which SYBOS serves as HTML
+ * fragments) before re-posting them. `credentials: 'include'` attaches the
+ * session cookie, same as `postForm`. Throws on a non-ok status so callers
+ * can distinguish a network/HTTP failure from a SYBOS-level error.
+ */
+export async function getDocument(url: string): Promise<Document> {
+  const res = await fetch(url, { credentials: 'include' });
+
+  if (!res.ok) {
+    throw new Error(`SYBOS request to ${url} failed with status ${res.status}`);
+  }
+
+  const text = await res.text();
+  return parseHtml(text);
+}
+
+/**
  * Find the SYBOS "Einsatz" (operation) id.
  *
  * SYBOS surfaces it two ways: as a hidden `EINSATZ_ESnr` input on the page
