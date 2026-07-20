@@ -23,6 +23,7 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import PinIcon from '@mui/icons-material/Pin';
 import PlaceIcon from '@mui/icons-material/Place';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -131,6 +132,11 @@ export default function AppDrawer({
       text: t('blaulichtSms'),
       icon: <SmsIcon />,
       href: '/blaulicht-sms',
+    },
+    {
+      text: t('kennzeichen'),
+      icon: <PinIcon />,
+      href: '/kennzeichen',
     },
     {
       text: t('geschaeftsbuch'),
