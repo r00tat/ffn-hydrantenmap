@@ -19,6 +19,7 @@ import {
 import useFirebaseCollection from './useFirebaseCollection';
 import { useFirecallId } from './useFirecall';
 import useFirebaseLogin from './useFirebaseLogin';
+import { BlaulichtSmsAlarm } from '../app/blaulicht-sms/actions';
 
 export interface BlaulichtSmsRecipient {
   id: string;
@@ -49,13 +50,28 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
     [firecallId]
   );
 
-  // syncFromAlarm reads Firestore directly (getDocs) to avoid race conditions
+  // syncFromAlarms reads Firestore directly (getDocs) to avoid race conditions
   // with the realtime listener. Also cleans up duplicates from earlier bugs.
-  const syncFromAlarm = useCallback(
-    async (recipients: BlaulichtSmsRecipient[]) => {
+  // Unions confirmed (yes) recipients across ALL assigned alarms.
+  const syncFromAlarms = useCallback(
+    async (alarms: BlaulichtSmsAlarm[]) => {
       if (!crewCollectionRef) return;
 
-      const confirmed = recipients.filter((r) => r.participation === 'yes');
+      // Union of yes recipients across all alarms, deduped by recipient id
+      const confirmedById = new Map<string, BlaulichtSmsRecipient>();
+      for (const alarm of alarms) {
+        for (const r of alarm.recipients) {
+          // First alarm that lists a recipient wins for name/details (later alarms don't overwrite).
+          if (r.participation === 'yes' && !confirmedById.has(r.id)) {
+            confirmedById.set(r.id, {
+              id: r.id,
+              name: r.name,
+              participation: r.participation,
+            });
+          }
+        }
+      }
+      const confirmed = [...confirmedById.values()];
       if (confirmed.length === 0) return;
 
       // Read current state directly from Firestore
@@ -104,6 +120,7 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
             vehicleId: null,
             vehicleName: '',
             funktion: 'Feuerwehrmann' as CrewFunktion,
+            source: 'alarm' as const,
             updatedAt: now,
             updatedBy: email || '',
           })
@@ -165,6 +182,33 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
         vehicleId: null,
         vehicleName: '',
         funktion: 'Feuerwehrmann' as CrewFunktion,
+        source: 'manual' as const,
+        updatedAt: new Date().toISOString(),
+        updatedBy: email || '',
+      });
+    },
+    [crewCollectionRef, email]
+  );
+
+  const addPersonFromRecipient = useCallback(
+    async (recipient: BlaulichtSmsRecipient) => {
+      if (!crewCollectionRef) return;
+
+      // Avoid duplicates: check current Firestore state for this recipient id
+      const snapshot = await getDocs(
+        query(crewCollectionRef) as Query<CrewAssignment>
+      );
+      if (snapshot.docs.some((d) => d.data().recipientId === recipient.id)) {
+        return;
+      }
+
+      await addDoc(crewCollectionRef, {
+        recipientId: recipient.id,
+        name: recipient.name,
+        vehicleId: null,
+        vehicleName: '',
+        funktion: 'Feuerwehrmann' as CrewFunktion,
+        source: 'manual' as const,
         updatedAt: new Date().toISOString(),
         updatedBy: email || '',
       });
@@ -189,8 +233,9 @@ export default function useCrewAssignments(firecallIdOverride?: string) {
 
   return {
     crewAssignments,
-    syncFromAlarm,
+    syncFromAlarms,
     addManualPerson,
+    addPersonFromRecipient,
     assignVehicle,
     updateFunktion,
     removeAssignment,

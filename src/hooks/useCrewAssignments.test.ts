@@ -62,17 +62,25 @@ describe('useCrewAssignments', () => {
     mockGetDocsResult.docs = [];
   });
 
-  describe('syncFromAlarm', () => {
-    it('creates docs for new yes recipients', async () => {
-      const recipients: BlaulichtSmsRecipient[] = [
+  describe('syncFromAlarms', () => {
+    const makeAlarm = (
+      alarmId: string,
+      recipients: BlaulichtSmsRecipient[],
+    ) =>
+      ({
+        alarmId,
+        recipients,
+      }) as unknown as import('../app/blaulicht-sms/actions').BlaulichtSmsAlarm;
+
+    it('creates docs for new yes recipients with source alarm', async () => {
+      const alarm = makeAlarm('alarm1', [
         { id: 'r1', name: 'Alice', participation: 'yes' },
         { id: 'r2', name: 'Bob', participation: 'yes' },
-      ];
+      ]);
 
       const { result } = renderHook(() => useCrewAssignments());
-
       await act(async () => {
-        await result.current.syncFromAlarm(recipients);
+        await result.current.syncFromAlarms([alarm]);
       });
 
       expect(mockAddDoc).toHaveBeenCalledTimes(2);
@@ -81,38 +89,54 @@ describe('useCrewAssignments', () => {
         expect.objectContaining({
           recipientId: 'r1',
           name: 'Alice',
-          vehicleId: null,
-          vehicleName: '',
           funktion: 'Feuerwehrmann',
+          source: 'alarm',
           updatedBy: 'test@example.com',
-        })
-      );
-      expect(mockAddDoc).toHaveBeenCalledWith(
-        expect.objectContaining({ path: expect.stringContaining('crew') }),
-        expect.objectContaining({
-          recipientId: 'r2',
-          name: 'Bob',
-        })
+        }),
       );
     });
 
     it('skips recipients with participation other than yes', async () => {
-      const recipients: BlaulichtSmsRecipient[] = [
+      const alarm = makeAlarm('alarm1', [
         { id: 'r1', name: 'Alice', participation: 'yes' },
         { id: 'r2', name: 'Bob', participation: 'no' },
         { id: 'r3', name: 'Carol', participation: 'pending' },
-      ];
+      ]);
 
       const { result } = renderHook(() => useCrewAssignments());
-
       await act(async () => {
-        await result.current.syncFromAlarm(recipients);
+        await result.current.syncFromAlarms([alarm]);
       });
 
       expect(mockAddDoc).toHaveBeenCalledTimes(1);
       expect(mockAddDoc).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ recipientId: 'r1', name: 'Alice' })
+        expect.objectContaining({ recipientId: 'r1', name: 'Alice' }),
+      );
+    });
+
+    it('unions yes recipients across multiple alarms and dedupes by id', async () => {
+      const alarm1 = makeAlarm('alarm1', [
+        { id: 'r1', name: 'Alice', participation: 'yes' },
+      ]);
+      const alarm2 = makeAlarm('alarm2', [
+        { id: 'r1', name: 'Alice', participation: 'yes' },
+        { id: 'r2', name: 'Bob', participation: 'yes' },
+      ]);
+
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.syncFromAlarms([alarm1, alarm2]);
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledTimes(2);
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ recipientId: 'r1', name: 'Alice' }),
+      );
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ recipientId: 'r2', name: 'Bob' }),
       );
     });
 
@@ -120,22 +144,79 @@ describe('useCrewAssignments', () => {
       mockGetDocsResult.docs = [
         { data: () => ({ recipientId: 'r1', name: 'Alice' }) },
       ];
-
-      const recipients: BlaulichtSmsRecipient[] = [
+      const alarm = makeAlarm('alarm1', [
         { id: 'r1', name: 'Alice', participation: 'yes' },
         { id: 'r2', name: 'Bob', participation: 'yes' },
-      ];
+      ]);
 
       const { result } = renderHook(() => useCrewAssignments());
-
       await act(async () => {
-        await result.current.syncFromAlarm(recipients);
+        await result.current.syncFromAlarms([alarm]);
       });
 
       expect(mockAddDoc).toHaveBeenCalledTimes(1);
       expect(mockAddDoc).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ recipientId: 'r2', name: 'Bob' })
+        expect.objectContaining({ recipientId: 'r2', name: 'Bob' }),
+      );
+    });
+  });
+
+  describe('addPersonFromRecipient', () => {
+    it('creates a manual-source doc with the real recipient id', async () => {
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.addPersonFromRecipient({
+          id: 'r9',
+          name: 'Declined Dan',
+          participation: 'no',
+        });
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledTimes(1);
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        expect.objectContaining({ path: expect.stringContaining('crew') }),
+        expect.objectContaining({
+          recipientId: 'r9',
+          name: 'Declined Dan',
+          source: 'manual',
+          funktion: 'Feuerwehrmann',
+        }),
+      );
+    });
+
+    it('does not create a duplicate when the recipient already exists', async () => {
+      mockGetDocsResult.docs = [
+        { data: () => ({ recipientId: 'r9', name: 'Declined Dan' }) },
+      ];
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.addPersonFromRecipient({
+          id: 'r9',
+          name: 'Declined Dan',
+          participation: 'no',
+        });
+      });
+
+      expect(mockAddDoc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addManualPerson', () => {
+    it('creates a manual-source doc with a manual- recipient id', async () => {
+      const { result } = renderHook(() => useCrewAssignments());
+      await act(async () => {
+        await result.current.addManualPerson('Walk-In Willy');
+      });
+
+      expect(mockAddDoc).toHaveBeenCalledTimes(1);
+      expect(mockAddDoc).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          name: 'Walk-In Willy',
+          source: 'manual',
+          recipientId: expect.stringContaining('manual-'),
+        }),
       );
     });
   });
