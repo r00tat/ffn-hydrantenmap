@@ -55,7 +55,7 @@ async function runQuery(
   // 1. Establish a token-bound session, capture PHPSESSID.
   const sessionRes = await fetch(
     `${BASE_URL}/index.php?token=${encodeURIComponent(token)}`,
-    { redirect: 'follow' }
+    { redirect: 'manual' }
   );
   const sessionId = extractSessionCookie(sessionRes);
   if (!sessionId) {
@@ -63,7 +63,7 @@ async function runQuery(
   }
   const cookie = `PHPSESSID=${sessionId}`;
 
-  // 2. Load the form to obtain the fx CSRF token (Einsatz only).
+  // 2. Load the form to obtain the fx CSRF token (present for Einsatz, absent for Übung).
   const formRes = await fetch(`${BASE_URL}/${path}/index.php`, {
     headers: { Cookie: cookie },
   });
