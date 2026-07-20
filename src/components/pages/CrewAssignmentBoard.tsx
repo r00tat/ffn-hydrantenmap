@@ -188,6 +188,14 @@ function CrewRow({
 
 /* ─── Main component ─── */
 
+// A crew entry counts as manually added when its source is 'manual' OR — for
+// legacy entries created before the `source` field existed — when its
+// recipientId carries the historical `manual-` prefix. Such entries must stay
+// visible and removable even while an alarm is loaded.
+const isManualEntry = (a: CrewAssignment) =>
+  a.source === 'manual' ||
+  (a.source === undefined && a.recipientId.startsWith('manual-'));
+
 export default function CrewAssignmentBoard({
   alarms,
 }: CrewAssignmentBoardProps) {
@@ -310,7 +318,7 @@ export default function CrewAssignmentBoard({
   const validAssignments = useMemo(() => {
     const seen = new Set<string>();
     return crewAssignments.filter((a) => {
-      const isManual = a.source === 'manual';
+      const isManual = isManualEntry(a);
       if (!isManual && confirmedIds && !confirmedIds.has(a.recipientId))
         return false;
       if (seen.has(a.recipientId)) return false;
@@ -374,7 +382,7 @@ export default function CrewAssignmentBoard({
           handleVehicleChange(a.id || a.recipientId, vId, vName)
         }
         onRemove={
-          a.source === 'manual' && a.id
+          isManualEntry(a) && a.id
             ? () => removeAssignment(a.id!)
             : undefined
         }

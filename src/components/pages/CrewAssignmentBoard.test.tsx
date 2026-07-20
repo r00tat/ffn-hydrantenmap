@@ -53,6 +53,15 @@ const mockAssignments: CrewAssignment[] = [
     funktion: 'Feuerwehrmann',
     source: 'manual',
   },
+  // Legacy manual entry created before the `source` field existed.
+  {
+    id: 'a4',
+    recipientId: 'manual-1699000000000',
+    name: 'Legacy Walkin',
+    vehicleId: null,
+    vehicleName: '',
+    funktion: 'Feuerwehrmann',
+  },
 ];
 
 const mockVehicles: Fzg[] = [
@@ -218,6 +227,11 @@ describe('CrewAssignmentBoard', () => {
   it('keeps a manually added declined person visible', () => {
     render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
     expect(screen.getByText('Fritz Nein')).toBeInTheDocument();
+  });
+
+  it('keeps a legacy manual entry (no source) visible with an alarm loaded', () => {
+    render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+    expect(screen.getByText('Legacy Walkin')).toBeInTheDocument();
   });
 
   it('hides an alarm-source person who is no longer confirmed', () => {
