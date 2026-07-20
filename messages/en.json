@@ -377,8 +377,6 @@
       "layer": "Layer"
     },
     "noPermission": "{group} (no permission)",
-    "manualEntry": "Manual entry",
-    "noAssignment": "No assignment",
     "alarmSelect": "Alarm SMS",
     "alarmsLoading": "Loading alarm SMS messages..."
   },

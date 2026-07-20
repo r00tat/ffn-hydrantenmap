@@ -9,6 +9,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
+import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
@@ -70,8 +71,11 @@ export default function EinsatzDialog({
   const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [alarmsLoading, setAlarmsLoading] = useState(false);
-  const [selectedAlarmId, setSelectedAlarmId] = useState<string>(
-    einsatzDefault?.blaulichtSmsAlarmId ?? ''
+  const [selectedAlarmIds, setSelectedAlarmIds] = useState<string[]>(
+    einsatzDefault?.blaulichtSmsAlarmIds ??
+      (einsatzDefault?.blaulichtSmsAlarmId
+        ? [einsatzDefault.blaulichtSmsAlarmId]
+        : []),
   );
 
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
@@ -87,6 +91,7 @@ export default function EinsatzDialog({
       date: new Date(alarm.alarmDate).toISOString(),
       description: alarm.alarmText,
       blaulichtSmsAlarmId: alarm.alarmId,
+      blaulichtSmsAlarmIds: [alarm.alarmId],
       ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
     }));
   }, []);
@@ -126,7 +131,7 @@ export default function EinsatzDialog({
 
     const clearStaleAlarmData = () => {
       if (!isNewEinsatz) return;
-      setSelectedAlarmId('');
+      setSelectedAlarmIds([]);
       setEinsatz((prev) =>
         prev.blaulichtSmsAlarmId ? resetEinsatzToManual(prev) : prev,
       );
@@ -148,7 +153,7 @@ export default function EinsatzDialog({
         setAlarms(sorted);
         if (isNewEinsatz) {
           if (sorted.length > 0) {
-            setSelectedAlarmId(sorted[0].alarmId);
+            setSelectedAlarmIds([sorted[0].alarmId]);
             applyAlarm(sorted[0]);
           } else {
             clearStaleAlarmData();
@@ -165,25 +170,36 @@ export default function EinsatzDialog({
   }, [isNewEinsatz, selectedGroup, configuredGroups, applyAlarm]);
 
   const handleAlarmChange = useCallback(
-    (event: SelectChangeEvent) => {
-      const alarmId = event.target.value;
-      setSelectedAlarmId(alarmId);
-      if (alarmId) {
-        const alarm = alarms.find((a) => a.alarmId === alarmId);
-        if (alarm) {
-          if (isNewEinsatz) {
-            applyAlarm(alarm);
-          } else {
-            setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: alarm.alarmId }));
-          }
+    (event: SelectChangeEvent<string[]>) => {
+      const value = event.target.value;
+      const ids = typeof value === 'string' ? value.split(',') : value;
+      setSelectedAlarmIds(ids);
+
+      if (ids.length === 0) {
+        if (isNewEinsatz) {
+          setEinsatz((prev) => resetEinsatzToManual(prev));
+        } else {
+          setEinsatz((prev) => ({
+            ...prev,
+            blaulichtSmsAlarmId: undefined,
+            blaulichtSmsAlarmIds: undefined,
+          }));
         }
-      } else if (isNewEinsatz) {
-        setEinsatz((prev) => resetEinsatzToManual(prev));
-      } else {
-        setEinsatz((prev) => ({ ...prev, blaulichtSmsAlarmId: undefined }));
+        return;
       }
+
+      // First selected alarm fills the Einsatz fields (new Einsatz only).
+      if (isNewEinsatz) {
+        const primary = alarms.find((a) => a.alarmId === ids[0]);
+        if (primary) applyAlarm(primary);
+      }
+      setEinsatz((prev) => ({
+        ...prev,
+        blaulichtSmsAlarmId: ids[0],
+        blaulichtSmsAlarmIds: ids,
+      }));
     },
-    [alarms, applyAlarm, isNewEinsatz]
+    [alarms, applyAlarm, isNewEinsatz],
   );
 
   const handleFileUploadComplete = useCallback(
@@ -274,15 +290,25 @@ export default function EinsatzDialog({
             <Select
               labelId="alarm-select-label"
               id="alarm-select"
-              value={selectedAlarmId}
+              multiple
+              value={selectedAlarmIds}
               label={t('firecall.alarmSelect')}
               onChange={handleAlarmChange}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {(selected as string[]).map((id) => {
+                    const a = alarms.find((x) => x.alarmId === id);
+                    return (
+                      <Chip
+                        key={id}
+                        size="small"
+                        label={a ? a.alarmText : id}
+                      />
+                    );
+                  })}
+                </Box>
+              )}
             >
-              <MenuItem value="">
-                {isNewEinsatz
-                  ? t('firecall.manualEntry')
-                  : t('firecall.noAssignment')}
-              </MenuItem>
               {alarms.map((alarm) => (
                 <MenuItem key={alarm.alarmId} value={alarm.alarmId}>
                   {alarm.alarmText} (

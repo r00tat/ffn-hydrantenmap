@@ -377,8 +377,6 @@
       "layer": "Ebene"
     },
     "noPermission": "{group} (keine Berechtigung)",
-    "manualEntry": "Manuell eingeben",
-    "noAssignment": "Keine Zuordnung",
     "alarmSelect": "Alarm SMS",
     "alarmsLoading": "Alarm-SMS-Alarme werden geladen..."
   },
