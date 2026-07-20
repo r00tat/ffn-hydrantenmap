@@ -84,9 +84,7 @@ export default function CrewVehicleColumn({
             )
           }
           onRemove={
-            onRemove &&
-            assignment.recipientId.startsWith('manual-') &&
-            assignment.id
+            onRemove && assignment.source === 'manual' && assignment.id
               ? () => onRemove(assignment.id!)
               : undefined
           }

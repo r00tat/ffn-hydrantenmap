@@ -412,7 +412,7 @@ export default function EinsatzDetails() {
 
       {/* Besatzung */}
       <Box sx={{ mt: 3 }}>
-        <CrewAssignmentBoard alarm={alarm} />
+        <CrewAssignmentBoard alarms={alarm ? [alarm] : null} />
       </Box>
 
       {/* Einsatztagebuch */}

@@ -179,7 +179,10 @@
   },
   "crew": {
     "title": "Besatzung",
-    "addPerson": "Person hinzufügen",
+    "additionalPersons": "Weitere Person hinzufügen",
+    "statusDeclined": "abgelehnt",
+    "statusNoAnswer": "nicht geantwortet",
+    "statusPending": "ausstehend",
     "cols": {
       "name": "Name",
       "function": "Funktion",

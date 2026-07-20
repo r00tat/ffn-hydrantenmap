@@ -179,7 +179,10 @@
   },
   "crew": {
     "title": "Crew",
-    "addPerson": "Add person",
+    "additionalPersons": "Add another person",
+    "statusDeclined": "declined",
+    "statusNoAnswer": "no answer",
+    "statusPending": "pending",
     "cols": {
       "name": "Name",
       "function": "Function",
