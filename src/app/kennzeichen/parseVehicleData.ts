@@ -1,5 +1,3 @@
-import { JSDOM } from 'jsdom';
-
 export interface Vehicle {
   antrieb: string;
   marke: string;
@@ -30,8 +28,20 @@ const LABEL_MAP: Record<string, keyof Vehicle> = {
   Version: 'version',
 };
 
-function normalize(text: string | null | undefined): string {
-  return (text ?? '')
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/gi, "'")
+    .replace(/&#x27;/gi, "'");
+}
+
+/** Strip HTML tags, decode entities, collapse whitespace. */
+function normalizeCell(html: string): string {
+  return decodeEntities(html.replace(/<[^>]*>/g, ' '))
     .replace(/ /g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -39,12 +49,16 @@ function normalize(text: string | null | undefined): string {
 
 /** Extracts the hidden `fx` CSRF token from a form page, or null if absent. */
 export function parseFx(html: string): string | null {
-  const doc = new JSDOM(html).window.document;
-  const input = doc.querySelector(
-    'input[name="fx"]'
-  ) as HTMLInputElement | null;
-  const value = input?.getAttribute('value') ?? '';
-  return value.length > 0 ? value : null;
+  const inputRe = /<input\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = inputRe.exec(html)) !== null) {
+    const tag = m[0];
+    if (!/\bname\s*=\s*["']fx["']/i.test(tag)) continue;
+    const valueMatch = /\bvalue\s*=\s*["']([^"']*)["']/i.exec(tag);
+    const value = valueMatch?.[1] ?? '';
+    return value.length > 0 ? value : null;
+  }
+  return null;
 }
 
 /**
@@ -53,18 +67,25 @@ export function parseFx(html: string): string | null {
  * (two tables = Wechselkennzeichen). No table = no result.
  */
 export function parseVehicleResult(html: string): VehicleResult {
-  const doc = new JSDOM(html).window.document;
-  const tables = Array.from(doc.querySelectorAll('table.table'));
-
   const vehicles: Vehicle[] = [];
-  for (const table of tables) {
+  const tableRe =
+    /<table\b[^>]*class\s*=\s*["'][^"']*\btable\b[^"']*["'][^>]*>([\s\S]*?)<\/table>/gi;
+  let tm: RegExpExecArray | null;
+  while ((tm = tableRe.exec(html)) !== null) {
+    const tableInner = tm[1];
     const vehicle: Partial<Vehicle> = {};
-    for (const row of Array.from(table.querySelectorAll('tr'))) {
-      const cells = row.querySelectorAll('td');
+    const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
+    let rm: RegExpExecArray | null;
+    while ((rm = rowRe.exec(tableInner)) !== null) {
+      const cellRe = /<td\b[^>]*>([\s\S]*?)<\/td>/gi;
+      const cells: string[] = [];
+      let cm: RegExpExecArray | null;
+      while ((cm = cellRe.exec(rm[1])) !== null) {
+        cells.push(normalizeCell(cm[1]));
+      }
       if (cells.length < 2) continue;
-      const label = normalize(cells[0].textContent);
-      const key = LABEL_MAP[label];
-      if (key) vehicle[key] = normalize(cells[1].textContent);
+      const key = LABEL_MAP[cells[0]];
+      if (key) vehicle[key] = cells[1];
     }
     if (Object.keys(vehicle).length > 0) {
       vehicles.push({
@@ -80,6 +101,5 @@ export function parseVehicleResult(html: string): VehicleResult {
       });
     }
   }
-
   return { vehicles, noResult: vehicles.length === 0 };
 }
