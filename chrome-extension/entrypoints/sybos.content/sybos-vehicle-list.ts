@@ -14,12 +14,14 @@ function normalizeCellText(value: string | null | undefined): string {
 }
 
 /**
- * Parse the SYBOS vehicle-list table (ExtJS x-grid3) from the current DOM.
+ * Parse the SYBOS vehicle-list table (ExtJS x-grid3) from the given root.
  * Each row is identified by a `.x-grid3-col-WAname` cell and a sibling
  * checkbox `input[name^="deleted["]`.
  */
-export function parseSybosVehicleList(): SybosVehicleListRow[] {
-  const wanameCells = document.querySelectorAll<HTMLElement>(
+export function parseSybosVehicleList(
+  root: ParentNode = document
+): SybosVehicleListRow[] {
+  const wanameCells = root.querySelectorAll<HTMLElement>(
     '.x-grid3-col-WAname'
   );
 
@@ -53,8 +55,8 @@ export function parseSybosVehicleList(): SybosVehicleListRow[] {
 }
 
 /**
- * Check whether the current page contains a SYBOS vehicle-list table.
+ * Check whether the given root contains a SYBOS vehicle-list table.
  */
-export function hasSybosVehicleList(): boolean {
-  return document.querySelector('.x-grid3-col-WAname') !== null;
+export function hasSybosVehicleList(root: ParentNode = document): boolean {
+  return root.querySelector('.x-grid3-col-WAname') !== null;
 }

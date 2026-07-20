@@ -74,6 +74,42 @@ describe('parseSybosPersonTable', () => {
   });
 });
 
+describe('parseSybosPersonTable with custom root', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('parses person entries from a detached document root and ignores the global document', () => {
+    // Put unrelated markup in the global document to prove it's ignored.
+    addPersonRow(document.body, '9999', 'Global Document Person');
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body></body></html>',
+      'text/html'
+    );
+    addPersonRow(doc.body, '1406', 'Mustermann Jörg');
+
+    const result = parseSybosPersonTable(doc);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: '1406',
+      name: 'Mustermann Jörg',
+      checkbox: expect.any(HTMLInputElement),
+    });
+  });
+
+  it('parses person entries from a detached container element', () => {
+    addPersonRow(document.body, '9999', 'Global Document Person');
+
+    const container = document.createElement('div');
+    addPersonRow(container, '1407', 'Müller Franz');
+
+    const result = parseSybosPersonTable(container);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('1407');
+  });
+});
+
 describe('hasSybosPersonTable', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -92,5 +128,18 @@ describe('hasSybosPersonTable', () => {
     addPersonRow(document.body, '2006', '{GEbez}');
     addPersonRow(document.body, '2007', '{GEbez}');
     expect(hasSybosPersonTable()).toBe(false);
+  });
+
+  it('detects a person table only within the given root, not the global document', () => {
+    addPersonRow(document.body, '9999', 'Global Document Person');
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body></body></html>',
+      'text/html'
+    );
+    expect(hasSybosPersonTable(doc)).toBe(false);
+
+    addPersonRow(doc.body, '1406', 'Mustermann Jörg');
+    expect(hasSybosPersonTable(doc)).toBe(true);
   });
 });

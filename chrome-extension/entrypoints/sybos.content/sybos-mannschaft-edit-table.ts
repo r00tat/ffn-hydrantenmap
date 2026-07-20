@@ -35,13 +35,15 @@ function extractPersonName(value: string): string {
 }
 
 /**
- * Parse the SYBOS "Mannschaft editieren" table rows.
+ * Parse the SYBOS "Mannschaft editieren" table rows from the given root.
  * Each row is anchored by an `ESADFahrzeugListe_<key>` select where
  * `<key>` encodes `<adrId>_<einsatzId>_<YYYY>_<MM>_<DD>_<HH>_<MM>_<SS>`.
  * The person name lives in a sibling `input[id^="ADR_"]` element.
  */
-export function parseSybosMannschaftEditTable(): SybosMannschaftEditRow[] {
-  const fahrzeugSelects = document.querySelectorAll<HTMLSelectElement>(
+export function parseSybosMannschaftEditTable(
+  root: ParentNode = document
+): SybosMannschaftEditRow[] {
+  const fahrzeugSelects = root.querySelectorAll<HTMLSelectElement>(
     'select[name^="ESADFahrzeugListe_"]'
   );
 
@@ -90,12 +92,12 @@ export function parseSybosMannschaftEditTable(): SybosMannschaftEditRow[] {
 }
 
 /**
- * Check whether the current page is the SYBOS "Mannschaft editieren" view.
+ * Check whether the given root is the SYBOS "Mannschaft editieren" view.
  * Detection requires at least one per-row `ESADFahrzeugListe_<key>` select
  * (the top-of-page "apply" select has no suffix and is ignored).
  */
-export function hasSybosMannschaftEditTable(): boolean {
-  return (
-    document.querySelector('select[name^="ESADFahrzeugListe_"]') !== null
-  );
+export function hasSybosMannschaftEditTable(
+  root: ParentNode = document
+): boolean {
+  return root.querySelector('select[name^="ESADFahrzeugListe_"]') !== null;
 }

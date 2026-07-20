@@ -19,12 +19,14 @@ function extractPersonName(value: string): string {
 }
 
 /**
- * Parse the SYBOS vehicle/funktion assignment table from the current page DOM.
+ * Parse the SYBOS vehicle/funktion assignment table from the given root DOM.
  * Finds all WARTIKEL_WAnr selects and extracts row data including
  * person name, funktion select, and fahrzeug select.
  */
-export function parseSybosVehicleTable(): SybosVehicleRow[] {
-  const fahrzeugSelects = document.querySelectorAll<HTMLSelectElement>(
+export function parseSybosVehicleTable(
+  root: ParentNode = document
+): SybosVehicleRow[] {
+  const fahrzeugSelects = root.querySelectorAll<HTMLSelectElement>(
     'select[name^="WARTIKEL_WAnr_"]'
   );
 
@@ -58,10 +60,8 @@ export function parseSybosVehicleTable(): SybosVehicleRow[] {
 }
 
 /**
- * Check if the current page contains a SYBOS vehicle assignment table.
+ * Check if the given root contains a SYBOS vehicle assignment table.
  */
-export function hasSybosVehicleTable(): boolean {
-  return (
-    document.querySelectorAll('select[name^="WARTIKEL_WAnr_"]').length > 0
-  );
+export function hasSybosVehicleTable(root: ParentNode = document): boolean {
+  return root.querySelectorAll('select[name^="WARTIKEL_WAnr_"]').length > 0;
 }
