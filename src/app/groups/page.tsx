@@ -206,9 +206,20 @@ function Groups() {
           onClose={async (group, assigendUsers) => {
             setShowEditDialog(false);
             if (group && assigendUsers) {
-              await updateGroupAction(group, assigendUsers);
+              // A group without an id is new: updateGroupAction creates it and
+              // returns the generated id. Reopen the freshly created group in
+              // edit mode so the integration sections (Alarm-SMS / ÖBFV-Token),
+              // which require an existing group id, become available.
+              const wasNew = !group.id;
+              const savedId = await updateGroupAction(group, assigendUsers);
+              await getGroups();
+              if (wasNew && savedId) {
+                setEditGroup({ ...group, id: savedId });
+                setShowEditDialog(true);
+              }
+            } else {
+              await getGroups();
             }
-            await getGroups();
           }}
         />
       )}

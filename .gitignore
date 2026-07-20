@@ -195,3 +195,4 @@ certificates
 /radiacode-python/
 .claude/scheudled_tasks.lock
 *.aab
+/docs/superpowers/**/*.md

@@ -1,0 +1,218 @@
+
+
+
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    
+
+    <title>feuerwehrapp.at</title>
+
+    <link rel="canonical" href="https://getbootstrap.com/docs/4.0/examples/cover/">
+
+    <!-- Bootstrap core CSS -->
+    <link href="../../bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="../../bootstrap/cover.css" rel="stylesheet">
+    
+    
+    
+    
+
+
+
+
+<style>
+
+      
+.form-control-lg {
+  font-size: 1.8rem;
+}
+
+.link-in-alert:link  {      color: #292929;   }
+.link-in-alert:visited  {   color: #292929;   }
+.link-in-alert:hover  {     color: #292929;   }
+.link-in-alert:active  {    color: #292929;   }
+
+:placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+  color: red;
+  opacity: 1; /* Firefox */
+}
+
+      
+</style>
+
+
+    
+  </head>
+
+  <body class="text-center">
+
+    <div class="cover-container d-flex h-100 p-3 mx-auto flex-column">
+
+
+      <header class="masthead mb-auto">
+        <div class="inner">
+          <!-- <h3 class="masthead-brand">FWdd</h3> -->
+          
+          <a href="../index.php" class="btn btn-lg btn-secondary btn-sm">HOME</a>
+          <a href="../logout.php" class="btn btn-lg btn-outline-secondary btn-sm">Logout</a>
+          <br>          
+
+          b20115@feuerwehr.or.at <span class="badge badge-warning"> via Link</span>   &nbsp;&nbsp;  
+          
+          <nav class="nav nav-masthead justify-content-center">
+            <!-- <a class="nav-link active" href="#">Home</a> -->
+            <!-- <a class="nav-link" href="#">Features</a> -->
+            <!-- <a class="nav-link" href="#">Contact</a> -->
+          </nav>
+        </div>
+      </header>
+      
+
+      <main role="main" class="inner cover mx-auto">
+       
+    <!-- -------------------------------------------- -->
+        <br>
+        <div class="alert alert-warning" role="alert">
+          ÜBUNGSSYSTEM 
+        </div>
+        <div class="alert alert-info" role="alert">
+          Download der Anleitung für Übungen inkl. Übungskennzeichen zum Ausdrucken: <b><a class="link-in-alert" href="../anleitung_v3.pdf">anleitung_v3.pdf</a></b>
+        </div>
+
+        <hr>
+
+        <h1 class="cover-heading">Suche nach Kennzeichen</h1>        
+        
+        
+      <form action="index.php" method="post">
+        <div class="form-row">
+          <div class="col-4">Behörde<br>
+            <input type="text" id="plate_pref" name="plate_pref"     class="font-weight-bold form-control form-control-lg text-uppercase" placeholder="FW"   maxlength="2"   value="FW">
+          </div>
+          <div class="col-8">Vormerkzeichen<br>
+            <input type="text" id="plate_number" name="plate_number" class="font-weight-bold form-control form-control-lg text-uppercase" placeholder="KFZ1" maxlength="10"  value="KFZ3">
+          </div>
+        </div>
+
+        <div class="form-group">      </div>
+  
+        <button type="submit" class=" form-control btn btn-lg btn-success">&nbsp; &nbsp; SUCHEN &nbsp; &nbsp; </button>
+        
+      </form>
+
+
+
+
+
+
+        <!-- <a href="index.php"  class="btn btn-sm btn-secondary">Zurück</a> -->
+        
+        <p class="lead"></p>
+        <p class="lead">
+          <hr> 
+        </p>
+        
+        <p class="lead">
+        
+        
+        <hr><h1>Daten aus Zulassung:</h1><table  class="table">
+                    <tr>
+                      <td>Antrieb</td>
+                      <td><h3>Elektro &nbsp; <img src="elektro.png"></h3></td>
+                    </tr>
+  
+                    <tr>
+                      <td>Marke</td>
+                      <td><h3>TESLA</h3></td>
+                    </tr>
+  
+                    <tr>
+                      <td>Name</td>
+                      <td><h3>Model 3</h3></td>
+                    </tr>
+  
+                    <tr>
+                      <td>Type</td>
+                      <td><h3>003</h3></td>
+                    </tr>
+                                    
+                    <tr>
+                      <td>Höchstzul. Masse</td>
+                      <td><h3>2305</h3></td>
+                    </tr>
+                    
+                    <tr>
+                      <td>Erstzulassung</td>
+                      <td><h3>2019-06-27</h3></td>
+                    </tr>
+                    
+                    <tr>
+                      <td>FIN</td>
+                      <td>5YJ3E7EB3KF312345</td>
+                    </tr>
+  
+                    <tr>
+                      <td>Variante</td>
+                      <td>E3D</td>
+                    </tr>
+                    
+                    <tr>
+                      <td>Version</td>
+                      <td>Pp2N</td>
+                    </tr>                  
+              
+                  </table> <br><br><hr>        
+
+        
+        </p>
+      
+      
+          <!-- -------------------------------------------- -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </main>
+
+      <footer class="mastfoot mt-auto">
+        <div class="inner">
+          <p>Impressum: <a href="https://www.bundesfeuerwehrverband.at/impressum/" target="_blank">Österreichischer Bundesfeuerwehrverband (ÖBFV)</a><br>
+             Support: <a href="mailto:m.seyfert@feuerwehr.at">m.seyfert@feuerwehr.at</a></p>
+        </div>
+      </footer>
+    </div>
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script>window.jQuery || document.write('<script src="bootstrap/assets/js/vendor/jquery-slim.min.js"><\/script>')</script>
+    <script src="bootstrap/assets/js/vendor/popper.min.js"></script>
+    <script src="bootstrap/dist/js/bootstrap.min.js"></script>
+  </body>
+</html>
