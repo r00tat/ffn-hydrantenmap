@@ -36,6 +36,7 @@ import { firestore } from '../firebase/firebase';
 import {
   Firecall,
   FIRECALL_COLLECTION_ID,
+  firecallAlarmIds,
 } from '../firebase/firestore';
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
@@ -67,8 +68,8 @@ export default function EinsatzDetails() {
   const [copied, setCopied] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [error, setError] = useState<string>();
-  const [alarm, setAlarm] = useState<BlaulichtSmsAlarm | null | undefined>(
-    undefined
+  const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[] | undefined>(
+    undefined,
   );
 
   useEffect(() => {
@@ -84,28 +85,35 @@ export default function EinsatzDetails() {
     })();
   }, [firecallId]);
 
-  const blaulichtSmsAlarmId = firecall?.blaulichtSmsAlarmId;
+  const alarmIdsKey = firecall ? firecallAlarmIds(firecall).join(',') : '';
   const firecallGroup = firecall?.group;
 
   useEffect(() => {
-    if (!blaulichtSmsAlarmId || !firecallGroup) return;
     let cancelled = false;
     (async () => {
+      if (!alarmIdsKey || !firecallGroup) {
+        if (!cancelled) setAlarms(undefined);
+        return;
+      }
+      const ids = alarmIdsKey.split(',');
       try {
-        const result = await getBlaulichtSmsAlarmById(
-          firecallGroup,
-          blaulichtSmsAlarmId
+        const results = await Promise.all(
+          ids.map((id) => getBlaulichtSmsAlarmById(firecallGroup, id)),
         );
-        if (!cancelled) setAlarm(result);
+        if (!cancelled) {
+          setAlarms(
+            results.filter((a): a is BlaulichtSmsAlarm => a !== null),
+          );
+        }
       } catch (err) {
-        console.error('Failed to load BlaulichtSMS alarm:', err);
-        if (!cancelled) setAlarm(null);
+        console.error('Failed to load BlaulichtSMS alarms:', err);
+        if (!cancelled) setAlarms([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [blaulichtSmsAlarmId, firecallGroup]);
+  }, [alarmIdsKey, firecallGroup]);
 
   const updateFirecall = useCallback(
     async (fc: Firecall) => {
@@ -191,6 +199,8 @@ export default function EinsatzDetails() {
 
   if (loading) return <CircularProgress sx={{ m: 4 }} />;
   if (!firecall) return <Typography sx={{ m: 2 }}>{t('notFound')}</Typography>;
+
+  const alarmIds = firecallAlarmIds(firecall);
 
   return (
     <Box sx={{ p: 2, m: 2 }}>
@@ -335,19 +345,27 @@ export default function EinsatzDetails() {
       </Grid>
 
       {/* BlaulichtSMS Details */}
-      {firecall.blaulichtSmsAlarmId && (
+      {alarmIds.length > 0 && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" gutterBottom>
             {t('blaulichtSmsTitle')}
           </Typography>
-          {alarm === undefined ? (
+          {alarms === undefined ? (
             <CircularProgress size={24} />
-          ) : alarm ? (
-            <AlarmCard alarm={alarm} defaultExpandRecipients={false} />
+          ) : alarms.length > 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {alarms.map((a) => (
+                <AlarmCard
+                  key={a.alarmId}
+                  alarm={a}
+                  defaultExpandRecipients={false}
+                />
+              ))}
+            </Box>
           ) : (
             <Typography color="text.secondary">
               {t('blaulichtSmsLoadError', {
-                id: firecall.blaulichtSmsAlarmId ?? '',
+                id: alarmIds.join(', '),
               })}
             </Typography>
           )}
@@ -412,7 +430,7 @@ export default function EinsatzDetails() {
 
       {/* Besatzung */}
       <Box sx={{ mt: 3 }}>
-        <CrewAssignmentBoard alarms={alarm ? [alarm] : null} />
+        <CrewAssignmentBoard alarms={alarms} />
       </Box>
 
       {/* Einsatztagebuch */}
