@@ -9,6 +9,7 @@ import React, {
   useState,
 } from 'react';
 import {
+  Autocomplete,
   Box,
   FormControl,
   IconButton,
@@ -22,12 +23,10 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
@@ -43,7 +42,9 @@ import {
 import { useDraggable } from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
 import { DEFAULT_VEHICLES } from '../../common/defaultKostenersatzRates';
-import useCrewAssignments from '../../hooks/useCrewAssignments';
+import useCrewAssignments, {
+  BlaulichtSmsRecipient,
+} from '../../hooks/useCrewAssignments';
 import { useFirecall } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useVehicles from '../../hooks/useVehicles';
@@ -58,7 +59,7 @@ import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
 import CrewVehicleColumn from './CrewVehicleColumn';
 
 export interface CrewAssignmentBoardProps {
-  alarm?: BlaulichtSmsAlarm | null;
+  alarms?: BlaulichtSmsAlarm[] | null;
 }
 
 /* ─── Mobile: compact table components ─── */
@@ -187,14 +188,23 @@ function CrewRow({
 
 /* ─── Main component ─── */
 
+// A crew entry counts as manually added when its source is 'manual' OR — for
+// legacy entries created before the `source` field existed — when its
+// recipientId carries the historical `manual-` prefix. Such entries must stay
+// visible and removable even while an alarm is loaded.
+const isManualEntry = (a: CrewAssignment) =>
+  a.source === 'manual' ||
+  (a.source === undefined && a.recipientId.startsWith('manual-'));
+
 export default function CrewAssignmentBoard({
-  alarm,
+  alarms,
 }: CrewAssignmentBoardProps) {
   const t = useTranslations('crew');
   const {
     crewAssignments,
-    syncFromAlarm,
+    syncFromAlarms,
     addManualPerson,
+    addPersonFromRecipient,
     assignVehicle,
     updateFunktion,
     removeAssignment,
@@ -209,6 +219,41 @@ export default function CrewAssignmentBoard({
   const existingVehicleNames = useMemo(
     () => vehicles.map((v) => v.name),
     [vehicles],
+  );
+
+  // Recipients across all alarms who did NOT confirm (no / unknown / pending),
+  // deduped by id, excluding anyone already in the crew list.
+  const additionalPersonOptions = useMemo(() => {
+    const alreadyAdded = new Set(crewAssignments.map((a) => a.recipientId));
+    const byId = new Map<string, BlaulichtSmsRecipient>();
+    for (const alarm of alarms ?? []) {
+      for (const r of alarm.recipients) {
+        if (r.participation === 'yes') continue;
+        if (alreadyAdded.has(r.id)) continue;
+        if (!byId.has(r.id)) {
+          byId.set(r.id, {
+            id: r.id,
+            name: r.name,
+            participation: r.participation,
+          });
+        }
+      }
+    }
+    return [...byId.values()];
+  }, [alarms, crewAssignments]);
+
+  const participationLabel = useCallback(
+    (participation: BlaulichtSmsRecipient['participation']) => {
+      switch (participation) {
+        case 'no':
+          return t('statusDeclined');
+        case 'pending':
+          return t('statusPending');
+        default:
+          return t('statusNoAnswer');
+      }
+    },
+    [t],
   );
 
   const handleAddVehicle = useCallback(
@@ -235,35 +280,45 @@ export default function CrewAssignmentBoard({
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Only sync once per alarm ID to prevent duplicate creation
-  const syncedAlarmRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!alarm) return;
-    if (syncedAlarmRef.current === alarm.alarmId) return;
-    syncedAlarmRef.current = alarm.alarmId;
-    syncFromAlarm(alarm.recipients);
-  }, [alarm, syncFromAlarm]);
-
-  // Only show crew entries for recipients who actually confirmed (yes)
-  // When alarm is unavailable, show all crew entries from Firestore
-  const confirmedIds = useMemo(
+  // Only sync once per alarm-set to prevent duplicate creation.
+  // The key is a stable join of all alarm ids so that adding/removing an
+  // alarm re-triggers the sync.
+  const alarmKey = useMemo(
     () =>
-      alarm
-        ? new Set(
-            alarm.recipients
-              .filter((r) => r.participation === 'yes')
-              .map((r) => r.id),
-          )
-        : null,
-    [alarm],
+      (alarms ?? [])
+        .map((a) => a.alarmId)
+        .sort()
+        .join(','),
+    [alarms],
   );
+  const syncedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!alarms || alarms.length === 0) return;
+    if (syncedKeyRef.current === alarmKey) return;
+    syncedKeyRef.current = alarmKey;
+    syncFromAlarms(alarms);
+  }, [alarms, alarmKey, syncFromAlarms]);
 
-  // Filter to confirmed recipients (if alarm available) and deduplicate
-  // Always include manual entries (recipientId starts with "manual-")
+  // Union of confirmed (yes) recipient ids across ALL alarms.
+  // null when no alarms are available → then all crew entries are shown.
+  const confirmedIds = useMemo(() => {
+    if (!alarms || alarms.length === 0) return null;
+    const ids = new Set<string>();
+    for (const alarm of alarms) {
+      for (const r of alarm.recipients) {
+        if (r.participation === 'yes') ids.add(r.id);
+      }
+    }
+    return ids;
+  }, [alarms]);
+
+  // Show an entry when it was explicitly added (source 'manual') OR when its
+  // recipient is currently in the union of confirmed ids. Legacy entries
+  // without a source are treated as 'alarm'. Dedupe by recipientId.
   const validAssignments = useMemo(() => {
     const seen = new Set<string>();
     return crewAssignments.filter((a) => {
-      const isManual = a.recipientId.startsWith('manual-');
+      const isManual = isManualEntry(a);
       if (!isManual && confirmedIds && !confirmedIds.has(a.recipientId))
         return false;
       if (seen.has(a.recipientId)) return false;
@@ -327,7 +382,7 @@ export default function CrewAssignmentBoard({
           handleVehicleChange(a.id || a.recipientId, vId, vName)
         }
         onRemove={
-          a.recipientId.startsWith('manual-') && a.id
+          isManualEntry(a) && a.id
             ? () => removeAssignment(a.id!)
             : undefined
         }
@@ -338,33 +393,46 @@ export default function CrewAssignmentBoard({
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <Typography variant="h5">{t('title')}</Typography>
-        <TextField
+        <Autocomplete
+          freeSolo
           size="small"
-          placeholder={t('addPerson')}
-          value={newPersonName}
-          onChange={(e) => setNewPersonName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && newPersonName.trim()) {
-              addManualPerson(newPersonName);
+          sx={{ ml: 'auto', minWidth: 260 }}
+          options={additionalPersonOptions}
+          getOptionLabel={(option) =>
+            typeof option === 'string' ? option : option.name
+          }
+          renderOption={(props, option) => (
+            <li {...props} key={option.id}>
+              {option.name} ({participationLabel(option.participation)})
+            </li>
+          )}
+          value={null}
+          inputValue={newPersonName}
+          onInputChange={(_e, value) => setNewPersonName(value)}
+          onChange={(_e, value) => {
+            if (value && typeof value !== 'string') {
+              addPersonFromRecipient(value);
               setNewPersonName('');
             }
           }}
-          sx={{ ml: 'auto', maxWidth: 220 }}
-        />
-        <Tooltip title={t('addPerson')}>
-          <span>
-            <IconButton
-              color="primary"
-              disabled={!newPersonName.trim()}
-              onClick={() => {
-                addManualPerson(newPersonName);
-                setNewPersonName('');
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label={t('additionalPersons')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newPersonName.trim()) {
+                  const isOption = additionalPersonOptions.some(
+                    (o) => o.name === newPersonName.trim(),
+                  );
+                  if (!isOption) {
+                    addManualPerson(newPersonName);
+                    setNewPersonName('');
+                  }
+                }
               }}
-            >
-              <AddIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
+            />
+          )}
+        />
       </Box>
 
       <VehicleQuickAddChips

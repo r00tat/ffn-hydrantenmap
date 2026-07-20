@@ -179,7 +179,10 @@
   },
   "crew": {
     "title": "Crew",
-    "addPerson": "Add person",
+    "additionalPersons": "Add another person",
+    "statusDeclined": "declined",
+    "statusNoAnswer": "no answer",
+    "statusPending": "pending",
     "cols": {
       "name": "Name",
       "function": "Function",
@@ -374,8 +377,6 @@
       "layer": "Layer"
     },
     "noPermission": "{group} (no permission)",
-    "manualEntry": "Manual entry",
-    "noAssignment": "No assignment",
     "alarmSelect": "Alarm SMS",
     "alarmsLoading": "Loading alarm SMS messages..."
   },

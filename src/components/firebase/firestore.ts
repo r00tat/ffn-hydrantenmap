@@ -297,8 +297,16 @@ export interface Firecall {
   group?: string;
   attachments?: string[];
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
-  blaulichtSmsAlarmId?: string;
+  blaulichtSmsAlarmId?: string; // Legacy: primärer Alarm (bleibt für Abwärtskompatibilität)
+  blaulichtSmsAlarmIds?: string[]; // Quelle der Wahrheit für zugeordnete Alarme
   [key: string]: any;
+}
+
+export function firecallAlarmIds(fc: Firecall): string[] {
+  if (fc.blaulichtSmsAlarmIds && fc.blaulichtSmsAlarmIds.length > 0) {
+    return fc.blaulichtSmsAlarmIds;
+  }
+  return fc.blaulichtSmsAlarmId ? [fc.blaulichtSmsAlarmId] : [];
 }
 
 export type CrewFunktion =
@@ -325,6 +333,7 @@ export interface CrewAssignment {
   vehicleId: string | null;
   vehicleName: string;
   funktion: CrewFunktion;
+  source?: 'alarm' | 'manual'; // undefined = 'alarm' (Legacy-Einträge)
   updatedAt?: string;
   updatedBy?: string;
 }

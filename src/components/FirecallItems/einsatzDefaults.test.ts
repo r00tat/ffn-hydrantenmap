@@ -45,6 +45,7 @@ describe('resetEinsatzToManual', () => {
       lat: 47.95,
       lng: 16.84,
       blaulichtSmsAlarmId: 'alarm-123',
+      blaulichtSmsAlarmIds: ['alarm-123', 'alarm-456'],
     };
 
     const reset = resetEinsatzToManual(current, now);
@@ -56,6 +57,7 @@ describe('resetEinsatzToManual', () => {
     expect(reset.lat).toBeUndefined();
     expect(reset.lng).toBeUndefined();
     expect(reset.blaulichtSmsAlarmId).toBeUndefined();
+    expect(reset.blaulichtSmsAlarmIds).toBeUndefined();
     expect(reset.name).toMatch(/^Einsatz am /);
   });
 
