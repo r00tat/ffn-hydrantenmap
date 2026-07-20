@@ -29,6 +29,12 @@ import {
   getBlaulichtsmsConfig,
   saveBlaulichtsmsConfig,
 } from '../blaulicht-sms/credentialsActions';
+import {
+  OebfvConfigPublic,
+  deleteOebfvConfig,
+  getOebfvConfig,
+  saveOebfvConfig,
+} from '../kennzeichen/configActions';
 import { Group } from './groupTypes';
 
 export interface GroupDialoggOptions {
@@ -71,6 +77,11 @@ export default function GroupDialogg({
   const [blsPassword, setBlsPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // ÖBFV Kennzeichenabfrage token state
+  const [oebfvConfig, setOebfvConfig] = useState<OebfvConfigPublic | null>(null);
+  const [oebfvToken, setOebfvToken] = useState('');
+  const [showOebfvToken, setShowOebfvToken] = useState(false);
+
   const groupId = group.id;
 
   useEffect(() => {
@@ -84,6 +95,13 @@ export default function GroupDialogg({
         }
       })
       .catch((err) => console.error('Failed to load BlaulichtSMS config:', err));
+  }, [groupId]);
+
+  useEffect(() => {
+    if (!groupId) return;
+    getOebfvConfig(groupId)
+      .then((existing) => setOebfvConfig(existing))
+      .catch((err) => console.error('Failed to load ÖBFV config:', err));
   }, [groupId]);
 
   const userMap = Object.fromEntries(users.map((user) => [user.uid, user]));
@@ -129,6 +147,9 @@ export default function GroupDialogg({
         } else if (blsConfig) {
           // All fields cleared — delete existing config
           await deleteBlaulichtsmsConfig(groupId);
+        }
+        if (oebfvToken) {
+          await saveOebfvConfig(groupId, { token: oebfvToken });
         }
       }
     } catch (err) {
@@ -259,6 +280,64 @@ export default function GroupDialogg({
                 },
               }}
             />
+            <Divider sx={{ mt: 3, mb: 1 }} />
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              ÖBFV Kennzeichenabfrage
+            </Typography>
+            {oebfvConfig && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Zuletzt geändert:{' '}
+                {oebfvConfig.updatedAt
+                  ? new Date(oebfvConfig.updatedAt).toLocaleString('de-AT')
+                  : '—'}{' '}
+                von {oebfvConfig.updatedBy ?? '—'}
+              </Typography>
+            )}
+            <TextField
+              label="Token"
+              fullWidth
+              margin="dense"
+              variant="standard"
+              type={showOebfvToken ? 'text' : 'password'}
+              value={oebfvToken}
+              onChange={(e) => setOebfvToken(e.target.value)}
+              placeholder={oebfvConfig?.hasToken ? '••••••••' : ''}
+              helperText={
+                oebfvConfig?.hasToken
+                  ? 'Leer lassen, um den bestehenden Token zu behalten.'
+                  : 'Token aus feuerwehrapp.at (Token verwalten).'
+              }
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowOebfvToken((s) => !s)}
+                        edge="end"
+                        size="small"
+                      >
+                        {showOebfvToken ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            {oebfvConfig?.hasToken && (
+              <Button
+                size="small"
+                color="error"
+                onClick={async () => {
+                  if (groupId) {
+                    await deleteOebfvConfig(groupId);
+                    setOebfvConfig(null);
+                    setOebfvToken('');
+                  }
+                }}
+              >
+                Token löschen
+              </Button>
+            )}
           </>
         )}
       </DialogContent>
