@@ -177,18 +177,34 @@ export async function getFirecallsByAlarmIds(
   const isAdmin = session.user.isAdmin;
 
   const results: Record<string, { id: string; name: string }> = {};
+  // Firestore caps both `in` and `array-contains-any` at 30 values per query.
+  const FIRESTORE_QUERY_LIMIT = 30;
   const chunks: string[][] = [];
-  for (let i = 0; i < alarmIds.length; i += 30) {
-    chunks.push(alarmIds.slice(i, i + 30));
+  for (let i = 0; i < alarmIds.length; i += FIRESTORE_QUERY_LIMIT) {
+    chunks.push(alarmIds.slice(i, i + FIRESTORE_QUERY_LIMIT));
   }
 
   for (const chunk of chunks) {
-    const snapshot = await firestore
-      .collection('call')
-      .where('blaulichtSmsAlarmId', 'in', chunk)
-      .where('deleted', '!=', true)
-      .get();
-    for (const doc of snapshot.docs) {
+    const [scalarSnap, arraySnap] = await Promise.all([
+      firestore
+        .collection('call')
+        .where('blaulichtSmsAlarmId', 'in', chunk)
+        .where('deleted', '!=', true)
+        .get(),
+      // Uses the composite index (call: blaulichtSmsAlarmIds ARRAY_CONTAINS, deleted)
+      // defined in firebase/{dev,prod}/firestore.indexes.json.
+      firestore
+        .collection('call')
+        .where('blaulichtSmsAlarmIds', 'array-contains-any', chunk)
+        .where('deleted', '!=', true)
+        .get(),
+    ]);
+
+    const seenDocIds = new Set<string>();
+    for (const doc of [...scalarSnap.docs, ...arraySnap.docs]) {
+      if (seenDocIds.has(doc.id)) continue;
+      seenDocIds.add(doc.id);
+
       const data = doc.data();
       // Only expose firecalls the user is authorized for; otherwise this leaks
       // ids/names of firecalls from other groups.
@@ -203,7 +219,17 @@ export async function getFirecallsByAlarmIds(
       ) {
         continue;
       }
-      results[data.blaulichtSmsAlarmId] = { id: doc.id, name: data.name };
+
+      // Map every alarm id of this firecall that was part of the request chunk
+      // so both primary and Nachalarm ids get badged.
+      const fcAlarmIds =
+        (data.blaulichtSmsAlarmIds as string[] | undefined) ??
+        (data.blaulichtSmsAlarmId ? [data.blaulichtSmsAlarmId] : []);
+      for (const aid of fcAlarmIds) {
+        if (chunk.includes(aid)) {
+          results[aid] = { id: doc.id, name: data.name };
+        }
+      }
     }
   }
 
