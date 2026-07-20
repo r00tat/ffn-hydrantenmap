@@ -153,9 +153,6 @@ export function findEinsatzId(
 /** uses to mark validation/error output. Matched case-insensitively. */
 const ERROR_CLASS_PATTERN = /error|fehler|paterror/i;
 
-/** "Pflichtfeld" (required field) is SYBOS's standard validation wording. */
-const PFLICHTFELD_PATTERN = /[^.\n]*Pflichtfeld[^.\n]*/i;
-
 /** Cap on how much error text we surface, in case SYBOS returns a huge blob. */
 const MAX_ERROR_MESSAGE_LENGTH = 300;
 
@@ -163,11 +160,15 @@ const MAX_ERROR_MESSAGE_LENGTH = 300;
  * Best-effort detection of a SYBOS validation/error response.
  *
  * SYBOS has no JSON error contract — a failed submit just re-renders HTML,
- * so we look for the conventions its markup tends to use: an element whose
- * class name contains "error"/"fehler"/"patError" (case-insensitive), or a
- * "Pflichtfeld" (required field) message anywhere in the body. This is
- * deliberately conservative (a normal, successful page must never match)
- * and will be refined once we've seen real failure responses.
+ * so we look for the convention its markup tends to use: an element whose
+ * class name contains "error"/"fehler"/"patError" (case-insensitive).
+ *
+ * This is deliberately conservative. In particular we do NOT scan the body
+ * for words like "Pflichtfeld" (required field): the successful response is
+ * the re-rendered edit form, which commonly carries a static required-field
+ * legend, and a body-wide keyword scan would flag every successful transfer
+ * as an error. Detection keys off explicit error-styled elements only, and
+ * will be refined once we've seen real SYBOS failure responses.
  *
  * Returns the trimmed text of the first matching element (capped to
  * `MAX_ERROR_MESSAGE_LENGTH` characters), or `null` if nothing matched.
@@ -181,12 +182,6 @@ export function detectError(doc: Document): string | null {
     if (text) {
       return text.slice(0, MAX_ERROR_MESSAGE_LENGTH);
     }
-  }
-
-  const bodyText = doc.body?.textContent ?? '';
-  const match = bodyText.match(PFLICHTFELD_PATTERN);
-  if (match) {
-    return match[0].trim().slice(0, MAX_ERROR_MESSAGE_LENGTH);
   }
 
   return null;

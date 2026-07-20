@@ -323,9 +323,18 @@ describe('detectError', () => {
     expect(detectError(doc)).toBe('Ungültiger Wert');
   });
 
-  it('detects a "Pflichtfeld" message even without a matching class', () => {
+  it('does NOT flag a static "Pflichtfeld" legend without an error class', () => {
+    // The successful edit-form response often carries a required-field
+    // legend; a body-wide keyword scan would misreport every success.
     const doc = parseHtml(
-      '<html><body><p>Name ist ein Pflichtfeld.</p></body></html>'
+      '<html><body><p>Felder mit * sind Pflichtfelder.</p></body></html>'
+    );
+    expect(detectError(doc)).toBeNull();
+  });
+
+  it('detects a "Pflichtfeld" message inside an error-styled element', () => {
+    const doc = parseHtml(
+      '<html><body><div class="patError">Name ist ein Pflichtfeld.</div></body></html>'
     );
     expect(detectError(doc)).toMatch(/Pflichtfeld/);
   });
