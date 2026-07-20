@@ -35,5 +35,6 @@ export function resetEinsatzToManual(
     lat: undefined,
     lng: undefined,
     blaulichtSmsAlarmId: undefined,
+    blaulichtSmsAlarmIds: undefined,
   };
 }
