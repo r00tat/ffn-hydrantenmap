@@ -153,7 +153,7 @@ export default function GroupDialogg({
         }
       }
     } catch (err) {
-      console.error('Failed to save BlaulichtSMS config:', err);
+      console.error('Failed to save group integration config:', err);
     } finally {
       setSaving(false);
     }
@@ -328,10 +328,13 @@ export default function GroupDialogg({
                 size="small"
                 color="error"
                 onClick={async () => {
-                  if (groupId) {
+                  if (!groupId) return;
+                  try {
                     await deleteOebfvConfig(groupId);
                     setOebfvConfig(null);
                     setOebfvToken('');
+                  } catch (err) {
+                    console.error('Failed to delete ÖBFV config:', err);
                   }
                 }}
               >
