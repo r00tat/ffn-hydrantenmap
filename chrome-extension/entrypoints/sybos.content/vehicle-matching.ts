@@ -12,10 +12,13 @@ export function findMatchingVehicleOption(
 
     const optionText = (option.textContent ?? '').trim().toLowerCase();
 
-    if (
-      optionText === normalized ||
-      optionText.startsWith(normalized + ' (')
-    ) {
+    // Match either the exact name, or the name followed by a space — SYBOS
+    // suffixes some options with a parenthesized descriptor
+    // ("KDTFA (Kommando …)") and others with a bare location
+    // ("WLF-K Neusiedl am See"). A plain `+ ' ('` prefix would miss the
+    // paren-less variant, so we key off the trailing space (which subsumes
+    // the "(" case). Mirrors `matchesVehicleName` in sybos-multiselect.ts.
+    if (optionText === normalized || optionText.startsWith(normalized + ' ')) {
       return option;
     }
   }
