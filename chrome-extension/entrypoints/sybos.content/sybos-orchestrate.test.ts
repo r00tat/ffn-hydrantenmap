@@ -271,7 +271,11 @@ describe('buildMaterialSelectionParams', () => {
     expect(notFound).toEqual(['Unbekannt']);
     expect(params.get('deleted[2006]')).toBe('2006');
     expect(params.has('deleted[46143]')).toBe(false);
-    expect(params.get('action_next')).toBe('action_next');
+    // Step 1 (device selection) is submitted with action_save — this is what
+    // advances SYBOS to the Material edit form. action_next only re-renders
+    // the selection popup, so the transfer silently saves nothing.
+    expect(params.get('action_save')).toBe('action_save');
+    expect(params.has('action_next')).toBe(false);
   });
 
   it('throws when the document has no form', () => {

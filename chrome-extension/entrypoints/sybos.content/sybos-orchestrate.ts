@@ -192,7 +192,12 @@ export function buildMaterialSelectionParams(
 ): { params: URLSearchParams; matched: string[]; notFound: string[] } {
   const form = findForm(doc);
   const rows = parseMultiselectData(doc);
-  const params = serializeForm(form, { action_next: 'action_next' });
+  // SYBOS advances the selection popup to the Material edit form only on the
+  // `action_save` submit marker; `action_next` merely re-renders the popup,
+  // so the second POST would serialize the selection form again and save
+  // nothing (HTTP 200, no error → silently lost). Verified against a real
+  // browser submit (captures/add-material.har).
+  const params = serializeForm(form, { action_save: 'action_save' });
 
   const matchedVehicleNames = new Set<string>();
 
