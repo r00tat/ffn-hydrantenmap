@@ -93,42 +93,35 @@ function personAssignmentDoc(rows: AssignRowSpec[]): Document {
   return doc;
 }
 
-/** The frmGeraetSelect material-selection popup (ExtJS x-grid3). */
+/**
+ * The frmGeraetSelect material-selection popup, as it actually arrives when
+ * FETCHED (no client-side JS has run, so there's no rendered ExtJS grid —
+ * only the `var myData = [...]` array a real browser would use to build it).
+ */
+function materialSelectionRow(
+  id: string,
+  waname: string,
+  warufname = ''
+): unknown[] {
+  const html =
+    `<input name='BListMulti[]' value='${id}' type='hidden'/>` +
+    `<input name='deleted[${id}]' id='selected_tbl[]' value='${id}' type='checkbox' class='checkbox' />` +
+    `<input type='hidden' name='name_tbl[${id}]' value='${id}'>` +
+    `<input type='hidden' name='id_tbl[${id}]' value='${id}'>` +
+    `<input type='hidden' name='name_tbl[deleted[${id}]]' value='{GEbez}'>`;
+  return [html, waname, 'Ort', 'Kennzeichen', 'Kategorie', 'Untertyp', warufname, ''];
+}
+
 function materialSelectionDoc(
   vehicles: { id: string; waname: string; warufname?: string }[]
 ): Document {
-  const doc = makeDoc(
-    '<form name="frmMain"><table><tbody></tbody></table></form>'
+  const rows = vehicles.map((v) =>
+    materialSelectionRow(v.id, v.waname, v.warufname)
   );
-  const tbody = doc.querySelector('tbody')!;
-  for (const v of vehicles) {
-    const tr = doc.createElement('tr');
-
-    const tdCheck = doc.createElement('td');
-    const checkbox = doc.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.name = `deleted[${v.id}]`;
-    checkbox.value = v.id;
-    tdCheck.appendChild(checkbox);
-    tr.appendChild(tdCheck);
-
-    const tdWAname = doc.createElement('td');
-    const divWAname = doc.createElement('div');
-    divWAname.className = 'x-grid3-col-WAname';
-    divWAname.textContent = v.waname;
-    tdWAname.appendChild(divWAname);
-    tr.appendChild(tdWAname);
-
-    const tdRuf = doc.createElement('td');
-    const divRuf = doc.createElement('div');
-    divRuf.className = 'x-grid3-col-WArufname';
-    divRuf.textContent = v.warufname ?? '';
-    tdRuf.appendChild(divRuf);
-    tr.appendChild(tdRuf);
-
-    tbody.appendChild(tr);
-  }
-  return doc;
+  const script = `var myData = ${JSON.stringify(rows)};`;
+  return makeDoc(
+    `<form name="frmMain"><input type="hidden" name="patFormCheckID" value="x~y"><script>${script}</script></form>`
+  );
 }
 
 // --- buildPersonalSelectionParams ----------------------------------------
@@ -300,6 +293,22 @@ describe('buildMaterialAssignmentParams', () => {
     expect(params.get('amount_123')).toBe('1');
     expect(params.get('action_next')).toBe('action_next');
     expect(params.get('patMultipleChoice')).toBe('true');
+  });
+
+  it('forces every WAESanzahl[<id>] field to 5, leaving other fields untouched', () => {
+    const doc = makeDoc(
+      '<form name="frmMain">' +
+        '<input type="hidden" name="WAESanzahl[2004]" value="1">' +
+        '<input type="hidden" name="WAESanzahl[46143]" value="99">' +
+        '<input type="hidden" name="amount_123" value="1">' +
+        '</form>'
+    );
+
+    const { params } = buildMaterialAssignmentParams(doc);
+
+    expect(params.get('WAESanzahl[2004]')).toBe('5');
+    expect(params.get('WAESanzahl[46143]')).toBe('5');
+    expect(params.get('amount_123')).toBe('1');
   });
 
   it('throws when the document has no form', () => {

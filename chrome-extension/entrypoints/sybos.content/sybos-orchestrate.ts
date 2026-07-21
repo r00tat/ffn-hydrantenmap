@@ -26,11 +26,10 @@ import {
   detectError,
 } from './sybos-post';
 import { parseSybosPersonTable } from './sybos-table';
-import { parseSybosVehicleList } from './sybos-vehicle-list';
 import { parseSybosVehicleTable } from './sybos-vehicle-table';
 import { findMatchingName } from './name-matching';
 import { findMatchingVehicleOption } from './vehicle-matching';
-import { findMatchingVehicleListRow } from './vehicle-list-matching';
+import { parseMultiselectData, matchesVehicleName } from './sybos-multiselect';
 
 const BASE = 'https://sybos.lfv-bgld.at';
 
@@ -175,37 +174,68 @@ export function buildPersonalAssignmentParams(
 }
 
 /**
- * Step 1 of the material flow: tick every device/vehicle in the frmGeraetSelect
- * popup that matches an EK vehicle, then serialize.
+ * Step 1 of the material flow: tick every device/vehicle in the
+ * frmGeraetSelect popup that matches an EK vehicle, then serialize.
+ *
+ * The popup's rows are ExtJS grid rows that only exist in the DOM after
+ * client-side JS renders them — since we fetch the HTML instead of
+ * navigating to it, that JS never runs. The actual row data ships as a plain
+ * JS array (`var myData = [...]`) inside a `<script>` tag instead; see
+ * `sybos-multiselect.ts` for the parser. Because there's no rendered
+ * checkbox element to flip, we append each matched row's hidden fields and
+ * checkbox field to `params` directly rather than mutating the (nonexistent)
+ * DOM.
  */
 export function buildMaterialSelectionParams(
   doc: Document,
   vehicles: FirecallVehicle[]
 ): { params: URLSearchParams; matched: string[]; notFound: string[] } {
   const form = findForm(doc);
-  const rows = parseSybosVehicleList(doc);
+  const rows = parseMultiselectData(doc);
+  const params = serializeForm(form, { action_next: 'action_next' });
+
+  const matchedVehicleNames = new Set<string>();
+
+  for (const row of rows) {
+    for (const field of row.hiddenFields) {
+      params.append(field.name, field.value);
+    }
+
+    const matchingVehicles = vehicles.filter((vehicle) =>
+      matchesVehicleName(vehicle.name, row)
+    );
+    if (matchingVehicles.length > 0 && row.checkboxName) {
+      params.append(row.checkboxName, row.checkboxValue);
+    }
+    for (const vehicle of matchingVehicles) {
+      matchedVehicleNames.add(vehicle.name);
+    }
+  }
 
   const matched: string[] = [];
   const notFound: string[] = [];
-
   for (const vehicle of vehicles) {
-    const row = findMatchingVehicleListRow(vehicle.name, rows);
-    if (row) {
-      row.checkbox.checked = true;
+    if (matchedVehicleNames.has(vehicle.name)) {
       matched.push(vehicle.name);
     } else {
       notFound.push(vehicle.name);
     }
   }
 
-  const params = serializeForm(form, { action_next: 'action_next' });
-
   return { params, matched, notFound };
 }
 
+/** Matches the "Anzahl"/km field SYBOS renders per material line. */
+const WAES_ANZAHL_PATTERN = /^WAESanzahl\[\d+\]$/;
+
+/** The default km/Anzahl value we force onto every material line. */
+const DEFAULT_MATERIAL_ANZAHL = '5';
+
 /**
- * Step 2 of the material flow: accept SYBOS's pre-filled amounts as-is and
- * just re-post the Material edit form with the submit markers.
+ * Step 2 of the material flow: re-post the Material edit form with the
+ * submit markers, forcing every material line's Anzahl/km field to
+ * {@link DEFAULT_MATERIAL_ANZAHL} rather than trusting SYBOS's pre-filled
+ * value.
  */
 export function buildMaterialAssignmentParams(doc: Document): {
   params: URLSearchParams;
@@ -215,6 +245,14 @@ export function buildMaterialAssignmentParams(doc: Document): {
     action_next: 'action_next',
     patMultipleChoice: 'true',
   });
+
+  const anzahlKeys = new Set(
+    Array.from(params.keys()).filter((key) => WAES_ANZAHL_PATTERN.test(key))
+  );
+  for (const key of anzahlKeys) {
+    params.set(key, DEFAULT_MATERIAL_ANZAHL);
+  }
+
   return { params };
 }
 
