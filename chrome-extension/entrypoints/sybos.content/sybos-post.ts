@@ -179,6 +179,37 @@ export function findEinsatzId(
   return null;
 }
 
+/**
+ * The `q` token SYBOS bakes into the detail page's `syfPopupPersonalAuswahl()`
+ * JS. Opening the person-selection popup is a `jQuery.post` to
+ * `index.php?comp=sybPersonal&s=PersonalAuswahl&patJustContent=1` whose only
+ * body field is `q: "<token>"`; without it the endpoint answers "Parameter
+ * fehlt" and renders no roster. The token is an opaque, per-render (and
+ * per-Einsatz) blob, so we must scrape the current value rather than hardcode
+ * it. The detail page carries several `q:` literals for different popups, so
+ * we anchor on the `comp=sybPersonal&s=PersonalAuswahl` URL to grab the right
+ * one.
+ */
+const PERSONAL_TOKEN_PATTERN =
+  /comp=sybPersonal&s=PersonalAuswahl[\s\S]{0,300}?\bq:\s*["']([^"']+)["']/;
+
+/**
+ * Scrape the PersonalAuswahl `q` token out of the SYBOS Einsatz detail page's
+ * inline scripts (see {@link PERSONAL_TOKEN_PATTERN}). Returns `null` when the
+ * page carries no such popup opener (e.g. not on the detail page).
+ */
+export function findPersonalAuswahlToken(root?: Document): string | null {
+  const doc = root ?? document;
+
+  for (const script of Array.from(doc.querySelectorAll('script'))) {
+    const match = script.textContent?.match(PERSONAL_TOKEN_PATTERN);
+    if (match) return match[1];
+  }
+
+  const match = doc.documentElement.outerHTML.match(PERSONAL_TOKEN_PATTERN);
+  return match ? match[1] : null;
+}
+
 /** Class-name fragments SYBOS/PAT (the underlying ExtJS/PatVeraSoft stack) */
 /** uses to mark validation/error output. Matched case-insensitively. */
 const ERROR_CLASS_PATTERN = /error|fehler|paterror/i;

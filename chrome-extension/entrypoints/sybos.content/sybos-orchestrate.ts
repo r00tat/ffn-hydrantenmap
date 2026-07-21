@@ -23,9 +23,9 @@ import {
   postForm,
   getDocument,
   findEinsatzId,
+  findPersonalAuswahlToken,
   detectError,
 } from './sybos-post';
-import { parseSybosPersonTable } from './sybos-table';
 import { parseSybosVehicleTable } from './sybos-vehicle-table';
 import { findMatchingName } from './name-matching';
 import { findMatchingVehicleOption } from './vehicle-matching';
@@ -84,35 +84,59 @@ function findForm(doc: Document): HTMLFormElement {
 /**
  * Step 1 of the personal flow: tick every roster person that matches an EK
  * assignment, then serialize the PersonalAuswahl popup form.
+ *
+ * Like the material popup, the roster is an ExtJS grid whose rows only exist
+ * after client-side JS runs; since we fetch the HTML, the rows ship as a
+ * `var myData = [...]` array instead (see `sybos-multiselect.ts`). Each row's
+ * HTML holds the hidden id scaffolding SYBOS expects back plus a
+ * `selected[<id>]` checkbox. We append every row's hidden fields and add the
+ * `selected[<id>]` marker only for matched persons — there is no rendered
+ * checkbox element to flip. Person rows use `row[1]` as the display name
+ * (matched via {@link findMatchingName}).
+ *
+ * `token` is the PersonalAuswahl `q` value scraped from the detail page; the
+ * submit re-sends it (SYBOS echoes it through both popup steps).
  */
 export function buildPersonalSelectionParams(
   doc: Document,
-  assignments: CrewAssignment[]
+  assignments: CrewAssignment[],
+  token?: string | null
 ): { params: URLSearchParams; matched: string[]; notFound: string[] } {
   const form = findForm(doc);
-  const persons = parseSybosPersonTable(doc);
-  const sybosNames = persons.map((p) => p.name);
+  const rows = parseMultiselectData(doc);
+  const params = serializeForm(form, {
+    action_next: 'action_next',
+    filter: '1',
+  });
+  if (token) params.set('q', token);
 
+  // SYBOS expects the full roster's id scaffolding back on submit.
+  for (const row of rows) {
+    for (const field of row.hiddenFields) {
+      params.append(field.name, field.value);
+    }
+  }
+
+  const rosterNames = rows.map((row) => row.waname);
   const matched: string[] = [];
   const notFound: string[] = [];
+  const markedIds = new Set<string>();
 
   for (const assignment of assignments) {
-    const matchedName = findMatchingName(assignment.name, sybosNames);
-    const person = matchedName
-      ? persons.find((p) => p.name === matchedName)
+    const matchedName = findMatchingName(assignment.name, rosterNames);
+    const row = matchedName
+      ? rows.find((r) => r.waname === matchedName)
       : undefined;
-    if (person) {
-      person.checkbox.checked = true;
+    if (row?.checkboxName) {
+      if (!markedIds.has(row.id)) {
+        params.append(row.checkboxName, row.checkboxValue);
+        markedIds.add(row.id);
+      }
       matched.push(assignment.name);
     } else {
       notFound.push(assignment.name);
     }
   }
-
-  const params = serializeForm(form, {
-    action_next: 'action_next',
-    filter: '1',
-  });
 
   return { params, matched, notFound };
 }
@@ -295,12 +319,27 @@ export async function orchestratePersonal(): Promise<OrchestrateResult> {
       return result;
     }
 
-    const selectUrl = `${BASE}/indexFrm.php?comp=sybPersonal&s=PersonalAuswahl&idParent=${id}&patJustContent=1&id=0`;
-    const doc1 = await getDocument(selectUrl);
-    const selection = buildPersonalSelectionParams(doc1, assignments);
+    // The roster popup is loaded by POSTing the detail page's `q` token to
+    // index.php (a GET answers "Parameter fehlt"). The token is baked into the
+    // detail page's syfPopupPersonalAuswahl() JS.
+    const token = findPersonalAuswahlToken();
+    if (!token) {
+      result.error = 'Personal-Token nicht gefunden';
+      return result;
+    }
+
+    const rosterUrl = `${BASE}/index.php?comp=sybPersonal&s=PersonalAuswahl&patJustContent=1`;
+    const rosterParams = new URLSearchParams();
+    rosterParams.set('q', token);
+    const doc1 = await postForm(rosterUrl, rosterParams);
+
+    const selection = buildPersonalSelectionParams(doc1, assignments, token);
     result.matched = selection.matched;
     result.notFound = selection.notFound;
 
+    // The selection form submits to the idParent-scoped indexFrm endpoint; its
+    // response is the MannschaftEinsatz edit form.
+    const selectUrl = `${BASE}/indexFrm.php?comp=sybPersonal&s=PersonalAuswahl&idParent=${id}&patJustContent=1&id=0`;
     const doc2 = await postForm(selectUrl, selection.params);
     const assignment = buildPersonalAssignmentParams(doc2, assignments);
     result.assigned = assignment.assigned;

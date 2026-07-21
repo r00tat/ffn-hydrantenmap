@@ -5,6 +5,7 @@ import {
   postForm,
   getDocument,
   findEinsatzId,
+  findPersonalAuswahlToken,
   detectError,
 } from './sybos-post';
 
@@ -381,5 +382,36 @@ describe('detectError', () => {
     const result = detectError(doc);
     expect(result).not.toBeNull();
     expect(result!.length).toBeLessThan(1000);
+  });
+});
+
+describe('findPersonalAuswahlToken', () => {
+  it('extracts the q token from the PersonalAuswahl popup opener', () => {
+    const doc = parseHtml(
+      `<html><body><script>
+        function syfPopupPersonalAuswahl() {
+          var popupWindow = frmWindowCenterReturnVar("indexFrm.php?s=PageLoading&patJustContent=1", "x", 730, 1210);
+          jQ.post("?comp=sybPersonal&s=PersonalAuswahl&patJustContent=1"
+              , { q: "S7QysaouTOKEN=="}
+              , function (data) {});
+        }
+      </script></body></html>`
+    );
+    expect(findPersonalAuswahlToken(doc)).toBe('S7QysaouTOKEN==');
+  });
+
+  it('picks the sybPersonal token even when other popup q tokens precede it', () => {
+    const doc = parseHtml(
+      `<html><body><script>
+        jQ.post("?comp=sybMap&s=syfMapView&patJustContent=1", { q: "MAPTOKEN" });
+        jQ.post("?comp=sybPersonal&s=PersonalAuswahl&patJustContent=1", { q: "PERSONTOKEN" });
+      </script></body></html>`
+    );
+    expect(findPersonalAuswahlToken(doc)).toBe('PERSONTOKEN');
+  });
+
+  it('returns null when the page has no PersonalAuswahl opener', () => {
+    const doc = parseHtml('<html><body><div>nichts</div></body></html>');
+    expect(findPersonalAuswahlToken(doc)).toBeNull();
   });
 });

@@ -17,28 +17,30 @@ function makeDoc(bodyHtml: string): Document {
 
 // --- Fixtures -------------------------------------------------------------
 
-/** A PersonalAuswahl popup: form[name=frmMain] with roster rows. */
+/**
+ * A PersonalAuswahl popup as it actually arrives when FETCHED: no rendered
+ * ExtJS grid, only the `var myData = [...]` array. Each person row's HTML
+ * carries its hidden id scaffolding plus a `selected[<id>]` checkbox; row[1]
+ * is the display name and row[6] the id.
+ */
+function personSelectionRow(id: string, name: string): unknown[] {
+  const html =
+    `<input name='BListMulti[]' value='${id}' type='hidden'/>` +
+    `<input name='selected[${id}]' id='selected_tbl[]' value='${id}' type='checkbox' class='checkbox' />` +
+    `<input type='hidden' name='name_tbl[${id}]' value='${id}'>` +
+    `<input type='hidden' name='id_tbl[${id}]' value='${id}'>` +
+    `<input type='hidden' name='name_tbl[deleted[${id}]]' value='${name}'>`;
+  return [html, name, 'FM', '01.01.1990', 'Neusiedl am See', 'Aktiv', id];
+}
+
 function personSelectionDoc(
   persons: { id: string; name: string }[]
 ): Document {
-  const doc = makeDoc(
-    '<form name="frmMain"><input type="hidden" name="patSave" value="1"></form>'
+  const rows = persons.map((p) => personSelectionRow(p.id, p.name));
+  const script = `var myData = ${JSON.stringify(rows)};`;
+  return makeDoc(
+    `<form name="frmMain"><input type="hidden" name="patSave" value="1"><script>${script}</script></form>`
   );
-  const form = doc.querySelector('form')!;
-  for (const p of persons) {
-    const nameInput = doc.createElement('input');
-    nameInput.type = 'hidden';
-    nameInput.name = `name_tbl[deleted[${p.id}]]`;
-    nameInput.value = p.name;
-    form.appendChild(nameInput);
-
-    const checkbox = doc.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.name = `selected[${p.id}]`;
-    checkbox.value = p.id;
-    form.appendChild(checkbox);
-  }
-  return doc;
 }
 
 interface AssignRowSpec {
@@ -139,7 +141,8 @@ describe('buildPersonalSelectionParams', () => {
 
     const { params, matched, notFound } = buildPersonalSelectionParams(
       doc,
-      assignments
+      assignments,
+      'TOKEN123'
     );
 
     expect(matched).toEqual(['Jörg Mustermann']);
@@ -148,7 +151,12 @@ describe('buildPersonalSelectionParams', () => {
     expect(params.has('selected[1407]')).toBe(false);
     expect(params.get('action_next')).toBe('action_next');
     expect(params.get('filter')).toBe('1');
-    // preserves the roster's own hidden fields
+    // the q token is re-sent on submit
+    expect(params.get('q')).toBe('TOKEN123');
+    // the full roster's id scaffolding is echoed back (all rows, not just matched)
+    expect(params.getAll('BListMulti[]')).toEqual(['1406', '1407']);
+    expect(params.get('name_tbl[deleted[1407]]')).toBe('Müller Franz');
+    // preserves the roster form's own hidden fields
     expect(params.get('patSave')).toBe('1');
   });
 
