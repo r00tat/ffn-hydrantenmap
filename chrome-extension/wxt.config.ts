@@ -143,6 +143,7 @@ export default defineConfig({
         'https://*.firebaseio.com/*',
         'https://*.googleapis.com/*',
         'https://*.firebaseapp.com/*',
+        'https://sybos.lfv-bgld.at/*',
       ],
       icons: {
         '16': 'icons/icon16.png',

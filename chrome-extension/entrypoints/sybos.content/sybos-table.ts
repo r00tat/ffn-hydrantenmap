@@ -5,12 +5,14 @@ export interface SybosPerson {
 }
 
 /**
- * Parse the SYBOS personnel table from the current page DOM.
+ * Parse the SYBOS personnel table from the given root DOM.
  * Finds all hidden inputs with name pattern name_tbl[deleted[ID]]
  * and pairs them with their corresponding checkboxes.
  */
-export function parseSybosPersonTable(): SybosPerson[] {
-  const nameInputs = document.querySelectorAll<HTMLInputElement>(
+export function parseSybosPersonTable(
+  root: ParentNode = document
+): SybosPerson[] {
+  const nameInputs = root.querySelectorAll<HTMLInputElement>(
     'input[type="hidden"][name^="name_tbl[deleted["]'
   );
 
@@ -23,7 +25,7 @@ export function parseSybosPersonTable(): SybosPerson[] {
     if (!match) continue;
 
     const id = match[1];
-    const checkbox = document.querySelector<HTMLInputElement>(
+    const checkbox = root.querySelector<HTMLInputElement>(
       `input[type="checkbox"][name="selected[${id}]"]`
     );
     if (!checkbox) continue;
@@ -35,8 +37,8 @@ export function parseSybosPersonTable(): SybosPerson[] {
 }
 
 /**
- * Check if the current page contains a SYBOS personnel table.
+ * Check if the given root contains a SYBOS personnel table.
  */
-export function hasSybosPersonTable(): boolean {
-  return parseSybosPersonTable().length > 0;
+export function hasSybosPersonTable(root: ParentNode = document): boolean {
+  return parseSybosPersonTable(root).length > 0;
 }

@@ -140,6 +140,30 @@ describe('parseSybosVehicleTable', () => {
   });
 });
 
+describe('parseSybosVehicleTable with custom root', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('parses rows from a detached document root and ignores the global document', () => {
+    // Unrelated markup in the global document, to prove it's ignored.
+    const globalTbody = createTable();
+    addVehicleRow(globalTbody, '99999', 'Global Document, 01.01.1990');
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body><table><tbody></tbody></table></body></html>',
+      'text/html'
+    );
+    const tbody = doc.querySelector('tbody') as HTMLTableSectionElement;
+    addVehicleRow(tbody, '20357', 'Theuritzbacher Reinhard, 30.08.1983');
+
+    const result = parseSybosVehicleTable(doc);
+    expect(result).toHaveLength(1);
+    expect(result[0].sybosId).toBe('20357');
+    expect(result[0].personName).toBe('Theuritzbacher Reinhard');
+  });
+});
+
 describe('hasSybosVehicleTable', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -153,5 +177,23 @@ describe('hasSybosVehicleTable', () => {
 
   it('returns false when none exists', () => {
     expect(hasSybosVehicleTable()).toBe(false);
+  });
+
+  it('detects a vehicle table only within the given root, not the global document', () => {
+    const globalTbody = createTable();
+    addVehicleRow(globalTbody, '99999', 'Global Document, 01.01.1990');
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body></body></html>',
+      'text/html'
+    );
+    expect(hasSybosVehicleTable(doc)).toBe(false);
+
+    const table = doc.createElement('table');
+    const tbody = doc.createElement('tbody');
+    table.appendChild(tbody);
+    doc.body.appendChild(table);
+    addVehicleRow(tbody, '20357', 'Theuritzbacher Reinhard, 30.08.1983');
+    expect(hasSybosVehicleTable(doc)).toBe(true);
   });
 });

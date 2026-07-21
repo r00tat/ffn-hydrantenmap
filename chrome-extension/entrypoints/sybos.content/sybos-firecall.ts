@@ -3,6 +3,7 @@ import {
   renderFirecallSelect,
   type FirecallListEntry,
 } from './sybos-firecall-select';
+import { renderAutoTransferSection } from './sybos-section-auto-transfer';
 import { renderPersonnelSection } from './sybos-section-personnel';
 import { renderVehicleTableSection } from './sybos-section-vehicle-table';
 import { renderMannschaftEditSection } from './sybos-section-mannschaft-edit';
@@ -67,6 +68,7 @@ function showFirecall(
   content.appendChild(link);
 
   // Page-specific sections (each renders only if its SYBOS page is detected)
+  renderAutoTransferSection(content);
   renderPersonnelSection(content);
   renderVehicleTableSection(content);
   renderMannschaftEditSection(content);

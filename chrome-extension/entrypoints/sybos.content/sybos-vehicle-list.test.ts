@@ -116,6 +116,36 @@ describe('parseSybosVehicleList', () => {
   });
 });
 
+describe('parseSybosVehicleList with custom root', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('parses rows from a detached document root and ignores the global document', () => {
+    // Unrelated markup in the global document, to prove it's ignored.
+    const globalTable = document.createElement('table');
+    const globalTbody = document.createElement('tbody');
+    globalTable.appendChild(globalTbody);
+    document.body.appendChild(globalTable);
+    addVehicleRow(globalTbody, '9999', 'GlobalDoc', 'Global Document Vehicle');
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body><table><tbody></tbody></table></body></html>',
+      'text/html'
+    );
+    const tbody = doc.querySelector('tbody')!;
+    addVehicleRow(tbody, '2006', 'SRF', 'Rüst Neusiedl am See');
+
+    const rows = parseSybosVehicleList(doc);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      id: '2006',
+      waname: 'SRF',
+      warufname: 'Rüst Neusiedl am See',
+    });
+  });
+});
+
 describe('hasSybosVehicleList', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -132,5 +162,24 @@ describe('hasSybosVehicleList', () => {
   it('returns false when no WAname column exists', () => {
     document.body.appendChild(document.createElement('span'));
     expect(hasSybosVehicleList()).toBe(false);
+  });
+
+  it('detects a WAname column only within the given root, not the global document', () => {
+    const globalDiv = document.createElement('div');
+    globalDiv.className = 'x-grid3-col-WAname';
+    globalDiv.textContent = 'Global Document Vehicle';
+    document.body.appendChild(globalDiv);
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body></body></html>',
+      'text/html'
+    );
+    expect(hasSybosVehicleList(doc)).toBe(false);
+
+    const div = doc.createElement('div');
+    div.className = 'x-grid3-col-WAname';
+    div.textContent = 'SRF';
+    doc.body.appendChild(div);
+    expect(hasSybosVehicleList(doc)).toBe(true);
   });
 });

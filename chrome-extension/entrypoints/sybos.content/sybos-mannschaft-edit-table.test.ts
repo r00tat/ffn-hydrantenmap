@@ -226,6 +226,40 @@ describe('parseSybosMannschaftEditTable', () => {
   });
 });
 
+describe('parseSybosMannschaftEditTable with custom root', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('parses rows from a detached document root and ignores the global document', () => {
+    // Unrelated markup in the global document, to prove it's ignored.
+    const globalTbody = createTable();
+    addRow(
+      globalTbody,
+      '11111',
+      '11111_100466_2026_04_13_18_35_00',
+      'Global Document, 01.01.1990'
+    );
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body><table><tbody></tbody></table></body></html>',
+      'text/html'
+    );
+    const tbody = doc.querySelector('tbody') as HTMLTableSectionElement;
+    addRow(
+      tbody,
+      '49968',
+      '49968_100466_2026_04_13_18_35_00',
+      'Bencic Florian, MSc, 26.01.1995'
+    );
+
+    const result = parseSybosMannschaftEditTable(doc);
+    expect(result).toHaveLength(1);
+    expect(result[0].adrId).toBe('49968');
+    expect(result[0].personName).toBe('Bencic Florian');
+  });
+});
+
 describe('hasSybosMannschaftEditTable', () => {
   beforeEach(() => {
     document.body.replaceChildren();
@@ -254,5 +288,33 @@ describe('hasSybosMannschaftEditTable', () => {
     topSelect.id = 'WARTIKEL_WAnr';
     document.body.appendChild(topSelect);
     expect(hasSybosMannschaftEditTable()).toBe(false);
+  });
+
+  it('detects the table only within the given root, not the global document', () => {
+    const globalTbody = createTable();
+    addRow(
+      globalTbody,
+      '11111',
+      '11111_100466_2026_04_13_18_35_00',
+      'Global Document, 01.01.1990'
+    );
+
+    const doc = new DOMParser().parseFromString(
+      '<html><body></body></html>',
+      'text/html'
+    );
+    expect(hasSybosMannschaftEditTable(doc)).toBe(false);
+
+    const table = doc.createElement('table');
+    const tbody = doc.createElement('tbody');
+    table.appendChild(tbody);
+    doc.body.appendChild(table);
+    addRow(
+      tbody,
+      '49968',
+      '49968_100466_2026_04_13_18_35_00',
+      'Bencic Florian, MSc, 26.01.1995'
+    );
+    expect(hasSybosMannschaftEditTable(doc)).toBe(true);
   });
 });

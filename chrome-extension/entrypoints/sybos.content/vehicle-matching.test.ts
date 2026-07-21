@@ -13,6 +13,7 @@ const defaultOptions = [
   createOption('57738', 'KDTFA (Kommando Neusiedl am See)'),
   createOption('30873', 'KRF-S (Kleinrüst Neusiedl am See)'),
   createOption('2802', 'Öl Einachsanhänger'),
+  createOption('105692', 'WLF-K Neusiedl am See'),
 ];
 
 describe('findMatchingVehicleOption', () => {
@@ -29,6 +30,13 @@ describe('findMatchingVehicleOption', () => {
   it('matches exact full text without parenthesis', () => {
     const result = findMatchingVehicleOption('Öl Einachsanhänger', defaultOptions);
     expect(result).toBe(defaultOptions[3]);
+  });
+
+  it('matches prefix with a bare location suffix (no parenthesis)', () => {
+    // SYBOS renders some vehicles as "WLF-K Neusiedl am See" (no descriptor
+    // in parentheses); the EK name is just "WLF-K".
+    const result = findMatchingVehicleOption('WLF-K', defaultOptions);
+    expect(result).toBe(defaultOptions[4]);
   });
 
   it('matches case-insensitive', () => {
