@@ -115,15 +115,40 @@ export async function getDocument(url: string): Promise<Document> {
 }
 
 /**
+ * Extract a SYBOS Einsatz id from the `idParent=<id>` query string that the
+ * detail page bakes into every link/onclick that opens a sub-form popup
+ * (Personal, Material, …). This is the only place the id is exposed on the
+ * `frmEinsatzAdd` detail page — its own URL carries `id=0` and it has no
+ * `EINSATZ_ESnr` hidden field. `idParent=0` (a "new"/empty reference) is
+ * ignored.
+ */
+function findIdParentInLinks(root: ParentNode): string | null {
+  const els = root.querySelectorAll<HTMLElement>(
+    'a[href*="idParent="], [onclick*="idParent="]'
+  );
+  for (const el of els) {
+    const source = el.getAttribute('href') || el.getAttribute('onclick') || '';
+    const match = source.match(/idParent=(\d+)/);
+    if (match && match[1] !== '0') {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+/**
  * Find the SYBOS "Einsatz" (operation) id.
  *
- * SYBOS surfaces it two ways: as a hidden `EINSATZ_ESnr` input on the page
- * (or in a fetched response fragment), or as the `idParent` query parameter
- * of the page URL. We check the hidden input first since it reflects
- * whatever the current form/response actually refers to; the URL is only a
- * fallback for the *current* page, so it's only consulted when no explicit
- * `root` was passed in (a fetched `Document` has no relationship to
- * `window.location`).
+ * SYBOS surfaces it in three places, checked in order of reliability:
+ * 1. a hidden `EINSATZ_ESnr` input (present on the selection/edit forms and
+ *    in fetched response fragments);
+ * 2. the `idParent=<id>` embedded in the detail page's popup links/onclicks
+ *    (the `frmEinsatzAdd` detail page has no `EINSATZ_ESnr` and `id=0` in its
+ *    own URL, so this is the only source there);
+ * 3. the `idParent` query parameter of the current page URL.
+ *
+ * The URL fallback is only consulted when no explicit `root` was passed in,
+ * since a fetched `Document` has no relationship to `window.location`.
  */
 export function findEinsatzId(
   root?: Document | Document['documentElement'] | ParentNode
@@ -135,6 +160,11 @@ export function findEinsatzId(
   );
   if (input?.value) {
     return input.value;
+  }
+
+  const linkId = findIdParentInLinks(searchRoot);
+  if (linkId) {
+    return linkId;
   }
 
   if (root === undefined) {

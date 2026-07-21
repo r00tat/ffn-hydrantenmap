@@ -285,6 +285,33 @@ describe('findEinsatzId', () => {
     expect(findEinsatzId(doc)).toBeNull();
   });
 
+  it('extracts idParent from a popup link when no hidden input or URL param exists (detail page)', () => {
+    // The frmEinsatzAdd detail page has id=0 in its own URL and no
+    // EINSATZ_ESnr, but bakes idParent=<id> into every sub-form popup link.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, search: '?comp=sybEinsatz&s=frmEinsatzAdd&id=0' },
+    });
+    document.body.innerHTML =
+      '<a href="indexFrm.php?comp=sybPersonal&s=PersonalAuswahl&idParent=103013&id=0">Personal</a>';
+    expect(findEinsatzId()).toBe('103013');
+  });
+
+  it('extracts idParent from an onclick handler and ignores idParent=0', () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<span onclick="openPopup(\'idParent=0\')">new</span>' +
+      '<span onclick="openPopup(\'foo&idParent=103013&bar\')">open</span>';
+    expect(findEinsatzId(root)).toBe('103013');
+  });
+
+  it('prefers the hidden input over a popup link', () => {
+    document.body.innerHTML =
+      '<input type="hidden" name="EINSATZ_ESnr" value="103004">' +
+      '<a href="x?idParent=999999">Personal</a>';
+    expect(findEinsatzId()).toBe('103004');
+  });
+
   it('returns null when nothing is found anywhere', () => {
     Object.defineProperty(window, 'location', {
       configurable: true,
