@@ -3,52 +3,11 @@ import 'server-only';
 
 import { actionUserRequired } from '../auth';
 import { firestore } from '../../server/firebase/admin';
-import { decryptPassword } from '../../server/blaulichtsms/encryption';
+import { fetchBlaulichtSmsAlarms } from '../../server/blaulichtsms/fetchAlarms';
 import { isAuthorizedForFirecall } from './groupFilter';
 import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
 export type { BlaulichtSmsAlarm };
-
-const COLLECTION = 'blaulichtsmsConfig';
-
-interface BlaulichtsmsCredentials {
-  username: string;
-  password: string;
-  customerId: string;
-}
-
-async function loadCredentials(
-  groupId: string
-): Promise<BlaulichtsmsCredentials | null> {
-  // Try Firestore first
-  const doc = await firestore.collection(COLLECTION).doc(groupId).get();
-  if (doc.exists) {
-    const data = doc.data()!;
-    try {
-      const password = await decryptPassword(data.passwordEncrypted);
-      return { username: data.username, password, customerId: data.customerId };
-    } catch (err) {
-      console.error(
-        `Failed to decrypt BlaulichtSMS password for group "${groupId}":`,
-        err
-      );
-      return null;
-    }
-  }
-
-  // Fall back to env vars for the legacy group
-  const legacyGroup = process.env.BLAULICHTSMS_REQUIRED_GROUP ?? 'ffnd';
-  if (groupId === legacyGroup) {
-    const username = process.env.BLAULICHTSMS_USERNAME;
-    const password = process.env.BLAULICHTSMS_PASSWORD;
-    const customerId = process.env.BLAULICHTSMS_CUSTOMER_ID;
-    if (username && password && customerId) {
-      return { username, password, customerId };
-    }
-  }
-
-  return null;
-}
 
 export async function getBlaulichtSmsAlarms(
   groupId: string
@@ -62,45 +21,16 @@ export async function getBlaulichtSmsAlarms(
     return [];
   }
 
-  const creds = await loadCredentials(groupId);
-  if (!creds) return [];
-
-  const { username, password, customerId } = creds;
-
-  const loginResponse = await fetch(
-    'https://api.blaulichtsms.net/blaulicht/api/alarm/v1/dashboard/login',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, customerId }),
-    }
-  );
-
-  if (!loginResponse.ok) {
+  try {
+    return await fetchBlaulichtSmsAlarms(groupId);
+  } catch (err) {
+    // Keep the UI usable: swallow config/API errors into an empty list.
     console.error(
-      'BlaulichtSMS dashboard login failed',
-      loginResponse.status,
-      loginResponse.statusText
+      `Failed to fetch BlaulichtSMS alarms for group "${groupId}":`,
+      err
     );
     return [];
   }
-
-  const { sessionId } = await loginResponse.json();
-
-  const dashboardResponse = await fetch(
-    `https://api.blaulichtsms.net/blaulicht/api/alarm/v1/dashboard/${sessionId}`
-  );
-
-  if (!dashboardResponse.ok) {
-    console.error(
-      'Failed to fetch BlaulichtSMS dashboard data',
-      dashboardResponse.status,
-      dashboardResponse.statusText
-    );
-    return [];
-  }
-
-  return ((await dashboardResponse.json()).alarms ?? []) as BlaulichtSmsAlarm[];
 }
 
 export async function getBlaulichtSmsAlarmById(
@@ -108,14 +38,8 @@ export async function getBlaulichtSmsAlarmById(
   alarmId: string
 ): Promise<BlaulichtSmsAlarm | null> {
   await actionUserRequired();
-
   try {
     const alarms = await getBlaulichtSmsAlarms(groupId);
-    if (alarms.length === 0) {
-      console.warn(
-        `BlaulichtSMS: No alarms returned for group "${groupId}" — credentials may be missing or API login failed`
-      );
-    }
     return alarms.find((a) => a.alarmId === alarmId) ?? null;
   } catch (err) {
     console.error(`BlaulichtSMS: Failed to fetch alarms for group "${groupId}":`, err);
