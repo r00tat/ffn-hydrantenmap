@@ -3,8 +3,10 @@ import {
   createDefaultEinsatz,
   DEFAULT_EINSATZ_FW,
   resetEinsatzToManual,
+  buildFirecallFromAlarm,
 } from './einsatzDefaults';
 import { Firecall } from '../firebase/firestore';
+import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
 describe('createDefaultEinsatz', () => {
   it('produces default values based on the given date', () => {
@@ -74,5 +76,65 @@ describe('resetEinsatzToManual', () => {
 
     expect(reset.group).toBe('custom-group');
     expect(reset.fw).toBe('Custom FW');
+  });
+});
+
+const baseAlarm = (overrides: Partial<BlaulichtSmsAlarm> = {}): BlaulichtSmsAlarm =>
+  ({
+    alarmId: 'a1',
+    alarmText: 'x',
+    alarmDate: '2026-07-22T10:00:00.000Z',
+    geolocation: null,
+    coordinates: null,
+    ...overrides,
+  } as BlaulichtSmsAlarm);
+
+describe('buildFirecallFromAlarm', () => {
+  it('parses the name from parts[2..4] when alarmText has >=5 segments', () => {
+    const fc = buildFirecallFromAlarm(
+      baseAlarm({ alarmText: 'a/b/B2/Zimmerbrand/Neusiedl/extra' }),
+    );
+    expect(fc.name).toBe('B2 Zimmerbrand Neusiedl');
+  });
+
+  it('falls back to the full alarmText when fewer than 5 segments', () => {
+    const fc = buildFirecallFromAlarm(baseAlarm({ alarmText: 'a/b/c' }));
+    expect(fc.name).toBe('a/b/c');
+  });
+
+  it('sets date, description and both alarm id fields', () => {
+    const fc = buildFirecallFromAlarm(
+      baseAlarm({ alarmId: 'a1', alarmText: 'hello', alarmDate: '2026-07-22T10:00:00.000Z' }),
+    );
+    expect(fc.date).toBe('2026-07-22T10:00:00.000Z');
+    expect(fc.description).toBe('hello');
+    expect(fc.blaulichtSmsAlarmId).toBe('a1');
+    expect(fc.blaulichtSmsAlarmIds).toEqual(['a1']);
+  });
+
+  it('uses geolocation coordinates when present', () => {
+    const fc = buildFirecallFromAlarm(
+      baseAlarm({
+        geolocation: {
+          coordinates: { lat: 47.9, lon: 16.8 },
+        } as BlaulichtSmsAlarm['geolocation'],
+      }),
+    );
+    expect(fc.lat).toBe(47.9);
+    expect(fc.lng).toBe(16.8);
+  });
+
+  it('falls back to coordinates when geolocation is absent', () => {
+    const fc = buildFirecallFromAlarm(
+      baseAlarm({ coordinates: { lat: 48.1, lon: 16.3 } }),
+    );
+    expect(fc.lat).toBe(48.1);
+    expect(fc.lng).toBe(16.3);
+  });
+
+  it('omits lat/lng when no coordinates are available', () => {
+    const fc = buildFirecallFromAlarm(baseAlarm());
+    expect(fc.lat).toBeUndefined();
+    expect(fc.lng).toBeUndefined();
   });
 });
