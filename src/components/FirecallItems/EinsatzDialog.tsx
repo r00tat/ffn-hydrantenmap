@@ -41,7 +41,11 @@ import {
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
 import { stripNullish } from '../../common/stripNullish';
-import { createDefaultEinsatz, resetEinsatzToManual } from './einsatzDefaults';
+import {
+  buildFirecallFromAlarm,
+  createDefaultEinsatz,
+  resetEinsatzToManual,
+} from './einsatzDefaults';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -79,20 +83,9 @@ export default function EinsatzDialog({
   );
 
   const applyAlarm = useCallback((alarm: BlaulichtSmsAlarm) => {
-    const parts = alarm.alarmText.split('/');
-    const name = parts.length >= 5
-      ? [parts[2], parts[3], parts[4]].join(' ').trim()
-      : alarm.alarmText;
-    const coords =
-      alarm.geolocation?.coordinates ?? alarm.coordinates ?? null;
     setEinsatz((prev) => ({
       ...prev,
-      name,
-      date: new Date(alarm.alarmDate).toISOString(),
-      description: alarm.alarmText,
-      blaulichtSmsAlarmId: alarm.alarmId,
-      blaulichtSmsAlarmIds: [alarm.alarmId],
-      ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
+      ...buildFirecallFromAlarm(alarm),
     }));
   }, []);
 
