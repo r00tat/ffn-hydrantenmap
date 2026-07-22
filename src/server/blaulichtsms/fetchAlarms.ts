@@ -74,7 +74,7 @@ export async function fetchBlaulichtSmsAlarms(
 
   if (!loginResponse.ok) {
     throw new ApiException(
-      `BlaulichtSMS dashboard login failed (${loginResponse.status})`,
+      `BlaulichtSMS dashboard login failed (${loginResponse.status} ${loginResponse.statusText})`,
       { status: 502 }
     );
   }
@@ -87,7 +87,7 @@ export async function fetchBlaulichtSmsAlarms(
 
   if (!dashboardResponse.ok) {
     throw new ApiException(
-      `Failed to fetch BlaulichtSMS dashboard data (${dashboardResponse.status})`,
+      `Failed to fetch BlaulichtSMS dashboard data (${dashboardResponse.status} ${dashboardResponse.statusText})`,
       { status: 502 }
     );
   }

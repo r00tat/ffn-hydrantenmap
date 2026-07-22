@@ -4,6 +4,7 @@ import 'server-only';
 import { actionUserRequired } from '../auth';
 import { firestore } from '../../server/firebase/admin';
 import { fetchBlaulichtSmsAlarms } from '../../server/blaulichtsms/fetchAlarms';
+import { ApiException } from '../api/errors';
 import { isAuthorizedForFirecall } from './groupFilter';
 import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
@@ -24,11 +25,14 @@ export async function getBlaulichtSmsAlarms(
   try {
     return await fetchBlaulichtSmsAlarms(groupId);
   } catch (err) {
-    // Keep the UI usable: swallow config/API errors into an empty list.
-    console.error(
-      `Failed to fetch BlaulichtSMS alarms for group "${groupId}":`,
-      err
-    );
+    // A 404 means the group simply has no BlaulichtSMS config — a normal,
+    // expected state that was silent before. Only log unexpected failures.
+    if (!(err instanceof ApiException && err.status === 404)) {
+      console.error(
+        `Failed to fetch BlaulichtSMS alarms for group "${groupId}":`,
+        err
+      );
+    }
     return [];
   }
 }
