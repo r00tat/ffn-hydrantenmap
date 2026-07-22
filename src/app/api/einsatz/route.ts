@@ -28,10 +28,15 @@ export async function POST(req: NextRequest) {
       throw new ApiException('field "group" is required', { status: 400 });
     }
     const hasAlarmId = typeof alarmId === 'string' && alarmId.length > 0;
-    if (hasAlarmId === (latest === true)) {
-      // both set or neither set
+    if (hasAlarmId && latest === true) {
       throw new ApiException(
-        'provide exactly one of "alarmId" or "latest": true',
+        'provide only one of "alarmId" or "latest": true, not both',
+        { status: 400 },
+      );
+    }
+    if (!hasAlarmId && latest !== true) {
+      throw new ApiException(
+        'provide exactly one of "alarmId" (non-empty string) or "latest": true',
         { status: 400 },
       );
     }
