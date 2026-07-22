@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { group, alarmId, latest } = body;
-    if (!group) {
-      throw new ApiException('field "group" is required', { status: 400 });
+    if (!group || typeof group !== 'string') {
+      throw new ApiException('field "group" is required and must be a string', {
+        status: 400,
+      });
     }
     const hasAlarmId = typeof alarmId === 'string' && alarmId.length > 0;
     if (hasAlarmId && latest === true) {
@@ -59,7 +61,13 @@ export async function POST(req: NextRequest) {
           status: 404,
         });
       }
-      alarm = alarms[0]; // list is newest-first
+      // Don't trust the fetch order — pick the most recent alarm by date,
+      // matching the defensive sorting used in the UI (EinsatzDialog, page.tsx).
+      const [latestAlarm] = [...alarms].sort(
+        (a, b) =>
+          new Date(b.alarmDate).getTime() - new Date(a.alarmDate).getTime(),
+      );
+      alarm = latestAlarm;
     }
 
     const result = await createFirecallFromAlarm(alarm, group, auth.owner);

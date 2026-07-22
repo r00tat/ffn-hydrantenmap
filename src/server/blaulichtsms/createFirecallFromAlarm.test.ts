@@ -86,4 +86,15 @@ describe('createFirecallFromAlarm', () => {
     const result = await createFirecallFromAlarm(alarm, 'ffnd', 'owner1');
     expect(result).toMatchObject({ id: 'new2', created: true, name: 'B2 Brand Ort' });
   });
+
+  it('ignores a matching firecall from a different group and creates a new one', async () => {
+    scalarRef.docs = [
+      { id: 'otherGroup1', data: () => ({ name: 'Fremd', group: 'other', deleted: false }) },
+    ];
+    addMock.mockResolvedValue({ id: 'new3' });
+    const result = await createFirecallFromAlarm(alarm, 'ffnd', 'owner1');
+    expect(result.created).toBe(true);
+    expect(result.id).toBe('new3');
+    expect(addMock).toHaveBeenCalledTimes(1);
+  });
 });

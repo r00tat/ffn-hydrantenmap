@@ -69,14 +69,21 @@ describe('POST /api/einsatz', () => {
     expect(res.status).toBe(404);
   });
 
-  it('uses the latest alarm (alarms[0]) when latest:true', async () => {
-    fetchAlarmsMock.mockResolvedValue([{ alarmId: 'newest' }, { alarmId: 'older' }]);
+  it('picks the most recent alarm by date when latest:true (sorts, not raw order)', async () => {
+    fetchAlarmsMock.mockResolvedValue([
+      { alarmId: 'older', alarmDate: '2026-07-20T10:00:00.000Z' },
+      { alarmId: 'newest', alarmDate: '2026-07-22T10:00:00.000Z' },
+    ]);
     createMock.mockResolvedValue({
       id: 'fc2', name: 'B2', group: 'ffnd', blaulichtSmsAlarmId: 'newest', created: true,
     });
     const res = await POST(makeReq({ group: 'ffnd', latest: true }));
     expect(res.status).toBe(200);
-    expect(createMock).toHaveBeenCalledWith({ alarmId: 'newest' }, 'ffnd', 'u1');
+    expect(createMock).toHaveBeenCalledWith(
+      { alarmId: 'newest', alarmDate: '2026-07-22T10:00:00.000Z' },
+      'ffnd',
+      'u1',
+    );
   });
 
   it('returns 404 when latest is requested but the group has no alarms', async () => {

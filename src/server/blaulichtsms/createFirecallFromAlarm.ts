@@ -2,7 +2,10 @@ import 'server-only';
 
 import { firestore } from '../firebase/admin';
 import { FIRECALL_COLLECTION_ID } from '../../components/firebase/firestore';
-import { buildFirecallFromAlarm } from '../../components/FirecallItems/einsatzDefaults';
+import {
+  buildFirecallFromAlarm,
+  DEFAULT_EINSATZ_FW,
+} from '../../components/FirecallItems/einsatzDefaults';
 import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
 export interface CreateFirecallResult {
@@ -41,11 +44,15 @@ export async function createFirecallFromAlarm(
     if (seen.has(doc.id)) continue;
     seen.add(doc.id);
     const data = doc.data();
-    if (data.deleted !== true) {
+    // Scope idempotency to the caller's group: never return (or leak) a
+    // firecall that belongs to a different group, even if it links the same
+    // alarm id. Group is filtered in JS (not the query) to avoid the Firestore
+    // composite-index requirement of combining it with array-contains.
+    if (data.deleted !== true && data.group === groupId) {
       return {
         id: doc.id,
         name: data.name,
-        group: data.group ?? groupId,
+        group: data.group,
         blaulichtSmsAlarmId: alarm.alarmId,
         created: false,
       };
@@ -56,6 +63,7 @@ export async function createFirecallFromAlarm(
   const firecallData = {
     ...buildFirecallFromAlarm(alarm),
     group: groupId,
+    fw: DEFAULT_EINSATZ_FW,
     deleted: false,
     user: owner,
     created: now,
