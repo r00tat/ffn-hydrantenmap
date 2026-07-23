@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { authMock, fetchAlarmsMock, fetchByIdMock, createMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
@@ -28,11 +28,20 @@ function makeReq(body: unknown) {
 }
 
 describe('POST /api/einsatz', () => {
+  const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+
   beforeEach(() => {
     authMock.mockReset().mockResolvedValue({ owner: 'u1', isAdmin: false, groups: ['ffnd'] });
     fetchAlarmsMock.mockReset();
     fetchByIdMock.mockReset();
     createMock.mockReset();
+    // Default: no NEXTAUTH_URL → route falls back to req.nextUrl.origin.
+    delete process.env.NEXTAUTH_URL;
+  });
+
+  afterEach(() => {
+    if (originalNextAuthUrl === undefined) delete process.env.NEXTAUTH_URL;
+    else process.env.NEXTAUTH_URL = originalNextAuthUrl;
   });
 
   it('returns 400 when group is missing', async () => {
@@ -61,6 +70,19 @@ describe('POST /api/einsatz', () => {
     expect(json).toMatchObject({ id: 'fc1', created: true });
     expect(json.url).toBe('https://example.test/einsatz/fc1');
     expect(authMock).toHaveBeenCalledWith(expect.anything(), 'ffnd');
+  });
+
+  it('builds the url from NEXTAUTH_URL (not req origin) and trims trailing slash', async () => {
+    // Behind the Cloud Run proxy req.nextUrl.origin is the internal container
+    // address; the public URL must come from NEXTAUTH_URL instead.
+    process.env.NEXTAUTH_URL = 'https://einsatz.ffnd.at/';
+    fetchByIdMock.mockResolvedValue({ alarmId: 'a1' });
+    createMock.mockResolvedValue({
+      id: 'fc1', name: 'B2', group: 'ffnd', blaulichtSmsAlarmId: 'a1', created: true,
+    });
+    const res = await POST(makeReq({ group: 'ffnd', alarmId: 'a1' }));
+    const json = await res.json();
+    expect(json.url).toBe('https://einsatz.ffnd.at/einsatz/fc1');
   });
 
   it('returns 404 when the requested alarmId is not found', async () => {

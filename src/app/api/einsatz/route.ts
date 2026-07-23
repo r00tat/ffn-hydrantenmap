@@ -72,9 +72,19 @@ export async function POST(req: NextRequest) {
 
     const result = await createFirecallFromAlarm(alarm, group, auth.owner);
 
+    // Build the public URL from NEXTAUTH_URL (the canonical public base URL,
+    // used across the app). `req.nextUrl.origin` must not be used behind the
+    // Cloud Run proxy: there it resolves to the internal container address
+    // (e.g. http://0.0.0.0:8080). Fall back to the request origin only for
+    // local development, where NEXTAUTH_URL may be unset.
+    const baseUrl = (process.env.NEXTAUTH_URL || req.nextUrl.origin).replace(
+      /\/+$/,
+      '',
+    );
+
     return NextResponse.json({
       ...result,
-      url: `${req.nextUrl.origin}/einsatz/${result.id}`,
+      url: `${baseUrl}/einsatz/${result.id}`,
     });
   } catch (err: any) {
     console.error(`POST /api/einsatz failed: ${err}`);
