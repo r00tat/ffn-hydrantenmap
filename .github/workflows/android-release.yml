@@ -227,39 +227,34 @@ jobs:
               "${API}/edits/${EDIT_ID}:commit${1:-}"
           }
 
-          if [[ " ${TRACKS} " == *" production "* ]]; then
-            # Production changes can be auto-submitted for review; fall back to a
-            # plain commit if Play refuses to send them for review automatically.
-            commit_code=$(commit_edit)
-            if [[ "${commit_code}" =~ ^2[0-9]{2}$ ]]; then
-              echo "Edit committed (auto-submitted for review)"
-            elif [[ "${commit_code}" == "400" ]] && grep -q "changesNotSentForReview" "${commit_resp}"; then
-              echo "Auto-review unavailable for this edit, retrying with changesNotSentForReview=true"
-              commit_code=$(commit_edit "?changesNotSentForReview=true")
-              if [[ ! "${commit_code}" =~ ^2[0-9]{2}$ ]]; then
-                echo "HTTP ${commit_code} from commit retry" >&2
-                cat "${commit_resp}" >&2
-                rm -f "${commit_resp}"
-                exit 1
-              fi
-              echo "::warning::Edit committed without auto-review. Submit manually in the Play Console."
-            else
-              echo "HTTP ${commit_code} from commit" >&2
-              cat "${commit_resp}" >&2
-              rm -f "${commit_resp}"
-              exit 1
-            fi
-          else
-            # Internal-testing-only edits are never sent for review (releases go
-            # live immediately), so changesNotSentForReview=true is the only valid path.
+          # Ob Play die Änderungen automatisch ins Review schickt, hängt von der
+          # App/dem Track ab und kann sich seitens Google ändern — das gilt
+          # inzwischen auch für den Internal-Track. Beide Varianten schließen
+          # sich gegenseitig aus:
+          #   * ohne Flag: Play reviewt automatisch. Ist das nicht möglich,
+          #     kommt HTTP 400 "changesNotSentForReview must be set".
+          #   * mit changesNotSentForReview=true: kein Auto-Review. Reviewt Play
+          #     automatisch, kommt HTTP 400 "must not be set".
+          # Daher erst plain versuchen und nur beim spezifischen 400, der den
+          # Parameter nennt, in die andere Richtung umschwenken.
+          commit_code=$(commit_edit)
+          if [[ "${commit_code}" =~ ^2[0-9]{2}$ ]]; then
+            echo "Edit committed (auto-submitted for review)"
+          elif [[ "${commit_code}" == "400" ]] && grep -q "changesNotSentForReview" "${commit_resp}"; then
+            echo "Auto-review unavailable for this edit, retrying with changesNotSentForReview=true"
             commit_code=$(commit_edit "?changesNotSentForReview=true")
             if [[ ! "${commit_code}" =~ ^2[0-9]{2}$ ]]; then
-              echo "HTTP ${commit_code} from commit" >&2
+              echo "HTTP ${commit_code} from commit retry" >&2
               cat "${commit_resp}" >&2
               rm -f "${commit_resp}"
               exit 1
             fi
-            echo "Edit committed (internal testing — no review required)"
+            echo "::warning::Edit committed without auto-review. Ggf. manuell in der Play Console freigeben."
+          else
+            echo "HTTP ${commit_code} from commit" >&2
+            cat "${commit_resp}" >&2
+            rm -f "${commit_resp}"
+            exit 1
           fi
           rm -f "${commit_resp}"
           echo "Done — versionName=${VERSION_NAME} versionCode=${UPLOADED_VC} tracks=${TRACKS}"
