@@ -16,6 +16,7 @@ import {
 import { hasBlaulichtsmsConfig } from './credentialsActions';
 import AlarmCard from './AlarmCard';
 import EinsatzDialog from '../../components/FirecallItems/EinsatzDialog';
+import { buildFirecallFromAlarm } from '../../components/FirecallItems/einsatzDefaults';
 import { Firecall } from '../../components/firebase/firestore';
 import useFirecall from '../../hooks/useFirecall';
 
@@ -75,24 +76,11 @@ const BlaulichtSmsPage = () => {
     setCreateFromAlarm(alarm);
   };
 
-  const buildEinsatzFromAlarm = (alarm: BlaulichtSmsAlarm): Firecall => {
-    const parts = alarm.alarmText.split('/');
-    const name =
-      parts.length >= 5
-        ? [parts[2], parts[3], parts[4]].join(' ').trim()
-        : alarm.alarmText;
-    const coords =
-      alarm.geolocation?.coordinates ?? alarm.coordinates ?? null;
-    return {
-      name,
-      date: new Date(alarm.alarmDate).toISOString(),
-      description: alarm.alarmText,
-      blaulichtSmsAlarmId: alarm.alarmId,
-      group: groupId ?? '',
-      fw: firecall?.fw ?? '',
-      ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
-    };
-  };
+  const buildEinsatzFromAlarm = (alarm: BlaulichtSmsAlarm): Firecall => ({
+    ...buildFirecallFromAlarm(alarm),
+    group: groupId ?? '',
+    fw: firecall?.fw ?? '',
+  } as Firecall);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

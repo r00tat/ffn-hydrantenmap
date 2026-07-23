@@ -1,5 +1,6 @@
 import { formatTimestamp } from '../../common/time-format';
 import { Firecall } from '../firebase/firestore';
+import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
 export const DEFAULT_EINSATZ_FW = 'Neusiedl am See';
 
@@ -36,5 +37,29 @@ export function resetEinsatzToManual(
     lng: undefined,
     blaulichtSmsAlarmId: undefined,
     blaulichtSmsAlarmIds: undefined,
+  };
+}
+
+/**
+ * Maps a BlaulichtSMS alarm onto the alarm-derived fields of a Firecall.
+ * `group`/`fw` are intentionally NOT set here — callers assign them from their
+ * own context (dialog: keeps the current group; page/API: the selected group).
+ */
+export function buildFirecallFromAlarm(
+  alarm: BlaulichtSmsAlarm,
+): Partial<Firecall> {
+  const parts = alarm.alarmText.split('/');
+  const name =
+    parts.length >= 5
+      ? [parts[2], parts[3], parts[4]].join(' ').trim()
+      : alarm.alarmText;
+  const coords = alarm.geolocation?.coordinates ?? alarm.coordinates ?? null;
+  return {
+    name,
+    date: new Date(alarm.alarmDate).toISOString(),
+    description: alarm.alarmText,
+    blaulichtSmsAlarmId: alarm.alarmId,
+    blaulichtSmsAlarmIds: [alarm.alarmId],
+    ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
   };
 }
