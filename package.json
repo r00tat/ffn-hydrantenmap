@@ -27,7 +27,7 @@
     "logs:android": "adb logcat -v time Capacitor:V Capacitor/Plugin:V chromium:V CapacitorBluetoothLe:V RadiacodeFg:V RadiacodeBT:V RadiacodeBTIo:V DataBufDecoder:* RadiacodeTrack:* Firestore:W Firestore:E FirebaseAuth:W *:S"
   },
   "dependencies": {
-    "@auth/core": "^0.41.2",
+    "@auth/core": "^0.41.3",
     "@capacitor-community/bluetooth-le": "^8.2.0",
     "@capacitor-firebase/authentication": "^8.3.0",
     "@capacitor-firebase/crashlytics": "^8.3.0",
