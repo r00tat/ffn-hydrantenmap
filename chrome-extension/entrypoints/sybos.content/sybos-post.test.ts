@@ -7,6 +7,7 @@ import {
   findEinsatzId,
   findPersonalAuswahlToken,
   detectError,
+  reloadUrlForEinsatz,
 } from './sybos-post';
 
 function buildForm(html: string): HTMLFormElement {
@@ -413,5 +414,46 @@ describe('findPersonalAuswahlToken', () => {
   it('returns null when the page has no PersonalAuswahl opener', () => {
     const doc = parseHtml('<html><body><div>nichts</div></body></html>');
     expect(findPersonalAuswahlToken(doc)).toBeNull();
+  });
+});
+
+describe('reloadUrlForEinsatz', () => {
+  const detailBase =
+    'https://sybos.lfv-bgld.at/index.php?comp=sybEinsatz&s=frmEinsatzAdd';
+
+  it('swaps id=0 for the real einsatz id on the detail page', () => {
+    expect(
+      reloadUrlForEinsatz(`${detailBase}&id=0`, '103013')
+    ).toBe(
+      'https://sybos.lfv-bgld.at/index.php?comp=sybEinsatz&s=frmEinsatzAdd&id=103013'
+    );
+  });
+
+  it('preserves all other query parameters when swapping the id', () => {
+    const result = reloadUrlForEinsatz(
+      `${detailBase}&id=0&patJustContent=1`,
+      '203099'
+    );
+    const params = new URL(result).searchParams;
+    expect(params.get('id')).toBe('203099');
+    expect(params.get('comp')).toBe('sybEinsatz');
+    expect(params.get('s')).toBe('frmEinsatzAdd');
+    expect(params.get('patJustContent')).toBe('1');
+  });
+
+  it('leaves the url unchanged when no einsatz id is known', () => {
+    expect(reloadUrlForEinsatz(`${detailBase}&id=0`, null)).toBe(
+      `${detailBase}&id=0`
+    );
+  });
+
+  it('leaves the url unchanged when id is not the "new" marker', () => {
+    const href = `${detailBase}&id=103013`;
+    expect(reloadUrlForEinsatz(href, '103013')).toBe(href);
+  });
+
+  it('leaves the url unchanged when there is no id parameter', () => {
+    const href = 'https://sybos.lfv-bgld.at/index.php?comp=sybEinsatz';
+    expect(reloadUrlForEinsatz(href, '103013')).toBe(href);
   });
 });

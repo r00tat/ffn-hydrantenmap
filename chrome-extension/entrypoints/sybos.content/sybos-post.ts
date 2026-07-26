@@ -180,6 +180,37 @@ export function findEinsatzId(
 }
 
 /**
+ * Build the URL to load after a successful auto-transfer.
+ *
+ * On the SYBOS Einsatz detail page (`frmEinsatzAdd`) the address bar carries
+ * `id=0` — the "new einsatz" marker — even once the einsatz has been saved and
+ * has a real id (the real id only lives in the `idParent=<id>` popup links).
+ * A plain `location.reload()` therefore reloads the `id=0` page and drops the
+ * user back into an empty *new* einsatz, even though the data was saved.
+ *
+ * When we know the real einsatz id and the current URL is the `id=0` detail
+ * page, swap the real id into the `id` parameter so the reload opens the saved
+ * einsatz. In every other case (no id known, or `id` is not `0`) the current
+ * href is returned unchanged, so the caller falls back to a plain reload.
+ */
+export function reloadUrlForEinsatz(
+  currentHref: string,
+  einsatzId: string | null
+): string {
+  if (!einsatzId) return currentHref;
+  try {
+    const url = new URL(currentHref);
+    if (url.searchParams.get('id') === '0') {
+      url.searchParams.set('id', einsatzId);
+      return url.toString();
+    }
+  } catch {
+    // Malformed href — fall through to the unchanged value.
+  }
+  return currentHref;
+}
+
+/**
  * The `q` token SYBOS bakes into the detail page's `syfPopupPersonalAuswahl()`
  * JS. Opening the person-selection popup is a `jQuery.post` to
  * `index.php?comp=sybPersonal&s=PersonalAuswahl&patJustContent=1` whose only
