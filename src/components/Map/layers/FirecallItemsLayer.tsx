@@ -110,6 +110,24 @@ export default function FirecallItemsLayer({
 
   const sortedRecords = useMemo(() => sortByZIndex(records), [records]);
 
+  // react-leaflet adds each item as a Leaflet layer on mount and does NOT
+  // re-add it when the React array is merely reordered (stable keys → no
+  // remount). Within a shared pane the visual stacking equals the DOM insertion
+  // order, so persisting a new zIndex alone has no visible effect (Bug: z-order
+  // context menu "keine Funktion"). Keying the rendered list on a signature of
+  // all (id, zIndex) pairs forces a remount in sorted order whenever a zIndex
+  // actually changes, which re-adds the Leaflet layers in the correct stacking
+  // order. The signature is order-independent (sorted), so normal edits/drags
+  // (which only change `datum`/position) leave it untouched — no flicker.
+  const orderSignature = useMemo(
+    () =>
+      records
+        .map((r) => `${r.id ?? ''}:${r.zIndex ?? 0}`)
+        .sort()
+        .join('|'),
+    [records]
+  );
+
   // Context menu state
   const [contextMenuTarget, setContextMenuTarget] = useState<FirecallItem>();
   const [contextMenuPos, setContextMenuPos] = useState<{
@@ -161,7 +179,8 @@ export default function FirecallItemsLayer({
 
   return (
     <>
-      {sortedRecords.map((record) => {
+      <React.Fragment key={orderSignature}>
+        {sortedRecords.map((record) => {
         let heatmapColor: string | undefined;
         if (heatmapConfig?.enabled && heatmapConfig?.activeKey) {
           const value = (record.fieldData as Record<string, unknown>)?.[heatmapConfig.activeKey];
@@ -181,7 +200,8 @@ export default function FirecallItemsLayer({
             }, crewCountMap)}</>
           </React.Fragment>
         );
-      })}
+        })}
+      </React.Fragment>
       {firecallItem && (
         <ItemOverlay
           item={firecallItem}
