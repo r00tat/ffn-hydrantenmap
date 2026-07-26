@@ -90,7 +90,10 @@ export const availableLayers: TileConfigs = {
     name: 'Opentopomap',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     options: {
-      maxNativeZoom: 19,
+      // OpenTopoMap liefert Kacheln nur bis Zoom 17. maxNativeZoom muss auf 17
+      // gesetzt werden, damit Leaflet die 17er-Kacheln für Zoom 18-24 hochskaliert
+      // (Overzoom) statt nicht existierende 18er/19er-Kacheln anzufordern (leere Karte).
+      maxNativeZoom: 17,
       maxZoom: 24,
       subdomains: ['a', 'b', 'c'],
       attribution:
