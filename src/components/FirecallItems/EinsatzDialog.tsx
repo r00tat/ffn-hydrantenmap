@@ -198,19 +198,36 @@ export default function EinsatzDialog({
   const handleFileUploadComplete = useCallback(
     async (refs: StorageReference[]) => {
       const newUrls = refs.map((r) => r.toString());
+      // No successful uploads: nothing to persist (arrayUnion() with zero args
+      // would throw). The FileUploader already surfaced the upload error.
+      if (newUrls.length === 0) return;
       setEinsatz((prev) => ({
         ...prev,
         attachments: [...(prev.attachments || []), ...newUrls],
       }));
       if (einsatz.id) {
-        await setDoc(
-          doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
-          { attachments: arrayUnion(...newUrls) },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(firestore, FIRECALL_COLLECTION_ID, einsatz.id),
+            { attachments: arrayUnion(...newUrls) },
+            { merge: true }
+          );
+        } catch (err) {
+          console.error('failed to persist attachments', err);
+          setEinsatz((prev) => ({
+            ...prev,
+            attachments: prev.attachments?.filter(
+              (u) => !newUrls.includes(u)
+            ),
+          }));
+          showSnackbar(
+            'Anhang konnte nicht gespeichert werden. Bitte erneut versuchen.',
+            'error'
+          );
+        }
       }
     },
-    [einsatz.id]
+    [einsatz.id, showSnackbar]
   );
 
   const onChange =

@@ -41,6 +41,7 @@ import {
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import { KostenersatzList } from '../Kostenersatz';
 import {
   getBlaulichtSmsAlarmById,
@@ -59,6 +60,7 @@ export default function EinsatzDetails() {
   const setFirecallId = useFirecallSelect();
   const { isAdmin, email, myGroups } = useFirebaseLogin();
   const logChange = useAuditLog();
+  const showSnackbar = useSnackbar();
   const { displayItems } = useVehicles();
   const [firecall, setFirecall] = useState<Firecall | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +159,10 @@ export default function EinsatzDetails() {
   const handleFileUploadComplete = useCallback(
     async (refs: StorageReference[]) => {
       const newUrls = refs.map((r) => r.toString());
+      // No successful uploads (all failed / cancelled): nothing to persist.
+      // arrayUnion() would throw with zero arguments, so bail out early. The
+      // FileUploader already surfaced the upload error to the user.
+      if (newUrls.length === 0) return;
       setFirecall((prev) =>
         prev
           ? {
@@ -166,14 +172,33 @@ export default function EinsatzDetails() {
           : prev
       );
       if (firecallId && firecallId !== 'unknown') {
-        await setDoc(
-          doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
-          { attachments: arrayUnion(...newUrls) },
-          { merge: true }
-        );
+        try {
+          await setDoc(
+            doc(firestore, FIRECALL_COLLECTION_ID, firecallId),
+            { attachments: arrayUnion(...newUrls) },
+            { merge: true }
+          );
+        } catch (err) {
+          console.error('failed to persist attachments', err);
+          // Roll back the optimistic update so the UI reflects reality.
+          setFirecall((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  attachments: prev.attachments?.filter(
+                    (u) => !newUrls.includes(u)
+                  ),
+                }
+              : prev
+          );
+          showSnackbar(
+            'Anhang konnte nicht gespeichert werden. Bitte erneut versuchen.',
+            'error'
+          );
+        }
       }
     },
-    [firecallId]
+    [firecallId, showSnackbar]
   );
 
   const handleDeleteAttachment = useCallback(
