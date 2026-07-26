@@ -54,6 +54,8 @@ export async function deleteFirecallPosition(
   }
 }
 
+export { insertedPointPosition } from './pointGeometry';
+
 export function findSectionOnPolyline(
   positions: LatLngPosition[],
   point: L.LatLng

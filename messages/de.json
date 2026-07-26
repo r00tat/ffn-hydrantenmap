@@ -253,7 +253,10 @@
   "firecallElements": {
     "addPoint": "Einen Punkt hinzufügen",
     "editLine": "Linie bearbeiten",
-    "removePoint": "Punkt entfernen"
+    "removePoint": "Punkt entfernen",
+    "deletePoint": "Punkt löschen",
+    "insertPoint": "Punkt einfügen",
+    "editElement": "Element bearbeiten"
   },
   "fileDisplay": {
     "download": "Herunterladen",

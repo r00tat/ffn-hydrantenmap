@@ -19,10 +19,12 @@ import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
+import PointContextMenu from '../PointContextMenu';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
   findSectionOnPolyline,
+  insertedPointPosition,
   updateFirecallPositions,
 } from '../connection/positions';
 
@@ -40,6 +42,11 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
   const [showMarkers, setShowMarkers] = useState(false);
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
+  const [pointMenu, setPointMenu] = useState<{
+    index: number;
+    top: number;
+    left: number;
+  }>();
   const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
@@ -66,7 +73,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
 
   return (
     <>
-      {(record.alwaysShowMarker === 'true' || showMarkers) &&
+      {(editable || record.alwaysShowMarker === 'true' || showMarkers) &&
         positions.map((p, index) => (
           <Marker
             key={index}
@@ -85,6 +92,18 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
                   email
                 );
               },
+              ...(editable
+                ? {
+                    contextmenu: (event: L.LeafletMouseEvent) => {
+                      event.originalEvent.preventDefault();
+                      setPointMenu({
+                        index,
+                        top: event.originalEvent.clientY,
+                        left: event.originalEvent.clientX,
+                      });
+                    },
+                  }
+                : {}),
             }}
           >
             <Popup>
@@ -168,6 +187,41 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
           {record.popupFn()}
         </Popup>
       </Polygon>
+      {editable && (
+        <PointContextMenu
+          anchorPosition={
+            pointMenu
+              ? { top: pointMenu.top, left: pointMenu.left }
+              : undefined
+          }
+          pointIndex={pointMenu?.index ?? -1}
+          pointCount={positions.length}
+          minPoints={3}
+          onClose={() => setPointMenu(undefined)}
+          onInsert={() => {
+            if (!pointMenu) return;
+            const pos = insertedPointPosition(positions, pointMenu.index, true);
+            addFirecallPosition(
+              firecallId,
+              { lat: pos[0], lng: pos[1] },
+              record.data(),
+              pointMenu.index + 1,
+              email
+            );
+          }}
+          onDelete={() => {
+            if (pointMenu) {
+              deleteFirecallPosition(
+                firecallId,
+                record.data(),
+                pointMenu.index,
+                email
+              );
+            }
+          }}
+          onEdit={() => selectItem(record)}
+        />
+      )}
     </>
   );
 }

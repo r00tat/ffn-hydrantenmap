@@ -17,10 +17,12 @@ import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
+import PointContextMenu from '../PointContextMenu';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
   findSectionOnPolyline,
+  insertedPointPosition,
   updateFirecallPositions,
 } from './positions';
 
@@ -43,6 +45,11 @@ export default function ConnectionMarker({
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
   const [showMarkers, setShowMarkers] = useState(false);
+  const [pointMenu, setPointMenu] = useState<{
+    index: number;
+    top: number;
+    left: number;
+  }>();
   const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
@@ -73,7 +80,8 @@ export default function ConnectionMarker({
         .filter(([pLat, pLng]) => pLat && pLng)
         .map(
           (p, index) =>
-            (record.alwaysShowMarker === 'true' ||
+            (editable ||
+              record.alwaysShowMarker === 'true' ||
               showMarkers ||
               index === 0 ||
               index === positions.length - 1) && (
@@ -94,6 +102,18 @@ export default function ConnectionMarker({
                       email
                     );
                   },
+                  ...(editable
+                    ? {
+                        contextmenu: (event: L.LeafletMouseEvent) => {
+                          event.originalEvent.preventDefault();
+                          setPointMenu({
+                            index,
+                            top: event.originalEvent.clientY,
+                            left: event.originalEvent.clientX,
+                          });
+                        },
+                      }
+                    : {}),
                 }}
               >
                 <Popup>
@@ -194,6 +214,41 @@ export default function ConnectionMarker({
           {record.popupFn()}
         </Popup>
       </Polyline>
+      {editable && (
+        <PointContextMenu
+          anchorPosition={
+            pointMenu
+              ? { top: pointMenu.top, left: pointMenu.left }
+              : undefined
+          }
+          pointIndex={pointMenu?.index ?? -1}
+          pointCount={positions.length}
+          minPoints={2}
+          onClose={() => setPointMenu(undefined)}
+          onInsert={() => {
+            if (!pointMenu) return;
+            const pos = insertedPointPosition(positions, pointMenu.index, false);
+            addFirecallPosition(
+              firecallId,
+              { lat: pos[0], lng: pos[1] },
+              record.data(),
+              pointMenu.index + 1,
+              email
+            );
+          }}
+          onDelete={() => {
+            if (pointMenu) {
+              deleteFirecallPosition(
+                firecallId,
+                record.data(),
+                pointMenu.index,
+                email
+              );
+            }
+          }}
+          onEdit={() => selectItem(record)}
+        />
+      )}
     </>
   );
 }
