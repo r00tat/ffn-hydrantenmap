@@ -390,7 +390,11 @@
   "einsatzDialog": {
     "title": "Add operation",
     "subtitleNew": "New operation",
-    "saveError": "Failed to save the operation. Please check your connection and sign-in."
+    "saveError": "Failed to save the operation. Please check your connection and sign-in.",
+    "duplicateTitle": "Operation already exists",
+    "duplicateText": "The operation “{names}” already exists for this alarm. Creating a second operation splits crew, diary and cost recovery across two operations. Create a new operation anyway?",
+    "duplicateConfirm": "Create anyway",
+    "duplicateCheckFailed": "Could not check for existing operations. Please check your connection."
   },
   "firecallItem": {
     "uploadTitle": "Upload file to the operation",

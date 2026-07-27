@@ -1,4 +1,5 @@
 import { formatTimestamp } from '../../common/time-format';
+import { stripNullish } from '../../common/stripNullish';
 import { Firecall } from '../firebase/firestore';
 import type { BlaulichtSmsAlarm } from '../../common/blaulichtsms';
 
@@ -62,4 +63,53 @@ export function buildFirecallFromAlarm(
     blaulichtSmsAlarmIds: [alarm.alarmId],
     ...(coords ? { lat: coords.lat, lng: coords.lon } : {}),
   };
+}
+
+/**
+ * Builds a complete, ready-to-edit Firecall draft from a BlaulichtSMS alarm.
+ *
+ * Unlike the bare `buildFirecallFromAlarm` this sets `deleted: false`, which is
+ * mandatory: every firecall list query filters on `deleted == false`, and a
+ * Firestore equality filter never matches a document where the field is absent.
+ * A draft created without the flag therefore produced a firecall that was
+ * invisible in the Einsatz overview and — because the alarm-dedup lookup also
+ * filters on `deleted` — did not stop a second firecall from being created for
+ * the same alarm.
+ */
+export function createEinsatzFromAlarm(
+  alarm: BlaulichtSmsAlarm,
+  { group, fw }: { group: string; fw: string },
+): Firecall {
+  return {
+    ...buildFirecallFromAlarm(alarm),
+    group,
+    fw,
+    deleted: false,
+  } as Firecall;
+}
+
+/**
+ * Builds the Firestore payload for a brand-new firecall document.
+ *
+ * `deleted` is defaulted to `false` here as a safety net for every caller: a
+ * document written without it is excluded from all `deleted == false` list
+ * queries and effectively unreachable through the UI.
+ */
+export function buildNewFirecallPayload(
+  fc: Firecall,
+  {
+    user,
+    lat,
+    lng,
+    now = new Date(),
+  }: { user?: string; lat?: number; lng?: number; now?: Date },
+): Partial<Firecall> {
+  return stripNullish({
+    ...fc,
+    deleted: fc.deleted ?? false,
+    user,
+    created: now.toISOString(),
+    lat: fc.lat ?? lat,
+    lng: fc.lng ?? lng,
+  });
 }
