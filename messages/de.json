@@ -258,8 +258,8 @@
     "insertPoint": "Punkt einfügen",
     "editElement": "Element bearbeiten",
     "addPointHere": "Punkt hier hinzufügen",
-    "pointOfArea": "Punkt {number} der Fläche {name}",
-    "pointOfLine": "Punkt {number} der Linie {name}"
+    "pointOfArea": "Punkt {number}",
+    "pointOfLine": "Punkt {number}"
   },
   "fileDisplay": {
     "download": "Herunterladen",

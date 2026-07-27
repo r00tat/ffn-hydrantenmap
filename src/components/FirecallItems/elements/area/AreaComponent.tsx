@@ -36,7 +36,12 @@ export interface AreaMarkerProps {
   onContextMenu?: (item: FirecallItem, event: LeafletMouseEvent) => void;
 }
 
-export default function AreaMarker({ record, selectItem, pane, onContextMenu }: AreaMarkerProps) {
+export default function AreaMarker({
+  record,
+  selectItem,
+  pane,
+  onContextMenu,
+}: AreaMarkerProps) {
   const t = useTranslations('firecallElements');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
@@ -90,7 +95,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
                   (event.target as L.Marker)?.getLatLng(),
                   record.data(),
                   index,
-                  email
+                  email,
                 );
               },
               // Keep the point markers visible while a point popup is open.
@@ -117,32 +122,42 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
           >
             <Popup>
               <div>
+                {editable && (
+                  <>
+                    <Tooltip title={t('editElement')}>
+                      <IconButton
+                        // sx={{ marginLeft: 'auto', float: 'right' }}
+                        onClick={() => selectItem(record)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title={t('deletePoint')}>
+                      <IconButton
+                        // sx={{ marginLeft: 'auto', float: 'right' }}
+                        onClick={() =>
+                          deleteFirecallPosition(
+                            firecallId,
+                            record.data(),
+                            index,
+                            email,
+                          )
+                        }
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
+                <PopupNavigateButton lat={p[0]} lng={p[1]} />
+              </div>
+              <div>
                 <strong>
                   {t('pointOfArea', {
                     number: index + 1,
-                    name: record.name || '',
                   })}
                 </strong>
               </div>
-              <PopupNavigateButton lat={p[0]} lng={p[1]} />
-              {editable && (
-                <>
-                  <IconButton
-                    sx={{ marginLeft: 'auto', float: 'right' }}
-                    onClick={() => selectItem(record)}
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    sx={{ marginLeft: 'auto', float: 'right' }}
-                    onClick={() =>
-                      deleteFirecallPosition(firecallId, record.data(), index, email)
-                    }
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </>
-              )}
               {record.popupFn()}
             </Popup>
           </Marker>
@@ -163,7 +178,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
             const index = nearestInsertIndex(
               positions,
               [event.latlng.lat, event.latlng.lng],
-              true
+              true,
             );
             setPoint(event.latlng);
             setPointIndex(index);
@@ -183,39 +198,44 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
         }}
       >
         <Popup>
-          <PopupNavigateButton lat={record.lat} lng={record.lng} />
-          {editable && pointIndex >= 0 && (
-            <Tooltip title={t('addPointHere')}>
-              <IconButton
-                size="small"
-                color="primary"
-                aria-label={t('addPointHere')}
-                onClick={() =>
-                  addFirecallPosition(firecallId, point, record, pointIndex, email)
-                }
-              >
-                <AddIcon fontSize="small" />
-                <CircleIcon sx={{ fontSize: 12 }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {editable && (
-            <IconButton
-              sx={{ marginLeft: 'auto', float: 'right' }}
-              onClick={() => selectItem(record)}
-            >
-              <EditIcon />
-            </IconButton>
-          )}
+          <div>
+            {editable && pointIndex >= 0 && (
+              <Tooltip title={t('addPointHere')}>
+                <IconButton
+                  color="primary"
+                  aria-label={t('addPointHere')}
+                  onClick={() =>
+                    addFirecallPosition(
+                      firecallId,
+                      point,
+                      record,
+                      pointIndex,
+                      email,
+                    )
+                  }
+                >
+                  <AddIcon fontSize="small" />
+                  <CircleIcon sx={{ fontSize: 12 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+            {editable && (
+              <Tooltip title={t('editElement')}>
+                <IconButton onClick={() => selectItem(record)}>
+                  <EditIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            <PopupNavigateButton lat={record.lat} lng={record.lng} />
+          </div>
+
           {record.popupFn()}
         </Popup>
       </Polygon>
       {editable && (
         <PointContextMenu
           anchorPosition={
-            pointMenu
-              ? { top: pointMenu.top, left: pointMenu.left }
-              : undefined
+            pointMenu ? { top: pointMenu.top, left: pointMenu.left } : undefined
           }
           pointIndex={pointMenu?.index ?? -1}
           pointCount={positions.length}
@@ -229,7 +249,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
               { lat: pos[0], lng: pos[1] },
               record.data(),
               pointMenu.index + 1,
-              email
+              email,
             );
           }}
           onDelete={() => {
@@ -238,7 +258,7 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
                 firecallId,
                 record.data(),
                 pointMenu.index,
-                email
+                email,
               );
             }
           }}

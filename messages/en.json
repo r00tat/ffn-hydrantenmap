@@ -258,8 +258,8 @@
     "insertPoint": "Insert point",
     "editElement": "Edit element",
     "addPointHere": "Add point here",
-    "pointOfArea": "Point {number} of area {name}",
-    "pointOfLine": "Point {number} of line {name}"
+    "pointOfArea": "Point {number}",
+    "pointOfLine": "Point {number}"
   },
   "fileDisplay": {
     "download": "Download",

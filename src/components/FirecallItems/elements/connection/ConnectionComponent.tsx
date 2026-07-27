@@ -126,7 +126,6 @@ export default function ConnectionMarker({
                     <strong>
                       {t('pointOfLine', {
                         number: index + 1,
-                        name: record.name || '',
                       })}
                     </strong>
                   </div>
