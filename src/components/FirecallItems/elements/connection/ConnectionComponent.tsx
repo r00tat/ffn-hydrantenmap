@@ -101,6 +101,11 @@ export default function ConnectionMarker({
                       email
                     );
                   },
+                  // Keep the point markers visible while a point popup is open
+                  // (see AreaComponent for the detailed rationale) so tapping a
+                  // point opens the point's popup instead of the line's.
+                  popupopen: () => setShowMarkers(true),
+                  popupclose: () => setShowMarkers(false),
                   ...(editable
                     ? {
                         contextmenu: (event: L.LeafletMouseEvent) => {

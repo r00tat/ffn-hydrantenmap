@@ -92,6 +92,14 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
                   email
                 );
               },
+              // Keep the point markers visible while a point popup is open.
+              // Opening a marker popup closes the polygon popup first; without
+              // these handlers showMarkers would flip to false and unmount the
+              // marker mid-tap, so on touch the tap fell through to the polygon
+              // and its popup opened instead of the point's. React batches the
+              // polygon-popupclose and this popupopen into one render.
+              popupopen: () => setShowMarkers(true),
+              popupclose: () => setShowMarkers(false),
               ...(editable
                 ? {
                     contextmenu: (event: L.LeafletMouseEvent) => {
