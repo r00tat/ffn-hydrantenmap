@@ -1,9 +1,11 @@
 'use client';
 
 import AddIcon from '@mui/icons-material/Add';
+import CircleIcon from '@mui/icons-material/Circle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
@@ -16,7 +18,6 @@ import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
-import Button from '@mui/material/Button';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import PointContextMenu from '../PointContextMenu';
@@ -184,17 +185,19 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Button
-              size="small"
-              variant="outlined"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                addFirecallPosition(firecallId, point, record, pointIndex, email)
-              }
-            >
-              {t('addPointHere')}
-            </Button>
+            <Tooltip title={t('addPointHere')}>
+              <IconButton
+                size="small"
+                color="primary"
+                aria-label={t('addPointHere')}
+                onClick={() =>
+                  addFirecallPosition(firecallId, point, record, pointIndex, email)
+                }
+              >
+                <AddIcon fontSize="small" />
+                <CircleIcon sx={{ fontSize: 12 }} />
+              </IconButton>
+            </Tooltip>
           )}
           {editable && (
             <IconButton

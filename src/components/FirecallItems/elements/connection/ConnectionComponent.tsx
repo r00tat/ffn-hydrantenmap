@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import CircleIcon from '@mui/icons-material/Circle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
@@ -15,7 +16,6 @@ import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
-import Button from '@mui/material/Button';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import PointContextMenu from '../PointContextMenu';
@@ -199,23 +199,25 @@ export default function ConnectionMarker({
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Button
-              size="small"
-              variant="outlined"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                addFirecallPosition(
-                  firecallId,
-                  point,
-                  record as Connection,
-                  pointIndex,
-                  email
-                )
-              }
-            >
-              {t('addPointHere')}
-            </Button>
+            <Tooltip title={t('addPointHere')}>
+              <IconButton
+                size="small"
+                color="primary"
+                aria-label={t('addPointHere')}
+                onClick={() =>
+                  addFirecallPosition(
+                    firecallId,
+                    point,
+                    record as Connection,
+                    pointIndex,
+                    email
+                  )
+                }
+              >
+                <AddIcon fontSize="small" />
+                <CircleIcon sx={{ fontSize: 12 }} />
+              </IconButton>
+            </Tooltip>
           )}
           {editable && (
             <IconButton
