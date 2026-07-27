@@ -15,13 +15,14 @@ import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { Connection, FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
+import Button from '@mui/material/Button';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import PointContextMenu from '../PointContextMenu';
+import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
-  findSectionOnPolyline,
   insertedPointPosition,
   updateFirecallPositions,
 } from './positions';
@@ -121,6 +122,14 @@ export default function ConnectionMarker({
                 }}
               >
                 <Popup>
+                  <div>
+                    <strong>
+                      {t('pointOfLine', {
+                        number: index + 1,
+                        name: record.name || '',
+                      })}
+                    </strong>
+                  </div>
                   <PopupNavigateButton lat={p[0]} lng={p[1]} />
                   {editable && (
                     <>
@@ -150,8 +159,6 @@ export default function ConnectionMarker({
                     </>
                   )}
                   {record.popupFn()}
-                  <br />
-                  Punkt {index + 1} von {positions.length}
                 </Popup>
               </Marker>
             )
@@ -165,10 +172,13 @@ export default function ConnectionMarker({
         }}
         eventHandlers={{
           click: (event) => {
-            const index = findSectionOnPolyline(positions, event.latlng);
-            // console.info(
-            //   `clicked on polyline ${event.latlng} index in points: ${index}`
-            // );
+            // nearestInsertIndex handles clicks anywhere near the line, so a new
+            // point can be added via left-click without hitting a segment exactly.
+            const index = nearestInsertIndex(
+              positions,
+              [event.latlng.lat, event.latlng.lng],
+              false
+            );
             setPoint(event.latlng);
             setPointIndex(index);
           },
@@ -189,23 +199,23 @@ export default function ConnectionMarker({
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Tooltip title={t('addPoint')}>
-              <IconButton
-                color="primary"
-                aria-label="add a point on the line"
-                onClick={() =>
-                  addFirecallPosition(
-                    firecallId,
-                    point,
-                    record as Connection,
-                    pointIndex,
-                    email
-                  )
-                }
-              >
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() =>
+                addFirecallPosition(
+                  firecallId,
+                  point,
+                  record as Connection,
+                  pointIndex,
+                  email
+                )
+              }
+            >
+              {t('addPointHere')}
+            </Button>
           )}
           {editable && (
             <IconButton

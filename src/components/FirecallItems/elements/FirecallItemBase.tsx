@@ -22,6 +22,18 @@ import {
 } from './marker/FirecallItemDefault';
 import React from 'react';
 
+/**
+ * Extra context passed to {@link FirecallItemBase.contextMenuItems} so an item
+ * can offer location-aware actions (e.g. "add a point here" on an area/line at
+ * the position that was right-clicked).
+ */
+export interface ItemContextMenuContext {
+  /** Map position the context menu was opened at, if available. */
+  latLng?: L.LatLng;
+  firecallId: string;
+  email?: string;
+}
+
 export function PopupNavigateButton({ lat, lng }: { lat?: number; lng?: number }) {
   if (!lat || !lng) return null;
   const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
@@ -289,7 +301,10 @@ export class FirecallItemBase {
     }
   }
 
-  public contextMenuItems(_onClose: () => void): ReactNode {
+  public contextMenuItems(
+    _onClose: () => void,
+    _ctx?: ItemContextMenuContext
+  ): ReactNode {
     return null;
   }
 

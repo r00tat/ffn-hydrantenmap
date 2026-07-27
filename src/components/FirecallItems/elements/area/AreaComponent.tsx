@@ -4,7 +4,6 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
@@ -17,13 +16,14 @@ import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
+import Button from '@mui/material/Button';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallArea } from '../FirecallArea';
 import PointContextMenu from '../PointContextMenu';
+import { nearestInsertIndex } from '../connection/pointGeometry';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
-  findSectionOnPolyline,
   insertedPointPosition,
   updateFirecallPositions,
 } from '../connection/positions';
@@ -115,6 +115,14 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
             }}
           >
             <Popup>
+              <div>
+                <strong>
+                  {t('pointOfArea', {
+                    number: index + 1,
+                    name: record.name || '',
+                  })}
+                </strong>
+              </div>
               <PopupNavigateButton lat={p[0]} lng={p[1]} />
               {editable && (
                 <>
@@ -148,10 +156,14 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
         }}
         eventHandlers={{
           click: (event) => {
-            const index = findSectionOnPolyline(positions, event.latlng);
-            // console.info(
-            //   `clicked on polyline ${event.latlng} index in points: ${index}`
-            // );
+            // nearestInsertIndex also handles clicks on the area fill (not just
+            // exactly on an edge), so a new point can be added anywhere on the
+            // Fläche via left-click.
+            const index = nearestInsertIndex(
+              positions,
+              [event.latlng.lat, event.latlng.lng],
+              true
+            );
             setPoint(event.latlng);
             setPointIndex(index);
           },
@@ -172,17 +184,17 @@ export default function AreaMarker({ record, selectItem, pane, onContextMenu }: 
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Tooltip title={t('addPoint')}>
-              <IconButton
-                color="primary"
-                aria-label="add a point on the line"
-                onClick={() =>
-                  addFirecallPosition(firecallId, point, record, pointIndex, email)
-                }
-              >
-                <AddIcon />
-              </IconButton>
-            </Tooltip>
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() =>
+                addFirecallPosition(firecallId, point, record, pointIndex, email)
+              }
+            >
+              {t('addPointHere')}
+            </Button>
           )}
           {editable && (
             <IconButton

@@ -256,7 +256,10 @@
     "removePoint": "Punkt entfernen",
     "deletePoint": "Punkt löschen",
     "insertPoint": "Punkt einfügen",
-    "editElement": "Element bearbeiten"
+    "editElement": "Element bearbeiten",
+    "addPointHere": "Punkt hier hinzufügen",
+    "pointOfArea": "Punkt {number} der Fläche {name}",
+    "pointOfLine": "Punkt {number} der Linie {name}"
   },
   "fileDisplay": {
     "download": "Herunterladen",

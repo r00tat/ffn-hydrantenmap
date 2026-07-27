@@ -19,6 +19,7 @@ import useMapEditor, { useHistoryPathSegments } from '../../../hooks/useMapEdito
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import copyAndSaveFirecallItems from '../../../hooks/copyLayer';
 import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
+import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
 import ItemContextMenu from '../../FirecallItems/ItemContextMenu';
 
 export interface FirecallLayerOptions {
@@ -134,10 +135,15 @@ export default function FirecallItemsLayer({
     top: number;
     left: number;
   }>();
+  // Map position the menu was opened at — lets location-aware items (areas,
+  // lines) offer "add a point here" at the clicked spot.
+  const [contextMenuLatLng, setContextMenuLatLng] = useState<L.LatLng>();
+  const { email } = useFirebaseLogin();
 
   const handleContextMenu = useCallback(
     (item: FirecallItem, event: L.LeafletMouseEvent) => {
       setContextMenuTarget(item);
+      setContextMenuLatLng(event.latlng);
       setContextMenuPos({
         top: event.originalEvent.clientY,
         left: event.originalEvent.clientX,
@@ -149,6 +155,7 @@ export default function FirecallItemsLayer({
   const closeContextMenu = useCallback(() => {
     setContextMenuTarget(undefined);
     setContextMenuPos(undefined);
+    setContextMenuLatLng(undefined);
   }, []);
 
   const { editable, setEditable } = useMapEditor();
@@ -174,8 +181,12 @@ export default function FirecallItemsLayer({
 
   const customActions = useMemo(() => {
     if (!contextMenuTarget) return undefined;
-    return getItemInstance(contextMenuTarget).contextMenuItems(closeContextMenu);
-  }, [contextMenuTarget, closeContextMenu]);
+    return getItemInstance(contextMenuTarget).contextMenuItems(closeContextMenu, {
+      latLng: contextMenuLatLng,
+      firecallId,
+      email,
+    });
+  }, [contextMenuTarget, closeContextMenu, contextMenuLatLng, firecallId, email]);
 
   return (
     <>
