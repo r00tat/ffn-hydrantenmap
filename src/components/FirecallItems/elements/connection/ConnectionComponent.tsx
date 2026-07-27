@@ -80,8 +80,7 @@ export default function ConnectionMarker({
         .filter(([pLat, pLng]) => pLat && pLng)
         .map(
           (p, index) =>
-            (editable ||
-              record.alwaysShowMarker === 'true' ||
+            (record.alwaysShowMarker === 'true' ||
               showMarkers ||
               index === 0 ||
               index === positions.length - 1) && (
