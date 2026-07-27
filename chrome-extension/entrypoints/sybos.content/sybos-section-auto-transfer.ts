@@ -4,7 +4,7 @@ import {
   orchestrateMaterial,
   type OrchestrateResult,
 } from './sybos-orchestrate';
-import { findEinsatzId } from './sybos-post';
+import { findEinsatzId, reloadUrlForEinsatz } from './sybos-post';
 import { hasSybosPersonTable } from './sybos-table';
 import { hasSybosVehicleList } from './sybos-vehicle-list';
 import { hasSybosVehicleTable } from './sybos-vehicle-table';
@@ -95,7 +95,18 @@ function scheduleReload(resultArea: HTMLElement): void {
   resultArea.appendChild(
     el('div', { className: 'ek-crew-result' }, 'Seite wird aktualisiert…')
   );
-  setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+  // The detail page's address bar keeps `id=0` even after the einsatz was
+  // saved, so a plain reload would drop us back into a new einsatz. Reload the
+  // saved einsatz explicitly when we can resolve its real id (see
+  // reloadUrlForEinsatz); otherwise fall back to a plain reload.
+  const target = reloadUrlForEinsatz(window.location.href, findEinsatzId());
+  setTimeout(() => {
+    if (target === window.location.href) {
+      window.location.reload();
+    } else {
+      window.location.assign(target);
+    }
+  }, RELOAD_DELAY_MS);
 }
 
 async function runTransfer(

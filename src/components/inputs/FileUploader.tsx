@@ -14,6 +14,7 @@ import { useCallback, useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import { useFirecallId } from '../../hooks/useFirecall';
 import app from '../firebase/firebase';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import LinearProgressWithLabel from './LinearProgressWithLabel';
 
 // Initialize Cloud Storage and get a reference to the service
@@ -59,6 +60,7 @@ export default function FileUploader({
   onFileUploadComplete,
 }: FileUploaderProps) {
   const firecallId = useFirecallId();
+  const showSnackbar = useSnackbar();
   const [uploadInProgress, setUploadInProgress] = useState(false);
   const [progress, setProgress] = useState<{
     [key: string]: UploadTaskSnapshot;
@@ -85,30 +87,44 @@ export default function FileUploader({
         setUploadInProgress(true);
         // setFileList(files);
         setProgress({});
-        const refs = (
-          await Promise.allSettled(
-            Array.from(files).map(async (file) => {
-              const ref = await uploadFile(
-                firecallId,
-                `${uuid()}-${file.name}`,
-                file,
-                {
-                  contentType: file.type,
-                },
-                progressCallback
-              );
-              // onFileUploadComplete(ref);
-              return ref;
-            })
+        const settled = await Promise.allSettled(
+          Array.from(files).map(async (file) => {
+            const ref = await uploadFile(
+              firecallId,
+              `${uuid()}-${file.name}`,
+              file,
+              {
+                contentType: file.type,
+              },
+              progressCallback
+            );
+            // onFileUploadComplete(ref);
+            return ref;
+          })
+        );
+        const refs = settled
+          .filter(
+            (p): p is PromiseFulfilledResult<StorageReference> =>
+              p.status === 'fulfilled'
           )
-        )
-          .filter((p) => p.status === 'fulfilled')
-          .map((p) => (p as PromiseFulfilledResult<StorageReference>).value);
+          .map((p) => p.value);
+        const failed = settled.filter(
+          (p): p is PromiseRejectedResult => p.status === 'rejected'
+        );
         setUploadInProgress(false);
+        // Surface upload failures instead of silently dropping them — otherwise
+        // an attachment simply "disappears" after upload with no explanation.
+        if (failed.length > 0) {
+          failed.forEach((f) => console.error('file upload failed', f.reason));
+          showSnackbar(
+            `${failed.length} Datei(en) konnten nicht hochgeladen werden.`,
+            'error'
+          );
+        }
         onFileUploadComplete(refs);
       }
     },
-    [firecallId, onFileUploadComplete, progressCallback]
+    [firecallId, onFileUploadComplete, progressCallback, showSnackbar]
   );
 
   return (

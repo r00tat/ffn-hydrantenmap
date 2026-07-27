@@ -7,7 +7,9 @@
         "firebase-tools@latest",
         "mcp",
         "--dir",
-        "."
+        ".",
+        "--only",
+        "core,firestore,storage,auth,messaging,functions,remoteconfig,database,developerknowledge,crashlytics"
       ]
     }
   }

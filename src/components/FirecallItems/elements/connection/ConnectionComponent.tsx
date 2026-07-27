@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import CircleIcon from '@mui/icons-material/Circle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
@@ -17,10 +18,12 @@ import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
+import PointContextMenu from '../PointContextMenu';
+import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
   deleteFirecallPosition,
-  findSectionOnPolyline,
+  insertedPointPosition,
   updateFirecallPositions,
 } from './positions';
 
@@ -43,6 +46,11 @@ export default function ConnectionMarker({
   const [point, setPoint] = useState(defaultPosition);
   const [pointIndex, setPointIndex] = useState(-1);
   const [showMarkers, setShowMarkers] = useState(false);
+  const [pointMenu, setPointMenu] = useState<{
+    index: number;
+    top: number;
+    left: number;
+  }>();
   const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
@@ -94,9 +102,33 @@ export default function ConnectionMarker({
                       email
                     );
                   },
+                  // Keep the point markers visible while a point popup is open
+                  // (see AreaComponent for the detailed rationale) so tapping a
+                  // point opens the point's popup instead of the line's.
+                  popupopen: () => setShowMarkers(true),
+                  popupclose: () => setShowMarkers(false),
+                  ...(editable
+                    ? {
+                        contextmenu: (event: L.LeafletMouseEvent) => {
+                          event.originalEvent.preventDefault();
+                          setPointMenu({
+                            index,
+                            top: event.originalEvent.clientY,
+                            left: event.originalEvent.clientX,
+                          });
+                        },
+                      }
+                    : {}),
                 }}
               >
                 <Popup>
+                  <div>
+                    <strong>
+                      {t('pointOfLine', {
+                        number: index + 1,
+                      })}
+                    </strong>
+                  </div>
                   <PopupNavigateButton lat={p[0]} lng={p[1]} />
                   {editable && (
                     <>
@@ -126,8 +158,6 @@ export default function ConnectionMarker({
                     </>
                   )}
                   {record.popupFn()}
-                  <br />
-                  Punkt {index + 1} von {positions.length}
                 </Popup>
               </Marker>
             )
@@ -141,10 +171,13 @@ export default function ConnectionMarker({
         }}
         eventHandlers={{
           click: (event) => {
-            const index = findSectionOnPolyline(positions, event.latlng);
-            // console.info(
-            //   `clicked on polyline ${event.latlng} index in points: ${index}`
-            // );
+            // nearestInsertIndex handles clicks anywhere near the line, so a new
+            // point can be added via left-click without hitting a segment exactly.
+            const index = nearestInsertIndex(
+              positions,
+              [event.latlng.lat, event.latlng.lng],
+              false
+            );
             setPoint(event.latlng);
             setPointIndex(index);
           },
@@ -165,10 +198,11 @@ export default function ConnectionMarker({
         <Popup>
           <PopupNavigateButton lat={record.lat} lng={record.lng} />
           {editable && pointIndex >= 0 && (
-            <Tooltip title={t('addPoint')}>
+            <Tooltip title={t('addPointHere')}>
               <IconButton
+                size="small"
                 color="primary"
-                aria-label="add a point on the line"
+                aria-label={t('addPointHere')}
                 onClick={() =>
                   addFirecallPosition(
                     firecallId,
@@ -179,7 +213,8 @@ export default function ConnectionMarker({
                   )
                 }
               >
-                <AddIcon />
+                <AddIcon fontSize="small" />
+                <CircleIcon sx={{ fontSize: 12 }} />
               </IconButton>
             </Tooltip>
           )}
@@ -194,6 +229,41 @@ export default function ConnectionMarker({
           {record.popupFn()}
         </Popup>
       </Polyline>
+      {editable && (
+        <PointContextMenu
+          anchorPosition={
+            pointMenu
+              ? { top: pointMenu.top, left: pointMenu.left }
+              : undefined
+          }
+          pointIndex={pointMenu?.index ?? -1}
+          pointCount={positions.length}
+          minPoints={2}
+          onClose={() => setPointMenu(undefined)}
+          onInsert={() => {
+            if (!pointMenu) return;
+            const pos = insertedPointPosition(positions, pointMenu.index, false);
+            addFirecallPosition(
+              firecallId,
+              { lat: pos[0], lng: pos[1] },
+              record.data(),
+              pointMenu.index + 1,
+              email
+            );
+          }}
+          onDelete={() => {
+            if (pointMenu) {
+              deleteFirecallPosition(
+                firecallId,
+                record.data(),
+                pointMenu.index,
+                email
+              );
+            }
+          }}
+          onEdit={() => selectItem(record)}
+        />
+      )}
     </>
   );
 }

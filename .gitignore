@@ -193,6 +193,6 @@ hydranten.csv
 
 certificates
 /radiacode-python/
-.claude/scheudled_tasks.lock
+.claude/scheduled_tasks.lock
 *.aab
 /docs/superpowers/**/*.md

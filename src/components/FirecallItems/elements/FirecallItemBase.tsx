@@ -22,7 +22,25 @@ import {
 } from './marker/FirecallItemDefault';
 import React from 'react';
 
-export function PopupNavigateButton({ lat, lng }: { lat?: number; lng?: number }) {
+/**
+ * Extra context passed to {@link FirecallItemBase.contextMenuItems} so an item
+ * can offer location-aware actions (e.g. "add a point here" on an area/line at
+ * the position that was right-clicked).
+ */
+export interface ItemContextMenuContext {
+  /** Map position the context menu was opened at, if available. */
+  latLng?: L.LatLng;
+  firecallId: string;
+  email?: string;
+}
+
+export function PopupNavigateButton({
+  lat,
+  lng,
+}: {
+  lat?: number;
+  lng?: number;
+}) {
   if (!lat || !lng) return null;
   const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   return (
@@ -31,7 +49,7 @@ export function PopupNavigateButton({ lat, lng }: { lat?: number; lng?: number }
         size="small"
         onClick={() => window.open(url, '_blank')}
         color="primary"
-        sx={{ float: 'right' }}
+        // sx={{ float: 'right' }}
       >
         <DirectionsIcon fontSize="small" />
       </IconButton>
@@ -264,7 +282,11 @@ export class FirecallItemBase {
 
   public renderPopup(selectItem: (item: FirecallItem) => void): ReactNode {
     return (
-      <FirecallItemPopup onClick={() => selectItem(this.data())} lat={this.lat} lng={this.lng}>
+      <FirecallItemPopup
+        onClick={() => selectItem(this.data())}
+        lat={this.lat}
+        lng={this.lng}
+      >
         {this.popupFn()}
       </FirecallItemPopup>
     );
@@ -289,7 +311,10 @@ export class FirecallItemBase {
     }
   }
 
-  public contextMenuItems(_onClose: () => void): ReactNode {
+  public contextMenuItems(
+    _onClose: () => void,
+    _ctx?: ItemContextMenuContext,
+  ): ReactNode {
     return null;
   }
 
@@ -311,13 +336,18 @@ export class FirecallItemBase {
 
   public formatFieldData(): string {
     if (!this.fieldData || Object.keys(this.fieldData).length === 0) return '';
-    if (!this._renderDataSchema || this._renderDataSchema.length === 0) return '';
+    if (!this._renderDataSchema || this._renderDataSchema.length === 0)
+      return '';
 
     return this._renderDataSchema
-      .filter((f) => this.fieldData[f.key] !== undefined && this.fieldData[f.key] !== null)
+      .filter(
+        (f) =>
+          this.fieldData[f.key] !== undefined && this.fieldData[f.key] !== null,
+      )
       .map((f) => {
         const val = this.fieldData[f.key];
-        const display = typeof val === 'number' ? parseFloat(val.toFixed(3)) : val;
+        const display =
+          typeof val === 'number' ? parseFloat(val.toFixed(3)) : val;
         return `${f.label}: ${display}${f.unit ? f.unit : ''}`;
       })
       .join(' | ');

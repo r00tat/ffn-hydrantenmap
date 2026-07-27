@@ -61,6 +61,17 @@ public class SettingsActivity extends AppCompatActivity {
         Button save = findViewById(R.id.save);
         save.setOnClickListener(v -> {
             String value = input.getText().toString().trim();
+            // Eine ungültige URL würde die App beim nächsten Start abstürzen
+            // lassen (Capacitor kann sie nicht parsen). Deshalb hier ablehnen,
+            // statt einen kaputten Wert zu speichern. Leer = Override löschen.
+            if (!value.isEmpty() && !ServerUrlValidation.isValidHttpUrl(value)) {
+                Toast.makeText(
+                    this,
+                    "Ungültige URL. Bitte vollständig inkl. https:// eingeben.",
+                    Toast.LENGTH_LONG
+                ).show();
+                return;
+            }
             prefs.edit().putString("server_url_override", value).apply();
             Toast.makeText(this, "Gespeichert. App neu starten.", Toast.LENGTH_LONG).show();
             finish();

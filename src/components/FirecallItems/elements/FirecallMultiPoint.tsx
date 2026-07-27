@@ -1,5 +1,10 @@
+import AddIcon from '@mui/icons-material/Add';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
+import { LatLngPosition } from '../../../common/geo';
 import { defaultPosition } from '../../../hooks/constants';
 import {
   Connection,
@@ -7,8 +12,11 @@ import {
   MultiPointItem,
 } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, ItemContextMenuContext } from './FirecallItemBase';
 import ConnectionMarker from './connection/ConnectionComponent';
+import { getConnectionPositions } from './connection/distance';
+import { nearestInsertIndex } from './connection/pointGeometry';
+import { addFirecallPosition } from './connection/positions';
 import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class FirecallMultiPoint extends FirecallItemBase {
@@ -155,5 +163,40 @@ export class FirecallMultiPoint extends FirecallItemBase {
 
   public static isPolyline(): boolean {
     return true;
+  }
+
+  /**
+   * Right-click on the line offers adding a new vertex at the clicked position
+   * (inserted on the nearest segment), in addition to the standard item
+   * actions.
+   */
+  public contextMenuItems(
+    onClose: () => void,
+    ctx?: ItemContextMenuContext
+  ): ReactNode {
+    if (!ctx?.latLng) return null;
+    const positions = getConnectionPositions(this.data());
+    if (positions.length < 2) return null;
+    const point: LatLngPosition = [ctx.latLng.lat, ctx.latLng.lng];
+    const index = nearestInsertIndex(positions, point, false);
+    return (
+      <MenuItem
+        onClick={() => {
+          addFirecallPosition(
+            ctx.firecallId,
+            { lat: point[0], lng: point[1] },
+            this.data(),
+            index,
+            ctx.email
+          );
+          onClose();
+        }}
+      >
+        <ListItemIcon>
+          <AddIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Punkt hinzufügen</ListItemText>
+      </MenuItem>
+    );
   }
 }

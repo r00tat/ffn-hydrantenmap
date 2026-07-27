@@ -62,7 +62,19 @@ public class MainActivity extends BridgeActivity {
         allowInsecureSsl = prefs.getBoolean("allow_insecure_ssl", false);
 
         if (override != null && !override.trim().isEmpty()) {
-            applyServerUrlOverride(override.trim());
+            String trimmedOverride = override.trim();
+            if (ServerUrlValidation.isValidHttpUrl(trimmedOverride)) {
+                applyServerUrlOverride(trimmedOverride);
+            } else {
+                // Ein ungültiger Override lässt Capacitor beim Start abstürzen:
+                // initWebView() bricht bei `new URL(invalid)` ab, appUrl bleibt
+                // null und loadWebView() ruft Uri.parse(null) -> NPE. Deshalb den
+                // ungültigen Wert ignorieren (Standard-URL greift) und löschen,
+                // damit sich die App selbst wieder fängt. Der Nutzer kann in den
+                // Einstellungen eine korrekte URL eingeben.
+                Log.e(TAG, "Ignoring invalid server_url_override: " + trimmedOverride);
+                prefs.edit().remove("server_url_override").apply();
+            }
         }
 
         registerPlugin(RadiacodeNotificationPlugin.class);
