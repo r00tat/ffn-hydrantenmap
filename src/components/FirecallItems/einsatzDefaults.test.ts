@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildNewFirecallPayload,
   createDefaultEinsatz,
+  createEinsatzFromAlarm,
   DEFAULT_EINSATZ_FW,
   resetEinsatzToManual,
   buildFirecallFromAlarm,
@@ -136,5 +138,110 @@ describe('buildFirecallFromAlarm', () => {
     const fc = buildFirecallFromAlarm(baseAlarm());
     expect(fc.lat).toBeUndefined();
     expect(fc.lng).toBeUndefined();
+  });
+});
+
+describe('createEinsatzFromAlarm', () => {
+  it('marks the einsatz as not deleted', () => {
+    // A firecall written without `deleted: false` is invisible to every list
+    // query (`where('deleted', '==', false)` never matches an absent field),
+    // which previously produced duplicate, unreachable Einsätze.
+    const einsatz = createEinsatzFromAlarm(baseAlarm(), {
+      group: 'ffnd',
+      fw: 'Neusiedl am See',
+    });
+
+    expect(einsatz.deleted).toBe(false);
+  });
+
+  it('applies the alarm fields plus group and fw', () => {
+    const einsatz = createEinsatzFromAlarm(
+      baseAlarm({
+        alarmId: 'a9',
+        alarmText: 'a/b/G1/Ölspur/Neusiedl am See/Am Tabor/7',
+        coordinates: { lat: 47.95, lon: 16.84 },
+      }),
+      { group: 'ffnd', fw: 'Neusiedl am See' },
+    );
+
+    expect(einsatz.name).toBe('G1 Ölspur Neusiedl am See');
+    expect(einsatz.blaulichtSmsAlarmId).toBe('a9');
+    expect(einsatz.blaulichtSmsAlarmIds).toEqual(['a9']);
+    expect(einsatz.lat).toBe(47.95);
+    expect(einsatz.lng).toBe(16.84);
+    expect(einsatz.group).toBe('ffnd');
+    expect(einsatz.fw).toBe('Neusiedl am See');
+  });
+
+  it('accepts empty group and fw without dropping the deleted flag', () => {
+    const einsatz = createEinsatzFromAlarm(baseAlarm(), { group: '', fw: '' });
+
+    expect(einsatz.group).toBe('');
+    expect(einsatz.fw).toBe('');
+    expect(einsatz.deleted).toBe(false);
+  });
+});
+
+describe('buildNewFirecallPayload', () => {
+  const now = new Date('2026-07-27T12:52:40.000Z');
+
+  it('always sets deleted: false when the firecall has no deleted flag', () => {
+    const payload = buildNewFirecallPayload({ name: 'Test' } as Firecall, {
+      user: 'test@example.com',
+      now,
+    });
+
+    expect(payload.deleted).toBe(false);
+  });
+
+  it('preserves an explicit deleted flag', () => {
+    const payload = buildNewFirecallPayload(
+      { name: 'Test', deleted: true } as Firecall,
+      { user: 'test@example.com', now },
+    );
+
+    expect(payload.deleted).toBe(true);
+  });
+
+  it('stamps user and created', () => {
+    const payload = buildNewFirecallPayload({ name: 'Test' } as Firecall, {
+      user: 'test@example.com',
+      now,
+    });
+
+    expect(payload.user).toBe('test@example.com');
+    expect(payload.created).toBe(now.toISOString());
+  });
+
+  it('falls back to the given position when the firecall has no coordinates', () => {
+    const payload = buildNewFirecallPayload({ name: 'Test' } as Firecall, {
+      user: 'u',
+      lat: 47.9,
+      lng: 16.8,
+      now,
+    });
+
+    expect(payload.lat).toBe(47.9);
+    expect(payload.lng).toBe(16.8);
+  });
+
+  it('keeps the firecall coordinates over the fallback position', () => {
+    const payload = buildNewFirecallPayload(
+      { name: 'Test', lat: 48.1, lng: 16.3 } as Firecall,
+      { user: 'u', lat: 47.9, lng: 16.8, now },
+    );
+
+    expect(payload.lat).toBe(48.1);
+    expect(payload.lng).toBe(16.3);
+  });
+
+  it('strips nullish values so Firestore accepts the payload', () => {
+    const payload = buildNewFirecallPayload(
+      { name: 'Test', abruecken: undefined } as Firecall,
+      { user: 'u', now },
+    );
+
+    expect('abruecken' in payload).toBe(false);
+    expect('id' in payload).toBe(false);
   });
 });

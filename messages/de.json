@@ -390,7 +390,11 @@
   "einsatzDialog": {
     "title": "Einsatz hinzufügen",
     "subtitleNew": "Neuer Einsatz",
-    "saveError": "Einsatz konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen."
+    "saveError": "Einsatz konnte nicht gespeichert werden. Bitte Verbindung und Anmeldung prüfen.",
+    "duplicateTitle": "Einsatz existiert bereits",
+    "duplicateText": "Für diesen Alarm existiert bereits der Einsatz „{names}“. Wenn du einen zweiten Einsatz anlegst, werden Mannschaft, Einsatztagebuch und Kostenersatz auf zwei Einsätze aufgeteilt. Trotzdem einen neuen Einsatz anlegen?",
+    "duplicateConfirm": "Trotzdem anlegen",
+    "duplicateCheckFailed": "Prüfung auf bestehende Einsätze fehlgeschlagen. Bitte Verbindung prüfen."
   },
   "firecallItem": {
     "uploadTitle": "Datei zum Einsatz hochladen",

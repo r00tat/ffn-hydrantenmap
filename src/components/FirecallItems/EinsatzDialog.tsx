@@ -37,15 +37,22 @@ import FileDisplay from '../inputs/FileDisplay';
 import FileUploader from '../inputs/FileUploader';
 import {
   getBlaulichtSmsAlarms,
+  getFirecallsByAlarmIds,
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
 import { getGroupsWithBlaulichtsmsConfig } from '../../app/blaulicht-sms/credentialsActions';
 import { stripNullish } from '../../common/stripNullish';
 import {
   buildFirecallFromAlarm,
+  buildNewFirecallPayload,
   createDefaultEinsatz,
   resetEinsatzToManual,
 } from './einsatzDefaults';
+import {
+  findExistingFirecallsForAlarms,
+  type ExistingFirecall,
+} from './duplicateFirecallCheck';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 
 export interface EinsatzDialogOptions {
   onClose: (einsatz?: Firecall) => void;
@@ -75,6 +82,7 @@ export default function EinsatzDialog({
   const [selectedGroup, setSelectedGroup] = useState<string>(einsatz.group ?? '');
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[]>([]);
   const [alarmsLoading, setAlarmsLoading] = useState(false);
+  const [duplicates, setDuplicates] = useState<ExistingFirecall[] | null>(null);
   const [selectedAlarmIds, setSelectedAlarmIds] = useState<string[]>(
     einsatzDefault?.blaulichtSmsAlarmIds ??
       (einsatzDefault?.blaulichtSmsAlarmId
@@ -254,12 +262,10 @@ export default function EinsatzDialog({
         );
       } else {
         //save new
-        const firecallData = stripNullish({
-          ...fc,
+        const firecallData = buildNewFirecallPayload(fc, {
           user: email,
-          created: new Date().toISOString(),
-          lat: fc.lat ?? position.lat,
-          lng: fc.lng ?? position.lng,
+          lat: position.lat,
+          lng: position.lng,
         });
         const newDoc = await addDoc(
           collection(firestore, FIRECALL_COLLECTION_ID),
@@ -272,6 +278,62 @@ export default function EinsatzDialog({
     },
     [email, position.lat, position.lng, setFirecallId]
   );
+
+  // Persist the einsatz and close the dialog. Shared by the plain save path and
+  // by the "create anyway" confirmation of the duplicate warning.
+  const persistAndClose = useCallback(
+    async (fc: Firecall) => {
+      setSaving(true);
+      try {
+        await saveEinsatz(fc);
+        setOpen(false);
+        onClose(fc);
+      } catch (err) {
+        console.error('Failed to save Einsatz:', err);
+        showSnackbar(t('einsatzDialog.saveError'), 'error');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [saveEinsatz, onClose, showSnackbar, t],
+  );
+
+  // Before saving, check whether another firecall is already linked to the
+  // selected alarm(s). Creating a second one splits crew, diary and
+  // Kostenersatz across two documents, so the user has to confirm explicitly.
+  const handleSaveClick = useCallback(async () => {
+    if (selectedAlarmIds.length === 0) {
+      await persistAndClose(einsatz);
+      return;
+    }
+
+    setSaving(true);
+    let existing: ExistingFirecall[];
+    try {
+      const firecallsByAlarmId = await getFirecallsByAlarmIds(selectedAlarmIds);
+      existing = findExistingFirecallsForAlarms(
+        selectedAlarmIds,
+        firecallsByAlarmId,
+        einsatz.id,
+      );
+    } catch (err) {
+      // A failed check must not block the Einsatz — warn and save anyway,
+      // because during an operation getting the Einsatz created wins.
+      console.error('Failed to check for existing Einsätze:', err);
+      showSnackbar(t('einsatzDialog.duplicateCheckFailed'), 'warning');
+      setSaving(false);
+      await persistAndClose(einsatz);
+      return;
+    }
+    setSaving(false);
+
+    if (existing.length > 0) {
+      setDuplicates(existing);
+      return;
+    }
+
+    await persistAndClose(einsatz);
+  }, [selectedAlarmIds, einsatz, persistAndClose, showSnackbar, t]);
 
   const handleChange = (event: SelectChangeEvent) => {
     const newGroup = event.target.value;
@@ -466,19 +528,7 @@ export default function EinsatzDialog({
         </Button>
         <Button
           disabled={!einsatz.name || !einsatz.group || saving}
-          onClick={async () => {
-            setSaving(true);
-            try {
-              await saveEinsatz(einsatz);
-              setOpen(false);
-              onClose(einsatz);
-            } catch (err) {
-              console.error('Failed to save Einsatz:', err);
-              showSnackbar(t('einsatzDialog.saveError'), 'error');
-            } finally {
-              setSaving(false);
-            }
-          }}
+          onClick={handleSaveClick}
         >
           {saving
             ? t('common.saving')
@@ -487,6 +537,23 @@ export default function EinsatzDialog({
               : t('common.add')}
         </Button>
       </DialogActions>
+
+      {duplicates && (
+        <ConfirmDialog
+          title={t('einsatzDialog.duplicateTitle')}
+          text={t('einsatzDialog.duplicateText', {
+            names: duplicates.map((d) => d.name).join(', '),
+          })}
+          yes={t('einsatzDialog.duplicateConfirm')}
+          no={t('common.cancel')}
+          onConfirm={(confirmed) => {
+            setDuplicates(null);
+            if (confirmed) {
+              persistAndClose(einsatz);
+            }
+          }}
+        />
+      )}
     </Dialog>
   );
 }

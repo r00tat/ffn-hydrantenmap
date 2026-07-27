@@ -71,18 +71,15 @@ export async function getFirecallsByAlarmIds(
   }
 
   for (const chunk of chunks) {
+    // The `deleted` filter is applied in JS (not in the query) because a
+    // Firestore `!=` filter silently excludes documents that lack the field
+    // entirely — those firecalls would then be invisible here and the duplicate
+    // warning in the Einsatz dialog would not fire for them.
     const [scalarSnap, arraySnap] = await Promise.all([
-      firestore
-        .collection('call')
-        .where('blaulichtSmsAlarmId', 'in', chunk)
-        .where('deleted', '!=', true)
-        .get(),
-      // Uses the composite index (call: blaulichtSmsAlarmIds ARRAY_CONTAINS, deleted)
-      // defined in firebase/{dev,prod}/firestore.indexes.json.
+      firestore.collection('call').where('blaulichtSmsAlarmId', 'in', chunk).get(),
       firestore
         .collection('call')
         .where('blaulichtSmsAlarmIds', 'array-contains-any', chunk)
-        .where('deleted', '!=', true)
         .get(),
     ]);
 
@@ -92,6 +89,7 @@ export async function getFirecallsByAlarmIds(
       seenDocIds.add(doc.id);
 
       const data = doc.data();
+      if (data.deleted === true) continue;
       // Only expose firecalls the user is authorized for; otherwise this leaks
       // ids/names of firecalls from other groups.
       if (
