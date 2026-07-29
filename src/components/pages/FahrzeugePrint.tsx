@@ -11,7 +11,11 @@ import { FirecallItem } from '../firebase/firestore';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import React from 'react';
 import { FirecallContext } from '../../hooks/useFirecall';
-import { getEffectiveBesatzung } from '../../common/vehicle-utils';
+import {
+  countCrewByVehicle,
+  getEffectiveAts,
+  getEffectiveBesatzung,
+} from '../../common/vehicle-utils';
 
 interface FcItemRowProps {
   item: FirecallItem;
@@ -41,11 +45,16 @@ export default function FahrzeugePrint() {
   const layers = useFirecallLayers();
   const otherItems = [...rohre, ...others];
 
+  const { crewCount: crewCountMap, atsCount: atsCountMap } = useMemo(
+    () => countCrewByVehicle(crewAssignments),
+    [crewAssignments]
+  );
+
   const totalCrew = vehicles
-    .map((v) => {
-      const crewCount = crewAssignments.filter((c) => c.vehicleId === v.id).length;
-      return getEffectiveBesatzung(v.besatzung, crewCount) + 1;
-    })
+    .map(
+      (v) =>
+        getEffectiveBesatzung(v.besatzung, crewCountMap.get(v.id || '') ?? 0) + 1
+    )
     .reduce((p, c) => p + c, 0);
 
   return (
@@ -93,9 +102,15 @@ export default function FahrzeugePrint() {
                     <td>{fzg.name}</td>
                     <td>
                       {(() => {
-                        const crewCount = crewAssignments.filter((c) => c.vehicleId === fzg.id).length;
-                        const bes = getEffectiveBesatzung(fzg.besatzung, crewCount);
-                        return `1:${bes} (${fzg.ats})`;
+                        const bes = getEffectiveBesatzung(
+                          fzg.besatzung,
+                          crewCountMap.get(fzg.id || '') ?? 0
+                        );
+                        const ats = getEffectiveAts(
+                          fzg.ats,
+                          atsCountMap.get(fzg.id || '') ?? 0
+                        );
+                        return `1:${bes} (${ats})`;
                       })()}
                     </td>
                     <td>{fzg.beschreibung}</td>

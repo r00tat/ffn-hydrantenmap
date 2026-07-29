@@ -25,6 +25,7 @@ import {
   Firecall,
   FIRECALL_COLLECTION_ID,
 } from '../components/firebase/firestore';
+import { ATS_FUNKTION } from '../common/vehicle-utils';
 import useFirebaseLogin from './useFirebaseLogin';
 
 export const defaultFirecall: Firecall = {
@@ -200,6 +201,20 @@ export const useCrewCountForVehicle = (vehicleId: string | undefined): number =>
   const { crewAssignments } = useContext(FirecallContext);
   return useMemo(
     () => vehicleId ? crewAssignments.filter((c) => c.vehicleId === vehicleId).length : 0,
+    [crewAssignments, vehicleId]
+  );
+};
+
+/** Anzahl der dem Fahrzeug zugeordneten Atemschutzträger */
+export const useAtsCountForVehicle = (vehicleId: string | undefined): number => {
+  const { crewAssignments } = useContext(FirecallContext);
+  return useMemo(
+    () =>
+      vehicleId
+        ? crewAssignments.filter(
+            (c) => c.vehicleId === vehicleId && c.funktion === ATS_FUNKTION
+          ).length
+        : 0,
     [crewAssignments, vehicleId]
   );
 };

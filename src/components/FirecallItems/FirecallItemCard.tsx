@@ -20,7 +20,11 @@ import { SxProps, Theme, styled } from '@mui/material/styles';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ReactNode, Ref, useCallback, useMemo, useState } from 'react';
 import copyAndSaveFirecallItems from '../../hooks/copyLayer';
-import { useCrewCountForVehicle, useFirecallId } from '../../hooks/useFirecall';
+import {
+  useAtsCountForVehicle,
+  useCrewCountForVehicle,
+  useFirecallId,
+} from '../../hooks/useFirecall';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { firestore } from '../firebase/firebase';
@@ -84,15 +88,18 @@ export default function FirecallItemCard({
   const firecallId = useFirecallId();
   const [expanded, setExpanded] = useState(false);
   const canEdit = useMapEditorCanEdit();
-  const crewCount = useCrewCountForVehicle(itemData.type === 'vehicle' ? itemData.id : undefined);
+  const vehicleId = itemData.type === 'vehicle' ? itemData.id : undefined;
+  const crewCount = useCrewCountForVehicle(vehicleId);
+  const atsCount = useAtsCountForVehicle(vehicleId);
 
   const item = useMemo(() => {
     const inst = getItemInstance(itemData);
     if (itemData.type === 'vehicle' && 'crewCount' in inst) {
       (inst as FirecallVehicle).crewCount = crewCount;
+      (inst as FirecallVehicle).atsCount = atsCount;
     }
     return inst;
-  }, [itemData, crewCount]);
+  }, [itemData, crewCount, atsCount]);
   const iconUrl = useMemo(() => {
     if (!compact) return undefined;
     try {
