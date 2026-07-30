@@ -15,7 +15,11 @@ import { useContext, useMemo, useState } from 'react';
 import { SimpleMap } from '../../common/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
-import { FirecallContext, useCrewCountForVehicle } from '../../hooks/useFirecall';
+import {
+  FirecallContext,
+  useAtsCountForVehicle,
+  useCrewCountForVehicle,
+} from '../../hooks/useFirecall';
 import useVehicles from '../../hooks/useVehicles';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import { CrewAssignment, FirecallItem } from '../firebase/firestore';
@@ -73,14 +77,17 @@ function CompactItemCard({
   onEdit: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const crewCount = useCrewCountForVehicle(item.type === 'vehicle' ? item.id : undefined);
+  const vehicleId = item.type === 'vehicle' ? item.id : undefined;
+  const crewCount = useCrewCountForVehicle(vehicleId);
+  const atsCount = useAtsCountForVehicle(vehicleId);
   const instance = useMemo(() => {
     const inst = getItemInstance(item);
     if (item.type === 'vehicle' && 'crewCount' in inst) {
       (inst as FirecallVehicle).crewCount = crewCount;
+      (inst as FirecallVehicle).atsCount = atsCount;
     }
     return inst;
-  }, [item, crewCount]);
+  }, [item, crewCount, atsCount]);
   const iconUrl = useMemo(() => {
     try {
       return instance.icon()?.options?.iconUrl;

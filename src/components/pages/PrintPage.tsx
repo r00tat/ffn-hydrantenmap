@@ -12,15 +12,24 @@ import {
   ref,
 } from 'firebase/storage';
 import { useTranslations } from 'next-intl';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { formatTimestamp } from '../../common/time-format';
-import useFirecall from '../../hooks/useFirecall';
+import { countCrewByVehicle } from '../../common/vehicle-utils';
+import useFirecall, { FirecallContext } from '../../hooks/useFirecall';
 import app from '../firebase/firebase';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
 import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import useVehicles from '../../hooks/useVehicles';
 import { FirecallItem, Spectrum } from '../firebase/firestore';
 import { getItemInstance } from '../FirecallItems/elements';
+import { FirecallVehicle } from '../FirecallItems/elements/FirecallVehicle';
 import DynamicMap from '../Map/PositionedMap';
 import { useDiaries } from '../pages/EinsatzTagebuch';
 import { useGeschaeftsbuchEintraege } from '../pages/Geschaeftsbuch';
@@ -43,6 +52,12 @@ export default function PrintPage() {
   const { locations } = useFirecallLocations();
   const { diaries } = useDiaries(true);
   const { eintraege } = useGeschaeftsbuchEintraege(true);
+  const { crewAssignments } = useContext(FirecallContext);
+
+  const { crewCount: crewCountMap, atsCount: atsCountMap } = useMemo(
+    () => countCrewByVehicle(crewAssignments),
+    [crewAssignments]
+  );
 
   const spectra = useMemo(
     () =>
@@ -274,6 +289,11 @@ export default function PrintPage() {
                     </tr>
                     {group.items.map((item) => {
                       const instance = getItemInstance(item);
+                      if (item.type === 'vehicle' && 'crewCount' in instance) {
+                        const vehicle = instance as FirecallVehicle;
+                        vehicle.crewCount = crewCountMap.get(item.id || '') ?? 0;
+                        vehicle.atsCount = atsCountMap.get(item.id || '') ?? 0;
+                      }
                       if (dataSchema) {
                         instance._renderDataSchema = dataSchema;
                       }

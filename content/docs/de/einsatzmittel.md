@@ -28,6 +28,18 @@ Die Einsatzmittel-Seite bietet eine Übersicht aller im Einsatz eingesetzten Fah
 Tipp: Die Stärketabelle aktualisiert sich automatisch, wenn Fahrzeuge hinzugefügt oder Besatzungsstärken geändert werden.
 :::
 
+### Besatzung und ATS-Träger automatisch zählen
+
+1. Personen im Besatzungs-Board (Einsatz-Details) einem Fahrzeug zuordnen
+2. Die Besatzung wird automatisch aus der Anzahl der zugeordneten Personen ermittelt
+3. Als ATS-Träger zählt jede zugeordnete Person mit der Funktion "Atemschutzträger" (ATS)
+
+:::info
+Ein am Fahrzeug manuell eingetragener Wert für Besatzung bzw. ATS-Träger hat immer Vorrang.
+Erst wenn kein Wert erfasst ist, wird automatisch aus der Besatzungszuordnung gezählt —
+praktisch für Fahrzeuge anderer Feuerwehren ohne Besatzungszuordnung.
+:::
+
 ### Fahrzeuge nach Ebenen ansehen
 
 1. Fahrzeuge sind nach Ebenen gruppiert

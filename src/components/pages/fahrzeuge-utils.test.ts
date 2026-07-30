@@ -106,6 +106,48 @@ describe('calculateStrength', () => {
     expect(result.totalMann).toBe(9);
   });
 
+  it('counts assigned Atemschutzträger as vehicle ats', () => {
+    const items: FirecallItem[] = [
+      { type: 'vehicle', name: 'TLF', id: 'v1', besatzung: '', ats: 0 } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { recipientId: '1', name: 'A', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Gruppenkommandant' },
+      { recipientId: '2', name: 'B', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Maschinist' },
+      { recipientId: '3', name: 'C', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Atemschutzträger' },
+      { recipientId: '4', name: 'D', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Atemschutzträger' },
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.rows[0].ats).toBe(2);
+    expect(result.totalAts).toBe(2);
+  });
+
+  it('prefers a manually entered ats value over the assigned Atemschutzträger', () => {
+    const items: FirecallItem[] = [
+      { type: 'vehicle', name: 'TLF', id: 'v1', besatzung: '8', ats: 4 } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { recipientId: '1', name: 'A', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Atemschutzträger' },
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.rows[0].ats).toBe(4);
+    expect(result.totalAts).toBe(4);
+  });
+
+  it('does not count Atemschutzträger of other vehicles', () => {
+    const items: FirecallItem[] = [
+      { type: 'vehicle', name: 'TLF', id: 'v1' } as any,
+      { type: 'vehicle', name: 'KLF', id: 'v2' } as any,
+    ];
+    const crew: CrewAssignment[] = [
+      { recipientId: '1', name: 'A', vehicleId: 'v1', vehicleName: 'TLF', funktion: 'Atemschutzträger' },
+      { recipientId: '2', name: 'B', vehicleId: null, vehicleName: '', funktion: 'Atemschutzträger' },
+    ];
+    const result = calculateStrength(items, crew);
+    expect(result.rows[0].ats).toBe(1);
+    expect(result.rows[1].ats).toBe(0);
+    expect(result.totalAts).toBe(1);
+  });
+
   it('returns per-item strength data', () => {
     const items: FirecallItem[] = [
       {

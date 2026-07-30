@@ -2,7 +2,10 @@ import L, { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { vehicleIconDataUrl } from '../../../common/markerSvg';
 import { formatTimestamp } from '../../../common/time-format';
-import { getEffectiveBesatzung } from '../../../common/vehicle-utils';
+import {
+  getEffectiveAts,
+  getEffectiveBesatzung,
+} from '../../../common/vehicle-utils';
 import { Fzg } from '../../firebase/firestore';
 import VehicleCrewPopup from '../VehicleCrewPopup';
 import { FirecallItemBase } from './FirecallItemBase';
@@ -14,7 +17,10 @@ export class FirecallVehicle extends FirecallItemBase {
   alarmierung?: string;
   eintreffen?: string;
   abruecken?: string;
+  /** Anzahl der zugeordneten Personen (nicht persistiert) */
   crewCount?: number;
+  /** Anzahl der zugeordneten Atemschutzträger (nicht persistiert) */
+  atsCount?: number;
 
   public constructor(firecallItem?: Fzg) {
     super(firecallItem);
@@ -79,7 +85,8 @@ export class FirecallVehicle extends FirecallItemBase {
 
   public info(): string {
     const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
-    return `1:${bes} ATS: ${this.ats || 0}`;
+    const ats = getEffectiveAts(this.ats, this.atsCount ?? 0);
+    return `1:${bes} ATS: ${ats}`;
   }
 
   public body(): ReactNode {
@@ -144,6 +151,7 @@ export class FirecallVehicle extends FirecallItemBase {
         </b>
         {(() => {
           const bes = getEffectiveBesatzung(this.besatzung, this.crewCount ?? 0);
+          const ats = getEffectiveAts(this.ats, this.atsCount ?? 0);
           return (
             <>
               {bes > 0 && (
@@ -152,10 +160,9 @@ export class FirecallVehicle extends FirecallItemBase {
                   Besatzung: 1:{bes}
                 </>
               )}
-              {this.ats !== undefined && this.ats > 0 && (
+              {ats > 0 && (
                 <>
-                  {!(bes > 0) && <br />}{' '}
-                  ({this.ats} ATS)
+                  {!(bes > 0) && <br />} ({ats} ATS)
                 </>
               )}
             </>

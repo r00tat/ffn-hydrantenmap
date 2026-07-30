@@ -32,7 +32,11 @@ import {
   formatTimestamp,
   parseTimestamp,
 } from '../../common/time-format';
-import { getEffectiveBesatzung } from '../../common/vehicle-utils';
+import {
+  countCrewByVehicle,
+  getEffectiveAts,
+  getEffectiveBesatzung,
+} from '../../common/vehicle-utils';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirecall, {
   FirecallContext,
@@ -84,15 +88,8 @@ export function useDiaries(sortAscending: boolean = false) {
       (item: FirecallItem) => item.type === 'vehicle'
     ) as Fzg[];
 
-    const crewCountMap = new Map<string, number>();
-    for (const c of crewAssignments) {
-      if (c.vehicleId) {
-        crewCountMap.set(
-          c.vehicleId,
-          (crewCountMap.get(c.vehicleId) || 0) + 1
-        );
-      }
-    }
+    const { crewCount: crewCountMap, atsCount: atsCountMap } =
+      countCrewByVehicle(crewAssignments);
 
     const getBesatzungText = (item: Fzg) => {
       const bes = getEffectiveBesatzung(
@@ -106,7 +103,13 @@ export function useDiaries(sortAscending: boolean = false) {
       const bt = getBesatzungText(item);
       return bt ? 'Besatzung ' + bt : '';
     };
-    const fmtAts = (item: Fzg) => (item.ats ? 'ATS ' + item.ats : '');
+    const fmtAts = (item: Fzg) => {
+      const ats = getEffectiveAts(
+        item.ats,
+        atsCountMap.get(item.id || '') ?? 0
+      );
+      return ats > 0 ? 'ATS ' + ats : '';
+    };
 
     const firecallEntries: Diary[] = [
       cars
@@ -121,9 +124,7 @@ export function useDiaries(sortAscending: boolean = false) {
                 name: item.name,
                 fw: item.fw || '',
               }),
-              beschreibung: `${getBesatzungText(item)} ${
-                item.ats ? 'ATS ' + item.ats : ''
-              }`,
+              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
               editable: false,
               original: item,
               textRepresenation: t('vehicleTextAlerted', {
@@ -157,9 +158,7 @@ export function useDiaries(sortAscending: boolean = false) {
                 name: item.name,
                 fw: item.fw || '',
               }),
-              beschreibung: `${getBesatzungText(item)} ${
-                item.ats ? 'ATS ' + item.ats : ''
-              }`,
+              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
               editable: false,
               original: item,
               textRepresenation: t('vehicleTextArrived', {
@@ -187,9 +186,7 @@ export function useDiaries(sortAscending: boolean = false) {
                 name: item.name,
                 fw: item.fw || '',
               }),
-              beschreibung: `${getBesatzungText(item)} ${
-                item.ats ? 'ATS ' + item.ats : ''
-              }`,
+              beschreibung: `${getBesatzungText(item)} ${fmtAts(item)}`,
               editable: false,
               original: item,
               textRepresenation: t('vehicleTextDeparted', {

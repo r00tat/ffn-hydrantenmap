@@ -5,7 +5,11 @@ import {
   TacticalUnit,
   TACTICAL_UNIT_LABELS,
 } from '../firebase/firestore';
-import { getEffectiveBesatzung } from '../../common/vehicle-utils';
+import {
+  countCrewByVehicle,
+  getEffectiveAts,
+  getEffectiveBesatzung,
+} from '../../common/vehicle-utils';
 
 export interface StrengthRow {
   name: string;
@@ -28,12 +32,8 @@ export interface StrengthSummary {
 }
 
 export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAssignment[] = []): StrengthSummary {
-  const crewCountMap = new Map<string, number>();
-  for (const c of crewAssignments) {
-    if (c.vehicleId) {
-      crewCountMap.set(c.vehicleId, (crewCountMap.get(c.vehicleId) ?? 0) + 1);
-    }
-  }
+  const { crewCount: crewCountMap, atsCount: atsCountMap } =
+    countCrewByVehicle(crewAssignments);
 
   const rows: StrengthRow[] = [];
 
@@ -47,7 +47,7 @@ export function calculateStrength(items: FirecallItem[], crewAssignments: CrewAs
         fw: v.fw,
         typ: 'Fahrzeug',
         mann: besatzung + 1,
-        ats: Number(v.ats) || 0,
+        ats: getEffectiveAts(v.ats, atsCountMap.get(v.id || '') ?? 0),
         alarmierung: v.alarmierung,
         eintreffen: v.eintreffen,
         abruecken: v.abruecken,

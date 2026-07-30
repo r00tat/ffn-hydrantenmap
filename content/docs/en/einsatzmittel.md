@@ -28,6 +28,18 @@ The operational resources page gives an overview of all vehicles and resources d
 Tip: The strength table updates automatically when vehicles are added or crew sizes change.
 :::
 
+### Count crew and ATS wearers automatically
+
+1. Assign people to a vehicle on the crew board (operation details)
+2. The crew size is derived automatically from the number of assigned people
+3. Every assigned person with the function "Atemschutzträger" (ATS) counts as an ATS wearer
+
+:::info
+A value entered manually on the vehicle for crew size or ATS wearers always takes precedence.
+Only when no value is set are they counted automatically from the crew assignment — handy for
+vehicles of other fire brigades without a crew assignment.
+:::
+
 ### View vehicles by layer
 
 1. Vehicles are grouped by layer
