@@ -74,6 +74,15 @@ dependencies {
     implementation platform("com.google.firebase:firebase-bom:33.3.0")
     implementation "com.google.firebase:firebase-firestore-ktx"
     implementation "com.google.firebase:firebase-auth-ktx"
+    // Firebase App Check — die nativen Firestore-Schreibpfade (Live-Standort,
+    // GPS-Tracks, Radiacode-Marker) laufen am WebView vorbei und trugen bisher
+    // keinen App-Check-Token. Play Integrity attestiert Release-Builds aus dem
+    // Play Store; Debug-Builds nutzen den Debug-Provider (nur debugImplementation,
+    // damit die Debug-Bibliothek nicht im Release-Classpath landet). Welche
+    // Factory zum Einsatz kommt, entscheidet AppCheckProviders je Build-Variante
+    // in app/src/{debug,release}/java.
+    implementation "com.google.firebase:firebase-appcheck-playintegrity"
+    debugImplementation "com.google.firebase:firebase-appcheck-debug"
     // Firebase Crashlytics — meldet native Android-Crashes an Firebase,
     // damit Play-Store-Rejections nicht ohne Stack-Trace bleiben.
     implementation "com.google.firebase:firebase-crashlytics-ktx"
