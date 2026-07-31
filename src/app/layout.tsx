@@ -63,7 +63,16 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
+    // suppressHydrationWarning: In der Capacitor-App injiziert Capacitors
+    // SystemBars-Plugin die Insets als Inline-Style (--safe-area-inset-top usw.)
+    // auf <html>, weil env(safe-area-inset-*) in Android-WebViews < 140 wegen
+    // eines Chromium-Bugs falsche Werte liefert (insetsHandling: 'css', Default).
+    // Das passiert vor der Hydration und ausserhalb von React, also kann der
+    // Server das Attribut nicht mitrendern — die Werte sind geraetespezifisch.
+    // React meldet das als Mismatch ("This won't be patched up"), laesst den
+    // Style aber stehen, was genau richtig ist. Das Flag wirkt nur fuer die
+    // Attribute dieses einen Elements, nicht fuer den Teilbaum darunter.
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <title>Einsatzkarte</title>
         <meta
