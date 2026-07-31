@@ -29,3 +29,11 @@ CLAUDE.md
 .node-version
 .gcloudignore
 .dockerignore
+
+# Lokale Env-Dateien nie ins Image bauen: next build würde sie einlesen und
+# NEXT_PUBLIC_*-Werte (u.a. NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN) ins Client-Bundle
+# inlinen. In CI sind sie nicht vorhanden, lokale Builds sollen sich gleich
+# verhalten. Konfiguration kommt ausschließlich über Docker-Build-Args.
+.env
+.env.*
+.envrc
