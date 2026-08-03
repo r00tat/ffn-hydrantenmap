@@ -172,6 +172,38 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Fahrtenbuch: Stammdaten und Einträge je Gruppe.
+    // Einträge werden über Server Actions geschrieben; die Regeln hier geben
+    // keinem Client Schreibrechte. Achtung: der abschließende
+    // match /{document=**} lässt Admins weiterhin direkt schreiben — Regeln
+    // sind additiv, ein "allow ...: if false" kann das nicht zurücknehmen.
+    match /groups/{groupId} {
+      // 'allUsers' ist keine echte Gruppe, sondern ein Pseudo-Eintrag, der
+      // jedem Benutzer in die Claims geschrieben wird (updateUser.ts) und den
+      // auch Einsatz-Gasttokens tragen (actions/auth.ts). Als Fahrtenbuch-
+      // Mandant darf er deshalb nie zählen.
+      function fahrtenbuchMember() {
+        return authorizedUser()
+          && groupId != 'allUsers'
+          && groupId in request.auth.token.groups;
+      }
+
+      match /person/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
+      match /vehicle/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
+      match /fahrtenbuch/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
