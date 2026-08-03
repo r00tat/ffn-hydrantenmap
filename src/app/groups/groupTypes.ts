@@ -5,6 +5,22 @@ export interface Group {
 }
 
 /**
+ * Pseudo-Gruppe, die jedem Benutzer in die Claims geschrieben wird
+ * (`updateUser.ts`) und die auch Einsatz-Gasttokens tragen. Sie ist kein
+ * Mandant und darf nie als Fahrtenbuch-Gruppe gelten.
+ */
+export const ALL_USERS_GROUP_ID = 'allUsers';
+
+/**
+ * Group IDs that are capabilities or pseudo-groups rather than brigades
+ * ("Mandanten"). Features that let a user pick "their" group — such as the
+ * Fahrtenbuch group selector — must filter these out, the same way
+ * `ALL_USERS_GROUP_ID` alone used to be filtered before `kostenersatz` was
+ * recognised as belonging to the same category.
+ */
+export const NON_TENANT_GROUP_IDS: string[] = [ALL_USERS_GROUP_ID, 'kostenersatz'];
+
+/**
  * Known groups with predefined IDs
  */
 export const KNOWN_GROUPS: Group[] = [
