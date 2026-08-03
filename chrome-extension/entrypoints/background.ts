@@ -19,6 +19,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { FIREBASE_CONFIG, FIRESTORE_DB } from '@shared/config';
+import { initExtensionAppCheck } from '@shared/appCheck';
 
 type MessageRequest =
   | { type: 'GET_AUTH_STATE' }
@@ -37,6 +38,11 @@ export default defineBackground({
     const firestore = FIRESTORE_DB
       ? getFirestore(app, FIRESTORE_DB)
       : getFirestore(app);
+
+    // App Check for the service worker context. Must run before the first
+    // Firestore call so requests carry a verified token; the custom provider
+    // only produces one once a user is signed in (see @shared/appCheck).
+    initExtensionAppCheck(app, auth);
 
     let currentUser: User | null = null;
     onAuthStateChanged(auth, (user) => {
