@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { firestore } from '@shared/firebase';
 import {
-  CrewAssignment,
+  type CrewAssignment,
   FIRECALL_COLLECTION_ID,
   FIRECALL_CREW_COLLECTION_ID,
 } from '@shared/types';

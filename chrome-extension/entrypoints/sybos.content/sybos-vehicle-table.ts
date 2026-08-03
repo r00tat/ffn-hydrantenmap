@@ -37,6 +37,8 @@ export function parseSybosVehicleTable(
     if (!match) continue;
 
     const sybosId = match[1];
+    if (!sybosId) continue;
+
     const tr = fahrzeugSelect.closest('tr');
     if (!tr) continue;
 

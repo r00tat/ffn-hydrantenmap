@@ -7,7 +7,7 @@ import {
   Chip,
   Skeleton,
 } from '@mui/material';
-import { Diary } from '@shared/types';
+import type { Diary } from '@shared/types';
 import { useLocale, useTranslations } from '@shared/i18n';
 
 const ART_COLORS: Record<string, 'info' | 'warning' | 'success'> = {

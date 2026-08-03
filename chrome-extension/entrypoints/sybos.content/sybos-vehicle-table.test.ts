@@ -73,10 +73,10 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(1);
-    expect(result[0].sybosId).toBe('20357');
-    expect(result[0].personName).toBe('Theuritzbacher Reinhard');
-    expect(result[0].funktionSelect).toBeInstanceOf(HTMLSelectElement);
-    expect(result[0].fahrzeugSelect).toBeInstanceOf(HTMLSelectElement);
+    expect(result[0]!.sybosId).toBe('20357');
+    expect(result[0]!.personName).toBe('Theuritzbacher Reinhard');
+    expect(result[0]!.funktionSelect).toBeInstanceOf(HTMLSelectElement);
+    expect(result[0]!.fahrzeugSelect).toBeInstanceOf(HTMLSelectElement);
   });
 
   it('parses multiple rows in DOM order', () => {
@@ -86,10 +86,10 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(2);
-    expect(result[0].sybosId).toBe('20357');
-    expect(result[0].personName).toBe('Theuritzbacher Reinhard');
-    expect(result[1].sybosId).toBe('87238');
-    expect(result[1].personName).toBe('Müller Franz');
+    expect(result[0]!.sybosId).toBe('20357');
+    expect(result[0]!.personName).toBe('Theuritzbacher Reinhard');
+    expect(result[1]!.sybosId).toBe('87238');
+    expect(result[1]!.personName).toBe('Müller Franz');
   });
 
   it('strips birthdate from person name', () => {
@@ -98,7 +98,7 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(1);
-    expect(result[0].personName).toBe('Mustermann Jörg');
+    expect(result[0]!.personName).toBe('Mustermann Jörg');
   });
 
   it('handles person name without comma', () => {
@@ -107,7 +107,7 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(1);
-    expect(result[0].personName).toBe('Firstname Lastname');
+    expect(result[0]!.personName).toBe('Firstname Lastname');
   });
 
   it('returns empty array when no vehicle table exists', () => {
@@ -124,7 +124,7 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(1);
-    expect(result[0].sybosId).toBe('20357');
+    expect(result[0]!.sybosId).toBe('20357');
   });
 
   it('skips rows where the ESADgrnr select is missing', () => {
@@ -136,7 +136,7 @@ describe('parseSybosVehicleTable', () => {
 
     const result = parseSybosVehicleTable();
     expect(result).toHaveLength(1);
-    expect(result[0].sybosId).toBe('20357');
+    expect(result[0]!.sybosId).toBe('20357');
   });
 });
 
@@ -159,8 +159,8 @@ describe('parseSybosVehicleTable with custom root', () => {
 
     const result = parseSybosVehicleTable(doc);
     expect(result).toHaveLength(1);
-    expect(result[0].sybosId).toBe('20357');
-    expect(result[0].personName).toBe('Theuritzbacher Reinhard');
+    expect(result[0]!.sybosId).toBe('20357');
+    expect(result[0]!.personName).toBe('Theuritzbacher Reinhard');
   });
 });
 

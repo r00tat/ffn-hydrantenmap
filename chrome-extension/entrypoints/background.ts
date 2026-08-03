@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   signInWithCredential,
   GoogleAuthProvider,
-  User,
+  type User,
 } from 'firebase/auth';
 import {
   getFirestore,

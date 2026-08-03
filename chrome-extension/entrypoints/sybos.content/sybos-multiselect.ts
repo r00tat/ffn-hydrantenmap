@@ -73,7 +73,7 @@ function deriveRowId(
 ): string {
   if (checkboxName) {
     const match = checkboxName.match(CHECKBOX_ID_PATTERN);
-    if (match) return match[1];
+    if (match?.[1]) return match[1];
   }
 
   const idField = hiddenFields.find((field) => field.name.startsWith('id_tbl['));
@@ -119,7 +119,7 @@ export function parseMultiselectData(doc: Document): MultiselectRow[] {
       match = doc.documentElement.outerHTML.match(MYDATA_PATTERN);
     }
 
-    if (!match) return [];
+    if (!match?.[1]) return [];
 
     const rows = JSON.parse(match[1]);
     if (!Array.isArray(rows)) return [];

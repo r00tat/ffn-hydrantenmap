@@ -5,7 +5,7 @@ import {
   MenuItem,
   Skeleton,
 } from '@mui/material';
-import { Firecall } from '@shared/types';
+import type { Firecall } from '@shared/types';
 import { useLocale, useTranslations } from '@shared/i18n';
 
 interface FirecallSelectProps {

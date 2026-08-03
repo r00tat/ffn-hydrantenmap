@@ -26,43 +26,43 @@ describe('parseMultiselectData', () => {
 
   it('extracts waname and rufname for each row', () => {
     const rows = parseMultiselectData(fixtureDoc());
-    expect(rows[0].waname).toBe('KDTFA');
-    expect(rows[0].rufname).toBe('');
-    expect(rows[1].waname).toBe('TLFA 4000');
-    expect(rows[1].rufname).toBe('TLFA');
-    expect(rows[2].waname).toBe('WLF-K Neusiedl am See');
-    expect(rows[2].rufname).toBe('WLF');
+    expect(rows[0]!.waname).toBe('KDTFA');
+    expect(rows[0]!.rufname).toBe('');
+    expect(rows[1]!.waname).toBe('TLFA 4000');
+    expect(rows[1]!.rufname).toBe('TLFA');
+    expect(rows[2]!.waname).toBe('WLF-K Neusiedl am See');
+    expect(rows[2]!.rufname).toBe('WLF');
   });
 
   it('extracts the checkbox name/value from row[0]', () => {
     const rows = parseMultiselectData(fixtureDoc());
-    expect(rows[0].checkboxName).toBe('deleted[57738]');
-    expect(rows[0].checkboxValue).toBe('57738');
-    expect(rows[1].checkboxName).toBe('deleted[2004]');
-    expect(rows[2].checkboxName).toBe('deleted[105692]');
+    expect(rows[0]!.checkboxName).toBe('deleted[57738]');
+    expect(rows[0]!.checkboxValue).toBe('57738');
+    expect(rows[1]!.checkboxName).toBe('deleted[2004]');
+    expect(rows[2]!.checkboxName).toBe('deleted[105692]');
   });
 
   it('derives the row id from the checkbox name', () => {
     const rows = parseMultiselectData(fixtureDoc());
-    expect(rows[0].id).toBe('57738');
-    expect(rows[1].id).toBe('2004');
-    expect(rows[2].id).toBe('105692');
+    expect(rows[0]!.id).toBe('57738');
+    expect(rows[1]!.id).toBe('2004');
+    expect(rows[2]!.id).toBe('105692');
   });
 
   it('collects all hidden inputs from row[0]', () => {
     const rows = parseMultiselectData(fixtureDoc());
-    const names = rows[0].hiddenFields.map((f) => f.name);
+    const names = rows[0]!.hiddenFields.map((f) => f.name);
     expect(names).toEqual([
       'BListMulti[]',
       'name_tbl[57738]',
       'id_tbl[57738]',
       'name_tbl[deleted[57738]]',
     ]);
-    expect(rows[0].hiddenFields.find((f) => f.name === 'BListMulti[]')?.value).toBe(
+    expect(rows[0]!.hiddenFields.find((f) => f.name === 'BListMulti[]')?.value).toBe(
       '57738'
     );
     expect(
-      rows[0].hiddenFields.find((f) => f.name === 'name_tbl[deleted[57738]]')?.value
+      rows[0]!.hiddenFields.find((f) => f.name === 'name_tbl[deleted[57738]]')?.value
     ).toBe('{GEbez}');
   });
 

@@ -3,7 +3,7 @@ import {
   signInWithCredential,
   onAuthStateChanged,
   signOut as firebaseSignOut,
-  User,
+  type User,
 } from 'firebase/auth';
 import { auth } from './firebase';
 

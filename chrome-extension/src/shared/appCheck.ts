@@ -1,7 +1,7 @@
 import type { FirebaseApp } from 'firebase/app';
 import {
-  AppCheck,
-  AppCheckToken,
+  type AppCheck,
+  type AppCheckToken,
   CustomProvider,
   initializeAppCheck,
 } from 'firebase/app-check';
