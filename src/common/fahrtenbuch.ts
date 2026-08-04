@@ -39,10 +39,12 @@ export interface CounterReading {
 }
 
 /**
- * Herkunft eines abgeleiteten Endstands: aus der Route berechnet oder vom
- * Startstand fortgeschrieben. Steht hier bei `CounterReading`, weil sie an
- * `FahrtenbuchEntry.counterSources` hängt — dem Nachweis, welche Stände
- * abgelesen und welche gerechnet wurden.
+ * Herkunft eines abgeleiteten Endstands: `'route'` heißt aus der
+ * Routendistanz berechnet, `'unchanged'` heißt unverändert übernommen — bei
+ * Start/Ende-Zählern aus dem Startstand dieser Fahrt, bei Ablesezählern aus
+ * dem letzten bekannten Stand. Steht hier und nicht in
+ * `fahrtenbuchAutoFill.ts`: Bliebe der Typ dort, müsste dieses Basismodul von
+ * seinem eigenen Konsumenten importieren.
  */
 export type CounterSource = 'route' | 'unchanged';
 
@@ -109,11 +111,11 @@ export interface FahrtenbuchEntry {
   /**
    * Zähler, deren Endstand abgeleitet und nicht abgelesen wurde. Ein
    * Fahrtenbuch ist ein Nachweisdokument — ohne dieses Feld wäre später nicht
-   * mehr erkennbar, welche Stände gerechnet und welche abgelesen sind.
+   * mehr erkennbar, welche Stände berechnet und welche abgelesen wurden.
    */
   counterSources?: Record<string, CounterSource>;
   /** Einfache Routendistanz in Metern, Grundlage des Kilometer-Endstands. */
-  routeDistanceM?: number;
+  routeDistanceMeters?: number;
   betriebsmittel?: Partial<Record<FuelType, number>>;
   hinweise?: string;
   defekt?: boolean;

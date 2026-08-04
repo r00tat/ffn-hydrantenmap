@@ -41,11 +41,18 @@ export interface EntryActor {
 /**
  * Serverseitig abgeleitete Werte. Steht bewusst nicht in
  * `FahrtenbuchEntryInput`: Der Client darf nicht behaupten, ein Wert stamme
- * aus einer Route.
+ * aus einer Route. Ausschließlich mit serverseitig berechneten Werten zu
+ * befüllen, nie mit Daten aus dem Request — die Trennung von
+ * `FahrtenbuchEntryInput` schützt heute nur über die Aufrufer, nicht über den
+ * Typ selbst.
+ *
+ * Enthält `counterSources` den Wert `'route'`, muss `routeDistanceMeters`
+ * gesetzt sein: Sonst behauptete das Dokument, ein Stand sei aus einer Route
+ * berechnet, ohne die Route nachprüfbar mitzuliefern.
  */
 export interface EntryDerivation {
   counterSources?: Record<string, CounterSource>;
-  routeDistanceM?: number;
+  routeDistanceMeters?: number;
 }
 
 /** Das geladene Fahrzeugdokument — die Quelle für Name und Zählerdefinitionen. */
@@ -126,16 +133,25 @@ export function buildEntryDocument(
   if (input.hinweise?.trim()) doc.hinweise = input.hinweise.trim();
   if (input.defekt) doc.defekt = true;
 
-  // Leere Objekte werden weggelassen, damit ein von Hand erfasster Eintrag
+  // Nur Zähler übernehmen, die im Dokument tatsächlich vorkommen — sonst
+  // entstünde eine Herkunftsangabe für einen Zähler, den `doc.counters` gar
+  // nicht enthält (etwa nach einem Fahrzeugwechsel auf eines ohne
+  // Kilometerzähler).
+  const counterSources = Object.fromEntries(
+    Object.entries(derivation?.counterSources ?? {}).filter(
+      ([id]) => id in doc.counters,
+    ),
+  );
+  // Ein leeres Objekt wird weggelassen, damit ein von Hand erfasster Eintrag
   // nicht so aussieht, als sei etwas abgeleitet worden.
-  if (
-    derivation?.counterSources &&
-    Object.keys(derivation.counterSources).length > 0
-  ) {
-    doc.counterSources = derivation.counterSources;
+  if (Object.keys(counterSources).length > 0) {
+    doc.counterSources = counterSources;
   }
-  if (derivation?.routeDistanceM !== undefined) {
-    doc.routeDistanceM = derivation.routeDistanceM;
+  // Die Distanz wird auch dann geschrieben, wenn kein Zähler als abgeleitet
+  // gilt: Sie ist dann Kontext zum Einsatz, keine Behauptung über die
+  // Herkunft eines bestimmten Zählers.
+  if (derivation?.routeDistanceMeters !== undefined) {
+    doc.routeDistanceMeters = derivation.routeDistanceMeters;
   }
 
   return doc;

@@ -275,6 +275,11 @@ export async function updateFahrtenbuchEntry(
 
     const vehicle = await loadVehicle(groupId, input.vehicleId);
     const now = new Date().toISOString();
+    // Ohne fünftes Argument verliert eine Bearbeitung derzeit die Herkunft
+    // abgeleiteter Zählerstände: `routeDistanceMeters` soll eine Bearbeitung
+    // immer überleben (die Distanz zum Einsatzort bleibt wahr), die Herkunft
+    // eines einzelnen Zählers nur, solange dessen Endstand unverändert
+    // bleibt. Die Übernahme dieser Werte aus `existing` steht noch aus.
     const rebuilt = buildEntryDocument(vehicle, input, groupId, {
       userId: existing.createdBy,
       userName: existing.createdByName,

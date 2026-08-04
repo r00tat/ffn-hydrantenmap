@@ -52,13 +52,26 @@ describe('buildEntryDocument', () => {
   it('ignoriert vom Client mitgeschickte Systemfelder', () => {
     const doc = buildEntryDocument(
       VEHICLE,
-      { ...input, group: 'fremd', createdBy: 'fremd', deleted: true } as never,
+      {
+        ...input,
+        group: 'fremd',
+        createdBy: 'fremd',
+        deleted: true,
+        // Die Trennung von `EntryDerivation` beruht heute darauf, dass
+        // `buildEntryDocument` Felder einzeln kopiert statt `input` zu spreaden
+        // — ein Client darf keine Herkunft behaupten, ohne dass der Server sie
+        // abgeleitet hat.
+        counterSources: { km: 'route' },
+        routeDistanceMeters: 12000,
+      } as never,
       'ffnd',
       actor,
     );
     expect(doc.group).toBe('ffnd');
     expect(doc.createdBy).toBe('u1');
     expect(doc.deleted).toBe(false);
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
   });
 
   it('entfernt firecall-Felder, wenn der Zweck nicht einsatz ist', () => {
@@ -196,6 +209,62 @@ describe('buildEntryDocument beim Bearbeiten', () => {
   });
 });
 
+describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
+  it('schreibt Herkunft und Routendistanz, wenn sie übergeben werden', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      counterSources: { km: 'route' },
+      routeDistanceMeters: 12000,
+    });
+    expect(doc.counterSources).toEqual({ km: 'route' });
+    expect(doc.routeDistanceMeters).toBe(12000);
+  });
+
+  it('lässt counterSources weg, wenn die Herkunftsliste leer ist', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      counterSources: {},
+    });
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
+  });
+
+  it('lässt beide Felder weg, wenn gar keine Ableitung übergeben wird', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor);
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
+  });
+
+  it('schreibt die Routendistanz auch, wenn kein Zähler als abgeleitet gilt', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      counterSources: {},
+      routeDistanceMeters: 12000,
+    });
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc.routeDistanceMeters).toBe(12000);
+  });
+
+  it('schreibt die Routendistanz auch, wenn sie 0 ist', () => {
+    // 0 unterscheidet „Route war 0 m" von „keine Route bekannt" — ein
+    // versehentliches `if (derivation?.routeDistanceMeters)` müsste hier
+    // durchfallen.
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      counterSources: {},
+      routeDistanceMeters: 0,
+    });
+    expect(doc.routeDistanceMeters).toBe(0);
+  });
+
+  it('lässt eine Herkunftsangabe für einen Zähler weg, den das Fahrzeug nicht hat', () => {
+    const doc = buildEntryDocument(
+      { name: 'WLA', counters: [] },
+      input,
+      'ffnd',
+      actor,
+      { counterSources: { km: 'route' } },
+    );
+    expect(doc).not.toHaveProperty('counterSources');
+  });
+});
+
 describe('canModifyEntry', () => {
   const entry = { createdBy: 'u1' } as FahrtenbuchEntry;
 
@@ -272,54 +341,5 @@ describe('computeVehicleCache', () => {
     expect(computeVehicleCache({ ...entry, driverName: '' })).toMatchObject({
       lastDriverName: null,
     });
-  });
-});
-
-describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
-  const vehicle = { name: 'RLFA', counters: VEHICLE_PRESETS.fahrzeug };
-  const actor = { userId: 'u1', userName: 'Tester', now: '2026-08-04T10:00:00.000Z' };
-  const input = {
-    vehicleId: 'v1',
-    driverName: 'Max Muster',
-    zweck: 'einsatz' as const,
-    ziel: 'Brand',
-    abfahrt: '2026-08-04T09:00:00.000Z',
-    ankunft: '2026-08-04T09:45:00.000Z',
-    counters: { km: { start: 1000, end: 1024 } },
-  };
-
-  it('schreibt Herkunft und Routendistanz, wenn sie übergeben werden', () => {
-    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
-      counterSources: { km: 'route' },
-      routeDistanceM: 12000,
-    });
-    expect(doc.counterSources).toEqual({ km: 'route' });
-    expect(doc.routeDistanceM).toBe(12000);
-  });
-
-  it('lässt beide Felder weg, wenn nichts abgeleitet wurde', () => {
-    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
-      counterSources: {},
-    });
-    expect(doc).not.toHaveProperty('counterSources');
-    expect(doc).not.toHaveProperty('routeDistanceM');
-  });
-
-  it('lässt beide Felder weg, wenn gar keine Ableitung übergeben wird', () => {
-    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor);
-    expect(doc).not.toHaveProperty('counterSources');
-    expect(doc).not.toHaveProperty('routeDistanceM');
-  });
-
-  it('schreibt die Routendistanz auch, wenn kein Zähler als abgeleitet gilt', () => {
-    // Fall „Route bekannt, aber der Endstand ist von Hand eingetippt": Die
-    // Distanz ist dann reiner Kontext, keine Behauptung über die Herkunft
-    // eines Zählers — sie darf trotzdem am Dokument landen.
-    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
-      counterSources: {},
-      routeDistanceM: 12000,
-    });
-    expect(doc).not.toHaveProperty('counterSources');
-    expect(doc.routeDistanceM).toBe(12000);
   });
 });
