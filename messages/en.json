@@ -441,12 +441,43 @@
         "none": "No counters"
       },
       "recipientId": "BlaulichtSMS ID",
-      "searchBlaulichtSms": "Search in BlaulichtSMS",
-      "syncPersons": "Import people from BlaulichtSMS",
-      "syncResult": "{created} created, {linked} linked, {ambiguous} ambiguous",
+      "phone": "Phone",
+      "email": "Email",
+      "importPersons": "Import persons from CSV",
+      "importPersonsTitle": "Import persons from the BlaulichtSMS export",
+      "importPersonsHint": "Export the recipient list as CSV in BlaulichtSMS under participants, then upload it here. The selected recipients are added to group {group}.",
+      "chooseFile": "Choose CSV file",
+      "importStatus": "Status",
+      "personImportActions": {
+        "create": "new",
+        "link": "will be linked",
+        "update": "update",
+        "unchanged": "unchanged",
+        "ambiguous": "ambiguous"
+      },
+      "changesHint": "changes: {fields}",
+      "changeFields": {
+        "name": "Name",
+        "phone": "Phone",
+        "email": "Email",
+        "note": "Note"
+      },
+      "personImportResult": "{created} created, {linked} linked, {updated} updated, {deactivated} deactivated, {skipped} skipped",
+      "importPersonsNothing": "The file contains no recipients.",
+      "csvErrorsTitle": "The file was not read completely:",
+      "csvErrors": {
+        "empty": "The file contains no recipients.",
+        "missingColumns": "Missing columns in the header row: {columns}",
+        "missingId": "Line {line}: no recipient ID, skipped",
+        "missingName": "Line {line}: no name, skipped",
+        "duplicateId": "Line {line}: recipient ID {id} appears more than once, skipped"
+      },
+      "missingTitle": "Not contained in the CSV",
+      "missingHint": "These persons are no longer part of the export. Selected ones are deactivated, not deleted — past trips stay assigned.",
+      "deactivate": "Deactivate",
       "importVehicles": "Import vehicles",
       "importTitle": "Import vehicles from the cost recovery fleet",
-      "importHint": "Vehicles that were already imported are skipped.",
+      "importHint": "The selected vehicles are added to group {group}. Vehicles that were already imported are skipped.",
       "importRun": "Import",
       "importResult": "{created} vehicles imported, {skipped} skipped",
       "noVehicles": "No vehicles in this group yet.",
@@ -458,8 +489,7 @@
       "noGroups": "You are not a member of any group whose master data can be managed.",
       "customCounters": "The current counters do not match any preset. Saving replaces them with the selected preset.",
       "alreadyImported": "already imported",
-      "importNothing": "No vehicles found in the cost recovery fleet.",
-      "ambiguousHint": "Ambiguous, please link manually: {names}"
+      "importNothing": "No vehicles found in the cost recovery fleet."
     }
   },
   "login": {

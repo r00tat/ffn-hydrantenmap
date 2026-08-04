@@ -1,31 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   VEHICLE_PRESETS,
-  type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
   type VehiclePresetId,
 } from '../../common/fahrtenbuch';
 import {
-  planPersonSync,
   planVehicleImport,
   resolveVehicleImportSelection,
   sanitizeCounterDefinitions,
   sanitizeFuelTypes,
   sanitizeSortOrder,
 } from './stammdatenLogic';
-
-function person(overrides: Partial<FahrtenbuchPerson>): FahrtenbuchPerson {
-  return {
-    id: 'p1',
-    name: 'Max Mustermann',
-    active: true,
-    createdAt: '',
-    createdBy: '',
-    updatedAt: '',
-    updatedBy: '',
-    ...overrides,
-  };
-}
 
 function vehicle(overrides: Partial<FahrtenbuchVehicle>): FahrtenbuchVehicle {
   return {
@@ -239,85 +224,5 @@ describe('sanitizeSortOrder', () => {
     expect(sanitizeSortOrder(Number.POSITIVE_INFINITY)).toBe(0);
     expect(sanitizeSortOrder(true)).toBe(0);
     expect(sanitizeSortOrder({})).toBe(0);
-  });
-});
-
-describe('planPersonSync', () => {
-  const recipients = [
-    { id: 'r1', name: 'Max Mustermann' },
-    { id: 'r2', name: 'Erika Musterfrau' },
-  ];
-
-  it('legt unbekannte Empfänger neu an', () => {
-    const plan = planPersonSync(recipients, []);
-    expect(plan.create.map((c) => c.blaulichtSmsRecipientId)).toEqual([
-      'r1',
-      'r2',
-    ]);
-    expect(plan.link).toEqual([]);
-  });
-
-  it('verknüpft bestehende Personen über den normalisierten Namen', () => {
-    const plan = planPersonSync(recipients, [
-      person({ id: 'p1', name: 'max mustermann' }),
-    ]);
-    expect(plan.link).toEqual([
-      { personId: 'p1', blaulichtSmsRecipientId: 'r1' },
-    ]);
-    expect(plan.create.map((c) => c.blaulichtSmsRecipientId)).toEqual(['r2']);
-  });
-
-  it('lässt bereits verknüpfte Personen unangetastet', () => {
-    const existing = [
-      person({ id: 'p1', name: 'Max Mustermann', blaulichtSmsRecipientId: 'r1' }),
-    ];
-    const plan = planPersonSync(recipients, existing);
-    expect(plan.link).toEqual([]);
-    expect(plan.create.map((c) => c.blaulichtSmsRecipientId)).toEqual(['r2']);
-  });
-
-  it('meldet mehrdeutige Namen, ohne zu verknüpfen', () => {
-    const existing = [
-      person({ id: 'p1', name: 'Max Mustermann' }),
-      person({ id: 'p2', name: 'max mustermann' }),
-    ];
-    const plan = planPersonSync(recipients, existing);
-    expect(plan.ambiguous).toEqual([
-      { blaulichtSmsRecipientId: 'r1', name: 'Max Mustermann' },
-    ]);
-    expect(plan.link).toEqual([]);
-    expect(plan.create.map((c) => c.blaulichtSmsRecipientId)).toEqual(['r2']);
-  });
-
-  it('meldet einen Namenstreffer mit abweichender Empfänger-ID, statt eine zweite Person anzulegen', () => {
-    const existing = [
-      person({ id: 'p1', name: 'Max Mustermann', blaulichtSmsRecipientId: 'r1' }),
-    ];
-    const plan = planPersonSync(
-      [{ id: 'r9', name: 'Max Mustermann' }],
-      existing,
-    );
-    expect(plan.create).toEqual([]);
-    expect(plan.link).toEqual([]);
-    expect(plan.ambiguous).toEqual([
-      { blaulichtSmsRecipientId: 'r9', name: 'Max Mustermann' },
-    ]);
-  });
-
-  it('verknüpft eine Person nicht mit zwei gleichnamigen Empfängern', () => {
-    const plan = planPersonSync(
-      [
-        { id: 'r1', name: 'Max Mustermann' },
-        { id: 'r2', name: 'max  mustermann' },
-      ],
-      [person({ id: 'p1', name: 'Max Mustermann' })],
-    );
-    expect(plan.link).toEqual([
-      { personId: 'p1', blaulichtSmsRecipientId: 'r1' },
-    ]);
-    expect(plan.create).toEqual([]);
-    expect(plan.ambiguous).toEqual([
-      { blaulichtSmsRecipientId: 'r2', name: 'max  mustermann' },
-    ]);
   });
 });

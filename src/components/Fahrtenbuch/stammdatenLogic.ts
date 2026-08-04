@@ -6,7 +6,6 @@ import {
   type CounterChangeWarning,
   type CounterDefinition,
   type CounterMode,
-  type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
   type FuelType,
   type VehiclePresetId,
@@ -187,75 +186,4 @@ export function resolveVehicleImportSelection(
   }
 
   return { create, skipped };
-}
-
-export interface RecipientRecord {
-  id: string;
-  name: string;
-}
-
-export interface PersonSyncPlan {
-  create: { name: string; blaulichtSmsRecipientId: string }[];
-  link: { personId: string; blaulichtSmsRecipientId: string }[];
-  ambiguous: { blaulichtSmsRecipientId: string; name: string }[];
-}
-
-/**
- * Plant den Personen-Abgleich mit der BlaulichtSMS-Empfängerliste. Mehrdeutige
- * Namenstreffer werden gemeldet statt geraten: mehrere gleichnamige Personen,
- * mehrere gleichnamige Empfänger für dieselbe Person und Personen, die bereits
- * auf eine andere Empfänger-ID zeigen (in BlaulichtSMS gelöscht und mit neuer
- * ID neu angelegt). Der Admin kann die ID im Personen-Dialog umhängen — eine
- * zweite gleichnamige Person wäre im Fahrer-Dropdown nicht unterscheidbar.
- */
-export function planPersonSync(
-  recipients: RecipientRecord[],
-  existing: FahrtenbuchPerson[],
-): PersonSyncPlan {
-  const plan: PersonSyncPlan = { create: [], link: [], ambiguous: [] };
-  const linkedIds = new Set(
-    existing.map((p) => p.blaulichtSmsRecipientId).filter(Boolean) as string[],
-  );
-  /** In diesem Lauf bereits verplante Personen — jede nur einmal verknüpfen. */
-  const claimedPersonIds = new Set<string>();
-
-  const reportAmbiguous = (recipient: RecipientRecord) =>
-    plan.ambiguous.push({
-      blaulichtSmsRecipientId: recipient.id,
-      name: recipient.name,
-    });
-
-  for (const recipient of recipients) {
-    if (linkedIds.has(recipient.id)) continue;
-
-    const normalized = normalizeName(recipient.name);
-    const sameName = existing.filter((p) => normalizeName(p.name) === normalized);
-    const unlinked = sameName.filter((p) => !p.blaulichtSmsRecipientId);
-    const free = unlinked.filter((p) => !claimedPersonIds.has(p.id as string));
-
-    if (unlinked.length > 1 || (unlinked.length === 1 && free.length === 0)) {
-      reportAmbiguous(recipient);
-      continue;
-    }
-    if (free.length === 1) {
-      claimedPersonIds.add(free[0].id as string);
-      plan.link.push({
-        personId: free[0].id as string,
-        blaulichtSmsRecipientId: recipient.id,
-      });
-      continue;
-    }
-    // Kein freier Namenstreffer: Zeigt eine gleichnamige Person auf eine andere
-    // Empfänger-ID, ist das eine Neuanlage in BlaulichtSMS — nicht duplizieren.
-    if (sameName.length > 0) {
-      reportAmbiguous(recipient);
-      continue;
-    }
-    plan.create.push({
-      name: recipient.name,
-      blaulichtSmsRecipientId: recipient.id,
-    });
-  }
-
-  return plan;
 }

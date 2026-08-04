@@ -44,6 +44,9 @@ export interface FahrtenbuchPerson {
   active: boolean;
   blaulichtSmsRecipientId?: string;
   userId?: string;
+  /** Aus dem BlaulichtSMS-CSV-Export übernommen, im Dialog korrigierbar. */
+  phone?: string;
+  email?: string;
   note?: string;
   createdAt: string;
   createdBy: string;

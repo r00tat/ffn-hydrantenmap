@@ -441,12 +441,43 @@
         "none": "Ohne Zähler"
       },
       "recipientId": "BlaulichtSMS-ID",
-      "searchBlaulichtSms": "Aus BlaulichtSMS suchen",
-      "syncPersons": "Personen aus BlaulichtSMS übernehmen",
-      "syncResult": "{created} angelegt, {linked} verknüpft, {ambiguous} mehrdeutig",
+      "phone": "Telefon",
+      "email": "E-Mail",
+      "importPersons": "Personen aus CSV importieren",
+      "importPersonsTitle": "Personen aus dem BlaulichtSMS-Export importieren",
+      "importPersonsHint": "In BlaulichtSMS unter Teilnehmer die Liste als CSV exportieren und hier hochladen. Die ausgewählten Empfänger werden in die Gruppe {group} übernommen.",
+      "chooseFile": "CSV-Datei wählen",
+      "importStatus": "Status",
+      "personImportActions": {
+        "create": "neu",
+        "link": "wird verknüpft",
+        "update": "aktualisieren",
+        "unchanged": "unverändert",
+        "ambiguous": "mehrdeutig"
+      },
+      "changesHint": "ändert: {fields}",
+      "changeFields": {
+        "name": "Name",
+        "phone": "Telefon",
+        "email": "E-Mail",
+        "note": "Notiz"
+      },
+      "personImportResult": "{created} angelegt, {linked} verknüpft, {updated} aktualisiert, {deactivated} deaktiviert, {skipped} übersprungen",
+      "importPersonsNothing": "Die Datei enthält keine Empfänger.",
+      "csvErrorsTitle": "Die Datei wurde nicht vollständig gelesen:",
+      "csvErrors": {
+        "empty": "Die Datei enthält keine Empfänger.",
+        "missingColumns": "Fehlende Spalten in der Kopfzeile: {columns}",
+        "missingId": "Zeile {line}: ohne Empfänger-ID, übersprungen",
+        "missingName": "Zeile {line}: ohne Namen, übersprungen",
+        "duplicateId": "Zeile {line}: Empfänger-ID {id} kommt mehrfach vor, übersprungen"
+      },
+      "missingTitle": "Nicht in der CSV enthalten",
+      "missingHint": "Diese Personen sind im Export nicht mehr enthalten. Ausgewählte werden deaktiviert, nicht gelöscht — vergangene Fahrten bleiben zugeordnet.",
+      "deactivate": "Deaktivieren",
       "importVehicles": "Fahrzeuge importieren",
       "importTitle": "Fahrzeuge aus dem Kostenersatz-Bestand importieren",
-      "importHint": "Bereits importierte Fahrzeuge werden übersprungen.",
+      "importHint": "Die ausgewählten Fahrzeuge werden in die Gruppe {group} übernommen. Bereits importierte Fahrzeuge werden übersprungen.",
       "importRun": "Importieren",
       "importResult": "{created} Fahrzeuge importiert, {skipped} übersprungen",
       "noVehicles": "Noch keine Fahrzeuge in dieser Gruppe.",
@@ -458,8 +489,7 @@
       "noGroups": "Du bist in keiner Gruppe, für die Stammdaten gepflegt werden können.",
       "customCounters": "Die vorhandenen Zähler entsprechen keiner Vorlage. Beim Speichern werden sie durch die gewählte Vorlage ersetzt.",
       "alreadyImported": "bereits importiert",
-      "importNothing": "Keine Fahrzeuge im Kostenersatz-Bestand gefunden.",
-      "ambiguousHint": "Mehrdeutig, bitte manuell zuordnen: {names}"
+      "importNothing": "Keine Fahrzeuge im Kostenersatz-Bestand gefunden."
     }
   },
   "login": {

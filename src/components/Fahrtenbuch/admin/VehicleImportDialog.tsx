@@ -44,9 +44,12 @@ type ImportStatus =
  */
 export default function VehicleImportDialog({
   groupId,
+  groupName,
   onClose,
 }: {
   groupId: string;
+  /** Zielgruppe im Klartext — der Dialog verdeckt die Gruppenauswahl. */
+  groupName: string;
   onClose: () => void;
 }) {
   const t = useTranslations('fahrtenbuch');
@@ -132,7 +135,7 @@ export default function VehicleImportDialog({
       <DialogTitle>{t('admin.importTitle')}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t('admin.importHint')}
+          {t('admin.importHint', { group: groupName })}
         </Typography>
         {statusText && (
           <Alert

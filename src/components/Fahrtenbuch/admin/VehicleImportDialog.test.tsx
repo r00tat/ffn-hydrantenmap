@@ -54,8 +54,26 @@ describe('VehicleImportDialog', () => {
     });
   });
 
+  it('nennt die Zielgruppe im Hinweis', async () => {
+    // Der Dialog verdeckt die Gruppenauswahl der Admin-Seite — ohne den Namen
+    // im Dialog ist beim Import nicht erkennbar, wohin importiert wird.
+    renderWithIntl(
+      <VehicleImportDialog
+        groupId="g1"
+        groupName="FF Neusiedl am See"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(
+      await screen.findByText(/FF Neusiedl am See/),
+    ).toBeInTheDocument();
+  });
+
   it('wählt nur noch nicht importierte Fahrzeuge vor', async () => {
-    renderWithIntl(<VehicleImportDialog groupId="g1" onClose={vi.fn()} />);
+    renderWithIntl(
+      <VehicleImportDialog groupId="g1" groupName="g1" onClose={vi.fn()} />,
+    );
 
     const kdtfa = await screen.findByLabelText('KDTFA');
     expect(kdtfa).toBeDisabled();
@@ -66,7 +84,9 @@ describe('VehicleImportDialog', () => {
   });
 
   it('zeigt je Zeile das aus dem Namen abgeleitete Preset', async () => {
-    renderWithIntl(<VehicleImportDialog groupId="g1" onClose={vi.fn()} />);
+    renderWithIntl(
+      <VehicleImportDialog groupId="g1" groupName="g1" onClose={vi.fn()} />,
+    );
     await screen.findByLabelText('MZB');
 
     // MZB → Boot, WLA → ohne Zähler, alles andere → Fahrzeug.
@@ -79,7 +99,9 @@ describe('VehicleImportDialog', () => {
 
   it('importiert die Auswahl und meldet das Ergebnis', async () => {
     const user = userEvent.setup();
-    renderWithIntl(<VehicleImportDialog groupId="g1" onClose={vi.fn()} />);
+    renderWithIntl(
+      <VehicleImportDialog groupId="g1" groupName="g1" onClose={vi.fn()} />,
+    );
     await screen.findByLabelText('MZB');
 
     await user.click(screen.getByLabelText('WLA Ölwehr'));
@@ -99,7 +121,9 @@ describe('VehicleImportDialog', () => {
       rows: [],
       error: 'kaputt',
     });
-    renderWithIntl(<VehicleImportDialog groupId="g1" onClose={vi.fn()} />);
+    renderWithIntl(
+      <VehicleImportDialog groupId="g1" groupName="g1" onClose={vi.fn()} />,
+    );
 
     expect(
       await screen.findByText('Laden fehlgeschlagen: kaputt'),

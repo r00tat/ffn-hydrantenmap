@@ -15,15 +15,19 @@ import {
   KOSTENERSATZ_VEHICLES_COLLECTION,
   type KostenersatzVehicle,
 } from '../../common/kostenersatz';
-import {
-  fetchBlaulichtSmsRecipients,
-  type BlaulichtSmsRecipientRecord,
-} from '../../server/blaulichtsms/fetchRecipients';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { assertFahrtenbuchGroup } from './authGuards';
 import {
-  planPersonSync,
+  fieldsForChanges,
+  parseRecipientCsv,
+  planPersonCsvImport,
+  resolvePersonImportSelection,
+  type PersonImportPlanRow,
+  type PersonImportSelection,
+  type RecipientCsvError,
+} from './personCsvImport';
+import {
   planVehicleImport,
   resolveVehicleImportSelection,
   sanitizeCounterDefinitions,
@@ -142,7 +146,7 @@ export async function saveFahrtenbuchPerson(
   personId: string | undefined,
   data: Pick<
     FahrtenbuchPerson,
-    'name' | 'active' | 'blaulichtSmsRecipientId' | 'note'
+    'name' | 'active' | 'blaulichtSmsRecipientId' | 'phone' | 'email' | 'note'
   >,
 ): Promise<StammdatenResult> {
   try {
@@ -153,6 +157,8 @@ export async function saveFahrtenbuchPerson(
       name: data.name.trim(),
       active: data.active !== false,
       blaulichtSmsRecipientId: data.blaulichtSmsRecipientId?.trim() ?? '',
+      phone: data.phone?.trim() ?? '',
+      email: data.email?.trim() ?? '',
       note: data.note?.trim() ?? '',
       updatedAt: now,
       updatedBy: session.user.id,
@@ -267,58 +273,132 @@ export async function importVehiclesFromKostenersatz(
   }
 }
 
-/** Empfängerliste für das Autocomplete im Personen-Dialog. */
-export async function listBlaulichtSmsRecipients(groupId: string): Promise<{
+export interface PersonImportPreview {
   success: boolean;
-  recipients: BlaulichtSmsRecipientRecord[];
+  rows: PersonImportPlanRow[];
+  missing: { personId: string; name: string }[];
+  /** Verworfene Zeilen und Dateifehler aus dem Parser. */
+  parseErrors: RecipientCsvError[];
   error?: string;
-}> {
+}
+
+/**
+ * Vorschau des Personen-Imports. Der Dialog schickt den Dateiinhalt; geparst
+ * und geplant wird auf dem Server — auf demselben Weg wie beim Import, damit
+ * die Vorschau nicht von der Auswirkung abweichen kann.
+ */
+export async function previewPersonCsvImport(
+  groupId: string,
+  csvText: string,
+): Promise<PersonImportPreview> {
   try {
     await actionAdminRequired();
     assertFahrtenbuchGroup(groupId);
-    return { success: true, recipients: await fetchBlaulichtSmsRecipients(groupId) };
+    const { records, errors } = parseRecipientCsv(csvText);
+    const plan = planPersonCsvImport(records, await loadPersons(groupId));
+    return {
+      success: true,
+      rows: plan.rows,
+      missing: plan.missing,
+      parseErrors: errors,
+    };
   } catch (err) {
-    console.error('listBlaulichtSmsRecipients failed', err);
-    return { success: false, recipients: [], error: (err as Error).message };
+    console.error('previewPersonCsvImport failed', err);
+    return {
+      success: false,
+      rows: [],
+      missing: [],
+      parseErrors: [],
+      error: (err as Error).message,
+    };
   }
 }
 
-export async function syncPersonsFromBlaulichtSms(groupId: string): Promise<{
+export interface PersonImportResult {
   success: boolean;
   created: number;
   linked: number;
-  ambiguous: { blaulichtSmsRecipientId: string; name: string }[];
+  updated: number;
+  deactivated: number;
+  skipped: number;
   error?: string;
-}> {
+}
+
+/**
+ * Übernimmt die ausgewählten Empfänger. Der Plan wird aus dem mitgeschickten
+ * Dateiinhalt neu erstellt; die Auswahl bestimmt nur, welche Zeilen daraus
+ * angewendet werden. Abgänge werden deaktiviert, nie gelöscht — vergangene
+ * Fahrten zeigen weiter auf die Person.
+ */
+export async function importPersonsFromCsv(
+  groupId: string,
+  csvText: string,
+  selection: PersonImportSelection,
+): Promise<PersonImportResult> {
   try {
     const session = await actionAdminRequired();
     assertFahrtenbuchGroup(groupId);
-    const [recipients, existing] = await Promise.all([
-      fetchBlaulichtSmsRecipients(groupId),
-      loadPersons(groupId),
-    ]);
-    const plan = planPersonSync(recipients, existing);
+    const { records } = parseRecipientCsv(csvText);
+    const plan = planPersonCsvImport(records, await loadPersons(groupId));
+    // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
+    // weg, also darf hier nichts als Array vorausgesetzt werden.
+    const resolved = resolvePersonImportSelection(plan, {
+      recipientIds: Array.isArray(selection?.recipientIds)
+        ? selection.recipientIds
+        : [],
+      deactivatePersonIds: Array.isArray(selection?.deactivatePersonIds)
+        ? selection.deactivatePersonIds
+        : [],
+    });
 
-    if (plan.create.length > 0 || plan.link.length > 0) {
+    const touched =
+      resolved.create.length +
+      resolved.link.length +
+      resolved.update.length +
+      resolved.deactivate.length;
+
+    if (touched > 0) {
+      const now = new Date().toISOString();
+      const touch = { updatedAt: now, updatedBy: session.user.id };
       const batch = firestore.batch();
-      for (const item of plan.create) {
+
+      for (const record of resolved.create) {
         batch.set(personsRef(groupId).doc(), {
-          name: item.name,
+          name: record.name,
           active: true,
-          blaulichtSmsRecipientId: item.blaulichtSmsRecipientId,
-          note: '',
+          blaulichtSmsRecipientId: record.id,
+          phone: record.phone,
+          email: record.email,
+          note: record.note,
           ...stamps(session.user.id),
         });
       }
-      const now = new Date().toISOString();
-      for (const item of plan.link) {
+      // Geschrieben wird nur, was die Vorschau als Änderung ausgewiesen hat —
+      // eine leere CSV-Spalte darf einen gepflegten Wert nicht löschen. Beim
+      // Verknüpfen kommt die Empfänger-ID dazu; der Name bleibt stehen, er hat
+      // den Treffer ja erzeugt.
+      for (const item of resolved.link) {
         batch.set(
           personsRef(groupId).doc(item.personId),
           {
-            blaulichtSmsRecipientId: item.blaulichtSmsRecipientId,
-            updatedAt: now,
-            updatedBy: session.user.id,
+            blaulichtSmsRecipientId: item.record.id,
+            ...fieldsForChanges(item.record, item.changes),
+            ...touch,
           },
+          { merge: true },
+        );
+      }
+      for (const item of resolved.update) {
+        batch.set(
+          personsRef(groupId).doc(item.personId),
+          { ...fieldsForChanges(item.record, item.changes), ...touch },
+          { merge: true },
+        );
+      }
+      for (const personId of resolved.deactivate) {
+        batch.set(
+          personsRef(groupId).doc(personId),
+          { active: false, ...touch },
           { merge: true },
         );
       }
@@ -327,17 +407,21 @@ export async function syncPersonsFromBlaulichtSms(groupId: string): Promise<{
 
     return {
       success: true,
-      created: plan.create.length,
-      linked: plan.link.length,
-      ambiguous: plan.ambiguous,
+      created: resolved.create.length,
+      linked: resolved.link.length,
+      updated: resolved.update.length,
+      deactivated: resolved.deactivate.length,
+      skipped: resolved.skipped,
     };
   } catch (err) {
-    console.error('syncPersonsFromBlaulichtSms failed', err);
+    console.error('importPersonsFromCsv failed', err);
     return {
       success: false,
       created: 0,
       linked: 0,
-      ambiguous: [],
+      updated: 0,
+      deactivated: 0,
+      skipped: 0,
       error: (err as Error).message,
     };
   }

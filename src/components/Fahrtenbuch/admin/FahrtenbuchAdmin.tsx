@@ -23,6 +23,9 @@ export default function FahrtenbuchAdmin() {
   const t = useTranslations('fahrtenbuch');
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const [tab, setTab] = useState(0);
+  // Fällt eine Gruppe aus den Claims, ohne dass die Auswahl nachzieht, ist die
+  // ID immer noch besser als ein leerer Name.
+  const groupName = groups.find((g) => g.id === groupId)?.name ?? groupId ?? '';
 
   return (
     <AdminGuard>
@@ -67,8 +70,20 @@ export default function FahrtenbuchAdmin() {
 
             {/* `key` verwirft Dialog- und Meldungszustand beim Gruppenwechsel,
                 damit keine Meldung der vorigen Gruppe stehen bleibt. */}
-            {tab === 0 && <VehicleAdmin key={groupId} groupId={groupId} />}
-            {tab === 1 && <PersonAdmin key={groupId} groupId={groupId} />}
+            {tab === 0 && (
+              <VehicleAdmin
+                key={groupId}
+                groupId={groupId}
+                groupName={groupName}
+              />
+            )}
+            {tab === 1 && (
+              <PersonAdmin
+                key={groupId}
+                groupId={groupId}
+                groupName={groupName}
+              />
+            )}
           </>
         )}
       </Container>

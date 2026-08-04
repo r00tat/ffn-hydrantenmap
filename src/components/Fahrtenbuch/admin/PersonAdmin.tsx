@@ -3,7 +3,6 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Alert from '@mui/material/Alert';
-import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Dialog from '@mui/material/Dialog';
@@ -29,28 +28,18 @@ import type { FahrtenbuchPerson } from '../../../common/fahrtenbuch';
 import useFahrtenbuchPersons from '../../../hooks/useFahrtenbuchPersons';
 import {
   deleteFahrtenbuchPerson,
-  listBlaulichtSmsRecipients,
   saveFahrtenbuchPerson,
-  syncPersonsFromBlaulichtSms,
 } from '../stammdatenActions';
+import PersonImportDialog from './PersonImportDialog';
 
-interface RecipientOption {
-  id: string;
-  name: string;
-}
-
-/** Ergebnis der letzten Aktion als Daten — der Text entsteht beim Rendern. */
-type PersonStatus =
-  | {
-      kind: 'synced';
-      created: number;
-      linked: number;
-      ambiguous: { blaulichtSmsRecipientId: string; name: string }[];
-    }
-  | { kind: 'syncFailed'; error: string }
-  | { kind: 'deleteFailed'; error: string };
-
-export default function PersonAdmin({ groupId }: { groupId: string }) {
+export default function PersonAdmin({
+  groupId,
+  groupName,
+}: {
+  groupId: string;
+  /** Zielgruppe im Klartext — der Import-Dialog verdeckt die Gruppenauswahl. */
+  groupName: string;
+}) {
   const t = useTranslations('fahrtenbuch');
   const { persons } = useFahrtenbuchPersons(groupId);
   const [editing, setEditing] = useState<FahrtenbuchPerson | null>(null);
@@ -58,33 +47,22 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
   const [note, setNote] = useState('');
   const [active, setActive] = useState(true);
   const [recipientId, setRecipientId] = useState('');
-  const [recipients, setRecipients] = useState<RecipientOption[]>([]);
-  const [recipientsError, setRecipientsError] = useState<string>();
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [dialogError, setDialogError] = useState<string>();
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [status, setStatus] = useState<PersonStatus>();
+  const [importing, setImporting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
 
-  const openDialog = async (person?: FahrtenbuchPerson) => {
+  const openDialog = (person?: FahrtenbuchPerson) => {
     setEditing(person ?? ({} as FahrtenbuchPerson));
     setDialogError(undefined);
-    setRecipientsError(undefined);
     setName(person?.name ?? '');
     setNote(person?.note ?? '');
     setActive(person?.active !== false);
     setRecipientId(person?.blaulichtSmsRecipientId ?? '');
-    try {
-      const result = await listBlaulichtSmsRecipients(groupId);
-      setRecipients(result.recipients);
-      // Ohne Empfängerliste bleibt das Feld manuell befüllbar — der Admin muss
-      // aber sehen, warum die Suche leer ist.
-      setRecipientsError(result.success ? undefined : (result.error ?? ''));
-    } catch (err) {
-      // Transportfehler (offline, 500, veraltete Deployment-ID). Ohne diesen
-      // Zweig wirkt eine leere Empfängerliste wie ein leeres BlaulichtSMS.
-      setRecipients([]);
-      setRecipientsError((err as Error).message);
-    }
+    setPhone(person?.phone ?? '');
+    setEmail(person?.email ?? '');
   };
 
   const save = async () => {
@@ -94,6 +72,8 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
         name,
         active,
         blaulichtSmsRecipientId: recipientId,
+        phone,
+        email,
         note,
       });
       if (!result.success) {
@@ -103,7 +83,9 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
       }
       setEditing(null);
     } catch (err) {
-      setDialogError(t('errors.saveFailed', { message: (err as Error).message }));
+      setDialogError(
+        t('errors.saveFailed', { message: (err as Error).message }),
+      );
     } finally {
       setSaving(false);
     }
@@ -114,38 +96,11 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
     if (!window.confirm(t('admin.deletePersonConfirm'))) return;
     try {
       const result = await deleteFahrtenbuchPerson(groupId, person.id);
-      // Erfolg löscht die Meldung nicht — ein Sync-Bericht mit mehrdeutigen
-      // Treffern wird noch gebraucht.
-      if (!result.success) {
-        setStatus({ kind: 'deleteFailed', error: result.error ?? '' });
-      }
+      if (!result.success) setDeleteError(result.error ?? '');
     } catch (err) {
-      setStatus({ kind: 'deleteFailed', error: (err as Error).message });
+      setDeleteError((err as Error).message);
     }
   };
-
-  const sync = async () => {
-    setSyncing(true);
-    try {
-      const result = await syncPersonsFromBlaulichtSms(groupId);
-      setStatus(
-        result.success
-          ? {
-              kind: 'synced',
-              created: result.created,
-              linked: result.linked,
-              ambiguous: result.ambiguous,
-            }
-          : { kind: 'syncFailed', error: result.error ?? '' },
-      );
-    } catch (err) {
-      setStatus({ kind: 'syncFailed', error: (err as Error).message });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const ambiguous = status?.kind === 'synced' ? status.ambiguous : [];
 
   return (
     <>
@@ -153,47 +108,18 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
         <Button variant="contained" onClick={() => openDialog()}>
           {t('admin.addPerson')}
         </Button>
-        <Button onClick={sync} disabled={syncing}>
-          {t('admin.syncPersons')}
+        <Button onClick={() => setImporting(true)}>
+          {t('admin.importPersons')}
         </Button>
       </Stack>
 
-      {status?.kind === 'synced' && (
+      {deleteError !== undefined && (
         <Alert
-          severity={ambiguous.length > 0 ? 'warning' : 'info'}
+          severity="error"
           sx={{ mb: 2 }}
-          onClose={() => setStatus(undefined)}
+          onClose={() => setDeleteError(undefined)}
         >
-          {t('admin.syncResult', {
-            created: status.created,
-            linked: status.linked,
-            ambiguous: ambiguous.length,
-          })}
-          {ambiguous.length > 0 && (
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              {/* Mit Empfänger-ID: der häufigste mehrdeutige Fall sind zwei
-                  gleichnamige Empfänger — ohne ID stünde derselbe Name zweimal
-                  da, und die ID ist genau das, was der Admin unten ins Feld
-                  „BlaulichtSMS-ID" einträgt. */}
-              {t('admin.ambiguousHint', {
-                names: ambiguous
-                  .map(
-                    (entry) => `${entry.name} (${entry.blaulichtSmsRecipientId})`,
-                  )
-                  .join(', '),
-              })}
-            </Typography>
-          )}
-        </Alert>
-      )}
-      {status?.kind === 'syncFailed' && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setStatus(undefined)}>
-          {t('errors.saveFailed', { message: status.error })}
-        </Alert>
-      )}
-      {status?.kind === 'deleteFailed' && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setStatus(undefined)}>
-          {t('admin.deleteFailed', { message: status.error })}
+          {t('admin.deleteFailed', { message: deleteError })}
         </Alert>
       )}
 
@@ -205,6 +131,8 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
             <TableHead>
               <TableRow>
                 <TableCell>{t('admin.name')}</TableCell>
+                <TableCell>{t('admin.phone')}</TableCell>
+                <TableCell>{t('admin.note')}</TableCell>
                 <TableCell>{t('admin.recipientId')}</TableCell>
                 <TableCell>{t('admin.active')}</TableCell>
                 <TableCell />
@@ -214,6 +142,8 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
               {persons.map((person) => (
                 <TableRow key={person.id}>
                   <TableCell>{person.name}</TableCell>
+                  <TableCell>{person.phone}</TableCell>
+                  <TableCell>{person.note}</TableCell>
                   <TableCell>{person.blaulichtSmsRecipientId}</TableCell>
                   <TableCell>{person.active !== false ? '✓' : ''}</TableCell>
                   <TableCell align="right">
@@ -254,11 +184,6 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {dialogError && <Alert severity="error">{dialogError}</Alert>}
-            {recipientsError !== undefined && (
-              <Alert severity="warning">
-                {t('admin.loadFailed', { message: recipientsError })}
-              </Alert>
-            )}
             <TextField
               label={t('admin.name')}
               value={name}
@@ -266,27 +191,22 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
               required
               fullWidth
             />
-            <Autocomplete
-              options={recipients}
-              // Mit ID im Label, sonst sind zwei gleichnamige Empfänger in der
-              // Liste nicht zu unterscheiden — und genau die meldet der Sync
-              // als mehrdeutig.
-              getOptionLabel={(option) => `${option.name} (${option.id})`}
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-              value={recipients.find((r) => r.id === recipientId) ?? null}
-              onChange={(_, option) => {
-                if (!option) return;
-                setRecipientId(option.id);
-                if (!name) setName(option.name);
-              }}
-              renderInput={(params) => (
-                <TextField {...params} label={t('admin.searchBlaulichtSms')} />
-              )}
-            />
             <TextField
               label={t('admin.recipientId')}
               value={recipientId}
               onChange={(e) => setRecipientId(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label={t('admin.phone')}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              fullWidth
+            />
+            <TextField
+              label={t('admin.email')}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               fullWidth
             />
             <TextField
@@ -317,6 +237,14 @@ export default function PersonAdmin({ groupId }: { groupId: string }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {importing && (
+        <PersonImportDialog
+          groupId={groupId}
+          groupName={groupName}
+          onClose={() => setImporting(false)}
+        />
+      )}
     </>
   );
 }

@@ -67,7 +67,13 @@ function presetForCounters(
   return PRESET_IDS.find((id) => countersKey(VEHICLE_PRESETS[id]) === key);
 }
 
-export default function VehicleAdmin({ groupId }: { groupId: string }) {
+export default function VehicleAdmin({
+  groupId,
+  groupName,
+}: {
+  groupId: string;
+  groupName: string;
+}) {
   const t = useTranslations('fahrtenbuch');
   const { vehicles } = useFahrtenbuchVehicles(groupId);
   const [editing, setEditing] = useState<FahrtenbuchVehicle | null>(null);
@@ -307,7 +313,11 @@ export default function VehicleAdmin({ groupId }: { groupId: string }) {
       </Dialog>
 
       {importOpen && (
-        <VehicleImportDialog groupId={groupId} onClose={() => setImportOpen(false)} />
+        <VehicleImportDialog
+          groupId={groupId}
+          groupName={groupName}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </>
   );

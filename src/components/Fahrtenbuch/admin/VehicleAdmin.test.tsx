@@ -91,7 +91,7 @@ describe('VehicleAdmin', () => {
         sortOrder: 205,
       }),
     ]);
-    renderWithIntl(<VehicleAdmin groupId="g1" />);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
 
     await user.click(
       screen.getByRole('button', { name: 'Fahrzeug bearbeiten: MZB' }),
@@ -107,7 +107,7 @@ describe('VehicleAdmin', () => {
 
   it('wählt für ein neues Fahrzeug die Fahrzeug-Vorlage vor', async () => {
     const user = userEvent.setup();
-    renderWithIntl(<VehicleAdmin groupId="g1" />);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
 
     await user.click(screen.getByRole('button', { name: 'Fahrzeug anlegen' }));
 
@@ -132,7 +132,7 @@ describe('VehicleAdmin', () => {
         ],
       }),
     ]);
-    renderWithIntl(<VehicleAdmin groupId="g1" />);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
 
     await user.click(
       screen.getByRole('button', {
@@ -151,7 +151,7 @@ describe('VehicleAdmin', () => {
       vehicle({ id: 'v1', name: 'KDTFA', sortOrder: 101 }),
       vehicle({ id: 'v2', name: 'MZB', sortOrder: 208 }),
     ]);
-    renderWithIntl(<VehicleAdmin groupId="g1" />);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
 
     await user.click(screen.getByRole('button', { name: 'Fahrzeug anlegen' }));
     await user.type(screen.getByRole('textbox', { name: /Name/ }), 'MTF');
@@ -167,7 +167,7 @@ describe('VehicleAdmin', () => {
   it('meldet einen Transportfehler beim Speichern', async () => {
     const user = userEvent.setup();
     saveFahrtenbuchVehicle.mockRejectedValue(new Error('offline'));
-    renderWithIntl(<VehicleAdmin groupId="g1" />);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="g1" />);
 
     await user.click(screen.getByRole('button', { name: 'Fahrzeug anlegen' }));
     await user.type(screen.getByRole('textbox', { name: /Name/ }), 'MTF');
