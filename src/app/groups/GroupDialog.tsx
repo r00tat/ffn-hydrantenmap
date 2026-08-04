@@ -35,6 +35,7 @@ import {
   getOebfvConfig,
   saveOebfvConfig,
 } from '../kennzeichen/configActions';
+import FahrtenbuchShareLinkSection from './FahrtenbuchShareLinkSection';
 import { Group } from './groupTypes';
 
 export interface GroupDialoggOptions {
@@ -341,6 +342,8 @@ export default function GroupDialogg({
                 Token löschen
               </Button>
             )}
+
+            <FahrtenbuchShareLinkSection groupId={groupId} />
           </>
         )}
       </DialogContent>

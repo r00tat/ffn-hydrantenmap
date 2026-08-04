@@ -8,7 +8,9 @@ import {
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
 import { ApiException } from '../../app/api/errors';
+import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
 import { firestore } from '../../server/firebase/admin';
+import { resolveFahrtenbuchShareLink } from '../../server/auth/resolveFahrtenbuchShareLink';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { actionGroupMemberRequired } from './authGuards';
 import {
@@ -44,6 +46,26 @@ function actionErrorKey(err: unknown): string {
     return 'notLoggedIn';
   }
   return message;
+}
+
+/**
+ * Fehlerschlüssel für den anmeldefreien Share-Pfad — eine geschlossene Menge.
+ *
+ * `actionErrorKey` gibt Unbekanntes als `err.message` zurück, und die
+ * Oberfläche rendert unbekannte Schlüssel wörtlich über `errors.saveFailed`.
+ * Am angemeldeten Pfad ist das gewollt (sprechende Meldungen für Mitglieder),
+ * gegenüber einem anonymen Besucher ist es ein Leck: `vehicle v9 not found in
+ * group ffnd` bestätigt die Gruppen-ID und verrät, welche Fahrzeug-IDs
+ * existieren — ein Enumerationsorakel. Deshalb hier eine eigene Zuordnung, die
+ * nur diese vier Schlüssel kennt und nie einen Detailtext durchreicht. Der
+ * Originalfehler steht im `console.error` des Aufrufers.
+ */
+function shareErrorKey(err: unknown): string {
+  if (err instanceof ApiException && err.status === 404) return 'linkInvalid';
+  const message = err instanceof Error ? err.message : String(err);
+  if (/^vehicle .* not found in group /.test(message)) return 'vehicleNotFound';
+  if (/^invalid fahrtenbuch entry: /.test(message)) return 'invalidEntry';
+  return 'shareSaveFailed';
 }
 
 function entriesRef(groupId: string) {
@@ -308,5 +330,50 @@ export async function deleteFahrtenbuchEntry(
   } catch (err) {
     console.error('deleteFahrtenbuchEntry failed', err);
     return { success: false, error: actionErrorKey(err) };
+  }
+}
+
+/**
+ * Erfassung über einen geteilten Link — ohne Anmeldung. Der Token ersetzt die
+ * Sitzung; alles danach ist derselbe Pfad wie bei `createFahrtenbuchEntry`,
+ * damit Validierung, Zählerlogik und Fahrzeug-Cache nicht auseinanderlaufen.
+ */
+export async function createFahrtenbuchEntryViaShareLink(
+  token: string,
+  input: FahrtenbuchEntryInput,
+): Promise<ActionResult> {
+  try {
+    const link = await resolveFahrtenbuchShareLink(token);
+    const vehicle = await loadVehicle(link.groupId, input.vehicleId);
+
+    const doc = buildEntryDocument(
+      vehicle,
+      {
+        ...input,
+        // Die Gastseite lädt keine Einsätze. Ein mitgeschickter Einsatzbezug
+        // wäre untergeschoben, also wird er hier verworfen und nicht bloß
+        // clientseitig weggelassen.
+        firecallId: undefined,
+        firecallName: undefined,
+      },
+      link.groupId,
+      {
+        // Kein Benutzer dahinter: Das Präfix macht die Herkunft im Eintrag
+        // sichtbar und sperrt gleichzeitig `canModifyEntry` für alle außer
+        // Admins. Dahinter steht die nicht geheime `linkId` und nicht der
+        // Token — Einträge sind für jedes Gruppenmitglied lesbar, und wer die
+        // Gruppe verlässt, behielte sonst einen dauerhaften Schreibkanal.
+        userId: `${SHARE_ACTOR_PREFIX}${link.linkId}`,
+        userName: input.driverName?.trim() ?? '',
+        now: new Date().toISOString(),
+      },
+    );
+
+    const ref = await entriesRef(link.groupId).add(doc);
+    await refreshVehicleCounters(link.groupId, input.vehicleId);
+    return { success: true, id: ref.id };
+  } catch (err) {
+    console.error('createFahrtenbuchEntryViaShareLink failed', err);
+    return { success: false, error: shareErrorKey(err) };
   }
 }

@@ -397,7 +397,11 @@
       "entryDeleted": "Dieser Eintrag wurde gelöscht und kann nicht bearbeitet werden.",
       "tooManyEntries": "Zu viele Fahrten auf einmal. Bitte in kleineren Schritten speichern.",
       "saveFailed": "Speichern fehlgeschlagen: {message}",
-      "deleteFailed": "Löschen fehlgeschlagen: {message}"
+      "deleteFailed": "Löschen fehlgeschlagen: {message}",
+      "linkInvalid": "Dieser Link ist nicht mehr gültig.",
+      "vehicleNotFound": "Das gewählte Fahrzeug ist nicht mehr verfügbar.",
+      "invalidEntry": "Die Eingaben sind unvollständig oder ungültig.",
+      "shareSaveFailed": "Die Fahrt konnte nicht gespeichert werden. Bitte später erneut versuchen."
     },
     "filters": {
       "vehicle": "Fahrzeug",
@@ -493,6 +497,20 @@
       "alreadyImported": "bereits importiert",
       "importNothing": "Keine Fahrzeuge im Kostenersatz-Bestand gefunden."
     }
+  },
+  "fahrtenbuchShare": {
+    "title": "Fahrt erfassen",
+    "notice": "Erfassung über einen geteilten Link. Bereits erfasste Fahrten sind hier nicht einsehbar.",
+    "submit": "Fahrt eintragen",
+    "savedTitle": "Fahrt eingetragen",
+    "savedText": "Die Fahrt wurde im Fahrtenbuch der Gruppe {group} gespeichert.",
+    "savedTextNoGroup": "Die Fahrt wurde im Fahrtenbuch gespeichert.",
+    "another": "Weitere Fahrt erfassen",
+    "invalidTitle": "Link ungültig",
+    "invalidText": "Dieser Link ist nicht mehr gültig. Bitte wende dich an die Gruppenverwaltung.",
+    "loadFailedTitle": "Daten nicht abrufbar",
+    "loadFailedText": "Die Fahrzeugdaten sind gerade nicht abrufbar. Bitte versuche es in ein paar Minuten erneut.",
+    "noVehicles": "Für diese Gruppe sind keine aktiven Fahrzeuge hinterlegt."
   },
   "login": {
     "pageTitle": "Login",
@@ -1262,6 +1280,26 @@
       "id": "ID",
       "name": "Name",
       "description": "Beschreibung"
+    },
+    "shareLink": {
+      "heading": "Fahrtenbuch-Link",
+      "description": "Über diesen Link können Fahrten ins Fahrtenbuch dieser Gruppe eingetragen werden — ohne Anmeldung.",
+      "warning": "Jeder mit diesem Link kann Fahrten erfassen. Bestehende Einträge sind über den Link nicht einsehbar.",
+      "none": "Für diese Gruppe ist noch kein Link erzeugt.",
+      "create": "Link erstellen",
+      "regenerate": "Neu erzeugen",
+      "revoke": "Löschen",
+      "copy": "Link kopieren",
+      "copied": "Link kopiert",
+      "copyFailed": "Kopieren nicht möglich. Bitte den Link von Hand markieren.",
+      "createdBy": "Erstellt am {date} von {name}",
+      "regenerateTitle": "Link neu erzeugen?",
+      "regenerateConfirm": "Der bisherige Link wird sofort ungültig. Bereits ausgedruckte QR-Codes funktionieren dann nicht mehr.",
+      "revokeTitle": "Link löschen?",
+      "revokeConfirm": "Der Link wird sofort ungültig. Bereits ausgedruckte QR-Codes funktionieren dann nicht mehr.",
+      "failed": "Die Aktion ist fehlgeschlagen.",
+      "loadFailed": "Der Link konnte nicht geladen werden.",
+      "retry": "Erneut versuchen"
     }
   },
   "tokens": {

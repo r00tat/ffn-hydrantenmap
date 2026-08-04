@@ -3,7 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { ReactElement, ReactNode } from 'react';
 import deMessages from '../../messages/de.json';
 
-function IntlWrapper({ children }: { children: ReactNode }) {
+export function IntlWrapper({ children }: { children: ReactNode }) {
   return (
     <NextIntlClientProvider locale="de" messages={deMessages}>
       {children}

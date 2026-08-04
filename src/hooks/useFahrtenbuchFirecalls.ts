@@ -2,7 +2,7 @@
 
 import { limit, orderBy, where, type QueryConstraint } from 'firebase/firestore';
 import { useMemo } from 'react';
-import type { FahrtenbuchFirecallOption } from '../components/Fahrtenbuch/FahrtenbuchDialog';
+import type { FahrtenbuchFirecallOption } from '../components/Fahrtenbuch/useEntryFormState';
 import {
   FIRECALL_COLLECTION_ID,
   type Firecall,

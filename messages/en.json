@@ -397,7 +397,11 @@
       "entryDeleted": "This entry was deleted and cannot be edited.",
       "tooManyEntries": "Too many trips at once. Please save in smaller batches.",
       "saveFailed": "Saving failed: {message}",
-      "deleteFailed": "Deleting failed: {message}"
+      "deleteFailed": "Deleting failed: {message}",
+      "linkInvalid": "This link is no longer valid.",
+      "vehicleNotFound": "The selected vehicle is no longer available.",
+      "invalidEntry": "The entry is incomplete or invalid.",
+      "shareSaveFailed": "The trip could not be saved. Please try again later."
     },
     "filters": {
       "vehicle": "Vehicle",
@@ -493,6 +497,20 @@
       "alreadyImported": "already imported",
       "importNothing": "No vehicles found in the cost recovery fleet."
     }
+  },
+  "fahrtenbuchShare": {
+    "title": "Log a trip",
+    "notice": "Submission via a shared link. Existing trips are not visible here.",
+    "submit": "Save trip",
+    "savedTitle": "Trip saved",
+    "savedText": "The trip was saved to the logbook of group {group}.",
+    "savedTextNoGroup": "The trip was saved to the logbook.",
+    "another": "Log another trip",
+    "invalidTitle": "Invalid link",
+    "invalidText": "This link is no longer valid. Please contact the group administration.",
+    "loadFailedTitle": "Data unavailable",
+    "loadFailedText": "Vehicle data is currently unavailable. Please try again in a few minutes.",
+    "noVehicles": "This group has no active vehicles."
   },
   "login": {
     "pageTitle": "Login",
@@ -1262,6 +1280,26 @@
       "id": "ID",
       "name": "Name",
       "description": "Description"
+    },
+    "shareLink": {
+      "heading": "Logbook link",
+      "description": "This link allows trips to be logged for this group without signing in.",
+      "warning": "Anyone with this link can log trips. Existing entries are not visible through the link.",
+      "none": "No link has been created for this group yet.",
+      "create": "Create link",
+      "regenerate": "Regenerate",
+      "revoke": "Delete",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "copyFailed": "Copying failed. Please select the link manually.",
+      "createdBy": "Created on {date} by {name}",
+      "regenerateTitle": "Regenerate link?",
+      "regenerateConfirm": "The current link stops working immediately. Printed QR codes will no longer work.",
+      "revokeTitle": "Delete link?",
+      "revokeConfirm": "The link stops working immediately. Printed QR codes will no longer work.",
+      "failed": "The action failed.",
+      "loadFailed": "The link could not be loaded.",
+      "retry": "Try again"
     }
   },
   "tokens": {

@@ -6,8 +6,10 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Typography from '@mui/material/Typography';
 import { SessionProvider } from 'next-auth/react';
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import React, { Suspense } from 'react';
 import About from '../../app/about/page';
+import { isPublicRoute } from '../../common/publicRoutes';
 import useFirebaseAppCheck from '../../hooks/useFirebaseAppCheck';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGlobalErrorReporter from '../../hooks/useGlobalErrorReporter';
@@ -103,6 +105,16 @@ function LogedinApp({ children }: AppProps) {
 function AuthorizationApp({ children }: AppProps) {
   const { isAuthorized } = useFirebaseLogin();
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
+  const pathname = usePathname();
+
+  // Öffentliche Routen (Fahrtenbuch-Share-Link) rendern ihren Inhalt ohne
+  // Anmeldung — und ohne Drawer, HeaderBar und die Einsatz-Provider, die eine
+  // Sitzung voraussetzen. Ohne diesen Zweig ersetzt der Login-Bildschirm unten
+  // jeden Seiteninhalt, egal was die Route selbst tut.
+  if (isPublicRoute(pathname)) {
+    return <>{children}</>;
+  }
+
   if (isAuthorized) {
     return <LogedinApp>{children}</LogedinApp>;
   }
@@ -124,11 +136,29 @@ function ServiceWorkerUpdateListener() {
   return null;
 }
 
+/**
+ * Der One-Tap-Prompt gehört nicht auf eine Seite, die bewusst ohne Anmeldung
+ * bedient wird — er würde Gästen ein Google-Login-Overlay vor das Formular
+ * legen.
+ */
+function OneTapLoginUnlessPublic() {
+  const pathname = usePathname();
+  if (isPublicRoute(pathname)) return null;
+  return <SingedOutOneTapLogin />;
+}
+
 export default function AppProviders({ children }: AppProps) {
   useFirebaseAppCheck();
   useCapacitorAppExit();
   useGlobalErrorReporter();
 
+  // Achtung beim Erweitern dieser Kette: Alles oberhalb von `AuthorizationApp`
+  // läuft auch auf öffentlichen Routen wie `/fahrtenbuch/teilen/*`, die bewusst
+  // ohne Anmeldung bedient werden. Ein Provider, der eine Sitzung voraussetzt
+  // oder ungefragt UI einblendet, gehört unterhalb von `AuthorizationApp` (dort
+  // steht der Bypass) oder muss sich selbst per `isPublicRoute` heraushalten —
+  // Vorbild: `OneTapLoginUnlessPublic` weiter oben. Ein Fehler hier bricht die
+  // Gastseite still: kein Test schlägt fehl, kein Linter warnt.
   return (
     <Suspense
       fallback={
@@ -146,7 +176,7 @@ export default function AppProviders({ children }: AppProps) {
               <DebugLoggingProvider>
                 <div className={`${styles.container} print-content-root`}>
                   <CssBaseline enableColorScheme />
-                  <SingedOutOneTapLogin />
+                  <OneTapLoginUnlessPublic />
                   <SettingsRedirectDialogProvider>
                     <PermissionOnboardingProvider>
                       <AuthorizationApp>{children}</AuthorizationApp>

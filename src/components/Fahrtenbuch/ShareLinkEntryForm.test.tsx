@@ -1,0 +1,184 @@
+// @vitest-environment jsdom
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithIntl } from '../../test-utils/intlRender';
+import type { ShareLinkFormData } from '../../common/fahrtenbuchShare';
+
+const { createMock, refreshMock } = vi.hoisted(() => ({
+  createMock: vi.fn(),
+  refreshMock: vi.fn(),
+}));
+
+vi.mock('./fahrtenbuchActions', () => ({
+  createFahrtenbuchEntryViaShareLink: createMock,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: refreshMock }),
+}));
+
+import ShareLinkEntryForm from './ShareLinkEntryForm';
+
+const data: ShareLinkFormData = {
+  groupName: 'FF Neusiedl am See',
+  vehicles: [
+    {
+      id: 'v1',
+      name: 'TLF',
+      counters: [
+        {
+          id: 'km',
+          label: 'Kilometerstand',
+          labelKey: 'counters.km',
+          unit: 'km',
+          mode: 'startEnd',
+          changeWarning: 'decrease',
+          required: true,
+        },
+      ],
+      fuelTypes: ['diesel'],
+      lastCounters: { km: 1200 },
+    },
+  ],
+  persons: [{ id: 'p1', name: 'Max Mustermann' }],
+};
+
+describe('ShareLinkEntryForm', () => {
+  beforeEach(() => {
+    createMock.mockReset();
+    refreshMock.mockReset();
+    createMock.mockResolvedValue({ success: true, id: 'e1' });
+    // jsdom kennt scrollIntoView nicht — das Formular ruft es bei einer
+    // Ablehnung auf, damit die Meldung oben im Sichtbereich landet.
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('zeigt den Gruppennamen und den Hinweis auf die eingeschränkte Sicht', () => {
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+    expect(screen.getByText('FF Neusiedl am See')).toBeInTheDocument();
+    expect(screen.getByText(/nicht einsehbar/i)).toBeInTheDocument();
+  });
+
+  it('bietet keine Einsatzauswahl an, auch beim Zweck Einsatz', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+
+    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
+  });
+
+  it('belegt den Startzähler aus dem Fahrzeug-Cache vor', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'TLF' }));
+
+    expect(await screen.findByLabelText('Kilometerstand — Start')).toHaveValue(
+      1200,
+    );
+  });
+
+  it('zeigt nach dem Speichern eine Bestätigung statt des Formulars', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'TLF' }));
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock.mock.calls[0][0]).toBe('tok');
+    expect(await screen.findByText('Fahrt eingetragen')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Fahrzeug')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Weitere Fahrt erfassen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt eine Meldung, wenn der Link zwischenzeitlich widerrufen wurde', async () => {
+    createMock.mockResolvedValue({ success: false, error: 'linkInvalid' });
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'TLF' }));
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    expect(
+      await screen.findByText('Dieser Link ist nicht mehr gültig.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Fahrzeug')).toBeInTheDocument();
+  });
+
+  it('zeigt eine übersetzte Meldung bei einer sonstigen Ablehnung und behält das Formular', async () => {
+    createMock.mockResolvedValue({ success: false, error: 'vehicleNotFound' });
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'TLF' }));
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    expect(
+      await screen.findByText('Das gewählte Fahrzeug ist nicht mehr verfügbar.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Fahrzeug')).toBeInTheDocument();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('zeigt einen Titel und den Gruppennamen, wenn keine Fahrzeuge hinterlegt sind', () => {
+    renderWithIntl(
+      <ShareLinkEntryForm token="tok" data={{ ...data, vehicles: [] }} />,
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Fahrt erfassen' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('FF Neusiedl am See')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Für diese Gruppe sind keine aktiven Fahrzeuge hinterlegt.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('liefert nach „Weitere Fahrt erfassen" ein leeres Formular und lädt die Stammdaten neu', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'TLF' }));
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Weitere Fahrt erfassen' }),
+    );
+
+    expect(await screen.findByLabelText('Fahrer')).toHaveValue('');
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+  });
+});

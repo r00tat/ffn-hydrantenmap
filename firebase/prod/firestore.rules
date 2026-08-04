@@ -204,9 +204,17 @@ service cloud.firestore {
       }
     }
 
+    // Der Token ist die Dokument-ID und damit das gesamte Geheimnis des
+    // Share-Links. Er wird ausschließlich vom Admin SDK gelesen und
+    // geschrieben; auch Admins holen ihn über eine Server Action. Die Regel
+    // steht vor dem Catch-all, damit sie greift.
+    match /fahrtenbuchShareLink/{token} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
-    
+
   }
 }
