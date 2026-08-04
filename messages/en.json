@@ -335,6 +335,7 @@
     "noGroupsHint": "Vehicles are created in the admin area under trip log.",
     "group": "Group",
     "allVehicles": "All trips",
+    "backToOverview": "Back to overview",
     "newEntry": "New entry",
     "addTrip": "Log a trip",
     "editEntry": "Edit trip",
@@ -409,6 +410,7 @@
     },
     "einsatz": {
       "title": "Trip log for this operation",
+      "bookForFirecall": "Record trips for incident “{name}”",
       "description": "Vehicles and drivers come from the crew assignment. Only the final readings are missing.",
       "notMember": "You are not a member of this operation's group.",
       "noVehicles": "No vehicles are assigned to this operation.",

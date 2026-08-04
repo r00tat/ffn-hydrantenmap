@@ -146,10 +146,12 @@ export default function AppDrawer({
       einsatzSection: 'geschaeftsbuch',
     },
     {
+      // Ohne `einsatzSection`: das Fahrtenbuch ist keine Einsatz-Ansicht, es
+      // wird auch ohne laufenden Einsatz geführt. Der Weg in die
+      // Einsatz-Sammelerfassung führt über den Button auf der Fahrtenbuch-Seite.
       text: t('fahrtenbuch'),
       icon: <EditRoadIcon />,
       href: '/fahrtenbuch',
-      einsatzSection: 'fahrtenbuch',
     },
     {
       text: t('kostenersatz'),

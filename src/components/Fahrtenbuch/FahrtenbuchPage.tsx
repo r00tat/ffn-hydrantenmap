@@ -12,6 +12,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
@@ -21,6 +22,7 @@ import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import FahrtenbuchVehicleCard from './FahrtenbuchVehicleCard';
@@ -38,6 +40,11 @@ export default function FahrtenbuchPage() {
   const { activePersons } = useFahrtenbuchPersons(groupId);
   const entries = useFahrtenbuchEntries(groupId);
   const firecalls = useFahrtenbuchFirecalls(groupId);
+  // Der Menüpunkt führt immer hierher; in die Sammelerfassung des laufenden
+  // Einsatzes geht es über diesen Button. `unknown` heißt: kein Einsatz aktiv.
+  const firecallId = useFirecallId();
+  const firecall = useFirecall();
+  const hasFirecall = firecallId !== 'unknown';
   const { deleteError, clearDeleteError, requestDelete } =
     useEntryDeletion(groupId);
 
@@ -111,6 +118,15 @@ export default function FahrtenbuchPage() {
               </MenuItem>
             ))}
           </TextField>
+        )}
+        {hasFirecall && (
+          <Button
+            variant="outlined"
+            component={Link}
+            href={`/einsatz/${firecallId}/fahrtenbuch`}
+          >
+            {t('einsatz.bookForFirecall', { name: firecall.name })}
+          </Button>
         )}
         <Button
           variant="contained"

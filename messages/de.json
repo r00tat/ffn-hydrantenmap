@@ -335,6 +335,7 @@
     "noGroupsHint": "Fahrzeuge werden im Admin-Bereich unter Fahrtenbuch angelegt.",
     "group": "Gruppe",
     "allVehicles": "Alle Fahrten",
+    "backToOverview": "Zurück zur Übersicht",
     "newEntry": "Neuer Eintrag",
     "addTrip": "Fahrt eintragen",
     "editEntry": "Fahrt bearbeiten",
@@ -409,6 +410,7 @@
     },
     "einsatz": {
       "title": "Fahrtenbuch zum Einsatz",
+      "bookForFirecall": "Fahrten für Einsatz „{name}\" erfassen",
       "description": "Fahrzeuge und Maschinisten stammen aus der Mannschaftszuordnung. Einzutragen sind nur die Endstände.",
       "notMember": "Du bist kein Mitglied der Gruppe dieses Einsatzes.",
       "noVehicles": "Für diesen Einsatz sind keine Fahrzeuge zugeordnet.",

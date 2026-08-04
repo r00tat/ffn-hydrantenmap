@@ -1,12 +1,16 @@
 'use client';
 
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
+import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
@@ -77,6 +81,17 @@ export default function FahrtenbuchVehiclePage({
         useFlexGap
         sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap' }}
       >
+        {/* Die Ansicht ist ein teilbarer Link und wird auch direkt geöffnet —
+            ohne diesen Button gibt es von hier keinen Weg zur Übersicht. */}
+        <Tooltip title={t('backToOverview')}>
+          <IconButton
+            component={Link}
+            href="/fahrtenbuch"
+            aria-label={t('backToOverview')}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        </Tooltip>
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {vehicle?.name ?? t('title')}
         </Typography>

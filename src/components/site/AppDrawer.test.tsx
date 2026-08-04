@@ -15,8 +15,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('../../hooks/useFirebaseLogin', () => ({
   default: () => firebaseLoginMock(),
 }));
+const firecallIdMock = vi.fn<() => string>(() => 'unknown');
 vi.mock('../../hooks/useFirecall', () => ({
-  useFirecallId: () => 'unknown',
+  useFirecallId: () => firecallIdMock(),
 }));
 vi.mock('../bugReport/BugReportProvider', () => ({
   useBugReport: () => ({ open: vi.fn() }),
@@ -76,5 +77,24 @@ describe('AppDrawer submenus', () => {
       </NextIntlClientProvider>,
     );
     expect(screen.queryByText('Profil')).toBeNull();
+  });
+});
+
+describe('AppDrawer Einsatz-Links', () => {
+  it('führt das Fahrtenbuch auch bei laufendem Einsatz auf /fahrtenbuch', () => {
+    // Das Fahrtenbuch wird auch ohne Einsatz geführt. Zeigte der Menüpunkt auf
+    // die Einsatz-Sammelerfassung, gäbe es keinen Weg zur Fahrzeugübersicht.
+    pathnameMock.mockReturnValue('/');
+    firecallIdMock.mockReturnValue('f1');
+    renderDrawer();
+
+    expect(screen.getByRole('link', { name: 'Fahrtenbuch' })).toHaveAttribute(
+      'href',
+      '/fahrtenbuch',
+    );
+    // Zum Vergleich ein Menüpunkt, der bewusst in den Einsatz führt.
+    expect(
+      screen.getByRole('link', { name: 'Einsatz Tagebuch' }),
+    ).toHaveAttribute('href', '/einsatz/f1/tagebuch');
   });
 });
