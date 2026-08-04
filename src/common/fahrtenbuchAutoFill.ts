@@ -1,5 +1,5 @@
 import haversine from 'haversine-distance';
-import type { CounterDefinition, CounterReading } from './fahrtenbuch';
+import type { CounterDefinition, CounterReading, CounterSource } from './fahrtenbuch';
 import type { GeoPositionObject } from './geo';
 
 /**
@@ -7,8 +7,6 @@ import type { GeoPositionObject } from './geo';
  * gespeichert wird immer die echte Routendistanz.
  */
 const DETOUR_FACTOR = 1.3;
-
-export type CounterSource = 'route' | 'unchanged';
 
 /**
  * Gesamtstrecke (Hin- und Rückfahrt) in ganzen Kilometern aus der einfachen

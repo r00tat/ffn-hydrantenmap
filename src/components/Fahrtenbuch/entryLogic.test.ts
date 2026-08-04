@@ -274,3 +274,52 @@ describe('computeVehicleCache', () => {
     });
   });
 });
+
+describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
+  const vehicle = { name: 'RLFA', counters: VEHICLE_PRESETS.fahrzeug };
+  const actor = { userId: 'u1', userName: 'Tester', now: '2026-08-04T10:00:00.000Z' };
+  const input = {
+    vehicleId: 'v1',
+    driverName: 'Max Muster',
+    zweck: 'einsatz' as const,
+    ziel: 'Brand',
+    abfahrt: '2026-08-04T09:00:00.000Z',
+    ankunft: '2026-08-04T09:45:00.000Z',
+    counters: { km: { start: 1000, end: 1024 } },
+  };
+
+  it('schreibt Herkunft und Routendistanz, wenn sie übergeben werden', () => {
+    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
+      counterSources: { km: 'route' },
+      routeDistanceM: 12000,
+    });
+    expect(doc.counterSources).toEqual({ km: 'route' });
+    expect(doc.routeDistanceM).toBe(12000);
+  });
+
+  it('lässt beide Felder weg, wenn nichts abgeleitet wurde', () => {
+    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
+      counterSources: {},
+    });
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceM');
+  });
+
+  it('lässt beide Felder weg, wenn gar keine Ableitung übergeben wird', () => {
+    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor);
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceM');
+  });
+
+  it('schreibt die Routendistanz auch, wenn kein Zähler als abgeleitet gilt', () => {
+    // Fall „Route bekannt, aber der Endstand ist von Hand eingetippt": Die
+    // Distanz ist dann reiner Kontext, keine Behauptung über die Herkunft
+    // eines Zählers — sie darf trotzdem am Dokument landen.
+    const doc = buildEntryDocument(vehicle, input, 'ffnd', actor, {
+      counterSources: {},
+      routeDistanceM: 12000,
+    });
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc.routeDistanceM).toBe(12000);
+  });
+});

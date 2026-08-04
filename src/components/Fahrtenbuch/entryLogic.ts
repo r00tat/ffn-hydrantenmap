@@ -4,6 +4,7 @@ import {
   validateEntryInput,
   type CounterDefinition,
   type CounterReading,
+  type CounterSource,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
   type FahrtZweck,
@@ -35,6 +36,16 @@ export interface EntryActor {
   userId: string;
   userName: string;
   now: string;
+}
+
+/**
+ * Serverseitig abgeleitete Werte. Steht bewusst nicht in
+ * `FahrtenbuchEntryInput`: Der Client darf nicht behaupten, ein Wert stamme
+ * aus einer Route.
+ */
+export interface EntryDerivation {
+  counterSources?: Record<string, CounterSource>;
+  routeDistanceM?: number;
 }
 
 /** Das geladene Fahrzeugdokument — die Quelle für Name und Zählerdefinitionen. */
@@ -69,6 +80,7 @@ export function buildEntryDocument(
   input: FahrtenbuchEntryInput,
   group: string,
   actor: EntryActor,
+  derivation?: EntryDerivation,
 ): FahrtenbuchEntry {
   const definitions: CounterDefinition[] = vehicle.counters ?? [];
   const errors = validateEntryInput(definitions, {
@@ -113,6 +125,18 @@ export function buildEntryDocument(
   }
   if (input.hinweise?.trim()) doc.hinweise = input.hinweise.trim();
   if (input.defekt) doc.defekt = true;
+
+  // Leere Objekte werden weggelassen, damit ein von Hand erfasster Eintrag
+  // nicht so aussieht, als sei etwas abgeleitet worden.
+  if (
+    derivation?.counterSources &&
+    Object.keys(derivation.counterSources).length > 0
+  ) {
+    doc.counterSources = derivation.counterSources;
+  }
+  if (derivation?.routeDistanceM !== undefined) {
+    doc.routeDistanceM = derivation.routeDistanceM;
+  }
 
   return doc;
 }

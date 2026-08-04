@@ -38,6 +38,14 @@ export interface CounterReading {
   diff?: number;
 }
 
+/**
+ * Herkunft eines abgeleiteten Endstands: aus der Route berechnet oder vom
+ * Startstand fortgeschrieben. Steht hier bei `CounterReading`, weil sie an
+ * `FahrtenbuchEntry.counterSources` hängt — dem Nachweis, welche Stände
+ * abgelesen und welche gerechnet wurden.
+ */
+export type CounterSource = 'route' | 'unchanged';
+
 export interface FahrtenbuchPerson {
   id?: string;
   name: string;
@@ -98,6 +106,14 @@ export interface FahrtenbuchEntry {
   /** ISO-Zeitstempel */
   ankunft: string;
   counters: Record<string, CounterReading>;
+  /**
+   * Zähler, deren Endstand abgeleitet und nicht abgelesen wurde. Ein
+   * Fahrtenbuch ist ein Nachweisdokument — ohne dieses Feld wäre später nicht
+   * mehr erkennbar, welche Stände gerechnet und welche abgelesen sind.
+   */
+  counterSources?: Record<string, CounterSource>;
+  /** Einfache Routendistanz in Metern, Grundlage des Kilometer-Endstands. */
+  routeDistanceM?: number;
   betriebsmittel?: Partial<Record<FuelType, number>>;
   hinweise?: string;
   defekt?: boolean;
