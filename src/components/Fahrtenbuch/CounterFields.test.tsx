@@ -16,8 +16,22 @@ describe('CounterFields', () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText(/Stand bei Abfahrt/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Stand bei Rückkehr/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Kilometerstand — Start/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Kilometerstand — Ende/)).toBeInTheDocument();
+  });
+
+  it('zeigt am Feld nur das kurze Label — der Zählername steht darüber', () => {
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.fahrzeug}
+        counters={{ km: { start: 1000, end: 1042 } }}
+        lastCounters={{}}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByText('Start').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Ende').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Kilometerstand —/)).not.toBeInTheDocument();
   });
 
   it('zeigt die berechnete Differenz', () => {
@@ -96,7 +110,7 @@ describe('CounterFields', () => {
         onChange={onChange}
       />,
     );
-    const endField = screen.getByLabelText(/Stand bei Rückkehr/);
+    const endField = screen.getByLabelText(/Kilometerstand — Ende/);
     expect(endField).not.toBeDisabled();
     await user.type(endField, '9');
     expect(onChange).toHaveBeenCalledWith({ km: { start: 900, end: 9 } });
@@ -113,7 +127,7 @@ describe('CounterFields', () => {
         onChange={onChange}
       />,
     );
-    await user.clear(screen.getByLabelText(/Stand bei Rückkehr/));
+    await user.clear(screen.getByLabelText(/Kilometerstand — Ende/));
     expect(onChange).toHaveBeenCalledWith({
       km: { start: 1000, end: undefined },
     });

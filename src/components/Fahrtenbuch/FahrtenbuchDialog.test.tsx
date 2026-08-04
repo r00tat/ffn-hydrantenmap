@@ -83,12 +83,12 @@ beforeEach(() => {
 describe('FahrtenbuchDialog', () => {
   it('belegt den Startzähler aus lastCounters vor', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
-    expect(screen.getByLabelText(/Stand bei Abfahrt/)).toHaveValue(1000);
+    expect(screen.getByLabelText(/Kilometerstand — Start/)).toHaveValue(1000);
   });
 
   it('lässt den Endzähler leer', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
-    expect(screen.getByLabelText(/Stand bei Rückkehr/)).toHaveValue(null);
+    expect(screen.getByLabelText(/Kilometerstand — Ende/)).toHaveValue(null);
   });
 
   it('zeigt für ein Boot keine Kilometerfelder, aber die Lenzpumpen', () => {
@@ -114,7 +114,7 @@ describe('FahrtenbuchDialog', () => {
 
     expect(screen.queryByText('Kilometerstand')).not.toBeInTheDocument();
     expect(
-      screen.getByLabelText(/Betriebsstunden Backbordmotor — Stand bei Abfahrt/),
+      screen.getByLabelText(/Betriebsstunden Backbordmotor — Start/),
     ).toHaveValue(120);
   });
 
@@ -147,7 +147,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(screen.getByLabelText(/Stand bei Rückkehr/), '1042');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
@@ -186,10 +186,10 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    const startField = screen.getByLabelText(/Stand bei Abfahrt/);
+    const startField = screen.getByLabelText(/Kilometerstand — Start/);
     await user.clear(startField);
     await user.type(startField, '900');
-    await user.type(screen.getByLabelText(/Stand bei Rückkehr/), '950');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '950');
 
     expect(
       screen.getByText(/Letzter bekannter Stand: 1000 km/),
@@ -203,7 +203,7 @@ describe('FahrtenbuchDialog', () => {
     const user = userEvent.setup();
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
-    await user.type(screen.getByLabelText(/Stand bei Rückkehr/), '1042');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     expect(
@@ -231,7 +231,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(screen.getByLabelText(/Stand bei Rückkehr/), '1042');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     expect(
@@ -249,7 +249,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(screen.getByLabelText(/Stand bei Rückkehr/), '1042');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     expect(

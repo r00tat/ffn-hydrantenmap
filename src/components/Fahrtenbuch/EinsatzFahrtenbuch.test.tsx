@@ -163,7 +163,7 @@ describe('EinsatzFahrtenbuchView', () => {
       />,
     );
     expect(
-      screen.getByLabelText(/Betriebsstunden Backbordmotor — Stand bei Rückkehr/),
+      screen.getByLabelText(/Betriebsstunden Backbordmotor — Ende/),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText(/Kilometerstand/)).not.toBeInTheDocument();
   });
@@ -206,7 +206,7 @@ describe('EinsatzFahrtenbuchView', () => {
         rows={[row()]}
       />,
     );
-    await user.type(screen.getByLabelText(/Kilometerstand — Stand bei Rückkehr/), '5');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '5');
     expect(onChangeRow).toHaveBeenCalledWith('i1', {
       counters: { km: { start: 1000, end: 5 } },
     });
@@ -255,7 +255,7 @@ describe('EinsatzFahrtenbuchView', () => {
     );
     expect(screen.getByText('Bereits erfasst')).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/Kilometerstand — Stand bei Rückkehr/),
+      screen.getByLabelText(/Kilometerstand — Ende/),
     ).toBeDisabled();
   });
 

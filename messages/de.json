@@ -358,8 +358,8 @@
     "betriebsmittel": "Getankt",
     "save": "Speichern",
     "cancel": "Abbrechen",
-    "counterStart": "Stand bei Abfahrt",
-    "counterEnd": "Stand bei Rückkehr",
+    "counterStart": "Start",
+    "counterEnd": "Ende",
     "counterDiff": "Differenz",
     "counters": {
       "km": "Kilometerstand",

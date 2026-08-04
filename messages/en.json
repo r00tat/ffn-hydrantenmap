@@ -358,8 +358,8 @@
     "betriebsmittel": "Refuelled",
     "save": "Save",
     "cancel": "Cancel",
-    "counterStart": "Reading at departure",
-    "counterEnd": "Reading on return",
+    "counterStart": "Start",
+    "counterEnd": "End",
     "counterDiff": "Difference",
     "counters": {
       "km": "Odometer",

@@ -89,10 +89,19 @@ export default function CounterFields({
                     type="number"
                     disabled={disabled}
                     required={def.required}
-                    label={`${label} — ${t('counterStart')}`}
+                    // Sichtbar nur "Start" — der Zählername steht in der
+                    // Überschrift darüber und würde am Feld auf schmalen
+                    // Displays abgeschnitten. Der Screenreader bekommt ihn
+                    // über das aria-label trotzdem.
+                    label={t('counterStart')}
                     value={reading.start ?? ''}
                     onChange={(e) => update(def.id, 'start', e.target.value)}
-                    slotProps={{ input: { endAdornment: unitAdornment } }}
+                    slotProps={{
+                      input: { endAdornment: unitAdornment },
+                      htmlInput: {
+                        'aria-label': `${label} — ${t('counterStart')}`,
+                      },
+                    }}
                   />
                 </Grid>
               )}
@@ -103,14 +112,17 @@ export default function CounterFields({
                   type="number"
                   disabled={disabled}
                   required={def.required}
-                  label={
-                    def.mode === 'startEnd'
-                      ? `${label} — ${t('counterEnd')}`
-                      : label
-                  }
+                  label={def.mode === 'startEnd' ? t('counterEnd') : label}
                   value={reading.end ?? ''}
                   onChange={(e) => update(def.id, 'end', e.target.value)}
-                  slotProps={{ input: { endAdornment: unitAdornment } }}
+                  slotProps={{
+                    input: { endAdornment: unitAdornment },
+                    ...(def.mode === 'startEnd' && {
+                      htmlInput: {
+                        'aria-label': `${label} — ${t('counterEnd')}`,
+                      },
+                    }),
+                  }}
                 />
               </Grid>
             </Grid>
