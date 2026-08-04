@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyCounterDiffs,
+  arrivalFromTimeOnly,
+  arrivalOnDepartureDay,
   counterWarnings,
-  defaultAnkunft,
   FAHRT_ZWECKE,
+  isTimeOnlyTimestamp,
   findEntryForFirecallVehicle,
   matchVehicleByName,
   normalizeName,
@@ -18,7 +20,9 @@ import {
 const KM = VEHICLE_PRESETS.fahrzeug;
 const BOOT = VEHICLE_PRESETS.boot;
 
-function vehicle(overrides: Partial<FahrtenbuchVehicle> = {}): FahrtenbuchVehicle {
+function vehicle(
+  overrides: Partial<FahrtenbuchVehicle> = {},
+): FahrtenbuchVehicle {
   return {
     id: 'v1',
     name: 'RLFA 2000',
@@ -65,34 +69,50 @@ describe('applyCounterDiffs', () => {
 
 describe('counterWarnings', () => {
   it('warnt bei decrease, wenn der Startwert unter dem letzten Endwert liegt', () => {
-    const warnings = counterWarnings(KM, { km: { start: 900, end: 950 } }, { km: 1000 });
+    const warnings = counterWarnings(
+      KM,
+      { km: { start: 900, end: 950 } },
+      { km: 1000 },
+    );
     expect(warnings).toEqual([
       { counterId: 'km', type: 'decrease', lastValue: 1000, value: 900 },
     ]);
   });
 
   it('warnt bei decrease nicht, wenn der Startwert passt', () => {
-    expect(counterWarnings(KM, { km: { start: 1000, end: 1010 } }, { km: 1000 })).toEqual([]);
+    expect(
+      counterWarnings(KM, { km: { start: 1000, end: 1010 } }, { km: 1000 }),
+    ).toEqual([]);
   });
 
   it('warnt bei anyChange, sobald der Stand vom letzten Wert abweicht', () => {
-    const warnings = counterWarnings(BOOT, { lenzpumpeBb: { end: 41 } }, { lenzpumpeBb: 39 });
+    const warnings = counterWarnings(
+      BOOT,
+      { lenzpumpeBb: { end: 41 } },
+      { lenzpumpeBb: 39 },
+    );
     expect(warnings).toEqual([
       { counterId: 'lenzpumpeBb', type: 'changed', lastValue: 39, value: 41 },
     ]);
   });
 
   it('warnt bei anyChange nicht, wenn der Stand gleich bleibt', () => {
-    expect(counterWarnings(BOOT, { lenzpumpeBb: { end: 39 } }, { lenzpumpeBb: 39 })).toEqual([]);
+    expect(
+      counterWarnings(BOOT, { lenzpumpeBb: { end: 39 } }, { lenzpumpeBb: 39 }),
+    ).toEqual([]);
   });
 
   it('warnt nie ohne bekannten Vorwert', () => {
-    expect(counterWarnings(KM, { km: { start: 900, end: 950 } }, {})).toEqual([]);
+    expect(counterWarnings(KM, { km: { start: 900, end: 950 } }, {})).toEqual(
+      [],
+    );
   });
 
   it('warnt nie bei changeWarning none', () => {
     const defs = [{ ...KM[0], changeWarning: 'none' as const }];
-    expect(counterWarnings(defs, { km: { start: 1, end: 2 } }, { km: 500 })).toEqual([]);
+    expect(
+      counterWarnings(defs, { km: { start: 1, end: 2 } }, { km: 500 }),
+    ).toEqual([]);
   });
 });
 
@@ -112,20 +132,23 @@ describe('validateEntryInput', () => {
   });
 
   it('meldet eine Ankunft vor der Abfahrt', () => {
-    expect(validateEntryInput(KM, { ...base, ankunft: '2026-08-03T09:00:00.000Z' })).toEqual([
-      'ankunftBeforeAbfahrt',
-    ]);
+    expect(
+      validateEntryInput(KM, { ...base, ankunft: '2026-08-03T09:00:00.000Z' }),
+    ).toEqual(['ankunftBeforeAbfahrt']);
   });
 
   it('meldet einen fehlenden Pflichtzähler', () => {
-    expect(validateEntryInput(KM, { ...base, counters: { km: { start: 1000 } } })).toEqual([
-      'counterMissing:km',
-    ]);
+    expect(
+      validateEntryInput(KM, { ...base, counters: { km: { start: 1000 } } }),
+    ).toEqual(['counterMissing:km']);
   });
 
   it('meldet einen Endwert unter dem Startwert', () => {
     expect(
-      validateEntryInput(KM, { ...base, counters: { km: { start: 1000, end: 900 } } }),
+      validateEntryInput(KM, {
+        ...base,
+        counters: { km: { start: 1000, end: 900 } },
+      }),
     ).toEqual(['counterEndBeforeStart:km']);
   });
 
@@ -139,7 +162,11 @@ describe('validateEntryInput', () => {
   });
 
   it('meldet einen fehlenden Fahrer und ein fehlendes Fahrzeug', () => {
-    const errors = validateEntryInput(KM, { ...base, driverName: '  ', vehicleId: '' });
+    const errors = validateEntryInput(KM, {
+      ...base,
+      driverName: '  ',
+      vehicleId: '',
+    });
     expect(errors).toContain('driverMissing');
     expect(errors).toContain('vehicleMissing');
   });
@@ -155,25 +182,29 @@ describe('validateEntryInput', () => {
   });
 
   it('meldet einen unbekannten Zweck', () => {
-    expect(validateEntryInput(KM, { ...base, zweck: 'x' })).toEqual(['zweckInvalid']);
+    expect(validateEntryInput(KM, { ...base, zweck: 'x' })).toEqual([
+      'zweckInvalid',
+    ]);
   });
 
   it('meldet einen fehlenden Zweck', () => {
-    expect(validateEntryInput(KM, { ...base, zweck: '' })).toEqual(['zweckInvalid']);
+    expect(validateEntryInput(KM, { ...base, zweck: '' })).toEqual([
+      'zweckInvalid',
+    ]);
   });
 
   it('meldet eine unparsbare Abfahrt', () => {
-    expect(validateEntryInput(KM, { ...base, abfahrt: 'nicht-ein-datum' })).toEqual([
-      'abfahrtInvalid',
-    ]);
+    expect(
+      validateEntryInput(KM, { ...base, abfahrt: 'nicht-ein-datum' }),
+    ).toEqual(['abfahrtInvalid']);
   });
 });
 
-describe('defaultAnkunft', () => {
-  it('übernimmt das Datum der Abfahrt und die aktuelle Uhrzeit', () => {
+describe('arrivalOnDepartureDay', () => {
+  it('übernimmt den Kalendertag der Abfahrt und die Uhrzeit der Referenz', () => {
     const abfahrt = new Date(2026, 7, 1, 8, 30).toISOString();
     const now = new Date(2026, 7, 3, 14, 45);
-    const result = new Date(defaultAnkunft(abfahrt, now));
+    const result = new Date(arrivalOnDepartureDay(abfahrt, now));
     expect(result.getFullYear()).toBe(2026);
     expect(result.getMonth()).toBe(7);
     expect(result.getDate()).toBe(1);
@@ -181,30 +212,70 @@ describe('defaultAnkunft', () => {
     expect(result.getMinutes()).toBe(45);
   });
 
-  it('liefert die aktuelle Zeit, wenn die Abfahrt unbrauchbar ist', () => {
+  it('liefert die Referenzzeit, wenn die Abfahrt unbrauchbar ist', () => {
     const now = new Date(2026, 7, 3, 14, 45);
-    expect(defaultAnkunft('', now)).toBe(now.toISOString());
+    expect(arrivalOnDepartureDay('', now)).toBe(now.toISOString());
   });
 
-  it('rollt bei einem Einsatz über Mitternacht auf den nächsten Kalendertag', () => {
+  it('bleibt am Tag der Abfahrt, wenn die Referenzzeit davor liegt', () => {
+    // Eine Fahrt dauert im Normalfall keinen Kalendertag. Früher rollte der
+    // Vorschlag hier auf den nächsten Tag — bei einem Einsatz von gestern Abend
+    // standen Abfahrt und Ankunft dann einen Tag auseinander.
     const abfahrt = new Date(2026, 7, 1, 23, 50).toISOString();
     const now = new Date(2026, 7, 5, 0, 15);
-    const result = new Date(defaultAnkunft(abfahrt, now));
-    expect(result.getFullYear()).toBe(2026);
-    expect(result.getMonth()).toBe(7);
-    expect(result.getDate()).toBe(2);
-    expect(result.getHours()).toBe(0);
+    expect(arrivalOnDepartureDay(abfahrt, now)).toBe(abfahrt);
+  });
+});
+
+describe('arrivalFromTimeOnly', () => {
+  it('legt eine Uhrzeit ohne Datum auf den Tag der Abfahrt', () => {
+    const abfahrt = new Date(2026, 7, 1, 8, 30).toISOString();
+    const time = new Date(2026, 7, 9, 10, 15);
+    const result = new Date(arrivalFromTimeOnly(abfahrt, time));
+    expect(result.getDate()).toBe(1);
+    expect(result.getHours()).toBe(10);
     expect(result.getMinutes()).toBe(15);
+  });
+
+  it('rollt auf den nächsten Tag, wenn die Uhrzeit vor der Abfahrt liegt', () => {
+    // „01:30" nach einer Abfahrt um 23:50 kann nur der nächste Morgen sein —
+    // anders als beim Vorschlag ist das hier eine eingetragene Uhrzeit.
+    const abfahrt = new Date(2026, 7, 1, 23, 50).toISOString();
+    const time = new Date(2026, 7, 9, 1, 30);
+    const result = new Date(arrivalFromTimeOnly(abfahrt, time));
+    expect(result.getDate()).toBe(2);
+    expect(result.getHours()).toBe(1);
+    expect(result.getMinutes()).toBe(30);
+  });
+});
+
+describe('isTimeOnlyTimestamp', () => {
+  it('erkennt Angaben ohne Datum', () => {
+    expect(isTimeOnlyTimestamp('10:05')).toBe(true);
+    expect(isTimeOnlyTimestamp('9:05')).toBe(true);
+    expect(isTimeOnlyTimestamp(' 10:05:30 ')).toBe(true);
+  });
+
+  it('erkennt Angaben mit Datum', () => {
+    expect(isTimeOnlyTimestamp('03.08.2026 10:07:00')).toBe(false);
+    expect(isTimeOnlyTimestamp('2026-08-03T10:00:00.000Z')).toBe(false);
+    expect(isTimeOnlyTimestamp('')).toBe(false);
+    expect(isTimeOnlyTimestamp(undefined)).toBe(false);
   });
 });
 
 describe('normalizeName und matchVehicleByName', () => {
   it('normalisiert Groß-/Kleinschreibung, Sonderzeichen und Mehrfach-Leerzeichen', () => {
-    expect(normalizeName('  RLFA-3000/100  ')).toBe(normalizeName('rlfa 3000 100'));
+    expect(normalizeName('  RLFA-3000/100  ')).toBe(
+      normalizeName('rlfa 3000 100'),
+    );
   });
 
   it('findet ein Fahrzeug über den normalisierten Namen', () => {
-    const vehicles = [vehicle({ id: 'a', name: 'RLFA 3000/100' }), vehicle({ id: 'b', name: 'MZB' })];
+    const vehicles = [
+      vehicle({ id: 'a', name: 'RLFA 3000/100' }),
+      vehicle({ id: 'b', name: 'MZB' }),
+    ];
     expect(matchVehicleByName(vehicles, 'rlfa-3000 100')?.id).toBe('a');
   });
 
@@ -219,8 +290,18 @@ describe('normalizeName und matchVehicleByName', () => {
 
 describe('findEntryForFirecallVehicle', () => {
   const entries = [
-    { id: 'e1', firecallId: 'f1', vehicleId: 'v1', deleted: false } as FahrtenbuchEntry,
-    { id: 'e2', firecallId: 'f1', vehicleId: 'v2', deleted: true } as FahrtenbuchEntry,
+    {
+      id: 'e1',
+      firecallId: 'f1',
+      vehicleId: 'v1',
+      deleted: false,
+    } as FahrtenbuchEntry,
+    {
+      id: 'e2',
+      firecallId: 'f1',
+      vehicleId: 'v2',
+      deleted: true,
+    } as FahrtenbuchEntry,
   ];
 
   it('findet den bestehenden Eintrag', () => {
@@ -234,16 +315,30 @@ describe('findEntryForFirecallVehicle', () => {
 
 describe('referenceCounters', () => {
   const entries = [
-    { id: 'e2', vehicleId: 'v1', deleted: false, counters: { km: { end: 1100 } } },
-    { id: 'e1', vehicleId: 'v1', deleted: false, counters: { km: { end: 1042 } } },
+    {
+      id: 'e2',
+      vehicleId: 'v1',
+      deleted: false,
+      counters: { km: { end: 1100 } },
+    },
+    {
+      id: 'e1',
+      vehicleId: 'v1',
+      deleted: false,
+      counters: { km: { end: 1042 } },
+    },
   ] as unknown as FahrtenbuchEntry[];
 
   it('nutzt beim Anlegen den Fahrzeug-Cache', () => {
-    expect(referenceCounters(entries, 'v1', { km: 1100 })).toEqual({ km: 1100 });
+    expect(referenceCounters(entries, 'v1', { km: 1100 })).toEqual({
+      km: 1100,
+    });
   });
 
   it('nutzt beim Bearbeiten den chronologischen Vorgänger', () => {
-    expect(referenceCounters(entries, 'v1', { km: 1100 }, 'e2')).toEqual({ km: 1042 });
+    expect(referenceCounters(entries, 'v1', { km: 1100 }, 'e2')).toEqual({
+      km: 1042,
+    });
   });
 
   it('liefert nichts, wenn der bearbeitete Eintrag der älteste ist', () => {

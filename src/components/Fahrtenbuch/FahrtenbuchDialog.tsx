@@ -15,7 +15,7 @@ import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
-  defaultAnkunft,
+  arrivalOnDepartureDay,
   FAHRT_ZWECKE,
   referenceCounters,
   validateEntryInput,
@@ -121,7 +121,7 @@ export default function FahrtenbuchDialog({
     entry?.abfahrt ?? new Date().toISOString(),
   );
   const [ankunft, setAnkunft] = useState(
-    entry?.ankunft ?? defaultAnkunft(new Date().toISOString()),
+    entry?.ankunft ?? arrivalOnDepartureDay(new Date().toISOString()),
   );
   const [betriebsmittel, setBetriebsmittel] = useState<
     Partial<Record<FuelType, number>>
@@ -323,7 +323,17 @@ export default function FahrtenbuchDialog({
               type="datetime-local"
               label={t('abfahrt')}
               value={toLocalInput(abfahrt)}
-              onChange={(e) => setAbfahrt(fromLocalInput(e.target.value))}
+              onChange={(e) => {
+                const next = fromLocalInput(e.target.value);
+                setAbfahrt(next);
+                // Die Ankunft zieht mit dem Datum mit und behält ihre Uhrzeit —
+                // eine Fahrt endet im Normalfall am Tag der Abfahrt. Ein Ende
+                // nach Mitternacht bleibt über das Ankunftsfeld eintragbar.
+                if (next)
+                  setAnkunft((current) =>
+                    arrivalOnDepartureDay(next, new Date(current)),
+                  );
+              }}
               slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>

@@ -1,7 +1,11 @@
 import {
+  arrivalFromTimeOnly,
+  arrivalOnDepartureDay,
   findEntryForFirecallVehicle,
+  isTimeOnlyTimestamp,
   matchVehicleByName,
   normalizeName,
+  timeOnSameDay,
   validateEntryInput,
   type CounterReading,
   type FahrtenbuchEntry,
@@ -77,9 +81,7 @@ function resolveDriver(
   if (!maschinist) return { driverName: '' };
 
   const byRecipient = maschinist.recipientId
-    ? persons.find(
-        (p) => p.blaulichtSmsRecipientId === maschinist.recipientId,
-      )
+    ? persons.find((p) => p.blaulichtSmsRecipientId === maschinist.recipientId)
     : undefined;
   if (byRecipient) {
     return { driverId: byRecipient.id, driverName: byRecipient.name };
@@ -121,10 +123,39 @@ export function startCounters(
  * kennt alle Varianten; ohne die Normalisierung stünde das Feld im Formular
  * leer und `Date.parse` in der Validierung meldete einen ungültigen Wert.
  */
-function firstTimestamp(...candidates: (string | undefined)[]): string {
+function firstTimestamp(
+  /**
+   * Kalendertag für Angaben ohne Datum. Ohne diese Verankerung legt
+   * `parseTimestamp` „19:00" auf **heute** — bei einem Einsatz von gestern
+   * lägen Abfahrt und Ankunft dann einen Tag auseinander.
+   */
+  dayAnchor: string | undefined,
+  candidates: (string | undefined)[],
+): string {
   for (const candidate of candidates) {
     const parsed = parseTimestamp(candidate);
-    if (parsed) return parsed.toISOString();
+    if (!parsed) continue;
+    return dayAnchor && isTimeOnlyTimestamp(candidate)
+      ? timeOnSameDay(dayAnchor, parsed.toDate())
+      : parsed.toISOString();
+  }
+  return '';
+}
+
+/**
+ * Wie `firstTimestamp`, aber für die Ankunft: eine Uhrzeit ohne Datum, die vor
+ * der Abfahrt liegt, ist der nächste Morgen („01:15" nach Abfahrt um 23:50).
+ */
+function firstArrival(
+  abfahrt: string,
+  candidates: (string | undefined)[],
+): string {
+  for (const candidate of candidates) {
+    const parsed = parseTimestamp(candidate);
+    if (!parsed) continue;
+    return abfahrt && isTimeOnlyTimestamp(candidate)
+      ? arrivalFromTimeOnly(abfahrt, parsed.toDate())
+      : parsed.toISOString();
   }
   return '';
 }
@@ -153,6 +184,18 @@ export function buildEinsatzRows(source: EinsatzRowSource): EinsatzRow[] {
     const groupVehicle = matchVehicleByName(vehicles, item.name ?? '');
     const { driverId, driverName } = resolveDriver(crew, persons, item.id);
 
+    // Der Einsatztag verankert eine Alarmierung ohne Datum, die Abfahrt dann
+    // das Abrücken. Fehlt das Abrücken ganz, bleibt der Vorschlag am Tag der
+    // Abfahrt statt auf „jetzt" zu springen.
+    const abfahrt = firstTimestamp(firecall.date, [
+      item.alarmierung,
+      firecall.date,
+      now,
+    ]);
+    const ankunft =
+      firstArrival(abfahrt, [item.abruecken, firecall.abruecken]) ||
+      arrivalOnDepartureDay(abfahrt, new Date(now));
+
     return {
       key: item.id,
       sourceName: item.name ?? '',
@@ -162,8 +205,8 @@ export function buildEinsatzRows(source: EinsatzRowSource): EinsatzRow[] {
       driverName,
       // Auf Einsatzebene ist `date` der Alarmierungszeitpunkt; ein eigenes
       // Alarmierungsfeld gibt es dort nicht.
-      abfahrt: firstTimestamp(item.alarmierung, firecall.date, now),
-      ankunft: firstTimestamp(item.abruecken, firecall.abruecken, now),
+      abfahrt,
+      ankunft,
       counters: startCounters(groupVehicle),
       existingEntry: groupVehicle?.id
         ? findEntryForFirecallVehicle(entries, firecall.id, groupVehicle.id)

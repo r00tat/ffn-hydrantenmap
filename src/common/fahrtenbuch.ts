@@ -273,16 +273,60 @@ export function validateEntryInput(
   return errors;
 }
 
-/**
- * Datum der Abfahrt mit der aktuellen Uhrzeit — der Default für die Ankunft.
- * Liegt das Ergebnis vor der Abfahrt (Einsatz über Mitternacht), wird auf den
- * nächsten Kalendertag verschoben.
- */
-export function defaultAnkunft(abfahrt: string, now: Date = new Date()): string {
-  const departure = new Date(abfahrt);
-  if (Number.isNaN(departure.getTime())) return now.toISOString();
+/** Zeitangabe ohne Datum, etwa „10:05" — im Einsatz die Regel. */
+export function isTimeOnlyTimestamp(value?: string): boolean {
+  return !!value && /^\d{1,2}:\d{2}(:\d{2})?$/.test(value.trim());
+}
+
+/** Uhrzeit der Referenz auf dem Kalendertag der Abfahrt. */
+function onDepartureDay(departure: Date, reference: Date): Date {
   const result = new Date(departure);
-  result.setHours(now.getHours(), now.getMinutes(), 0, 0);
+  result.setHours(reference.getHours(), reference.getMinutes(), 0, 0);
+  return result;
+}
+
+/**
+ * Uhrzeit auf dem Kalendertag des Ankers, ohne weitere Regel. Für eine
+ * Alarmierung wie „19:00", die auf den Einsatztag gehört.
+ */
+export function timeOnSameDay(anchor: string, time: Date): string {
+  const day = new Date(anchor);
+  if (Number.isNaN(day.getTime())) return time.toISOString();
+  return onDepartureDay(day, time).toISOString();
+}
+
+/**
+ * Vorschlag für die Ankunft: Kalendertag der Abfahrt, Uhrzeit der Referenz
+ * (im Regelfall „jetzt"). Fahrten dauern normalerweise keinen Kalendertag,
+ * deshalb bleibt der Vorschlag am Tag der Abfahrt; läge die Referenzzeit davor,
+ * wird auf die Abfahrt geklemmt statt auf den nächsten Tag zu rollen. Eine
+ * Fahrt über Mitternacht trägt der Benutzer selbst ein — sonst stünden bei
+ * einem Einsatz von gestern Abend Abfahrt und Ankunft einen Tag auseinander.
+ *
+ * Dient auch dem Nachziehen: ändert der Benutzer die Abfahrt, wandert die
+ * Ankunft mit dem Datum mit und behält ihre Uhrzeit.
+ */
+export function arrivalOnDepartureDay(
+  abfahrt: string,
+  reference: Date = new Date(),
+): string {
+  const departure = new Date(abfahrt);
+  if (Number.isNaN(departure.getTime())) return reference.toISOString();
+  const result = onDepartureDay(departure, reference);
+  return (
+    result.getTime() < departure.getTime() ? departure : result
+  ).toISOString();
+}
+
+/**
+ * Ankunft aus einer eingetragenen Uhrzeit ohne Datum. Anders als beim Vorschlag
+ * ist die Uhrzeit hier gewollt: „01:30" nach einer Abfahrt um 23:50 kann nur der
+ * nächste Morgen sein, deshalb wird hier auf den nächsten Tag gerollt.
+ */
+export function arrivalFromTimeOnly(abfahrt: string, time: Date): string {
+  const departure = new Date(abfahrt);
+  if (Number.isNaN(departure.getTime())) return time.toISOString();
+  const result = onDepartureDay(departure, time);
   if (result.getTime() < departure.getTime()) {
     result.setDate(result.getDate() + 1);
   }

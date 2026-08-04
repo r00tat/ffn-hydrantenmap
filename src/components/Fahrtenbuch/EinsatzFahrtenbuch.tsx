@@ -16,6 +16,7 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
+  arrivalOnDepartureDay,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
@@ -207,11 +208,24 @@ export function EinsatzFahrtenbuchView({
                     label={t('abfahrt')}
                     value={toLocalInput(row.abfahrt)}
                     disabled={recorded}
-                    onChange={(e) =>
-                      onChangeRow(row.key, {
-                        abfahrt: fromLocalInput(e.target.value),
-                      })
-                    }
+                    onChange={(e) => {
+                      const abfahrt = fromLocalInput(e.target.value);
+                      // Die Ankunft zieht mit dem Datum mit und behält ihre
+                      // Uhrzeit — eine Fahrt endet im Normalfall am Tag der
+                      // Abfahrt.
+                      onChangeRow(
+                        row.key,
+                        abfahrt
+                          ? {
+                              abfahrt,
+                              ankunft: arrivalOnDepartureDay(
+                                abfahrt,
+                                new Date(row.ankunft),
+                              ),
+                            }
+                          : { abfahrt },
+                      );
+                    }}
                     slotProps={{ inputLabel: { shrink: true } }}
                   />
                 </Grid>

@@ -602,3 +602,97 @@ describe('mergeRowEdits', () => {
     expect(merged[0].driverName).toBe('J. Müller');
   });
 });
+
+describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
+  /** Einsatz von vorgestern, erfasst wird heute. */
+  const gestern = {
+    id: 'f2',
+    name: 'Brand B2',
+    date: '2026-08-01T18:45:00.000Z',
+  };
+  const heute = '2026-08-03T09:00:00.000Z';
+
+  it('legt eine Alarmierung ohne Datum auf den Einsatztag, nicht auf heute', () => {
+    // `alarmierung: '19:00'` hat kein Datum. Ohne Verankerung landete die
+    // Abfahrt auf dem heutigen Tag und damit zwei Tage nach dem Einsatz.
+    const rows = buildEinsatzRows({
+      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
+      crew: [],
+      vehicles: [vehicle],
+      persons: [],
+      entries: [],
+      firecall: gestern,
+      now: heute,
+    });
+
+    const abfahrt = new Date(rows[0].abfahrt);
+    expect(abfahrt.getMonth()).toBe(7);
+    expect(abfahrt.getDate()).toBe(1);
+    expect(abfahrt.getHours()).toBe(19);
+  });
+
+  it('legt ein Abrücken ohne Datum auf den Tag der Abfahrt', () => {
+    const rows = buildEinsatzRows({
+      fzgItems: [
+        {
+          id: 'i1',
+          name: 'RLFA 3000/100',
+          alarmierung: '19:00',
+          abruecken: '21:30',
+        },
+      ],
+      crew: [],
+      vehicles: [vehicle],
+      persons: [],
+      entries: [],
+      firecall: gestern,
+      now: heute,
+    });
+
+    const ankunft = new Date(rows[0].ankunft);
+    expect(ankunft.getDate()).toBe(new Date(rows[0].abfahrt).getDate());
+    expect(ankunft.getHours()).toBe(21);
+    expect(ankunft.getMinutes()).toBe(30);
+  });
+
+  it('rollt ein Abrücken nach Mitternacht auf den nächsten Tag', () => {
+    const rows = buildEinsatzRows({
+      fzgItems: [
+        {
+          id: 'i1',
+          name: 'RLFA 3000/100',
+          alarmierung: '23:50',
+          abruecken: '01:15',
+        },
+      ],
+      crew: [],
+      vehicles: [vehicle],
+      persons: [],
+      entries: [],
+      firecall: gestern,
+      now: heute,
+    });
+
+    expect(new Date(rows[0].ankunft).getDate()).toBe(2);
+    expect(new Date(rows[0].ankunft).getHours()).toBe(1);
+  });
+
+  it('schlägt ohne Abrücken eine Ankunft am Tag der Abfahrt vor', () => {
+    // Ohne diese Regel stand hier die aktuelle Uhrzeit von heute — bei einem
+    // Einsatz von vorgestern zwei Tage nach der Abfahrt.
+    const rows = buildEinsatzRows({
+      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
+      crew: [],
+      vehicles: [vehicle],
+      persons: [],
+      entries: [],
+      firecall: gestern,
+      now: heute,
+    });
+
+    const abfahrt = new Date(rows[0].abfahrt);
+    const ankunft = new Date(rows[0].ankunft);
+    expect(ankunft.getDate()).toBe(abfahrt.getDate());
+    expect(ankunft.getTime()).toBeGreaterThanOrEqual(abfahrt.getTime());
+  });
+});
