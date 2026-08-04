@@ -144,7 +144,9 @@ describe('autoFillCounterEnds', () => {
       {},
       24,
     );
-    expect(result.counters.km).toEqual({ start: 1000, end: 1024 });
+    // `toStrictEqual`, nicht `toEqual`: Letzteres übersieht ein explizit auf
+    // `undefined` gesetztes `diff` — das landete in Firestore als Feld.
+    expect(result.counters.km).toStrictEqual({ start: 1000, end: 1024 });
   });
 
   it('verändert die übergebenen Zähler nicht', () => {
