@@ -5,7 +5,7 @@ import {
   estimateRoundTripKm,
   isKmCounter,
   roundTripKmFromMeters,
-} from './fahrtenbuchAuto';
+} from './fahrtenbuchAutoFill';
 
 const km = VEHICLE_PRESETS.fahrzeug;
 const boot = VEHICLE_PRESETS.boot;
@@ -23,14 +23,13 @@ describe('roundTripKmFromMeters', () => {
 });
 
 describe('estimateRoundTripKm', () => {
-  it('schätzt die Rundstrecke aus der Luftlinie mit Umwegfaktor', () => {
-    // 0,1° Breitengrad ≈ 11,1 km Luftlinie → × 1,3 × 2 ≈ 28,9 km.
+  it('schätzt die Gesamtstrecke (Hin- und Rückfahrt) aus der Luftlinie mit Umwegfaktor', () => {
+    // 0,1° Breitengrad ≈ 11,13 km Luftlinie → × 1,3 × 2 ≈ 28,94 km, aufgerundet 29.
     const value = estimateRoundTripKm(
       { lat: 47.9482913, lng: 16.848222 },
       { lat: 48.0482913, lng: 16.848222 },
     );
-    expect(value).toBeGreaterThanOrEqual(28);
-    expect(value).toBeLessThanOrEqual(30);
+    expect(value).toBe(29);
   });
 });
 
@@ -40,6 +39,10 @@ describe('isKmCounter', () => {
     expect(isKmCounter({ ...km[0], unit: ' KM ' })).toBe(true);
   });
 
+  it('erkennt einen importierten Zähler mit ausgeschriebener Einheit über die Preset-ID', () => {
+    expect(isKmCounter({ ...km[0], unit: 'Kilometer' })).toBe(true);
+  });
+
   it('lehnt Zähler ohne Kilometereinheit und reine Ablesungen ab', () => {
     expect(isKmCounter(boot[0])).toBe(false);
     expect(isKmCounter({ ...km[0], mode: 'reading' })).toBe(false);
@@ -47,7 +50,7 @@ describe('isKmCounter', () => {
 });
 
 describe('autoFillCounterEnds', () => {
-  it('leitet den Kilometer-Endstand aus der Rundstrecke ab', () => {
+  it('leitet den Kilometer-Endstand aus der Gesamtstrecke ab', () => {
     const result = autoFillCounterEnds(km, { km: { start: 1000 } }, {}, 24);
     expect(result.counters.km).toEqual({ start: 1000, end: 1024 });
     expect(result.counterSources).toEqual({ km: 'route' });
@@ -65,22 +68,28 @@ describe('autoFillCounterEnds', () => {
   });
 
   it('füllt nichts, wenn der Startstand fehlt', () => {
-    const result = autoFillCounterEnds(km, {}, {}, 24);
+    const result = autoFillCounterEnds(km, {}, { km: 990 }, 24);
     expect(result.counters.km?.end).toBeUndefined();
     expect(result.counterSources).toEqual({});
   });
 
-  it('füllt nichts, wenn keine Rundstrecke bekannt ist', () => {
-    const result = autoFillCounterEnds(km, { km: { start: 1000 } }, {}, undefined);
+  it('füllt nichts, wenn keine Gesamtstrecke bekannt ist', () => {
+    const result = autoFillCounterEnds(
+      km,
+      { km: { start: 1000 } },
+      { km: 990 },
+      undefined,
+    );
     expect(result.counters.km).toEqual({ start: 1000 });
+    expect(result.counters.km?.end).toBeUndefined();
     expect(result.counterSources).toEqual({});
   });
 
   it('übernimmt Zähler ohne Kilometerbezug unverändert', () => {
     const result = autoFillCounterEnds(
       boot,
-      {},
-      { betriebsstundenBb: 20, lenzpumpeStb: 5, lenzpumpeBb: 7 },
+      { betriebsstundenBb: { start: 20 } },
+      { lenzpumpeStb: 5, lenzpumpeBb: 7 },
       24,
     );
     expect(result.counters.betriebsstundenBb?.end).toBe(20);
@@ -97,6 +106,45 @@ describe('autoFillCounterEnds', () => {
     const result = autoFillCounterEnds(boot, {}, {}, 24);
     expect(result.counters.betriebsstundenBb?.end).toBeUndefined();
     expect(result.counterSources).toEqual({});
+  });
+
+  it('füllt einen Start/Ende-Zähler nicht, wenn der Startstand dieser Fahrt fehlt, selbst wenn ein letzter Stand bekannt ist', () => {
+    const result = autoFillCounterEnds(boot, {}, { betriebsstundenBb: 20 }, 24);
+    expect(result.counters.betriebsstundenBb?.end).toBeUndefined();
+    expect(result.counterSources).toEqual({});
+  });
+
+  it('füllt nur den abgeleiteten Zähler, wenn der Kilometer-Endstand bereits eingetragen ist', () => {
+    const definitions: CounterDefinition[] = [
+      ...km,
+      {
+        id: 'sonstige',
+        label: 'Sonstige Ablesung',
+        unit: 'h',
+        mode: 'reading',
+        changeWarning: 'anyChange',
+        required: false,
+      },
+    ];
+    const result = autoFillCounterEnds(
+      definitions,
+      { km: { start: 1000, end: 1050 } },
+      { sonstige: 12 },
+      24,
+    );
+    expect(result.counters.km).toEqual({ start: 1000, end: 1050 });
+    expect(result.counters.sonstige?.end).toBe(12);
+    expect(result.counterSources).toEqual({ sonstige: 'unchanged' });
+  });
+
+  it('verwirft ein mitgeschlepptes diff beim Auffüllen', () => {
+    const result = autoFillCounterEnds(
+      km,
+      { km: { start: 1000, diff: 999 } },
+      {},
+      24,
+    );
+    expect(result.counters.km).toEqual({ start: 1000, end: 1024 });
   });
 
   it('verändert die übergebenen Zähler nicht', () => {
