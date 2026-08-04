@@ -1,6 +1,8 @@
 'use client';
 
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DownloadIcon from '@mui/icons-material/Download';
+import PrintIcon from '@mui/icons-material/Print';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -12,9 +14,9 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { useFormatter, useTranslations } from 'next-intl';
+import { useFormatter, useLocale, useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ShareLinkInfo } from '../../common/fahrtenbuchShare';
 import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
 import { NON_TENANT_GROUP_IDS } from './groupTypes';
@@ -23,12 +25,22 @@ import {
   getFahrtenbuchShareLink,
   revokeFahrtenbuchShareLink,
 } from './shareLinkActions';
+import {
+  PrintWindowBlockedError,
+  downloadShareLinkQr,
+  printShareLinkQr,
+} from './shareLinkQr';
 
 export interface FahrtenbuchShareLinkSectionProps {
   groupId: string;
+  /** Erscheint auf dem Ausdruck, damit der Zettel zuordenbar bleibt. */
+  groupName?: string;
 }
 
 type PendingAction = 'regenerate' | 'revoke';
+
+/** Warum ein Export scheiterte — der Pop-up-Blocker braucht einen eigenen Rat. */
+type ExportError = 'failed' | 'blocked';
 
 /** Wie lange „Link kopiert“ im Tooltip stehen bleibt. */
 const COPIED_RESET_MS = 3000;
@@ -40,9 +52,13 @@ const COPIED_RESET_MS = 3000;
  */
 export default function FahrtenbuchShareLinkSection({
   groupId,
+  groupName,
 }: FahrtenbuchShareLinkSectionProps) {
   const t = useTranslations('groups.shareLink');
   const format = useFormatter();
+  const locale = useLocale();
+  const qrRef = useRef<HTMLDivElement>(null);
+  const [exportError, setExportError] = useState<ExportError>();
   const [link, setLink] = useState<ShareLinkInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -108,6 +124,25 @@ export default function FahrtenbuchShareLinkSection({
       await revokeFahrtenbuchShareLink(groupId);
       setLink(null);
     });
+
+  /**
+   * Beide Exporte lesen das SVG aus dem DOM statt den Code neu zu erzeugen —
+   * so kann ein Ausdruck nie auf einen anderen Link zeigen als der Bildschirm.
+   */
+  const runExport = useCallback(async (action: (svg: SVGSVGElement) => void | Promise<void>) => {
+    setExportError(undefined);
+    const svg = qrRef.current?.querySelector('svg');
+    if (!svg) {
+      setExportError('failed');
+      return;
+    }
+    try {
+      await action(svg);
+    } catch (err) {
+      console.error('Fahrtenbuch share link QR export failed:', err);
+      setExportError(err instanceof PrintWindowBlockedError ? 'blocked' : 'failed');
+    }
+  }, []);
 
   if (!isTenant) return null;
 
@@ -225,6 +260,7 @@ export default function FahrtenbuchShareLinkSection({
               abbekommt — die Defaults von qrcode.react (`L`, `marginSize=0`)
               sind dafür die schwächste Stufe. */}
           <Box
+            ref={qrRef}
             sx={{
               p: 2,
               mt: 1,
@@ -241,7 +277,43 @@ export default function FahrtenbuchShareLinkSection({
               title={t('heading')}
             />
           </Box>
-          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          {exportError && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              {exportError === 'blocked' ? t('printBlocked') : t('exportFailed')}
+            </Alert>
+          )}
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ mt: 1, flexWrap: 'wrap' }}
+          >
+            <Button
+              size="small"
+              startIcon={<DownloadIcon />}
+              onClick={() =>
+                runExport((svg) => downloadShareLinkQr(svg, groupId))
+              }
+            >
+              {t('download')}
+            </Button>
+            <Button
+              size="small"
+              startIcon={<PrintIcon />}
+              onClick={() =>
+                runExport((svg) =>
+                  printShareLinkQr(svg, {
+                    heading: t('heading'),
+                    groupName,
+                    hint: t('printHint'),
+                    url: link.url,
+                    locale,
+                  }),
+                )
+              }
+            >
+              {t('print')}
+            </Button>
             <Button
               size="small"
               disabled={busy}

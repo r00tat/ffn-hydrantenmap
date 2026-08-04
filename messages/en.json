@@ -1289,6 +1289,8 @@
       "create": "Create link",
       "regenerate": "Regenerate",
       "revoke": "Delete",
+      "download": "Download PNG",
+      "print": "Print",
       "copy": "Copy link",
       "copied": "Link copied",
       "copyFailed": "Copying failed. Please select the link manually.",
@@ -1299,7 +1301,10 @@
       "revokeConfirm": "The link stops working immediately. Printed QR codes will no longer work.",
       "failed": "The action failed.",
       "loadFailed": "The link could not be loaded.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "exportFailed": "The QR code could not be exported.",
+      "printBlocked": "The print window was blocked. Please allow pop-ups for this site.",
+      "printHint": "Scan this code to log a trip in the logbook. No sign-in required."
     }
   },
   "tokens": {

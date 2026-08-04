@@ -343,7 +343,10 @@ export default function GroupDialogg({
               </Button>
             )}
 
-            <FahrtenbuchShareLinkSection groupId={groupId} />
+            <FahrtenbuchShareLinkSection
+              groupId={groupId}
+              groupName={group.name}
+            />
           </>
         )}
       </DialogContent>

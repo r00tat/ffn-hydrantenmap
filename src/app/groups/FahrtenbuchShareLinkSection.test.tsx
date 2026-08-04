@@ -4,11 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithIntl } from '../../test-utils/intlRender';
 
-const { getMock, createMock, revokeMock } = vi.hoisted(() => ({
-  getMock: vi.fn(),
-  createMock: vi.fn(),
-  revokeMock: vi.fn(),
-}));
+const { getMock, createMock, revokeMock, downloadQrMock, printQrMock } =
+  vi.hoisted(() => ({
+    getMock: vi.fn(),
+    createMock: vi.fn(),
+    revokeMock: vi.fn(),
+    downloadQrMock: vi.fn(),
+    printQrMock: vi.fn(),
+  }));
 
 vi.mock('./shareLinkActions', () => ({
   getFahrtenbuchShareLink: getMock,
@@ -16,7 +19,18 @@ vi.mock('./shareLinkActions', () => ({
   revokeFahrtenbuchShareLink: revokeMock,
 }));
 
+// Canvas und Bild-Dekodierung fehlen in jsdom; die Exporte selbst sind in
+// shareLinkQr.test.ts abgedeckt. Hier zählt nur, dass die Buttons sie mit den
+// richtigen Daten aufrufen — `PrintWindowBlockedError` bleibt echt, weil die
+// Komponente den Fehlertyp auswertet.
+vi.mock('./shareLinkQr', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./shareLinkQr')>()),
+  downloadShareLinkQr: downloadQrMock,
+  printShareLinkQr: printQrMock,
+}));
+
 import FahrtenbuchShareLinkSection from './FahrtenbuchShareLinkSection';
+import { PrintWindowBlockedError } from './shareLinkQr';
 
 const info = {
   url: 'https://einsatz.example/fahrtenbuch/teilen/tok123',
@@ -31,6 +45,9 @@ describe('FahrtenbuchShareLinkSection', () => {
     getMock.mockReset();
     createMock.mockReset();
     revokeMock.mockReset();
+    downloadQrMock.mockReset();
+    downloadQrMock.mockResolvedValue(undefined);
+    printQrMock.mockReset();
   });
 
   it('bietet das Erstellen an, wenn noch kein Link existiert', async () => {
@@ -148,6 +165,91 @@ describe('FahrtenbuchShareLinkSection', () => {
     expect(
       screen.getByRole('button', { name: 'Erneut versuchen' }),
     ).toBeInTheDocument();
+  });
+
+  it('lädt den QR-Code als Bild herunter', async () => {
+    getMock.mockResolvedValue(info);
+    const user = userEvent.setup();
+    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'PNG herunterladen' }),
+    );
+
+    await waitFor(() => expect(downloadQrMock).toHaveBeenCalledTimes(1));
+    const [svg, groupId] = downloadQrMock.mock.calls[0];
+    // Exportiert wird das SVG aus dem DOM — nicht ein zweiter, neu erzeugter
+    // Code, der auf einen anderen Link zeigen könnte.
+    expect((svg as SVGSVGElement).tagName).toBe('svg');
+    expect((svg as SVGSVGElement).querySelector('title')?.textContent).toBe(
+      'Fahrtenbuch-Link',
+    );
+    expect(groupId).toBe('ffnd');
+  });
+
+  it('druckt den QR-Code mit Gruppenname und Link im Klartext', async () => {
+    getMock.mockResolvedValue(info);
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchShareLinkSection groupId="ffnd" groupName="FF Neusiedl" />,
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Drucken' }));
+
+    await waitFor(() => expect(printQrMock).toHaveBeenCalledTimes(1));
+    const [svg, labels] = printQrMock.mock.calls[0];
+    expect((svg as SVGSVGElement).tagName).toBe('svg');
+    expect(labels).toMatchObject({
+      heading: 'Fahrtenbuch-Link',
+      groupName: 'FF Neusiedl',
+      url: info.url,
+      locale: 'de',
+    });
+  });
+
+  it('rät bei blockiertem Pop-up zum Freigeben statt nur „fehlgeschlagen“ zu melden', async () => {
+    getMock.mockResolvedValue(info);
+    printQrMock.mockImplementation(() => {
+      throw new PrintWindowBlockedError();
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+
+    await user.click(await screen.findByRole('button', { name: 'Drucken' }));
+
+    expect(
+      await screen.findByText(
+        'Das Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('meldet einen fehlgeschlagenen Download', async () => {
+    getMock.mockResolvedValue(info);
+    downloadQrMock.mockRejectedValueOnce(new Error('no canvas'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'PNG herunterladen' }),
+    );
+
+    expect(
+      await screen.findByText('Der QR-Code konnte nicht exportiert werden.'),
+    ).toBeInTheDocument();
+  });
+
+  it('bietet Export erst an, wenn ein Link existiert', async () => {
+    getMock.mockResolvedValue(null);
+    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+
+    await screen.findByRole('button', { name: 'Link erstellen' });
+    expect(screen.queryByRole('button', { name: 'Drucken' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'PNG herunterladen' }),
+    ).toBeNull();
   });
 
   it('rendert nichts für eine Nicht-Mandanten-Gruppe', () => {

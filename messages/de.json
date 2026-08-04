@@ -1289,6 +1289,8 @@
       "create": "Link erstellen",
       "regenerate": "Neu erzeugen",
       "revoke": "Löschen",
+      "download": "PNG herunterladen",
+      "print": "Drucken",
       "copy": "Link kopieren",
       "copied": "Link kopiert",
       "copyFailed": "Kopieren nicht möglich. Bitte den Link von Hand markieren.",
@@ -1299,7 +1301,10 @@
       "revokeConfirm": "Der Link wird sofort ungültig. Bereits ausgedruckte QR-Codes funktionieren dann nicht mehr.",
       "failed": "Die Aktion ist fehlgeschlagen.",
       "loadFailed": "Der Link konnte nicht geladen werden.",
-      "retry": "Erneut versuchen"
+      "retry": "Erneut versuchen",
+      "exportFailed": "Der QR-Code konnte nicht exportiert werden.",
+      "printBlocked": "Das Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.",
+      "printHint": "Diesen Code scannen, um eine Fahrt ins Fahrtenbuch einzutragen. Eine Anmeldung ist nicht nötig."
     }
   },
   "tokens": {
