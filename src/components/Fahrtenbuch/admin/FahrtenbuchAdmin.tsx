@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import AdminGuard from '../../site/AdminGuard';
+import GroupSettings from './GroupSettings';
 import PersonAdmin from './PersonAdmin';
 import VehicleAdmin from './VehicleAdmin';
 
@@ -66,6 +67,7 @@ export default function FahrtenbuchAdmin() {
             >
               <Tab label={t('admin.vehicles')} />
               <Tab label={t('admin.persons')} />
+              <Tab label={t('admin.settings')} />
             </Tabs>
 
             {/* `key` verwirft Dialog- und Meldungszustand beim Gruppenwechsel,
@@ -84,6 +86,7 @@ export default function FahrtenbuchAdmin() {
                 groupName={groupName}
               />
             )}
+            {tab === 2 && <GroupSettings key={groupId} groupId={groupId} />}
           </>
         )}
       </Container>

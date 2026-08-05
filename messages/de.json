@@ -431,6 +431,7 @@
       "title": "Fahrtenbuch-Stammdaten",
       "vehicles": "Fahrzeuge",
       "persons": "Personen",
+      "settings": "Einstellungen",
       "addVehicle": "Fahrzeug anlegen",
       "addPerson": "Person anlegen",
       "editVehicle": "Fahrzeug bearbeiten",
@@ -495,7 +496,14 @@
       "noGroups": "Du bist in keiner Gruppe, für die Stammdaten gepflegt werden können.",
       "customCounters": "Die vorhandenen Zähler entsprechen keiner Vorlage. Beim Speichern werden sie durch die gewählte Vorlage ersetzt.",
       "alreadyImported": "bereits importiert",
-      "importNothing": "Keine Fahrzeuge im Kostenersatz-Bestand gefunden."
+      "importNothing": "Keine Fahrzeuge im Kostenersatz-Bestand gefunden.",
+      "standort": "Standort des Feuerwehrhauses",
+      "standortHint": "Startpunkt für die Berechnung der Einsatzkilometer. Ohne Angabe wird der Standardstandort verwendet.",
+      "latitude": "Breitengrad",
+      "longitude": "Längengrad",
+      "standortSaved": "Standort gespeichert.",
+      "standortInvalid": "Die Koordinaten sind ungültig.",
+      "standortSaveFailed": "Speichern fehlgeschlagen: {message}"
     }
   },
   "fahrtenbuchShare": {

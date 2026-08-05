@@ -431,6 +431,7 @@
       "title": "Trip log master data",
       "vehicles": "Vehicles",
       "persons": "People",
+      "settings": "Settings",
       "addVehicle": "Add vehicle",
       "addPerson": "Add person",
       "editVehicle": "Edit vehicle",
@@ -495,7 +496,14 @@
       "noGroups": "You are not a member of any group whose master data can be managed.",
       "customCounters": "The current counters do not match any preset. Saving replaces them with the selected preset.",
       "alreadyImported": "already imported",
-      "importNothing": "No vehicles found in the cost recovery fleet."
+      "importNothing": "No vehicles found in the cost recovery fleet.",
+      "standort": "Fire station location",
+      "standortHint": "Starting point for calculating operation mileage. The default location is used when left empty.",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "standortSaved": "Location saved.",
+      "standortInvalid": "The coordinates are invalid.",
+      "standortSaveFailed": "Saving failed: {message}"
     }
   },
   "fahrtenbuchShare": {
