@@ -1,38 +1,91 @@
 import 'server-only';
 
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth, Impersonated } from 'google-auth-library';
 import type { GeoPositionObject } from '../../../common/geo';
 import { getGcpProjectId } from '../../../server/firebase/project';
 
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
-// Der dokumentierte Autorisierungs-Scope für v2:computeRoutes. Lokal mit
-// Service-Account-JSON scheitert bei einem falschen Scope bereits die
-// Tokenausgabe mit `invalid_scope`. Auf Cloud Run fällt ein falscher Scope
-// dagegen gar nicht auf: Der Metadata-Server ignoriert angeforderte Scopes und
-// liefert ohnehin das Standardtoken. Ein 403 dort deutet deshalb nicht auf den
-// Scope, sondern auf fehlende IAM-Rechte oder eine nicht aktivierte Routes API.
+// Der dokumentierte Autorisierungs-Scope für v2:computeRoutes. Die Routes API
+// akzeptiert `cloud-platform` ausdrücklich nicht.
 const ROUTES_SCOPE =
   'https://www.googleapis.com/auth/maps-platform.routespreferred';
 
+// Für den Aufruf der IAM Credentials API, die das Maps-Token ausstellt.
+const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
+
 /**
  * Die Maps Platform akzeptiert wahlweise API-Key oder OAuth. Wir nehmen OAuth
- * über den Service Account: Auf Cloud Run liefert ADC das Token ohne jede
- * Konfiguration, lokal greift `GOOGLE_APPLICATION_CREDENTIALS`. Damit braucht
- * es kein weiteres Secret im Deployment.
+ * über den Service Account, damit kein weiteres Secret ins Deployment muss.
  *
- * Die Instanz wird erst beim ersten Aufruf erzeugt: Vitest hebt die
- * `vi.mock`-Factory über die `const`-Deklarationen des Testmoduls, auf die sie
- * zugreift — ein `new GoogleAuth()` auf Modulebene liefe im Test, während diese
- * Bindungen noch in ihrer temporalen Totzone liegen. Danach bleibt die Instanz
- * für Folgeaufrufe erhalten, damit Tokens über Aufrufe hinweg gecacht werden.
+ * Der Weg dorthin ist umständlicher als er aussieht: `new GoogleAuth({ scopes })`
+ * bekommt in genau den beiden Umgebungen, die uns betreffen, **kein** Token mit
+ * dem gewünschten Scope.
+ *
+ * - Auf Cloud Run ignoriert der Metadata-Server angeforderte Scopes und liefert
+ *   immer das Standardtoken der Instanz (`cloud-platform`).
+ * - Lokal mit `gcloud auth application-default login` liegen die Scopes zum
+ *   Zeitpunkt des Logins fest; ein anderer lässt sich nachträglich nicht
+ *   anfordern.
+ *
+ * In beiden Fällen geht der Aufruf hinaus und die Routes API antwortet mit
+ * `403 ACCESS_TOKEN_SCOPE_INSUFFICIENT` — der Scope im Code ist dabei richtig,
+ * nur trägt ihn das Token nicht. Nur ein Service-Account-JSON-Key könnte ein
+ * beliebig gescoptes Token selbst signieren, und den wollen wir nicht.
+ *
+ * Deshalb der Umweg über die IAM Credentials API: Der Service Account
+ * impersoniert sich selbst und lässt sich dabei ein Token mit dem Maps-Scope
+ * ausstellen. Das funktioniert in beiden Umgebungen gleich und setzt
+ * `roles/iam.serviceAccountTokenCreator` auf sich selbst voraus (siehe
+ * `terraform/main.tf`).
  */
 let auth: GoogleAuth | undefined;
 function getAuth(): GoogleAuth {
+  // Erst beim ersten Aufruf erzeugt: Vitest hebt die `vi.mock`-Factory über die
+  // `const`-Deklarationen des Testmoduls, auf die sie zugreift — ein
+  // `new GoogleAuth()` auf Modulebene liefe, während diese Bindungen noch in
+  // ihrer temporalen Totzone liegen.
   if (!auth) {
-    auth = new GoogleAuth({ scopes: [ROUTES_SCOPE] });
+    auth = new GoogleAuth({ scopes: [CLOUD_PLATFORM_SCOPE] });
   }
   return auth;
+}
+
+/**
+ * Der Client, der das Maps-Token ausstellt. Wird über Aufrufe hinweg behalten,
+ * weil er das ausgestellte Token bis kurz vor Ablauf cacht — sonst käme auf
+ * jeden Routing-Aufruf ein zweiter an die IAM Credentials API.
+ */
+let tokenSource: Impersonated | undefined;
+
+async function getRoutesToken(): Promise<string | undefined> {
+  if (!tokenSource) {
+    const googleAuth = getAuth();
+    const [sourceClient, credentials] = await Promise.all([
+      googleAuth.getClient(),
+      googleAuth.getCredentials(),
+    ]);
+    // Ohne Service-Account-Identität gibt es kein Ziel für die Impersonation.
+    // Das trifft etwa auf ein reines Nutzer-ADC ohne konfigurierten Service
+    // Account zu; dort bleibt das Routing aus, statt mit einem untauglichen
+    // Token loszulaufen.
+    if (!credentials.client_email) {
+      console.error(
+        'computeRouteDistanceMeters: kein Service Account in den Credentials — ' +
+          'Routing braucht eine SA-Identität, die sich selbst impersonieren kann',
+      );
+      return undefined;
+    }
+    tokenSource = new Impersonated({
+      sourceClient,
+      targetPrincipal: credentials.client_email,
+      targetScopes: [ROUTES_SCOPE],
+      lifetime: 3600,
+    });
+  }
+
+  const { token } = await tokenSource.getAccessToken();
+  return token ?? undefined;
 }
 
 interface ComputeRoutesResponse {
@@ -61,7 +114,7 @@ export async function computeRouteDistanceMeters(
 ): Promise<number | undefined> {
   try {
     const [token, project] = await Promise.all([
-      getAuth().getAccessToken(),
+      getRoutesToken(),
       getGcpProjectId(),
     ]);
     if (!token) {

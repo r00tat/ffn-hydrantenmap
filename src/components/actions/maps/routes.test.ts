@@ -3,11 +3,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const getAccessToken = vi.fn();
+const getClient = vi.fn();
+const getCredentials = vi.fn();
 const googleAuthConstructorCalls: { scopes?: string[] }[] = [];
+const impersonatedConstructorCalls: {
+  targetPrincipal?: string;
+  targetScopes?: string[];
+}[] = [];
 vi.mock('google-auth-library', () => ({
   GoogleAuth: class {
     constructor(options?: { scopes?: string[] }) {
       googleAuthConstructorCalls.push(options ?? {});
+    }
+    getClient = getClient;
+    getCredentials = getCredentials;
+  },
+  // Das Maps-Token entsteht nicht aus `GoogleAuth`, sondern über die IAM
+  // Credentials API — nur so trägt es den Routes-Scope. Die Begründung steht
+  // in `routes.ts`.
+  Impersonated: class {
+    constructor(options?: {
+      targetPrincipal?: string;
+      targetScopes?: string[];
+    }) {
+      impersonatedConstructorCalls.push(options ?? {});
     }
     getAccessToken = getAccessToken;
   },
@@ -24,7 +43,11 @@ const to = { lat: 47.98, lng: 16.9 };
 
 describe('computeRouteDistanceMeters', () => {
   beforeEach(() => {
-    getAccessToken.mockResolvedValue('test-token');
+    getAccessToken.mockResolvedValue({ token: 'test-token' });
+    getClient.mockResolvedValue({ type: 'source-client' });
+    getCredentials.mockResolvedValue({
+      client_email: 'run-sa@ffn-utils.iam.gserviceaccount.com',
+    });
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -162,13 +185,18 @@ describe('computeRouteDistanceMeters', () => {
   });
 
   it('liefert undefined ohne fetch-Aufruf, wenn kein Access-Token vorliegt', async () => {
-    getAccessToken.mockResolvedValue(null);
+    getAccessToken.mockResolvedValue({ token: null });
 
     await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('legt GoogleAuth nur einmal mit dem Routes-Scope an', async () => {
+  it('holt das Token über Selbst-Impersonation mit dem Routes-Scope', async () => {
+    // Der Kern des 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT`: Ein `GoogleAuth` mit
+    // dem Maps-Scope bekommt auf Cloud Run trotzdem nur das Standardtoken
+    // (`cloud-platform`). Den Routes-Scope trägt erst ein Token, das die IAM
+    // Credentials API ausstellt. Stünde der Maps-Scope wieder am `GoogleAuth`,
+    // wäre der Fehler zurück.
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ routes: [{ distanceMeters: 1 }] }),
@@ -177,9 +205,33 @@ describe('computeRouteDistanceMeters', () => {
     await computeRouteDistanceMeters(from, to);
     await computeRouteDistanceMeters(from, to);
 
+    // Beide nur einmal angelegt: Der Impersonated-Client cacht das Token, sonst
+    // käme auf jeden Routing-Aufruf ein zweiter an die IAM Credentials API.
     expect(googleAuthConstructorCalls).toHaveLength(1);
     expect(googleAuthConstructorCalls[0].scopes).toEqual([
+      'https://www.googleapis.com/auth/cloud-platform',
+    ]);
+
+    expect(impersonatedConstructorCalls).toHaveLength(1);
+    expect(impersonatedConstructorCalls[0].targetScopes).toEqual([
       'https://www.googleapis.com/auth/maps-platform.routespreferred',
     ]);
+    expect(impersonatedConstructorCalls[0].targetPrincipal).toBe(
+      'run-sa@ffn-utils.iam.gserviceaccount.com',
+    );
+  });
+
+  it('bricht ohne Service-Account-Identität ab, statt mit untauglichem Token loszulaufen', async () => {
+    // Eigene Modulinstanz: Die geteilte hat ihren Token-Client längst gebaut,
+    // und der Zweig würde nie erreicht.
+    vi.resetModules();
+    getCredentials.mockResolvedValue({});
+    const fresh = await import('./routes');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      fresh.computeRouteDistanceMeters(from, to),
+    ).resolves.toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
