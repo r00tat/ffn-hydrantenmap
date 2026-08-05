@@ -55,6 +55,17 @@ export interface EntryDerivation {
   routeDistanceMeters?: number;
 }
 
+export interface BuildEntryOptions {
+  /** Serverseitig abgeleitete Werte — siehe `EntryDerivation`. */
+  derivation?: EntryDerivation;
+  /**
+   * Fehlende Zählerstände nicht als Fehler behandeln. Setzt nur die
+   * Sammelerfassung aus dem Einsatz; die Begründung steht an
+   * `ValidateEntryOptions.countersOptional`.
+   */
+  countersOptional?: boolean;
+}
+
 /** Das geladene Fahrzeugdokument — die Quelle für Name und Zählerdefinitionen. */
 export type EntryVehicle = Partial<
   Pick<FahrtenbuchVehicle, 'name' | 'counters'>
@@ -87,12 +98,16 @@ export function buildEntryDocument(
   input: FahrtenbuchEntryInput,
   group: string,
   actor: EntryActor,
-  derivation?: EntryDerivation,
+  options?: BuildEntryOptions,
 ): FahrtenbuchEntry {
+  const derivation = options?.derivation;
   // Die Invariante von `EntryDerivation` strukturell abgesichert, statt sie
   // nur zu dokumentieren: Ein Dokument darf nicht behaupten, ein Stand sei aus
   // einer Route berechnet, ohne die Route mitzuliefern. Die Aufrufer fangen
   // Ausnahmen je Eintrag ab — die betroffene Zeile fällt aus, der Rest nicht.
+  //
+  // Gilt nur für `'route'`: Eine Schätzung hat keine Route, die sie belegen
+  // könnte — sie kennzeichnet sich über `'estimate'` selbst als geschätzt.
   if (
     derivation?.routeDistanceMeters === undefined &&
     Object.values(derivation?.counterSources ?? {}).includes('route')
@@ -103,15 +118,19 @@ export function buildEntryDocument(
   }
 
   const definitions: CounterDefinition[] = vehicle.counters ?? [];
-  const errors = validateEntryInput(definitions, {
-    vehicleId: input.vehicleId,
-    driverName: input.driverName,
-    zweck: input.zweck,
-    ziel: input.ziel,
-    abfahrt: input.abfahrt,
-    ankunft: input.ankunft,
-    counters: input.counters ?? {},
-  });
+  const errors = validateEntryInput(
+    definitions,
+    {
+      vehicleId: input.vehicleId,
+      driverName: input.driverName,
+      zweck: input.zweck,
+      ziel: input.ziel,
+      abfahrt: input.abfahrt,
+      ankunft: input.ankunft,
+      counters: input.counters ?? {},
+    },
+    { countersOptional: options?.countersOptional },
+  );
   if (errors.length > 0) {
     throw new Error(`invalid fahrtenbuch entry: ${errors.join(', ')}`);
   }

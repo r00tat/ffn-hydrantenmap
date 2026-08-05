@@ -2,7 +2,11 @@ import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Container from '@mui/material/Container';
 import { getTranslations } from 'next-intl/server';
-import type { ShareLinkFormData } from '../../../../common/fahrtenbuchShare';
+import {
+  SHARE_LINK_VEHICLE_PARAM,
+  resolveShareLinkVehicleId,
+  type ShareLinkFormData,
+} from '../../../../common/fahrtenbuchShare';
 import ShareLinkEntryForm from '../../../../components/Fahrtenbuch/ShareLinkEntryForm';
 import {
   resolveFahrtenbuchShareLink,
@@ -17,10 +21,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { token } = await params;
+  const [{ token }, query] = await Promise.all([params, searchParams]);
   const t = await getTranslations('fahrtenbuchShare');
 
   // Zwei getrennte try-Blöcke: nur das Auflösen des Tokens darf pauschal als
@@ -59,5 +65,17 @@ export default async function Page({
     );
   }
 
-  return <ShareLinkEntryForm token={token} data={data} />;
+  return (
+    <ShareLinkEntryForm
+      token={token}
+      data={data}
+      // Erst gegen die geladenen Fahrzeuge geprüft: ein Aufkleber überlebt das
+      // Fahrzeug, und eine ID, die der Server beim Speichern ablehnen würde,
+      // darf im Formular nicht vorbelegt stehen.
+      vehicleId={resolveShareLinkVehicleId(
+        query[SHARE_LINK_VEHICLE_PARAM],
+        data.vehicles,
+      )}
+    />
+  );
 }

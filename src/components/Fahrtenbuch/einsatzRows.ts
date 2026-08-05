@@ -7,12 +7,17 @@ import {
   normalizeName,
   timeOnSameDay,
   validateEntryInput,
+  type CounterDefinition,
   type CounterReading,
   type FahrtenbuchEntry,
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import { autoFillCounterEnds } from '../../common/fahrtenbuchAutoFill';
+import {
+  autoFillCounterEnds,
+  isKmCounter,
+  type RoundTripDistance,
+} from '../../common/fahrtenbuchAutoFill';
 import { parseTimestamp } from '../../common/time-format';
 
 export interface EinsatzFzgItem {
@@ -46,7 +51,6 @@ export interface EinsatzRowSource {
   persons: FahrtenbuchPerson[];
   entries: FahrtenbuchEntry[];
   firecall: EinsatzFirecall;
-  now: string;
 }
 
 export interface EinsatzRow {
@@ -161,12 +165,81 @@ function firstArrival(
   return '';
 }
 
+/** Abfahrt und Ankunft, die für alle Fahrzeuge des Einsatzes gelten. */
+export interface EinsatzTimes {
+  abfahrt: string;
+  ankunft: string;
+}
+
+/**
+ * Die gemeinsamen Zeiten des Einsatzes. Eine Zeit für alle statt einer je
+ * Fahrzeug: Beim Befüllen aus dem Einsatz sind die Zeiten fast immer dieselben,
+ * und ein Feldpaar je Fahrzeug bedeutete dieselbe Angabe fünfmal zu prüfen.
+ *
+ * Gewählt wird die **früheste** Alarmierung und das **späteste** Abrücken —
+ * damit deckt die gemeinsame Spanne jede einzelne Fahrt ab. Der umgekehrte Fall
+ * (späteste Abfahrt) würde für ein früher ausgerücktes Fahrzeug eine Abfahrt
+ * behaupten, die nach seiner Ankunft liegt.
+ */
+export function einsatzTimes(
+  fzgItems: EinsatzFzgItem[],
+  firecall: EinsatzFirecall,
+  now: string,
+): EinsatzTimes {
+  const abfahrt =
+    earliest(
+      fzgItems.map((item) => firstTimestamp(firecall.date, [item.alarmierung])),
+    ) ?? firstTimestamp(firecall.date, [firecall.date, now]);
+
+  const ankunft =
+    latest([
+      ...fzgItems.map((item) => firstArrival(abfahrt, [item.abruecken])),
+      firstArrival(abfahrt, [firecall.abruecken]),
+    ]) ?? arrivalOnDepartureDay(abfahrt, new Date(now));
+
+  return { abfahrt, ankunft };
+}
+
+/** Der früheste nicht-leere Zeitstempel, oder `undefined`. */
+function earliest(candidates: string[]): string | undefined {
+  return pickByTime(candidates, (value, best) => value < best);
+}
+
+/** Der späteste nicht-leere Zeitstempel, oder `undefined`. */
+function latest(candidates: string[]): string | undefined {
+  return pickByTime(candidates, (value, best) => value > best);
+}
+
+function pickByTime(
+  candidates: string[],
+  better: (value: number, best: number) => boolean,
+): string | undefined {
+  let result: string | undefined;
+  let bestTime = 0;
+  for (const candidate of candidates) {
+    const time = Date.parse(candidate);
+    if (Number.isNaN(time)) continue;
+    if (result === undefined || better(time, bestTime)) {
+      result = candidate;
+      bestTime = time;
+    }
+  }
+  return result;
+}
+
 /**
  * Baut die Zeilen der Sammelerfassung. Quelle sind die Fzg-Items der Karte,
  * ergänzt um Fahrzeuge, die nur über die Mannschaftszuordnung bekannt sind.
+ *
+ * Die Zeiten kommen für alle Zeilen aus `times` — dem Kopfblock der
+ * Sammelerfassung. Wer für ein einzelnes Fahrzeug abweichende Zeiten braucht,
+ * überschreibt sie über `mergeRowEdits`.
  */
-export function buildEinsatzRows(source: EinsatzRowSource): EinsatzRow[] {
-  const { fzgItems, crew, vehicles, persons, entries, firecall, now } = source;
+export function buildEinsatzRows(
+  source: EinsatzRowSource,
+  times: EinsatzTimes,
+): EinsatzRow[] {
+  const { fzgItems, crew, vehicles, persons, entries, firecall } = source;
 
   const items: EinsatzFzgItem[] = [...fzgItems];
   const knownIds = new Set(items.map((i) => i.id));
@@ -185,18 +258,6 @@ export function buildEinsatzRows(source: EinsatzRowSource): EinsatzRow[] {
     const groupVehicle = matchVehicleByName(vehicles, item.name ?? '');
     const { driverId, driverName } = resolveDriver(crew, persons, item.id);
 
-    // Der Einsatztag verankert eine Alarmierung ohne Datum, die Abfahrt dann
-    // das Abrücken. Fehlt das Abrücken ganz, bleibt der Vorschlag am Tag der
-    // Abfahrt statt auf „jetzt" zu springen.
-    const abfahrt = firstTimestamp(firecall.date, [
-      item.alarmierung,
-      firecall.date,
-      now,
-    ]);
-    const ankunft =
-      firstArrival(abfahrt, [item.abruecken, firecall.abruecken]) ||
-      arrivalOnDepartureDay(abfahrt, new Date(now));
-
     return {
       key: item.id,
       sourceName: item.name ?? '',
@@ -204,10 +265,8 @@ export function buildEinsatzRows(source: EinsatzRowSource): EinsatzRow[] {
       vehicleName: groupVehicle?.name ?? item.name ?? '',
       driverId,
       driverName,
-      // Auf Einsatzebene ist `date` der Alarmierungszeitpunkt; ein eigenes
-      // Alarmierungsfeld gibt es dort nicht.
-      abfahrt,
-      ankunft,
+      abfahrt: times.abfahrt,
+      ankunft: times.ankunft,
       counters: startCounters(groupVehicle),
       existingEntry: groupVehicle?.id
         ? findEntryForFirecallVehicle(entries, firecall.id, groupVehicle.id)
@@ -241,10 +300,59 @@ export interface EinsatzRowPartition {
  * Was die Server Action beim Speichern ergänzen wird. Der Client rechnet mit
  * der Luftlinien-Schätzung, damit eine Zeile nicht als unvollständig gemeldet
  * wird, obwohl sie speicherbar ist.
+ *
+ * Ein leeres Objekt heißt „Auffüllen aktiv, aber keine Strecke bekannt" — dann
+ * werden Zähler ohne Streckenbezug weiterhin fortgeschrieben. Fehlt das Objekt
+ * ganz, füllt niemand auf (die Einzelerfassung im Dialog).
  */
 export interface EinsatzAutoFill {
-  /** Geschätzte Gesamtstrecke in Kilometern; fehlt ohne Einsatzkoordinaten. */
-  roundTripKm?: number;
+  /**
+   * Gesamtstrecke samt Herkunft; fehlt ohne Einsatzkoordinaten. Am Client immer
+   * `'estimate'` — die gefahrene Route holt erst die Server Action.
+   */
+  distance?: RoundTripDistance;
+}
+
+/**
+ * Was in der kompakten Zeile über die Kilometer steht. `undefined` heißt: Das
+ * Fahrzeug hat keinen Kilometerzähler (ein Boot etwa) — dann gibt es hier
+ * nichts anzuzeigen.
+ */
+export interface KmPreview {
+  start?: number;
+  end?: number;
+  /**
+   * Gesetzt, wenn der Endstand nicht eingetragen ist, sondern erst beim
+   * Speichern entsteht. Am Client immer `'estimate'`; die Zeile muss das
+   * kenntlich machen, sonst liest sich eine Schätzung wie eine Ablesung.
+   */
+  derived?: 'route' | 'estimate';
+}
+
+/**
+ * Die Kilometer-Vorschau einer Zeile. Zeigt den eingetragenen Endstand, sonst
+ * den, der beim Speichern ergänzt wird, sonst nur den Startstand.
+ */
+export function kmPreview(
+  definitions: CounterDefinition[],
+  counters: Record<string, CounterReading>,
+  autoFill?: EinsatzAutoFill,
+): KmPreview | undefined {
+  const def = definitions.find(isKmCounter);
+  if (!def) return undefined;
+
+  const reading = counters[def.id] ?? {};
+  if (reading.end !== undefined) {
+    return { start: reading.start, end: reading.end };
+  }
+  if (autoFill?.distance && reading.start !== undefined) {
+    return {
+      start: reading.start,
+      end: reading.start + autoFill.distance.roundTripKm,
+      derived: autoFill.distance.source,
+    };
+  }
+  return { start: reading.start };
 }
 
 /**
@@ -290,17 +398,25 @@ export function partitionEinsatzRows(
       vehicle?.counters ?? [],
       row.counters,
       vehicle?.lastCounters ?? {},
-      autoFill?.roundTripKm,
+      autoFill?.distance,
     );
-    const errors = validateEntryInput(vehicle?.counters ?? [], {
-      vehicleId: row.vehicleId,
-      driverName: row.driverName,
-      zweck: 'einsatz',
-      ziel,
-      abfahrt: row.abfahrt,
-      ankunft: row.ankunft,
-      counters,
-    });
+    const errors = validateEntryInput(
+      vehicle?.counters ?? [],
+      {
+        vehicleId: row.vehicleId,
+        driverName: row.driverName,
+        zweck: 'einsatz',
+        ziel,
+        abfahrt: row.abfahrt,
+        ankunft: row.ankunft,
+        counters,
+      },
+      // Dieselbe Lockerung, die die Server Action anwendet: Ein fehlender
+      // Zählerstand hält die Fahrt nicht auf. Ohne den Gleichlauf meldete die
+      // Vorprüfung eine Zeile als unvollständig, die der Server anstandslos
+      // speichert.
+      { countersOptional: true },
+    );
 
     if (errors.length > 0) {
       partition.incomplete.push({ row, errors });

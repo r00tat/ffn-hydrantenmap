@@ -121,7 +121,7 @@ describe('useEntryFormState', () => {
     it('übernimmt Alarmierung und Abrücken als Zeitvorschlag', () => {
       const { result } = renderForm();
 
-      act(() => result.current.changeFirecall('f1'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
 
       expect(result.current.firecallId).toBe('f1');
       expect(result.current.abfahrt).toBe('2026-03-10T18:00:00.000Z');
@@ -131,8 +131,8 @@ describe('useEntryFormState', () => {
     it('setzt die Auswahl bei leerem Wert auf undefined zurück', () => {
       const { result } = renderForm();
 
-      act(() => result.current.changeFirecall('f1'));
-      act(() => result.current.changeFirecall(''));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.changeFirecall(undefined, ''));
 
       expect(result.current.firecallId).toBeUndefined();
     });
@@ -158,7 +158,7 @@ describe('useEntryFormState', () => {
 
       act(() => result.current.changeDriver('Max'));
       act(() => result.current.setZweck('einsatz'));
-      act(() => result.current.changeFirecall('f1'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
       act(() => result.current.setZweck('sonstiges'));
 
       await act(async () => {
@@ -177,7 +177,7 @@ describe('useEntryFormState', () => {
 
       act(() => result.current.changeDriver('Max'));
       act(() => result.current.setZweck('einsatz'));
-      act(() => result.current.changeFirecall('f1'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
 
       await act(async () => {
         await result.current.submit();
@@ -195,8 +195,9 @@ describe('useEntryFormState', () => {
 
       act(() => result.current.changeDriver('Max'));
       act(() => result.current.setZweck('einsatz'));
-      // Ohne Liste gibt es keine Auswahl — trotzdem darf nichts krachen.
-      act(() => result.current.changeFirecall('f1'));
+      // Ohne Liste gibt es keine Auswahl — die UI ruft changeFirecall dort
+      // nie mit einem Namen auf, trotzdem darf nichts krachen.
+      act(() => result.current.changeFirecall('f1', ''));
 
       let result_: { success: boolean } | undefined;
       await act(async () => {

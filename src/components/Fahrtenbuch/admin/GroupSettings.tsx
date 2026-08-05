@@ -1,5 +1,6 @@
 'use client';
 
+import MapIcon from '@mui/icons-material/Map';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
@@ -11,7 +12,16 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { defaultPosition } from '../../../hooks/constants';
 import useFahrtenbuchGroupStandort from '../../../hooks/useFahrtenbuchGroupStandort';
+import LocationMapPicker from '../../Einsatzorte/LocationMapPicker';
 import { saveFahrtenbuchGroupStandort } from '../stammdatenActions';
+
+/**
+ * Stellen nach dem Komma, mit denen eine auf der Karte gewählte Position in die
+ * Felder geschrieben wird — wie bei den Risikoobjekten. Sechs Stellen sind
+ * besser als zentimetergenau; ohne die Rundung stünde eine 15-stellige Zahl im
+ * Feld, die niemand mehr von Hand prüfen kann.
+ */
+const MAP_DECIMALS = 6;
 
 export default function GroupSettings({ groupId }: { groupId: string }) {
   const t = useTranslations('fahrtenbuch');
@@ -20,6 +30,7 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
     { severity: 'success' | 'error'; text: string } | undefined
   >();
   const [saving, setSaving] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
 
   // Nur die Eingaben des Benutzers liegen im State; angezeigt wird sonst der
   // geladene Wert. Ein `useState`-Anfangswert griffe nur beim ersten Rendern —
@@ -32,6 +43,19 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
   // schriebe sie mit einem Klick auf Speichern als gepflegt fest.
   const lat = edits.lat ?? (configured ? String(standort.lat) : '');
   const lng = edits.lng ?? (configured ? String(standort.lng) : '');
+
+  /**
+   * Ausgangsmarkierung der Karte: der Wert aus den Feldern, nicht der geladene
+   * Standort. Wer Koordinaten getippt hat und dann die Karte öffnet, will genau
+   * dort nachjustieren.
+   *
+   * Ohne Wert bleibt sie leer. Eine Markierung auf dem Standardstandort würde
+   * sonst ein „Übernehmen“ genügen lassen, um die Neusiedler Koordinaten als
+   * eigenen, gepflegten Wert festzuschreiben.
+   */
+  const mapLat = Number.parseFloat(lat);
+  const mapLng = Number.parseFloat(lng);
+  const mapPositionSet = Number.isFinite(mapLat) && Number.isFinite(mapLng);
 
   const save = async () => {
     setSaving(true);
@@ -117,11 +141,41 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
         </Grid>
       </Grid>
 
+      <Stack direction="row" sx={{ mt: 1 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<MapIcon />}
+          onClick={() => setMapOpen(true)}
+        >
+          {t('admin.standortMap')}
+        </Button>
+      </Stack>
+
       <Stack direction="row" sx={{ mt: 2 }}>
         <Button variant="contained" onClick={save} disabled={saving}>
           {t('save')}
         </Button>
       </Stack>
+
+      {/* Dieselbe Karte wie bei den Risikoobjekten und Einsatzorten. Die
+          Auswahl füllt nur die Felder — gespeichert wird erst mit „Speichern“,
+          wie bei einer Eingabe von Hand. */}
+      <LocationMapPicker
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        onConfirm={(pickedLat, pickedLng) =>
+          setEdits({
+            lat: pickedLat.toFixed(MAP_DECIMALS),
+            lng: pickedLng.toFixed(MAP_DECIMALS),
+          })
+        }
+        showFirecallLayers={false}
+        title={t('admin.standortPick')}
+        initialLat={mapPositionSet ? mapLat : undefined}
+        initialLng={mapPositionSet ? mapLng : undefined}
+        center={standort}
+      />
     </Paper>
   );
 }

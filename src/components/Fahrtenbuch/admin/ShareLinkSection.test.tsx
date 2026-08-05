@@ -2,18 +2,29 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderWithIntl } from '../../test-utils/intlRender';
+import { renderWithIntl } from '../../../test-utils/intlRender';
 
-const { getMock, createMock, revokeMock, downloadQrMock, printQrMock } =
-  vi.hoisted(() => ({
-    getMock: vi.fn(),
-    createMock: vi.fn(),
-    revokeMock: vi.fn(),
-    downloadQrMock: vi.fn(),
-    printQrMock: vi.fn(),
-  }));
+const {
+  getMock,
+  createMock,
+  revokeMock,
+  downloadQrMock,
+  printQrMock,
+  vehiclesMock,
+} = vi.hoisted(() => ({
+  getMock: vi.fn(),
+  createMock: vi.fn(),
+  revokeMock: vi.fn(),
+  downloadQrMock: vi.fn(),
+  printQrMock: vi.fn(),
+  vehiclesMock: vi.fn(),
+}));
 
-vi.mock('./shareLinkActions', () => ({
+vi.mock('../../../hooks/useFahrtenbuchVehicles', () => ({
+  default: vehiclesMock,
+}));
+
+vi.mock('../shareLinkActions', () => ({
   getFahrtenbuchShareLink: getMock,
   createFahrtenbuchShareLink: createMock,
   revokeFahrtenbuchShareLink: revokeMock,
@@ -29,7 +40,7 @@ vi.mock('./shareLinkQr', async (importOriginal) => ({
   printShareLinkQr: printQrMock,
 }));
 
-import FahrtenbuchShareLinkSection from './FahrtenbuchShareLinkSection';
+import ShareLinkSection from './ShareLinkSection';
 import { PrintWindowBlockedError } from './shareLinkQr';
 
 const info = {
@@ -40,7 +51,7 @@ const info = {
 
 const info2 = { ...info, url: 'https://einsatz.example/fahrtenbuch/teilen/neu' };
 
-describe('FahrtenbuchShareLinkSection', () => {
+describe('ShareLinkSection', () => {
   beforeEach(() => {
     getMock.mockReset();
     createMock.mockReset();
@@ -48,11 +59,18 @@ describe('FahrtenbuchShareLinkSection', () => {
     downloadQrMock.mockReset();
     downloadQrMock.mockResolvedValue(undefined);
     printQrMock.mockReset();
+    vehiclesMock.mockReset();
+    vehiclesMock.mockReturnValue({
+      activeVehicles: [
+        { id: 'v1', name: 'TLF 2000' },
+        { id: 'v2', name: 'MTF' },
+      ],
+    });
   });
 
   it('bietet das Erstellen an, wenn noch kein Link existiert', async () => {
     getMock.mockResolvedValue(null);
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     expect(
       await screen.findByRole('button', { name: 'Link erstellen' }),
@@ -62,7 +80,7 @@ describe('FahrtenbuchShareLinkSection', () => {
 
   it('zeigt Link und QR-Code, wenn ein Link existiert', async () => {
     getMock.mockResolvedValue(info);
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     expect(await screen.findByDisplayValue(info.url)).toBeInTheDocument();
     // Gezielt über den <title> des QR-Codes. `container.querySelector('svg')`
@@ -76,7 +94,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     getMock.mockResolvedValue(null);
     createMock.mockResolvedValue(info);
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(
       await screen.findByRole('button', { name: 'Link erstellen' }),
@@ -91,7 +109,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     createMock.mockRejectedValue(new Error('boom'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(
       await screen.findByRole('button', { name: 'Link erstellen' }),
@@ -108,7 +126,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     getMock.mockResolvedValue(info);
     createMock.mockResolvedValue(info2);
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(
       await screen.findByRole('button', { name: 'Neu erzeugen' }),
@@ -124,7 +142,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     getMock.mockResolvedValue(info);
     revokeMock.mockResolvedValue(undefined);
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(await screen.findByRole('button', { name: 'Löschen' }));
     expect(revokeMock).not.toHaveBeenCalled();
@@ -139,7 +157,7 @@ describe('FahrtenbuchShareLinkSection', () => {
   it('tut nichts, wenn der Widerruf abgebrochen wird', async () => {
     getMock.mockResolvedValue(info);
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(await screen.findByRole('button', { name: 'Löschen' }));
     await user.click(await screen.findByRole('button', { name: 'nein' }));
@@ -152,7 +170,7 @@ describe('FahrtenbuchShareLinkSection', () => {
   it('bietet bei einem Ladefehler kein Erstellen an', async () => {
     getMock.mockRejectedValue(new Error('offline'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     expect(
       await screen.findByText('Der Link konnte nicht geladen werden.'),
@@ -170,7 +188,7 @@ describe('FahrtenbuchShareLinkSection', () => {
   it('lädt den QR-Code als Bild herunter', async () => {
     getMock.mockResolvedValue(info);
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(
       await screen.findByRole('button', { name: 'PNG herunterladen' }),
@@ -191,7 +209,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     getMock.mockResolvedValue(info);
     const user = userEvent.setup();
     renderWithIntl(
-      <FahrtenbuchShareLinkSection groupId="ffnd" groupName="FF Neusiedl" />,
+      <ShareLinkSection groupId="ffnd" groupName="FF Neusiedl" />,
     );
 
     await user.click(await screen.findByRole('button', { name: 'Drucken' }));
@@ -214,7 +232,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(await screen.findByRole('button', { name: 'Drucken' }));
 
@@ -230,7 +248,7 @@ describe('FahrtenbuchShareLinkSection', () => {
     downloadQrMock.mockRejectedValueOnce(new Error('no canvas'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await user.click(
       await screen.findByRole('button', { name: 'PNG herunterladen' }),
@@ -243,7 +261,7 @@ describe('FahrtenbuchShareLinkSection', () => {
 
   it('bietet Export erst an, wenn ein Link existiert', async () => {
     getMock.mockResolvedValue(null);
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="ffnd" />);
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
 
     await screen.findByRole('button', { name: 'Link erstellen' });
     expect(screen.queryByRole('button', { name: 'Drucken' })).toBeNull();
@@ -252,8 +270,56 @@ describe('FahrtenbuchShareLinkSection', () => {
     ).toBeNull();
   });
 
+  it('hängt das gewählte Fahrzeug an den angezeigten Link', async () => {
+    getMock.mockResolvedValue(info);
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
+
+    // Ohne Auswahl bleibt der Link der allgemeine — ein Parameter „leer" wäre
+    // in jedem ausgedruckten Code mit drin.
+    expect(await screen.findByDisplayValue(info.url)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Fahrzeug vorauswählen'));
+    await user.click(await screen.findByRole('option', { name: 'MTF' }));
+
+    expect(
+      await screen.findByDisplayValue(`${info.url}?fahrzeug=v2`),
+    ).toBeInTheDocument();
+  });
+
+  it('nimmt das Fahrzeug in Ausdruck und Dateinamen auf', async () => {
+    getMock.mockResolvedValue(info);
+    const user = userEvent.setup();
+    renderWithIntl(
+      <ShareLinkSection groupId="ffnd" groupName="FF Neusiedl" />,
+    );
+
+    await user.click(await screen.findByLabelText('Fahrzeug vorauswählen'));
+    await user.click(await screen.findByRole('option', { name: 'TLF 2000' }));
+
+    await user.click(screen.getByRole('button', { name: 'Drucken' }));
+    await waitFor(() => expect(printQrMock).toHaveBeenCalledTimes(1));
+    expect(printQrMock.mock.calls[0][1]).toMatchObject({
+      vehicleName: 'TLF 2000',
+      url: `${info.url}?fahrzeug=v1`,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'PNG herunterladen' }));
+    await waitFor(() => expect(downloadQrMock).toHaveBeenCalledTimes(1));
+    expect(downloadQrMock.mock.calls[0].slice(1)).toEqual(['ffnd', 'TLF 2000']);
+  });
+
+  it('verzichtet auf die Fahrzeugauswahl, wenn die Gruppe keine Fahrzeuge hat', async () => {
+    getMock.mockResolvedValue(info);
+    vehiclesMock.mockReturnValue({ activeVehicles: [] });
+    renderWithIntl(<ShareLinkSection groupId="ffnd" />);
+
+    await screen.findByDisplayValue(info.url);
+    expect(screen.queryByLabelText('Fahrzeug vorauswählen')).toBeNull();
+  });
+
   it('rendert nichts für eine Nicht-Mandanten-Gruppe', () => {
-    renderWithIntl(<FahrtenbuchShareLinkSection groupId="allUsers" />);
+    renderWithIntl(<ShareLinkSection groupId="allUsers" />);
     expect(screen.queryByText('Fahrtenbuch-Link')).not.toBeInTheDocument();
     expect(getMock).not.toHaveBeenCalled();
   });

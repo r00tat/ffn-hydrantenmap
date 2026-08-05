@@ -8,6 +8,7 @@ const {
   vehicleGetMock,
   vehicleSetMock,
   entriesQueryGetMock,
+  latestEntryGetMock,
   entryDocGetMock,
   entryDocSetMock,
   groupGetMock,
@@ -23,6 +24,9 @@ const {
   vehicleGetMock: vi.fn(),
   vehicleSetMock: vi.fn(),
   entriesQueryGetMock: vi.fn(),
+  latestEntryGetMock: vi.fn(async () => ({
+    docs: [] as { data: () => unknown }[],
+  })),
   entryDocGetMock: vi.fn(),
   entryDocSetMock: vi.fn(),
   groupGetMock: vi.fn(),
@@ -53,14 +57,22 @@ vi.mock('../actions/maps/routes', () => ({
 // bedient werden — dieselbe Struktur wie im Rest der Datei zuvor, nur um das
 // Gruppen- und Einsatzdokument erweitert.
 vi.mock('../../server/firebase/admin', () => {
-  const entriesCollection = {
+  // Der Query-Builder trägt seine Filter mit und merkt sich, ob sortiert
+  // wurde. Nur so lassen sich die beiden Abfragen derselben Subcollection
+  // auseinanderhalten: die Bestandsabfrage (nur `where`) und die Abfrage der
+  // jüngsten Fahrt für den Fahrzeug-Cache (`orderBy`/`limit`). Ohne die
+  // Trennung landete ein für einen Dublettentest gesetzter Bestandseintrag
+  // auch im Cache und die Tests prüften nicht mehr, was sie behaupten.
+  const query = (filters: Record<string, unknown>, ordered: boolean) => ({
     add: addMock,
     doc: () => ({ get: entryDocGetMock, set: entryDocSetMock, update: vi.fn() }),
-    where: () => entriesCollection,
-    orderBy: () => entriesCollection,
-    limit: () => entriesCollection,
-    get: entriesQueryGetMock,
-  };
+    where: (field: string, _op: string, value: unknown) =>
+      query({ ...filters, [field]: value }, ordered),
+    orderBy: () => query(filters, true),
+    limit: () => query(filters, true),
+    get: () => (ordered ? latestEntryGetMock() : entriesQueryGetMock(filters)),
+  });
+  const entriesCollection = query({}, false);
   const groupDoc = {
     get: groupGetMock,
     collection: (name: string) =>
@@ -79,9 +91,11 @@ vi.mock('../../server/firebase/admin', () => {
 });
 
 import { ApiException } from '../../app/api/errors';
+import type { FahrtenbuchEntryInput } from './entryLogic';
 import {
   createFahrtenbuchEntries,
   createFahrtenbuchEntryViaShareLink,
+  importFahrtenbuchEntries,
   updateFahrtenbuchEntry,
 } from './fahrtenbuchActions';
 
@@ -345,7 +359,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     expect(result.created).toBe(1);
   });
 
-  it('überspringt eine Zeile ohne Kilometerstand bei ausgefallenem Routing, speichert eine Zeile mit von Hand erfassten Kilometern im selben Aufruf', async () => {
+  it('schätzt die Strecke, wenn kein Routing zu bekommen ist, statt die Fahrt auszulassen', async () => {
     firecallGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
@@ -353,22 +367,41 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     routeMock.mockResolvedValue(undefined);
 
     const result = await createFahrtenbuchEntries('ffnd', [
-      einsatzEntry('v1'), // kein Endstand, Routing liefert nichts -> unvollständig
+      einsatzEntry('v1'),
       einsatzEntry('v2', { counters: { km: { start: 2000, end: 2030 } } }),
     ]);
 
     expect(result.success).toBe(true);
-    expect(result.created).toBe(1);
-    // Nicht geschrieben heißt nicht „schon erfasst": Die Zeile gehört in das
-    // eigene Feld, sonst meldete die Oberfläche eine fehlende Fahrt als
-    // bereits gebucht.
-    expect(result.failedVehicleIds).toEqual(['v1']);
+    // Beide Zeilen landen im Fahrtenbuch. Früher fiel die erste aus, weil ohne
+    // Route kein Endstand zu ermitteln war — die Fahrt fehlte dann ganz.
+    expect(result.created).toBe(2);
+    expect(result.failedVehicleIds).toEqual([]);
     expect(result.skippedVehicleIds).toEqual([]);
-    // Nur die tatsächlich geschriebene Zeile darf den Fahrzeug-Cache
-    // auffrischen und in den Batch gelangen.
-    expect(batchSetMock).toHaveBeenCalledTimes(1);
-    expect(batchCommitMock).toHaveBeenCalledTimes(1);
-    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+    // Die Meldung muss die Schätzung als solche ausweisen.
+    expect(result.distanceSource).toBe('estimate');
+    expect(result.roundTripKm).toBeGreaterThan(0);
+    expect(batchSetMock).toHaveBeenCalledTimes(2);
+
+    // Der Kilometerstand von v1 stammt aus der Schätzung und ist am Eintrag als
+    // solcher gekennzeichnet — ohne nachprüfbare Route.
+    const [, doc] = batchSetMock.mock.calls[0];
+    expect(doc.counterSources).toEqual({ km: 'estimate' });
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
+  });
+
+  it('cacht eine geschätzte Strecke nicht am Einsatz', async () => {
+    // Sonst behielte ein einzelner Routing-Ausfall die Schätzung für alle
+    // späteren Fahrzeuge desselben Einsatzes bei, obwohl die API längst wieder
+    // antwortet.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
+    });
+    routeMock.mockResolvedValue(undefined);
+
+    await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
+
+    expect(firecallSetMock).not.toHaveBeenCalled();
   });
 
   it('meldet keine Gesamtstrecke, wenn alle Endstände von Hand eingetragen wurden', async () => {
@@ -426,7 +459,6 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
       exists: true,
       data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
     });
-    routeMock.mockResolvedValue(undefined);
     // v3 hat zu diesem Einsatz schon einen Eintrag.
     entriesQueryGetMock.mockResolvedValue({
       docs: [{ data: () => ({ vehicleId: 'v3', counters: {} }) }],
@@ -434,11 +466,16 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
 
     const result = await createFahrtenbuchEntries('ffnd', [
       einsatzEntry('v3'), // schon erfasst -> übersprungen
-      einsatzEntry('v1'), // kein Endstand, kein Routing -> fehlgeschlagen
+      // Unlesbare Abfahrt: ein widersprüchlicher Wert, kein fehlender — den
+      // lehnt die Validierung weiterhin ab.
+      einsatzEntry('v1', { abfahrt: 'sofort' }),
     ]);
 
     expect(result.success).toBe(true);
     expect(result.created).toBe(0);
+    // Nicht geschrieben heißt nicht „schon erfasst": Die Zeile gehört in das
+    // eigene Feld, sonst meldete die Oberfläche eine fehlende Fahrt als
+    // bereits gebucht.
     expect(result.skippedVehicleIds).toEqual(['v3']);
     expect(result.failedVehicleIds).toEqual(['v1']);
   });
@@ -524,5 +561,313 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     const doc = entryDocSetMock.mock.calls[0][0];
     expect(doc).not.toHaveProperty('counterSources');
     expect(doc.routeDistanceMeters).toBe(8000);
+  });
+});
+
+describe('importFahrtenbuchEntries', () => {
+  function importInput(
+    overrides: Partial<FahrtenbuchEntryInput> = {},
+  ): FahrtenbuchEntryInput {
+    return {
+      vehicleId: 'v1',
+      driverName: 'Anna Muster',
+      zweck: 'einsatz',
+      ziel: 'N/S Ölspur',
+      // Ortszeit, weil die Dublettenregel am Kalendertag hängt: eine
+      // UTC-Angabe kurz vor Mitternacht fiele sonst auf den Vortag.
+      abfahrt: new Date(2025, 5, 4, 17, 40).toISOString(),
+      ankunft: new Date(2025, 5, 4, 18, 0).toISOString(),
+      counters: { km: { start: 14646, end: 14664 } },
+      ...overrides,
+    };
+  }
+
+  /** Ein Bestandseintrag, wie ihn die Bestandsabfrage des Imports liefert. */
+  const existingDoc = (
+    entry: Partial<{
+      vehicleId: string;
+      abfahrt: string;
+      counters: Record<string, { start?: number; end?: number }>;
+    }> = {},
+  ) => ({
+    data: () => ({
+      vehicleId: 'v1',
+      abfahrt: new Date(2025, 5, 4, 9, 0).toISOString(),
+      counters: { km: { start: 14646, end: 14664 } },
+      deleted: false,
+      ...entry,
+    }),
+  });
+
+  beforeEach(() => {
+    actionUserRequiredMock.mockReset();
+    vehicleGetMock.mockReset();
+    vehicleSetMock.mockReset();
+    entriesQueryGetMock.mockReset();
+    latestEntryGetMock.mockClear();
+    batchSetMock.mockReset();
+    batchCommitMock.mockReset();
+    routeMock.mockReset();
+    groupGetMock.mockReset();
+
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+    batchCommitMock.mockResolvedValue(undefined);
+    vehicleSetMock.mockResolvedValue(undefined);
+  });
+
+  it('überspringt eine bereits vorhandene Zeile', async () => {
+    // Bestand: gleiche Fahrt (Fahrzeug, Tag, Startstand) liegt schon vor —
+    // nur zu einer anderen Uhrzeit, wie beim zweiten Lauf derselben Datei.
+    entriesQueryGetMock.mockResolvedValue({ docs: [existingDoc()] });
+
+    const result = await importFahrtenbuchEntries('ffnd', [importInput()]);
+
+    expect(result).toMatchObject({ success: true, created: 0, duplicates: 1 });
+    expect(batchSetMock).not.toHaveBeenCalled();
+    expect(batchCommitMock).not.toHaveBeenCalled();
+    // Ohne geschriebene Zeile darf auch der Fahrzeug-Cache nicht angefasst
+    // werden.
+    expect(vehicleSetMock).not.toHaveBeenCalled();
+  });
+
+  it('fragt den Bestand je Fahrzeug ab und trennt die Fahrzeuge dabei', async () => {
+    // Nur v1 hat die Fahrt schon; die gleichlautende Zeile von v2 ist neu.
+    entriesQueryGetMock.mockImplementation(
+      async (filters: Record<string, unknown>) => ({
+        docs: filters.vehicleId === 'v1' ? [existingDoc()] : [],
+      }),
+    );
+
+    const result = await importFahrtenbuchEntries('ffnd', [
+      importInput(),
+      importInput({ vehicleId: 'v2' }),
+    ]);
+
+    expect(result).toMatchObject({ created: 1, duplicates: 1 });
+    expect(entriesQueryGetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ vehicleId: 'v1', deleted: false }),
+    );
+    expect(entriesQueryGetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ vehicleId: 'v2', deleted: false }),
+    );
+  });
+
+  it('schreibt neue Zeilen und frischt den Fahrzeug-Cache einmal auf', async () => {
+    const result = await importFahrtenbuchEntries('ffnd', [
+      importInput({ abfahrt: new Date(2025, 5, 4, 8, 0).toISOString() }),
+      importInput({
+        abfahrt: new Date(2025, 5, 5, 8, 0).toISOString(),
+        ankunft: new Date(2025, 5, 5, 8, 30).toISOString(),
+        counters: { km: { start: 14664, end: 14700 } },
+      }),
+    ]);
+
+    expect(result).toMatchObject({
+      success: true,
+      created: 2,
+      duplicates: 0,
+      failed: 0,
+    });
+    expect(batchSetMock).toHaveBeenCalledTimes(2);
+    expect(batchCommitMock).toHaveBeenCalledTimes(1);
+    // Beide Zeilen gehören demselben Fahrzeug — der Cache wird erst nach dem
+    // Schreiben und nur einmal neu berechnet.
+    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('erkennt eine doppelt enthaltene Zeile innerhalb desselben Aufrufs', async () => {
+    const result = await importFahrtenbuchEntries('ffnd', [
+      importInput(),
+      importInput(),
+    ]);
+
+    expect(result).toMatchObject({ created: 1, duplicates: 1 });
+    expect(batchSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('schreibt zwei Fahrten eines Fahrzeugs ohne Kilometerzähler am selben Tag', async () => {
+    // Anhänger oder Boot: ohne Startkilometerstand gibt es keinen
+    // Dublettenschlüssel. Zwei Fahrten am selben Tag sind hier normal — sie
+    // stillschweigend zu einer zusammenzufassen wäre der schlechtere Fehler.
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'boot',
+      data: () => ({
+        name: 'MZB',
+        counters: [
+          {
+            id: 'betriebsstundenBb',
+            label: 'Betriebsstunden',
+            unit: 'h',
+            mode: 'startEnd',
+            changeWarning: 'decrease',
+            required: true,
+          },
+        ],
+        fuelTypes: [],
+      }),
+    });
+
+    const bootInput = (start: number, end: number, hour: number) =>
+      importInput({
+        vehicleId: 'boot',
+        abfahrt: new Date(2025, 5, 4, hour, 0).toISOString(),
+        ankunft: new Date(2025, 5, 4, hour + 1, 0).toISOString(),
+        counters: { betriebsstundenBb: { start, end } },
+      });
+
+    const result = await importFahrtenbuchEntries('ffnd', [
+      bootInput(20, 22, 8),
+      bootInput(22, 24, 14),
+    ]);
+
+    expect(result).toMatchObject({
+      success: true,
+      created: 2,
+      duplicates: 0,
+      failed: 0,
+    });
+  });
+
+  it('lässt eine Zeile ohne Endstand aus, statt sie aufzufüllen', async () => {
+    const result = await importFahrtenbuchEntries('ffnd', [
+      importInput({ counters: { km: { start: 14646 } } }),
+      importInput({
+        abfahrt: new Date(2025, 5, 5, 8, 0).toISOString(),
+        ankunft: new Date(2025, 5, 5, 8, 30).toISOString(),
+        counters: { km: { start: 14664, end: 14700 } },
+      }),
+    ]);
+
+    expect(result).toMatchObject({ created: 1, duplicates: 0, failed: 1 });
+    // Ein aus einer Route errechneter Endstand wäre bei einer Fahrt von vor
+    // zwei Jahren eine erfundene Angabe — es darf gar nicht erst geroutet
+    // werden.
+    expect(routeMock).not.toHaveBeenCalled();
+    expect(batchSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('schreibt keine Herkunftsangabe an importierte Zählerstände', async () => {
+    await importFahrtenbuchEntries('ffnd', [importInput()]);
+
+    const doc = batchSetMock.mock.calls[0][1];
+    // Importierte Stände sind abgelesen, nicht abgeleitet.
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
+    expect(doc.counters.km).toMatchObject({ start: 14646, end: 14664 });
+    expect(doc.group).toBe('ffnd');
+    expect(doc.deleted).toBe(false);
+  });
+
+  it('verteilt mehr Zeilen als ein Batch fasst auf mehrere Commits', async () => {
+    const inputs = Array.from({ length: 250 }, (_, index) =>
+      importInput({
+        counters: { km: { start: 10000 + index, end: 10010 + index } },
+      }),
+    );
+
+    const result = await importFahrtenbuchEntries('ffnd', inputs);
+
+    expect(result).toMatchObject({ success: true, created: 250 });
+    expect(batchCommitMock).toHaveBeenCalledTimes(2);
+    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet einen gescheiterten Block, ohne den bereits geschriebenen zu verschweigen', async () => {
+    const inputs = Array.from({ length: 250 }, (_, index) =>
+      importInput({
+        counters: { km: { start: 10000 + index, end: 10010 + index } },
+      }),
+    );
+    // Der erste Block ist geschrieben, der zweite fällt aus.
+    batchCommitMock
+      .mockImplementationOnce(async () => undefined)
+      .mockImplementationOnce(async () => {
+        throw new Error('5 UNAVAILABLE: backend unavailable');
+      });
+
+    const result = await importFahrtenbuchEntries('ffnd', inputs);
+
+    // „Nichts importiert" wäre hier die gefährliche Meldung: Der Benutzer
+    // startete den Import neu, und jede Zeile ohne Startkilometerstand stünde
+    // danach doppelt im Fahrtenbuch.
+    expect(result).toMatchObject({
+      success: true,
+      created: 200,
+      duplicates: 0,
+      failed: 50,
+    });
+    // Die 200 committeten Zeilen gehören in den Fahrzeug-Cache.
+    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('hält nach einem gescheiterten Block die folgenden nicht auf', async () => {
+    const inputs = Array.from({ length: 450 }, (_, index) =>
+      importInput({
+        counters: { km: { start: 10000 + index, end: 10010 + index } },
+      }),
+    );
+    batchCommitMock
+      .mockImplementationOnce(async () => {
+        throw new Error('5 UNAVAILABLE: backend unavailable');
+      })
+      .mockImplementation(async () => undefined);
+
+    const result = await importFahrtenbuchEntries('ffnd', inputs);
+
+    expect(result).toMatchObject({ success: true, created: 250, failed: 200 });
+    expect(batchCommitMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('meldet den Import trotz gescheitertem Fahrzeug-Cache als erfolgreich', async () => {
+    // Der Cache ist ein abgeleiteter Wert — die Fahrten stehen schon im
+    // Fahrtenbuch und dürfen nicht als verloren gemeldet werden.
+    vehicleSetMock.mockRejectedValueOnce(new Error('5 UNAVAILABLE'));
+
+    const result = await importFahrtenbuchEntries('ffnd', [importInput()]);
+
+    expect(result).toMatchObject({ success: true, created: 1 });
+  });
+
+  it('weist mehr als 1000 Zeilen ab, ohne etwas zu schreiben', async () => {
+    const inputs = Array.from({ length: 1001 }, (_, index) =>
+      importInput({
+        counters: { km: { start: 10000 + index, end: 10010 + index } },
+      }),
+    );
+
+    const result = await importFahrtenbuchEntries('ffnd', inputs);
+
+    expect(result).toMatchObject({ success: false, error: 'tooManyEntries' });
+    expect(batchSetMock).not.toHaveBeenCalled();
+  });
+
+  it('kommt mit einer leeren Eingabe zurecht, ohne Fahrzeuge zu laden', async () => {
+    const result = await importFahrtenbuchEntries('ffnd', []);
+
+    expect(result).toEqual({
+      success: true,
+      created: 0,
+      duplicates: 0,
+      failed: 0,
+    });
+    expect(vehicleGetMock).not.toHaveBeenCalled();
+  });
+
+  it('weist ein Nichtmitglied ab', async () => {
+    actionUserRequiredMock.mockResolvedValueOnce({
+      user: { ...SESSION.user, groups: ['andere-feuerwehr'] },
+    });
+
+    const result = await importFahrtenbuchEntries('ffnd', [importInput()]);
+
+    expect(result).toMatchObject({ success: false, error: 'notInGroup' });
+    expect(batchSetMock).not.toHaveBeenCalled();
   });
 });

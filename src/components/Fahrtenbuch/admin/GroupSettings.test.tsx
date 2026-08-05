@@ -23,6 +23,31 @@ vi.mock('../../../hooks/useFahrtenbuchGroupStandort', () => ({
   default: useFahrtenbuchGroupStandort,
 }));
 
+// Leaflet braucht ein echtes Layout und lädt Kartenkacheln; hier zählt nur, mit
+// welcher Ausgangsposition der Picker geöffnet wird und was mit dem Ergebnis
+// passiert.
+vi.mock('../../Einsatzorte/LocationMapPicker', () => ({
+  default: ({
+    open,
+    onConfirm,
+    initialLat,
+    initialLng,
+  }: {
+    open: boolean;
+    onConfirm: (lat: number, lng: number) => void;
+    initialLat?: number;
+    initialLng?: number;
+  }) =>
+    open ? (
+      <div>
+        <span>{`picker:${initialLat ?? '-'}/${initialLng ?? '-'}`}</span>
+        <button onClick={() => onConfirm(48.1234567, 16.7654321)}>
+          picker-confirm
+        </button>
+      </div>
+    ) : null,
+}));
+
 import GroupSettings from './GroupSettings';
 
 describe('GroupSettings', () => {
@@ -129,6 +154,52 @@ describe('GroupSettings', () => {
       'placeholder',
       String(defaultPosition.lat),
     );
+  });
+
+  it('übernimmt eine auf der Karte gewählte Position', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<GroupSettings groupId="ffnd" />);
+
+    await user.click(screen.getByRole('button', { name: 'Auf Karte wählen' }));
+    await user.click(screen.getByRole('button', { name: 'picker-confirm' }));
+
+    // Sechs Dezimalstellen wie bei den Risikoobjekten — mehr als
+    // zentimetergenau, und ohne die Rundung stünde eine 15-stellige Zahl im
+    // Feld.
+    expect(screen.getByLabelText('Breitengrad')).toHaveValue(48.123457);
+    expect(screen.getByLabelText('Längengrad')).toHaveValue(16.765432);
+
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(saveFahrtenbuchGroupStandort).toHaveBeenCalledWith('ffnd', {
+        lat: 48.123457,
+        lng: 16.765432,
+      }),
+    );
+  });
+
+  it('öffnet die Karte am gepflegten Standort', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<GroupSettings groupId="ffnd" />);
+
+    await user.click(screen.getByRole('button', { name: 'Auf Karte wählen' }));
+
+    expect(screen.getByText('picker:47.94/16.84')).toBeInTheDocument();
+  });
+
+  it('öffnet die Karte ohne Ausgangsposition, wenn kein Standort gepflegt ist', async () => {
+    // Sonst wäre der Neusiedler Standardstandort schon als Markierung gesetzt
+    // und ein Klick auf „Übernehmen" schriebe ihn als eigenen Wert fest.
+    useFahrtenbuchGroupStandort.mockReturnValue({
+      standort: defaultPosition,
+      configured: false,
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<GroupSettings groupId="ffnd" />);
+
+    await user.click(screen.getByRole('button', { name: 'Auf Karte wählen' }));
+
+    expect(screen.getByText('picker:-/-')).toBeInTheDocument();
   });
 
   it('setzt den Standort zurück, wenn beide Felder geleert werden', async () => {

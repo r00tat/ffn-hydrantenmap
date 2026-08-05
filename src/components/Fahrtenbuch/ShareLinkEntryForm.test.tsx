@@ -145,6 +145,47 @@ describe('ShareLinkEntryForm', () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
+  it('belegt das Fahrzeug aus dem Link vor', async () => {
+    const two = {
+      ...data,
+      vehicles: [
+        ...data.vehicles,
+        { ...data.vehicles[0], id: 'v2', name: 'MTF', lastCounters: { km: 90 } },
+      ],
+    };
+    renderWithIntl(
+      <ShareLinkEntryForm token="tok" data={two} vehicleId="v2" />,
+    );
+
+    expect(screen.getByLabelText('Fahrzeug')).toHaveTextContent('MTF');
+    // Der Zählerstand muss zum vorbelegten Fahrzeug passen — sonst trüge der
+    // Aufkleber im MTF den Kilometerstand des TLF ein.
+    expect(await screen.findByLabelText('Kilometerstand — Start')).toHaveValue(
+      90,
+    );
+  });
+
+  it('behält die Vorauswahl nach „Weitere Fahrt erfassen"', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <ShareLinkEntryForm token="tok" data={data} vehicleId="v1" />,
+    );
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Weitere Fahrt erfassen' }),
+    );
+
+    // Zwei Fahrten hintereinander sind am Fahrzeug der Normalfall; die zweite
+    // darf die Fahrzeugwahl nicht erneut verlangen.
+    expect(await screen.findByLabelText('Fahrzeug')).toHaveTextContent('TLF');
+  });
+
   it('zeigt einen Titel und den Gruppennamen, wenn keine Fahrzeuge hinterlegt sind', () => {
     renderWithIntl(
       <ShareLinkEntryForm token="tok" data={{ ...data, vehicles: [] }} />,

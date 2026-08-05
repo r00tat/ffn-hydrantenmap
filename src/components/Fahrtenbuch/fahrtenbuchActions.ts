@@ -8,7 +8,12 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import { autoFillCounterEnds, roundTripKmFromMeters } from '../../common/fahrtenbuchAutoFill';
+import {
+  autoFillCounterEnds,
+  estimatedDistance,
+  routeDistance,
+  type RoundTripDistance,
+} from '../../common/fahrtenbuchAutoFill';
 import { ApiException } from '../../app/api/errors';
 import type { GeoPositionObject } from '../../common/geo';
 import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
@@ -114,17 +119,25 @@ async function loadGroupStandort(groupId: string): Promise<GeoPositionObject> {
 }
 
 /**
- * Löst die einfache Straßenstrecke vom Standort der Gruppe zum Einsatzort auf
- * und cacht sie am Einsatz-Dokument. Liefert `undefined`, wenn der Einsatz
- * nicht existiert, keiner passenden Gruppe gehört, keine Koordinaten hat oder
- * das Routing ausfällt — in all diesen Fällen bleibt der Kilometer-Endstand
- * dem Benutzer überlassen.
+ * Löst die Gesamtstrecke vom Standort der Gruppe zum Einsatzort auf und cacht
+ * die gefahrene Route am Einsatz-Dokument.
+ *
+ * Fällt das Routing aus, wird auf die Luftlinien-Schätzung zurückgefallen und
+ * das Ergebnis als `'estimate'` gekennzeichnet: Ein grober, als grob erkennbarer
+ * Kilometerstand ist für den Nachweis mehr wert als eine Fahrt, die gar nicht
+ * erfasst wurde. Geschätzte Werte werden **nicht** gecacht — sonst behielte ein
+ * einzelner Routing-Ausfall die Schätzung für alle späteren Fahrzeuge desselben
+ * Einsatzes bei, obwohl die API längst wieder antwortet.
+ *
+ * `undefined` bleibt für die Fälle, in denen auch nicht geschätzt werden kann:
+ * Der Einsatz existiert nicht, gehört einer anderen Gruppe oder hat keine
+ * Koordinaten. Dann bleibt der Kilometer-Endstand dem Benutzer überlassen.
  */
-async function resolveFirecallRouteDistance(
+async function resolveFirecallDistance(
   groupId: string,
   firecallId: string,
   standort: GeoPositionObject,
-): Promise<number | undefined> {
+): Promise<RoundTripDistance | undefined> {
   const ref = firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId);
   const doc = await ref.get();
   if (!doc.exists) return undefined;
@@ -142,16 +155,22 @@ async function resolveFirecallRouteDistance(
   const einsatzort: GeoPositionObject = { lat: firecall.lat, lng: firecall.lng };
 
   const cached = cachedRouteDistance(firecall.fahrtenbuchRoute, standort, einsatzort);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return routeDistance(cached);
 
   const distanceM = await computeRouteDistanceMeters(standort, einsatzort);
-  if (distanceM === undefined) return undefined;
+  if (distanceM === undefined) {
+    console.warn(
+      'resolveFirecallDistance: keine Route — es wird geschätzt und nicht gecacht',
+      { groupId, firecallId },
+    );
+    return estimatedDistance(standort, einsatzort);
+  }
 
   await ref.set(
     { fahrtenbuchRoute: routeCacheEntry(standort, einsatzort, distanceM) },
     { merge: true },
   );
-  return distanceM;
+  return routeDistance(distanceM);
 }
 
 /**
@@ -221,9 +240,15 @@ export interface CreateEntriesResult {
   failedVehicleIds: string[];
   /**
    * Gesamtstrecke in Kilometern, die in die Kilometerstände eingegangen ist.
-   * Fehlt, wenn keine Route zu ermitteln war.
+   * Fehlt, wenn gar keine Strecke zu ermitteln war (etwa ein Einsatz ohne
+   * Koordinaten) oder wenn kein Zähler daraus abgeleitet wurde.
    */
   roundTripKm?: number;
+  /**
+   * Woher `roundTripKm` stammt. Muss in der Meldung sichtbar werden: Eine
+   * geschätzte Strecke gehört im Fahrtenbuch nachgesehen, eine gefahrene nicht.
+   */
+  distanceSource?: 'route' | 'estimate';
   error?: string;
 }
 
@@ -313,45 +338,51 @@ export async function createFahrtenbuchEntries(
     // genau einmal ermittelt — sonst löste jedes weitere Fahrzeug desselben
     // Einsatzes einen eigenen, redundanten Routing-Aufruf aus.
     const standort = await loadGroupStandort(groupId);
-    const distances = new Map<string, number | undefined>();
+    const distances = new Map<string, RoundTripDistance | undefined>();
     for (const firecallId of new Set(
       accepted.map((i) => i.firecallId).filter((id): id is string => !!id),
     )) {
       distances.set(
         firecallId,
-        await resolveFirecallRouteDistance(groupId, firecallId, standort),
+        await resolveFirecallDistance(groupId, firecallId, standort),
       );
     }
 
     const batch = firestore.batch();
     let created = 0;
     let roundTripKm: number | undefined;
+    let distanceSource: 'route' | 'estimate' | undefined;
     const failedVehicleIds: string[] = [];
     const writtenVehicleIds = new Set<string>();
     for (const input of accepted) {
       const vehicle = vehicles.get(input.vehicleId)!;
-      const distanceM = input.firecallId ? distances.get(input.firecallId) : undefined;
-      const entryRoundTripKm =
-        distanceM !== undefined ? roundTripKmFromMeters(distanceM) : undefined;
+      const distance = input.firecallId ? distances.get(input.firecallId) : undefined;
       const filled = autoFillCounterEnds(
         vehicle.counters ?? [],
         input.counters ?? {},
         vehicle.lastCounters ?? {},
-        entryRoundTripKm,
+        distance,
       );
 
       try {
-        // Wirft, wenn nach dem Auffüllen immer noch ein Pflichtzähler fehlt —
-        // meist, weil das Routing ausgefallen ist und niemand den
-        // Kilometerstand von Hand nachgetragen hat. Diese Zeile wird
-        // ausgelassen, statt den ganzen Batch abzubrechen; sie zählt zu den
-        // fehlgeschlagenen und nicht zu den schon erfassten Fahrzeugen.
+        // `countersOptional`: Ein fehlender Zählerstand darf die Fahrt nicht
+        // verhindern — der Startstand eines nie erfassten Fahrzeugs ist
+        // unbekannt, und dann lässt sich auch kein Endstand ableiten. Der
+        // Eintrag entsteht ohne Kilometer und wird von Hand nachgetragen.
+        // Widersprüchliche Angaben werfen weiterhin; die Zeile fällt dann aus,
+        // ohne den Batch mitzunehmen, und zählt zu den fehlgeschlagenen.
         const doc = buildEntryDocument(
           vehicle,
           { ...input, counters: filled.counters },
           groupId,
           actor,
-          { counterSources: filled.counterSources, routeDistanceMeters: distanceM },
+          {
+            derivation: {
+              counterSources: filled.counterSources,
+              routeDistanceMeters: distance?.distanceMeters,
+            },
+            countersOptional: true,
+          },
         );
         batch.set(entriesRef(groupId).doc(), doc);
         created += 1;
@@ -360,11 +391,10 @@ export async function createFahrtenbuchEntries(
         // ist. Sonst behauptete die Oberfläche „20 km je Fahrzeug", obwohl nur
         // ein Boot gespeichert wurde oder alle Fahrer ihren Endstand selbst
         // eingetippt haben.
-        if (
-          entryRoundTripKm !== undefined &&
-          Object.values(filled.counterSources).includes('route')
-        ) {
-          roundTripKm = entryRoundTripKm;
+        const sources = Object.values(filled.counterSources);
+        if (distance && (sources.includes('route') || sources.includes('estimate'))) {
+          roundTripKm = distance.roundTripKm;
+          distanceSource = distance.source;
         }
       } catch (err) {
         console.error('createFahrtenbuchEntries: Zeile nicht gespeichert', err, {
@@ -389,6 +419,7 @@ export async function createFahrtenbuchEntries(
       skippedVehicleIds,
       failedVehicleIds,
       roundTripKm,
+      distanceSource,
     };
   } catch (err) {
     console.error('createFahrtenbuchEntries failed', err);
@@ -397,6 +428,229 @@ export async function createFahrtenbuchEntries(
       created: 0,
       skippedVehicleIds: [],
       failedVehicleIds: [],
+      error: actionErrorKey(err),
+    };
+  }
+}
+
+export interface ImportEntriesResult {
+  success: boolean;
+  created: number;
+  /** Serverseitig als bereits vorhanden erkannt und übersprungen. */
+  duplicates: number;
+  /** Zeilen, die die Validierung nicht bestanden haben. */
+  failed: number;
+  error?: string;
+}
+
+/**
+ * Kalendertag der Abfahrt in der Zeitzone des laufenden Prozesses.
+ *
+ * Die Vorschau in `fahrtenbuchImportPlan` bildet denselben Schlüssel im
+ * Browser und damit in der Zeitzone des Benutzers, dieser Code auf dem Server
+ * und damit meist in UTC — dieselbe Fahrt kann beiden Seiten also auf
+ * verschiedene Tage fallen. Jede Seite bleibt für sich stimmig, weil Bestand
+ * und Eingabe jeweils durch dieselbe Funktion laufen; und weil zusätzlich der
+ * Start-Kilometerstand übereinstimmen muss, ist eine Fehlzuordnung praktisch
+ * ausgeschlossen. Beim Verschieben der Regel auf einen absoluten Zeitpunkt
+ * müssen beide Seiten gemeinsam wandern.
+ */
+function localDayKey(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? iso
+    : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+/** Der Kilometerzähler des Fahrzeugs — die Einheit entscheidet, nicht die ID. */
+function kmCounterId(vehicle: FahrtenbuchVehicle | undefined): string | undefined {
+  const counters = vehicle?.counters ?? [];
+  return (
+    counters.find((c) => c.unit === 'km')?.id ??
+    counters.find((c) => c.id === 'km')?.id
+  );
+}
+
+/**
+ * Der Dublettenschlüssel einer Fahrt: Fahrzeug, Kalendertag der Abfahrt und
+ * Start-Kilometerstand.
+ *
+ * Ohne Startstand gibt es keinen Schlüssel und damit keine Dublettenprüfung —
+ * `vehicleId|Tag|''` fasste sonst alle Fahrten eines Anhängers oder Bootes an
+ * einem Tag zu einer einzigen zusammen, und jede weitere fiele stillschweigend
+ * weg. Von den beiden Fehlern ist das der schlechtere: Eine doppelt erfasste
+ * Fahrt steht im Fahrtenbuch und lässt sich löschen, eine nie geschriebene
+ * fehlt unbemerkt.
+ */
+function dedupKey(
+  vehicleId: string,
+  abfahrt: string,
+  start: number | undefined,
+): string | undefined {
+  return start === undefined
+    ? undefined
+    : `${vehicleId}|${localDayKey(abfahrt)}|${start}`;
+}
+
+/**
+ * Übernimmt Fahrten aus einem importierten Fahrtenbuch.
+ *
+ * Bewusst getrennt von `createFahrtenbuchEntries`: deren Dedup hängt an
+ * `firecallId`, den importierte Zeilen nicht haben, und deren
+ * `autoFillCounterEnds` würde einen fehlenden Endstand aus einer Routendistanz
+ * errechnen. Bei einer Fahrt von vor zwei Jahren wäre das eine erfundene
+ * Angabe in einem Nachweisdokument. Hier wird nichts aufgefüllt — was nicht
+ * vollständig ist, fällt aus und wird gezählt.
+ */
+export async function importFahrtenbuchEntries(
+  groupId: string,
+  inputs: FahrtenbuchEntryInput[],
+): Promise<ImportEntriesResult> {
+  try {
+    const session = await actionGroupMemberRequired(groupId);
+    if (inputs.length > 1000) {
+      return {
+        success: false,
+        created: 0,
+        duplicates: 0,
+        failed: 0,
+        error: 'tooManyEntries',
+      };
+    }
+    if (inputs.length === 0) {
+      return { success: true, created: 0, duplicates: 0, failed: 0 };
+    }
+
+    const now = new Date().toISOString();
+    const actor = {
+      userId: session.user.id,
+      userName: session.user.name ?? session.user.email ?? '',
+      now,
+    };
+
+    const vehicleIds = [...new Set(inputs.map((i) => i.vehicleId))];
+    const vehicles = new Map<string, FahrtenbuchVehicle>();
+    for (const id of vehicleIds) {
+      vehicles.set(id, await loadVehicle(groupId, id));
+    }
+
+    // Bestand je Fahrzeug einmal laden. Der Riegel gegen einen Doppelklick
+    // und gegen einen zweiten Lauf derselben Datei — die Vorschau prüft
+    // dasselbe, ist aber nur ein Vorschlag des Clients.
+    const taken = new Set<string>();
+    for (const id of vehicleIds) {
+      const snapshot = await entriesRef(groupId)
+        .where('vehicleId', '==', id)
+        .where('deleted', '==', false)
+        .get();
+      const kmId = kmCounterId(vehicles.get(id));
+      for (const doc of snapshot.docs) {
+        const entry = doc.data() as FahrtenbuchEntry;
+        const start = kmId ? entry.counters?.[kmId]?.start : undefined;
+        const key = dedupKey(id, entry.abfahrt, start);
+        if (key) taken.add(key);
+      }
+    }
+
+    let created = 0;
+    let duplicates = 0;
+    let failed = 0;
+    const written = new Set<string>();
+    // Ein Firestore-Batch fasst 500 Schreibvorgänge; 200 lässt Luft.
+    const CHUNK = 200;
+
+    for (let offset = 0; offset < inputs.length; offset += CHUNK) {
+      const batch = firestore.batch();
+      let inBatch = 0;
+      // Fahrzeuge und Dublettenschlüssel dieses Blocks getrennt sammeln: Beide
+      // gelten erst, wenn der Block auch committet ist.
+      const blockVehicleIds = new Set<string>();
+      const blockKeys: string[] = [];
+      for (const input of inputs.slice(offset, offset + CHUNK)) {
+        const vehicle = vehicles.get(input.vehicleId);
+        const kmId = kmCounterId(vehicle);
+        const start = kmId ? input.counters?.[kmId]?.start : undefined;
+        // Ohne Startstand gibt es keinen Schlüssel — die Zeile läuft dann
+        // immer in den Schreibpfad (siehe `dedupKey`).
+        const key = dedupKey(input.vehicleId, input.abfahrt, start);
+        if (key && taken.has(key)) {
+          duplicates += 1;
+          continue;
+        }
+        // Auch innerhalb desselben Aufrufs: dieselbe Zeile darf nicht zweimal
+        // durchkommen, wenn die Datei sie doppelt enthält.
+        if (key) {
+          taken.add(key);
+          blockKeys.push(key);
+        }
+
+        try {
+          // Ohne `derivation`: importierte Stände sind abgelesen, nicht
+          // abgeleitet. Wirft bei einer unvollständigen Zeile — die fällt
+          // aus, statt aufgefüllt zu werden.
+          const doc = buildEntryDocument(vehicle!, input, groupId, actor);
+          batch.set(entriesRef(groupId).doc(), doc);
+          inBatch += 1;
+          blockVehicleIds.add(input.vehicleId);
+        } catch (err) {
+          console.error('importFahrtenbuchEntries: Zeile nicht gespeichert', err, {
+            vehicleId: input.vehicleId,
+            abfahrt: input.abfahrt,
+          });
+          failed += 1;
+          // Der eben belegte Schlüssel wird wieder frei: Diese Fahrt steht
+          // nicht im Fahrtenbuch, eine zweite Kopie derselben Zeile ist keine
+          // Dublette, sondern scheitert für sich.
+          if (key) taken.delete(key);
+        }
+      }
+      if (inBatch === 0) continue;
+
+      try {
+        await batch.commit();
+        created += inBatch;
+        for (const id of blockVehicleIds) written.add(id);
+      } catch (err) {
+        // Ein gescheiterter Block darf die folgenden nicht aufhalten und die
+        // schon geschriebenen nicht entwerten — dieselbe Haltung wie bei der
+        // einzelnen Zeile: Was durchgeht, geht durch; was scheitert, wird
+        // gezählt und gemeldet. Ohne das meldete ein Fehler im zweiten Block
+        // „nichts importiert", der Benutzer startete den Import neu, und jede
+        // Zeile ohne Startkilometerstand — die einzige, die kein Dublettenriegel
+        // schützt — stünde danach doppelt im Fahrtenbuch.
+        console.error('importFahrtenbuchEntries: Block nicht gespeichert', err, {
+          offset,
+          count: inBatch,
+        });
+        failed += inBatch;
+        // Die Schlüssel dieses Blocks wieder freigeben: Nichts davon steht im
+        // Fahrtenbuch, eine spätere Kopie derselben Zeile soll ihre Chance
+        // behalten.
+        for (const key of blockKeys) taken.delete(key);
+      }
+    }
+
+    // Erst am Ende, sonst schriebe jeder Block den Cache neu. Ein Fehler hier
+    // darf den Import nicht als gescheitert melden: Die Fahrten stehen bereits
+    // im Fahrtenbuch, der Cache ist ein abgeleiteter Wert und wird von der
+    // nächsten Fahrt ohnehin neu geschrieben.
+    for (const id of written) {
+      try {
+        await refreshVehicleCounters(groupId, id);
+      } catch (err) {
+        console.error('importFahrtenbuchEntries: Fahrzeug-Cache nicht aufgefrischt', err, {
+          vehicleId: id,
+        });
+      }
+    }
+    return { success: true, created, duplicates, failed };
+  } catch (err) {
+    console.error('importFahrtenbuchEntries failed', err);
+    return {
+      success: false,
+      created: 0,
+      duplicates: 0,
+      failed: 0,
       error: actionErrorKey(err),
     };
   }
@@ -441,12 +695,14 @@ export async function updateFahrtenbuchEntry(
         now: existing.createdAt,
       },
       {
-        counterSources: survivingCounterSources(
-          existing.counterSources,
-          existing.counters,
-          input.counters ?? {},
-        ),
-        routeDistanceMeters: existing.routeDistanceMeters,
+        derivation: {
+          counterSources: survivingCounterSources(
+            existing.counterSources,
+            existing.counters,
+            input.counters ?? {},
+          ),
+          routeDistanceMeters: existing.routeDistanceMeters,
+        },
       },
     );
 

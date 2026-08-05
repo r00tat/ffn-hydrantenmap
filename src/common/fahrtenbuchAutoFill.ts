@@ -3,8 +3,9 @@ import type { CounterDefinition, CounterReading, CounterSource } from './fahrten
 import type { GeoPositionObject } from './geo';
 
 /**
- * Umwegfaktor für die Luftlinien-Schätzung. Nur für Anzeige und Vorprüfung —
- * gespeichert wird immer die echte Routendistanz.
+ * Umwegfaktor für die Luftlinien-Schätzung. Die Schätzung dient dem Hinweis im
+ * Formular und — wenn kein Routing zu bekommen ist — als Rückfallebene für den
+ * gespeicherten Wert. Dann wird sie als `'estimate'` gekennzeichnet.
  */
 const DETOUR_FACTOR = 1.3;
 
@@ -54,6 +55,40 @@ export interface AutoFilledCounters {
 }
 
 /**
+ * Die Gesamtstrecke samt ihrer Herkunft. Beides gehört zusammen: Die Zahl
+ * allein sagt nicht, ob sie gefahren oder geschätzt ist, und genau diese
+ * Unterscheidung landet als `CounterSource` im Nachweisdokument.
+ */
+export interface RoundTripDistance {
+  /** Gesamtstrecke (Hin- und Rückfahrt) in ganzen Kilometern. */
+  roundTripKm: number;
+  source: 'route' | 'estimate';
+  /**
+   * Die einfache Straßenstrecke in Metern — nur bei `'route'`. Eine Schätzung
+   * hat hier bewusst nichts stehen: `routeDistanceMeters` am Eintrag ist die
+   * Belegstelle für eine gefahrene Route, keine Ablage für Rechenzwischenwerte.
+   */
+  distanceMeters?: number;
+}
+
+/** Aus einer gemessenen einfachen Straßenstrecke in Metern. */
+export function routeDistance(oneWayMeters: number): RoundTripDistance {
+  return {
+    roundTripKm: roundTripKmFromMeters(oneWayMeters),
+    source: 'route',
+    distanceMeters: oneWayMeters,
+  };
+}
+
+/** Aus der Luftlinie geschätzt, weil kein Routing zu bekommen war. */
+export function estimatedDistance(
+  from: GeoPositionObject,
+  to: GeoPositionObject,
+): RoundTripDistance {
+  return { roundTripKm: estimateRoundTripKm(from, to), source: 'estimate' };
+}
+
+/**
  * Ergänzt fehlende Endstände. Ein vom Benutzer eingetragener Wert hat immer
  * Vorrang und wird nie überschrieben.
  *
@@ -68,7 +103,7 @@ export function autoFillCounterEnds(
   definitions: CounterDefinition[],
   counters: Record<string, CounterReading>,
   lastCounters: Record<string, number>,
-  roundTripKm?: number,
+  distance?: RoundTripDistance,
 ): AutoFilledCounters {
   const result: Record<string, CounterReading> = { ...counters };
   const counterSources: Record<string, CounterSource> = {};
@@ -80,13 +115,14 @@ export function autoFillCounterEnds(
     if (isKmCounter(def)) {
       // Ohne Startstand fehlt der Bezugswert, zu dem die Strecke addiert
       // werden könnte.
-      if (roundTripKm === undefined || reading?.start === undefined) continue;
-      result[def.id] = withEnd(reading, reading.start + roundTripKm);
-      // Nur die Server Action darf dieses Ergebnis speichern: Ruft der Client
-      // die Funktion mit seiner Luftlinien-Schätzung auf, wäre `'route'`
-      // gelogen. Er nutzt das Ergebnis deshalb ausschließlich zur Vorprüfung
-      // und schickt den Endstand leer mit.
-      counterSources[def.id] = 'route';
+      if (!distance || reading?.start === undefined) continue;
+      result[def.id] = withEnd(reading, reading.start + distance.roundTripKm);
+      // Die Herkunft kommt aus der Distanz und wird hier nicht erfunden: Ruft
+      // der Client die Funktion mit seiner Schätzung auf, steht dort
+      // `'estimate'`. Gespeichert wird das Ergebnis ohnehin nur von der Server
+      // Action — der Client nutzt es zur Vorprüfung und schickt den Endstand
+      // leer mit.
+      counterSources[def.id] = distance.source;
       continue;
     }
 

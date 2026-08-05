@@ -97,9 +97,14 @@ const boot: FahrtenbuchVehicle = {
 const baseProps = {
   groupId: 'ffnd',
   vehicles: [vehicle],
+  times: {
+    abfahrt: '2026-08-03T10:00:00.000Z',
+    ankunft: '2026-08-03T12:00:00.000Z',
+  },
   isMember: true,
   saving: false,
   onSave: vi.fn(),
+  onChangeTimes: vi.fn(),
   onChangeRow: vi.fn(),
 };
 
@@ -140,10 +145,47 @@ describe('EinsatzFahrtenbuchView', () => {
     expect(screen.getByText(/keine Fahrzeuge zugeordnet/)).toBeInTheDocument();
   });
 
-  it('zeigt den vorbelegten Fahrer und Startzähler', () => {
+  it('zeigt den vorbelegten Fahrer in der Zeile', () => {
     renderWithIntl(<EinsatzFahrtenbuchView {...baseProps} rows={[row()]} />);
     expect(screen.getByDisplayValue('Max Mustermann')).toBeInTheDocument();
+  });
+
+  it('hält die Zählerfelder eingeklappt, bis Details geöffnet werden', async () => {
+    // Der Sinn des Umbaus: Im Normalfall ist an einer Zeile nichts zu tun. Die
+    // Zählerfelder standen vorher immer offen und machten aus fünf Fahrzeugen
+    // eine Wand aus Eingabefeldern.
+    const user = userEvent.setup();
+    renderWithIntl(<EinsatzFahrtenbuchView {...baseProps} rows={[row()]} />);
+    expect(screen.queryByDisplayValue('1000')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     expect(screen.getByDisplayValue('1000')).toBeInTheDocument();
+  });
+
+  it('zeigt die Kilometer-Vorschau als Schätzung in der Zeile', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row()]}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
+      />,
+    );
+    // „ca.“ muss dran: Im Fahrtenbuch darf eine Schätzung nicht wie eine
+    // Ablesung aussehen.
+    expect(screen.getByText('1000 → ca. 1024 km (ca. +24)')).toBeInTheDocument();
+  });
+
+  it('meldet eine Zeile ohne Startstand, statt eine Zahl zu erfinden', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row({ counters: {} })]}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
+      />,
+    );
+    expect(
+      screen.getByText('kein Startstand — wird ohne Kilometer gespeichert'),
+    ).toBeInTheDocument();
   });
 
   it('markiert bereits erfasste Fahrzeuge und bietet das Bearbeiten an', async () => {
@@ -163,17 +205,25 @@ describe('EinsatzFahrtenbuchView', () => {
     expect(onEditEntry).toHaveBeenCalledWith(existingEntry);
   });
 
-  it('sperrt die Eingabe bereits erfasster Zeilen', () => {
+  it('zeigt an einer bereits erfassten Zeile keine Eingabefelder', () => {
+    // Gesperrte Felder waren vorher nötig, weil die Karte alle Felder zeigte.
+    // Die kompakte Zeile lässt sie ganz weg: Wer den Eintrag ändern will, nimmt
+    // den Bearbeiten-Knopf und damit den vollen Dialog.
     renderWithIntl(
       <EinsatzFahrtenbuchView
         {...baseProps}
         rows={[row({ existingEntry: { id: 'e1' } as FahrtenbuchEntry })]}
       />,
     );
-    expect(screen.getByDisplayValue('Max Mustermann')).toBeDisabled();
+    expect(screen.getByText('Bereits erfasst')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Max Mustermann')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Details bearbeiten' }),
+    ).not.toBeInTheDocument();
   });
 
-  it('fragt beim Boot Betriebsstunden statt Kilometer ab', () => {
+  it('fragt beim Boot Betriebsstunden statt Kilometer ab', async () => {
+    const user = userEvent.setup();
     renderWithIntl(
       <EinsatzFahrtenbuchView
         {...baseProps}
@@ -189,6 +239,7 @@ describe('EinsatzFahrtenbuchView', () => {
         ]}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     expect(
       screen.getByLabelText(/Betriebsstunden Backbordmotor — Ende/),
     ).toBeInTheDocument();
@@ -233,6 +284,7 @@ describe('EinsatzFahrtenbuchView', () => {
         rows={[row()]}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '5');
     expect(onChangeRow).toHaveBeenCalledWith('i1', {
       counters: { km: { start: 1000, end: 5 } },
@@ -282,8 +334,8 @@ describe('EinsatzFahrtenbuchView', () => {
     );
     expect(screen.getByText('Bereits erfasst')).toBeInTheDocument();
     expect(
-      screen.getByLabelText(/Kilometerstand — Ende/),
-    ).toBeDisabled();
+      screen.queryByLabelText(/Kilometerstand — Ende/),
+    ).not.toBeInTheDocument();
   });
 
   it('sperrt den Speichern-Button während des Speicherns', () => {
@@ -295,17 +347,37 @@ describe('EinsatzFahrtenbuchView', () => {
 });
 
 describe('EinsatzFahrtenbuchView — Kilometer-Hinweis', () => {
-  it('reicht die Schätzung an die Zählerfelder durch', () => {
+  it('reicht die Schätzung an die Zählerfelder durch', async () => {
+    const user = userEvent.setup();
     renderWithIntl(
       <EinsatzFahrtenbuchView
         {...baseProps}
         rows={[row()]}
-        autoFill={{ roundTripKm: 24 }}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
       />,
     );
+    await user.click(screen.getByRole('button', { name: 'Details bearbeiten' }));
     expect(
-      screen.getByText('ca. 24 km, wird beim Speichern aus der Route berechnet'),
+      screen.getByText('ca. 24 km, wird beim Speichern berechnet'),
     ).toBeInTheDocument();
+  });
+
+  it('setzt die Zeiten des Kopfblocks, nicht je Fahrzeug', async () => {
+    const user = userEvent.setup();
+    const onChangeTimes = vi.fn();
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row(), row({ key: 'i2' })]}
+        onChangeTimes={onChangeTimes}
+      />,
+    );
+    // Genau ein Paar Zeitfelder für beide Fahrzeuge.
+    expect(screen.getAllByLabelText('Abfahrt')).toHaveLength(1);
+
+    await user.clear(screen.getByLabelText('Abfahrt'));
+    await user.type(screen.getByLabelText('Abfahrt'), '2026-08-03T11:30');
+    expect(onChangeTimes).toHaveBeenCalled();
   });
 });
 

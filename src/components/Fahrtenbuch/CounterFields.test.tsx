@@ -166,11 +166,11 @@ describe('CounterFields — Hinweise auf automatische Endstände', () => {
         counters={{ km: { start: 1000 } }}
         lastCounters={{ km: 1000 }}
         onChange={vi.fn()}
-        autoFill={{ roundTripKm: 24 }}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
       />,
     );
     expect(
-      screen.getByText('ca. 24 km, wird beim Speichern aus der Route berechnet'),
+      screen.getByText('ca. 24 km, wird beim Speichern berechnet'),
     ).toBeInTheDocument();
   });
 
@@ -181,11 +181,11 @@ describe('CounterFields — Hinweise auf automatische Endstände', () => {
         counters={{ km: { start: 1000, end: 1024 } }}
         lastCounters={{ km: 1000 }}
         onChange={vi.fn()}
-        autoFill={{ roundTripKm: 24 }}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
       />,
     );
     expect(
-      screen.queryByText(/wird beim Speichern aus der Route berechnet/),
+      screen.queryByText(/wird beim Speichern berechnet/),
     ).not.toBeInTheDocument();
   });
 
@@ -227,7 +227,7 @@ describe('CounterFields — Hinweise auf automatische Endstände', () => {
       />,
     );
     expect(
-      screen.queryByText(/wird beim Speichern aus der Route berechnet/),
+      screen.queryByText(/wird beim Speichern berechnet/),
     ).not.toBeInTheDocument();
   });
 });

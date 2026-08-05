@@ -32,6 +32,15 @@ vi.mock('../../../hooks/useFahrtenbuchVehicles', () => ({
   default: useFahrtenbuchVehicles,
 }));
 
+// Vom QR-Dialog importiert — ebenfalls 'use server'/'server-only'.
+const { getFahrtenbuchShareLink } = vi.hoisted(() => ({
+  getFahrtenbuchShareLink: vi.fn(),
+}));
+
+vi.mock('../shareLinkActions', () => ({
+  getFahrtenbuchShareLink,
+}));
+
 import VehicleAdmin from './VehicleAdmin';
 
 /**
@@ -78,7 +87,30 @@ describe('VehicleAdmin', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     saveFahrtenbuchVehicle.mockResolvedValue({ success: true, id: 'v1' });
+    getFahrtenbuchShareLink.mockResolvedValue({
+      url: 'https://einsatz.example/fahrtenbuch/teilen/tok123',
+      createdAt: '2026-08-04T10:00:00.000Z',
+      createdByName: 'Paul',
+    });
     setVehicles([]);
+  });
+
+  it('öffnet den QR-Code des Fahrzeugs aus der Liste', async () => {
+    const user = userEvent.setup();
+    setVehicles([vehicle({ id: 'v2', name: 'MTF' })]);
+    renderWithIntl(<VehicleAdmin groupId="g1" groupName="FF Neusiedl" />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'QR-Code für dieses Fahrzeug: MTF' }),
+    );
+
+    // Der Link trägt genau dieses Fahrzeug — ein Aufkleber im MTF darf nicht
+    // den allgemeinen Code der Gruppe zeigen.
+    expect(
+      await screen.findByText(
+        'https://einsatz.example/fahrtenbuch/teilen/tok123?fahrzeug=v2',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('wählt für ein gespeichertes Boot die Boot-Vorlage vor', async () => {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const downloadBlobMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../components/firebase/download', () => ({
+vi.mock('../../firebase/download', () => ({
   downloadBlob: downloadBlobMock,
 }));
 
@@ -65,6 +65,12 @@ describe('shareLinkQrFilename', () => {
   it('bleibt bei einer ID ohne verwertbare Zeichen brauchbar', () => {
     expect(shareLinkQrFilename('///')).toBe('fahrtenbuch-link.png');
   });
+
+  it('nimmt das vorbelegte Fahrzeug auf, damit Aufkleber unterscheidbar sind', () => {
+    expect(shareLinkQrFilename('ffnd', 'TLF 2000')).toBe(
+      'fahrtenbuch-link-ffnd-tlf-2000.png',
+    );
+  });
 });
 
 describe('qrPrintDocument', () => {
@@ -94,6 +100,23 @@ describe('qrPrintDocument', () => {
     });
     expect(html).not.toContain('<img src=x');
     expect(html).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+  });
+
+  it('stellt das vorbelegte Fahrzeug heraus', () => {
+    const html = qrPrintDocument('<svg></svg>', {
+      ...labels,
+      vehicleName: 'TLF 2000',
+    });
+    // Der Ausdruck klebt im Fahrzeug: wer ihn sieht, muss auf einen Blick
+    // erkennen, ob der Zettel zum richtigen Fahrzeug gehört.
+    expect(html).toContain('class="vehicle"');
+    expect(html).toContain('TLF 2000');
+  });
+
+  it('lässt die Fahrzeugzeile weg, wenn kein Fahrzeug vorbelegt ist', () => {
+    expect(qrPrintDocument('<svg></svg>', labels)).not.toContain(
+      'class="vehicle"',
+    );
   });
 
   it('lässt die Gruppenzeile weg, wenn kein Name bekannt ist', () => {
@@ -244,5 +267,11 @@ describe('downloadShareLinkQr', () => {
     const [blob, filename] = downloadBlobMock.mock.calls[0];
     expect((blob as Blob).type).toBe('image/png');
     expect(filename).toBe('fahrtenbuch-link-ffnd.png');
+
+    downloadBlobMock.mockReset();
+    await downloadShareLinkQr(makeSvg(), 'ffnd', 'MTF');
+    expect(downloadBlobMock.mock.calls[0][1]).toBe(
+      'fahrtenbuch-link-ffnd-mtf.png',
+    );
   });
 });

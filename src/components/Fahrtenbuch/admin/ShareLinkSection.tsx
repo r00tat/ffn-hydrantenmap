@@ -1,37 +1,34 @@
 'use client';
 
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DownloadIcon from '@mui/icons-material/Download';
-import PrintIcon from '@mui/icons-material/Print';
 import Alert from '@mui/material/Alert';
-import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
-import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { useFormatter, useLocale, useTranslations } from 'next-intl';
-import { QRCodeSVG } from 'qrcode.react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ShareLinkInfo } from '../../common/fahrtenbuchShare';
-import ConfirmDialog from '../../components/dialogs/ConfirmDialog';
-import { NON_TENANT_GROUP_IDS } from './groupTypes';
+import { useFormatter, useTranslations } from 'next-intl';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NON_TENANT_GROUP_IDS } from '../../../app/groups/groupTypes';
+import {
+  shareLinkUrlWithVehicle,
+  type ShareLinkInfo,
+} from '../../../common/fahrtenbuchShare';
+import useFahrtenbuchVehicles from '../../../hooks/useFahrtenbuchVehicles';
+import ConfirmDialog from '../../dialogs/ConfirmDialog';
 import {
   createFahrtenbuchShareLink,
   getFahrtenbuchShareLink,
   revokeFahrtenbuchShareLink,
-} from './shareLinkActions';
-import {
-  PrintWindowBlockedError,
-  downloadShareLinkQr,
-  printShareLinkQr,
-} from './shareLinkQr';
+} from '../shareLinkActions';
+import ShareLinkQrBlock from './ShareLinkQrBlock';
 
-export interface FahrtenbuchShareLinkSectionProps {
+export interface ShareLinkSectionProps {
   groupId: string;
   /** Erscheint auf dem Ausdruck, damit der Zettel zuordenbar bleibt. */
   groupName?: string;
@@ -39,26 +36,22 @@ export interface FahrtenbuchShareLinkSectionProps {
 
 type PendingAction = 'regenerate' | 'revoke';
 
-/** Warum ein Export scheiterte — der Pop-up-Blocker braucht einen eigenen Rat. */
-type ExportError = 'failed' | 'blocked';
-
 /** Wie lange „Link kopiert“ im Tooltip stehen bleibt. */
 const COPIED_RESET_MS = 3000;
 
 /**
- * Erzeugt und zeigt den Fahrtenbuch-Share-Link einer Gruppe. Die Aktionen
- * wirken sofort und nicht erst beim „Aktualisieren“ des Gruppen-Dialogs — ein
- * Widerruf, der erst beim Speichern greift, wäre eine Falle.
+ * Erzeugt und zeigt den Fahrtenbuch-Share-Link einer Gruppe. Jede Aktion wirkt
+ * sofort — es gibt kein „Speichern“, hinter dem ein Widerruf hängen bliebe.
+ *
+ * Der Link gilt für die gesamte Gruppe; die Fahrzeug-Vorauswahl hängt nur einen
+ * Parameter an. Widerruf und Neuerzeugung treffen deshalb immer alle Fahrzeuge.
  */
-export default function FahrtenbuchShareLinkSection({
+export default function ShareLinkSection({
   groupId,
   groupName,
-}: FahrtenbuchShareLinkSectionProps) {
-  const t = useTranslations('groups.shareLink');
+}: ShareLinkSectionProps) {
+  const t = useTranslations('fahrtenbuch.shareLink');
   const format = useFormatter();
-  const locale = useLocale();
-  const qrRef = useRef<HTMLDivElement>(null);
-  const [exportError, setExportError] = useState<ExportError>();
   const [link, setLink] = useState<ShareLinkInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -67,6 +60,20 @@ export default function FahrtenbuchShareLinkSection({
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const [pending, setPending] = useState<PendingAction>();
+  const [vehicleId, setVehicleId] = useState('');
+
+  const { activeVehicles } = useFahrtenbuchVehicles(groupId);
+  const vehicleName = activeVehicles.find((v) => v.id === vehicleId)?.name;
+
+  /**
+   * Der Link mit der Fahrzeug-Vorauswahl. Textfeld, Kopieren, QR-Code, Ausdruck
+   * und Download hängen alle daran — ein Aufkleber im Fahrzeug darf niemals
+   * einen anderen Code tragen als der, den der Admin gerade am Bildschirm sieht.
+   */
+  const shareUrl = useMemo(
+    () => (link ? shareLinkUrlWithVehicle(link.url, vehicleId) : ''),
+    [link, vehicleId],
+  );
 
   // Eine Berechtigungsgruppe wie `kostenersatz` ist kein Fahrtenbuch-Mandant;
   // die Server Actions lehnen sie ohnehin ab.
@@ -125,31 +132,11 @@ export default function FahrtenbuchShareLinkSection({
       setLink(null);
     });
 
-  /**
-   * Beide Exporte lesen das SVG aus dem DOM statt den Code neu zu erzeugen —
-   * so kann ein Ausdruck nie auf einen anderen Link zeigen als der Bildschirm.
-   */
-  const runExport = useCallback(async (action: (svg: SVGSVGElement) => void | Promise<void>) => {
-    setExportError(undefined);
-    const svg = qrRef.current?.querySelector('svg');
-    if (!svg) {
-      setExportError('failed');
-      return;
-    }
-    try {
-      await action(svg);
-    } catch (err) {
-      console.error('Fahrtenbuch share link QR export failed:', err);
-      setExportError(err instanceof PrintWindowBlockedError ? 'blocked' : 'failed');
-    }
-  }, []);
-
   if (!isTenant) return null;
 
   return (
-    <>
-      <Divider sx={{ mt: 3, mb: 1 }} />
-      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+    <Paper sx={{ p: 3, maxWidth: 640 }}>
+      <Typography variant="h6" gutterBottom>
         {t('heading')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
@@ -197,12 +184,33 @@ export default function FahrtenbuchShareLinkSection({
           <Alert severity="warning" sx={{ mb: 1 }}>
             {t('warning')}
           </Alert>
+          {activeVehicles.length > 0 && (
+            <TextField
+              select
+              fullWidth
+              margin="dense"
+              variant="standard"
+              label={t('vehicle')}
+              value={vehicleId}
+              onChange={(event) => setVehicleId(event.target.value)}
+              helperText={t('vehicleHint')}
+            >
+              {/* Leerer Wert statt „alle": der Link ohne Parameter belegt nichts
+                  vor — das ist der Zettel fürs Feuerwehrhaus, nicht fürs Auto. */}
+              <MenuItem value="">{t('vehicleNone')}</MenuItem>
+              {activeVehicles.map((vehicle) => (
+                <MenuItem key={vehicle.id} value={vehicle.id}>
+                  {vehicle.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             fullWidth
             margin="dense"
             variant="standard"
             label={t('heading')}
-            value={link.url}
+            value={shareUrl}
             slotProps={{
               input: {
                 readOnly: true,
@@ -221,7 +229,7 @@ export default function FahrtenbuchShareLinkSection({
                             if (!navigator.clipboard) {
                               throw new Error('clipboard API unavailable');
                             }
-                            await navigator.clipboard.writeText(link.url);
+                            await navigator.clipboard.writeText(shareUrl);
                             setCopyFailed(false);
                             setCopied(true);
                           } catch (err) {
@@ -254,66 +262,20 @@ export default function FahrtenbuchShareLinkSection({
               name: link.createdByName || '—',
             })}
           </Typography>
-          {/* Weißer Grund: ein QR-Code auf dunklem Hintergrund ist im Dark Mode
-              für Scanner unbrauchbar. `level="M"` und eine volle Quiet Zone von
-              4 Modulen, weil der Ausdruck am Fahrzeug Sonne, Schmutz und Knicke
-              abbekommt — die Defaults von qrcode.react (`L`, `marginSize=0`)
-              sind dafür die schwächste Stufe. */}
-          <Box
-            ref={qrRef}
-            sx={{
-              p: 2,
-              mt: 1,
-              bgcolor: 'white',
-              borderRadius: 1,
-              width: 'fit-content',
-            }}
-          >
-            <QRCodeSVG
-              value={link.url}
-              size={200}
-              level="M"
-              marginSize={4}
-              title={t('heading')}
-            />
-          </Box>
-          {exportError && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              {exportError === 'blocked' ? t('printBlocked') : t('exportFailed')}
-            </Alert>
-          )}
+          <ShareLinkQrBlock
+            url={shareUrl}
+            groupId={groupId}
+            groupName={groupName}
+            vehicleName={vehicleName}
+          />
+          {/* Erzeugen und Widerrufen unter dem Code, nicht daneben: Beide
+              treffen alle Fahrzeuge, nicht das gerade vorausgewählte. */}
           <Stack
             direction="row"
             spacing={1}
             useFlexGap
-            sx={{ mt: 1, flexWrap: 'wrap' }}
+            sx={{ mt: 2, flexWrap: 'wrap' }}
           >
-            <Button
-              size="small"
-              startIcon={<DownloadIcon />}
-              onClick={() =>
-                runExport((svg) => downloadShareLinkQr(svg, groupId))
-              }
-            >
-              {t('download')}
-            </Button>
-            <Button
-              size="small"
-              startIcon={<PrintIcon />}
-              onClick={() =>
-                runExport((svg) =>
-                  printShareLinkQr(svg, {
-                    heading: t('heading'),
-                    groupName,
-                    hint: t('printHint'),
-                    url: link.url,
-                    locale,
-                  }),
-                )
-              }
-            >
-              {t('print')}
-            </Button>
             <Button
               size="small"
               disabled={busy}
@@ -348,6 +310,6 @@ export default function FahrtenbuchShareLinkSection({
           }}
         />
       )}
-    </>
+    </Paper>
   );
 }

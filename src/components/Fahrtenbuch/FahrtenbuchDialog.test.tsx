@@ -56,25 +56,35 @@ const baseProps = {
   onClose: vi.fn(),
 };
 
-const existingEntry: FahrtenbuchEntry = {
-  id: 'e1',
-  vehicleId: 'v1',
-  vehicleName: 'RLFA 2000',
-  driverName: 'Max Mustermann',
+function entry(overrides: Partial<FahrtenbuchEntry> = {}): FahrtenbuchEntry {
+  return {
+    id: 'e1',
+    vehicleId: 'v1',
+    vehicleName: 'RLFA 2000',
+    driverName: 'Max Mustermann',
+    zweck: 'sonstiges',
+    ziel: '',
+    abfahrt: '2026-08-03T10:00:00.000Z',
+    ankunft: '2026-08-03T11:00:00.000Z',
+    counters: {},
+    group: 'ffnd',
+    deleted: false,
+    createdAt: '',
+    createdBy: 'u1',
+    createdByName: '',
+    updatedAt: '',
+    updatedBy: '',
+    ...overrides,
+  };
+}
+
+const existingEntry: FahrtenbuchEntry = entry({
   zweck: 'einsatz',
   firecallId: 'f1',
+  firecallName: 'Brand B2',
   ziel: 'Hauptplatz',
-  abfahrt: '2026-08-03T10:00:00.000Z',
-  ankunft: '2026-08-03T11:00:00.000Z',
   counters: { km: { start: 1000, end: 1042, diff: 42 } },
-  group: 'ffnd',
-  deleted: false,
-  createdAt: '',
-  createdBy: 'u1',
-  createdByName: '',
-  updatedAt: '',
-  updatedBy: '',
-};
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -255,5 +265,123 @@ describe('FahrtenbuchDialog', () => {
     expect(
       await screen.findByText(/Speichern fehlgeschlagen: PERMISSION_DENIED/),
     ).toBeInTheDocument();
+  });
+
+  it('übernimmt bei Auswahl aus der Liste ID und Namen', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        firecalls={[{ id: 'f1', name: 'B1 Kaminbrand' }]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    await user.click(screen.getByLabelText('Einsatz'));
+    await user.click(await screen.findByRole('option', { name: 'B1 Kaminbrand' }));
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      firecallId: 'f1',
+      firecallName: 'B1 Kaminbrand',
+    });
+  });
+
+  it('speichert einen frei eingegebenen Einsatz ohne ID', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        firecalls={[{ id: 'f1', name: 'B1 Kaminbrand' }]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    await user.type(screen.getByLabelText('Einsatz'), 'N/S Ölspur Hauptstraße');
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      firecallId: undefined,
+      firecallName: 'N/S Ölspur Hauptstraße',
+    });
+  });
+
+  it('verknüpft nicht heimlich, nur weil der getippte Name zufällig zu einem Listeneintrag passt', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        firecalls={[{ id: 'f1', name: 'B1 Kaminbrand' }]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    // Tippen, nicht auswählen — trotz exakt gleichlautendem Listeneintrag darf
+    // daraus keine Verknüpfung entstehen.
+    await user.type(screen.getByLabelText('Einsatz'), 'B1 Kaminbrand');
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      firecallId: undefined,
+      firecallName: 'B1 Kaminbrand',
+    });
+  });
+
+  it('zeigt beim Bearbeiten den gespeicherten Einsatznamen ohne passende ID', () => {
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        firecalls={[]}
+        entry={entry({ zweck: 'einsatz', firecallName: 'Altbestand Ölspur' })}
+      />,
+    );
+
+    expect(screen.getByLabelText('Einsatz')).toHaveValue('Altbestand Ölspur');
+  });
+
+  it('verwirft den Einsatzbezug, wenn der Zweck nicht Einsatz ist', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        firecalls={[{ id: 'f1', name: 'B1 Kaminbrand' }]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    await user.click(screen.getByLabelText('Einsatz'));
+    await user.click(await screen.findByRole('option', { name: 'B1 Kaminbrand' }));
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Übung' }));
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      firecallId: undefined,
+      firecallName: undefined,
+    });
   });
 });

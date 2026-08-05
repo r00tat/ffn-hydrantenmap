@@ -17,11 +17,17 @@ import { useEntryFormState } from './useEntryFormState';
 export interface ShareLinkEntryFormProps {
   token: string;
   data: ShareLinkFormData;
+  /**
+   * Fahrzeug aus dem Link (`?fahrzeug=…`) — für Aufkleber im Fahrzeug. Die
+   * Seite prüft vorher, dass die ID zu einem aktiven Fahrzeug gehört.
+   */
+  vehicleId?: string;
 }
 
 function ShareLinkFormBody({
   token,
   data,
+  vehicleId,
   onSaved,
 }: ShareLinkEntryFormProps & { onSaved: () => void }) {
   const t = useTranslations('fahrtenbuchShare');
@@ -31,7 +37,10 @@ function ShareLinkFormBody({
   // dass es keine Einsatzauswahl anbieten darf.
   const form = useEntryFormState({
     vehicles: data.vehicles,
-    vehicleId: data.vehicles.length === 1 ? data.vehicles[0].id : undefined,
+    // Der Link gewinnt gegen den Einzelfahrzeug-Fall — beide sagen dasselbe,
+    // wenn die Gruppe nur ein Fahrzeug hat.
+    vehicleId:
+      vehicleId ?? (data.vehicles.length === 1 ? data.vehicles[0].id : undefined),
     onSubmit: (input) => createFahrtenbuchEntryViaShareLink(token, input),
   });
 
@@ -79,6 +88,7 @@ function ShareLinkFormBody({
 export default function ShareLinkEntryForm({
   token,
   data,
+  vehicleId,
 }: ShareLinkEntryFormProps) {
   const t = useTranslations('fahrtenbuchShare');
   const router = useRouter();
@@ -108,6 +118,7 @@ export default function ShareLinkEntryForm({
         <ShareLinkFormBody
           token={token}
           data={data}
+          vehicleId={vehicleId}
           // Die Bestätigung ersetzt das Formular — das ist zugleich der Schutz
           // gegen ein zweites Absenden derselben Fahrt.
           onSaved={() => setShowForm(false)}

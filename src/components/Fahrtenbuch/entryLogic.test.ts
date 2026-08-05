@@ -218,8 +218,7 @@ describe('buildEntryDocument beim Bearbeiten', () => {
 describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
   it('schreibt Herkunft und Routendistanz, wenn sie übergeben werden', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      counterSources: { km: 'route' },
-      routeDistanceMeters: 12000,
+      derivation: { counterSources: { km: 'route' }, routeDistanceMeters: 12000 },
     });
     expect(doc.counterSources).toEqual({ km: 'route' });
     expect(doc.routeDistanceMeters).toBe(12000);
@@ -227,7 +226,7 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
 
   it('lässt counterSources weg, wenn die Herkunftsliste leer ist', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      counterSources: {},
+      derivation: { counterSources: {} },
     });
     expect(doc).not.toHaveProperty('counterSources');
     expect(doc).not.toHaveProperty('routeDistanceMeters');
@@ -241,8 +240,7 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
 
   it('schreibt die Routendistanz auch, wenn kein Zähler als abgeleitet gilt', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      counterSources: {},
-      routeDistanceMeters: 12000,
+      derivation: { counterSources: {}, routeDistanceMeters: 12000 },
     });
     expect(doc).not.toHaveProperty('counterSources');
     expect(doc.routeDistanceMeters).toBe(12000);
@@ -253,8 +251,7 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
     // versehentliches `if (derivation?.routeDistanceMeters)` müsste hier
     // durchfallen.
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      counterSources: {},
-      routeDistanceMeters: 0,
+      derivation: { counterSources: {}, routeDistanceMeters: 0 },
     });
     expect(doc.routeDistanceMeters).toBe(0);
   });
@@ -265,7 +262,7 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
       input,
       'ffnd',
       actor,
-      { counterSources: { km: 'route' }, routeDistanceMeters: 12000 },
+      { derivation: { counterSources: { km: 'route' }, routeDistanceMeters: 12000 } },
     );
     expect(doc).not.toHaveProperty('counterSources');
   });
@@ -275,14 +272,14 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
     // Dokument behaupten, ein Stand sei daraus berechnet worden.
     expect(() =>
       buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-        counterSources: { km: 'route' },
+        derivation: { counterSources: { km: 'route' } },
       }),
     ).toThrow(/routeDistanceMeters/);
   });
 
   it('wirft nicht, wenn nur unveränderte Herkunftsangaben ohne Distanz kommen', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      counterSources: { km: 'unchanged' },
+      derivation: { counterSources: { km: 'unchanged' } },
     });
     expect(doc.counterSources).toEqual({ km: 'unchanged' });
   });

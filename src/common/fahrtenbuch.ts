@@ -39,14 +39,21 @@ export interface CounterReading {
 }
 
 /**
- * Herkunft eines abgeleiteten Endstands: `'route'` heißt aus der
- * Routendistanz berechnet, `'unchanged'` heißt unverändert übernommen — bei
- * Start/Ende-Zählern aus dem Startstand dieser Fahrt, bei Ablesezählern aus
- * dem letzten bekannten Stand. Steht hier und nicht in
- * `fahrtenbuchAutoFill.ts`: Bliebe der Typ dort, müsste dieses Basismodul von
- * seinem eigenen Konsumenten importieren.
+ * Herkunft eines abgeleiteten Endstands:
+ *
+ * - `'route'` — aus der gefahrenen Straßenstrecke berechnet. Die einfache
+ *   Strecke steht als `routeDistanceMeters` am Eintrag und ist damit
+ *   nachprüfbar.
+ * - `'estimate'` — aus der Luftlinie mit Umwegfaktor geschätzt, weil kein
+ *   Routing zu bekommen war. Streng von `'route'` getrennt: In einem
+ *   Nachweisdokument muss eine geschätzte Zahl als solche erkennbar bleiben.
+ * - `'unchanged'` — unverändert übernommen; bei Start/Ende-Zählern aus dem
+ *   Startstand dieser Fahrt, bei Ablesezählern aus dem letzten bekannten Stand.
+ *
+ * Steht hier und nicht in `fahrtenbuchAutoFill.ts`: Bliebe der Typ dort, müsste
+ * dieses Basismodul von seinem eigenen Konsumenten importieren.
  */
-export type CounterSource = 'route' | 'unchanged';
+export type CounterSource = 'route' | 'estimate' | 'unchanged';
 
 export interface FahrtenbuchPerson {
   id?: string;
@@ -252,9 +259,24 @@ export function counterWarnings(
  * Harte Validierung. Liefert eine Liste von Fehlerschlüsseln; leer heißt gültig.
  * Zählerbezogene Fehler tragen die Zähler-ID nach einem Doppelpunkt.
  */
+export interface ValidateEntryOptions {
+  /**
+   * Fehlende Zählerstände blockieren nicht. Für die Sammelerfassung aus dem
+   * Einsatz: Dort füllt der Server auf, was er belegen kann, und der Rest darf
+   * die Fahrt nicht verhindern. Eine Fahrt ohne Kilometerstand ist ein
+   * unvollständiger Eintrag — eine gar nicht erfasste Fahrt ist eine Lücke im
+   * Nachweis, und die ist schwerer zu heilen.
+   *
+   * Widersprüchliche Angaben werden weiterhin abgelehnt: Ein Endstand unter dem
+   * Startstand ist kein fehlender, sondern ein falscher Wert.
+   */
+  countersOptional?: boolean;
+}
+
 export function validateEntryInput(
   definitions: CounterDefinition[],
   input: EntryInput,
+  options?: ValidateEntryOptions,
 ): string[] {
   const errors: string[] = [];
 
@@ -277,7 +299,7 @@ export function validateEntryInput(
     const hasEnd = reading?.end !== undefined;
     const hasStart = reading?.start !== undefined;
 
-    if (def.required) {
+    if (def.required && !options?.countersOptional) {
       if (!hasEnd || (def.mode === 'startEnd' && !hasStart)) {
         errors.push(`counterMissing:${def.id}`);
         continue;

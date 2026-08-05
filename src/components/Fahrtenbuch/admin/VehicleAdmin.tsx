@@ -2,6 +2,7 @@
 
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -44,6 +45,7 @@ import {
   saveFahrtenbuchVehicle,
 } from '../stammdatenActions';
 import VehicleImportDialog from './VehicleImportDialog';
+import VehicleQrDialog from './VehicleQrDialog';
 
 const PRESET_IDS: VehiclePresetId[] = ['fahrzeug', 'boot', 'none'];
 
@@ -78,6 +80,8 @@ export default function VehicleAdmin({
   const { vehicles } = useFahrtenbuchVehicles(groupId);
   const [editing, setEditing] = useState<FahrtenbuchVehicle | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  // Das Fahrzeug, dessen QR-Code gerade angezeigt wird.
+  const [qrVehicle, setQrVehicle] = useState<{ id: string; name: string }>();
   const [feedback, setFeedback] = useState<string>();
   const [dialogError, setDialogError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -195,6 +199,27 @@ export default function VehicleAdmin({
                   </TableCell>
                   <TableCell>{vehicle.active !== false ? '✓' : ''}</TableCell>
                   <TableCell align="right">
+                    {/* Nur für gespeicherte Fahrzeuge: der Link belegt das
+                        Fahrzeug über seine ID vor, die es ohne Speichern nicht
+                        gibt. */}
+                    {vehicle.id && (
+                      <Tooltip title={t('admin.vehicleQr')}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            aria-label={`${t('admin.vehicleQr')}: ${vehicle.name}`}
+                            onClick={() =>
+                              setQrVehicle({
+                                id: vehicle.id as string,
+                                name: vehicle.name,
+                              })
+                            }
+                          >
+                            <QrCode2Icon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                     <Tooltip title={t('admin.editVehicle')}>
                       <span>
                         <IconButton
@@ -317,6 +342,15 @@ export default function VehicleAdmin({
           groupId={groupId}
           groupName={groupName}
           onClose={() => setImportOpen(false)}
+        />
+      )}
+
+      {qrVehicle && (
+        <VehicleQrDialog
+          groupId={groupId}
+          groupName={groupName}
+          vehicle={qrVehicle}
+          onClose={() => setQrVehicle(undefined)}
         />
       )}
     </>

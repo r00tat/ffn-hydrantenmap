@@ -97,22 +97,43 @@ export default function FahrtenbuchEntryFields({
           />
         </Grid>
         {/* Ohne Einsatzliste (Gastformular) entfällt die Auswahl ganz — der
-            Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung. */}
+            Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung. Ein freier
+            Name wäre dort unkontrollierter Fremdinhalt; der Server verwirft
+            ihn ohnehin. `hasFirecallSelection` statt Truthiness auf
+            `firecalls`, weil eine leere Liste („noch keine Einsätze geladen")
+            das Feld zeigen soll, `undefined` (Gastformular) aber nicht. */}
         {form.zweck === 'einsatz' && form.hasFirecallSelection && (
           <Grid size={{ xs: 12 }}>
-            <TextField
-              select
-              fullWidth
-              label={t('firecall')}
-              value={form.firecallId ?? ''}
-              onChange={(e) => form.changeFirecall(e.target.value)}
-            >
-              {form.firecalls?.map((f) => (
-                <MenuItem key={f.id} value={f.id}>
-                  {f.name}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Autocomplete
+              freeSolo
+              options={form.firecalls ?? []}
+              // Beide Richtungen nötig: `options` sind Objekte, der Wert im
+              // Feld ist bei freier Eingabe eine Zeichenkette.
+              getOptionLabel={(option) =>
+                typeof option === 'string' ? option : option.name
+              }
+              value={form.firecallName}
+              onChange={(_, option) => {
+                if (option && typeof option !== 'string') {
+                  form.changeFirecall(option.id, option.name);
+                } else {
+                  form.changeFirecall(undefined, option ?? '');
+                }
+              }}
+              // Tippen ohne Auswahl ist der manuelle Fall. Kein Abgleich gegen
+              // die Liste: ein zufällig gleichlautender Name soll nicht
+              // stillschweigend zu einer Verknüpfung werden.
+              onInputChange={(_, text, reason) => {
+                if (reason === 'input') form.changeFirecall(undefined, text);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={t('firecall')}
+                  helperText={t('firecallManual')}
+                />
+              )}
+            />
           </Grid>
         )}
         <Grid size={{ xs: 12, sm: 6 }}>

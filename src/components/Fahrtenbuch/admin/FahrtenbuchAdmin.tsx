@@ -11,8 +11,10 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import AdminGuard from '../../site/AdminGuard';
+import FahrtenbuchImportDialog from './FahrtenbuchImportDialog';
 import GroupSettings from './GroupSettings';
 import PersonAdmin from './PersonAdmin';
+import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
 
 /**
@@ -68,6 +70,8 @@ export default function FahrtenbuchAdmin() {
               <Tab label={t('admin.vehicles')} />
               <Tab label={t('admin.persons')} />
               <Tab label={t('admin.settings')} />
+              <Tab label={t('shareLink.heading')} />
+              <Tab label={t('admin.pdfImport.tab')} />
             </Tabs>
 
             {/* `key` verwirft Dialog- und Meldungszustand beim Gruppenwechsel,
@@ -87,6 +91,23 @@ export default function FahrtenbuchAdmin() {
               />
             )}
             {tab === 2 && <GroupSettings key={groupId} groupId={groupId} />}
+            {tab === 3 && (
+              <ShareLinkSection
+                key={groupId}
+                groupId={groupId}
+                groupName={groupName}
+              />
+            )}
+            {/* Bewusst ein Dialog und kein Panel — damit bleibt der Aufbau bei
+                den anderen Importen; `onClose` fällt auf den ersten Tab zurück. */}
+            {tab === 4 && (
+              <FahrtenbuchImportDialog
+                key={groupId}
+                groupId={groupId}
+                groupName={groupName}
+                onClose={() => setTab(0)}
+              />
+            )}
           </>
         )}
       </Container>

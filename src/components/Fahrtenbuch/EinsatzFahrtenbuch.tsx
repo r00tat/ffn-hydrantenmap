@@ -1,10 +1,13 @@
 'use client';
 
 import EditIcon from '@mui/icons-material/Edit';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
+import FormHelperText from '@mui/material/FormHelperText';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
@@ -20,7 +23,7 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import { estimateRoundTripKm } from '../../common/fahrtenbuchAutoFill';
+import { estimatedDistance } from '../../common/fahrtenbuchAutoFill';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchGroupStandort from '../../hooks/useFahrtenbuchGroupStandort';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
@@ -38,12 +41,15 @@ import {
 import CounterFields from './CounterFields';
 import {
   buildEinsatzRows,
+  einsatzTimes,
+  kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
   startCounters,
   type EinsatzAutoFill,
   type EinsatzRow,
   type EinsatzRowIssue,
+  type EinsatzTimes,
 } from './einsatzRows';
 import { createFahrtenbuchEntries } from './fahrtenbuchActions';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
@@ -65,6 +71,8 @@ export interface EinsatzFahrtenbuchViewProps {
   groupId: string;
   vehicles: FahrtenbuchVehicle[];
   rows: EinsatzRow[];
+  /** Die Zeiten des Kopfblocks — sie gelten für alle Fahrzeuge. */
+  times: EinsatzTimes;
   isMember: boolean;
   saving: boolean;
   message?: string;
@@ -73,10 +81,59 @@ export interface EinsatzFahrtenbuchViewProps {
   messageSeverity?: 'success' | 'warning' | 'error';
   /** Was beim Speichern automatisch ergänzt wird — für die Hinweise im Formular. */
   autoFill?: EinsatzAutoFill;
+  onChangeTimes: (patch: Partial<EinsatzTimes>) => void;
   onChangeRow: (key: string, patch: Partial<EinsatzRow>) => void;
   onSave: () => void;
   /** Öffnet die Bearbeitung eines bereits erfassten Eintrags. */
   onEditEntry?: (entry: FahrtenbuchEntry) => void;
+}
+
+/**
+ * Die Kilometer-Vorschau als Text. Eine abgeleitete Zahl wird als solche
+ * ausgewiesen — im Fahrtenbuch darf eine Schätzung nicht wie eine Ablesung
+ * aussehen.
+ */
+function KmPreviewText({
+  vehicle,
+  row,
+  autoFill,
+}: {
+  vehicle?: FahrtenbuchVehicle;
+  row: EinsatzRow;
+  autoFill?: EinsatzAutoFill;
+}) {
+  const t = useTranslations('fahrtenbuch');
+  const preview = kmPreview(vehicle?.counters ?? [], row.counters, autoFill);
+  // Kein Kilometerzähler (ein Boot etwa) — die Zähler stehen in den Details.
+  if (!preview) return null;
+
+  if (preview.start === undefined || preview.end === undefined) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {t('einsatz.kmPreviewNoStart')}
+      </Typography>
+    );
+  }
+
+  const diff = preview.end - preview.start;
+  return (
+    <Typography
+      variant="body2"
+      color={preview.derived ? 'text.secondary' : 'text.primary'}
+    >
+      {preview.derived
+        ? t('einsatz.kmPreviewEstimated', {
+            start: preview.start,
+            end: preview.end,
+            diff,
+          })
+        : t('einsatz.kmPreview', {
+            start: preview.start,
+            end: preview.end,
+            diff,
+          })}
+    </Typography>
+  );
 }
 
 /**
@@ -86,17 +143,23 @@ export interface EinsatzFahrtenbuchViewProps {
 export function EinsatzFahrtenbuchView({
   vehicles,
   rows,
+  times,
   isMember,
   saving,
   message,
   messageDetails,
   messageSeverity = 'success',
   autoFill,
+  onChangeTimes,
   onChangeRow,
   onSave,
   onEditEntry,
 }: EinsatzFahrtenbuchViewProps) {
   const t = useTranslations('fahrtenbuch');
+  // Rein visueller Zustand: welche Zeilen ihre Details zeigen. Gehört in die
+  // Ansicht, nicht in die Zeilendaten — ein Firestore-Snapshot darf einen
+  // aufgeklappten Bereich nicht zuklappen.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   // Wer nicht in der Gruppe des Einsatzes ist, sieht hier nichts — weder
   // Fahrzeuge noch Namen der Mannschaft.
@@ -126,28 +189,85 @@ export function EinsatzFahrtenbuchView({
         </Alert>
       )}
 
-      <Stack spacing={2}>
+      {/* Ein Zeitpaar für alle Fahrzeuge: Beim Befüllen aus dem Einsatz sind
+          die Zeiten fast immer dieselben, und ein Feldpaar je Fahrzeug hieße
+          dieselbe Angabe fünfmal zu prüfen. */}
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          {t('einsatz.commonTimes')}
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              size="small"
+              type="datetime-local"
+              label={t('abfahrt')}
+              value={toLocalInput(times.abfahrt)}
+              onChange={(e) => {
+                const abfahrt = fromLocalInput(e.target.value);
+                // Die Ankunft zieht mit dem Datum mit und behält ihre Uhrzeit —
+                // eine Fahrt endet im Normalfall am Tag der Abfahrt.
+                onChangeTimes(
+                  abfahrt
+                    ? {
+                        abfahrt,
+                        ankunft: arrivalOnDepartureDay(
+                          abfahrt,
+                          new Date(times.ankunft),
+                        ),
+                      }
+                    : { abfahrt },
+                );
+              }}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField
+              fullWidth
+              size="small"
+              type="datetime-local"
+              label={t('ankunft')}
+              value={toLocalInput(times.ankunft)}
+              onChange={(e) =>
+                onChangeTimes({ ankunft: fromLocalInput(e.target.value) })
+              }
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+        </Grid>
+        <FormHelperText>{t('einsatz.commonTimesHint')}</FormHelperText>
+      </Paper>
+
+      <Stack spacing={1}>
         {rows.map((row) => {
           const vehicle = vehicles.find((v) => v.id === row.vehicleId);
           const recorded = !!row.existingEntry;
+          const isOpen = !!expanded[row.key];
 
           return (
-            <Paper key={row.key} sx={{ p: 2 }} variant="outlined">
+            <Paper key={row.key} sx={{ px: 2, py: 1.5 }} variant="outlined">
               <Stack
                 direction="row"
                 spacing={1}
-                sx={{ alignItems: 'center', flexWrap: 'wrap', mb: 2 }}
+                sx={{ alignItems: 'center', flexWrap: 'wrap' }}
               >
-                <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ minWidth: 110, flexShrink: 0 }}
+                >
                   {row.vehicleName || row.sourceName}
                 </Typography>
-                {recorded && (
+
+                {recorded ? (
                   <>
                     <Chip
                       size="small"
                       color="success"
                       label={t('einsatz.alreadyRecorded')}
                     />
+                    <Box sx={{ flexGrow: 1 }} />
                     <Tooltip title={t('editEntry')}>
                       <IconButton
                         size="small"
@@ -160,10 +280,54 @@ export function EinsatzFahrtenbuchView({
                       </IconButton>
                     </Tooltip>
                   </>
+                ) : (
+                  <>
+                    <TextField
+                      size="small"
+                      label={t('driver')}
+                      value={row.driverName}
+                      sx={{ flexGrow: 1, minWidth: 160 }}
+                      onChange={(e) =>
+                        onChangeRow(row.key, {
+                          driverName: e.target.value,
+                          driverId: undefined,
+                        })
+                      }
+                    />
+                    <KmPreviewText
+                      vehicle={vehicle}
+                      row={row}
+                      autoFill={autoFill}
+                    />
+                    <Tooltip title={t('einsatz.editDetails')}>
+                      <IconButton
+                        size="small"
+                        aria-label={t('einsatz.editDetails')}
+                        aria-expanded={isOpen}
+                        onClick={() =>
+                          setExpanded((current) => ({
+                            ...current,
+                            [row.key]: !current[row.key],
+                          }))
+                        }
+                      >
+                        <ExpandMoreIcon
+                          fontSize="small"
+                          sx={{
+                            transform: isOpen ? 'rotate(180deg)' : undefined,
+                            transition: 'transform 150ms',
+                          }}
+                        />
+                      </IconButton>
+                    </Tooltip>
+                  </>
                 )}
               </Stack>
 
-              {!row.vehicleId && (
+              {/* Ohne Stammdaten-Treffer bleibt die Zeile unspeicherbar — die
+                  Zuordnung gehört deshalb in die Zeile und nicht in die
+                  Details. */}
+              {!row.vehicleId && !recorded && (
                 <TextField
                   select
                   fullWidth
@@ -180,7 +344,7 @@ export function EinsatzFahrtenbuchView({
                       counters: startCounters(selected),
                     });
                   }}
-                  sx={{ mb: 2 }}
+                  sx={{ mt: 1.5 }}
                 >
                   {vehicles.map((v) => (
                     <MenuItem key={v.id} value={v.id}>
@@ -190,68 +354,50 @@ export function EinsatzFahrtenbuchView({
                 </TextField>
               )}
 
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label={t('driver')}
-                    value={row.driverName}
-                    disabled={recorded}
-                    onChange={(e) =>
-                      onChangeRow(row.key, {
-                        driverName: e.target.value,
-                        driverId: undefined,
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="datetime-local"
-                    label={t('abfahrt')}
-                    value={toLocalInput(row.abfahrt)}
-                    disabled={recorded}
-                    onChange={(e) => {
-                      const abfahrt = fromLocalInput(e.target.value);
-                      // Die Ankunft zieht mit dem Datum mit und behält ihre
-                      // Uhrzeit — eine Fahrt endet im Normalfall am Tag der
-                      // Abfahrt.
-                      onChangeRow(
-                        row.key,
-                        abfahrt
-                          ? {
-                              abfahrt,
-                              ankunft: arrivalOnDepartureDay(
-                                abfahrt,
-                                new Date(row.ankunft),
-                              ),
-                            }
-                          : { abfahrt },
-                      );
-                    }}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="datetime-local"
-                    label={t('ankunft')}
-                    value={toLocalInput(row.ankunft)}
-                    disabled={recorded}
-                    onChange={(e) =>
-                      onChangeRow(row.key, {
-                        ankunft: fromLocalInput(e.target.value),
-                      })
-                    }
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12 }}>
+              <Collapse in={isOpen && !recorded} unmountOnExit>
+                <Box sx={{ mt: 2 }}>
+                  <Grid container spacing={2} sx={{ mb: 1 }}>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="datetime-local"
+                        label={t('abfahrt')}
+                        value={toLocalInput(row.abfahrt)}
+                        onChange={(e) => {
+                          const abfahrt = fromLocalInput(e.target.value);
+                          onChangeRow(
+                            row.key,
+                            abfahrt
+                              ? {
+                                  abfahrt,
+                                  ankunft: arrivalOnDepartureDay(
+                                    abfahrt,
+                                    new Date(row.ankunft),
+                                  ),
+                                }
+                              : { abfahrt },
+                          );
+                        }}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="datetime-local"
+                        label={t('ankunft')}
+                        value={toLocalInput(row.ankunft)}
+                        onChange={(e) =>
+                          onChangeRow(row.key, {
+                            ankunft: fromLocalInput(e.target.value),
+                          })
+                        }
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Grid>
+                  </Grid>
                   {/* Die Zählerfelder kommen aus den Definitionen des
                       Fahrzeugs — ein Boot bekommt Betriebsstunden, kein
                       Kilometerfeld. */}
@@ -259,12 +405,11 @@ export function EinsatzFahrtenbuchView({
                     definitions={vehicle?.counters ?? []}
                     counters={row.counters}
                     lastCounters={vehicle?.lastCounters ?? {}}
-                    disabled={recorded}
                     autoFill={autoFill}
                     onChange={(counters) => onChangeRow(row.key, { counters })}
                   />
-                </Grid>
-              </Grid>
+                </Box>
+              </Collapse>
             </Paper>
           );
         })}
@@ -349,7 +494,7 @@ export default function EinsatzFahrtenbuch({
     () =>
       typeof firecallLat === 'number' && typeof firecallLng === 'number'
         ? {
-            roundTripKm: estimateRoundTripKm(standort, {
+            distance: estimatedDistance(standort, {
               lat: firecallLat,
               lng: firecallLng,
             }),
@@ -358,44 +503,71 @@ export default function EinsatzFahrtenbuch({
     [standort, firecallLat, firecallLng],
   );
 
+  const items = useMemo(
+    () =>
+      (fzgItems ?? []).map((i) => ({
+        id: i.id as string,
+        name: i.name,
+        alarmierung: i.alarmierung,
+        abruecken: i.abruecken,
+      })),
+    [fzgItems],
+  );
+
+  const firecallSource = useMemo(
+    () => ({
+      id: firecallId,
+      name: firecallName,
+      date: firecallDate,
+      abruecken: firecallAbruecken,
+    }),
+    [firecallId, firecallName, firecallDate, firecallAbruecken],
+  );
+
+  // Die gemeinsamen Zeiten liegen als Änderungen über den berechneten Werten —
+  // nicht als `useState`, das mit ihnen vorbelegt wird. Die Einsatzdaten kommen
+  // aus einem Firestore-Snapshot und sind beim ersten Rendern noch nicht da; ein
+  // vorbelegter Zustand behielte für immer den Platzhalter.
+  const computedTimes = useMemo(
+    () => einsatzTimes(items, firecallSource, now),
+    [items, firecallSource, now],
+  );
+  const [timeEdits, setTimeEdits] = useState<Partial<EinsatzTimes>>({});
+  const times = useMemo<EinsatzTimes>(
+    () => ({
+      abfahrt: timeEdits.abfahrt ?? computedTimes.abfahrt,
+      ankunft: timeEdits.ankunft ?? computedTimes.ankunft,
+    }),
+    [timeEdits, computedTimes],
+  );
+
   const computedRows = useMemo(
     () =>
-      buildEinsatzRows({
-        fzgItems: (fzgItems ?? []).map((i) => ({
-          id: i.id as string,
-          name: i.name,
-          alarmierung: i.alarmierung,
-          abruecken: i.abruecken,
-        })),
-        crew: (crew ?? []).map((c) => ({
-          recipientId: c.recipientId,
-          name: c.name,
-          vehicleId: c.vehicleId,
-          vehicleName: c.vehicleName,
-          funktion: c.funktion,
-        })),
-        vehicles: activeVehicles,
-        persons: activePersons,
-        entries,
-        firecall: {
-          id: firecallId,
-          name: firecallName,
-          date: firecallDate,
-          abruecken: firecallAbruecken,
+      buildEinsatzRows(
+        {
+          fzgItems: items,
+          crew: (crew ?? []).map((c) => ({
+            recipientId: c.recipientId,
+            name: c.name,
+            vehicleId: c.vehicleId,
+            vehicleName: c.vehicleName,
+            funktion: c.funktion,
+          })),
+          vehicles: activeVehicles,
+          persons: activePersons,
+          entries,
+          firecall: firecallSource,
         },
-        now,
-      }),
+        times,
+      ),
     [
-      now,
-      fzgItems,
+      items,
       crew,
       activeVehicles,
       activePersons,
       entries,
-      firecallId,
-      firecallName,
-      firecallDate,
-      firecallAbruecken,
+      firecallSource,
+      times,
     ],
   );
 
@@ -453,12 +625,18 @@ export default function EinsatzFahrtenbuch({
     duplicates: number,
     failed: number,
     roundTripKm?: number,
+    distanceSource?: 'route' | 'estimate',
   ) => {
     const parts = [t('einsatz.saved', { count: created })];
     // Die tatsächlich eingetragene Strecke gehört in die Meldung: Im Formular
-    // stand nur eine Schätzung.
+    // stand nur eine Schätzung. Ob sie gefahren oder geschätzt ist, muss dabei
+    // stehen — eine geschätzte Strecke gehört im Fahrtenbuch nachgesehen.
     if (created > 0 && roundTripKm !== undefined) {
-      parts.push(t('einsatz.savedKm', { km: roundTripKm }));
+      parts.push(
+        distanceSource === 'estimate'
+          ? t('einsatz.savedKmEstimated', { km: roundTripKm })
+          : t('einsatz.savedKm', { km: roundTripKm }),
+      );
     }
     // Übersprungene Zeilen bleiben stehen und werden gemeldet — mit dem
     // tatsächlichen Grund, nicht pauschal als „ohne Endstand".
@@ -475,7 +653,7 @@ export default function EinsatzFahrtenbuch({
     // Sie als „schon erfasst" zu melden wäre die einzige unwahre Rückmeldung
     // der Sammelerfassung — und die Fahrt bliebe unbemerkt aus.
     if (failed > 0) {
-      parts.push(t('einsatz.failedNoRoute', { count: failed }));
+      parts.push(t('einsatz.failed', { count: failed }));
     }
     const skipped =
       incomplete.length > 0 ||
@@ -544,6 +722,7 @@ export default function EinsatzFahrtenbuch({
       result.skippedVehicleIds.length,
       result.failedVehicleIds.length,
       result.roundTripKm,
+      result.distanceSource,
     );
   };
 
@@ -553,12 +732,16 @@ export default function EinsatzFahrtenbuch({
         groupId={groupId ?? ''}
         vehicles={activeVehicles}
         rows={rows}
+        times={times}
         isMember={isMember}
         saving={saving}
         message={message}
         messageDetails={messageDetails}
         messageSeverity={messageSeverity}
         autoFill={autoFill}
+        onChangeTimes={(patch) =>
+          setTimeEdits((current) => ({ ...current, ...patch }))
+        }
         onChangeRow={changeRow}
         onSave={save}
         onEditEntry={setEditEntry}

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { FahrtenbuchPerson, FahrtenbuchVehicle } from './fahrtenbuch';
-import { toShareLinkPerson, toShareLinkVehicle } from './fahrtenbuchShare';
+import {
+  resolveShareLinkVehicleId,
+  shareLinkUrlWithVehicle,
+  toShareLinkPerson,
+  toShareLinkVehicle,
+} from './fahrtenbuchShare';
 
 const vehicle: FahrtenbuchVehicle = {
   id: 'v1',
@@ -72,6 +77,50 @@ describe('toShareLinkVehicle', () => {
     const projected = toShareLinkVehicle(bare) as unknown as Record<string, unknown>;
     expect(projected).not.toHaveProperty('kennzeichen');
     expect(projected).not.toHaveProperty('lastCounters');
+  });
+});
+
+describe('shareLinkUrlWithVehicle', () => {
+  const url = 'https://einsatz.example/fahrtenbuch/teilen/tok';
+
+  it('hängt die Fahrzeug-Vorauswahl an', () => {
+    expect(shareLinkUrlWithVehicle(url, 'v1')).toBe(`${url}?fahrzeug=v1`);
+  });
+
+  it('lässt den Link ohne Fahrzeug unverändert', () => {
+    expect(shareLinkUrlWithVehicle(url, undefined)).toBe(url);
+    expect(shareLinkUrlWithVehicle(url, '')).toBe(url);
+  });
+
+  it('kodiert Zeichen, die eine Firestore-ID sonst zerlegen würden', () => {
+    expect(shareLinkUrlWithVehicle(url, 'a b&c')).toBe(
+      `${url}?fahrzeug=a%20b%26c`,
+    );
+  });
+
+  it('hängt an einen Link mit vorhandener Query korrekt an', () => {
+    expect(shareLinkUrlWithVehicle(`${url}?x=1`, 'v1')).toBe(
+      `${url}?x=1&fahrzeug=v1`,
+    );
+  });
+});
+
+describe('resolveShareLinkVehicleId', () => {
+  const vehicles = [{ id: 'v1' }, { id: 'v2' }];
+
+  it('nimmt eine ID an, die zu einem Fahrzeug der Gruppe gehört', () => {
+    expect(resolveShareLinkVehicleId('v2', vehicles)).toBe('v2');
+  });
+
+  it('ignoriert eine unbekannte ID, statt ein leeres Formular zu blockieren', () => {
+    // Ein Aufkleber überlebt das Fahrzeug: wird es deaktiviert oder gelöscht,
+    // soll die Seite die Auswahl anbieten statt auf ein totes Fahrzeug zu zeigen.
+    expect(resolveShareLinkVehicleId('weg', vehicles)).toBeUndefined();
+  });
+
+  it('ignoriert einen fehlenden oder mehrfach gesetzten Parameter', () => {
+    expect(resolveShareLinkVehicleId(undefined, vehicles)).toBeUndefined();
+    expect(resolveShareLinkVehicleId(['v1', 'v2'], vehicles)).toBeUndefined();
   });
 });
 

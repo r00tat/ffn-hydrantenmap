@@ -83,9 +83,8 @@ export default function CounterFields({
             return undefined;
           }
           if (isKmCounter(def)) {
-            return autoFill.roundTripKm !== undefined &&
-              reading.start !== undefined
-              ? t('einsatz.autoKmHint', { km: autoFill.roundTripKm })
+            return autoFill.distance && reading.start !== undefined
+              ? t('einsatz.autoKmHint', { km: autoFill.distance.roundTripKm })
               : undefined;
           }
           // Die Bedingungen spiegeln `autoFillCounterEnds`: Ein Start/Ende-Zähler

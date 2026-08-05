@@ -8,13 +8,13 @@ import {
   type FahrtenbuchShareLink,
   type ShareLinkInfo,
 } from '../../common/fahrtenbuchShare';
-import { assertFahrtenbuchGroup } from '../../components/Fahrtenbuch/authGuards';
 import { firestore } from '../../server/firebase/admin';
 import {
   generateShareLinkId,
   generateShareToken,
 } from '../../server/fahrtenbuchShare/shareToken';
-import { actionAdminRequired } from '../auth';
+import { actionAdminRequired } from '../../app/auth';
+import { assertFahrtenbuchGroup } from './authGuards';
 
 function linksRef() {
   return firestore.collection(FAHRTENBUCH_SHARE_LINK_COLLECTION_ID);

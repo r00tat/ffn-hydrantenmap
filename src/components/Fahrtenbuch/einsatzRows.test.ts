@@ -7,9 +7,12 @@ import {
 } from '../../common/fahrtenbuch';
 import {
   buildEinsatzRows,
+  einsatzTimes,
+  kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
   type EinsatzRow,
+  type EinsatzTimes,
 } from './einsatzRows';
 
 const vehicle: FahrtenbuchVehicle = {
@@ -58,6 +61,20 @@ const firecall = {
 
 const now = '2026-08-03T13:00:00.000Z';
 
+/**
+ * Die gemeinsamen Zeiten des Kopfblocks. `buildEinsatzRows` leitet keine Zeiten
+ * mehr ab — das macht `einsatzTimes`, mit eigenen Tests weiter unten.
+ */
+/** Eine Schätzung von 24 km Gesamtstrecke, wie sie der Client berechnet. */
+const ESTIMATE_24 = {
+  distance: { roundTripKm: 24, source: 'estimate' as const },
+};
+
+const TIMES: EinsatzTimes = {
+  abfahrt: '2026-08-03T10:00:00.000Z',
+  ankunft: '2026-08-03T12:00:00.000Z',
+};
+
 describe('buildEinsatzRows', () => {
   it('bildet je Fzg-Item eine Zeile und matcht das Gruppen-Fahrzeug über den Namen', () => {
     const rows = buildEinsatzRows({
@@ -67,8 +84,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows).toHaveLength(1);
     expect(rows[0].vehicleId).toBe('gv1');
     expect(rows[0].vehicleName).toBe('RLFA 3000/100');
@@ -82,8 +98,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].vehicleId).toBeUndefined();
     expect(rows[0].sourceName).toBe('Drehleiter');
   });
@@ -103,8 +118,7 @@ describe('buildEinsatzRows', () => {
       persons: [person],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverId).toBe('p1');
     expect(rows[0].driverName).toBe('Max Mustermann');
   });
@@ -125,8 +139,7 @@ describe('buildEinsatzRows', () => {
       persons: [withoutRecipient],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverId).toBe('p1');
   });
 
@@ -145,8 +158,7 @@ describe('buildEinsatzRows', () => {
       persons: [person],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverId).toBeUndefined();
     expect(rows[0].driverName).toBe('Unbekannt');
   });
@@ -166,40 +178,8 @@ describe('buildEinsatzRows', () => {
       persons: [person],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverName).toBe('');
-  });
-
-  it('belegt Zeiten aus dem Fzg-Item, sonst aus dem Einsatz', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [
-        { id: 'i1', name: 'RLFA 3000/100', alarmierung: '2026-08-03T10:05:00.000Z' },
-        { id: 'i2', name: 'MZB' },
-      ],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall,
-      now,
-    });
-    expect(rows[0].abfahrt).toBe('2026-08-03T10:05:00.000Z');
-    expect(rows[0].ankunft).toBe('2026-08-03T12:00:00.000Z');
-    expect(rows[1].abfahrt).toBe('2026-08-03T10:00:00.000Z');
-  });
-
-  it('nutzt jetzt als Ankunft, wenn der Einsatz noch läuft', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100' }],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall: { ...firecall, abruecken: undefined },
-      now,
-    });
-    expect(rows[0].ankunft).toBe(now);
   });
 
   it('belegt die Startzähler aus lastCounters', () => {
@@ -210,8 +190,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].counters).toEqual({ km: { start: 1000 } });
   });
 
@@ -229,8 +208,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [existing],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].existingEntry?.id).toBe('e1');
   });
 
@@ -250,8 +228,7 @@ describe('buildEinsatzRows', () => {
       persons: [person],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows).toHaveLength(1);
     expect(rows[0].vehicleId).toBe('gv1');
     expect(rows[0].driverId).toBe('p1');
@@ -265,8 +242,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].vehicleId).toBe('gv2');
     expect(rows[0].counters).toEqual({ betriebsstundenBb: { start: 20 } });
     expect(rows[0].counters.km).toBeUndefined();
@@ -288,8 +264,7 @@ describe('buildEinsatzRows', () => {
       persons: [person],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows).toHaveLength(1);
   });
 
@@ -321,8 +296,7 @@ describe('buildEinsatzRows', () => {
       persons: [personB, personA],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverId).toBe('p1');
     expect(rows[0].driverName).toBe('Maximilian Mustermann');
   });
@@ -347,48 +321,9 @@ describe('buildEinsatzRows', () => {
       persons: [person, twin],
       entries: [],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].driverId).toBeUndefined();
     expect(rows[0].driverName).toBe('Max Mustermann');
-  });
-
-  it('normalisiert Zeitstempel, die nicht ISO-8601 sind', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [
-        // So schreibt der KI-Assistent `alarmierung` in die Fzg-Items.
-        { id: 'i1', name: 'RLFA 3000/100', alarmierung: '10:05' },
-        { id: 'i2', name: 'MZB', alarmierung: '03.08.2026 10:07:00' },
-      ],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall,
-      now,
-    });
-    const first = new Date(rows[0].abfahrt);
-    expect(Number.isNaN(first.getTime())).toBe(false);
-    expect(first.getHours()).toBe(10);
-    expect(first.getMinutes()).toBe(5);
-
-    const second = new Date(rows[1].abfahrt);
-    expect(second.getFullYear()).toBe(2026);
-    expect(second.getHours()).toBe(10);
-    expect(second.getMinutes()).toBe(7);
-  });
-
-  it('fällt bei unlesbarem Zeitstempel auf den Einsatz zurück', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: 'sofort' }],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall,
-      now,
-    });
-    expect(rows[0].abfahrt).toBe(firecall.date);
   });
 
   it('ignoriert einen gelöschten Eintrag desselben Einsatzes', () => {
@@ -405,8 +340,7 @@ describe('buildEinsatzRows', () => {
       persons: [],
       entries: [deleted],
       firecall,
-      now,
-    });
+    }, TIMES);
     expect(rows[0].existingEntry).toBeUndefined();
   });
 });
@@ -434,15 +368,17 @@ describe('partitionEinsatzRows', () => {
     expect(result.existing).toHaveLength(0);
   });
 
-  it('sammelt Zeilen ohne Endstand als unvollständig und nennt den Grund', () => {
+  it('hält eine Zeile ohne Endstand für speicherbar', () => {
+    // Zählerstände sind in der Sammelerfassung nicht verpflichtend: Was der
+    // Server ableiten kann, füllt er auf; der Rest wird nachgetragen. Früher
+    // blockierte hier `counterMissing:km` die ganze Fahrt.
     const result = partitionEinsatzRows(
       [row({ counters: { km: { start: 1000 } } })],
       [vehicle],
       'Brand B2',
     );
-    expect(result.ready).toHaveLength(0);
-    expect(result.incomplete).toHaveLength(1);
-    expect(result.incomplete[0].errors).toEqual(['counterMissing:km']);
+    expect(result.ready).toHaveLength(1);
+    expect(result.incomplete).toHaveLength(0);
   });
 
   it('sammelt Zeilen ohne Fahrer als unvollständig und nennt den Grund', () => {
@@ -513,15 +449,15 @@ describe('partitionEinsatzRows', () => {
     expect(result.existing).toHaveLength(2);
   });
 
-  it('verlangt beim Boot die Ablesewerte der Lenzpumpen', () => {
+  it('hält ein Boot auch ohne die Ablesewerte der Lenzpumpen für speicherbar', () => {
     const bootRow = row({
       vehicleId: 'gv2',
       vehicleName: 'MZB',
       counters: { betriebsstundenBb: { start: 20, end: 22 } },
     });
-    expect(partitionEinsatzRows([bootRow], [boot], 'Brand B2').incomplete).toHaveLength(
-      1,
-    );
+    expect(
+      partitionEinsatzRows([bootRow], [boot], 'Brand B2').ready,
+    ).toHaveLength(1);
 
     const complete = row({
       vehicleId: 'gv2',
@@ -603,7 +539,7 @@ describe('mergeRowEdits', () => {
   });
 });
 
-describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
+describe('einsatzTimes', () => {
   /** Einsatz von vorgestern, erfasst wird heute. */
   const gestern = {
     id: 'f2',
@@ -615,25 +551,21 @@ describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
   it('legt eine Alarmierung ohne Datum auf den Einsatztag, nicht auf heute', () => {
     // `alarmierung: '19:00'` hat kein Datum. Ohne Verankerung landete die
     // Abfahrt auf dem heutigen Tag und damit zwei Tage nach dem Einsatz.
-    const rows = buildEinsatzRows({
-      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall: gestern,
-      now: heute,
-    });
+    const { abfahrt } = einsatzTimes(
+      [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
+      gestern,
+      heute,
+    );
 
-    const abfahrt = new Date(rows[0].abfahrt);
-    expect(abfahrt.getMonth()).toBe(7);
-    expect(abfahrt.getDate()).toBe(1);
-    expect(abfahrt.getHours()).toBe(19);
+    const parsed = new Date(abfahrt);
+    expect(parsed.getMonth()).toBe(7);
+    expect(parsed.getDate()).toBe(1);
+    expect(parsed.getHours()).toBe(19);
   });
 
   it('legt ein Abrücken ohne Datum auf den Tag der Abfahrt', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [
+    const { abfahrt, ankunft } = einsatzTimes(
+      [
         {
           id: 'i1',
           name: 'RLFA 3000/100',
@@ -641,23 +573,19 @@ describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
           abruecken: '21:30',
         },
       ],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall: gestern,
-      now: heute,
-    });
+      gestern,
+      heute,
+    );
 
-    const ankunft = new Date(rows[0].ankunft);
-    expect(ankunft.getDate()).toBe(new Date(rows[0].abfahrt).getDate());
-    expect(ankunft.getHours()).toBe(21);
-    expect(ankunft.getMinutes()).toBe(30);
+    const parsed = new Date(ankunft);
+    expect(parsed.getDate()).toBe(new Date(abfahrt).getDate());
+    expect(parsed.getHours()).toBe(21);
+    expect(parsed.getMinutes()).toBe(30);
   });
 
   it('rollt ein Abrücken nach Mitternacht auf den nächsten Tag', () => {
-    const rows = buildEinsatzRows({
-      fzgItems: [
+    const { ankunft } = einsatzTimes(
+      [
         {
           id: 'i1',
           name: 'RLFA 3000/100',
@@ -665,35 +593,156 @@ describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
           abruecken: '01:15',
         },
       ],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall: gestern,
-      now: heute,
-    });
+      gestern,
+      heute,
+    );
 
-    expect(new Date(rows[0].ankunft).getDate()).toBe(2);
-    expect(new Date(rows[0].ankunft).getHours()).toBe(1);
+    expect(new Date(ankunft).getDate()).toBe(2);
+    expect(new Date(ankunft).getHours()).toBe(1);
   });
 
   it('schlägt ohne Abrücken eine Ankunft am Tag der Abfahrt vor', () => {
     // Ohne diese Regel stand hier die aktuelle Uhrzeit von heute — bei einem
     // Einsatz von vorgestern zwei Tage nach der Abfahrt.
-    const rows = buildEinsatzRows({
-      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
-      crew: [],
-      vehicles: [vehicle],
-      persons: [],
-      entries: [],
-      firecall: gestern,
-      now: heute,
-    });
+    const { abfahrt, ankunft } = einsatzTimes(
+      [{ id: 'i1', name: 'RLFA 3000/100', alarmierung: '19:00' }],
+      gestern,
+      heute,
+    );
 
-    const abfahrt = new Date(rows[0].abfahrt);
-    const ankunft = new Date(rows[0].ankunft);
-    expect(ankunft.getDate()).toBe(abfahrt.getDate());
-    expect(ankunft.getTime()).toBeGreaterThanOrEqual(abfahrt.getTime());
+    expect(new Date(ankunft).getDate()).toBe(new Date(abfahrt).getDate());
+    expect(new Date(ankunft).getTime()).toBeGreaterThanOrEqual(
+      new Date(abfahrt).getTime(),
+    );
+  });
+
+  it('nimmt die früheste Alarmierung und das späteste Abrücken', () => {
+    // Eine Zeit für alle Fahrzeuge: Die gemeinsame Spanne muss jede einzelne
+    // Fahrt umfassen. Die späteste Abfahrt zu nehmen behauptete für ein früher
+    // ausgerücktes Fahrzeug eine Abfahrt nach seiner eigenen Ankunft.
+    const { abfahrt, ankunft } = einsatzTimes(
+      [
+        {
+          id: 'i1',
+          name: 'RLFA',
+          alarmierung: '2026-08-03T10:05:00.000Z',
+          abruecken: '2026-08-03T11:30:00.000Z',
+        },
+        {
+          id: 'i2',
+          name: 'MZB',
+          alarmierung: '2026-08-03T10:02:00.000Z',
+          abruecken: '2026-08-03T12:40:00.000Z',
+        },
+      ],
+      firecall,
+      now,
+    );
+
+    expect(abfahrt).toBe('2026-08-03T10:02:00.000Z');
+    expect(ankunft).toBe('2026-08-03T12:40:00.000Z');
+  });
+
+  it('fällt ohne Alarmierung auf den Einsatzzeitpunkt zurück', () => {
+    const { abfahrt } = einsatzTimes(
+      [{ id: 'i1', name: 'RLFA' }],
+      firecall,
+      now,
+    );
+    expect(abfahrt).toBe(firecall.date);
+  });
+
+  it('normalisiert Zeitstempel, die nicht ISO-8601 sind', () => {
+    // So schreibt der KI-Assistent `alarmierung` in die Fzg-Items; Importe
+    // liefern deutsches Datumsformat. Ohne Normalisierung stünde das Feld im
+    // Formular leer und die Validierung meldete einen ungültigen Wert.
+    const { abfahrt } = einsatzTimes(
+      [
+        { id: 'i1', name: 'RLFA 3000/100', alarmierung: '10:05' },
+        { id: 'i2', name: 'MZB', alarmierung: '03.08.2026 10:07:00' },
+      ],
+      firecall,
+      now,
+    );
+
+    const parsed = new Date(abfahrt);
+    expect(Number.isNaN(parsed.getTime())).toBe(false);
+    expect(parsed.getHours()).toBe(10);
+    expect(parsed.getMinutes()).toBe(5);
+  });
+
+  it('nutzt jetzt als Ankunft, wenn der Einsatz noch läuft', () => {
+    const { ankunft } = einsatzTimes(
+      [{ id: 'i1', name: 'RLFA 3000/100' }],
+      { ...firecall, abruecken: undefined },
+      now,
+    );
+    expect(ankunft).toBe(now);
+  });
+
+  it('ignoriert eine unlesbare Alarmierung', () => {
+    const { abfahrt } = einsatzTimes(
+      [{ id: 'i1', name: 'RLFA', alarmierung: 'sofort' }],
+      firecall,
+      now,
+    );
+    expect(abfahrt).toBe(firecall.date);
+  });
+});
+
+describe('kmPreview', () => {
+  const kmDefs = VEHICLE_PRESETS.fahrzeug;
+
+  it('zeigt einen eingetragenen Endstand ohne Herkunftsvermerk', () => {
+    expect(
+      kmPreview(kmDefs, { km: { start: 1000, end: 1042 } }, ESTIMATE_24),
+    ).toEqual({ start: 1000, end: 1042 });
+  });
+
+  it('rechnet den Endstand aus der Strecke und vermerkt die Herkunft', () => {
+    expect(kmPreview(kmDefs, { km: { start: 1000 } }, ESTIMATE_24)).toEqual({
+      start: 1000,
+      end: 1024,
+      derived: 'estimate',
+    });
+  });
+
+  it('lässt den Endstand offen, wenn keine Strecke bekannt ist', () => {
+    expect(kmPreview(kmDefs, { km: { start: 1000 } })).toEqual({ start: 1000 });
+  });
+
+  it('lässt den Endstand offen, wenn der Startstand fehlt', () => {
+    expect(kmPreview(kmDefs, {}, ESTIMATE_24)).toEqual({ start: undefined });
+  });
+
+  it('liefert nichts für ein Fahrzeug ohne Kilometerzähler', () => {
+    expect(
+      kmPreview(VEHICLE_PRESETS.boot, { betriebsstundenBb: { start: 20 } }, ESTIMATE_24),
+    ).toBeUndefined();
+  });
+});
+
+describe('buildEinsatzRows — gemeinsame Zeiten', () => {
+  it('setzt bei allen Zeilen dieselben Zeiten', () => {
+    const rows = buildEinsatzRows(
+      {
+        fzgItems: [
+          // Beide tragen eigene Zeiten in der Quelle — die Sammelerfassung
+          // führt sie bewusst nicht mehr je Zeile, sondern einmal im Kopfblock.
+          { id: 'i1', name: 'RLFA 3000/100', alarmierung: '10:05' },
+          { id: 'i2', name: 'MZB', alarmierung: '10:42' },
+        ],
+        crew: [],
+        vehicles: [vehicle, boot],
+        persons: [],
+        entries: [],
+        firecall,
+      },
+      TIMES,
+    );
+
+    expect(rows.map((r) => r.abfahrt)).toEqual([TIMES.abfahrt, TIMES.abfahrt]);
+    expect(rows.map((r) => r.ankunft)).toEqual([TIMES.ankunft, TIMES.ankunft]);
   });
 });
 
@@ -723,17 +772,13 @@ describe('partitionEinsatzRows — automatische Endstände', () => {
   };
 
   it('hält eine Zeile ohne Endstand für speicherbar, wenn eine Schätzung vorliegt', () => {
-    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', {
-      roundTripKm: 24,
-    });
+    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', ESTIMATE_24);
     expect(result.ready).toHaveLength(1);
     expect(result.incomplete).toHaveLength(0);
   });
 
   it('schickt den Endstand nicht mit — den setzt der Server', () => {
-    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', {
-      roundTripKm: 24,
-    });
+    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', ESTIMATE_24);
     expect(result.ready[0].counters.km).toEqual({ start: 1000 });
   });
 
@@ -742,27 +787,43 @@ describe('partitionEinsatzRows — automatische Endstände', () => {
       [{ ...kmRow, counters: { km: { start: 1000, end: 1042 } } }],
       [kmVehicle],
       'Brand',
-      { roundTripKm: 24 },
+      ESTIMATE_24,
     );
     expect(result.ready).toHaveLength(1);
     expect(result.ready[0].counters.km).toEqual({ start: 1000, end: 1042 });
   });
 
-  it('bleibt ohne Schätzung unvollständig', () => {
+  it('bleibt auch ohne Schätzung speicherbar', () => {
+    // Ein fehlender Kilometerstand hält die Fahrt nicht auf: Der Eintrag
+    // entsteht ohne Kilometer und wird nachgetragen. Eine gar nicht erfasste
+    // Fahrt wäre eine Lücke im Nachweis und schwerer zu heilen.
     const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand');
-    expect(result.ready).toHaveLength(0);
-    expect(result.incomplete[0].errors).toContain('counterMissing:km');
+    expect(result.ready).toHaveLength(1);
+    expect(result.incomplete).toHaveLength(0);
   });
 
-  it('bleibt unvollständig, wenn auch der Startstand fehlt', () => {
+  it('bleibt speicherbar, wenn auch der Startstand fehlt', () => {
     const result = partitionEinsatzRows(
       [{ ...kmRow, counters: {} }],
       [kmVehicle],
       'Brand',
-      { roundTripKm: 24 },
+      ESTIMATE_24,
+    );
+    expect(result.ready).toHaveLength(1);
+    expect(result.ready[0].counters.km).toBeUndefined();
+  });
+
+  it('lehnt einen Endstand unter dem Startstand weiterhin ab', () => {
+    // Gelockert ist nur die Pflicht, nicht die Plausibilität: Ein Endstand
+    // unter dem Startstand ist kein fehlender, sondern ein falscher Wert.
+    const result = partitionEinsatzRows(
+      [{ ...kmRow, counters: { km: { start: 1000, end: 900 } } }],
+      [kmVehicle],
+      'Brand',
+      ESTIMATE_24,
     );
     expect(result.ready).toHaveLength(0);
-    expect(result.incomplete[0].errors).toContain('counterMissing:km');
+    expect(result.incomplete[0].errors).toContain('counterEndBeforeStart:km');
   });
 
   it('hält ein Boot mit bekannten Ständen für speicherbar', () => {
@@ -785,7 +846,7 @@ describe('partitionEinsatzRows — automatische Endstände', () => {
       ],
       [bootVehicle],
       'Brand',
-      { roundTripKm: 24 },
+      ESTIMATE_24,
     );
     expect(result.ready).toHaveLength(1);
   });

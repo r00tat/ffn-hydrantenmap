@@ -59,6 +59,47 @@ export interface ShareLinkFormData {
   persons: ShareLinkPerson[];
 }
 
+/**
+ * Query-Parameter, mit dem ein Share-Link ein Fahrzeug im Formular vorbelegt.
+ * Deutsch wie die Route selbst (`/fahrtenbuch/teilen/…`) — der Link landet als
+ * Klartext unter jedem ausgedruckten QR-Code.
+ *
+ * Die Vorauswahl ist kein Zwang: sie füllt das Feld, ersetzt es aber nicht. Ein
+ * Aufkleber kann im falschen Fahrzeug landen oder umgehängt werden, und dann
+ * muss die Fahrt trotzdem richtig eingetragen werden können.
+ */
+export const SHARE_LINK_VEHICLE_PARAM = 'fahrzeug';
+
+/**
+ * Hängt die Fahrzeug-Vorauswahl an einen Share-Link. Zusammengesetzt statt über
+ * `URL`, damit dieselbe Funktion auch für einen relativen Pfad trägt.
+ */
+export function shareLinkUrlWithVehicle(
+  url: string,
+  vehicleId?: string,
+): string {
+  if (!vehicleId) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${SHARE_LINK_VEHICLE_PARAM}=${encodeURIComponent(vehicleId)}`;
+}
+
+/**
+ * Nimmt den Parameter nur an, wenn er auf ein Fahrzeug der Gruppe zeigt.
+ *
+ * Ein Aufkleber überlebt das Fahrzeug: wird es deaktiviert, umbenannt oder
+ * gelöscht, fällt die Seite still auf die Fahrzeugauswahl zurück statt einen
+ * Wert vorzubelegen, den der Server beim Speichern ablehnt. Ein mehrfach
+ * gesetzter Parameter — von Next als Array geliefert — ist nicht eindeutig und
+ * wird deshalb gar nicht ausgewertet.
+ */
+export function resolveShareLinkVehicleId(
+  raw: string | string[] | undefined,
+  vehicles: { id: string }[],
+): string | undefined {
+  if (typeof raw !== 'string' || !raw) return undefined;
+  return vehicles.some((vehicle) => vehicle.id === raw) ? raw : undefined;
+}
+
 /** Was der Gruppen-Dialog über den aktiven Link anzeigt — nie der nackte Token. */
 export interface ShareLinkInfo {
   url: string;

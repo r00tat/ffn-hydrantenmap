@@ -132,6 +132,11 @@ export function useEntryFormState({
   const [firecallId, setFirecallId] = useState<string | undefined>(
     entry?.firecallId,
   );
+  // Getrennt von `firecallId`, weil ein frei eingegebener Einsatz keinen
+  // Datensatz im System hat. Beim Bearbeiten kommt der Name aus dem Eintrag
+  // und nicht aus der Einsatzliste — steht der verknüpfte Einsatz nicht mehr
+  // in den geladenen 50, bliebe das Feld sonst leer.
+  const [firecallName, setFirecallName] = useState(entry?.firecallName ?? '');
   const [ziel, setZiel] = useState(entry?.ziel ?? '');
   const [abfahrt, setAbfahrt] = useState(
     entry?.abfahrt ?? new Date().toISOString(),
@@ -210,10 +215,16 @@ export function useEntryFormState({
 
   const changeVehicle = (id: string) => setSelectedVehicleId(id);
 
-  const changeFirecall = (id: string) => {
+  /**
+   * Auswahl aus der Liste liefert ID und Namen, freie Eingabe nur den Namen.
+   * Der Zeitvorschlag hängt an der Auswahl: ein frei eingegebener Einsatz hat
+   * weder Alarmierung noch Abrücken, und ein bereits eingetragener Zeitraum
+   * darf durch das Tippen im Namensfeld nicht überschrieben werden.
+   */
+  const changeFirecall = (id: string | undefined, name: string) => {
     setFirecallId(id || undefined);
-    const firecall = firecalls?.find((f) => f.id === id);
-    // Einsatzdaten als Zeitvorschlag übernehmen
+    setFirecallName(name);
+    const firecall = id ? firecalls?.find((f) => f.id === id) : undefined;
     if (firecall?.date) setAbfahrt(firecall.date);
     if (firecall?.abruecken) setAnkunft(firecall.abruecken);
   };
@@ -226,7 +237,6 @@ export function useEntryFormState({
   };
 
   const submit = async (): Promise<EntryFormSubmitResult> => {
-    const firecall = firecalls?.find((f) => f.id === firecallId);
     // Kein vehicleName: der Server leitet ihn aus dem geladenen Fahrzeug ab,
     // damit Name und Zähler nicht auseinanderlaufen können.
     const input: FahrtenbuchEntryInput = {
@@ -235,7 +245,8 @@ export function useEntryFormState({
       driverName,
       zweck,
       firecallId: zweck === 'einsatz' ? firecallId : undefined,
-      firecallName: zweck === 'einsatz' ? firecall?.name : undefined,
+      firecallName:
+        zweck === 'einsatz' ? firecallName.trim() || undefined : undefined,
       ziel,
       abfahrt,
       ankunft,
@@ -270,8 +281,9 @@ export function useEntryFormState({
     /**
      * Ob es überhaupt eine Einsatzauswahl gibt. Bewusst an `undefined` geknüpft
      * und nicht an die Länge: eine leere Liste heißt „Auswahl vorhanden, aber
-     * noch keine Einsätze geladen" und zeigt ein leeres Select, `undefined`
-     * heißt „diese Oberfläche kennt keine Einsätze" (Gastformular).
+     * noch keine Einsätze geladen" und zeigt das Autocomplete-Feld leer,
+     * `undefined` heißt „diese Oberfläche kennt keine Einsätze" (Gastformular)
+     * und blendet das Feld ganz aus.
      */
     hasFirecallSelection: firecalls !== undefined,
     vehicle,
@@ -284,6 +296,7 @@ export function useEntryFormState({
     zweck,
     setZweck,
     firecallId,
+    firecallName,
     changeFirecall,
     ziel,
     setZiel,

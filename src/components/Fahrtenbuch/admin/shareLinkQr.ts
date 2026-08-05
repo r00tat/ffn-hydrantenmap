@@ -1,4 +1,4 @@
-import { downloadBlob } from '../../components/firebase/download';
+import { downloadBlob } from '../../firebase/download';
 
 /**
  * Export des Fahrtenbuch-Share-QR-Codes als PNG-Datei und als Druckseite.
@@ -40,17 +40,31 @@ export function serializeQrSvg(svg: SVGSVGElement): string {
   return new XMLSerializer().serializeToString(clone);
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /**
  * Dateiname des PNG-Exports. Die Gruppen-ID steckt drin, weil ein Admin
  * mehrerer Gruppen sonst mehrere `fahrtenbuch-link.png` im Download-Ordner
  * liegen hätte und nicht mehr wüsste, welcher Code zu welcher Gruppe gehört.
+ *
+ * Dasselbe gilt für das Fahrzeug: Wer Aufkleber für den ganzen Fuhrpark
+ * herunterlädt, hat sonst `fahrtenbuch-link-ffnd(3).png` und keine Ahnung, in
+ * welches Fahrzeug welcher Code gehört.
  */
-export function shareLinkQrFilename(groupId: string): string {
-  const slug = groupId
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `fahrtenbuch-link${slug ? `-${slug}` : ''}.png`;
+export function shareLinkQrFilename(
+  groupId: string,
+  vehicleName?: string,
+): string {
+  const parts = [slugify(groupId), vehicleName ? slugify(vehicleName) : ''];
+  return `fahrtenbuch-link${parts
+    .filter(Boolean)
+    .map((part) => `-${part}`)
+    .join('')}.png`;
 }
 
 /**
@@ -107,6 +121,8 @@ export interface QrPrintLabels {
   heading: string;
   /** Name der Gruppe; entfällt, wenn keiner bekannt ist. */
   groupName?: string;
+  /** Vorbelegtes Fahrzeug; entfällt beim allgemeinen Link. */
+  vehicleName?: string;
   /** Erklärung für den, der den Zettel vorfindet. */
   hint: string;
   /** Der Link im Klartext — als Rückfallebene, wenn das Scannen scheitert. */
@@ -127,7 +143,7 @@ export interface QrPrintLabels {
  */
 export function qrPrintDocument(
   svgMarkup: string,
-  { heading, groupName, hint, url, locale }: QrPrintLabels,
+  { heading, groupName, vehicleName, hint, url, locale }: QrPrintLabels,
 ): string {
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(locale)}">
@@ -144,7 +160,14 @@ export function qrPrintDocument(
     text-align: center;
   }
   h1 { font-size: 24pt; margin: 0 0 4mm; }
-  .group { font-size: 18pt; margin: 0 0 8mm; }
+  /* Gruppe und Fahrzeug in einem Block, damit der Abstand zum Code gleich
+     bleibt, egal welche der beiden Zeilen vorhanden ist. */
+  .who { margin: 0 0 8mm; }
+  .who p { margin: 0; }
+  .group { font-size: 18pt; }
+  /* Größer als der Gruppenname: der Zettel klebt im Fahrzeug, und wer ihn
+     sieht, muss auf einen Blick erkennen, ob er zum richtigen gehört. */
+  .vehicle { font-size: 22pt; font-weight: bold; }
   .hint { font-size: 13pt; margin: 8mm 0 4mm; }
   .url { font-size: 10pt; color: #333; word-break: break-all; }
   svg { width: 120mm; height: 120mm; }
@@ -152,7 +175,15 @@ export function qrPrintDocument(
 </head>
 <body>
 <h1>${escapeHtml(heading)}</h1>
-${groupName ? `<p class="group">${escapeHtml(groupName)}</p>\n` : ''}${svgMarkup}
+${
+  groupName || vehicleName
+    ? `<div class="who">${
+        groupName ? `<p class="group">${escapeHtml(groupName)}</p>` : ''
+      }${
+        vehicleName ? `<p class="vehicle">${escapeHtml(vehicleName)}</p>` : ''
+      }</div>\n`
+    : ''
+}${svgMarkup}
 <p class="hint">${escapeHtml(hint)}</p>
 <p class="url">${escapeHtml(url)}</p>
 <script>window.onload=function(){window.focus();window.print();};</script>
@@ -186,7 +217,8 @@ export function printShareLinkQr(
 export async function downloadShareLinkQr(
   svg: SVGSVGElement,
   groupId: string,
+  vehicleName?: string,
 ): Promise<void> {
   const blob = await svgToPngBlob(serializeQrSvg(svg), QR_PNG_SIZE);
-  await downloadBlob(blob, shareLinkQrFilename(groupId));
+  await downloadBlob(blob, shareLinkQrFilename(groupId, vehicleName));
 }
