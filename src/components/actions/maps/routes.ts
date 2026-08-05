@@ -6,13 +6,12 @@ import { getGcpProjectId } from '../../../server/firebase/project';
 
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
-// Der Scope stammt aus der Vorgängerversion der API und ist gegen den
-// aktuellen v2:computeRoutes-Endpunkt nicht verifiziert. Lokal mit
+// Der dokumentierte Autorisierungs-Scope für v2:computeRoutes. Lokal mit
 // Service-Account-JSON scheitert bei einem falschen Scope bereits die
-// Tokenausgabe mit `invalid_scope`. Auf Cloud Run fällt er dagegen gar nicht
-// auf: Der Metadata-Server ignoriert angeforderte Scopes und liefert ohnehin
-// das Standardtoken. Ein 403 dort deutet deshalb nicht auf den Scope, sondern
-// auf fehlende IAM-Rechte oder eine nicht aktivierte Routes API.
+// Tokenausgabe mit `invalid_scope`. Auf Cloud Run fällt ein falscher Scope
+// dagegen gar nicht auf: Der Metadata-Server ignoriert angeforderte Scopes und
+// liefert ohnehin das Standardtoken. Ein 403 dort deutet deshalb nicht auf den
+// Scope, sondern auf fehlende IAM-Rechte oder eine nicht aktivierte Routes API.
 const ROUTES_SCOPE =
   'https://www.googleapis.com/auth/maps-platform.routespreferred';
 
