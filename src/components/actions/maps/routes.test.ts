@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const getAccessToken = vi.fn();
+const googleAuthConstructorCalls: { scopes?: string[] }[] = [];
 vi.mock('google-auth-library', () => ({
   GoogleAuth: class {
+    constructor(options?: { scopes?: string[] }) {
+      googleAuthConstructorCalls.push(options ?? {});
+    }
     getAccessToken = getAccessToken;
   },
 }));
@@ -66,6 +70,26 @@ describe('computeRouteDistanceMeters', () => {
     });
   });
 
+  it('setzt ein Zeitlimit für den Netzaufruf', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [{ distanceMeters: 1 }] }),
+    } as Response);
+
+    await computeRouteDistanceMeters(from, to);
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('liefert undefined, wenn der Aufruf durch das Zeitlimit abgebrochen wird', async () => {
+    const abortError = new Error('The operation was aborted');
+    abortError.name = 'AbortError';
+    vi.mocked(fetch).mockRejectedValue(abortError);
+
+    await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
+  });
+
   it('liefert undefined statt zu werfen, wenn der Dienst einen Fehler meldet', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
@@ -91,10 +115,62 @@ describe('computeRouteDistanceMeters', () => {
     await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
   });
 
+  it('liefert undefined, wenn die Route ohne Distanz zurückkommt', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [{}] }),
+    } as Response);
+
+    await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
+  });
+
+  it('liefert undefined, wenn die Antwort kein gültiges JSON ist', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected token');
+      },
+    } as unknown as Response);
+
+    await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
+  });
+
+  it('protokolliert das Koordinatenpaar, wenn keine Route zurückkommt', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [] }),
+    } as Response);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await computeRouteDistanceMeters(from, to);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      { from, to }
+    );
+    errorSpy.mockRestore();
+  });
+
   it('liefert undefined ohne fetch-Aufruf, wenn kein Access-Token vorliegt', async () => {
     getAccessToken.mockResolvedValue(null);
 
     await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('legt GoogleAuth nur einmal mit dem Routes-Scope an', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ routes: [{ distanceMeters: 1 }] }),
+    } as Response);
+
+    await computeRouteDistanceMeters(from, to);
+    await computeRouteDistanceMeters(from, to);
+
+    expect(googleAuthConstructorCalls).toHaveLength(1);
+    expect(googleAuthConstructorCalls[0].scopes).toEqual([
+      'https://www.googleapis.com/auth/maps-platform.routespreferred',
+    ]);
   });
 });
