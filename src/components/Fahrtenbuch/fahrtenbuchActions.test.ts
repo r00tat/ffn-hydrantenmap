@@ -352,12 +352,38 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
 
     expect(result.success).toBe(true);
     expect(result.created).toBe(1);
-    expect(result.skippedVehicleIds).toEqual(['v1']);
+    // Nicht geschrieben heißt nicht „schon erfasst": Die Zeile gehört in das
+    // eigene Feld, sonst meldete die Oberfläche eine fehlende Fahrt als
+    // bereits gebucht.
+    expect(result.failedVehicleIds).toEqual(['v1']);
+    expect(result.skippedVehicleIds).toEqual([]);
     // Nur die tatsächlich geschriebene Zeile darf den Fahrzeug-Cache
     // auffrischen und in den Batch gelangen.
     expect(batchSetMock).toHaveBeenCalledTimes(1);
     expect(batchCommitMock).toHaveBeenCalledTimes(1);
     expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('trennt ein bereits erfasstes Fahrzeug von einer nicht schreibbaren Zeile', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
+    });
+    routeMock.mockResolvedValue(undefined);
+    // v3 hat zu diesem Einsatz schon einen Eintrag.
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [{ data: () => ({ vehicleId: 'v3', counters: {} }) }],
+    });
+
+    const result = await createFahrtenbuchEntries('ffnd', [
+      einsatzEntry('v3'), // schon erfasst -> übersprungen
+      einsatzEntry('v1'), // kein Endstand, kein Routing -> fehlgeschlagen
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(result.created).toBe(0);
+    expect(result.skippedVehicleIds).toEqual(['v3']);
+    expect(result.failedVehicleIds).toEqual(['v1']);
   });
 });
 

@@ -206,9 +206,19 @@ export interface CreateEntriesResult {
   created: number;
   /**
    * Fahrzeuge, für die zu diesem Einsatz schon ein Eintrag bestand — sie
-   * wurden übersprungen, damit die Oberfläche das melden kann.
+   * wurden übersprungen, damit die Oberfläche das melden kann. Ihre Fahrt
+   * steht bereits im Fahrtenbuch; es fehlt nichts.
    */
   skippedVehicleIds: string[];
+  /**
+   * Fahrzeuge, deren Zeile der Server nicht schreiben konnte — meist, weil das
+   * Routing ausgefallen ist und damit kein Kilometer-Endstand zu ermitteln
+   * war. Abgrenzung zu `skippedVehicleIds`: Dort ist die Fahrt schon erfasst,
+   * hier fehlt sie und muss von Hand nachgetragen werden. Die beiden dürfen
+   * nicht zusammenfallen — sonst meldete die Oberfläche eine fehlende Fahrt
+   * als bereits gebucht.
+   */
+  failedVehicleIds: string[];
   /**
    * Gesamtstrecke in Kilometern, die in die Kilometerstände eingegangen ist.
    * Fehlt, wenn keine Route zu ermitteln war.
@@ -248,6 +258,7 @@ export async function createFahrtenbuchEntries(
         success: false,
         created: 0,
         skippedVehicleIds: [],
+        failedVehicleIds: [],
         error: 'tooManyEntries',
       };
     }
@@ -284,7 +295,12 @@ export async function createFahrtenbuchEntries(
     }
 
     if (accepted.length === 0) {
-      return { success: true, created: 0, skippedVehicleIds };
+      return {
+        success: true,
+        created: 0,
+        skippedVehicleIds,
+        failedVehicleIds: [],
+      };
     }
 
     const vehicleIds = [...new Set(accepted.map((i) => i.vehicleId))];
@@ -310,6 +326,7 @@ export async function createFahrtenbuchEntries(
     const batch = firestore.batch();
     let created = 0;
     let roundTripKm: number | undefined;
+    const failedVehicleIds: string[] = [];
     const writtenVehicleIds = new Set<string>();
     for (const input of accepted) {
       const vehicle = vehicles.get(input.vehicleId)!;
@@ -327,7 +344,8 @@ export async function createFahrtenbuchEntries(
         // Wirft, wenn nach dem Auffüllen immer noch ein Pflichtzähler fehlt —
         // meist, weil das Routing ausgefallen ist und niemand den
         // Kilometerstand von Hand nachgetragen hat. Diese Zeile wird
-        // übersprungen, statt den ganzen Batch abzubrechen.
+        // ausgelassen, statt den ganzen Batch abzubrechen; sie zählt zu den
+        // fehlgeschlagenen und nicht zu den schon erfassten Fahrzeugen.
         const doc = buildEntryDocument(
           vehicle,
           { ...input, counters: filled.counters },
@@ -340,11 +358,11 @@ export async function createFahrtenbuchEntries(
         writtenVehicleIds.add(input.vehicleId);
         if (entryRoundTripKm !== undefined) roundTripKm = entryRoundTripKm;
       } catch (err) {
-        console.error('createFahrtenbuchEntries: Zeile übersprungen', err, {
+        console.error('createFahrtenbuchEntries: Zeile nicht gespeichert', err, {
           vehicleId: input.vehicleId,
           firecallId: input.firecallId,
         });
-        skippedVehicleIds.push(input.vehicleId);
+        failedVehicleIds.push(input.vehicleId);
       }
     }
 
@@ -356,13 +374,20 @@ export async function createFahrtenbuchEntries(
         await refreshVehicleCounters(groupId, id);
       }
     }
-    return { success: true, created, skippedVehicleIds, roundTripKm };
+    return {
+      success: true,
+      created,
+      skippedVehicleIds,
+      failedVehicleIds,
+      roundTripKm,
+    };
   } catch (err) {
     console.error('createFahrtenbuchEntries failed', err);
     return {
       success: false,
       created: 0,
       skippedVehicleIds: [],
+      failedVehicleIds: [],
       error: actionErrorKey(err),
     };
   }

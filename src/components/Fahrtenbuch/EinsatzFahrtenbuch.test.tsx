@@ -34,6 +34,8 @@ vi.mock('./fahrtenbuchActions', () => ({
   createFahrtenbuchEntries: vi.fn().mockResolvedValue({
     success: true,
     created: 0,
+    skippedVehicleIds: [],
+    failedVehicleIds: [],
   }),
   createFahrtenbuchEntry: vi.fn(),
   updateFahrtenbuchEntry: vi.fn(),
@@ -330,6 +332,7 @@ describe('EinsatzFahrtenbuch — Sammelerfassung ohne Endstand', () => {
       success: true,
       created: 1,
       skippedVehicleIds: [],
+      failedVehicleIds: [],
       roundTripKm: 20,
     });
   });
@@ -369,5 +372,42 @@ describe('EinsatzFahrtenbuch — Sammelerfassung ohne Endstand', () => {
     expect(
       await screen.findByText('1 Fahrt gespeichert — 20 km je Fahrzeug'),
     ).toBeInTheDocument();
+  });
+
+  it('meldet eine nicht schreibbare Zeile als fehlend und nicht als schon erfasst', async () => {
+    vi.mocked(createFahrtenbuchEntries).mockResolvedValue({
+      success: true,
+      created: 0,
+      skippedVehicleIds: [],
+      failedVehicleIds: ['gv1'],
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<EinsatzFahrtenbuch firecallId="f1" firecall={firecall} />);
+
+    await user.click(screen.getByRole('button', { name: 'Alle speichern' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('konnte nicht gespeichert werden');
+    expect(alert).toHaveTextContent('von Hand nachgetragen');
+    // Der Kern des Befunds: Die Fahrt fehlt — sie darf nicht als bereits
+    // gebucht gemeldet werden.
+    expect(alert).not.toHaveTextContent('schon erfasst');
+  });
+
+  it('meldet ein inzwischen erfasstes Fahrzeug weiterhin als Duplikat', async () => {
+    vi.mocked(createFahrtenbuchEntries).mockResolvedValue({
+      success: true,
+      created: 0,
+      skippedVehicleIds: ['gv1'],
+      failedVehicleIds: [],
+    });
+    const user = userEvent.setup();
+    renderWithIntl(<EinsatzFahrtenbuch firecallId="f1" firecall={firecall} />);
+
+    await user.click(screen.getByRole('button', { name: 'Alle speichern' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('schon erfasst');
+    expect(alert).not.toHaveTextContent('konnte nicht gespeichert werden');
   });
 });

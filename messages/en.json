@@ -426,6 +426,7 @@
       "skipped": "{count, plural, one {# incomplete row skipped} other {# incomplete rows skipped}}",
       "skippedUnassigned": "{count, plural, one {# row without an assigned vehicle skipped} other {# rows without an assigned vehicle skipped}}",
       "skippedDuplicate": "{count, plural, one {# vehicle had already been recorded} other {# vehicles had already been recorded}}",
+      "failedNoRoute": "{count, plural, one {# vehicle could not be saved (no route available) — the trip is missing and has to be added manually} other {# vehicles could not be saved (no route available) — the trips are missing and have to be added manually}}",
       "autoKmHint": "approx. {km} km, calculated from the route when saving",
       "autoUnchangedHint": "carried over unchanged",
       "savedKm": "{km} km per vehicle"

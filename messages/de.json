@@ -426,6 +426,7 @@
       "skipped": "{count, plural, one {# unvollständige Zeile übersprungen} other {# unvollständige Zeilen übersprungen}}",
       "skippedUnassigned": "{count, plural, one {# Zeile ohne zugeordnetes Fahrzeug übersprungen} other {# Zeilen ohne zugeordnetes Fahrzeug übersprungen}}",
       "skippedDuplicate": "{count, plural, one {# Fahrzeug war inzwischen schon erfasst} other {# Fahrzeuge waren inzwischen schon erfasst}}",
+      "failedNoRoute": "{count, plural, one {# Fahrzeug konnte nicht gespeichert werden (keine Route ermittelbar) — die Fahrt fehlt und muss von Hand nachgetragen werden} other {# Fahrzeuge konnten nicht gespeichert werden (keine Route ermittelbar) — die Fahrten fehlen und müssen von Hand nachgetragen werden}}",
       "autoKmHint": "ca. {km} km, wird beim Speichern aus der Route berechnet",
       "autoUnchangedHint": "unverändert übernommen",
       "savedKm": "{km} km je Fahrzeug"

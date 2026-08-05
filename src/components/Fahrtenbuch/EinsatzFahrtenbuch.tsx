@@ -451,6 +451,7 @@ export default function EinsatzFahrtenbuch({
     incomplete: EinsatzRowIssue[],
     unassigned: EinsatzRow[],
     duplicates: number,
+    failed: number,
     roundTripKm?: number,
   ) => {
     const parts = [t('einsatz.saved', { count: created })];
@@ -470,8 +471,17 @@ export default function EinsatzFahrtenbuch({
     if (duplicates > 0) {
       parts.push(t('einsatz.skippedDuplicate', { count: duplicates }));
     }
+    // Streng von den Duplikaten getrennt: Diese Fahrten fehlen im Fahrtenbuch.
+    // Sie als „schon erfasst" zu melden wäre die einzige unwahre Rückmeldung
+    // der Sammelerfassung — und die Fahrt bliebe unbemerkt aus.
+    if (failed > 0) {
+      parts.push(t('einsatz.failedNoRoute', { count: failed }));
+    }
     const skipped =
-      incomplete.length > 0 || unassigned.length > 0 || duplicates > 0;
+      incomplete.length > 0 ||
+      unassigned.length > 0 ||
+      duplicates > 0 ||
+      failed > 0;
     setMessageSeverity(skipped ? 'warning' : 'success');
     setMessage(parts.join(' — '));
     setMessageDetails(incomplete.map(issueMessage));
@@ -492,7 +502,7 @@ export default function EinsatzFahrtenbuch({
 
     if (ready.length === 0) {
       setSaving(false);
-      report(0, incomplete, unassigned, 0);
+      report(0, incomplete, unassigned, 0, 0);
       return;
     }
 
@@ -525,12 +535,14 @@ export default function EinsatzFahrtenbuch({
       return;
     }
     // Der Server überspringt Fahrzeuge, die inzwischen von einem anderen
-    // Gerät erfasst wurden — das muss sichtbar sein.
+    // Gerät erfasst wurden, und meldet getrennt davon die Zeilen, die er nicht
+    // schreiben konnte — beides muss sichtbar sein.
     report(
       result.created,
       incomplete,
       unassigned,
       result.skippedVehicleIds.length,
+      result.failedVehicleIds.length,
       result.roundTripKm,
     );
   };
