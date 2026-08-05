@@ -6,9 +6,14 @@ export interface Group {
   description?: string;
   /**
    * Feuerwehrhaus der Gruppe — Startpunkt für die Berechnung der
-   * Einsatzkilometer im Fahrtenbuch.
+   * Einsatzkilometer im Fahrtenbuch. `null` bedeutet: bewusst zurückgesetzt
+   * (ein zuvor gepflegter Standort wurde explizit geleert) — zu
+   * unterscheiden von `undefined`/fehlendem Feld, wenn nie einer gepflegt
+   * wurde. Geschrieben wird ein expliziter `null`-Wert statt das Feld mit
+   * `FieldValue.delete()` zu entfernen, weil das ein `merge: true`-Schreiben
+   * übersteht und „nie gesetzt“ von „bewusst geleert“ unterscheidbar macht.
    */
-  standort?: GeoPositionObject;
+  standort?: GeoPositionObject | null;
 }
 
 /**

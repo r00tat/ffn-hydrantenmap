@@ -279,4 +279,29 @@ describe('sanitizeStandort', () => {
       lng: 16.84,
     });
   });
+
+  it('verwirft Null Island (0,0) als Sentinel eines leeren Formulars', () => {
+    expect(sanitizeStandort({ lat: 0, lng: 0 })).toBeUndefined();
+  });
+
+  it('akzeptiert lat 0 für sich allein — der Äquator ist eine gültige Breite', () => {
+    expect(sanitizeStandort({ lat: 0, lng: 16.84 })).toEqual({
+      lat: 0,
+      lng: 16.84,
+    });
+  });
+
+  it('verwirft Nicht-Objekte', () => {
+    expect(sanitizeStandort(null)).toBeUndefined();
+    expect(sanitizeStandort('47.94,16.84')).toBeUndefined();
+    expect(sanitizeStandort([47.94, 16.84])).toBeUndefined();
+    expect(sanitizeStandort({})).toBeUndefined();
+  });
+
+  it('wandelt numerische Zeichenketten in Zahlen', () => {
+    expect(sanitizeStandort({ lat: '47.94', lng: '16.84' })).toEqual({
+      lat: 47.94,
+      lng: 16.84,
+    });
+  });
 });

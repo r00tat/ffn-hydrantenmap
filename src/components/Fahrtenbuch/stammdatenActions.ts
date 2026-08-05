@@ -430,28 +430,34 @@ export async function importPersonsFromCsv(
 }
 
 /**
- * Speichert das Feuerwehrhaus der Gruppe. Wie die übrigen Stammdaten-Actions
- * nur für Admins, und nur für echte Mandanten.
+ * Speichert das Feuerwehrhaus der Gruppe. Nur für echte Mandanten.
  */
 export async function saveFahrtenbuchGroupStandort(
   groupId: string,
   standort: GeoPositionObject | undefined,
 ): Promise<StammdatenResult> {
   try {
-    await actionAdminRequired();
+    const session = await actionAdminRequired();
     assertFahrtenbuchGroup(groupId);
 
     const sanitized = sanitizeStandort(standort);
+    // Kein Standort ist erlaubt (Zurücksetzen); ein übergebener, aber
+    // ungültiger nicht — den lehnt die Action ab, statt ihn still zu
+    // verwerfen.
     if (standort && !sanitized) {
       return { success: false, error: 'standortInvalid' };
     }
 
+    const now = new Date().toISOString();
     await firestore
       .collection(GROUP_COLLECTION_ID)
       .doc(groupId)
-      // `merge: true`, damit Name und Beschreibung der Gruppe unberührt bleiben.
-      // `null` löscht den Standort, `undefined` würde das Feld stehen lassen.
-      .set({ standort: sanitized ?? null }, { merge: true });
+      // `merge: true`, damit Name und Beschreibung der Gruppe unberührt
+      // bleiben. Bedeutung von `null` hier: siehe `Group.standort`.
+      .set(
+        { standort: sanitized ?? null, updatedAt: now, updatedBy: session.user.id },
+        { merge: true },
+      );
 
     return { success: true, id: groupId };
   } catch (err) {

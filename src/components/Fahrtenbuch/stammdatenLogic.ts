@@ -189,17 +189,39 @@ export function resolveVehicleImportSelection(
   return { create, skipped };
 }
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
 /**
- * Prüft die eingegebenen Koordinaten. Ein ungültiger Wert wird verworfen statt
- * gespeichert — ein Standort irgendwo im Nirgendwo lieferte stillschweigend
- * falsche Kilometer.
+ * Prüft die eingegebenen Koordinaten. Ein ungültiger Wert wird verworfen,
+ * statt gespeichert zu werden — ein Standort irgendwo im Nirgendwo würde
+ * stillschweigend falsche Kilometer liefern.
+ *
+ * `input` ist Client-Eingabe der Server Action, der Typ existiert zur
+ * Laufzeit nicht (siehe `sanitizeCounterDefinitions`). Numerische
+ * Zeichenketten werden wie bei `sanitizeSortOrder` angenommen.
  */
-export function sanitizeStandort(
-  standort: GeoPositionObject | undefined,
-): GeoPositionObject | undefined {
-  if (!standort) return undefined;
-  const { lat, lng } = standort;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+export function sanitizeStandort(input: unknown): GeoPositionObject | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const record = input as Record<string, unknown>;
+
+  const lat = toFiniteNumber(record.lat);
+  const lng = toFiniteNumber(record.lng);
+  if (lat === undefined || lng === undefined) return undefined;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return undefined;
+
+  // Null Island: (0,0) ist exakt der Wert, den ein genulltes oder leeres
+  // Formularfeld liefert (vgl. `latLngPosition()` in `common/geo.ts`, das aus
+  // demselben Grund `lat || default` nutzt) — das „Nirgendwo“, vor dem der
+  // Kommentar oben warnt. `lat === 0` allein ist kein Warnsignal, der Äquator
+  // ist eine gültige Breite.
+  if (lat === 0 && lng === 0) return undefined;
+
   return { lat, lng };
 }
