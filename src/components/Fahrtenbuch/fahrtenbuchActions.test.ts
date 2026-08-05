@@ -233,7 +233,14 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
 });
 
 describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
-  const einsatzEntry = (vehicleId: string, overrides: Partial<typeof input> = {}) => ({
+  const einsatzEntry = (
+    vehicleId: string,
+    // Die Zähler bleiben bewusst offen getypt: Ein Boot bringt andere Zähler
+    // mit als der Kilometerstand aus `input`.
+    overrides: Partial<Omit<typeof input, 'counters'>> & {
+      counters?: Record<string, { start?: number; end?: number }>;
+    } = {},
+  ) => ({
     vehicleId,
     driverId: 'p1',
     driverName: 'Max Mustermann',
@@ -362,6 +369,56 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     expect(batchSetMock).toHaveBeenCalledTimes(1);
     expect(batchCommitMock).toHaveBeenCalledTimes(1);
     expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('meldet keine Gesamtstrecke, wenn alle Endstände von Hand eingetragen wurden', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
+    });
+    routeMock.mockResolvedValue(10000);
+
+    const result = await createFahrtenbuchEntries('ffnd', [
+      einsatzEntry('v1', { counters: { km: { start: 1000, end: 1005 } } }),
+    ]);
+
+    expect(result.created).toBe(1);
+    // Die Route wurde zwar aufgelöst, ging aber in keinen Zählerstand ein —
+    // „20 km je Fahrzeug" wäre eine Behauptung über fremde Zahlen.
+    expect(result.roundTripKm).toBeUndefined();
+  });
+
+  it('meldet keine Gesamtstrecke für ein Fahrzeug ohne Kilometerzähler', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
+    });
+    routeMock.mockResolvedValue(10000);
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'boot',
+      data: () => ({
+        name: 'MZB',
+        counters: [
+          {
+            id: 'betriebsstundenBb',
+            label: 'Betriebsstunden',
+            unit: 'h',
+            mode: 'startEnd',
+            changeWarning: 'decrease',
+            required: true,
+          },
+        ],
+        fuelTypes: [],
+      }),
+    });
+
+    const result = await createFahrtenbuchEntries('ffnd', [
+      einsatzEntry('boot', { counters: { betriebsstundenBb: { start: 20 } } }),
+    ]);
+
+    expect(result.created).toBe(1);
+    expect(result.roundTripKm).toBeUndefined();
   });
 
   it('trennt ein bereits erfasstes Fahrzeug von einer nicht schreibbaren Zeile', async () => {

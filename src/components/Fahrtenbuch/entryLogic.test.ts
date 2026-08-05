@@ -265,9 +265,26 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
       input,
       'ffnd',
       actor,
-      { counterSources: { km: 'route' } },
+      { counterSources: { km: 'route' }, routeDistanceMeters: 12000 },
     );
     expect(doc).not.toHaveProperty('counterSources');
+  });
+
+  it('wirft, wenn ein Zähler als Route ausgewiesen wird, ohne die Distanz mitzuliefern', () => {
+    // Die Invariante von `EntryDerivation`: Ohne nachprüfbare Route darf kein
+    // Dokument behaupten, ein Stand sei daraus berechnet worden.
+    expect(() =>
+      buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+        counterSources: { km: 'route' },
+      }),
+    ).toThrow(/routeDistanceMeters/);
+  });
+
+  it('wirft nicht, wenn nur unveränderte Herkunftsangaben ohne Distanz kommen', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      counterSources: { km: 'unchanged' },
+    });
+    expect(doc.counterSources).toEqual({ km: 'unchanged' });
   });
 });
 
@@ -292,6 +309,17 @@ describe('survivingCounterSources', () => {
   it('verliert die Herkunft, wenn der Endstand geändert wurde', () => {
     const result = survivingCounterSources(previous, previousCounters, {
       km: { start: 1000, end: 1030 },
+      betriebsstunden: { start: 10 },
+    });
+    expect(result).toEqual({ betriebsstunden: 'unchanged' });
+  });
+
+  it('verliert die Herkunft, wenn der Startstand korrigiert wird', () => {
+    // `end - start` entspräche danach nicht mehr der Gesamtstrecke — der
+    // Eintrag behauptete eine Ableitung, der seine eigenen Zahlen
+    // widersprechen.
+    const result = survivingCounterSources(previous, previousCounters, {
+      km: { start: 900, end: 1024 },
       betriebsstunden: { start: 10 },
     });
     expect(result).toEqual({ betriebsstunden: 'unchanged' });

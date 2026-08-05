@@ -356,7 +356,16 @@ export async function createFahrtenbuchEntries(
         batch.set(entriesRef(groupId).doc(), doc);
         created += 1;
         writtenVehicleIds.add(input.vehicleId);
-        if (entryRoundTripKm !== undefined) roundTripKm = entryRoundTripKm;
+        // Nur melden, wenn die Strecke auch in einen Zählerstand eingegangen
+        // ist. Sonst behauptete die Oberfläche „20 km je Fahrzeug", obwohl nur
+        // ein Boot gespeichert wurde oder alle Fahrer ihren Endstand selbst
+        // eingetippt haben.
+        if (
+          entryRoundTripKm !== undefined &&
+          Object.values(filled.counterSources).includes('route')
+        ) {
+          roundTripKm = entryRoundTripKm;
+        }
       } catch (err) {
         console.error('createFahrtenbuchEntries: Zeile nicht gespeichert', err, {
           vehicleId: input.vehicleId,

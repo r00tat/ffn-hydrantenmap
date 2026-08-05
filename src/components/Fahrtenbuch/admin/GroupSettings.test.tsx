@@ -102,9 +102,7 @@ describe('GroupSettings', () => {
     });
     const { rerender } = renderWithIntl(<GroupSettings groupId="ffnd" />);
 
-    expect(screen.getByLabelText('Breitengrad')).toHaveValue(
-      defaultPosition.lat,
-    );
+    expect(screen.getByLabelText('Breitengrad')).toHaveValue(null);
 
     useFahrtenbuchGroupStandort.mockReturnValue({
       standort: { lat: 47.94, lng: 16.84 },
@@ -113,5 +111,41 @@ describe('GroupSettings', () => {
     rerender(<GroupSettings groupId="ffnd" />);
 
     expect(screen.getByLabelText('Breitengrad')).toHaveValue(47.94);
+  });
+
+  it('lässt die Felder leer, wenn kein Standort gepflegt ist', () => {
+    // Sonst sähe die Verwalterin einer anderen Feuerwehr den Neusiedler
+    // Standardstandort wie einen eigenen, gepflegten Wert.
+    useFahrtenbuchGroupStandort.mockReturnValue({
+      standort: defaultPosition,
+      configured: false,
+    });
+    renderWithIntl(<GroupSettings groupId="ffnd" />);
+
+    expect(screen.getByLabelText('Breitengrad')).toHaveValue(null);
+    expect(screen.getByLabelText('Längengrad')).toHaveValue(null);
+    // Der Standardwert bleibt als Platzhalter erkennbar.
+    expect(screen.getByLabelText('Breitengrad')).toHaveAttribute(
+      'placeholder',
+      String(defaultPosition.lat),
+    );
+  });
+
+  it('setzt den Standort zurück, wenn beide Felder geleert werden', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<GroupSettings groupId="ffnd" />);
+
+    await user.clear(screen.getByLabelText('Breitengrad'));
+    await user.clear(screen.getByLabelText('Längengrad'));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Nicht (0,0): `Number('')` wäre 0 und würde als ungültig abgelehnt — es
+    // gäbe keinen Weg zurück zum Standardstandort.
+    await waitFor(() =>
+      expect(saveFahrtenbuchGroupStandort).toHaveBeenCalledWith(
+        'ffnd',
+        undefined,
+      ),
+    );
   });
 });

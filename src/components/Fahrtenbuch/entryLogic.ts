@@ -89,6 +89,19 @@ export function buildEntryDocument(
   actor: EntryActor,
   derivation?: EntryDerivation,
 ): FahrtenbuchEntry {
+  // Die Invariante von `EntryDerivation` strukturell abgesichert, statt sie
+  // nur zu dokumentieren: Ein Dokument darf nicht behaupten, ein Stand sei aus
+  // einer Route berechnet, ohne die Route mitzuliefern. Die Aufrufer fangen
+  // Ausnahmen je Eintrag ab — die betroffene Zeile fällt aus, der Rest nicht.
+  if (
+    derivation?.routeDistanceMeters === undefined &&
+    Object.values(derivation?.counterSources ?? {}).includes('route')
+  ) {
+    throw new Error(
+      'fahrtenbuch derivation: counter source route without routeDistanceMeters',
+    );
+  }
+
   const definitions: CounterDefinition[] = vehicle.counters ?? [];
   const errors = validateEntryInput(definitions, {
     vehicleId: input.vehicleId,
@@ -159,10 +172,15 @@ export function buildEntryDocument(
 
 /**
  * Die Herkunftsangaben, die eine Bearbeitung überdauern. Ein geänderter
- * Endstand ist eine Ablesung und keine Ableitung mehr; ein unveränderter
+ * Zählerstand ist eine Ablesung und keine Ableitung mehr; ein unveränderter
  * behält seine Herkunft — sonst löschte schon eine Korrektur der Hinweise
  * (`hinweise`, `defekt`, …) den Nachweis für einen Zähler, den niemand
  * angefasst hat.
+ *
+ * Verglichen werden Start *und* Ende: Die Ableitung lautet „Startstand plus
+ * Gesamtstrecke". Bliebe die Herkunft bei bloß korrigiertem Startstand
+ * erhalten, behauptete der Eintrag eine Ableitung, der seine eigene Differenz
+ * widerspricht.
  */
 export function survivingCounterSources(
   previous: Record<string, CounterSource> | undefined,
@@ -171,7 +189,12 @@ export function survivingCounterSources(
 ): Record<string, CounterSource> {
   const result: Record<string, CounterSource> = {};
   for (const [id, source] of Object.entries(previous ?? {})) {
-    if (previousCounters[id]?.end === nextCounters[id]?.end) result[id] = source;
+    if (
+      previousCounters[id]?.end === nextCounters[id]?.end &&
+      previousCounters[id]?.start === nextCounters[id]?.start
+    ) {
+      result[id] = source;
+    }
   }
   return result;
 }

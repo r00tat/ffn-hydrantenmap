@@ -9,12 +9,13 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { defaultPosition } from '../../../hooks/constants';
 import useFahrtenbuchGroupStandort from '../../../hooks/useFahrtenbuchGroupStandort';
 import { saveFahrtenbuchGroupStandort } from '../stammdatenActions';
 
 export default function GroupSettings({ groupId }: { groupId: string }) {
   const t = useTranslations('fahrtenbuch');
-  const { standort } = useFahrtenbuchGroupStandort(groupId);
+  const { standort, configured } = useFahrtenbuchGroupStandort(groupId);
   const [feedback, setFeedback] = useState<
     { severity: 'success' | 'error'; text: string } | undefined
   >();
@@ -25,17 +26,25 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
   // der Firestore-Snapshot kommt aber später und das Formular zeigte dann
   // dauerhaft den Standardstandort.
   const [edits, setEdits] = useState<{ lat?: string; lng?: string }>({});
-  const lat = edits.lat ?? String(standort.lat);
-  const lng = edits.lng ?? String(standort.lng);
+  // Ohne gepflegten Standort bleiben die Felder leer und zeigen den
+  // Standardstandort nur als Platzhalter: Die Verwalterin einer anderen
+  // Feuerwehr sähe sonst die Neusiedler Koordinaten wie einen eigenen Wert und
+  // schriebe sie mit einem Klick auf Speichern als gepflegt fest.
+  const lat = edits.lat ?? (configured ? String(standort.lat) : '');
+  const lng = edits.lng ?? (configured ? String(standort.lng) : '');
 
   const save = async () => {
     setSaving(true);
     setFeedback(undefined);
     try {
-      const result = await saveFahrtenbuchGroupStandort(groupId, {
-        lat: Number(lat),
-        lng: Number(lng),
-      });
+      // Beide Felder leer heißt: zurücksetzen. `Number('')` wäre 0 und ergäbe
+      // den Nullmeridian-Punkt (0,0), den die Action ohnehin ablehnt — es gäbe
+      // damit keinen Weg zurück zum Standardstandort.
+      const cleared = !lat.trim() && !lng.trim();
+      const result = await saveFahrtenbuchGroupStandort(
+        groupId,
+        cleared ? undefined : { lat: Number(lat), lng: Number(lng) },
+      );
       if (!result.success) {
         setFeedback({
           severity: 'error',
@@ -86,6 +95,7 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
           <TextField
             label={t('admin.latitude')}
             type="number"
+            placeholder={String(defaultPosition.lat)}
             value={lat}
             onChange={(e) =>
               setEdits((prev) => ({ ...prev, lat: e.target.value }))
@@ -97,6 +107,7 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
           <TextField
             label={t('admin.longitude')}
             type="number"
+            placeholder={String(defaultPosition.lng)}
             value={lng}
             onChange={(e) =>
               setEdits((prev) => ({ ...prev, lng: e.target.value }))
