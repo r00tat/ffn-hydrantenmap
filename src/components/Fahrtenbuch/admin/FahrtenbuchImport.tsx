@@ -1,9 +1,11 @@
 'use client';
 
+import EditIcon from '@mui/icons-material/Edit';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -28,12 +30,19 @@ import useFahrtenbuchEntries from '../../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchPersons from '../../../hooks/useFahrtenbuchPersons';
 import useFahrtenbuchVehicles from '../../../hooks/useFahrtenbuchVehicles';
 import { importFahrtenbuchEntries } from '../fahrtenbuchActions';
-import { planFahrtenbuchImport, type ImportPlanRow } from '../fahrtenbuchImportPlan';
+import {
+  planFahrtenbuchImport,
+  unknownDriverNames,
+  type ImportPlanRow,
+  type ImportRowEdit,
+} from '../fahrtenbuchImportPlan';
 import {
   extractPdfItems,
   parseFahrtenbuchPdf,
   type PdfParseResult,
 } from '../fahrtenbuchPdfImport';
+import { createInactivePersons } from '../stammdatenActions';
+import ImportRowEditDialog from './ImportRowEditDialog';
 
 /**
  * Ergebnis der letzten Aktion als Daten, nicht als fertiger Text. `parseFailed`
@@ -45,15 +54,27 @@ type ImportStatus =
   | { kind: 'parseFailed'; reason: 'unknownFormat' | 'empty' }
   | { kind: 'parseCrashed'; error: string }
   | { kind: 'importFailed'; error: string }
-  | { kind: 'imported'; created: number; duplicates: number; failed: number };
+  | {
+      kind: 'imported';
+      created: number;
+      duplicates: number;
+      failed: number;
+      /** Angelegte deaktivierte Personen für unbekannte Fahrer. */
+      persons: number;
+    };
 
 /**
- * Die Schlüssel, die `importFahrtenbuchEntries` als `error` melden kann.
- * Alles andere gibt die Action als Klartext der Ausnahme zurück und wird
- * unübersetzt durchgereicht — ein „tooManyEntries" mitten im Satz ist dagegen
- * für niemanden ein Satz.
+ * Die Schlüssel, die `importFahrtenbuchEntries` und `createInactivePersons`
+ * als `error` melden können. Alles andere gibt die Action als Klartext der
+ * Ausnahme zurück und wird unübersetzt durchgereicht — ein „tooManyEntries"
+ * mitten im Satz ist dagegen für niemanden ein Satz.
  */
-const KNOWN_ERROR_KEYS = ['tooManyEntries', 'notInGroup', 'notLoggedIn'] as const;
+const KNOWN_ERROR_KEYS = [
+  'tooManyEntries',
+  'tooManyPersons',
+  'notInGroup',
+  'notLoggedIn',
+] as const;
 
 type KnownErrorKey = (typeof KNOWN_ERROR_KEYS)[number];
 
@@ -64,12 +85,14 @@ function isKnownErrorKey(error: string): error is KnownErrorKey {
 /**
  * Übernimmt die Fahrten aus dem PDF-Export eines anderen digitalen
  * Fahrtenbuchs. Die Datei wird ausschließlich im Browser gelesen — sie geht
- * nie an den Server, nur die bestätigten Eintragsentwürfe tun das. Vorausgewählt
- * ist nur, was zweifelsfrei ist; Dubletten, Problemzeilen und unbekannte Fahrer
- * bleiben sichtbar, damit der Admin sieht, was er in ein Nachweisdokument
- * schreibt.
+ * nie an den Server, nur die bestätigten Eintragsentwürfe tun das.
+ * Vorausgewählt ist, was vollständig ist; Dubletten und Problemzeilen bleiben
+ * sichtbar, aber abgewählt, damit der Admin sieht, was er in ein
+ * Nachweisdokument schreibt. Jede Zeile lässt sich vorher korrigieren — ein
+ * Export nennt Fahrer gern abgekürzt, und eine falsch gelesene Zeile ist so
+ * zu retten, statt sie später von Hand nachzutragen.
  *
- * Ein Panel und kein Dialog: die Vorschau hat acht Spalten und bis zu 156
+ * Ein Panel und kein Dialog: die Vorschau hat neun Spalten und bis zu 156
  * Zeilen, ein Modal schnürte sie unnötig ein.
  */
 export default function FahrtenbuchImport({
@@ -88,6 +111,9 @@ export default function FahrtenbuchImport({
   const [parsed, setParsed] = useState<PdfParseResult>();
   /** `undefined` heißt „noch nicht angefasst" — dann gilt die Vorauswahl. */
   const [selected, setSelected] = useState<Set<number>>();
+  /** Korrekturen je Zeilennummer; die gelesene Zeile bleibt unangetastet. */
+  const [edits, setEdits] = useState<Record<number, ImportRowEdit>>({});
+  const [editingLine, setEditingLine] = useState<number>();
   const [status, setStatus] = useState<ImportStatus>();
   const [busy, setBusy] = useState(false);
 
@@ -106,8 +132,9 @@ export default function FahrtenbuchImport({
     if (!parsed?.rows.length || !vehicle) return [];
     return planFahrtenbuchImport(parsed.rows, vehicle, persons, entries, {
       fuelType: fuelType || undefined,
+      edits,
     });
-  }, [parsed, vehicle, persons, entries, fuelType]);
+  }, [parsed, vehicle, persons, entries, fuelType, edits]);
 
   // Die Kraftstoffauswahl gehört zum Fahrzeug: beim Wechsel verfällt sie,
   // sonst landete der Treibstoff des PDFs in der Spalte des Vorgängers.
@@ -125,6 +152,7 @@ export default function FahrtenbuchImport({
       );
       setParsed(result);
       setSelected(undefined);
+      setEdits({});
       if (result.error) {
         setStatus({ kind: 'parseFailed', reason: result.error });
         return;
@@ -147,20 +175,73 @@ export default function FahrtenbuchImport({
     }
   };
 
-  // Vorauswahl folgt dem Plan: alles außer `ready` bleibt abgewählt, bis der
-  // Admin es bewusst anhakt.
-  const readyLines = useMemo(
-    () => rows.filter((r) => r.state === 'ready').map((r) => r.line),
+  // Vorauswahl folgt dem Plan: Dubletten und Problemzeilen bleiben abgewählt,
+  // bis der Admin sie bewusst anhakt. Eine Zeile mit unbekanntem Fahrer ist
+  // dagegen vollständig — ihr Fahrer wird beim Übernehmen als deaktivierte
+  // Person angelegt.
+  const autoLines = useMemo(
+    () =>
+      rows
+        .filter((r) => r.state === 'ready' || r.state === 'unknownDriver')
+        .map((r) => r.line),
     [rows],
   );
-  const effectiveSelection = selected ?? new Set(readyLines);
+  const effectiveSelection = selected ?? new Set(autoLines);
+
+  // Die ausgewählten Zeilen sind die Grundlage von Hinweis und Lauf — beides
+  // muss dieselbe Menge sehen.
+  const chosen = rows.filter((r) => effectiveSelection.has(r.line) && r.input);
+  const newDriverNames = unknownDriverNames(chosen);
+
+  const editingRow = rows.find((r) => r.line === editingLine);
+
+  /**
+   * Übernimmt die Korrektur einer Zeile und hakt sie an: Wer eine Zeile
+   * anfasst, will sie importieren — sonst müsste er sie danach noch suchen.
+   * Bleibt sie trotz Korrektur ein Problem, greift der Haken nicht (die
+   * Checkbox hängt an `r.input`).
+   */
+  const saveEdit = (line: number, edit: ImportRowEdit) => {
+    setEdits((current) => ({ ...current, [line]: edit }));
+    setSelected((current) => new Set(current ?? autoLines).add(line));
+    setEditingLine(undefined);
+  };
+
+  const discardEdit = (line: number) => {
+    setEdits((current) => {
+      const next = { ...current };
+      delete next[line];
+      return next;
+    });
+    setEditingLine(undefined);
+  };
 
   const run = async () => {
     setBusy(true);
     try {
-      const inputs = rows
-        .filter((r) => effectiveSelection.has(r.line) && r.input)
-        .map((r) => r.input!);
+      // Erst die Personen, dann die Fahrten: Ohne die IDs hinge jede Fahrt
+      // eines ausgetretenen Fahrers an einem bloßen Namen. Scheitert das,
+      // wird gar nichts geschrieben — ein zweiter Anlauf ist über die
+      // Dublettenprüfung gefahrlos.
+      let personIds: Record<string, string> = {};
+      let personsCreated = 0;
+      if (newDriverNames.length > 0) {
+        const result = await createInactivePersons(groupId, newDriverNames);
+        if (!result.success) {
+          setStatus({ kind: 'importFailed', error: result.error ?? '' });
+          return;
+        }
+        personIds = result.personIds;
+        personsCreated = result.created;
+      }
+
+      const inputs = chosen.map((r) => {
+        const input = r.input!;
+        if (input.driverId) return input;
+        const personId = personIds[normalizeName(input.driverName)];
+        return personId ? { ...input, driverId: personId } : input;
+      });
+
       const result = await importFahrtenbuchEntries(groupId, inputs);
       if (!result.success) {
         setStatus({ kind: 'importFailed', error: result.error ?? '' });
@@ -171,9 +252,11 @@ export default function FahrtenbuchImport({
         created: result.created,
         duplicates: result.duplicates,
         failed: result.failed,
+        persons: personsCreated,
       });
       setParsed(undefined);
       setSelected(undefined);
+      setEdits({});
     } catch (err) {
       setStatus({ kind: 'importFailed', error: (err as Error).message });
     } finally {
@@ -188,17 +271,24 @@ export default function FahrtenbuchImport({
   const reset = () => {
     setParsed(undefined);
     setSelected(undefined);
+    setEdits({});
     setStatus(undefined);
   };
 
   function statusMessage(current: ImportStatus): string {
     switch (current.kind) {
       case 'imported':
-        return t('admin.pdfImport.result', {
-          created: current.created,
-          duplicates: current.duplicates,
-          failed: current.failed,
-        });
+        return [
+          t('admin.pdfImport.result', {
+            created: current.created,
+            duplicates: current.duplicates,
+            failed: current.failed,
+          }),
+          current.persons > 0 &&
+            t('admin.pdfImport.personsCreated', { count: current.persons }),
+        ]
+          .filter(Boolean)
+          .join(' ');
       case 'parseFailed':
         return t('admin.pdfImport.parseFailed', {
           message: t(
@@ -333,6 +423,15 @@ export default function FahrtenbuchImport({
                 .length,
             })}
           </Typography>
+          {/* Nicht verschweigen, dass der Import Stammdaten anlegt — und
+              welche. Wer den Namen hier liest, kann ihn vorher korrigieren. */}
+          {newDriverNames.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {t('admin.pdfImport.unknownDriverNotice', {
+                names: newDriverNames.join(', '),
+              })}
+            </Alert>
+          )}
           {/* Acht Spalten passen auf einem Telefon nicht nebeneinander — die
               Tabelle scrollt in ihrem eigenen Kasten, damit nicht die ganze
               Seite waagrecht wandert. */}
@@ -348,6 +447,7 @@ export default function FahrtenbuchImport({
                   <TableCell>{t('ziel')}</TableCell>
                   <TableCell>{t('admin.pdfImport.km')}</TableCell>
                   <TableCell>{t('admin.pdfImport.state')}</TableCell>
+                  <TableCell padding="checkbox" />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -357,14 +457,14 @@ export default function FahrtenbuchImport({
                       <Checkbox
                         slotProps={{
                           input: {
-                            'aria-label': `${row.preview.datum} ${row.preview.fahrer}`,
+                            'aria-label': `${row.preview.datum} ${row.values.driverName}`,
                           },
                         }}
                         disabled={busy || !row.input}
-                        checked={effectiveSelection.has(row.line)}
+                        checked={effectiveSelection.has(row.line) && !!row.input}
                         onChange={(e) =>
                           setSelected((current) => {
-                            const next = new Set(current ?? readyLines);
+                            const next = new Set(current ?? autoLines);
                             if (e.target.checked) next.add(row.line);
                             else next.delete(row.line);
                             return next;
@@ -374,10 +474,26 @@ export default function FahrtenbuchImport({
                     </TableCell>
                     <TableCell>{row.preview.datum}</TableCell>
                     <TableCell>{row.preview.zeit}</TableCell>
-                    <TableCell>{row.preview.fahrer}</TableCell>
-                    <TableCell>{row.preview.zweck}</TableCell>
                     <TableCell>
-                      {row.preview.ziel}
+                      {row.values.driverName}
+                      {/* Nur an der ausgewählten Zeile: Eine abgewählte legt
+                          keine Person an, und der Hinweis wäre dort falsch. */}
+                      {row.state === 'unknownDriver' &&
+                        effectiveSelection.has(row.line) && (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'block' }}
+                          >
+                            {t('admin.pdfImport.driverWillBeCreated')}
+                          </Typography>
+                        )}
+                    </TableCell>
+                    <TableCell>
+                      {t(`zwecke.${row.values.zweck}` as 'zwecke.einsatz')}
+                    </TableCell>
+                    <TableCell>
+                      {row.values.ziel}
                       {row.state === 'problem' && (
                         <Typography
                           variant="caption"
@@ -390,19 +506,45 @@ export default function FahrtenbuchImport({
                     </TableCell>
                     <TableCell>{row.preview.km}</TableCell>
                     <TableCell>
-                      <Chip
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        useFlexGap
+                        sx={{ flexWrap: 'wrap' }}
+                      >
+                        <Chip
+                          size="small"
+                          color={row.state === 'ready' ? 'success' : 'default'}
+                          label={
+                            row.state === 'problem' && row.problem
+                              ? t(
+                                  `admin.pdfImport.problems.${row.problem}` as 'admin.pdfImport.problems.kmMismatch',
+                                )
+                              : t(
+                                  `admin.pdfImport.states.${row.state}` as 'admin.pdfImport.states.ready',
+                                )
+                          }
+                        />
+                        {row.edited && (
+                          <Chip
+                            size="small"
+                            color="info"
+                            label={t('admin.pdfImport.edited')}
+                          />
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell padding="checkbox">
+                      <IconButton
                         size="small"
-                        color={row.state === 'ready' ? 'success' : 'default'}
-                        label={
-                          row.state === 'problem' && row.problem
-                            ? t(
-                                `admin.pdfImport.problems.${row.problem}` as 'admin.pdfImport.problems.kmMismatch',
-                              )
-                            : t(
-                                `admin.pdfImport.states.${row.state}` as 'admin.pdfImport.states.ready',
-                              )
-                        }
-                      />
+                        aria-label={t('admin.pdfImport.editRow', {
+                          line: row.line,
+                        })}
+                        disabled={busy}
+                        onClick={() => setEditingLine(row.line)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -410,6 +552,21 @@ export default function FahrtenbuchImport({
             </Table>
           </TableContainer>
         </>
+      )}
+
+      {editingRow && (
+        <ImportRowEditDialog
+          // Der Dialog übernimmt seine Felder beim Aufbau — ohne `key` zeigte
+          // er beim Öffnen der nächsten Zeile noch die Werte der vorigen.
+          key={editingRow.line}
+          row={editingRow}
+          persons={persons}
+          onSave={(edit) => saveEdit(editingRow.line, edit)}
+          onClose={() => setEditingLine(undefined)}
+          onDiscard={
+            editingRow.edited ? () => discardEdit(editingRow.line) : undefined
+          }
+        />
       )}
     </>
   );

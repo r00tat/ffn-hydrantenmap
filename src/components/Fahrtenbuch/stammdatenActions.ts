@@ -5,6 +5,7 @@ import { actionAdminRequired } from '../../app/auth';
 import {
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
+  normalizeName,
   VEHICLE_PRESETS,
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
@@ -19,6 +20,7 @@ import {
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { assertFahrtenbuchGroup } from './authGuards';
+import { planInactivePersons } from './fahrtenbuchImportPlan';
 import {
   fieldsForChanges,
   parseRecipientCsv,
@@ -424,6 +426,82 @@ export async function importPersonsFromCsv(
       updated: 0,
       deactivated: 0,
       skipped: 0,
+      error: (err as Error).message,
+    };
+  }
+}
+
+export interface InactivePersonsResult {
+  success: boolean;
+  /**
+   * Normalisierter Name → Personen-ID. Enthält auch die schon vorhandenen
+   * Personen: Der Aufrufer braucht für jeden gemeldeten Namen eine ID, nicht
+   * nur für die neu angelegten.
+   */
+  personIds: Record<string, string>;
+  created: number;
+  error?: string;
+}
+
+/**
+ * Legt für Fahrernamen aus einem Import Personen an — **deaktiviert**.
+ *
+ * Ein importiertes Fahrtenbuch reicht Jahre zurück und nennt Fahrer, die
+ * längst ausgetreten sind. Ohne Person hinge deren Fahrt an einem bloßen
+ * Namen und wäre über keine Auswertung mehr zu finden; als aktive Person
+ * stünde ein Ausgetretener wieder in jeder Fahrerauswahl. Deaktiviert
+ * angelegt trifft beides zu: verknüpfbar, aber nicht mehr auswählbar. Wer noch
+ * fährt, wird im Personen-Tab aktiviert.
+ *
+ * Bereits vorhandene Namen werden nicht angefasst — insbesondere wird eine
+ * aktive Person nicht durch einen Import deaktiviert.
+ */
+export async function createInactivePersons(
+  groupId: string,
+  names: string[],
+): Promise<InactivePersonsResult> {
+  try {
+    const session = await actionAdminRequired();
+    assertFahrtenbuchGroup(groupId);
+    // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
+    // weg, also darf hier nichts als Array vorausgesetzt werden.
+    const list = (Array.isArray(names) ? names : []).filter(
+      (name): name is string => typeof name === 'string',
+    );
+    // Ein Firestore-Batch fasst 500 Schreibvorgänge. Mehr Fahrer als das kann
+    // ein einzelnes Fahrzeug-Fahrtenbuch nicht plausibel nennen; die Grenze
+    // ist der Riegel gegen eine manipulierte Anfrage.
+    if (list.length > 400) {
+      return { success: false, personIds: {}, created: 0, error: 'tooManyPersons' };
+    }
+
+    const plan = planInactivePersons(list, await loadPersons(groupId));
+    const personIds = { ...plan.existing };
+    if (plan.create.length > 0) {
+      const batch = firestore.batch();
+      for (const name of plan.create) {
+        const ref = personsRef(groupId).doc();
+        batch.set(ref, {
+          name,
+          active: false,
+          blaulichtSmsRecipientId: '',
+          phone: '',
+          email: '',
+          note: '',
+          ...stamps(session.user.id),
+        });
+        personIds[normalizeName(name)] = ref.id;
+      }
+      await batch.commit();
+    }
+
+    return { success: true, personIds, created: plan.create.length };
+  } catch (err) {
+    console.error('createInactivePersons failed', err);
+    return {
+      success: false,
+      personIds: {},
+      created: 0,
       error: (err as Error).message,
     };
   }

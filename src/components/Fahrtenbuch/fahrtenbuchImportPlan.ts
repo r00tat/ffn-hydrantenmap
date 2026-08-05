@@ -1,8 +1,10 @@
 /**
  * Bildet gelesene PDF-Zeilen (`fahrtenbuchPdfImport`) auf Eintragsentwürfe ab.
  * Rein — keine Firestore-Zugriffe, keine React-Abhängigkeiten. Ein
- * Fahrtenbuch ist ein Nachweisdokument: Nichts wird ergänzt oder geschätzt,
- * fehlt ein Pflichtwert, bleibt die Zeile ein Problem statt eines Entwurfs.
+ * Fahrtenbuch ist ein Nachweisdokument: Von selbst wird nichts ergänzt oder
+ * geschätzt, fehlt ein Pflichtwert, bleibt die Zeile ein Problem statt eines
+ * Entwurfs. Was ein Mensch vor dem Import bewusst einträgt
+ * (`ImportRowEdit`), gilt dagegen — er hat den Nachweis vor sich.
  */
 import {
   arrivalFromTimeOnly,
@@ -19,20 +21,50 @@ import { toIsoTimestamp, type PdfFahrtRow, type RowProblem } from './fahrtenbuch
 
 export type ImportRowState = 'ready' | 'duplicate' | 'problem' | 'unknownDriver';
 
-export type ImportProblem = RowProblem | 'noKmCounter' | 'unreadable';
+export type ImportProblem =
+  | RowProblem
+  | 'noKmCounter'
+  | 'unreadable'
+  | 'timeMismatch'
+  | 'driverMissing';
+
+/**
+ * Die wirksamen Werte einer Zeile. Vorschau, Entwurf und die Vorbelegung des
+ * Bearbeiten-Dialogs speisen sich aus derselben Quelle — sonst zeigte die
+ * Tabelle etwas anderes, als der Dialog zum Ändern anbietet.
+ */
+export interface ImportRowValues {
+  driverName: string;
+  zweck: FahrtZweck;
+  ziel: string;
+  /** ISO-Zeitstempel; leer, wenn Datum oder Uhrzeit nicht lesbar sind. */
+  abfahrt: string;
+  ankunft: string;
+  startKm?: number;
+  endeKm?: number;
+  hinweise: string;
+}
+
+/**
+ * Was jemand vor dem Import an einer Zeile geändert hat. Nur gesetzte Felder
+ * wirken; `undefined` heißt „unverändert", nicht „geleert". Ein leerer String
+ * ist dagegen eine echte Änderung — so lässt sich ein Ziel auch löschen.
+ */
+export type ImportRowEdit = Partial<ImportRowValues>;
 
 export interface ImportPlanRow {
   line: number;
   state: ImportRowState;
   problem?: ImportProblem;
+  /** Die Zeile weicht von der gelesenen ab — jemand hat sie angefasst. */
+  edited: boolean;
   /** Fehlt genau dann, wenn `state === 'problem'`. */
   input?: FahrtenbuchEntryInput;
+  /** Die wirksamen Werte — Vorbelegung des Bearbeiten-Dialogs. */
+  values: ImportRowValues;
   preview: {
     datum: string;
     zeit: string;
-    fahrer: string;
-    zweck: string;
-    ziel: string;
     km: string;
   };
   /** Rohtext der Zeile — die Vorschau zeigt ihn bei einem Problem. */
@@ -92,16 +124,124 @@ function localDayKey(iso: string): string {
     : `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
-export interface ImportPlanOptions {
-  /** Kraftstoffart für die Spalte „Treibstoff"; sonst die Vorgabe des Fahrzeugs. */
-  fuelType?: FuelType;
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
 /**
- * Baut aus den gelesenen Zeilen die Eintragsentwürfe. Nichts wird ergänzt oder
- * geschätzt: Fehlt ein Pflichtwert, bleibt die Zeile ein Problem. Ein
- * Fahrtenbuch ist ein Nachweisdokument, und ein importierter Kilometerstand,
- * den niemand abgelesen hat, wäre eine Behauptung.
+ * `dd.mm.yyyy` und `HH:MM` aus einem ISO-Zeitstempel. Bewusst von Hand statt
+ * über `toLocaleDateString`: Die Vorschau soll dasselbe Format zeigen wie die
+ * Quelle, unabhängig von der Sprache des Browsers.
+ */
+function formatDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()}`;
+}
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Die Werte, wie sie aus dem PDF gelesen wurden — ohne jede Bearbeitung. */
+function baseValues(row: PdfFahrtRow): ImportRowValues {
+  const { zweck, prefix } = mapGrund(row.grund);
+  const abfahrt = row.von ? (toIsoTimestamp(row.datum, row.von) ?? '') : '';
+  const bis = row.bis ? toIsoTimestamp(row.datum, row.bis) : undefined;
+  return {
+    driverName: row.fahrer.trim(),
+    zweck,
+    ziel: [prefix, row.zweckStrecke].filter(Boolean).join(': '),
+    abfahrt,
+    // Über `arrivalFromTimeOnly`, damit eine Ankunft vor der Abfahrt auf den
+    // Folgetag rollt — im Beispielexport betrifft das vier Fahrten.
+    ankunft: abfahrt && bis ? arrivalFromTimeOnly(abfahrt, new Date(bis)) : '',
+    startKm: row.startKm,
+    endeKm: row.endeKm,
+    hinweise: row.notizen ?? '',
+  };
+}
+
+const VALUE_KEYS = [
+  'driverName',
+  'zweck',
+  'ziel',
+  'abfahrt',
+  'ankunft',
+  'startKm',
+  'endeKm',
+  'hinweise',
+] as const;
+
+function mergeValues(
+  base: ImportRowValues,
+  edit: ImportRowEdit | undefined,
+): ImportRowValues {
+  if (!edit) return base;
+  const merged = { ...base };
+  for (const key of VALUE_KEYS) {
+    const value = edit[key];
+    if (value !== undefined) {
+      // Der Schlüssel bestimmt auf beiden Seiten denselben Typ; TypeScript
+      // löst das über die Vereinigung aller Schlüssel nicht auf.
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+  // Wird nur die Abfahrt verschoben, behält die Ankunft ihre Uhrzeit und folgt
+  // dem neuen Kalendertag — sonst läge sie einen Tag vor der Abfahrt.
+  if (edit.abfahrt && edit.ankunft === undefined && base.ankunft) {
+    merged.ankunft = arrivalFromTimeOnly(merged.abfahrt, new Date(base.ankunft));
+  }
+  return merged;
+}
+
+function differs(base: ImportRowValues, merged: ImportRowValues): boolean {
+  return VALUE_KEYS.some((key) => base[key] !== merged[key]);
+}
+
+/**
+ * Was die Zeile am Import hindert — nach der Bearbeitung beurteilt. Die
+ * Meldungen des Parsers gelten nur so weit, wie sie durch die Bearbeitung
+ * nicht gegenstandslos geworden sind.
+ */
+function rowProblem(
+  row: PdfFahrtRow,
+  values: ImportRowValues,
+  kmEdited: boolean,
+): ImportProblem | undefined {
+  if (!values.driverName.trim()) return 'driverMissing';
+  if (!values.abfahrt || !values.ankunft) {
+    return row.problem === 'dateInvalid' || row.problem === 'timeMissing'
+      ? row.problem
+      : 'unreadable';
+  }
+  if (new Date(values.ankunft) < new Date(values.abfahrt)) return 'timeMismatch';
+  if (values.startKm === undefined || values.endeKm === undefined) {
+    return 'kmMissing';
+  }
+  if (values.endeKm < values.startKm) return 'kmMismatch';
+  // Die Selbstprüfung des Parsers („Ende − Start == Gef.") gilt nur für
+  // unangetastete Kilometer: Hat jemand sie von Hand gesetzt, ist die
+  // mitgelesene Differenz der Quelle nicht mehr der Maßstab.
+  if (row.problem === 'kmMismatch' && !kmEdited) return 'kmMismatch';
+  return undefined;
+}
+
+export interface ImportPlanOptions {
+  /** Kraftstoffart für die Spalte „Treibstoff"; sonst die Vorgabe des Fahrzeugs. */
+  fuelType?: FuelType;
+  /** Bearbeitungen je Zeilennummer (`PdfFahrtRow.line`). */
+  edits?: Record<number, ImportRowEdit>;
+}
+
+/**
+ * Baut aus den gelesenen Zeilen die Eintragsentwürfe. Von selbst wird nichts
+ * ergänzt oder geschätzt: Fehlt ein Pflichtwert, bleibt die Zeile ein Problem.
+ * Ein Fahrtenbuch ist ein Nachweisdokument, und ein importierter
+ * Kilometerstand, den niemand abgelesen hat, wäre eine Behauptung. Trägt ihn
+ * jemand über `options.edits` ein, ist er abgelesen — dann zählt er.
  */
 export function planFahrtenbuchImport(
   rows: PdfFahrtRow[],
@@ -129,40 +269,40 @@ export function planFahrtenbuchImport(
   );
 
   return rows.map((row) => {
-    const { zweck, prefix } = mapGrund(row.grund);
-    const ziel = [prefix, row.zweckStrecke].filter(Boolean).join(': ');
-    const preview = {
-      datum: row.datum,
-      zeit: row.von && row.bis ? `${row.von} - ${row.bis}` : '',
-      fahrer: row.fahrer,
-      zweck: prefix ?? row.grund,
-      ziel,
-      km:
-        row.startKm !== undefined && row.endeKm !== undefined
-          ? `${row.startKm} → ${row.endeKm}`
-          : '',
+    const base = baseValues(row);
+    const edit = options.edits?.[row.line];
+    const values = mergeValues(base, edit);
+    const edited = differs(base, values);
+
+    const common = {
+      line: row.line,
+      edited,
+      values,
+      preview: {
+        datum: values.abfahrt ? formatDay(values.abfahrt) : row.datum,
+        zeit:
+          values.abfahrt && values.ankunft
+            ? `${formatTime(values.abfahrt)} - ${formatTime(values.ankunft)}`
+            : '',
+        km:
+          values.startKm !== undefined && values.endeKm !== undefined
+            ? `${values.startKm} → ${values.endeKm}`
+            : '',
+      },
+      raw: row.raw,
     };
-    const base = { line: row.line, preview, raw: row.raw };
 
     if (!kmCounter) {
-      return { ...base, state: 'problem' as const, problem: 'noKmCounter' as const };
+      return { ...common, state: 'problem' as const, problem: 'noKmCounter' as const };
     }
-    if (row.problem) {
-      return { ...base, state: 'problem' as const, problem: row.problem };
-    }
-
-    const abfahrt = toIsoTimestamp(row.datum, row.von as string);
-    if (!abfahrt || row.startKm === undefined || row.endeKm === undefined) {
-      return { ...base, state: 'problem' as const, problem: 'unreadable' as const };
-    }
-    // Über `arrivalFromTimeOnly`, damit eine Ankunft vor der Abfahrt auf den
-    // Folgetag rollt — im Beispielexport betrifft das vier Fahrten.
-    const ankunft = arrivalFromTimeOnly(
-      abfahrt,
-      new Date(toIsoTimestamp(row.datum, row.bis as string) as string),
+    const problem = rowProblem(
+      row,
+      values,
+      values.startKm !== base.startKm || values.endeKm !== base.endeKm,
     );
+    if (problem) return { ...common, state: 'problem' as const, problem };
 
-    const person = personByName.get(normalizeName(row.fahrer));
+    const person = personByName.get(normalizeName(values.driverName));
     const betriebsmittel: Partial<Record<FuelType, number>> = {};
     if (row.treibstoff !== undefined && fuel) betriebsmittel[fuel] = row.treibstoff;
     if (row.adBlue !== undefined && (vehicle.fuelTypes ?? []).includes('adblue')) {
@@ -172,22 +312,83 @@ export function planFahrtenbuchImport(
     const input: FahrtenbuchEntryInput = {
       vehicleId: vehicle.id as string,
       driverId: person?.id,
-      driverName: person?.name ?? row.fahrer,
-      zweck,
-      ziel,
-      abfahrt,
-      ankunft,
-      counters: { [kmCounter.id]: { start: row.startKm, end: row.endeKm } },
+      driverName: person?.name ?? values.driverName.trim(),
+      zweck: values.zweck,
+      ziel: values.ziel,
+      abfahrt: values.abfahrt,
+      ankunft: values.ankunft,
+      counters: {
+        [kmCounter.id]: { start: values.startKm, end: values.endeKm },
+      },
       betriebsmittel,
-      hinweise: row.notizen || undefined,
+      hinweise: values.hinweise || undefined,
     };
 
-    if (taken.has(`${localDayKey(abfahrt)}|${row.startKm}`)) {
-      return { ...base, state: 'duplicate' as const, input };
+    if (taken.has(`${localDayKey(values.abfahrt)}|${values.startKm}`)) {
+      return { ...common, state: 'duplicate' as const, input };
     }
     if (!person) {
-      return { ...base, state: 'unknownDriver' as const, input };
+      return { ...common, state: 'unknownDriver' as const, input };
     }
-    return { ...base, state: 'ready' as const, input };
+    return { ...common, state: 'ready' as const, input };
   });
+}
+
+/**
+ * Die Fahrernamen der ausgewählten Zeilen, für die es keine Person gibt —
+ * jeder Name genau einmal, in der Reihenfolge des Auftretens. Für sie legt der
+ * Import deaktivierte Personen an: Ein Fahrtenbuch von vor zwei Jahren nennt
+ * Fahrer, die längst ausgetreten sind. Ohne Person hinge die Fahrt an einem
+ * bloßen Namen, mit einer aktiven Person stünde ein Ausgetretener wieder zur
+ * Auswahl.
+ */
+export function unknownDriverNames(rows: ImportPlanRow[]): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const row of rows) {
+    if (row.state !== 'unknownDriver' || !row.input) continue;
+    const name = row.input.driverName.trim();
+    const key = normalizeName(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+export interface InactivePersonPlan {
+  /** Namen, für die eine Person angelegt werden muss. */
+  create: string[];
+  /** Normalisierter Name → ID der bereits vorhandenen Person. */
+  existing: Record<string, string>;
+}
+
+/**
+ * Teilt die gemeldeten Fahrernamen in „gibt es schon" und „muss angelegt
+ * werden". Verglichen wird über `normalizeName`, also so, wie auch die Vorschau
+ * Fahrer und Person zusammenbringt — sonst legte der Import eine zweite Person
+ * für einen Namen an, den er selbst als Treffer anzeigt.
+ */
+export function planInactivePersons(
+  names: string[],
+  persons: FahrtenbuchPerson[],
+): InactivePersonPlan {
+  const byName = new Map(
+    persons
+      .filter((p) => p.id)
+      .map((p) => [normalizeName(p.name), p.id as string]),
+  );
+  const create: string[] = [];
+  const existing: Record<string, string> = {};
+  const seen = new Set<string>();
+  for (const raw of names) {
+    const name = (raw ?? '').trim();
+    const key = normalizeName(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const id = byName.get(key);
+    if (id) existing[key] = id;
+    else create.push(name);
+  }
+  return { create, existing };
 }

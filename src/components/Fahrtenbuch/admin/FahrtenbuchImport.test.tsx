@@ -95,12 +95,14 @@ const parseResult: PdfParseResult = {
   ],
 };
 
-// `fahrtenbuchActions` ist 'use server'/'server-only' und lässt sich im Test
-// nicht laden.
-const { importFahrtenbuchEntries } = vi.hoisted(() => ({
+// `fahrtenbuchActions` und `stammdatenActions` sind 'use server'/'server-only'
+// und lassen sich im Test nicht laden.
+const { importFahrtenbuchEntries, createInactivePersons } = vi.hoisted(() => ({
   importFahrtenbuchEntries: vi.fn(),
+  createInactivePersons: vi.fn(),
 }));
 vi.mock('../fahrtenbuchActions', () => ({ importFahrtenbuchEntries }));
+vi.mock('../stammdatenActions', () => ({ createInactivePersons }));
 
 // Nur die beiden PDF-Schritte werden ersetzt; `toIsoTimestamp` bleibt echt,
 // weil `fahrtenbuchImportPlan` es aus demselben Modul bezieht.
@@ -160,22 +162,31 @@ describe('FahrtenbuchImport', () => {
       duplicates: 0,
       failed: 0,
     });
+    createInactivePersons.mockResolvedValue({
+      success: true,
+      personIds: { 'erika unbekannt': 'p9' },
+      created: 1,
+    });
   });
 
-  it('wählt nur zweifelsfreie Zeilen vor', async () => {
-    // Ein Fahrtenbuch ist ein Nachweisdokument: Dubletten, Problemzeilen und
-    // unbekannte Fahrer bleiben sichtbar, aber unangehakt.
+  it('wählt nur vollständige Zeilen vor', async () => {
+    // Ein Fahrtenbuch ist ein Nachweisdokument: Dubletten und Problemzeilen
+    // bleiben sichtbar, aber unangehakt. Eine Zeile mit unbekanntem Fahrer ist
+    // dagegen vollständig — für ihren Fahrer entsteht eine Person.
     renderPanel();
     await chooseFile();
 
     expect(screen.getByLabelText('01.03.2026 Max Mustermann')).toBeChecked();
     expect(screen.getByLabelText('02.03.2026 Max Mustermann')).toBeChecked();
     expect(screen.getByLabelText('03.03.2026 Max Mustermann')).not.toBeChecked();
-    expect(screen.getByLabelText('04.03.2026 Erika Unbekannt')).not.toBeChecked();
+    expect(screen.getByLabelText('04.03.2026 Erika Unbekannt')).toBeChecked();
     expect(screen.getByLabelText('05.03.2026 Max Mustermann')).not.toBeChecked();
 
     expect(screen.getByText('bereits vorhanden')).toBeInTheDocument();
     expect(screen.getByText('Fahrer unbekannt')).toBeInTheDocument();
+    expect(
+      screen.getByText(/werden als deaktivierte Personen angelegt: Erika Unbekannt/),
+    ).toBeInTheDocument();
   });
 
   it('zeigt bei einer Problemzeile den Rohtext', async () => {
@@ -194,8 +205,7 @@ describe('FahrtenbuchImport', () => {
     renderPanel();
     await chooseFile();
 
-    // Die zweite vorausgewählte Zeile abwählen und zusätzlich die Zeile mit
-    // dem unbekannten Fahrer bewusst anhaken.
+    // Zwei der vorausgewählten Zeilen abwählen, eine bleibt übrig.
     await user.click(screen.getByLabelText('02.03.2026 Max Mustermann'));
     await user.click(screen.getByLabelText('04.03.2026 Erika Unbekannt'));
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
@@ -203,17 +213,58 @@ describe('FahrtenbuchImport', () => {
     await waitFor(() => expect(importFahrtenbuchEntries).toHaveBeenCalled());
     const [groupId, inputs] = importFahrtenbuchEntries.mock.calls[0];
     expect(groupId).toBe('g1');
-    expect(inputs).toHaveLength(2);
+    expect(inputs).toHaveLength(1);
     expect(inputs[0]).toMatchObject({
       vehicleId: 'v1',
       driverId: 'p1',
       counters: { km: { start: 1000, end: 1020 } },
     });
-    expect(inputs[1]).toMatchObject({
+    // Kein unbekannter Fahrer mehr in der Auswahl — dann darf der Import auch
+    // keine Person anlegen.
+    expect(createInactivePersons).not.toHaveBeenCalled();
+  });
+
+  it('legt unbekannte Fahrer als deaktivierte Person an und verknüpft sie', async () => {
+    // Der Fall „ehemaliger Fahrer": Die Fahrt darf nicht an einem bloßen Namen
+    // hängen bleiben, die Person aber auch nicht wieder auswählbar werden.
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    await waitFor(() => expect(importFahrtenbuchEntries).toHaveBeenCalled());
+    expect(createInactivePersons).toHaveBeenCalledWith('g1', ['Erika Unbekannt']);
+    const inputs = importFahrtenbuchEntries.mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[2]).toMatchObject({
       driverName: 'Erika Unbekannt',
-      counters: { km: { start: 1000, end: 1020 } },
+      driverId: 'p9',
     });
-    expect(inputs[1].driverId).toBeUndefined();
+    expect(
+      await screen.findByText(/als deaktivierte Person angelegt/),
+    ).toBeInTheDocument();
+  });
+
+  it('importiert nichts, wenn die Personen nicht angelegt werden konnten', async () => {
+    // Sonst stünden Fahrten mit unverknüpftem Fahrer im Fahrtenbuch, und der
+    // zweite Anlauf hinge an der Dublettenprüfung.
+    createInactivePersons.mockResolvedValue({
+      success: false,
+      personIds: {},
+      created: 0,
+      error: 'tooManyPersons',
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+
+    expect(
+      await screen.findByText(/Zu viele unbekannte Fahrer/),
+    ).toBeInTheDocument();
+    expect(importFahrtenbuchEntries).not.toHaveBeenCalled();
   });
 
   it('importiert nichts, wenn alles abgewählt ist', async () => {
@@ -225,11 +276,81 @@ describe('FahrtenbuchImport', () => {
 
     await user.click(screen.getByLabelText('01.03.2026 Max Mustermann'));
     await user.click(screen.getByLabelText('02.03.2026 Max Mustermann'));
+    await user.click(screen.getByLabelText('04.03.2026 Erika Unbekannt'));
 
     const run = screen.getByRole('button', { name: 'Übernehmen' });
     expect(run).toBeDisabled();
     fireEvent.click(run);
     expect(importFahrtenbuchEntries).not.toHaveBeenCalled();
+  });
+
+  it('korrigiert den Fahrer einer Zeile vor dem Import', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    await user.click(screen.getByRole('button', { name: 'Zeile 4 bearbeiten' }));
+    const driver = screen.getByRole('combobox', { name: 'Fahrer' });
+    await user.clear(driver);
+    await user.type(driver, 'Max Mustermann');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Der korrigierte Fahrer ist bekannt: keine Person mehr anzulegen.
+    expect(screen.getByText('bearbeitet')).toBeInTheDocument();
+    expect(screen.queryByText('Fahrer unbekannt')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(importFahrtenbuchEntries).toHaveBeenCalled());
+    expect(createInactivePersons).not.toHaveBeenCalled();
+    const inputs = importFahrtenbuchEntries.mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[2]).toMatchObject({
+      driverName: 'Max Mustermann',
+      driverId: 'p1',
+    });
+  });
+
+  it('macht eine Problemzeile durch nachgetragene Kilometer übernehmbar', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    expect(screen.getByLabelText('05.03.2026 Max Mustermann')).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Zeile 5 bearbeiten' }));
+    await user.type(screen.getByLabelText('Kilometer Start'), '1060');
+    await user.type(screen.getByLabelText('Kilometer Ende'), '1075');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Die korrigierte Zeile hakt sich selbst an — wer sie anfasst, will sie
+    // übernehmen.
+    expect(screen.getByLabelText('05.03.2026 Max Mustermann')).toBeChecked();
+    expect(screen.queryByText('Kilometerstand fehlt')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(importFahrtenbuchEntries).toHaveBeenCalled());
+    const inputs = importFahrtenbuchEntries.mock.calls[0][1];
+    expect(inputs).toHaveLength(4);
+    expect(inputs[3]).toMatchObject({
+      counters: { km: { start: 1060, end: 1075 } },
+    });
+  });
+
+  it('nimmt eine Korrektur über den Dialog wieder zurück', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    await user.click(screen.getByRole('button', { name: 'Zeile 1 bearbeiten' }));
+    await user.clear(screen.getByLabelText('Fahrstrecke / Ziel'));
+    await user.type(screen.getByLabelText('Fahrstrecke / Ziel'), 'Podersdorf');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(screen.getByText('Podersdorf')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Zeile 1 bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Korrektur verwerfen' }));
+
+    expect(screen.queryByText('Podersdorf')).not.toBeInTheDocument();
+    expect(screen.queryByText('bearbeitet')).not.toBeInTheDocument();
   });
 
   it('verwirft Datei, Vorschau und Auswahl über das Zurücksetzen', async () => {
