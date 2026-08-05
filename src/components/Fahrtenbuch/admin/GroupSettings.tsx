@@ -6,7 +6,6 @@ import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -108,13 +107,9 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
       </Grid>
 
       <Stack direction="row" sx={{ mt: 2 }}>
-        <Tooltip title={t('save')}>
-          <span>
-            <Button variant="contained" onClick={save} disabled={saving}>
-              {t('save')}
-            </Button>
-          </span>
-        </Tooltip>
+        <Button variant="contained" onClick={save} disabled={saving}>
+          {t('save')}
+        </Button>
       </Stack>
     </Paper>
   );
