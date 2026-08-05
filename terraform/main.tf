@@ -84,20 +84,6 @@ resource "google_project_iam_member" "run_iam" {
   project = var.project
 }
 
-# Die Routes API verlangt den Scope `maps-platform.routespreferred` und lehnt
-# `cloud-platform` ab. Weder der Metadata-Server auf Cloud Run noch ein
-# Nutzer-ADC stellt ein anders gescoptes Token aus — beide liefern ihr
-# Standardtoken, und der Aufruf endet mit `ACCESS_TOKEN_SCOPE_INSUFFICIENT`.
-# Deshalb lässt sich der Service Account über die IAM Credentials API ein Token
-# mit dem Maps-Scope ausstellen und impersoniert dafür sich selbst. Genau dafür
-# ist diese Rolle da — sie gilt nur auf diesem einen Service Account, nicht
-# projektweit (siehe `src/components/actions/maps/routes.ts`).
-resource "google_service_account_iam_member" "run_sa_self_impersonation" {
-  service_account_id = google_service_account.run_sa.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = google_service_account.run_sa.member
-}
-
 resource "google_artifact_registry_repository" "run_docker" {
   project       = var.project
   location      = var.region
