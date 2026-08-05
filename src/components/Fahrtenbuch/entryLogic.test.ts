@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { VEHICLE_PRESETS, type FahrtenbuchEntry } from '../../common/fahrtenbuch';
+import {
+  VEHICLE_PRESETS,
+  type CounterReading,
+  type CounterSource,
+  type FahrtenbuchEntry,
+} from '../../common/fahrtenbuch';
 import {
   buildEntryDocument,
   canModifyEntry,
   computeLastCounters,
   computeVehicleCache,
+  survivingCounterSources,
   type VehicleCacheEntry,
 } from './entryLogic';
 
@@ -262,6 +268,66 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
       { counterSources: { km: 'route' } },
     );
     expect(doc).not.toHaveProperty('counterSources');
+  });
+});
+
+describe('survivingCounterSources', () => {
+  const previous: Record<string, CounterSource> = {
+    km: 'route',
+    betriebsstunden: 'unchanged',
+  };
+  const previousCounters: Record<string, CounterReading> = {
+    km: { start: 1000, end: 1024 },
+    betriebsstunden: { start: 10 },
+  };
+
+  it('behält die Herkunft, wenn der Endstand unverändert bleibt', () => {
+    const result = survivingCounterSources(previous, previousCounters, {
+      km: { start: 1000, end: 1024 },
+      betriebsstunden: { start: 10 },
+    });
+    expect(result).toEqual(previous);
+  });
+
+  it('verliert die Herkunft, wenn der Endstand geändert wurde', () => {
+    const result = survivingCounterSources(previous, previousCounters, {
+      km: { start: 1000, end: 1030 },
+      betriebsstunden: { start: 10 },
+    });
+    expect(result).toEqual({ betriebsstunden: 'unchanged' });
+  });
+
+  it('verliert die Herkunft, wenn der Endstand von undefined auf einen Wert wechselt', () => {
+    const result = survivingCounterSources(previous, previousCounters, {
+      km: { start: 1000, end: 1024 },
+      betriebsstunden: { start: 10, end: 12 },
+    });
+    expect(result).toEqual({ km: 'route' });
+  });
+
+  it('behält die Herkunft, wenn der Endstand bei undefined bleibt', () => {
+    const withoutEnd: Record<string, CounterSource> = { betriebsstunden: 'unchanged' };
+    const withoutEndCounters: Record<string, CounterReading> = {
+      betriebsstunden: { start: 10 },
+    };
+    const result = survivingCounterSources(withoutEnd, withoutEndCounters, {
+      betriebsstunden: { start: 10 },
+    });
+    expect(result).toEqual({ betriebsstunden: 'unchanged' });
+  });
+
+  it('kennt keinen Zähler ohne vorherige Herkunft', () => {
+    const result = survivingCounterSources(previous, previousCounters, {
+      km: { start: 1000, end: 1024 },
+      neu: { start: 5, end: 5 },
+    });
+    expect(result).not.toHaveProperty('neu');
+  });
+
+  it('liefert ein leeres Objekt, wenn keine vorherige Herkunft übergeben wird', () => {
+    expect(survivingCounterSources(undefined, previousCounters, previousCounters)).toEqual(
+      {},
+    );
   });
 });
 

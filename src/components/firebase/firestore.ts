@@ -295,6 +295,12 @@ export interface Firecall {
   lat?: number;
   lng?: number;
   group?: string;
+  /** Gecachte Route zum Einsatzort für das Fahrtenbuch (siehe firecallRoute.ts). */
+  fahrtenbuchRoute?: {
+    distanceM: number;
+    from: [number, number];
+    to: [number, number];
+  };
   attachments?: string[];
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
   blaulichtSmsAlarmId?: string; // Legacy: primärer Alarm (bleibt für Abwärtskompatibilität)

@@ -1,24 +1,31 @@
 'use server';
 import 'server-only';
 
+import type { Group } from '../../app/groups/groupTypes';
 import {
   FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { autoFillCounterEnds, roundTripKmFromMeters } from '../../common/fahrtenbuchAutoFill';
 import { ApiException } from '../../app/api/errors';
+import type { GeoPositionObject } from '../../common/geo';
 import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
+import { defaultPosition } from '../../hooks/constants';
 import { firestore } from '../../server/firebase/admin';
 import { resolveFahrtenbuchShareLink } from '../../server/auth/resolveFahrtenbuchShareLink';
-import { GROUP_COLLECTION_ID } from '../firebase/firestore';
+import { computeRouteDistanceMeters } from '../actions/maps/routes';
+import { FIRECALL_COLLECTION_ID, GROUP_COLLECTION_ID, type Firecall } from '../firebase/firestore';
 import { actionGroupMemberRequired } from './authGuards';
 import {
   buildEntryDocument,
   canModifyEntry,
   computeVehicleCache,
+  survivingCounterSources,
   type FahrtenbuchEntryInput,
 } from './entryLogic';
+import { cachedRouteDistance, routeCacheEntry } from './firecallRoute';
 
 export interface ActionResult {
   success: boolean;
@@ -95,6 +102,59 @@ async function loadVehicle(
 }
 
 /**
+ * Standort der Gruppe (Feuerwehrhaus) als Startpunkt der Einsatzkilometer.
+ * Sowohl ein explizit zurückgesetzter (`null`) als auch ein nie gepflegter
+ * (fehlendes Feld) Standort landen auf derselben Rückfallebene — siehe
+ * `Group.standort`.
+ */
+async function loadGroupStandort(groupId: string): Promise<GeoPositionObject> {
+  const doc = await firestore.collection(GROUP_COLLECTION_ID).doc(groupId).get();
+  const standort = (doc.data() as Group | undefined)?.standort;
+  return standort ?? defaultPosition;
+}
+
+/**
+ * Löst die einfache Straßenstrecke vom Standort der Gruppe zum Einsatzort auf
+ * und cacht sie am Einsatz-Dokument. Liefert `undefined`, wenn der Einsatz
+ * nicht existiert, keiner passenden Gruppe gehört, keine Koordinaten hat oder
+ * das Routing ausfällt — in all diesen Fällen bleibt der Kilometer-Endstand
+ * dem Benutzer überlassen.
+ */
+async function resolveFirecallRouteDistance(
+  groupId: string,
+  firecallId: string,
+  standort: GeoPositionObject,
+): Promise<number | undefined> {
+  const ref = firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId);
+  const doc = await ref.get();
+  if (!doc.exists) return undefined;
+  const firecall = doc.data() as Firecall;
+
+  // Der Guard der Action prüft nur, ob der Benutzer Mitglied *seiner* Gruppe
+  // ist — nicht, welcher Gruppe dieser Einsatz gehört. Ohne diesen Vergleich
+  // könnte ein Mitglied von Gruppe A einen Einsatz von Gruppe B lesen und
+  // dessen Einsatz-Dokument mit einer fremden Route beschreiben.
+  if (firecall.group !== groupId) return undefined;
+
+  if (typeof firecall.lat !== 'number' || typeof firecall.lng !== 'number') {
+    return undefined;
+  }
+  const einsatzort: GeoPositionObject = { lat: firecall.lat, lng: firecall.lng };
+
+  const cached = cachedRouteDistance(firecall.fahrtenbuchRoute, standort, einsatzort);
+  if (cached !== undefined) return cached;
+
+  const distanceM = await computeRouteDistanceMeters(standort, einsatzort);
+  if (distanceM === undefined) return undefined;
+
+  await ref.set(
+    { fahrtenbuchRoute: routeCacheEntry(standort, einsatzort, distanceM) },
+    { merge: true },
+  );
+  return distanceM;
+}
+
+/**
  * Schreibt den Cache der jüngsten Fahrt am Fahrzeug neu — Zählerstände,
  * Zeitpunkt, Fahrer und Defekt-Hinweis. Wird nach jedem Create, Update und
  * Delete aufgerufen, damit der Cache nicht driftet.
@@ -149,6 +209,11 @@ export interface CreateEntriesResult {
    * wurden übersprungen, damit die Oberfläche das melden kann.
    */
   skippedVehicleIds: string[];
+  /**
+   * Gesamtstrecke in Kilometern, die in die Kilometerstände eingegangen ist.
+   * Fehlt, wenn keine Route zu ermitteln war.
+   */
+  roundTripKm?: number;
   error?: string;
 }
 
@@ -228,18 +293,70 @@ export async function createFahrtenbuchEntries(
       vehicles.set(id, await loadVehicle(groupId, id));
     }
 
+    // Standort und Routendistanz werden vor der Eintragsschleife je Einsatz
+    // genau einmal ermittelt — sonst löste jedes weitere Fahrzeug desselben
+    // Einsatzes einen eigenen, redundanten Routing-Aufruf aus.
+    const standort = await loadGroupStandort(groupId);
+    const distances = new Map<string, number | undefined>();
+    for (const firecallId of new Set(
+      accepted.map((i) => i.firecallId).filter((id): id is string => !!id),
+    )) {
+      distances.set(
+        firecallId,
+        await resolveFirecallRouteDistance(groupId, firecallId, standort),
+      );
+    }
+
     const batch = firestore.batch();
+    let created = 0;
+    let roundTripKm: number | undefined;
+    const writtenVehicleIds = new Set<string>();
     for (const input of accepted) {
       const vehicle = vehicles.get(input.vehicleId)!;
-      const doc = buildEntryDocument(vehicle, input, groupId, actor);
-      batch.set(entriesRef(groupId).doc(), doc);
-    }
-    await batch.commit();
+      const distanceM = input.firecallId ? distances.get(input.firecallId) : undefined;
+      const entryRoundTripKm =
+        distanceM !== undefined ? roundTripKmFromMeters(distanceM) : undefined;
+      const filled = autoFillCounterEnds(
+        vehicle.counters ?? [],
+        input.counters ?? {},
+        vehicle.lastCounters ?? {},
+        entryRoundTripKm,
+      );
 
-    for (const id of vehicleIds) {
-      await refreshVehicleCounters(groupId, id);
+      try {
+        // Wirft, wenn nach dem Auffüllen immer noch ein Pflichtzähler fehlt —
+        // meist, weil das Routing ausgefallen ist und niemand den
+        // Kilometerstand von Hand nachgetragen hat. Diese Zeile wird
+        // übersprungen, statt den ganzen Batch abzubrechen.
+        const doc = buildEntryDocument(
+          vehicle,
+          { ...input, counters: filled.counters },
+          groupId,
+          actor,
+          { counterSources: filled.counterSources, routeDistanceMeters: distanceM },
+        );
+        batch.set(entriesRef(groupId).doc(), doc);
+        created += 1;
+        writtenVehicleIds.add(input.vehicleId);
+        if (entryRoundTripKm !== undefined) roundTripKm = entryRoundTripKm;
+      } catch (err) {
+        console.error('createFahrtenbuchEntries: Zeile übersprungen', err, {
+          vehicleId: input.vehicleId,
+          firecallId: input.firecallId,
+        });
+        skippedVehicleIds.push(input.vehicleId);
+      }
     }
-    return { success: true, created: accepted.length, skippedVehicleIds };
+
+    // Ein leerer Batch darf nicht committet werden, und ein Fahrzeug ohne
+    // tatsächlich geschriebenen Eintrag darf seinen Cache nicht neu bekommen.
+    if (created > 0) {
+      await batch.commit();
+      for (const id of writtenVehicleIds) {
+        await refreshVehicleCounters(groupId, id);
+      }
+    }
+    return { success: true, created, skippedVehicleIds, roundTripKm };
   } catch (err) {
     console.error('createFahrtenbuchEntries failed', err);
     return {
@@ -275,16 +392,29 @@ export async function updateFahrtenbuchEntry(
 
     const vehicle = await loadVehicle(groupId, input.vehicleId);
     const now = new Date().toISOString();
-    // Ohne fünftes Argument verliert eine Bearbeitung derzeit die Herkunft
-    // abgeleiteter Zählerstände: `routeDistanceMeters` soll eine Bearbeitung
-    // immer überleben (die Distanz zum Einsatzort bleibt wahr), die Herkunft
-    // eines einzelnen Zählers nur, solange dessen Endstand unverändert
-    // bleibt. Die Übernahme dieser Werte aus `existing` steht noch aus.
-    const rebuilt = buildEntryDocument(vehicle, input, groupId, {
-      userId: existing.createdBy,
-      userName: existing.createdByName,
-      now: existing.createdAt,
-    });
+    // `routeDistanceMeters` überlebt eine Bearbeitung immer — die Distanz zum
+    // Einsatzort bleibt wahr, egal was jemand am Eintrag ändert. Die Herkunft
+    // eines einzelnen Zählers überlebt nur, solange dessen Endstand
+    // unverändert bleibt (`survivingCounterSources`) — sonst behauptete eine
+    // bloße Korrektur der Hinweise weiterhin einen abgeleiteten Zähler.
+    const rebuilt = buildEntryDocument(
+      vehicle,
+      input,
+      groupId,
+      {
+        userId: existing.createdBy,
+        userName: existing.createdByName,
+        now: existing.createdAt,
+      },
+      {
+        counterSources: survivingCounterSources(
+          existing.counterSources,
+          existing.counters,
+          input.counters ?? {},
+        ),
+        routeDistanceMeters: existing.routeDistanceMeters,
+      },
+    );
 
     await entriesRef(groupId)
       .doc(entryId)

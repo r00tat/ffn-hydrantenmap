@@ -157,6 +157,25 @@ export function buildEntryDocument(
   return doc;
 }
 
+/**
+ * Die Herkunftsangaben, die eine Bearbeitung überdauern. Ein geänderter
+ * Endstand ist eine Ablesung und keine Ableitung mehr; ein unveränderter
+ * behält seine Herkunft — sonst löschte schon eine Korrektur der Hinweise
+ * (`hinweise`, `defekt`, …) den Nachweis für einen Zähler, den niemand
+ * angefasst hat.
+ */
+export function survivingCounterSources(
+  previous: Record<string, CounterSource> | undefined,
+  previousCounters: Record<string, CounterReading>,
+  nextCounters: Record<string, CounterReading>,
+): Record<string, CounterSource> {
+  const result: Record<string, CounterSource> = {};
+  for (const [id, source] of Object.entries(previous ?? {})) {
+    if (previousCounters[id]?.end === nextCounters[id]?.end) result[id] = source;
+  }
+  return result;
+}
+
 export function canModifyEntry(
   entry: Pick<FahrtenbuchEntry, 'createdBy'>,
   userId: string,
