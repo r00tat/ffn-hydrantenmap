@@ -12,6 +12,7 @@ import {
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { autoFillCounterEnds } from '../../common/fahrtenbuchAutoFill';
 import { parseTimestamp } from '../../common/time-format';
 
 export interface EinsatzFzgItem {
@@ -237,6 +238,16 @@ export interface EinsatzRowPartition {
 }
 
 /**
+ * Was die Server Action beim Speichern ergänzen wird. Der Client rechnet mit
+ * der Luftlinien-Schätzung, damit eine Zeile nicht als unvollständig gemeldet
+ * wird, obwohl sie speicherbar ist.
+ */
+export interface EinsatzAutoFill {
+  /** Geschätzte Gesamtstrecke in Kilometern; fehlt ohne Einsatzkoordinaten. */
+  roundTripKm?: number;
+}
+
+/**
  * Teilt die Zeilen vor dem Speichern auf. Die Sammelerfassung schreibt in
  * einem Firestore-Batch: eine einzige ungültige Zeile ließe sonst den ganzen
  * Batch scheitern. Übersprungene Zeilen bleiben stehen und werden gemeldet.
@@ -249,6 +260,7 @@ export function partitionEinsatzRows(
   rows: EinsatzRow[],
   vehicles: FahrtenbuchVehicle[],
   ziel: string,
+  autoFill?: EinsatzAutoFill,
 ): EinsatzRowPartition {
   const partition: EinsatzRowPartition = {
     ready: [],
@@ -270,6 +282,16 @@ export function partitionEinsatzRows(
     }
 
     const vehicle = vehicles.find((v) => v.id === row.vehicleId);
+    // Gegen die aufgefüllten Zähler prüfen, nicht gegen die eingegebenen: Der
+    // Kilometer-Endstand entsteht erst serverseitig aus der Route, sonst
+    // meldete die Vorprüfung eine Zeile als unvollständig, die der Server
+    // anstandslos speichert.
+    const { counters } = autoFillCounterEnds(
+      vehicle?.counters ?? [],
+      row.counters,
+      vehicle?.lastCounters ?? {},
+      autoFill?.roundTripKm,
+    );
     const errors = validateEntryInput(vehicle?.counters ?? [], {
       vehicleId: row.vehicleId,
       driverName: row.driverName,
@@ -277,7 +299,7 @@ export function partitionEinsatzRows(
       ziel,
       abfahrt: row.abfahrt,
       ankunft: row.ankunft,
-      counters: row.counters,
+      counters,
     });
 
     if (errors.length > 0) {
@@ -285,6 +307,10 @@ export function partitionEinsatzRows(
       continue;
     }
     covered.add(row.vehicleId);
+    // Bewusst die unveränderte Zeile, nicht die aufgefüllte: Der Client rechnet
+    // nur mit einer Luftlinien-Schätzung. Schickte er sie mit, hielte der Server
+    // sie für eine Ablesung und schriebe eine geschätzte Zahl in ein
+    // Nachweisdokument.
     partition.ready.push(row);
   }
 

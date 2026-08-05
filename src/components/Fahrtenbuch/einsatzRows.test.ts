@@ -696,3 +696,97 @@ describe('buildEinsatzRows Zeitstempel am selben Tag', () => {
     expect(ankunft.getTime()).toBeGreaterThanOrEqual(abfahrt.getTime());
   });
 });
+
+describe('partitionEinsatzRows — automatische Endstände', () => {
+  const kmVehicle: FahrtenbuchVehicle = {
+    id: 'gv1',
+    name: 'RLFA',
+    active: true,
+    counters: VEHICLE_PRESETS.fahrzeug,
+    fuelTypes: [],
+    lastCounters: { km: 1000 },
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  };
+
+  const kmRow: EinsatzRow = {
+    key: 'i1',
+    sourceName: 'RLFA',
+    vehicleId: 'gv1',
+    vehicleName: 'RLFA',
+    driverName: 'Max Muster',
+    abfahrt: '2026-08-04T09:00:00.000Z',
+    ankunft: '2026-08-04T09:45:00.000Z',
+    counters: { km: { start: 1000 } },
+  };
+
+  it('hält eine Zeile ohne Endstand für speicherbar, wenn eine Schätzung vorliegt', () => {
+    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', {
+      roundTripKm: 24,
+    });
+    expect(result.ready).toHaveLength(1);
+    expect(result.incomplete).toHaveLength(0);
+  });
+
+  it('schickt den Endstand nicht mit — den setzt der Server', () => {
+    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand', {
+      roundTripKm: 24,
+    });
+    expect(result.ready[0].counters.km).toEqual({ start: 1000 });
+  });
+
+  it('lässt einen selbst eingetragenen Endstand unangetastet', () => {
+    const result = partitionEinsatzRows(
+      [{ ...kmRow, counters: { km: { start: 1000, end: 1042 } } }],
+      [kmVehicle],
+      'Brand',
+      { roundTripKm: 24 },
+    );
+    expect(result.ready).toHaveLength(1);
+    expect(result.ready[0].counters.km).toEqual({ start: 1000, end: 1042 });
+  });
+
+  it('bleibt ohne Schätzung unvollständig', () => {
+    const result = partitionEinsatzRows([kmRow], [kmVehicle], 'Brand');
+    expect(result.ready).toHaveLength(0);
+    expect(result.incomplete[0].errors).toContain('counterMissing:km');
+  });
+
+  it('bleibt unvollständig, wenn auch der Startstand fehlt', () => {
+    const result = partitionEinsatzRows(
+      [{ ...kmRow, counters: {} }],
+      [kmVehicle],
+      'Brand',
+      { roundTripKm: 24 },
+    );
+    expect(result.ready).toHaveLength(0);
+    expect(result.incomplete[0].errors).toContain('counterMissing:km');
+  });
+
+  it('hält ein Boot mit bekannten Ständen für speicherbar', () => {
+    const bootVehicle: FahrtenbuchVehicle = {
+      ...kmVehicle,
+      id: 'gv2',
+      name: 'MZB',
+      counters: VEHICLE_PRESETS.boot,
+      lastCounters: { betriebsstundenBb: 20, lenzpumpeStb: 5, lenzpumpeBb: 7 },
+    };
+    const result = partitionEinsatzRows(
+      [
+        {
+          ...kmRow,
+          key: 'i2',
+          vehicleId: 'gv2',
+          vehicleName: 'MZB',
+          counters: { betriebsstundenBb: { start: 20 } },
+        },
+      ],
+      [bootVehicle],
+      'Brand',
+      { roundTripKm: 24 },
+    );
+    expect(result.ready).toHaveLength(1);
+  });
+});
