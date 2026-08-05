@@ -313,45 +313,54 @@ function parseDecimal(value: string): number | undefined {
 }
 
 /**
+ * `dd.mm.yyyy` als Kalenderdatum — oder `undefined`, wenn es den Tag nicht gibt.
+ *
+ * `new Date` rollt einen zu großen Tag stillschweigend weiter: aus dem
+ * 31.02.2025 wird der 03.03.2025, und `NaN` entsteht dabei nie. Ein unmögliches
+ * Datum muss aber als unlesbar gelten und nicht als ein anderes, plausibel
+ * aussehendes — in einem Nachweisdokument ist die stille Verschiebung der
+ * schlimmere Fehler. Deshalb der Rückvergleich.
+ */
+function parseGermanDate(
+  datum: string,
+): { day: number; month: number; year: number } | undefined {
+  if (!DATE_RE.test(datum)) return undefined;
+  const [day, month, year] = datum.split('.').map(Number);
+  const probe = new Date(year, month - 1, day);
+  if (
+    probe.getDate() !== day ||
+    probe.getMonth() !== month - 1 ||
+    probe.getFullYear() !== year
+  ) {
+    return undefined;
+  }
+  return { day, month, year };
+}
+
+/**
  * `dd.mm.yyyy` plus `HH:MM` als ISO-Zeitstempel in Ortszeit. Der Export nennt
  * keine Zeitzone; die Fahrten sind lokal erfasst, also werden sie lokal
  * gelesen.
- *
- * `new Date` rollt einen zu großen Tag stillschweigend weiter: aus dem
- * 31.02.2025 wird der 03.03.2025, und `NaN` gibt es dabei nie. Deshalb der
- * Rückvergleich — ein unmögliches Datum muss als unlesbar gelten und nicht als
- * ein anderes, plausibel aussehendes.
  */
 export function toIsoTimestamp(
   datum: string,
   time: string,
 ): string | undefined {
-  const date = DATE_RE.test(datum) ? datum.split('.') : undefined;
+  const date = parseGermanDate(datum);
   const clock = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
   if (!date || !clock) return undefined;
-  const [day, month, year] = [Number(date[0]), Number(date[1]), Number(date[2])];
+  const [hours, minutes] = [Number(clock[1]), Number(clock[2])];
   const value = new Date(
-    year,
-    month - 1,
-    day,
-    Number(clock[1]),
-    Number(clock[2]),
+    date.year,
+    date.month - 1,
+    date.day,
+    hours,
+    minutes,
     0,
     0,
   );
-  if (Number.isNaN(value.getTime())) return undefined;
-  if (
-    value.getDate() !== day ||
-    value.getMonth() !== month - 1 ||
-    value.getFullYear() !== year
-  ) {
-    return undefined;
-  }
   // Eine Uhrzeit wie „25:70" rollt genauso weiter wie ein zu großer Tag.
-  if (
-    value.getHours() !== Number(clock[1]) ||
-    value.getMinutes() !== Number(clock[2])
-  ) {
+  if (value.getHours() !== hours || value.getMinutes() !== minutes) {
     return undefined;
   }
   return value.toISOString();
@@ -443,7 +452,9 @@ function readRow(
   };
 
   // Reihenfolge der Prüfungen: Was die Zeile unbrauchbar macht, zuerst.
-  if (!DATE_RE.test(datum)) row.problem = 'dateInvalid';
+  // Geprüft wird das Kalenderdatum, nicht bloß das Format — sonst ginge der
+  // 31.02. als 03.03. durch.
+  if (!parseGermanDate(datum)) row.problem = 'dateInvalid';
   else if (!time) row.problem = 'timeMissing';
   else if (startKm === undefined || endeKm === undefined)
     row.problem = 'kmMissing';

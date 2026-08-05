@@ -4,16 +4,14 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
@@ -70,16 +68,17 @@ function isKnownErrorKey(error: string): error is KnownErrorKey {
  * ist nur, was zweifelsfrei ist; Dubletten, Problemzeilen und unbekannte Fahrer
  * bleiben sichtbar, damit der Admin sieht, was er in ein Nachweisdokument
  * schreibt.
+ *
+ * Ein Panel und kein Dialog: die Vorschau hat acht Spalten und bis zu 156
+ * Zeilen, ein Modal schnürte sie unnötig ein.
  */
-export default function FahrtenbuchImportDialog({
+export default function FahrtenbuchImport({
   groupId,
   groupName,
-  onClose,
 }: {
   groupId: string;
-  /** Zielgruppe im Klartext — der Dialog verdeckt die Gruppenauswahl. */
+  /** Zielgruppe im Klartext — die Gruppenauswahl steht außerhalb des Panels. */
   groupName: string;
-  onClose: () => void;
 }) {
   const t = useTranslations('fahrtenbuch');
   const { activeVehicles, vehiclesById } = useFahrtenbuchVehicles(groupId);
@@ -182,6 +181,16 @@ export default function FahrtenbuchImportDialog({
     }
   };
 
+  // Zurück auf Null — im Panel gibt es kein Schließen, das den Zustand
+  // verwirft, und nach einem Lauf will man dieselbe Fläche für die nächste
+  // Datei nutzen. Das Fahrzeug bleibt stehen: es schlägt beim nächsten PDF
+  // ohnehin wieder aus dem Titel an.
+  const reset = () => {
+    setParsed(undefined);
+    setSelected(undefined);
+    setStatus(undefined);
+  };
+
   function statusMessage(current: ImportStatus): string {
     switch (current.kind) {
       case 'imported':
@@ -210,96 +219,124 @@ export default function FahrtenbuchImportDialog({
   const statusText = status ? statusMessage(status) : undefined;
 
   return (
-    <Dialog open onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{t('admin.pdfImport.title')}</DialogTitle>
-      <DialogContent>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {t('admin.pdfImport.hint', { group: groupName })}
-        </Typography>
-        {statusText && (
-          <Alert
-            severity={status?.kind === 'imported' ? 'info' : 'error'}
-            sx={{ mb: 2 }}
-          >
-            {statusText}
-          </Alert>
-        )}
+    <>
+      <Typography variant="h6" gutterBottom>
+        {t('admin.pdfImport.title')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {t('admin.pdfImport.hint', { group: groupName })}
+      </Typography>
+      {statusText && (
+        <Alert
+          severity={status?.kind === 'imported' ? 'info' : 'error'}
+          sx={{ mb: 2 }}
+        >
+          {statusText}
+        </Alert>
+      )}
 
-        <Stack direction="row" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
-          <Button component="label" variant="outlined" disabled={busy}>
-            {t('admin.pdfImport.chooseFile')}
-            <input
-              hidden
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                // Auswahl zurücksetzen, sonst löst dieselbe Datei nach einem
-                // Fehlversuch kein zweites `change` aus.
-                e.target.value = '';
-                if (file) chooseFile(file);
-              }}
-            />
-          </Button>
+      {/* `useFlexGap`, damit die Zeile beim Umbruch auf schmalen Geräten
+          ihren Abstand behält — `Stack` setzt sonst nur linke Ränder. */}
+      <Stack
+        direction="row"
+        spacing={2}
+        useFlexGap
+        sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
+      >
+        <Button component="label" variant="outlined" disabled={busy}>
+          {t('admin.pdfImport.chooseFile')}
+          <input
+            hidden
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // Auswahl zurücksetzen, sonst löst dieselbe Datei nach einem
+              // Fehlversuch kein zweites `change` aus.
+              e.target.value = '';
+              if (file) chooseFile(file);
+            }}
+          />
+        </Button>
+        <TextField
+          select
+          size="small"
+          label={t('vehicle')}
+          value={vehicleId}
+          onChange={(e) => chooseVehicle(e.target.value)}
+          sx={{ minWidth: 220 }}
+        >
+          {activeVehicles.map((v) => (
+            <MenuItem key={v.id} value={v.id}>
+              {v.name}
+            </MenuItem>
+          ))}
+        </TextField>
+        {/* Nur nötig, wenn das Fahrzeug mehr als eine Kraftstoffart führt —
+            die Quelle nennt in der Spalte „Treibstoff" keine. */}
+        {(vehicle?.fuelTypes ?? []).filter((f) => f !== 'adblue').length > 1 && (
           <TextField
             select
             size="small"
-            label={t('vehicle')}
-            value={vehicleId}
-            onChange={(e) => chooseVehicle(e.target.value)}
-            sx={{ minWidth: 220 }}
+            label={t('admin.pdfImport.fuelColumn')}
+            value={fuelType}
+            onChange={(e) => setFuelType(e.target.value as FuelType)}
+            sx={{ minWidth: 180 }}
           >
-            {activeVehicles.map((v) => (
-              <MenuItem key={v.id} value={v.id}>
-                {v.name}
+            {FUEL_TYPES.filter(
+              (f) => f !== 'adblue' && (vehicle?.fuelTypes ?? []).includes(f),
+            ).map((f) => (
+              <MenuItem key={f} value={f}>
+                {t(`fuel.${f}` as 'fuel.diesel')}
               </MenuItem>
             ))}
           </TextField>
-          {/* Nur nötig, wenn das Fahrzeug mehr als eine Kraftstoffart führt —
-              die Quelle nennt in der Spalte „Treibstoff" keine. */}
-          {(vehicle?.fuelTypes ?? []).filter((f) => f !== 'adblue').length > 1 && (
-            <TextField
-              select
-              size="small"
-              label={t('admin.pdfImport.fuelColumn')}
-              value={fuelType}
-              onChange={(e) => setFuelType(e.target.value as FuelType)}
-              sx={{ minWidth: 180 }}
-            >
-              {FUEL_TYPES.filter(
-                (f) => f !== 'adblue' && (vehicle?.fuelTypes ?? []).includes(f),
-              ).map((f) => (
-                <MenuItem key={f} value={f}>
-                  {t(`fuel.${f}` as 'fuel.diesel')}
-                </MenuItem>
-              ))}
-            </TextField>
-          )}
-        </Stack>
-
-        {busy && <LinearProgress sx={{ mb: 2 }} />}
-        {parsed && !vehicle && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            {t('admin.pdfImport.chooseVehicle', {
-              title: [parsed.vehicleName, parsed.kennzeichen]
-                .filter(Boolean)
-                .join(' '),
-            })}
-          </Alert>
         )}
+        {/* Die Aktionen rücken nach rechts, brechen auf schmalen Geräten aber
+            mit um. */}
+        <Stack direction="row" spacing={2} sx={{ ml: 'auto' }}>
+          {(parsed || status) && (
+            <Button onClick={reset} disabled={busy}>
+              {t('admin.pdfImport.reset')}
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            onClick={run}
+            disabled={busy || !vehicle || effectiveSelection.size === 0}
+          >
+            {t('admin.pdfImport.run')}
+          </Button>
+        </Stack>
+      </Stack>
 
-        {rows.length > 0 && (
-          <>
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              {t('admin.pdfImport.summary', {
-                total: rows.length,
-                ready: rows.filter((r) => r.state === 'ready').length,
-                duplicates: rows.filter((r) => r.state === 'duplicate').length,
-                problems: rows.filter((r) => r.state === 'problem').length,
-                unknownDrivers: rows.filter((r) => r.state === 'unknownDriver')
-                  .length,
-              })}
-            </Typography>
+      {busy && <LinearProgress sx={{ mb: 2 }} />}
+      {parsed && !vehicle && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {t('admin.pdfImport.chooseVehicle', {
+            title: [parsed.vehicleName, parsed.kennzeichen]
+              .filter(Boolean)
+              .join(' '),
+          })}
+        </Alert>
+      )}
+
+      {rows.length > 0 && (
+        <>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            {t('admin.pdfImport.summary', {
+              total: rows.length,
+              ready: rows.filter((r) => r.state === 'ready').length,
+              duplicates: rows.filter((r) => r.state === 'duplicate').length,
+              problems: rows.filter((r) => r.state === 'problem').length,
+              unknownDrivers: rows.filter((r) => r.state === 'unknownDriver')
+                .length,
+            })}
+          </Typography>
+          {/* Acht Spalten passen auf einem Telefon nicht nebeneinander — die
+              Tabelle scrollt in ihrem eigenen Kasten, damit nicht die ganze
+              Seite waagrecht wandert. */}
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -371,19 +408,9 @@ export default function FahrtenbuchImportDialog({
                 ))}
               </TableBody>
             </Table>
-          </>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>{t('cancel')}</Button>
-        <Button
-          variant="contained"
-          onClick={run}
-          disabled={busy || !vehicle || effectiveSelection.size === 0}
-        >
-          {t('admin.pdfImport.run')}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          </TableContainer>
+        </>
+      )}
+    </>
   );
 }

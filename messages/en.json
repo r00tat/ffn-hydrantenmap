@@ -532,6 +532,7 @@
         "state": "Status",
         "summary": "{total} rows · {ready} importable · {duplicates} already present · {problems} to review · {unknownDrivers} unknown drivers",
         "run": "Import",
+        "reset": "Reset",
         "result": "Imported {created} trips, {duplicates} already present, {failed} not importable.",
         "parseFailed": "Could not read the PDF: {message}",
         "states": {

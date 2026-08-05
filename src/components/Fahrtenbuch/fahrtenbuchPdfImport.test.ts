@@ -166,6 +166,28 @@ describe('splitTrailingNumber', () => {
   it('trennt nichts ab, wenn nur die Zahl dasteht', () => {
     expect(splitTrailingNumber('15,134')).toEqual({ text: '15,134' });
   });
+
+  it('trennt auch einen Stand ohne Tausendertrenner ab', () => {
+    // Unter 1000 km — bei einem Anhänger oder neuen Fahrzeug der Normalfall.
+    expect(splitTrailingNumber('T1 Verkehrswege freimachen946')).toEqual({
+      text: 'T1 Verkehrswege freimachen',
+      number: '946',
+    });
+  });
+
+  it('lässt eine Zahl stehen, die zum Text gehört', () => {
+    // Leerzeichen davor: die Zahl ist Teil der Bezeichnung, nicht verklebt.
+    expect(splitTrailingNumber('Einsatz Halle 3')).toEqual({
+      text: 'Einsatz Halle 3',
+    });
+    expect(splitTrailingNumber('Objekt 123')).toEqual({ text: 'Objekt 123' });
+    // Zu kurz, um ein Kilometerstand zu sein.
+    expect(splitTrailingNumber('Bergung A4')).toEqual({ text: 'Bergung A4' });
+  });
+
+  it('zerlegt eine reine Zahl ohne Trenner nicht', () => {
+    expect(splitTrailingNumber('14646')).toEqual({ text: '14646' });
+  });
 });
 
 describe('toIsoTimestamp', () => {
@@ -293,5 +315,87 @@ describe('parseFahrtenbuchPdf', () => {
 
   it('meldet eine leere Datei', () => {
     expect(parseFahrtenbuchPdf([[]]).error).toBe('empty');
+  });
+
+  it('meldet einen fehlenden Kilometerstand', () => {
+    const missing = row(100, [
+      '13.09.2025',
+      '08:00 - 09:00',
+      'Bea Beispiel',
+      'Einsatz',
+      'BMA',
+      '',
+      '',
+      '',
+      '-',
+      '-',
+      '',
+    ]);
+    const result = parseFahrtenbuchPdf([page(...filler(20), missing)]);
+    expect(result.rows.find((r) => r.datum === '13.09.2025')?.problem).toBe(
+      'kmMissing',
+    );
+  });
+
+  it('meldet eine fehlende Uhrzeit', () => {
+    const missing = row(100, [
+      '14.09.2025',
+      '',
+      'Bea Beispiel',
+      'Einsatz',
+      'BMA',
+      '15,000',
+      '15,010',
+      '10',
+      '-',
+      '-',
+      '',
+    ]);
+    const result = parseFahrtenbuchPdf([page(...filler(20), missing)]);
+    expect(result.rows.find((r) => r.datum === '14.09.2025')?.problem).toBe(
+      'timeMissing',
+    );
+  });
+
+  it('meldet ein unmögliches Datum, statt es weiterzurollen', () => {
+    const impossible = row(100, [
+      '31.02.2025',
+      '08:00 - 09:00',
+      'Bea Beispiel',
+      'Einsatz',
+      'BMA',
+      '15,000',
+      '15,010',
+      '10',
+      '-',
+      '-',
+      '',
+    ]);
+    const result = parseFahrtenbuchPdf([page(...filler(20), impossible)]);
+    const parsed = result.rows.find((r) => r.datum === '31.02.2025');
+    // Die Zeile darf nicht als 03.03.2025 durchgehen.
+    expect(parsed?.problem).toBe('dateInvalid');
+  });
+
+  it('liest eine Tankmenge mit drei Nachkommastellen als Dezimalzahl', () => {
+    // Ohne die getrennte Regel für die Betriebsmittelspalten fiele `1,234`
+    // auf die Ganzzahl zurück und würde zu 1234 Litern.
+    const fuel = row(100, [
+      '15.09.2025',
+      '08:00 - 09:00',
+      'Bea Beispiel',
+      'Sonstiges',
+      'Tanken',
+      '15,000',
+      '15,010',
+      '10',
+      '1,234',
+      '-',
+      '',
+    ]);
+    const result = parseFahrtenbuchPdf([page(...filler(20), fuel)]);
+    expect(result.rows.find((r) => r.datum === '15.09.2025')?.treibstoff).toBe(
+      1.234,
+    );
   });
 });

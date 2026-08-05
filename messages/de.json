@@ -532,6 +532,7 @@
         "state": "Status",
         "summary": "{total} Zeilen · {ready} übernehmbar · {duplicates} bereits vorhanden · {problems} zu prüfen · {unknownDrivers} unbekannte Fahrer",
         "run": "Übernehmen",
+        "reset": "Zurücksetzen",
         "result": "{created} Fahrten übernommen, {duplicates} bereits vorhanden, {failed} nicht übernehmbar.",
         "parseFailed": "PDF konnte nicht gelesen werden: {message}",
         "states": {

@@ -128,7 +128,7 @@ vi.mock('../../../hooks/useFahrtenbuchEntries', () => ({
   default: () => [existingEntry],
 }));
 
-import FahrtenbuchImportDialog from './FahrtenbuchImportDialog';
+import FahrtenbuchImport from './FahrtenbuchImport';
 
 /** Wählt die Datei über den versteckten Eingabefeld des „PDF wählen"-Buttons. */
 async function chooseFile() {
@@ -143,17 +143,13 @@ async function chooseFile() {
   await screen.findByLabelText('01.03.2026 Max Mustermann');
 }
 
-function renderDialog() {
+function renderPanel() {
   return renderWithIntl(
-    <FahrtenbuchImportDialog
-      groupId="g1"
-      groupName="FF Neusiedl am See"
-      onClose={vi.fn()}
-    />,
+    <FahrtenbuchImport groupId="g1" groupName="FF Neusiedl am See" />,
   );
 }
 
-describe('FahrtenbuchImportDialog', () => {
+describe('FahrtenbuchImport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     extractPdfItems.mockResolvedValue([]);
@@ -169,7 +165,7 @@ describe('FahrtenbuchImportDialog', () => {
   it('wählt nur zweifelsfreie Zeilen vor', async () => {
     // Ein Fahrtenbuch ist ein Nachweisdokument: Dubletten, Problemzeilen und
     // unbekannte Fahrer bleiben sichtbar, aber unangehakt.
-    renderDialog();
+    renderPanel();
     await chooseFile();
 
     expect(screen.getByLabelText('01.03.2026 Max Mustermann')).toBeChecked();
@@ -184,7 +180,7 @@ describe('FahrtenbuchImportDialog', () => {
 
   it('zeigt bei einer Problemzeile den Rohtext', async () => {
     // Ohne den Rohtext ist nicht nachvollziehbar, was nicht gelesen wurde.
-    renderDialog();
+    renderPanel();
     await chooseFile();
 
     expect(
@@ -195,7 +191,7 @@ describe('FahrtenbuchImportDialog', () => {
 
   it('übernimmt genau die angehakten Zeilen', async () => {
     const user = userEvent.setup();
-    renderDialog();
+    renderPanel();
     await chooseFile();
 
     // Die zweite vorausgewählte Zeile abwählen und zusätzlich die Zeile mit
@@ -224,7 +220,7 @@ describe('FahrtenbuchImportDialog', () => {
     // Der gefährliche Fall: „nichts angehakt" darf nicht auf die Vorauswahl
     // zurückfallen und stillschweigend alle Zeilen schreiben.
     const user = userEvent.setup();
-    renderDialog();
+    renderPanel();
     await chooseFile();
 
     await user.click(screen.getByLabelText('01.03.2026 Max Mustermann'));
@@ -236,13 +232,47 @@ describe('FahrtenbuchImportDialog', () => {
     expect(importFahrtenbuchEntries).not.toHaveBeenCalled();
   });
 
+  it('verwirft Datei, Vorschau und Auswahl über das Zurücksetzen', async () => {
+    // Im Panel gibt es kein Schließen — ohne diesen Weg käme man von einer
+    // geladenen Datei nicht mehr zu einer anderen.
+    const user = userEvent.setup();
+    renderPanel();
+    expect(
+      screen.queryByRole('button', { name: 'Zurücksetzen' }),
+    ).not.toBeInTheDocument();
+
+    await chooseFile();
+    await user.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+
+    expect(
+      screen.queryByLabelText('01.03.2026 Max Mustermann'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Zurücksetzen' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+  });
+
+  it('räumt auch die Meldung eines gelaufenen Imports weg', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await chooseFile();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    const message = await screen.findByText(/2 Fahrten übernommen/);
+    expect(message).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    expect(screen.queryByText(/2 Fahrten übernommen/)).not.toBeInTheDocument();
+  });
+
   it('verlangt ein Fahrzeug, wenn der Titel keines trifft', async () => {
     parseFahrtenbuchPdf.mockReturnValue({
       ...parseResult,
       vehicleName: 'Unbekanntes Fahrzeug',
       kennzeichen: 'ND-99999',
     });
-    renderDialog();
+    renderPanel();
 
     fireEvent.change(screen.getByLabelText('PDF wählen'), {
       target: {
@@ -266,7 +296,7 @@ describe('FahrtenbuchImportDialog', () => {
       error: 'tooManyEntries',
     });
     const user = userEvent.setup();
-    renderDialog();
+    renderPanel();
     await chooseFile();
 
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
