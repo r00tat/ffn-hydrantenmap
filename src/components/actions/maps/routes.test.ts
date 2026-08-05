@@ -31,6 +31,10 @@ describe('computeRouteDistanceMeters', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
+    // Spione zentral zurücksetzen: Ein `mockRestore()` am Ende eines Testrumpfs
+    // wird bei einer fehlschlagenden Assertion nie erreicht und ließe den Spion
+    // für die folgenden Tests stehen.
+    vi.restoreAllMocks();
   });
 
   it('liefert die Distanz der ersten Route', async () => {
@@ -70,7 +74,10 @@ describe('computeRouteDistanceMeters', () => {
     });
   });
 
-  it('setzt ein Zeitlimit für den Netzaufruf', async () => {
+  it('bricht den Netzaufruf nach acht Sekunden ab', async () => {
+    // Über den Spion, nicht über `toBeInstanceOf(AbortSignal)`: Das bestünde
+    // auch ein Signal, das nie feuert — die Frist bliebe ungeprüft.
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ routes: [{ distanceMeters: 1 }] }),
@@ -78,14 +85,17 @@ describe('computeRouteDistanceMeters', () => {
 
     await computeRouteDistanceMeters(from, to);
 
+    expect(timeout).toHaveBeenCalledWith(8000);
     const [, init] = vi.mocked(fetch).mock.calls[0];
-    expect((init as RequestInit).signal).toBeInstanceOf(AbortSignal);
+    expect((init as RequestInit).signal).toBe(timeout.mock.results[0].value);
   });
 
   it('liefert undefined, wenn der Aufruf durch das Zeitlimit abgebrochen wird', async () => {
-    const abortError = new Error('The operation was aborted');
-    abortError.name = 'AbortError';
-    vi.mocked(fetch).mockRejectedValue(abortError);
+    // `AbortSignal.timeout` verwirft mit einer `DOMException` namens
+    // `TimeoutError` — nicht mit `AbortError`, wie beim Abbruch von Hand.
+    vi.mocked(fetch).mockRejectedValue(
+      new DOMException('The operation timed out', 'TimeoutError'),
+    );
 
     await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
   });
@@ -149,7 +159,6 @@ describe('computeRouteDistanceMeters', () => {
       expect.anything(),
       { from, to }
     );
-    errorSpy.mockRestore();
   });
 
   it('liefert undefined ohne fetch-Aufruf, wenn kein Access-Token vorliegt', async () => {

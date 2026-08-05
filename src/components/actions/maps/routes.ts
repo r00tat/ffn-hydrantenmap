@@ -7,11 +7,12 @@ import { getGcpProjectId } from '../../../server/firebase/project';
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
 
 // Der Scope stammt aus der Vorgängerversion der API und ist gegen den
-// aktuellen v2:computeRoutes-Endpunkt nicht verifiziert. Auf Cloud Run
-// ignoriert der Metadata-Server angeforderte Scopes und liefert ohnehin das
-// Standardtoken — ein falscher Scope fällt dort erst als 403 im
-// Nicht-OK-Zweig auf. Lokal mit Service-Account-JSON lehnt dagegen schon die
-// Tokenausgabe mit `invalid_scope` ab.
+// aktuellen v2:computeRoutes-Endpunkt nicht verifiziert. Lokal mit
+// Service-Account-JSON scheitert bei einem falschen Scope bereits die
+// Tokenausgabe mit `invalid_scope`. Auf Cloud Run fällt er dagegen gar nicht
+// auf: Der Metadata-Server ignoriert angeforderte Scopes und liefert ohnehin
+// das Standardtoken. Ein 403 dort deutet deshalb nicht auf den Scope, sondern
+// auf fehlende IAM-Rechte oder eine nicht aktivierte Routes API.
 const ROUTES_SCOPE =
   'https://www.googleapis.com/auth/maps-platform.routespreferred';
 
@@ -22,10 +23,10 @@ const ROUTES_SCOPE =
  * es kein weiteres Secret im Deployment.
  *
  * Die Instanz wird erst beim ersten Aufruf erzeugt: Vitest hebt die
- * `vi.mock`-Factory über die `const`-Deklaration, die sie einschließt — ein
- * `new GoogleAuth()` auf Modulebene träfe diese Bindung deshalb in ihrer
- * temporalen Totzone. Danach bleibt die Instanz für Folgeaufrufe erhalten,
- * damit Tokens über Aufrufe hinweg gecacht werden.
+ * `vi.mock`-Factory über die `const`-Deklarationen des Testmoduls, auf die sie
+ * zugreift — ein `new GoogleAuth()` auf Modulebene liefe im Test, während diese
+ * Bindungen noch in ihrer temporalen Totzone liegen. Danach bleibt die Instanz
+ * für Folgeaufrufe erhalten, damit Tokens über Aufrufe hinweg gecacht werden.
  */
 let auth: GoogleAuth | undefined;
 function getAuth(): GoogleAuth {
@@ -92,8 +93,8 @@ export async function computeRouteDistanceMeters(
         routingPreference: 'TRAFFIC_UNAWARE',
       }),
       // Der Aufrufer hält währenddessen einen offenen Firestore-Batch — das
-      // Zeitlimit schützt vor einer blackholed Verbindung, nicht vor der
-      // Rundreisezeit der API.
+      // Zeitlimit schützt vor einer Verbindung, die ins Leere läuft, nicht vor
+      // einer bloß langsamen Antwort der API.
       signal: AbortSignal.timeout(8000),
     });
 
@@ -118,7 +119,10 @@ export async function computeRouteDistanceMeters(
     }
     return distanceMeters;
   } catch (err) {
-    console.error('computeRouteDistanceMeters failed', err, { from, to });
+    console.error('computeRouteDistanceMeters: Aufruf fehlgeschlagen', err, {
+      from,
+      to,
+    });
     return undefined;
   }
 }
