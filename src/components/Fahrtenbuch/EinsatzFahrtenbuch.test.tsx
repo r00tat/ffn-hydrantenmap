@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   VEHICLE_PRESETS,
   type FahrtenbuchEntry,
@@ -11,7 +11,17 @@ import { renderWithIntl } from '../../test-utils/intlRender';
 import type { EinsatzRow } from './einsatzRows';
 
 // Die Default-Komponente derselben Datei lädt Firestore-Daten; für die reine
-// Darstellung genügen Attrappen der Firebase- und Server-Action-Module.
+// Darstellung genügen Attrappen der Firebase- und Server-Action-Module. Die
+// Rückgaben liegen in einem veränderbaren Objekt, damit der Test der
+// Default-Komponente weiter unten echte Fahrzeuge und Mannschaft einspielen
+// kann; die Voreinstellung ist überall leer.
+const firestoreData = vi.hoisted(() => ({
+  groups: [] as string[],
+  activeVehicles: [] as unknown[],
+  fzgItems: [] as unknown[],
+  crew: [] as unknown[],
+}));
+
 vi.mock('server-only', () => ({}));
 vi.mock('../firebase/firebase', () => ({
   default: {},
@@ -29,13 +39,18 @@ vi.mock('./fahrtenbuchActions', () => ({
   updateFahrtenbuchEntry: vi.fn(),
 }));
 vi.mock('../../hooks/useFirebaseLogin', () => ({
-  default: () => ({ groups: [] }),
+  default: () => ({ groups: firestoreData.groups }),
 }));
-vi.mock('../../hooks/useFirebaseCollection', () => ({ default: () => [] }));
+vi.mock('../../hooks/useFirebaseCollection', () => ({
+  // Die Komponente liest zwei Unterkollektionen des Einsatzes; unterschieden
+  // wird am letzten Pfadsegment.
+  default: ({ pathSegments }: { pathSegments?: string[] }) =>
+    pathSegments?.[1] === 'crew' ? firestoreData.crew : firestoreData.fzgItems,
+}));
 vi.mock('../../hooks/useFahrtenbuchVehicles', () => ({
   default: () => ({
-    vehicles: [],
-    activeVehicles: [],
+    vehicles: firestoreData.activeVehicles,
+    activeVehicles: firestoreData.activeVehicles,
     vehiclesById: new Map(),
   }),
 }));
@@ -43,8 +58,18 @@ vi.mock('../../hooks/useFahrtenbuchPersons', () => ({
   default: () => ({ persons: [], activePersons: [] }),
 }));
 vi.mock('../../hooks/useFahrtenbuchEntries', () => ({ default: () => [] }));
+vi.mock('../../hooks/useFahrtenbuchGroupStandort', () => ({
+  default: () => ({
+    standort: { lat: 47.9482913, lng: 16.848222 },
+    configured: false,
+  }),
+}));
 
-import { EinsatzFahrtenbuchView } from './EinsatzFahrtenbuch';
+import type { Firecall } from '../firebase/firestore';
+import EinsatzFahrtenbuch, {
+  EinsatzFahrtenbuchView,
+} from './EinsatzFahrtenbuch';
+import { createFahrtenbuchEntries } from './fahrtenbuchActions';
 
 const vehicle: FahrtenbuchVehicle = {
   id: 'gv1',
@@ -264,5 +289,85 @@ describe('EinsatzFahrtenbuchView', () => {
       <EinsatzFahrtenbuchView {...baseProps} rows={[row()]} saving />,
     );
     expect(screen.getByRole('button', { name: 'Alle speichern' })).toBeDisabled();
+  });
+});
+
+describe('EinsatzFahrtenbuchView — Kilometer-Hinweis', () => {
+  it('reicht die Schätzung an die Zählerfelder durch', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row()]}
+        autoFill={{ roundTripKm: 24 }}
+      />,
+    );
+    expect(
+      screen.getByText('ca. 24 km, wird beim Speichern aus der Route berechnet'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('EinsatzFahrtenbuch — Sammelerfassung ohne Endstand', () => {
+  const firecall = {
+    id: 'f1',
+    name: 'Brand',
+    group: 'ffnd',
+    date: '2026-08-03T10:00:00.000Z',
+    abruecken: '2026-08-03T12:00:00.000Z',
+    // Einsatzort im Nachbarort — daraus entsteht die Luftlinien-Schätzung.
+    lat: 47.98,
+    lng: 16.9,
+  } as unknown as Firecall;
+
+  beforeEach(() => {
+    firestoreData.groups = ['ffnd'];
+    firestoreData.activeVehicles = [vehicle];
+    firestoreData.fzgItems = [{ id: 'i1', name: 'RLFA 3000/100' }];
+    firestoreData.crew = [
+      { name: 'Max Mustermann', vehicleId: 'i1', funktion: 'Maschinist' },
+    ];
+    vi.mocked(createFahrtenbuchEntries).mockResolvedValue({
+      success: true,
+      created: 1,
+      skippedVehicleIds: [],
+      roundTripKm: 20,
+    });
+  });
+
+  afterEach(() => {
+    firestoreData.groups = [];
+    firestoreData.activeVehicles = [];
+    firestoreData.fzgItems = [];
+    firestoreData.crew = [];
+  });
+
+  it('speichert die Zeile ohne Endstand und schickt ihn nicht mit', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <EinsatzFahrtenbuch firecallId="f1" firecall={firecall} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alle speichern' }));
+
+    await waitFor(() => expect(createFahrtenbuchEntries).toHaveBeenCalled());
+    const [, entries] = vi.mocked(createFahrtenbuchEntries).mock.calls[0];
+    // Kern der Vorprüfung: Der Client hält die Zeile für speicherbar, überlässt
+    // den Endstand aber dem Server — seine Schätzung darf nicht als Ablesung im
+    // Fahrtenbuch landen.
+    expect(entries).toHaveLength(1);
+    expect(entries[0].counters.km).toEqual({ start: 1000 });
+  });
+
+  it('nennt die tatsächlich eingetragene Strecke in der Erfolgsmeldung', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <EinsatzFahrtenbuch firecallId="f1" firecall={firecall} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alle speichern' }));
+
+    expect(
+      await screen.findByText('1 Fahrt gespeichert — 20 km je Fahrzeug'),
+    ).toBeInTheDocument();
   });
 });

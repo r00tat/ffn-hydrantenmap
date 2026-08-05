@@ -425,7 +425,10 @@
       "saved": "{count, plural, one {# trip saved} other {# trips saved}}",
       "skipped": "{count, plural, one {# incomplete row skipped} other {# incomplete rows skipped}}",
       "skippedUnassigned": "{count, plural, one {# row without an assigned vehicle skipped} other {# rows without an assigned vehicle skipped}}",
-      "skippedDuplicate": "{count, plural, one {# vehicle had already been recorded} other {# vehicles had already been recorded}}"
+      "skippedDuplicate": "{count, plural, one {# vehicle had already been recorded} other {# vehicles had already been recorded}}",
+      "autoKmHint": "approx. {km} km, calculated from the route when saving",
+      "autoUnchangedHint": "carried over unchanged",
+      "savedKm": "{km} km per vehicle"
     },
     "admin": {
       "title": "Trip log master data",

@@ -12,6 +12,8 @@ import {
   type CounterDefinition,
   type CounterReading,
 } from '../../common/fahrtenbuch';
+import { isKmCounter } from '../../common/fahrtenbuchAutoFill';
+import type { EinsatzAutoFill } from './einsatzRows';
 
 export interface CounterFieldsProps {
   definitions: CounterDefinition[];
@@ -20,6 +22,12 @@ export interface CounterFieldsProps {
   lastCounters: Record<string, number>;
   onChange: (counters: Record<string, CounterReading>) => void;
   disabled?: boolean;
+  /**
+   * Sammelerfassung: leere Endstände werden beim Speichern ergänzt. Gesetzt
+   * zeigen die leeren Felder an, was dort landen wird — ohne diesen Hinweis
+   * wirkte ein leeres Pflichtfeld wie ein Fehler.
+   */
+  autoFill?: EinsatzAutoFill;
 }
 
 function parseNumber(value: string): number | undefined {
@@ -39,6 +47,7 @@ export default function CounterFields({
   lastCounters,
   onChange,
   disabled,
+  autoFill,
 }: CounterFieldsProps) {
   const t = useTranslations('fahrtenbuch');
 
@@ -67,6 +76,27 @@ export default function CounterFields({
           reading.end !== undefined
             ? reading.end - reading.start
             : undefined;
+        // Der Hinweis gilt nur dem leeren Endstand-Feld: Was schon eingetragen
+        // ist, bleibt stehen und wird nicht überschrieben.
+        const autoHint = (() => {
+          if (!autoFill || disabled || reading.end !== undefined) {
+            return undefined;
+          }
+          if (isKmCounter(def)) {
+            return autoFill.roundTripKm !== undefined &&
+              reading.start !== undefined
+              ? t('einsatz.autoKmHint', { km: autoFill.roundTripKm })
+              : undefined;
+          }
+          // Die Bedingungen spiegeln `autoFillCounterEnds`: Ein Start/Ende-Zähler
+          // wird aus dem Startstand dieser Fahrt fortgeschrieben, ein Ablesezähler
+          // aus dem letzten bekannten Stand.
+          const fillable =
+            def.mode === 'startEnd'
+              ? reading.start !== undefined
+              : lastCounters[def.id] !== undefined;
+          return fillable ? t('einsatz.autoUnchangedHint') : undefined;
+        })();
         const unitAdornment = (
           <InputAdornment position="end">{def.unit}</InputAdornment>
         );
@@ -126,6 +156,7 @@ export default function CounterFields({
                 />
               </Grid>
             </Grid>
+            {autoHint && <FormHelperText>{autoHint}</FormHelperText>}
             {diff !== undefined && (
               <FormHelperText>{`${t('counterDiff')}: ${diff} ${def.unit}`}</FormHelperText>
             )}

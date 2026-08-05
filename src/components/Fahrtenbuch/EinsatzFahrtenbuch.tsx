@@ -20,7 +20,9 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { estimateRoundTripKm } from '../../common/fahrtenbuchAutoFill';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
+import useFahrtenbuchGroupStandort from '../../hooks/useFahrtenbuchGroupStandort';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
@@ -39,6 +41,7 @@ import {
   mergeRowEdits,
   partitionEinsatzRows,
   startCounters,
+  type EinsatzAutoFill,
   type EinsatzRow,
   type EinsatzRowIssue,
 } from './einsatzRows';
@@ -68,6 +71,8 @@ export interface EinsatzFahrtenbuchViewProps {
   /** Je übersprungener Zeile eine Zeile Klartext, warum sie nicht ging. */
   messageDetails?: string[];
   messageSeverity?: 'success' | 'warning' | 'error';
+  /** Was beim Speichern automatisch ergänzt wird — für die Hinweise im Formular. */
+  autoFill?: EinsatzAutoFill;
   onChangeRow: (key: string, patch: Partial<EinsatzRow>) => void;
   onSave: () => void;
   /** Öffnet die Bearbeitung eines bereits erfassten Eintrags. */
@@ -86,6 +91,7 @@ export function EinsatzFahrtenbuchView({
   message,
   messageDetails,
   messageSeverity = 'success',
+  autoFill,
   onChangeRow,
   onSave,
   onEditEntry,
@@ -254,6 +260,7 @@ export function EinsatzFahrtenbuchView({
                     counters={row.counters}
                     lastCounters={vehicle?.lastCounters ?? {}}
                     disabled={recorded}
+                    autoFill={autoFill}
                     onChange={(counters) => onChangeRow(row.key, { counters })}
                   />
                 </Grid>
@@ -313,6 +320,7 @@ export default function EinsatzFahrtenbuch({
   // enthielte einen älteren Einsatz nicht mehr, und die Zeilen sähen dann
   // unerfasst aus, obwohl es die Einträge längst gibt.
   const entries = useFahrtenbuchEntries(memberGroupId, { firecallId });
+  const { standort } = useFahrtenbuchGroupStandort(memberGroupId);
 
   const fzgItems = useFirebaseCollection<Fzg>({
     collectionName: memberGroupId ? FIRECALL_COLLECTION_ID : '',
@@ -330,6 +338,25 @@ export default function EinsatzFahrtenbuch({
   const firecallName = firecall?.name ?? '';
   const firecallDate = firecall?.date;
   const firecallAbruecken = firecall?.abruecken;
+  const firecallLat = firecall?.lat;
+  const firecallLng = firecall?.lng;
+
+  // Nur eine Größenordnung: Gespeichert wird immer die echte Routendistanz,
+  // die die Server Action beim Speichern holt. Hier ginge dafür ein
+  // API-Aufruf je geöffneter Einsatzseite drauf — die meisten davon, ohne dass
+  // jemand das Fahrtenbuch befüllt.
+  const autoFill = useMemo<EinsatzAutoFill>(
+    () =>
+      typeof firecallLat === 'number' && typeof firecallLng === 'number'
+        ? {
+            roundTripKm: estimateRoundTripKm(standort, {
+              lat: firecallLat,
+              lng: firecallLng,
+            }),
+          }
+        : {},
+    [standort, firecallLat, firecallLng],
+  );
 
   const computedRows = useMemo(
     () =>
@@ -424,8 +451,14 @@ export default function EinsatzFahrtenbuch({
     incomplete: EinsatzRowIssue[],
     unassigned: EinsatzRow[],
     duplicates: number,
+    roundTripKm?: number,
   ) => {
     const parts = [t('einsatz.saved', { count: created })];
+    // Die tatsächlich eingetragene Strecke gehört in die Meldung: Im Formular
+    // stand nur eine Schätzung.
+    if (created > 0 && roundTripKm !== undefined) {
+      parts.push(t('einsatz.savedKm', { km: roundTripKm }));
+    }
     // Übersprungene Zeilen bleiben stehen und werden gemeldet — mit dem
     // tatsächlichen Grund, nicht pauschal als „ohne Endstand".
     if (incomplete.length > 0) {
@@ -454,6 +487,7 @@ export default function EinsatzFahrtenbuch({
       rows,
       activeVehicles,
       firecallName,
+      autoFill,
     );
 
     if (ready.length === 0) {
@@ -497,6 +531,7 @@ export default function EinsatzFahrtenbuch({
       incomplete,
       unassigned,
       result.skippedVehicleIds.length,
+      result.roundTripKm,
     );
   };
 
@@ -511,6 +546,7 @@ export default function EinsatzFahrtenbuch({
         message={message}
         messageDetails={messageDetails}
         messageSeverity={messageSeverity}
+        autoFill={autoFill}
         onChangeRow={changeRow}
         onSave={save}
         onEditEntry={setEditEntry}

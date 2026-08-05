@@ -157,3 +157,77 @@ describe('CounterFields', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('CounterFields — Hinweise auf automatische Endstände', () => {
+  it('kündigt den berechneten Kilometerstand an', () => {
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.fahrzeug}
+        counters={{ km: { start: 1000 } }}
+        lastCounters={{ km: 1000 }}
+        onChange={vi.fn()}
+        autoFill={{ roundTripKm: 24 }}
+      />,
+    );
+    expect(
+      screen.getByText('ca. 24 km, wird beim Speichern aus der Route berechnet'),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt den Hinweis nicht, sobald ein Endstand eingetragen ist', () => {
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.fahrzeug}
+        counters={{ km: { start: 1000, end: 1024 } }}
+        lastCounters={{ km: 1000 }}
+        onChange={vi.fn()}
+        autoFill={{ roundTripKm: 24 }}
+      />,
+    );
+    expect(
+      screen.queryByText(/wird beim Speichern aus der Route berechnet/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('kündigt bei Zählern ohne Kilometerbezug den unveränderten Stand an', () => {
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.boot}
+        counters={{ betriebsstundenBb: { start: 20 } }}
+        lastCounters={{ betriebsstundenBb: 20, lenzpumpeStb: 5, lenzpumpeBb: 7 }}
+        onChange={vi.fn()}
+        autoFill={{}}
+      />,
+    );
+    expect(screen.getAllByText('unverändert übernommen')).toHaveLength(3);
+  });
+
+  it('kündigt bei einem Start/Ende-Zähler ohne Startstand nichts an', () => {
+    // Ohne Startstand hat `autoFillCounterEnds` keinen Wert zum Fortschreiben —
+    // der letzte bekannte Stand zählt hier ausdrücklich nicht.
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.boot}
+        counters={{}}
+        lastCounters={{ betriebsstundenBb: 20, lenzpumpeStb: 5, lenzpumpeBb: 7 }}
+        onChange={vi.fn()}
+        autoFill={{}}
+      />,
+    );
+    expect(screen.getAllByText('unverändert übernommen')).toHaveLength(2);
+  });
+
+  it('zeigt ohne autoFill gar keinen Hinweis', () => {
+    renderWithIntl(
+      <CounterFields
+        definitions={VEHICLE_PRESETS.fahrzeug}
+        counters={{ km: { start: 1000 } }}
+        lastCounters={{ km: 1000 }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.queryByText(/wird beim Speichern aus der Route berechnet/),
+    ).not.toBeInTheDocument();
+  });
+});
