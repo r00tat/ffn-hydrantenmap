@@ -10,6 +10,7 @@ import {
   type FuelType,
   type VehiclePresetId,
 } from '../../common/fahrtenbuch';
+import type { GeoPositionObject } from '../../common/geo';
 
 const COUNTER_MODES: CounterMode[] = ['startEnd', 'reading'];
 const COUNTER_CHANGE_WARNINGS: CounterChangeWarning[] = [
@@ -186,4 +187,19 @@ export function resolveVehicleImportSelection(
   }
 
   return { create, skipped };
+}
+
+/**
+ * Prüft die eingegebenen Koordinaten. Ein ungültiger Wert wird verworfen statt
+ * gespeichert — ein Standort irgendwo im Nirgendwo lieferte stillschweigend
+ * falsche Kilometer.
+ */
+export function sanitizeStandort(
+  standort: GeoPositionObject | undefined,
+): GeoPositionObject | undefined {
+  if (!standort) return undefined;
+  const { lat, lng } = standort;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return undefined;
+  return { lat, lng };
 }

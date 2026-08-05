@@ -188,6 +188,13 @@ service cloud.firestore {
           && groupId in request.auth.token.groups;
       }
 
+      // Das Gruppen-Dokument trägt neben Name und Beschreibung den Standort
+      // des Feuerwehrhauses. Den braucht der Client, um im Fahrtenbuch die
+      // Einsatzkilometer abzuschätzen. Geschrieben wird ausschließlich über
+      // Server Actions.
+      allow read: if fahrtenbuchMember();
+      allow write: if false;
+
       match /person/{doc} {
         allow read: if fahrtenbuchMember();
         allow write: if adminUser();

@@ -1,7 +1,14 @@
+import type { GeoPositionObject } from '../../common/geo';
+
 export interface Group {
   id?: string;
   name: string;
   description?: string;
+  /**
+   * Feuerwehrhaus der Gruppe — Startpunkt für die Berechnung der
+   * Einsatzkilometer im Fahrtenbuch.
+   */
+  standort?: GeoPositionObject;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   sanitizeCounterDefinitions,
   sanitizeFuelTypes,
   sanitizeSortOrder,
+  sanitizeStandort,
 } from './stammdatenLogic';
 
 function vehicle(overrides: Partial<FahrtenbuchVehicle>): FahrtenbuchVehicle {
@@ -224,5 +225,58 @@ describe('sanitizeSortOrder', () => {
     expect(sanitizeSortOrder(Number.POSITIVE_INFINITY)).toBe(0);
     expect(sanitizeSortOrder(true)).toBe(0);
     expect(sanitizeSortOrder({})).toBe(0);
+  });
+});
+
+describe('sanitizeStandort', () => {
+  it('übernimmt gültige Koordinaten', () => {
+    expect(sanitizeStandort({ lat: 47.94, lng: 16.84 })).toEqual({
+      lat: 47.94,
+      lng: 16.84,
+    });
+  });
+
+  it('verwirft Werte außerhalb des gültigen Bereichs', () => {
+    expect(sanitizeStandort({ lat: 91, lng: 16.84 })).toBeUndefined();
+    expect(sanitizeStandort({ lat: 47.94, lng: 181 })).toBeUndefined();
+  });
+
+  it('verwirft nicht-endliche und fehlende Werte', () => {
+    expect(sanitizeStandort({ lat: Number.NaN, lng: 16.84 })).toBeUndefined();
+    expect(sanitizeStandort(undefined)).toBeUndefined();
+  });
+
+  it('akzeptiert die Randwerte des gültigen Bereichs', () => {
+    expect(sanitizeStandort({ lat: 90, lng: 180 })).toEqual({
+      lat: 90,
+      lng: 180,
+    });
+    expect(sanitizeStandort({ lat: -90, lng: -180 })).toEqual({
+      lat: -90,
+      lng: -180,
+    });
+  });
+
+  it('verwirft Werte knapp außerhalb der Randwerte', () => {
+    expect(sanitizeStandort({ lat: -91, lng: 16.84 })).toBeUndefined();
+    expect(sanitizeStandort({ lat: 47.94, lng: -181 })).toBeUndefined();
+  });
+
+  it('verwirft Infinity als Wert', () => {
+    expect(
+      sanitizeStandort({ lat: Number.POSITIVE_INFINITY, lng: 16.84 }),
+    ).toBeUndefined();
+    expect(
+      sanitizeStandort({ lat: 47.94, lng: Number.NEGATIVE_INFINITY }),
+    ).toBeUndefined();
+  });
+
+  it('übernimmt nur lat und lng, keine Zusatzfelder wie alt', () => {
+    expect(
+      sanitizeStandort({ lat: 47.94, lng: 16.84, alt: 123 }),
+    ).toStrictEqual({
+      lat: 47.94,
+      lng: 16.84,
+    });
   });
 });

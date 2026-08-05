@@ -11,6 +11,7 @@ import {
   type VehiclePresetId,
 } from '../../common/fahrtenbuch';
 import { getDefaultVehicles } from '../../common/defaultKostenersatzRates';
+import type { GeoPositionObject } from '../../common/geo';
 import {
   KOSTENERSATZ_VEHICLES_COLLECTION,
   type KostenersatzVehicle,
@@ -33,6 +34,7 @@ import {
   sanitizeCounterDefinitions,
   sanitizeFuelTypes,
   sanitizeSortOrder,
+  sanitizeStandort,
   type VehicleImportPlanRow,
 } from './stammdatenLogic';
 
@@ -424,5 +426,36 @@ export async function importPersonsFromCsv(
       skipped: 0,
       error: (err as Error).message,
     };
+  }
+}
+
+/**
+ * Speichert das Feuerwehrhaus der Gruppe. Wie die übrigen Stammdaten-Actions
+ * nur für Admins, und nur für echte Mandanten.
+ */
+export async function saveFahrtenbuchGroupStandort(
+  groupId: string,
+  standort: GeoPositionObject | undefined,
+): Promise<StammdatenResult> {
+  try {
+    await actionAdminRequired();
+    assertFahrtenbuchGroup(groupId);
+
+    const sanitized = sanitizeStandort(standort);
+    if (standort && !sanitized) {
+      return { success: false, error: 'standortInvalid' };
+    }
+
+    await firestore
+      .collection(GROUP_COLLECTION_ID)
+      .doc(groupId)
+      // `merge: true`, damit Name und Beschreibung der Gruppe unberührt bleiben.
+      // `null` löscht den Standort, `undefined` würde das Feld stehen lassen.
+      .set({ standort: sanitized ?? null }, { merge: true });
+
+    return { success: true, id: groupId };
+  } catch (err) {
+    console.error('saveFahrtenbuchGroupStandort failed', err);
+    return { success: false, error: (err as Error).message };
   }
 }
