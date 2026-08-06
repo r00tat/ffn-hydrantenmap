@@ -46,13 +46,37 @@ export interface EntryActor {
  * `FahrtenbuchEntryInput` schützt heute nur über die Aufrufer, nicht über den
  * Typ selbst.
  *
- * Enthält `counterSources` den Wert `'route'`, muss `routeDistanceMeters`
- * gesetzt sein: Sonst behauptete das Dokument, ein Stand sei aus einer Route
- * berechnet, ohne die Route nachprüfbar mitzuliefern.
+ * Enthält `counterSources` den Wert `'route'`, muss die Route belegt sein:
+ * Sonst behauptete das Dokument, ein Stand sei aus einer Route berechnet, ohne
+ * die Route nachprüfbar mitzuliefern.
  */
 export interface EntryDerivation {
   counterSources?: Record<string, CounterSource>;
+  /** Gemessener Hinweg in Metern. */
+  routeOutboundMeters?: number;
+  /** Gemessener Rückweg in Metern. */
+  routeReturnMeters?: number;
+  /**
+   * Einfache Strecke in Metern aus einem Eintrag, der vor der getrennten
+   * Messung von Hin- und Rückweg entstanden ist. Wird bei einer Bearbeitung
+   * mitgeführt, damit der alte Nachweis nicht verloren geht — neu gesetzt wird
+   * das Feld nirgends.
+   */
   routeDistanceMeters?: number;
+}
+
+/**
+ * Ob die Ableitung eine nachprüfbare Route mitbringt. Die getrennten Wegstrecken
+ * gelten nur gemeinsam: Ein einzelner Weg belegt keine Gesamtstrecke.
+ */
+function hasRouteProof(derivation: EntryDerivation | undefined): boolean {
+  if (
+    derivation?.routeOutboundMeters !== undefined &&
+    derivation?.routeReturnMeters !== undefined
+  ) {
+    return true;
+  }
+  return derivation?.routeDistanceMeters !== undefined;
 }
 
 export interface BuildEntryOptions {
@@ -109,11 +133,11 @@ export function buildEntryDocument(
   // Gilt nur für `'route'`: Eine Schätzung hat keine Route, die sie belegen
   // könnte — sie kennzeichnet sich über `'estimate'` selbst als geschätzt.
   if (
-    derivation?.routeDistanceMeters === undefined &&
+    !hasRouteProof(derivation) &&
     Object.values(derivation?.counterSources ?? {}).includes('route')
   ) {
     throw new Error(
-      'fahrtenbuch derivation: counter source route without routeDistanceMeters',
+      'fahrtenbuch derivation: counter source route without route distance',
     );
   }
 
@@ -179,9 +203,15 @@ export function buildEntryDocument(
   if (Object.keys(counterSources).length > 0) {
     doc.counterSources = counterSources;
   }
-  // Die Distanz wird auch dann geschrieben, wenn kein Zähler als abgeleitet
-  // gilt: Sie ist dann Kontext zum Einsatz, keine Behauptung über die
-  // Herkunft eines bestimmten Zählers.
+  // Die Wegstrecken werden auch dann geschrieben, wenn kein Zähler als
+  // abgeleitet gilt: Sie sind dann Kontext zum Einsatz, keine Behauptung über
+  // die Herkunft eines bestimmten Zählers.
+  if (derivation?.routeOutboundMeters !== undefined) {
+    doc.routeOutboundMeters = derivation.routeOutboundMeters;
+  }
+  if (derivation?.routeReturnMeters !== undefined) {
+    doc.routeReturnMeters = derivation.routeReturnMeters;
+  }
   if (derivation?.routeDistanceMeters !== undefined) {
     doc.routeDistanceMeters = derivation.routeDistanceMeters;
   }

@@ -246,32 +246,46 @@ describe('EinsatzFahrtenbuchView', () => {
     expect(screen.queryByLabelText(/Kilometerstand/)).not.toBeInTheDocument();
   });
 
-  it('bietet eine Fahrzeugauswahl für unbekannte Fahrzeuge', async () => {
-    const user = userEvent.setup();
-    const onChangeRow = vi.fn();
+  it('zeigt Einheiten ohne Fahrzeug in den Stammdaten als Hinweis statt als Zeile', () => {
+    // Der gemeldete Fall: WLA-Bergung stand als Zeile in der Liste, obwohl für
+    // sie kein Fahrtenbucheintrag nötig ist. Sie bekommt keine Zeile mehr — der
+    // Hinweis hält aber fest, dass für sie bewusst nichts erfasst wird, damit
+    // ein Fahrzeug, das in den Stammdaten versehentlich fehlt, auffällt.
     renderWithIntl(
       <EinsatzFahrtenbuchView
         {...baseProps}
-        onChangeRow={onChangeRow}
-        rows={[
-          row({
-            vehicleId: undefined,
-            vehicleName: '',
-            sourceName: 'Drehleiter',
-            counters: {},
-          }),
-        ]}
+        rows={[row()]}
+        unitsWithoutVehicle={['WLA-Bergung', 'WLA-Logistik']}
       />,
     );
-    await user.click(
-      screen.getByRole('combobox', { name: 'Fahrzeug zuordnen' }),
+
+    expect(
+      screen.getByText(/Nicht im Fahrtenbuch hinterlegt/),
+    ).toHaveTextContent('WLA-Bergung, WLA-Logistik');
+    // Keine Zeile und damit auch kein Zuordnungsfeld für sie.
+    expect(
+      screen.queryByRole('combobox', { name: 'Fahrzeug zuordnen' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Hinweis auch, wenn gar keine Zeile übrig bleibt', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[]}
+        unitsWithoutVehicle={['WLA-Bergung']}
+      />,
     );
-    await user.click(screen.getByRole('option', { name: 'RLFA 3000/100' }));
-    expect(onChangeRow).toHaveBeenCalledWith('i1', {
-      vehicleId: 'gv1',
-      vehicleName: 'RLFA 3000/100',
-      counters: { km: { start: 1000 } },
-    });
+
+    expect(screen.getByText(/keine Fahrzeuge zugeordnet/)).toBeInTheDocument();
+    expect(screen.getByText(/WLA-Bergung/)).toBeInTheDocument();
+  });
+
+  it('zeigt keinen Hinweis, wenn jede Einheit ein Fahrzeug hat', () => {
+    renderWithIntl(<EinsatzFahrtenbuchView {...baseProps} rows={[row()]} />);
+    expect(
+      screen.queryByText(/Nicht im Fahrtenbuch hinterlegt/),
+    ).not.toBeInTheDocument();
   });
 
   it('meldet den Endstand über onChangeRow', async () => {
@@ -315,6 +329,46 @@ describe('EinsatzFahrtenbuchView', () => {
     expect(
       screen.getByText('RLFA 3000/100: Kilometerstand fehlt.'),
     ).toBeInTheDocument();
+  });
+
+  it('zeigt für eine Einheit ohne Zähler weder Fahrer noch Kilometer', () => {
+    // WLA-Bergung, WLA-Logistik und Anhänger werden aufgenommen bzw. gezogen —
+    // die Mannschaftszuordnung kennt für sie keinen Maschinisten, und eine
+    // eigene Wegstrecke haben sie auch nicht.
+    const wla: FahrtenbuchVehicle = {
+      ...vehicle,
+      id: 'gv3',
+      name: 'WLA-Bergung',
+      counters: VEHICLE_PRESETS.none,
+      lastCounters: {},
+    };
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        vehicles={[vehicle, wla]}
+        rows={[
+          row({
+            vehicleId: 'gv3',
+            vehicleName: 'WLA-Bergung',
+            sourceName: 'WLA-Bergung',
+            driverId: undefined,
+            driverName: '',
+            counters: {},
+          }),
+        ]}
+        autoFill={{ distance: { roundTripKm: 24, source: 'estimate' } }}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Fahrer')).not.toBeInTheDocument();
+    expect(screen.queryByText(/km/)).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei einem Fahrzeug mit Zähler weiterhin das Fahrerfeld', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView {...baseProps} rows={[row()]} />,
+    );
+    expect(screen.getByLabelText('Fahrer')).toBeInTheDocument();
   });
 
   it('sperrt eine Zeile, die nach der Zuordnung als erfasst erkannt wird', () => {

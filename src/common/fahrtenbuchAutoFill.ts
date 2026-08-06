@@ -10,26 +10,25 @@ import type { GeoPositionObject } from './geo';
 const DETOUR_FACTOR = 1.3;
 
 /**
- * Gesamtstrecke (Hin- und Rückfahrt) in ganzen Kilometern aus der einfachen
- * Strecke in Metern. Das Fahrzeug kehrt ins Feuerwehrhaus zurück, deshalb die
- * Verdopplung. Aufgerundet statt kaufmännisch gerundet, weil Rangieren am
- * Einsatzort zusätzliche Meter kostet.
+ * Ganze Kilometer aus einer Streckenlänge in Metern. Aufgerundet statt
+ * kaufmännisch gerundet, weil Rangieren am Einsatzort zusätzliche Meter kostet.
  */
-export function roundTripKmFromMeters(oneWayMeters: number): number {
-  return Math.ceil((2 * oneWayMeters) / 1000);
+export function totalKmFromMeters(totalMeters: number): number {
+  return Math.ceil(totalMeters / 1000);
 }
 
 /**
- * Grobe Gesamtstrecke aus der Luftlinie — für den Hinweis im Formular. Der
- * Umwegfaktor wird schon auf die einfache Strecke angewandt, bevor verdoppelt
- * wird, damit `roundTripKmFromMeters` seine übliche Bedeutung (einfache
- * Strecke → Hin- und Rückfahrt) behält.
+ * Grobe Gesamtstrecke aus der Luftlinie — für den Hinweis im Formular und als
+ * Rückfallebene ohne Routing. Hier wird verdoppelt, weil die Luftlinie in beide
+ * Richtungen dieselbe ist: Eine Schätzung kann den Unterschied zwischen Hin-
+ * und Rückweg nicht kennen, eine gemessene Route schon (siehe
+ * `routeDistance`).
  */
 export function estimateRoundTripKm(
   from: GeoPositionObject,
   to: GeoPositionObject,
 ): number {
-  return roundTripKmFromMeters(haversine(from, to) * DETOUR_FACTOR);
+  return totalKmFromMeters(2 * haversine(from, to) * DETOUR_FACTOR);
 }
 
 /**
@@ -60,23 +59,38 @@ export interface AutoFilledCounters {
  * Unterscheidung landet als `CounterSource` im Nachweisdokument.
  */
 export interface RoundTripDistance {
-  /** Gesamtstrecke (Hin- und Rückfahrt) in ganzen Kilometern. */
+  /** Gesamtstrecke (Hin- und Rückweg) in ganzen Kilometern. */
   roundTripKm: number;
   source: 'route' | 'estimate';
   /**
-   * Die einfache Straßenstrecke in Metern — nur bei `'route'`. Eine Schätzung
-   * hat hier bewusst nichts stehen: `routeDistanceMeters` am Eintrag ist die
-   * Belegstelle für eine gefahrene Route, keine Ablage für Rechenzwischenwerte.
+   * Gemessener Hinweg (Feuerwehrhaus → Einsatzort) in Metern — nur bei
+   * `'route'`. Eine Schätzung hat hier bewusst nichts stehen: Die
+   * Routenfelder am Eintrag sind die Belegstelle für eine gefahrene Strecke,
+   * keine Ablage für Rechenzwischenwerte.
    */
-  distanceMeters?: number;
+  outboundMeters?: number;
+  /** Gemessener Rückweg (Einsatzort → Feuerwehrhaus) in Metern — nur bei `'route'`. */
+  returnMeters?: number;
 }
 
-/** Aus einer gemessenen einfachen Straßenstrecke in Metern. */
-export function routeDistance(oneWayMeters: number): RoundTripDistance {
+/**
+ * Aus zwei gemessenen Straßenstrecken in Metern.
+ *
+ * Hin- und Rückweg werden getrennt gemessen und addiert, statt den Hinweg zu
+ * verdoppeln. Im Ortsgebiet macht das keinen Unterschied; bei einem Einsatz auf
+ * der Autobahn schon — dort führt der Rückweg über die nächste Abfahrt und kann
+ * um Kilometer vom Hinweg abweichen. Ein verdoppelter Hinweg wäre dann ein
+ * falscher Kilometerstand in einem Nachweisdokument.
+ */
+export function routeDistance(
+  outboundMeters: number,
+  returnMeters: number,
+): RoundTripDistance {
   return {
-    roundTripKm: roundTripKmFromMeters(oneWayMeters),
+    roundTripKm: totalKmFromMeters(outboundMeters + returnMeters),
     source: 'route',
-    distanceMeters: oneWayMeters,
+    outboundMeters,
+    returnMeters,
   };
 }
 

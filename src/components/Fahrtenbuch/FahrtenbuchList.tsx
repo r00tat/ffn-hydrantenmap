@@ -27,6 +27,7 @@ import {
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { counterLines, fuelLines, type CounterLine } from './entrySummary';
 
 export interface FahrtenbuchListProps {
   entries: FahrtenbuchEntry[];
@@ -65,27 +66,56 @@ export default function FahrtenbuchList({
     [entries, vehicleFilter, zweckFilter, onlyDefects],
   );
 
+  const vehiclesById = useMemo(
+    () => new Map(vehicles.map((v) => [v.id, v])),
+    [vehicles],
+  );
+
+  const counterLabel = (line: CounterLine) =>
+    line.labelKey ? t(line.labelKey as 'counters.km') : line.label;
+
   /**
-   * Zählerzusammenfassung einer Fahrt. `startEnd`-Zähler zeigen die Differenz,
-   * `reading`-Zähler den abgelesenen Stand. Ohne passende Definition (Fahrzeug
-   * noch nicht geladen) bleibt die Zelle leer.
+   * Die Zählerstände einer Fahrt: je Zähler eine beschriftete Zeile mit Start,
+   * Ende und Differenz. Nur die Differenz zu zeigen reichte nicht — bei einem
+   * Fahrzeug mit mehreren Zählern war nicht erkennbar, welche Zahl zu welchem
+   * Zähler gehört, und der abgelesene Stand fehlte ganz.
    */
-  const counterSummary = (entry: FahrtenbuchEntry) =>
-    Object.entries(entry.counters ?? {})
-      .map(([id, reading]) => {
-        const def = vehicles
-          .find((v) => v.id === entry.vehicleId)
-          ?.counters?.find((c) => c.id === id);
-        if (!def) return undefined;
-        if (def.mode === 'startEnd' && reading.diff !== undefined) {
-          return `${reading.diff} ${def.unit}`;
-        }
-        return reading.end !== undefined
-          ? `${reading.end} ${def.unit}`
-          : undefined;
-      })
-      .filter(Boolean)
-      .join(' · ');
+  const counterCell = (entry: FahrtenbuchEntry) => (
+    <Stack spacing={0.25}>
+      {counterLines(entry, vehiclesById.get(entry.vehicleId)).map((line) => (
+        <Typography
+          key={line.counterId}
+          variant="body2"
+          sx={{ whiteSpace: 'nowrap' }}
+        >
+          <Box component="span" sx={{ color: 'text.secondary' }}>
+            {counterLabel(line)}
+            {': '}
+          </Box>
+          {line.value}
+          {line.diff && (
+            <Box component="span" sx={{ color: 'text.secondary' }}>
+              {` (${line.diff})`}
+            </Box>
+          )}
+        </Typography>
+      ))}
+    </Stack>
+  );
+
+  const fuelCell = (entry: FahrtenbuchEntry) => (
+    <Stack spacing={0.25}>
+      {fuelLines(entry).map(({ fuel, amount }) => (
+        <Typography key={fuel} variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+          <Box component="span" sx={{ color: 'text.secondary' }}>
+            {t(`fuel.${fuel}` as 'fuel.diesel')}
+            {': '}
+          </Box>
+          {`${amount} ${t('fuelUnit')}`}
+        </Typography>
+      ))}
+    </Stack>
+  );
 
   return (
     <Box>
@@ -152,7 +182,8 @@ export default function FahrtenbuchList({
                 <TableCell>{t('driver')}</TableCell>
                 <TableCell>{t('zweck')}</TableCell>
                 <TableCell>{t('ziel')}</TableCell>
-                <TableCell>{t('counterDiff')}</TableCell>
+                <TableCell>{t('counterReadings')}</TableCell>
+                <TableCell>{t('betriebsmittel')}</TableCell>
                 <TableCell />
               </TableRow>
             </TableHead>
@@ -173,7 +204,8 @@ export default function FahrtenbuchList({
                     {t(`zwecke.${entry.zweck}` as 'zwecke.einsatz')}
                   </TableCell>
                   <TableCell>{entry.ziel}</TableCell>
-                  <TableCell>{counterSummary(entry)}</TableCell>
+                  <TableCell>{counterCell(entry)}</TableCell>
+                  <TableCell>{fuelCell(entry)}</TableCell>
                   <TableCell align="right">
                     <Stack
                       direction="row"

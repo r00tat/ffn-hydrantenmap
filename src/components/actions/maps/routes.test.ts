@@ -17,7 +17,7 @@ vi.mock('../../../server/firebase/project', () => ({
   getGcpProjectId: vi.fn().mockResolvedValue('ffn-utils'),
 }));
 
-import { computeRouteDistanceMeters } from './routes';
+import { computeRouteDistanceMeters, computeRouteLegsMeters } from './routes';
 
 const from = { lat: 47.9482913, lng: 16.848222 };
 const to = { lat: 47.98, lng: 16.9 };
@@ -195,5 +195,69 @@ describe('computeRouteDistanceMeters', () => {
 
     await expect(computeRouteDistanceMeters(from, to)).resolves.toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('computeRouteLegsMeters', () => {
+  /** Antwortet je Aufrufreihenfolge mit einer eigenen Distanz. */
+  function respondWith(...distances: (number | undefined)[]) {
+    let call = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      const distanceMeters = distances[call++];
+      return {
+        ok: true,
+        json: async () => ({
+          routes: distanceMeters === undefined ? [] : [{ distanceMeters }],
+        }),
+      } as Response;
+    });
+  }
+
+  beforeEach(() => {
+    getAccessToken.mockResolvedValue('test-token');
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('misst Hinweg und Rückweg getrennt und gibt beide zurück', async () => {
+    // Der Kern der Korrektur: Der Rückweg ist nicht der gespiegelte Hinweg.
+    // Auf der Autobahn liegt die nächste Abfahrt hinter dem Einsatzort — hier
+    // 21 km zurück gegenüber 12 km hin.
+    respondWith(12000, 21000);
+
+    await expect(computeRouteLegsMeters(from, to)).resolves.toEqual({
+      outboundMeters: 12000,
+      returnMeters: 21000,
+    });
+  });
+
+  it('fragt die zweite Route mit vertauschten Endpunkten ab', async () => {
+    respondWith(12000, 21000);
+
+    await computeRouteLegsMeters(from, to);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const bodies = vi
+      .mocked(fetch)
+      .mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    expect(bodies[0].origin.location.latLng.latitude).toBe(from.lat);
+    expect(bodies[0].destination.location.latLng.latitude).toBe(to.lat);
+    expect(bodies[1].origin.location.latLng.latitude).toBe(to.lat);
+    expect(bodies[1].destination.location.latLng.latitude).toBe(from.lat);
+  });
+
+  it('liefert undefined, wenn nur eine der beiden Richtungen zu bekommen ist', async () => {
+    // Kein Verdoppeln der einen Richtung als Rettung — das wäre genau die
+    // Annahme, die hier abgelöst wird. Der Aufrufer schätzt dann und weist die
+    // Schätzung aus.
+    respondWith(12000, undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(computeRouteLegsMeters(from, to)).resolves.toBeUndefined();
   });
 });

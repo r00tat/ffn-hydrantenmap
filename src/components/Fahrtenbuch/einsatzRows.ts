@@ -56,9 +56,14 @@ export interface EinsatzRowSource {
 export interface EinsatzRow {
   /** Stabiler Schlüssel für React — die ID des Fzg-Items bzw. des Crew-Fahrzeugs. */
   key: string;
-  /** Fahrzeugname aus der Einsatzquelle, auch ohne Stammdaten-Treffer. */
+  /** Name der Einheit aus der Einsatzquelle. */
   sourceName: string;
-  vehicleId?: string;
+  /**
+   * Immer gesetzt: Eine Zeile entsteht nur für eine Einheit, die in den
+   * Fahrtenbuch-Stammdaten steht (siehe `buildEinsatzRows`). Was dort fehlt,
+   * bekommt keine Fahrt und damit auch keine Zeile.
+   */
+  vehicleId: string;
   vehicleName: string;
   driverId?: string;
   driverName: string;
@@ -228,19 +233,13 @@ function pickByTime(
 }
 
 /**
- * Baut die Zeilen der Sammelerfassung. Quelle sind die Fzg-Items der Karte,
- * ergänzt um Fahrzeuge, die nur über die Mannschaftszuordnung bekannt sind.
- *
- * Die Zeiten kommen für alle Zeilen aus `times` — dem Kopfblock der
- * Sammelerfassung. Wer für ein einzelnes Fahrzeug abweichende Zeiten braucht,
- * überschreibt sie über `mergeRowEdits`.
+ * Die Einheiten des Einsatzes: die Fzg-Items der Karte, ergänzt um Fahrzeuge,
+ * die nur über die Mannschaftszuordnung bekannt sind.
  */
-export function buildEinsatzRows(
-  source: EinsatzRowSource,
-  times: EinsatzTimes,
-): EinsatzRow[] {
-  const { fzgItems, crew, vehicles, persons, entries, firecall } = source;
-
+function einsatzUnits(
+  fzgItems: EinsatzFzgItem[],
+  crew: EinsatzCrewMember[],
+): EinsatzFzgItem[] {
   const items: EinsatzFzgItem[] = [...fzgItems];
   const knownIds = new Set(items.map((i) => i.id));
   for (const member of crew) {
@@ -253,26 +252,77 @@ export function buildEinsatzRows(
       items.push({ id: member.vehicleId, name: member.vehicleName });
     }
   }
+  return items;
+}
 
-  return items.map((item) => {
+/**
+ * Baut die Zeilen der Sammelerfassung — eine je Einheit des Einsatzes, die in
+ * den Fahrtenbuch-Stammdaten steht.
+ *
+ * Einheiten ohne Fahrzeug in den Stammdaten fallen heraus. Was dort nicht
+ * geführt wird, braucht keine Fahrt: Ein Wechselladeaufbau oder ein Gerät auf
+ * der Einsatzkarte ist keine Einheit mit eigenem Fahrtenbuch, und eine Zeile
+ * dafür wäre nur eine Zeile, die niemand ausfüllen kann. Welche Einheiten das
+ * betrifft, sagt `unitsWithoutVehicle` — damit ein Fahrzeug, das dort
+ * versehentlich fehlt, nicht unbemerkt bleibt.
+ *
+ * Die Zeiten kommen für alle Zeilen aus `times` — dem Kopfblock der
+ * Sammelerfassung. Wer für ein einzelnes Fahrzeug abweichende Zeiten braucht,
+ * überschreibt sie über `mergeRowEdits`.
+ */
+export function buildEinsatzRows(
+  source: EinsatzRowSource,
+  times: EinsatzTimes,
+): EinsatzRow[] {
+  const { fzgItems, crew, vehicles, persons, entries, firecall } = source;
+
+  return einsatzUnits(fzgItems, crew).flatMap((item) => {
     const groupVehicle = matchVehicleByName(vehicles, item.name ?? '');
+    if (!groupVehicle?.id) return [];
+    const vehicleId = groupVehicle.id;
     const { driverId, driverName } = resolveDriver(crew, persons, item.id);
 
-    return {
-      key: item.id,
-      sourceName: item.name ?? '',
-      vehicleId: groupVehicle?.id,
-      vehicleName: groupVehicle?.name ?? item.name ?? '',
-      driverId,
-      driverName,
-      abfahrt: times.abfahrt,
-      ankunft: times.ankunft,
-      counters: startCounters(groupVehicle),
-      existingEntry: groupVehicle?.id
-        ? findEntryForFirecallVehicle(entries, firecall.id, groupVehicle.id)
-        : undefined,
-    };
+    return [
+      {
+        key: item.id,
+        sourceName: item.name ?? '',
+        vehicleId,
+        vehicleName: groupVehicle.name,
+        driverId,
+        driverName,
+        abfahrt: times.abfahrt,
+        ankunft: times.ankunft,
+        counters: startCounters(groupVehicle),
+        existingEntry: findEntryForFirecallVehicle(
+          entries,
+          firecall.id,
+          vehicleId,
+        ),
+      },
+    ];
   });
+}
+
+/**
+ * Namen der Einheiten des Einsatzes, für die es kein Fahrzeug in den
+ * Fahrtenbuch-Stammdaten gibt — die also keine Zeile bekommen.
+ *
+ * Der Gegenwert zum stillen Weglassen in `buildEinsatzRows`: Für einen
+ * Wechselladeaufbau ist das Weglassen richtig, für ein Fahrzeug, dessen Name in
+ * den Stammdaten anders geschrieben steht, wäre es eine Lücke im Nachweis. Ein
+ * Hinweis in der Oberfläche macht den Unterschied sichtbar, ohne die Liste mit
+ * Zeilen zu füllen, die niemand ausfüllen kann.
+ */
+export function unitsWithoutVehicle(
+  source: Pick<EinsatzRowSource, 'fzgItems' | 'crew' | 'vehicles'>,
+): string[] {
+  const names = einsatzUnits(source.fzgItems, source.crew)
+    .filter((item) => !matchVehicleByName(source.vehicles, item.name ?? ''))
+    .map((item) => (item.name ?? '').trim())
+    .filter(Boolean);
+  // Dieselbe Einheit kann zweimal auf der Karte stehen; im Hinweis genügt sie
+  // einmal.
+  return [...new Set(names)];
 }
 
 /** Eine übersprungene Zeile samt der Fehlerschlüssel, die sie blockieren. */
@@ -284,10 +334,8 @@ export interface EinsatzRowIssue {
 export interface EinsatzRowPartition {
   /** Vollständig und speicherbar. */
   ready: EinsatzRow[];
-  /** Fahrzeug zugeordnet, aber Pflichtangaben fehlen — wird gemeldet. */
+  /** Pflichtangaben fehlen — wird gemeldet. */
   incomplete: EinsatzRowIssue[];
-  /** Kein Gruppenfahrzeug zugeordnet — wird gemeldet. */
-  unassigned: EinsatzRow[];
   /**
    * Für dieses Fahrzeug wird zu diesem Einsatz nichts (mehr) geschrieben:
    * entweder existiert bereits ein Eintrag, oder eine frühere Zeile desselben
@@ -361,8 +409,8 @@ export function kmPreview(
  * Batch scheitern. Übersprungene Zeilen bleiben stehen und werden gemeldet.
  *
  * Dasselbe Fahrzeug kann mehrfach auftauchen — etwa als automatisch angelegtes
- * und als von Hand gesetztes Fzg-Item oder nach manueller Zuordnung zweier
- * Zeilen auf dasselbe Fahrzeug. Es wird trotzdem nur einmal geschrieben.
+ * und als von Hand gesetztes Fzg-Item, oder weil zwei Namensschreibweisen auf
+ * dasselbe Fahrzeug treffen. Es wird trotzdem nur einmal geschrieben.
  */
 export function partitionEinsatzRows(
   rows: EinsatzRow[],
@@ -373,16 +421,11 @@ export function partitionEinsatzRows(
   const partition: EinsatzRowPartition = {
     ready: [],
     incomplete: [],
-    unassigned: [],
     existing: [],
   };
   const covered = new Set<string>();
 
   for (const row of rows) {
-    if (!row.vehicleId) {
-      partition.unassigned.push(row);
-      continue;
-    }
     if (row.existingEntry || covered.has(row.vehicleId)) {
       covered.add(row.vehicleId);
       partition.existing.push(row);
@@ -440,8 +483,8 @@ export function partitionEinsatzRows(
  * werden konnte, ihre bereits getippten Werte. Felder, die niemand angefasst
  * hat, kommen weiter frisch aus den Quelldaten.
  *
- * `existingEntry` wird dabei immer neu bestimmt — sonst umginge eine von Hand
- * zugeordnete Zeile die Duplikatserkennung.
+ * `existingEntry` wird dabei immer neu bestimmt und nie aus den Eingaben
+ * übernommen — eine Eingabe darf die Duplikatserkennung nicht umgehen können.
  */
 export function mergeRowEdits(
   rows: EinsatzRow[],
@@ -453,9 +496,11 @@ export function mergeRowEdits(
     const edit = edits[row.key];
     if (!edit) return row;
     const merged = { ...row, ...edit };
-    merged.existingEntry = merged.vehicleId
-      ? findEntryForFirecallVehicle(entries, firecallId, merged.vehicleId)
-      : undefined;
+    merged.existingEntry = findEntryForFirecallVehicle(
+      entries,
+      firecallId,
+      merged.vehicleId,
+    );
     return merged;
   });
 }

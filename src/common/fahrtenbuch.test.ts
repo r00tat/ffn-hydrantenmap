@@ -10,6 +10,7 @@ import {
   matchVehicleByName,
   normalizeName,
   referenceCounters,
+  requiresDriver,
   suggestPresetForVehicleName,
   validateEntryInput,
   VEHICLE_PRESETS,
@@ -116,6 +117,27 @@ describe('counterWarnings', () => {
   });
 });
 
+describe('requiresDriver', () => {
+  it('verlangt einen Fahrer für Einheiten mit Zähler', () => {
+    expect(requiresDriver(VEHICLE_PRESETS.fahrzeug)).toBe(true);
+    expect(requiresDriver(VEHICLE_PRESETS.boot)).toBe(true);
+  });
+
+  it('verlangt keinen Fahrer für Einheiten ohne Zähler', () => {
+    // Die Zähler-Vorlage „Ohne Zähler" ist genau die von WLA-Aufbauten und
+    // Anhängern (siehe `suggestPresetForVehicleName`).
+    expect(requiresDriver(VEHICLE_PRESETS.none)).toBe(false);
+    expect(requiresDriver([])).toBe(false);
+  });
+
+  it('deckt sich mit der Vorlage, die für WLA und Anhänger vorgeschlagen wird', () => {
+    for (const name of ['WLA-Bergung', 'WLA-Logistik', 'Anhänger Notstrom']) {
+      const preset = suggestPresetForVehicleName(name);
+      expect(requiresDriver(VEHICLE_PRESETS[preset])).toBe(false);
+    }
+  });
+});
+
 describe('validateEntryInput', () => {
   const base = {
     vehicleId: 'v1',
@@ -173,6 +195,15 @@ describe('validateEntryInput', () => {
 
   it('akzeptiert ein Fahrzeug ohne Zähler', () => {
     expect(validateEntryInput([], { ...base, counters: {} })).toEqual([]);
+  });
+
+  it('verlangt für eine Einheit ohne Zähler keinen Fahrer', () => {
+    // WLA-Bergung, WLA-Logistik und Anhänger werden aufgenommen bzw. gezogen —
+    // sie haben keinen eigenen Fahrer. Die Fahrerpflicht hätte ihre Erfassung
+    // dauerhaft blockiert.
+    expect(
+      validateEntryInput([], { ...base, driverName: '', counters: {} }),
+    ).toEqual([]);
   });
 
   it('akzeptiert jeden bekannten Zweck', () => {

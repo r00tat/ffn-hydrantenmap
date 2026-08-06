@@ -10,7 +10,6 @@ import Collapse from '@mui/material/Collapse';
 import FormHelperText from '@mui/material/FormHelperText';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
-import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -20,6 +19,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   arrivalOnDepartureDay,
+  requiresDriver,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
@@ -45,7 +45,7 @@ import {
   kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
-  startCounters,
+  unitsWithoutVehicle,
   type EinsatzAutoFill,
   type EinsatzRow,
   type EinsatzRowIssue,
@@ -73,6 +73,12 @@ export interface EinsatzFahrtenbuchViewProps {
   rows: EinsatzRow[];
   /** Die Zeiten des Kopfblocks — sie gelten für alle Fahrzeuge. */
   times: EinsatzTimes;
+  /**
+   * Einheiten des Einsatzes, die nicht in den Fahrtenbuch-Stammdaten stehen und
+   * deshalb keine Zeile bekommen. Als Hinweis ausgewiesen, damit ein Fahrzeug,
+   * das dort versehentlich fehlt, nicht unbemerkt ohne Fahrt bleibt.
+   */
+  unitsWithoutVehicle?: string[];
   isMember: boolean;
   saving: boolean;
   message?: string;
@@ -144,6 +150,7 @@ export function EinsatzFahrtenbuchView({
   vehicles,
   rows,
   times,
+  unitsWithoutVehicle: withoutVehicle,
   isMember,
   saving,
   message,
@@ -169,8 +176,19 @@ export function EinsatzFahrtenbuchView({
   if (vehicles.length === 0) {
     return <Alert severity="info">{t('einsatz.noGroupVehicles')}</Alert>;
   }
+  const withoutVehicleHint = withoutVehicle?.length ? (
+    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+      {t('einsatz.notInFahrtenbuch', { names: withoutVehicle.join(', ') })}
+    </Typography>
+  ) : null;
+
   if (rows.length === 0) {
-    return <Alert severity="info">{t('einsatz.noVehicles')}</Alert>;
+    return (
+      <Box>
+        <Alert severity="info">{t('einsatz.noVehicles')}</Alert>
+        {withoutVehicleHint}
+      </Box>
+    );
   }
 
   return (
@@ -245,6 +263,10 @@ export function EinsatzFahrtenbuchView({
           const vehicle = vehicles.find((v) => v.id === row.vehicleId);
           const recorded = !!row.existingEntry;
           const isOpen = !!expanded[row.key];
+          // Ein Wechselladeaufbau oder Anhänger hat keinen eigenen Fahrer. Das
+          // Feld stünde bei ihm dauerhaft leer da und wäre auch nicht zu
+          // füllen — die Mannschaftszuordnung kennt für ihn keinen Maschinisten.
+          const needsDriver = requiresDriver(vehicle?.counters ?? []);
 
           return (
             <Paper key={row.key} sx={{ px: 2, py: 1.5 }} variant="outlined">
@@ -253,6 +275,11 @@ export function EinsatzFahrtenbuchView({
                 spacing={1}
                 sx={{ alignItems: 'center', flexWrap: 'wrap' }}
               >
+                {/* Der Name aus den Stammdaten: Unter ihm entsteht der Eintrag,
+                    und die Zeile steht nur da, weil der Name des Einsatzes ihn
+                    getroffen hat. Schreibweisen wie „RLFA-3000/100" auf der
+                    Karte sollen nicht neben „RLFA 3000/100" im Fahrtenbuch
+                    stehen. */}
                 <Typography
                   variant="subtitle2"
                   sx={{ minWidth: 110, flexShrink: 0 }}
@@ -282,18 +309,22 @@ export function EinsatzFahrtenbuchView({
                   </>
                 ) : (
                   <>
-                    <TextField
-                      size="small"
-                      label={t('driver')}
-                      value={row.driverName}
-                      sx={{ flexGrow: 1, minWidth: 160 }}
-                      onChange={(e) =>
-                        onChangeRow(row.key, {
-                          driverName: e.target.value,
-                          driverId: undefined,
-                        })
-                      }
-                    />
+                    {needsDriver ? (
+                      <TextField
+                        size="small"
+                        label={t('driver')}
+                        value={row.driverName}
+                        sx={{ flexGrow: 1, minWidth: 160 }}
+                        onChange={(e) =>
+                          onChangeRow(row.key, {
+                            driverName: e.target.value,
+                            driverId: undefined,
+                          })
+                        }
+                      />
+                    ) : (
+                      <Box sx={{ flexGrow: 1 }} />
+                    )}
                     <KmPreviewText
                       vehicle={vehicle}
                       row={row}
@@ -324,35 +355,6 @@ export function EinsatzFahrtenbuchView({
                 )}
               </Stack>
 
-              {/* Ohne Stammdaten-Treffer bleibt die Zeile unspeicherbar — die
-                  Zuordnung gehört deshalb in die Zeile und nicht in die
-                  Details. */}
-              {!row.vehicleId && !recorded && (
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label={t('einsatz.unknownVehicle')}
-                  value=""
-                  onChange={(e) => {
-                    const selected = vehicles.find(
-                      (v) => v.id === e.target.value,
-                    );
-                    onChangeRow(row.key, {
-                      vehicleId: selected?.id,
-                      vehicleName: selected?.name ?? '',
-                      counters: startCounters(selected),
-                    });
-                  }}
-                  sx={{ mt: 1.5 }}
-                >
-                  {vehicles.map((v) => (
-                    <MenuItem key={v.id} value={v.id}>
-                      {v.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
 
               <Collapse in={isOpen && !recorded} unmountOnExit>
                 <Box sx={{ mt: 2 }}>
@@ -414,6 +416,8 @@ export function EinsatzFahrtenbuchView({
           );
         })}
       </Stack>
+
+      {withoutVehicleHint}
 
       <Tooltip title={t('einsatz.saveAll')}>
         <span>
@@ -541,18 +545,24 @@ export default function EinsatzFahrtenbuch({
     [timeEdits, computedTimes],
   );
 
+  const crewMembers = useMemo(
+    () =>
+      (crew ?? []).map((c) => ({
+        recipientId: c.recipientId,
+        name: c.name,
+        vehicleId: c.vehicleId,
+        vehicleName: c.vehicleName,
+        funktion: c.funktion,
+      })),
+    [crew],
+  );
+
   const computedRows = useMemo(
     () =>
       buildEinsatzRows(
         {
           fzgItems: items,
-          crew: (crew ?? []).map((c) => ({
-            recipientId: c.recipientId,
-            name: c.name,
-            vehicleId: c.vehicleId,
-            vehicleName: c.vehicleName,
-            funktion: c.funktion,
-          })),
+          crew: crewMembers,
           vehicles: activeVehicles,
           persons: activePersons,
           entries,
@@ -562,13 +572,26 @@ export default function EinsatzFahrtenbuch({
       ),
     [
       items,
-      crew,
+      crewMembers,
       activeVehicles,
       activePersons,
       entries,
       firecallSource,
       times,
     ],
+  );
+
+  // Die Einheiten, für die es kein Fahrzeug in den Stammdaten gibt. Sie
+  // bekommen keine Zeile — der Hinweis hält fest, dass für sie bewusst nichts
+  // erfasst wird.
+  const withoutVehicle = useMemo(
+    () =>
+      unitsWithoutVehicle({
+        fzgItems: items,
+        crew: crewMembers,
+        vehicles: activeVehicles,
+      }),
+    [items, crewMembers, activeVehicles],
   );
 
   // Kein useEffect zum Übernehmen der berechneten Zeilen: die Eingaben liegen
@@ -621,7 +644,6 @@ export default function EinsatzFahrtenbuch({
   const report = (
     created: number,
     incomplete: EinsatzRowIssue[],
-    unassigned: EinsatzRow[],
     duplicates: number,
     failed: number,
     roundTripKm?: number,
@@ -643,9 +665,6 @@ export default function EinsatzFahrtenbuch({
     if (incomplete.length > 0) {
       parts.push(t('einsatz.skipped', { count: incomplete.length }));
     }
-    if (unassigned.length > 0) {
-      parts.push(t('einsatz.skippedUnassigned', { count: unassigned.length }));
-    }
     if (duplicates > 0) {
       parts.push(t('einsatz.skippedDuplicate', { count: duplicates }));
     }
@@ -655,11 +674,7 @@ export default function EinsatzFahrtenbuch({
     if (failed > 0) {
       parts.push(t('einsatz.failed', { count: failed }));
     }
-    const skipped =
-      incomplete.length > 0 ||
-      unassigned.length > 0 ||
-      duplicates > 0 ||
-      failed > 0;
+    const skipped = incomplete.length > 0 || duplicates > 0 || failed > 0;
     setMessageSeverity(skipped ? 'warning' : 'success');
     setMessage(parts.join(' — '));
     setMessageDetails(incomplete.map(issueMessage));
@@ -671,7 +686,7 @@ export default function EinsatzFahrtenbuch({
     setMessage(undefined);
     setMessageDetails(undefined);
 
-    const { ready, incomplete, unassigned } = partitionEinsatzRows(
+    const { ready, incomplete } = partitionEinsatzRows(
       rows,
       activeVehicles,
       firecallName,
@@ -680,7 +695,7 @@ export default function EinsatzFahrtenbuch({
 
     if (ready.length === 0) {
       setSaving(false);
-      report(0, incomplete, unassigned, 0, 0);
+      report(0, incomplete, 0, 0);
       return;
     }
 
@@ -688,7 +703,7 @@ export default function EinsatzFahrtenbuch({
     const result = await createFahrtenbuchEntries(
       groupId,
       ready.map((row) => ({
-        vehicleId: row.vehicleId as string,
+        vehicleId: row.vehicleId,
         driverId: row.driverId,
         driverName: row.driverName,
         zweck: 'einsatz' as const,
@@ -718,7 +733,6 @@ export default function EinsatzFahrtenbuch({
     report(
       result.created,
       incomplete,
-      unassigned,
       result.skippedVehicleIds.length,
       result.failedVehicleIds.length,
       result.roundTripKm,
@@ -733,6 +747,7 @@ export default function EinsatzFahrtenbuch({
         vehicles={activeVehicles}
         rows={rows}
         times={times}
+        unitsWithoutVehicle={withoutVehicle}
         isMember={isMember}
         saving={saving}
         message={message}

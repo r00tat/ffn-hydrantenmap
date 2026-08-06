@@ -295,9 +295,14 @@ export interface Firecall {
   lat?: number;
   lng?: number;
   group?: string;
-  /** Gecachte Route zum Einsatzort für das Fahrtenbuch (siehe firecallRoute.ts). */
+  /**
+   * Gecachte Route zum Einsatzort für das Fahrtenbuch — Hin- und Rückweg
+   * getrennt (siehe firecallRoute.ts). Ältere Dokumente tragen hier ein
+   * `distanceM`; das gilt als Cache-Fehltreffer und wird neu gemessen.
+   */
   fahrtenbuchRoute?: {
-    distanceM: number;
+    outboundM: number;
+    returnM: number;
     from: [number, number];
     to: [number, number];
   };

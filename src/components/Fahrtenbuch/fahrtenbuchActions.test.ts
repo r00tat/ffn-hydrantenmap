@@ -48,7 +48,7 @@ vi.mock('../../server/auth/resolveFahrtenbuchShareLink', () => ({
 }));
 
 vi.mock('../actions/maps/routes', () => ({
-  computeRouteDistanceMeters: routeMock,
+  computeRouteLegsMeters: routeMock,
 }));
 
 // Ein Firestore-Stub, der drei Kollektionen bedient: `groups` (Gruppendokument
@@ -300,7 +300,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
       exists: true,
       data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
     });
-    routeMock.mockResolvedValue(10000);
+    routeMock.mockResolvedValue({ outboundMeters: 8000, returnMeters: 12000 });
 
     const result = await createFahrtenbuchEntries('ffnd', [
       einsatzEntry('v1'),
@@ -310,11 +310,62 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     expect(routeMock).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(true);
     expect(result.created).toBe(2);
-    // 10000 m einfache Strecke -> 20000 m Rundstrecke -> 20 km.
+    // 8 km Hinweg + 12 km Rückweg -> 20 km. Ein verdoppelter Hinweg ergäbe 16.
     expect(result.roundTripKm).toBe(20);
   });
 
+  it('schreibt Hin- und Rückweg getrennt an den Eintrag', async () => {
+    // Die Belegstelle im Nachweisdokument: Aus den beiden Wegstrecken lässt
+    // sich der Kilometerstand nachrechnen. Ein einzelner verdoppelter Wert
+    // könnte das bei einer Autobahnanfahrt nicht.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
+    });
+    routeMock.mockResolvedValue({ outboundMeters: 8000, returnMeters: 12000 });
+
+    await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
+
+    const [, doc] = batchSetMock.mock.calls[0];
+    expect(doc.routeOutboundMeters).toBe(8000);
+    expect(doc.routeReturnMeters).toBe(12000);
+    expect(doc).not.toHaveProperty('routeDistanceMeters');
+    expect(doc.counterSources).toEqual({ km: 'route' });
+    // Startstand 1000 aus `einsatzEntry` plus 20 km Gesamtstrecke.
+    expect(doc.counters.km).toEqual({ start: 1000, end: 1020, diff: 20 });
+  });
+
   it('verwendet einen Cache-Treffer am Einsatz-Dokument statt neu zu routen', async () => {
+    const standort = { lat: 47.9482913, lng: 16.848222 }; // defaultPosition
+    const einsatzort = { lat: 47.98, lng: 16.9 };
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        group: 'ffnd',
+        lat: einsatzort.lat,
+        lng: einsatzort.lng,
+        fahrtenbuchRoute: {
+          outboundM: 4000,
+          returnM: 6000,
+          from: [standort.lat, standort.lng],
+          to: [einsatzort.lat, einsatzort.lng],
+        },
+      }),
+    });
+
+    const result = await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
+
+    expect(routeMock).not.toHaveBeenCalled();
+    expect(firecallSetMock).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(result.created).toBe(1);
+    // 4 km Hinweg + 6 km Rückweg aus dem Cache -> 10 km.
+    expect(result.roundTripKm).toBe(10);
+  });
+
+  it('misst neu, wenn am Einsatz nur die alte einfache Strecke gecacht ist', async () => {
+    // Sonst blieben Einsätze auf der Autobahn dauerhaft beim verdoppelten
+    // Hinweg stehen, obwohl längst richtungsgetrennt gemessen wird.
     const standort = { lat: 47.9482913, lng: 16.848222 }; // defaultPosition
     const einsatzort = { lat: 47.98, lng: 16.9 };
     firecallGetMock.mockResolvedValue({
@@ -330,15 +381,18 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
         },
       }),
     });
+    routeMock.mockResolvedValue({ outboundMeters: 5000, returnMeters: 14000 });
 
     const result = await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
 
-    expect(routeMock).not.toHaveBeenCalled();
-    expect(firecallSetMock).not.toHaveBeenCalled();
-    expect(result.success).toBe(true);
-    expect(result.created).toBe(1);
-    // 5000 m einfache Strecke -> 10 km Rundstrecke.
-    expect(result.roundTripKm).toBe(10);
+    expect(routeMock).toHaveBeenCalledTimes(1);
+    expect(result.roundTripKm).toBe(19);
+    // Der neue Cache trägt beide Richtungen.
+    const [cacheWrite] = firecallSetMock.mock.calls[0];
+    expect(cacheWrite.fahrtenbuchRoute).toMatchObject({
+      outboundM: 5000,
+      returnM: 14000,
+    });
   });
 
   it('routet und beschreibt das Einsatz-Dokument nicht bei einem Einsatz einer fremden Gruppe', async () => {
@@ -386,6 +440,8 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     // solcher gekennzeichnet — ohne nachprüfbare Route.
     const [, doc] = batchSetMock.mock.calls[0];
     expect(doc.counterSources).toEqual({ km: 'estimate' });
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
+    expect(doc).not.toHaveProperty('routeReturnMeters');
     expect(doc).not.toHaveProperty('routeDistanceMeters');
   });
 
@@ -409,7 +465,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
       exists: true,
       data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
     });
-    routeMock.mockResolvedValue(10000);
+    routeMock.mockResolvedValue({ outboundMeters: 8000, returnMeters: 12000 });
 
     const result = await createFahrtenbuchEntries('ffnd', [
       einsatzEntry('v1', { counters: { km: { start: 1000, end: 1005 } } }),
@@ -426,7 +482,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
       exists: true,
       data: () => ({ group: 'ffnd', lat: 47.98, lng: 16.9 }),
     });
-    routeMock.mockResolvedValue(10000);
+    routeMock.mockResolvedValue({ outboundMeters: 8000, returnMeters: 12000 });
     vehicleGetMock.mockResolvedValue({
       exists: true,
       id: 'boot',
@@ -493,7 +549,8 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     ankunft: '2026-08-05T09:00:00.000Z',
     counters: { km: { start: 1000, end: 1020, diff: 20 } },
     counterSources: { km: 'route' as const },
-    routeDistanceMeters: 8000,
+    routeOutboundMeters: 8000,
+    routeReturnMeters: 9000,
     group: 'ffnd',
     deleted: false,
     createdAt: '2026-08-05T09:05:00.000Z',
@@ -525,7 +582,7 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     entryDocSetMock.mockResolvedValue(undefined);
   });
 
-  it('behält die Herkunft, wenn der Endstand des Zählers unverändert bleibt, und übernimmt die Routendistanz', async () => {
+  it('behält die Herkunft, wenn der Endstand des Zählers unverändert bleibt, und übernimmt beide Wegstrecken', async () => {
     const result = await updateFahrtenbuchEntry('ffnd', 'e1', {
       vehicleId: 'v1',
       driverName: 'Max Mustermann',
@@ -541,10 +598,11 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     expect(result.success).toBe(true);
     const doc = entryDocSetMock.mock.calls[0][0];
     expect(doc.counterSources).toEqual({ km: 'route' });
-    expect(doc.routeDistanceMeters).toBe(8000);
+    expect(doc.routeOutboundMeters).toBe(8000);
+    expect(doc.routeReturnMeters).toBe(9000);
   });
 
-  it('verwirft die Herkunft, wenn der Endstand von Hand geändert wird, behält aber die Routendistanz', async () => {
+  it('verwirft die Herkunft, wenn der Endstand von Hand geändert wird, behält aber die Wegstrecken', async () => {
     const result = await updateFahrtenbuchEntry('ffnd', 'e1', {
       vehicleId: 'v1',
       driverName: 'Max Mustermann',
@@ -560,7 +618,41 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     expect(result.success).toBe(true);
     const doc = entryDocSetMock.mock.calls[0][0];
     expect(doc).not.toHaveProperty('counterSources');
+    expect(doc.routeOutboundMeters).toBe(8000);
+    expect(doc.routeReturnMeters).toBe(9000);
+  });
+
+  it('führt das alte routeDistanceMeters eines vorbestehenden Eintrags weiter', async () => {
+    // Einträge aus der Zeit der verdoppelten einfachen Strecke tragen nur
+    // dieses Feld. Verlöre es eine Bearbeitung, stünde ein als `'route'`
+    // ausgewiesener Zählerstand ohne jede Belegstelle da.
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        ...existingEntry,
+        routeOutboundMeters: undefined,
+        routeReturnMeters: undefined,
+        routeDistanceMeters: 8000,
+      }),
+    });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', {
+      vehicleId: 'v1',
+      driverName: 'Max Mustermann',
+      zweck: 'einsatz',
+      firecallId: 'f1',
+      firecallName: 'Brand',
+      ziel: 'Bahnhof',
+      abfahrt: existingEntry.abfahrt,
+      ankunft: existingEntry.ankunft,
+      counters: { km: { start: 1000, end: 1020 } },
+    });
+
+    expect(result.success).toBe(true);
+    const doc = entryDocSetMock.mock.calls[0][0];
+    expect(doc.counterSources).toEqual({ km: 'route' });
     expect(doc.routeDistanceMeters).toBe(8000);
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
   });
 });
 
@@ -759,7 +851,8 @@ describe('importFahrtenbuchEntries', () => {
     const doc = batchSetMock.mock.calls[0][1];
     // Importierte Stände sind abgelesen, nicht abgeleitet.
     expect(doc).not.toHaveProperty('counterSources');
-    expect(doc).not.toHaveProperty('routeDistanceMeters');
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
+    expect(doc).not.toHaveProperty('routeReturnMeters');
     expect(doc.counters.km).toMatchObject({ start: 14646, end: 14664 });
     expect(doc.group).toBe('ffnd');
     expect(doc.deleted).toBe(false);

@@ -11,6 +11,7 @@ import {
   kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
+  unitsWithoutVehicle,
   type EinsatzRow,
   type EinsatzTimes,
 } from './einsatzRows';
@@ -90,17 +91,22 @@ describe('buildEinsatzRows', () => {
     expect(rows[0].vehicleName).toBe('RLFA 3000/100');
   });
 
-  it('lässt vehicleId leer, wenn kein Gruppen-Fahrzeug passt', () => {
+  it('lässt eine Einheit ohne Fahrzeug in den Stammdaten ganz weg', () => {
+    // Ein Wechselladeaufbau oder ein Gerät auf der Einsatzkarte hat kein
+    // eigenes Fahrtenbuch. Eine Zeile dafür könnte niemand ausfüllen.
     const rows = buildEinsatzRows({
-      fzgItems: [{ id: 'i1', name: 'Drehleiter' }],
+      fzgItems: [
+        { id: 'i1', name: 'RLFA 3000/100' },
+        { id: 'i2', name: 'WLA-Bergung' },
+      ],
       crew: [],
       vehicles: [vehicle],
       persons: [],
       entries: [],
       firecall,
     }, TIMES);
-    expect(rows[0].vehicleId).toBeUndefined();
-    expect(rows[0].sourceName).toBe('Drehleiter');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].vehicleId).toBe('gv1');
   });
 
   it('übernimmt den Maschinisten über die BlaulichtSMS-ID', () => {
@@ -345,6 +351,59 @@ describe('buildEinsatzRows', () => {
   });
 });
 
+describe('unitsWithoutVehicle', () => {
+  it('nennt die Einheiten, für die kein Fahrzeug hinterlegt ist', () => {
+    // Der Gegenwert zum Weglassen: Ein Fahrzeug, das in den Stammdaten anders
+    // geschrieben steht, bliebe sonst unbemerkt ohne Fahrt.
+    expect(
+      unitsWithoutVehicle({
+        fzgItems: [
+          { id: 'i1', name: 'RLFA 3000/100' },
+          { id: 'i2', name: 'WLA-Bergung' },
+          { id: 'i3', name: 'WLA-Logistik' },
+        ],
+        crew: [],
+        vehicles: [vehicle],
+      }),
+    ).toEqual(['WLA-Bergung', 'WLA-Logistik']);
+  });
+
+  it('nennt jede Einheit nur einmal', () => {
+    expect(
+      unitsWithoutVehicle({
+        fzgItems: [
+          { id: 'i1', name: 'WLA-Bergung' },
+          { id: 'i2', name: 'WLA-Bergung' },
+        ],
+        crew: [],
+        vehicles: [vehicle],
+      }),
+    ).toEqual(['WLA-Bergung']);
+  });
+
+  it('erfasst auch Einheiten, die nur über die Mannschaftszuordnung bekannt sind', () => {
+    expect(
+      unitsWithoutVehicle({
+        fzgItems: [],
+        crew: [
+          { name: 'Max Muster', vehicleId: 'i9', vehicleName: 'WLA-Bergung' },
+        ],
+        vehicles: [vehicle],
+      }),
+    ).toEqual(['WLA-Bergung']);
+  });
+
+  it('meldet nichts, wenn jede Einheit ein Fahrzeug hat', () => {
+    expect(
+      unitsWithoutVehicle({
+        fzgItems: [{ id: 'i1', name: 'RLFA 3000/100' }],
+        crew: [],
+        vehicles: [vehicle],
+      }),
+    ).toEqual([]);
+  });
+});
+
 function row(overrides: Partial<EinsatzRow> = {}): EinsatzRow {
   return {
     key: 'i1',
@@ -364,8 +423,36 @@ describe('partitionEinsatzRows', () => {
     const result = partitionEinsatzRows([row()], [vehicle], 'Brand B2');
     expect(result.ready).toHaveLength(1);
     expect(result.incomplete).toHaveLength(0);
-    expect(result.unassigned).toHaveLength(0);
     expect(result.existing).toHaveLength(0);
+  });
+
+  it('nimmt eine Einheit ohne Zähler auch ohne Fahrer und ohne Kilometer auf', () => {
+    // WLA-Bergung, WLA-Logistik und Anhänger haben keinen eigenen Fahrer und
+    // keine eigene Wegstrecke. Zuvor blockierte `driverMissing` ihre Zeile, und
+    // die Fahrt fehlte im Fahrtenbuch.
+    const wla: FahrtenbuchVehicle = {
+      ...boot,
+      id: 'gv3',
+      name: 'WLA-Bergung',
+      counters: VEHICLE_PRESETS.none,
+      lastCounters: {},
+    };
+    const result = partitionEinsatzRows(
+      [
+        row({
+          vehicleId: 'gv3',
+          vehicleName: 'WLA-Bergung',
+          sourceName: 'WLA-Bergung',
+          driverName: '',
+          counters: {},
+        }),
+      ],
+      [wla],
+      'Brand B2',
+    );
+
+    expect(result.incomplete).toHaveLength(0);
+    expect(result.ready).toHaveLength(1);
   });
 
   it('hält eine Zeile ohne Endstand für speicherbar', () => {
@@ -411,17 +498,6 @@ describe('partitionEinsatzRows', () => {
     expect(result.ready[0].key).toBe('i1');
     expect(result.existing).toHaveLength(1);
     expect(result.existing[0].key).toBe('i2');
-  });
-
-  it('sammelt Zeilen ohne Fahrzeugzuordnung getrennt', () => {
-    const result = partitionEinsatzRows(
-      [row({ vehicleId: undefined })],
-      [vehicle],
-      'Brand B2',
-    );
-    expect(result.unassigned).toHaveLength(1);
-    expect(result.incomplete).toHaveLength(0);
-    expect(result.ready).toHaveLength(0);
   });
 
   it('überspringt bereits erfasste Fahrzeuge, ohne sie zu melden', () => {
@@ -507,24 +583,18 @@ describe('mergeRowEdits', () => {
     expect(merged[0].driverName).toBe('J. Müller');
   });
 
-  it('erkennt einen bestehenden Eintrag nach manueller Fahrzeugzuordnung', () => {
+  it('bestimmt den bestehenden Eintrag neu und übernimmt ihn nicht aus den Eingaben', () => {
+    // Sonst ließe sich die Duplikatserkennung über eine untergeschobene
+    // Eingabe umgehen — oder eine Zeile behielte einen Eintrag, den ein
+    // frischer Snapshot längst nicht mehr kennt.
     const merged = mergeRowEdits(
-      [row({ vehicleId: undefined, vehicleName: '', sourceName: 'RLF' })],
-      { i1: { vehicleId: 'gv1', vehicleName: 'RLFA 3000/100' } },
+      [row({ existingEntry: undefined })],
+      { i1: { existingEntry: undefined, driverName: 'J. Müller' } },
       entries,
       'f1',
     );
     expect(merged[0].existingEntry?.id).toBe('e1');
-  });
-
-  it('verwirft einen bestehenden Eintrag, wenn die Zuordnung zurückgenommen wird', () => {
-    const merged = mergeRowEdits(
-      [row({ existingEntry: entries[0] })],
-      { i1: { vehicleId: undefined, vehicleName: '' } },
-      entries,
-      'f1',
-    );
-    expect(merged[0].existingEntry).toBeUndefined();
+    expect(merged[0].driverName).toBe('J. Müller');
   });
 
   it('übernimmt frische Daten für Felder, die niemand angefasst hat', () => {

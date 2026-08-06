@@ -68,7 +68,8 @@ describe('buildEntryDocument', () => {
         // — ein Client darf keine Herkunft behaupten, ohne dass der Server sie
         // abgeleitet hat.
         counterSources: { km: 'route' },
-        routeDistanceMeters: 12000,
+        routeOutboundMeters: 12000,
+        routeReturnMeters: 14000,
       } as never,
       'ffnd',
       actor,
@@ -77,7 +78,8 @@ describe('buildEntryDocument', () => {
     expect(doc.createdBy).toBe('u1');
     expect(doc.deleted).toBe(false);
     expect(doc).not.toHaveProperty('counterSources');
-    expect(doc).not.toHaveProperty('routeDistanceMeters');
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
+    expect(doc).not.toHaveProperty('routeReturnMeters');
   });
 
   it('entfernt firecall-Felder, wenn der Zweck nicht einsatz ist', () => {
@@ -216,12 +218,16 @@ describe('buildEntryDocument beim Bearbeiten', () => {
 });
 
 describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
-  it('schreibt Herkunft und Routendistanz, wenn sie übergeben werden', () => {
+  /** Hin- und Rückweg als Belegstelle einer gefahrenen Route. */
+  const ROUTE = { routeOutboundMeters: 12000, routeReturnMeters: 14000 };
+
+  it('schreibt Herkunft sowie Hin- und Rückweg, wenn sie übergeben werden', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      derivation: { counterSources: { km: 'route' }, routeDistanceMeters: 12000 },
+      derivation: { counterSources: { km: 'route' }, ...ROUTE },
     });
     expect(doc.counterSources).toEqual({ km: 'route' });
-    expect(doc.routeDistanceMeters).toBe(12000);
+    expect(doc.routeOutboundMeters).toBe(12000);
+    expect(doc.routeReturnMeters).toBe(14000);
   });
 
   it('lässt counterSources weg, wenn die Herkunftsliste leer ist', () => {
@@ -229,31 +235,59 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
       derivation: { counterSources: {} },
     });
     expect(doc).not.toHaveProperty('counterSources');
-    expect(doc).not.toHaveProperty('routeDistanceMeters');
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
+    expect(doc).not.toHaveProperty('routeReturnMeters');
   });
 
-  it('lässt beide Felder weg, wenn gar keine Ableitung übergeben wird', () => {
+  it('lässt alle Felder weg, wenn gar keine Ableitung übergeben wird', () => {
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor);
     expect(doc).not.toHaveProperty('counterSources');
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
+    expect(doc).not.toHaveProperty('routeReturnMeters');
+  });
+
+  it('schreibt nie ein neues routeDistanceMeters aus den Wegstrecken', () => {
+    // Das Feld steht für die alte, verdoppelte einfache Strecke. Stünde es
+    // neben Hin- und Rückweg, wäre später nicht mehr erkennbar, welche der
+    // beiden Angaben in den Kilometerstand eingegangen ist.
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      derivation: { counterSources: { km: 'route' }, ...ROUTE },
+    });
     expect(doc).not.toHaveProperty('routeDistanceMeters');
   });
 
-  it('schreibt die Routendistanz auch, wenn kein Zähler als abgeleitet gilt', () => {
+  it('führt ein altes routeDistanceMeters weiter, wenn es übergeben wird', () => {
+    // Der Bearbeitungspfad: Ein Eintrag aus der Zeit vor der getrennten Messung
+    // darf seinen Nachweis nicht durch eine Korrektur der Hinweise verlieren.
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      derivation: { counterSources: {}, routeDistanceMeters: 12000 },
+      derivation: { counterSources: { km: 'route' }, routeDistanceMeters: 8000 },
     });
-    expect(doc).not.toHaveProperty('counterSources');
-    expect(doc.routeDistanceMeters).toBe(12000);
+    expect(doc.routeDistanceMeters).toBe(8000);
+    expect(doc).not.toHaveProperty('routeOutboundMeters');
   });
 
-  it('schreibt die Routendistanz auch, wenn sie 0 ist', () => {
-    // 0 unterscheidet „Route war 0 m" von „keine Route bekannt" — ein
-    // versehentliches `if (derivation?.routeDistanceMeters)` müsste hier
+  it('schreibt die Wegstrecken auch, wenn kein Zähler als abgeleitet gilt', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+      derivation: { counterSources: {}, ...ROUTE },
+    });
+    expect(doc).not.toHaveProperty('counterSources');
+    expect(doc.routeOutboundMeters).toBe(12000);
+    expect(doc.routeReturnMeters).toBe(14000);
+  });
+
+  it('schreibt eine Wegstrecke auch, wenn sie 0 ist', () => {
+    // 0 unterscheidet „Weg war 0 m" von „kein Weg bekannt" — ein
+    // versehentliches `if (derivation?.routeOutboundMeters)` müsste hier
     // durchfallen.
     const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
-      derivation: { counterSources: {}, routeDistanceMeters: 0 },
+      derivation: {
+        counterSources: {},
+        routeOutboundMeters: 0,
+        routeReturnMeters: 0,
+      },
     });
-    expect(doc.routeDistanceMeters).toBe(0);
+    expect(doc.routeOutboundMeters).toBe(0);
+    expect(doc.routeReturnMeters).toBe(0);
   });
 
   it('lässt eine Herkunftsangabe für einen Zähler weg, den das Fahrzeug nicht hat', () => {
@@ -262,19 +296,32 @@ describe('buildEntryDocument — Nachweis abgeleiteter Zählerstände', () => {
       input,
       'ffnd',
       actor,
-      { derivation: { counterSources: { km: 'route' }, routeDistanceMeters: 12000 } },
+      { derivation: { counterSources: { km: 'route' }, ...ROUTE } },
     );
     expect(doc).not.toHaveProperty('counterSources');
   });
 
-  it('wirft, wenn ein Zähler als Route ausgewiesen wird, ohne die Distanz mitzuliefern', () => {
+  it('wirft, wenn ein Zähler als Route ausgewiesen wird, ohne die Wegstrecken mitzuliefern', () => {
     // Die Invariante von `EntryDerivation`: Ohne nachprüfbare Route darf kein
     // Dokument behaupten, ein Stand sei daraus berechnet worden.
     expect(() =>
       buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
         derivation: { counterSources: { km: 'route' } },
       }),
-    ).toThrow(/routeDistanceMeters/);
+    ).toThrow(/route distance/);
+  });
+
+  it('wirft, wenn nur eine der beiden Wegstrecken mitkommt', () => {
+    // Ein einzelner Weg belegt keine Gesamtstrecke — sonst könnte ein halbes
+    // Routing-Ergebnis als voller Nachweis durchgehen.
+    expect(() =>
+      buildEntryDocument(VEHICLE, input, 'ffnd', actor, {
+        derivation: {
+          counterSources: { km: 'route' },
+          routeOutboundMeters: 12000,
+        },
+      }),
+    ).toThrow(/route distance/);
   });
 
   it('wirft nicht, wenn nur unveränderte Herkunftsangaben ohne Distanz kommen', () => {

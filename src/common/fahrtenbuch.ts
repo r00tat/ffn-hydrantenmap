@@ -41,9 +41,9 @@ export interface CounterReading {
 /**
  * Herkunft eines abgeleiteten Endstands:
  *
- * - `'route'` — aus der gefahrenen Straßenstrecke berechnet. Die einfache
- *   Strecke steht als `routeDistanceMeters` am Eintrag und ist damit
- *   nachprüfbar.
+ * - `'route'` — aus der gefahrenen Straßenstrecke berechnet. Hin- und Rückweg
+ *   stehen getrennt als `routeOutboundMeters`/`routeReturnMeters` am Eintrag
+ *   und sind damit nachprüfbar.
  * - `'estimate'` — aus der Luftlinie mit Umwegfaktor geschätzt, weil kein
  *   Routing zu bekommen war. Streng von `'route'` getrennt: In einem
  *   Nachweisdokument muss eine geschätzte Zahl als solche erkennbar bleiben.
@@ -121,7 +121,20 @@ export interface FahrtenbuchEntry {
    * mehr erkennbar, welche Stände berechnet und welche abgelesen wurden.
    */
   counterSources?: Record<string, CounterSource>;
-  /** Einfache Routendistanz in Metern, Grundlage des Kilometer-Endstands. */
+  /**
+   * Gemessener Hinweg (Feuerwehrhaus → Einsatzort) in Metern. Zusammen mit
+   * `routeReturnMeters` die Belegstelle für den Kilometer-Endstand.
+   */
+  routeOutboundMeters?: number;
+  /** Gemessener Rückweg (Einsatzort → Feuerwehrhaus) in Metern. */
+  routeReturnMeters?: number;
+  /**
+   * Einfache Routendistanz in Metern, die verdoppelt in den Kilometer-Endstand
+   * eingegangen ist. Nur an Einträgen aus der Zeit vor der getrennten Messung
+   * von Hin- und Rückweg — bei einer Anfahrt über die Autobahn lag der
+   * verdoppelte Hinweg teils um Kilometer daneben. Wird nur noch gelesen und
+   * bei einer Bearbeitung mitgeführt, nie neu geschrieben.
+   */
   routeDistanceMeters?: number;
   betriebsmittel?: Partial<Record<FuelType, number>>;
   hinweise?: string;
@@ -180,6 +193,23 @@ export const VEHICLE_PRESETS: Record<VehiclePresetId, CounterDefinition[]> = {
   ],
   none: [],
 };
+
+/**
+ * Ob für diese Einheit ein Fahrer anzugeben ist.
+ *
+ * Ein Wechselladeaufbau (WLA-Bergung, WLA-Logistik) oder ein Anhänger wird
+ * aufgenommen bzw. gezogen — er hat keinen eigenen Fahrer und keine eigene
+ * Wegstrecke. Die Zählerdefinitionen sind das Signal dafür: Die Vorlage „Ohne
+ * Zähler" gilt genau für diese Einheiten (siehe `suggestPresetForVehicleName`).
+ *
+ * Bewusst an den Stammdaten und nicht an einer Namensregel zur Laufzeit
+ * festgemacht: So entscheidet die Zähler-Vorlage des Fahrzeugs darüber, und ein
+ * Anhänger mit einem Namen, den keine Regel erkennt, ist über die Stammdaten
+ * geradezuziehen.
+ */
+export function requiresDriver(definitions: CounterDefinition[]): boolean {
+  return definitions.length > 0;
+}
 
 export interface CounterWarning {
   counterId: string;
@@ -281,7 +311,9 @@ export function validateEntryInput(
   const errors: string[] = [];
 
   if (!input.vehicleId?.trim()) errors.push('vehicleMissing');
-  if (!input.driverName?.trim()) errors.push('driverMissing');
+  if (!input.driverName?.trim() && requiresDriver(definitions)) {
+    errors.push('driverMissing');
+  }
   if (!FAHRT_ZWECKE.includes(input.zweck as FahrtZweck)) {
     errors.push('zweckInvalid');
   }

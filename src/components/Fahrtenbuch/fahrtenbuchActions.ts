@@ -20,7 +20,7 @@ import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
 import { defaultPosition } from '../../hooks/constants';
 import { firestore } from '../../server/firebase/admin';
 import { resolveFahrtenbuchShareLink } from '../../server/auth/resolveFahrtenbuchShareLink';
-import { computeRouteDistanceMeters } from '../actions/maps/routes';
+import { computeRouteLegsMeters } from '../actions/maps/routes';
 import { FIRECALL_COLLECTION_ID, GROUP_COLLECTION_ID, type Firecall } from '../firebase/firestore';
 import { actionGroupMemberRequired } from './authGuards';
 import {
@@ -30,7 +30,7 @@ import {
   survivingCounterSources,
   type FahrtenbuchEntryInput,
 } from './entryLogic';
-import { cachedRouteDistance, routeCacheEntry } from './firecallRoute';
+import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
 
 export interface ActionResult {
   success: boolean;
@@ -119,8 +119,11 @@ async function loadGroupStandort(groupId: string): Promise<GeoPositionObject> {
 }
 
 /**
- * Löst die Gesamtstrecke vom Standort der Gruppe zum Einsatzort auf und cacht
- * die gefahrene Route am Einsatz-Dokument.
+ * Löst die Gesamtstrecke vom Standort der Gruppe zum Einsatzort und zurück auf
+ * und cacht die gefahrene Route am Einsatz-Dokument.
+ *
+ * Hin- und Rückweg werden getrennt gemessen; die Begründung steht an
+ * `computeRouteLegsMeters`.
  *
  * Fällt das Routing aus, wird auf die Luftlinien-Schätzung zurückgefallen und
  * das Ergebnis als `'estimate'` gekennzeichnet: Ein grober, als grob erkennbarer
@@ -154,11 +157,13 @@ async function resolveFirecallDistance(
   }
   const einsatzort: GeoPositionObject = { lat: firecall.lat, lng: firecall.lng };
 
-  const cached = cachedRouteDistance(firecall.fahrtenbuchRoute, standort, einsatzort);
-  if (cached !== undefined) return routeDistance(cached);
+  const cached = cachedRouteLegs(firecall.fahrtenbuchRoute, standort, einsatzort);
+  if (cached) {
+    return routeDistance(cached.outboundMeters, cached.returnMeters);
+  }
 
-  const distanceM = await computeRouteDistanceMeters(standort, einsatzort);
-  if (distanceM === undefined) {
+  const legs = await computeRouteLegsMeters(standort, einsatzort);
+  if (legs === undefined) {
     console.warn(
       'resolveFirecallDistance: keine Route — es wird geschätzt und nicht gecacht',
       { groupId, firecallId },
@@ -167,10 +172,10 @@ async function resolveFirecallDistance(
   }
 
   await ref.set(
-    { fahrtenbuchRoute: routeCacheEntry(standort, einsatzort, distanceM) },
+    { fahrtenbuchRoute: routeCacheEntry(standort, einsatzort, legs) },
     { merge: true },
   );
-  return routeDistance(distanceM);
+  return routeDistance(legs.outboundMeters, legs.returnMeters);
 }
 
 /**
@@ -379,7 +384,8 @@ export async function createFahrtenbuchEntries(
           {
             derivation: {
               counterSources: filled.counterSources,
-              routeDistanceMeters: distance?.distanceMeters,
+              routeOutboundMeters: distance?.outboundMeters,
+              routeReturnMeters: distance?.returnMeters,
             },
             countersOptional: true,
           },
@@ -680,11 +686,14 @@ export async function updateFahrtenbuchEntry(
 
     const vehicle = await loadVehicle(groupId, input.vehicleId);
     const now = new Date().toISOString();
-    // `routeDistanceMeters` überlebt eine Bearbeitung immer — die Distanz zum
-    // Einsatzort bleibt wahr, egal was jemand am Eintrag ändert. Die Herkunft
-    // eines einzelnen Zählers überlebt nur, solange dessen Endstand
-    // unverändert bleibt (`survivingCounterSources`) — sonst behauptete eine
-    // bloße Korrektur der Hinweise weiterhin einen abgeleiteten Zähler.
+    // Die gemessenen Wegstrecken überleben eine Bearbeitung immer — die
+    // Entfernung zum Einsatzort bleibt wahr, egal was jemand am Eintrag ändert.
+    // Das alte `routeDistanceMeters` wird mitgeführt, damit ein Eintrag aus der
+    // Zeit vor der getrennten Messung seinen Nachweis nicht durch eine
+    // Bearbeitung verliert. Die Herkunft eines einzelnen Zählers überlebt nur,
+    // solange dessen Endstand unverändert bleibt (`survivingCounterSources`) —
+    // sonst behauptete eine bloße Korrektur der Hinweise weiterhin einen
+    // abgeleiteten Zähler.
     const rebuilt = buildEntryDocument(
       vehicle,
       input,
@@ -701,6 +710,8 @@ export async function updateFahrtenbuchEntry(
             existing.counters,
             input.counters ?? {},
           ),
+          routeOutboundMeters: existing.routeOutboundMeters,
+          routeReturnMeters: existing.routeReturnMeters,
           routeDistanceMeters: existing.routeDistanceMeters,
         },
       },

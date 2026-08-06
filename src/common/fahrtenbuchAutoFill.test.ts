@@ -5,26 +5,26 @@ import {
   estimateRoundTripKm,
   estimatedDistance,
   isKmCounter,
-  roundTripKmFromMeters,
   routeDistance,
+  totalKmFromMeters,
   type RoundTripDistance,
 } from './fahrtenbuchAutoFill';
 
 const km = VEHICLE_PRESETS.fahrzeug;
 const boot = VEHICLE_PRESETS.boot;
 
-/** 12 km einfache Strecke → 24 km Gesamtstrecke. */
-const ROUTE_24: RoundTripDistance = routeDistance(12000);
+/** 12 km Hinweg + 12 km Rückweg → 24 km Gesamtstrecke. */
+const ROUTE_24: RoundTripDistance = routeDistance(12000, 12000);
 
-describe('roundTripKmFromMeters', () => {
-  it('verdoppelt die einfache Strecke und rundet auf', () => {
-    expect(roundTripKmFromMeters(12000)).toBe(24);
-    expect(roundTripKmFromMeters(12001)).toBe(25);
-    expect(roundTripKmFromMeters(1)).toBe(1);
+describe('totalKmFromMeters', () => {
+  it('rundet auf ganze Kilometer auf', () => {
+    expect(totalKmFromMeters(24000)).toBe(24);
+    expect(totalKmFromMeters(24001)).toBe(25);
+    expect(totalKmFromMeters(1)).toBe(1);
   });
 
   it('liefert 0 für eine Distanz von 0', () => {
-    expect(roundTripKmFromMeters(0)).toBe(0);
+    expect(totalKmFromMeters(0)).toBe(0);
   });
 });
 
@@ -40,16 +40,33 @@ describe('estimateRoundTripKm', () => {
 });
 
 describe('routeDistance / estimatedDistance', () => {
-  it('trägt bei einer gefahrenen Route die einfache Strecke als Belegstelle mit', () => {
-    expect(routeDistance(12000)).toStrictEqual({
+  it('trägt bei einer gefahrenen Route Hin- und Rückweg als Belegstelle mit', () => {
+    expect(routeDistance(12000, 12000)).toStrictEqual({
       roundTripKm: 24,
       source: 'route',
-      distanceMeters: 12000,
+      outboundMeters: 12000,
+      returnMeters: 12000,
     });
   });
 
-  it('lässt bei einer Schätzung die Streckenangabe weg', () => {
-    // `routeDistanceMeters` am Eintrag belegt eine gefahrene Route. Stünde dort
+  it('addiert einen vom Hinweg abweichenden Rückweg statt den Hinweg zu verdoppeln', () => {
+    // Der Fall Autobahn: Der Rückweg führt über die nächste Abfahrt und ist
+    // hier 9 km länger. Ein verdoppelter Hinweg ergäbe 24 km — 9 km zu wenig.
+    expect(routeDistance(12000, 21000)).toMatchObject({
+      roundTripKm: 33,
+      outboundMeters: 12000,
+      returnMeters: 21000,
+    });
+  });
+
+  it('rundet erst die Summe auf, nicht jeden Weg für sich', () => {
+    // 2 × aufgerundet ergäbe 2 km, die Summe ergibt 1 km — die Gesamtstrecke
+    // ist die abgerechnete Größe, nicht der einzelne Weg.
+    expect(routeDistance(300, 400).roundTripKm).toBe(1);
+  });
+
+  it('lässt bei einer Schätzung die Streckenangaben weg', () => {
+    // Die Routenfelder am Eintrag belegen eine gefahrene Strecke. Stünde dort
     // ein Schätzwert, wäre der Nachweis nicht mehr von einer Messung zu
     // unterscheiden.
     const estimate = estimatedDistance(
@@ -58,7 +75,8 @@ describe('routeDistance / estimatedDistance', () => {
     );
     expect(estimate.source).toBe('estimate');
     expect(estimate.roundTripKm).toBe(29);
-    expect(estimate.distanceMeters).toBeUndefined();
+    expect(estimate.outboundMeters).toBeUndefined();
+    expect(estimate.returnMeters).toBeUndefined();
   });
 });
 

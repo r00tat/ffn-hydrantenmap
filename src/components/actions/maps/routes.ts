@@ -139,3 +139,46 @@ export async function computeRouteDistanceMeters(
     return undefined;
   }
 }
+
+export interface RouteLegsMeters {
+  /** Hinweg in Metern. */
+  outboundMeters: number;
+  /** Rückweg in Metern. */
+  returnMeters: number;
+}
+
+/**
+ * Hin- und Rückweg getrennt gemessen — zwei Routenabfragen, nicht eine
+ * verdoppelte.
+ *
+ * Der Rückweg ist nicht der gespiegelte Hinweg: Auf der Autobahn liegt die
+ * nächste Abfahrt Kilometer hinter dem Einsatzort, Einbahnen und
+ * Abbiegeverbote wirken ebenso nur in einer Richtung. Im Ortsgebiet fallen
+ * beide Strecken meist zusammen, dort kostet die zweite Abfrage nur einen
+ * Aufruf.
+ *
+ * `undefined`, sobald eine der beiden Richtungen fehlt: Ein halbes Ergebnis
+ * ließe sich nur durch Verdoppeln der anderen Richtung retten — genau die
+ * Annahme, die hier abgelöst wird. Der Aufrufer fällt dann auf die
+ * Luftlinien-Schätzung zurück, die sich als Schätzung ausweist.
+ */
+export async function computeRouteLegsMeters(
+  from: GeoPositionObject,
+  to: GeoPositionObject
+): Promise<RouteLegsMeters | undefined> {
+  const [outboundMeters, returnMeters] = await Promise.all([
+    computeRouteDistanceMeters(from, to),
+    computeRouteDistanceMeters(to, from),
+  ]);
+
+  if (outboundMeters === undefined || returnMeters === undefined) {
+    console.error('computeRouteLegsMeters: unvollständige Route', {
+      outboundMeters,
+      returnMeters,
+      from,
+      to,
+    });
+    return undefined;
+  }
+  return { outboundMeters, returnMeters };
+}

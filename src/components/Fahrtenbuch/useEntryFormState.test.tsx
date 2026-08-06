@@ -12,7 +12,27 @@ import {
 } from './useEntryFormState';
 
 const vehicles: EntryFormVehicle[] = [
-  { id: 'v1', name: 'TLF', counters: [], fuelTypes: [] },
+  // Ohne Zähler — für `requiresDriver` ein Anhänger bzw. Wechselladeaufbau, der
+  // keinen Fahrer braucht.
+  { id: 'v1', name: 'WLA-Bergung', counters: [], fuelTypes: [] },
+  // Mit Zähler, damit die Fahrerpflicht greift. Der Zähler ist bewusst nicht
+  // `required`, damit die Fahrerprüfung nicht hinter einem fehlenden Stand
+  // verschwindet.
+  {
+    id: 'v2',
+    name: 'TLF',
+    counters: [
+      {
+        id: 'km',
+        label: 'Kilometerstand',
+        unit: 'km',
+        mode: 'startEnd',
+        changeWarning: 'decrease',
+        required: false,
+      },
+    ],
+    fuelTypes: [],
+  },
 ];
 
 const firecalls: FahrtenbuchFirecallOption[] = [
@@ -221,15 +241,31 @@ describe('useEntryFormState', () => {
     });
 
     it('sendet nicht, wenn die Validierung fehlschlägt', async () => {
-      const { result, onSubmit } = renderForm();
+      // Ein Fahrzeug mit Zähler wird selbst gefahren — ohne Fahrer ist der
+      // Eintrag ungültig.
+      const { result, onSubmit } = renderForm({ vehicleId: 'v2' });
 
-      // Ohne Fahrer ist der Eintrag ungültig.
       await act(async () => {
         await result.current.submit();
       });
 
       expect(onSubmit).not.toHaveBeenCalled();
       expect(result.current.errors).toContain('driverMissing');
+    });
+
+    it('sendet einen Anhänger ohne Zähler auch ohne Fahrer', async () => {
+      // Ein Wechselladeaufbau wird aufgenommen, ein Anhänger gezogen — beide
+      // haben keinen eigenen Fahrer. Die Fahrerpflicht hätte ihre Erfassung
+      // dauerhaft blockiert.
+      const { result, onSubmit } = renderForm();
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(result.current.errors).toEqual([]);
+      expect(onSubmit).toHaveBeenCalled();
+      expect(submitted(onSubmit).driverName).toBe('');
     });
   });
 });
