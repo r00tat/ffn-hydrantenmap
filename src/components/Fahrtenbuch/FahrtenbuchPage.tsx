@@ -1,6 +1,7 @@
 'use client';
 
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -24,6 +25,7 @@ import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
+import FahrtenbuchExportDialog from './FahrtenbuchExportDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import FahrtenbuchVehicleCard from './FahrtenbuchVehicleCard';
 import useEntryDeletion from './useEntryDeletion';
@@ -51,6 +53,7 @@ export default function FahrtenbuchPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogVehicleId, setDialogVehicleId] = useState<string>();
   const [editEntry, setEditEntry] = useState<FahrtenbuchEntry>();
+  const [exportOpen, setExportOpen] = useState(false);
 
   /** Letzter Eintrag je Fahrzeug — für Fahrer und Defekt-Hinweis auf der Karte. */
   const lastEntryByVehicle = useMemo(() => {
@@ -128,6 +131,17 @@ export default function FahrtenbuchPage() {
             {t('einsatz.bookForFirecall', { name: firecall.name })}
           </Button>
         )}
+        {/* Auch mit ausschließlich stillgelegten Fahrzeugen sinnvoll: deren
+            alte Fahrten gehören in einen Nachweis über einen vergangenen
+            Zeitraum. */}
+        <Button
+          variant="outlined"
+          startIcon={<PictureAsPdfIcon />}
+          disabled={!groupId || vehicles.length === 0}
+          onClick={() => setExportOpen(true)}
+        >
+          {t('export.button')}
+        </Button>
         <Button
           variant="contained"
           disabled={!groupId || activeVehicles.length === 0}
@@ -185,6 +199,17 @@ export default function FahrtenbuchPage() {
           />
         </AccordionDetails>
       </Accordion>
+
+      {/* Ebenfalls bedingt gemountet: Zeitraum und Fahrzeugauswahl sind beim
+          Öffnen neu zu setzen, nicht die des letzten Exports. */}
+      {exportOpen && groupId && (
+        <FahrtenbuchExportDialog
+          open
+          groupId={groupId}
+          vehicles={vehicles}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
 
       {/* Bedingtes Mounten (plus key): der Dialog liest seinen Anfangszustand
           nur beim Mounten — sonst zeigt er beim zweiten Öffnen alte Werte. */}
