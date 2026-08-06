@@ -63,7 +63,7 @@ jobs:
           VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
           VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9-]+@-@g' )
           VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
-          export NEXTAUTH_URL="https://hydrantenmap-dev-xrhhpxsnva-ez.a.run.app/"
+          export NEXTAUTH_URL="https://einsatz-dev.ffnd.at"
           export SUMUP_SECRET_SUFFIX="_DEV"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
