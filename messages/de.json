@@ -1196,6 +1196,8 @@
     "itemRow": {
       "amountShort": "Anz:",
       "hoursShort": "h:",
+      "increase": "Anzahl erhöhen",
+      "decrease": "Anzahl verringern",
       "byEffort": "nach Aufwand",
       "pricePerHour": "{price}/h",
       "pricePerHourFlat": "{price}/h • {flat} pauschal",
