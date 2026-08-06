@@ -60,6 +60,99 @@ describe('ShareLinkEntryForm', () => {
     expect(screen.getByText(/nicht einsehbar/i)).toBeInTheDocument();
   });
 
+  /** Zwei Fahrzeuge — damit greift die Vorauswahl des Einzelfahrzeugs nicht. */
+  const twoVehicles: ShareLinkFormData = {
+    ...data,
+    vehicles: [
+      ...data.vehicles,
+      { ...data.vehicles[0], id: 'v2', name: 'MTF', lastCounters: { km: 90 } },
+    ],
+  };
+
+  it('zeigt ohne gewähltes Fahrzeug nur die Fahrzeugauswahl', () => {
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={twoVehicles} />);
+
+    expect(screen.getByLabelText('Fahrzeug')).toBeInTheDocument();
+    expect(
+      screen.getByText(/zuerst ein Fahrzeug/i),
+    ).toBeInTheDocument();
+    // Die übrigen Felder hängen am Fahrzeug — ohne Auswahl stünde ein
+    // Formular da, dem der Kilometerstand fehlt.
+    expect(screen.queryByLabelText('Fahrer')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fahrtzweck')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fahrstrecke / Ziel')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Abfahrt')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Hinweise')).not.toBeInTheDocument();
+  });
+
+  it('zeigt die übrigen Felder, sobald ein Fahrzeug gewählt ist', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={twoVehicles} />);
+
+    await user.click(screen.getByLabelText('Fahrzeug'));
+    await user.click(await screen.findByRole('option', { name: 'MTF' }));
+
+    expect(await screen.findByLabelText('Fahrer')).toBeInTheDocument();
+    expect(screen.getByLabelText('Kilometerstand — Start')).toHaveValue(90);
+    expect(screen.queryByText(/zuerst ein Fahrzeug/i)).not.toBeInTheDocument();
+  });
+
+  it('zeigt das Mangelfeld erst, wenn ein Defekt angehakt ist', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    expect(screen.queryByLabelText(/Mangelbeschreibung/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Defekt oder Mangel'));
+
+    expect(
+      await screen.findByLabelText(/Mangelbeschreibung/),
+    ).toBeInTheDocument();
+  });
+
+  it('speichert den Mangel getrennt von den Hinweisen', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.type(screen.getByLabelText('Hinweise'), 'Tank halb voll');
+    await user.click(screen.getByLabelText('Defekt oder Mangel'));
+    await user.type(
+      await screen.findByLabelText(/Mangelbeschreibung/),
+      'Bremse zieht nach links',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      hinweise: 'Tank halb voll',
+      defekt: true,
+      mangel: 'Bremse zieht nach links',
+    });
+  });
+
+  it('lehnt einen gemeldeten Defekt ohne Beschreibung ab', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByLabelText('Defekt oder Mangel'));
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    expect(
+      await screen.findByText('Bitte den Mangel beschreiben.'),
+    ).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it('bietet keine Einsatzauswahl an, auch beim Zweck Einsatz', async () => {
     const user = userEvent.setup();
     renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);

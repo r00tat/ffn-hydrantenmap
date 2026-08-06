@@ -3,10 +3,12 @@ import 'server-only';
 
 import { actionAdminRequired } from '../../app/auth';
 import {
+  FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   normalizeName,
   VEHICLE_PRESETS,
+  type FahrtenbuchConfig,
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
   type VehiclePresetId,
@@ -35,6 +37,7 @@ import {
   resolveVehicleImportSelection,
   sanitizeCounterDefinitions,
   sanitizeFuelTypes,
+  sanitizeMangelEmails,
   sanitizeSortOrder,
   sanitizeStandort,
   type VehicleImportPlanRow,
@@ -540,6 +543,83 @@ export async function saveFahrtenbuchGroupStandort(
     return { success: true, id: groupId };
   } catch (err) {
     console.error('saveFahrtenbuchGroupStandort failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+function configRef(groupId: string) {
+  return firestore.collection(FAHRTENBUCH_CONFIG_COLLECTION_ID).doc(groupId);
+}
+
+export interface MangelEmailsQueryResult {
+  success: boolean;
+  emails: string[];
+  error?: string;
+}
+
+/**
+ * Die Empfänger der Mangel-Benachrichtigung dieser Gruppe.
+ *
+ * Nur über diese Action zu bekommen: Die Collection ist für Clients gesperrt,
+ * damit nicht jedes Gruppenmitglied die Adresse des Fahrzeugverantwortlichen
+ * auslesen kann (siehe `FAHRTENBUCH_CONFIG_COLLECTION_ID`). Ein Snapshot-Hook
+ * wie beim Standort ist deshalb kein Weg.
+ */
+export async function getFahrtenbuchMangelEmails(
+  groupId: string,
+): Promise<MangelEmailsQueryResult> {
+  try {
+    await actionAdminRequired();
+    assertFahrtenbuchGroup(groupId);
+
+    const doc = await configRef(groupId).get();
+    if (!doc.exists) return { success: true, emails: [] };
+    const stored = (doc.data() as FahrtenbuchConfig | undefined)?.mangelEmails;
+    return {
+      success: true,
+      // Nur filtern, nicht validieren: Ein Altbestand soll im Formular
+      // sichtbar und damit korrigierbar sein, nicht unsichtbar verschwinden.
+      emails: Array.isArray(stored)
+        ? stored.filter((value): value is string => typeof value === 'string')
+        : [],
+    };
+  } catch (err) {
+    console.error('getFahrtenbuchMangelEmails failed', err);
+    return { success: false, emails: [], error: (err as Error).message };
+  }
+}
+
+/**
+ * Speichert die Empfänger der Mangel-Benachrichtigung. Eine leere Liste
+ * schaltet die Benachrichtigung ab; eine ungültige Adresse wird abgelehnt und
+ * nicht still verworfen (siehe `sanitizeMangelEmails`).
+ */
+export async function saveFahrtenbuchMangelEmails(
+  groupId: string,
+  emails: string[],
+): Promise<StammdatenResult> {
+  try {
+    const session = await actionAdminRequired();
+    assertFahrtenbuchGroup(groupId);
+
+    const { emails: sanitized, error } = sanitizeMangelEmails(emails);
+    if (error) return { success: false, error };
+
+    await configRef(groupId).set(
+      {
+        groupId,
+        mangelEmails: sanitized,
+        updatedAt: new Date().toISOString(),
+        updatedBy: session.user.id,
+      },
+      // `merge: true`, damit spätere Felder dieses Konfigurationsdokuments von
+      // einer Änderung an den Empfängern nicht mitgelöscht werden.
+      { merge: true },
+    );
+
+    return { success: true, id: groupId };
+  } catch (err) {
+    console.error('saveFahrtenbuchMangelEmails failed', err);
     return { success: false, error: (err as Error).message };
   }
 }

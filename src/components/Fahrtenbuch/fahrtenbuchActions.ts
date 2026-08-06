@@ -32,6 +32,7 @@ import {
   type FahrtenbuchEntryInput,
 } from './entryLogic';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
+import { notifyMangel } from './notifyMangel';
 
 export interface ActionResult {
   success: boolean;
@@ -181,6 +182,34 @@ async function refreshVehicleCounters(groupId: string, vehicleId: string) {
   });
 }
 
+/**
+ * Meldet einen mit der Fahrt erfassten Mangel an die Empfänger der Gruppe.
+ *
+ * Best-effort und bewusst nach dem Schreiben: Die Fahrt steht im Fahrtenbuch,
+ * und eine ausgefallene Mail darf sie nicht als gescheitert melden — der
+ * Benutzer würde sie sonst ein zweites Mal eintragen. Dieselbe Haltung wie
+ * beim Bug-Report; der Fehler steht im Log.
+ *
+ * Nur beim Anlegen, nicht beim Bearbeiten: Eine Korrektur an einer schon
+ * gemeldeten Fahrt soll keine zweite Mail auslösen. Auch nicht beim Import —
+ * eine Fahrt von vor zwei Jahren löst keinen Werkstatttermin mehr aus.
+ */
+async function notifyMangelIfReported(
+  groupId: string,
+  entry: FahrtenbuchEntry,
+  vehicle: FahrtenbuchVehicle,
+): Promise<void> {
+  if (!entry.defekt) return;
+  try {
+    await notifyMangel({ groupId, entry, vehicle });
+  } catch (err) {
+    console.error('Mangel-Benachrichtigung fehlgeschlagen', err, {
+      groupId,
+      vehicleId: entry.vehicleId,
+    });
+  }
+}
+
 export async function createFahrtenbuchEntry(
   groupId: string,
   input: FahrtenbuchEntryInput,
@@ -197,6 +226,7 @@ export async function createFahrtenbuchEntry(
 
     const ref = await entriesRef(groupId).add(doc);
     await refreshVehicleCounters(groupId, input.vehicleId);
+    await notifyMangelIfReported(groupId, doc, vehicle);
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createFahrtenbuchEntry failed', err);
@@ -786,6 +816,11 @@ export async function createFahrtenbuchEntryViaShareLink(
 
     const ref = await entriesRef(link.groupId).add(doc);
     await refreshVehicleCounters(link.groupId, input.vehicleId);
+    // Auch über den Freigabelink: Wer den QR-Code am Fahrzeug nutzt, ist meist
+    // genau die Person, die den Mangel bemerkt hat. Die Mail weist die Herkunft
+    // aus (siehe `buildMangelEmail`), damit die Empfängerin weiß, dass hinter
+    // dem Namen kein angemeldetes Mitglied steht.
+    await notifyMangelIfReported(link.groupId, doc, vehicle);
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createFahrtenbuchEntryViaShareLink failed', err);

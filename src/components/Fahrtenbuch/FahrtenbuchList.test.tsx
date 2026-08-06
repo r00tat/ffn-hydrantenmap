@@ -153,4 +153,33 @@ describe('FahrtenbuchList', () => {
     expect(screen.getByText('42 l')).toBeInTheDocument();
     expect(screen.getByText('5 l')).toBeInTheDocument();
   });
+
+  it('nennt den Mangel am Warnzeichen', () => {
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry({ defekt: true, mangel: 'Bremse zieht nach links' })]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText('Bremse zieht nach links'),
+    ).toBeInTheDocument();
+  });
+
+  it('fällt am Warnzeichen auf den allgemeinen Vermerk zurück', () => {
+    // Einträge aus der Zeit vor dem eigenen Mangelfeld haben nur das Häkchen.
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry({ defekt: true })]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(screen.getByLabelText('Defekt gemeldet')).toBeInTheDocument();
+  });
 });

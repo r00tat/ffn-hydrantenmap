@@ -356,6 +356,9 @@
     "ankunft": "Ankunft",
     "hinweise": "Hinweise",
     "defekt": "Defekt oder Mangel",
+    "mangel": "Mangelbeschreibung",
+    "mangelHelp": "Was ist am Fahrzeug kaputt oder auffällig?",
+    "selectVehicleHint": "Bitte zuerst ein Fahrzeug wählen — die weiteren Felder hängen davon ab.",
     "betriebsmittel": "Getankt",
     "save": "Speichern",
     "cancel": "Abbrechen",
@@ -398,6 +401,7 @@
       "ankunftInvalid": "Ankunftszeitpunkt ist ungültig.",
       "ankunftBeforeAbfahrt": "Die Ankunft liegt vor der Abfahrt.",
       "zweckInvalid": "Bitte einen gültigen Fahrtzweck wählen.",
+      "mangelMissing": "Bitte den Mangel beschreiben.",
       "counterMissing": "{counter} fehlt.",
       "counterEndBeforeStart": "{counter}: Endstand liegt unter dem Startstand.",
       "notAllowed": "Nur der Ersteller oder ein Admin darf diesen Eintrag ändern.",
@@ -611,7 +615,17 @@
           "unknownFormat": "unbekannter Aufbau",
           "empty": "keine Daten enthalten"
         }
-      }
+      },
+      "mangelEmails": "Mangel-Benachrichtigung",
+      "mangelEmailsHint": "Wird mit einer Fahrt ein Defekt oder Mangel gemeldet, geht eine E-Mail an diese Adressen — die erste im An-Feld, alle weiteren in Kopie. Ohne Eintrag wird nichts versandt.",
+      "mangelEmailsLabel": "E-Mail-Adressen",
+      "mangelEmailsPlaceholder": "zeugwart@feuerwehr.at",
+      "mangelEmailsHelper": "Adresse eintippen und mit Enter bestätigen.",
+      "mangelEmailsSaved": "Empfänger gespeichert.",
+      "mangelEmailsLoadFailed": "Empfänger konnten nicht geladen werden: {message}",
+      "mangelEmailsSaveFailed": "Empfänger konnten nicht gespeichert werden: {message}",
+      "mangelEmailInvalid": "Bitte gültige E-Mail-Adressen eintragen.",
+      "mangelEmailsTooMany": "Es sind höchstens {max} Empfänger möglich."
     },
     "shareLink": {
       "heading": "Fahrtenbuch-Link",

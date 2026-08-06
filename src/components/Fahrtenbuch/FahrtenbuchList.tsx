@@ -236,7 +236,12 @@ export default function FahrtenbuchList({
                       sx={{ justifyContent: 'flex-end', alignItems: 'center' }}
                     >
                       {entry.defekt && (
-                        <Tooltip title={t('defectReported')}>
+                        // Einträge aus der Zeit vor dem eigenen Mangelfeld
+                        // tragen nur das Häkchen — dort bleibt der allgemeine
+                        // Vermerk die einzige Auskunft.
+                        <Tooltip
+                          title={entry.mangel?.trim() || t('defectReported')}
+                        >
                           <WarningAmberIcon color="warning" fontSize="small" />
                         </Tooltip>
                       )}

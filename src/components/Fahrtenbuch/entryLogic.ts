@@ -30,6 +30,8 @@ export interface FahrtenbuchEntryInput {
   betriebsmittel?: Partial<Record<FuelType, number>>;
   hinweise?: string;
   defekt?: boolean;
+  /** Nur mit `defekt` zusammen sinnvoll — ohne ihn wird es verworfen. */
+  mangel?: string;
 }
 
 export interface EntryActor {
@@ -152,6 +154,8 @@ export function buildEntryDocument(
       abfahrt: input.abfahrt,
       ankunft: input.ankunft,
       counters: input.counters ?? {},
+      defekt: input.defekt,
+      mangel: input.mangel,
     },
     { countersOptional: options?.countersOptional },
   );
@@ -187,7 +191,13 @@ export function buildEntryDocument(
     doc.betriebsmittel = betriebsmittel;
   }
   if (input.hinweise?.trim()) doc.hinweise = input.hinweise.trim();
-  if (input.defekt) doc.defekt = true;
+  // Die Beschreibung hängt am Häkchen: Wird der Defekt bei einer Bearbeitung
+  // zurückgenommen, darf der alte Mangeltext nicht am Eintrag zurückbleiben —
+  // Liste, Export und Mail lesen ihn sonst weiter aus.
+  if (input.defekt) {
+    doc.defekt = true;
+    if (input.mangel?.trim()) doc.mangel = input.mangel.trim();
+  }
 
   // Nur Zähler übernehmen, die im Dokument tatsächlich vorkommen — sonst
   // entstünde eine Herkunftsangabe für einen Zähler, den `doc.counters` gar

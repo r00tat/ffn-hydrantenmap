@@ -74,6 +74,16 @@ Weicht ein Zählerstand vom letzten bekannten Stand ab oder liegt er darunter, w
 Ändern und Löschen darf nur, wer den Eintrag erstellt hat, oder ein Administrator. Gelöschte Fahrten bleiben als gelöscht markiert erhalten und verschwinden aus den Listen und dem Export.
 :::
 
+### Defekt oder Mangel melden
+
+Ist an einer Fahrt **Defekt oder Mangel** angehakt, trägt die Fahrzeugkarte den Hinweis, bis eine neuere Fahrt ihn nicht mehr meldet. Die Liste **Alle Fahrten** lässt sich auf „Nur Defekte" filtern. Beschreibe den Mangel im Feld **Hinweise** — dieser Text geht in die Benachrichtigung ein.
+
+Sind für die Gruppe Empfänger gepflegt (Admin-Bereich → Fahrtenbuch → **Einstellungen** → *Mangel-Benachrichtigung*), geht beim Speichern eine E-Mail an sie: Fahrzeug und Kennzeichen, Fahrer, Zeiten, Zweck und Ziel, die Zählerstände, die Mangelbeschreibung und ein Link auf das Fahrtenbuch des Fahrzeugs. Die erste Adresse steht im An-Feld, alle weiteren in Kopie.
+
+:::info
+Die Benachrichtigung geht nur bei einer **neu erfassten** Fahrt raus — auch bei einer Meldung über den QR-Code ohne Anmeldung, dann mit dem Vermerk *über Freigabelink*. Eine nachträgliche Bearbeitung, die Sammelerfassung und der PDF-Import lösen keine Mail aus. Ohne gepflegte Empfänger wird nichts versandt; die Fahrt wird in jedem Fall gespeichert.
+:::
+
 ### Fahrtenbuch für mehrere Fahrzeuge eines Einsatzes schreiben
 
 Nach einem Einsatz braucht nicht jedes Fahrzeug einen eigenen Dialog: Die **Sammelerfassung** legt für alle Fahrzeuge des Einsatzes gleichzeitig eine Fahrt an.
@@ -150,7 +160,7 @@ Der Admin-Bereich unter **Fahrtenbuch** hat fünf Reiter:
 
 - **Fahrzeuge** Name, Kennzeichen, aktiv/stillgelegt, Zähler-Vorlage, Betriebsmittel, Notiz. Über **Fahrzeuge importieren** lassen sich die Fahrzeuge aus dem Kostenersatz-Bestand übernehmen; je Fahrzeug gibt es hier auch den QR-Code
 - **Personen** Fahrer der Gruppe mit Telefon, E-Mail und Alarm-SMS-Empfänger-ID. Über **Personen aus CSV importieren** wird der Teilnehmer-Export aus Alarm SMS eingelesen; Personen, die nicht mehr enthalten sind, können deaktiviert werden — gelöscht wird nichts, damit vergangene Fahrten zugeordnet bleiben
-- **Einstellungen** Standort des Feuerwehrhauses als Startpunkt der Einsatzkilometer, per Koordinaten oder Auswahl auf der Karte
+- **Einstellungen** Standort des Feuerwehrhauses als Startpunkt der Einsatzkilometer, per Koordinaten oder Auswahl auf der Karte; darunter die **Mangel-Benachrichtigung** mit den E-Mail-Empfängern für gemeldete Defekte
 - **Fahrtenbuch-Link** Link für die Erfassung ohne Anmeldung erzeugen, neu erzeugen oder löschen
 - **Fahrtenbuch-Import** Fahrten aus einem PDF-Export übernehmen
 

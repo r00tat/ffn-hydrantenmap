@@ -323,6 +323,26 @@ describe('buildFahrtenbuchExport', () => {
     expect(model.sections[0].rows[0].defekt).toBe(true);
   });
 
+  it('hängt die Mangelbeschreibung an den Defekt-Vermerk', () => {
+    const model = buildFahrtenbuchExport(
+      {
+        ...baseOptions,
+        entries: [
+          entry({
+            hinweise: 'Scheibenwischer erneuert',
+            defekt: true,
+            mangel: 'Bremse zieht nach links',
+          }),
+        ],
+      },
+      t,
+    );
+
+    expect(model.sections[0].rows[0].cells[9]).toBe(
+      'Scheibenwischer erneuert — defectReported: Bremse zieht nach links',
+    );
+  });
+
   it('ergänzt eine Betriebsmittelspalte, die nur in den Fahrten vorkommt', () => {
     const model = buildFahrtenbuchExport(
       {

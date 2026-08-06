@@ -229,6 +229,46 @@ describe('validateEntryInput', () => {
       validateEntryInput(KM, { ...base, abfahrt: 'nicht-ein-datum' }),
     ).toEqual(['abfahrtInvalid']);
   });
+
+  it('verlangt zu einem gemeldeten Defekt eine Beschreibung', () => {
+    expect(validateEntryInput(KM, { ...base, defekt: true })).toEqual([
+      'mangelMissing',
+    ]);
+  });
+
+  it('lässt Leerzeichen nicht als Mangelbeschreibung durchgehen', () => {
+    expect(
+      validateEntryInput(KM, { ...base, defekt: true, mangel: '   ' }),
+    ).toEqual(['mangelMissing']);
+  });
+
+  it('akzeptiert einen Defekt mit Beschreibung', () => {
+    expect(
+      validateEntryInput(KM, {
+        ...base,
+        defekt: true,
+        mangel: 'Bremse zieht nach links',
+      }),
+    ).toEqual([]);
+  });
+
+  it('verlangt ohne gemeldeten Defekt keine Mangelbeschreibung', () => {
+    expect(validateEntryInput(KM, { ...base, defekt: false })).toEqual([]);
+  });
+
+  it('verlangt die Beschreibung auch bei optionalen Zählern', () => {
+    // Die Sammelerfassung aus dem Einsatz darf fehlende Zählerstände
+    // durchlassen — ein Mangel ohne Beschreibung ist dagegen kein
+    // unvollständiger, sondern ein unbrauchbarer Eintrag: Die Meldung an die
+    // Fahrzeugverantwortlichen bestünde nur aus einem Häkchen.
+    expect(
+      validateEntryInput(
+        KM,
+        { ...base, counters: {}, defekt: true },
+        { countersOptional: true },
+      ),
+    ).toEqual(['mangelMissing']);
+  });
 });
 
 describe('arrivalOnDepartureDay', () => {

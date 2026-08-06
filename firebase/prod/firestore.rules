@@ -155,6 +155,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Fahrtenbuch-Konfiguration je Gruppe — derzeit die Empfänger der
+    // Mangel-Benachrichtigung. Eine eigene Collection statt weiterer Felder am
+    // Gruppen-Dokument, weil dort jedes Feld für jedes Gruppenmitglied lesbar
+    // ist (siehe /groups/{groupId}) und eine Empfängeradresse das nicht sein
+    // soll. Zugriff nur über Admin Server Actions.
+    match /fahrtenbuchConfig/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Bug reports: any authorized user may create their own report (createdBy
     // must match the auth token). Reads and modifications are admin-only.
     match /bugReport/{doc} {

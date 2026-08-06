@@ -13,6 +13,7 @@ import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import AdminGuard from '../../site/AdminGuard';
 import FahrtenbuchImport from './FahrtenbuchImport';
 import GroupSettings from './GroupSettings';
+import MangelNotificationSettings from './MangelNotificationSettings';
 import PersonAdmin from './PersonAdmin';
 import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
@@ -90,7 +91,15 @@ export default function FahrtenbuchAdmin() {
                 groupName={groupName}
               />
             )}
-            {tab === 2 && <GroupSettings key={groupId} groupId={groupId} />}
+            {/* Der Einstellungen-Tab setzt die Abschnitte nur zusammen; jeder
+                pflegt seinen eigenen Teil der Gruppenkonfiguration und lädt
+                ihn selbst. `key` erneuert beide beim Gruppenwechsel. */}
+            {tab === 2 && (
+              <Stack key={groupId} spacing={3} sx={{ alignItems: 'flex-start' }}>
+                <GroupSettings groupId={groupId} />
+                <MangelNotificationSettings groupId={groupId} />
+              </Stack>
+            )}
             {tab === 3 && (
               <ShareLinkSection
                 key={groupId}

@@ -424,9 +424,17 @@ export function buildFahrtenbuchExport(
         return cell.text;
       });
 
+      // Der Mangeltext hängt am Vermerk und steht nicht als dritter Eintrag
+      // daneben — sonst ließe die Notizspalte offen, ob er zum Defekt gehört
+      // oder eine allgemeine Bemerkung ist.
+      const mangel = entry.mangel?.trim();
       const notes = [
         entry.hinweise?.trim(),
-        entry.defekt ? t('defectReported') : undefined,
+        entry.defekt
+          ? mangel
+            ? `${t('defectReported')}: ${mangel}`
+            : t('defectReported')
+          : undefined,
       ].filter(Boolean);
 
       return {

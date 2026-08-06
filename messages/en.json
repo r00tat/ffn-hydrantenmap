@@ -356,6 +356,9 @@
     "ankunft": "Arrival",
     "hinweise": "Notes",
     "defekt": "Defect or fault",
+    "mangel": "Defect description",
+    "mangelHelp": "What is broken or unusual about the vehicle?",
+    "selectVehicleHint": "Please select a vehicle first — the remaining fields depend on it.",
     "betriebsmittel": "Refuelled",
     "save": "Save",
     "cancel": "Cancel",
@@ -398,6 +401,7 @@
       "ankunftInvalid": "Arrival time is invalid.",
       "ankunftBeforeAbfahrt": "Arrival is before departure.",
       "zweckInvalid": "Please select a valid trip purpose.",
+      "mangelMissing": "Please describe the defect.",
       "counterMissing": "{counter} is missing.",
       "counterEndBeforeStart": "{counter}: final reading is below the starting reading.",
       "notAllowed": "Only the author or an admin may change this entry.",
@@ -611,7 +615,17 @@
           "unknownFormat": "unknown layout",
           "empty": "contains no data"
         }
-      }
+      },
+      "mangelEmails": "Defect notification",
+      "mangelEmailsHint": "When a trip reports a defect, an email is sent to these addresses — the first one in the To field, all others in copy. Nothing is sent when left empty.",
+      "mangelEmailsLabel": "Email addresses",
+      "mangelEmailsPlaceholder": "equipment.officer@firebrigade.at",
+      "mangelEmailsHelper": "Type an address and confirm with Enter.",
+      "mangelEmailsSaved": "Recipients saved.",
+      "mangelEmailsLoadFailed": "Recipients could not be loaded: {message}",
+      "mangelEmailsSaveFailed": "Recipients could not be saved: {message}",
+      "mangelEmailInvalid": "Please enter valid email addresses.",
+      "mangelEmailsTooMany": "At most {max} recipients are possible."
     },
     "shareLink": {
       "heading": "Logbook link",

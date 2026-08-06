@@ -147,6 +147,30 @@ describe('buildEntryDocument', () => {
     );
     expect(doc).not.toHaveProperty('betriebsmittel');
   });
+
+  it('schreibt die Mangelbeschreibung getrimmt und getrennt von den Hinweisen', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      { ...input, defekt: true, mangel: '  Bremse zieht nach links  ' },
+      'ffnd',
+      actor,
+    );
+    expect(doc.mangel).toBe('Bremse zieht nach links');
+    expect(doc.hinweise).toBe('nichts besonderes');
+  });
+
+  it('lässt mangel weg, wenn kein Defekt gemeldet ist', () => {
+    const doc = buildEntryDocument(VEHICLE, input, 'ffnd', actor);
+    expect(doc).not.toHaveProperty('mangel');
+  });
+
+  it('wirft, wenn ein Defekt ohne Beschreibung gemeldet wird', () => {
+    // Die Prüfung gehört auf den Server: Der anmeldefreie Freigabelink
+    // schickt dieselbe Eingabe, und dort steht kein Formular dazwischen.
+    expect(() =>
+      buildEntryDocument(VEHICLE, { ...input, defekt: true }, 'ffnd', actor),
+    ).toThrow(/mangelMissing/);
+  });
 });
 
 describe('buildEntryDocument beim Bearbeiten', () => {
@@ -214,6 +238,13 @@ describe('buildEntryDocument beim Bearbeiten', () => {
     expect(doc).not.toHaveProperty('defekt');
     expect(doc).not.toHaveProperty('betriebsmittel');
     expect(doc).not.toHaveProperty('driverId');
+  });
+
+  it('entfernt die Mangelbeschreibung, wenn der Defekt zurückgenommen wird', () => {
+    // Ein behobener Mangel darf nicht als Text am Eintrag zurückbleiben —
+    // Liste und Export lesen ihn sonst weiter aus.
+    const doc = rebuild({ ...input, defekt: false, mangel: 'Bremse defekt' });
+    expect(doc).not.toHaveProperty('mangel');
   });
 });
 

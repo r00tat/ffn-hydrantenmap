@@ -1,4 +1,5 @@
 import {
+  FAHRTENBUCH_MANGEL_EMAILS_MAX,
   FUEL_TYPES,
   normalizeName,
   suggestPresetForVehicleName,
@@ -11,6 +12,7 @@ import {
   type VehiclePresetId,
 } from '../../common/fahrtenbuch';
 import type { GeoPositionObject } from '../../common/geo';
+import { isValidEmail } from '../../common/kostenersatzEmail';
 
 const COUNTER_MODES: CounterMode[] = ['startEnd', 'reading'];
 const COUNTER_CHANGE_WARNINGS: CounterChangeWarning[] = [
@@ -224,4 +226,44 @@ export function sanitizeStandort(input: unknown): GeoPositionObject | undefined 
   if (lat === 0 && lng === 0) return undefined;
 
   return { lat, lng };
+}
+
+export interface MangelEmailsResult {
+  emails: string[];
+  /** Fehlerschlüssel, sobald die Eingabe nicht vollständig brauchbar ist. */
+  error?: 'emailInvalid' | 'tooManyEmails';
+}
+
+/**
+ * Prüft die Empfängerliste der Mangel-Benachrichtigung.
+ *
+ * Anders als bei den Zählerdefinitionen wird hier **nicht** still verworfen:
+ * Wer eine Adresse vertippt, bekommt eine Meldung. Eine stillschweigend
+ * weggelassene Adresse sähe im Formular nach dem Neuladen wie „nie
+ * eingetragen" aus, und ein Mangel ginge monatelang an niemanden — auffallen
+ * würde das erst, wenn ihn jemand vermisst.
+ *
+ * Die leere Liste ist ausdrücklich gültig: Sie ist die Abschaltung.
+ */
+export function sanitizeMangelEmails(input: unknown): MangelEmailsResult {
+  // Server-Action-Argumente sind Client-Eingabe — `string[]` existiert zur
+  // Laufzeit nicht.
+  if (!Array.isArray(input)) return { emails: [] };
+
+  const emails: string[] = [];
+  for (const value of input) {
+    if (typeof value !== 'string') return { emails: [], error: 'emailInvalid' };
+    const trimmed = value.trim();
+    // Leere Felder sind kein Fehler, sondern das, was ein Formular liefert,
+    // in dem jemand einen Eintrag geleert hat.
+    if (!trimmed) continue;
+    if (!isValidEmail(trimmed)) return { emails: [], error: 'emailInvalid' };
+    // Dieselbe Adresse zweimal bekäme die Mail zweimal.
+    if (!emails.includes(trimmed)) emails.push(trimmed);
+  }
+
+  if (emails.length > FAHRTENBUCH_MANGEL_EMAILS_MAX) {
+    return { emails: [], error: 'tooManyEmails' };
+  }
+  return { emails };
 }

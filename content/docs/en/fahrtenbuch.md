@@ -74,6 +74,16 @@ If a counter reading differs from the last known value or falls below it, a hint
 Only the person who created an entry, or an administrator, may change or delete it. Deleted trips are kept as marked-deleted and disappear from the lists and from the export.
 :::
 
+### Report a defect
+
+If **Defect** is ticked on a trip, the vehicle card carries the notice until a newer trip no longer reports it. The **All trips** list can be filtered to defects only. Describe the defect in the **Notes** field — that text goes into the notification.
+
+If recipients are configured for the group (admin area → Trip log → **Settings** → *Defect notification*), an email is sent on save: vehicle and licence plate, driver, times, purpose and destination, the counter readings, the defect description and a link to the vehicle's trip log. The first address goes into the To field, all others in copy.
+
+:::info
+The notification is only sent for a **newly recorded** trip — including a report via the QR code without login, which is then marked as submitted via the share link. A later edit, bulk entry and the PDF import do not trigger an email. Nothing is sent without configured recipients; the trip is saved either way.
+:::
+
 ### Write the trip log for several vehicles of one operation
 
 After an operation you do not need a separate dialog per vehicle: **bulk entry** creates a trip for all vehicles of the operation at once.
@@ -150,7 +160,7 @@ The admin area under **Trip log** has five tabs:
 
 - **Vehicles** Name, registration, active/decommissioned, counter preset, consumables, note. **Import vehicles** takes the vehicles over from the cost recovery inventory; the per-vehicle QR code lives here as well
 - **Persons** The group's drivers with phone, email and Alarm SMS recipient ID. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed
-- **Settings** The fire station location as the starting point for operation mileage, via coordinates or by picking it on the map
+- **Settings** The fire station location as the starting point for operation mileage, via coordinates or by picking it on the map; below it the **defect notification** with the email recipients for reported defects
 - **Trip log link** Create, regenerate or delete the link for entry without signing in
 - **Trip log import** Take over trips from a PDF export
 

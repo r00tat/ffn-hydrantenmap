@@ -149,6 +149,7 @@ export function useEntryFormState({
   >(entry?.betriebsmittel ?? {});
   const [hinweise, setHinweise] = useState(entry?.hinweise ?? '');
   const [defekt, setDefekt] = useState(entry?.defekt ?? false);
+  const [mangel, setMangel] = useState(entry?.mangel ?? '');
   const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string>();
   const [saving, setSaving] = useState(false);
@@ -254,6 +255,10 @@ export function useEntryFormState({
       betriebsmittel,
       hinweise,
       defekt,
+      // Ohne Häkchen wird die Beschreibung nicht mitgeschickt: Wer den Defekt
+      // abwählt, hat ihn zurückgenommen — der Text im ausgeblendeten Feld darf
+      // nicht stillschweigend am Eintrag hängen bleiben.
+      mangel: defekt ? mangel : undefined,
     };
 
     const validationErrors = validateEntryInput(definitions, input);
@@ -313,6 +318,8 @@ export function useEntryFormState({
     setHinweise,
     defekt,
     setDefekt,
+    mangel,
+    setMangel,
     errors,
     errorMessage,
     saveError,

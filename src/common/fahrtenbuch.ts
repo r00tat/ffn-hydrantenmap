@@ -3,6 +3,35 @@ export const FAHRTENBUCH_PERSON_COLLECTION_ID = 'person';
 export const FAHRTENBUCH_VEHICLE_COLLECTION_ID = 'vehicle';
 export const FAHRTENBUCH_COLLECTION_ID = 'fahrtenbuch';
 
+/**
+ * Konfiguration je Gruppe — Dokument-ID ist die Gruppen-ID.
+ *
+ * Bewusst eine eigene Collection und nicht ein weiteres Feld am
+ * Gruppen-Dokument: Dessen Regel erlaubt jedem Gruppenmitglied das Lesen
+ * *aller* Felder, weil der Standort des Feuerwehrhauses im Client gebraucht
+ * wird. Die Mailadresse eines Fahrzeugverantwortlichen ist dagegen nichts, was
+ * jedes Mitglied auslesen soll. Diese Collection ist für Clients gesperrt
+ * (`allow read, write: if false`) und nur über Admin-Actions zugänglich —
+ * dieselbe Bauweise wie `blaulichtsmsConfig`.
+ */
+export const FAHRTENBUCH_CONFIG_COLLECTION_ID = 'fahrtenbuchConfig';
+
+/** Obergrenze für die Empfängerliste — ein Riegel gegen eine manipulierte Anfrage. */
+export const FAHRTENBUCH_MANGEL_EMAILS_MAX = 10;
+
+export interface FahrtenbuchConfig {
+  groupId: string;
+  /**
+   * Empfänger der Mangel-Benachrichtigung. Die erste Adresse wird `To`, alle
+   * weiteren `Cc`. Eine leere Liste ist die Abschaltung — es gibt bewusst kein
+   * zusätzliches `enabled`-Flag, das mit einer gepflegten Liste in Widerspruch
+   * geraten könnte.
+   */
+  mangelEmails: string[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export type CounterMode = 'startEnd' | 'reading';
 export type CounterChangeWarning = 'decrease' | 'anyChange' | 'none';
 
@@ -139,6 +168,16 @@ export interface FahrtenbuchEntry {
   betriebsmittel?: Partial<Record<FuelType, number>>;
   hinweise?: string;
   defekt?: boolean;
+  /**
+   * Beschreibung des gemeldeten Mangels — nur zusammen mit `defekt` gesetzt.
+   *
+   * Bewusst getrennt von `hinweise`: Vorher stand beides in einem Feld, und
+   * weder die Mail an die Fahrzeugverantwortlichen noch der Export konnten
+   * unterscheiden, was der Mangel ist und was nur nebenbei notiert wurde.
+   * Optional, weil Einträge aus der Zeit davor es nicht haben — dort steckt
+   * die Beschreibung, wenn überhaupt, in `hinweise`.
+   */
+  mangel?: string;
   group: string;
   deleted: boolean;
   createdAt: string;
@@ -227,6 +266,8 @@ export interface EntryInput {
   abfahrt: string;
   ankunft: string;
   counters: Record<string, CounterReading>;
+  defekt?: boolean;
+  mangel?: string;
 }
 
 /** Füllt `diff` für Zähler im Modus startEnd und verwirft unbekannte Zähler. */
@@ -317,6 +358,9 @@ export function validateEntryInput(
   if (!FAHRT_ZWECKE.includes(input.zweck as FahrtZweck)) {
     errors.push('zweckInvalid');
   }
+  // Auch bei `countersOptional`: Ein Häkchen ohne Text ergibt eine Meldung an
+  // die Fahrzeugverantwortlichen, die nicht sagt, was kaputt ist.
+  if (input.defekt && !input.mangel?.trim()) errors.push('mangelMissing');
 
   const abfahrt = Date.parse(input.abfahrt);
   const ankunft = Date.parse(input.ankunft);

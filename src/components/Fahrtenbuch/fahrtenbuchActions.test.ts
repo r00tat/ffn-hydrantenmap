@@ -18,6 +18,7 @@ const {
   batchCommitMock,
   routeMock,
   actionUserRequiredMock,
+  notifyMangelMock,
 } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   addMock: vi.fn(),
@@ -36,6 +37,7 @@ const {
   batchCommitMock: vi.fn(),
   routeMock: vi.fn(),
   actionUserRequiredMock: vi.fn(),
+  notifyMangelMock: vi.fn(),
 }));
 
 vi.mock('../../app/auth', () => ({
@@ -50,6 +52,8 @@ vi.mock('../../server/auth/resolveFahrtenbuchShareLink', () => ({
 vi.mock('../actions/maps/routes', () => ({
   computeRouteLegsMeters: routeMock,
 }));
+
+vi.mock('./notifyMangel', () => ({ notifyMangel: notifyMangelMock }));
 
 // Ein Firestore-Stub, der drei Kollektionen bedient: `groups` (Gruppendokument
 // selbst + Subcollections `fahrtenbuch`/`vehicle`) und `call` (Einsatzdokument
@@ -94,6 +98,7 @@ import { ApiException } from '../../app/api/errors';
 import type { FahrtenbuchEntryInput } from './entryLogic';
 import {
   createFahrtenbuchEntries,
+  createFahrtenbuchEntry,
   createFahrtenbuchEntryViaShareLink,
   importFahrtenbuchEntries,
   updateFahrtenbuchEntry,
@@ -962,5 +967,118 @@ describe('importFahrtenbuchEntries', () => {
 
     expect(result).toMatchObject({ success: false, error: 'notInGroup' });
     expect(batchSetMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mangel-Benachrichtigung', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+    resolveMock.mockResolvedValue({
+      token: 'tok',
+      groupId: 'ffnd',
+      linkId: 'abc123def456',
+    });
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    addMock.mockResolvedValue({ id: 'e1' });
+    latestEntryGetMock.mockResolvedValue({ docs: [] });
+    notifyMangelMock.mockResolvedValue(true);
+  });
+
+  it('benachrichtigt bei einer neu erfassten Fahrt mit Defekt', async () => {
+    const result = await createFahrtenbuchEntry('ffnd', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+    expect(notifyMangelMock).toHaveBeenCalledTimes(1);
+    const args = notifyMangelMock.mock.calls[0][0];
+    expect(args.groupId).toBe('ffnd');
+    expect(args.entry).toMatchObject({
+      defekt: true,
+      mangel: 'Bremse schleift',
+      vehicleId: 'v1',
+    });
+    // Kennzeichen und Zähler-Bezeichnungen stehen nur in den Stammdaten.
+    expect(args.vehicle).toMatchObject({ name: 'RLFA 2000' });
+  });
+
+  it('benachrichtigt nicht, wenn kein Defekt gemeldet wurde', async () => {
+    await createFahrtenbuchEntry('ffnd', input);
+    expect(notifyMangelMock).not.toHaveBeenCalled();
+  });
+
+  it('meldet die Fahrt als gespeichert, obwohl die Mail scheitert', async () => {
+    // Die Fahrt steht im Fahrtenbuch. Ein Fehler hier würde den Benutzer dazu
+    // bringen, sie ein zweites Mal einzutragen.
+    notifyMangelMock.mockRejectedValue(new Error('SMTP kaputt'));
+
+    const result = await createFahrtenbuchEntry('ffnd', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+  });
+
+  it('benachrichtigt auch bei einer Meldung über den Freigabelink', async () => {
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+    expect(notifyMangelMock).toHaveBeenCalledTimes(1);
+    expect(notifyMangelMock.mock.calls[0][0].entry.createdBy).toBe(
+      'share:abc123def456',
+    );
+  });
+
+  it('benachrichtigt nicht beim Bearbeiten einer bereits defekten Fahrt', async () => {
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        vehicleId: 'v1',
+        deleted: false,
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+        createdAt: '2026-08-04T08:00:00.000Z',
+        counters: { km: { start: 1200, end: 1250 } },
+        defekt: true,
+      }),
+    });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift, Ergänzung',
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(notifyMangelMock).not.toHaveBeenCalled();
+  });
+
+  it('benachrichtigt nicht beim Import', async () => {
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+    batchCommitMock.mockResolvedValue(undefined);
+
+    const result = await importFahrtenbuchEntries('ffnd', [
+      {
+        ...input,
+        defekt: true,
+        mangel: 'Bremse schleift',
+      } as FahrtenbuchEntryInput,
+    ]);
+
+    expect(result).toMatchObject({ success: true, created: 1 });
+    expect(notifyMangelMock).not.toHaveBeenCalled();
   });
 });

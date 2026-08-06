@@ -9,6 +9,7 @@ import {
   resolveVehicleImportSelection,
   sanitizeCounterDefinitions,
   sanitizeFuelTypes,
+  sanitizeMangelEmails,
   sanitizeSortOrder,
   sanitizeStandort,
 } from './stammdatenLogic';
@@ -303,5 +304,56 @@ describe('sanitizeStandort', () => {
       lat: 47.94,
       lng: 16.84,
     });
+  });
+});
+
+describe('sanitizeMangelEmails', () => {
+  it('übernimmt gültige Adressen getrimmt', () => {
+    expect(
+      sanitizeMangelEmails([' zeugwart@example.at ', 'kommandant@example.at']),
+    ).toEqual({ emails: ['zeugwart@example.at', 'kommandant@example.at'] });
+  });
+
+  it('lässt die leere Liste als Abschaltung durch', () => {
+    expect(sanitizeMangelEmails([])).toEqual({ emails: [] });
+  });
+
+  it('überspringt leere Felder, ohne sie als Fehler zu melden', () => {
+    expect(sanitizeMangelEmails(['zeugwart@example.at', '   ', ''])).toEqual({
+      emails: ['zeugwart@example.at'],
+    });
+  });
+
+  it('meldet eine ungültige Adresse, statt sie still zu verwerfen', () => {
+    expect(sanitizeMangelEmails(['zeugwart@example.at', 'kein-mail'])).toEqual({
+      emails: [],
+      error: 'emailInvalid',
+    });
+  });
+
+  it('meldet Werte, die keine Zeichenkette sind', () => {
+    expect(sanitizeMangelEmails([42])).toEqual({
+      emails: [],
+      error: 'emailInvalid',
+    });
+  });
+
+  it('entfernt Dubletten', () => {
+    expect(
+      sanitizeMangelEmails(['a@example.at', 'a@example.at', 'b@example.at']),
+    ).toEqual({ emails: ['a@example.at', 'b@example.at'] });
+  });
+
+  it('lehnt eine zu lange Liste ab', () => {
+    const many = Array.from({ length: 11 }, (_v, i) => `a${i}@example.at`);
+    expect(sanitizeMangelEmails(many)).toEqual({
+      emails: [],
+      error: 'tooManyEmails',
+    });
+  });
+
+  it('verwirft Nicht-Arrays', () => {
+    expect(sanitizeMangelEmails('a@example.at')).toEqual({ emails: [] });
+    expect(sanitizeMangelEmails(undefined)).toEqual({ emails: [] });
   });
 });
