@@ -1,10 +1,9 @@
 'use server';
 import 'server-only';
 import { FieldValue } from 'firebase-admin/firestore';
-import { gmail } from '@googleapis/gmail';
 import { actionUserRequired } from '../../app/auth';
 import { firestore } from '../../server/firebase/admin';
-import { createWorkspaceAuth } from '../../server/auth/workspace';
+import { mailSender, sendRawMail } from '../../server/mail/sendRawMail';
 import {
   APP_CONFIG_COLLECTION,
   BUG_REPORT_COLLECTION,
@@ -15,8 +14,6 @@ import {
   type BugReportSubmitInput,
 } from '../../common/bugReport';
 import { buildBugReportEmail } from './buildBugReportEmail';
-
-const GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
 
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -110,28 +107,14 @@ async function sendNotification(report: BugReport): Promise<void> {
   const cfg = configSnap.data() as BugReportConfig;
   if (!cfg.enabled || !cfg.recipientEmails?.length) return;
 
-  if (
-    !process.env.GOOGLE_SERVICE_ACCOUNT ||
-    !process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT
-  ) {
+  const from = mailSender();
+  if (!from) {
     throw new Error('Email service not configured');
   }
 
-  const from = process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT;
   const [to, ...cc] = cfg.recipientEmails;
   const appBaseUrl = process.env.NEXTAUTH_URL ?? '';
 
   const { raw } = buildBugReportEmail({ report, appBaseUrl, from, to, cc });
-  const encoded = Buffer.from(raw)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  const auth = createWorkspaceAuth(GMAIL_SCOPES);
-  const client = gmail({ version: 'v1', auth });
-  await client.users.messages.send({
-    userId: 'me',
-    requestBody: { raw: encoded },
-  });
+  await sendRawMail(raw);
 }

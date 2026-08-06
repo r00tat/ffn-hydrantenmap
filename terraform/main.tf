@@ -33,6 +33,7 @@ locals {
     "monitoring.googleapis.com",
     "places.googleapis.com",
     # "pubsub.googleapis.com",
+    "routes.googleapis.com",
     "run.googleapis.com",
     "runtimeconfig.googleapis.com",
     "script.googleapis.com",
@@ -72,6 +73,11 @@ resource "google_project_iam_member" "run_iam" {
   for_each = toset([
     "roles/firebase.admin",
     "roles/aiplatform.user",
+    # Die Routes API wird mit OAuth und `X-Goog-User-Project` aufgerufen, damit
+    # Kontingent und Abrechnung diesem Projekt zugeordnet werden. Der Header
+    # verlangt `serviceusage.services.use` — in den beiden Rollen darüber ist
+    # das nicht verlässlich enthalten, sonst antwortete der Aufruf mit 403.
+    "roles/serviceusage.serviceUsageConsumer",
   ])
   member  = google_service_account.run_sa.member
   role    = each.value

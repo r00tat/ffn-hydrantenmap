@@ -155,6 +155,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Fahrtenbuch-Konfiguration je Gruppe — derzeit die Empfänger der
+    // Mangel-Benachrichtigung. Eine eigene Collection statt weiterer Felder am
+    // Gruppen-Dokument, weil dort jedes Feld für jedes Gruppenmitglied lesbar
+    // ist (siehe /groups/{groupId}) und eine Empfängeradresse das nicht sein
+    // soll. Zugriff nur über Admin Server Actions.
+    match /fahrtenbuchConfig/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Bug reports: any authorized user may create their own report (createdBy
     // must match the auth token). Reads and modifications are admin-only.
     match /bugReport/{doc} {
@@ -172,9 +181,67 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Fahrtenbuch: Stammdaten und Einträge je Gruppe.
+    // Einträge werden über Server Actions geschrieben; die Regeln hier geben
+    // keinem Client Schreibrechte. Achtung: der abschließende
+    // match /{document=**} lässt Admins weiterhin direkt schreiben — Regeln
+    // sind additiv, ein "allow ...: if false" kann das nicht zurücknehmen.
+    match /groups/{groupId} {
+      // 'allUsers' ist keine echte Gruppe, sondern ein Pseudo-Eintrag, der
+      // jedem Benutzer in die Claims geschrieben wird (updateUser.ts) und den
+      // auch Einsatz-Gasttokens tragen (actions/auth.ts). Als Fahrtenbuch-
+      // Mandant darf er deshalb nie zählen.
+      // 'kostenersatz' ist keine Feuerwehr, sondern eine Berechtigungsgruppe
+      // ("Zugang zur Kostenersatz-Funktion") — siehe NON_TENANT_GROUP_IDS und
+      // assertFahrtenbuchGroup() in authGuards.ts, dieselbe Sperre gilt dort.
+      function fahrtenbuchMember() {
+        return authorizedUser()
+          && groupId != 'allUsers'
+          && groupId != 'kostenersatz'
+          && groupId in request.auth.token.groups;
+      }
+
+      // Das Gruppen-Dokument trägt neben Name und Beschreibung den Standort
+      // des Feuerwehrhauses. Den braucht der Client, um im Fahrtenbuch die
+      // Einsatzkilometer abzuschätzen. Jedes Feld dieses Dokuments ist damit
+      // für jedes Gruppenmitglied lesbar. Geheimnisse und Konfiguration
+      // gehören deshalb in eine eigene Collection (siehe blaulichtsmsConfig),
+      // nicht hierher.
+      // Schreiben nur über Server Actions; diese Regel gibt keinem Client
+      // Schreibrechte — Admins schreiben weiterhin über den Catch-all am
+      // Dateiende (siehe Kommentar oben).
+      allow read: if fahrtenbuchMember();
+      allow write: if false;
+
+      match /person/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
+      match /vehicle/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow write: if adminUser();
+      }
+
+      match /fahrtenbuch/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
+    }
+
+    // Der Token ist die Dokument-ID und damit das gesamte Geheimnis des
+    // Share-Links. Er wird ausschließlich vom Admin SDK gelesen und
+    // geschrieben; auch Admins holen ihn über eine Server Action. Die
+    // Reihenfolge der Regeln spielt dabei keine Rolle — Regeln sind additiv:
+    // Der abschließende Catch-all erlaubt Admins weiterhin Zugriff, dieser
+    // Block erlaubt allen anderen nichts. Beides gilt gleichzeitig.
+    match /fahrtenbuchShareLink/{token} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }
-    
+
   }
 }

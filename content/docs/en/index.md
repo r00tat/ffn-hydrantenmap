@@ -32,6 +32,7 @@ Welcome to the operations map documentation. Here you will find guides for every
 
 ## Administration and export
 
+- **Trip log** [Record trips per vehicle, bulk entry for an operation, QR code without signing in, PDF export](/docs/fahrtenbuch)
 - **Cost recovery** [Create invoices, add line items, PDF export, email dispatch, SumUp payment](/docs/kostenersatz)
 - **Business log** [Document incoming/outgoing transactions, staff functions S1-S6, CSV export](/docs/geschaeftsbuch)
 - **Print** [Print operation reports with map, resources, log and business log](/docs/drucken)

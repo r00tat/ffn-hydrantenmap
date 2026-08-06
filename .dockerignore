@@ -1,4 +1,7 @@
 node_modules
+# Worktrees sind eigene lokale Checkouts (inkl. node_modules) und haben im
+# Build-Kontext nichts zu suchen — sonst wandern mehrere GB zum Docker-Daemon.
+.worktrees
 .next
 .git
 .vscode

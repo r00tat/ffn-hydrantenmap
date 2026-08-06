@@ -24,6 +24,24 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
+# next build inlined NEXT_PUBLIC_*-Werte fest ins Client-Bundle: was hier fehlt,
+# ist im Browser dauerhaft undefined — ohne Firebase-Konfiguration scheitert
+# schon getFirestore() mit '"projectId" not provided in firebase.initializeApp.'.
+# .dockerignore hält .env* bewusst aus dem Image (sonst landet der lokale
+# App-Check-Debug-Token im Bundle), deshalb kommt die Konfiguration als
+# Build-Arg. Alles hier Aufgeführte ist ohnehin öffentlich, sobald das Bundle
+# ausgeliefert ist — echte Secrets gehören weiterhin in die Laufzeitumgebung.
+ARG NEXT_PUBLIC_FIREBASE_APIKEY=""
+ARG NEXT_PUBLIC_FIRESTORE_DB=""
+ARG NEXT_PUBLIC_OAUTH_CLIENT_ID=""
+ARG NEXT_PUBLIC_RECAPTCHA_KEY=""
+ARG NEXT_PUBLIC_BUILD_ID=""
+ENV NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}
+ENV NEXT_PUBLIC_FIRESTORE_DB=${NEXT_PUBLIC_FIRESTORE_DB}
+ENV NEXT_PUBLIC_OAUTH_CLIENT_ID=${NEXT_PUBLIC_OAUTH_CLIENT_ID}
+ENV NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}
+ENV NEXT_PUBLIC_BUILD_ID=${NEXT_PUBLIC_BUILD_ID}
+
 RUN npm run build
 
 # Production image, copy all the files and run next

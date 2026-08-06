@@ -30,6 +30,15 @@ export const cachePatterns: RuntimeCaching[] = [
     // method: 'GET'
   },
 
+  // Die anmeldefreie Gastseite darf nie aus dem Cache kommen: ein Mitglied mit
+  // installierter PWA bekäme sonst das HTML eines inzwischen widerrufenen
+  // Links serviert. Ohne diesen Eintrag greift Serwists Standard (NetworkFirst
+  // für Navigationen), der genau das täte.
+  {
+    matcher: /\/fahrtenbuch\/teilen\/.*/i,
+    handler: new NetworkOnly(),
+  },
+
   {
     matcher: /icons\/.*/i,
     handler: new CacheFirst({

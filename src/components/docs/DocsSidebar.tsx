@@ -26,6 +26,7 @@ const docPages = [
   { key: 'schadstoff', href: '/docs/schadstoff' },
   { key: 'strahlenschutz', href: '/docs/strahlenschutz' },
   { key: 'energiespektrum', href: '/docs/energiespektrum' },
+  { key: 'fahrtenbuch', href: '/docs/fahrtenbuch' },
   { key: 'kostenersatz', href: '/docs/kostenersatz' },
   { key: 'geschaeftsbuch', href: '/docs/geschaeftsbuch' },
   { key: 'wetter', href: '/docs/wetter' },

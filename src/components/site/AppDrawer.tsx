@@ -12,6 +12,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
+import EditRoadIcon from '@mui/icons-material/EditRoad';
 import GroupIcon from '@mui/icons-material/Group';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import HubIcon from '@mui/icons-material/Hub';
@@ -145,6 +146,14 @@ export default function AppDrawer({
       einsatzSection: 'geschaeftsbuch',
     },
     {
+      // Ohne `einsatzSection`: das Fahrtenbuch ist keine Einsatz-Ansicht, es
+      // wird auch ohne laufenden Einsatz geführt. Der Weg in die
+      // Einsatz-Sammelerfassung führt über den Button auf der Fahrtenbuch-Seite.
+      text: t('fahrtenbuch'),
+      icon: <EditRoadIcon />,
+      href: '/fahrtenbuch',
+    },
+    {
       text: t('kostenersatz'),
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',
@@ -201,6 +210,7 @@ export default function AppDrawer({
         { text: t('gisDataPipeline'), icon: <StorageIcon />, href: '/admin/gis-data' },
         { text: t('hydrantClusters'), icon: <HubIcon />, href: '/admin/hydrant-clusters' },
         { text: t('adminKostenersatz'), icon: <ReceiptLongIcon />, href: '/admin/kostenersatz' },
+        { text: t('adminFahrtenbuch'), icon: <EditRoadIcon />, href: '/admin/fahrtenbuch' },
         { text: t('pegelstaende'), icon: <WavesIcon />, href: '/admin/pegelstaende' },
         { text: t('deletedItems'), icon: <DeleteIcon />, href: '/admin/deleted-items' },
         { text: t('hydrantCsvImport'), icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },

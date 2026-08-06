@@ -63,7 +63,7 @@ jobs:
           VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
           VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9-]+@-@g' )
           VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
-          export NEXTAUTH_URL="https://hydrantenmap-dev-xrhhpxsnva-ez.a.run.app/"
+          export NEXTAUTH_URL="https://einsatz-dev.ffnd.at"
           export SUMUP_SECRET_SUFFIX="_DEV"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
@@ -76,6 +76,15 @@ jobs:
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" || "${NEXT_PUBLIC_FIRESTORE_DB}" == "(default)" ]]; then
             # '(default)' / 'default' sentinel -> empty string selects the default DB
             export NEXT_PUBLIC_FIRESTORE_DB=""
+          fi
+
+          # Die NEXT_PUBLIC_*-Werte werden von next build fest ins Client-Bundle
+          # inlined. Fehlen sie, baut das Image fehlerfrei und die App ist erst im
+          # Browser kaputt ('"projectId" not provided in firebase.initializeApp.').
+          # Ein Deploy ohne Firebase-Konfiguration bricht deshalb hier ab.
+          if [[ -n "${workload_identity_provider}" && -z "${NEXT_PUBLIC_FIREBASE_APIKEY}" ]]; then
+            echo "::error::Repository-Variable NEXT_PUBLIC_FIREBASE_APIKEY ist leer - das Image würde ohne Firebase-Konfiguration gebaut."
+            exit 1
           fi
 
           echo "Environment:"
@@ -163,6 +172,11 @@ jobs:
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             DOCKER_REGISTRY=${{ env.workload_identity_provider != '' && format('{0}-docker.pkg.dev/{1}/dockerhub/', env.RUN_REGION, env.GOOGLE_CLOUD_PROJECT) || '' }}
+            NEXT_PUBLIC_FIREBASE_APIKEY=${{ env.NEXT_PUBLIC_FIREBASE_APIKEY }}
+            NEXT_PUBLIC_FIRESTORE_DB=${{ env.NEXT_PUBLIC_FIRESTORE_DB }}
+            NEXT_PUBLIC_OAUTH_CLIENT_ID=${{ env.NEXT_PUBLIC_OAUTH_CLIENT_ID }}
+            NEXT_PUBLIC_RECAPTCHA_KEY=${{ env.NEXT_PUBLIC_RECAPTCHA_KEY }}
+            NEXT_PUBLIC_BUILD_ID=${{ steps.env.outputs.VERSION }}
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}
           cache-to: ${{ env.workload_identity_provider != '' && 'type=inline' || '' }}
       - id: deploy

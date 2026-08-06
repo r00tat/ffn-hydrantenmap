@@ -48,6 +48,7 @@ import {
   BlaulichtSmsAlarm,
 } from '../../app/blaulicht-sms/actions';
 import AlarmCard from '../../app/blaulicht-sms/AlarmCard';
+import EinsatzFahrtenbuch from '../Fahrtenbuch/EinsatzFahrtenbuch';
 import CrewAssignmentBoard from './CrewAssignmentBoard';
 import EinsatzorteWrapper from './EinsatzorteWrapper';
 import EinsatzTagebuchWrapper from './EinsatzTagebuchWrapper';
@@ -56,6 +57,7 @@ import StrengthTable from './StrengthTable';
 export default function EinsatzDetails() {
   const t = useTranslations('einsatzDetails');
   const tCommon = useTranslations('common');
+  const tFahrtenbuch = useTranslations('fahrtenbuch');
   const firecallId = useFirecallId();
   const setFirecallId = useFirecallSelect();
   const { isAdmin, email, myGroups } = useFirebaseLogin();
@@ -457,6 +459,18 @@ export default function EinsatzDetails() {
       <Box sx={{ mt: 3 }}>
         <CrewAssignmentBoard alarms={alarms} />
       </Box>
+
+      {/* Fahrtenbuch — Sammelerfassung direkt nach der Mannschaftszuordnung.
+          Ohne Gruppe gibt es kein Fahrtenbuch, zu dem der Einsatz gehören
+          könnte; dann bleibt der Abschnitt ganz weg. */}
+      {firecall.id && firecall.group && (
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            {tFahrtenbuch('einsatz.title')}
+          </Typography>
+          <EinsatzFahrtenbuch firecallId={firecall.id} firecall={firecall} />
+        </Box>
+      )}
 
       {/* Einsatztagebuch */}
       <Box sx={{ mt: 3 }}>

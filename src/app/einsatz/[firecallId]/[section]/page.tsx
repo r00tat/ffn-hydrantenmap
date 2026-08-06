@@ -15,6 +15,8 @@ const SECTIONS: Record<
   chat: () => import('../../../../components/pages/Chat'),
   print: () => import('../../../../components/pages/PrintWrapper'),
   details: () => import('../../../../components/pages/EinsatzDetails'),
+  fahrtenbuch: () =>
+    import('../../../../components/Fahrtenbuch/EinsatzFahrtenbuchSection'),
 };
 
 export default async function EinsatzSectionPage({

@@ -21,6 +21,7 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import React, { useEffect, useMemo, useState } from 'react';
 import { UserRecordExtended } from '../../common/users';
 import {
@@ -66,6 +67,7 @@ export default function GroupDialogg({
   group: groupDefault,
   users,
 }: GroupDialoggOptions) {
+  const tGroups = useTranslations('groups');
   const [open, setOpen] = useState(true);
   const [group, setGroup] = useState<Group>(groupDefault);
   const [saving, setSaving] = useState(false);
@@ -341,6 +343,21 @@ export default function GroupDialogg({
                 Token löschen
               </Button>
             )}
+
+            {/* Der Fahrtenbuch-Link samt QR-Codes liegt in der
+                Fahrtenbuch-Verwaltung: Dort stehen die Fahrzeuge, für die ein
+                Code erzeugt wird. Hier bleibt nur der Verweis, damit ihn nicht
+                sucht, wer ihn früher an dieser Stelle bedient hat. */}
+            <Divider sx={{ mt: 3, mb: 1 }} />
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Fahrtenbuch-Link
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              {tGroups('fahrtenbuchLinkHint')}
+            </Typography>
+            <Button size="small" href="/admin/fahrtenbuch">
+              {tGroups('fahrtenbuchLinkAction')}
+            </Button>
           </>
         )}
       </DialogContent>
