@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { uniqueArray } from '../../common/arrayUtils';
+import { guestCanWrite } from '../../common/firecallGuest';
 import { isInternalEmail } from '../../common/internalDomains';
 import { FirebaseUserInfo } from '../../common/users';
 import { USER_COLLECTION_ID } from '../../components/firebase/firestore';
@@ -16,6 +17,8 @@ export interface AutoProvisionedUser {
   isAdmin: boolean;
   groups: string[];
   firecall?: string;
+  /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
+  firecallWrite?: boolean;
 }
 
 /**
@@ -121,6 +124,7 @@ export async function getUserSessionData(
       isAdmin: !!userData.isAdmin,
       groups: uniqueArray(['allUsers', ...(userData.groups || [])]),
       firecall: userData.firecall,
+      firecallWrite: guestCanWrite(userData),
     };
     userSessionCache.set(uid, result);
     return result;

@@ -23,6 +23,8 @@ interface EinsatzorteRowProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
   mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
@@ -36,6 +38,7 @@ export default function EinsatzorteRow({
   onChange,
   onDelete,
   onAdd,
+  readOnly = false,
   mapVehicles,
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
@@ -292,6 +295,7 @@ export default function EinsatzorteRow({
             fullWidth
             placeholder={isNew ? t('einsatzorte.placeholderNew') : ''}
             variant="standard"
+            slotProps={{ input: { readOnly } }}
           />
         </TableCell>
         <TableCell sx={{ minWidth: 350 }}>
@@ -303,6 +307,7 @@ export default function EinsatzorteRow({
               placeholder={t('einsatzorte.placeholderStreet')}
               variant="standard"
               sx={{ flex: 2, minWidth: 150, mr: 1 }}
+              slotProps={{ input: { readOnly } }}
             />
             <TextField
               value={local.number || ''}
@@ -311,6 +316,7 @@ export default function EinsatzorteRow({
               placeholder={t('einsatzorte.placeholderNumber')}
               variant="standard"
               sx={{ width: 50, mr: 1 }}
+              slotProps={{ input: { readOnly } }}
             />
             <TextField
               value={local.city || ''}
@@ -319,6 +325,7 @@ export default function EinsatzorteRow({
               placeholder={t('einsatzorte.placeholderCity')}
               variant="standard"
               sx={{ flex: 1, minWidth: 100 }}
+              slotProps={{ input: { readOnly } }}
             />
           </Box>
         </TableCell>
@@ -326,6 +333,7 @@ export default function EinsatzorteRow({
           <StatusChip
             status={(local.status as LocationStatus) || 'offen'}
             onChange={(status) => handleFieldChange('status', status)}
+            readOnly={readOnly}
           />
         </TableCell>
         <TableCell sx={{ minWidth: 200 }}>
@@ -337,6 +345,7 @@ export default function EinsatzorteRow({
             onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
             onMapVehicleSelected={handleMapVehicleSelected}
             onCreateVehicle={handleCreateVehicle}
+            disabled={readOnly}
           />
         </TableCell>
         <TableCell>
@@ -349,6 +358,7 @@ export default function EinsatzorteRow({
             maxRows={3}
             placeholder={t('einsatzorte.placeholderDescription')}
             variant="standard"
+            slotProps={{ input: { readOnly } }}
           />
         </TableCell>
         <TableCell>
@@ -359,6 +369,7 @@ export default function EinsatzorteRow({
             size="small"
             variant="standard"
             sx={{ width: 80 }}
+            slotProps={{ input: { readOnly } }}
           />
         </TableCell>
         <TableCell>
@@ -369,6 +380,7 @@ export default function EinsatzorteRow({
             size="small"
             variant="standard"
             sx={{ width: 80 }}
+            slotProps={{ input: { readOnly } }}
           />
         </TableCell>
         <TableCell>
@@ -379,6 +391,7 @@ export default function EinsatzorteRow({
             size="small"
             variant="standard"
             sx={{ width: 80 }}
+            slotProps={{ input: { readOnly } }}
           />
         </TableCell>
         <TableCell>
@@ -392,18 +405,20 @@ export default function EinsatzorteRow({
               endAdornment: (
                 <>
                   {!isNew && <NavigateButton lat={local.lat} lng={local.lng} />}
-                  <Tooltip title={t('einsatzorte.pickOnMap')}>
-                    <IconButton size="small" onClick={() => setMapOpen(true)}>
-                      <MyLocationIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                  {!readOnly && (
+                    <Tooltip title={t('einsatzorte.pickOnMap')}>
+                      <IconButton size="small" onClick={() => setMapOpen(true)}>
+                        <MyLocationIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </>
               ),
             } }}
           />
         </TableCell>
         <TableCell>
-          {!isNew && onDelete && (
+          {!isNew && !readOnly && onDelete && (
             <Tooltip title={t('common.delete')}>
               <IconButton size="small" onClick={onDelete} color="error">
                 <DeleteIcon fontSize="small" />

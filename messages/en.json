@@ -160,13 +160,10 @@
     "openMapButton": "Map",
     "createShareLink": "Create anonymous-access link",
     "jumpToKostenersatz": "Jump to cost recovery",
-    "linkCopied": "Link copied to clipboard",
-    "linkCopyFallback": "Link could not be copied. Please copy manually:",
     "blaulichtSmsTitle": "Alarm SMS",
     "blaulichtSmsLoadError": "Alarm SMS could not be loaded (alarm id: {id}). The Alarm SMS credentials may not be configured or the alarm may no longer be available.",
     "attachments": "Attachments",
     "noAttachments": "No attachments yet",
-    "tokenCreateError": "Token could not be created: {error}",
     "labels": {
       "group": "Group",
       "fw": "Fire department",
@@ -276,7 +273,11 @@
     "groups": "Groups",
     "groupLabel": "Group",
     "authorized": "Authorized",
-    "admin": "Admin"
+    "admin": "Admin",
+    "firecallGuestSection": "Operation guest",
+    "firecallGuestFor": "Access limited to operation {firecall}",
+    "firecallWrite": "Write access to the operation",
+    "firecallWriteHint": "Takes effect the next time the access is refreshed (within 45 minutes)."
   },
   "header": {
     "appTitle": "Operations Map",
@@ -716,7 +717,8 @@
     "userNotAuthorized": "User not authorized",
     "userIdMissing": "User not authorized: no id set",
     "adminRequired": "Administrator privileges required",
-    "invalidLanguage": "Invalid language"
+    "invalidLanguage": "Invalid language",
+    "readOnlyFirecallGuest": "This access is read-only for the operation."
   },
   "firecall": {
     "fields": {
@@ -1439,7 +1441,12 @@
       "groups": "Groups"
     },
     "pagination": "{from}-{to} of {count}",
-    "paginationOf": "{from}-{to} of {count} ({total} total)"
+    "paginationOf": "{from}-{to} of {count} ({total} total)",
+    "showFirecallGuests": "Show operation guests",
+    "firecallGuestsFilter": "Show or hide operation guests created via share link",
+    "guestChip": "Guest",
+    "guestWrite": "Write access",
+    "guestReadOnly": "Read only"
   },
   "groups": {
     "title": "Groups",
@@ -1537,10 +1544,7 @@
     "shareTooltip": "Create anonymous-access link",
     "kostenersatzTooltip": "Cost recovery calculations",
     "deleteTitle": "Delete operation {name} {date}",
-    "deleteConfirm": "Really delete operation {name} {date}?",
-    "tokenCreateError": "Token could not be created: {error}",
-    "linkCopied": "Link copied to clipboard",
-    "linkCopyFallback": "Link could not be copied. Please copy manually:"
+    "deleteConfirm": "Really delete operation {name} {date}?"
   },
   "geschaeftsbuch": {
     "title": "Business log",
@@ -1715,5 +1719,27 @@
     "save": "Save",
     "configSaved": "Configuration saved",
     "configSaveFailed": "Save failed"
+  },
+  "firecallShare": {
+    "title": "Share operation",
+    "intro": "Creates a link that lets someone without their own account access this operation.",
+    "nameLabel": "Guest name",
+    "nameHelper": "Used to recognise the guest in user administration, e.g. “Weiden fire brigade”.",
+    "nameRequired": "Please enter a name.",
+    "accessLabel": "Access",
+    "accessRead": "Read only",
+    "accessReadHint": "The guest can view the operation but cannot change anything.",
+    "accessWrite": "Read and write",
+    "accessWriteHint": "The guest can edit the operation just like a member.",
+    "create": "Create link",
+    "linkLabel": "Share link",
+    "copy": "Copy link",
+    "copied": "Link copied to clipboard",
+    "copyFallback": "Link could not be copied. Please copy manually:",
+    "open": "Open link",
+    "createAnother": "Create another link",
+    "error": "Link could not be created: {error}",
+    "createdFor": "Link for {name} ({access})",
+    "readOnlyGuestHint": "Read-only access — changes are not possible with this account."
   }
 }

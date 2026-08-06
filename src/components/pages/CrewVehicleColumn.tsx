@@ -21,6 +21,8 @@ export interface CrewVehicleColumnProps {
     vehicleName: string,
   ) => void;
   onRemove?: (assignmentId: string) => void;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
 }
 
 export default function CrewVehicleColumn({
@@ -31,9 +33,11 @@ export default function CrewVehicleColumn({
   onFunktionChange,
   onVehicleChange,
   onRemove,
+  readOnly = false,
 }: CrewVehicleColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: vehicleId || 'unassigned',
+    disabled: readOnly,
   });
 
   return (
@@ -92,6 +96,7 @@ export default function CrewVehicleColumn({
               ? () => onRemove(assignment.id!)
               : undefined
           }
+          readOnly={readOnly}
         />
       ))}
     </Box>

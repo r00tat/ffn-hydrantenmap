@@ -25,6 +25,8 @@ interface EinsatzorteCardProps {
   onChange: (updates: Partial<FirecallLocation>) => void;
   onDelete?: () => void;
   onAdd?: (location: Partial<FirecallLocation>) => void;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
   mapVehicles: Fzg[];
   kostenersatzVehicleNames: Set<string>;
   onKostenersatzVehicleSelected?: (vehicleName: string, location: FirecallLocation) => void;
@@ -40,6 +42,7 @@ export default function EinsatzorteCard({
   onChange,
   onDelete,
   onAdd,
+  readOnly = false,
   mapVehicles,
   kostenersatzVehicleNames,
   onKostenersatzVehicleSelected,
@@ -244,8 +247,9 @@ export default function EinsatzorteCard({
             <StatusChip
               status={(local.status as LocationStatus) || 'offen'}
               onChange={(status) => handleFieldChange('status', status)}
+              readOnly={readOnly}
             />
-            {!isNew && onDelete && (
+            {!isNew && !readOnly && onDelete && (
               <IconButton size="small" onClick={onDelete} color="error">
                 <DeleteIcon fontSize="small" />
               </IconButton>
@@ -260,6 +264,7 @@ export default function EinsatzorteCard({
             placeholder={isNew ? t('placeholderNew') : t('placeholderName')}
             variant="outlined"
             sx={{ mb: 2 }}
+            slotProps={{ input: { readOnly } }}
           />
 
           <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
@@ -269,6 +274,7 @@ export default function EinsatzorteCard({
               size="small"
               placeholder={t('placeholderStreet')}
               sx={{ flex: 2 }}
+              slotProps={{ input: { readOnly } }}
             />
             <TextField
               value={local.number || ''}
@@ -276,6 +282,7 @@ export default function EinsatzorteCard({
               size="small"
               placeholder={t('placeholderNumber')}
               sx={{ flex: 0.5 }}
+              slotProps={{ input: { readOnly } }}
             />
           </Stack>
 
@@ -286,6 +293,7 @@ export default function EinsatzorteCard({
             fullWidth
             placeholder={t('placeholderCity')}
             sx={{ mb: 2 }}
+            slotProps={{ input: { readOnly } }}
           />
 
           <Box sx={{ mb: 2 }}>
@@ -300,6 +308,7 @@ export default function EinsatzorteCard({
               onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
               onMapVehicleSelected={handleMapVehicleSelected}
               onCreateVehicle={handleCreateVehicle}
+              disabled={readOnly}
             />
           </Box>
 
@@ -316,6 +325,7 @@ export default function EinsatzorteCard({
                 onChange={(e) => handleFieldChange('alarmTime', e.target.value)}
                 size="small"
                 fullWidth
+                slotProps={{ input: { readOnly } }}
               />
             </Box>
             <Box>
@@ -328,6 +338,7 @@ export default function EinsatzorteCard({
                 onChange={(e) => handleFieldChange('startTime', e.target.value)}
                 size="small"
                 fullWidth
+                slotProps={{ input: { readOnly } }}
               />
             </Box>
             <Box>
@@ -340,6 +351,7 @@ export default function EinsatzorteCard({
                 onChange={(e) => handleFieldChange('doneTime', e.target.value)}
                 size="small"
                 fullWidth
+                slotProps={{ input: { readOnly } }}
               />
             </Box>
           </Stack>
@@ -353,6 +365,7 @@ export default function EinsatzorteCard({
             rows={2}
             placeholder={t('placeholderDescription')}
             sx={{ mb: 2 }}
+            slotProps={{ input: { readOnly } }}
           />
 
           <Box
@@ -369,9 +382,11 @@ export default function EinsatzorteCard({
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {!isNew && <NavigateButton lat={local.lat} lng={local.lng} size="medium" />}
-              <IconButton onClick={() => setMapOpen(true)}>
-                <MyLocationIcon />
-              </IconButton>
+              {!readOnly && (
+                <IconButton onClick={() => setMapOpen(true)}>
+                  <MyLocationIcon />
+                </IconButton>
+              )}
             </Box>
           </Box>
         </CardContent>

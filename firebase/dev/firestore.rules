@@ -19,6 +19,18 @@ service cloud.firestore {
     function kostenersatzUser() {
       return authorizedUser() && 'kostenersatz' in request.auth.token.groups;
     }
+
+    // Einsatz-Gäste kommen über einen Share-Link (/einsatz/<id>?token=…) und
+    // tragen den Claim `firecall`. `firecallWrite` entscheidet, ob ihr Zugriff
+    // auch Schreibrechte umfasst.
+    // Fehlt der Claim komplett, gilt Schreibzugriff: Gäste, deren Link vor
+    // Einführung dieses Feldes erzeugt wurde, behalten ihren bisherigen
+    // Zugriff, bis ihr Token erneuert wurde (spätestens nach 45 Minuten, siehe
+    // useFirebaseCustomTokenLogin.ts).
+    function guestMayWrite() {
+      return !('firecallWrite' in request.auth.token)
+        || request.auth.token.firecallWrite == true;
+    }
     
     match /hydrant/{doc=*} {
       allow read: if authorizedUser()
@@ -40,10 +52,15 @@ service cloud.firestore {
     }
 
     match /call/{doc} {
-      allow read, write: if authorizedUser() 
+      allow read: if authorizedUser() 
             // && resource.data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
             && (
             	doc == request.auth.token.firecall ||
+              resource.data.group in request.auth.token.groups
+            );
+      allow write: if authorizedUser() 
+            && (
+            	(doc == request.auth.token.firecall && guestMayWrite()) ||
               resource.data.group in request.auth.token.groups
             );
       allow create: if authorizedUser() 
@@ -52,6 +69,14 @@ service cloud.firestore {
       function callAuthorized() {
         return authorizedUser() && (
           doc == request.auth.token.firecall ||
+          get(/databases/$(database)/documents/call/$(doc)).data.group in request.auth.token.groups
+        )
+      }
+
+      // Wie callAuthorized(), schließt aber Nur-Lese-Gäste aus.
+      function callWriteAuthorized() {
+        return authorizedUser() && (
+          (doc == request.auth.token.firecall && guestMayWrite()) ||
           get(/databases/$(database)/documents/call/$(doc)).data.group in request.auth.token.groups
         )
       }
@@ -66,6 +91,11 @@ service cloud.firestore {
 
       // Live location sharing: read for any firecall-authorized user,
       // write/delete only for the doc owner whose UID equals the doc id.
+      // Bewusst callAuthorized() statt callWriteAuthorized(): Die eigene
+      // Standortfreigabe ist keine Bearbeitung des Einsatzes, sondern eine
+      // Information an die Einsatzleitung — genau dafür sind Nur-Lese-Gäste
+      // (externe Kräfte, Nachbarwehr) da. Dasselbe gilt für das Audit-Log
+      // oben: append-only und nur zur Nachvollziehbarkeit.
       match /livelocation/{userId} {
         allow read: if callAuthorized();
         allow create: if callAuthorized()
@@ -79,7 +109,8 @@ service cloud.firestore {
       }
 
       match /{subitem=**} {
-        allow read, write: if callAuthorized()
+        allow read: if callAuthorized();
+        allow write: if callWriteAuthorized();
       }
       
     }

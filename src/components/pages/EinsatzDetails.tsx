@@ -23,14 +23,15 @@ import { StorageReference } from 'firebase/storage';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { createCustomFirebaseTokenForFirecall } from '../../app/actions/auth';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useVehicles from '../../hooks/useVehicles';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { useAuditLog } from '../../hooks/useAuditLog';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import FirecallShareDialog from '../dialogs/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import { firestore } from '../firebase/firebase';
 import {
@@ -68,10 +69,8 @@ export default function EinsatzDetails() {
   const [loading, setLoading] = useState(true);
   const [displayUpdateDialog, setDisplayUpdateDialog] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [tokenLink, setTokenLink] = useState<string>();
-  const [copied, setCopied] = useState(false);
-  const [creatingLink, setCreatingLink] = useState(false);
-  const [error, setError] = useState<string>();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const canWrite = useFirecallWriteAccess();
   const [alarms, setAlarms] = useState<BlaulichtSmsAlarm[] | undefined>(
     undefined,
   );
@@ -138,25 +137,6 @@ export default function EinsatzDetails() {
     },
     [email, logChange]
   );
-
-  const createLink = useCallback(async (fcId: string) => {
-    setError('');
-    setCreatingLink(true);
-    const token = await createCustomFirebaseTokenForFirecall(fcId);
-    if (token.token) {
-      const link = `${window.location.origin}/einsatz/${fcId}?token=${token.token}`;
-      setTokenLink(link);
-      try {
-        await navigator.clipboard?.writeText(link);
-        setCopied(true);
-      } catch {
-        setCopied(false);
-      }
-    } else {
-      setError(t('tokenCreateError', { error: token.error ?? '' }));
-    }
-    setCreatingLink(false);
-  }, [t]);
 
   const handleFileUploadComplete = useCallback(
     async (refs: StorageReference[]) => {
@@ -254,11 +234,16 @@ export default function EinsatzDetails() {
           </Button>
         </Tooltip>
         {firecall.id && <FirecallExport firecallId={firecall.id} />}
-        <Tooltip title={tCommon('edit')}>
-          <IconButton size="small" onClick={() => setDisplayUpdateDialog(true)}>
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
+        {canWrite && (
+          <Tooltip title={tCommon('edit')}>
+            <IconButton
+              size="small"
+              onClick={() => setDisplayUpdateDialog(true)}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         {isAdmin && (
           <Tooltip title={tCommon('delete')}>
             <IconButton
@@ -270,16 +255,9 @@ export default function EinsatzDetails() {
             </IconButton>
           </Tooltip>
         )}
-        {creatingLink ? (
-          <CircularProgress size={24} sx={{ mx: 1 }} />
-        ) : (
+        {canWrite && (
           <Tooltip title={t('createShareLink')}>
-            <IconButton
-              size="small"
-              onClick={() => {
-                if (firecall.id) createLink(firecall.id);
-              }}
-            >
+            <IconButton size="small" onClick={() => setShareDialogOpen(true)}>
               <ShareIcon />
             </IconButton>
           </Tooltip>
@@ -294,28 +272,6 @@ export default function EinsatzDetails() {
           </IconButton>
         </Tooltip>
       </Box>
-
-      {tokenLink && (
-        <Box sx={{ mb: 2 }}>
-          {copied ? (
-            <Typography variant="body2" color="success.main">
-              {t('linkCopied')}
-            </Typography>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              {t('linkCopyFallback')}
-            </Typography>
-          )}
-          <Link href={tokenLink} target="_blank">
-            {tokenLink.substring(0, 100)}...
-          </Link>
-        </Box>
-      )}
-      {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
 
       {/* Einsatz info */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -408,7 +364,9 @@ export default function EinsatzDetails() {
           <DownloadAllButton urls={firecall.attachments} />
         )}
       </Box>
-      <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+      {canWrite && (
+        <FileUploader onFileUploadComplete={handleFileUploadComplete} />
+      )}
       {firecall.attachments && firecall.attachments.length > 0 ? (
         <Box
           sx={{
@@ -427,7 +385,7 @@ export default function EinsatzDetails() {
             <Box key={url} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <FileDisplay
                 url={url}
-                edit
+                edit={canWrite}
                 onDeleteCallback={handleDeleteAttachment}
                 imageSize={200}
               />
@@ -485,6 +443,12 @@ export default function EinsatzDetails() {
       )}
 
       {/* Dialogs */}
+      {shareDialogOpen && firecall.id && (
+        <FirecallShareDialog
+          firecallId={firecall.id}
+          onClose={() => setShareDialogOpen(false)}
+        />
+      )}
       {displayUpdateDialog && (
         <EinsatzDialog
           onClose={(fc) => {

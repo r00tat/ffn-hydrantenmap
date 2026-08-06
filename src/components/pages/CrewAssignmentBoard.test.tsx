@@ -114,6 +114,12 @@ vi.mock('../../hooks/useVehicles', () => ({
   }),
 }));
 
+// Der Board-Code fragt das Schreibrecht ab; der echte Hook zieht die
+// Firebase-Login-Kette (und damit server-only Module) in den Test.
+vi.mock('../../hooks/useFirecallWriteAccess', () => ({
+  default: () => true,
+}));
+
 vi.mock('../../hooks/useFirecallItemAdd', () => ({
   default: () => vi.fn(),
 }));

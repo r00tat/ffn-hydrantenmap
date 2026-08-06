@@ -15,6 +15,7 @@ import { useContext, useMemo, useState } from 'react';
 import { SimpleMap } from '../../common/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import {
   FirecallContext,
   useAtsCountForVehicle,
@@ -77,6 +78,7 @@ function CompactItemCard({
   onEdit: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const canEdit = useMapEditorCanEdit();
   const vehicleId = item.type === 'vehicle' ? item.id : undefined;
   const crewCount = useCrewCountForVehicle(vehicleId);
   const atsCount = useAtsCountForVehicle(vehicleId);
@@ -145,17 +147,19 @@ function CompactItemCard({
           </Box>
           <Collapse in={expanded}>
             <Box sx={{ mt: 1 }}>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                aria-label="edit"
-                sx={{ float: 'right', ml: 0.5 }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
+              {canEdit && (
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  aria-label="edit"
+                  sx={{ float: 'right', ml: 0.5 }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
               <Typography color="text.secondary" variant="body2">
                 {instance.info()}
               </Typography>

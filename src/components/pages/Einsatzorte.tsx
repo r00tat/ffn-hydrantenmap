@@ -15,6 +15,7 @@ import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useFirecall from '../../hooks/useFirecall';
 import useFirecallLocations from '../../hooks/useFirecallLocations';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import useEmailImport from '../../hooks/useEmailImport';
 import useVehicles from '../../hooks/useVehicles';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
@@ -47,6 +48,7 @@ export default function Einsatzorte() {
   const firecall = useFirecall();
   const { locations, addLocation, updateLocation, deleteLocation } =
     useFirecallLocations();
+  const canWrite = useFirecallWriteAccess();
   const { importFromEmail, isImporting, lastResult, clearResult } =
     useEmailImport(firecall?.id);
   const [snackbar, setSnackbar] = useState<string | null>(null);
@@ -475,7 +477,7 @@ export default function Einsatzorte() {
               size="small"
             />
           )}
-          {isGroupFfn && (
+          {isGroupFfn && canWrite && (
             <Tooltip title={t('checkEmails')}>
               <span>
                 <IconButton
@@ -504,20 +506,25 @@ export default function Einsatzorte() {
               onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
               onMapVehicleSelected={handleMapVehicleSelected}
               onCreateVehicle={handleCreateVehicle}
+              readOnly={!canWrite}
             />
           ))}
-          <EinsatzorteCard
-            key="new"
-            location={emptyLocation}
-            isNew
-            onChange={() => {}}
-            onAdd={handleAdd}
-            mapVehicles={mapVehicles}
-            kostenersatzVehicleNames={kostenersatzVehicleNames}
-            onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
-            onMapVehicleSelected={handleMapVehicleSelected}
-            onCreateVehicle={handleCreateVehicle}
-          />
+          {/* Die leere Karte am Ende ist die Eingabemaske für neue Standorte —
+              ohne Schreibrecht gibt es sie nicht. */}
+          {canWrite && (
+            <EinsatzorteCard
+              key="new"
+              location={emptyLocation}
+              isNew
+              onChange={() => {}}
+              onAdd={handleAdd}
+              mapVehicles={mapVehicles}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleSelected={handleKostenersatzVehicleSelected}
+              onMapVehicleSelected={handleMapVehicleSelected}
+              onCreateVehicle={handleCreateVehicle}
+            />
+          )}
         </Box>
       ) : (
         <EinsatzorteTable
@@ -533,6 +540,7 @@ export default function Einsatzorte() {
           sortField={sortField}
           sortDirection={sortDirection}
           onSortClick={handleSortClick}
+          readOnly={!canWrite}
         />
       )}
 

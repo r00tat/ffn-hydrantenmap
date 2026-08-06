@@ -3,6 +3,8 @@ export interface CacheableUserData {
   isAdmin: boolean;
   groups: string[];
   firecall?: string;
+  /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
+  firecallWrite?: boolean;
 }
 
 export class UserSessionCache {

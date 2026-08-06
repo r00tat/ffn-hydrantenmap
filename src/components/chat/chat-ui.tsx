@@ -19,6 +19,7 @@ import useRegisterMessaging, {
   useUnRegisterMessaging,
 } from '../../hooks/useRegisterMessaging';
 import useSendMessage from '../../hooks/useSendMessage';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import ChatMessages from './messages';
 
 export default function ChatUi() {
@@ -30,6 +31,7 @@ export default function ChatUi() {
   const registerMessaging = useRegisterMessaging();
   const unregisterMessaging = useUnRegisterMessaging();
   const sendMessage = useSendMessage();
+  const canWrite = useFirecallWriteAccess();
 
   const [text, setText] = useState('');
 
@@ -91,8 +93,9 @@ export default function ChatUi() {
               fullWidth
               onChange={(ev) => setText(ev.target.value)}
               value={text}
+              readOnly={!canWrite}
               onKeyDown={(ev) => {
-                if (ev.key === 'Enter') sendChatMessage(text);
+                if (ev.key === 'Enter' && canWrite) sendChatMessage(text);
               }}
               endAdornment={
                 <InputAdornment position="end">
@@ -100,6 +103,7 @@ export default function ChatUi() {
                     aria-label={t('sendAria')}
                     onClick={() => sendChatMessage(text)}
                     edge="end"
+                    disabled={!canWrite}
                   >
                     <SendIcon />
                   </IconButton>

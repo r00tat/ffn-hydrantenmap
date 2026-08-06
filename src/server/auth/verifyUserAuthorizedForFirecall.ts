@@ -7,6 +7,7 @@ import {
   USER_COLLECTION_ID,
 } from '../../components/firebase/firestore';
 import { FirebaseUserInfo } from '../../common/users';
+import { guestCanWrite } from '../../common/firecallGuest';
 import { firestore } from '../firebase/admin';
 
 /**
@@ -16,9 +17,18 @@ import { firestore } from '../firebase/admin';
  * single-firecall guest claim. Throws an `ApiException` otherwise and returns
  * the firecall data on success.
  */
+export interface VerifyFirecallOptions {
+  /**
+   * Für schreibende Endpunkte setzen. Einsatz-Gäste ohne Schreibrecht werden
+   * dann abgewiesen; Benutzer mit Gruppenzugriff sind nicht betroffen.
+   */
+  requireWrite?: boolean;
+}
+
 export async function verifyUserAuthorizedForFirecall(
   user: DecodedIdToken,
-  firecallId: string
+  firecallId: string,
+  options: VerifyFirecallOptions = {}
 ): Promise<Firecall> {
   const firecallDoc = await firestore
     .collection(FIRECALL_COLLECTION_ID)
@@ -43,10 +53,18 @@ export async function verifyUserAuthorizedForFirecall(
   const userData = userDoc.data() as FirebaseUserInfo | undefined;
   const userGroups: string[] = userData?.groups || [];
   const userFirecall: string | undefined = userData?.firecall;
+  const isGroupMember = userGroups.includes(firecallData.group);
 
-  if (!userGroups.includes(firecallData.group) && userFirecall !== firecallId) {
+  if (!isGroupMember && userFirecall !== firecallId) {
     throw new ApiException(
       `user ${user.uid} is not authorized for firecall ${firecallId}`,
+      { status: 403 }
+    );
+  }
+
+  if (options.requireWrite && !isGroupMember && !guestCanWrite(userData)) {
+    throw new ApiException(
+      `firecall guest ${user.uid} has read-only access to firecall ${firecallId}`,
       { status: 403 }
     );
   }

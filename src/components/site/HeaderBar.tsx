@@ -1,10 +1,12 @@
 import HistoryIcon from '@mui/icons-material/History';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import LocalFireDepartmentTwoToneIcon from '@mui/icons-material/LocalFireDepartmentTwoTone';
 import MenuIcon from '@mui/icons-material/Menu';
 import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
@@ -14,6 +16,7 @@ import Link from 'next/link';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useFirecall from '../../hooks/useFirecall';
+import { useIsReadOnlyFirecallGuest } from '../../hooks/useFirecallWriteAccess';
 import useMapEditor from '../../hooks/useMapEditor';
 import { FirecallHistory } from '../firebase/firestore';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
@@ -27,11 +30,13 @@ function HeaderBar({
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
   const t = useTranslations('header');
+  const tShare = useTranslations('firecallShare');
   const { isSignedIn, displayName, photoURL, isAuthorized } =
     useFirebaseLogin();
   const firecall = useFirecall();
   const { history, selectHistory, selectedHistory, historyModeActive } =
     useMapEditor();
+  const isReadOnlyGuest = useIsReadOnlyFirecallGuest();
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const historyDialogClose = useCallback(
     (history?: FirecallHistory) => {
@@ -120,7 +125,25 @@ function HeaderBar({
               )}
             </Box>
 
-            {isSignedIn && (
+            {/* Erklärt dem Einsatz-Gast, warum keine Bedienelemente zum
+                Bearbeiten sichtbar sind. */}
+            {isReadOnlyGuest && (
+              <Tooltip title={tShare('readOnlyGuestHint')}>
+                <Chip
+                  icon={<VisibilityIcon />}
+                  label={tShare('accessRead')}
+                  size="small"
+                  sx={{
+                    backgroundColor: '#fff',
+                    ml: 1,
+                    mr: 1,
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
+            )}
+
+            {isSignedIn && !isReadOnlyGuest && (
               <Tooltip title={t('newFirecallTooltip')}>
                 <Button
                   color={'info'}

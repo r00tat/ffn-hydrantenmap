@@ -160,13 +160,10 @@
     "openMapButton": "Karte",
     "createShareLink": "Link für anonymen Zugriff erstellen",
     "jumpToKostenersatz": "Zu Kostenersatz springen",
-    "linkCopied": "Link in Zwischenablage kopiert",
-    "linkCopyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:",
     "blaulichtSmsTitle": "Alarm SMS",
     "blaulichtSmsLoadError": "Alarm SMS konnte nicht geladen werden (Alarm-ID: {id}). Möglicherweise sind die Alarm-SMS-Zugangsdaten nicht konfiguriert oder der Alarm ist nicht mehr verfügbar.",
     "attachments": "Anhänge",
     "noAttachments": "Keine Anhänge vorhanden",
-    "tokenCreateError": "Token konnte nicht erstellt werden: {error}",
     "labels": {
       "group": "Gruppe",
       "fw": "Feuerwehr",
@@ -276,7 +273,11 @@
     "groups": "Gruppen",
     "groupLabel": "Group",
     "authorized": "Authorized",
-    "admin": "Admin"
+    "admin": "Admin",
+    "firecallGuestSection": "Einsatz-Gast",
+    "firecallGuestFor": "Zugang beschränkt auf Einsatz {firecall}",
+    "firecallWrite": "Schreibzugriff auf den Einsatz",
+    "firecallWriteHint": "Wirkt beim nächsten Aktualisieren des Zugangs (spätestens nach 45 Minuten)."
   },
   "header": {
     "appTitle": "Einsatzkarte",
@@ -716,7 +717,8 @@
     "userNotAuthorized": "Benutzer nicht autorisiert",
     "userIdMissing": "Benutzer nicht autorisiert: keine ID gesetzt",
     "adminRequired": "Administrator-Rechte erforderlich",
-    "invalidLanguage": "Ungültige Sprache"
+    "invalidLanguage": "Ungültige Sprache",
+    "readOnlyFirecallGuest": "Dieser Zugang hat nur Lesezugriff auf den Einsatz."
   },
   "firecall": {
     "fields": {
@@ -1439,7 +1441,12 @@
       "groups": "Gruppen"
     },
     "pagination": "{from}-{to} von {count}",
-    "paginationOf": "{from}-{to} von {count} ({total} gesamt)"
+    "paginationOf": "{from}-{to} von {count} ({total} gesamt)",
+    "showFirecallGuests": "Einsatz-Gäste anzeigen",
+    "firecallGuestsFilter": "Über Share-Link erstellte Einsatz-Gäste ein- oder ausblenden",
+    "guestChip": "Gast",
+    "guestWrite": "Schreibzugriff",
+    "guestReadOnly": "Nur Lesezugriff"
   },
   "groups": {
     "title": "Gruppen",
@@ -1537,10 +1544,7 @@
     "shareTooltip": "Link für anonymen Zugriff erstellen",
     "kostenersatzTooltip": "Kostenersatz-Berechnungen",
     "deleteTitle": "Einsatz {name} {date} löschen",
-    "deleteConfirm": "Einsatz {name} {date} wirklich löschen?",
-    "tokenCreateError": "Token konnte nicht erstellt werden: {error}",
-    "linkCopied": "Link in Zwischenablage kopiert",
-    "linkCopyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:"
+    "deleteConfirm": "Einsatz {name} {date} wirklich löschen?"
   },
   "geschaeftsbuch": {
     "title": "Geschäftsbuch",
@@ -1715,5 +1719,27 @@
     "save": "Speichern",
     "configSaved": "Konfiguration gespeichert",
     "configSaveFailed": "Speichern fehlgeschlagen"
+  },
+  "firecallShare": {
+    "title": "Einsatz teilen",
+    "intro": "Erstellt einen Link, mit dem eine Person ohne eigenen Zugang auf diesen Einsatz zugreifen kann.",
+    "nameLabel": "Name des Gasts",
+    "nameHelper": "Zum Wiedererkennen in der Benutzerverwaltung, z. B. „Nachbarwehr Weiden“.",
+    "nameRequired": "Bitte einen Namen eingeben.",
+    "accessLabel": "Zugriff",
+    "accessRead": "Nur Lesezugriff",
+    "accessReadHint": "Der Gast kann den Einsatz ansehen, aber nichts ändern.",
+    "accessWrite": "Lesen und Schreiben",
+    "accessWriteHint": "Der Gast kann den Einsatz genauso bearbeiten wie ein Mitglied.",
+    "create": "Link erstellen",
+    "linkLabel": "Share-Link",
+    "copy": "Link kopieren",
+    "copied": "Link in Zwischenablage kopiert",
+    "copyFallback": "Link konnte nicht kopiert werden. Bitte manuell kopieren:",
+    "open": "Link öffnen",
+    "createAnother": "Weiteren Link erstellen",
+    "error": "Link konnte nicht erstellt werden: {error}",
+    "createdFor": "Link für {name} ({access})",
+    "readOnlyGuestHint": "Nur Lesezugriff — Änderungen sind für diesen Zugang nicht möglich."
   }
 }

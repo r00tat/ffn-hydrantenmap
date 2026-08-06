@@ -214,7 +214,9 @@ export async function processUnwetterEmails(
 
   // Check authorization and restrict to group 'ffnd'
   try {
-    const firecallData = await actionUserAuthorizedForFirecall(firecallId);
+    const firecallData = await actionUserAuthorizedForFirecall(firecallId, {
+      requireWrite: true,
+    });
     if (firecallData.group && firecallData.group !== 'ffnd') {
       return {
         ...result,

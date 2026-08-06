@@ -8,6 +8,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
@@ -20,6 +22,7 @@ import Typography from '@mui/material/Typography';
 import { green, red } from '@mui/material/colors';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useMemo, useState } from 'react';
+import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
 import { UserRecordExtended } from '../../common/users';
 import AdminGuard from '../../components/site/AdminGuard';
 import UserRecordExtendedDialog from '../../components/users/UserDialog';
@@ -27,6 +30,7 @@ import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useUpdateUser from '../../hooks/useUpdateUser';
 import useUserList from '../../hooks/useUserList';
 import { Group } from '../groups/groupTypes';
+import { defaultUserFilters, filterUsers } from './filterUsers';
 
 interface UserRowButtonParams {
   row: UserRecordExtended;
@@ -102,48 +106,14 @@ function Users() {
     [groupsArray]
   );
 
-  const [filters, setFilters] = useState({
-    name: '',
-    email: '',
-    feuerwehr: '',
-    groups: [] as string[],
-  });
+  const [filters, setFilters] = useState(defaultUserFilters);
   const [groupsMenuAnchor, setGroupsMenuAnchor] =
     useState<null | HTMLElement>(null);
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      if (
-        filters.name &&
-        !(user.displayName || '')
-          .toLowerCase()
-          .includes(filters.name.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.email &&
-        !(user.email || '').toLowerCase().includes(filters.email.toLowerCase())
-      ) {
-        return false;
-      }
-      if (
-        filters.feuerwehr &&
-        !(user.feuerwehr || '')
-          .toLowerCase()
-          .includes(filters.feuerwehr.toLowerCase())
-      ) {
-        return false;
-      }
-      if (filters.groups.length > 0) {
-        const userGroups = user.groups || [];
-        if (!filters.groups.some((g) => userGroups.includes(g))) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [users, filters]);
+  const filteredUsers = useMemo(
+    () => filterUsers(users, filters),
+    [users, filters]
+  );
 
   const handleFilterChange = useCallback(
     (field: keyof typeof filters) =>
@@ -153,6 +123,14 @@ function Users() {
       },
     []
   );
+
+  const handleFirecallGuestsToggle = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      showFirecallGuests: !prev.showFirecallGuests,
+    }));
+    setPage(0);
+  }, []);
 
   const handleGroupFilterToggle = useCallback((groupId: string) => {
     setFilters((prev) => ({
@@ -293,6 +271,20 @@ function Users() {
             </Box>
           </Grid>
           <Grid size={{ xs: 12 }}>
+            <Tooltip title={t('firecallGuestsFilter')}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={filters.showFirecallGuests}
+                    onChange={handleFirecallGuestsToggle}
+                  />
+                }
+                label={t('showFirecallGuests')}
+              />
+            </Tooltip>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
             <hr />
           </Grid>
           {paginatedUsers.map((user) => (
@@ -306,6 +298,22 @@ function Users() {
               </Grid>
               <Grid size={{ xs: 5, md: 6, lg: 2 }}>
                 {user.displayName || ''}
+                {isFirecallGuest(user) && (
+                  <>
+                    {' '}
+                    <Chip label={t('guestChip')} size="small" />{' '}
+                    <Chip
+                      label={
+                        guestCanWrite(user)
+                          ? t('guestWrite')
+                          : t('guestReadOnly')
+                      }
+                      size="small"
+                      variant="outlined"
+                      color={guestCanWrite(user) ? 'warning' : 'default'}
+                    />
+                  </>
+                )}
               </Grid>
               <Grid size={{ xs: 5, md: 6, lg: 2 }}>
                 {user.email}{' '}

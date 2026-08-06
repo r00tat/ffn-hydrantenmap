@@ -28,6 +28,8 @@ export interface CrewPersonCardProps {
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
   onRemove?: () => void;
   showVehicleSelect?: boolean;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
 }
 
 export default function CrewPersonCard({
@@ -37,9 +39,11 @@ export default function CrewPersonCard({
   onVehicleChange,
   onRemove,
   showVehicleSelect = false,
+  readOnly = false,
 }: CrewPersonCardProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: assignment.id || assignment.recipientId,
+    disabled: readOnly,
   });
 
   const style = transform
@@ -75,20 +79,22 @@ export default function CrewPersonCard({
         p: 1,
       }}
     >
-      <DragIndicatorIcon
-        {...listeners}
-        {...attributes}
-        sx={{
-          cursor: 'grab',
-          color: 'action.active',
-          flexShrink: 0,
-          touchAction: 'none',
-        }}
-      />
+      {!readOnly && (
+        <DragIndicatorIcon
+          {...listeners}
+          {...attributes}
+          sx={{
+            cursor: 'grab',
+            color: 'action.active',
+            flexShrink: 0,
+            touchAction: 'none',
+          }}
+        />
+      )}
       <Typography variant="body2" sx={{ flexShrink: 0 }}>
         {assignment.name}
       </Typography>
-      {onRemove && (
+      {!readOnly && onRemove && (
         <IconButton size="small" onClick={onRemove} color="error" sx={{ p: 0.25 }}>
           <DeleteOutlineIcon fontSize="small" />
         </IconButton>
@@ -100,6 +106,7 @@ export default function CrewPersonCard({
           onChange={handleFunktionChange}
           size="small"
           data-testid="funktion-select"
+          readOnly={readOnly}
         >
           {CREW_FUNKTIONEN.map((f) => (
             <MenuItem key={f} value={f}>
@@ -115,6 +122,7 @@ export default function CrewPersonCard({
             onChange={handleVehicleChange}
             size="small"
             data-testid="vehicle-select"
+            readOnly={readOnly}
           >
             <MenuItem value="">-- Nicht zugeordnet --</MenuItem>
             {vehicles.map((v) => (

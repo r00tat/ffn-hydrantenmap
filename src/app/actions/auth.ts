@@ -12,20 +12,38 @@ import { actionUserAuthorizedForFirecall } from '../auth';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { createJwt, verifyJwt } from './jwt';
+import { FirebaseUserInfo } from '../../common/users';
+import { guestCanWrite, guestDisplayName } from '../../common/firecallGuest';
 
-export async function createCustomFirebaseTokenForFirecall(firecallId: string) {
+export interface FirecallShareLinkOptions {
+  /** Anzeigename des Gasts, im Share-Dialog Pflichtfeld. */
+  name: string;
+  /** `true` = Lesen und Schreiben, `false` = nur Lesen. */
+  canWrite: boolean;
+}
+
+export async function createCustomFirebaseTokenForFirecall(
+  firecallId: string,
+  options: FirecallShareLinkOptions,
+) {
   if (!firecallId) {
     throw new Error('firecall parameter is missing');
   }
 
-  const firecall = await actionUserAuthorizedForFirecall(firecallId);
+  // Schreibrecht erforderlich: ein Nur-Lese-Gast darf sich nicht über einen
+  // selbst erzeugten Link ein Schreibrecht beschaffen.
+  const firecall = await actionUserAuthorizedForFirecall(firecallId, {
+    requireWrite: true,
+  });
 
   try {
+    const displayName = guestDisplayName(options?.name, firecall.name);
+    const canWrite = !!options?.canWrite;
     const digest = crypto.hash('sha256', uuidv4()).substring(0, 8);
 
     // 1. Create a new anonymous user
     const userBaseData: CreateRequest = {
-      displayName: `Einsatz-Gast ${firecall.name} ${digest}`,
+      displayName,
       email: `firecall+${firecallId}-${digest}@ff-neusiedlamsee.at`,
       emailVerified: true,
     };
@@ -39,6 +57,7 @@ export async function createCustomFirebaseTokenForFirecall(firecallId: string) {
       groups: ['allUsers'],
       isAdmin: false,
       firecall: firecallId,
+      firecallWrite: canWrite,
     };
 
     await firestore.collection(USER_COLLECTION_ID).doc(uid).set(userData);
@@ -48,6 +67,7 @@ export async function createCustomFirebaseTokenForFirecall(firecallId: string) {
       isAdmin: false,
       authorized: true,
       firecall: firecallId,
+      firecallWrite: canWrite,
     };
     await setCustomClaimsForUser(uid, customClaims);
 
@@ -62,6 +82,14 @@ export async function createCustomFirebaseTokenForFirecall(firecallId: string) {
   }
 }
 
+/**
+ * Tauscht das JWT aus einem Share-Link gegen ein Firebase Custom Token.
+ *
+ * Die Berechtigungen kommen dabei aus dem **Benutzerdokument**, nicht aus dem
+ * JWT-Payload: Das JWT belegt nur, *wer* der Gast ist. Damit lässt sich einem
+ * bereits verteilten Link das Schreibrecht nachträglich entziehen oder der
+ * Zugang ganz sperren.
+ */
 export async function exchangeCustomJwtForFirebaseToken(customToken: string) {
   try {
     const payload = await verifyJwt(customToken);
@@ -72,16 +100,43 @@ export async function exchangeCustomJwtForFirebaseToken(customToken: string) {
 
     const uid = payload.sub;
 
+    const userDoc = await firestore
+      .collection(USER_COLLECTION_ID)
+      .doc(uid)
+      .get();
+    if (!userDoc.exists) {
+      throw new Error(`no user document for ${uid}`);
+    }
+    const userData = userDoc.data() as FirebaseUserInfo;
+    if (!userData.authorized) {
+      throw new Error(`user ${uid} is not authorized`);
+    }
+
+    const claims: CustomClaims = {
+      groups: userData.groups || ['allUsers'],
+      isAdmin: !!userData.isAdmin,
+      authorized: true,
+      firecall: userData.firecall,
+      firecallWrite: guestCanWrite(userData),
+    };
+
     console.info(
-      `payload: ${JSON.stringify({ sub: payload.sub, firecall: payload.firecall })}`
+      `payload: ${JSON.stringify({
+        sub: payload.sub,
+        firecall: claims.firecall,
+        firecallWrite: claims.firecallWrite,
+      })}`,
     );
 
-    // all claims should be configured on the user
+    // `undefined` ist als Developer Claim nicht erlaubt — der firecall-Claim
+    // entfällt daher komplett, wenn der Benutzer kein Einsatz-Gast (mehr) ist.
     const firebaseToken = await firebaseAuth.createCustomToken(uid, {
-      firecall: payload.firecall,
-      groups: payload.groups,
-      isAdmin: payload.isAdmin,
-      authorized: payload.authorized,
+      groups: claims.groups,
+      isAdmin: claims.isAdmin,
+      authorized: claims.authorized,
+      ...(claims.firecall
+        ? { firecall: claims.firecall, firecallWrite: claims.firecallWrite }
+        : {}),
     });
     return { token: firebaseToken };
   } catch (error: any) {

@@ -3,9 +3,11 @@ import 'server-only';
 import { uniqueArray } from '../../../../common/arrayUtils';
 import { isTruthy } from '../../../../common/boolish';
 import { feuerwehren } from '../../../../common/feuerwehren';
+import { isFirecallGuest } from '../../../../common/firecallGuest';
 import { UserRecordExtended } from '../../../../common/users';
 import { USER_COLLECTION_ID } from '../../../../components/firebase/firestore';
 import { firebaseAuth, firestore } from '../../../../server/firebase/admin';
+import { userSessionCache } from '../../../../server/auth/userSessionCache';
 
 export interface UsersResponse {
   user: UserRecordExtended;
@@ -20,6 +22,10 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     feuerwehr: user.feuerwehr || 'neusiedl',
     abschnitt: feuerwehren[user.feuerwehr || 'neusiedl'].abschnitt || 0,
     groups: uniqueArray([...(user.groups || []), 'allUsers']),
+    // Nur für Einsatz-Gäste relevant. Bei allen anderen Benutzern bleibt das
+    // Feld undefined und wird von `filteredData` unten herausgefiltert, damit
+    // ein merge-Write kein bestehendes Feld überschreibt.
+    firecallWrite: isFirecallGuest(user) ? !!user.firecallWrite : undefined,
   };
 
   const filteredData = Object.fromEntries(
@@ -43,7 +49,14 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     groups: newData.groups,
     isAdmin: newData.isAdmin,
     authorized: newData.authorized,
+    ...(isFirecallGuest(user)
+      ? { firecall: user.firecall, firecallWrite: !!user.firecallWrite }
+      : {}),
   });
+
+  // Die Session liest Autorisierung und Schreibrecht über einen Cache. Ohne
+  // Invalidierung bliebe eine Admin-Änderung bis zum Cache-Ablauf wirkungslos.
+  userSessionCache.invalidate(uid);
 
   return newData;
 }
@@ -53,6 +66,7 @@ export interface CustomClaims {
   isAdmin: boolean;
   authorized: boolean;
   firecall?: string;
+  firecallWrite?: boolean;
 }
 
 export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {
@@ -60,6 +74,11 @@ export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {
     groups: uniqueArray([...(user.groups || []), 'allUsers']),
     isAdmin: !!user.isAdmin,
     authorized: !!user.authorized,
+    // Einsatz-Gast-Claims nur setzen, wenn vorhanden — `undefined` ist als
+    // Custom Claim nicht erlaubt.
+    ...(user.firecall
+      ? { firecall: user.firecall, firecallWrite: user.firecallWrite !== false }
+      : {}),
   };
   console.info(
     `setting custom claims for ${uid}: ${JSON.stringify(customClaims)}`

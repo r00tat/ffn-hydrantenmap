@@ -7,6 +7,7 @@ import { useSaveHistory } from '../../hooks/firecallHistory/useSaveHistory';
 import useAutoSnapshot from '../../hooks/firecallHistory/useAutoSnapshot';
 import useSelectHistory from '../../hooks/firecallHistory/useSelectHistory';
 import { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { MapEditorContext, MapEditorOptions } from '../../hooks/useMapEditor';
 import { firestore } from '../firebase/firebase';
 import {
@@ -34,6 +35,7 @@ function useMapEditorProvider() {
   const [editFirecallItem, setEditFirecallItem] = useState<FirecallItem>();
   const [lastSelectedLayer, setLastSelectedLayer] = useState('');
   const firecallId = useFirecallId();
+  const canWrite = useFirecallWriteAccess();
 
   useEffect(() => {
     (async () => {
@@ -74,7 +76,10 @@ function useMapEditorProvider() {
   useAutoSnapshot();
 
   const options: MapEditorOptions = {
-    editable: historyId ? false : editable,
+    canWrite,
+    // Nur-Lese-Gäste können den Bearbeitungsmodus nicht einschalten, selbst
+    // wenn `setEditable` von irgendwo aufgerufen wird.
+    editable: historyId || !canWrite ? false : editable,
     setEditable,
     saveHistory,
     saveInProgress,

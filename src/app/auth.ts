@@ -2,6 +2,7 @@ import NextAuth, { DefaultSession, Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { getTranslations } from 'next-intl/server';
 import { isTruthy } from '../common/boolish';
+import { guestCanWrite } from '../common/firecallGuest';
 import { isInternalEmail } from '../common/internalDomains';
 import {
   Firecall,
@@ -60,7 +61,10 @@ declare module 'next-auth' {
       isAuthorized: boolean;
       isAdmin: boolean;
       groups: string[];
+      /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
       firecall?: string;
+      /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
+      firecallWrite?: boolean;
       /**
        * Preferred UI language from `userSettings/{uid}`. Undefined when the
        * user has not configured one yet — callers fall back to cookie /
@@ -152,6 +156,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.isAdmin = userData.isAdmin;
           session.user.groups = userData.groups;
           session.user.firecall = userData.firecall;
+          session.user.firecallWrite = userData.firecallWrite;
         }
       } catch (err) {
         console.error(`session callback: failed to fetch user data`, err);
@@ -218,7 +223,20 @@ export async function actionAdminRequired() {
   return session;
 }
 
-export async function userAuthorized(session: Session, firecallId: string) {
+export interface FirecallAuthorizationOptions {
+  /**
+   * Für schreibende Operationen setzen. Einsatz-Gäste ohne Schreibrecht werden
+   * dann abgewiesen; Benutzer, die über ihre Gruppe Zugriff haben, sind nicht
+   * betroffen.
+   */
+  requireWrite?: boolean;
+}
+
+export async function userAuthorized(
+  session: Session,
+  firecallId: string,
+  options: FirecallAuthorizationOptions = {},
+) {
   const firecall = await firestore
     .collection(FIRECALL_COLLECTION_ID)
     .doc(firecallId)
@@ -231,18 +249,34 @@ export async function userAuthorized(session: Session, firecallId: string) {
     throw new Error(`firecall ${firecallId} has no data`);
   }
 
-  if (
-    session.user.groups.indexOf(firecallData.group) < 0 &&
-    session.user.firecall !== firecallId
-  ) {
+  const isGroupMember = session.user.groups.indexOf(firecallData.group) >= 0;
+  const isGuestOfFirecall = session.user.firecall === firecallId;
+
+  if (!isGroupMember && !isGuestOfFirecall) {
     throw new Error(
       `user ${session.user.id} is not in group ${firecallData.group}`,
     );
   }
-  return firecallData;
+
+  if (
+    options.requireWrite &&
+    !isGroupMember &&
+    !guestCanWrite({
+      firecall: session.user.firecall,
+      firecallWrite: session.user.firecallWrite,
+    })
+  ) {
+    const t = await getTranslations('auth');
+    throw new ApiException(t('readOnlyFirecallGuest'), { status: 403 });
+  }
+
+  return { id: firecall.id, ...firecallData };
 }
 
-export async function actionUserAuthorizedForFirecall(firecallId: string) {
+export async function actionUserAuthorizedForFirecall(
+  firecallId: string,
+  options: FirecallAuthorizationOptions = {},
+) {
   const session = await actionUserRequired();
-  return userAuthorized(session, firecallId);
+  return userAuthorized(session, firecallId, options);
 }
