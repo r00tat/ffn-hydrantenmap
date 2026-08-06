@@ -1196,6 +1196,8 @@
     "itemRow": {
       "amountShort": "Qty:",
       "hoursShort": "h:",
+      "increase": "Increase quantity",
+      "decrease": "Decrease quantity",
       "byEffort": "by effort",
       "pricePerHour": "{price}/h",
       "pricePerHourFlat": "{price}/h • {flat} flat",

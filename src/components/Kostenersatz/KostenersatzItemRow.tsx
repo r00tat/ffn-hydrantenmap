@@ -18,6 +18,34 @@ import {
   KostenersatzRate,
 } from '../../common/kostenersatz';
 
+/**
+ * The +/- buttons are only 28px, well below the ~44px recommended touch target,
+ * so taps next to the icon are easy to miss on a phone. The pseudo element
+ * enlarges the tappable area to 34x40px without changing the (very tight)
+ * layout of the row.
+ */
+const touchTargetSx = {
+  p: 0.5,
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    top: -6,
+    bottom: -6,
+    left: -3,
+    right: -3,
+  },
+} as const;
+
+/**
+ * An in-progress edit of one of the inputs: the text the user sees, together
+ * with the value it started from. Once the underlying value changes elsewhere,
+ * `base` no longer matches and the input falls back to the current value.
+ */
+interface Edit {
+  base: number;
+  text: string;
+}
+
 export interface KostenersatzItemRowProps {
   rate: KostenersatzRate;
   item?: KostenersatzLineItem;
@@ -44,17 +72,37 @@ export default function KostenersatzItemRow({
   const stundenOverridden = item?.stundenOverridden || false;
   const sum = item?.sum || 0;
 
-  const [localEinheiten, setLocalEinheiten] = useState<string>(
-    einheiten > 0 ? String(einheiten) : ''
-  );
-  const [localStunden, setLocalStunden] = useState<string>(String(stunden));
+  // The inputs show the value from `item` unless this row is in the middle of an
+  // edit. An edit is tracked together with the value it started from, so it is
+  // dropped as soon as the value changes elsewhere (loading a template, adding a
+  // vehicle that maps to the same rate, changing the Einsatzdauer) instead of
+  // leaving a stale number behind.
+  const [einheitenEdit, setEinheitenEdit] = useState<Edit | null>(null);
+  const [stundenEdit, setStundenEdit] = useState<Edit | null>(null);
 
-  const hasValue = einheiten > 0;
+  const localEinheiten =
+    einheitenEdit?.base === einheiten
+      ? einheitenEdit.text
+      : einheiten > 0
+        ? String(einheiten)
+        : '';
+  const localStunden =
+    stundenEdit?.base === stunden ? stundenEdit.text : String(stunden);
+
+  const editEinheiten = (text: string) => setEinheitenEdit({ base: einheiten, text });
+  const editStunden = (text: string) => setStundenEdit({ base: stunden, text });
+
+  // The number shown in the input drives +/-, so the buttons keep counting from
+  // what the user sees — also for the very first unit, where no item exists yet.
+  const parsedEinheiten = parseInt(localEinheiten, 10);
+  const displayedEinheiten = isNaN(parsedEinheiten) ? 0 : parsedEinheiten;
+
+  const hasValue = displayedEinheiten > 0;
   const showHours = isHourlyRate(rate);
 
   const handleEinheitenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setLocalEinheiten(value);
+    editEinheiten(value);
 
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue >= 0) {
@@ -71,8 +119,8 @@ export default function KostenersatzItemRow({
   };
 
   const handleEinheitenIncrement = () => {
-    const newValue = einheiten + 1;
-    setLocalEinheiten(String(newValue));
+    const newValue = displayedEinheiten + 1;
+    editEinheiten(String(newValue));
     const effectiveStunden = showHours
       ? stundenOverridden
         ? stunden
@@ -82,9 +130,9 @@ export default function KostenersatzItemRow({
   };
 
   const handleEinheitenDecrement = () => {
-    if (einheiten <= 0) return;
-    const newValue = einheiten - 1;
-    setLocalEinheiten(newValue > 0 ? String(newValue) : '');
+    if (displayedEinheiten <= 0) return;
+    const newValue = displayedEinheiten - 1;
+    editEinheiten(newValue > 0 ? String(newValue) : '');
     if (newValue === 0) {
       onItemChange(rate.id, 0, defaultStunden, false);
     } else {
@@ -99,22 +147,22 @@ export default function KostenersatzItemRow({
 
   const handleStundenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setLocalStunden(value);
+    editStunden(value);
 
     const numValue = parseFloat(value);
     if (!isNaN(numValue) && numValue > 0) {
-      onItemChange(rate.id, einheiten, numValue, numValue !== defaultStunden);
+      onItemChange(rate.id, displayedEinheiten, numValue, numValue !== defaultStunden);
     }
   };
 
   const handleToggleStundenOverride = () => {
     if (stundenOverridden) {
       // Reset to default
-      setLocalStunden(String(defaultStunden));
-      onItemChange(rate.id, einheiten, defaultStunden, false);
+      editStunden(String(defaultStunden));
+      onItemChange(rate.id, displayedEinheiten, defaultStunden, false);
     } else {
       // Enable override (keep current value)
-      onItemChange(rate.id, einheiten, stunden, true);
+      onItemChange(rate.id, displayedEinheiten, stunden, true);
     }
   };
 
@@ -168,9 +216,10 @@ export default function KostenersatzItemRow({
           </Typography>
           <IconButton
             size="small"
+            aria-label={t('decrease')}
             onClick={handleEinheitenDecrement}
-            disabled={disabled || einheiten <= 0}
-            sx={{ p: 0.5 }}
+            disabled={disabled || displayedEinheiten <= 0}
+            sx={touchTargetSx}
           >
             <RemoveIcon fontSize="small" />
           </IconButton>
@@ -186,9 +235,10 @@ export default function KostenersatzItemRow({
           />
           <IconButton
             size="small"
+            aria-label={t('increase')}
             onClick={handleEinheitenIncrement}
             disabled={disabled}
-            sx={{ p: 0.5 }}
+            sx={touchTargetSx}
           >
             <AddIcon fontSize="small" />
           </IconButton>
