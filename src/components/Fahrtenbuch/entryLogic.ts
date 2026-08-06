@@ -143,6 +143,8 @@ export function buildEntryDocument(
     );
   }
 
+  const isEinsatz = input.zweck === 'einsatz';
+
   const definitions: CounterDefinition[] = vehicle.counters ?? [];
   const errors = validateEntryInput(
     definitions,
@@ -151,6 +153,10 @@ export function buildEntryDocument(
       driverName: input.driverName,
       zweck: input.zweck,
       ziel: input.ziel,
+      // Nur der Einsatzbezug, der auch ins Dokument kommt, darf das Ziel
+      // ersetzen: Bei einem anderen Zweck wird `firecallId` verworfen, und die
+      // Fahrt stünde sonst ganz ohne Angabe da.
+      firecallId: isEinsatz ? input.firecallId : undefined,
       abfahrt: input.abfahrt,
       ankunft: input.ankunft,
       counters: input.counters ?? {},
@@ -162,8 +168,6 @@ export function buildEntryDocument(
   if (errors.length > 0) {
     throw new Error(`invalid fahrtenbuch entry: ${errors.join(', ')}`);
   }
-
-  const isEinsatz = input.zweck === 'einsatz';
 
   const doc: FahrtenbuchEntry = {
     vehicleId: input.vehicleId,

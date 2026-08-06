@@ -177,6 +177,7 @@ describe('useEntryFormState', () => {
       const { result, onSubmit } = renderForm();
 
       act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZiel('Hauptplatz'));
       act(() => result.current.setZweck('einsatz'));
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
       act(() => result.current.setZweck('sonstiges'));
@@ -259,6 +260,7 @@ describe('useEntryFormState', () => {
       // dauerhaft blockiert.
       const { result, onSubmit } = renderForm();
 
+      act(() => result.current.setZiel('Werkstatt'));
       await act(async () => {
         await result.current.submit();
       });
@@ -266,6 +268,53 @@ describe('useEntryFormState', () => {
       expect(result.current.errors).toEqual([]);
       expect(onSubmit).toHaveBeenCalled();
       expect(submitted(onSubmit).driverName).toBe('');
+    });
+
+    it('verlangt ohne verknüpften Einsatz eine Angabe zur Fahrstrecke', async () => {
+      const { result, onSubmit } = renderForm();
+
+      act(() => result.current.changeDriver('Max'));
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(result.current.errors).toContain('zielMissing');
+      expect(result.current.zielCoveredByFirecall).toBe(false);
+    });
+
+    it('lässt das Ziel offen, wenn ein Einsatz verknüpft ist', async () => {
+      const { result, onSubmit } = renderForm();
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+
+      expect(result.current.zielCoveredByFirecall).toBe(true);
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(result.current.errors).toEqual([]);
+      expect(onSubmit).toHaveBeenCalled();
+    });
+
+    it('verlangt das Ziel bei einem nur eingetippten Einsatznamen', async () => {
+      // Hinter einem freien Namen steht kein Datensatz — Liste und Export
+      // hätten nichts, worauf sie zurückfallen könnten.
+      const { result, onSubmit } = renderForm();
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeFirecall(undefined, 'Brand irgendwo'));
+
+      expect(result.current.zielCoveredByFirecall).toBe(false);
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(result.current.errors).toContain('zielMissing');
     });
   });
 });

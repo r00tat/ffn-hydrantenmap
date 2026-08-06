@@ -154,6 +154,21 @@ describe('FahrtenbuchList', () => {
     expect(screen.getByText('5 l')).toBeInTheDocument();
   });
 
+  it('zeigt bei leerem Ziel den Einsatznamen', () => {
+    // Bei einer Einsatzfahrt darf das Ziel leer bleiben — der Einsatz benennt
+    // es, und die Spalte bliebe sonst leer.
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry({ ziel: '', firecallName: 'Brand B2 Hauptstraße' })]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(screen.getByText('Brand B2 Hauptstraße')).toBeInTheDocument();
+  });
+
   it('nennt den Mangel am Warnzeichen', () => {
     renderWithIntl(
       <FahrtenbuchList

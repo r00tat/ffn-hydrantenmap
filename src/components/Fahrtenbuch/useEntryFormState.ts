@@ -303,6 +303,13 @@ export function useEntryFormState({
     firecallId,
     firecallName,
     changeFirecall,
+    /**
+     * Ob der verknüpfte Einsatz das Ziel bereits benennt. Nur die Verknüpfung
+     * zählt, nicht ein frei eingetippter Einsatzname — dieselbe Grenze zieht
+     * `validateEntryInput`, und das Feld soll nicht als freiwillig aussehen,
+     * wenn der Server es verlangt.
+     */
+    zielCoveredByFirecall: zweck === 'einsatz' && !!firecallId,
     ziel,
     setZiel,
     abfahrt,

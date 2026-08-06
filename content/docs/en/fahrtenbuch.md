@@ -57,7 +57,7 @@ Clicking a vehicle card opens that vehicle's page with its master data, current 
 ### Record a single trip
 
 1. Click **New entry**, or **Add trip** on the vehicle's card
-2. Pick the **vehicle** — coming from a vehicle card it is already selected
+2. Pick the **vehicle** — coming from a vehicle card it is already selected. The remaining fields appear only afterwards: counters and consumables depend on the chosen vehicle
 3. Enter the **driver**: suggestions come from the group's persons, free text is allowed
 4. Choose the **purpose** (operation, drill, supply run, other)
 5. For the purpose *operation* you can additionally select the **operation** or type it in freely
@@ -65,6 +65,10 @@ Clicking a vehicle card opens that vehicle's page with its master data, current 
 7. Enter the **counter readings** — the start value is prefilled from the previous trip
 8. Optional: **refuelled** (diesel, petrol, AdBlue), **notes** and **defect or fault**
 9. Save the trip
+
+:::info
+**Route / destination** is mandatory — where the trip went is part of the record. The field may only stay empty when an **operation** has been picked from the list: the operation then names the destination, and both the list and the export show its name. Merely typing an operation name is not enough.
+:::
 
 :::info
 If a counter reading differs from the last known value or falls below it, a hint points that out. The trip can still be saved — readings do get added or corrected after the fact.
@@ -76,7 +80,7 @@ Only the person who created an entry, or an administrator, may change or delete 
 
 ### Report a defect
 
-If **Defect** is ticked on a trip, the vehicle card carries the notice until a newer trip no longer reports it. The **All trips** list can be filtered to defects only. Describe the defect in the **Notes** field — that text goes into the notification.
+If **Defect** is ticked on a trip, the vehicle card carries the notice until a newer trip no longer reports it. The **All trips** list can be filtered to defects only. Ticking the box reveals the **defect description** field — it is mandatory, and that text goes into the notification. The **notes** stay separate from it: they hold what was noticed in passing, the defect holds what is broken.
 
 If recipients are configured for the group (admin area → Trip log → **Settings** → *Defect notification*), an email is sent on save: vehicle and licence plate, driver, times, purpose and destination, the counter readings, the defect description and a link to the vehicle's trip log. The first address goes into the To field, all others in copy.
 

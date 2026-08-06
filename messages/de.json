@@ -401,6 +401,7 @@
       "ankunftInvalid": "Ankunftszeitpunkt ist ungültig.",
       "ankunftBeforeAbfahrt": "Die Ankunft liegt vor der Abfahrt.",
       "zweckInvalid": "Bitte einen gültigen Fahrtzweck wählen.",
+      "zielMissing": "Bitte Fahrstrecke oder Ziel angeben.",
       "mangelMissing": "Bitte den Mangel beschreiben.",
       "counterMissing": "{counter} fehlt.",
       "counterEndBeforeStart": "{counter}: Endstand liegt unter dem Startstand.",
@@ -612,6 +613,7 @@
           "noKmCounter": "Fahrzeug hat keinen Kilometerzähler",
           "timeMismatch": "Ankunft liegt vor der Abfahrt",
           "driverMissing": "Fahrer fehlt",
+          "zielMissing": "Fahrstrecke/Ziel fehlt",
           "unknownFormat": "unbekannter Aufbau",
           "empty": "keine Daten enthalten"
         }

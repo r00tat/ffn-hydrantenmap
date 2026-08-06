@@ -263,6 +263,13 @@ export interface EntryInput {
   /** Muss einer der Werte aus `FAHRT_ZWECKE` sein. */
   zweck: string;
   ziel: string;
+  /**
+   * Nur der verknüpfte Einsatz, nicht ein frei eingetippter Name: Er macht die
+   * Angabe von `ziel` entbehrlich, weil der Einsatz selbst benennt, wohin die
+   * Fahrt ging, und Liste wie Export auf seinen Namen zurückfallen. Ein freier
+   * Text hat diesen Rückhalt nicht — dahinter steht kein Datensatz.
+   */
+  firecallId?: string;
   abfahrt: string;
   ankunft: string;
   counters: Record<string, CounterReading>;
@@ -358,6 +365,10 @@ export function validateEntryInput(
   if (!FAHRT_ZWECKE.includes(input.zweck as FahrtZweck)) {
     errors.push('zweckInvalid');
   }
+  // Wohin die Fahrt ging, gehört zum Nachweis. Der verknüpfte Einsatz beantwortet
+  // das bereits — nur dort darf das Feld leer bleiben. Auch bei
+  // `countersOptional`: Das lockert die Zählerstände, nicht den Zweck der Fahrt.
+  if (!input.ziel?.trim() && !input.firecallId) errors.push('zielMissing');
   // Auch bei `countersOptional`: Ein Häkchen ohne Text ergibt eine Meldung an
   // die Fahrzeugverantwortlichen, die nicht sagt, was kaputt ist.
   if (input.defekt && !input.mangel?.trim()) errors.push('mangelMissing');

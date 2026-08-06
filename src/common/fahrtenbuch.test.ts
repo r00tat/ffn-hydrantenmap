@@ -224,6 +224,38 @@ describe('validateEntryInput', () => {
     ]);
   });
 
+  it('verlangt ein Ziel', () => {
+    expect(validateEntryInput(KM, { ...base, ziel: '' })).toEqual([
+      'zielMissing',
+    ]);
+  });
+
+  it('lässt Leerzeichen nicht als Ziel durchgehen', () => {
+    expect(validateEntryInput(KM, { ...base, ziel: '   ' })).toEqual([
+      'zielMissing',
+    ]);
+  });
+
+  it('verlangt kein Ziel, wenn ein Einsatz verknüpft ist', () => {
+    // Der Einsatz benennt das Ziel bereits — Export und Liste zeigen seinen
+    // Namen, wenn das Feld leer bleibt.
+    expect(
+      validateEntryInput(KM, { ...base, ziel: '', firecallId: 'fc1' }),
+    ).toEqual([]);
+  });
+
+  it('verlangt das Ziel auch bei optionalen Zählern', () => {
+    // Die Sammelerfassung aus dem Einsatz lockert nur die Zählerstände: Wo die
+    // Fahrt hinging, muss auch dort feststehen.
+    expect(
+      validateEntryInput(
+        KM,
+        { ...base, ziel: '', counters: {} },
+        { countersOptional: true },
+      ),
+    ).toEqual(['zielMissing']);
+  });
+
   it('meldet eine unparsbare Abfahrt', () => {
     expect(
       validateEntryInput(KM, { ...base, abfahrt: 'nicht-ein-datum' }),

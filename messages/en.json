@@ -401,6 +401,7 @@
       "ankunftInvalid": "Arrival time is invalid.",
       "ankunftBeforeAbfahrt": "Arrival is before departure.",
       "zweckInvalid": "Please select a valid trip purpose.",
+      "zielMissing": "Please enter the route or destination.",
       "mangelMissing": "Please describe the defect.",
       "counterMissing": "{counter} is missing.",
       "counterEndBeforeStart": "{counter}: final reading is below the starting reading.",
@@ -612,6 +613,7 @@
           "noKmCounter": "vehicle has no odometer",
           "timeMismatch": "arrival is before departure",
           "driverMissing": "driver missing",
+          "zielMissing": "route/destination missing",
           "unknownFormat": "unknown layout",
           "empty": "contains no data"
         }

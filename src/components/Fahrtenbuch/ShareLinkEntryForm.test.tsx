@@ -80,7 +80,7 @@ describe('ShareLinkEntryForm', () => {
     // Formular da, dem der Kilometerstand fehlt.
     expect(screen.queryByLabelText('Fahrer')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Fahrtzweck')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Fahrstrecke / Ziel')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Fahrstrecke \/ Ziel/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Abfahrt')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Hinweise')).not.toBeInTheDocument();
   });
@@ -119,6 +119,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText('Hinweise'), 'Tank halb voll');
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
     await user.type(
@@ -144,11 +145,31 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
       await screen.findByText('Bitte den Mangel beschreiben.'),
+    ).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('verlangt eine Angabe zur Fahrstrecke', async () => {
+    // Ohne Einsatzauswahl ist das Feld die einzige Auskunft darüber, wohin die
+    // Fahrt ging — der Freigabelink kennt keine Einsätze.
+    const user = userEvent.setup();
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    expect(
+      await screen.findByText('Bitte Fahrstrecke oder Ziel angeben.'),
     ).toBeInTheDocument();
     expect(createMock).not.toHaveBeenCalled();
   });
@@ -186,6 +207,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
@@ -209,6 +231,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
@@ -229,6 +252,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
@@ -269,6 +293,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
     await user.click(
       await screen.findByRole('button', { name: 'Weitere Fahrt erfassen' }),
@@ -306,6 +331,7 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     await user.click(

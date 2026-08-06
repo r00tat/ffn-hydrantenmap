@@ -104,9 +104,14 @@ export default function FahrtenbuchEntryFields({
               </TextField>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
+              {/* Pflicht, solange kein Einsatz verknüpft ist: Der Einsatz
+                  benennt das Ziel selbst, jede andere Fahrt stünde sonst ohne
+                  Angabe da, wohin sie ging. */}
               <TextField
                 fullWidth
+                required={!form.zielCoveredByFirecall}
                 label={t('ziel')}
+                error={form.errors.includes('zielMissing')}
                 value={form.ziel}
                 onChange={(e) => form.setZiel(e.target.value)}
               />

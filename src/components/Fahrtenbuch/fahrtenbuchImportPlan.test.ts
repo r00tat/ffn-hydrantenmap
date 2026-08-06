@@ -272,6 +272,28 @@ describe('planFahrtenbuchImport mit Bearbeitungen', () => {
     expect(row).toMatchObject({ state: 'problem', problem: 'driverMissing' });
   });
 
+  it('meldet eine Zeile ohne Zweck/Strecke', () => {
+    // Ein Import kennt keinen verknüpften Einsatz, der das Ziel benennen
+    // könnte — die Zeile ist im Dialog zu vervollständigen.
+    const [row] = planFahrtenbuchImport(
+      [pdfRow({ grund: 'Einsatz', zweckStrecke: '' })],
+      vehicle(),
+      [person('Anna Muster')],
+      [],
+    );
+    expect(row).toMatchObject({ state: 'problem', problem: 'zielMissing' });
+  });
+
+  it('nimmt den Grund als Ziel, wenn er im Zweck nicht aufgeht', () => {
+    const [row] = planFahrtenbuchImport(
+      [pdfRow({ grund: 'Werkstatt', zweckStrecke: '' })],
+      vehicle(),
+      [person('Anna Muster')],
+      [],
+    );
+    expect(row).toMatchObject({ state: 'ready', values: { ziel: 'Werkstatt' } });
+  });
+
   it('zieht die Ankunft auf den Tag der verschobenen Abfahrt nach', () => {
     // Nur die Abfahrt bearbeitet: Die Uhrzeit der Ankunft bleibt, ihr
     // Kalendertag folgt — sonst läge sie einen Tag vor der Abfahrt.

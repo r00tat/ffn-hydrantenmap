@@ -417,6 +417,12 @@ export function partitionEinsatzRows(
   vehicles: FahrtenbuchVehicle[],
   ziel: string,
   autoFill?: EinsatzAutoFill,
+  /**
+   * Der Einsatz, dem die Fahrten zugeschrieben werden. Er macht das Ziel
+   * entbehrlich — ohne ihn meldete die Vorprüfung eine Zeile als unvollständig,
+   * die der Server anstandslos speichert, sobald der Einsatz keinen Namen hat.
+   */
+  firecallId?: string,
 ): EinsatzRowPartition {
   const partition: EinsatzRowPartition = {
     ready: [],
@@ -450,6 +456,7 @@ export function partitionEinsatzRows(
         driverName: row.driverName,
         zweck: 'einsatz',
         ziel,
+        firecallId,
         abfahrt: row.abfahrt,
         ankunft: row.ankunft,
         counters,

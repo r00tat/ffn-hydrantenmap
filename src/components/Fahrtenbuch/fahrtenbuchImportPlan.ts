@@ -26,7 +26,8 @@ export type ImportProblem =
   | 'noKmCounter'
   | 'unreadable'
   | 'timeMismatch'
-  | 'driverMissing';
+  | 'driverMissing'
+  | 'zielMissing';
 
 /**
  * Die wirksamen Werte einer Zeile. Vorschau, Entwurf und die Vorbelegung des
@@ -212,6 +213,10 @@ function rowProblem(
   kmEdited: boolean,
 ): ImportProblem | undefined {
   if (!values.driverName.trim()) return 'driverMissing';
+  // Ein Import kennt keinen verknüpften Einsatz — bleibt die Spalte
+  // „Zweck/Strecke" leer, ist die Zeile über den Bearbeiten-Dialog zu
+  // vervollständigen. Ohne die Prüfung scheiterte erst der Schreibvorgang.
+  if (!values.ziel.trim()) return 'zielMissing';
   if (!values.abfahrt || !values.ankunft) {
     return row.problem === 'dateInvalid' || row.problem === 'timeMissing'
       ? row.problem

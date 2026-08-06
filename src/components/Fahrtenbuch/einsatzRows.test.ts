@@ -426,6 +426,21 @@ describe('partitionEinsatzRows', () => {
     expect(result.existing).toHaveLength(0);
   });
 
+  it('nimmt Zeilen eines namenlosen Einsatzes auf', () => {
+    // Der Einsatzname wird als Ziel durchgereicht — ist er leer, trägt allein
+    // der Einsatzbezug die Angabe. Ohne den Gleichlauf meldete die Vorprüfung
+    // eine Zeile als unvollständig, die der Server anstandslos speichert.
+    const result = partitionEinsatzRows([row()], [vehicle], '', undefined, 'fc1');
+    expect(result.incomplete).toHaveLength(0);
+    expect(result.ready).toHaveLength(1);
+  });
+
+  it('meldet eine Zeile ohne Ziel und ohne Einsatzbezug als unvollständig', () => {
+    const result = partitionEinsatzRows([row()], [vehicle], '');
+    expect(result.ready).toHaveLength(0);
+    expect(result.incomplete[0].errors).toContain('zielMissing');
+  });
+
   it('nimmt eine Einheit ohne Zähler auch ohne Fahrer und ohne Kilometer auf', () => {
     // WLA-Bergung, WLA-Logistik und Anhänger haben keinen eigenen Fahrer und
     // keine eigene Wegstrecke. Zuvor blockierte `driverMissing` ihre Zeile, und

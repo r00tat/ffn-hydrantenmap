@@ -157,6 +157,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -199,6 +200,7 @@ describe('FahrtenbuchDialog', () => {
     const startField = screen.getByLabelText(/Kilometerstand — Start/);
     await user.clear(startField);
     await user.type(startField, '900');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '950');
 
     expect(
@@ -213,6 +215,7 @@ describe('FahrtenbuchDialog', () => {
     const user = userEvent.setup();
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -241,6 +244,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -259,6 +263,7 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -283,6 +288,7 @@ describe('FahrtenbuchDialog', () => {
     await user.click(await screen.findByRole('option', { name: 'B1 Kaminbrand' }));
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -308,6 +314,7 @@ describe('FahrtenbuchDialog', () => {
     await user.type(screen.getByLabelText('Einsatz'), 'N/S Ölspur Hauptstraße');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -335,6 +342,7 @@ describe('FahrtenbuchDialog', () => {
     await user.type(screen.getByLabelText('Einsatz'), 'B1 Kaminbrand');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -375,6 +383,7 @@ describe('FahrtenbuchDialog', () => {
     await user.click(await screen.findByRole('option', { name: 'Übung' }));
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 

@@ -57,7 +57,7 @@ Ein Klick auf eine Fahrzeugkarte öffnet die Seite dieses Fahrzeugs mit seinen S
 ### Einzelne Fahrt erfassen
 
 1. Klicke auf **Neuer Eintrag** oder auf **Fahrt eintragen** auf der Karte des Fahrzeugs
-2. Wähle das **Fahrzeug** — bei der Fahrzeugkarte ist es bereits vorbelegt
+2. Wähle das **Fahrzeug** — bei der Fahrzeugkarte ist es bereits vorbelegt. Die übrigen Felder erscheinen erst danach: Zähler und Betriebsmittel hängen am gewählten Fahrzeug
 3. Trage den **Fahrer** ein: Vorschläge kommen aus den Personen der Gruppe, freie Namen sind erlaubt
 4. Wähle den **Fahrtzweck** (Einsatz, Übung, Versorgungsfahrt, Sonstiges)
 5. Beim Zweck *Einsatz* kann zusätzlich der **Einsatz** ausgewählt oder frei eingegeben werden
@@ -65,6 +65,10 @@ Ein Klick auf eine Fahrzeugkarte öffnet die Seite dieses Fahrzeugs mit seinen S
 7. Trage die **Zählerstände** ein — der Startstand ist aus der letzten Fahrt vorbelegt
 8. Optional: **Getankt** (Diesel, Benzin, AdBlue), **Hinweise** und **Defekt oder Mangel**
 9. Speichere die Fahrt
+
+:::info
+**Fahrstrecke / Ziel** ist verpflichtend — wohin die Fahrt ging, gehört zum Nachweis. Nur wenn ein **Einsatz** aus der Liste ausgewählt ist, darf das Feld leer bleiben: Dann benennt der Einsatz das Ziel, und Liste wie Export zeigen seinen Namen. Ein bloß eingetippter Einsatzname reicht dafür nicht.
+:::
 
 :::info
 Weicht ein Zählerstand vom letzten bekannten Stand ab oder liegt er darunter, weist ein Hinweis darauf hin. Die Fahrt lässt sich trotzdem speichern — Zählerstände werden auch mal nachgetragen oder korrigiert.
@@ -76,7 +80,7 @@ Weicht ein Zählerstand vom letzten bekannten Stand ab oder liegt er darunter, w
 
 ### Defekt oder Mangel melden
 
-Ist an einer Fahrt **Defekt oder Mangel** angehakt, trägt die Fahrzeugkarte den Hinweis, bis eine neuere Fahrt ihn nicht mehr meldet. Die Liste **Alle Fahrten** lässt sich auf „Nur Defekte" filtern. Beschreibe den Mangel im Feld **Hinweise** — dieser Text geht in die Benachrichtigung ein.
+Ist an einer Fahrt **Defekt oder Mangel** angehakt, trägt die Fahrzeugkarte den Hinweis, bis eine neuere Fahrt ihn nicht mehr meldet. Die Liste **Alle Fahrten** lässt sich auf „Nur Defekte" filtern. Mit dem Häkchen erscheint das Feld **Mangelbeschreibung** — es ist verpflichtend, und dieser Text geht in die Benachrichtigung ein. Die **Hinweise** bleiben davon getrennt: Dort steht, was nebenbei aufgefallen ist, im Mangel steht, was kaputt ist.
 
 Sind für die Gruppe Empfänger gepflegt (Admin-Bereich → Fahrtenbuch → **Einstellungen** → *Mangel-Benachrichtigung*), geht beim Speichern eine E-Mail an sie: Fahrzeug und Kennzeichen, Fahrer, Zeiten, Zweck und Ziel, die Zählerstände, die Mangelbeschreibung und ein Link auf das Fahrtenbuch des Fahrzeugs. Die erste Adresse steht im An-Feld, alle weiteren in Kopie.
 

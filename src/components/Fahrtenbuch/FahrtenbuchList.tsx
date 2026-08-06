@@ -226,7 +226,11 @@ export default function FahrtenbuchList({
                   <TableCell sx={tightCell}>
                     {t(`zwecke.${entry.zweck}` as 'zwecke.einsatz')}
                   </TableCell>
-                  <TableCell>{entry.ziel}</TableCell>
+                  {/* Bei einer Einsatzfahrt darf das Ziel leer bleiben — der
+                      Einsatz benennt es. Derselbe Rückfall wie im Export. */}
+                  <TableCell>
+                    {entry.ziel?.trim() || entry.firecallName || ''}
+                  </TableCell>
                   <TableCell sx={tightCell}>{counterCell(entry)}</TableCell>
                   <TableCell sx={tightCell}>{fuelCell(entry)}</TableCell>
                   <TableCell align="right" sx={tightCell}>

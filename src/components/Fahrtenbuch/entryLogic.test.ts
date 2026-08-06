@@ -164,6 +164,36 @@ describe('buildEntryDocument', () => {
     expect(doc).not.toHaveProperty('mangel');
   });
 
+  it('wirft, wenn weder Ziel noch verknüpfter Einsatz vorliegen', () => {
+    expect(() =>
+      buildEntryDocument(
+        VEHICLE,
+        { ...input, ziel: '', firecallId: undefined },
+        'ffnd',
+        actor,
+      ),
+    ).toThrow(/zielMissing/);
+  });
+
+  it('lässt das Ziel weg, wenn ein Einsatz verknüpft ist', () => {
+    const doc = buildEntryDocument(VEHICLE, { ...input, ziel: '' }, 'ffnd', actor);
+    expect(doc.ziel).toBe('');
+    expect(doc.firecallId).toBe('f1');
+  });
+
+  it('verlangt ein Ziel, wenn der Einsatzbezug wegen des Zwecks entfällt', () => {
+    // `firecallId` wird bei einem anderen Zweck verworfen — dann bliebe die
+    // Fahrt ohne jede Angabe, wohin sie ging.
+    expect(() =>
+      buildEntryDocument(
+        VEHICLE,
+        { ...input, zweck: 'uebung', ziel: '' },
+        'ffnd',
+        actor,
+      ),
+    ).toThrow(/zielMissing/);
+  });
+
   it('wirft, wenn ein Defekt ohne Beschreibung gemeldet wird', () => {
     // Die Prüfung gehört auf den Server: Der anmeldefreie Freigabelink
     // schickt dieselbe Eingabe, und dort steht kein Formular dazwischen.
