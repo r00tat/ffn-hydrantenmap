@@ -67,7 +67,39 @@ describe('FahrtenbuchList', () => {
 
     expect(screen.getByText(/12340 → 12362 km/)).toBeInTheDocument();
     expect(screen.getByText(/\(\+22 km\)/)).toBeInTheDocument();
-    expect(screen.getByText('Kilometerstand:')).toBeInTheDocument();
+    // Abgekürzt: „Kilometerstand" allein war breiter als die Fahrstrecke
+    // daneben.
+    expect(screen.getByText('km-Stand:')).toBeInTheDocument();
+  });
+
+  it('behält bei einem eigenen Zähler dessen Beschriftung', () => {
+    // Nur Preset-Zähler haben eine Kurzform — ein selbst benannter Zähler wird
+    // nicht geraten abgekürzt.
+    const custom = vehicle({
+      id: 'v1',
+      name: 'Sonderfahrzeug',
+      counters: [
+        {
+          id: 'seilwinde',
+          label: 'Seilwinde Betriebsstunden',
+          unit: 'h',
+          mode: 'reading',
+          changeWarning: 'anyChange',
+          required: false,
+        },
+      ],
+    });
+
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry({ counters: { seilwinde: { end: 12 } } })]}
+        vehicles={[custom]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(screen.getByText('Seilwinde Betriebsstunden:')).toBeInTheDocument();
   });
 
   it('beschriftet die Zähler eines Bootes', () => {
@@ -95,11 +127,9 @@ describe('FahrtenbuchList', () => {
       />,
     );
 
-    expect(
-      screen.getByText('Betriebsstunden Backbordmotor:'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Lenzpumpe Steuerbord:')).toBeInTheDocument();
-    expect(screen.getByText('Lenzpumpe Backbord:')).toBeInTheDocument();
+    expect(screen.getByText('Betriebsst. Bb:')).toBeInTheDocument();
+    expect(screen.getByText('Lenzp. Stb:')).toBeInTheDocument();
+    expect(screen.getByText('Lenzp. Bb:')).toBeInTheDocument();
   });
 
   it('zeigt die getankten Betriebsmittel in einer eigenen Spalte', () => {

@@ -95,8 +95,10 @@ export default function FahrtenbuchPage() {
     );
   }
 
+  // Volle Fensterbreite: Die Fahrtenliste hat viele Spalten, bei „lg" blieb die
+  // Fahrstrecke auf einem breiten Monitor unnötig schmal.
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Container maxWidth={false} sx={{ py: 3 }}>
       <Stack
         direction="row"
         spacing={2}
@@ -160,8 +162,14 @@ export default function FahrtenbuchPage() {
         </>
       ) : (
         <Grid container spacing={2}>
+          {/* Die Breakpoints bis `xl` gehören zur vollen Fensterbreite: Sonst
+              wären es auf einem breiten Monitor drei extrem breite Karten pro
+              Zeile. */}
           {activeVehicles.map((vehicle) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={vehicle.id}>
+            <Grid
+              size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2 }}
+              key={vehicle.id}
+            >
               <FahrtenbuchVehicleCard
                 groupId={groupId as string}
                 vehicle={vehicle}

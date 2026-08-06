@@ -73,8 +73,9 @@ export default function FahrtenbuchVehiclePage({
     );
   }
 
+  // Volle Fensterbreite — wie die Übersicht, wegen der breiten Fahrtenliste.
   return (
-    <Container maxWidth="lg" sx={{ py: 3 }}>
+    <Container maxWidth={false} sx={{ py: 3 }}>
       <Stack
         direction="row"
         spacing={2}

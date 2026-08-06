@@ -370,6 +370,12 @@
       "lenzpumpeStb": "Bilge pump starboard",
       "lenzpumpeBb": "Bilge pump port"
     },
+    "countersShort": {
+      "km": "Odometer",
+      "betriebsstundenBb": "Eng. hours port",
+      "lenzpumpeStb": "Bilge stbd",
+      "lenzpumpeBb": "Bilge port"
+    },
     "zwecke": {
       "einsatz": "Operation",
       "uebung": "Drill",

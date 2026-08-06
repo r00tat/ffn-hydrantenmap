@@ -71,8 +71,20 @@ export default function FahrtenbuchList({
     [vehicles],
   );
 
-  const counterLabel = (line: CounterLine) =>
-    line.labelKey ? t(line.labelKey as 'counters.km') : line.label;
+  /**
+   * In der Tabelle steht die Kurzform der Beschriftung („km-Stand" statt
+   * „Kilometerstand"): Ausgeschrieben war die Zählerspalte breiter als die
+   * Fahrstrecke daneben. Nur Preset-Zähler haben eine Kurzform — ein selbst
+   * benannter Zähler behält seine Beschriftung.
+   */
+  const counterLabel = (line: CounterLine) => {
+    if (!line.labelKey) return line.label;
+    const shortKey = line.labelKey.replace(
+      'counters.',
+      'countersShort.',
+    ) as 'countersShort.km';
+    return t.has(shortKey) ? t(shortKey) : t(line.labelKey as 'counters.km');
+  };
 
   /**
    * Die Zählerstände einer Fahrt: je Zähler eine beschriftete Zeile mit Start,
@@ -102,6 +114,15 @@ export default function FahrtenbuchList({
       ))}
     </Stack>
   );
+
+  /**
+   * Spaltenbreiten: Alle Spalten außer der Fahrstrecke schrumpfen auf ihren
+   * Inhalt (`width: '1%'` plus `nowrap`), die Fahrstrecke bekommt mit
+   * `width: '99%'` den ganzen Rest. Ohne das verteilte der Browser die Breite
+   * gleichmäßig — auf einem breiten Monitor blieb die Fahrstrecke schmal,
+   * während die Zählerspalte mehr Platz hatte als sie braucht.
+   */
+  const tightCell = { width: '1%', whiteSpace: 'nowrap' } as const;
 
   const fuelCell = (entry: FahrtenbuchEntry) => (
     <Stack spacing={0.25}>
@@ -177,36 +198,38 @@ export default function FahrtenbuchList({
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>{t('abfahrt')}</TableCell>
-                {!hideVehicleFilter && <TableCell>{t('vehicle')}</TableCell>}
-                <TableCell>{t('driver')}</TableCell>
-                <TableCell>{t('zweck')}</TableCell>
-                <TableCell>{t('ziel')}</TableCell>
-                <TableCell>{t('counterReadings')}</TableCell>
-                <TableCell>{t('betriebsmittel')}</TableCell>
-                <TableCell />
+                <TableCell sx={tightCell}>{t('abfahrt')}</TableCell>
+                {!hideVehicleFilter && (
+                  <TableCell sx={tightCell}>{t('vehicle')}</TableCell>
+                )}
+                <TableCell sx={tightCell}>{t('driver')}</TableCell>
+                <TableCell sx={tightCell}>{t('zweck')}</TableCell>
+                <TableCell sx={{ width: '99%' }}>{t('ziel')}</TableCell>
+                <TableCell sx={tightCell}>{t('counterReadings')}</TableCell>
+                <TableCell sx={tightCell}>{t('betriebsmittel')}</TableCell>
+                <TableCell sx={tightCell} />
               </TableRow>
             </TableHead>
             <TableBody>
               {filtered.map((entry) => (
                 <TableRow key={entry.id}>
-                  <TableCell>
+                  <TableCell sx={tightCell}>
                     {format.dateTime(new Date(entry.abfahrt), {
                       dateStyle: 'short',
                       timeStyle: 'short',
                     })}
                   </TableCell>
                   {!hideVehicleFilter && (
-                    <TableCell>{entry.vehicleName}</TableCell>
+                    <TableCell sx={tightCell}>{entry.vehicleName}</TableCell>
                   )}
-                  <TableCell>{entry.driverName}</TableCell>
-                  <TableCell>
+                  <TableCell sx={tightCell}>{entry.driverName}</TableCell>
+                  <TableCell sx={tightCell}>
                     {t(`zwecke.${entry.zweck}` as 'zwecke.einsatz')}
                   </TableCell>
                   <TableCell>{entry.ziel}</TableCell>
-                  <TableCell>{counterCell(entry)}</TableCell>
-                  <TableCell>{fuelCell(entry)}</TableCell>
-                  <TableCell align="right">
+                  <TableCell sx={tightCell}>{counterCell(entry)}</TableCell>
+                  <TableCell sx={tightCell}>{fuelCell(entry)}</TableCell>
+                  <TableCell align="right" sx={tightCell}>
                     <Stack
                       direction="row"
                       spacing={0.5}
