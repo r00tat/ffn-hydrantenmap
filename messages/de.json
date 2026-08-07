@@ -1373,7 +1373,14 @@
     "fieldVariante": "Variante",
     "fieldVersion": "Version",
     "errorGeneric": "Die Abfrage ist fehlgeschlagen. Bitte später erneut versuchen.",
-    "errorNotAuthorized": "Sie sind nicht berechtigt, für diese Gruppe abzufragen."
+    "errorNotAuthorized": "Sie sind nicht berechtigt, für diese Gruppe abzufragen.",
+    "diaryTitle": "Kennzeichenabfrage {plate}",
+    "diaryTitleUebung": "Kennzeichenabfrage {plate} (Übungssystem)",
+    "diaryNoResult": "Keine Zulassung gefunden.",
+    "diaryVehicleHeading": "Fahrzeug {n}:",
+    "diaryWritten": "Die Abfrage wurde ins Einsatztagebuch eingetragen.",
+    "diaryFailed": "Der Eintrag ins Einsatztagebuch ist fehlgeschlagen.",
+    "diaryNoFirecall": "Kein Einsatz ausgewählt – die Abfrage wurde nicht ins Einsatztagebuch eingetragen."
   },
   "about": {
     "title": "Über",

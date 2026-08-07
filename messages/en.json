@@ -1373,7 +1373,14 @@
     "fieldVariante": "Variant",
     "fieldVersion": "Version",
     "errorGeneric": "The query failed. Please try again later.",
-    "errorNotAuthorized": "You are not authorized to query for this group."
+    "errorNotAuthorized": "You are not authorized to query for this group.",
+    "diaryTitle": "License plate query {plate}",
+    "diaryTitleUebung": "License plate query {plate} (training system)",
+    "diaryNoResult": "No registration found.",
+    "diaryVehicleHeading": "Vehicle {n}:",
+    "diaryWritten": "The query was recorded in the operational diary.",
+    "diaryFailed": "Recording the query in the operational diary failed.",
+    "diaryNoFirecall": "No operation selected – the query was not recorded in the operational diary."
   },
   "about": {
     "title": "About",

@@ -17,16 +17,23 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { getGroupsWithOebfvConfig } from './configActions';
 import { queryKennzeichen } from './queryActions';
+import { buildKennzeichenDiaryEntry } from './diaryEntry';
 // Type-only imports MUST use `import type` — these modules pull in
 // server-only code / are pure types that must never enter the client bundle.
 import type { KennzeichenQueryResult } from './queryActions';
 import type { KennzeichenSystem } from './logEntry';
 import type { Vehicle } from './parseVehicleData';
-import useFirecall from '../../hooks/useFirecall';
+import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
+import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+
+/** Outcome of writing the query result to the Einsatztagebuch. */
+type DiaryStatus = 'written' | 'failed' | 'no-firecall';
 
 const KennzeichenPage = () => {
   const t = useTranslations('kennzeichen');
   const firecall = useFirecall();
+  const firecallId = useFirecallId();
+  const addFirecallItem = useFirecallItemAdd();
 
   const [groupId, setGroupId] = useState<string | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
@@ -35,6 +42,7 @@ const KennzeichenPage = () => {
   const [plateNumber, setPlateNumber] = useState('');
   const [querying, setQuerying] = useState(false);
   const [result, setResult] = useState<KennzeichenQueryResult | null>(null);
+  const [diaryStatus, setDiaryStatus] = useState<DiaryStatus | null>(null);
 
   useEffect(() => {
     getGroupsWithOebfvConfig()
@@ -54,10 +62,56 @@ const KennzeichenPage = () => {
       .finally(() => setConfigLoading(false));
   }, [firecall?.group]);
 
+  /**
+   * Documents the query and its result in the Einsatztagebuch. Only called
+   * for queries that actually reached the ÖBFV system — technical failures
+   * stay in the query log only.
+   */
+  const writeDiaryEntry = async (res: KennzeichenQueryResult) => {
+    if (firecallId === 'unknown') {
+      setDiaryStatus('no-firecall');
+      return;
+    }
+    try {
+      await addFirecallItem(
+        buildKennzeichenDiaryEntry({
+          platePrefix,
+          plateNumber,
+          system: res.system,
+          vehicles: res.vehicles,
+          noResult: res.noResult,
+          timestamp: new Date().toISOString(),
+          labels: {
+            title: (plate) => t('diaryTitle', { plate }),
+            titleUebung: (plate) => t('diaryTitleUebung', { plate }),
+            noResult: t('diaryNoResult'),
+            vehicleHeading: (n) => t('diaryVehicleHeading', { n }),
+            fields: {
+              antrieb: t('fieldAntrieb'),
+              marke: t('fieldMarke'),
+              name: t('fieldName'),
+              type: t('fieldType'),
+              hoechstMasse: t('fieldMasse'),
+              erstzulassung: t('fieldErstzulassung'),
+              fin: t('fieldFin'),
+              variante: t('fieldVariante'),
+              version: t('fieldVersion'),
+            },
+          },
+        })
+      );
+      setDiaryStatus('written');
+    } catch (err) {
+      console.error('Failed to write Kennzeichenabfrage to diary:', err);
+      setDiaryStatus('failed');
+    }
+  };
+
   const handleSearch = async () => {
     if (!groupId) return;
     setQuerying(true);
     setResult(null);
+    setDiaryStatus(null);
     try {
       const res = await queryKennzeichen({
         groupId,
@@ -66,6 +120,9 @@ const KennzeichenPage = () => {
         system,
       });
       setResult(res);
+      if (!res.error) {
+        await writeDiaryEntry(res);
+      }
     } catch (err) {
       console.error('Query failed:', err);
       setResult({ vehicles: [], noResult: true, system, error: 'upstream' });
@@ -167,6 +224,21 @@ const KennzeichenPage = () => {
               )}
               {!result.error && result.noResult && (
                 <Alert severity="info">{t('noResult')}</Alert>
+              )}
+              {diaryStatus === 'written' && (
+                <Alert severity="success" sx={{ mt: 1 }}>
+                  {t('diaryWritten')}
+                </Alert>
+              )}
+              {diaryStatus === 'failed' && (
+                <Alert severity="warning" sx={{ mt: 1 }}>
+                  {t('diaryFailed')}
+                </Alert>
+              )}
+              {diaryStatus === 'no-firecall' && (
+                <Alert severity="info" sx={{ mt: 1 }}>
+                  {t('diaryNoFirecall')}
+                </Alert>
               )}
               {!result.error &&
                 result.vehicles.map((vehicle, idx) => (
