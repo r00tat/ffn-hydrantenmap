@@ -74,6 +74,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const derivedFirecall = hasSessionAuth
     ? (session.user.firecall ?? loginStatus.firecall)
     : loginStatus.firecall;
+  const derivedFirecallWrite = hasSessionAuth
+    ? (session.user.firecallWrite ?? loginStatus.firecallWrite)
+    : loginStatus.firecallWrite;
 
   const serverLogin = useCallback(async () => {
     const token = await auth.currentUser?.getIdToken();
@@ -114,6 +117,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           isAdmin: session.user.isAdmin,
           groups: session.user.groups,
           firecall: session.user.firecall,
+          firecallWrite: session.user.firecallWrite,
           isRefreshing: false,
         }));
       } else {
@@ -180,6 +184,9 @@ export default function useFirebaseLoginObserver(): LoginStatus {
             isRefreshing: true,
             loginStep: 'loading_permissions',
             firecall: tokenResult?.claims?.firecall as string | undefined,
+            firecallWrite: tokenResult?.claims?.firecallWrite as
+              | boolean
+              | undefined,
           };
 
           setLoginStatus((prev) => ({ ...prev, ...authData }));
@@ -371,6 +378,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     isAdmin: derivedIsAdmin,
     groups: derivedGroups,
     firecall: derivedFirecall,
+    firecallWrite: derivedFirecallWrite,
     myGroups,
     refresh,
     signOut: fbSignOut,

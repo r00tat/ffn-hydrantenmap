@@ -48,6 +48,7 @@ import useCrewAssignments, {
 import { useFirecall } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useVehicles from '../../hooks/useVehicles';
+import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import {
   CrewAssignment,
   CrewFunktion,
@@ -88,15 +89,21 @@ function CrewRow({
   onFunktionChange,
   onVehicleChange,
   onRemove,
+  readOnly = false,
 }: {
   assignment: CrewAssignment;
   vehicles: Fzg[];
   onFunktionChange: (funktion: CrewFunktion) => void;
   onVehicleChange: (vehicleId: string | null, vehicleName: string) => void;
   onRemove?: () => void;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id: assignment.id || assignment.recipientId });
+    useDraggable({
+      id: assignment.id || assignment.recipientId,
+      disabled: readOnly,
+    });
 
   const style = transform
     ? {
@@ -127,12 +134,14 @@ function CrewRow({
       sx={{ opacity: isDragging ? 0.5 : 1 }}
     >
       <TableCell sx={{ width: 32, p: 0.5 }}>
-        <DragIndicatorIcon
-          {...listeners}
-          {...attributes}
-          fontSize="small"
-          sx={{ cursor: 'grab', color: 'action.active', touchAction: 'none' }}
-        />
+        {!readOnly && (
+          <DragIndicatorIcon
+            {...listeners}
+            {...attributes}
+            fontSize="small"
+            sx={{ cursor: 'grab', color: 'action.active', touchAction: 'none' }}
+          />
+        )}
       </TableCell>
       <TableCell sx={{ p: 0.5 }}>
         <Typography variant="body2" noWrap>
@@ -147,6 +156,7 @@ function CrewRow({
             size="small"
             variant="standard"
             sx={{ fontSize: '0.875rem' }}
+            readOnly={readOnly}
           >
             {CREW_FUNKTIONEN.map((f) => (
               <MenuItem key={f} value={f}>
@@ -165,6 +175,7 @@ function CrewRow({
             variant="standard"
             displayEmpty
             sx={{ fontSize: '0.875rem' }}
+            readOnly={readOnly}
           >
             <MenuItem value="">—</MenuItem>
             {vehicles.map((v) => (
@@ -175,7 +186,7 @@ function CrewRow({
           </Select>
         </FormControl>
       </TableCell>
-      {onRemove && (
+      {!readOnly && onRemove && (
         <TableCell sx={{ width: 32, p: 0.5 }}>
           <IconButton size="small" onClick={onRemove} color="error">
             <DeleteOutlineIcon fontSize="small" />
@@ -210,6 +221,7 @@ export default function CrewAssignmentBoard({
     removeAssignment,
   } = useCrewAssignments();
   const [newPersonName, setNewPersonName] = useState('');
+  const canWrite = useFirecallWriteAccess();
   const { vehicles } = useVehicles();
   const firecall = useFirecall();
   const addFirecallItem = useFirecallItemAdd();
@@ -386,6 +398,7 @@ export default function CrewAssignmentBoard({
             ? () => removeAssignment(a.id!)
             : undefined
         }
+        readOnly={!canWrite}
       />
     ));
 
@@ -393,6 +406,7 @@ export default function CrewAssignmentBoard({
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <Typography variant="h5">{t('title')}</Typography>
+        {canWrite && (
         <Autocomplete
           freeSolo
           size="small"
@@ -433,13 +447,16 @@ export default function CrewAssignmentBoard({
             />
           )}
         />
+        )}
       </Box>
 
-      <VehicleQuickAddChips
-        selectedNames={[]}
-        existingNames={existingVehicleNames}
-        onToggle={handleAddVehicle}
-      />
+      {canWrite && (
+        <VehicleQuickAddChips
+          selectedNames={[]}
+          existingNames={existingVehicleNames}
+          onToggle={handleAddVehicle}
+        />
+      )}
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         {isMobile ? (
@@ -498,6 +515,7 @@ export default function CrewAssignmentBoard({
               onFunktionChange={handleFunktionChange}
               onVehicleChange={handleVehicleChange}
               onRemove={removeAssignment}
+              readOnly={!canWrite}
             />
             {vehicles.map((v) => (
               <CrewVehicleColumn
@@ -509,6 +527,7 @@ export default function CrewAssignmentBoard({
                 onFunktionChange={handleFunktionChange}
                 onVehicleChange={handleVehicleChange}
                 onRemove={removeAssignment}
+                readOnly={!canWrite}
               />
             ))}
           </Box>

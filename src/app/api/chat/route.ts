@@ -69,7 +69,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await verifyUserAuthorizedForFirecall(authData, firecallId);
+    await verifyUserAuthorizedForFirecall(authData, firecallId, {
+      requireWrite: true,
+    });
     const result = await newChatMessage(authData, firecallId, message);
 
     return NextResponse.json(result);

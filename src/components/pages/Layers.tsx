@@ -41,7 +41,7 @@ import {
   useFirecallLayers,
   useFirecallLayersSorted,
 } from '../../hooks/useFirecallLayers';
-import useMapEditor from '../../hooks/useMapEditor';
+import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import FirecallItemCard, {
   FirecallItemCardOptions,
 } from '../FirecallItems/FirecallItemCard';
@@ -186,6 +186,7 @@ export default function LayersPage() {
   const layers = useFirecallLayers();
   const sortedLayers = useFirecallLayersSorted();
   const { historyPathSegments, historyModeActive } = useMapEditor();
+  const canEdit = useMapEditorCanEdit();
 
   const items = useFirebaseCollection<FirecallItem>({
     collectionName: FIRECALL_COLLECTION_ID,
@@ -345,7 +346,7 @@ export default function LayersPage() {
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} sensors={sensors}>
         <Box sx={{ p: 2, m: 2 }}>
           <Typography variant="h4" gutterBottom>
-            Ebenen {!historyModeActive && <LayerImport />}
+            Ebenen {canEdit && <LayerImport />}
           </Typography>
           <Grid container spacing={2}>
             <Grid
@@ -375,7 +376,7 @@ export default function LayersPage() {
             />
           </Grid>
         </Box>
-        {!historyModeActive && (
+        {canEdit && (
           <Fab
             color="primary"
             aria-label="add"

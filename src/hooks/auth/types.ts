@@ -25,7 +25,10 @@ export interface LoginData {
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;
+  /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
   firecall?: string;
+  /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
+  firecallWrite?: boolean;
   loginStep: LoginStep;
 }
 

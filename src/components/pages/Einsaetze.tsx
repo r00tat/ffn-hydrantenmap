@@ -8,7 +8,6 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
@@ -28,13 +27,13 @@ import { setDoc } from '../../lib/firestoreClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
-import { createCustomFirebaseTokenForFirecall } from '../../app/actions/auth';
 import { formatTimestamp } from '../../common/time-format';
 import useFirebaseCollection from '../../hooks/useFirebaseCollection';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
+import FirecallShareDialog from '../dialogs/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
@@ -84,10 +83,7 @@ function EinsatzCard({
   const { isAdmin } = useFirebaseLogin();
   const setFirecallId = useFirecallSelect();
   const router = useRouter();
-  const [tokenLink, setTokenLink] = useState<string>();
-  const [copied, setCopied] = useState(false);
-  const [creatingLink, setCreatingLink] = useState(false);
-  const [error, setError] = useState<string>();
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const updateFn = useCallback(
     (fzg?: Firecall) => {
@@ -108,26 +104,6 @@ function EinsatzCard({
     [updateFirecall, einsatz]
   );
 
-  const createLink = useCallback(async (firefallId: string) => {
-    setError('');
-    setCreatingLink(true);
-    const token = await createCustomFirebaseTokenForFirecall(firefallId);
-    console.info('created new token for link:', token);
-    if (token.token) {
-      const tokenLink = `${window.location.origin}/einsatz/${firefallId}?token=${token.token}`;
-      setTokenLink(tokenLink);
-      try {
-        await navigator.clipboard?.writeText(tokenLink);
-        setCopied(true);
-      } catch {
-        setCopied(false);
-      }
-    } else {
-      setError(t('einsaetze.tokenCreateError', { error: token.error ?? '' }));
-      console.warn(`unable to create token: ${token.error}\n${token.details}`);
-    }
-    setCreatingLink(false);
-  }, [t]);
 
   return (
     <Grid size={{ xs: 12, md: 6, lg: 4 }}>
@@ -143,24 +119,6 @@ function EinsatzCard({
             {formatTimestamp(einsatz.date)}
           </Typography>
           <Typography variant="body2">{einsatz.description}</Typography>
-          {tokenLink && (
-            <>
-              {copied && (
-                <Typography variant="body2" color="success.main">
-                  {t('einsaetze.linkCopied')}
-                </Typography>
-              )}
-              {!copied && (
-                <Typography variant="body2" color="text.secondary">
-                  {t('einsaetze.linkCopyFallback')}
-                </Typography>
-              )}
-              <Link href={tokenLink} target="_blank">
-                {tokenLink.substring(0, 100)}...
-              </Link>
-            </>
-          )}
-          {error && <Typography color="error">{error}</Typography>}
         </CardContent>
         <CardActions>
           <Tooltip title={t('einsaetze.activate')}>
@@ -206,22 +164,14 @@ function EinsatzCard({
               </IconButton>
             </Tooltip>
           )}
-          {creatingLink ? (
-            <CircularProgress size={24} sx={{ mx: 1 }} />
-          ) : (
-            <Tooltip title={t('einsaetze.shareTooltip')}>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  if (einsatz.id) {
-                    createLink(einsatz.id);
-                  }
-                }}
-              >
-                <ShareIcon />
-              </IconButton>
-            </Tooltip>
-          )}
+          <Tooltip title={t('einsaetze.shareTooltip')}>
+            <IconButton
+              size="small"
+              onClick={() => setShareDialogOpen(true)}
+            >
+              <ShareIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title={t('einsaetze.kostenersatzTooltip')}>
             <IconButton
               size="small"
@@ -235,6 +185,12 @@ function EinsatzCard({
       </Card>
       {displayUpdateDialog && (
         <EinsatzDialog onClose={updateFn} einsatz={einsatz} />
+      )}
+      {shareDialogOpen && einsatz.id && (
+        <FirecallShareDialog
+          firecallId={einsatz.id}
+          onClose={() => setShareDialogOpen(false)}
+        />
       )}
       {isConfirmOpen && (
         <ConfirmDialog

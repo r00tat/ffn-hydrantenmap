@@ -35,6 +35,8 @@ interface EinsatzorteTableProps {
   sortField?: EinsatzorteSortField;
   sortDirection?: 'asc' | 'desc';
   onSortClick?: (field: EinsatzorteSortField) => void;
+  /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
+  readOnly?: boolean;
 }
 
 export default function EinsatzorteTable({
@@ -50,6 +52,7 @@ export default function EinsatzorteTable({
   sortField = 'created',
   sortDirection = 'asc',
   onSortClick,
+  readOnly = false,
 }: EinsatzorteTableProps) {
   const handleChange = useCallback(
     (id: string) => (updates: Partial<FirecallLocation>) => {
@@ -156,20 +159,25 @@ export default function EinsatzorteTable({
               onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
               onMapVehicleSelected={onMapVehicleSelected}
               onCreateVehicle={onCreateVehicle}
+              readOnly={readOnly}
             />
           ))}
-          <EinsatzorteRow
-            key="new"
-            location={emptyLocation}
-            isNew
-            onChange={() => {}}
-            onAdd={onAdd}
-            mapVehicles={mapVehicles}
-            kostenersatzVehicleNames={kostenersatzVehicleNames}
-            onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
-            onMapVehicleSelected={onMapVehicleSelected}
-            onCreateVehicle={onCreateVehicle}
-          />
+          {/* Die leere Zeile am Ende ist die Eingabemaske für neue Standorte —
+              ohne Schreibrecht gibt es sie nicht. */}
+          {!readOnly && (
+            <EinsatzorteRow
+              key="new"
+              location={emptyLocation}
+              isNew
+              onChange={() => {}}
+              onAdd={onAdd}
+              mapVehicles={mapVehicles}
+              kostenersatzVehicleNames={kostenersatzVehicleNames}
+              onKostenersatzVehicleSelected={onKostenersatzVehicleSelected}
+              onMapVehicleSelected={onMapVehicleSelected}
+              onCreateVehicle={onCreateVehicle}
+            />
+          )}
         </TableBody>
       </Table>
     </TableContainer>

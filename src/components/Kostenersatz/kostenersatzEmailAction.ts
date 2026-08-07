@@ -97,7 +97,9 @@ export async function sendKostenersatzEmailAction(
   }
 
   // Check authentication and authorization for this firecall
-  const firecall = await actionUserAuthorizedForFirecall(firecallId);
+  const firecall = await actionUserAuthorizedForFirecall(firecallId, {
+    requireWrite: true,
+  });
 
   // Validate Gmail API is configured
   if (!process.env.GOOGLE_SERVICE_ACCOUNT || !process.env.EINSATZMAPPE_IMPERSONATION_ACCOUNT) {

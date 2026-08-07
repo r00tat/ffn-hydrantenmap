@@ -21,6 +21,7 @@ import OutlinedInput from '@mui/material/OutlinedInput';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import React, { useCallback, useState } from 'react';
 import {
@@ -29,6 +30,7 @@ import {
 } from '../../app/users/action';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { feuerwehren } from '../../common/feuerwehren';
+import { guestCanWrite, isFirecallGuest } from '../../common/firecallGuest';
 import { UserRecordExtended, userTextFields } from '../../common/users';
 
 const ITEM_HEIGHT = 48;
@@ -341,6 +343,34 @@ export default function UserRecordExtendedDialog({
             label={t('admin')}
           />
         </FormGroup>
+
+        {/* Einsatz-Gäste sind über einen Share-Link angelegt und auf einen
+            einzelnen Einsatz beschränkt. Ihr Schreibrecht lässt sich hier
+            nachträglich ändern — die Berechtigungen werden beim Token-Tausch
+            aus dem Benutzerdokument gelesen. */}
+        {isFirecallGuest(user) && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2">
+              {t('firecallGuestSection')}
+            </Typography>
+            <DialogContentText>
+              {t('firecallGuestFor', { firecall: user.firecall ?? '' })}
+            </DialogContentText>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={guestCanWrite(user)}
+                  onChange={onChangeSwitch('firecallWrite')}
+                />
+              }
+              label={t('firecallWrite')}
+            />
+            <Typography variant="body2" color="text.secondary">
+              {t('firecallWriteHint')}
+            </Typography>
+          </>
+        )}
 
         <Divider sx={{ my: 2 }} />
         <PasswordResetSection uid={user.uid} email={user.email || ''} />

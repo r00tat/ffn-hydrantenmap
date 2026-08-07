@@ -18,7 +18,7 @@ export async function updateRecipientAction(
     return { success: false, error: 'Missing firecallId or calculationId' };
   }
 
-  await actionUserAuthorizedForFirecall(firecallId);
+  await actionUserAuthorizedForFirecall(firecallId, { requireWrite: true });
 
   try {
     const calculationRef = firestore
