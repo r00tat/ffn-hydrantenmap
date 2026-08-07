@@ -14,11 +14,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import FormControl from '@mui/material/FormControl';
 import IconButton from '@mui/material/IconButton';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import React, {
@@ -49,13 +45,13 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   FirecallItem,
   HeatmapConfig,
-  NON_CREATE_ITEMS,
   filterDisplayableItems,
 } from '../firebase/firestore';
-import { fcItemNames, getItemInstance } from './elements';
+import { getItemInstance } from './elements';
 import { FirecallItemBase } from './elements/FirecallItemBase';
 import DataSchemaEditor from './DataSchemaEditor';
 import FirecallItemFields from './FirecallItemFields';
+import FirecallItemTypeSelect from './FirecallItemTypeSelect';
 import HeatmapSettings from './HeatmapSettings';
 import { computeAllFields } from '../../common/computeFieldValue';
 import ItemDataFields, { ItemDataFieldsHandle } from './ItemDataFields';
@@ -143,11 +139,9 @@ export default function FirecallItemDialog({
     [setItemField],
   );
 
-  const handleChange = (event: SelectChangeEvent) => {
-    setFirecallItem((prev) =>
-      getItemInstance({ ...prev.data(), type: event.target.value }),
-    );
-  };
+  const handleTypeChange = useCallback((type: string) => {
+    setFirecallItem((prev) => getItemInstance({ ...prev.data(), type }));
+  }, []);
 
   const isUpload = item.type === 'upload';
   const isExistingItem = !!item.id;
@@ -309,26 +303,10 @@ export default function FirecallItemDialog({
               : item.dialogText()}
           </DialogContentText>
           {allowTypeChange && (
-            <FormControl fullWidth variant="standard">
-              <InputLabel id="firecall-item-type-label">
-                {t('firecallItem.elementType')}
-              </InputLabel>
-              <Select
-                labelId="firecall-item-type-label"
-                id="firecall-item-type"
-                value={item.type}
-                label={t('common.type')}
-                onChange={handleChange}
-              >
-                {Object.entries(fcItemNames)
-                  .filter(([key]) => !NON_CREATE_ITEMS.includes(key))
-                  .map(([key, name]) => (
-                    <MenuItem key={key} value={key}>
-                      {name}
-                    </MenuItem>
-                  ))}
-              </Select>
-            </FormControl>
+            <FirecallItemTypeSelect
+              value={item.type}
+              onChange={handleTypeChange}
+            />
           )}
           {isUpload ? (
             <Box sx={{ mt: 2 }}>

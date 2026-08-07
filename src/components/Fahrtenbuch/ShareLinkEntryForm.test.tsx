@@ -44,6 +44,22 @@ const data: ShareLinkFormData = {
   persons: [{ id: 'p1', name: 'Max Mustermann' }],
 };
 
+/**
+ * Füllt ein Feld in einem Rutsch, statt Zeichen für Zeichen zu tippen. Das
+ * Fahrer-Feld ist ein Autocomplete, das bei jedem Anschlag neu filtert und
+ * rendert — zeichenweise getippt braucht das Ausfüllen des Formulars auf
+ * langsamen CI-Runnern mehr als das 5s-Testtimeout, ohne dass die zusätzlichen
+ * Anschläge etwas absichern.
+ */
+async function pasteInto(
+  user: ReturnType<typeof userEvent.setup>,
+  element: HTMLElement,
+  text: string,
+) {
+  await user.click(element);
+  await user.paste(text);
+}
+
 describe('ShareLinkEntryForm', () => {
   beforeEach(() => {
     createMock.mockReset();
@@ -114,15 +130,21 @@ describe('ShareLinkEntryForm', () => {
     const user = userEvent.setup();
     renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
 
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
-    await user.type(screen.getByLabelText('Hinweise'), 'Tank halb voll');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
+    await pasteInto(user, screen.getByLabelText('Hinweise'), 'Tank halb voll');
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
-    await user.type(
+    await pasteInto(
+      user,
       await screen.findByLabelText(/Mangelbeschreibung/),
       'Bremse zieht nach links',
     );
@@ -140,12 +162,17 @@ describe('ShareLinkEntryForm', () => {
     const user = userEvent.setup();
     renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
 
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
@@ -161,8 +188,9 @@ describe('ShareLinkEntryForm', () => {
     const user = userEvent.setup();
     renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
 
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
@@ -202,12 +230,17 @@ describe('ShareLinkEntryForm', () => {
 
     await user.click(screen.getByLabelText('Fahrzeug'));
     await user.click(await screen.findByRole('option', { name: 'TLF' }));
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
@@ -226,12 +259,17 @@ describe('ShareLinkEntryForm', () => {
 
     await user.click(screen.getByLabelText('Fahrzeug'));
     await user.click(await screen.findByRole('option', { name: 'TLF' }));
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
@@ -247,12 +285,17 @@ describe('ShareLinkEntryForm', () => {
 
     await user.click(screen.getByLabelText('Fahrzeug'));
     await user.click(await screen.findByRole('option', { name: 'TLF' }));
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
@@ -288,12 +331,17 @@ describe('ShareLinkEntryForm', () => {
       <ShareLinkEntryForm token="tok" data={data} vehicleId="v1" />,
     );
 
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
     await user.click(
       await screen.findByRole('button', { name: 'Weitere Fahrt erfassen' }),
@@ -326,12 +374,17 @@ describe('ShareLinkEntryForm', () => {
 
     await user.click(screen.getByLabelText('Fahrzeug'));
     await user.click(await screen.findByRole('option', { name: 'TLF' }));
-    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
+      'Hauptplatz',
+    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     await user.click(

@@ -775,6 +775,14 @@
       "showLabel": "Show label",
       "showLabels": "Show labels"
     },
+    "itemGroups": {
+      "tactical": "Operational tactics",
+      "waterSupply": "Water supply",
+      "drawing": "Drawing",
+      "documentation": "Documentation",
+      "organisation": "Organisation",
+      "other": "Other"
+    },
     "markerNames": {
       "fallback": "Item",
       "marker": "Marker",

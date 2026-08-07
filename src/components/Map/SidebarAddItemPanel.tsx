@@ -13,6 +13,7 @@ import {
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import useMapEditor from '../../hooks/useMapEditor';
+import FirecallItemTypeIcon from '../FirecallItems/FirecallItemTypeIcon';
 import { fcItemClasses } from '../FirecallItems/elements';
 import { icons } from '../FirecallItems/elements/icons';
 import { NON_DISPLAYABLE_ITEMS } from '../firebase/firestore';
@@ -54,12 +55,7 @@ export default function SidebarAddItemPanel() {
             }}
           >
             {displayableItems.map(([key, FcClass]) => {
-              const instance = FcClass.factory();
-              const icon = instance.icon();
-              const [iw, ih] = icon.options.iconSize as [number, number];
-              const isSquare = iw === ih;
-              const renderHeight = Math.round((24 * ih) / iw);
-              const label = markerLabel(key, instance.markerName());
+              const label = markerLabel(key, FcClass.factory().markerName());
 
               return (
                 <Tooltip key={key} title={label}>
@@ -76,23 +72,7 @@ export default function SidebarAddItemPanel() {
                       },
                     }}
                   >
-                    {isSquare && (
-                      <Image
-                        src={icon.options.iconUrl}
-                        alt={key}
-                        width={24}
-                        height={24}
-                      />
-                    )}
-                    {!isSquare && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={icon.options.iconUrl}
-                        alt={key}
-                        width={24}
-                        height={renderHeight}
-                      />
-                    )}
+                    <FirecallItemTypeIcon type={key} />
                     <Typography
                       variant="caption"
                       sx={{
