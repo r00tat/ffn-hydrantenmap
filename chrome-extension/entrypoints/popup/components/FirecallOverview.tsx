@@ -14,9 +14,9 @@ import DirectionsCar from '@mui/icons-material/DirectionsCar';
 import People from '@mui/icons-material/People';
 import AccessTime from '@mui/icons-material/AccessTime';
 import {
-  Firecall,
-  FirecallItem,
-  CrewAssignment,
+  type Firecall,
+  type FirecallItem,
+  type CrewAssignment,
   funktionAbkuerzung,
 } from '@shared/types';
 import { EINSATZKARTE_URL } from '@shared/config';

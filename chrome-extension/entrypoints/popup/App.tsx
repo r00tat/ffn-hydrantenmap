@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import {
   CssBaseline,
   Box,
@@ -56,11 +56,12 @@ function MainContent({ email }: { email: string }) {
   // from dev to prod).
   // setState during render is the React 19 pattern for deriving state from
   // changing props — avoids the set-state-in-effect lint rule.
+  const mostRecentFirecall = firecalls[0];
   if (
-    firecalls.length > 0 &&
+    mostRecentFirecall &&
     (!selectedFirecallId || !firecalls.some((fc) => fc.id === selectedFirecallId))
   ) {
-    setSelectedFirecallId(firecalls[0].id!);
+    setSelectedFirecallId(mostRecentFirecall.id!);
   }
 
   // Persist the selection whenever it changes.

@@ -27,11 +27,12 @@ function extractPersonName(value: string): string {
 
   if (parts.length === 0) return value.trim();
   // Drop trailing date part if present
-  if (parts.length > 1 && DATE_PATTERN.test(parts[parts.length - 1])) {
+  const lastPart = parts[parts.length - 1];
+  if (parts.length > 1 && lastPart && DATE_PATTERN.test(lastPart)) {
     parts.pop();
   }
   // First part is the name; titles live in remaining parts and are discarded.
-  return parts[0];
+  return parts[0] ?? value.trim();
 }
 
 /**
@@ -53,6 +54,7 @@ export function parseSybosMannschaftEditTable(
     const match = fahrzeugSelect.name.match(/^ESADFahrzeugListe_(.+)$/);
     if (!match) continue;
     const rowKey = match[1];
+    if (!rowKey) continue;
 
     const tr = fahrzeugSelect.closest('tr');
     if (!tr) continue;
@@ -65,6 +67,7 @@ export function parseSybosMannschaftEditTable(
     const adrMatch = adrInput.id.match(/^ADR_(\d+)$/);
     if (!adrMatch) continue;
     const adrId = adrMatch[1];
+    if (!adrId) continue;
 
     const funktionSelect = tr.querySelector<HTMLSelectElement>(
       `select[name="ESADFunktionListe_${rowKey}"]`

@@ -129,7 +129,7 @@ function findIdParentInLinks(root: ParentNode): string | null {
   for (const el of els) {
     const source = el.getAttribute('href') || el.getAttribute('onclick') || '';
     const match = source.match(/idParent=(\d+)/);
-    if (match && match[1] !== '0') {
+    if (match?.[1] && match[1] !== '0') {
       return match[1];
     }
   }
@@ -234,11 +234,11 @@ export function findPersonalAuswahlToken(root?: Document): string | null {
 
   for (const script of Array.from(doc.querySelectorAll('script'))) {
     const match = script.textContent?.match(PERSONAL_TOKEN_PATTERN);
-    if (match) return match[1];
+    if (match?.[1]) return match[1];
   }
 
   const match = doc.documentElement.outerHTML.match(PERSONAL_TOKEN_PATTERN);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 /** Class-name fragments SYBOS/PAT (the underlying ExtJS/PatVeraSoft stack) */

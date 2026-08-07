@@ -4,7 +4,7 @@
  *
  */
 
-import { Hydrant } from '../../common/gis-objects';
+import type { Hydrant } from '../../common/gis-objects';
 import type { SampleRateSpec } from '../../hooks/radiacode/types';
 
 /**

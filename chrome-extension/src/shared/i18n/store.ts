@@ -1,4 +1,9 @@
-import { DEFAULT_LOCALE, Locale, isLocale, resolveInitialLocale } from './config';
+import {
+  DEFAULT_LOCALE,
+  type Locale,
+  isLocale,
+  resolveInitialLocale,
+} from './config';
 
 const STORAGE_KEY = 'locale';
 

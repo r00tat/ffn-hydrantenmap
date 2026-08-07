@@ -25,6 +25,8 @@ export function parseSybosPersonTable(
     if (!match) continue;
 
     const id = match[1];
+    if (!id) continue;
+
     const checkbox = root.querySelector<HTMLInputElement>(
       `input[type="checkbox"][name="selected[${id}]"]`
     );

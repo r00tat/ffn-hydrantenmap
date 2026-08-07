@@ -114,12 +114,12 @@ describe('parseSybosMannschaftEditTable', () => {
 
     const result = parseSybosMannschaftEditTable();
     expect(result).toHaveLength(1);
-    expect(result[0].adrId).toBe('49968');
-    expect(result[0].rowKey).toBe('49968_100466_2026_04_13_18_35_00');
-    expect(result[0].personName).toBe('Bencic Florian');
-    expect(result[0].statusSelect).toBeInstanceOf(HTMLSelectElement);
-    expect(result[0].funktionSelect).toBeInstanceOf(HTMLSelectElement);
-    expect(result[0].fahrzeugSelect).toBeInstanceOf(HTMLSelectElement);
+    expect(result[0]!.adrId).toBe('49968');
+    expect(result[0]!.rowKey).toBe('49968_100466_2026_04_13_18_35_00');
+    expect(result[0]!.personName).toBe('Bencic Florian');
+    expect(result[0]!.statusSelect).toBeInstanceOf(HTMLSelectElement);
+    expect(result[0]!.funktionSelect).toBeInstanceOf(HTMLSelectElement);
+    expect(result[0]!.fahrzeugSelect).toBeInstanceOf(HTMLSelectElement);
   });
 
   it('parses multiple rows in DOM order', () => {
@@ -162,7 +162,7 @@ describe('parseSybosMannschaftEditTable', () => {
       'Köstner Günther, 09.01.1970'
     );
     const result = parseSybosMannschaftEditTable();
-    expect(result[0].personName).toBe('Köstner Günther');
+    expect(result[0]!.personName).toBe('Köstner Günther');
   });
 
   it('strips titles and date for names with multiple commas', () => {
@@ -174,14 +174,14 @@ describe('parseSybosMannschaftEditTable', () => {
       'Meyer Denise, BSc, MBA, 29.07.1995'
     );
     const result = parseSybosMannschaftEditTable();
-    expect(result[0].personName).toBe('Meyer Denise');
+    expect(result[0]!.personName).toBe('Meyer Denise');
   });
 
   it('handles a name without any comma', () => {
     const tbody = createTable();
     addRow(tbody, '1234', '1234_100466_2026_04_13_18_35_00', 'OnlyName');
     const result = parseSybosMannschaftEditTable();
-    expect(result[0].personName).toBe('OnlyName');
+    expect(result[0]!.personName).toBe('OnlyName');
   });
 
   it('skips rows where the ADR_ input is missing', () => {
@@ -195,7 +195,7 @@ describe('parseSybosMannschaftEditTable', () => {
     addRow(tbody, '2', '2_100466_2026_04_13_18_35_00', '', { skipAdr: true });
     const result = parseSybosMannschaftEditTable();
     expect(result).toHaveLength(1);
-    expect(result[0].adrId).toBe('1');
+    expect(result[0]!.adrId).toBe('1');
   });
 
   it('skips rows where the Funktion select is missing', () => {
@@ -215,7 +215,7 @@ describe('parseSybosMannschaftEditTable', () => {
     );
     const result = parseSybosMannschaftEditTable();
     expect(result).toHaveLength(1);
-    expect(result[0].adrId).toBe('1');
+    expect(result[0]!.adrId).toBe('1');
   });
 
   it('returns empty array when no fahrzeug list select exists', () => {
@@ -255,8 +255,8 @@ describe('parseSybosMannschaftEditTable with custom root', () => {
 
     const result = parseSybosMannschaftEditTable(doc);
     expect(result).toHaveLength(1);
-    expect(result[0].adrId).toBe('49968');
-    expect(result[0].personName).toBe('Bencic Florian');
+    expect(result[0]!.adrId).toBe('49968');
+    expect(result[0]!.personName).toBe('Bencic Florian');
   });
 });
 

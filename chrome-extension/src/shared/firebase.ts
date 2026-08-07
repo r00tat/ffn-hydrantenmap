@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { FIREBASE_CONFIG, FIRESTORE_DB } from './config';
 import { initExtensionAppCheck } from './appCheck';

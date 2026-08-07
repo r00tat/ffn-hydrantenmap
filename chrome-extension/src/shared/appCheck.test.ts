@@ -122,7 +122,7 @@ describe('initExtensionAppCheck', () => {
 
     initExtensionAppCheck({ name: 'ext-app' } as any, authWithUser(), fetchImpl);
 
-    const providerOptions = customProviderMock.mock.calls[0][0] as any;
+    const providerOptions = customProviderMock.mock.calls[0]![0] as any;
     await expect(providerOptions.getToken()).resolves.toEqual({
       token: 'ac-token',
       expireTimeMillis: 42,

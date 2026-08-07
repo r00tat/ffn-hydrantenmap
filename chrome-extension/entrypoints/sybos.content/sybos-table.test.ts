@@ -106,7 +106,7 @@ describe('parseSybosPersonTable with custom root', () => {
 
     const result = parseSybosPersonTable(container);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('1407');
+    expect(result[0]!.id).toBe('1407');
   });
 });
 

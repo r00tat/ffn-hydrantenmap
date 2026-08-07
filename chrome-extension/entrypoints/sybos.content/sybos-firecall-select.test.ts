@@ -29,8 +29,8 @@ describe('renderFirecallSelect', () => {
     renderFirecallSelect(container, fcs, 'a', () => {});
     const opts = container.querySelectorAll('option');
     expect(opts.length).toBe(2);
-    expect(opts[0].value).toBe('a');
-    expect(opts[1].value).toBe('b');
+    expect(opts[0]!.value).toBe('a');
+    expect(opts[1]!.value).toBe('b');
   });
 
   it('marks the option matching selectedId as selected', () => {

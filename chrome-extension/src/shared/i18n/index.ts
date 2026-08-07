@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { Locale } from './config';
+import type { Locale } from './config';
 import { getMessage, interpolate } from './messages';
 import { getLocale, initLocale, subscribe } from './store';
 

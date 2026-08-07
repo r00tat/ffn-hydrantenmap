@@ -40,6 +40,8 @@ export function parseSybosVehicleList(
     if (!match) continue;
 
     const id = match[1];
+    if (!id) continue;
+
     const waname = normalizeCellText(wanameCell.textContent);
     if (!waname) continue;
 

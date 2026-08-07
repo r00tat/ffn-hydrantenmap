@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { firestore } from '@shared/firebase';
 import {
-  Diary,
-  FirecallItem,
+  type Diary,
+  type FirecallItem,
   FIRECALL_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
 } from '@shared/types';

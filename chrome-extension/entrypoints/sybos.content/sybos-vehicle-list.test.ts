@@ -73,8 +73,8 @@ describe('parseSybosVehicleList', () => {
       waname: 'SRF',
       warufname: 'Rüst Neusiedl am See',
     });
-    expect(rows[0].checkbox).toBeInstanceOf(HTMLInputElement);
-    expect(rows[1].waname).toBe('RLFA 3000/100');
+    expect(rows[0]!.checkbox).toBeInstanceOf(HTMLInputElement);
+    expect(rows[1]!.waname).toBe('RLFA 3000/100');
   });
 
   it('treats non-breaking-space WArufname as empty', () => {
@@ -86,7 +86,7 @@ describe('parseSybosVehicleList', () => {
 
     const rows = parseSybosVehicleList();
     expect(rows).toHaveLength(1);
-    expect(rows[0].warufname).toBe('');
+    expect(rows[0]!.warufname).toBe('');
   });
 
   it('returns empty array when no vehicle rows are present', () => {

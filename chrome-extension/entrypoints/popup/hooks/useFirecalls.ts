@@ -8,7 +8,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { firestore } from '@shared/firebase';
-import { Firecall, FIRECALL_COLLECTION_ID } from '@shared/types';
+import { type Firecall, FIRECALL_COLLECTION_ID } from '@shared/types';
 
 /**
  * Subscribe to firecalls the current user has access to.
