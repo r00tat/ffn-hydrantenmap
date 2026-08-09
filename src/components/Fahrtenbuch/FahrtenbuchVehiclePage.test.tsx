@@ -43,6 +43,13 @@ vi.mock('../../hooks/useFahrtenbuchPersons', () => ({
   default: () => ({ persons: [], activePersons: [] }),
 }));
 vi.mock('../../hooks/useFahrtenbuchEntries', () => ({ default: () => [] }));
+vi.mock('../../hooks/useFahrtenbuchMangel', () => ({
+  default: () => ({
+    mangel: [],
+    openMangel: [],
+    openCountByVehicle: new Map(),
+  }),
+}));
 vi.mock('../../hooks/useFahrtenbuchFirecalls', () => ({ default: () => [] }));
 vi.mock('./useEntryDeletion', () => ({
   default: () => ({
