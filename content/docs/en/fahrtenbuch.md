@@ -10,6 +10,7 @@ The trip log records every journey of a fire brigade's vehicles — operation, d
 - **Counters per vehicle type** Kilometres for vehicles, engine hours and bilge pumps for boats, no counters for trailers
 - **Entry without signing in** Via a group link or a QR code inside the vehicle
 - **PDF export** Free choice of period and vehicles, estimated values clearly marked
+- **Statistics with drill-down** Kilometres, trips, time on the road and consumption per period, purpose, vehicle and driver — from the chart down to the single trip
 - **Defects and consumables** Defect reported on the last trip shown on the vehicle card, refuelled amounts per consumable
 - **Master data in the admin area** Vehicles, persons, fire station location, import from cost recovery and Alarm SMS
 - **PDF import** Take over trips from an earlier PDF export
@@ -157,6 +158,23 @@ Anyone holding this link can record trips. Existing entries are **not** visible 
 4. Click **Create PDF**
 
 The PDF contains one table per vehicle with date, time, driver, reason, purpose/route, notes, counter readings and consumables. Estimated values are prefixed with "approx." and explained in the legend. Very large periods are rejected — export those in smaller sections.
+
+### Analyse the statistics
+
+The **Statistics** button on the trip log page opens the analysis; from a vehicle card it starts with that vehicle as a filter.
+
+1. Choose the **period** at the top — the current year by default, plus presets for month, quarter, last year, last 12 months or a freely set period
+2. The **key figures** show trips, totals per counter (kilometres, operating hours), time on the road, refuelled amounts, average kilometres per trip, average consumption and defect reports
+3. In the **over time** chart you choose which figure is shown (trips, distance, operating hours, time on the road, refuelled amount), how it is split (purpose, vehicle, driver) and at which granularity (day, week, month, year)
+4. Below that are the distribution **by purpose**, the ranking **by vehicle** and the distribution **by weekday**
+5. The **drivers** table is sortable: trips, kilometres, operating hours, time on the road, vehicles used and last trip
+6. **Operating fluids and consumption** shows the refuelled amounts over time and the approximated consumption per vehicle
+
+**Drill-down:** Clicking a bar in the over-time chart narrows the period to that section and steps the granularity down one level — from year through month to day. Clicking a segment of the purpose distribution, a bar of the vehicle ranking or a row of the drivers table sets the respective filter. All active filters appear as chips above the charts and can be removed individually or via **Reset filters**. At the very bottom, **trips in selection** lists the trips currently being analysed — the way from the chart to the individual entry.
+
+:::info
+How exact are the figures? Only counters with a start and an end reading are summed; a plain reading (a bilge pump, for instance) yields no difference and enters no total. If a trip has no end reading, it is missing from the distance total — the analysis states the number of such trips and the number of trips with estimated readings below the key figures. Consumption is an approximation: a tank fill also covers trips outside the period. The figure is useful over a year, not over a week.
+:::
 
 ### Maintain master data (admins only)
 

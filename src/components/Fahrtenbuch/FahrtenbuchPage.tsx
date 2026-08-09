@@ -1,5 +1,6 @@
 'use client';
 
+import BarChartIcon from '@mui/icons-material/BarChart';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import Accordion from '@mui/material/Accordion';
@@ -133,6 +134,14 @@ export default function FahrtenbuchPage() {
             {t('einsatz.bookForFirecall', { name: firecall.name })}
           </Button>
         )}
+        <Button
+          variant="outlined"
+          startIcon={<BarChartIcon />}
+          component={Link}
+          href="/fahrtenbuch/statistik"
+        >
+          {t('stats.button')}
+        </Button>
         {/* Auch mit ausschließlich stillgelegten Fahrzeugen sinnvoll: deren
             alte Fahrten gehören in einen Nachweis über einen vergangenen
             Zeitraum. */}
