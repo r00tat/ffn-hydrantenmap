@@ -28,6 +28,7 @@ import FitBoundsToItems from './FitBoundsToItems';
 import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
+import LayerErrorBoundary from './layers/LayerErrorBoundary';
 import LiveLocationLayer from './layers/LiveLocationLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
@@ -119,34 +120,56 @@ export default function Map() {
               )}
             </LayersControl.BaseLayer>
           ))}
-          <FirecallLayer />
+          <LayerErrorBoundary name="Einsatz">
+            <FirecallLayer />
+          </LayerErrorBoundary>
           <LayersControl.Overlay name="Einsatzorte" checked>
-            <LocationsLayer />
+            <LayerErrorBoundary name="Einsatzorte">
+              <LocationsLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Entfernung">
-            <DistanceMarker />
+            <LayerErrorBoundary name="Entfernung">
+              <DistanceMarker />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
-          <Clusters />
+          <LayerErrorBoundary name="Hydranten">
+            <Clusters />
+          </LayerErrorBoundary>
           <LayersControl.Overlay name="Umkreis">
-            <DistanceLayer />
+            <LayerErrorBoundary name="Umkreis">
+              <DistanceLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Position" checked>
-            <PositionMarker />
+            <LayerErrorBoundary name="Position">
+              <PositionMarker />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Live-Standorte" checked>
-            <LiveLocationLayer />
+            <LayerErrorBoundary name="Live-Standorte">
+              <LiveLocationLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Stromausfälle">
-            <PowerOutageLayer />
+            <LayerErrorBoundary name="Stromausfälle">
+              <PowerOutageLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Pegelstände">
-            <PegelstandLayer />
+            <LayerErrorBoundary name="Pegelstände">
+              <PegelstandLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name="Wetterstationen">
-            <WetterstationLayer />
+            <LayerErrorBoundary name="Wetterstationen">
+              <WetterstationLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           <LayersControl.Overlay name={STRECKENKILOMETER_LAYER_NAME}>
-            <StreckenkilometerLayer />
+            <LayerErrorBoundary name={STRECKENKILOMETER_LAYER_NAME}>
+              <StreckenkilometerLayer />
+            </LayerErrorBoundary>
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
             .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')

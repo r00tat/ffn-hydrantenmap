@@ -1,12 +1,15 @@
 'use client';
 
 import L from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LayerGroup, Marker, Popup, useMap } from 'react-leaflet';
+import { recordError } from '../../firebase/crashlytics';
+import { fetchPowerOutageData } from './PowerOutageAction';
 import {
-  fetchPowerOutageData,
+  formatOutageTime,
+  isValidLatLng,
   PowerOutage,
-} from './PowerOutageAction';
+} from './powerOutageUtils';
 
 const LAYER_NAME = 'Stromausfälle';
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -49,11 +52,12 @@ function usePowerOutageData() {
       try {
         const data = await fetchPowerOutageData();
         if (mountedRef.current) {
-          setOutages(data);
+          setOutages(Array.isArray(data) ? data : []);
           lastFetchRef.current = Date.now();
         }
       } catch (err) {
         console.error('Failed to fetch power outage data', err);
+        void recordError(err, { source: 'power-outage-layer' });
       }
     };
 
@@ -73,19 +77,21 @@ function usePowerOutageData() {
   return outages;
 }
 
-function formatOutageTime(dateStr: string): string {
-  if (!dateStr || dateStr.startsWith('31.12.2099')) return '';
-  return dateStr;
-}
-
 export default function PowerOutageLayer() {
   const outages = usePowerOutageData();
+
+  // Never hand invalid coordinates to Leaflet — L.latLng() throws on NaN and
+  // would take the whole map down.
+  const markers = useMemo(
+    () => outages.filter((outage) => isValidLatLng(outage.lat, outage.lng)),
+    [outages]
+  );
 
   return (
     <LayerGroup
       attribution='Störungsinfo: <a href="https://analytics.netzburgenland.at/stoerungsinfo" target="_blank" rel="noopener noreferrer">Netz Burgenland</a>'
     >
-      {outages.map((outage) => (
+      {markers.map((outage) => (
         <Marker
           position={[outage.lat, outage.lng]}
           icon={powerOutageIcon}
