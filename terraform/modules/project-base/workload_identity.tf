@@ -1,4 +1,5 @@
 resource "google_iam_workload_identity_pool" "github" {
+  project                   = var.project
   workload_identity_pool_id = "github"
   display_name              = "Github"
   description               = "Identity pool for github"
@@ -17,9 +18,6 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     "attribute.repository"    = "assertion.repository"
     "attribute.workflow"      = "assertion.workflow"
     "attribute.repository_id" = "assertion.repository_id"
-    "attribute.aud"           = "assertion.aud"
-    "attribute.actor"         = "assertion.actor"
-    "attribute.repository"    = "assertion.repository"
     "attribute.ref"           = "assertion.ref"
   }
 
@@ -28,9 +26,4 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   }
 
   attribute_condition = "assertion.repository_owner=='${var.github_org}'"
-}
-
-output "workload_identity_provider" {
-  description = "Workload identity provider id"
-  value       = google_iam_workload_identity_pool_provider.github.name
 }

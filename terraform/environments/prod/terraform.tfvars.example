@@ -1,0 +1,4 @@
+# Kopieren nach terraform.tfvars (gitignored) und Werte einsetzen.
+project               = "ffn-utils"
+build_service_account = "cloudbuild@ffn-utils.iam.gserviceaccount.com"
+github_org            = "r00tat"

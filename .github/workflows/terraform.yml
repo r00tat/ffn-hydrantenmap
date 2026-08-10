@@ -1,0 +1,267 @@
+name: Terraform
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "terraform/**"
+      - "firebase/**"
+      - "storage.rules"
+      - ".github/workflows/terraform.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+      - "firebase/**"
+      - "storage.rules"
+      - ".github/workflows/terraform.yml"
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+      mode:
+        description: Mode
+        type: choice
+        options:
+          - plan
+          - apply
+        default: plan
+
+env:
+  # Muss zu terraform/.tool-versions passen, damit lokal und CI identisch sind.
+  TOFU_VERSION: 1.9.0
+
+jobs:
+  plan:
+    name: "plan ${{ matrix.environment }}"
+    # Feature-Branches und PRs planen. Push auf main und Releases applien
+    # stattdessen in den Jobs darunter.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref != 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'plan')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev","prod"]') }}
+    # Push- und pull_request-Event desselben Branches landen in derselben
+    # Gruppe, damit nicht zweimal dasselbe geplant wird.
+    concurrency:
+      group: tf-plan-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ matrix.environment }}
+      cancel-in-progress: true
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform/environments/${{ matrix.environment }}
+    env:
+      # gcp_ready ist der Guard für alle Steps, die GCP brauchen. Beide Secrets
+      # müssen gesetzt sein: der Provider für die Authentisierung und der SA,
+      # der impersoniert wird. In Fork-PRs sind Secrets leer (und es gibt kein
+      # id-token), solange TERRAFORM_SERVICE_ACCOUNT noch nicht hinterlegt ist
+      # ebenfalls — dann läuft nur fmt/validate statt eines roten Auth-Fehlers.
+      gcp_ready: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER != '' && secrets.TERRAFORM_SERVICE_ACCOUNT != '' }}
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: Format check
+        working-directory: terraform
+        run: tofu fmt -check -recursive
+
+      - name: "Authenticate to Google Cloud"
+        if: ${{ env.gcp_ready == 'true' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      # Ohne Secrets (Fork-PRs) gibt es kein id-token und keine
+      # GCP-Credentials. validate braucht kein Backend, plan schon.
+      - name: Validate without backend
+        if: ${{ env.gcp_ready != 'true' }}
+        run: |
+          tofu init -backend=false
+          tofu validate
+
+      - name: Init
+        if: ${{ env.gcp_ready == 'true' }}
+        run: tofu init -input=false
+
+      - name: Validate
+        if: ${{ env.gcp_ready == 'true' }}
+        run: tofu validate
+
+      - name: Plan
+        id: plan
+        if: ${{ env.gcp_ready == 'true' }}
+        run: |
+          set -o pipefail
+          tofu plan -input=false -no-color -out=tfplan
+          tofu show -no-color tfplan > plan.txt
+
+      - name: Step summary
+        if: ${{ env.gcp_ready == 'true' }}
+        run: |
+          {
+            echo "## Terraform plan — ${{ matrix.environment }}"
+            echo
+            echo '```terraform'
+            head -c 60000 plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment plan on PR
+        if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v8
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        with:
+          script: |
+            const fs = require('fs');
+            const env = process.env.ENVIRONMENT;
+            const marker = `<!-- tofu-plan:${env} -->`;
+            const plan = fs
+              .readFileSync(`terraform/environments/${env}/plan.txt`, 'utf8')
+              .slice(0, 60000);
+            const body = `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  apply-dev:
+    name: "apply dev"
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'apply' && github.event.inputs.environment == 'dev')
+    runs-on: ubuntu-latest
+    environment: dev
+    # Zwei gleichzeitige apply auf denselben state sind ausgeschlossen.
+    concurrency:
+      group: tf-apply-dev
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform/environments/dev
+    env:
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: "Authenticate to Google Cloud"
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: Init
+        run: tofu init -input=false
+
+      - name: Apply
+        run: tofu apply -input=false -no-color -auto-approve
+
+  apply-prod:
+    name: "apply prod"
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'apply' && github.event.inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: tf-apply-prod
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform/environments/prod
+    env:
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: "Authenticate to Google Cloud"
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: Init
+        run: tofu init -input=false
+
+      - name: Apply
+        run: tofu apply -input=false -no-color -auto-approve
