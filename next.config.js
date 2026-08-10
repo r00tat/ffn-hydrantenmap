@@ -14,6 +14,25 @@ module.exports = async () => {
     // dest: 'public',
     // skipWaiting: true,
     transpilePackages: ['mui-color-input'],
+    turbopack: {
+      rules: {
+        // Macht Markdown importierbar, damit der import.meta.glob in
+        // src/components/docs/loadDocsContent.ts den Dateiinhalt als String
+        // liefert. Turbopack hat anders als Vite keine eingebaute
+        // ?raw-Behandlung.
+        //
+        // Zwei Sackgassen, die die Next.js-Doku nicht abdeckt: `type: 'text'`
+        // laut Doku kennt Turbopack 16.3.0 nicht und bricht den Build mit
+        // "Unknown module type" ab (gueltig sind asset, ecmascript, typescript,
+        // css, css-module, json, wasm, raw, node, bytes). Und `type: 'raw'`
+        // laesst den Build durchlaufen, macht die Dateien aber nicht
+        // aufloesbar — zur Laufzeit dann "could not resolve ... into a module".
+        // Nur der Loader-Weg funktioniert.
+        //
+        // Ohne `condition`, damit die Regel unabhaengig von der Query greift.
+        '*.md': { loaders: ['raw-loader'], as: '*.js' },
+      },
+    },
     serverExternalPackages: ['@google-cloud/secret-manager', 'protobufjs'],
     allowedDevOrigins: ['192.168.*.*', '127.0.0*', 'localhost', '*.nip.io'],
     async headers() {
