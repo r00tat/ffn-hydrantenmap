@@ -74,7 +74,7 @@ Bucket und Prefix stehen fest in `environments/<env>/backend.tf`. Falls `.envrc`
 
 | Ereignis | Aktion |
 | --- | --- |
-| Push auf einen Branch ≠ `main`, oder PR nach `main` | `plan` für dev und prod |
+| PR nach `main` | `plan` für dev und prod, Ergebnis als PR-Kommentar |
 | Push auf `main` | `apply` auf dev |
 | Release veröffentlicht | `apply` auf prod |
 | `workflow_dispatch` | Environment und Modus wählbar |

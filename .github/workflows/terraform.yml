@@ -1,9 +1,15 @@
 name: Terraform
 
 on:
+  # Nur main: hier laeuft apply-dev. Der plan haengt bewusst am pull_request,
+  # nicht am push. Grund: legt ein push einen NEUEN Branch an, hat GitHub keinen
+  # Vorgaenger-Commit als Vergleichsbasis (`before` ist 0000...) und wertet den
+  # paths-Filter nicht aus — der Workflow lief dann bei jedem neuen Branch,
+  # auch ohne jede Terraform-Aenderung. Beim pull_request wird der Filter gegen
+  # den PR-Diff ausgewertet und greift zuverlaessig.
   push:
     branches:
-      - "**"
+      - main
     paths:
       - "terraform/**"
       - "firebase/**"
@@ -44,21 +50,18 @@ env:
 jobs:
   plan:
     name: "plan ${{ matrix.environment }}"
-    # Feature-Branches und PRs planen. Push auf main und Releases applien
-    # stattdessen in den Jobs darunter.
+    # PRs planen. Push auf main und Releases applien stattdessen in den Jobs
+    # darunter.
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'push' && github.ref != 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'plan')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev","prod"]') }}
-    # Push- und pull_request-Event desselben Branches landen in derselben
-    # Gruppe, damit nicht zweimal dasselbe geplant wird.
     concurrency:
-      group: tf-plan-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ matrix.environment }}
+      group: tf-plan-${{ github.event.pull_request.number || github.ref_name }}-${{ matrix.environment }}
       cancel-in-progress: true
     permissions:
       id-token: write
