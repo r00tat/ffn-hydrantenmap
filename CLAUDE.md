@@ -13,24 +13,45 @@ npm run dev          # Development server (Turbopack)
 npm run build        # Production build (Webpack)
 npm run start        # Start production server
 npm run lint         # ESLint validation
+npm run typecheck    # TypeScript type check (TypeScript 7)
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
-npm run check        # Run all checks: tsc, lint, tests, build
+npm run check        # Run all checks: typecheck, lint, tests, build
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
 **After completing a feature or bugfix, run the checks individually (not `npm run check`) so the source of any error is easier to spot:**
 
 ```bash
-npx tsc --noEmit        # TypeScript type check
-npx eslint              # Lint
-npx vitest run          # Tests
+npm run typecheck      # TypeScript type check
+npx eslint             # Lint
+npx vitest run         # Tests
 npx next build --webpack  # Production build
 ```
 
 Run them in order and fix errors before moving on to the next step. Only run `npm run check` when you want a single combined pass.
 
-**WICHTIG: TypeScript-Fehler (`tsc --noEmit`) dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
+**WICHTIG: TypeScript-Fehler dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
+
+### TypeScript 6 und 7 parallel
+
+Der Typecheck läuft über **TypeScript 7** (Go-Compiler, ~1,3s statt ~8,8s), das Paket
+liegt als Alias `typescript7` in den devDependencies. `npm run typecheck` ruft es über den
+expliziten Pfad `node_modules/typescript7/bin/tsc` auf — nicht über `npx tsc`, weil beide
+Pakete ein `tsc`-Binary mitbringen und nicht garantiert ist, welches in
+`node_modules/.bin/` landet.
+
+Das Paket `typescript` bleibt bewusst bei **6.x**, weil `typescript@7` unter `.` nur noch
+`lib/version.cjs` exportiert und die Compiler-API nicht mehr mitliefert:
+
+- `typescript-eslint` (via `eslint-config-next`) crasht damit sofort
+  (`TypeError: Cannot read properties of undefined (reading 'Cjs')`). Peer-Range ist
+  `>=4.8.4 <6.1.0`; TS-7-Support ist dort abgelehnt, bis die stabile API in TS 7.1 kommt.
+- `next build` löst `typescript/package.json` auf und nutzt dessen `bin.tsc`, prüft also
+  weiterhin mit TS 6.
+
+Sobald typescript-eslint auf der TS-7.1-API aufsetzt: `typescript` auf `^7` ziehen und den
+`typescript7`-Alias samt `typecheck`-Pfad entfernen.
 
 ## Android-Build (Capacitor)
 
