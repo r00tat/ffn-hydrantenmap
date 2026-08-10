@@ -3,6 +3,7 @@
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Box from '@mui/material/Box';
+import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
@@ -87,13 +88,33 @@ export default function MangelList({
               {!hideVehicle && (
                 <TableCell sx={tightCell}>{item.vehicleName}</TableCell>
               )}
-              <TableCell>
-                <Typography variant="body2">{item.description}</Typography>
-                {item.entryId && (
-                  <Typography variant="caption" color="text.secondary">
-                    {t('fromEntry')}
-                  </Typography>
-                )}
+              {/* Die Beschreibung öffnet die Bearbeitung: Der Stiftknopf am
+                  Zeilenende ist ein kleines Ziel, und die Beschreibung ist die
+                  breiteste Fläche der Zeile. `ButtonBase` statt eines
+                  `onClick` an der Zelle, damit das Ziel fokussierbar und mit
+                  der Tastatur bedienbar bleibt. */}
+              <TableCell sx={{ p: 0 }}>
+                <ButtonBase
+                  onClick={() => onEdit(item)}
+                  sx={{
+                    width: '100%',
+                    // Die Zellen-Polsterung wandert in den Knopf, damit die
+                    // ganze Zelle das Ziel ist und nicht nur der Text. Die
+                    // Werte sind die von `TableCell` bei `size="small"` —
+                    // sonst wäre diese Zeile höher als die Nachbarspalten.
+                    px: 2,
+                    py: 0.75,
+                    display: 'block',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Typography variant="body2">{item.description}</Typography>
+                  {item.entryId && (
+                    <Typography variant="caption" color="text.secondary">
+                      {t('fromEntry')}
+                    </Typography>
+                  )}
+                </ButtonBase>
               </TableCell>
               <TableCell sx={tightCell}>
                 <Box>{dateText(item.reportedAt)}</Box>

@@ -95,6 +95,31 @@ describe('MangelList', () => {
     expect(onEdit).toHaveBeenCalledWith(item);
   });
 
+  it('öffnet die Bearbeitung auch über die Beschreibung', async () => {
+    // Der Stiftknopf ist ein kleines Ziel, gerade am Telefon. Die Beschreibung
+    // ist die breiteste Fläche der Zeile und damit das naheliegende.
+    const onEdit = vi.fn();
+    const item = mangel();
+    renderWithIntl(<MangelList mangel={[item]} onEdit={onEdit} />);
+    await userEvent.click(screen.getByText('Blinker hinten links defekt'));
+    expect(onEdit).toHaveBeenCalledWith(item);
+  });
+
+  it('macht die Beschreibung auch per Tastatur bedienbar', async () => {
+    // Ein `onClick` auf der Tabellenzelle allein wäre mit der Tastatur nicht
+    // erreichbar — deshalb ein echtes fokussierbares Element.
+    const onEdit = vi.fn();
+    const item = mangel();
+    renderWithIntl(<MangelList mangel={[item]} onEdit={onEdit} />);
+
+    const target = screen.getByRole('button', {
+      name: /Blinker hinten links defekt/,
+    });
+    target.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onEdit).toHaveBeenCalledWith(item);
+  });
+
   it('zeigt den Löschbutton nur mit Handler — Löschen ist Admins vorbehalten', () => {
     const { unmount } = renderWithIntl(
       <MangelList mangel={[mangel()]} onEdit={vi.fn()} />,
