@@ -17,6 +17,7 @@ npm run typecheck    # TypeScript type check (TypeScript 7)
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
 npm run check        # Run all checks: typecheck, lint, tests, build
+npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
@@ -52,6 +53,34 @@ Das Paket `typescript` bleibt bewusst bei **6.x**, weil `typescript@7` unter `.`
 
 Sobald typescript-eslint auf der TS-7.1-API aufsetzt: `typescript` auf `^7` ziehen und den
 `typescript7`-Alias samt `typecheck`-Pfad entfernen.
+
+### Turbopack-Cache
+
+Turbopack cacht auf Platte, getrennt nach Modus: `next dev` in `.next/dev/cache/turbopack`,
+`next build` in `.next/cache/turbopack`. Beides ist seit 16.3 standardmäßig an und bringt
+die Startup- und Memory-Gewinne von 16.3 überhaupt erst.
+
+**Der Cache wird nie kompaktiert.** Gemessen an diesem Projekt wachsen pro Build ~3,7 MB
+und 5 `.sst`-Dateien dazu (424 → 435 MB über vier Builds), es gibt keine
+Größenbegrenzung, kein GC und kein Max-Age. Dazu ist das Verzeichnis an die Next-Version
+gebunden (`v16.3.0-<hash>`) — ein Update legt ein neues an und lässt das alte liegen. Über
+Monate summiert sich das auf Gigabyte. Bei Bedarf:
+
+```bash
+npm run clean:cache   # rm -rf .next/cache/turbopack .next/dev/cache/turbopack
+```
+
+Deshalb löscht `npm run dev` **nicht** mehr das ganze `.next` (vorher `rm -rf .next` vor
+und nach dem Start) — das warf genau diesen Cache jedes Mal weg. Unter Next 16 ist das
+unbedenklich, weil der Dev-Output unter `.next/dev/` liegt und die Prod-Artefakte
+(`.next/server`, `.next/static`, Manifeste) unberührt bleiben: `next start` funktioniert
+nach einer Dev-Session weiterhin.
+
+Im **Docker-Build** ist der Build-Cache abgeschaltet (`DISABLE_TURBOPACK_BUILD_CACHE=1` im
+Dockerfile, ausgewertet über `turbopackFileSystemCacheForBuild` in `next.config.js`): Die
+Builder-Stage startet aus einer frischen Layer und nach unten kopiert werden nur
+`.next/standalone` und `.next/static` — der Cache wäre ~430 MB, die geschrieben und nie
+gelesen werden.
 
 ## Android-Build (Capacitor)
 

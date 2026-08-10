@@ -33,6 +33,20 @@ module.exports = async () => {
         '*.md': { loaders: ['raw-loader'], as: '*.js' },
       },
     },
+    experimental: {
+      // Turbopacks Build-Cache liegt in .next/cache/turbopack und beschleunigt
+      // wiederholte Builds erheblich — aber nur, wenn das Verzeichnis zwischen
+      // den Builds erhalten bleibt. Der Docker-Build startet aus einer frischen
+      // Layer und kopiert am Ende nur .next/standalone und .next/static, der
+      // Cache waere also reine Schreiblast (~430 MB) in der Builder-Stage.
+      //
+      // Der Cache wird ausserdem nie kompaktiert: gemessen wachsen pro Build
+      // ~3,7 MB und 5 .sst-Dateien dazu, und das Verzeichnis ist an die
+      // Next-Version gebunden — ein Update laesst das alte liegen. Lokal daher
+      // gelegentlich `npm run clean:cache`.
+      turbopackFileSystemCacheForBuild:
+        process.env.DISABLE_TURBOPACK_BUILD_CACHE !== '1',
+    },
     serverExternalPackages: ['@google-cloud/secret-manager', 'protobufjs'],
     allowedDevOrigins: ['192.168.*.*', '127.0.0*', 'localhost', '*.nip.io'],
     async headers() {
