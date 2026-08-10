@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Opentofu 1.9 (siehe `.tool-versions`)
+- Opentofu 1.12 (genaue Version in `.tool-versions`, identisch mit `TOFU_VERSION` im Workflow)
 - direnv
 
 ## Environments

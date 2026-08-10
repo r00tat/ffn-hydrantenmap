@@ -39,7 +39,7 @@ on:
 
 env:
   # Muss zu terraform/.tool-versions passen, damit lokal und CI identisch sind.
-  TOFU_VERSION: 1.9.0
+  TOFU_VERSION: 1.12.5
 
 jobs:
   plan:
