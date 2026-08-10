@@ -154,6 +154,14 @@ export default function AppDrawer({
       href: '/fahrtenbuch',
     },
     {
+      // Eigener Menüpunkt und nicht nur ein Button im Fahrtenbuch: Die
+      // Mängelliste ist die Arbeitsliste des Fahrzeugverantwortlichen und wird
+      // unabhängig vom Erfassen einer Fahrt geöffnet.
+      text: t('maengel'),
+      icon: <BuildIcon />,
+      href: '/fahrtenbuch/maengel',
+    },
+    {
       text: t('kostenersatz'),
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',

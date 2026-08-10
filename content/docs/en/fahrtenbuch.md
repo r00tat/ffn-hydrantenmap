@@ -11,7 +11,8 @@ The trip log records every journey of a fire brigade's vehicles — operation, d
 - **Entry without signing in** Via a group link or a QR code inside the vehicle
 - **PDF export** Free choice of period and vehicles, estimated values clearly marked
 - **Statistics with drill-down** Kilometres, trips, time on the road and consumption per period, purpose, vehicle and driver — from the chart down to the single trip
-- **Defects and consumables** Defect reported on the last trip shown on the vehicle card, refuelled amounts per consumable
+- **Defect management** Status *open*, *in progress*, *resolved* with resolution date and an unchangeable note history; a page across all vehicles, open-defect count on the vehicle card
+- **Defects and consumables** Defect reported from within a trip, refuelled amounts per consumable
 - **Master data in the admin area** Vehicles, persons, fire station location, import from cost recovery and Alarm SMS
 - **PDF import** Take over trips from an earlier PDF export
 
@@ -81,7 +82,28 @@ Only the person who created an entry, or an administrator, may change or delete 
 
 ### Report a defect
 
-If **Defect** is ticked on a trip, the vehicle card carries the notice until a newer trip no longer reports it. The **All trips** list can be filtered to defects only. Ticking the box reveals the **defect description** field — it is mandatory, and that text goes into the notification. The **notes** stay separate from it: they hold what was noticed in passing, the defect holds what is broken.
+If **Defect** is ticked on a trip, a defect in status *Open* is created from it — a record of its own that from then on carries its own status, history and resolution date. The **All trips** list can be filtered to defects only. Ticking the box reveals the **defect description** field — it is mandatory, and that text goes into the notification and into the defect. The **notes** stay separate from it: they hold what was noticed in passing, the defect holds what is broken.
+
+:::info
+The defect is only created when a trip is **added**. Editing the trip later creates no second defect and does not reset one that is already being worked on — from the moment it is reported the defect is managed through the defect list. If the tick is removed later, the defect stays and has to be closed there.
+:::
+
+### Manage defects
+
+The **Defects** page (menu → *Defects*, or the button in the trip log) is the work list: all defects of all vehicles of the group, pre-filtered to *open and in progress*. The filters show a single status or a single vehicle — decommissioned vehicles are listed too, so an open defect on one does not become unfindable.
+
+Clicking **Edit** opens the defect:
+
+- **Status** *Open*, *In progress* or *Resolved*. Every change is recorded in the history with author and timestamp.
+- **Resolved on** appears for status *Resolved*, pre-filled with the current time and editable — for the defect fixed last week and only entered today. Reopening the defect removes the date.
+- **Add note** appends an entry to the history. Notes cannot be changed afterwards, which keeps the path from report to repair traceable (“garage appointment on 12 Aug”, “spare part ordered”).
+- The **defect description** can be corrected without it showing up in the history — a typo is not an event.
+
+Every member of the group may edit: whoever works off a defect is rarely the person who reported it. Traceability comes from the history. **Deleting** is restricted to administrators and is meant for defects created by mistake — a repaired defect belongs on *Resolved*, not deleted.
+
+**Report defect** also records a defect without a trip, for instance during the monthly vehicle check.
+
+The vehicle card and the vehicle page show the number of open defects instead of “defect reported”; clicking it opens the defect list filtered to that vehicle. The old “defect reported” notice only appears while there are no open defects.
 
 If recipients are configured for the group (admin area → Trip log → **Settings** → *Defect notification*), an email is sent on save: vehicle and licence plate, driver, times, purpose and destination, the counter readings, the defect description and a link to the vehicle's trip log. The first address goes into the To field, all others in copy.
 
@@ -182,7 +204,7 @@ The admin area under **Trip log** has five tabs:
 
 - **Vehicles** Name, registration, active/decommissioned, counter preset, consumables, note. **Import vehicles** takes the vehicles over from the cost recovery inventory; the per-vehicle QR code lives here as well
 - **Persons** The group's drivers with phone, email and Alarm SMS recipient ID. **Import persons from CSV** reads the participant export from Alarm SMS; persons no longer contained can be deactivated — nothing is deleted, so past trips stay attributed
-- **Settings** The fire station location as the starting point for operation mileage, via coordinates or by picking it on the map; below it the **defect notification** with the email recipients for reported defects
+- **Settings** The fire station location as the starting point for operation mileage, via coordinates or by picking it on the map; below it the **defect notification** with the email recipients for reported defects, and the **defect import** that creates an open defect from every existing trip that reported one (running it again creates no duplicates)
 - **Trip log link** Create, regenerate or delete the link for entry without signing in
 - **Trip log import** Take over trips from a PDF export
 

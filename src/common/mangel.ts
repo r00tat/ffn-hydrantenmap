@@ -1,0 +1,293 @@
+/**
+ * Mängel an Fahrzeugen — eigener Vorgang mit Lebenszyklus.
+ *
+ * Bewusst nicht als Felder am Fahrtenbuch-Eintrag: Der ist ein
+ * Nachweisdokument, das nur sein Ersteller (oder ein Admin) ändern darf, und
+ * `updateFahrtenbuchEntry` baut es bei jeder Bearbeitung komplett neu auf. Ein
+ * Statuswechsel schriebe damit den ganzen Nachweis um — und der
+ * Fahrzeugverantwortliche, der den Mangel abarbeitet, ist selten der Fahrer,
+ * der ihn gemeldet hat. Ein Mangel, der bei einer Überprüfung und nicht auf
+ * einer Fahrt auffällt, wäre dort außerdem gar nicht abbildbar.
+ */
+
+/** Subcollection unter groups/{groupId} — wie `fahrtenbuch` und `vehicle`. */
+export const FAHRTENBUCH_MANGEL_COLLECTION_ID = 'mangel';
+
+export type MangelStatus = 'open' | 'inProgress' | 'resolved';
+
+export const MANGEL_STATUSES: MangelStatus[] = [
+  'open',
+  'inProgress',
+  'resolved',
+];
+
+/** Was noch Arbeit macht — die Grundlage des Zählers auf der Fahrzeugkarte. */
+export const OPEN_MANGEL_STATUSES: MangelStatus[] = ['open', 'inProgress'];
+
+/**
+ * Ein Eintrag im Verlauf. Append-only: Was einmal notiert wurde, bleibt stehen.
+ * Der Verlauf einer Reparatur („Werkstatttermin 12.8.", „Ersatzteil bestellt")
+ * ist genau das, was ein einzelnes überschreibbares Notizfeld verlöre.
+ */
+export interface MangelNote {
+  /** Leer erlaubt, wenn `status` gesetzt ist — ein reiner Statuswechsel. */
+  text: string;
+  /** Gesetzt, wenn diese Notiz einen Statuswechsel begleitet. */
+  status?: MangelStatus;
+  at: string;
+  by: string;
+  byName: string;
+}
+
+export interface Mangel {
+  id?: string;
+  vehicleId: string;
+  /**
+   * Kopie des Fahrzeugnamens. Die gruppenweite Mängelliste soll ohne einen
+   * Join über alle Fahrzeuge lesbar sein — dieselbe Bauweise wie
+   * `FahrtenbuchEntry.vehicleName`.
+   */
+  vehicleName: string;
+  /** Die meldende Fahrt; fehlt bei direkt am Fahrzeug gemeldeten Mängeln. */
+  entryId?: string;
+  description: string;
+  status: MangelStatus;
+  /**
+   * Nur bei `status === 'resolved'`. Wird beim Wiederöffnen entfernt — sonst
+   * behauptete ein offener Mangel ein Behebungsdatum.
+   */
+  resolvedAt?: string;
+  notes: MangelNote[];
+  /**
+   * Wann der Mangel bemerkt wurde. Bei einem Mangel aus einer Fahrt die
+   * Abfahrt dieser Fahrt und nicht der Zeitpunkt des Schreibens: Eine
+   * nachgetragene Fahrt von vorletzter Woche meldet einen Mangel von
+   * vorletzter Woche.
+   */
+  reportedAt: string;
+  reportedBy: string;
+  reportedByName: string;
+  group: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** Die Eingabe des Clients. Systemfelder stehen bewusst nicht darin. */
+export interface MangelInput {
+  vehicleId: string;
+  description: string;
+  /** Muss einer der Werte aus `MANGEL_STATUSES` sein; Vorgabe `'open'`. */
+  status?: string;
+  entryId?: string;
+  /** ISO-Zeitstempel; Vorgabe ist der Zeitpunkt des Anlegens. */
+  reportedAt?: string;
+  /**
+   * Der Melder, wenn er nicht der Schreibende ist — der Fahrer einer Fahrt
+   * oder ein Gast über den Freigabelink.
+   */
+  reportedByName?: string;
+  reportedBy?: string;
+}
+
+export interface MangelActor {
+  userId: string;
+  userName: string;
+  now: string;
+}
+
+export interface MangelVehicle {
+  name?: string;
+}
+
+function isMangelStatus(value: unknown): value is MangelStatus {
+  return MANGEL_STATUSES.includes(value as MangelStatus);
+}
+
+/**
+ * Harte Validierung. Liefert eine Liste von Fehlerschlüsseln; leer heißt
+ * gültig — dieselbe Bauweise wie `validateEntryInput`.
+ */
+export function validateMangelInput(input: MangelInput): string[] {
+  const errors: string[] = [];
+  if (!input.vehicleId?.trim()) errors.push('vehicleMissing');
+  // Ein Mangel ohne Beschreibung sagt niemandem, was kaputt ist — dieselbe
+  // Begründung wie beim Defekt-Häkchen am Fahrtenbuch-Eintrag.
+  if (!input.description?.trim()) errors.push('descriptionMissing');
+  if (input.status !== undefined && !isMangelStatus(input.status)) {
+    errors.push('statusInvalid');
+  }
+  if (
+    input.reportedAt !== undefined &&
+    Number.isNaN(Date.parse(input.reportedAt))
+  ) {
+    errors.push('reportedAtInvalid');
+  }
+  return errors;
+}
+
+/**
+ * Baut das zu speichernde Dokument. Systemfelder werden serverseitig gesetzt,
+ * Clientwerte dafür verworfen. Wirft bei ungültiger Eingabe.
+ *
+ * `reportedBy`/`reportedByName` dürfen von außen kommen, `createdBy` nie: Wer
+ * den Mangel bemerkt hat, ist eine andere Frage als wer den Datensatz
+ * geschrieben hat. Bei einem Mangel aus einer Fahrt fallen die beiden
+ * auseinander — gemeldet hat der Fahrer, geschrieben hat der Server im Auftrag
+ * dessen, der die Fahrt erfasst.
+ */
+export function buildMangelDocument(
+  input: MangelInput,
+  vehicle: MangelVehicle,
+  group: string,
+  actor: MangelActor,
+): Mangel {
+  const errors = validateMangelInput(input);
+  if (errors.length > 0) {
+    throw new Error(`invalid mangel: ${errors.join(', ')}`);
+  }
+
+  const doc: Mangel = {
+    vehicleId: input.vehicleId.trim(),
+    vehicleName: vehicle.name ?? '',
+    description: input.description.trim(),
+    status: isMangelStatus(input.status) ? input.status : 'open',
+    notes: [],
+    reportedAt: input.reportedAt ?? actor.now,
+    reportedBy: input.reportedBy ?? actor.userId,
+    reportedByName: input.reportedByName?.trim() || actor.userName,
+    group,
+    createdAt: actor.now,
+    createdBy: actor.userId,
+    updatedAt: actor.now,
+    updatedBy: actor.userId,
+  };
+  // Nicht `doc.entryId = input.entryId`: Firestore lehnt `undefined` ab.
+  if (input.entryId) doc.entryId = input.entryId;
+  return doc;
+}
+
+/**
+ * Das Patch-Objekt eines Statuswechsels.
+ *
+ * `resolvedAt: null` ist das Löschsignal für den Aufrufer (`FieldValue.delete()`
+ * beim Schreiben): `undefined` ließe das Feld beim Merge stehen, und ein wieder
+ * geöffneter Mangel behielte sein Behebungsdatum.
+ */
+export interface MangelStatusPatch {
+  status: MangelStatus;
+  resolvedAt?: string | null;
+  notes: MangelNote[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface ApplyMangelStatusOptions {
+  /** Notiz, die den Statuswechsel begleitet. */
+  note?: string;
+  /**
+   * Korrigiertes Behebungsdatum. Ohne Angabe „jetzt" — ein Mangel, der vorige
+   * Woche behoben und erst heute nachgetragen wurde, bekäme sonst ein falsches
+   * Datum.
+   */
+  resolvedAt?: string;
+}
+
+/**
+ * Statuswechsel als Patch, inklusive Verlaufseintrag.
+ *
+ * Ein unveränderter Status erzeugt keinen Verlaufseintrag: Sonst füllte jedes
+ * Speichern des Dialogs den Verlauf mit „Status: offen"-Zeilen, obwohl niemand
+ * etwas geändert hat. Eine Notiz allein wird trotzdem angehängt.
+ */
+export function applyMangelStatus(
+  mangel: Pick<Mangel, 'status' | 'notes'>,
+  status: MangelStatus,
+  actor: MangelActor,
+  options: ApplyMangelStatusOptions = {},
+): MangelStatusPatch {
+  if (!isMangelStatus(status)) {
+    throw new Error('invalid mangel: statusInvalid');
+  }
+  if (
+    options.resolvedAt !== undefined &&
+    Number.isNaN(Date.parse(options.resolvedAt))
+  ) {
+    throw new Error('invalid mangel: resolvedAtInvalid');
+  }
+
+  const changed = mangel.status !== status;
+  const text = options.note?.trim() ?? '';
+  const notes = [...(mangel.notes ?? [])];
+  if (changed || text) {
+    const note: MangelNote = {
+      text,
+      at: actor.now,
+      by: actor.userId,
+      byName: actor.userName,
+    };
+    if (changed) note.status = status;
+    notes.push(note);
+  }
+
+  const patch: MangelStatusPatch = {
+    status,
+    notes,
+    updatedAt: actor.now,
+    updatedBy: actor.userId,
+  };
+
+  if (status === 'resolved') {
+    // Nur beim Übergang nach „behoben" oder bei einer ausdrücklichen
+    // Korrektur. Ein bereits behobener Mangel, der bloß eine Notiz bekommt,
+    // behält sein Datum — sonst wanderte es bei jeder Notiz nach vorn.
+    if (changed || options.resolvedAt !== undefined) {
+      patch.resolvedAt = options.resolvedAt ?? actor.now;
+    }
+  } else if (changed) {
+    patch.resolvedAt = null;
+  }
+
+  return patch;
+}
+
+export interface MangelNotePatch {
+  notes: MangelNote[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** Notiz an den Verlauf anhängen. */
+export function appendMangelNote(
+  mangel: Pick<Mangel, 'notes'>,
+  text: string,
+  actor: MangelActor,
+): MangelNotePatch {
+  const trimmed = text?.trim() ?? '';
+  if (!trimmed) {
+    throw new Error('invalid mangel: noteMissing');
+  }
+  return {
+    notes: [
+      ...(mangel.notes ?? []),
+      { text: trimmed, at: actor.now, by: actor.userId, byName: actor.userName },
+    ],
+    updatedAt: actor.now,
+    updatedBy: actor.userId,
+  };
+}
+
+/**
+ * Ob der Mangel noch Arbeit macht. Ein fehlender Status gilt als offen: Ein
+ * Datensatz aus einer künftigen Migration oder mit einem Schreibfehler soll
+ * sichtbar bleiben und nicht stillschweigend als behoben durchgehen.
+ */
+export function isOpenMangel(mangel: Pick<Mangel, 'status'>): boolean {
+  return mangel.status !== 'resolved';
+}
+
+/** Der Zähler für den Fahrzeug-Cache `openMangelCount`. */
+export function openMangelCount(mangel: Pick<Mangel, 'status'>[]): number {
+  return mangel.filter(isOpenMangel).length;
+}

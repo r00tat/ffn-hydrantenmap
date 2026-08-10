@@ -19,6 +19,7 @@ const {
   routeMock,
   actionUserRequiredMock,
   notifyMangelMock,
+  createMangelForEntryMock,
 } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   addMock: vi.fn(),
@@ -38,6 +39,7 @@ const {
   routeMock: vi.fn(),
   actionUserRequiredMock: vi.fn(),
   notifyMangelMock: vi.fn(),
+  createMangelForEntryMock: vi.fn(),
 }));
 
 vi.mock('../../app/auth', () => ({
@@ -54,6 +56,10 @@ vi.mock('../actions/maps/routes', () => ({
 }));
 
 vi.mock('./notifyMangel', () => ({ notifyMangel: notifyMangelMock }));
+
+vi.mock('./mangelStore', () => ({
+  createMangelForEntry: createMangelForEntryMock,
+}));
 
 // Ein Firestore-Stub, der drei Kollektionen bedient: `groups` (Gruppendokument
 // selbst + Subcollections `fahrtenbuch`/`vehicle`) und `call` (Einsatzdokument
@@ -1080,5 +1086,117 @@ describe('Mangel-Benachrichtigung', () => {
 
     expect(result).toMatchObject({ success: true, created: 1 });
     expect(notifyMangelMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mangel aus einer Fahrt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+    resolveMock.mockResolvedValue({
+      token: 'tok',
+      groupId: 'ffnd',
+      linkId: 'abc123def456',
+    });
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    addMock.mockResolvedValue({ id: 'e1' });
+    latestEntryGetMock.mockResolvedValue({ docs: [] });
+    notifyMangelMock.mockResolvedValue(true);
+    createMangelForEntryMock.mockResolvedValue('m1');
+  });
+
+  it('legt zur Fahrt mit Defekt einen Mangel an', async () => {
+    const result = await createFahrtenbuchEntry('ffnd', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+    expect(createMangelForEntryMock).toHaveBeenCalledTimes(1);
+    const args = createMangelForEntryMock.mock.calls[0][0];
+    expect(args).toMatchObject({ groupId: 'ffnd', entryId: 'e1' });
+    expect(args.entry).toMatchObject({
+      defekt: true,
+      mangel: 'Bremse schleift',
+      vehicleId: 'v1',
+    });
+    expect(args.actor.userId).toBe('u1');
+  });
+
+  it('legt ohne Defekt keinen Mangel an', async () => {
+    await createFahrtenbuchEntry('ffnd', input);
+    expect(createMangelForEntryMock).not.toHaveBeenCalled();
+  });
+
+  it('meldet die Fahrt als gespeichert, obwohl der Mangel scheitert', async () => {
+    // Dieselbe Haltung wie bei der Mail: Die Fahrt steht im Fahrtenbuch, ein
+    // Fehler im Folgeschritt darf sie nicht als gescheitert melden.
+    createMangelForEntryMock.mockRejectedValue(new Error('Firestore kaputt'));
+
+    const result = await createFahrtenbuchEntry('ffnd', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+  });
+
+  it('legt auch über den Freigabelink einen Mangel an', async () => {
+    await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift',
+    });
+
+    expect(createMangelForEntryMock).toHaveBeenCalledTimes(1);
+    // Derselbe Actor wie am Eintrag — die nicht geheime `linkId`, nie der Token.
+    expect(createMangelForEntryMock.mock.calls[0][0].actor.userId).toBe(
+      'share:abc123def456',
+    );
+  });
+
+  it('legt beim Bearbeiten keinen zweiten Mangel an', async () => {
+    // Ab der Meldung hat der Mangel sein eigenes Leben. Eine Korrektur an der
+    // Fahrt darf ihn weder verdoppeln noch zurücksetzen.
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        vehicleId: 'v1',
+        deleted: false,
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+        createdAt: '2026-08-04T08:00:00.000Z',
+        counters: { km: { start: 1200, end: 1250 } },
+        defekt: true,
+      }),
+    });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', {
+      ...input,
+      defekt: true,
+      mangel: 'Bremse schleift, Ergänzung',
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(createMangelForEntryMock).not.toHaveBeenCalled();
+  });
+
+  it('legt beim Import keinen Mangel an', async () => {
+    // Eine Fahrt von vor zwei Jahren löst keinen Werkstatttermin mehr aus.
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+    batchCommitMock.mockResolvedValue(undefined);
+
+    const result = await importFahrtenbuchEntries('ffnd', [
+      { ...input, defekt: true, mangel: 'Bremse schleift' } as FahrtenbuchEntryInput,
+    ]);
+
+    expect(result).toMatchObject({ success: true, created: 1 });
+    expect(createMangelForEntryMock).not.toHaveBeenCalled();
   });
 });

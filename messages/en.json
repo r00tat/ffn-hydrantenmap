@@ -327,7 +327,8 @@
     "about": "About",
     "bugReports": "Bug Reports",
     "feedbackBugReport": "Feedback / Report bug",
-    "fahrtenbuch": "Trip log"
+    "fahrtenbuch": "Trip log",
+    "maengel": "Defects"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -738,6 +739,63 @@
       "exportFailed": "The QR code could not be exported.",
       "printBlocked": "The print window was blocked. Please allow pop-ups for this site.",
       "printHint": "Scan this code to log a trip in the logbook. No sign-in required."
+    },
+    "maengel": {
+      "title": "Defects",
+      "subtitle": "Defects across all vehicles of the group",
+      "newMangel": "Report defect",
+      "editMangel": "Edit defect",
+      "vehicle": "Vehicle",
+      "description": "Defect description",
+      "descriptionHelp": "What is broken or noticeable on the vehicle?",
+      "status": "Status",
+      "statuses": {
+        "open": "Open",
+        "inProgress": "In progress",
+        "resolved": "Resolved"
+      },
+      "reportedAt": "Reported",
+      "reportedBy": "Reported by",
+      "resolvedAt": "Resolved on",
+      "notes": "History",
+      "addNote": "Add note",
+      "addNoteHelp": "Appended to the history on save and unchangeable afterwards.",
+      "noteStatusChange": "Status: {status}",
+      "noNotes": "No history entries yet.",
+      "noMangel": "No defects.",
+      "noOpenMangel": "No open defects.",
+      "openCount": "{count, plural, =0 {No open defects} one {# open defect} other {# open defects}}",
+      "noteCount": "{count, plural, =0 {No history} one {# entry} other {# entries}}",
+      "fromEntry": "Reported from a trip",
+      "showEntry": "Go to trip",
+      "delete": "Delete defect",
+      "deleteConfirm": "Really delete this defect permanently? For a fixed defect use “Resolved” — deleting is only for entries created by mistake.",
+      "actions": "Actions",
+      "filters": {
+        "status": "Status",
+        "vehicle": "Vehicle",
+        "all": "All",
+        "openOnly": "Open and in progress"
+      },
+      "errors": {
+        "vehicleMissing": "Please select a vehicle.",
+        "descriptionMissing": "Please describe the defect.",
+        "noteMissing": "Please enter a note.",
+        "statusInvalid": "Invalid status.",
+        "resolvedAtInvalid": "The resolution date is invalid.",
+        "mangelNotFound": "This defect no longer exists.",
+        "notAllowedDelete": "Only an admin may delete a defect.",
+        "saveFailed": "Saving failed: {message}",
+        "deleteFailed": "Deleting failed: {message}"
+      },
+      "migrate": {
+        "title": "Import defects from existing trips",
+        "description": "Creates an open defect for every trip that reported one. Running it again creates no duplicates.",
+        "button": "Start import",
+        "running": "Importing …",
+        "result": "{created} imported, {skipped} already present.",
+        "failed": "Import failed: {message}"
+      }
     }
   },
   "fahrtenbuchShare": {

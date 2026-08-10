@@ -327,7 +327,8 @@
     "about": "Über",
     "bugReports": "Bug Reports",
     "feedbackBugReport": "Feedback / Bug melden",
-    "fahrtenbuch": "Fahrtenbuch"
+    "fahrtenbuch": "Fahrtenbuch",
+    "maengel": "Mängel"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -738,6 +739,63 @@
       "exportFailed": "Der QR-Code konnte nicht exportiert werden.",
       "printBlocked": "Das Druckfenster wurde blockiert. Bitte Pop-ups für diese Seite erlauben.",
       "printHint": "Diesen Code scannen, um eine Fahrt ins Fahrtenbuch einzutragen. Eine Anmeldung ist nicht nötig."
+    },
+    "maengel": {
+      "title": "Mängel",
+      "subtitle": "Mängel aller Fahrzeuge der Gruppe",
+      "newMangel": "Mangel melden",
+      "editMangel": "Mangel bearbeiten",
+      "vehicle": "Fahrzeug",
+      "description": "Mangelbeschreibung",
+      "descriptionHelp": "Was ist am Fahrzeug kaputt oder auffällig?",
+      "status": "Status",
+      "statuses": {
+        "open": "Offen",
+        "inProgress": "In Arbeit",
+        "resolved": "Behoben"
+      },
+      "reportedAt": "Gemeldet",
+      "reportedBy": "Gemeldet von",
+      "resolvedAt": "Behoben am",
+      "notes": "Verlauf",
+      "addNote": "Notiz hinzufügen",
+      "addNoteHelp": "Wird beim Speichern an den Verlauf angehängt und bleibt danach unverändert.",
+      "noteStatusChange": "Status: {status}",
+      "noNotes": "Noch keine Einträge im Verlauf.",
+      "noMangel": "Keine Mängel.",
+      "noOpenMangel": "Keine offenen Mängel.",
+      "openCount": "{count, plural, =0 {Keine offenen Mängel} one {# offener Mangel} other {# offene Mängel}}",
+      "noteCount": "{count, plural, =0 {Kein Verlauf} one {# Eintrag} other {# Einträge}}",
+      "fromEntry": "Aus einer Fahrt gemeldet",
+      "showEntry": "Zur Fahrt",
+      "delete": "Mangel löschen",
+      "deleteConfirm": "Diesen Mangel wirklich endgültig löschen? Für einen behobenen Mangel ist „Behoben“ der richtige Weg — gelöscht gehört nur, was versehentlich angelegt wurde.",
+      "actions": "Aktionen",
+      "filters": {
+        "status": "Status",
+        "vehicle": "Fahrzeug",
+        "all": "Alle",
+        "openOnly": "Offen und in Arbeit"
+      },
+      "errors": {
+        "vehicleMissing": "Bitte ein Fahrzeug wählen.",
+        "descriptionMissing": "Bitte den Mangel beschreiben.",
+        "noteMissing": "Bitte eine Notiz eingeben.",
+        "statusInvalid": "Ungültiger Status.",
+        "resolvedAtInvalid": "Das Behebungsdatum ist ungültig.",
+        "mangelNotFound": "Dieser Mangel existiert nicht mehr.",
+        "notAllowedDelete": "Nur ein Admin darf einen Mangel löschen.",
+        "saveFailed": "Speichern fehlgeschlagen: {message}",
+        "deleteFailed": "Löschen fehlgeschlagen: {message}"
+      },
+      "migrate": {
+        "title": "Mängel aus bestehenden Fahrten übernehmen",
+        "description": "Legt für jede Fahrt mit gemeldetem Defekt einen offenen Mangel an. Mehrfaches Ausführen erzeugt keine Duplikate.",
+        "button": "Übernahme starten",
+        "running": "Übernahme läuft …",
+        "result": "{created} übernommen, {skipped} bereits vorhanden.",
+        "failed": "Übernahme fehlgeschlagen: {message}"
+      }
     }
   },
   "fahrtenbuchShare": {

@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
+import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -40,12 +41,16 @@ export default function FahrtenbuchVehiclePage({
   vehicleId,
 }: FahrtenbuchVehiclePageProps) {
   const t = useTranslations('fahrtenbuch');
+  const tMaengel = useTranslations('fahrtenbuch.maengel');
   const { isAuthorized } = useFirebaseLogin();
   const [pageSize, setPageSize] = useState(PAGE_STEP);
   const { vehicles, vehiclesById, activeVehicles } =
     useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
   const entries = useFahrtenbuchEntries(groupId, { vehicleId, pageSize });
+  const { openMangel: openMangelList } = useFahrtenbuchMangel(groupId, {
+    vehicleId,
+  });
   const firecalls = useFahrtenbuchFirecalls(groupId);
   const { deleteError, clearDeleteError, requestDelete } =
     useEntryDeletion(groupId);
@@ -65,6 +70,10 @@ export default function FahrtenbuchVehiclePage({
     }
     return [...activeVehicles, vehicle];
   }, [activeVehicles, vehicle, vehicleId]);
+
+  // Der serverseitig gepflegte Zähler gewinnt; die geladenen Mängel sind der
+  // Rückfall für Fahrzeuge, an denen das Feld noch nie geschrieben wurde.
+  const openMangel = vehicle?.openMangelCount ?? openMangelList.length;
 
   if (!isAuthorized) {
     return (
@@ -128,15 +137,28 @@ export default function FahrtenbuchVehiclePage({
         {vehicle?.kennzeichen && (
           <Chip size="small" label={vehicle.kennzeichen} />
         )}
-        {/* Derselbe sicherheitsrelevante Hinweis wie auf der Fahrzeugkarte —
-            aus dem serverseitig gepflegten Cache, nicht aus den Einträgen. */}
-        {vehicle?.lastEntryHasDefect && (
+        {/* Derselbe sicherheitsrelevante Hinweis wie auf der Fahrzeugkarte,
+            mit demselben Vorrang: der Mängelzähler, sonst der Defekt-Hinweis
+            der letzten Fahrt. */}
+        {openMangel > 0 ? (
           <Chip
             size="small"
-            color="warning"
+            color="error"
+            clickable
+            component={Link}
+            href={`/fahrtenbuch/maengel?vehicle=${vehicleId}`}
             icon={<WarningAmberIcon />}
-            label={t('defectReported')}
+            label={tMaengel('openCount', { count: openMangel })}
           />
+        ) : (
+          vehicle?.lastEntryHasDefect && (
+            <Chip
+              size="small"
+              color="warning"
+              icon={<WarningAmberIcon />}
+              label={t('defectReported')}
+            />
+          )
         )}
         {/* Zähler kommen ausschließlich aus den Definitionen des Fahrzeugs —
             ein Anhänger ohne Zähler zeigt hier schlicht nichts. */}

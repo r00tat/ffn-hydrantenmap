@@ -178,4 +178,68 @@ describe('FahrtenbuchVehicleCard', () => {
     );
     expect(screen.queryByText('Defekt gemeldet')).not.toBeInTheDocument();
   });
+
+  it('zeigt die Anzahl offener Mängel aus dem Fahrzeug-Cache', () => {
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({ openMangelCount: 2 })}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('2 offene Mängel')).toBeInTheDocument();
+  });
+
+  it('verlinkt den Mängel-Chip auf die gefilterte Mängelliste', () => {
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({ openMangelCount: 1 })}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('link', { name: /1 offener Mangel/ }),
+    ).toHaveAttribute('href', '/fahrtenbuch/maengel?vehicle=v1');
+  });
+
+  it('fällt auf die geladenen Mängel zurück, solange der Cache fehlt', () => {
+    // Ein Fahrzeug aus der Zeit vor `openMangelCount` — `undefined` heißt dort
+    // „nie geschrieben" und darf nicht als „keine Mängel" durchgehen.
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle()}
+        openMangelCount={3}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('3 offene Mängel')).toBeInTheDocument();
+  });
+
+  it('lässt ein gecachtes 0 nicht auf die Ableitung zurückfallen', () => {
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({ openMangelCount: 0 })}
+        openMangelCount={3}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText(/offene Mängel/)).not.toBeInTheDocument();
+  });
+
+  it('ersetzt den Defekt-Hinweis, sobald es offene Mängel gibt', () => {
+    // Beide gleichzeitig wären doppelt gemoppelt: Der Zähler sagt alles, was
+    // „Defekt gemeldet" sagt, und zusätzlich wie viel offen ist.
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({ lastEntryHasDefect: true, openMangelCount: 1 })}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('1 offener Mangel')).toBeInTheDocument();
+    expect(screen.queryByText('Defekt gemeldet')).not.toBeInTheDocument();
+  });
 });

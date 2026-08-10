@@ -32,6 +32,7 @@ import {
   type FahrtenbuchEntryInput,
 } from './entryLogic';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
+import { createMangelForEntry } from './mangelStore';
 import { notifyMangel } from './notifyMangel';
 
 export interface ActionResult {
@@ -210,6 +211,41 @@ async function notifyMangelIfReported(
   }
 }
 
+/**
+ * Legt zu einer Fahrt mit Defekt den zugehörigen Mangel an — den Vorgang, der
+ * ab jetzt seinen eigenen Status, Verlauf und ein Behebungsdatum trägt.
+ *
+ * Best-effort und nach dem Schreiben, aus demselben Grund wie die Mail: Die
+ * Fahrt steht im Fahrtenbuch, und ein fehlgeschlagener Folgeschritt darf sie
+ * nicht als gescheitert melden — der Benutzer trüge sie sonst ein zweites Mal
+ * ein. Der Fehler steht im Log; der Mangel lässt sich über die Mängelseite von
+ * Hand nachtragen.
+ *
+ * Nur beim Anlegen, nie beim Bearbeiten oder Importieren: Ab der Meldung hat
+ * der Mangel sein eigenes Leben, und eine Korrektur an der Fahrt darf einen
+ * längst bearbeiteten Mangel weder zurücksetzen noch verdoppeln. Eine Fahrt von
+ * vor zwei Jahren löst zudem keine Reparatur mehr aus — dieselbe Haltung wie
+ * bei der Mail.
+ */
+async function createMangelIfReported(
+  groupId: string,
+  entryId: string,
+  entry: FahrtenbuchEntry,
+  vehicle: FahrtenbuchVehicle,
+  actor: { userId: string; userName: string; now: string },
+): Promise<void> {
+  if (!entry.defekt) return;
+  try {
+    await createMangelForEntry({ groupId, entryId, entry, vehicle, actor });
+  } catch (err) {
+    console.error('Mangel konnte nicht angelegt werden', err, {
+      groupId,
+      entryId,
+      vehicleId: entry.vehicleId,
+    });
+  }
+}
+
 export async function createFahrtenbuchEntry(
   groupId: string,
   input: FahrtenbuchEntryInput,
@@ -218,14 +254,16 @@ export async function createFahrtenbuchEntry(
     const session = await actionGroupMemberRequired(groupId);
     const vehicle = await loadVehicle(groupId, input.vehicleId);
 
-    const doc = buildEntryDocument(vehicle, input, groupId, {
+    const actor = {
       userId: session.user.id,
       userName: session.user.name ?? session.user.email ?? '',
       now: new Date().toISOString(),
-    });
+    };
+    const doc = buildEntryDocument(vehicle, input, groupId, actor);
 
     const ref = await entriesRef(groupId).add(doc);
     await refreshVehicleCounters(groupId, input.vehicleId);
+    await createMangelIfReported(groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(groupId, doc, vehicle);
     return { success: true, id: ref.id };
   } catch (err) {
@@ -791,6 +829,17 @@ export async function createFahrtenbuchEntryViaShareLink(
     const link = await resolveFahrtenbuchShareLink(token);
     const vehicle = await loadVehicle(link.groupId, input.vehicleId);
 
+    // Kein Benutzer dahinter: Das Präfix macht die Herkunft im Eintrag
+    // sichtbar und sperrt gleichzeitig `canModifyEntry` für alle außer
+    // Admins. Dahinter steht die nicht geheime `linkId` und nicht der
+    // Token — Einträge sind für jedes Gruppenmitglied lesbar, und wer die
+    // Gruppe verlässt, behielte sonst einen dauerhaften Schreibkanal.
+    const actor = {
+      userId: `${SHARE_ACTOR_PREFIX}${link.linkId}`,
+      userName: input.driverName?.trim() ?? '',
+      now: new Date().toISOString(),
+    };
+
     const doc = buildEntryDocument(
       vehicle,
       {
@@ -802,16 +851,7 @@ export async function createFahrtenbuchEntryViaShareLink(
         firecallName: undefined,
       },
       link.groupId,
-      {
-        // Kein Benutzer dahinter: Das Präfix macht die Herkunft im Eintrag
-        // sichtbar und sperrt gleichzeitig `canModifyEntry` für alle außer
-        // Admins. Dahinter steht die nicht geheime `linkId` und nicht der
-        // Token — Einträge sind für jedes Gruppenmitglied lesbar, und wer die
-        // Gruppe verlässt, behielte sonst einen dauerhaften Schreibkanal.
-        userId: `${SHARE_ACTOR_PREFIX}${link.linkId}`,
-        userName: input.driverName?.trim() ?? '',
-        now: new Date().toISOString(),
-      },
+      actor,
     );
 
     const ref = await entriesRef(link.groupId).add(doc);
@@ -820,6 +860,7 @@ export async function createFahrtenbuchEntryViaShareLink(
     // genau die Person, die den Mangel bemerkt hat. Die Mail weist die Herkunft
     // aus (siehe `buildMangelEmail`), damit die Empfängerin weiß, dass hinter
     // dem Namen kein angemeldetes Mitglied steht.
+    await createMangelIfReported(link.groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(link.groupId, doc, vehicle);
     return { success: true, id: ref.id };
   } catch (err) {

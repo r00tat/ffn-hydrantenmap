@@ -1,6 +1,7 @@
 'use client';
 
 import BarChartIcon from '@mui/icons-material/BarChart';
+import BuildIcon from '@mui/icons-material/Build';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import Accordion from '@mui/material/Accordion';
@@ -21,6 +22,7 @@ import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
+import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
 import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useFahrtenbuchVehicles from '../../hooks/useFahrtenbuchVehicles';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
@@ -37,12 +39,14 @@ import useEntryDeletion from './useEntryDeletion';
  */
 export default function FahrtenbuchPage() {
   const t = useTranslations('fahrtenbuch');
+  const tMaengel = useTranslations('fahrtenbuch.maengel');
   const { isAuthorized } = useFirebaseLogin();
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { vehicles, activeVehicles } = useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
   const entries = useFahrtenbuchEntries(groupId);
   const firecalls = useFahrtenbuchFirecalls(groupId);
+  const { openCountByVehicle } = useFahrtenbuchMangel(groupId);
   // Der Menüpunkt führt immer hierher; in die Sammelerfassung des laufenden
   // Einsatzes geht es über diesen Button. `unknown` heißt: kein Einsatz aktiv.
   const firecallId = useFirecallId();
@@ -142,6 +146,14 @@ export default function FahrtenbuchPage() {
         >
           {t('stats.button')}
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={<BuildIcon />}
+          component={Link}
+          href="/fahrtenbuch/maengel"
+        >
+          {tMaengel('title')}
+        </Button>
         {/* Auch mit ausschließlich stillgelegten Fahrzeugen sinnvoll: deren
             alte Fahrten gehören in einen Nachweis über einen vergangenen
             Zeitraum. */}
@@ -188,6 +200,7 @@ export default function FahrtenbuchPage() {
                 lastDriverName={
                   lastEntryByVehicle.get(vehicle.id as string)?.driverName
                 }
+                openMangelCount={openCountByVehicle.get(vehicle.id as string)}
                 onAddTrip={(vehicleId) => openDialog(vehicleId)}
               />
             </Grid>
