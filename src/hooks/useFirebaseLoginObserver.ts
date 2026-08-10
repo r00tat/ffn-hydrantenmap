@@ -291,6 +291,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     }
     console.info(`logout completed`);
     if (typeof window !== 'undefined') {
+      // Bewusst ein harter Reload statt router.push(): nach dem Logout muss der
+      // gesamte In-Memory-State (Firebase-Listener, NextAuth-Session, Provider)
+      // verworfen werden, was eine Client-seitige Navigation nicht leistet.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign('/login');
     }
   }, []);
