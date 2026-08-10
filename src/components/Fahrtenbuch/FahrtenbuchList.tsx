@@ -38,14 +38,26 @@ export interface FahrtenbuchListProps {
   vehicles: FahrtenbuchVehicle[];
   /** Blendet den Fahrzeugfilter aus — in der Fahrzeug-Ansicht überflüssig. */
   hideVehicleFilter?: boolean;
-  onEdit: (entry: FahrtenbuchEntry) => void;
-  onDelete: (entry: FahrtenbuchEntry) => void;
+  /**
+   * Blendet die Filterzeile ganz aus. Für die Statistik, die ihre eigenen
+   * Filter führt: Ein zweiter Satz Filter in der Liste könnte dem Ausschnitt
+   * widersprechen, den die Diagramme zeigen.
+   */
+  hideFilters?: boolean;
+  /**
+   * Ohne Handler bleibt die Liste eine reine Anzeige und zeigt keine
+   * Bearbeiten-/Löschen-Knöpfe. Der Defekt-Hinweis bleibt — er gehört zur
+   * Fahrt, nicht zur Bedienung.
+   */
+  onEdit?: (entry: FahrtenbuchEntry) => void;
+  onDelete?: (entry: FahrtenbuchEntry) => void;
 }
 
 export default function FahrtenbuchList({
   entries,
   vehicles,
   hideVehicleFilter,
+  hideFilters,
   onEdit,
   onDelete,
 }: FahrtenbuchListProps) {
@@ -140,56 +152,58 @@ export default function FahrtenbuchList({
 
   return (
     <Box>
-      <Stack
-        direction="row"
-        spacing={2}
-        useFlexGap
-        sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
-      >
-        {!hideVehicleFilter && (
+      {!hideFilters && (
+        <Stack
+          direction="row"
+          spacing={2}
+          useFlexGap
+          sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
+        >
+          {!hideVehicleFilter && (
+            <TextField
+              select
+              size="small"
+              label={t('filters.vehicle')}
+              value={vehicleFilter}
+              onChange={(e) => setVehicleFilter(e.target.value)}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">{t('filters.all')}</MenuItem>
+              {vehicles
+                .filter((v) => v.active !== false)
+                .map((v) => (
+                  <MenuItem key={v.id} value={v.id}>
+                    {v.name}
+                  </MenuItem>
+                ))}
+            </TextField>
+          )}
           <TextField
             select
             size="small"
-            label={t('filters.vehicle')}
-            value={vehicleFilter}
-            onChange={(e) => setVehicleFilter(e.target.value)}
+            label={t('filters.zweck')}
+            value={zweckFilter}
+            onChange={(e) => setZweckFilter(e.target.value)}
             sx={{ minWidth: 180 }}
           >
             <MenuItem value="">{t('filters.all')}</MenuItem>
-            {vehicles
-              .filter((v) => v.active !== false)
-              .map((v) => (
-                <MenuItem key={v.id} value={v.id}>
-                  {v.name}
-                </MenuItem>
-              ))}
+            {FAHRT_ZWECKE.map((z) => (
+              <MenuItem key={z} value={z}>
+                {t(`zwecke.${z}` as 'zwecke.einsatz')}
+              </MenuItem>
+            ))}
           </TextField>
-        )}
-        <TextField
-          select
-          size="small"
-          label={t('filters.zweck')}
-          value={zweckFilter}
-          onChange={(e) => setZweckFilter(e.target.value)}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">{t('filters.all')}</MenuItem>
-          {FAHRT_ZWECKE.map((z) => (
-            <MenuItem key={z} value={z}>
-              {t(`zwecke.${z}` as 'zwecke.einsatz')}
-            </MenuItem>
-          ))}
-        </TextField>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={onlyDefects}
-              onChange={(e) => setOnlyDefects(e.target.checked)}
-            />
-          }
-          label={t('filters.onlyDefects')}
-        />
-      </Stack>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={onlyDefects}
+                onChange={(e) => setOnlyDefects(e.target.checked)}
+              />
+            }
+            label={t('filters.onlyDefects')}
+          />
+        </Stack>
+      )}
 
       {filtered.length === 0 ? (
         <Typography color="text.secondary">{t('noEntries')}</Typography>
@@ -249,23 +263,30 @@ export default function FahrtenbuchList({
                           <WarningAmberIcon color="warning" fontSize="small" />
                         </Tooltip>
                       )}
-                      <Tooltip title={t('editEntry')}>
-                        <span>
-                          <IconButton size="small" onClick={() => onEdit(entry)}>
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={t('deleteEntry')}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => onDelete(entry)}
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                      {onEdit && (
+                        <Tooltip title={t('editEntry')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => onEdit(entry)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                      {onDelete && (
+                        <Tooltip title={t('deleteEntry')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => onDelete(entry)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>

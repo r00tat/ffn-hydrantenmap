@@ -1,6 +1,7 @@
 'use client';
 
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -96,6 +97,16 @@ export default function FahrtenbuchVehiclePage({
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
           {vehicle?.name ?? t('title')}
         </Typography>
+        {/* Die Auswertung startet mit diesem Fahrzeug als Filter — von hier
+            aus ist die Frage immer „wie viel fährt dieses Fahrzeug". */}
+        <Button
+          variant="outlined"
+          startIcon={<BarChartIcon />}
+          component={Link}
+          href={`/fahrtenbuch/statistik?vehicle=${vehicleId}`}
+        >
+          {t('stats.button')}
+        </Button>
         <Button
           variant="contained"
           disabled={!vehicle}

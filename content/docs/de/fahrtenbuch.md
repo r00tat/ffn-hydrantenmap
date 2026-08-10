@@ -10,6 +10,7 @@ Das Fahrtenbuch führt je Feuerwehr die Fahrten aller Fahrzeuge — Einsatz, Üb
 - **Zähler je Fahrzeugtyp** Kilometer beim Fahrzeug, Betriebsstunden und Lenzpumpen beim Boot, keine Zähler beim Anhänger
 - **Erfassung ohne Anmeldung** Über einen Gruppen-Link bzw. einen QR-Code im Fahrzeug
 - **PDF-Export** Zeitraum und Fahrzeuge frei wählbar, geschätzte Werte gekennzeichnet
+- **Statistik mit Drill-down** Kilometer, Fahrten, Fahrzeit und Verbrauch je Zeitraum, Zweck, Fahrzeug und Fahrer — vom Diagramm bis zur einzelnen Fahrt
 - **Defekte und Betriebsmittel** Defektmeldung der letzten Fahrt direkt auf der Fahrzeugkarte, Tankmengen je Betriebsmittel
 - **Stammdaten im Admin-Bereich** Fahrzeuge, Personen, Standort des Feuerwehrhauses, Import aus Kostenersatz und Alarm SMS
 - **PDF-Import** Fahrten aus einem früheren PDF-Export übernehmen
@@ -157,6 +158,23 @@ Jeder mit diesem Link kann Fahrten erfassen. Bestehende Einträge sind über den
 4. Klicke auf **PDF erstellen**
 
 Das PDF enthält je Fahrzeug eine Tabelle mit Datum, Zeit, Fahrer, Grund, Zweck/Strecke, Notizen, Zählerständen und Betriebsmitteln. Geschätzte Werte stehen mit „ca." und werden in der Legende erklärt. Sehr große Zeiträume werden abgelehnt — dann in kleineren Abschnitten exportieren.
+
+### Statistik auswerten
+
+Der Knopf **Statistik** auf der Fahrtenbuch-Seite öffnet die Auswertung; von einer Fahrzeugkarte aus startet sie gleich mit diesem Fahrzeug als Filter.
+
+1. Wähle oben den **Zeitraum** — als Vorgabe das laufende Jahr, dazu Vorgaben für Monat, Quartal, Vorjahr, letzte 12 Monate oder ein frei gesetzter Zeitraum
+2. Unter den **Kennzahlen** stehen Fahrten, Summen je Zähler (Kilometer, Betriebsstunden), Fahrzeit, getankte Mengen, Ø Kilometer je Fahrt, Ø Verbrauch und Defektmeldungen
+3. Im **Verlauf** ist wählbar, welche Kennzahl gezeigt wird (Fahrten, Strecke, Betriebsstunden, Fahrzeit, Tankmenge), wonach sie aufgeteilt wird (Zweck, Fahrzeug, Fahrer) und in welchem Raster (Tag, Woche, Monat, Jahr)
+4. Darunter liegen die Verteilung **nach Zweck**, die Rangliste **nach Fahrzeug** und die Verteilung **nach Wochentag**
+5. Die **Fahrer**-Tabelle ist sortierbar: Fahrten, Kilometer, Betriebsstunden, Fahrzeit, genutzte Fahrzeuge und letzte Fahrt
+6. **Betriebsmittel und Verbrauch** zeigt die getankten Mengen im Zeitverlauf und je Fahrzeug den genäherten Verbrauch
+
+**Drill-down:** Ein Klick auf einen Balken im Verlauf verengt den Zeitraum auf diesen Abschnitt und schaltet das Raster eine Stufe feiner — vom Jahr über den Monat bis zum Tag. Ein Klick auf ein Segment der Zweck-Verteilung, auf einen Balken der Fahrzeug-Rangliste oder auf eine Zeile der Fahrer-Tabelle setzt den jeweiligen Filter. Alle aktiven Filter stehen als Chips über den Diagrammen und lassen sich einzeln oder über **Filter zurücksetzen** wieder lösen. Ganz unten liegt unter **Fahrten im Ausschnitt** die Liste der Fahrten, die gerade ausgewertet werden — der Weg vom Diagramm zum einzelnen Eintrag.
+
+:::info
+Wie genau sind die Zahlen? Summiert werden nur Zähler mit Start- und Endstand; ein reiner Ablesewert (etwa eine Lenzpumpe) ergibt keine Differenz und geht in keine Summe ein. Fehlt an einer Fahrt der Endstand, fehlt sie in der Streckensumme — die Auswertung weist die Anzahl solcher Fahrten und die Anzahl der Fahrten mit geschätzten Ständen unter den Kennzahlen aus. Der Verbrauch ist eine Näherung: Eine Tankung füllt den Tank auch für Fahrten außerhalb des Zeitraums. Über ein Jahr ist der Wert brauchbar, über eine Woche nicht.
+:::
 
 ### Stammdaten pflegen (nur Admins)
 

@@ -468,6 +468,84 @@
       "all": "All",
       "reset": "Reset filters"
     },
+    "stats": {
+      "button": "Statistics",
+      "title": "Logbook statistics",
+      "range": "Period",
+      "ranges": {
+        "thisMonth": "This month",
+        "lastMonth": "Last month",
+        "last30Days": "Last 30 days",
+        "thisQuarter": "This quarter",
+        "thisYear": "This year",
+        "lastYear": "Last year",
+        "last12Months": "Last 12 months",
+        "custom": "Custom"
+      },
+      "metric": "Metric",
+      "metrics": {
+        "trips": "Trips",
+        "distance": "Distance",
+        "operatingHours": "Operating hours",
+        "duration": "Time on the road",
+        "fuel": "Refuelled amount"
+      },
+      "stackBy": "Split by",
+      "stacks": {
+        "zweck": "Purpose",
+        "vehicle": "Vehicle",
+        "driver": "Driver",
+        "none": "No split"
+      },
+      "granularities": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "year": "Year"
+      },
+      "weekPrefix": "W",
+      "noDriver": "No driver",
+      "otherStack": "Others",
+      "overTime": "Over time",
+      "byZweck": "By purpose",
+      "byVehicle": "By vehicle",
+      "byWeekday": "By weekday",
+      "drivers": "Drivers",
+      "drillHint": "Click a bar to break that period down further.",
+      "noData": "No data in the current selection.",
+      "tooManyEntries": "Only the first {count} trips of the period are evaluated. Please narrow the period.",
+      "entriesInSelection": "{count, plural, =0 {No trips} =1 {1 trip} other {# trips}} in selection",
+      "hoursMinutes": "{hours} h {minutes} min",
+      "consumptionUnit": "l/100 km",
+      "consumptionHint": "Approximation: refuelled fuel divided by the kilometres driven in the period. A tank fill also covers trips outside the period — the figure is useful over a year, not over a week. AdBlue is excluded.",
+      "units": {
+        "trips": "trips"
+      },
+      "kpi": {
+        "trips": "Trips",
+        "counterTotal": "Total {unit}",
+        "counterTotalHint": "{count, plural, =1 {from 1 trip} other {from # trips}} with a recorded difference",
+        "duration": "Time on the road",
+        "distancePerTrip": "Avg. per trip",
+        "fuel": "Refuelled",
+        "consumption": "Avg. consumption",
+        "defects": "Defect reports"
+      },
+      "quality": {
+        "missingCounters": "{count, plural, =1 {One trip has no counter reading and is} other {# trips have no counter reading and are}} not included in the totals.",
+        "estimated": "{count, plural, =1 {One trip contains} other {# trips contain}} estimated counter readings."
+      },
+      "driverTable": {
+        "name": "Driver",
+        "vehicles": "Vehicles",
+        "lastTrip": "Last trip",
+        "truncated": "Showing {shown} of {total} drivers."
+      },
+      "fuel": {
+        "title": "Operating fluids and consumption",
+        "none": "No refuelling recorded in the current selection."
+      }
+    },
     "einsatz": {
       "title": "Trip log for this operation",
       "bookForFirecall": "Record trips for incident “{name}”",

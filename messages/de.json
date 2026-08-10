@@ -468,6 +468,84 @@
       "all": "Alle",
       "reset": "Filter zurücksetzen"
     },
+    "stats": {
+      "button": "Statistik",
+      "title": "Fahrtenbuch-Statistik",
+      "range": "Zeitraum",
+      "ranges": {
+        "thisMonth": "Dieser Monat",
+        "lastMonth": "Letzter Monat",
+        "last30Days": "Letzte 30 Tage",
+        "thisQuarter": "Dieses Quartal",
+        "thisYear": "Dieses Jahr",
+        "lastYear": "Vorjahr",
+        "last12Months": "Letzte 12 Monate",
+        "custom": "Frei gewählt"
+      },
+      "metric": "Kennzahl",
+      "metrics": {
+        "trips": "Fahrten",
+        "distance": "Strecke",
+        "operatingHours": "Betriebsstunden",
+        "duration": "Fahrzeit",
+        "fuel": "Getankte Menge"
+      },
+      "stackBy": "Aufteilen nach",
+      "stacks": {
+        "zweck": "Zweck",
+        "vehicle": "Fahrzeug",
+        "driver": "Fahrer",
+        "none": "Nicht aufteilen"
+      },
+      "granularities": {
+        "day": "Tag",
+        "week": "Woche",
+        "month": "Monat",
+        "year": "Jahr"
+      },
+      "weekPrefix": "KW ",
+      "noDriver": "Ohne Fahrer",
+      "otherStack": "Sonstige",
+      "overTime": "Verlauf",
+      "byZweck": "Nach Zweck",
+      "byVehicle": "Nach Fahrzeug",
+      "byWeekday": "Nach Wochentag",
+      "drivers": "Fahrer",
+      "drillHint": "Ein Klick auf einen Balken zeigt diesen Zeitabschnitt im Detail.",
+      "noData": "Keine Daten im gewählten Ausschnitt.",
+      "tooManyEntries": "Es werden nur die ersten {count} Fahrten des Zeitraums ausgewertet. Bitte den Zeitraum eingrenzen.",
+      "entriesInSelection": "{count, plural, =0 {Keine Fahrten} =1 {1 Fahrt} other {# Fahrten}} im Ausschnitt",
+      "hoursMinutes": "{hours} h {minutes} min",
+      "consumptionUnit": "l/100 km",
+      "consumptionHint": "Näherung: getankte Kraftstoffmenge geteilt durch die gefahrenen Kilometer des Zeitraums. Eine Tankung füllt den Tank auch für Fahrten außerhalb des Zeitraums — über ein Jahr ist der Wert brauchbar, über eine Woche nicht. AdBlue zählt nicht mit.",
+      "units": {
+        "trips": "Fahrten"
+      },
+      "kpi": {
+        "trips": "Fahrten",
+        "counterTotal": "Summe {unit}",
+        "counterTotalHint": "{count, plural, =1 {aus 1 Fahrt} other {aus # Fahrten}} mit erfasster Differenz",
+        "duration": "Fahrzeit",
+        "distancePerTrip": "Ø je Fahrt",
+        "fuel": "Getankt",
+        "consumption": "Ø Verbrauch",
+        "defects": "Defektmeldungen"
+      },
+      "quality": {
+        "missingCounters": "{count, plural, =1 {Bei einer Fahrt fehlt der Zählerstand — sie ist} other {Bei # Fahrten fehlt der Zählerstand — sie sind}} nicht in den Summen enthalten.",
+        "estimated": "{count, plural, =1 {Eine Fahrt enthält} other {# Fahrten enthalten}} geschätzte Zählerstände."
+      },
+      "driverTable": {
+        "name": "Fahrer",
+        "vehicles": "Fahrzeuge",
+        "lastTrip": "Letzte Fahrt",
+        "truncated": "Zeigt {shown} von {total} Fahrern."
+      },
+      "fuel": {
+        "title": "Betriebsmittel und Verbrauch",
+        "none": "Im gewählten Ausschnitt sind keine Tankungen erfasst."
+      }
+    },
     "einsatz": {
       "title": "Fahrtenbuch zum Einsatz",
       "bookForFirecall": "Fahrten für Einsatz „{name}\" erfassen",

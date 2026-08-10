@@ -17,6 +17,15 @@ export interface UseFahrtenbuchEntriesOptions {
    * würde einen älteren Einsatz nicht mehr enthalten und Duplikate zulassen.
    */
   firecallId?: string;
+  /**
+   * Nur Fahrten ab diesem Zeitpunkt (ISO). Für die Statistik, die einen
+   * Zeitraum auswertet statt der jüngsten Fahrten — ein Fenster der letzten 50
+   * Einträge ergäbe für einen Jahresvergleich falsche Summen. Der bestehende
+   * Index (`deleted`/`abfahrt DESC`) trägt die Bereichsabfrage mit.
+   */
+  fromIso?: string;
+  /** Nur Fahrten bis zu diesem Zeitpunkt (ISO). */
+  toIso?: string;
   /** Anzahl der geladenen Einträge; die UI erhöht sie über „Mehr laden". */
   pageSize?: number;
 }
@@ -25,17 +34,19 @@ export default function useFahrtenbuchEntries(
   groupId?: string,
   options: UseFahrtenbuchEntriesOptions = {},
 ) {
-  const { vehicleId, firecallId, pageSize = 50 } = options;
+  const { vehicleId, firecallId, fromIso, toIso, pageSize = 50 } = options;
 
   const queryConstraints = useMemo<QueryConstraint[]>(() => {
     const constraints: QueryConstraint[] = [];
     if (vehicleId) constraints.push(where('vehicleId', '==', vehicleId));
     if (firecallId) constraints.push(where('firecallId', '==', firecallId));
     constraints.push(where('deleted', '==', false));
+    if (fromIso) constraints.push(where('abfahrt', '>=', fromIso));
+    if (toIso) constraints.push(where('abfahrt', '<=', toIso));
     constraints.push(orderBy('abfahrt', 'desc'));
     constraints.push(limit(pageSize));
     return constraints;
-  }, [vehicleId, firecallId, pageSize]);
+  }, [vehicleId, firecallId, fromIso, toIso, pageSize]);
 
   const entries = useFirebaseCollection<FahrtenbuchEntry>({
     // Empty string makes useFirebaseCollection build a null query and skip

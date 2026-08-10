@@ -21,6 +21,10 @@ import {
   type FahrtenbuchVehicle,
   type FuelType,
 } from '../../common/fahrtenbuch';
+// Die Zeitzonenrechnung stand früher hier; sie liegt jetzt unter `src/common`,
+// weil die Statistik dieselben Tagesgrenzen braucht. Weiterhin von hier
+// exportiert — für Aufrufer ist das dieselbe Funktion.
+export { zonedDayRange } from '../../common/zonedDay';
 
 /**
  * Wie `t` von next-intl, aber ohne dessen Schlüsseltypen. Schlüssel sind
@@ -88,72 +92,6 @@ export interface BuildFahrtenbuchExportOptions {
 }
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Verschiebung der Zone gegenüber UTC zu einem Zeitpunkt, in Millisekunden.
- * `0` bei unbekannter Zone — ein Export soll an einer exotischen
- * Browsereinstellung nicht scheitern.
- */
-function zoneOffsetMs(instant: number, timeZone: string): number {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).formatToParts(new Date(instant));
-    const value = (type: string) =>
-      Number(parts.find((p) => p.type === type)?.value);
-    const asUtc = Date.UTC(
-      value('year'),
-      value('month') - 1,
-      value('day'),
-      // Manche Umgebungen liefern für Mitternacht „24" statt „00".
-      value('hour') % 24,
-      value('minute'),
-      value('second'),
-    );
-    return asUtc - Math.floor(instant / 1000) * 1000;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Ein Kalendertag in der Zone als UTC-Zeitpunkt. Zweistufig, weil der Offset
- * selbst vom Zeitpunkt abhängt: Der erste Durchgang schätzt ihn an der
- * UTC-Mitternacht, der zweite an der so gefundenen Ortszeit. Ohne den zweiten
- * Schritt läge die Grenze an einem Zeitumstellungstag um eine Stunde daneben.
- */
-function zonedInstant(day: string, endOfDay: boolean, timeZone: string): string {
-  const naive = Date.parse(
-    `${day}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`,
-  );
-  const first = naive - zoneOffsetMs(naive, timeZone);
-  const exact = naive - zoneOffsetMs(first, timeZone);
-  return new Date(exact).toISOString();
-}
-
-/**
- * Die Abfragegrenzen eines Zeitraums: von der ersten Sekunde des `from`-Tags
- * bis zur letzten Millisekunde des `to`-Tags, jeweils in der Zone des
- * Benutzers. Ohne Zonenrechnung fehlten einem Wiener Benutzer im Sommer die
- * Fahrten zwischen 00:00 und 02:00 des ersten Tags.
- */
-export function zonedDayRange(
-  from: string,
-  to: string,
-  timeZone = 'UTC',
-): { fromIso: string; toIso: string } {
-  return {
-    fromIso: zonedInstant(from, false, timeZone),
-    toIso: zonedInstant(to, true, timeZone),
-  };
-}
 
 /** `2025-06-01` → `01.06.2025`, ohne Zeitzonenrechnung. */
 export function formatDayLabel(day: string): string {
