@@ -7,10 +7,13 @@ import { recordError } from '../components/firebase/crashlytics';
 
 export default function Error({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  // Next.js 16.3: `retry()` rendert auch fehlgeschlagene Server Components neu
+  // und holt deren Daten erneut. `reset()` existiert weiterhin, setzt aber nur
+  // den Client-State zurueck.
+  retry: () => void;
 }) {
   useEffect(() => {
     void recordError(error, {
@@ -22,7 +25,7 @@ export default function Error({
   return (
     <div>
       <h2>Etwas ist schiefgelaufen</h2>
-      <button onClick={() => reset()}>Erneut versuchen</button>
+      <button onClick={() => retry()}>Erneut versuchen</button>
     </div>
   );
 }

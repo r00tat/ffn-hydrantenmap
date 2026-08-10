@@ -1885,5 +1885,11 @@
     "error": "Link konnte nicht erstellt werden: {error}",
     "createdFor": "Link für {name} ({access})",
     "readOnlyGuestHint": "Nur Lesezugriff — Änderungen sind für diesen Zugang nicht möglich."
+  },
+  "errors": {
+    "title": "Etwas ist schiefgelaufen",
+    "retry": "Erneut versuchen",
+    "unknown": "Unbekannter Fehler",
+    "docsTitle": "Dokumentation konnte nicht geladen werden"
   }
 }
