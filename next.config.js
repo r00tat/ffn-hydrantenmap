@@ -1,15 +1,11 @@
 // @ts-check
 
-const {
-  PHASE_DEVELOPMENT_SERVER,
-  PHASE_PRODUCTION_BUILD,
-} = require('next/constants');
 const createNextIntlPlugin = require('next-intl/plugin');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /** @type {(phase: string, defaultConfig: import("next").NextConfig) => Promise<import("next").NextConfig>} */
-module.exports = async (phase) => {
+module.exports = async () => {
   /** @type {import("next").NextConfig} */
   /** @type {import('next').NextConfig} */
   const nextConfig = {
@@ -67,17 +63,12 @@ module.exports = async (phase) => {
     },
   };
 
-  // add phase === PHASE_DEVELOPMENT_SERVER || for dev serwist
-  if (phase === PHASE_PRODUCTION_BUILD) {
-    const withSerwist = (await import('@serwist/next')).default({
-      // Note: This is only an example. If you use Pages Router,
-      // use something else that works, such as "service-worker/index.ts".
-      swSrc: 'src/worker/index.ts',
-      swDest: 'public/firebase-messaging-sw.js',
-      swUrl: 'firebase-messaging-sw.js',
-    });
-    return withNextIntl(withSerwist(nextConfig));
-  }
+  // Serwist laeuft seit dem Wechsel auf Turbopack nicht mehr als Webpack-Plugin,
+  // sondern ueber den Route Handler in src/app/serwist/[path]/route.ts. Der Service
+  // Worker wird dort zur Build-Zeit mit esbuild gebaut und statisch ausgeliefert.
+  // withSerwist traegt nur esbuild/esbuild-wasm in serverExternalPackages ein und
+  // muss deshalb in jeder Phase greifen, nicht nur im Production-Build.
+  const { withSerwist } = await import('@serwist/turbopack');
 
-  return withNextIntl(nextConfig);
+  return withNextIntl(withSerwist(nextConfig));
 };

@@ -10,7 +10,7 @@ Einsatzkarte (operations map) for Freiwillige Feuerwehr Neusiedl am See - a PWA 
 
 ```bash
 npm run dev          # Development server (Turbopack)
-npm run build        # Production build (Webpack)
+npm run build        # Production build (Turbopack)
 npm run start        # Start production server
 npm run lint         # ESLint validation
 npm run typecheck    # TypeScript type check (TypeScript 7)
@@ -26,7 +26,7 @@ NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output
 npm run typecheck      # TypeScript type check
 npx eslint             # Lint
 npx vitest run         # Tests
-npx next build --webpack  # Production build
+npx next build         # Production build
 ```
 
 Run them in order and fix errors before moving on to the next step. Only run `npm run check` when you want a single combined pass.
@@ -310,6 +310,27 @@ Call the guard at the top of every server action before any logic. For API route
 **Authentication Flow**: Firebase Auth (client) → Firebase ID token → NextAuth Credentials provider (server verification) → Session with authorization flags (`isAuthorized`, `isAdmin`, `groups`).
 
 **Map Architecture**: `PositionedMap` → `Map` (Leaflet config) → `Clusters` (marker clustering) + layer components in `components/Map/layers/`.
+
+**Service Worker / PWA** (`@serwist/turbopack`): Der Service Worker wird aus
+`src/worker/index.ts` gebaut und über den Route Handler
+[src/app/serwist/\[path\]/route.ts](src/app/serwist/[path]/route.ts) als SSG-Route unter
+`/serwist/sw.js` ausgeliefert — nicht mehr als Datei in `public/`. Er enthält sowohl das
+Serwist-Precaching als auch die FCM-Background-Handler.
+
+- Registriert wird er im Root-Scope, einmal über den `SerwistProvider` in
+  [src/app/layout.tsx](src/app/layout.tsx) (in Dev deaktiviert) und einmal in
+  [src/components/firebase/messaging.ts](src/components/firebase/messaging.ts), sobald
+  Push-Rechte erteilt sind. Root-Scope trotz Unterpfad geht, weil der Route Handler
+  `Service-Worker-Allowed: /` setzt.
+- Die alte URL `/firebase-messaging-sw.js` gibt es nicht mehr. Firebase braucht diesen
+  festen Pfad nur, wenn `getToken()` keine eigene Registrierung bekommt — `messaging.ts`
+  übergibt eine. Bereits installierte PWAs behalten ihre alte Registrierung aber (ein 404
+  auf das Skript meldet einen Worker nicht ab), deshalb räumt
+  `unregisterLegacyServiceWorker()` aus [src/common/serviceWorker.ts](src/common/serviceWorker.ts)
+  sie aktiv weg. Diese Funktion darf erst entfernt werden, wenn alle Clients migriert sind.
+- Serwist bündelt den Worker mit `esbuild-wasm` (Default auf allen Nicht-Windows-Systemen).
+  Zur Laufzeit wird esbuild nicht gebraucht, weil die Route vollständig prerendered ist —
+  daher fehlt es korrekt im `.next/standalone/node_modules`.
 
 ### Firestore Collections
 

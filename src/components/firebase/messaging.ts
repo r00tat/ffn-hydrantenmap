@@ -1,5 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { Messaging, getMessaging, getToken } from 'firebase/messaging';
+import {
+  SERWIST_SW_URL,
+  unregisterLegacyServiceWorker,
+} from '../../common/serviceWorker';
 import { ensureNotifications } from '../../lib/permissions';
 import app from './firebase';
 
@@ -30,17 +34,25 @@ export async function getMessagingToken(): Promise<string | undefined> {
 
   const granted = await requestPermission();
   if (granted) {
-    let reg = await navigator.serviceWorker.getRegistration(
-      '/firebase-messaging-sw.js'
-    );
-    if (!reg) {
-      reg = await navigator.serviceWorker.register(
-        '/firebase-messaging-sw.js',
-        {
-          scope: 'firebase-cloud-messaging-push-scope',
-        }
-      );
-    }
+    // Alten, per Webpack nach public/ geschriebenen Worker abmelden, bevor der
+    // neue registriert wird — sonst bleiben bei bereits installierten PWAs zwei
+    // Worker aktiv.
+    await unregisterLegacyServiceWorker();
+
+    // register() ist fuer dieselbe Skript-URL und denselben Scope idempotent und
+    // liefert die bestehende Registrierung zurueck. Der SerwistProvider im
+    // Root-Layout registriert denselben Worker, hier wird also nichts doppelt
+    // angelegt. Root-Scope ist moeglich, weil der Route Handler
+    // `Service-Worker-Allowed: /` setzt.
+    const reg = await navigator.serviceWorker.register(SERWIST_SW_URL, {
+      scope: '/',
+    });
+
+    // Ohne aktiven Worker lehnt das Firebase-SDK die Registrierung ab
+    // (invalid-sw-registration), direkt nach register() ist sie das aber noch
+    // nicht zwangslaeufig.
+    await navigator.serviceWorker.ready;
+
     const token = await getToken(messaging, {
       vapidKey:
         'BBFxZ_tOn6iVR5Sua3oXDBPyw-FYZfHWZcPD2emQ8Zv-r7LuNyKVs1U11uiEj5FZLoXH3nff_CqPqlqKQFJvr8E',
