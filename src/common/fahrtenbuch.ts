@@ -123,6 +123,18 @@ export interface FahrtenbuchVehicle {
   lastDriverName?: string | null;
   /** Die jüngste Fahrt meldet einen Defekt — sicherheitsrelevanter Hinweis. */
   lastEntryHasDefect?: boolean;
+  /**
+   * Anzahl der Mängel dieses Fahrzeugs, die noch Arbeit machen (`open` oder
+   * `inProgress`). Serverseitig nach jeder Mangel-Mutation neu gezählt, damit
+   * die Fahrzeugübersicht den Stand zeigen kann, ohne alle Mängel der Gruppe
+   * zu laden — dieselbe Bauweise wie `lastCounters`.
+   *
+   * `undefined` heißt „Cache stammt aus der Zeit vor diesem Feld", nicht
+   * „keine offenen Mängel". Andere Aussage als `lastEntryHasDefect`: Das sagt,
+   * dass die *letzte Fahrt* einen Defekt gemeldet hat, und verschwindet mit
+   * der nächsten Fahrt ohne Defekt — auch wenn der Mangel noch offen ist.
+   */
+  openMangelCount?: number;
   createdAt: string;
   createdBy: string;
   updatedAt: string;

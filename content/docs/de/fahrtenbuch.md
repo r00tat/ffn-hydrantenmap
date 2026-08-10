@@ -11,7 +11,8 @@ Das Fahrtenbuch führt je Feuerwehr die Fahrten aller Fahrzeuge — Einsatz, Üb
 - **Erfassung ohne Anmeldung** Über einen Gruppen-Link bzw. einen QR-Code im Fahrzeug
 - **PDF-Export** Zeitraum und Fahrzeuge frei wählbar, geschätzte Werte gekennzeichnet
 - **Statistik mit Drill-down** Kilometer, Fahrten, Fahrzeit und Verbrauch je Zeitraum, Zweck, Fahrzeug und Fahrer — vom Diagramm bis zur einzelnen Fahrt
-- **Defekte und Betriebsmittel** Defektmeldung der letzten Fahrt direkt auf der Fahrzeugkarte, Tankmengen je Betriebsmittel
+- **Mängelverwaltung** Status *Offen*, *In Arbeit*, *Behoben* mit Behebungsdatum und unveränderlichem Notizverlauf; eigene Seite über alle Fahrzeuge, Anzahl offener Mängel auf der Fahrzeugkarte
+- **Defekte und Betriebsmittel** Defektmeldung aus der Fahrt heraus, Tankmengen je Betriebsmittel
 - **Stammdaten im Admin-Bereich** Fahrzeuge, Personen, Standort des Feuerwehrhauses, Import aus Kostenersatz und Alarm SMS
 - **PDF-Import** Fahrten aus einem früheren PDF-Export übernehmen
 
@@ -81,7 +82,28 @@ Weicht ein Zählerstand vom letzten bekannten Stand ab oder liegt er darunter, w
 
 ### Defekt oder Mangel melden
 
-Ist an einer Fahrt **Defekt oder Mangel** angehakt, trägt die Fahrzeugkarte den Hinweis, bis eine neuere Fahrt ihn nicht mehr meldet. Die Liste **Alle Fahrten** lässt sich auf „Nur Defekte" filtern. Mit dem Häkchen erscheint das Feld **Mangelbeschreibung** — es ist verpflichtend, und dieser Text geht in die Benachrichtigung ein. Die **Hinweise** bleiben davon getrennt: Dort steht, was nebenbei aufgefallen ist, im Mangel steht, was kaputt ist.
+Ist an einer Fahrt **Defekt oder Mangel** angehakt, entsteht daraus ein Mangel im Status *Offen* — ein eigener Vorgang, der ab da seinen eigenen Status, Verlauf und ein Behebungsdatum trägt. Die Liste **Alle Fahrten** lässt sich auf „Nur Defekte" filtern. Mit dem Häkchen erscheint das Feld **Mangelbeschreibung** — es ist verpflichtend, und dieser Text geht in die Benachrichtigung und in den Mangel ein. Die **Hinweise** bleiben davon getrennt: Dort steht, was nebenbei aufgefallen ist, im Mangel steht, was kaputt ist.
+
+:::info
+Der Mangel entsteht nur beim **Anlegen** einer Fahrt. Eine spätere Bearbeitung der Fahrt legt keinen zweiten Mangel an und setzt einen bereits bearbeiteten nicht zurück — ab der Meldung wird der Mangel über die Mängelliste geführt. Wird das Häkchen nachträglich entfernt, bleibt der Mangel bestehen und ist dort zu schließen.
+:::
+
+### Mängel verwalten
+
+Die Seite **Mängel** (Menü → *Mängel* oder der Knopf im Fahrtenbuch) ist die Arbeitsliste: alle Mängel aller Fahrzeuge der Gruppe, vorgefiltert auf *Offen und in Arbeit*. Über die Filter lassen sich einzelne Status und ein einzelnes Fahrzeug einblenden — auch stillgelegte Fahrzeuge stehen zur Wahl, damit ein offener Mangel dort nicht unauffindbar wird.
+
+Ein Klick auf **Bearbeiten** öffnet den Mangel:
+
+- **Status** *Offen*, *In Arbeit* oder *Behoben*. Jeder Wechsel wird mit Autor und Zeitpunkt im Verlauf vermerkt.
+- **Behoben am** erscheint beim Status *Behoben*, vorbelegt mit dem aktuellen Zeitpunkt und korrigierbar — für den Mangel, der vorige Woche behoben und erst heute nachgetragen wird. Wird der Mangel wieder geöffnet, verschwindet das Datum.
+- **Notiz hinzufügen** hängt einen Eintrag an den Verlauf. Notizen sind nachträglich unveränderlich; so bleibt der Weg von der Meldung bis zur Reparatur nachvollziehbar („Werkstatttermin am 12.8.", „Ersatzteil bestellt").
+- Die **Mangelbeschreibung** lässt sich korrigieren, ohne dass das im Verlauf landet — ein Tippfehler ist kein Vorgang.
+
+Bearbeiten darf jedes Mitglied der Gruppe: Wer einen Mangel abarbeitet, ist selten der, der ihn gemeldet hat. Nachvollziehbar bleibt es über den Verlauf. **Löschen** dürfen nur Administratoren und ist für versehentlich angelegte Mängel gedacht — ein reparierter Mangel gehört auf *Behoben* gesetzt, nicht gelöscht.
+
+Über **Mangel melden** lässt sich ein Mangel auch ohne Fahrt erfassen, etwa bei der monatlichen Fahrzeugüberprüfung.
+
+Auf der Fahrzeugkarte und der Fahrzeugseite steht statt „Defekt gemeldet" die Anzahl der offenen Mängel; ein Klick darauf führt in die Mängelliste, gefiltert auf dieses Fahrzeug. Der alte Hinweis „Defekt gemeldet" erscheint nur noch, solange es keine offenen Mängel gibt.
 
 Sind für die Gruppe Empfänger gepflegt (Admin-Bereich → Fahrtenbuch → **Einstellungen** → *Mangel-Benachrichtigung*), geht beim Speichern eine E-Mail an sie: Fahrzeug und Kennzeichen, Fahrer, Zeiten, Zweck und Ziel, die Zählerstände, die Mangelbeschreibung und ein Link auf das Fahrtenbuch des Fahrzeugs. Die erste Adresse steht im An-Feld, alle weiteren in Kopie.
 
@@ -182,7 +204,7 @@ Der Admin-Bereich unter **Fahrtenbuch** hat fünf Reiter:
 
 - **Fahrzeuge** Name, Kennzeichen, aktiv/stillgelegt, Zähler-Vorlage, Betriebsmittel, Notiz. Über **Fahrzeuge importieren** lassen sich die Fahrzeuge aus dem Kostenersatz-Bestand übernehmen; je Fahrzeug gibt es hier auch den QR-Code
 - **Personen** Fahrer der Gruppe mit Telefon, E-Mail und Alarm-SMS-Empfänger-ID. Über **Personen aus CSV importieren** wird der Teilnehmer-Export aus Alarm SMS eingelesen; Personen, die nicht mehr enthalten sind, können deaktiviert werden — gelöscht wird nichts, damit vergangene Fahrten zugeordnet bleiben
-- **Einstellungen** Standort des Feuerwehrhauses als Startpunkt der Einsatzkilometer, per Koordinaten oder Auswahl auf der Karte; darunter die **Mangel-Benachrichtigung** mit den E-Mail-Empfängern für gemeldete Defekte
+- **Einstellungen** Standort des Feuerwehrhauses als Startpunkt der Einsatzkilometer, per Koordinaten oder Auswahl auf der Karte; darunter die **Mangel-Benachrichtigung** mit den E-Mail-Empfängern für gemeldete Defekte und die **Mängel-Übernahme**, die aus jeder bestehenden Fahrt mit gemeldetem Defekt einen offenen Mangel anlegt (mehrfaches Ausführen erzeugt keine Duplikate)
 - **Fahrtenbuch-Link** Link für die Erfassung ohne Anmeldung erzeugen, neu erzeugen oder löschen
 - **Fahrtenbuch-Import** Fahrten aus einem PDF-Export übernehmen
 

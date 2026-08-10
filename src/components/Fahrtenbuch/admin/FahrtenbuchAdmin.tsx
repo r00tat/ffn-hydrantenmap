@@ -13,6 +13,7 @@ import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
 import AdminGuard from '../../site/AdminGuard';
 import FahrtenbuchImport from './FahrtenbuchImport';
 import GroupSettings from './GroupSettings';
+import MangelMigration from './MangelMigration';
 import MangelNotificationSettings from './MangelNotificationSettings';
 import PersonAdmin from './PersonAdmin';
 import ShareLinkSection from './ShareLinkSection';
@@ -98,6 +99,7 @@ export default function FahrtenbuchAdmin() {
               <Stack key={groupId} spacing={3} sx={{ alignItems: 'flex-start' }}>
                 <GroupSettings groupId={groupId} />
                 <MangelNotificationSettings groupId={groupId} />
+                <MangelMigration groupId={groupId} />
               </Stack>
             )}
             {tab === 3 && (

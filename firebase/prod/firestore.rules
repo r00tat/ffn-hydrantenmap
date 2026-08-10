@@ -258,6 +258,16 @@ service cloud.firestore {
         allow read: if fahrtenbuchMember();
         allow create, update, delete: if false;
       }
+
+      // Mängel an Fahrzeugen. Jedes Gruppenmitglied darf sie lesen und über
+      // die Server Actions bearbeiten — wer einen Mangel abarbeitet, ist
+      // selten der, der ihn gemeldet hat. Geschrieben wird ausschließlich
+      // serverseitig, damit Statuswechsel und Verlaufseinträge ihre Spur
+      // (Autor, Zeitpunkt) nicht verlieren können.
+      match /mangel/{doc} {
+        allow read: if fahrtenbuchMember();
+        allow create, update, delete: if false;
+      }
     }
 
     // Der Token ist die Dokument-ID und damit das gesamte Geheimnis des

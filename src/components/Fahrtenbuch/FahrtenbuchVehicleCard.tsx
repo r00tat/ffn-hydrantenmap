@@ -26,6 +26,12 @@ export interface FahrtenbuchVehicleCardProps {
   lastEntryHasDefect?: boolean;
   /** Fallback für den Fahrer der letzten Fahrt, siehe oben. */
   lastDriverName?: string;
+  /**
+   * Anzahl offener Mängel aus den geladenen Mängeln der Gruppe. Nur ein
+   * Rückfall für Fahrzeuge, deren `openMangelCount` noch nie geschrieben
+   * wurde — der serverseitig gepflegte Zähler am Fahrzeug gewinnt.
+   */
+  openMangelCount?: number;
   onAddTrip: (vehicleId: string) => void;
 }
 
@@ -40,9 +46,11 @@ export default function FahrtenbuchVehicleCard({
   vehicle,
   lastEntryHasDefect,
   lastDriverName,
+  openMangelCount,
   onAddTrip,
 }: FahrtenbuchVehicleCardProps) {
   const t = useTranslations('fahrtenbuch');
+  const tMaengel = useTranslations('fahrtenbuch.maengel');
   const format = useFormatter();
 
   const lastEntryDate = vehicle.lastEntryAt
@@ -57,6 +65,15 @@ export default function FahrtenbuchVehicleCard({
   // nicht auf den abgeleiteten Wert zurückfallen.
   const hasDefect = vehicle.lastEntryHasDefect ?? lastEntryHasDefect;
   const driverName = vehicle.lastDriverName ?? lastDriverName;
+
+  // Derselbe Vorrang: Der serverseitig gepflegte Zähler am Fahrzeug gewinnt,
+  // die Ableitung aus den geladenen Mängeln ist nur der Rückfall für
+  // Fahrzeuge, an denen das Feld noch nie geschrieben wurde.
+  const openMangel = vehicle.openMangelCount ?? openMangelCount ?? 0;
+  // Der Defekt-Hinweis der letzten Fahrt tritt hinter den Mängelzähler
+  // zurück, sobald es einen gibt: „2 offene Mängel" sagt alles, was
+  // „Defekt gemeldet" sagt, und zusätzlich, wie viel Arbeit offen ist.
+  const showLegacyDefect = hasDefect && openMangel === 0;
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -101,7 +118,7 @@ export default function FahrtenbuchVehicleCard({
               })}${driverName ? ` — ${driverName}` : ''}`}
             </Typography>
           )}
-          {hasDefect && (
+          {showLegacyDefect && (
             <Chip
               size="small"
               color="warning"
@@ -116,6 +133,21 @@ export default function FahrtenbuchVehicleCard({
         <Button size="small" onClick={() => onAddTrip(vehicle.id as string)}>
           {t('addTrip')}
         </Button>
+        {/* Der Chip steht außerhalb der `CardActionArea`: Die ist selbst ein
+            Link auf die Fahrzeugseite, und ein Link im Link ist kein gültiges
+            HTML — der Browser würde die Verschachtelung auflösen und der
+            Mängel-Link ginge verloren. */}
+        {openMangel > 0 && (
+          <Chip
+            size="small"
+            color="error"
+            clickable
+            component={Link}
+            href={`/fahrtenbuch/maengel?vehicle=${vehicle.id}`}
+            icon={<WarningAmberIcon />}
+            label={tMaengel('openCount', { count: openMangel })}
+          />
+        )}
       </CardActions>
     </Card>
   );
