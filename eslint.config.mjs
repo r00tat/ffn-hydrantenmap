@@ -10,6 +10,10 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     '.next/**',
+    // Nested Next.js build outputs (e.g. capacitor/android/.next from a Capacitor
+    // sync) are generated artifacts and gitignored, but eslint-config-next only
+    // ignores the root-level .next.
+    '**/.next/**',
     '.worktrees/**',
     'out/**',
     'build/**',
