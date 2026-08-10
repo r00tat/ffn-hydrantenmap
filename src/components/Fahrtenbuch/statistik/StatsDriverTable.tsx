@@ -77,8 +77,17 @@ export default function StatsDriverTable({
     setDescending(key !== 'name');
   };
 
+  // Der Schlüssel ist auch der React-`key`: Die Einheitenspalten entstehen aus
+  // einer Schleife und brauchen einen, und ein Sortierschlüssel kommt in der
+  // Kopfzeile nur einmal vor.
   const header = (key: SortKey, label: string, align: 'left' | 'right') => (
-    <TableCell align={align} sortDirection={sortKey === key ? (descending ? 'desc' : 'asc') : false}>
+    <TableCell
+      key={key}
+      align={align}
+      sortDirection={
+        sortKey === key ? (descending ? 'desc' : 'asc') : false
+      }
+    >
       <TableSortLabel
         active={sortKey === key}
         direction={descending ? 'desc' : 'asc'}
@@ -105,9 +114,7 @@ export default function StatsDriverTable({
             <TableRow>
               {header('name', t('stats.driverTable.name'), 'left')}
               {header('trips', t('stats.kpi.trips'), 'right')}
-              {units.map((unit) =>
-                header(`unit:${unit}`, unit, 'right'),
-              )}
+              {units.map((unit) => header(`unit:${unit}`, unit, 'right'))}
               {header('duration', t('stats.kpi.duration'), 'right')}
               <TableCell align="right">{t('stats.driverTable.vehicles')}</TableCell>
               {header('lastEntry', t('stats.driverTable.lastTrip'), 'right')}
