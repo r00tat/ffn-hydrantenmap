@@ -120,6 +120,21 @@ cp .env.local .worktrees/<branch-name>/
 
 **Wichtig:** `gh push` existiert nicht. Zum Pushen immer `git push` verwenden.
 
+### Plan- und Spec-Dokumente (Superpowers)
+
+Alle Markdown-Dateien unter `docs/superpowers/` sind **gitignored**
+(`.gitignore`: `/docs/superpowers/**/*.md`) und werden **nicht committet**. Das betrifft insbesondere:
+
+- `docs/superpowers/plans/` — Implementierungspläne (Superpowers `writing-plans` / `executing-plans`)
+- `docs/superpowers/specs/` — Design-/Spec-Dokumente (Superpowers `brainstorming`)
+
+Neue Pläne und Specs gehören daher immer in `docs/superpowers/plans/` bzw. `docs/superpowers/specs/` —
+sie bleiben rein lokale Arbeitsdokumente. Sie dürfen nicht gestaged oder mit `git add -f` erzwungen werden
+und sind auch kein Teil von PR-Änderungslisten.
+
+Das ältere Verzeichnis `docs/plans/` ist weiterhin versioniert (historische Pläne/Designs).
+Dort keine neuen Dokumente ablegen.
+
 ### Conventional Commits
 
 Alle Commit-Messages müssen dem [Conventional Commits](https://www.conventionalcommits.org/) Format folgen:
