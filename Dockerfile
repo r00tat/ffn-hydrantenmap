@@ -42,6 +42,12 @@ ENV NEXT_PUBLIC_OAUTH_CLIENT_ID=${NEXT_PUBLIC_OAUTH_CLIENT_ID}
 ENV NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}
 ENV NEXT_PUBLIC_BUILD_ID=${NEXT_PUBLIC_BUILD_ID}
 
+# Turbopacks Build-Cache in .next/cache/turbopack bringt hier nichts: Diese Stage
+# startet aus einer frischen Layer, und nach unten kopiert werden nur
+# .next/standalone und .next/static. Der Cache waere also ~430 MB, die geschrieben
+# und nie gelesen werden. Siehe turbopackFileSystemCacheForBuild in next.config.js.
+ENV DISABLE_TURBOPACK_BUILD_CACHE=1
+
 RUN npm run build
 
 # Production image, copy all the files and run next

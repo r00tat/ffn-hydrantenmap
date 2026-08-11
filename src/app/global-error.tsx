@@ -7,10 +7,11 @@ import { recordError } from '../components/firebase/crashlytics';
 
 export default function GlobalError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  // Next.js 16.3: siehe error.tsx — retry() holt auch Server-Daten neu.
+  retry: () => void;
 }) {
   useEffect(() => {
     void recordError(error, {
@@ -24,7 +25,7 @@ export default function GlobalError({
     <html lang="de">
       <body>
         <h2>Etwas ist schiefgelaufen</h2>
-        <button onClick={() => reset()}>Erneut versuchen</button>
+        <button onClick={() => retry()}>Erneut versuchen</button>
       </body>
     </html>
   );

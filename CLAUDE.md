@@ -10,27 +10,77 @@ Einsatzkarte (operations map) for Freiwillige Feuerwehr Neusiedl am See - a PWA 
 
 ```bash
 npm run dev          # Development server (Turbopack)
-npm run build        # Production build (Webpack)
+npm run build        # Production build (Turbopack)
 npm run start        # Start production server
 npm run lint         # ESLint validation
+npm run typecheck    # TypeScript type check (TypeScript 7)
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
-npm run check        # Run all checks: tsc, lint, tests, build
+npm run check        # Run all checks: typecheck, lint, tests, build
+npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
 **After completing a feature or bugfix, run the checks individually (not `npm run check`) so the source of any error is easier to spot:**
 
 ```bash
-npx tsc --noEmit        # TypeScript type check
-npx eslint              # Lint
-npx vitest run          # Tests
-npx next build --webpack  # Production build
+npm run typecheck      # TypeScript type check
+npx eslint             # Lint
+npx vitest run         # Tests
+npx next build         # Production build
 ```
 
 Run them in order and fix errors before moving on to the next step. Only run `npm run check` when you want a single combined pass.
 
-**WICHTIG: TypeScript-Fehler (`tsc --noEmit`) dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
+**WICHTIG: TypeScript-Fehler dürfen NIEMALS ignoriert werden.** Auch wenn ein Fehler scheinbar vorbestehend ist, muss er untersucht und behoben werden, bevor committed wird. Kein Commit mit TSC-Fehlern.
+
+### TypeScript 6 und 7 parallel
+
+Der Typecheck läuft über **TypeScript 7** (Go-Compiler, ~1,3s statt ~8,8s), das Paket
+liegt als Alias `typescript7` in den devDependencies. `npm run typecheck` ruft es über den
+expliziten Pfad `node_modules/typescript7/bin/tsc` auf — nicht über `npx tsc`, weil beide
+Pakete ein `tsc`-Binary mitbringen und nicht garantiert ist, welches in
+`node_modules/.bin/` landet.
+
+Das Paket `typescript` bleibt bewusst bei **6.x**, weil `typescript@7` unter `.` nur noch
+`lib/version.cjs` exportiert und die Compiler-API nicht mehr mitliefert:
+
+- `typescript-eslint` (via `eslint-config-next`) crasht damit sofort
+  (`TypeError: Cannot read properties of undefined (reading 'Cjs')`). Peer-Range ist
+  `>=4.8.4 <6.1.0`; TS-7-Support ist dort abgelehnt, bis die stabile API in TS 7.1 kommt.
+- `next build` löst `typescript/package.json` auf und nutzt dessen `bin.tsc`, prüft also
+  weiterhin mit TS 6.
+
+Sobald typescript-eslint auf der TS-7.1-API aufsetzt: `typescript` auf `^7` ziehen und den
+`typescript7`-Alias samt `typecheck`-Pfad entfernen.
+
+### Turbopack-Cache
+
+Turbopack cacht auf Platte, getrennt nach Modus: `next dev` in `.next/dev/cache/turbopack`,
+`next build` in `.next/cache/turbopack`. Beides ist seit 16.3 standardmäßig an und bringt
+die Startup- und Memory-Gewinne von 16.3 überhaupt erst.
+
+**Der Cache wird nie kompaktiert.** Gemessen an diesem Projekt wachsen pro Build ~3,7 MB
+und 5 `.sst`-Dateien dazu (424 → 435 MB über vier Builds), es gibt keine
+Größenbegrenzung, kein GC und kein Max-Age. Dazu ist das Verzeichnis an die Next-Version
+gebunden (`v16.3.0-<hash>`) — ein Update legt ein neues an und lässt das alte liegen. Über
+Monate summiert sich das auf Gigabyte. Bei Bedarf:
+
+```bash
+npm run clean:cache   # rm -rf .next/cache/turbopack .next/dev/cache/turbopack
+```
+
+Deshalb löscht `npm run dev` **nicht** mehr das ganze `.next` (vorher `rm -rf .next` vor
+und nach dem Start) — das warf genau diesen Cache jedes Mal weg. Unter Next 16 ist das
+unbedenklich, weil der Dev-Output unter `.next/dev/` liegt und die Prod-Artefakte
+(`.next/server`, `.next/static`, Manifeste) unberührt bleiben: `next start` funktioniert
+nach einer Dev-Session weiterhin.
+
+Im **Docker-Build** ist der Build-Cache abgeschaltet (`DISABLE_TURBOPACK_BUILD_CACHE=1` im
+Dockerfile, ausgewertet über `turbopackFileSystemCacheForBuild` in `next.config.js`): Die
+Builder-Stage startet aus einer frischen Layer und nach unten kopiert werden nur
+`.next/standalone` und `.next/static` — der Cache wäre ~430 MB, die geschrieben und nie
+gelesen werden.
 
 ## Android-Build (Capacitor)
 
@@ -69,6 +119,21 @@ cp .env.local .worktrees/<branch-name>/
 `next-env.d.ts` is gitignored — Next.js regenerates it on every `dev`/`build` and there's no need to stage or reset it.
 
 **Wichtig:** `gh push` existiert nicht. Zum Pushen immer `git push` verwenden.
+
+### Plan- und Spec-Dokumente (Superpowers)
+
+Alle Markdown-Dateien unter `docs/superpowers/` sind **gitignored**
+(`.gitignore`: `/docs/superpowers/**/*.md`) und werden **nicht committet**. Das betrifft insbesondere:
+
+- `docs/superpowers/plans/` — Implementierungspläne (Superpowers `writing-plans` / `executing-plans`)
+- `docs/superpowers/specs/` — Design-/Spec-Dokumente (Superpowers `brainstorming`)
+
+Neue Pläne und Specs gehören daher immer in `docs/superpowers/plans/` bzw. `docs/superpowers/specs/` —
+sie bleiben rein lokale Arbeitsdokumente. Sie dürfen nicht gestaged oder mit `git add -f` erzwungen werden
+und sind auch kein Teil von PR-Änderungslisten.
+
+Das ältere Verzeichnis `docs/plans/` ist weiterhin versioniert (historische Pläne/Designs).
+Dort keine neuen Dokumente ablegen.
 
 ### Conventional Commits
 
@@ -290,6 +355,27 @@ Call the guard at the top of every server action before any logic. For API route
 
 **Map Architecture**: `PositionedMap` → `Map` (Leaflet config) → `Clusters` (marker clustering) + layer components in `components/Map/layers/`.
 
+**Service Worker / PWA** (`@serwist/turbopack`): Der Service Worker wird aus
+`src/worker/index.ts` gebaut und über den Route Handler
+[src/app/serwist/\[path\]/route.ts](src/app/serwist/[path]/route.ts) als SSG-Route unter
+`/serwist/sw.js` ausgeliefert — nicht mehr als Datei in `public/`. Er enthält sowohl das
+Serwist-Precaching als auch die FCM-Background-Handler.
+
+- Registriert wird er im Root-Scope, einmal über den `SerwistProvider` in
+  [src/app/layout.tsx](src/app/layout.tsx) (in Dev deaktiviert) und einmal in
+  [src/components/firebase/messaging.ts](src/components/firebase/messaging.ts), sobald
+  Push-Rechte erteilt sind. Root-Scope trotz Unterpfad geht, weil der Route Handler
+  `Service-Worker-Allowed: /` setzt.
+- Die alte URL `/firebase-messaging-sw.js` gibt es nicht mehr. Firebase braucht diesen
+  festen Pfad nur, wenn `getToken()` keine eigene Registrierung bekommt — `messaging.ts`
+  übergibt eine. Bereits installierte PWAs behalten ihre alte Registrierung aber (ein 404
+  auf das Skript meldet einen Worker nicht ab), deshalb räumt
+  `unregisterLegacyServiceWorker()` aus [src/common/serviceWorker.ts](src/common/serviceWorker.ts)
+  sie aktiv weg. Diese Funktion darf erst entfernt werden, wenn alle Clients migriert sind.
+- Serwist bündelt den Worker mit `esbuild-wasm` (Default auf allen Nicht-Windows-Systemen).
+  Zur Laufzeit wird esbuild nicht gebraucht, weil die Route vollständig prerendered ist —
+  daher fehlt es korrekt im `.next/standalone/node_modules`.
+
 ### Firestore Collections
 
 - `call` - Emergency calls/operations (Einsätze)
@@ -353,3 +439,13 @@ Required environment variables (see `.env.local`):
 - Firebase config (`NEXT_PUBLIC_FIREBASE_*`)
 - `NEXT_PUBLIC_FIRESTORE_DB` - `ffndev` for dev, empty/default for prod
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

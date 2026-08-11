@@ -1885,5 +1885,11 @@
     "error": "Link could not be created: {error}",
     "createdFor": "Link for {name} ({access})",
     "readOnlyGuestHint": "Read-only access — changes are not possible with this account."
+  },
+  "errors": {
+    "title": "Something went wrong",
+    "retry": "Try again",
+    "unknown": "Unknown error",
+    "docsTitle": "Could not load the documentation"
   }
 }

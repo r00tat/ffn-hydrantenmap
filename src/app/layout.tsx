@@ -1,8 +1,10 @@
+import { SerwistProvider } from '@serwist/turbopack/react';
 import 'leaflet/dist/leaflet.css';
 import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import React from 'react';
+import { SERWIST_SW_URL } from '../common/serviceWorker';
 import AppProviders from '../components/providers/AppProviders';
 import '../styles/globals.css';
 
@@ -94,9 +96,20 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <AppProviders>{children}</AppProviders>
-        </NextIntlClientProvider>
+        {/* Registriert den von src/app/serwist/[path]/route.ts ausgelieferten
+            Service Worker im Root-Scope. In der Entwicklung bleibt er aus, damit
+            kein Precache-Layer zwischen Dev-Server und Browser haengt — das war
+            vorher implizit so, weil das Serwist-Webpack-Plugin nur im
+            Production-Build lief. */}
+        <SerwistProvider
+          swUrl={SERWIST_SW_URL}
+          disable={process.env.NODE_ENV !== 'production'}
+          options={{ scope: '/' }}
+        >
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            <AppProviders>{children}</AppProviders>
+          </NextIntlClientProvider>
+        </SerwistProvider>
       </body>
     </html>
   );
