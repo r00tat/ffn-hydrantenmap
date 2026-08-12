@@ -21,7 +21,7 @@ import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import React from 'react';
 import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
-import useMapEditor from '../../hooks/useMapEditor';
+import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import NavigateButton from '../common/NavigateButton';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import { FirecallItem } from '../firebase/firestore';
@@ -338,18 +338,23 @@ function FirecallItemDisplay({ item }: { item: FirecallItem }) {
 
 export default function MapSidebar() {
   const t = useTranslations('sidebar');
-  const { editable, setEditable, selectedFirecallItem, historyModeActive } =
+  const tShare = useTranslations('firecallShare');
+  const { editable, setEditable, selectedFirecallItem, canWrite } =
     useMapEditor();
+  const canEdit = useMapEditorCanEdit();
 
   return (
     <SidebarBox isEditable={editable}>
       <Paper elevation={0} sx={{ px: 1.5, py: 1, height: '100%' }}>
         {!editable && !selectedFirecallItem && (
           <Box>
+            {/* Ein Nur-Lese-Gast soll nicht aufgefordert werden, den
+                Bearbeitungsmodus einzuschalten — der Provider erzwingt für ihn
+                `editable: false`, der Knopf bliebe wirkungslos. */}
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              {t('emptyHint')}
+              {canWrite ? t('emptyHint') : tShare('readOnlyGuestHint')}
             </Typography>
-            {!historyModeActive && (
+            {canEdit && (
               <Button
                 variant="outlined"
                 startIcon={<EditIcon />}
