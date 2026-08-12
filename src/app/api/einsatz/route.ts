@@ -7,6 +7,7 @@ import {
 } from '../../../server/blaulichtsms/fetchAlarms';
 import { createFirecallFromAlarm } from '../../../server/blaulichtsms/createFirecallFromAlarm';
 import type { BlaulichtSmsAlarm } from '../../../common/blaulichtsms';
+import { requestOrigin } from '../../../server/auth/baseUrl';
 
 interface CreateEinsatzBody {
   group?: string;
@@ -72,15 +73,17 @@ export async function POST(req: NextRequest) {
 
     const result = await createFirecallFromAlarm(alarm, group, auth.owner);
 
-    // Build the public URL from NEXTAUTH_URL (the canonical public base URL,
-    // used across the app). `req.nextUrl.origin` must not be used behind the
-    // Cloud Run proxy: there it resolves to the internal container address
-    // (e.g. http://0.0.0.0:8080). Fall back to the request origin only for
-    // local development, where NEXTAUTH_URL may be unset.
-    const baseUrl = (process.env.NEXTAUTH_URL || req.nextUrl.origin).replace(
-      /\/+$/,
-      '',
-    );
+    // Die öffentliche URL kommt aus den Forwarded-Headern des Requests —
+    // Cloud Run kennt seine Custom Domain nicht als Umgebungsvariable, reicht
+    // aber den Original-Host durch. `req.nextUrl.origin` darf dahinter nicht
+    // verwendet werden: dort steht die interne Container-Adresse
+    // (z.B. http://0.0.0.0:8080). NEXTAUTH_URL und die Request-Origin bleiben
+    // als Fallback für die lokale Entwicklung.
+    const baseUrl = (
+      (await requestOrigin()) ??
+      process.env.NEXTAUTH_URL ??
+      req.nextUrl.origin
+    ).replace(/\/+$/, '');
 
     return NextResponse.json({
       ...result,

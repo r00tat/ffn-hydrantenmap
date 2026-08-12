@@ -106,6 +106,30 @@
       "plainName": "Name"
     }
   },
+  "passkey": {
+    "or": "or",
+    "loginButton": "Sign in with passkey",
+    "loginFailed": "Passkey sign-in failed.",
+    "title": "Passkeys",
+    "description": "Sign in without a password using fingerprint, face recognition or your device PIN.",
+    "add": "Add passkey",
+    "addFailed": "Could not create the passkey.",
+    "none": "No passkeys yet.",
+    "created": "Created on {date}",
+    "lastUsed": "Last used on {date}",
+    "neverUsed": "Not used yet",
+    "otherDomain": "Only valid on {domain}",
+    "rename": "Rename",
+    "renameTitle": "Rename passkey",
+    "labelField": "Label",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Really delete passkey \"{label}\"?",
+    "deleteFailed": "Could not delete the passkey.",
+    "notSupported": "This device does not support passkeys.",
+    "defaultLabel": "Passkey"
+  },
   "mapUi": {
     "addElement": "Add new element",
     "editMap": "Edit operations map",

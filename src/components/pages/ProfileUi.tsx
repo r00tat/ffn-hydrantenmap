@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import PasskeyManager from '../auth/PasskeyManager';
 import { auth } from '../firebase/firebase';
 import LanguageSelector from '../i18n/LanguageSelector';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
@@ -85,6 +86,9 @@ export default function ProfileUi() {
               </Link>
             </Typography>
           )}
+          {/* Nur für freigeschaltete Benutzer: die Server Actions hinter der
+              Verwaltung verlangen ohnehin actionUserRequired(). */}
+          <PasskeyManager />
         </>
       )}
       {!isAuthorized && !isRefreshing && (

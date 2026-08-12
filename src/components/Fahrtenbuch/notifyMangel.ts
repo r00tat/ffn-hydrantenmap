@@ -12,6 +12,7 @@ import { mailSender, sendRawMail } from '../../server/mail/sendRawMail';
 import type { Group } from '../../app/groups/groupTypes';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { buildMangelEmail } from './buildMangelEmail';
+import { getBaseUrl } from '../../server/auth/baseUrl';
 
 export interface NotifyMangelArgs {
   groupId: string;
@@ -83,7 +84,7 @@ export async function notifyMangel({
     vehicle,
     groupId,
     groupName: await groupName(groupId),
-    appBaseUrl: process.env.NEXTAUTH_URL ?? '',
+    appBaseUrl: await getBaseUrl(),
     from,
     to,
     cc,

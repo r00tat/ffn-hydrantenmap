@@ -10,6 +10,7 @@ import {
   KOSTENERSATZ_GROUP,
 } from '../../common/kostenersatz';
 import { completePaymentAndNotify } from './completePaymentAndNotify';
+import { getBaseUrl } from '../../server/auth/baseUrl';
 
 // ============================================================================
 // Types
@@ -153,7 +154,7 @@ export async function createSumupCheckout(
       return { success: false, error: 'SumUp merchant code not configured' };
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://einsatz.ffnd.at';
+    const baseUrl = await getBaseUrl();
     const checkoutReference = `KE-${firecallId}-${calculationId}-${Date.now()}`;
     const redirectToken = crypto.randomUUID();
 
@@ -263,7 +264,7 @@ export async function getSumupDeepLink(
       return { success: false, error: 'SumUp affiliate key not configured' };
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'https://einsatz.ffnd.at';
+    const baseUrl = await getBaseUrl();
     const foreignTxId = `KE-${firecallId}-${calculationId}-${Date.now()}`;
     const redirectToken = crypto.randomUUID();
     const callbackUrl = `${baseUrl}/einsatz/${firecallId}/kostenersatz/${calculationId}/payment?token=${redirectToken}`;

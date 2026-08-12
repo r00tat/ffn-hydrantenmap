@@ -52,10 +52,18 @@ export const FirecallContext = createContext<FirecallContextType>({
 
 export function useLastFirecall() {
   const [firecall, setFirecall] = useState<Firecall>(defaultFirecall);
-  const { isAuthorized, groups, firecall: firecallClaim } = useFirebaseLogin();
+  const {
+    isAuthorized,
+    hasFirebaseUser,
+    groups,
+    firecall: firecallClaim,
+  } = useFirebaseLogin();
 
   useEffect(() => {
-    if (isAuthorized) {
+    // `hasFirebaseUser` zusätzlich zu `isAuthorized`: letzteres ist beim ersten
+    // Render optimistisch aus dem Session-Cache vorbelegt, `request.auth` aber
+    // noch null — der Listener liefe in ein `permission-denied`.
+    if (isAuthorized && hasFirebaseUser) {
       if (!firecallClaim) {
         const q = query(
           collection(db, FIRECALL_COLLECTION_ID),
@@ -111,7 +119,7 @@ export function useLastFirecall() {
     } else {
       return () => {};
     }
-  }, [firecallClaim, groups, isAuthorized]);
+  }, [firecallClaim, groups, hasFirebaseUser, isAuthorized]);
 
   return firecall;
 }

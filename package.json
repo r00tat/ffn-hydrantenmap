@@ -58,6 +58,8 @@
     "@react-leaflet/core": "^3.0.0",
     "@react-pdf/renderer": "^4.5.1",
     "@serwist/turbopack": "^9.5.12",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "@turf/bbox-polygon": "^7.4.0",
     "@turf/boolean-within": "^7.4.0",
     "@turf/center": "^7.4.0",
@@ -148,6 +150,8 @@
     "eslint-plugin-react-hooks": "7.0.1",
     "mui-color-input": {
       "@mui/material": "$@mui/material"
-    }
+    },
+    "@simplewebauthn/browser": "$@simplewebauthn/browser",
+    "@simplewebauthn/server": "$@simplewebauthn/server"
   }
 }

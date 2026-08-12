@@ -34,13 +34,23 @@ function nonNull(value: any) {
 function getInitialLoginStatus(): LoginData {
   const cachedAuth = loadAuthFromSessionStorage();
   if (cachedAuth) {
-    return { ...cachedAuth, isRefreshing: true, isAuthLoading: false, loginStep: 'done' };
+    // `hasFirebaseUser` bewusst hart auf false: der Cache lässt die App sofort
+    // in ihrer angemeldeten Form rendern, aber Firebase Auth hat zu diesem
+    // Zeitpunkt noch keinen Benutzer. Erst onAuthStateChanged setzt das Flag.
+    return {
+      ...cachedAuth,
+      hasFirebaseUser: false,
+      isRefreshing: true,
+      isAuthLoading: false,
+      loginStep: 'done',
+    };
   }
   return {
     isSignedIn: false,
     isAuthorized: false,
     isAdmin: false,
     isAuthLoading: true,
+    hasFirebaseUser: false,
     myGroups: [],
     loginStep: 'idle',
   };
@@ -171,6 +181,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
           const authData: Partial<LoginData> = {
             isSignedIn: true,
             isAuthLoading: false,
+            hasFirebaseUser: true,
             user,
             email: nonNull(u?.email),
             displayName: nonNull(u?.displayName),
@@ -198,6 +209,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
             ...prev,
             isSignedIn: false,
             isAuthLoading: false,
+            hasFirebaseUser: false,
             user: undefined,
             loginStep: 'idle',
           }));

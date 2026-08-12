@@ -439,6 +439,34 @@ Required environment variables (see `.env.local`):
 - Firebase config (`NEXT_PUBLIC_FIREBASE_*`)
 - `NEXT_PUBLIC_FIRESTORE_DB` - `ffndev` for dev, empty/default for prod
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+- `PASSKEY_ALLOWED_ORIGINS` (optional) — komma-separierte Allowlist erlaubter
+  Origins, siehe unten
+
+### Basis-URL und erlaubte Origins
+
+Cloud Run stellt die öffentliche URL **nicht** als Umgebungsvariable bereit —
+Custom Domains sind dem Container unbekannt. Die Origin kommt deshalb aus dem
+Request: Cloud Run reicht den Original-`Host` durch und setzt
+`X-Forwarded-Proto`. Zuständig ist [src/server/auth/baseUrl.ts](src/server/auth/baseUrl.ts):
+
+- `requestOrigin()` — Origin aus den Forwarded-Headern, geprüft gegen die
+  Allowlist. Für WebAuthn zwingend, weil RP ID und Origin sich zwischen Prod,
+  Dev und localhost unterscheiden.
+- `getBaseUrl()` — dasselbe, mit `NEXTAUTH_URL` als Fallback für request-lose
+  Kontexte (E-Mail-Versand, Hintergrund-Jobs). Für generierte Links verwenden.
+
+Ohne `PASSKEY_ALLOWED_ORIGINS` gilt `NEXTAUTH_URL` plus `http://localhost:3000`.
+**Außerhalb von Produktion** wird zusätzlich jede Loopback-Adresse akzeptiert
+(`localhost`, `127.0.0.1`, `::1`) — unabhängig von Port und Schema, damit
+`next dev -p 3001` und `npm run dev:https` (dort lautet die Origin
+`https://localhost:3000`) nicht an einer auf einen Port festgelegten Allowlist
+scheitern. LAN-IPs und Tunnel-Domains bleiben außen vor: über http sind sie kein
+Secure Context, dort verweigert schon der Browser die WebAuthn-Ceremony. Wer sie
+braucht (z.B. `*.nip.io` mit TLS für Gerätetests), trägt sie explizit in
+`PASSKEY_ALLOWED_ORIGINS` ein.
+
+Wird eine Origin abgelehnt, protokolliert `requestOrigin()` sie zusammen mit der
+Allowlist — der Aufrufer sieht sonst nur `passkey: request origin is not allowed`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

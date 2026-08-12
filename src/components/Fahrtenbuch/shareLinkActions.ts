@@ -2,12 +2,12 @@
 import 'server-only';
 
 import type { WriteBatch } from 'firebase-admin/firestore';
-import { headers } from 'next/headers';
 import {
   FAHRTENBUCH_SHARE_LINK_COLLECTION_ID,
   type FahrtenbuchShareLink,
   type ShareLinkInfo,
 } from '../../common/fahrtenbuchShare';
+import { getBaseUrl } from '../../server/auth/baseUrl';
 import { firestore } from '../../server/firebase/admin';
 import {
   generateShareLinkId,
@@ -20,29 +20,12 @@ function linksRef() {
   return firestore.collection(FAHRTENBUCH_SHARE_LINK_COLLECTION_ID);
 }
 
-/**
- * Die öffentliche Basis-URL. `NEXTAUTH_URL` ist die kanonische Adresse; hinter
- * einem Proxy oder in der Capacitor-App ist `window.location.origin` falsch
- * (dort `https://localhost`), deshalb wird die URL serverseitig gebaut. Der
- * Header-Fallback deckt die lokale Entwicklung ab, wo `NEXTAUTH_URL` fehlen
- * kann.
- */
-async function baseUrl(): Promise<string> {
-  if (process.env.NEXTAUTH_URL) {
-    return process.env.NEXTAUTH_URL.replace(/\/$/, '');
-  }
-  const headerList = await headers();
-  const host = headerList.get('host') ?? 'localhost:3000';
-  const proto = headerList.get('x-forwarded-proto') ?? 'http';
-  return `${proto}://${host}`;
-}
-
 async function toInfo(
   token: string,
   data: FahrtenbuchShareLink,
 ): Promise<ShareLinkInfo> {
   return {
-    url: `${await baseUrl()}/fahrtenbuch/teilen/${token}`,
+    url: `${await getBaseUrl()}/fahrtenbuch/teilen/${token}`,
     createdAt: data.createdAt,
     createdByName: data.createdByName,
   };

@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Die Route ermittelt die Basis-URL über server/auth/baseUrl, das `server-only`
+// importiert — außerhalb des Next-Bundlers wirft dieses Modul beim Laden.
+vi.mock('server-only', () => ({}));
+
 const { authMock, fetchAlarmsMock, fetchByIdMock, createMock } = vi.hoisted(() => ({
   authMock: vi.fn(),
   fetchAlarmsMock: vi.fn(),

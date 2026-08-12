@@ -14,6 +14,7 @@ export const FirebaseLoginContext = createContext<LoginStatus>({
   isAuthorized: false,
   isAdmin: false,
   isAuthLoading: true,
+  hasFirebaseUser: false,
   loginStep: 'idle',
   signOut: async () => {},
   refresh: async () => {},
