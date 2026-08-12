@@ -1,7 +1,7 @@
 # https://nextjs.org/docs/deployment
 # Install dependencies only when needed
 ARG DOCKER_REGISTRY=""
-FROM ${DOCKER_REGISTRY}node:22-alpine AS base
+FROM ${DOCKER_REGISTRY}node:24-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
