@@ -16,7 +16,10 @@ import { getItemInstance } from '../../FirecallItems/elements';
 import { FirecallVehicle } from '../../FirecallItems/elements/FirecallVehicle';
 import { MarkerRenderOptions } from '../../FirecallItems/elements/marker/FirecallItemDefault';
 import ItemOverlay from '../../FirecallItems/ItemOverlay';
-import useMapEditor, { useHistoryPathSegments } from '../../../hooks/useMapEditor';
+import useMapEditor, {
+  useHistoryPathSegments,
+  useMapEditorCanEdit,
+} from '../../../hooks/useMapEditor';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import copyAndSaveFirecallItems from '../../../hooks/copyLayer';
 import { sortByZIndex, useFirecallLayers } from '../../../hooks/useFirecallLayers';
@@ -158,6 +161,7 @@ export default function FirecallItemsLayer({
   }, []);
 
   const { editable, setEditable } = useMapEditor();
+  const canEdit = useMapEditorCanEdit();
   const updateItem = useFirecallItemUpdate();
 
   const handleEdit = useCallback(
@@ -218,15 +222,18 @@ export default function FirecallItemsLayer({
           close={() => setFirecallItem(undefined)}
         />
       )}
+      {/* Ohne Schreibrecht führen Bearbeiten, Kopieren und die Z-Order-Aktionen
+          nur in ein `permission-denied` — dann bleibt das Kontextmenü auf die
+          reinen Ansichts-Aktionen beschränkt. */}
       {contextMenuPos && (
         <ItemContextMenu
           item={contextMenuTarget}
           siblings={records}
           anchorPosition={contextMenuPos}
           onClose={closeContextMenu}
-          onEdit={handleEdit}
+          onEdit={canEdit ? handleEdit : undefined}
           onDelete={editable ? handleDelete : undefined}
-          onCopy={handleCopy}
+          onCopy={canEdit ? handleCopy : undefined}
           customActions={customActions}
         />
       )}

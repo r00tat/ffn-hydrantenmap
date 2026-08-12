@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { getTranslations } from 'next-intl/server';
 import { isTruthy } from '../common/boolish';
 import { guestCanWrite } from '../common/firecallGuest';
+import { shareLinkStatus } from '../common/firecallShareLink';
 import { isInternalEmail } from '../common/internalDomains';
 import {
   Firecall,
@@ -65,6 +66,8 @@ declare module 'next-auth' {
       firecall?: string;
       /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
       firecallWrite?: boolean;
+      /** Ablauf des Gastzugangs in Millisekunden, siehe `shareLinkStatus`. */
+      firecallExpiresAt?: number;
       /**
        * Preferred UI language from `userSettings/{uid}`. Undefined when the
        * user has not configured one yet — callers fall back to cookie /
@@ -157,6 +160,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.groups = userData.groups;
           session.user.firecall = userData.firecall;
           session.user.firecallWrite = userData.firecallWrite;
+          session.user.firecallExpiresAt = userData.firecallExpiresAt;
         }
       } catch (err) {
         console.error(`session callback: failed to fetch user data`, err);
@@ -230,6 +234,12 @@ export interface FirecallAuthorizationOptions {
    * betroffen.
    */
   requireWrite?: boolean;
+  /**
+   * Für die Verwaltung der Share-Links setzen: nur Benutzer mit Gruppenzugriff
+   * dürfen Zugänge sehen und vergeben. Ohne diese Schranke könnte ein
+   * weitergegebener Gast-Link beliebig viele weitere Zugänge nach sich ziehen.
+   */
+  requireGroupMember?: boolean;
 }
 
 export async function userAuthorized(
@@ -255,6 +265,31 @@ export async function userAuthorized(
   if (!isGroupMember && !isGuestOfFirecall) {
     throw new Error(
       `user ${session.user.id} is not in group ${firecallData.group}`,
+    );
+  }
+
+  if (options.requireGroupMember && !isGroupMember) {
+    throw new ApiException(
+      `user ${session.user.id} is not a member of group ${firecallData.group}`,
+      { status: 403 },
+    );
+  }
+
+  // Ein abgelaufener oder gesperrter Gastzugang ist kein Zugang mehr.
+  // Gruppenmitglieder haben kein Ablaufdatum und sind nicht betroffen.
+  if (
+    !isGroupMember &&
+    shareLinkStatus(
+      {
+        expiresAt: session.user.firecallExpiresAt,
+        disabled: !session.user.isAuthorized,
+      },
+      Date.now(),
+    ) !== 'active'
+  ) {
+    throw new ApiException(
+      `firecall guest ${session.user.id} is expired or disabled`,
+      { status: 403 },
     );
   }
 

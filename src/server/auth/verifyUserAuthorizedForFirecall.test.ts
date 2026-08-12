@@ -41,13 +41,22 @@ const { collectionMock, setFirecall, setFirecallMissing, setUser } = vi.hoisted(
       groups: string[],
       firecallClaim?: string,
       firecallWrite?: boolean,
+      // Gäste brauchen seit der Link-Verwaltung ein Ablaufdatum; ohne eines
+      // gelten sie als abgelaufen. `null` erzwingt genau diesen Altbestand.
+      options: { authorized?: boolean; firecallExpiresAt?: number | null } = {},
     ) => {
+      const expiresAt =
+        options.firecallExpiresAt === undefined
+          ? Date.now() + 60 * 60 * 1000
+          : options.firecallExpiresAt;
       user = {
         exists: true,
         data: () => ({
           groups,
+          authorized: options.authorized ?? true,
           firecall: firecallClaim,
           ...(firecallWrite === undefined ? {} : { firecallWrite }),
+          ...(expiresAt === null ? {} : { firecallExpiresAt: expiresAt }),
         }),
       };
     },
@@ -137,6 +146,44 @@ describe('verifyUserAuthorizedForFirecall', () => {
   it('still allows reads for a read-only guest', async () => {
     setFirecall('ffnd');
     setUser(['allUsers'], 'fc1', false);
+
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).resolves.toMatchObject({ group: 'ffnd' });
+  });
+
+  it('throws 403 for a guest whose link has expired', async () => {
+    setFirecall('ffnd');
+    setUser(['allUsers'], 'fc1', true, {
+      firecallExpiresAt: Date.now() - 1000,
+    });
+
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('throws 403 for a guest from before the expiry feature', async () => {
+    setFirecall('ffnd');
+    setUser(['allUsers'], 'fc1', true, { firecallExpiresAt: null });
+
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('throws 403 for a deactivated guest', async () => {
+    setFirecall('ffnd');
+    setUser(['allUsers'], 'fc1', true, { authorized: false });
+
+    await expect(
+      verifyUserAuthorizedForFirecall(user, 'fc1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('still allows a group member without any expiry', async () => {
+    setFirecall('ffnd');
+    setUser(['ffnd'], undefined, undefined, { firecallExpiresAt: null });
 
     await expect(
       verifyUserAuthorizedForFirecall(user, 'fc1'),

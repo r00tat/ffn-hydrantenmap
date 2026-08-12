@@ -19,6 +19,8 @@ export interface AutoProvisionedUser {
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;
+  /** Ablauf des Gastzugangs in Millisekunden, siehe `shareLinkStatus`. */
+  firecallExpiresAt?: number;
 }
 
 /**
@@ -125,6 +127,7 @@ export async function getUserSessionData(
       groups: uniqueArray(['allUsers', ...(userData.groups || [])]),
       firecall: userData.firecall,
       firecallWrite: guestCanWrite(userData),
+      firecallExpiresAt: userData.firecallExpiresAt,
     };
     userSessionCache.set(uid, result);
     return result;

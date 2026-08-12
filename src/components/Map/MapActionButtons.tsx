@@ -9,7 +9,7 @@ import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import { useTranslations } from 'next-intl';
-import useMapEditor from '../../hooks/useMapEditor';
+import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import { useFirecallItems } from '../firebase/firestoreHooks';
 import AddFirecallItem from './AddFirecallItem';
@@ -30,6 +30,7 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
     selectHistory,
     openFirecallItemDialog,
   } = useMapEditor();
+  const canEdit = useMapEditorCanEdit();
   const firecallItems = useFirecallItems();
   return (
     <>
@@ -58,7 +59,9 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           </Tooltip>
         )}
 
-        {historyId === undefined && (
+        {/* Ohne Schreibrecht bliebe der Umschalter wirkungslos: der Provider
+            erzwingt für Nur-Lese-Gäste `editable: false`. */}
+        {historyId === undefined && canEdit && (
           <Tooltip title={editable ? t('disableEdit') : t('editMap')}>
             <Fab
               color={editable ? 'default' : 'primary'}

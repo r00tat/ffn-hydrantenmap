@@ -27,6 +27,7 @@ beforeEach(() => {
   vi.unstubAllEnvs();
   process.env = { ...originalEnv };
   delete process.env.PASSKEY_ALLOWED_ORIGINS;
+  delete process.env.ALLOWED_ORIGINS;
   process.env.NEXTAUTH_URL = 'https://einsatz.ffnd.at';
 });
 
@@ -96,6 +97,19 @@ describe('requestOrigin', () => {
       'https://a.ffnd.at, https://b.ffnd.at';
     withHeaders({ host: 'b.ffnd.at', 'x-forwarded-proto': 'https' });
     expect(await requestOrigin()).toBe('https://b.ffnd.at');
+  });
+
+  it('honours ALLOWED_ORIGINS, the name that also covers share links', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://a.ffnd.at, https://b.ffnd.at';
+    withHeaders({ host: 'b.ffnd.at', 'x-forwarded-proto': 'https' });
+    expect(await requestOrigin()).toBe('https://b.ffnd.at');
+  });
+
+  it('prefers ALLOWED_ORIGINS over the passkey specific fallback', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://a.ffnd.at';
+    process.env.PASSKEY_ALLOWED_ORIGINS = 'https://b.ffnd.at';
+    withHeaders({ host: 'b.ffnd.at', 'x-forwarded-proto': 'https' });
+    expect(await requestOrigin()).toBeUndefined();
   });
 
   it('rejects the NEXTAUTH_URL host once an explicit allowlist is set', async () => {

@@ -33,7 +33,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId, useFirecallSelect } from '../../hooks/useFirecall';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import FirecallShareDialog from '../dialogs/FirecallShareDialog';
+import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';

@@ -33,6 +33,20 @@ export function guestDisplayName(name: string, firecallName?: string): string {
   return `${guestName} (${GUEST_NAME_MARKER}${einsatz ? ` ${einsatz}` : ''})`;
 }
 
+/**
+ * Kehrt `guestDisplayName` um: liefert den reinen Gastnamen zurück, damit er im
+ * Share-Dialog bearbeitbar ist. Greift der Marker nicht (händisch angelegter
+ * Benutzer, alter Datenstand), bleibt der Anzeigename unverändert — lieber ein
+ * unschöner Name in der Liste als ein leeres Feld.
+ */
+export function guestNameFromDisplayName(displayName?: string): string {
+  const value = normalizeGuestName(displayName);
+  const match = value.match(
+    new RegExp(`^(.*)\\s*\\(${GUEST_NAME_MARKER}(?:\\s[^)]*)?\\)$`)
+  );
+  return match ? normalizeGuestName(match[1]) : value;
+}
+
 /** Ist dieser Benutzer ein über Share-Link angelegter Einsatz-Gast? */
 export function isFirecallGuest(user?: FirecallGuestInfo): boolean {
   return !!user?.firecall;

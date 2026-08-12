@@ -8,6 +8,7 @@ import {
 } from '../../components/firebase/firestore';
 import { FirebaseUserInfo } from '../../common/users';
 import { guestCanWrite } from '../../common/firecallGuest';
+import { shareLinkStatus } from '../../common/firecallShareLink';
 import { firestore } from '../firebase/admin';
 
 /**
@@ -58,6 +59,24 @@ export async function verifyUserAuthorizedForFirecall(
   if (!isGroupMember && userFirecall !== firecallId) {
     throw new ApiException(
       `user ${user.uid} is not authorized for firecall ${firecallId}`,
+      { status: 403 }
+    );
+  }
+
+  // Wie in `userAuthorized`: ein abgelaufener oder gesperrter Gastzugang gilt
+  // nicht mehr, Gruppenmitglieder sind davon nicht betroffen.
+  if (
+    !isGroupMember &&
+    shareLinkStatus(
+      {
+        expiresAt: userData?.firecallExpiresAt,
+        disabled: !userData?.authorized,
+      },
+      Date.now()
+    ) !== 'active'
+  ) {
+    throw new ApiException(
+      `firecall guest ${user.uid} is expired or disabled for firecall ${firecallId}`,
       { status: 403 }
     );
   }

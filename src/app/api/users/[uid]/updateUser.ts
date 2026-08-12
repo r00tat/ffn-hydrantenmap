@@ -26,6 +26,11 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     // Feld undefined und wird von `filteredData` unten herausgefiltert, damit
     // ein merge-Write kein bestehendes Feld überschreibt.
     firecallWrite: isFirecallGuest(user) ? !!user.firecallWrite : undefined,
+    // Wie `firecallWrite`: bei Nicht-Gästen undefined, damit `filteredData` das
+    // Feld herausfiltert und ein merge-Write nichts überschreibt.
+    firecallExpiresAt: isFirecallGuest(user)
+      ? user.firecallExpiresAt
+      : undefined,
   };
 
   const filteredData = Object.fromEntries(
@@ -50,7 +55,14 @@ export async function updateUser(uid: string, user: UserRecordExtended) {
     isAdmin: newData.isAdmin,
     authorized: newData.authorized,
     ...(isFirecallGuest(user)
-      ? { firecall: user.firecall, firecallWrite: !!user.firecallWrite }
+      ? {
+          firecall: user.firecall,
+          firecallWrite: !!user.firecallWrite,
+          // Ohne diese Zeile löschte jede Admin-Bearbeitung in der
+          // Benutzerverwaltung den Ablauf-Claim — der Gastzugang wäre danach
+          // aus Sicht der Firestore-Rules unbegrenzt gültig.
+          firecallExpires: user.firecallExpiresAt,
+        }
       : {}),
   });
 
@@ -67,6 +79,12 @@ export interface CustomClaims {
   authorized: boolean;
   firecall?: string;
   firecallWrite?: boolean;
+  /**
+   * Ablauf des Gastzugangs in Millisekunden. Die Firestore-Rules vergleichen
+   * ihn gegen `request.time` und sperren abgelaufene Gäste, ohne dafür das
+   * Benutzerdokument lesen zu müssen.
+   */
+  firecallExpires?: number;
 }
 
 export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {
@@ -77,7 +95,13 @@ export async function setCustomClaimsForUser(uid: string, user: CustomClaims) {
     // Einsatz-Gast-Claims nur setzen, wenn vorhanden — `undefined` ist als
     // Custom Claim nicht erlaubt.
     ...(user.firecall
-      ? { firecall: user.firecall, firecallWrite: user.firecallWrite !== false }
+      ? {
+          firecall: user.firecall,
+          firecallWrite: user.firecallWrite !== false,
+          ...(user.firecallExpires
+            ? { firecallExpires: user.firecallExpires }
+            : {}),
+        }
       : {}),
   };
   console.info(
