@@ -190,7 +190,7 @@ jobs:
 
       - name: Install chrome-extension dependencies
         working-directory: chrome-extension
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build extension
         working-directory: chrome-extension

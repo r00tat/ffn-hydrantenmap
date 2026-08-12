@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: capacitor
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Setup Java
         uses: actions/setup-java@v5

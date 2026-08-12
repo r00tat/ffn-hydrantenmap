@@ -43,7 +43,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: chrome-extension
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run tests
         working-directory: chrome-extension
