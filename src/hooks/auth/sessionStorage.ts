@@ -41,9 +41,14 @@ export function saveAuthToSessionStorage(loginStatus: LoginData): void {
     loginStatus.expiration &&
     new Date(loginStatus.expiration) > new Date()
   ) {
+    // `hasFirebaseUser` beschreibt den aktuellen Firebase-Auth-Zustand und darf
+    // den Reload nicht überleben: wiederhergestellt würde es eine Sitzung
+    // behaupten, die es noch nicht gibt, und genau die verfrühten
+    // Firestore-Listener auslösen, die es verhindern soll.
+    const { hasFirebaseUser, ...persistable } = loginStatus;
     window.sessionStorage.setItem(
       SESSION_STORAGE_AUTH_KEY,
-      JSON.stringify(loginStatus)
+      JSON.stringify(persistable)
     );
   }
 }

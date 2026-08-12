@@ -4,6 +4,7 @@ import { collection, query, QueryConstraint, Query } from 'firebase/firestore';
 import { useMemo, useRef } from 'react';
 import { firestore } from '../components/firebase/firebase';
 import { useFirestoreQuery } from './useFirestoreQuery';
+import useFirebaseLogin from './useFirebaseLogin';
 import { FIRECALL_COLLECTION_ID } from '../components/firebase/firestore';
 
 export interface FirebaseCollectionOptions<T> {
@@ -22,6 +23,13 @@ export default function useFirebaseCollection<T>(
     pathSegments = [],
     filterFn,
   } = options;
+
+  // Ohne angemeldeten Firebase-Benutzer ist `request.auth` null und jede Regel
+  // verweigert den Zugriff. Der Auth-Cache lässt `isAuthorized` beim ersten
+  // Render bereits true sein, damit die App sofort paintet — würde hier nicht
+  // auf den echten Auth-Zustand gewartet, liefe jeder Listener in dieser
+  // Zeitspanne in ein `permission-denied`.
+  const { hasFirebaseUser } = useFirebaseLogin();
 
   // Serialize path and constraints for stable dependency comparison
   const pathKey = JSON.stringify([collectionName, ...pathSegments]);
@@ -45,6 +53,9 @@ export default function useFirebaseCollection<T>(
   // Memoize the query to prevent re-subscribing on every render.
   // Uses serialized keys for stable dependency tracking.
   const memoizedQuery: Query<T> | null = useMemo(() => {
+    if (!hasFirebaseUser) {
+      return null;
+    }
     const path = pathRef.current;
     if (
       path.length === 0 ||
@@ -63,7 +74,7 @@ export default function useFirebaseCollection<T>(
       return null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathKey, constraintsKey]);
+  }, [pathKey, constraintsKey, hasFirebaseUser]);
 
   const { value, loading, error, records } = useFirestoreQuery<T>(
     memoizedQuery,

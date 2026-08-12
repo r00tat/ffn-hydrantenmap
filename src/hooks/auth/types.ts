@@ -13,6 +13,17 @@ export interface LoginData {
   isAuthorized: boolean;
   isAdmin: boolean;
   isAuthLoading: boolean;
+  /**
+   * Ob Firebase Auth *jetzt* einen angemeldeten Benutzer hat.
+   *
+   * Nicht dasselbe wie `isSignedIn`/`isAuthorized`: die werden beim ersten
+   * Render optimistisch aus dem Session-Cache vorbelegt, damit die App sofort
+   * paintet. Firestore-Listener dürfen sich darauf nicht verlassen — ohne
+   * `request.auth` weisen die Security Rules jede Abfrage mit
+   * `permission-denied` ab. Dieses Flag stammt ausschließlich aus
+   * `onAuthStateChanged` und wird nie aus dem Cache wiederhergestellt.
+   */
+  hasFirebaseUser: boolean;
   user?: User;
   email?: string;
   displayName?: string;
