@@ -63,7 +63,39 @@ export async function requestOrigin(): Promise<string | undefined> {
       : 'https');
 
   const origin = normalize(`${scheme}://${host}`);
-  return allowedOrigins().includes(origin) ? origin : undefined;
+  const allowed = allowedOrigins();
+  if (allowed.includes(origin)) {
+    return origin;
+  }
+
+  // In der lokalen Entwicklung zusätzlich jede localhost-Adresse akzeptieren,
+  // unabhängig von Port und Schema: `next dev -p 3001`, `npm run dev:https` und
+  // der Aufruf über 127.0.0.1 statt localhost sollen nicht an einer
+  // Allowlist scheitern, die auf einen einzigen Port festgelegt ist. Nur
+  // localhost — LAN-IPs und Tunnel-Domains sind über http ohnehin kein Secure
+  // Context, dort verweigert schon der Browser die WebAuthn-Ceremony.
+  if (process.env.NODE_ENV !== 'production' && isLoopbackOrigin(origin)) {
+    return origin;
+  }
+
+  // Ohne diese Zeile ist ein Origin-Mismatch praktisch nicht zu diagnostizieren:
+  // der Aufrufer sieht nur ein `undefined` bzw. eine generische Fehlermeldung.
+  console.warn(
+    `origin ${origin} is not allowed (allowed: ${allowed.join(', ') || 'none'})`,
+  );
+  return undefined;
+}
+
+/** localhost, 127.0.0.1 oder ::1 — unabhängig von Port und Schema. */
+function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const { hostname } = new URL(origin);
+    return (
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

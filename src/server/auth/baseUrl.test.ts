@@ -22,6 +22,9 @@ const originalEnv = { ...process.env };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Vor dem Zurücksetzen von process.env, sonst schreibt das Aufheben der Stubs
+  // in das frisch ersetzte Objekt.
+  vi.unstubAllEnvs();
   process.env = { ...originalEnv };
   delete process.env.PASSKEY_ALLOWED_ORIGINS;
   process.env.NEXTAUTH_URL = 'https://einsatz.ffnd.at';
@@ -55,6 +58,36 @@ describe('requestOrigin', () => {
 
   it('rejects an origin that is not on the allowlist', async () => {
     withHeaders({ host: 'evil.example.com', 'x-forwarded-proto': 'https' });
+    expect(await requestOrigin()).toBeUndefined();
+  });
+
+  it('accepts localhost on any port during development', async () => {
+    // `next dev -p 3001` darf nicht an der auf 3000 festgelegten Allowlist
+    // scheitern.
+    withHeaders({ host: 'localhost:3001' });
+    expect(await requestOrigin()).toBe('http://localhost:3001');
+  });
+
+  it('accepts 127.0.0.1 during development', async () => {
+    withHeaders({ host: '127.0.0.1:3000' });
+    expect(await requestOrigin()).toBe('http://127.0.0.1:3000');
+  });
+
+  it('accepts https on localhost during development (npm run dev:https)', async () => {
+    withHeaders({ host: 'localhost:3000', 'x-forwarded-proto': 'https' });
+    expect(await requestOrigin()).toBe('https://localhost:3000');
+  });
+
+  it('does not accept an unlisted loopback origin in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    withHeaders({ host: 'localhost:3001' });
+    expect(await requestOrigin()).toBeUndefined();
+  });
+
+  it('still rejects a LAN address during development', async () => {
+    // Über http ist eine LAN-IP kein Secure Context — der Browser verweigert
+    // die Ceremony ohnehin, also hier gar nicht erst zulassen.
+    withHeaders({ host: '192.168.1.147:3000' });
     expect(await requestOrigin()).toBeUndefined();
   });
 
