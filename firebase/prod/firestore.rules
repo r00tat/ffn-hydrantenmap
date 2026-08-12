@@ -31,6 +31,17 @@ service cloud.firestore {
       return !('firecallWrite' in request.auth.token)
         || request.auth.token.firecallWrite == true;
     }
+
+    // Der Ablauf eines Gastzugangs steckt als absoluter Zeitstempel im Token und
+    // wird beim Refresh (alle 45 Min, siehe useFirebaseCustomTokenLogin.ts) neu
+    // gesetzt. Fehlt der Claim, gilt kein Ablauf: Gruppenmitglieder tragen ihn
+    // nie, und Gäste aus der Zeit vor der Link-Verwaltung verlieren ihren
+    // Zugriff ohnehin beim nächsten Token-Tausch, weil ihr Benutzerdokument
+    // kein Ablaufdatum hat.
+    function guestNotExpired() {
+      return !('firecallExpires' in request.auth.token)
+        || request.auth.token.firecallExpires > request.time.toMillis();
+    }
     
     match /hydrant/{doc=*} {
       allow read: if authorizedUser()
@@ -55,12 +66,12 @@ service cloud.firestore {
       allow read: if authorizedUser() 
             // && resource.data.group in get(/databases/$(database)/documents/user/$(request.auth.uid)).data.groups 
             && (
-            	doc == request.auth.token.firecall ||
+            	(doc == request.auth.token.firecall && guestNotExpired()) ||
               resource.data.group in request.auth.token.groups
             );
       allow write: if authorizedUser() 
             && (
-            	(doc == request.auth.token.firecall && guestMayWrite()) ||
+            	(doc == request.auth.token.firecall && guestNotExpired() && guestMayWrite()) ||
               resource.data.group in request.auth.token.groups
             );
       allow create: if authorizedUser() 
@@ -68,7 +79,7 @@ service cloud.firestore {
 
       function callAuthorized() {
         return authorizedUser() && (
-          doc == request.auth.token.firecall ||
+          (doc == request.auth.token.firecall && guestNotExpired()) ||
           get(/databases/$(database)/documents/call/$(doc)).data.group in request.auth.token.groups
         )
       }
@@ -76,7 +87,7 @@ service cloud.firestore {
       // Wie callAuthorized(), schließt aber Nur-Lese-Gäste aus.
       function callWriteAuthorized() {
         return authorizedUser() && (
-          (doc == request.auth.token.firecall && guestMayWrite()) ||
+          (doc == request.auth.token.firecall && guestNotExpired() && guestMayWrite()) ||
           get(/databases/$(database)/documents/call/$(doc)).data.group in request.auth.token.groups
         )
       }

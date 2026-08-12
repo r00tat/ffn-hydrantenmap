@@ -31,7 +31,7 @@ import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import { useAuditLog } from '../../hooks/useAuditLog';
 import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
-import FirecallShareDialog from '../dialogs/FirecallShareDialog';
+import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
 import { firestore } from '../firebase/firebase';
 import {

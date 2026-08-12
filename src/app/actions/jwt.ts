@@ -52,13 +52,15 @@ export async function getOrCreateJwtKeys(): Promise<JwtKeys> {
  * Creates a new JWT.
  * @param payload The payload to include in the JWT.
  * @param subject The subject of the JWT.
- * @param expiresIn The expiration time for the JWT (e.g., "2 hours", "60s").
+ * @param expiresIn Duration (e.g. "2 hours", "60s") or an absolute point in
+ *   time as seconds since the epoch. Share links pass the absolute expiry of
+ *   the guest account so the JWT dies exactly when the access does.
  * @returns {Promise<string>} A promise that resolves to the signed JWT.
  */
 export async function createJwt(
   payload: Record<string, unknown>,
   subject: string,
-  expiresIn: string
+  expiresIn: string | number
 ): Promise<string> {
   const { privateKey, algorithm } = await getOrCreateJwtKeys();
 

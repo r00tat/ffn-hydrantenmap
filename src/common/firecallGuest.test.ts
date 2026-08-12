@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   guestCanWrite,
   guestDisplayName,
+  guestNameFromDisplayName,
   isFirecallGuest,
   normalizeGuestName,
 } from './firecallGuest';
@@ -71,5 +72,31 @@ describe('guestCanWrite', () => {
 
   it('grants write access to legacy guests without the flag', () => {
     expect(guestCanWrite({ firecall: 'abc' })).toBe(true);
+  });
+});
+
+describe('guestNameFromDisplayName', () => {
+  it('strips the guest marker and the firecall name', () => {
+    expect(guestNameFromDisplayName('ORF (Einsatz-Gast Brand Hauptstraße)')).toBe(
+      'ORF',
+    );
+  });
+
+  it('strips the marker without a firecall name', () => {
+    expect(guestNameFromDisplayName('ORF (Einsatz-Gast)')).toBe('ORF');
+  });
+
+  it('keeps parentheses that belong to the guest name', () => {
+    expect(
+      guestNameFromDisplayName('FF Weiden (Bezirk ND) (Einsatz-Gast Brand)'),
+    ).toBe('FF Weiden (Bezirk ND)');
+  });
+
+  it('falls back to the full name when the pattern does not match', () => {
+    expect(guestNameFromDisplayName('Irgendwer')).toBe('Irgendwer');
+  });
+
+  it('handles a missing display name', () => {
+    expect(guestNameFromDisplayName(undefined)).toBe('');
   });
 });

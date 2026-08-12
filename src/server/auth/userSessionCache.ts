@@ -5,6 +5,8 @@ export interface CacheableUserData {
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;
+  /** Ablauf des Gastzugangs in Millisekunden, siehe `shareLinkStatus`. */
+  firecallExpiresAt?: number;
 }
 
 export class UserSessionCache {

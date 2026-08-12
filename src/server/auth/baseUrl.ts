@@ -13,10 +13,14 @@ function normalize(url: string): string {
  * die Allowlist verhindert, dass eine fremde Origin in eine WebAuthn-Ceremony
  * oder in einen generierten Link gerät.
  *
- * Ohne `PASSKEY_ALLOWED_ORIGINS` gilt `NEXTAUTH_URL` plus localhost.
+ * `ALLOWED_ORIGINS` ist der maßgebliche Name — die Liste gilt inzwischen auch
+ * für erzeugte Share-Links und nicht mehr nur für WebAuthn-Ceremonies.
+ * `PASSKEY_ALLOWED_ORIGINS` bleibt als Fallback, damit bestehende Deployments
+ * unverändert weiterlaufen. Ohne beides gilt `NEXTAUTH_URL` plus localhost.
  */
 function allowedOrigins(): string[] {
-  const configured = process.env.PASSKEY_ALLOWED_ORIGINS;
+  const configured =
+    process.env.ALLOWED_ORIGINS || process.env.PASSKEY_ALLOWED_ORIGINS;
   if (configured) {
     return configured.split(',').map(normalize).filter(Boolean);
   }
