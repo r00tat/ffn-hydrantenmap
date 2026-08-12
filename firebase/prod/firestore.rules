@@ -280,6 +280,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Passkeys werden ausschließlich über Server Actions mit dem Admin SDK
+    // gelesen und geschrieben — die Ceremony-Verifikation, der Replay-Schutz
+    // über `lastChallenge` und die Counter-Fortschreibung dürfen nicht am
+    // Server vorbei manipulierbar sein. Wie beim Share-Link gilt: Regeln sind
+    // additiv, der abschließende Catch-all lässt Admins weiterhin lesen. Das
+    // ist vertretbar, weil hier nur öffentliche Schlüssel liegen und kein
+    // Geheimnis, mit dem sich jemand anmelden könnte.
+    match /passkey/{credentialId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }

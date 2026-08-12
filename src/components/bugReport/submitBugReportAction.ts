@@ -14,6 +14,7 @@ import {
   type BugReportSubmitInput,
 } from '../../common/bugReport';
 import { buildBugReportEmail } from './buildBugReportEmail';
+import { getBaseUrl } from '../../server/auth/baseUrl';
 
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -113,7 +114,7 @@ async function sendNotification(report: BugReport): Promise<void> {
   }
 
   const [to, ...cc] = cfg.recipientEmails;
-  const appBaseUrl = process.env.NEXTAUTH_URL ?? '';
+  const appBaseUrl = await getBaseUrl();
 
   const { raw } = buildBugReportEmail({ report, appBaseUrl, from, to, cc });
   await sendRawMail(raw);

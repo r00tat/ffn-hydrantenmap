@@ -20,6 +20,7 @@ import {
   NativeDebugInfo,
 } from '../firebase/googleAuthAdapter';
 import NativeLoginPanel from '../firebase/NativeLoginPanel';
+import PasskeyLoginButton from '../auth/PasskeyLoginButton';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import ProfileUi from './ProfileUi';
@@ -139,6 +140,10 @@ export default function LoginUi() {
             ) : (
               <FirebaseUiLogin />
             )}
+            {/* Passkey-Login gilt für beide Varianten und liegt deshalb hier
+                statt in den beiden Panels — firebaseui rendert seinen eigenen
+                DOM-Baum, in den sich ein MUI-Button nicht sauber einfügt. */}
+            <PasskeyLoginButton />
           </Paper>
           <Box sx={{ mx: 2 }}>
             <DebugLoggingSwitch />

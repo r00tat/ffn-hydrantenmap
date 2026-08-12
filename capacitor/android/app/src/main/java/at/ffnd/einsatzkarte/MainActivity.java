@@ -25,6 +25,8 @@ import androidx.annotation.RequiresApi;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.WindowCompat;
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewFeature;
 
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
@@ -87,6 +89,22 @@ public class MainActivity extends BridgeActivity {
         WindowCompat.setDecorFitsSystemWindows(window, false);
 
         WebView webView = this.bridge.getWebView();
+
+        // WebAuthn/Passkeys sind im Android-WebView standardmäßig deaktiviert und
+        // müssen explizit freigeschaltet werden, sonst schlägt
+        // navigator.credentials.get() im Login fehl. FOR_APP leitet die Anfrage
+        // über den Credential Manager der App; die Relying Party sieht dabei
+        // weiterhin die Web-Origin (https://einsatz.ffnd.at), weshalb serverseitig
+        // nichts zu konfigurieren ist. Voraussetzung ist die Verknüpfung über
+        // /.well-known/assetlinks.json mit delegate_permission/common.get_login_creds.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+            WebSettingsCompat.setWebAuthenticationSupport(
+                webView.getSettings(),
+                WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP
+            );
+        } else {
+            Log.i(TAG, "WebView does not support WebAuthn, passkey login unavailable");
+        }
 
         swipeRefreshLayout = findViewById(R.id.swipe_refresh);
         if (swipeRefreshLayout != null) {

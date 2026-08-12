@@ -63,6 +63,9 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
+    // WebSettingsCompat.setWebAuthenticationSupport — schaltet Passkeys im
+    // WebView frei (siehe MainActivity). Erst ab androidx.webkit 1.12.0.
+    implementation "androidx.webkit:webkit:1.14.0"
     implementation project(':capacitor-android')
     // FusedLocationProviderClient — hält den GPS-Chip während einer
     // Radiacode-Session im PRIORITY_HIGH_ACCURACY-Modus, damit das WebView
