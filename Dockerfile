@@ -1,7 +1,7 @@
 # https://nextjs.org/docs/deployment
 # Install dependencies only when needed
 ARG DOCKER_REGISTRY=""
-FROM ${DOCKER_REGISTRY}node:22-alpine AS base
+FROM ${DOCKER_REGISTRY}node:24-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -10,8 +10,16 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
+# --ignore-scripts: a dependency's lifecycle scripts are the cheapest path to
+# code execution in a supply-chain attack — they run at install time, before
+# anyone has imported the package. Note that npm 11 does NOT prevent this on
+# its own: it prints an "allow-scripts" warning listing the pending scripts and
+# then runs them anyway, so the flag is what actually blocks execution.
+# Nothing in this tree needs them (no node-gyp, no prebuild-install; the native
+# bindings of sharp et al. ship as prebuilt platform packages via
+# optionalDependencies).
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Rebuild the source code only when needed
 FROM base AS builder

@@ -55,7 +55,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: |
             package-lock.json
@@ -190,7 +190,7 @@ jobs:
 
       - name: Install chrome-extension dependencies
         working-directory: chrome-extension
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build extension
         working-directory: chrome-extension

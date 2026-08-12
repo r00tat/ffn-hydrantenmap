@@ -19,7 +19,7 @@ Chrome Extension (Manifest V3) für die Einsatzkarte der FF Neusiedl am See. Bie
 
 ### Voraussetzungen
 
-- Node.js (siehe `.node-version` im Root)
+- Node.js (siehe `.tool-versions` im Root)
 - `.env.local` im Projekt-Root mit Firebase-Konfiguration (`NEXT_PUBLIC_FIREBASE_APIKEY`, `NEXT_PUBLIC_FIRESTORE_DB`)
 
 ### Setup
@@ -27,7 +27,14 @@ Chrome Extension (Manifest V3) für die Einsatzkarte der FF Neusiedl am See. Bie
 ```bash
 cd chrome-extension
 npm install
+npx wxt prepare
 ```
+
+`.npmrc` setzt `ignore-scripts=true` (siehe `.npmrc` im Root), damit
+Lifecycle-Scripts von Dependencies nicht beim Install ausgeführt werden. Das
+deaktiviert auch den eigenen `postinstall` (`wxt prepare`), deshalb der
+zusätzliche Aufruf oben. `npm test` und `npm run build` rufen `wxt prepare`
+ohnehin selbst auf.
 
 ### Development
 
