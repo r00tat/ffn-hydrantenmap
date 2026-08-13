@@ -274,8 +274,12 @@ function counterColumns(
 /**
  * Betriebsmittel des Fahrzeugs, ergänzt um Arten, die nur in den Fahrten
  * vorkommen — dieselbe Begründung wie bei den Zählern.
+ *
+ * Exportiert und nicht auf den Export zugeschnitten benannt, weil der
+ * Wochenbericht (`weeklyReportModel.ts`) dieselbe Liste braucht: Zwei Fassungen
+ * davon hieße, dass eine getankte Menge in einem der beiden Dokumente fehlt.
  */
-function fuelColumnTypes(
+export function usedFuelTypes(
   vehicle: FahrtenbuchVehicle,
   entries: FahrtenbuchEntry[],
 ): FuelType[] {
@@ -338,7 +342,7 @@ export function buildFahrtenbuchExport(
 
     const definitions = counterDefinitions(vehicle, vehicleEntries);
     const { columns: counterCols, specs } = counterColumns(definitions, t);
-    const fuels = fuelColumnTypes(vehicle, vehicleEntries);
+    const fuels = usedFuelTypes(vehicle, vehicleEntries);
 
     const columns: ExportColumn[] = [
       { key: 'datum', label: t('export.columns.datum'), flex: 1.2 },

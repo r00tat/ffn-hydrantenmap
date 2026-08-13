@@ -8,18 +8,17 @@
  */
 
 import {
-  FUEL_TYPES,
   type CounterDefinition,
   type CounterReading,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
-  type FuelType,
 } from '../../common/fahrtenbuch';
 import { isOpenMangel, type Mangel } from '../../common/mangel';
 import {
   counterDefinitions,
   formatDate,
   formatTimeRange,
+  usedFuelTypes,
 } from './fahrtenbuchExportModel';
 import {
   FUEL_LABELS,
@@ -239,23 +238,6 @@ function vehicleWarnings(
   return warnings;
 }
 
-/** Betriebsmittel des Fahrzeugs, ergänzt um Arten, die nur in den Fahrten vorkommen. */
-function fuelTypes(
-  vehicle: FahrtenbuchVehicle,
-  entries: FahrtenbuchEntry[],
-): FuelType[] {
-  const used = new Set<FuelType>(vehicle.fuelTypes ?? []);
-  for (const entry of entries) {
-    for (const fuel of FUEL_TYPES) {
-      const amount = entry.betriebsmittel?.[fuel];
-      if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
-        used.add(fuel);
-      }
-    }
-  }
-  return FUEL_TYPES.filter((f) => used.has(f));
-}
-
 function rowNote(entry: FahrtenbuchEntry): string | undefined {
   const mangel = entry.mangel?.trim();
   // Der Mangeltext hängt am Vermerk und steht nicht daneben — sonst ließe der
@@ -298,7 +280,7 @@ export function buildWeeklyReportModel(
     entryCount += vehicleEntries.length;
 
     const definitions = counterDefinitions(vehicle, vehicleEntries);
-    const fuels = fuelTypes(vehicle, vehicleEntries);
+    const fuels = usedFuelTypes(vehicle, vehicleEntries);
     const totals = new Map<string, number>();
 
     const rows = vehicleEntries.map<WeeklyReportRow>((entry) => {

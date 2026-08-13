@@ -197,8 +197,15 @@ describe('buildWeeklyReportModel', () => {
         }),
       ],
     });
-    expect(model.vehicles[0].warnings).toMatchObject([
-      { kind: 'gap', previousEnd: 17557, nextStart: 17600, date: '06.08.2026' },
+    expect(model.vehicles[0].warnings).toEqual([
+      {
+        kind: 'gap',
+        counterLabel: 'Kilometerstand',
+        unit: 'km',
+        previousEnd: 17557,
+        nextStart: 17600,
+        date: '06.08.2026',
+      },
     ]);
   });
 
@@ -278,7 +285,9 @@ describe('buildWeeklyReportModel', () => {
 
   it('meldet einen Pflichtzähler ohne Startstand', () => {
     const model = build({ entries: [entry({ counters: { km: { end: 17557 } } })] });
-    expect(model.vehicles[0].warnings).toMatchObject([{ kind: 'missing' }]);
+    expect(model.vehicles[0].warnings).toEqual([
+      { kind: 'missing', counterLabel: 'Kilometerstand', date: '05.08.2026' },
+    ]);
   });
 
   it('meldet einen fehlenden Wert nur einmal und nicht als Lücke der Folgefahrt', () => {
