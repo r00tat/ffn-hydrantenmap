@@ -328,9 +328,14 @@ export function buildWeeklyReportModel(
 
     return {
       vehicleId,
+      // `name` ist im Typ Pflicht, ein Dokument aus Firestore kann es dennoch
+      // vermissen lassen — die Sortierung in `sendWeeklyReports` fängt das
+      // schon ab. Ohne Rückfall käme hier ein `undefined` in die Überschrift
+      // und `heading.length` im Textteil der Mail würde werfen: Der Bericht der
+      // ganzen Gruppe fiele wegen eines Fahrzeugs aus.
       heading: vehicle.kennzeichen?.trim()
-        ? `${vehicle.name} (${vehicle.kennzeichen.trim()})`
-        : vehicle.name,
+        ? `${vehicle.name ?? ''} (${vehicle.kennzeichen.trim()})`.trim()
+        : (vehicle.name ?? ''),
       rows,
       // Nur Zähler mit erfassten Werten: Eine Summe „0 km" behauptete, das
       // Fahrzeug sei keinen Meter gefahren, obwohl niemand etwas eingetragen hat.

@@ -81,4 +81,13 @@ variable "run_service_url" {
     condition     = startswith(var.run_service_url, "https://")
     error_message = "run_service_url muss mit https:// beginnen (Repository-Variable RUN_SERVICE_URL_DEV)."
   }
+
+  # Ein Schrägstrich am Ende wäre genauso tödlich, nur unauffälliger: Der
+  # Scheduler stellte das Token auf "https://host/" aus, während `getBaseUrl()`
+  # im Dienst den Schrägstrich abschneidet und "https://host" erwartet. Die
+  # Audience passte nicht und `cronRequired` antwortete 403.
+  validation {
+    condition     = !endswith(var.run_service_url, "/")
+    error_message = "run_service_url darf nicht mit / enden — die Audience des OIDC-Tokens müsste sonst exakt so lauten."
+  }
 }

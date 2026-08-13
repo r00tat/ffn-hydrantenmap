@@ -17,3 +17,11 @@ output "firestore_database" {
   description = "Firestore database of this environment"
   value       = module.firestore.database_name
 }
+
+# Der Wert, der als Version in das Secret CRON_INVOKER_EMAILS gehört. Ohne
+# diesen Output müsste der Betreiber die Adresse aus dem State oder der Konsole
+# heraussuchen.
+output "fahrtenbuch_report_invoker" {
+  description = "Service account that invokes the weekly report; belongs in the CRON_INVOKER_EMAILS secret"
+  value       = module.cloud_scheduler.invoker_service_account_email
+}

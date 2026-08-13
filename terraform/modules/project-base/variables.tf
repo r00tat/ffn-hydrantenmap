@@ -121,5 +121,12 @@ variable "secrets" {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
+    # Allowlist der Service-Account-Adressen für zeitplan-gesteuerte Endpoints.
+    # Muss hier stehen, weil service.yaml einen secretKeyRef darauf hält: fehlt
+    # das Secret oder das accessor-Binding, wird die Revision nicht ready und
+    # die ganze Anwendung deployt nicht mehr. Terraform legt Hülle und Binding
+    # an, den Wert (die E-Mail aus dem Output invoker_service_account_email)
+    # trägt der Betreiber als Version nach.
+    "CRON_INVOKER_EMAILS",
   ]
 }

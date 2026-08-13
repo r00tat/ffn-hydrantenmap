@@ -114,7 +114,15 @@ describe('buildWeeklyReportEmail', () => {
     );
     expect(raw).toContain('Content-Type: text/plain; charset="UTF-8"');
     expect(raw).toContain('Content-Type: text/html; charset="UTF-8"');
-    expect(raw.trimEnd().endsWith('--')).toBe(true);
+
+    // Die Boundary aus der Kopfzeile lesen und prüfen, dass genau sie beide
+    // Teile trennt und die Nachricht abschließt. Ein `endsWith('--')` allein
+    // wäre von jeder Zeichenkette mit zwei Bindestrichen am Ende erfüllt und
+    // würde eine abweichende Schluss-Boundary nicht bemerken.
+    const boundary = raw.match(/boundary="([^"]+)"/)?.[1];
+    expect(boundary).toMatch(/^boundary_/);
+    expect(raw.split(`--${boundary}\r\n`)).toHaveLength(3);
+    expect(raw.trimEnd().endsWith(`--${boundary}--`)).toBe(true);
   });
 
   it('bricht die base64-Teile auf höchstens 76 Zeichen um', () => {

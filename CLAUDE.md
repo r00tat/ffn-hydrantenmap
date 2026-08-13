@@ -455,8 +455,12 @@ curl -s -X POST "$SERVICE_URL/api/fahrtenbuch/weekly-report" \
 
 Ein Fehler bei einer Gruppe beendet den Lauf nicht und ergibt trotzdem 200 —
 sonst würde der Scheduler wiederholen und den erfolgreichen Gruppen die Mail
-doppelt schicken. 500 gibt es nur, wenn keine Gruppe eine Mail bekommen hat;
-dann ist die Wiederholung gefahrlos.
+doppelt schicken. 500 gibt es nur, wenn **keine** Gruppe eine Mail bekommen hat
+**und mindestens eine gescheitert ist**; dann ist die Wiederholung gefahrlos.
+Ein Lauf, in dem alle Gruppen übersprungen wurden (keine Empfänger gepflegt) und
+ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
+zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
+am Status-Code.
 
 ## German Terminology
 
