@@ -419,6 +419,45 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+## Fahrtenbuch-Wochenbericht
+
+Cloud Scheduler ruft montags 07:00 (Europe/Vienna)
+`POST /api/fahrtenbuch/weekly-report` auf. Der Lauf verschickt je Gruppe mit
+gepflegten `fahrtenbuchConfig.mangelEmails` einen Bericht über die Fahrten der
+abgeschlossenen ISO-Vorwoche — Fahrtentabelle je Fahrzeug, Wochensumme,
+Plausibilitätswarnungen zu den Zählerständen und die offenen Mängel. Empfänger
+sind dieselben wie bei der Mangel-Benachrichtigung; eine leere Liste ist die
+Abschaltung.
+
+Authentifiziert über ein OIDC-ID-Token, geprüft von
+[cronRequired](src/server/auth/cronRequired.ts) gegen `CRON_INVOKER_EMAILS`.
+Infrastruktur im Terraform-Modul
+[cloud-scheduler](terraform/modules/cloud-scheduler/) — in Dev bewusst
+**pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
+
+Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
+Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
+Grund, aus dem es den Bericht überhaupt gibt.
+
+Zum Prüfen ohne Versand (`dryRun` baut den Bericht und gibt Betreff und
+Textfassung zurück, verschickt aber nichts):
+
+```bash
+SERVICE_URL=https://<host>
+TOKEN=$(gcloud auth print-identity-token \
+  --impersonate-service-account=fahrtenbuch-report-invoker@<projekt>.iam.gserviceaccount.com \
+  --audiences="$SERVICE_URL")
+curl -s -X POST "$SERVICE_URL/api/fahrtenbuch/weekly-report" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"year":2026,"week":32,"dryRun":true}' | jq
+```
+
+Ein Fehler bei einer Gruppe beendet den Lauf nicht und ergibt trotzdem 200 —
+sonst würde der Scheduler wiederholen und den erfolgreichen Gruppen die Mail
+doppelt schicken. 500 gibt es nur, wenn keine Gruppe eine Mail bekommen hat;
+dann ist die Wiederholung gefahrlos.
+
 ## German Terminology
 
 Key domain terms used throughout the codebase:
@@ -441,6 +480,16 @@ Required environment variables (see `.env.local`):
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
 - `PASSKEY_ALLOWED_ORIGINS` (optional) — komma-separierte Allowlist erlaubter
   Origins, siehe unten
+- `CRON_INVOKER_EMAILS` — komma-separierte Allowlist der
+  Service-Account-Adressen, die zeitplan-gesteuerte Endpoints aufrufen dürfen
+  (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
+  Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
+  offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
+  Mail-Relay. Der Wert ist die E-Mail des Invoker-Service-Accounts aus dem
+  Terraform-Modul `cloud-scheduler`.
+- `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
+  Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
+  `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.
 
 ### Basis-URL und erlaubte Origins
 

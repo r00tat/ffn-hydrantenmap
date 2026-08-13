@@ -81,6 +81,13 @@ jobs:
       TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      # Öffentliche URL des Cloud-Run-Dienstes. Cloud Run gibt sie nicht als
+      # Attribut her, das terraform lesen könnte, und sie ist zugleich die
+      # erwartete OIDC-Audience des Scheduler-Tokens — deshalb als
+      # Repository-Variable je Umgebung. Fehlt sie, scheitert `plan` an der
+      # Meldung aus dem `validation`-Block, statt einen Scheduler-Job mit
+      # kaputter URI anzulegen.
+      TF_VAR_run_service_url: ${{ matrix.environment == 'prod' && vars.RUN_SERVICE_URL_PROD || vars.RUN_SERVICE_URL_DEV }}
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -198,6 +205,7 @@ jobs:
       TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_VAR_run_service_url: ${{ vars.RUN_SERVICE_URL_DEV }}
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -244,6 +252,7 @@ jobs:
       TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_VAR_run_service_url: ${{ vars.RUN_SERVICE_URL_PROD }}
       TF_IN_AUTOMATION: "true"
 
     steps:

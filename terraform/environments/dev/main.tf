@@ -61,3 +61,19 @@ module "cloudbuild" {
     _NEXT_PUBLIC_FIRESTORE_DB = local.database_name
   }
 }
+
+module "cloud_scheduler" {
+  source = "../../modules/cloud-scheduler"
+
+  project    = var.project
+  run_region = var.run_region
+  # `var.name` ist in beiden Umgebungen auf "hydrantenmap" voreingestellt, der
+  # Dev-Dienst heißt laut service.yaml aber "hydrantenmap-dev".
+  service_name = "${var.name}-dev"
+  service_url  = var.run_service_url
+
+  # Pausiert: Dev und Prod lesen dieselbe `fahrtenbuchConfig`-Struktur, und zwei
+  # Umgebungen dürfen nicht dieselbe Verteilerliste bemailen. Zum Prüfen in Dev
+  # den Job von Hand auslösen oder `dryRun` verwenden.
+  weekly_report_paused = true
+}

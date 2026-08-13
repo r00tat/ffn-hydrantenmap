@@ -59,3 +59,12 @@ module "cloudbuild" {
     _SERVICE_NAME             = var.name
   }
 }
+
+module "cloud_scheduler" {
+  source = "../../modules/cloud-scheduler"
+
+  project      = var.project
+  run_region   = var.run_region
+  service_name = var.name
+  service_url  = var.run_service_url
+}
