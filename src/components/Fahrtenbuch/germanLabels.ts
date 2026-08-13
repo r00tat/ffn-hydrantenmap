@@ -32,8 +32,12 @@ export const FUEL_UNIT = 'l';
 /**
  * Nur die offenen Status. `resolved` kommt in einer Mail nicht vor: Der Bericht
  * listet, was noch Arbeit macht.
+ *
+ * Groß geschrieben wie `fahrtenbuch.maengel.statuses.*` im Katalog — der
+ * Empfänger sieht denselben Mangel in der Mail und in der Oberfläche, und zwei
+ * Schreibweisen desselben Status lesen sich wie zwei verschiedene Zustände.
  */
 export const OPEN_MANGEL_STATUS_LABELS: Record<'open' | 'inProgress', string> = {
-  open: 'offen',
-  inProgress: 'in Arbeit',
+  open: 'Offen',
+  inProgress: 'In Arbeit',
 };
