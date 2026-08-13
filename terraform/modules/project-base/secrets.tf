@@ -1,10 +1,13 @@
 # ============================================================================
 # Secret Manager
 #
-# Terraform verwaltet nur die Hüllen, nicht die Werte — für Werte, die es nicht
-# kennen kann (API-Keys, Zugangsdaten). Ausnahmen weiter unten sind der
-# BlaulichtSMS-Encryption-Key und die Cron-Invoker-Allowlist: die erzeugt
-# terraform selbst, deshalb schreibt es auch die Version.
+# Terraform verwaltet nur die Hüllen, nicht die Werte. Ausnahme ist der
+# BlaulichtSMS-Encryption-Key weiter unten.
+#
+# Die Cron-Invoker-Allowlist steht bewusst nicht hier: Sie ist eine Kennung, kein
+# Geheimnis, und als Secret hinge jedes Deploy an einem vorherigen apply dieses
+# Moduls. Sie wird beim Deploy als Env-Var gesetzt, siehe
+# .github/workflows/cloud-run.yml.
 # ============================================================================
 
 resource "google_secret_manager_secret" "secrets" {
@@ -52,40 +55,6 @@ resource "google_secret_manager_secret_version" "blaulichtsms_encryption_key" {
 
 resource "google_secret_manager_secret_iam_member" "blaulichtsms_encryption_key_access" {
   secret_id = google_secret_manager_secret.blaulichtsms_encryption_key.id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = google_service_account.run_sa.member
-}
-
-# ============================================================================
-# Cron-Invoker-Allowlist
-#
-# Die Adressen stammen aus terraform selbst (siehe modules/cloud-scheduler),
-# deshalb schreibt terraform hier auch die Version. Kein `ignore_changes`: kommt
-# eine Umgebung dazu oder ändert sich ein Name, soll der nächste apply die
-# Allowlist mitziehen.
-# ============================================================================
-
-resource "google_secret_manager_secret" "cron_invoker_emails" {
-  secret_id = "CRON_INVOKER_EMAILS"
-  project   = var.project
-
-  replication {
-    auto {}
-  }
-}
-
-resource "google_secret_manager_secret_version" "cron_invoker_emails" {
-  # Ohne Adressen keine Version: eine leere Allowlist würde von cronRequired wie
-  # „nicht konfiguriert" behandelt, und eine Hülle ohne Version macht dasselbe —
-  # nur ohne eine Version, die später mühsam deaktiviert werden müsste.
-  count = length(var.cron_invoker_emails) > 0 ? 1 : 0
-
-  secret      = google_secret_manager_secret.cron_invoker_emails.id
-  secret_data = join(",", var.cron_invoker_emails)
-}
-
-resource "google_secret_manager_secret_iam_member" "cron_invoker_emails_access" {
-  secret_id = google_secret_manager_secret.cron_invoker_emails.id
   role      = "roles/secretmanager.secretAccessor"
   member    = google_service_account.run_sa.member
 }

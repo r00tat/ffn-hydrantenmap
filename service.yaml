@@ -36,20 +36,6 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: EINSATZMAPPE_SHEET_RANGE
-            # Allowlist der Service-Account-Adressen, die zeitplan-gesteuerte
-            # Endpoints aufrufen dürfen. Ohne sie lehnt cronRequired jeden
-            # Aufruf ab; Wert und Secret kommen aus dem Terraform-Modul
-            # project-base.
-            #
-            # Achtung: Diese Datei ist ein Abzug des Dev-Dienstes und wird von
-            # keiner Pipeline angewandt (sie steht in .dockerignore).
-            # Maßgeblich ist --update-secrets in
-            # .github/workflows/cloud-run.yml.
-            - name: CRON_INVOKER_EMAILS
-              valueFrom:
-                secretKeyRef:
-                  key: latest
-                  name: CRON_INVOKER_EMAILS
           image: $IMAGE_TAG
           ports:
             - containerPort: 8080

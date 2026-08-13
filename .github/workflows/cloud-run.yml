@@ -73,6 +73,20 @@ jobs:
             export SUMUP_SECRET_SUFFIX=""
           fi
 
+          # Allowlist der Service Accounts, die zeitplan-gesteuerte Endpoints
+          # aufrufen dürfen (cronRequired). Beide Umgebungen stehen drin, weil
+          # ein Invoker aus dev auch gegen den dev-Dienst legitim ist; die Namen
+          # kommen aus terraform/modules/cloud-scheduler (account_id plus
+          # name_suffix) und müssen dort und hier gleich lauten.
+          #
+          # Bewusst eine Env-Var und kein Secret-Manager-Secret: der Wert ist
+          # eine Kennung, kein Geheimnis (wer sie kennt, kann kein Token dafür
+          # ausstellen - dazu braucht es IAM-Rechte auf den SA). Als Secret hinge
+          # jedes Deploy daran, dass vorher ein terraform apply gelaufen ist -
+          # und der prod-apply, dem die Projekt-Basis gehört, läuft nur bei einem
+          # Release.
+          export CRON_INVOKER_EMAILS="fahrtenbuch-report-invoker@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com,fahrtenbuch-report-invoker-dev@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com"
+
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" || "${NEXT_PUBLIC_FIRESTORE_DB}" == "(default)" ]]; then
             # '(default)' / 'default' sentinel -> empty string selects the default DB
             export NEXT_PUBLIC_FIRESTORE_DB=""
@@ -100,6 +114,7 @@ jobs:
           NEXTAUTH_URL_INTERNAL=http://localhost:8080
           NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}
           SUMUP_SECRET_SUFFIX=${SUMUP_SECRET_SUFFIX}
+          CRON_INVOKER_EMAILS=${CRON_INVOKER_EMAILS}
           EOF
 
           cat >.env.local <<EOF
@@ -192,7 +207,7 @@ jobs:
             --max-instances=2 --region $RUN_REGION \
             --tag=${VERSION_TAG} \
             --service-account=$RUN_SERVICE_ACCOUNT \
-            --update-secrets="AUTH_SECRET=AUTH_SECRET:latest,GOOGLE_SERVICE_ACCOUNT=GOOGLE_SERVICE_ACCOUNT:latest,BLAULICHTSMS_USERNAME=BLAULICHTSMS_USERNAME:latest,BLAULICHTSMS_PASSWORD=BLAULICHTSMS_PASSWORD:latest,BLAULICHTSMS_CUSTOMER_ID=BLAULICHTSMS_CUSTOMER_ID:latest,SUMUP_API_KEY=SUMUP_API_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_AFFILIATE_KEY=SUMUP_AFFILIATE_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_MERCHANT_CODE=SUMUP_MERCHANT_CODE${SUMUP_SECRET_SUFFIX}:latest,CRON_INVOKER_EMAILS=CRON_INVOKER_EMAILS:latest" \
+            --update-secrets="AUTH_SECRET=AUTH_SECRET:latest,GOOGLE_SERVICE_ACCOUNT=GOOGLE_SERVICE_ACCOUNT:latest,BLAULICHTSMS_USERNAME=BLAULICHTSMS_USERNAME:latest,BLAULICHTSMS_PASSWORD=BLAULICHTSMS_PASSWORD:latest,BLAULICHTSMS_CUSTOMER_ID=BLAULICHTSMS_CUSTOMER_ID:latest,SUMUP_API_KEY=SUMUP_API_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_AFFILIATE_KEY=SUMUP_AFFILIATE_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_MERCHANT_CODE=SUMUP_MERCHANT_CODE${SUMUP_SECRET_SUFFIX}:latest" \
             --remove-secrets="NEXT_PUBLIC_FIREBASE_APIKEY,NEXT_PUBLIC_MAPBOX_APIKEY,EINSATZMAPPE_SHEET_ID,EINSATZMAPPE_SHEET_RANGE,EINSATZMAPPE_SHEET_FOLDER" \
-           --update-env-vars="^@@^NEXTAUTH_URL=${NEXTAUTH_URL}@@NEXTAUTH_URL_INTERNAL=http://localhost:8080@@NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}@@EINSATZMAPPE_IMPERSONATION_ACCOUNT=${EINSATZMAPPE_IMPERSONATION_ACCOUNT}@@NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}@@GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}" \
+           --update-env-vars="^@@^NEXTAUTH_URL=${NEXTAUTH_URL}@@NEXTAUTH_URL_INTERNAL=http://localhost:8080@@NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}@@EINSATZMAPPE_IMPERSONATION_ACCOUNT=${EINSATZMAPPE_IMPERSONATION_ACCOUNT}@@NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}@@GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}@@CRON_INVOKER_EMAILS=${CRON_INVOKER_EMAILS}" \
             ${RUN_ARGS}

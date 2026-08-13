@@ -8,20 +8,6 @@ locals {
   create_database = false
 
   artifact_registry = "${var.run_region}-docker.pkg.dev/${var.project}/hydrantenkarte"
-
-  # Prod besitzt die Projekt-Basis und damit das projektweite Secret
-  # CRON_INVOKER_EMAILS. Dev liest dasselbe Secret, also müssen beide Invoker
-  # darin stehen — auch der von dev, den dieser Root nicht anlegt.
-  #
-  # Die Suffixe müssen zu `name_suffix` der jeweiligen cloud_scheduler-Instanz
-  # passen (hier "", in dev "-dev"). Bewusst abgeleitet statt aus den Outputs
-  # gelesen: sonst hinge die Projekt-Basis am Scheduler-Modul und die
-  # Scheduler-API würde erst nach dem Job aktiviert.
-  cron_invoker_suffixes = ["", "-dev"]
-  cron_invoker_emails = [
-    for suffix in local.cron_invoker_suffixes :
-    "fahrtenbuch-report-invoker${suffix}@${var.project}.iam.gserviceaccount.com"
-  ]
 }
 
 module "project_base" {
@@ -38,8 +24,6 @@ module "project_base" {
   github_repo        = var.github_repo
   state_bucket       = var.state_bucket
   storage_rules_file = "${local.repo_root}/storage.rules"
-
-  cron_invoker_emails = local.cron_invoker_emails
 }
 
 module "firestore" {

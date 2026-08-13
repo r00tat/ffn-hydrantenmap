@@ -1,7 +1,6 @@
 locals {
-  # Muss zur Allowlist in `cron_invoker_emails` der Projekt-Basis passen (siehe
-  # terraform/environments/prod/main.tf) — sonst weist cronRequired den Aufrufer
-  # ab, obwohl Token und Berechtigung stimmen.
+  # Muss zu CRON_INVOKER_EMAILS in .github/workflows/cloud-run.yml passen — sonst
+  # weist cronRequired den Aufrufer ab, obwohl Token und Berechtigung stimmen.
   invoker_account_id = "fahrtenbuch-report-invoker${var.name_suffix}"
 }
 
@@ -61,11 +60,10 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
   }
 }
 
-# Nur zur Kontrolle und für den `dryRun`-Aufruf von Hand: Den Wert des Secrets
-# CRON_INVOKER_EMAILS schreibt die Projekt-Basis selbst, abgeleitet aus
-# `local.invoker_account_id` — nicht aus diesem Output, weil sonst die
-# Projekt-Basis von diesem Modul abhinge und die Scheduler-API erst nach dem Job
-# aktiviert würde.
+# Nur zur Kontrolle und für den `dryRun`-Aufruf von Hand. Die Allowlist
+# CRON_INVOKER_EMAILS wird nicht aus diesem Output gespeist, sondern beim Deploy
+# aus denselben Namen abgeleitet (.github/workflows/cloud-run.yml) — das Deploy
+# soll nicht davon abhängen, dass dieses Modul schon appliziert wurde.
 output "invoker_service_account_email" {
   description = "Service account the Cloud Scheduler job authenticates as"
   value       = google_service_account.fahrtenbuch_report_invoker.email

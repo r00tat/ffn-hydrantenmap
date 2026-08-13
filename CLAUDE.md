@@ -435,14 +435,16 @@ Infrastruktur im Terraform-Modul
 [cloud-scheduler](terraform/modules/cloud-scheduler/) — in Dev bewusst
 **pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
 
-Job, Invoker-Service-Account und die Allowlist im Secret `CRON_INVOKER_EMAILS`
-legt terraform vollständig an; nach dem `apply` ist nur noch der Job in Prod zu
-entpausieren. Dev und Prod teilen das Projekt `ffn-utils`, deshalb tragen die
-Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev `"-dev"`) und die
-Allowlist enthält beide Adressen. Wer eine Umgebung hinzufügt, erweitert
-`cron_invoker_suffixes` in
-[terraform/environments/prod/main.tf](terraform/environments/prod/main.tf) —
-sonst bekommt der neue Invoker ein 403 von `cronRequired`.
+Job und Invoker-Service-Account legt terraform an; nach dem `apply` ist nur noch
+der Job in Prod zu entpausieren. Dev und Prod teilen das Projekt `ffn-utils`,
+deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev
+`"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
+Job an und der zweite `apply` scheiterte mit 409.
+
+Die Allowlist `CRON_INVOKER_EMAILS` wird beim Deploy gesetzt, nicht von
+terraform. Wer eine Umgebung hinzufügt, erweitert sie in
+[cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
+`name_suffix` — sonst bekommt der neue Invoker ein 403 von `cronRequired`.
 
 Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
 Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
@@ -499,14 +501,20 @@ Required environment variables (see `.env.local`):
   (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
   Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
   offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
-  Mail-Relay. In Cloud Run kommt der Wert aus dem gleichnamigen Secret, das
-  terraform anlegt **und füllt** (`cron_invoker_emails` in
-  `terraform/modules/project-base/secrets.tf`) — nichts von Hand nachzutragen.
-  Weil Dev und Prod das Projekt `ffn-utils` und damit dieses Secret teilen,
-  enthält die Liste die Invoker **beider** Umgebungen; deren Namen unterscheidet
-  `name_suffix` des Moduls `cloud-scheduler`. Das Secret muss in
-  `--update-secrets` in [.github/workflows/cloud-run.yml](.github/workflows/cloud-run.yml)
-  stehen, sonst erreicht es den Container nicht.
+  Mail-Relay. In Cloud Run wird der Wert beim Deploy gesetzt
+  ([cloud-run.yml](.github/workflows/cloud-run.yml)), abgeleitet aus
+  `GOOGLE_CLOUD_PROJECT` und den Namen der Invoker-Service-Accounts. Die Liste
+  enthält die Invoker **beider** Umgebungen, weil Dev und Prod das Projekt
+  `ffn-utils` teilen; deren Namen unterscheidet `name_suffix` des Moduls
+  `cloud-scheduler`, und die Namen müssen dort und im Workflow gleich lauten.
+
+  **Bewusst kein Secret-Manager-Secret:** Der Wert ist eine Kennung, kein
+  Geheimnis — wer die Adresse kennt, kann kein Token dafür ausstellen, dazu
+  braucht es IAM-Rechte auf den Service Account. Als Secret hinge außerdem jedes
+  Deploy daran, dass vorher ein `terraform apply` gelaufen ist, und der
+  prod-apply (dem die Projekt-Basis und damit das Secret gehören) läuft nur bei
+  einem Release. Ein Deploy von main hätte dann mit
+  `Secret … was not found` abgebrochen.
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.
