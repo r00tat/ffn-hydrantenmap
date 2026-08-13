@@ -18,10 +18,10 @@ output "firestore_database" {
   value       = module.firestore.database_name
 }
 
-# Der Wert, der als Version in das Secret CRON_INVOKER_EMAILS gehört. Ohne
-# diesen Output müsste der Betreiber die Adresse aus dem State oder der Konsole
-# heraussuchen.
+# Das Secret CRON_INVOKER_EMAILS füllt der Prod-Root (dem die Projekt-Basis
+# gehört) für beide Umgebungen. Dieser Output dient der Kontrolle und dem
+# `dryRun`-Aufruf von Hand, für den die Adresse zum Impersonieren gebraucht wird.
 output "fahrtenbuch_report_invoker" {
-  description = "Service account that invokes the weekly report; belongs in the CRON_INVOKER_EMAILS secret"
+  description = "Service account the weekly report job authenticates as"
   value       = module.cloud_scheduler.invoker_service_account_email
 }

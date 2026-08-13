@@ -68,9 +68,17 @@ module "cloud_scheduler" {
   project    = var.project
   run_region = var.run_region
   # `var.name` ist in beiden Umgebungen auf "hydrantenmap" voreingestellt, der
-  # Dev-Dienst heißt laut service.yaml aber "hydrantenmap-dev".
+  # Dev-Dienst heißt aber "hydrantenmap-dev" (RUN_SERVICE, siehe
+  # .github/workflows/cloud-run.yml: bei einem Tag wird das "-dev" abgeschnitten).
   service_name = "${var.name}-dev"
   service_url  = var.run_service_url
+
+  # Dev und Prod teilen das Projekt ffn-utils. Ohne eigenes Suffix legten beide
+  # Roots denselben Service Account und denselben Job an, und der zweite apply
+  # scheiterte mit 409. Muss zu `cron_invoker_suffixes` in
+  # terraform/environments/prod/main.tf passen, sonst steht dieser Invoker nicht
+  # auf der Allowlist.
+  name_suffix = "-dev"
 
   # Pausiert: Dev und Prod lesen dieselbe `fahrtenbuchConfig`-Struktur, und zwei
   # Umgebungen dürfen nicht dieselbe Verteilerliste bemailen. Zum Prüfen in Dev

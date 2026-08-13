@@ -1,12 +1,21 @@
+locals {
+  # Muss zur Allowlist in `cron_invoker_emails` der Projekt-Basis passen (siehe
+  # terraform/environments/prod/main.tf) — sonst weist cronRequired den Aufrufer
+  # ab, obwohl Token und Berechtigung stimmen.
+  invoker_account_id = "fahrtenbuch-report-invoker${var.name_suffix}"
+}
+
 resource "google_service_account" "fahrtenbuch_report_invoker" {
   project      = var.project
-  account_id   = "fahrtenbuch-report-invoker"
-  display_name = "Cloud Scheduler — Fahrtenbuch-Wochenbericht"
+  account_id   = local.invoker_account_id
+  display_name = "Cloud Scheduler — Fahrtenbuch-Wochenbericht${var.name_suffix}"
   description  = "Ruft den Wochenbericht-Endpoint mit einem OIDC-Token auf"
 }
 
-# Der Dienst ist mit `serving.knative.dev/v1` deployt (siehe service.yaml),
-# deshalb die v1-Ressource und nicht `google_cloud_run_v2_service_iam_member`.
+# Der Dienst selbst wird außerhalb von terraform per `gcloud run deploy` angelegt
+# (.github/workflows/cloud-run.yml). Die v1-Ressource setzt die Policy auf
+# demselben Dienst-Objekt wie `google_cloud_run_v2_service_iam_member` und
+# braucht kein von terraform verwaltetes Service-Objekt.
 resource "google_cloud_run_service_iam_member" "invoker" {
   project  = var.project
   location = var.run_region
@@ -18,7 +27,7 @@ resource "google_cloud_run_service_iam_member" "invoker" {
 resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
   project     = var.project
   region      = var.run_region
-  name        = "fahrtenbuch-weekly-report"
+  name        = "fahrtenbuch-weekly-report${var.name_suffix}"
   description = "Wochenbericht des Fahrtenbuchs je Gruppe"
   schedule    = var.weekly_report_schedule
   time_zone   = "Europe/Vienna"
@@ -52,7 +61,12 @@ resource "google_cloud_scheduler_job" "fahrtenbuch_weekly_report" {
   }
 }
 
+# Nur zur Kontrolle und für den `dryRun`-Aufruf von Hand: Den Wert des Secrets
+# CRON_INVOKER_EMAILS schreibt die Projekt-Basis selbst, abgeleitet aus
+# `local.invoker_account_id` — nicht aus diesem Output, weil sonst die
+# Projekt-Basis von diesem Modul abhinge und die Scheduler-API erst nach dem Job
+# aktiviert würde.
 output "invoker_service_account_email" {
-  description = "Gehört in das Secret CRON_INVOKER_EMAILS dieser Umgebung"
+  description = "Service account the Cloud Scheduler job authenticates as"
   value       = google_service_account.fahrtenbuch_report_invoker.email
 }

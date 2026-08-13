@@ -435,6 +435,15 @@ Infrastruktur im Terraform-Modul
 [cloud-scheduler](terraform/modules/cloud-scheduler/) — in Dev bewusst
 **pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
 
+Job, Invoker-Service-Account und die Allowlist im Secret `CRON_INVOKER_EMAILS`
+legt terraform vollständig an; nach dem `apply` ist nur noch der Job in Prod zu
+entpausieren. Dev und Prod teilen das Projekt `ffn-utils`, deshalb tragen die
+Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev `"-dev"`) und die
+Allowlist enthält beide Adressen. Wer eine Umgebung hinzufügt, erweitert
+`cron_invoker_suffixes` in
+[terraform/environments/prod/main.tf](terraform/environments/prod/main.tf) —
+sonst bekommt der neue Invoker ein 403 von `cronRequired`.
+
 Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
 Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
 Grund, aus dem es den Bericht überhaupt gibt.
@@ -444,6 +453,7 @@ Textfassung zurück, verschickt aber nichts):
 
 ```bash
 SERVICE_URL=https://<host>
+# In Dev heißt der Invoker fahrtenbuch-report-invoker-dev (siehe name_suffix).
 TOKEN=$(gcloud auth print-identity-token \
   --impersonate-service-account=fahrtenbuch-report-invoker@<projekt>.iam.gserviceaccount.com \
   --audiences="$SERVICE_URL")
@@ -489,8 +499,14 @@ Required environment variables (see `.env.local`):
   (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
   Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
   offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
-  Mail-Relay. Der Wert ist die E-Mail des Invoker-Service-Accounts aus dem
-  Terraform-Modul `cloud-scheduler`.
+  Mail-Relay. In Cloud Run kommt der Wert aus dem gleichnamigen Secret, das
+  terraform anlegt **und füllt** (`cron_invoker_emails` in
+  `terraform/modules/project-base/secrets.tf`) — nichts von Hand nachzutragen.
+  Weil Dev und Prod das Projekt `ffn-utils` und damit dieses Secret teilen,
+  enthält die Liste die Invoker **beider** Umgebungen; deren Namen unterscheidet
+  `name_suffix` des Moduls `cloud-scheduler`. Das Secret muss in
+  `--update-secrets` in [.github/workflows/cloud-run.yml](.github/workflows/cloud-run.yml)
+  stehen, sonst erreicht es den Container nicht.
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.

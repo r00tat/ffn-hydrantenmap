@@ -68,7 +68,7 @@ variable "manage_project_base" {
 }
 
 # Cloud Run stellt die öffentliche URL nicht als Attribut bereit, das terraform
-# hier lesen könnte — der Dienst wird über service.yaml und Cloud Build
+# hier lesen könnte — der Dienst wird über .github/workflows/cloud-run.yml
 # deployt. Sie ist zugleich die erwartete OIDC-Audience des Scheduler-Tokens.
 variable "run_service_url" {
   description = "Public base URL of the Cloud Run service, e.g. https://dev.karte.example.at"

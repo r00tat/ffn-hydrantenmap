@@ -63,6 +63,7 @@ variable "project_services" {
     "cloudapis.googleapis.com",
     "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "cloudscheduler.googleapis.com",
     "cloudtrace.googleapis.com",
     "containerregistry.googleapis.com",
     "datastore.googleapis.com",
@@ -121,12 +122,27 @@ variable "secrets" {
     "SUMUP_AFFILIATE_KEY_DEV",
     "SUMUP_MERCHANT_CODE",
     "SUMUP_MERCHANT_CODE_DEV",
-    # Allowlist der Service-Account-Adressen für zeitplan-gesteuerte Endpoints.
-    # Muss hier stehen, weil service.yaml einen secretKeyRef darauf hält: fehlt
-    # das Secret oder das accessor-Binding, wird die Revision nicht ready und
-    # die ganze Anwendung deployt nicht mehr. Terraform legt Hülle und Binding
-    # an, den Wert (die E-Mail aus dem Output invoker_service_account_email)
-    # trägt der Betreiber als Version nach.
-    "CRON_INVOKER_EMAILS",
   ]
+}
+
+# Allowlist der Service Accounts, die zeitplan-gesteuerte Endpoints aufrufen
+# dürfen (siehe cronRequired). Anders als die Secrets oben ist das kein Wert von
+# außen: Terraform legt diese Service Accounts selbst an, kennt die Adressen also
+# und schreibt sie als Version. Der Betreiber trägt nichts nach.
+#
+# Das Secret muss existieren und für den Run-SA lesbar sein, weil das Deployment
+# es in `--update-secrets` nennt (.github/workflows/cloud-run.yml): fehlt es,
+# scheitert nicht der Wochenbericht, sondern das Deploy der ganzen Anwendung.
+variable "cron_invoker_emails" {
+  description = "Service account emails allowed to invoke scheduled endpoints. All environments sharing this project belong in here."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for email in var.cron_invoker_emails :
+      can(regex("^[a-z0-9-]+@[a-z0-9-]+\\.iam\\.gserviceaccount\\.com$", email))
+    ])
+    error_message = "cron_invoker_emails darf nur Service-Account-Adressen der Form <account-id>@<projekt>.iam.gserviceaccount.com enthalten."
+  }
 }
