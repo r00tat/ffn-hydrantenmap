@@ -40,14 +40,32 @@ export type ReportPeriodErrorKey =
   | 'periodTooLong';
 
 /**
+ * Lesbare Meldung je Schlüssel. Wie `ApiException` in `src/app/api/errors.ts`
+ * eine Prosa-`message` neben dem maschinenlesbaren `status` führt, trennt auch
+ * hier die Meldung vom Schlüssel: Wer nur `err.message` protokolliert oder
+ * anzeigt — und das tut fast jeder Logger — soll einen Satz sehen und nicht
+ * das Wort `periodTooLong`.
+ */
+const REPORT_PERIOD_MESSAGES: Record<ReportPeriodErrorKey, string> = {
+  conflictingPeriod: 'Kalenderwoche und freier Zeitraum zugleich angegeben',
+  invalidWeek: 'Keine gültige ISO-Kalenderwoche des angegebenen Jahres',
+  invalidDay: 'Erster und letzter Tag müssen als YYYY-MM-DD angegeben sein',
+  periodReversed: 'Der letzte Tag liegt vor dem ersten',
+  periodTooLong: `Der Zeitraum überschreitet die Höchstspanne von ${REPORT_MAX_DAYS} Tagen`,
+};
+
+/**
  * Eine unbrauchbare Zeitraum-Angabe. Eigene Klasse, damit die Route sie von
  * einem Fehler beim Laden unterscheiden und mit 400 statt 500 antworten kann.
+ *
+ * Erzeugt wird sie über den Schlüssel, nicht über die Meldung: Der Schlüssel
+ * ist der Vertrag, an dem der Aufrufer entscheidet, die Meldung nur Prosa.
  */
 export class ReportPeriodError extends Error {
   readonly key: ReportPeriodErrorKey;
 
   constructor(key: ReportPeriodErrorKey) {
-    super(key);
+    super(REPORT_PERIOD_MESSAGES[key]);
     this.name = 'ReportPeriodError';
     this.key = key;
   }

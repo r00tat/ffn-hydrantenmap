@@ -2,11 +2,33 @@ import { describe, expect, it } from 'vitest';
 import {
   REPORT_MAX_DAYS,
   ReportPeriodError,
+  type ReportPeriodErrorKey,
+  type ReportPeriodRequest,
   resolveReportPeriod,
 } from './weeklyReportPeriod';
 
 /** Montag, 10.08.2026, 07:15 Ortszeit Wien (= 05:15 UTC). */
 const MONDAY_KW33 = new Date('2026-08-10T05:15:00.000Z');
+
+/**
+ * Der Schlüssel eines Aufrufs, der scheitern muss — und unterwegs die Prüfung,
+ * dass es überhaupt ein `ReportPeriodError` war.
+ *
+ * Geprüft wird der Schlüssel und nicht die Meldung: Der Schlüssel ist der
+ * Vertrag, an dem der Aufrufer seine Antwort entscheidet, die Meldung ist
+ * Prosa fürs Log und darf umformuliert werden, ohne Tests zu brechen.
+ */
+function rejectionKey(request: ReportPeriodRequest): ReportPeriodErrorKey {
+  try {
+    resolveReportPeriod(request);
+  } catch (err) {
+    expect(err).toBeInstanceOf(ReportPeriodError);
+    return (err as ReportPeriodError).key;
+  }
+  throw new Error(
+    `resolveReportPeriod(${JSON.stringify(request)}) hat nicht geworfen`,
+  );
+}
 
 describe('resolveReportPeriod', () => {
   it('nimmt ohne Angabe die letzte abgeschlossene ISO-Woche', () => {
@@ -68,9 +90,7 @@ describe('resolveReportPeriod', () => {
     // 2025 hat 52 Wochen; ohne Prüfung wäre der „Montag der KW53" der
     // 29.12.2025 — der Montag der KW1/2026. Der Bericht trüge eine Woche,
     // die es nicht gibt, und deckte eine Woche des Folgejahres ab.
-    expect(() => resolveReportPeriod({ year: 2025, week: 53 })).toThrow(
-      ReportPeriodError,
-    );
+    expect(rejectionKey({ year: 2025, week: 53 })).toBe('invalidWeek');
   });
 
   it.each([
@@ -81,7 +101,7 @@ describe('resolveReportPeriod', () => {
     [{ week: 32 }],
     [{ year: 2026.5, week: 5 }],
   ])('lehnt unbrauchbare Wochenangaben ab: %o', (request) => {
-    expect(() => resolveReportPeriod(request)).toThrow(ReportPeriodError);
+    expect(rejectionKey(request)).toBe('invalidWeek');
   });
 
   it('nimmt einen freien Zeitraum und trägt dessen Kalenderwoche', () => {
@@ -97,27 +117,25 @@ describe('resolveReportPeriod', () => {
   });
 
   it('lehnt einen unmöglichen Tag ab', () => {
-    expect(() =>
-      resolveReportPeriod({ from: '2026-02-30', to: '2026-03-02' }),
-    ).toThrow(/invalidDay/);
-  });
-
-  it('lehnt einen halben Zeitraum ab', () => {
-    expect(() => resolveReportPeriod({ from: '2026-08-03' })).toThrow(
-      /invalidDay/,
+    expect(rejectionKey({ from: '2026-02-30', to: '2026-03-02' })).toBe(
+      'invalidDay',
     );
   });
 
+  it('lehnt einen halben Zeitraum ab', () => {
+    expect(rejectionKey({ from: '2026-08-03' })).toBe('invalidDay');
+  });
+
   it('lehnt einen verdrehten Zeitraum ab', () => {
-    expect(() =>
-      resolveReportPeriod({ from: '2026-08-09', to: '2026-08-03' }),
-    ).toThrow(/periodReversed/);
+    expect(rejectionKey({ from: '2026-08-09', to: '2026-08-03' })).toBe(
+      'periodReversed',
+    );
   });
 
   it('lehnt einen zu langen Zeitraum ab', () => {
-    expect(() =>
-      resolveReportPeriod({ from: '2026-01-01', to: '2026-12-31' }),
-    ).toThrow(/periodTooLong/);
+    expect(rejectionKey({ from: '2026-01-01', to: '2026-12-31' })).toBe(
+      'periodTooLong',
+    );
   });
 
   it('lässt genau die Höchstspanne zu', () => {
@@ -129,22 +147,39 @@ describe('resolveReportPeriod', () => {
   });
 
   it('lehnt gemischte Angaben ab', () => {
-    expect(() =>
-      resolveReportPeriod({
+    expect(
+      rejectionKey({
         year: 2026,
         week: 32,
         from: '2026-08-03',
         to: '2026-08-09',
       }),
-    ).toThrow(/conflictingPeriod/);
+    ).toBe('conflictingPeriod');
   });
 
-  it('trägt den Fehlerschlüssel als key', () => {
+  it('trennt den Schlüssel von einer lesbaren Meldung', () => {
     try {
       resolveReportPeriod({ from: '2026-08-09', to: '2026-08-03' });
       expect.unreachable('sollte werfen');
     } catch (err) {
-      expect((err as ReportPeriodError).key).toBe('periodReversed');
+      const error = err as ReportPeriodError;
+      expect(error.key).toBe('periodReversed');
+      expect(error.name).toBe('ReportPeriodError');
+      // Wer nur `message` protokolliert, soll einen Satz sehen und nicht den
+      // Schlüssel — sonst steht `periodReversed` in einer Cron-Logzeile.
+      expect(error.message).toBe('Der letzte Tag liegt vor dem ersten');
+      expect(error.message).not.toBe(error.key);
+    }
+  });
+
+  it('nennt in der Meldung zum langen Zeitraum die Höchstspanne', () => {
+    try {
+      resolveReportPeriod({ from: '2026-01-01', to: '2026-12-31' });
+      expect.unreachable('sollte werfen');
+    } catch (err) {
+      expect((err as ReportPeriodError).message).toBe(
+        `Der Zeitraum überschreitet die Höchstspanne von ${REPORT_MAX_DAYS} Tagen`,
+      );
     }
   });
 });
