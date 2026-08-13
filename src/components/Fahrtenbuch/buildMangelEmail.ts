@@ -1,9 +1,9 @@
 import type {
   FahrtenbuchEntry,
   FahrtenbuchVehicle,
-  FahrtZweck,
 } from '../../common/fahrtenbuch';
 import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
+import { ZWECK_LABELS } from './germanLabels';
 
 /**
  * Zeitzone der Zeitangaben in der Mail. Der Server läuft in UTC, die
@@ -12,19 +12,6 @@ import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
  * `src/i18n/request.ts`.
  */
 const TIME_ZONE = 'Europe/Vienna';
-
-/**
- * Die Mail entsteht auf dem Server ohne Locale des Lesers: Der Empfänger ist
- * die eigene Feuerwehr, und `next-intl` steht in einer Server Action ohne
- * Request-Kontext nicht zur Verfügung. Die Texte sind deshalb deutsch —
- * dieselbe Entscheidung wie bei der Bug-Report-Mail.
- */
-const ZWECK_LABELS: Record<FahrtZweck, string> = {
-  einsatz: 'Einsatz',
-  uebung: 'Übung',
-  versorgung: 'Versorgung',
-  sonstiges: 'Sonstiges',
-};
 
 export interface MangelEmailArgs {
   entry: FahrtenbuchEntry;
