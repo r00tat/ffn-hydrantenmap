@@ -73,6 +73,22 @@ export type WeeklyReportWarning =
       nextStart: number;
       date: string;
     }
+  /**
+   * Der Startstand liegt unter dem Vorgänger, das Ende trifft aber genau
+   * dessen Startstand: Die Kette passt in umgekehrter Reihenfolge, die Fahrt
+   * ist also nachgetragen. Nicht der Zählerstand ist falsch, sondern die
+   * Uhrzeit — deshalb eine eigene Art und nicht `overlap`.
+   */
+  | {
+      kind: 'outOfOrder';
+      counterLabel: string;
+      unit: string;
+      /** Endstand der nach Uhrzeit vorigen Fahrt. */
+      previousEnd: number;
+      /** Startstand dieser Fahrt. */
+      nextStart: number;
+      date: string;
+    }
   | {
       kind: 'decrease';
       counterLabel: string;
@@ -171,6 +187,13 @@ function vehicleWarnings(
   for (const def of definitions) {
     let lastEnd =
       comparable(def) && previous ? readingOf(previous, def.id)?.end : undefined;
+    // Der Startstand des Vergleichswerts. Nur damit ist ein Nachtrag von einem
+    // falschen Zählerstand zu unterscheiden: Trifft das Ende einer Fahrt genau
+    // diesen Startstand, passt die Kette in umgekehrter Reihenfolge.
+    let lastStart =
+      comparable(def) && previous
+        ? readingOf(previous, def.id)?.start
+        : undefined;
 
     for (const entry of entries) {
       const date = formatDate(entry.abfahrt, timeZone);
@@ -183,6 +206,9 @@ function vehicleWarnings(
       const missing =
         def.required &&
         (end === undefined || (def.mode === 'startEnd' && start === undefined));
+      // Eine nachgetragene Fahrt darf die Vergleichswerte nicht verschieben,
+      // siehe unten.
+      let lateEntry = false;
       if (missing) {
         warnings.push({ kind: 'missing', counterLabel: def.label, date });
       }
@@ -202,8 +228,13 @@ function vehicleWarnings(
               date,
             });
           } else if (start < lastEnd) {
+            // Trifft das Ende dieser Fahrt genau den Startstand der vorigen,
+            // ergeben beide zusammen eine lückenlose Kette — nur in der
+            // anderen Reihenfolge. Dann ist die Fahrt nachgetragen und der
+            // Zählerstand in Ordnung.
+            lateEntry = end !== undefined && end === lastStart;
             warnings.push({
-              kind: 'overlap',
+              kind: lateEntry ? 'outOfOrder' : 'overlap',
               counterLabel: def.label,
               unit: def.unit,
               previousEnd: lastEnd,
@@ -231,7 +262,15 @@ function vehicleWarnings(
       // ihr Startstand zum letzten erfassten Ende passt. Fehlt das Ende, bleibt
       // der Vorgängerwert stehen — die Kette der Woche reißt an einer
       // unvollständigen Fahrt nicht ab.
-      if (comparable(def) && end !== undefined) lastEnd = end;
+      //
+      // Ein Nachtrag ist die Ausnahme: Er beschreibt einen früheren Abschnitt
+      // und verschiebt den Stand des Fahrzeugs nicht. Würde der Vergleichswert
+      // auf sein Ende zurückfallen, bekäme die nächste Fahrt eine Lücke
+      // gemeldet, die es nicht gibt — ein Erfassungsfehler, zwei Warnungen.
+      if (comparable(def) && end !== undefined && !lateEntry) {
+        lastEnd = end;
+        lastStart = start;
+      }
     }
   }
 

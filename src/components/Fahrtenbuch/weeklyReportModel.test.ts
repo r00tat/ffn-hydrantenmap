@@ -186,6 +186,109 @@ describe('buildWeeklyReportModel', () => {
     ]);
   });
 
+  it('erkennt eine nachgetragene Fahrt an der passenden Kette', () => {
+    // Der Fall aus der Praxis: Eine vergessene frühere Fahrt wird später
+    // erfasst, Abfahrt und Ankunft sind der Erfassungszeitpunkt (gleiche
+    // Uhrzeit, null Dauer). Ihr Endstand ist genau der Startstand der Fahrt
+    // davor — die Zählerstände sind also in Ordnung, die Uhrzeit ist es nicht.
+    const model = build({
+      entries: [
+        entry({ counters: { km: { start: 17552, end: 17585, diff: 33 } } }),
+        entry({
+          id: 'e2',
+          abfahrt: '2026-08-05T17:34:00.000Z',
+          ankunft: '2026-08-05T17:34:00.000Z',
+          counters: { km: { start: 17542, end: 17552, diff: 10 } },
+        }),
+      ],
+    });
+    expect(model.vehicles[0].warnings).toEqual([
+      {
+        kind: 'outOfOrder',
+        counterLabel: 'Kilometerstand',
+        unit: 'km',
+        previousEnd: 17585,
+        nextStart: 17542,
+        date: '05.08.2026',
+      },
+    ]);
+  });
+
+  it('hängt der Fahrt nach einem Nachtrag keine erfundene Lücke an', () => {
+    // Ein Nachtrag beschreibt einen früheren Abschnitt und verschiebt den
+    // Stand des Fahrzeugs nicht. Würde der Vergleichswert auf sein Ende
+    // fallen, bekäme die nächste Fahrt eine Lücke gemeldet, die es nicht gibt:
+    // ein Erfassungsfehler, zwei Warnungen.
+    const model = build({
+      entries: [
+        entry({ counters: { km: { start: 17552, end: 17585, diff: 33 } } }),
+        entry({
+          id: 'e2',
+          abfahrt: '2026-08-05T17:34:00.000Z',
+          ankunft: '2026-08-05T17:34:00.000Z',
+          counters: { km: { start: 17542, end: 17552, diff: 10 } },
+        }),
+        entry({
+          id: 'e3',
+          abfahrt: '2026-08-06T08:00:00.000Z',
+          ankunft: '2026-08-06T09:00:00.000Z',
+          counters: { km: { start: 17585, end: 17600, diff: 15 } },
+        }),
+      ],
+    });
+    expect(model.vehicles[0].warnings).toEqual([
+      expect.objectContaining({ kind: 'outOfOrder' }),
+    ]);
+  });
+
+  it('bleibt bei einer echten Überlappung, wenn die Kette nicht passt', () => {
+    // Startstand unter dem Vorgänger, Endstand aber nicht auf dessen
+    // Startstand: Hier stimmt wirklich ein Zählerstand nicht.
+    const model = build({
+      entries: [
+        entry({ counters: { km: { start: 17552, end: 17585, diff: 33 } } }),
+        entry({
+          id: 'e2',
+          abfahrt: '2026-08-06T08:00:00.000Z',
+          ankunft: '2026-08-06T09:00:00.000Z',
+          counters: { km: { start: 17570, end: 17590, diff: 20 } },
+        }),
+      ],
+    });
+    expect(model.vehicles[0].warnings).toEqual([
+      {
+        kind: 'overlap',
+        counterLabel: 'Kilometerstand',
+        unit: 'km',
+        previousEnd: 17585,
+        nextStart: 17570,
+        date: '06.08.2026',
+      },
+    ]);
+  });
+
+  it('erkennt einen Nachtrag auch gegen die Fahrt vor dem Zeitraum', () => {
+    const model = build({
+      entries: [
+        entry({
+          abfahrt: '2026-08-03T08:00:00.000Z',
+          ankunft: '2026-08-03T08:00:00.000Z',
+          counters: { km: { start: 17530, end: 17540, diff: 10 } },
+        }),
+      ],
+      previousEntries: {
+        v1: entry({
+          id: 'e0',
+          abfahrt: '2026-07-30T10:00:00.000Z',
+          counters: { km: { start: 17540, end: 17550, diff: 10 } },
+        }),
+      },
+    });
+    expect(model.vehicles[0].warnings).toEqual([
+      expect.objectContaining({ kind: 'outOfOrder', previousEnd: 17550 }),
+    ]);
+  });
+
   it('prüft auch die Lücke zwischen zwei Fahrten derselben Woche', () => {
     const model = build({
       entries: [

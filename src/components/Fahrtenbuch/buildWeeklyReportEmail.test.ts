@@ -224,6 +224,69 @@ describe('buildWeeklyReportEmail', () => {
     }
   });
 
+  it('nennt einen Rücksprung nicht Überlappung', () => {
+    // 1000–1010 nach 1010–1043 überlappt nicht, es berührt sich nur.
+    const { raw } = build({
+      hasWarnings: true,
+      vehicles: [
+        {
+          vehicleId: 'v1',
+          heading: 'WLF-K (FW-109ND)',
+          rows: [],
+          totals: [],
+          warnings: [
+            {
+              kind: 'overlap',
+              counterLabel: 'Kilometerstand',
+              unit: 'km',
+              previousEnd: 1043,
+              nextStart: 1000,
+              date: '06.08.2026',
+            },
+          ],
+        },
+      ],
+    });
+    const text = decodePart(raw, 'text/plain');
+    expect(text).toContain('Kilometerstand springt zurück');
+    expect(text).not.toContain('überlappt');
+  });
+
+  it('weist eine nachgetragene Fahrt als solche aus', () => {
+    const { raw } = build({
+      hasWarnings: true,
+      vehicles: [
+        {
+          vehicleId: 'v1',
+          heading: 'WLF-K (FW-109ND)',
+          rows: [],
+          totals: [],
+          warnings: [
+            {
+              kind: 'outOfOrder',
+              counterLabel: 'Kilometerstand',
+              unit: 'km',
+              previousEnd: 1043,
+              nextStart: 1000,
+              date: '06.08.2026',
+            },
+          ],
+        },
+      ],
+    });
+    for (const text of [
+      decodePart(raw, 'text/plain'),
+      decodePart(raw, 'text/html'),
+    ]) {
+      // Der Hinweis muss sagen, wo der Fehler steckt: nicht im Zählerstand,
+      // sondern in der Uhrzeit.
+      expect(text).toContain('vermutlich nachgetragen');
+      expect(text).toContain('Uhrzeit prüfen');
+      expect(text).toContain('1043');
+      expect(text).toContain('1000');
+    }
+  });
+
   it('listet die offenen Mängel', () => {
     const { raw } = build({
       openMangel: [

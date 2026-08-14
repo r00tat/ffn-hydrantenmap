@@ -125,8 +125,13 @@ function warningText(warning: WeeklyReportWarning): string {
   switch (warning.kind) {
     case 'gap':
       return `${warning.date}: Lücke im ${warning.counterLabel} — davor endete er bei ${withUnit(formatCounterValue(warning.previousEnd), warning.unit)}, diese Fahrt beginnt bei ${withUnit(formatCounterValue(warning.nextStart), warning.unit)}.`;
+    // Nicht „überlappt": Die Bereiche müssen sich nicht überschneiden, der
+    // Stand springt zurück. Bei 1000–1010 nach 1010–1043 berühren sie sich
+    // nur — „überlappt" behauptete dort etwas Falsches.
     case 'overlap':
-      return `${warning.date}: ${warning.counterLabel} überlappt — davor endete er bei ${withUnit(formatCounterValue(warning.previousEnd), warning.unit)}, diese Fahrt beginnt darunter bei ${withUnit(formatCounterValue(warning.nextStart), warning.unit)}.`;
+      return `${warning.date}: ${warning.counterLabel} springt zurück — davor endete er bei ${withUnit(formatCounterValue(warning.previousEnd), warning.unit)}, diese Fahrt beginnt bei ${withUnit(formatCounterValue(warning.nextStart), warning.unit)}.`;
+    case 'outOfOrder':
+      return `${warning.date}: ${warning.counterLabel} springt zurück — davor endete er bei ${withUnit(formatCounterValue(warning.previousEnd), warning.unit)}, diese Fahrt beginnt bei ${withUnit(formatCounterValue(warning.nextStart), warning.unit)}. Die Stände passen lückenlos, wenn diese Fahrt vor der vorigen liegt: vermutlich nachgetragen, bitte Uhrzeit prüfen.`;
     case 'decrease':
       return `${warning.date}: ${warning.counterLabel} sinkt innerhalb der Fahrt — Start ${withUnit(formatCounterValue(warning.start), warning.unit)}, Ende ${withUnit(formatCounterValue(warning.end), warning.unit)}.`;
     case 'missing':
