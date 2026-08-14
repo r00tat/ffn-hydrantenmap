@@ -3,6 +3,11 @@
 #
 # Terraform verwaltet nur die Hüllen, nicht die Werte. Ausnahme ist der
 # BlaulichtSMS-Encryption-Key weiter unten.
+#
+# Die Cron-Invoker-Allowlist steht bewusst nicht hier: Sie ist eine Kennung, kein
+# Geheimnis, und als Secret hinge jedes Deploy an einem vorherigen apply dieses
+# Moduls. Sie wird beim Deploy als Env-Var gesetzt, siehe
+# .github/workflows/cloud-run.yml.
 # ============================================================================
 
 resource "google_secret_manager_secret" "secrets" {

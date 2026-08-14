@@ -66,3 +66,30 @@ variable "manage_project_base" {
   type        = bool
   default     = true
 }
+
+# Cloud Run stellt die öffentliche URL nicht als Attribut bereit, das terraform
+# hier lesen könnte — der Dienst wird über .github/workflows/cloud-run.yml
+# deployt. Sie ist zugleich die erwartete OIDC-Audience des Scheduler-Tokens.
+variable "run_service_url" {
+  description = "Public base URL of the Cloud Run service, e.g. https://karte.example.at"
+  type        = string
+
+  # Ohne Wert (Repository-Variable RUN_SERVICE_URL_PROD nicht gesetzt) käme ein
+  # leerer String an und der Scheduler-Job bekäme die URI "/api/...". Der Job
+  # liefe dann jede Woche ins Leere, ohne dass es auffällt — deshalb hier ein
+  # lauter Fehler statt einer stillen Fehlkonfiguration.
+  validation {
+    condition     = startswith(var.run_service_url, "https://")
+    error_message = "run_service_url muss mit https:// beginnen (Repository-Variable RUN_SERVICE_URL_PROD)."
+  }
+
+  # Ein Schrägstrich am Ende wäre genauso tödlich, nur unauffälliger: Der
+  # Scheduler stellte das Token auf "https://host/" aus, während `getBaseUrl()`
+  # im Dienst den Schrägstrich abschneidet und "https://host" erwartet. Die
+  # Audience passte nicht, `cronRequired` antwortete 403, und die einzige Spur
+  # wäre jeden Montag eine Logzeile — ohne Mail und ohne Alarm.
+  validation {
+    condition     = !endswith(var.run_service_url, "/")
+    error_message = "run_service_url darf nicht mit / enden — die Audience des OIDC-Tokens müsste sonst exakt so lauten."
+  }
+}

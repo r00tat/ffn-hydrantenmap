@@ -419,6 +419,74 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+## Fahrtenbuch-Wochenbericht
+
+Cloud Scheduler ruft montags 07:00 (Europe/Vienna)
+`POST /api/fahrtenbuch/weekly-report` auf. Der Lauf verschickt je Gruppe mit
+gepflegten `fahrtenbuchConfig.mangelEmails` einen Bericht über die Fahrten der
+abgeschlossenen ISO-Vorwoche — Fahrtentabelle je Fahrzeug, Wochensumme,
+Plausibilitätswarnungen zu den Zählerständen und die offenen Mängel. Empfänger
+sind dieselben wie bei der Mangel-Benachrichtigung; eine leere Liste ist die
+Abschaltung.
+
+Authentifiziert über ein OIDC-ID-Token, geprüft von
+[cronRequired](src/server/auth/cronRequired.ts) gegen `CRON_INVOKER_EMAILS`.
+Infrastruktur im Terraform-Modul
+[cloud-scheduler](terraform/modules/cloud-scheduler/) — in Dev bewusst
+**pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
+
+Job und Invoker-Service-Account legt terraform an; nach dem `apply` ist nur noch
+der Job in Prod zu entpausieren. Dev und Prod teilen das Projekt `ffn-utils`,
+deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev
+`"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
+Job an und der zweite `apply` scheiterte mit 409.
+
+Die Allowlist `CRON_INVOKER_EMAILS` wird beim Deploy gesetzt, nicht von
+terraform. Wer eine Umgebung hinzufügt, erweitert sie in
+[cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
+`name_suffix` — sonst bekommt der neue Invoker ein 403 von `cronRequired`.
+
+**Von Hand versenden:** Im Admin-Bereich unter Fahrtenbuch → Einstellungen sitzt
+der Abschnitt „Wochenbericht versenden"
+([WeeklyReportSendSection](src/components/Fahrtenbuch/admin/WeeklyReportSendSection.tsx)).
+Woche wählbar (letzte abgeschlossene voreingestellt), Empfänger vorbelegt aus
+`mangelEmails` und **nur für diesen Versand** überschreibbar — die Änderung wird
+nicht gespeichert. „Vorschau" ist der `dryRun` und verschickt nichts.
+
+Der Versand läuft über `sendWeeklyReportForGroup`, das dieselbe interne
+`runForGroup` benutzt wie der Montagslauf: Die Mail von Hand ist dieselbe
+Nachricht, nicht bloß eine gleich gebaute. Empfänger sind dort **Pflicht**, es
+gibt keinen Rückfall auf die gepflegte Liste — wer das Feld leer räumt, würde
+sonst ausgerechnet die Adressen bemailen, die er gerade entfernt hat.
+
+Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
+Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
+Grund, aus dem es den Bericht überhaupt gibt.
+
+Zum Prüfen ohne Versand (`dryRun` baut den Bericht und gibt Betreff und
+Textfassung zurück, verschickt aber nichts):
+
+```bash
+SERVICE_URL=https://<host>
+# In Dev heißt der Invoker fahrtenbuch-report-invoker-dev (siehe name_suffix).
+TOKEN=$(gcloud auth print-identity-token \
+  --impersonate-service-account=fahrtenbuch-report-invoker@<projekt>.iam.gserviceaccount.com \
+  --audiences="$SERVICE_URL")
+curl -s -X POST "$SERVICE_URL/api/fahrtenbuch/weekly-report" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"year":2026,"week":32,"dryRun":true}' | jq
+```
+
+Ein Fehler bei einer Gruppe beendet den Lauf nicht und ergibt trotzdem 200 —
+sonst würde der Scheduler wiederholen und den erfolgreichen Gruppen die Mail
+doppelt schicken. 500 gibt es nur, wenn **keine** Gruppe eine Mail bekommen hat
+**und mindestens eine gescheitert ist**; dann ist die Wiederholung gefahrlos.
+Ein Lauf, in dem alle Gruppen übersprungen wurden (keine Empfänger gepflegt) und
+ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
+zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
+am Status-Code.
+
 ## German Terminology
 
 Key domain terms used throughout the codebase:
@@ -441,6 +509,28 @@ Required environment variables (see `.env.local`):
 - `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
 - `PASSKEY_ALLOWED_ORIGINS` (optional) — komma-separierte Allowlist erlaubter
   Origins, siehe unten
+- `CRON_INVOKER_EMAILS` — komma-separierte Allowlist der
+  Service-Account-Adressen, die zeitplan-gesteuerte Endpoints aufrufen dürfen
+  (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
+  Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
+  offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
+  Mail-Relay. In Cloud Run wird der Wert beim Deploy gesetzt
+  ([cloud-run.yml](.github/workflows/cloud-run.yml)), abgeleitet aus
+  `GOOGLE_CLOUD_PROJECT` und den Namen der Invoker-Service-Accounts. Die Liste
+  enthält die Invoker **beider** Umgebungen, weil Dev und Prod das Projekt
+  `ffn-utils` teilen; deren Namen unterscheidet `name_suffix` des Moduls
+  `cloud-scheduler`, und die Namen müssen dort und im Workflow gleich lauten.
+
+  **Bewusst kein Secret-Manager-Secret:** Der Wert ist eine Kennung, kein
+  Geheimnis — wer die Adresse kennt, kann kein Token dafür ausstellen, dazu
+  braucht es IAM-Rechte auf den Service Account. Als Secret hinge außerdem jedes
+  Deploy daran, dass vorher ein `terraform apply` gelaufen ist, und der
+  prod-apply (dem die Projekt-Basis und damit das Secret gehören) läuft nur bei
+  einem Release. Ein Deploy von main hätte dann mit
+  `Secret … was not found` abgebrochen.
+- `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
+  Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
+  `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.
 
 ### Basis-URL und erlaubte Origins
 

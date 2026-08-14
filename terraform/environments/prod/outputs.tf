@@ -17,3 +17,11 @@ output "firestore_database" {
   description = "Firestore database of this environment"
   value       = module.firestore.database_name
 }
+
+# Das Secret CRON_INVOKER_EMAILS füllt terraform selbst (siehe
+# modules/project-base/secrets.tf). Dieser Output dient der Kontrolle und dem
+# `dryRun`-Aufruf von Hand, für den die Adresse zum Impersonieren gebraucht wird.
+output "fahrtenbuch_report_invoker" {
+  description = "Service account the weekly report job authenticates as"
+  value       = module.cloud_scheduler.invoker_service_account_email
+}

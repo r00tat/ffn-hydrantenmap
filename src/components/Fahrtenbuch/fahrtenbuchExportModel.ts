@@ -123,7 +123,8 @@ function dateTimeFormat(
   }
 }
 
-function formatDate(iso: string, timeZone: string): string {
+/** Exportiert für den Wochenbericht — dieselbe Schreibweise wie im PDF. */
+export function formatDate(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return dateTimeFormat(timeZone, {
@@ -145,8 +146,10 @@ function formatTime(iso: string, timeZone: string): string {
 /**
  * „08:45 - 10:00", bei einer Fahrt über Mitternacht „23:50 - 09.06. 01:30".
  * Ohne den Tag an der Ankunft läse sich eine Nachtfahrt wie eine Zeitreise.
+ *
+ * Exportiert für den Wochenbericht.
  */
-function formatTimeRange(entry: FahrtenbuchEntry, timeZone: string): string {
+export function formatTimeRange(entry: FahrtenbuchEntry, timeZone: string): string {
   const departure = formatTime(entry.abfahrt, timeZone);
   const arrival = formatTime(entry.ankunft, timeZone);
   if (!departure && !arrival) return '';
@@ -195,8 +198,12 @@ interface CounterColumnSpec {
  * Fahrten stehen. Ein Fahrtenbuch ist ein Nachweisdokument — ein erfasster
  * Wert darf nicht verschwinden, weil die Zähler-Vorlage des Fahrzeugs
  * inzwischen gewechselt wurde.
+ *
+ * Exportiert, weil der Wochenbericht (`weeklyReportModel.ts`) dieselbe Regel
+ * braucht. Zwei Fassungen davon wären ein stiller Datenverlust in einem der
+ * beiden Dokumente.
  */
-function counterDefinitions(
+export function counterDefinitions(
   vehicle: FahrtenbuchVehicle,
   entries: FahrtenbuchEntry[],
 ): CounterDefinition[] {
@@ -267,8 +274,12 @@ function counterColumns(
 /**
  * Betriebsmittel des Fahrzeugs, ergänzt um Arten, die nur in den Fahrten
  * vorkommen — dieselbe Begründung wie bei den Zählern.
+ *
+ * Exportiert und nicht auf den Export zugeschnitten benannt, weil der
+ * Wochenbericht (`weeklyReportModel.ts`) dieselbe Liste braucht: Zwei Fassungen
+ * davon hieße, dass eine getankte Menge in einem der beiden Dokumente fehlt.
  */
-function fuelColumnTypes(
+export function usedFuelTypes(
   vehicle: FahrtenbuchVehicle,
   entries: FahrtenbuchEntry[],
 ): FuelType[] {
@@ -331,7 +342,7 @@ export function buildFahrtenbuchExport(
 
     const definitions = counterDefinitions(vehicle, vehicleEntries);
     const { columns: counterCols, specs } = counterColumns(definitions, t);
-    const fuels = fuelColumnTypes(vehicle, vehicleEntries);
+    const fuels = usedFuelTypes(vehicle, vehicleEntries);
 
     const columns: ExportColumn[] = [
       { key: 'datum', label: t('export.columns.datum'), flex: 1.2 },

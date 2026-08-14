@@ -59,3 +59,17 @@ module "cloudbuild" {
     _SERVICE_NAME             = var.name
   }
 }
+
+module "cloud_scheduler" {
+  source = "../../modules/cloud-scheduler"
+
+  project      = var.project
+  run_region   = var.run_region
+  service_name = var.name
+  service_url  = var.run_service_url
+
+  # Der Scheduler-Job braucht cloudscheduler.googleapis.com, aktiviert von der
+  # Projekt-Basis. Ohne diese Kante könnte terraform beides gleichzeitig anlegen
+  # und der Job auf einer noch nicht aktivierten API scheitern.
+  depends_on = [module.project_base]
+}

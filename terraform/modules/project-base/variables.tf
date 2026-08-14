@@ -63,6 +63,7 @@ variable "project_services" {
     "cloudapis.googleapis.com",
     "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "cloudscheduler.googleapis.com",
     "cloudtrace.googleapis.com",
     "containerregistry.googleapis.com",
     "datastore.googleapis.com",

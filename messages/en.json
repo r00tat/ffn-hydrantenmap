@@ -731,7 +731,31 @@
       "mangelEmailsLoadFailed": "Recipients could not be loaded: {message}",
       "mangelEmailsSaveFailed": "Recipients could not be saved: {message}",
       "mangelEmailInvalid": "Please enter valid email addresses.",
-      "mangelEmailsTooMany": "At most {max} recipients are possible."
+      "mangelEmailsTooMany": "At most {max} recipients are possible.",
+      "weeklyReport": {
+        "title": "Send weekly report",
+        "hint": "Sends the report of a calendar week again — the same mail the Monday run sends.",
+        "year": "Year",
+        "week": "Week",
+        "period": "Period: {from} – {to}",
+        "periodInvalid": "Not a valid calendar week of this year.",
+        "recipients": "Recipients for this send",
+        "recipientsPlaceholder": "address@example.at",
+        "recipientsHelper": "Prefilled with the defect recipients. A change applies to this send only and is not saved.",
+        "preview": "Preview",
+        "previewTitle": "Preview — nothing sent",
+        "subject": "Subject",
+        "send": "Send",
+        "confirmTitle": "Send the report now?",
+        "confirmText": "Week {week} of {year} to {count, plural, one {one address} other {# addresses}}:",
+        "sent": "Sent: {entries, plural, one {one trip} other {# trips}}, {warnings, plural, one {one warning} other {# warnings}}, {mangel, plural, one {one open defect} other {# open defects}}.",
+        "failed": "Sending failed: {message}",
+        "loadFailed": "Could not load recipients: {message}",
+        "errorNoRecipients": "Enter at least one recipient address.",
+        "errorEmailInvalid": "At least one address is not a valid email address.",
+        "errorTooManyEmails": "At most {max} addresses.",
+        "errorInvalidWeek": "Not a valid calendar week of this year."
+      }
     },
     "shareLink": {
       "heading": "Logbook link",
