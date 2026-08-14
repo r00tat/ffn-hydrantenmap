@@ -446,6 +446,19 @@ terraform. Wer eine Umgebung hinzufügt, erweitert sie in
 [cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
 `name_suffix` — sonst bekommt der neue Invoker ein 403 von `cronRequired`.
 
+**Von Hand versenden:** Im Admin-Bereich unter Fahrtenbuch → Einstellungen sitzt
+der Abschnitt „Wochenbericht versenden"
+([WeeklyReportSendSection](src/components/Fahrtenbuch/admin/WeeklyReportSendSection.tsx)).
+Woche wählbar (letzte abgeschlossene voreingestellt), Empfänger vorbelegt aus
+`mangelEmails` und **nur für diesen Versand** überschreibbar — die Änderung wird
+nicht gespeichert. „Vorschau" ist der `dryRun` und verschickt nichts.
+
+Der Versand läuft über `sendWeeklyReportForGroup`, das dieselbe interne
+`runForGroup` benutzt wie der Montagslauf: Die Mail von Hand ist dieselbe
+Nachricht, nicht bloß eine gleich gebaute. Empfänger sind dort **Pflicht**, es
+gibt keinen Rückfall auf die gepflegte Liste — wer das Feld leer räumt, würde
+sonst ausgerechnet die Adressen bemailen, die er gerade entfernt hat.
+
 Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
 Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
 Grund, aus dem es den Bericht überhaupt gibt.

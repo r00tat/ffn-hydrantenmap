@@ -18,6 +18,7 @@ import MangelNotificationSettings from './MangelNotificationSettings';
 import PersonAdmin from './PersonAdmin';
 import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
+import WeeklyReportSendSection from './WeeklyReportSendSection';
 
 /**
  * Klammer über die Stammdaten: Gruppenauswahl plus Tabs für Fahrzeuge und
@@ -99,6 +100,10 @@ export default function FahrtenbuchAdmin() {
               <Stack key={groupId} spacing={3} sx={{ alignItems: 'flex-start' }}>
                 <GroupSettings groupId={groupId} />
                 <MangelNotificationSettings groupId={groupId} />
+                {/* Steht unter den Empfängern, weil der Versand sie vorbelegt:
+                    Die Nachbarschaft macht den Unterschied zwischen einmaliger
+                    Überschreibung und dauerhafter Pflege sichtbar. */}
+                <WeeklyReportSendSection groupId={groupId} />
                 <MangelMigration groupId={groupId} />
               </Stack>
             )}

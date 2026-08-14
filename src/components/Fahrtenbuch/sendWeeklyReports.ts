@@ -50,6 +50,19 @@ export interface SendWeeklyReportsOptions {
   dryRun?: boolean;
 }
 
+export interface SendWeeklyReportForGroupOptions {
+  groupId: string;
+  period: ReportPeriod;
+  /**
+   * Die Empfänger dieses Versands. Pflicht und ohne Rückfall auf die gepflegte
+   * Liste: Der manuelle Versand erlaubt eine Überschreibung, und wer das Feld
+   * leer räumt, darf nicht ausgerechnet die Liste bemailen, die er gerade
+   * entfernt hat. Der Aufrufer prüft die Adressen (`sanitizeMangelEmails`).
+   */
+  recipients: string[];
+  dryRun?: boolean;
+}
+
 function groupRef(groupId: string) {
   return firestore.collection(GROUP_COLLECTION_ID).doc(groupId);
 }
@@ -257,6 +270,64 @@ async function reportForGroup(
   return { ...base, status: 'sent' };
 }
 
+/**
+ * Bauen, Verschicken und Fehlerformung für eine Gruppe mit bekannten
+ * Empfängern — der Teil, den der Montagslauf und der manuelle Versand aus der
+ * Admin-Oberfläche gemeinsam haben.
+ *
+ * Ein Fehler wird zum Ergebnis und nicht geworfen: Im Montagslauf darf eine
+ * Gruppe die anderen nicht um ihren Bericht bringen, und die Server Action des
+ * manuellen Versands soll dem Formular etwas anzeigen können.
+ */
+async function runForGroup(
+  groupId: string,
+  recipients: string[],
+  period: ReportPeriod,
+  appBaseUrl: string,
+  dryRun: boolean,
+): Promise<WeeklyReportResult> {
+  try {
+    return await reportForGroup(groupId, recipients, period, appBaseUrl, dryRun);
+  } catch (err) {
+    console.error('sendWeeklyReports: Gruppe fehlgeschlagen', err, {
+      groupId,
+    });
+    return {
+      groupId,
+      status: 'failed',
+      recipientCount: recipients.length,
+      entryCount: 0,
+      warningCount: 0,
+      openMangelCount: 0,
+      error: err instanceof Error ? err.message : 'unbekannter Fehler',
+    };
+  }
+}
+
+/**
+ * Der Bericht einer einzelnen Gruppe an ausdrücklich genannte Empfänger — für
+ * den manuellen Versand aus der Admin-Oberfläche.
+ *
+ * Läuft über dieselbe `runForGroup` wie der Montagslauf. Die Mail ist damit
+ * nicht bloß gleich gebaut, sondern dieselbe Nachricht; eine zweite Bauweise,
+ * die auseinanderdriftet, kann es nicht geben.
+ */
+export async function sendWeeklyReportForGroup({
+  groupId,
+  period,
+  recipients,
+  dryRun = false,
+}: SendWeeklyReportForGroupOptions): Promise<WeeklyReportResult> {
+  // Vor dem `try` in `runForGroup`, weil das ein Programmierfehler des
+  // Aufrufers ist und kein Betriebsfehler: Ohne Empfänger entstünde eine
+  // Nachricht mit `To: undefined`, die die Gmail-API annehmen könnte.
+  if (recipients.length === 0) {
+    throw new Error('sendWeeklyReportForGroup: recipients must not be empty');
+  }
+  const appBaseUrl = await getBaseUrl();
+  return runForGroup(groupId, recipients, period, appBaseUrl, dryRun);
+}
+
 export async function sendWeeklyReports({
   period,
   dryRun = false,
@@ -287,26 +358,11 @@ export async function sendWeeklyReports({
       continue;
     }
 
-    try {
-      results.push(
-        await reportForGroup(groupId, recipients, period, appBaseUrl, dryRun),
-      );
-    } catch (err) {
-      // Ein Fehler bei einer Gruppe darf die anderen nicht um ihren Bericht
-      // bringen: Der Lauf geht weiter, das Ergebnis hält den Fehler fest.
-      console.error('sendWeeklyReports: Gruppe fehlgeschlagen', err, {
-        groupId,
-      });
-      results.push({
-        groupId,
-        status: 'failed',
-        recipientCount: recipients.length,
-        entryCount: 0,
-        warningCount: 0,
-        openMangelCount: 0,
-        error: err instanceof Error ? err.message : 'unbekannter Fehler',
-      });
-    }
+    // Ein Fehler bei einer Gruppe darf die anderen nicht um ihren Bericht
+    // bringen; `runForGroup` fasst ihn deshalb in ein Ergebnis.
+    results.push(
+      await runForGroup(groupId, recipients, period, appBaseUrl, dryRun),
+    );
   }
 
   return results;

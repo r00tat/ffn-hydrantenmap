@@ -87,7 +87,10 @@ vi.mock('../../server/firebase/admin', () => ({
   },
 }));
 
-import { sendWeeklyReports } from './sendWeeklyReports';
+import {
+  sendWeeklyReportForGroup,
+  sendWeeklyReports,
+} from './sendWeeklyReports';
 import { resolveReportPeriod } from './weeklyReportPeriod';
 
 const period = resolveReportPeriod({ year: 2026, week: 32 });
@@ -280,5 +283,90 @@ describe('sendWeeklyReports', () => {
     expect(results[0]).toMatchObject({ warningCount: 1, openMangelCount: 1 });
     expect(results[0].text).toContain('Blinker rechts defekt');
     expect(results[0].text).not.toContain('Erledigt');
+  });
+});
+
+/**
+ * Der Versand für eine einzelne Gruppe — die Bahn des manuellen Versands aus der
+ * Admin-Oberfläche. Sie teilt mit dem Montagslauf denselben Bau- und Sendeweg,
+ * bekommt die Empfänger aber ausdrücklich übergeben.
+ */
+describe('sendWeeklyReportForGroup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mailSenderMock.mockReturnValue('noreply@example.at');
+    process.env.NEXTAUTH_URL = 'https://karte.example.at';
+    firestoreState.configs = [
+      {
+        id: 'ffnd',
+        data: { groupId: 'ffnd', mangelEmails: ['zeugwart@example.at'] },
+      },
+    ];
+    firestoreState.groups = { ffnd: { name: 'FF Neusiedl am See' } };
+    firestoreState.vehicles = [vehicleDoc];
+    firestoreState.entries = [entryDoc];
+    firestoreState.previous = [];
+    firestoreState.mangel = [];
+  });
+
+  it('verschickt an die übergebenen Empfänger und nicht an die gepflegten', async () => {
+    // Der Kern der Überschreibung: Ein Probeversand an die eigene Adresse darf
+    // die Montags-Verteilerliste nicht behelligen.
+    const result = await sendWeeklyReportForGroup({
+      groupId: 'ffnd',
+      period,
+      recipients: ['kommandant@example.at'],
+    });
+    expect(result).toMatchObject({
+      groupId: 'ffnd',
+      status: 'sent',
+      recipientCount: 1,
+      entryCount: 1,
+    });
+    const raw = sendRawMailMock.mock.calls[0][0];
+    expect(raw).toContain('To: kommandant@example.at');
+    expect(raw).not.toContain('zeugwart@example.at');
+  });
+
+  it('setzt weitere übergebene Empfänger als Cc', async () => {
+    await sendWeeklyReportForGroup({
+      groupId: 'ffnd',
+      period,
+      recipients: ['a@example.at', 'b@example.at'],
+    });
+    expect(sendRawMailMock.mock.calls[0][0]).toContain('Cc: b@example.at');
+  });
+
+  it('sendet bei dryRun nicht und liefert Betreff und Text', async () => {
+    const result = await sendWeeklyReportForGroup({
+      groupId: 'ffnd',
+      period,
+      recipients: ['a@example.at'],
+      dryRun: true,
+    });
+    expect(sendRawMailMock).not.toHaveBeenCalled();
+    expect(result.status).toBe('dryRun');
+    expect(result.subject).toContain('KW32');
+    expect(result.text).toContain('KDTFA');
+  });
+
+  it('fasst einen Fehler als Ergebnis und wirft nicht', async () => {
+    // Der Aufrufer ist eine Server Action, die dem Formular etwas anzeigen
+    // soll — dieselbe Fehlerformung wie im Montagslauf.
+    sendRawMailMock.mockRejectedValueOnce(new Error('gmail down'));
+    const result = await sendWeeklyReportForGroup({
+      groupId: 'ffnd',
+      period,
+      recipients: ['a@example.at'],
+    });
+    expect(result).toMatchObject({ status: 'failed', error: 'gmail down' });
+  });
+
+  it('lehnt eine leere Empfängerliste ab, statt eine Mail ohne To zu bauen', async () => {
+    // Ohne diese Sperre würde `To: undefined` in der Nachricht landen.
+    await expect(
+      sendWeeklyReportForGroup({ groupId: 'ffnd', period, recipients: [] }),
+    ).rejects.toThrow(/recipients/);
+    expect(sendRawMailMock).not.toHaveBeenCalled();
   });
 });

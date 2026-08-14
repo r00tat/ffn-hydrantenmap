@@ -731,7 +731,31 @@
       "mangelEmailsLoadFailed": "Empfänger konnten nicht geladen werden: {message}",
       "mangelEmailsSaveFailed": "Empfänger konnten nicht gespeichert werden: {message}",
       "mangelEmailInvalid": "Bitte gültige E-Mail-Adressen eintragen.",
-      "mangelEmailsTooMany": "Es sind höchstens {max} Empfänger möglich."
+      "mangelEmailsTooMany": "Es sind höchstens {max} Empfänger möglich.",
+      "weeklyReport": {
+        "title": "Wochenbericht versenden",
+        "hint": "Verschickt den Bericht einer Kalenderwoche noch einmal — dieselbe Mail, die der Montagslauf verschickt.",
+        "year": "Jahr",
+        "week": "KW",
+        "period": "Zeitraum: {from} – {to}",
+        "periodInvalid": "Keine gültige Kalenderwoche dieses Jahres.",
+        "recipients": "Empfänger dieses Versands",
+        "recipientsPlaceholder": "adresse@example.at",
+        "recipientsHelper": "Vorbelegt mit den Mangel-Empfängern. Eine Änderung gilt nur für diesen Versand und wird nicht gespeichert.",
+        "preview": "Vorschau",
+        "previewTitle": "Vorschau — nichts verschickt",
+        "subject": "Betreff",
+        "send": "Versenden",
+        "confirmTitle": "Bericht jetzt verschicken?",
+        "confirmText": "KW{week} {year} an {count, plural, one {eine Adresse} other {# Adressen}}:",
+        "sent": "Verschickt: {entries, plural, one {eine Fahrt} other {# Fahrten}}, {warnings, plural, one {eine Warnung} other {# Warnungen}}, {mangel, plural, one {ein offener Mangel} other {# offene Mängel}}.",
+        "failed": "Versand fehlgeschlagen: {message}",
+        "loadFailed": "Empfänger nicht abrufbar: {message}",
+        "errorNoRecipients": "Mindestens eine Empfängeradresse angeben.",
+        "errorEmailInvalid": "Mindestens eine Adresse ist keine gültige E-Mail-Adresse.",
+        "errorTooManyEmails": "Höchstens {max} Adressen.",
+        "errorInvalidWeek": "Keine gültige Kalenderwoche dieses Jahres."
+      }
     },
     "shareLink": {
       "heading": "Fahrtenbuch-Link",
