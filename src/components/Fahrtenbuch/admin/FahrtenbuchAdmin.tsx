@@ -1,5 +1,6 @@
 'use client';
 
+import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
@@ -35,7 +36,10 @@ export default function FahrtenbuchAdmin() {
 
   return (
     <AdminGuard>
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      {/* `xl` statt `lg`: Bei 1200px Inhaltsbreite bleiben auf einem großen
+          Display zwei Spalten und breite leere Ränder. Die Fahrzeug- und
+          Personentabellen gewinnen durch die Breite ebenso. */}
+      <Container maxWidth="xl" sx={{ py: 3 }}>
         <Stack
           direction="row"
           spacing={2}
@@ -95,17 +99,45 @@ export default function FahrtenbuchAdmin() {
             )}
             {/* Der Einstellungen-Tab setzt die Abschnitte nur zusammen; jeder
                 pflegt seinen eigenen Teil der Gruppenkonfiguration und lädt
-                ihn selbst. `key` erneuert beide beim Gruppenwechsel. */}
+                ihn selbst. `key` erneuert alle beim Gruppenwechsel.
+
+                Die Breite steuert dieser Container und nicht die Karte: So
+                füllen sie ihre Spalte, statt in ihr zu schwimmen. */}
             {tab === 2 && (
-              <Stack key={groupId} spacing={3} sx={{ alignItems: 'flex-start' }}>
+              <Box
+                key={groupId}
+                sx={{
+                  display: 'grid',
+                  gap: 3,
+                  // Die Spaltenzahl wächst so, dass eine Spalte nie unter etwa
+                  // 420px fällt: Die Abschnitte sind Formulare mit Hilfetexten
+                  // und Chips, enge Spalten lesen sich schlechter als wenige
+                  // breite. Bei `md` bleiben rund 430px je Spalte, bei `xl`
+                  // rund 480 — die Breite, für die die Karten gebaut sind. Eine
+                  // einzelne Spalte bleibt darauf begrenzt, damit ein Formular
+                  // auf dem Tablet nicht über die halbe Seite läuft.
+                  //
+                  // `minmax(0, …)` statt `1fr`: Ein `1fr` ist `minmax(auto,
+                  // 1fr)` und wächst über seinen Anteil hinaus, sobald ein
+                  // Inhalt nicht umbricht — etwa eine lange Empfängeradresse.
+                  gridTemplateColumns: {
+                    xs: 'minmax(0, 480px)',
+                    md: 'repeat(2, minmax(0, 1fr))',
+                    xl: 'repeat(3, minmax(0, 1fr))',
+                  },
+                  // Jede Karte behält ihre natürliche Höhe, statt auf die
+                  // höchste ihrer Zeile gestreckt zu werden.
+                  alignItems: 'start',
+                }}
+              >
                 <GroupSettings groupId={groupId} />
                 <MangelNotificationSettings groupId={groupId} />
-                {/* Steht unter den Empfängern, weil der Versand sie vorbelegt:
-                    Die Nachbarschaft macht den Unterschied zwischen einmaliger
+                {/* Folgt den Empfängern, weil der Versand sie vorbelegt: Die
+                    Nachbarschaft macht den Unterschied zwischen einmaliger
                     Überschreibung und dauerhafter Pflege sichtbar. */}
                 <WeeklyReportSendSection groupId={groupId} />
                 <MangelMigration groupId={groupId} />
-              </Stack>
+              </Box>
             )}
             {tab === 3 && (
               <ShareLinkSection

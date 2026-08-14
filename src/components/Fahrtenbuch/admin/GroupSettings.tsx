@@ -96,7 +96,7 @@ export default function GroupSettings({ groupId }: { groupId: string }) {
   };
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 480 }}>
+    <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>
         {t('admin.standort')}
       </Typography>

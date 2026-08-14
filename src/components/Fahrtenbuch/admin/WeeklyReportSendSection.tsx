@@ -166,7 +166,7 @@ export default function WeeklyReportSendSection({
   const disabled = busy || !loaded || !period;
 
   return (
-    <Paper sx={{ p: 3, maxWidth: 480 }}>
+    <Paper sx={{ p: 3 }}>
       <Typography variant="h6" gutterBottom>
         {t('admin.weeklyReport.title')}
       </Typography>
