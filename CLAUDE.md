@@ -571,6 +571,35 @@ ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
 zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
 am Status-Code.
 
+## Mangel-Bilder
+
+Zu einem Fahrzeugmangel gehören Fotos (`Mangel.images`, [mangel.ts](src/common/mangel.ts)).
+Gespeichert wird der Storage-**Pfad**, nicht die URL — eine Download-URL veraltet, der
+Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{name}`.
+
+- **Gelesen wird über Signed URLs vom Server**, nicht über die Storage-Regeln: Die
+  Berechtigung hängt an der Gruppenmitgliedschaft, und die steht in Firestore. Ein
+  `firestore.get` aus einer Storage-Regel trifft immer die Default-Datenbank und gäbe in
+  der Dev-Datenbank `ffndev` die falsche Antwort. Deshalb verweigert
+  [storage.rules](storage.rules) jedem Client das Lesen und die Action `mangelImageUrls`
+  ([mangelActions.ts](src/components/Fahrtenbuch/mangelActions.ts)) prüft die
+  Mitgliedschaft und signiert. Gleiches Muster wie bei den Bug-Report-Anhängen.
+- **Jeder Pfad aus dem Browser wird geprüft** (`sanitizeMangelImages`) — beim Schreiben
+  *und* beim Signieren. Ohne das zeigte ein Mangel auf Dateien einer fremden Gruppe.
+- **Hochgeladen wird erst beim Speichern** des Dialogs; nach einem erfolgreichen Upload
+  gelten die Bilder sofort als gespeichert, damit ein zweiter Anlauf nach einem Fehler
+  nicht dieselben Dateien noch einmal hochlädt.
+- **Gelöscht wird serverseitig** — beim Entfernen eines einzelnen Bildes (`updateMangel`
+  bekommt die vollständige Liste, was fehlt, fliegt aus dem Storage) und beim Löschen des
+  Mangels.
+- **`storage.rules` wird über terraform ausgerollt**
+  (`google_firebaserules_ruleset`/`_release` in
+  [firebase.tf](terraform/modules/project-base/firebase.tf)), nicht über `firebase deploy`
+  — in `firebase.json` steht die Datei deshalb bewusst nicht. Eine Änderung braucht einen
+  Apply aus [terraform.yml](.github/workflows/terraform.yml).
+- Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
+  braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
+
 ## German Terminology
 
 Key domain terms used throughout the codebase:

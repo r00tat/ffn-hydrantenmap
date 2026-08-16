@@ -15,7 +15,11 @@ const {
   batchCommitMock,
   actionUserRequiredMock,
   actionAdminRequiredMock,
+  deleteMangelImagesMock,
+  signMangelImagesMock,
 } = vi.hoisted(() => ({
+  deleteMangelImagesMock: vi.fn(),
+  signMangelImagesMock: vi.fn(),
   addMock: vi.fn(),
   mangelDocGetMock: vi.fn(),
   mangelDocSetMock: vi.fn(),
@@ -33,6 +37,11 @@ const {
 vi.mock('../../app/auth', () => ({
   actionUserRequired: actionUserRequiredMock,
   actionAdminRequired: actionAdminRequiredMock,
+}));
+
+vi.mock('./mangelImageStore', () => ({
+  deleteMangelImages: deleteMangelImagesMock,
+  signMangelImages: signMangelImagesMock,
 }));
 
 // `FieldValue.delete()` als erkennbarer Marker — die Tests prüfen damit, dass
@@ -81,6 +90,7 @@ import {
   changeMangelStatus,
   createMangel,
   deleteMangel,
+  mangelImageUrls,
   migrateDefectsToMangel,
   updateMangel,
 } from './mangelActions';
@@ -146,6 +156,8 @@ beforeEach(() => {
   mangelDocGetMock.mockResolvedValue(mangelSnapshot());
   mangelQueryGetMock.mockResolvedValue(openMangel(['open']));
   entriesQueryGetMock.mockResolvedValue({ docs: [] });
+  deleteMangelImagesMock.mockResolvedValue(undefined);
+  signMangelImagesMock.mockResolvedValue([]);
 });
 
 describe('createMangel', () => {
@@ -219,6 +231,28 @@ describe('createMangel', () => {
     });
     expect(result).toEqual({ success: false, error: 'notInGroup' });
     expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('übernimmt die hochgeladenen Bilder', async () => {
+    await createMangel('ffnd', {
+      vehicleId: 'v1',
+      description: 'x',
+      images: ['groups/ffnd/mangel/u-1/foto.jpg'],
+    });
+    expect(addMock.mock.calls[0][0].images).toEqual([
+      'groups/ffnd/mangel/u-1/foto.jpg',
+    ]);
+  });
+
+  it('verwirft ein Bild aus einer fremden Gruppe', async () => {
+    // Der Pfad kommt aus dem Browser. Ohne die Prüfung zeigte ein Mangel auf
+    // Dateien einer fremden Gruppe — und die Anzeige signierte sie brav.
+    await createMangel('ffnd', {
+      vehicleId: 'v1',
+      description: 'x',
+      images: ['groups/andere/mangel/u-1/foto.jpg'],
+    });
+    expect(addMock.mock.calls[0][0]).not.toHaveProperty('images');
   });
 
   it('verwirft einen vom Client behaupteten Status', async () => {
@@ -363,6 +397,85 @@ describe('updateMangel', () => {
     expect(result.success).toBe(false);
     expect(mangelDocSetMock).not.toHaveBeenCalled();
   });
+
+  it('löscht die entfernten Bilder aus dem Storage', async () => {
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({
+        images: ['groups/ffnd/mangel/m1/a.jpg', 'groups/ffnd/mangel/m1/b.jpg'],
+      }),
+    );
+    const result = await updateMangel('ffnd', 'm1', {
+      description: 'x',
+      images: ['groups/ffnd/mangel/m1/b.jpg'],
+    });
+    expect(result.success).toBe(true);
+    expect(mangelDocSetMock.mock.calls[0][0].images).toEqual([
+      'groups/ffnd/mangel/m1/b.jpg',
+    ]);
+    expect(deleteMangelImagesMock).toHaveBeenCalledWith([
+      'groups/ffnd/mangel/m1/a.jpg',
+    ]);
+  });
+
+  it('lässt die Bilder unangetastet, wenn keine Liste mitkommt', async () => {
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({ images: ['groups/ffnd/mangel/m1/a.jpg'] }),
+    );
+    await updateMangel('ffnd', 'm1', { description: 'x' });
+    expect(mangelDocSetMock.mock.calls[0][0]).not.toHaveProperty('images');
+    expect(deleteMangelImagesMock).not.toHaveBeenCalled();
+  });
+
+  it('leert die Bilderliste, wenn alle entfernt wurden', async () => {
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({ images: ['groups/ffnd/mangel/m1/a.jpg'] }),
+    );
+    await updateMangel('ffnd', 'm1', { description: 'x', images: [] });
+    expect(mangelDocSetMock.mock.calls[0][0].images).toEqual([]);
+    expect(deleteMangelImagesMock).toHaveBeenCalledWith([
+      'groups/ffnd/mangel/m1/a.jpg',
+    ]);
+  });
+});
+
+describe('mangelImageUrls', () => {
+  it('signiert die Bilder des Mangels', async () => {
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({ images: ['groups/ffnd/mangel/m1/a.jpg'] }),
+    );
+    signMangelImagesMock.mockResolvedValue(['https://signed/a']);
+
+    const result = await mangelImageUrls('ffnd', 'm1');
+    expect(result).toEqual({
+      success: true,
+      images: [
+        { path: 'groups/ffnd/mangel/m1/a.jpg', url: 'https://signed/a' },
+      ],
+    });
+    expect(signMangelImagesMock).toHaveBeenCalledWith([
+      'groups/ffnd/mangel/m1/a.jpg',
+    ]);
+  });
+
+  it('signiert nichts für ein Nicht-Mitglied', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { ...SESSION.user, groups: ['andere'] },
+    });
+    const result = await mangelImageUrls('ffnd', 'm1');
+    expect(result).toEqual({ success: false, error: 'notInGroup' });
+    expect(signMangelImagesMock).not.toHaveBeenCalled();
+  });
+
+  it('signiert keinen Pfad aus einer fremden Gruppe', async () => {
+    // Ein manipuliertes Dokument darf die Signatur nicht auf fremde Dateien
+    // lenken — die Prüfung gilt beim Lesen genauso wie beim Schreiben.
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({ images: ['groups/andere/mangel/m1/a.jpg'] }),
+    );
+    const result = await mangelImageUrls('ffnd', 'm1');
+    expect(result.success).toBe(true);
+    expect(signMangelImagesMock).toHaveBeenCalledWith([]);
+  });
 });
 
 describe('deleteMangel', () => {
@@ -384,6 +497,19 @@ describe('deleteMangel', () => {
       { openMangelCount: 0 },
       { merge: true },
     );
+  });
+
+  it('räumt die Bilder aus dem Storage mit weg', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { ...SESSION.user, isAdmin: true },
+    });
+    mangelDocGetMock.mockResolvedValue(
+      mangelSnapshot({ images: ['groups/ffnd/mangel/m1/a.jpg'] }),
+    );
+    await deleteMangel('ffnd', 'm1');
+    expect(deleteMangelImagesMock).toHaveBeenCalledWith([
+      'groups/ffnd/mangel/m1/a.jpg',
+    ]);
   });
 });
 

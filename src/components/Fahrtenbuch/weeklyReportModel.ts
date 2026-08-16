@@ -122,6 +122,13 @@ export interface WeeklyReportMangel {
   description: string;
   reportedAt: string;
   reportedByName: string;
+  /**
+   * Nur die Anzahl, nicht die Bilder selbst: Die Mail geht an Werkstatt und
+   * Gerätewart und soll klein bleiben, und ein Anhang bräuchte eine
+   * Berechtigungsprüfung, die eine Mail nicht hat. Der Hinweis sagt, dass es
+   * im Fahrtenbuch mehr zu sehen gibt.
+   */
+  imageCount: number;
 }
 
 export interface WeeklyReportModel {
@@ -408,6 +415,7 @@ export function buildWeeklyReportModel(
       description: m.description,
       reportedAt: formatDate(m.reportedAt, timeZone),
       reportedByName: m.reportedByName,
+      imageCount: m.images?.length ?? 0,
     };
   });
 

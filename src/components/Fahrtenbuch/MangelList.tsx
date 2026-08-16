@@ -2,6 +2,7 @@
 
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
@@ -113,6 +114,22 @@ export default function MangelList({
                     <Typography variant="caption" color="text.secondary">
                       {t('fromEntry')}
                     </Typography>
+                  )}
+                  {/* Nur die Anzahl, keine Vorschaubilder: Jedes Bild braucht
+                      eine eigene signierte URL vom Server — für eine Liste mit
+                      dutzenden Zeilen wären das dutzende Aufrufe. Die Bilder
+                      selbst stehen einen Klick weiter im Dialog. */}
+                  {(item.images?.length ?? 0) > 0 && (
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{ alignItems: 'center', color: 'text.secondary' }}
+                    >
+                      <PhotoLibraryIcon fontSize="inherit" />
+                      <Typography variant="caption">
+                        {t('imageCount', { count: item.images?.length ?? 0 })}
+                      </Typography>
+                    </Stack>
                   )}
                 </ButtonBase>
               </TableCell>

@@ -48,6 +48,30 @@ describe('MangelList', () => {
     expect(screen.getByText(/05\.08\.26|5\.8\.2026|05\.08\.2026/)).toBeInTheDocument();
   });
 
+  it('weist auf hinterlegte Bilder hin', () => {
+    // Nur die Anzahl: Jedes Bild bräuchte eine eigene signierte URL vom
+    // Server, für eine ganze Liste also dutzende Aufrufe.
+    renderWithIntl(
+      <MangelList
+        mangel={[
+          mangel({
+            images: [
+              'groups/ffnd/mangel/m1/a.jpg',
+              'groups/ffnd/mangel/m1/b.jpg',
+            ],
+          }),
+        ]}
+        onEdit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('2 Bilder')).toBeInTheDocument();
+  });
+
+  it('zeigt keinen Bildhinweis ohne Bilder', () => {
+    renderWithIntl(<MangelList mangel={[mangel()]} onEdit={vi.fn()} />);
+    expect(screen.queryByText(/Bilder?$/)).toBeNull();
+  });
+
   it('weist einen aus einer Fahrt gemeldeten Mangel als solchen aus', () => {
     renderWithIntl(
       <MangelList mangel={[mangel({ entryId: 'e1' })]} onEdit={vi.fn()} />,

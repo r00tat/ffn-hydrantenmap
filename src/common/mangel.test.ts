@@ -4,7 +4,11 @@ import {
   applyMangelStatus,
   buildMangelDocument,
   isOpenMangel,
+  MANGEL_MAX_IMAGES,
+  mangelImagePath,
   openMangelCount,
+  sanitizeMangelFileName,
+  sanitizeMangelImages,
   validateMangelInput,
   type Mangel,
   type MangelActor,
@@ -168,6 +172,123 @@ describe('buildMangelDocument', () => {
         actor,
       ),
     ).toThrow(/descriptionMissing/);
+  });
+
+  it('keeps images that belong to the group', () => {
+    const doc = buildMangelDocument(
+      {
+        vehicleId: 'v1',
+        description: 'x',
+        images: ['groups/ffn/mangel/m1/foto.jpg'],
+      },
+      { name: 'TLF-A' },
+      'ffn',
+      actor,
+    );
+    expect(doc.images).toEqual(['groups/ffn/mangel/m1/foto.jpg']);
+  });
+
+  it('drops images from another group — the path comes from the browser', () => {
+    const doc = buildMangelDocument(
+      {
+        vehicleId: 'v1',
+        description: 'x',
+        images: ['groups/andere/mangel/m1/foto.jpg', 'bugReports/r1/shot.png'],
+      },
+      { name: 'TLF-A' },
+      'ffn',
+      actor,
+    );
+    expect('images' in doc).toBe(false);
+  });
+
+  it('omits images instead of writing an empty array', () => {
+    const doc = buildMangelDocument(
+      { vehicleId: 'v1', description: 'x' },
+      { name: 'TLF-A' },
+      'ffn',
+      actor,
+    );
+    expect('images' in doc).toBe(false);
+  });
+});
+
+describe('sanitizeMangelImages', () => {
+  it('accepts a path inside the group folder', () => {
+    expect(
+      sanitizeMangelImages(['groups/ffn/mangel/m1/foto.jpg'], 'ffn'),
+    ).toEqual(['groups/ffn/mangel/m1/foto.jpg']);
+  });
+
+  it('normalises a leading slash', () => {
+    expect(
+      sanitizeMangelImages(['/groups/ffn/mangel/m1/foto.jpg'], 'ffn'),
+    ).toEqual(['groups/ffn/mangel/m1/foto.jpg']);
+  });
+
+  it('rejects other groups, other prefixes and traversal', () => {
+    expect(
+      sanitizeMangelImages(
+        [
+          'groups/andere/mangel/m1/foto.jpg',
+          'bugReports/r1/shot.png',
+          'groups/ffn/fahrtenbuch/e1/foto.jpg',
+          'groups/ffn/mangel/../../../secret.jpg',
+          'groups/ffn/mangel/m1/sub/foto.jpg',
+          'groups/ffn/mangel/m1/',
+        ],
+        'ffn',
+      ),
+    ).toEqual([]);
+  });
+
+  it('drops duplicates and non-strings', () => {
+    expect(
+      sanitizeMangelImages(
+        [
+          'groups/ffn/mangel/m1/a.jpg',
+          'groups/ffn/mangel/m1/a.jpg',
+          42,
+          null,
+        ],
+        'ffn',
+      ),
+    ).toEqual(['groups/ffn/mangel/m1/a.jpg']);
+  });
+
+  it('caps the number of images', () => {
+    const many = Array.from(
+      { length: MANGEL_MAX_IMAGES + 5 },
+      (_v, i) => `groups/ffn/mangel/m1/${i}.jpg`,
+    );
+    expect(sanitizeMangelImages(many, 'ffn')).toHaveLength(MANGEL_MAX_IMAGES);
+  });
+
+  it('returns an empty list for anything that is not an array', () => {
+    expect(sanitizeMangelImages(undefined, 'ffn')).toEqual([]);
+    expect(sanitizeMangelImages('groups/ffn/mangel/m1/a.jpg', 'ffn')).toEqual(
+      [],
+    );
+  });
+});
+
+describe('mangelImagePath', () => {
+  it('builds the folder path of a Mangel', () => {
+    expect(mangelImagePath('ffn', 'm1', 'foto.jpg')).toBe(
+      'groups/ffn/mangel/m1/foto.jpg',
+    );
+  });
+
+  it('strips anything that could leave the folder', () => {
+    expect(mangelImagePath('ffn', 'm1', '../../etc/passwd')).toBe(
+      'groups/ffn/mangel/m1/.._.._etc_passwd',
+    );
+    expect(mangelImagePath('ffn', 'm1', '..')).toBe(
+      'groups/ffn/mangel/m1/bild',
+    );
+    expect(sanitizeMangelFileName('Foto 1 (Blinker).JPG')).toBe(
+      'Foto_1__Blinker_.JPG',
+    );
   });
 });
 
