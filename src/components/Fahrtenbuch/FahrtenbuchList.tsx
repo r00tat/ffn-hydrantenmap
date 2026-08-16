@@ -2,11 +2,14 @@
 
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -24,9 +27,18 @@ import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   FAHRT_ZWECKE,
+  type FahrtZweck,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import {
+  EMPTY_FAHRTENBUCH_LIST_FILTER,
+  driverOptionsOf,
+  filterFahrtenbuchEntries,
+  hasActiveFahrtenbuchListFilter,
+  type FahrtenbuchListFilter,
+} from '../../common/fahrtenbuchListFilter';
+import { browserTimeZone } from '../../common/fahrtenbuchStats';
 import { counterLines, fuelLines, type CounterLine } from './entrySummary';
 
 export interface FahrtenbuchListProps {
@@ -45,6 +57,14 @@ export interface FahrtenbuchListProps {
    */
   hideFilters?: boolean;
   /**
+   * Der Filterzustand. Ohne diese beiden Eigenschaften führt die Liste ihn
+   * selbst — die Seiten geben ihn vor, weil bei ihnen der Zeitraum auch die
+   * Firestore-Abfrage weitet und der Zustand in der URL steht
+   * (`useFahrtenbuchListFilter`).
+   */
+  filter?: FahrtenbuchListFilter;
+  onFilterChange?: (filter: FahrtenbuchListFilter) => void;
+  /**
    * Ohne Handler bleibt die Liste eine reine Anzeige und zeigt keine
    * Bearbeiten-/Löschen-Knöpfe. Der Defekt-Hinweis bleibt — er gehört zur
    * Fahrt, nicht zur Bedienung.
@@ -58,25 +78,48 @@ export default function FahrtenbuchList({
   vehicles,
   hideVehicleFilter,
   hideFilters,
+  filter: filterProp,
+  onFilterChange,
   onEdit,
   onDelete,
 }: FahrtenbuchListProps) {
   const t = useTranslations('fahrtenbuch');
   const format = useFormatter();
-  const [vehicleFilter, setVehicleFilter] = useState('');
-  const [zweckFilter, setZweckFilter] = useState('');
-  const [onlyDefects, setOnlyDefects] = useState(false);
+  const [ownFilter, setOwnFilter] = useState(EMPTY_FAHRTENBUCH_LIST_FILTER);
+  const filter = filterProp ?? ownFilter;
+  const setFilter = onFilterChange ?? setOwnFilter;
+  const change = (patch: Partial<FahrtenbuchListFilter>) =>
+    setFilter({ ...filter, ...patch });
+
+  // Der Zeitraum meint den Tag, an dem die Fahrt vor Ort begonnen hat.
+  const timeZone = useMemo(() => browserTimeZone(), []);
 
   const filtered = useMemo(
-    () =>
-      entries.filter((e) => {
-        if (vehicleFilter && e.vehicleId !== vehicleFilter) return false;
-        if (zweckFilter && e.zweck !== zweckFilter) return false;
-        if (onlyDefects && !e.defekt) return false;
-        return true;
-      }),
-    [entries, vehicleFilter, zweckFilter, onlyDefects],
+    () => filterFahrtenbuchEntries(entries, filter, timeZone),
+    [entries, filter, timeZone],
   );
+
+  /**
+   * Die Fahrerauswahl entsteht aus allen übergebenen Fahrten, nicht aus den
+   * gefilterten: Sonst bliebe nach der Auswahl nur noch dieser eine Fahrer
+   * übrig und es gäbe keinen Weg zu einem anderen.
+   */
+  const driverOptions = useMemo(() => driverOptionsOf(entries), [entries]);
+  /**
+   * Ein Fahrer aus der URL, zu dem keine Fahrt geladen ist, wäre für das
+   * Auswahlfeld ein unbekannter Wert — MUI zeigt dann leer, und der aktive
+   * Filter wäre unsichtbar.
+   */
+  const driverChoices = useMemo(
+    () =>
+      filter.driverKey &&
+      !driverOptions.some((option) => option.key === filter.driverKey)
+        ? [...driverOptions, { key: filter.driverKey, name: filter.driverKey }]
+        : driverOptions,
+    [driverOptions, filter.driverKey],
+  );
+
+  const filterActive = hasActiveFahrtenbuchListFilter(filter);
 
   const vehiclesById = useMemo(
     () => new Map(vehicles.map((v) => [v.id, v])),
@@ -159,13 +202,48 @@ export default function FahrtenbuchList({
           useFlexGap
           sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}
         >
+          {/* Die Suche steht vorne und breiter als die Auswahlfelder: Sie ist
+              der Einstieg, wenn man eine bestimmte Fahrt sucht. */}
+          <TextField
+            size="small"
+            label={t('filters.search')}
+            placeholder={t('filters.searchPlaceholder')}
+            value={filter.search}
+            onChange={(e) => change({ search: e.target.value })}
+            sx={{ minWidth: 240, flexGrow: 1, maxWidth: 420 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <TextField
+            type="date"
+            size="small"
+            label={t('filters.from')}
+            value={filter.from}
+            onChange={(e) => change({ from: e.target.value })}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+          <TextField
+            type="date"
+            size="small"
+            label={t('filters.to')}
+            value={filter.to}
+            onChange={(e) => change({ to: e.target.value })}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
           {!hideVehicleFilter && (
             <TextField
               select
               size="small"
               label={t('filters.vehicle')}
-              value={vehicleFilter}
-              onChange={(e) => setVehicleFilter(e.target.value)}
+              value={filter.vehicleId}
+              onChange={(e) => change({ vehicleId: e.target.value })}
               sx={{ minWidth: 180 }}
             >
               <MenuItem value="">{t('filters.all')}</MenuItem>
@@ -181,9 +259,26 @@ export default function FahrtenbuchList({
           <TextField
             select
             size="small"
+            label={t('filters.driver')}
+            value={filter.driverKey}
+            onChange={(e) => change({ driverKey: e.target.value })}
+            sx={{ minWidth: 180 }}
+          >
+            <MenuItem value="">{t('filters.all')}</MenuItem>
+            {driverChoices.map((option) => (
+              <MenuItem key={option.key} value={option.key}>
+                {option.name}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
             label={t('filters.zweck')}
-            value={zweckFilter}
-            onChange={(e) => setZweckFilter(e.target.value)}
+            value={filter.zweck}
+            onChange={(e) =>
+              change({ zweck: e.target.value as FahrtZweck | '' })
+            }
             sx={{ minWidth: 180 }}
           >
             <MenuItem value="">{t('filters.all')}</MenuItem>
@@ -196,17 +291,32 @@ export default function FahrtenbuchList({
           <FormControlLabel
             control={
               <Switch
-                checked={onlyDefects}
-                onChange={(e) => setOnlyDefects(e.target.checked)}
+                checked={filter.onlyDefects}
+                onChange={(e) => change({ onlyDefects: e.target.checked })}
               />
             }
             label={t('filters.onlyDefects')}
           />
+          {filterActive && (
+            <Button
+              size="small"
+              onClick={() => setFilter(EMPTY_FAHRTENBUCH_LIST_FILTER)}
+            >
+              {t('filters.reset')}
+            </Button>
+          )}
         </Stack>
       )}
 
       {filtered.length === 0 ? (
-        <Typography color="text.secondary">{t('noEntries')}</Typography>
+        // „Keine Fahrten" und „nichts passt zum Filter" sind zwei verschiedene
+        // Auskünfte: Beim gesetzten Filter ist die Liste nicht leer, sondern
+        // die Suche zu eng. Der Weg zurück steht im Filterband darüber.
+        <Typography color="text.secondary">
+          {filterActive && !hideFilters
+            ? t('filters.noResults')
+            : t('noEntries')}
+        </Typography>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
           <Table size="small">

@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
   VEHICLE_PRESETS,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { EMPTY_FAHRTENBUCH_LIST_FILTER } from '../../common/fahrtenbuchListFilter';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import FahrtenbuchList from './FahrtenbuchList';
 
@@ -196,5 +198,147 @@ describe('FahrtenbuchList', () => {
     );
 
     expect(screen.getByLabelText('Defekt gemeldet')).toBeInTheDocument();
+  });
+});
+
+describe('FahrtenbuchList — Filter', () => {
+  const v1 = vehicle({ id: 'v1', name: 'RLFA 2000' });
+
+  /**
+   * Die Fahrstrecken der angezeigten Zeilen. Ohne Fahrzeugspalte
+   * (`hideVehicleFilter`) ist das die vierte Zelle: Abfahrt, Fahrer, Zweck,
+   * Fahrstrecke.
+   */
+  function shownTargets() {
+    const rows = screen.queryAllByRole('row').slice(1);
+    return rows.map((row) => within(row).getAllByRole('cell')[3].textContent);
+  }
+
+  const entries = [
+    entry({
+      id: 'a',
+      driverName: 'Max Mustermann',
+      ziel: 'Untere Hauptstraße 12',
+      abfahrt: '2026-08-05T12:00:00.000Z',
+      ankunft: '2026-08-05T13:00:00.000Z',
+    }),
+    entry({
+      id: 'b',
+      driverName: 'Erika Musterfrau',
+      ziel: 'Seepark',
+      hinweise: 'Schlauch getauscht',
+      abfahrt: '2026-08-20T12:00:00.000Z',
+      ankunft: '2026-08-20T13:00:00.000Z',
+    }),
+    entry({
+      id: 'c',
+      driverName: 'Max Mustermann',
+      ziel: 'Bauhof',
+      abfahrt: '2026-09-02T12:00:00.000Z',
+      ankunft: '2026-09-02T13:00:00.000Z',
+    }),
+  ];
+
+  function renderList() {
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={entries}
+        vehicles={[v1]}
+        hideVehicleFilter
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+  }
+
+  it('findet über die Fahrstrecke, auch ohne Umlaut', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.type(screen.getByLabelText('Suche'), 'hauptstrasse');
+
+    expect(shownTargets()).toEqual(['Untere Hauptstraße 12']);
+  });
+
+  it('findet über den Kommentar', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.type(screen.getByLabelText('Suche'), 'schlauch');
+
+    expect(shownTargets()).toEqual(['Seepark']);
+  });
+
+  it('grenzt auf den Zeitraum ein', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.type(screen.getByLabelText('Von'), '2026-08-06');
+    await user.type(screen.getByLabelText('Bis'), '2026-08-31');
+
+    expect(shownTargets()).toEqual(['Seepark']);
+  });
+
+  it('zeigt nur die Fahrten des gewählten Fahrers', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.click(screen.getByLabelText('Fahrer'));
+    await user.click(
+      within(screen.getByRole('listbox')).getByText('Max Mustermann'),
+    );
+
+    expect(shownTargets()).toEqual(['Untere Hauptstraße 12', 'Bauhof']);
+  });
+
+  it('liefert kombiniert die Schnittmenge', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.click(screen.getByLabelText('Fahrer'));
+    await user.click(
+      within(screen.getByRole('listbox')).getByText('Max Mustermann'),
+    );
+    await user.type(screen.getByLabelText('Von'), '2026-09-01');
+
+    expect(shownTargets()).toEqual(['Bauhof']);
+  });
+
+  it('meldet ein leeres Ergebnis und setzt den Filter zurück', async () => {
+    const user = userEvent.setup();
+    renderList();
+
+    await user.type(screen.getByLabelText('Suche'), 'gibt es nicht');
+
+    expect(screen.getByText('Keine Fahrt passt zum Filter.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+
+    expect(shownTargets()).toHaveLength(3);
+  });
+
+  it('führt den Filter von außen, wenn er übergeben wird', async () => {
+    const user = userEvent.setup();
+    const onFilterChange = vi.fn();
+
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={entries}
+        vehicles={[v1]}
+        hideVehicleFilter
+        filter={{ ...EMPTY_FAHRTENBUCH_LIST_FILTER, search: 'seepark' }}
+        onFilterChange={onFilterChange}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(shownTargets()).toEqual(['Seepark']);
+
+    await user.type(screen.getByLabelText('Von'), '2026-08-06');
+
+    expect(onFilterChange).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'seepark', from: '2026-08-06' }),
+    );
   });
 });

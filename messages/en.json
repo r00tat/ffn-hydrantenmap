@@ -493,11 +493,15 @@
     "filters": {
       "vehicle": "Vehicle",
       "zweck": "Purpose",
+      "driver": "Driver",
       "from": "From",
       "to": "To",
+      "search": "Search",
+      "searchPlaceholder": "Route, destination, comment …",
       "onlyDefects": "Defects only",
       "all": "All",
-      "reset": "Reset filters"
+      "reset": "Reset filters",
+      "noResults": "No trip matches the filter."
     },
     "stats": {
       "button": "Statistics",

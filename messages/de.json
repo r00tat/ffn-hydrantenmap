@@ -493,11 +493,15 @@
     "filters": {
       "vehicle": "Fahrzeug",
       "zweck": "Zweck",
+      "driver": "Fahrer",
       "from": "Von",
       "to": "Bis",
+      "search": "Suche",
+      "searchPlaceholder": "Fahrstrecke, Ziel, Kommentar …",
       "onlyDefects": "Nur Defekte",
       "all": "Alle",
-      "reset": "Filter zurücksetzen"
+      "reset": "Filter zurücksetzen",
+      "noResults": "Keine Fahrt passt zum Filter."
     },
     "stats": {
       "button": "Statistik",
