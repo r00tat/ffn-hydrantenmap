@@ -39,11 +39,38 @@ export function isScreenshotSupported(): boolean {
   return typeof document !== 'undefined';
 }
 
-export async function captureScreenshot(): Promise<Blob | null> {
+// modern-screenshot has no timeout of its own: if the data-URL image holding
+// the serialised foreignObject never loads — which happens in mobile WebViews
+// under memory pressure — its promise stays pending forever and the caller
+// waits with it. 15s is far above a normal capture (<2s even on old phones).
+export const SCREENSHOT_TIMEOUT_MS = 15_000;
+
+export interface CaptureScreenshotOptions {
+  /** Overridable for tests. */
+  timeoutMs?: number;
+}
+
+/**
+ * Resolves after the browser had a chance to paint. The dialog is hidden right
+ * before the capture starts; without this the snapshot can still contain it,
+ * because React's state update and the capture run in the same frame.
+ */
+function waitForNextPaint(): Promise<void> {
+  if (typeof requestAnimationFrame !== 'function') return Promise.resolve();
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+export async function captureScreenshot({
+  timeoutMs = SCREENSHOT_TIMEOUT_MS,
+}: CaptureScreenshotOptions = {}): Promise<Blob | null> {
   if (!isScreenshotSupported()) return null;
 
   // Lazy-load modern-screenshot so it stays out of the main bundle.
   const { domToBlob } = await import('modern-screenshot');
+
+  await waitForNextPaint();
 
   // Downscale very large layouts so the intermediate SVG/data URL stays
   // small enough for the browser to load.
@@ -53,8 +80,16 @@ export async function captureScreenshot(): Promise<Blob | null> {
   const srcH = body.scrollHeight || body.clientHeight || window.innerHeight;
   const scale = Math.min(1, MAX_DIM / srcW, MAX_DIM / srcH);
 
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`bug-report: screenshot timed out after ${timeoutMs}ms`);
+      resolve(null);
+    }, timeoutMs);
+  });
+
   try {
-    return await domToBlob(body, {
+    const capture = domToBlob(body, {
       type: 'image/png',
       scale,
       backgroundColor: '#ffffff',
@@ -76,8 +111,12 @@ export async function captureScreenshot(): Promise<Blob | null> {
         placeholderImage: TRANSPARENT_PIXEL,
       },
     });
+
+    return await Promise.race([capture, timeout]);
   } catch (err) {
     console.warn('bug-report: screenshot failed', describeScreenshotError(err));
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }

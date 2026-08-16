@@ -45,6 +45,7 @@ import {
 import { useSnackbar } from '../providers/SnackbarProvider';
 import { captureScreenshot, isScreenshotSupported } from './captureScreenshot';
 import { collectContext } from './collectContext';
+import ScreenshotCaptureOverlay from './ScreenshotCaptureOverlay';
 import { submitBugReportAction } from './submitBugReportAction';
 import { uploadBugReportFile } from './uploadBugReportFile';
 
@@ -71,10 +72,13 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
   const [pendingScreenshots, setPendingScreenshots] = useState<Blob[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [minimized, setMinimized] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [snapshot, setSnapshot] = useState<FrozenSnapshot | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Bumped on every capture start and on cancel, so a capture that finishes
+  // after the user gave up cannot resurrect the overlay or push a screenshot.
+  const captureRunRef = useRef(0);
 
   const screenshotSupported = isScreenshotSupported();
 
@@ -107,7 +111,8 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
       setPendingScreenshots([]);
       setPendingAttachments([]);
       setSubmitting(false);
-      setMinimized(false);
+      setCapturing(false);
+      captureRunRef.current += 1;
     }
     // We deliberately only re-run when `open` toggles.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,15 +135,32 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
   }, [screenshotPreviews, attachmentPreviews]);
 
   const handleCaptureScreenshot = useCallback(async () => {
-    setMinimized(true);
+    const run = (captureRunRef.current += 1);
+    setCapturing(true);
     try {
-      const blob = await captureScreenshot();
+      let blob: Blob | null = null;
+      try {
+        blob = await captureScreenshot();
+      } catch (err) {
+        // e.g. the lazily loaded capture chunk is unavailable offline.
+        console.warn('bug-report: screenshot capture threw', err);
+      }
+      // User cancelled or closed the dialog in the meantime.
+      if (captureRunRef.current !== run) return;
       if (blob) {
         setPendingScreenshots((prev) => [...prev, blob]);
+        showSnackbar(t('screenshotAdded'), 'success');
+      } else {
+        showSnackbar(t('screenshotFailed'), 'error');
       }
     } finally {
-      setMinimized(false);
+      if (captureRunRef.current === run) setCapturing(false);
     }
+  }, [showSnackbar, t]);
+
+  const handleCancelCapture = useCallback(() => {
+    captureRunRef.current += 1;
+    setCapturing(false);
   }, []);
 
   const handleFileInputChange = useCallback(
@@ -221,262 +243,273 @@ export default function BugReportDialog({ open, onClose }: BugReportDialogProps)
   ]);
 
   return (
-    <Dialog
-      open={open}
-      onClose={() => {
-        if (!submitting) onClose();
-      }}
-      fullWidth
-      maxWidth="sm"
-      sx={{ display: minimized ? 'none' : undefined }}
-    >
-      <DialogTitle>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <BugReportIcon />
-          <span>{t('dialogTitle')}</span>
-        </Stack>
-      </DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <ToggleButtonGroup
-            value={kind}
-            exclusive
-            onChange={(_e, next) => {
-              if (next === 'bug' || next === 'feature') setKind(next);
-            }}
-            aria-label={t('kindAriaLabel')}
-            size="small"
-          >
-            <ToggleButton value="bug" aria-label={t('kindBug')}>
-              {t('kindBug')}
-            </ToggleButton>
-            <ToggleButton value="feature" aria-label={t('kindFeature')}>
-              {t('kindFeature')}
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          {kind === 'bug' && !displayMessages && (
-            <Alert severity="info">
-              <Stack spacing={1}>
-                <Typography variant="body2">{t('debugHint')}</Typography>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={false}
-                      onChange={(_e, checked) => setDisplayMessages(checked)}
-                      slotProps={{
-                        input: { 'aria-label': t('enableDebugLogging') },
-                      }}
-                    />
-                  }
-                  label={t('enableDebugLogging')}
-                />
-              </Stack>
-            </Alert>
-          )}
-          {kind === 'bug' && displayMessages && (
-            <Alert severity="success">{t('debugLoggingActive')}</Alert>
-          )}
-
-          <TextField
-            label={t('titleLabel')}
-            required
-            autoFocus
-            fullWidth
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            slotProps={{ htmlInput: { maxLength: 200 } }}
-          />
-          <TextField
-            label={t('descriptionLabel')}
-            required
-            fullWidth
-            multiline
-            minRows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              {t('attachments')}
-            </Typography>
-            <Stack
-              direction="row"
-              spacing={1}
-              useFlexGap
-              sx={{ flexWrap: 'wrap' }}
+    <>
+      <ScreenshotCaptureOverlay
+        open={open && capturing}
+        onCancel={handleCancelCapture}
+      />
+      <Dialog
+        open={open}
+        onClose={() => {
+          if (!submitting && !capturing) onClose();
+        }}
+        fullWidth
+        maxWidth="sm"
+        // Hidden — not unmounted — during the capture so the form state and the
+        // frozen context survive it. The overlay above keeps the user informed.
+        sx={{ display: capturing ? 'none' : undefined }}
+        // The dialog is still open while hidden, so its focus trap would drag
+        // focus back out of the overlay and make the cancel button unreachable.
+        disableEnforceFocus={capturing}
+      >
+        <DialogTitle>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <BugReportIcon />
+            <span>{t('dialogTitle')}</span>
+          </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <ToggleButtonGroup
+              value={kind}
+              exclusive
+              onChange={(_e, next) => {
+                if (next === 'bug' || next === 'feature') setKind(next);
+              }}
+              aria-label={t('kindAriaLabel')}
+              size="small"
             >
-              {screenshotSupported && (
-                <Button
-                  startIcon={<ScreenshotMonitorIcon />}
-                  variant="outlined"
-                  size="small"
-                  onClick={handleCaptureScreenshot}
-                  disabled={submitting}
-                >
-                  {t('captureScreenshot')}
-                </Button>
-              )}
-              <Button
-                startIcon={<PhotoCameraIcon />}
-                variant="outlined"
-                size="small"
-                component="label"
-                disabled={submitting}
-              >
-                {t('addImages')}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  hidden
-                  onChange={handleFileInputChange}
-                />
-              </Button>
-            </Stack>
+              <ToggleButton value="bug" aria-label={t('kindBug')}>
+                {t('kindBug')}
+              </ToggleButton>
+              <ToggleButton value="feature" aria-label={t('kindFeature')}>
+                {t('kindFeature')}
+              </ToggleButton>
+            </ToggleButtonGroup>
 
-            {(pendingScreenshots.length > 0 ||
-              pendingAttachments.length > 0) && (
+            {kind === 'bug' && !displayMessages && (
+              <Alert severity="info">
+                <Stack spacing={1}>
+                  <Typography variant="body2">{t('debugHint')}</Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={false}
+                        onChange={(_e, checked) => setDisplayMessages(checked)}
+                        slotProps={{
+                          input: { 'aria-label': t('enableDebugLogging') },
+                        }}
+                      />
+                    }
+                    label={t('enableDebugLogging')}
+                  />
+                </Stack>
+              </Alert>
+            )}
+            {kind === 'bug' && displayMessages && (
+              <Alert severity="success">{t('debugLoggingActive')}</Alert>
+            )}
+
+            <TextField
+              label={t('titleLabel')}
+              required
+              autoFocus
+              fullWidth
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              slotProps={{ htmlInput: { maxLength: 200 } }}
+            />
+            <TextField
+              label={t('descriptionLabel')}
+              required
+              fullWidth
+              multiline
+              minRows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('attachments')}
+              </Typography>
               <Stack
                 direction="row"
                 spacing={1}
                 useFlexGap
-                sx={{ mt: 2, flexWrap: 'wrap' }}
+                sx={{ flexWrap: 'wrap' }}
               >
-                {pendingScreenshots.map((blob, idx) => (
-                  <Box
-                    key={`ss-${idx}`}
-                    sx={{
-                      position: 'relative',
-                      width: 96,
-                      height: 96,
-                      border: '1px solid #ccc',
-                    }}
+                {screenshotSupported && (
+                  <Button
+                    startIcon={<ScreenshotMonitorIcon />}
+                    variant="outlined"
+                    size="small"
+                    onClick={handleCaptureScreenshot}
+                    disabled={submitting}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={screenshotPreviews[idx]}
-                      alt={`screenshot-${idx + 1}`}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      aria-label={t('removeScreenshot')}
-                      onClick={() => removeScreenshot(idx)}
-                      sx={{
-                        position: 'absolute',
-                        top: 0,
-                        right: 0,
-                        bgcolor: 'background.paper',
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
-                {pendingAttachments.map((file, idx) => (
-                  <Box
-                    key={`att-${idx}`}
-                    sx={{
-                      position: 'relative',
-                      width: 96,
-                      height: 96,
-                      border: '1px solid #ccc',
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={attachmentPreviews[idx]}
-                      alt={file.name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      aria-label={t('removeAttachment')}
-                      onClick={() => removeAttachment(idx)}
-                      sx={{
-                        position: 'absolute',
-                        top: 0,
-                        right: 0,
-                        bgcolor: 'background.paper',
-                      }}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
+                    {t('captureScreenshot')}
+                  </Button>
+                )}
+                <Button
+                  startIcon={<PhotoCameraIcon />}
+                  variant="outlined"
+                  size="small"
+                  component="label"
+                  disabled={submitting}
+                >
+                  {t('addImages')}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={handleFileInputChange}
+                  />
+                </Button>
               </Stack>
-            )}
-          </Box>
 
-          <Accordion disableGutters elevation={0}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="body2">{t('capturedContext')}</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {snapshot ? (
-                <Box>
-                  <Typography variant="caption" component="div">
-                    {t('urlLabel')}: {snapshot.context.url}
-                  </Typography>
-                  <Typography variant="caption" component="div">
-                    {t('buildLabel')}: {snapshot.context.buildId || '-'}
-                  </Typography>
-                  <Typography variant="caption" component="div">
-                    {t('platformLabel')}: {snapshot.context.platform}
-                  </Typography>
-                  <Typography variant="caption" component="div">
-                    {t('firecallLabel')}: {snapshot.context.firecallName ?? '-'}
-                  </Typography>
-                  <Typography variant="caption" component="div">
-                    {t('logEntriesLabel')}: {snapshot.logs.length}
-                  </Typography>
-                  <Box
-                    component="pre"
-                    sx={{
-                      whiteSpace: 'pre-wrap',
-                      maxHeight: 160,
-                      overflow: 'auto',
-                      fontSize: 11,
-                      mt: 1,
-                      bgcolor: 'action.hover',
-                      p: 1,
-                    }}
-                  >
-                    {snapshot.logs
-                      .map((l) => `[${l.level ?? '-'}] ${l.message}`)
-                      .join('\n')}
-                  </Box>
-                </Box>
-              ) : (
-                <Typography variant="caption">-</Typography>
+              {(pendingScreenshots.length > 0 ||
+                pendingAttachments.length > 0) && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ mt: 2, flexWrap: 'wrap' }}
+                >
+                  {pendingScreenshots.map((blob, idx) => (
+                    <Box
+                      key={`ss-${idx}`}
+                      sx={{
+                        position: 'relative',
+                        width: 96,
+                        height: 96,
+                        border: '1px solid #ccc',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={screenshotPreviews[idx]}
+                        alt={`screenshot-${idx + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        aria-label={t('removeScreenshot')}
+                        onClick={() => removeScreenshot(idx)}
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  {pendingAttachments.map((file, idx) => (
+                    <Box
+                      key={`att-${idx}`}
+                      sx={{
+                        position: 'relative',
+                        width: 96,
+                        height: 96,
+                        border: '1px solid #ccc',
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={attachmentPreviews[idx]}
+                        alt={file.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        aria-label={t('removeAttachment')}
+                        onClick={() => removeAttachment(idx)}
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
               )}
-            </AccordionDetails>
-          </Accordion>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={submitting}>
-          {t('cancel')}
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={!isValid || submitting}
-        >
-          {t('submit')}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            </Box>
+
+            <Accordion disableGutters elevation={0}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="body2">{t('capturedContext')}</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                {snapshot ? (
+                  <Box>
+                    <Typography variant="caption" component="div">
+                      {t('urlLabel')}: {snapshot.context.url}
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      {t('buildLabel')}: {snapshot.context.buildId || '-'}
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      {t('platformLabel')}: {snapshot.context.platform}
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      {t('firecallLabel')}: {snapshot.context.firecallName ?? '-'}
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      {t('logEntriesLabel')}: {snapshot.logs.length}
+                    </Typography>
+                    <Box
+                      component="pre"
+                      sx={{
+                        whiteSpace: 'pre-wrap',
+                        maxHeight: 160,
+                        overflow: 'auto',
+                        fontSize: 11,
+                        mt: 1,
+                        bgcolor: 'action.hover',
+                        p: 1,
+                      }}
+                    >
+                      {snapshot.logs
+                        .map((l) => `[${l.level ?? '-'}] ${l.message}`)
+                        .join('\n')}
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography variant="caption">-</Typography>
+                )}
+              </AccordionDetails>
+            </Accordion>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} disabled={submitting}>
+            {t('cancel')}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={!isValid || submitting}
+          >
+            {t('submit')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

@@ -164,6 +164,111 @@ describe('BugReportDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows a capture indicator while the screenshot is being taken', async () => {
+    let resolveCapture: (blob: Blob | null) => void = () => {};
+    captureScreenshotMock.mockReturnValueOnce(
+      new Promise<Blob | null>((resolve) => {
+        resolveCapture = resolve;
+      }),
+    );
+    render(<BugReportDialog open onClose={vi.fn()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /bildschirmaufnahme/i }),
+    );
+
+    // While the dialog is hidden the user must see that a capture is running.
+    const indicator = await screen.findByRole('status');
+    expect(indicator).toHaveTextContent(/bildschirmaufnahme wird erstellt/i);
+
+    await act(async () => {
+      resolveCapture(new Blob(['png-bytes'], { type: 'image/png' }));
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByRole('status')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('lets the cancel button take focus while the hidden dialog is still mounted', async () => {
+    captureScreenshotMock.mockReturnValueOnce(new Promise<Blob | null>(() => {}));
+    render(<BugReportDialog open onClose={vi.fn()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /bildschirmaufnahme/i }),
+    );
+    await screen.findByRole('status');
+
+    // The dialog's focus trap must not pull focus back out of the overlay.
+    const cancelBtn = screen.getByRole('button', {
+      name: /aufnahme abbrechen/i,
+    });
+    act(() => cancelBtn.focus());
+    expect(cancelBtn).toHaveFocus();
+  });
+
+  it('cancelling the capture brings the dialog back and discards a late result', async () => {
+    let resolveCapture: (blob: Blob | null) => void = () => {};
+    captureScreenshotMock.mockReturnValueOnce(
+      new Promise<Blob | null>((resolve) => {
+        resolveCapture = resolve;
+      }),
+    );
+    render(<BugReportDialog open onClose={vi.fn()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /bildschirmaufnahme/i }),
+    );
+    await screen.findByRole('status');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /aufnahme abbrechen/i }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('status')).not.toBeInTheDocument(),
+    );
+
+    // The capture still finishes in the background; its result is dropped.
+    await act(async () => {
+      resolveCapture(new Blob(['png-bytes'], { type: 'image/png' }));
+    });
+    expect(screen.queryByAltText('screenshot-1')).not.toBeInTheDocument();
+  });
+
+  it('reports a failed capture via snackbar instead of failing silently', async () => {
+    captureScreenshotMock.mockResolvedValueOnce(null);
+    render(<BugReportDialog open onClose={vi.fn()} />);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /bildschirmaufnahme/i }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(showSnackbarMock).toHaveBeenCalledWith(expect.any(String), 'error'),
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('recovers from a rejected capture (e.g. lazy chunk not loadable offline)', async () => {
+    captureScreenshotMock.mockRejectedValueOnce(new Error('chunk load failed'));
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<BugReportDialog open onClose={vi.fn()} />);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /bildschirmaufnahme/i }),
+      );
+    });
+
+    await waitFor(() =>
+      expect(showSnackbarMock).toHaveBeenCalledWith(expect.any(String), 'error'),
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
   it('uploads attachments and submits with expected payload; shows success snackbar', async () => {
     const onClose = vi.fn();
     render(<BugReportDialog open onClose={onClose} />);
