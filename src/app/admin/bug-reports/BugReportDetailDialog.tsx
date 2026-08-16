@@ -26,6 +26,7 @@ import {
   type BugReport,
   type BugReportStatus,
 } from '../../../common/bugReport';
+import { formatBugReportDate } from '../../../common/bugReportDate';
 import { useSnackbar } from '../../../components/providers/SnackbarProvider';
 import {
   getBugReportAction,
@@ -51,39 +52,6 @@ const STATUS_OPTIONS = [
   { value: 'closed', tKey: 'statusClosed' },
   { value: 'wontfix', tKey: 'statusWontfix' },
 ] as const satisfies readonly { value: BugReportStatus; tKey: string }[];
-
-interface SerializedTimestamp {
-  _seconds?: number;
-  seconds?: number;
-}
-
-function toDate(value: BugReport['createdAt'] | undefined): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const ts = value as unknown as SerializedTimestamp;
-  const seconds = ts._seconds ?? ts.seconds;
-  if (typeof seconds === 'number') {
-    return new Date(seconds * 1000);
-  }
-  return null;
-}
-
-function formatDate(value: BugReport['createdAt'] | undefined): string {
-  const d = toDate(value);
-  if (!d) return '-';
-  return d.toLocaleString('de-AT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
 
 function MetadataRow({
   label,
@@ -244,7 +212,9 @@ export default function BugReportDetailDialog({
               />
               <MetadataRow
                 label={t('metaDate')}
-                value={formatDate(data.report.createdAt)}
+                value={formatBugReportDate(data.report.createdAt, {
+                  withSeconds: true,
+                })}
               />
               <MetadataRow
                 label={t('metaUser')}

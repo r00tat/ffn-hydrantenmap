@@ -1,5 +1,9 @@
 import 'server-only';
 import type { BugReport } from '../../common/bugReport';
+import { formatBugReportDate } from '../../common/bugReportDate';
+
+/** Der Server läuft in UTC, die Empfänger der Mail lesen sie in Österreich. */
+const MAIL_TIME_ZONE = 'Europe/Vienna';
 
 interface BuildArgs {
   report: BugReport;
@@ -36,7 +40,10 @@ export function buildBugReportEmail({
     '',
     `Titel:     ${report.title}`,
     `User:      ${userLabel}`,
-    `Datum:     ${report.createdAt}`,
+    `Datum:     ${formatBugReportDate(report.createdAt, {
+      timeZone: MAIL_TIME_ZONE,
+      withSeconds: true,
+    })}`,
     `URL:       ${report.context.url}`,
     `Build:     ${report.context.buildId} (${dbLabel})`,
     `Plattform: ${report.context.platform}`,

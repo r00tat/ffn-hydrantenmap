@@ -48,17 +48,26 @@ export async function submitBugReportAction(
     ...(session.user.name ? { displayName: session.user.name } : {}),
   };
 
-  const data = {
+  // Für die Benachrichtigungsmail brauchen wir ein echtes Datum. Der Sentinel
+  // aus `FieldValue.serverTimestamp()` wird erst vom Firestore-Server ersetzt
+  // und ergäbe in der Mail `[object Object]` (#670).
+  const report: Omit<BugReport, 'id'> = {
     kind: input.kind,
     title: input.title.trim(),
     description: input.description.trim(),
-    status: 'open' as const,
-    createdAt: FieldValue.serverTimestamp(),
+    status: 'open',
+    createdAt: new Date(),
     createdBy,
     context: input.context,
     logs: (input.logs ?? []).slice(-BUG_REPORT_MAX_LOG_ENTRIES),
     screenshots: input.screenshots ?? [],
     attachments: input.attachments ?? [],
+  };
+
+  const data = {
+    ...report,
+    // Maßgeblich ist die Serverzeit, nicht die Uhr dieser Instanz.
+    createdAt: FieldValue.serverTimestamp(),
   };
 
   const docRef = firestore
@@ -82,9 +91,9 @@ export async function submitBugReportAction(
   // Best-effort notification mail
   try {
     await sendNotification({
-      ...data,
+      ...report,
       id: input.reportId,
-    } as unknown as BugReport);
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('bug report notification failed:', err);

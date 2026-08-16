@@ -40,6 +40,19 @@ import { submitBugReportAction } from './submitBugReportAction';
 
 const VALID_UUID = '11111111-1111-4111-8111-111111111111';
 
+/** Gmail bekommt die Nachricht base64url-kodiert, der Textteil noch einmal base64. */
+function decodeRawMailBody(encoded: string): string {
+  const message = Buffer.from(
+    encoded.replace(/-/g, '+').replace(/_/g, '/'),
+    'base64',
+  ).toString('utf8');
+  const part = message.match(
+    /Content-Transfer-Encoding: base64\r\n\r\n([\s\S]*?)\r\n--/,
+  );
+  if (!part) throw new Error('kein base64-Textteil in der Nachricht');
+  return Buffer.from(part[1], 'base64').toString('utf8');
+}
+
 const baseInput = {
   reportId: VALID_UUID,
   kind: 'bug' as const,
@@ -119,6 +132,24 @@ describe('submitBugReportAction', () => {
     });
     await submitBugReportAction(baseInput);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('writes the server timestamp but mails a resolvable date (#670)', async () => {
+    mockGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({ recipientEmails: ['a@x'], enabled: true }),
+    });
+    await submitBugReportAction(baseInput);
+
+    // Firestore keeps the authoritative timestamp …
+    expect(mockCreate.mock.calls[0][0].createdAt).toBe('SERVER_TS');
+
+    // … the mail must not contain the unresolved sentinel.
+    const raw = sendMock.mock.calls[0][0].requestBody.raw as string;
+    const body = decodeRawMailBody(raw);
+    expect(body).not.toContain('[object Object]');
+    expect(body).not.toContain('SERVER_TS');
+    expect(body).toMatch(/Datum:\s+\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}/);
   });
 
   it('writes notificationError on mail failure but does not throw', async () => {
