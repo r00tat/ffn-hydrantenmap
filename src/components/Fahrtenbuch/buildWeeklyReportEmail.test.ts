@@ -297,6 +297,7 @@ describe('buildWeeklyReportEmail', () => {
           description: 'Blinker rechts defekt',
           reportedAt: '05.08.2026',
           reportedByName: 'Lukas Fürst',
+          imageCount: 0,
         },
       ],
     });
@@ -306,6 +307,31 @@ describe('buildWeeklyReportEmail', () => {
     ]) {
       expect(text).toContain('Blinker rechts defekt');
       expect(text).toContain('Offen');
+    }
+  });
+
+  it('weist auf Bilder zu einem Mangel hin', () => {
+    // Die Bilder selbst bleiben im Fahrtenbuch — die Mail geht an Werkstatt
+    // und Gerätewart und soll klein bleiben. Der Hinweis sagt, dass es dort
+    // mehr zu sehen gibt.
+    const { raw } = build({
+      openMangel: [
+        {
+          vehicleName: 'KDTFA',
+          status: 'open',
+          statusLabel: 'Offen',
+          description: 'Blinker rechts defekt',
+          reportedAt: '05.08.2026',
+          reportedByName: 'Lukas Fürst',
+          imageCount: 2,
+        },
+      ],
+    });
+    for (const text of [
+      decodePart(raw, 'text/plain'),
+      decodePart(raw, 'text/html'),
+    ]) {
+      expect(text).toContain('Blinker rechts defekt (2 Bilder)');
     }
   });
 

@@ -12,6 +12,7 @@ import {
   appendMangelNote,
   applyMangelStatus,
   buildMangelDocument,
+  sanitizeMangelImages,
   type Mangel,
   type MangelActor,
   type MangelStatus,
@@ -20,6 +21,7 @@ import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { actionErrorKey } from './actionErrorKey';
 import { actionGroupMemberRequired, assertFahrtenbuchGroup } from './authGuards';
+import { deleteMangelImages, signMangelImages } from './mangelImageStore';
 import {
   loadMangel,
   mangelRef,
@@ -72,6 +74,8 @@ function actorFrom(session: {
 export interface CreateMangelInput {
   vehicleId: string;
   description: string;
+  /** Bereits hochgeladene Bilder als Storage-Pfade. */
+  images?: string[];
 }
 
 /**
@@ -90,7 +94,11 @@ export async function createMangel(
     const vehicle = await loadVehicle(groupId, input.vehicleId);
 
     const doc = buildMangelDocument(
-      { vehicleId: input.vehicleId, description: input.description },
+      {
+        vehicleId: input.vehicleId,
+        description: input.description,
+        images: input.images,
+      },
       vehicle,
       groupId,
       actorFrom(session),
@@ -107,11 +115,19 @@ export async function createMangel(
 
 export interface UpdateMangelInput {
   description: string;
+  /**
+   * Die vollständige Bilderliste nach der Bearbeitung, nicht die neu
+   * hinzugekommenen. Was hier fehlt, wird aus dem Storage gelöscht — ohne das
+   * bliebe jedes im Dialog entfernte Bild als bezahlte Datei liegen.
+   * Nicht angegeben heißt „unverändert".
+   */
+  images?: string[];
 }
 
 /**
- * Korrigiert die Beschreibung. Verlauf und Status bleiben unangetastet — ein
- * Tippfehler in der Beschreibung ist kein Vorgang, der in den Verlauf gehört.
+ * Korrigiert die Beschreibung und die Bilderliste. Verlauf und Status bleiben
+ * unangetastet — ein Tippfehler in der Beschreibung ist kein Vorgang, der in
+ * den Verlauf gehört.
  */
 export async function updateMangel(
   groupId: string,
@@ -127,16 +143,76 @@ export async function updateMangel(
     }
 
     const actor = actorFrom(session);
-    await mangelRef(groupId)
-      .doc(mangelId)
-      .set(
-        { description, updatedAt: actor.now, updatedBy: actor.userId },
-        { merge: true },
-      );
+    const patch: Record<string, unknown> = {
+      description,
+      updatedAt: actor.now,
+      updatedBy: actor.userId,
+    };
+
+    // Der Pfad kommt aus dem Browser: erst gegen die eigene Gruppe prüfen,
+    // dann speichern. Sonst zeigte ein Mangel auf die Dateien einer fremden
+    // Gruppe und die Anzeige signierte sie bereitwillig.
+    let removed: string[] = [];
+    if (input.images !== undefined) {
+      const images = sanitizeMangelImages(input.images, groupId);
+      const previous = sanitizeMangelImages(mangel.images, groupId);
+      removed = previous.filter((path) => !images.includes(path));
+      patch.images = images;
+    }
+
+    await mangelRef(groupId).doc(mangelId).set(patch, { merge: true });
+    // Erst nach dem Schreiben: Scheitert das Speichern, zeigt das Dokument
+    // weiterhin auf Dateien, die es noch gibt.
+    if (removed.length > 0) await deleteMangelImages(removed);
     await refreshVehicleMangelCount(groupId, mangel.vehicleId);
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('updateMangel failed', err);
+    return { success: false, error: actionErrorKey(err) };
+  }
+}
+
+export interface MangelImageUrl {
+  /** Der Storage-Pfad, wie er am Dokument steht. */
+  path: string;
+  /** Kurzlebige Lese-URL zu genau diesem Pfad. */
+  url: string;
+}
+
+export interface MangelImageUrlsResult {
+  success: boolean;
+  error?: string;
+  /**
+   * Pfad und URL als Paar statt zweier Listen: Der Aufrufer entfernt einzelne
+   * Bilder und darf dabei nicht auf gleiche Reihenfolge angewiesen sein.
+   */
+  images?: MangelImageUrl[];
+}
+
+/**
+ * Kurzlebige Lese-URLs zu den Bildern eines Mangels.
+ *
+ * Der Weg über den Server statt über die `storage.rules`: Lesen darf, wer in
+ * der Gruppe ist — eine Bedingung, die in Firestore steht und die eine
+ * Storage-Regel nur über die Default-Datenbank prüfen könnte. In der
+ * Dev-Datenbank `ffndev` wäre die Antwort dann falsch. Deshalb verweigern die
+ * Regeln jedem Client das Lesen und diese Action gibt signierte URLs heraus.
+ */
+export async function mangelImageUrls(
+  groupId: string,
+  mangelId: string,
+): Promise<MangelImageUrlsResult> {
+  try {
+    await actionGroupMemberRequired(groupId);
+    const mangel = await loadMangel(groupId, mangelId);
+    const paths = sanitizeMangelImages(mangel.images, groupId);
+    const urls = await signMangelImages(paths);
+    return {
+      success: true,
+      images: paths.map((path, index) => ({ path, url: urls[index] })),
+    };
+  } catch (err) {
+    console.error('mangelImageUrls failed', err);
     return { success: false, error: actionErrorKey(err) };
   }
 }
@@ -228,6 +304,10 @@ export async function deleteMangel(
     const mangel = await loadMangel(groupId, mangelId);
 
     await mangelRef(groupId).doc(mangelId).delete();
+    // Nach dem Löschen des Dokuments: Der Datensatz ist der Vorgang, die
+    // Dateien sind seine Anhänge. Umgekehrt bliebe bei einem Fehler ein Mangel
+    // stehen, dessen Bilder schon weg sind.
+    await deleteMangelImages(sanitizeMangelImages(mangel.images, groupId));
     await refreshVehicleMangelCount(groupId, mangel.vehicleId);
     return { success: true, id: mangelId };
   } catch (err) {
