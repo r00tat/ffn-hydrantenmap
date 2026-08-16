@@ -74,6 +74,57 @@ export interface FahrtenbuchExportModel {
   footer?: string;
 }
 
+/**
+ * Zerlegt das Modell in Teilmodelle mit je höchstens `rowsPerDocument` Zeilen
+ * und genau einem Abschnitt.
+ *
+ * Der Grund ist der Speicher: `@react-pdf/renderer` hält das vollständig
+ * ausgelegte Dokument bis zum Schluss im Speicher — gemessen 0,3 bis 0,5 MB je
+ * Tabellenzeile. Ein Jahresexport über alle Fahrzeuge sprengte damit das
+ * Speicherlimit des Containers, und der Nutzer sah einen 503 statt eines PDFs
+ * (#665). Wer die Teile einzeln rendert, freigibt und danach zusammenfügt,
+ * begrenzt den Spitzenbedarf auf ein Teildokument statt auf den ganzen Export.
+ * Die Zahlen dazu stehen bei `renderFahrtenbuchPdf`.
+ *
+ * Die Grenze gilt je Abschnitt: Ein Fahrzeug mit sehr vielen Fahrten ist sonst
+ * für sich schon zu groß, auch wenn der Export insgesamt klein aussieht.
+ */
+export function chunkFahrtenbuchExport(
+  model: FahrtenbuchExportModel,
+  rowsPerDocument: number,
+): FahrtenbuchExportModel[] {
+  const size = Math.max(1, Math.floor(rowsPerDocument));
+  const { sections, ...rest } = model;
+
+  return sections.flatMap<FahrtenbuchExportModel>((section) => {
+    // Ein Fahrzeug ohne Fahrten bleibt ein eigener Teil — „keine Fahrten" ist
+    // eine Aussage, ein fehlender Abschnitt sähe wie ein vergessenes Fahrzeug
+    // aus.
+    if (section.rows.length === 0) {
+      return [{ ...rest, sections: [section] }];
+    }
+
+    const parts: FahrtenbuchExportModel[] = [];
+    for (let offset = 0; offset < section.rows.length; offset += size) {
+      const rows = section.rows.slice(offset, offset + size);
+      const isLast = offset + size >= section.rows.length;
+      parts.push({
+        ...rest,
+        sections: [
+          {
+            ...section,
+            rows,
+            // Die Legende steht einmal unter dem Abschnitt, nicht unter jedem
+            // Teil — sonst unterbräche sie die Tabelle desselben Fahrzeugs.
+            ...(section.hasEstimates && isLast ? {} : { hasEstimates: undefined }),
+          },
+        ],
+      });
+    }
+    return parts;
+  });
+}
+
 export interface BuildFahrtenbuchExportOptions {
   /** Die gewählten Fahrzeuge in der Reihenfolge der Ausgabe. */
   vehicles: FahrtenbuchVehicle[];

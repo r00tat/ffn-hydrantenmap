@@ -1,7 +1,6 @@
 'use server';
 import 'server-only';
 
-import { renderToBuffer } from '@react-pdf/renderer';
 import { getTranslations } from 'next-intl/server';
 import type { Group } from '../../app/groups/groupTypes';
 import {
@@ -14,19 +13,23 @@ import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import { actionErrorKey } from './actionErrorKey';
 import { actionGroupMemberRequired } from './authGuards';
-import FahrtenbuchPdf from './FahrtenbuchPdf';
 import {
   buildFahrtenbuchExport,
   exportFileName,
   zonedDayRange,
   type ExportTranslate,
 } from './fahrtenbuchExportModel';
+import { renderFahrtenbuchPdf } from './renderFahrtenbuchPdf';
 
 /**
- * Obergrenze der ausgelesenen Fahrten. Ein Jahr einer Feuerwehr liegt bei
+ * Obergrenze der Fahrten eines Exports. Ein Jahr einer Feuerwehr liegt bei
  * einigen hundert Einträgen; die Grenze fängt einen versehentlich riesigen
- * Zeitraum ab, bevor der Server ein PDF mit tausenden Seiten rendert. Der
- * Benutzer bekommt eine Meldung und keinen Timeout.
+ * Zeitraum ab. Der Benutzer bekommt eine Meldung und keinen Timeout.
+ *
+ * 5000 Fahrten sind seit dem Umbau auf Teildokumente auch wirklich zu
+ * schaffen — gemessen 22 s für ein PDF von 1,4 MB. Vorher war die Zahl
+ * unerreichbar: Der Container starb lange davor am Speicher (#665), sodass
+ * statt dieser Meldung ein 503 ankam.
  */
 const MAX_EXPORT_ENTRIES = 5000;
 
@@ -108,17 +111,42 @@ async function loadSelectedVehicles(
  * besteht (`deleted`/`abfahrt DESC`); die Reihenfolge der Ausgabe stellt das
  * Modell her. Ohne Fahrzeugfilter in der Abfrage — die Auswahl wird im
  * Speicher angewandt, sonst bräuchte jedes Fahrzeug eine eigene Abfrage.
+ *
+ * Das `orderBy` gehört auch dann dazu, wenn nur gezählt wird: Ohne es sucht
+ * Firestore einen Index `deleted ASC, abfahrt ASC`, den es nicht gibt, und die
+ * Abfrage scheitert mit `FAILED_PRECONDITION`.
  */
+function entriesQuery(groupId: string, fromIso: string, toIso: string) {
+  return entriesRef(groupId)
+    .where('deleted', '==', false)
+    .where('abfahrt', '>=', fromIso)
+    .where('abfahrt', '<=', toIso)
+    .orderBy('abfahrt', 'desc');
+}
+
+/**
+ * Zahl der Fahrten im Zeitraum — über alle Fahrzeuge, nicht nur die gewählten.
+ * Dieselbe Bezugsgröße wie bisher die Leseobergrenze; ein Fahrzeugfilter wäre
+ * auf 30 Werte je Abfrage beschränkt.
+ *
+ * Gezählt wird **vor** dem Lesen, damit ein zu großer Export den Nutzer eine
+ * Meldung kostet und nicht ein paar tausend gelesene Dokumente.
+ */
+async function countEntries(
+  groupId: string,
+  fromIso: string,
+  toIso: string,
+): Promise<number> {
+  const snapshot = await entriesQuery(groupId, fromIso, toIso).count().get();
+  return snapshot.data().count;
+}
+
 async function loadEntries(
   groupId: string,
   fromIso: string,
   toIso: string,
 ): Promise<{ entries: FahrtenbuchEntry[]; truncated: boolean }> {
-  const snapshot = await entriesRef(groupId)
-    .where('deleted', '==', false)
-    .where('abfahrt', '>=', fromIso)
-    .where('abfahrt', '<=', toIso)
-    .orderBy('abfahrt', 'desc')
+  const snapshot = await entriesQuery(groupId, fromIso, toIso)
     .limit(MAX_EXPORT_ENTRIES + 1)
     .get();
   const entries = snapshot.docs.map(
@@ -157,6 +185,14 @@ export async function exportFahrtenbuchPdf(
 
     const zone = timeZone?.trim() || DEFAULT_TIME_ZONE;
     const { fromIso, toIso } = zonedDayRange(from, to, zone);
+
+    if ((await countEntries(groupId, fromIso, toIso)) > MAX_EXPORT_ENTRIES) {
+      return { success: false, error: 'exportTooLarge' };
+    }
+
+    // Die Obergrenze bleibt zusätzlich beim Lesen stehen: Zwischen Zählen und
+    // Lesen können Fahrten dazukommen, und ein stillschweigend gekürzter
+    // Nachweis wäre schlimmer als eine Absage.
     const { entries, truncated } = await loadEntries(groupId, fromIso, toIso);
     if (truncated) {
       return { success: false, error: 'exportTooLarge' };
@@ -184,11 +220,8 @@ export async function exportFahrtenbuchPdf(
       translate,
     );
 
-    const pdf = await renderToBuffer(
-      FahrtenbuchPdf({
-        model,
-        pageLabel: (page, total) => t('export.page', { page, total }),
-      }),
+    const pdf = await renderFahrtenbuchPdf(model, (page, total) =>
+      t('export.page', { page, total }),
     );
 
     return {
