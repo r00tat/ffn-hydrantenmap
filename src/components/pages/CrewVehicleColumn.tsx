@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Box, Chip, Typography } from '@mui/material';
+import { Box, Chip, IconButton, Tooltip, Typography } from '@mui/material';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { useDroppable } from '@dnd-kit/core';
+import { useTranslations } from 'next-intl';
 import { CrewAssignment, CrewFunktion, Fzg } from '../firebase/firestore';
 import CrewPersonCard from './CrewPersonCard';
 
@@ -21,6 +23,8 @@ export interface CrewVehicleColumnProps {
     vehicleName: string,
   ) => void;
   onRemove?: (assignmentId: string) => void;
+  /** Entfernt das Fahrzeug selbst aus dem Einsatz (nicht die Besatzung). */
+  onRemoveVehicle?: (vehicleId: string) => void;
   /** Nur-Lese-Ansicht für Einsatz-Gäste ohne Schreibrecht. */
   readOnly?: boolean;
 }
@@ -33,12 +37,16 @@ export default function CrewVehicleColumn({
   onFunktionChange,
   onVehicleChange,
   onRemove,
+  onRemoveVehicle,
   readOnly = false,
 }: CrewVehicleColumnProps) {
+  const t = useTranslations('crew');
   const { isOver, setNodeRef } = useDroppable({
     id: vehicleId || 'unassigned',
     disabled: readOnly,
   });
+  // Die Spalte „Verfügbar" (vehicleId null) ist kein Fahrzeug und bleibt.
+  const canRemoveVehicle = !readOnly && !!vehicleId && !!onRemoveVehicle;
 
   return (
     <Box
@@ -67,7 +75,23 @@ export default function CrewVehicleColumn({
         <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
           {vehicleName}
         </Typography>
-        <Chip label={String(assignments.length)} size="small" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Chip label={String(assignments.length)} size="small" />
+          {canRemoveVehicle && (
+            <Tooltip
+              title={t('removeVehicleTooltip', { name: vehicleName })}
+            >
+              <IconButton
+                size="small"
+                color="error"
+                aria-label={t('removeVehicleTooltip', { name: vehicleName })}
+                onClick={() => onRemoveVehicle(vehicleId)}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
       {assignments.map((assignment) => (
         <CrewPersonCard

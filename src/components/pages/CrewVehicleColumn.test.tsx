@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 import { CrewAssignment, Fzg } from '../firebase/firestore';
 
 vi.mock('@dnd-kit/core', () => ({
@@ -95,5 +96,56 @@ describe('CrewVehicleColumn', () => {
     );
     expect(screen.getByText('Verfügbar')).toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  describe('vehicle removal', () => {
+    it('renders no remove button without onRemoveVehicle', () => {
+      render(<CrewVehicleColumn {...defaultProps} />);
+      expect(
+        screen.queryByLabelText('KDTFA aus dem Einsatz entfernen'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('calls onRemoveVehicle with the vehicle id', () => {
+      const onRemoveVehicle = vi.fn();
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          onRemoveVehicle={onRemoveVehicle}
+        />,
+      );
+      fireEvent.click(
+        screen.getByLabelText('KDTFA aus dem Einsatz entfernen'),
+      );
+      expect(onRemoveVehicle).toHaveBeenCalledWith('v1');
+    });
+
+    it('renders no remove button for the unassigned column', () => {
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          vehicleId={null}
+          vehicleName="Verfügbar"
+          assignments={[]}
+          onRemoveVehicle={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByLabelText('Verfügbar aus dem Einsatz entfernen'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('renders no remove button in read-only mode', () => {
+      render(
+        <CrewVehicleColumn
+          {...defaultProps}
+          onRemoveVehicle={vi.fn()}
+          readOnly
+        />,
+      );
+      expect(
+        screen.queryByLabelText('KDTFA aus dem Einsatz entfernen'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

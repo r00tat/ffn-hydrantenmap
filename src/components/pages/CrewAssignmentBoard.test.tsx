@@ -15,6 +15,9 @@ const {
   mockUpdateFunktion,
   mockRemoveAssignment,
   mockUseMediaQuery,
+  mockAddFirecallItem,
+  mockUpdateFirecallItem,
+  mockWriteAccess,
 } = vi.hoisted(() => ({
   mockSyncFromAlarms: vi.fn(),
   mockAddManualPerson: vi.fn(),
@@ -23,6 +26,9 @@ const {
   mockUpdateFunktion: vi.fn(),
   mockRemoveAssignment: vi.fn(),
   mockUseMediaQuery: vi.fn(() => false),
+  mockAddFirecallItem: vi.fn(),
+  mockUpdateFirecallItem: vi.fn(),
+  mockWriteAccess: vi.fn(() => true),
 }));
 
 const mockAssignments: CrewAssignment[] = [
@@ -117,11 +123,15 @@ vi.mock('../../hooks/useVehicles', () => ({
 // Der Board-Code fragt das Schreibrecht ab; der echte Hook zieht die
 // Firebase-Login-Kette (und damit server-only Module) in den Test.
 vi.mock('../../hooks/useFirecallWriteAccess', () => ({
-  default: () => true,
+  default: mockWriteAccess,
 }));
 
 vi.mock('../../hooks/useFirecallItemAdd', () => ({
-  default: () => vi.fn(),
+  default: () => mockAddFirecallItem,
+}));
+
+vi.mock('../../hooks/useFirecallItemUpdate', () => ({
+  default: () => mockUpdateFirecallItem,
 }));
 
 vi.mock('../../hooks/useFirecall', () => ({
@@ -212,6 +222,7 @@ describe('CrewAssignmentBoard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
+    mockWriteAccess.mockReturnValue(true);
   });
 
   it('renders Besatzung heading', () => {
@@ -283,5 +294,93 @@ describe('CrewAssignmentBoard', () => {
     // as crew rows, never as a status-labelled option.
     expect(screen.queryByText(/Max Mustermann \(/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Fritz Nein \(/)).not.toBeInTheDocument();
+  });
+
+  describe('removing a vehicle', () => {
+    const removeVehicle = async (name: string) => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      await user.click(
+        screen.getAllByLabelText(`${name} aus dem Einsatz entfernen`)[0],
+      );
+      return user;
+    };
+
+    it('asks for confirmation instead of removing right away', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      await removeVehicle('TLFA 4000');
+      expect(screen.getByText('TLFA 4000 entfernen')).toBeInTheDocument();
+      expect(mockUpdateFirecallItem).not.toHaveBeenCalled();
+    });
+
+    it('soft-deletes the vehicle after confirmation', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await removeVehicle('TLFA 4000');
+      await user.click(screen.getByRole('button', { name: 'ja' }));
+      expect(mockUpdateFirecallItem).toHaveBeenCalledWith({
+        ...mockVehicles[1],
+        deleted: true,
+      });
+    });
+
+    it('keeps the vehicle when the confirmation is declined', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await removeVehicle('TLFA 4000');
+      await user.click(screen.getByRole('button', { name: 'nein' }));
+      expect(mockUpdateFirecallItem).not.toHaveBeenCalled();
+      expect(mockAssignVehicle).not.toHaveBeenCalled();
+    });
+
+    it('moves the crew of the removed vehicle back to unassigned', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await removeVehicle('KDTFA');
+      // Anna Beispiel (a2) sits in KDTFA and must not be deleted with it.
+      expect(
+        screen.getByText(/Die zugeordnete Person wird/),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'ja' }));
+      expect(mockAssignVehicle).toHaveBeenCalledWith('a2', null, '');
+      expect(mockRemoveAssignment).not.toHaveBeenCalled();
+      expect(mockUpdateFirecallItem).toHaveBeenCalledWith({
+        ...mockVehicles[0],
+        deleted: true,
+      });
+    });
+
+    it('removes a vehicle from the quick-add chips as well', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      // Column header and quick-add chip both offer removal.
+      const buttons = screen.getAllByLabelText(
+        'TLFA 4000 aus dem Einsatz entfernen',
+      );
+      expect(buttons.length).toBe(2);
+      await user.click(buttons[buttons.length - 1]);
+      await user.click(screen.getByRole('button', { name: 'ja' }));
+      expect(mockUpdateFirecallItem).toHaveBeenCalledWith({
+        ...mockVehicles[1],
+        deleted: true,
+      });
+    });
+
+    it('offers removal on mobile too', async () => {
+      mockUseMediaQuery.mockReturnValue(true);
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await removeVehicle('TLFA 4000');
+      await user.click(screen.getByRole('button', { name: 'ja' }));
+      expect(mockUpdateFirecallItem).toHaveBeenCalledWith({
+        ...mockVehicles[1],
+        deleted: true,
+      });
+    });
+
+    it('offers no removal without write access', () => {
+      mockWriteAccess.mockReturnValue(false);
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      expect(
+        screen.queryAllByLabelText('KDTFA aus dem Einsatz entfernen'),
+      ).toHaveLength(0);
+    });
   });
 });

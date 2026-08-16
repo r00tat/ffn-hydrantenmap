@@ -47,6 +47,7 @@ import useCrewAssignments, {
 } from '../../hooks/useCrewAssignments';
 import { useFirecall } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import useFirecallItemUpdate from '../../hooks/useFirecallItemUpdate';
 import useVehicles from '../../hooks/useVehicles';
 import useFirecallWriteAccess from '../../hooks/useFirecallWriteAccess';
 import {
@@ -57,6 +58,7 @@ import {
   funktionAbkuerzung,
 } from '../firebase/firestore';
 import VehicleQuickAddChips from '../FirecallItems/VehicleQuickAddChips';
+import ConfirmDialog from '../dialogs/ConfirmDialog';
 import CrewVehicleColumn from './CrewVehicleColumn';
 
 export interface CrewAssignmentBoardProps {
@@ -221,10 +223,12 @@ export default function CrewAssignmentBoard({
     removeAssignment,
   } = useCrewAssignments();
   const [newPersonName, setNewPersonName] = useState('');
+  const [vehicleToRemove, setVehicleToRemove] = useState<Fzg | undefined>();
   const canWrite = useFirecallWriteAccess();
   const { vehicles } = useVehicles();
   const firecall = useFirecall();
   const addFirecallItem = useFirecallItemAdd();
+  const updateFirecallItem = useFirecallItemUpdate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -283,6 +287,45 @@ export default function CrewAssignmentBoard({
     },
     [addFirecallItem, firecall],
   );
+
+  const crewOnVehicleToRemove = useMemo(
+    () =>
+      vehicleToRemove?.id
+        ? crewAssignments.filter((a) => a.vehicleId === vehicleToRemove.id)
+            .length
+        : 0,
+    [crewAssignments, vehicleToRemove],
+  );
+
+  const handleRemoveVehicleRequest = useCallback(
+    (vehicleId: string) => {
+      setVehicleToRemove(vehicles.find((v) => v.id === vehicleId));
+    },
+    [vehicles],
+  );
+
+  const handleRemoveVehicleByName = useCallback(
+    (vehicleName: string) => {
+      setVehicleToRemove(vehicles.find((v) => v.name === vehicleName));
+    },
+    [vehicles],
+  );
+
+  // Das Fahrzeug verlässt den Einsatz, die Besatzung bleibt: alle Zuordnungen
+  // fallen auf „Verfügbar" zurück, damit niemand mit dem Fahrzeug verschwindet.
+  // Bewusst über alle `crewAssignments` statt nur die sichtbaren — sonst bliebe
+  // an ausgeblendeten Einträgen eine tote vehicleId hängen.
+  const handleRemoveVehicleConfirmed = useCallback(async () => {
+    const vehicle = vehicleToRemove;
+    setVehicleToRemove(undefined);
+    if (!vehicle?.id) return;
+    await Promise.all(
+      crewAssignments
+        .filter((a) => a.vehicleId === vehicle.id && a.id)
+        .map((a) => assignVehicle(a.id!, null, '')),
+    );
+    await updateFirecallItem({ ...vehicle, deleted: true });
+  }, [assignVehicle, crewAssignments, updateFirecallItem, vehicleToRemove]);
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: { distance: 8 },
@@ -455,6 +498,7 @@ export default function CrewAssignmentBoard({
           selectedNames={[]}
           existingNames={existingVehicleNames}
           onToggle={handleAddVehicle}
+          onRemove={handleRemoveVehicleByName}
         />
       )}
 
@@ -478,7 +522,7 @@ export default function CrewAssignmentBoard({
                     sx={{ p: 0.5, backgroundColor: 'action.hover' }}
                   >
                     <Typography variant="subtitle2">
-                      Verfügbar ({unassigned.length})
+                      {t('available')} ({unassigned.length})
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -493,9 +537,31 @@ export default function CrewAssignmentBoard({
                         colSpan={4}
                         sx={{ p: 0.5, backgroundColor: 'action.hover' }}
                       >
-                        <Typography variant="subtitle2">
-                          {v.name} ({assigned.length})
-                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <Typography variant="subtitle2">
+                            {v.name} ({assigned.length})
+                          </Typography>
+                          {canWrite && v.id && (
+                            <IconButton
+                              size="small"
+                              color="error"
+                              aria-label={t('removeVehicleTooltip', {
+                                name: v.name,
+                              })}
+                              onClick={() =>
+                                handleRemoveVehicleRequest(v.id!)
+                              }
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
                       </TableCell>
                     </TableRow>
                     {renderRows(assigned)}
@@ -509,7 +575,7 @@ export default function CrewAssignmentBoard({
           <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: 1 }}>
             <CrewVehicleColumn
               vehicleId={null}
-              vehicleName="Verfügbar"
+              vehicleName={t('available')}
               assignments={unassigned}
               vehicles={vehicles}
               onFunktionChange={handleFunktionChange}
@@ -527,6 +593,9 @@ export default function CrewAssignmentBoard({
                 onFunktionChange={handleFunktionChange}
                 onVehicleChange={handleVehicleChange}
                 onRemove={removeAssignment}
+                onRemoveVehicle={
+                  canWrite ? handleRemoveVehicleRequest : undefined
+                }
                 readOnly={!canWrite}
               />
             ))}
@@ -534,6 +603,27 @@ export default function CrewAssignmentBoard({
         )}
         <DragOverlay />
       </DndContext>
+
+      {vehicleToRemove && (
+        <ConfirmDialog
+          title={t('removeVehicleTitle', { name: vehicleToRemove.name })}
+          text={
+            crewOnVehicleToRemove > 0
+              ? t('removeVehicleConfirmWithCrew', {
+                  name: vehicleToRemove.name,
+                  count: crewOnVehicleToRemove,
+                })
+              : t('removeVehicleConfirm', { name: vehicleToRemove.name })
+          }
+          onConfirm={(confirmed) => {
+            if (confirmed) {
+              handleRemoveVehicleConfirmed();
+            } else {
+              setVehicleToRemove(undefined);
+            }
+          }}
+        />
+      )}
     </Box>
   );
 }
