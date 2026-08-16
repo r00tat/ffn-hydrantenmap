@@ -208,7 +208,12 @@
       "name": "Name",
       "function": "Funktion",
       "vehicle": "Fahrzeug"
-    }
+    },
+    "removeVehicleTooltip": "{name} aus dem Einsatz entfernen",
+    "removeVehicleTitle": "{name} entfernen",
+    "removeVehicleConfirm": "{name} wirklich aus dem Einsatz entfernen?",
+    "removeVehicleConfirmWithCrew": "{name} wirklich aus dem Einsatz entfernen? {count, plural, one {Die zugeordnete Person wird} other {Die # zugeordneten Personen werden}} wieder auf \"Verfügbar\" gesetzt.",
+    "available": "Verfügbar"
   },
   "einsatzorte": {
     "placeholderNew": "Neue Adresse...",
@@ -988,7 +993,10 @@
       "spectrum": "Energiespektrum",
       "multiPoint": "MultiPoint",
       "upload": "Foto / Datei"
-    }
+    },
+    "quickAddVehiclesTitle": "Fahrzeuge Neusiedl am See",
+    "quickAddAlreadyAdded": "{name} bereits im Einsatz",
+    "quickAddRemove": "{name} aus dem Einsatz entfernen"
   },
   "heatmap": {
     "enable": "Heatmap-Färbung aktivieren",
