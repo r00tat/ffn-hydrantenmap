@@ -209,7 +209,12 @@
       "name": "Name",
       "function": "Function",
       "vehicle": "Vehicle"
-    }
+    },
+    "removeVehicleTooltip": "Remove {name} from the operation",
+    "removeVehicleTitle": "Remove {name}",
+    "removeVehicleConfirm": "Really remove {name} from the operation?",
+    "removeVehicleConfirmWithCrew": "Really remove {name} from the operation? {count, plural, one {The assigned person will be} other {The # assigned persons will be}} moved back to \"Available\".",
+    "available": "Available"
   },
   "einsatzorte": {
     "placeholderNew": "New address...",
@@ -989,7 +994,10 @@
       "spectrum": "Energy spectrum",
       "multiPoint": "MultiPoint",
       "upload": "Photo / File"
-    }
+    },
+    "quickAddVehiclesTitle": "Vehicles Neusiedl am See",
+    "quickAddAlreadyAdded": "{name} already in the operation",
+    "quickAddRemove": "Remove {name} from the operation"
   },
   "heatmap": {
     "enable": "Enable heatmap colouring",
