@@ -369,11 +369,52 @@ den State. Die Blöcke dürfen stehenbleiben — terraform überspringt sie, sob
 die Ressource im State liegt — und können nach dem ersten erfolgreichen Apply in
 beiden Umgebungen entfallen.
 
-Der Pipeline-SA braucht dafür `roles/run.admin`, eingetragen in
-[terraform_sa.tf](terraform/modules/project-base/terraform_sa.tf). Das Modul
-project-base gehört dem Prod-Root, deshalb gilt hier wie immer: **erst prod
-applien** (`workflow_dispatch`, mode `apply`, environment `prod`), sonst
-scheitert dev mit 403.
+## Projekt-Basis
+
+**Ein Root je GCP-Projekt, nicht je Environment** — derzeit
+[terraform/projects/ffn-utils](terraform/projects/ffn-utils/). Dort liegt alles,
+was ein Environment-Apply bereits **vorfindet**, statt es anzulegen: die Rechte
+des Pipeline-SA, die aktivierten APIs, die Secret-Hüllen, die Registries, der
+WIF-Pool, die Storage-Regeln.
+
+Vorher gehörte das dem Prod-Root über ein `manage_project_base`-Flag. Damit hing
+eine Voraussetzung des Dev-Applies an der Release-Kadenz von prod: Eine neue
+Rolle wurde erst beim nächsten Release wirksam, und bis dahin scheiterte dev mit
+403 auf der neuen Ressource. Das galt genauso für ein neues Dev-Secret oder eine
+neu gebrauchte API. Die Regel „erst prod applien" war das Symptom, nicht die
+Lösung — sie ist ersatzlos entfallen.
+
+**Der Base-Job in [cloud-run.yml](.github/workflows/cloud-run.yml) läuft vor
+jedem Environment-Apply**, parallel zum Build. Die Reihenfolge ist damit
+erzwungen statt dokumentiert. Der `workflow_dispatch`-Apply in
+[terraform.yml](.github/workflows/terraform.yml) kennt `base` zusätzlich als
+Auswahl — gebraucht wird er nur für den Erstimport.
+
+### Wenn dev ein eigenes Projekt bekommt
+
+Die Struktur ist darauf ausgelegt und ändert sich dabei **nicht**: Es kommt ein
+zweiter Root `terraform/projects/<projekt-id>/` dazu, und `BASE_ROOT` in beiden
+Workflows zeigt für dev dorthin. Die Environment-Roots bleiben, wie sie sind.
+
+Ersatzlos entfallen dann die Kunstgriffe, die es nur gibt, weil beide sich ein
+Projekt teilen: `name_suffix` im [cloud-scheduler](terraform/modules/cloud-scheduler/),
+der zweite Eintrag in `local.cron_invoker_emails` samt `check`-Block, das `-dev`
+im Dienstnamen, die `SUMUP_*_DEV`-Secrets und die Firestore-Datenbank `ffndev`.
+`CLOUDSDK_CORE_PROJECT`, `WORKLOAD_IDENTITY_PROVIDER`, `TERRAFORM_SERVICE_ACCOUNT`,
+`GOOGLE_SERVICE_ACCOUNT`, `IMAGE` und `RUN_SERVICE` wandern vom Repository- in
+den Environment-Scope.
+
+**Wichtig dabei: nichts über die Projektgrenze reichen lassen.** Sonst kehrt
+genau dieselbe Falle als Cross-Project-Abhängigkeit zurück, nur schlimmer — ein
+Service Account kann sich im fremden Projekt keine Rechte erteilen. Betrifft drei
+Dinge, die heute geteilt sind und dann verdoppelt gehören: **State-Bucket**
+(sonst müsste prod dem Dev-SA Zugriff geben), **Artifact Registry** (sonst
+bräuchte der Dev-Runtime-SA einen Cross-Project-Reader) und der **WIF-Pool**.
+Hält man das durch, wissen die beiden Pipelines nichts mehr voneinander.
+
+Der Erstaufbau eines neuen Projekts (Projekt, Bucket, SA, WIF, erste Rollen)
+bleibt Handarbeit — er erzeugt die Credentials, mit denen terraform danach
+arbeitet.
 
 ## Testing (TDD)
 
@@ -674,15 +715,12 @@ deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, De
 `"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
 Job an und der zweite `apply` scheiterte mit 409.
 
-**Prod zuerst applien.** Die API-Aktivierung (`cloudscheduler.googleapis.com`)
-und die Rolle `roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
-[project-base](terraform/modules/project-base/), und das gehört ausschließlich
-dem Root mit `manage_project_base = true` — derzeit prod. Dev appliziert aber
-schon beim Push auf main, prod erst beim Release. Nach jeder Erweiterung der
-Projekt-Basis deshalb erst prod von Hand applien
-([terraform.yml](.github/workflows/terraform.yml), `workflow_dispatch`, mode
-`apply`, environment `prod`), sonst scheitert der Dev-Lauf mit 403 auf der neuen
-Ressource.
+Die API-Aktivierung (`cloudscheduler.googleapis.com`) und die Rolle
+`roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
+[project-base](terraform/modules/project-base/). Das liegt im Projekt-Root
+(siehe „Projekt-Basis"), der in beiden Pipelines vor jedem Environment-Apply
+läuft — eine Erweiterung ist damit sofort wirksam. Die frühere Regel „erst prod
+applien" gibt es nicht mehr.
 
 Die Allowlist `CRON_INVOKER_EMAILS` setzt terraform als Env-Var des Dienstes
 (`local.cron_invoker_emails` im jeweiligen Root). Sie wird dort aus Zeichenketten

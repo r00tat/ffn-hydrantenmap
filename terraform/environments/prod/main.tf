@@ -24,20 +24,20 @@ locals {
   ])
 }
 
-module "project_base" {
-  count  = var.manage_project_base ? 1 : 0
-  source = "../../modules/project-base"
+# Die Projekt-Basis ist nach terraform/projects/ffn-utils umgezogen. Sie ist
+# Voraussetzung jedes Environment-Applies (Rechte des Pipeline-SA, APIs,
+# Secret-Hüllen) und gehörte deshalb nie in ein Environment: Solange sie hier
+# lag, wurde eine neue Rolle erst beim nächsten prod-Release wirksam und dev
+# scheiterte bis dahin mit 403.
+#
+# `destroy = false` ist der Kern: Die Ressourcen wechseln nur den State, sie
+# werden nicht angefasst. Der neue Root importiert dieselben Objekte.
+removed {
+  from = module.project_base
 
-  project            = var.project
-  region             = var.region
-  run_region         = var.run_region
-  name               = var.name
-  run_sa             = var.run_sa
-  deploy_sa          = var.deploy_sa
-  github_org         = var.github_org
-  github_repo        = var.github_repo
-  state_bucket       = var.state_bucket
-  storage_rules_file = "${local.repo_root}/storage.rules"
+  lifecycle {
+    destroy = false
+  }
 }
 
 module "firestore" {
@@ -63,9 +63,8 @@ module "cloudbuild" {
     "deploy-prod-on-tag" = { tag = ".*" }
   }
 
-  # Aus Variablen abgeleitet statt aus module.project_base-Outputs: so
-  # funktioniert der Root identisch, ob dieses Environment die Projekt-Basis
-  # besitzt oder sie mit einem anderen teilt.
+  # Aus Variablen abgeleitet statt aus den Outputs des Projekt-Roots: ein
+  # Environment-Root liest keinen fremden State.
   substitutions = {
     _RUN_SERVICE_ACCOUNT      = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
     _IMAGE                    = "${local.artifact_registry}/${var.name}/tag"
@@ -114,9 +113,6 @@ module "cloud_run" {
     SUMUP_MERCHANT_CODE      = "SUMUP_MERCHANT_CODE"
   }
 
-  # Der Dienst braucht den Runtime-SA und die Secret-Hüllen aus der
-  # Projekt-Basis.
-  depends_on = [module.project_base]
 }
 
 module "cloud_scheduler" {
@@ -131,10 +127,6 @@ module "cloud_scheduler" {
   # Host des Requests ab. Ein Token auf die run.app-URL passte nicht dazu.
   service_url = var.public_url
 
-  # Der Scheduler-Job braucht cloudscheduler.googleapis.com, aktiviert von der
-  # Projekt-Basis. Ohne diese Kante könnte terraform beides gleichzeitig anlegen
-  # und der Job auf einer noch nicht aktivierten API scheitern.
-  depends_on = [module.project_base]
 }
 
 # Die Allowlist oben wird aus Zeichenketten gebaut, weil eine Referenz auf das

@@ -27,21 +27,9 @@ locals {
   ])
 }
 
-module "project_base" {
-  count  = var.manage_project_base ? 1 : 0
-  source = "../../modules/project-base"
-
-  project            = var.project
-  region             = var.region
-  run_region         = var.run_region
-  name               = var.name
-  run_sa             = var.run_sa
-  deploy_sa          = var.deploy_sa
-  github_org         = var.github_org
-  github_repo        = var.github_repo
-  state_bucket       = var.state_bucket
-  storage_rules_file = "${local.repo_root}/storage.rules"
-}
+# Die Projekt-Basis liegt in terraform/projects/ffn-utils. Dieser Root hat
+# sie nie besessen (manage_project_base war hier immer false), es steht
+# entsprechend nichts davon in seinem State.
 
 module "firestore" {
   source = "../../modules/firestore-env"
@@ -68,9 +56,8 @@ module "cloudbuild" {
     "build-main-branch"      = { branch = "^main$" }
   }
 
-  # Aus Variablen abgeleitet statt aus module.project_base-Outputs: so
-  # funktioniert der Root identisch, ob dieses Environment die Projekt-Basis
-  # besitzt oder sie mit einem anderen teilt.
+  # Aus Variablen abgeleitet statt aus den Outputs des Projekt-Roots: ein
+  # Environment-Root liest keinen fremden State.
   substitutions = {
     _RUN_SERVICE_ACCOUNT      = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
     _IMAGE                    = "${local.artifact_registry}/${var.name}/dev"
@@ -120,9 +107,6 @@ module "cloud_run" {
     SUMUP_MERCHANT_CODE      = "SUMUP_MERCHANT_CODE_DEV"
   }
 
-  # Der Dienst braucht den Runtime-SA und die Secret-Hüllen aus der
-  # Projekt-Basis.
-  depends_on = [module.project_base]
 }
 
 module "cloud_scheduler" {
@@ -149,9 +133,6 @@ module "cloud_scheduler" {
   # den Job von Hand auslösen oder `dryRun` verwenden.
   weekly_report_paused = true
 
-  # Der Scheduler-Job braucht cloudscheduler.googleapis.com, aktiviert von der
-  # Projekt-Basis.
-  depends_on = [module.project_base]
 }
 
 # Die Allowlist oben wird aus Zeichenketten gebaut, weil eine Referenz auf das

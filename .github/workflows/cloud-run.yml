@@ -25,6 +25,13 @@ env:
   # passen, damit lokal und beide Pipelines identisch rechnen.
   TOFU_VERSION: 1.12.5
 
+  # Zuordnung Environment -> Projekt-Root. Die Projekt-Basis gibt es einmal je
+  # GCP-Projekt, nicht je Environment; dev und prod teilen sich ffn-utils,
+  # deshalb stehen links und rechts derzeit dieselben Pfade. Bekommt dev ein
+  # eigenes Projekt, wird der rechte Zweig auf dessen Root umgestellt — mehr ist
+  # an diesem Workflow nicht zu ändern.
+  BASE_ROOT: ${{ github.ref_type == 'tag' && 'terraform/projects/ffn-utils' || 'terraform/projects/ffn-utils' }}
+
 jobs:
   build:
     name: "Build"
@@ -181,20 +188,78 @@ jobs:
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}
           cache-to: ${{ env.workload_identity_provider != '' && 'type=inline' || '' }}
 
+  # Die Projekt-Basis läuft vor jedem Environment-Apply, nicht als Handgriff bei
+  # Gelegenheit. Sie enthält, was ein Environment-Apply bereits vorfinden muss —
+  # Rechte des Pipeline-SA, aktivierte APIs, Secret-Hüllen. Solange sie am
+  # prod-Root hing, wurde eine neue Rolle erst beim nächsten Release wirksam und
+  # dev scheiterte bis dahin mit 403.
+  #
+  # Ohne `needs`, damit sie parallel zum Build läuft: Sie hängt vom Image nicht
+  # ab, und der Deploy wartet ohnehin auf beide.
+  base:
+    name: "Projekt-Basis"
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    # Eine Gruppe, weil es einen Projekt-Root gibt. Kommt mit einem eigenen
+    # dev-Projekt ein zweiter dazu, muss der Root im Gruppennamen stehen —
+    # sonst applizieren dev und prod denselben State gleichzeitig.
+    concurrency:
+      group: tf-apply-base
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      gcp_ready: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER != '' && secrets.TERRAFORM_SERVICE_ACCOUNT != '' }}
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        if: ${{ env.gcp_ready == 'true' }}
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: "Authenticate to Google Cloud"
+        if: ${{ env.gcp_ready == 'true' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: Init
+        if: ${{ env.gcp_ready == 'true' }}
+        working-directory: ${{ env.BASE_ROOT }}
+        run: tofu init -input=false
+
+      - name: Apply
+        if: ${{ env.gcp_ready == 'true' }}
+        working-directory: ${{ env.BASE_ROOT }}
+        run: tofu apply -input=false -no-color -auto-approve
+
   deploy:
     name: "Deploy ${{ github.ref_type == 'tag' && 'prod' || 'dev' }}"
-    needs: build
+    needs: [build, base]
     # Kein Deploy aus einem Pull Request. Der Deploy ist jetzt ein `tofu apply`,
     # und ein apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die
     # gemeinsame Dev-Umgebung wäre nicht zu verantworten. Einen Branch auf dev
     # ausprobieren geht über workflow_dispatch auf diesem Branch.
     #
-    # `always()`, weil der Build beim Rollback übersprungen wird — die beiden
-    # Zeilen darunter schließen aus, dass ein gescheiterter Build trotzdem
-    # deployt.
+    # `always()`, weil der Build beim Rollback übersprungen wird — die Zeilen
+    # darunter schließen aus, dass ein gescheiterter Build trotzdem deployt.
+    # Die Projekt-Basis muss dagegen gelaufen sein: Ohne sie fehlen dem
+    # Environment-Apply womöglich Rechte oder Secret-Hüllen.
     if: >-
       always() &&
       github.event_name != 'pull_request' &&
+      needs.base.result == 'success' &&
       needs.build.result != 'failure' &&
       needs.build.result != 'cancelled' &&
       (needs.build.result == 'skipped' || needs.build.outputs.pushed == 'true')

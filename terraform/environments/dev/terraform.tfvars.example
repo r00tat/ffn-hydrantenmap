@@ -3,7 +3,9 @@ project               = "ffn-utils"
 build_service_account = "cloudbuild@ffn-utils.iam.gserviceaccount.com"
 github_org            = "r00tat"
 
-# Nur setzen, wenn dev ein eigenes GCP-Projekt bekommt — dann zusätzlich
-# project und state_bucket auf das neue Projekt umstellen und den Prefix in
-# backend.tf anpassen.
-# manage_project_base = true
+# Bekommt dev ein eigenes GCP-Projekt, ist das hier nur die halbe Miete:
+# Zusätzlich braucht es einen zweiten Projekt-Root unter
+# terraform/projects/<projekt-id>/ (die Projekt-Basis gibt es einmal je
+# Projekt), einen eigenen State-Bucket in diesem Projekt und die Umstellung
+# von BASE_ROOT_DEV in den beiden Workflows. Siehe CLAUDE.md, Abschnitt
+# "Projekt-Basis".

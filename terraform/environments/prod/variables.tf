@@ -49,27 +49,12 @@ variable "deploy_sa" {
   default     = "cloudbuild"
 }
 
-variable "state_bucket" {
-  description = "GCS bucket holding the terraform state"
-  type        = string
-  default     = "ffn-utils-tfstate"
-}
-
 variable "cloudbuild_disabled" {
   description = "Disable cloud build triggers"
   type        = bool
   default     = true
 }
 
-variable "manage_project_base" {
-  description = "Whether this environment owns the base infrastructure of its GCP project. Prod owns it as long as dev and prod share the project."
-  type        = bool
-  default     = true
-}
-
-# Cloud Run stellt die öffentliche URL nicht als Attribut bereit, das terraform
-# hier lesen könnte — der Dienst wird über .github/workflows/cloud-run.yml
-# deployt. Sie ist zugleich die erwartete OIDC-Audience des Scheduler-Tokens.
 # Die öffentliche Adresse dieser Umgebung. Sie ist dreierlei zugleich:
 # NEXTAUTH_URL des Dienstes, Ziel des Scheduler-Aufrufs und erwartete Audience
 # des OIDC-Tokens. Deshalb genau eine Quelle statt einer Repository-Variablen

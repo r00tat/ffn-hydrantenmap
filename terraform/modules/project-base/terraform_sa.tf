@@ -7,11 +7,13 @@
 # Federation aus diesem Repository impersoniert — es existiert kein Key.
 #
 # Wer ein neues Modul hinzufügt, trägt dessen Rolle hier ein. Dieser Block ist
-# die einzige Stelle, an der der Pipeline-SA Rechte bekommt, und er wird nur im
-# Root appliziert, der `manage_project_base = true` setzt (derzeit prod). Ein
-# dev-apply kann eine fehlende Rolle also nicht nachziehen — nach einer
-# Erweiterung muss zuerst prod laufen (`workflow_dispatch`, mode `apply`,
-# environment `prod`), sonst scheitert dev mit 403 auf der neuen Ressource.
+# die einzige Stelle, an der der Pipeline-SA Rechte bekommt. Er liegt im
+# Projekt-Root (terraform/projects/<projekt-id>), der in beiden Pipelines vor
+# jedem Environment-Apply läuft — eine neue Rolle ist damit sofort wirksam.
+#
+# Solange das Modul am prod-Root hing, war das anders: Eine Erweiterung wurde
+# erst beim nächsten Release wirksam, und der dev-Apply scheiterte bis dahin mit
+# 403 auf der neuen Ressource.
 # ============================================================================
 
 resource "google_service_account" "terraform_sa" {

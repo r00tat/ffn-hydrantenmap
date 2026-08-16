@@ -49,22 +49,10 @@ variable "deploy_sa" {
   default     = "cloudbuild"
 }
 
-variable "state_bucket" {
-  description = "GCS bucket holding the terraform state"
-  type        = string
-  default     = "ffn-utils-tfstate"
-}
-
 variable "cloudbuild_disabled" {
   description = "Disable cloud build triggers"
   type        = bool
   default     = true
-}
-
-variable "manage_project_base" {
-  description = "Whether this environment owns the base infrastructure of its GCP project. False while dev shares the project with prod; set to true together with a dedicated project id."
-  type        = bool
-  default     = false
 }
 
 # Die öffentliche Adresse dieser Umgebung. Sie ist dreierlei zugleich:
