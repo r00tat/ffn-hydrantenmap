@@ -5,6 +5,13 @@
 # Projekt-Administrator-Rechte. Bewusste Entscheidung: automatisiertes
 # `apply` braucht sie. Er wird ausschließlich per Workload Identity
 # Federation aus diesem Repository impersoniert — es existiert kein Key.
+#
+# Wer ein neues Modul hinzufügt, trägt dessen Rolle hier ein. Dieser Block ist
+# die einzige Stelle, an der der Pipeline-SA Rechte bekommt, und er wird nur im
+# Root appliziert, der `manage_project_base = true` setzt (derzeit prod). Ein
+# dev-apply kann eine fehlende Rolle also nicht nachziehen — nach einer
+# Erweiterung muss zuerst prod laufen (`workflow_dispatch`, mode `apply`,
+# environment `prod`), sonst scheitert dev mit 403 auf der neuen Ressource.
 # ============================================================================
 
 resource "google_service_account" "terraform_sa" {
@@ -26,6 +33,7 @@ resource "google_project_iam_member" "terraform_iam" {
     "roles/artifactregistry.admin",          # Artifact Registries
     "roles/secretmanager.admin",             # Secret Manager
     "roles/cloudbuild.builds.editor",        # Cloud Build Trigger
+    "roles/cloudscheduler.admin",            # Scheduler-Jobs (modules/cloud-scheduler)
   ])
   member  = google_service_account.terraform_sa.member
   role    = each.value

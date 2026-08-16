@@ -587,6 +587,15 @@ deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, De
 `"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
 Job an und der zweite `apply` scheiterte mit 409.
 
+**Prod zuerst applien.** Die API-Aktivierung (`cloudscheduler.googleapis.com`)
+und die Rolle `roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
+[project-base](terraform/modules/project-base/), und das gehört ausschließlich
+dem Root mit `manage_project_base = true` — derzeit prod. Dev appliziert aber
+schon beim Push auf main, prod erst beim Release. Nach jeder Erweiterung der
+Projekt-Basis deshalb erst prod von Hand applien (`workflow_dispatch`, mode
+`apply`, environment `prod`), sonst scheitert der Dev-Lauf mit 403 auf der neuen
+Ressource.
+
 Die Allowlist `CRON_INVOKER_EMAILS` wird beim Deploy gesetzt, nicht von
 terraform. Wer eine Umgebung hinzufügt, erweitert sie in
 [cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
