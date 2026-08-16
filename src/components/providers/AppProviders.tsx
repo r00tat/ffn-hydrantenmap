@@ -15,7 +15,6 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import useGlobalErrorReporter from '../../hooks/useGlobalErrorReporter';
 import useServerActionErrorDetection from '../../hooks/useServerActionErrorDetection';
 import useServiceWorkerUpdate from '../../hooks/useServiceWorkerUpdate';
-import { useCapacitorAppExit } from '../../hooks/useCapacitorAppExit';
 import styles from '../../styles/Home.module.css';
 import SingedOutOneTapLogin from '../auth/SingedOutOneTapLogin';
 import ChatMessageDisplay from '../chat/chat-message';
@@ -24,6 +23,7 @@ import DynamicLogin from '../pages/LoginUi';
 import AppDrawer from '../site/AppDrawer';
 import HeaderBar from '../site/HeaderBar';
 import OfflineWarning from '../site/OfflineWarning';
+import CapacitorBackButton from './CapacitorBackButton';
 import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
@@ -149,7 +149,6 @@ function OneTapLoginUnlessPublic() {
 
 export default function AppProviders({ children }: AppProps) {
   useFirebaseAppCheck();
-  useCapacitorAppExit();
   useGlobalErrorReporter();
 
   // Achtung beim Erweitern dieser Kette: Alles oberhalb von `AuthorizationApp`
@@ -172,6 +171,7 @@ export default function AppProviders({ children }: AppProps) {
           <FirebaseUserProvider>
             <SnackbarProvider>
               <ServiceWorkerUpdateListener />
+              <CapacitorBackButton />
               <OfflineWarning />
               <DebugLoggingProvider>
                 <div className={`${styles.container} print-content-root`}>

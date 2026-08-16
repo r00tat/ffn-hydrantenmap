@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Operations Map",
-    "title": "Operations Map"
+    "title": "Operations Map",
+    "backAgainToExit": "Press back again to exit"
   },
   "common": {
     "save": "Save",

@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Einsatzkarte",
-    "title": "Einsatzkarte"
+    "title": "Einsatzkarte",
+    "backAgainToExit": "Zum Beenden erneut Zurück drücken"
   },
   "common": {
     "save": "Speichern",
