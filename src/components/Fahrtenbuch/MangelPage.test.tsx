@@ -19,6 +19,13 @@ vi.mock('./mangelActions', () => ({
   updateMangel: vi.fn().mockResolvedValue({ success: true }),
   changeMangelStatus: vi.fn().mockResolvedValue({ success: true }),
   deleteMangel: vi.fn().mockResolvedValue({ success: true }),
+  mangelImageUrls: vi.fn().mockResolvedValue({ success: true, images: [] }),
+}));
+
+// Der Bild-Upload initialisiert beim Import den Firebase-Client, den es im
+// Test nicht gibt — der Dialog zieht ihn über die Bilderauswahl herein.
+vi.mock('./uploadMangelImage', () => ({
+  uploadMangelImage: vi.fn().mockResolvedValue('groups/ffnd/mangel/m1/a.jpg'),
 }));
 
 vi.mock('../../hooks/useFirebaseLogin', () => ({

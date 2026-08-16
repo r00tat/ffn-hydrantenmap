@@ -493,11 +493,15 @@
     "filters": {
       "vehicle": "Fahrzeug",
       "zweck": "Zweck",
+      "driver": "Fahrer",
       "from": "Von",
       "to": "Bis",
+      "search": "Suche",
+      "searchPlaceholder": "Fahrstrecke, Ziel, Kommentar …",
       "onlyDefects": "Nur Defekte",
       "all": "Alle",
-      "reset": "Filter zurücksetzen"
+      "reset": "Filter zurücksetzen",
+      "noResults": "Keine Fahrt passt zum Filter."
     },
     "stats": {
       "button": "Statistik",
@@ -820,6 +824,14 @@
       "noOpenMangel": "Keine offenen Mängel.",
       "openCount": "{count, plural, =0 {Keine offenen Mängel} one {# offener Mangel} other {# offene Mängel}}",
       "noteCount": "{count, plural, =0 {Kein Verlauf} one {# Eintrag} other {# Einträge}}",
+      "images": "Bilder",
+      "takePhoto": "Foto aufnehmen",
+      "addImages": "Bilder wählen",
+      "imagesFull": "Höchstens {count} Bilder je Mangel.",
+      "imagesLoadFailed": "Die Bilder konnten nicht geladen werden.",
+      "showImage": "Bild {index} anzeigen",
+      "removeImage": "Bild {index} entfernen",
+      "imageCount": "{count, plural, =0 {Keine Bilder} one {# Bild} other {# Bilder}}",
       "fromEntry": "Aus einer Fahrt gemeldet",
       "showEntry": "Zur Fahrt",
       "delete": "Mangel löschen",
@@ -840,7 +852,8 @@
         "mangelNotFound": "Dieser Mangel existiert nicht mehr.",
         "notAllowedDelete": "Nur ein Admin darf einen Mangel löschen.",
         "saveFailed": "Speichern fehlgeschlagen: {message}",
-        "deleteFailed": "Löschen fehlgeschlagen: {message}"
+        "deleteFailed": "Löschen fehlgeschlagen: {message}",
+        "imageUploadFailed": "Ein Bild konnte nicht hochgeladen werden. Bitte erneut versuchen."
       },
       "migrate": {
         "title": "Mängel aus bestehenden Fahrten übernehmen",
@@ -1858,6 +1871,11 @@
     "descriptionLabel": "Beschreibung",
     "attachments": "Anhänge",
     "captureScreenshot": "Bildschirmaufnahme machen",
+    "screenshotInProgress": "Bildschirmaufnahme wird erstellt …",
+    "screenshotInProgressHint": "Der Dialog ist dafür kurz ausgeblendet und kommt gleich zurück. Bitte nicht wegnavigieren.",
+    "cancelScreenshot": "Aufnahme abbrechen",
+    "screenshotAdded": "Bildschirmaufnahme hinzugefügt",
+    "screenshotFailed": "Bildschirmaufnahme fehlgeschlagen",
     "addImages": "Bilder hinzufügen",
     "removeScreenshot": "Screenshot entfernen",
     "removeAttachment": "Anhang entfernen",

@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
+import { fahrtenbuchListFilterRange } from '../../common/fahrtenbuchListFilter';
+import { browserTimeZone } from '../../common/fahrtenbuchStats';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
 import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
@@ -24,6 +26,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import useEntryDeletion from './useEntryDeletion';
+import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
 
 export interface FahrtenbuchVehiclePageProps {
   groupId: string;
@@ -47,7 +50,28 @@ export default function FahrtenbuchVehiclePage({
   const { vehicles, vehiclesById, activeVehicles } =
     useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
+  const { filter, setFilter } = useFahrtenbuchListFilter();
+  const timeZone = useMemo(() => browserTimeZone(), []);
+  const { fromIso, toIso } = useMemo(
+    () => fahrtenbuchListFilterRange(filter, timeZone),
+    [filter, timeZone],
+  );
+  /**
+   * Zwei Abfragen mit Absicht: Der Zeitraumfilter darf nur die Liste
+   * verschieben. `entries` bleibt das Fenster der jüngsten Fahrten und ist die
+   * Vorlage des Dialogs — mit einem Zeitraum aus dem Frühjahr schlüge er sonst
+   * dessen Zählerstände als Startwerte einer neuen Fahrt vor.
+   *
+   * Ohne gesetzten Zeitraum sind beide Abfragen deckungsgleich; Firestore
+   * führt gleiche Abfragen auf demselben Kanal zusammen.
+   */
   const entries = useFahrtenbuchEntries(groupId, { vehicleId, pageSize });
+  const listEntries = useFahrtenbuchEntries(groupId, {
+    vehicleId,
+    pageSize,
+    fromIso,
+    toIso,
+  });
   const { openMangel: openMangelList } = useFahrtenbuchMangel(groupId, {
     vehicleId,
   });
@@ -185,9 +209,11 @@ export default function FahrtenbuchVehiclePage({
       )}
 
       <FahrtenbuchList
-        entries={entries}
+        entries={listEntries}
         vehicles={vehicles}
         hideVehicleFilter
+        filter={filter}
+        onFilterChange={setFilter}
         onEdit={(entry) => {
           setEditEntry(entry);
           setDialogOpen(true);
@@ -195,7 +221,7 @@ export default function FahrtenbuchVehiclePage({
         onDelete={requestDelete}
       />
 
-      {entries.length >= pageSize && (
+      {listEntries.length >= pageSize && (
         <Button
           sx={{ mt: 2 }}
           onClick={() => setPageSize((size) => size + PAGE_STEP)}

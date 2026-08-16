@@ -561,6 +561,7 @@ describe('buildWeeklyReportModel', () => {
         description: 'Blinker rechts defekt',
         reportedAt: '05.08.2026',
         reportedByName: 'Lukas Fürst',
+        imageCount: 0,
       },
       {
         vehicleName: 'KDTFA',
@@ -569,8 +570,32 @@ describe('buildWeeklyReportModel', () => {
         description: 'Undichte Kupplung',
         reportedAt: '05.08.2026',
         reportedByName: 'Lukas Fürst',
+        imageCount: 0,
       },
     ]);
+  });
+
+  it('zählt die Bilder eines Mangels', () => {
+    // Die Bilder selbst bleiben im Fahrtenbuch; der Bericht sagt nur, dass es
+    // welche gibt.
+    const withImages: Mangel = {
+      vehicleId: 'v1',
+      vehicleName: 'KDTFA',
+      description: 'Blinker rechts defekt',
+      status: 'open',
+      notes: [],
+      images: ['groups/ffnd/mangel/m1/a.jpg', 'groups/ffnd/mangel/m1/b.jpg'],
+      reportedAt: '2026-08-05T17:00:00.000Z',
+      reportedBy: 'u1',
+      reportedByName: 'Lukas Fürst',
+      group: 'ffnd',
+      createdAt: '2026-08-05T17:00:00.000Z',
+      createdBy: 'u1',
+      updatedAt: '2026-08-05T17:00:00.000Z',
+      updatedBy: 'u1',
+    };
+    const model = build({ openMangel: [withImages] });
+    expect(model.openMangel[0].imageCount).toBe(2);
   });
 
   it('trägt Gruppe und Zeitraum durch', () => {

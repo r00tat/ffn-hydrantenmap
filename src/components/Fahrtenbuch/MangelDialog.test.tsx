@@ -3,17 +3,29 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createMangelMock, updateMangelMock, changeMangelStatusMock } =
-  vi.hoisted(() => ({
-    createMangelMock: vi.fn(),
-    updateMangelMock: vi.fn(),
-    changeMangelStatusMock: vi.fn(),
-  }));
+const {
+  createMangelMock,
+  updateMangelMock,
+  changeMangelStatusMock,
+  mangelImageUrlsMock,
+  uploadMangelImageMock,
+} = vi.hoisted(() => ({
+  createMangelMock: vi.fn(),
+  updateMangelMock: vi.fn(),
+  changeMangelStatusMock: vi.fn(),
+  mangelImageUrlsMock: vi.fn(),
+  uploadMangelImageMock: vi.fn(),
+}));
 
 vi.mock('./mangelActions', () => ({
   createMangel: createMangelMock,
   updateMangel: updateMangelMock,
   changeMangelStatus: changeMangelStatusMock,
+  mangelImageUrls: mangelImageUrlsMock,
+}));
+
+vi.mock('./uploadMangelImage', () => ({
+  uploadMangelImage: uploadMangelImageMock,
 }));
 
 import {
@@ -69,7 +81,18 @@ beforeEach(() => {
   createMangelMock.mockResolvedValue({ success: true, id: 'm1' });
   updateMangelMock.mockResolvedValue({ success: true, id: 'm1' });
   changeMangelStatusMock.mockResolvedValue({ success: true, id: 'm1' });
+  mangelImageUrlsMock.mockResolvedValue({ success: true, images: [] });
+  uploadMangelImageMock.mockImplementation(
+    async (_groupId: string, folderId: string, file: File) =>
+      `groups/ffnd/mangel/${folderId}/${file.name}`,
+  );
+  // jsdom kennt keine Objekt-URLs; die Vorschau braucht sie.
+  URL.createObjectURL = vi.fn(() => 'blob:preview');
+  URL.revokeObjectURL = vi.fn();
 });
+
+const photo = () =>
+  new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' });
 
 describe('MangelDialog — anlegen', () => {
   it('legt einen Mangel mit Fahrzeug und Beschreibung an', async () => {
@@ -94,9 +117,96 @@ describe('MangelDialog — anlegen', () => {
       expect(createMangelMock).toHaveBeenCalledWith('ffnd', {
         vehicleId: 'v1',
         description: 'Kupplung rutscht',
+        images: [],
       }),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('lädt ein gewähltes Bild erst beim Speichern hoch', async () => {
+    const onClose = vi.fn();
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        vehicleId="v1"
+        onClose={onClose}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Mangelbeschreibung/), 'x');
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), photo());
+
+    // Vor dem Speichern wird nichts hochgeladen — ein abgebrochener Dialog
+    // soll keine Dateien hinterlassen.
+    expect(uploadMangelImageMock).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMangelMock).toHaveBeenCalled());
+    expect(uploadMangelImageMock).toHaveBeenCalledTimes(1);
+    expect(createMangelMock.mock.calls[0][1].images).toHaveLength(1);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('lädt bei einem zweiten Anlauf nicht noch einmal hoch', async () => {
+    // Sonst lägen nach jedem Fehlversuch dieselben Fotos ein weiteres Mal im
+    // Storage, und die ersten fänden sich in keinem Dokument wieder.
+    createMangelMock.mockResolvedValueOnce({
+      success: false,
+      error: 'descriptionMissing',
+    });
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        vehicleId="v1"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Mangelbeschreibung/), 'x');
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), photo());
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(createMangelMock).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(createMangelMock).toHaveBeenCalledTimes(2));
+
+    expect(uploadMangelImageMock).toHaveBeenCalledTimes(1);
+    expect(createMangelMock.mock.calls[1][1].images).toEqual(
+      createMangelMock.mock.calls[0][1].images,
+    );
+  });
+
+  it('meldet einen gescheiterten Upload und legt nichts an', async () => {
+    uploadMangelImageMock.mockRejectedValue(new Error('offline'));
+    const onClose = vi.fn();
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        vehicleId="v1"
+        onClose={onClose}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Mangelbeschreibung/), 'x');
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), photo());
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Ein Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.',
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(createMangelMock).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('zeigt beim Anlegen weder Status noch Verlauf', () => {
@@ -243,8 +353,90 @@ describe('MangelDialog — bearbeiten', () => {
     await waitFor(() =>
       expect(updateMangelMock).toHaveBeenCalledWith('ffnd', 'm1', {
         description: 'Blinker vorne rechts defekt',
+        images: [],
       }),
     );
+  });
+
+  it('zeigt die gespeicherten Bilder über signierte URLs', async () => {
+    mangelImageUrlsMock.mockResolvedValue({
+      success: true,
+      images: [
+        { path: 'groups/ffnd/mangel/m1/a.jpg', url: 'https://signed/a' },
+      ],
+    });
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        mangel={mangel({ images: ['groups/ffnd/mangel/m1/a.jpg'] })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('img', { name: 'Bild 1 anzeigen' }),
+      ).toHaveAttribute('src', 'https://signed/a'),
+    );
+    expect(mangelImageUrlsMock).toHaveBeenCalledWith('ffnd', 'm1');
+  });
+
+  it('entfernt ein Bild und speichert die Liste ohne es', async () => {
+    mangelImageUrlsMock.mockResolvedValue({
+      success: true,
+      images: [
+        { path: 'groups/ffnd/mangel/m1/a.jpg', url: 'https://signed/a' },
+        { path: 'groups/ffnd/mangel/m1/b.jpg', url: 'https://signed/b' },
+      ],
+    });
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        mangel={mangel({
+          images: ['groups/ffnd/mangel/m1/a.jpg', 'groups/ffnd/mangel/m1/b.jpg'],
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Bild 1 entfernen' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Die Beschreibung blieb unverändert — die Bilderliste allein ist Grund
+    // genug für das Update, sonst bliebe das entfernte Bild stehen.
+    await waitFor(() =>
+      expect(updateMangelMock).toHaveBeenCalledWith('ffnd', 'm1', {
+        description: 'Blinker hinten links defekt',
+        images: ['groups/ffnd/mangel/m1/b.jpg'],
+      }),
+    );
+  });
+
+  it('lädt ein neues Bild in den Ordner des Mangels', async () => {
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        mangel={mangel()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), photo());
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(uploadMangelImageMock).toHaveBeenCalled());
+    expect(uploadMangelImageMock.mock.calls[0][1]).toBe('m1');
+    expect(updateMangelMock.mock.calls[0][2].images).toEqual([
+      'groups/ffnd/mangel/m1/foto.jpg',
+    ]);
   });
 
   it('zeigt den Verlauf mit Autor, Zeit und Statuswechsel', () => {

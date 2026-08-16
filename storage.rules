@@ -12,6 +12,13 @@ function authorizedUser() {
 // Craft rules based on data in your Firestore database
 // allow write: if firestore.get(
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+//
+// Diese Datei wird über terraform ausgerollt
+// (`google_firebaserules_ruleset`/`_release` in
+// terraform/modules/project-base/firebase.tf), nicht über `firebase deploy` —
+// in `firebase.json` steht sie deshalb bewusst nicht. Eine Änderung hier
+// braucht einen terraform-Apply, ausgelöst vom Workflow `terraform.yml`, der
+// auf `storage.rules` lauscht.
 service firebase.storage {
   match /b/{bucket}/o {
   	match /firecall/{firecallId}/files/{fileName} {
@@ -21,6 +28,30 @@ service firebase.storage {
     match /bugReports/{reportId}/{fileName} {
       allow create: if authorizedUser();
       allow read: if false;  // nur Admin SDK liest Anhänge (Admin-UI lädt signed URLs server-seitig)
+    }
+
+    // Bilder zu einem Fahrzeugmangel.
+    //
+    // Lesen ist auch für angemeldete Benutzer gesperrt: Ob jemand die Bilder
+    // sehen darf, hängt an der Mitgliedschaft in der Gruppe, und die steht in
+    // Firestore. Ein `firestore.get` aus einer Storage-Regel trifft immer die
+    // Default-Datenbank und gäbe in der Dev-Datenbank `ffndev` die falsche
+    // Antwort. Deshalb prüft die Server Action `mangelImageUrls` die
+    // Mitgliedschaft und gibt kurzlebige Signed URLs heraus — wie bei den
+    // Bug-Report-Anhängen.
+    //
+    // Nur `create`: Ein Dateiname trägt eine UUID, es gibt also nichts zu
+    // überschreiben. Gelöscht wird ausschließlich serverseitig, wenn ein Bild
+    // aus dem Mangel entfernt oder der Mangel gelöscht wird.
+    //
+    // Größe und Typ prüft die Regel selbst — die clientseitige Verkleinerung
+    // ist eine Bequemlichkeit, keine Schranke: Wer den Upload direkt aufruft,
+    // kommt an ihr vorbei.
+    match /groups/{groupId}/mangel/{mangelId}/{fileName} {
+      allow create: if authorizedUser()
+        && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow read, update, delete: if false;
     }
 
     match /{allPaths=**} {

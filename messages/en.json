@@ -493,11 +493,15 @@
     "filters": {
       "vehicle": "Vehicle",
       "zweck": "Purpose",
+      "driver": "Driver",
       "from": "From",
       "to": "To",
+      "search": "Search",
+      "searchPlaceholder": "Route, destination, comment …",
       "onlyDefects": "Defects only",
       "all": "All",
-      "reset": "Reset filters"
+      "reset": "Reset filters",
+      "noResults": "No trip matches the filter."
     },
     "stats": {
       "button": "Statistics",
@@ -820,6 +824,14 @@
       "noOpenMangel": "No open defects.",
       "openCount": "{count, plural, =0 {No open defects} one {# open defect} other {# open defects}}",
       "noteCount": "{count, plural, =0 {No history} one {# entry} other {# entries}}",
+      "images": "Photos",
+      "takePhoto": "Take photo",
+      "addImages": "Choose photos",
+      "imagesFull": "At most {count} photos per defect.",
+      "imagesLoadFailed": "The photos could not be loaded.",
+      "showImage": "Show photo {index}",
+      "removeImage": "Remove photo {index}",
+      "imageCount": "{count, plural, =0 {No photos} one {# photo} other {# photos}}",
       "fromEntry": "Reported from a trip",
       "showEntry": "Go to trip",
       "delete": "Delete defect",
@@ -840,7 +852,8 @@
         "mangelNotFound": "This defect no longer exists.",
         "notAllowedDelete": "Only an admin may delete a defect.",
         "saveFailed": "Saving failed: {message}",
-        "deleteFailed": "Deleting failed: {message}"
+        "deleteFailed": "Deleting failed: {message}",
+        "imageUploadFailed": "A photo could not be uploaded. Please try again."
       },
       "migrate": {
         "title": "Import defects from existing trips",
@@ -1858,6 +1871,11 @@
     "descriptionLabel": "Description",
     "attachments": "Attachments",
     "captureScreenshot": "Capture screenshot",
+    "screenshotInProgress": "Capturing screenshot …",
+    "screenshotInProgressHint": "The dialog is hidden for a moment and will come back. Please don't navigate away.",
+    "cancelScreenshot": "Cancel capture",
+    "screenshotAdded": "Screenshot added",
+    "screenshotFailed": "Screenshot capture failed",
     "addImages": "Add images",
     "removeScreenshot": "Remove screenshot",
     "removeAttachment": "Remove attachment",

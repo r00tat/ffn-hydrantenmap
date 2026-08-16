@@ -435,6 +435,36 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+### Screenshot-Aufnahme
+
+Der Dialog wird für die Aufnahme nur **ausgeblendet** (`display: none`), nicht
+geschlossen — sonst wären Eingaben und der eingefrorene Kontext weg. Solange er
+weg ist, liegt der
+[ScreenshotCaptureOverlay](src/components/bugReport/ScreenshotCaptureOverlay.tsx)
+darüber: Ohne ihn hielten Nutzer den Dialog für geschlossen, navigierten weg und
+verloren ihren Report (#662). Er blockiert die Bedienung für die Dauer der
+Aufnahme und bietet immer einen Weg zurück.
+
+Drei Dinge hängen daran zusammen:
+
+- **Das Overlay trägt `data-skip-screenshot="true"`** und wird damit vom Filter
+  in [captureScreenshot.ts](src/components/bugReport/captureScreenshot.ts) aus
+  dem Bild geworfen. Alles, was während einer Aufnahme sichtbar sein soll, aber
+  nicht ins Bild gehört, braucht dieses Attribut.
+- **`disableEnforceFocus` am Dialog**, solange aufgenommen wird. Der Dialog ist
+  weiter `open`, sein Focus-Trap zöge den Fokus sonst aus dem Overlay heraus und
+  der Abbrechen-Button wäre per Tastatur nicht erreichbar.
+- **`captureRunRef`** zählt jeden Lauf hoch. Eine Aufnahme, die nach dem
+  Abbrechen doch noch fertig wird, darf weder das Overlay zurückholen noch einen
+  Screenshot anhängen.
+
+`captureScreenshot()` hat ein eigenes Timeout (`SCREENSHOT_TIMEOUT_MS`, 15s):
+`modern-screenshot` bringt keines mit, und in mobilen WebViews lädt das
+`foreignObject`-Bild unter Speicherdruck gelegentlich nie fertig — ohne Timeout
+bliebe der Dialog dauerhaft ausgeblendet. Vor dem Snapshot wird über zwei
+`requestAnimationFrame` auf einen Paint gewartet, sonst steht der eben erst
+ausgeblendete Dialog noch im Bild.
+
 ## Fahrtenbuch-PDF-Export
 
 Der Export ([fahrtenbuchExportActions.ts](src/components/Fahrtenbuch/fahrtenbuchExportActions.ts))
@@ -540,6 +570,35 @@ Ein Lauf, in dem alle Gruppen übersprungen wurden (keine Empfänger gepflegt) u
 ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
 zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
 am Status-Code.
+
+## Mangel-Bilder
+
+Zu einem Fahrzeugmangel gehören Fotos (`Mangel.images`, [mangel.ts](src/common/mangel.ts)).
+Gespeichert wird der Storage-**Pfad**, nicht die URL — eine Download-URL veraltet, der
+Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{name}`.
+
+- **Gelesen wird über Signed URLs vom Server**, nicht über die Storage-Regeln: Die
+  Berechtigung hängt an der Gruppenmitgliedschaft, und die steht in Firestore. Ein
+  `firestore.get` aus einer Storage-Regel trifft immer die Default-Datenbank und gäbe in
+  der Dev-Datenbank `ffndev` die falsche Antwort. Deshalb verweigert
+  [storage.rules](storage.rules) jedem Client das Lesen und die Action `mangelImageUrls`
+  ([mangelActions.ts](src/components/Fahrtenbuch/mangelActions.ts)) prüft die
+  Mitgliedschaft und signiert. Gleiches Muster wie bei den Bug-Report-Anhängen.
+- **Jeder Pfad aus dem Browser wird geprüft** (`sanitizeMangelImages`) — beim Schreiben
+  *und* beim Signieren. Ohne das zeigte ein Mangel auf Dateien einer fremden Gruppe.
+- **Hochgeladen wird erst beim Speichern** des Dialogs; nach einem erfolgreichen Upload
+  gelten die Bilder sofort als gespeichert, damit ein zweiter Anlauf nach einem Fehler
+  nicht dieselben Dateien noch einmal hochlädt.
+- **Gelöscht wird serverseitig** — beim Entfernen eines einzelnen Bildes (`updateMangel`
+  bekommt die vollständige Liste, was fehlt, fliegt aus dem Storage) und beim Löschen des
+  Mangels.
+- **`storage.rules` wird über terraform ausgerollt**
+  (`google_firebaserules_ruleset`/`_release` in
+  [firebase.tf](terraform/modules/project-base/firebase.tf)), nicht über `firebase deploy`
+  — in `firebase.json` steht die Datei deshalb bewusst nicht. Eine Änderung braucht einen
+  Apply aus [terraform.yml](.github/workflows/terraform.yml).
+- Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
+  braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
 
 ## German Terminology
 

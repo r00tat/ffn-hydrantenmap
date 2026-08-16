@@ -19,6 +19,8 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
+import { fahrtenbuchListFilterRange } from '../../common/fahrtenbuchListFilter';
+import { browserTimeZone } from '../../common/fahrtenbuchStats';
 import useFahrtenbuchEntries from '../../hooks/useFahrtenbuchEntries';
 import useFahrtenbuchFirecalls from '../../hooks/useFahrtenbuchFirecalls';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
@@ -32,6 +34,10 @@ import FahrtenbuchExportDialog from './FahrtenbuchExportDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import FahrtenbuchVehicleCard from './FahrtenbuchVehicleCard';
 import useEntryDeletion from './useEntryDeletion';
+import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
+
+/** Schrittweite von „Mehr laden" — wie auf der Fahrzeugseite. */
+const PAGE_STEP = 50;
 
 /**
  * Übersicht des Fahrtenbuchs: eine Karte je aktivem Fahrzeug mit Direkt-Button,
@@ -44,7 +50,28 @@ export default function FahrtenbuchPage() {
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { vehicles, activeVehicles } = useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
+  const { filter, setFilter } = useFahrtenbuchListFilter();
+  const [pageSize, setPageSize] = useState(PAGE_STEP);
+  const timeZone = useMemo(() => browserTimeZone(), []);
+  const { fromIso, toIso } = useMemo(
+    () => fahrtenbuchListFilterRange(filter, timeZone),
+    [filter, timeZone],
+  );
+  /**
+   * Zwei Abfragen mit Absicht: Der Zeitraumfilter darf nur die Liste
+   * verschieben. `entries` bleibt das Fenster der jüngsten Fahrten — daraus
+   * kommen der letzte Fahrer auf den Fahrzeugkarten und die Vorlage des
+   * Dialogs, und beide meinen „zuletzt", nicht „zuletzt im gewählten Zeitraum".
+   *
+   * Ohne gesetzten Zeitraum sind beide Abfragen deckungsgleich; Firestore
+   * führt gleiche Abfragen auf demselben Kanal zusammen.
+   */
   const entries = useFahrtenbuchEntries(groupId);
+  const listEntries = useFahrtenbuchEntries(groupId, {
+    pageSize,
+    fromIso,
+    toIso,
+  });
   const firecalls = useFahrtenbuchFirecalls(groupId);
   const { openCountByVehicle } = useFahrtenbuchMangel(groupId);
   // Der Menüpunkt führt immer hierher; in die Sammelerfassung des laufenden
@@ -222,11 +249,25 @@ export default function FahrtenbuchPage() {
             </Alert>
           )}
           <FahrtenbuchList
-            entries={entries}
+            entries={listEntries}
             vehicles={vehicles}
+            filter={filter}
+            onFilterChange={setFilter}
             onEdit={(entry) => openDialog(entry.vehicleId, entry)}
             onDelete={requestDelete}
           />
+
+          {/* Ohne „Mehr laden" endete ein gewählter Zeitraum stillschweigend
+              nach 50 Fahrten — die Liste sähe vollständig aus, wäre es aber
+              nicht. */}
+          {listEntries.length >= pageSize && (
+            <Button
+              sx={{ mt: 2 }}
+              onClick={() => setPageSize((size) => size + PAGE_STEP)}
+            >
+              {t('loadMore')}
+            </Button>
+          )}
         </AccordionDetails>
       </Accordion>
 
