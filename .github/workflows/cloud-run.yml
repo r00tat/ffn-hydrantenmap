@@ -9,27 +9,46 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      serving_revision:
+        description: "Rollback: Revision, die den Traffic bekommt (leer = die neu gebaute)"
+        type: string
+        required: false
+        default: ""
   repository_dispatch:
     types:
       - deploy
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+env:
+  # Muss zu terraform/.tool-versions und zu .github/workflows/terraform.yml
+  # passen, damit lokal und beide Pipelines identisch rechnen.
+  TOFU_VERSION: 1.12.5
 
 jobs:
-  cloudrun:
-    name: "Cloud Run"
+  build:
+    name: "Build"
+    # Ein Rollback baut nichts: Es zeigt auf eine Revision, die es schon gibt.
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.serving_revision == '' }}
     runs-on: ubuntu-latest
+    # Nur der Build darf abgebrochen werden. Der Deploy-Job hat seine eigene
+    # Gruppe ohne cancel-in-progress — ein mitten im `tofu apply` abgeschossener
+    # Lauf hinterließe ein hängendes State-Lock.
+    concurrency:
+      group: cloud-run-build-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     permissions:
-      id-token: write # This is required for requesting the JWT
-      contents: read # This is required for actions/checkout
-      pull-requests: write # Write contents to the PR
-    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+      id-token: write # required for requesting the JWT
+      contents: read # required for actions/checkout
     defaults:
       run:
         shell: bash
+    outputs:
+      image_tag: ${{ steps.env.outputs.IMAGE_TAG }}
+      version: ${{ steps.env.outputs.VERSION }}
+      version_tag: ${{ steps.env.outputs.VERSION_TAG }}
+      run_service: ${{ steps.env.outputs.RUN_SERVICE }}
+      pushed: ${{ steps.env.outputs.PUSHED }}
     env:
       DEBIAN_FRONTEND: noninteractive
       NEXT_PUBLIC_FIREBASE_APIKEY: ${{ vars.NEXT_PUBLIC_FIREBASE_APIKEY }}
@@ -37,18 +56,14 @@ jobs:
       NEXT_PUBLIC_FIRESTORE_DB: ${{ vars.NEXT_PUBLIC_FIRESTORE_DB }}
       NEXT_PUBLIC_RECAPTCHA_KEY: ${{ vars.NEXT_PUBLIC_RECAPTCHA_KEY }}
       GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
-      AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-      EINSATZMAPPE_IMPERSONATION_ACCOUNT: ${{ secrets.EINSATZMAPPE_IMPERSONATION_ACCOUNT }}
-      RUN_SERVICE: ${{ vars.RUN_SERVICE}}
+      RUN_SERVICE: ${{ vars.RUN_SERVICE }}
       RUN_REGION: ${{ vars.RUN_REGION }}
-      RUN_SERVICE_ACCOUNT: ${{ secrets.RUN_SERVICE_ACCOUNT}}
       CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       CLOUDSDK_COMPUTE_REGION: ${{ vars.CLOUDSDK_COMPUTE_REGION }}
       IMAGE: ${{ vars.IMAGE }}
       workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
 
     steps:
-      # Checkout the repository to the GitHub Actions runner
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -58,34 +73,19 @@ jobs:
         shell: bash
         id: env
         run: |
-          # write env file
           set -eo pipefail
-          VERSION=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-          VERSION_TAG=$(echo ${VERSION} | tr '[:upper:]' '[:lower:]'} | sed -r 's@[^a-zA-Z0-9-]+@-@g' )
-          VERSION_TAG=$(echo -n ${VERSION_TAG:0:30} | sed 's@-$@@')
-          export NEXTAUTH_URL="https://einsatz-dev.ffnd.at"
-          export SUMUP_SECRET_SUFFIX="_DEV"
+
+          # GITHUB_REF_NAME ist bei einem Tag "v2.63.0" und bei einem Branch
+          # dessen Name — anders als das frühere ${GITHUB_REF#refs/heads/},
+          # das bei Tags nichts abschnitt und Revisionen wie
+          # "refs-tags-v2-63-0" hinterließ.
+          VERSION="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          VERSION_TAG="$(scripts/cloud-run-tfvars.sh --print-tag --version "$VERSION")"
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             export NEXT_PUBLIC_FIRESTORE_DB=""
-            export RUN_SERVICE=$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')
-            export NEXTAUTH_URL="https://einsatz.ffnd.at"
-            export SUMUP_SECRET_SUFFIX=""
+            RUN_SERVICE="$(echo -n "${RUN_SERVICE}" | sed 's/-dev$//')"
           fi
-
-          # Allowlist der Service Accounts, die zeitplan-gesteuerte Endpoints
-          # aufrufen dürfen (cronRequired). Beide Umgebungen stehen drin, weil
-          # ein Invoker aus dev auch gegen den dev-Dienst legitim ist; die Namen
-          # kommen aus terraform/modules/cloud-scheduler (account_id plus
-          # name_suffix) und müssen dort und hier gleich lauten.
-          #
-          # Bewusst eine Env-Var und kein Secret-Manager-Secret: der Wert ist
-          # eine Kennung, kein Geheimnis (wer sie kennt, kann kein Token dafür
-          # ausstellen - dazu braucht es IAM-Rechte auf den SA). Als Secret hinge
-          # jedes Deploy daran, dass vorher ein terraform apply gelaufen ist -
-          # und der prod-apply, dem die Projekt-Basis gehört, läuft nur bei einem
-          # Release.
-          export CRON_INVOKER_EMAILS="fahrtenbuch-report-invoker@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com,fahrtenbuch-report-invoker-dev@${GOOGLE_CLOUD_PROJECT}.iam.gserviceaccount.com"
 
           if [[ "${NEXT_PUBLIC_FIRESTORE_DB}" == "default" || "${NEXT_PUBLIC_FIRESTORE_DB}" == "(default)" ]]; then
             # '(default)' / 'default' sentinel -> empty string selects the default DB
@@ -101,8 +101,11 @@ jobs:
             exit 1
           fi
 
+          PUSHED=false
+          [[ -n "${workload_identity_provider}" ]] && PUSHED=true
+
           echo "Environment:"
-          cat <<EOF | tee -a $GITHUB_ENV | tee -a $GITHUB_OUTPUT
+          cat <<EOF | tee -a "$GITHUB_ENV" | tee -a "$GITHUB_OUTPUT"
           VERSION=${VERSION}
           VERSION_TAG=${VERSION_TAG}
           RUN_SERVICE=${RUN_SERVICE}
@@ -110,38 +113,21 @@ jobs:
           NEXT_PUBLIC_FIRESTORE_DB=${NEXT_PUBLIC_FIRESTORE_DB}
           IMAGE=${IMAGE}
           IMAGE_TAG=${IMAGE}:${VERSION_TAG}
-          NEXTAUTH_URL=${NEXTAUTH_URL}
-          NEXTAUTH_URL_INTERNAL=http://localhost:8080
           NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}
-          SUMUP_SECRET_SUFFIX=${SUMUP_SECRET_SUFFIX}
-          CRON_INVOKER_EMAILS=${CRON_INVOKER_EMAILS}
+          PUSHED=${PUSHED}
           EOF
 
+          # .env.local liefert next build dieselben NEXT_PUBLIC_*-Werte wie die
+          # Build-Args. Ohne Laufzeit-Geheimnisse: die kommen aus Secret Manager
+          # und würden hier nur in einer Image-Layer landen.
           cat >.env.local <<EOF
           NEXT_PUBLIC_FIREBASE_APIKEY='${NEXT_PUBLIC_FIREBASE_APIKEY}'
           NEXT_PUBLIC_BUILD_ID='$VERSION'
           NEXT_PUBLIC_OAUTH_CLIENT_ID='${NEXT_PUBLIC_OAUTH_CLIENT_ID}'
           NEXT_PUBLIC_FIRESTORE_DB="${NEXT_PUBLIC_FIRESTORE_DB}"
           NEXT_PUBLIC_RECAPTCHA_KEY="${NEXT_PUBLIC_RECAPTCHA_KEY}"
-          AUTH_SECRET='${AUTH_SECRET}'
-          NEXTAUTH_URL='${NEXTAUTH_URL}'
           NEXTAUTH_URL_INTERNAL=http://localhost:8080
           EOF
-
-      # - id: 'deploy'
-      #   uses: 'google-github-actions/deploy-cloudrun@v2'
-      #   with:
-      #     service: ${{vars.RUN_SERVICE}}
-      #     image: ${{ steps.env.outputs.IMAGE_TAG}}
-      #     region: ${{vars.RUN_REGION}}
-      #     project_id: ${{vars.CLOUDSDK_CORE_PROJECT}}
-      #     tag: ${{steps.env.outputs.VERSION_TAG}}
-      #     # service account is not available
-      #     # service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT}}
-      #     secrets: |-
-      #       NEXT_PUBLIC_FIREBASE_APIKEY=NEXT_PUBLIC_FIREBASE_APIKEY:latest
-      #       AUTH_SECRET=AUTH_SECRET:latest
-      #       EINSATZMAPPE_SHEET_ID=EINSATZMAPPE_SHEET_ID:latest,EINSATZMAPPE_SHEET_RANGE=EINSATZMAPPE_SHEET_RANGE:latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -194,28 +180,127 @@ jobs:
             NEXT_PUBLIC_BUILD_ID=${{ steps.env.outputs.VERSION }}
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}
           cache-to: ${{ env.workload_identity_provider != '' && 'type=inline' || '' }}
-      - id: deploy
-        name: deploy to Cloud Run
-        if: ${{ env.workload_identity_provider != '' }}
+
+  deploy:
+    name: "Deploy ${{ github.ref_type == 'tag' && 'prod' || 'dev' }}"
+    needs: build
+    # Kein Deploy aus einem Pull Request. Der Deploy ist jetzt ein `tofu apply`,
+    # und ein apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die
+    # gemeinsame Dev-Umgebung wäre nicht zu verantworten. Einen Branch auf dev
+    # ausprobieren geht über workflow_dispatch auf diesem Branch.
+    #
+    # `always()`, weil der Build beim Rollback übersprungen wird — die beiden
+    # Zeilen darunter schließen aus, dass ein gescheiterter Build trotzdem
+    # deployt.
+    if: >-
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.build.result != 'failure' &&
+      needs.build.result != 'cancelled' &&
+      (needs.build.result == 'skipped' || needs.build.outputs.pushed == 'true')
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_type == 'tag' && 'prod' || 'dev' }}
+    # Dieselbe Gruppe wie die apply-Jobs in terraform.yml: Beide Workflows
+    # applien denselben State, zwei gleichzeitige Läufe sind ausgeschlossen.
+    concurrency:
+      group: tf-apply-${{ github.ref_type == 'tag' && 'prod' || 'dev' }}
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform/environments/${{ github.ref_type == 'tag' && 'prod' || 'dev' }}
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
+      TF_VAR_firebase_config: ${{ vars.NEXT_PUBLIC_FIREBASE_APIKEY }}
+      TF_VAR_recaptcha_key: ${{ vars.NEXT_PUBLIC_RECAPTCHA_KEY }}
+      TF_VAR_einsatzmappe_impersonation_account: ${{ secrets.EINSATZMAPPE_IMPERSONATION_ACCOUNT }}
+      TF_VAR_serving_revision: ${{ inputs.serving_revision }}
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      # Leer, wenn der Build übersprungen wurde (Rollback) — dann übernimmt das
+      # Skript Image und Revisions-Suffix aus dem laufenden Dienst.
+      IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+      VERSION: ${{ needs.build.outputs.version }}
+      RUN_SERVICE_BASE: ${{ vars.RUN_SERVICE }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: "Authenticate to Google Cloud"
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Aufbewahrung der Traffic-Tags. prod hält ein Rollback-Fenster über die
+      # letzten Releases, dev nur die Tags noch existierender Branches — ein
+      # gemergter Branch verliert seinen Tag damit von selbst. Ohne Regel wüchse
+      # die Liste unbegrenzt, und jeder Tag hält seine Revision dauerhaft aus
+      # Cloud Runs automatischer Bereinigung.
+      - name: Deploy-Variablen erzeugen
+        working-directory: ${{ github.workspace }}
         run: |
           set -eo pipefail
 
-          # --memory: Der PDF-Export des Fahrtenbuchs legt sein Dokument im
-          # Speicher aus. Seit #665 geschieht das in Teilen, wodurch der
-          # Spitzenbedarf bei rund 300 MB liegt statt bei über 600 MB — aber
-          # Cloud Run lässt bis zu 80 Anfragen auf dieselbe Instanz, und die
-          # bisherigen 512Mi (der Vorgabewert, hier nie gesetzt) hatten dafür
-          # keine Reserve. Ohne das Flag behielte der Dienst stillschweigend
-          # seinen alten Wert.
-          gcloud run deploy $RUN_SERVICE \
-            --allow-unauthenticated \
-            --image $IMAGE_TAG \
-            --execution-environment gen2 \
-            --memory=1Gi \
-            --max-instances=2 --region $RUN_REGION \
-            --tag=${VERSION_TAG} \
-            --service-account=$RUN_SERVICE_ACCOUNT \
-            --update-secrets="AUTH_SECRET=AUTH_SECRET:latest,GOOGLE_SERVICE_ACCOUNT=GOOGLE_SERVICE_ACCOUNT:latest,BLAULICHTSMS_USERNAME=BLAULICHTSMS_USERNAME:latest,BLAULICHTSMS_PASSWORD=BLAULICHTSMS_PASSWORD:latest,BLAULICHTSMS_CUSTOMER_ID=BLAULICHTSMS_CUSTOMER_ID:latest,SUMUP_API_KEY=SUMUP_API_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_AFFILIATE_KEY=SUMUP_AFFILIATE_KEY${SUMUP_SECRET_SUFFIX}:latest,SUMUP_MERCHANT_CODE=SUMUP_MERCHANT_CODE${SUMUP_SECRET_SUFFIX}:latest" \
-            --remove-secrets="NEXT_PUBLIC_FIREBASE_APIKEY,NEXT_PUBLIC_MAPBOX_APIKEY,EINSATZMAPPE_SHEET_ID,EINSATZMAPPE_SHEET_RANGE,EINSATZMAPPE_SHEET_FOLDER" \
-           --update-env-vars="^@@^NEXTAUTH_URL=${NEXTAUTH_URL}@@NEXTAUTH_URL_INTERNAL=http://localhost:8080@@NEXT_PUBLIC_FIREBASE_APIKEY=${NEXT_PUBLIC_FIREBASE_APIKEY}@@EINSATZMAPPE_IMPERSONATION_ACCOUNT=${EINSATZMAPPE_IMPERSONATION_ACCOUNT}@@NEXT_PUBLIC_RECAPTCHA_KEY=${NEXT_PUBLIC_RECAPTCHA_KEY}@@GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}@@CRON_INVOKER_EMAILS=${CRON_INVOKER_EMAILS}" \
-            ${RUN_ARGS}
+          RUN_SERVICE="$RUN_SERVICE_BASE"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] && RUN_SERVICE="${RUN_SERVICE%-dev}"
+
+          # Ohne neues Image (Rollback) bleibt das laufende stehen; das Skript
+          # liest es dann selbst aus dem Dienst.
+          args=()
+          if [[ -n "$IMAGE_TAG" ]]; then
+            args+=(--image "$IMAGE_TAG" --version "$VERSION")
+          fi
+
+          scripts/cloud-run-tfvars.sh \
+            --service "$RUN_SERVICE" \
+            --project "$TF_VAR_project" \
+            --region "$RUN_REGION" \
+            "${args[@]}" \
+            ${{ github.ref_type == 'tag' && '--keep 20' || '--keep-branches' }} \
+            --out "terraform/environments/${{ github.ref_type == 'tag' && 'prod' || 'dev' }}/cloudrun.auto.tfvars.json"
+
+      - name: Init
+        run: tofu init -input=false
+
+      - name: Apply
+        run: tofu apply -input=false -no-color -auto-approve
+
+      - name: Step summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "## Deploy — ${{ github.ref_type == 'tag' && 'prod' || 'dev' }}"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`${IMAGE_TAG}\` |"
+            echo "| Revision | \`$(tofu output -raw run_revision 2>/dev/null || echo '?')\` |"
+            echo "| URL | $(tofu output -raw run_service_uri 2>/dev/null || echo '?') |"
+            echo
+            echo "Rollback: dieser Workflow über *Run workflow* mit \`serving_revision\`."
+            echo
+            echo "<details><summary>Traffic-Tags (Rollback-Ziele)</summary>"
+            echo
+            echo '```json'
+            tofu output -json run_traffic_tags 2>/dev/null | jq . 2>/dev/null || echo '{}'
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"

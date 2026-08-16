@@ -1,6 +1,7 @@
 locals {
-  # Muss zu CRON_INVOKER_EMAILS in .github/workflows/cloud-run.yml passen — sonst
-  # weist cronRequired den Aufrufer ab, obwohl Token und Berechtigung stimmen.
+  # Muss zu `local.cron_invoker_emails` im aufrufenden Root passen — sonst weist
+  # cronRequired den Aufrufer ab, obwohl Token und Berechtigung stimmen. Dort
+  # prüft ein `check`-Block genau diese Übereinstimmung.
   invoker_account_id = "fahrtenbuch-report-invoker${var.name_suffix}"
 }
 
@@ -11,10 +12,10 @@ resource "google_service_account" "fahrtenbuch_report_invoker" {
   description  = "Ruft den Wochenbericht-Endpoint mit einem OIDC-Token auf"
 }
 
-# Der Dienst selbst wird außerhalb von terraform per `gcloud run deploy` angelegt
-# (.github/workflows/cloud-run.yml). Die v1-Ressource setzt die Policy auf
-# demselben Dienst-Objekt wie `google_cloud_run_v2_service_iam_member` und
-# braucht kein von terraform verwaltetes Service-Objekt.
+# Die v1-Ressource setzt die Policy auf demselben Dienst-Objekt wie
+# `google_cloud_run_v2_service_iam_member` in modules/cloud-run und nimmt den
+# Dienstnamen als Zeichenkette — das Modul braucht deshalb keine Referenz auf
+# die Service-Ressource.
 resource "google_cloud_run_service_iam_member" "invoker" {
   project  = var.project
   location = var.run_region

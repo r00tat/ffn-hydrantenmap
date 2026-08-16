@@ -35,9 +35,10 @@ variable "name_suffix" {
   }
 }
 
-# Der Cloud-Run-Dienst selbst liegt nicht in Terraform (Deployment über
-# .github/workflows/cloud-run.yml), deshalb kommt seine URL als Wert herein statt
-# aus einem Resource-Attribut. Sie ist zugleich die erwartete OIDC-Audience.
+# Bewusst die Custom Domain und nicht `module.cloud_run.uri`: Der Dienst ist
+# öffentlich unter einsatz(-dev).ffnd.at erreichbar, und `getBaseUrl()` leitet
+# die erwartete Audience aus dem Host des Requests ab. Ein Token auf die
+# run.app-URL passte nicht dazu.
 variable "service_url" {
   description = "Public base URL of the service, e.g. https://karte.example.at"
   type        = string

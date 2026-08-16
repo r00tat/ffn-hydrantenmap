@@ -290,6 +290,91 @@ EOF
 )"
 ```
 
+## Deployment (Cloud Run über Terraform)
+
+Der Cloud-Run-Dienst liegt in [terraform/modules/cloud-run](terraform/modules/cloud-run/);
+deployt wird mit `tofu apply`, nicht mit `gcloud run deploy`. Der Deploy-Job in
+[cloud-run.yml](.github/workflows/cloud-run.yml) baut das Image und appliziert
+anschließend den Root der Zielumgebung — dev bei jedem Push auf main, prod bei
+jedem Release-Tag.
+
+**Es gibt genau einen automatischen Applier.** [terraform.yml](.github/workflows/terraform.yml)
+plant nur noch (PRs) und hat einen `workflow_dispatch`-Apply als Handgriff. Beide
+Workflows teilen die Concurrency-Gruppe `tf-apply-<env>`, zwei gleichzeitige
+apply auf denselben State sind damit ausgeschlossen.
+
+**Aus PRs wird nicht mehr deployt.** Ein Deploy ist jetzt ein Apply, und ein
+Apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die gemeinsame
+Dev-Umgebung wäre nicht zu verantworten. Einen Branch auf dev ausprobieren geht
+über `workflow_dispatch` auf diesem Branch.
+
+### Revisionsnamen und Fingerabdruck
+
+Der Revisionsname wird gesetzt, nicht von Cloud Run generiert — sonst kennt
+terraform ihn beim Plan nicht und könnte keinen Traffic-Tag darauf legen. Er
+lautet `<dienst>-<version>-<fingerabdruck>`, wobei der Fingerabdruck ein Hash
+über alles ist, was ins Template einfließt (`local.template_fingerprint`).
+
+Revisionen sind unveränderlich: Ein geändertes Template unter einem schon
+vergebenen Namen wird abgelehnt. Der Fingerabdruck sorgt dafür, dass sich der
+Name genau dann ändert, wenn sich der Inhalt ändert — ein apply ohne Änderung
+legt keine neue Revision an. **Wer dem Template ein Feld hinzufügt, trägt es in
+den Fingerabdruck ein**, sonst scheitert der apply an einem Namenskonflikt.
+
+### Traffic-Tags und ihre Bereinigung
+
+Der `traffic`-Block ist autoritativ: Was nicht drinsteht, verliert seinen Tag.
+Das ist beabsichtigt, denn ein Tag macht seine Revision adressierbar und nimmt
+sie damit dauerhaft aus Cloud Runs automatischer Bereinigung (Limit 1000
+Revisionen je Dienst, 2000 Tags je Projekt und Region). Vor der Umstellung waren
+so 108 Tags in prod und 73 in dev aufgelaufen, die meisten davon Branches, die es
+längst nicht mehr gibt.
+
+Welche Tags bleiben, entscheidet [scripts/cloud-run-tfvars.sh](scripts/cloud-run-tfvars.sh),
+das vor jedem Plan und Apply `cloudrun.auto.tfvars.json` schreibt (gitignored):
+
+- **prod:** `--keep 20` — die zwanzig jüngsten Releases als Rollback-Fenster.
+- **dev:** `--keep-branches` — nur Tags, zu denen es auf origin noch einen Branch
+  gibt. Ein gemergter Branch verliert seinen Tag beim nächsten Dev-Deploy von
+  selbst.
+
+Das Skript ist auch die einzige Stelle, die einen Git-Ref auf einen Tag
+normalisiert (`--print-tag`); der Workflow bildet den Image-Tag darüber, statt
+die Abbildung ein zweites Mal in `sed` nachzubauen.
+
+**Ohne `--image` liest das Skript Image und Revisions-Suffix aus dem laufenden
+Dienst.** Nur deshalb kann ein Apply von Hand, der etwa Firestore-Regeln ändert,
+die App nicht versehentlich auf einen alten Stand zurückdrehen. Das Suffix steht
+dafür als Label `deploy-version` an der Revision.
+
+### Rollback
+
+Ein `gcloud run services update-traffic` von Hand ist **kein Rollback mehr,
+sondern Drift** — der nächste apply dreht ihn zurück. Der Weg zurück führt über
+den Workflow:
+
+*Actions → Cloud Run → Run workflow*, Feld `serving_revision` auf die
+Zielrevision (z.B. `hydrantenmap-v2-62-0-a1b2c3d4`). Ist das Feld gesetzt, wird
+der Build übersprungen — ein Rollback baut nichts, es zeigt auf eine Revision,
+die es schon gibt. Getaggte Revisionen sind vorher unter ihrer eigenen URL
+(`https://<tag>---<dienst>-<hash>.a.run.app`) prüfbar.
+
+Der Nachteil gegenüber `gcloud`: Ein Rollback dauert so lang wie ein Apply,
+Größenordnung ein bis zwei Minuten statt zehn Sekunden.
+
+### Übernahme bestehender Dienste
+
+`imports.tf` in beiden Roots holt den seit 2021 bzw. 2022 bestehenden Dienst in
+den State. Die Blöcke dürfen stehenbleiben — terraform überspringt sie, sobald
+die Ressource im State liegt — und können nach dem ersten erfolgreichen Apply in
+beiden Umgebungen entfallen.
+
+Der Pipeline-SA braucht dafür `roles/run.admin`, eingetragen in
+[terraform_sa.tf](terraform/modules/project-base/terraform_sa.tf). Das Modul
+project-base gehört dem Prod-Root, deshalb gilt hier wie immer: **erst prod
+applien** (`workflow_dispatch`, mode `apply`, environment `prod`), sonst
+scheitert dev mit 403.
+
 ## Testing (TDD)
 
 **For all new features, write tests first before writing implementation code.** Follow test-driven development:
@@ -556,9 +641,11 @@ Daran hängen drei Dinge, die zusammengehören:
   Cloud Run lässt bis zu 80 Anfragen auf denselben Container, und ein OOM reißt
   alle mit, nicht nur den Export.
 
-Das Speicherlimit steht auf **1Gi**, gesetzt über `--memory` in
-[cloud-run.yml](.github/workflows/cloud-run.yml). Ohne das Flag behält der
-Dienst stillschweigend seinen bisherigen Wert.
+Das Speicherlimit steht auf **1Gi**, als Vorgabewert von `memory` in
+[terraform/modules/cloud-run](terraform/modules/cloud-run/variables.tf). Vorher
+war es ein `--memory`-Flag am `gcloud run deploy`, und weil `gcloud` additiv
+arbeitet, hing der tatsächliche Wert daran, ob seit der Änderung schon einmal
+deployt wurde — prod lief nach #674 noch monatelang auf den alten 512Mi.
 
 Die Größenprüfung (`MAX_EXPORT_ENTRIES`, 5000) läuft als Count-Query **vor** dem
 Lesen. Die Zählung braucht dasselbe `orderBy('abfahrt', 'desc')` wie die
@@ -592,14 +679,18 @@ und die Rolle `roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modu
 [project-base](terraform/modules/project-base/), und das gehört ausschließlich
 dem Root mit `manage_project_base = true` — derzeit prod. Dev appliziert aber
 schon beim Push auf main, prod erst beim Release. Nach jeder Erweiterung der
-Projekt-Basis deshalb erst prod von Hand applien (`workflow_dispatch`, mode
+Projekt-Basis deshalb erst prod von Hand applien
+([terraform.yml](.github/workflows/terraform.yml), `workflow_dispatch`, mode
 `apply`, environment `prod`), sonst scheitert der Dev-Lauf mit 403 auf der neuen
 Ressource.
 
-Die Allowlist `CRON_INVOKER_EMAILS` wird beim Deploy gesetzt, nicht von
-terraform. Wer eine Umgebung hinzufügt, erweitert sie in
-[cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
-`name_suffix` — sonst bekommt der neue Invoker ein 403 von `cronRequired`.
+Die Allowlist `CRON_INVOKER_EMAILS` setzt terraform als Env-Var des Dienstes
+(`local.cron_invoker_emails` im jeweiligen Root). Sie wird dort aus Zeichenketten
+gebaut statt aus `module.cloud_scheduler` gelesen: Der Dienst braucht die Liste,
+der Scheduler braucht die URL des Dienstes — eine Referenz ergäbe einen Zyklus.
+Ein `check`-Block im Root prüft deshalb nach jedem apply, dass der tatsächliche
+Invoker-SA auf der gebauten Liste steht. Wer eine Umgebung hinzufügt, erweitert
+die Suffix-Liste **und** setzt das passende `name_suffix`.
 
 **Von Hand versenden:** Im Admin-Bereich unter Fahrtenbuch → Einstellungen sitzt
 der Abschnitt „Wochenbericht versenden"
@@ -698,20 +789,16 @@ Required environment variables (see `.env.local`):
   (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
   Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
   offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
-  Mail-Relay. In Cloud Run wird der Wert beim Deploy gesetzt
-  ([cloud-run.yml](.github/workflows/cloud-run.yml)), abgeleitet aus
-  `GOOGLE_CLOUD_PROJECT` und den Namen der Invoker-Service-Accounts. Die Liste
-  enthält die Invoker **beider** Umgebungen, weil Dev und Prod das Projekt
-  `ffn-utils` teilen; deren Namen unterscheidet `name_suffix` des Moduls
-  `cloud-scheduler`, und die Namen müssen dort und im Workflow gleich lauten.
+  Mail-Relay. In Cloud Run setzt terraform den Wert als Env-Var des Dienstes
+  (`local.cron_invoker_emails` im jeweiligen Root), abgeleitet aus dem Projekt
+  und den Namen der Invoker-Service-Accounts. Die Liste enthält die Invoker
+  **beider** Umgebungen, weil Dev und Prod das Projekt `ffn-utils` teilen; deren
+  Namen unterscheidet `name_suffix` des Moduls `cloud-scheduler`. Ein
+  `check`-Block im Root prüft, dass der tatsächliche Invoker auf der Liste steht.
 
   **Bewusst kein Secret-Manager-Secret:** Der Wert ist eine Kennung, kein
   Geheimnis — wer die Adresse kennt, kann kein Token dafür ausstellen, dazu
-  braucht es IAM-Rechte auf den Service Account. Als Secret hinge außerdem jedes
-  Deploy daran, dass vorher ein `terraform apply` gelaufen ist, und der
-  prod-apply (dem die Projekt-Basis und damit das Secret gehören) läuft nur bei
-  einem Release. Ein Deploy von main hätte dann mit
-  `Secret … was not found` abgebrochen.
+  braucht es IAM-Rechte auf den Service Account.
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.
