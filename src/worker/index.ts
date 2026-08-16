@@ -1,5 +1,5 @@
 import { defaultCache } from '@serwist/turbopack/worker';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import {
   MessagePayload,
   getMessaging,
@@ -8,6 +8,7 @@ import {
 import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { Serwist } from 'serwist';
 import { ChatMessage } from '../common/chat';
+import { parseFirebaseConfig } from './firebaseConfig';
 import { cachePatterns } from './patterns';
 
 // This declares the value of `injectionPoint` to TypeScript.
@@ -37,8 +38,13 @@ serwist.addEventListeners();
 //
 self.__WB_DISABLE_DEV_LOGS = true;
 
-const firebaseConfig = JSON.parse(
-  process.env.NEXT_PUBLIC_FIREBASE_APIKEY || '{}'
+// Der Wert wird beim Bauen von esbuild eingesetzt (`serviceWorkerDefine` in
+// src/server/serviceWorkerDefine.ts). Wer hier eine weitere `process.env`-
+// Variable liest, muss sie dort eintragen — sonst stirbt das Skript beim
+// Auswerten an `ReferenceError: process is not defined`. Ein Test in
+// src/server/serviceWorkerDefine.test.ts prüft das.
+const firebaseConfig = parseFirebaseConfig(
+  process.env.NEXT_PUBLIC_FIREBASE_APIKEY
 );
 
 const scope = 'sw:' + self.registration.scope.replace(/^.*\//, '');
@@ -108,44 +114,67 @@ addEventListener('notificationclick', (ev) => {
   );
 });
 
-// if (scope.includes('firebase-cloud-messaging-push-scope')) {
-console.info(`[${scope}] firebase messaging scope, starting messaging`);
-initializeApp(firebaseConfig);
-
-const messaging = getMessaging();
-
 interface NotificationOptionsWithActions extends NotificationOptions {
   actions?: { action: string; title: string }[];
 }
 
-// If you would like to customize notifications that are received in the
-// background (Web app is closed or not in browser focus) then you should
-// implement this optional method.
-// Keep in mind that FCM will still show notification messages automatically
-// and you should use data messages for custom notifications.
-// For more info see:
-// https://firebase.google.com/docs/cloud-messaging/concept-options
-onBackgroundMessage(messaging, function (payload: MessagePayload) {
-  console.info(
-    `[${scope}] Received fb background message ${JSON.stringify(payload)}`
-  );
-  // Customize notification here
-  if (payload.data) {
-    const message: ChatMessage = payload.data as unknown as ChatMessage;
-    const notificationTitle = `Einsatz Chat: ${message.name || message.email}`;
-    const notificationOptions: NotificationOptionsWithActions = {
-      body: message.message,
-      icon: '/app-icon.png',
-      actions: [
-        {
-          action: 'chat',
-          title: 'Open Chat',
-        },
-      ],
-    };
+function startBackgroundMessaging(config: FirebaseOptions) {
+  console.info(`[${scope}] firebase messaging scope, starting messaging`);
+  initializeApp(config);
 
-    console.info(`[${scope}] showing notification`);
-    self.registration.showNotification(notificationTitle, notificationOptions);
+  const messaging = getMessaging();
+
+  // If you would like to customize notifications that are received in the
+  // background (Web app is closed or not in browser focus) then you should
+  // implement this optional method.
+  // Keep in mind that FCM will still show notification messages automatically
+  // and you should use data messages for custom notifications.
+  // For more info see:
+  // https://firebase.google.com/docs/cloud-messaging/concept-options
+  onBackgroundMessage(messaging, function (payload: MessagePayload) {
+    console.info(
+      `[${scope}] Received fb background message ${JSON.stringify(payload)}`
+    );
+    // Customize notification here
+    if (payload.data) {
+      const message: ChatMessage = payload.data as unknown as ChatMessage;
+      const notificationTitle = `Einsatz Chat: ${
+        message.name || message.email
+      }`;
+      const notificationOptions: NotificationOptionsWithActions = {
+        body: message.message,
+        icon: '/app-icon.png',
+        actions: [
+          {
+            action: 'chat',
+            title: 'Open Chat',
+          },
+        ],
+      };
+
+      console.info(`[${scope}] showing notification`);
+      self.registration.showNotification(
+        notificationTitle,
+        notificationOptions
+      );
+    }
+  });
+}
+
+// Push ist die Kür, Precaching und Caching-Regeln sind die Pflicht: Wirft
+// irgendetwas an dieser Einrichtung — eine unbrauchbare Konfiguration,
+// `getMessaging()` in einem Browser ohne Push-Unterstützung — dann bricht das
+// die Auswertung des Skripts ab und der Worker registriert sich überhaupt
+// nicht mehr. Die App liefe dann mit dem Precache eines alten Builds weiter
+// (siehe #663), nur damit eine Benachrichtigung ankommt.
+if (firebaseConfig) {
+  try {
+    startBackgroundMessaging(firebaseConfig);
+  } catch (err) {
+    console.error(`[${scope}] failed to start background messaging`, err);
   }
-});
-// }
+} else {
+  console.warn(
+    `[${scope}] no usable firebase config - background messaging disabled`
+  );
+}
