@@ -97,4 +97,29 @@ describe('captureScreenshot', () => {
     expect(result).toBeNull();
     spy.mockRestore();
   });
+
+  it('gives up and returns null when the capture never settles', async () => {
+    // A mobile WebView can leave the foreignObject image load pending forever;
+    // without a timeout the caller would wait for it indefinitely.
+    domToBlobMock.mockReturnValueOnce(new Promise<Blob>(() => {}));
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await captureScreenshot({ timeoutMs: 20 });
+
+    expect(result).toBeNull();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('waits for a repaint before snapshotting the DOM', async () => {
+    // The dialog is hidden right before the call; without waiting for a paint
+    // it would still be part of the snapshot.
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame');
+    domToBlobMock.mockResolvedValueOnce(new Blob(['x'], { type: 'image/png' }));
+
+    await captureScreenshot();
+
+    expect(rafSpy).toHaveBeenCalled();
+    rafSpy.mockRestore();
+  });
 });

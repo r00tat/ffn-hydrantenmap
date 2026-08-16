@@ -435,6 +435,36 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+### Screenshot-Aufnahme
+
+Der Dialog wird für die Aufnahme nur **ausgeblendet** (`display: none`), nicht
+geschlossen — sonst wären Eingaben und der eingefrorene Kontext weg. Solange er
+weg ist, liegt der
+[ScreenshotCaptureOverlay](src/components/bugReport/ScreenshotCaptureOverlay.tsx)
+darüber: Ohne ihn hielten Nutzer den Dialog für geschlossen, navigierten weg und
+verloren ihren Report (#662). Er blockiert die Bedienung für die Dauer der
+Aufnahme und bietet immer einen Weg zurück.
+
+Drei Dinge hängen daran zusammen:
+
+- **Das Overlay trägt `data-skip-screenshot="true"`** und wird damit vom Filter
+  in [captureScreenshot.ts](src/components/bugReport/captureScreenshot.ts) aus
+  dem Bild geworfen. Alles, was während einer Aufnahme sichtbar sein soll, aber
+  nicht ins Bild gehört, braucht dieses Attribut.
+- **`disableEnforceFocus` am Dialog**, solange aufgenommen wird. Der Dialog ist
+  weiter `open`, sein Focus-Trap zöge den Fokus sonst aus dem Overlay heraus und
+  der Abbrechen-Button wäre per Tastatur nicht erreichbar.
+- **`captureRunRef`** zählt jeden Lauf hoch. Eine Aufnahme, die nach dem
+  Abbrechen doch noch fertig wird, darf weder das Overlay zurückholen noch einen
+  Screenshot anhängen.
+
+`captureScreenshot()` hat ein eigenes Timeout (`SCREENSHOT_TIMEOUT_MS`, 15s):
+`modern-screenshot` bringt keines mit, und in mobilen WebViews lädt das
+`foreignObject`-Bild unter Speicherdruck gelegentlich nie fertig — ohne Timeout
+bliebe der Dialog dauerhaft ausgeblendet. Vor dem Snapshot wird über zwei
+`requestAnimationFrame` auf einen Paint gewartet, sonst steht der eben erst
+ausgeblendete Dialog noch im Bild.
+
 ## Fahrtenbuch-PDF-Export
 
 Der Export ([fahrtenbuchExportActions.ts](src/components/Fahrtenbuch/fahrtenbuchExportActions.ts))
