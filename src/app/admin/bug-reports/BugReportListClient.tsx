@@ -23,6 +23,7 @@ import {
   type BugReportKind,
   type BugReportStatus,
 } from '../../../common/bugReport';
+import { formatBugReportDate } from '../../../common/bugReportDate';
 import { useSnackbar } from '../../../components/providers/SnackbarProvider';
 import BugReportConfigSection from './BugReportConfigSection';
 import BugReportDetailDialog from './BugReportDetailDialog';
@@ -57,40 +58,6 @@ const KIND_KEY = {
   bug: 'kindBug',
   feature: 'kindFeatureShort',
 } as const satisfies Record<BugReportKind, string>;
-
-interface SerializedTimestamp {
-  _seconds?: number;
-  seconds?: number;
-  _nanoseconds?: number;
-  nanoseconds?: number;
-}
-
-function toDate(value: BugReport['createdAt'] | undefined): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  const ts = value as unknown as SerializedTimestamp;
-  const seconds = ts._seconds ?? ts.seconds;
-  if (typeof seconds === 'number') {
-    return new Date(seconds * 1000);
-  }
-  return null;
-}
-
-function formatDate(value: BugReport['createdAt'] | undefined): string {
-  const d = toDate(value);
-  if (!d) return '-';
-  return d.toLocaleString('de-AT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function attachmentCount(report: BugReport): number {
   return (
@@ -252,7 +219,9 @@ export default function BugReportListClient({
                     sx={{ cursor: 'pointer' }}
                     onClick={() => handleRowClick(report.id)}
                   >
-                    <TableCell>{formatDate(report.createdAt)}</TableCell>
+                    <TableCell>
+                      {formatBugReportDate(report.createdAt)}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="small"

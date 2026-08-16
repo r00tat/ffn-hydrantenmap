@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { Timestamp } from 'firebase/firestore';
 
 vi.mock('server-only', () => ({}));
 
@@ -62,6 +63,42 @@ describe('buildBugReportEmail', () => {
     });
     expect(body).toContain('https://app/admin/bug-reports/r1');
     expect(body).toContain('Einsatz 1');
+  });
+
+  describe('Datum', () => {
+    const buildBody = (createdAt: BugReport['createdAt']) =>
+      buildBugReportEmail({
+        report: { ...baseReport, createdAt },
+        appBaseUrl: 'https://app',
+        from: 'noreply@x',
+        to: 'admin@x',
+      }).body;
+
+    // 2026-05-11T10:00:00Z ist in Europe/Vienna (CEST) 12:00 Uhr.
+    it('formats an ISO string as local Vienna time', () => {
+      expect(buildBody('2026-05-11T10:00:00.000Z')).toContain(
+        'Datum:     11.05.2026, 12:00:00',
+      );
+    });
+
+    it('formats a Date', () => {
+      expect(buildBody(new Date('2026-05-11T10:00:00.000Z'))).toContain(
+        'Datum:     11.05.2026, 12:00:00',
+      );
+    });
+
+    it('formats a Firestore Timestamp', () => {
+      expect(
+        buildBody(Timestamp.fromDate(new Date('2026-05-11T10:00:00.000Z'))),
+      ).toContain('Datum:     11.05.2026, 12:00:00');
+    });
+
+    it('never renders [object Object] for an unresolved server timestamp', () => {
+      const sentinel = { _methodName: 'serverTimestamp' } as never;
+      const body = buildBody(sentinel);
+      expect(body).not.toContain('[object Object]');
+      expect(body).toContain('Datum:     -');
+    });
   });
 
   it('produces an RFC-2822 raw message with UTF-8 subject', () => {
