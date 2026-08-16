@@ -15,18 +15,21 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { v4 as uuid } from 'uuid';
 import type { FahrtenbuchVehicle } from '../../common/fahrtenbuch';
 import {
   MANGEL_STATUSES,
   type Mangel,
   type MangelStatus,
 } from '../../common/mangel';
+import MangelImages from './MangelImages';
 import {
   changeMangelStatus,
   createMangel,
   updateMangel,
 } from './mangelActions';
 import { mangelStatusColor } from './mangelStatus';
+import { uploadMangelImage } from './uploadMangelImage';
 
 export interface MangelDialogProps {
   open: boolean;
@@ -90,6 +93,12 @@ export default function MangelDialog({
     toLocalInput(mangel?.resolvedAt),
   );
   const [note, setNote] = useState('');
+  // Die gespeicherten Bilder, die bleiben sollen — entfernte fallen hier
+  // heraus und werden beim Speichern serverseitig aus dem Storage gelöscht.
+  const [images, setImages] = useState<string[]>(mangel?.images ?? []);
+  // Neu gewählte Bilder. Hochgeladen wird erst beim Speichern: Ein
+  // abgebrochener Dialog soll keine Dateien hinterlassen.
+  const [pending, setPending] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -102,14 +111,45 @@ export default function MangelDialog({
     }
   };
 
+  /**
+   * Lädt die neu gewählten Bilder hoch und liefert alle Pfade.
+   *
+   * Beim Anlegen gibt es noch keine Dokument-ID; der Ordner bekommt deshalb
+   * eine UUID. Der Pfad ist ohnehin nur die Adresse der Datei — gefunden
+   * werden die Bilder über die Liste am Dokument, nicht über den Ordnernamen.
+   */
+  const uploadPending = async (folderId: string): Promise<string[]> => {
+    if (pending.length === 0) return images;
+    const uploaded = await Promise.all(
+      pending.map((file) => uploadMangelImage(groupId, folderId, file)),
+    );
+    return [...images, ...uploaded];
+  };
+
   const save = async () => {
     setSaving(true);
     setError(undefined);
     try {
+      let allImages: string[];
+      try {
+        allImages = await uploadPending(mangel?.id ?? uuid());
+      } catch (err) {
+        console.error('Mangel: Bild-Upload fehlgeschlagen', err);
+        setError('imageUploadFailed');
+        return;
+      }
+      // Hochgeladenes wandert sofort in den gespeicherten Zustand — auch wenn
+      // das Speichern gleich scheitert. Sonst lüde ein zweiter Anlauf
+      // dieselben Dateien ein zweites Mal hoch und ließe die ersten als
+      // Karteileichen im Storage zurück.
+      setImages(allImages);
+      setPending([]);
+
       if (!isEdit) {
         const result = await createMangel(groupId, {
           vehicleId: vehicle,
           description,
+          images: allImages,
         });
         if (!result.success) {
           setError(result.error);
@@ -121,9 +161,15 @@ export default function MangelDialog({
 
       // Beschreibung und Status sind zwei Vorgänge: Die Korrektur eines
       // Tippfehlers gehört nicht in den Verlauf, der Statuswechsel schon.
-      if (description.trim() !== mangel.description) {
+      // Die Bilder gehören zur Beschreibung: Sie sagen dasselbe wie sie, nur
+      // deutlicher.
+      const imagesChanged =
+        allImages.length !== (mangel.images?.length ?? 0) ||
+        allImages.some((path, index) => path !== mangel.images?.[index]);
+      if (description.trim() !== mangel.description || imagesChanged) {
         const result = await updateMangel(groupId, mangel.id as string, {
           description,
+          images: allImages,
         });
         if (!result.success) {
           setError(result.error);
@@ -193,6 +239,21 @@ export default function MangelDialog({
             multiline
             minRows={2}
             fullWidth
+          />
+
+          <MangelImages
+            groupId={groupId}
+            mangelId={mangel?.id}
+            images={images}
+            pending={pending}
+            disabled={saving}
+            onAdd={(files) => setPending((prev) => [...prev, ...files])}
+            onRemove={(path) =>
+              setImages((prev) => prev.filter((entry) => entry !== path))
+            }
+            onRemovePending={(index) =>
+              setPending((prev) => prev.filter((_file, i) => i !== index))
+            }
           />
 
           {/* Der Status ist beim Anlegen immer „offen" — die Action verwirft

@@ -234,6 +234,16 @@ function vehicleHtml(vehicle: WeeklyReportVehicle): string {
   return parts.join('');
 }
 
+/**
+ * „Blinker defekt (2 Bilder)" — die Bilder selbst bleiben im Fahrtenbuch, der
+ * Hinweis sagt, dass es dort mehr zu sehen gibt.
+ */
+function mangelDescription(m: WeeklyReportModel['openMangel'][number]): string {
+  if (m.imageCount <= 0) return m.description;
+  const label = m.imageCount === 1 ? '1 Bild' : `${m.imageCount} Bilder`;
+  return `${m.description} (${label})`;
+}
+
 function mangelHtml(model: WeeklyReportModel): string {
   if (model.openMangel.length === 0) return '';
   const rows = model.openMangel
@@ -242,7 +252,7 @@ function mangelHtml(model: WeeklyReportModel): string {
         `<tr>${[
           m.vehicleName,
           m.statusLabel,
-          m.description,
+          mangelDescription(m),
           m.reportedAt,
           m.reportedByName,
         ]
@@ -318,7 +328,7 @@ function buildText(model: WeeklyReportModel, link: string): string {
     lines.push('', title, '-'.repeat(title.length));
     for (const m of model.openMangel) {
       lines.push(
-        `  ${m.vehicleName} [${m.statusLabel}] ${m.description}`,
+        `  ${m.vehicleName} [${m.statusLabel}] ${mangelDescription(m)}`,
         `    gemeldet ${m.reportedAt} von ${m.reportedByName}`,
       );
     }
