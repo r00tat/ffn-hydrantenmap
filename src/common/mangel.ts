@@ -134,6 +134,31 @@ const MANGEL_STORAGE_ROOT = 'groups';
 export const MANGEL_MAX_IMAGES = 10;
 
 /**
+ * Größtes Bild, das der Storage annimmt.
+ *
+ * Die Schranke ist die `storage.rules`, nicht diese Zahl — hier steht nur ihre
+ * Kopie für die Prüfung im Browser. Ohne sie lehnt der Storage einen zu großen
+ * Upload mit `storage/unauthorized` ab, und der Melder liest „Ein Bild konnte
+ * nicht hochgeladen werden", ohne je zu erfahren, dass sein Foto zu groß war.
+ * Ausgerechnet der Rückfallpfad von `compressImage` (HEIC am Desktop, kaputte
+ * Datei) reicht das Original unverkleinert durch und läuft genau da hinein.
+ *
+ * Wer den Wert ändert, ändert `storage.rules` mit — ein Test hier vergleicht
+ * beide, und ausgerollt wird die Regel über einen terraform-Apply.
+ */
+export const MANGEL_MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+/**
+ * Ob der Contenttype durch die Regel kommt. Bewusst derselbe Ausdruck wie dort
+ * (`matches('image/.*')`, auf die ganze Zeichenkette): Was der Browser
+ * durchlässt, muss der Storage annehmen — sonst ist die Prüfung hier nur eine
+ * zweite Fehlerquelle.
+ */
+export function isAllowedMangelImageType(contentType: string): boolean {
+  return /^image\/.*$/.test(contentType ?? '');
+}
+
+/**
  * Ein Dateiname, der in einem Storage-Pfad keinen Schaden anrichtet. Alles
  * außerhalb von `[A-Za-z0-9._-]` fällt weg — insbesondere `/` und `..`, die
  * sonst aus dem Ordner des Mangels herausführten. Gleiche Regel wie bei

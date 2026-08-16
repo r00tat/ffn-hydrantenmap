@@ -18,10 +18,12 @@ import { useState } from 'react';
 import { v4 as uuid } from 'uuid';
 import type { FahrtenbuchVehicle } from '../../common/fahrtenbuch';
 import {
+  MANGEL_MAX_IMAGE_BYTES,
   MANGEL_STATUSES,
   type Mangel,
   type MangelStatus,
 } from '../../common/mangel';
+import { MangelImageError, prepareMangelImage } from './compressImage';
 import MangelImages from './MangelImages';
 import {
   changeMangelStatus,
@@ -100,7 +102,13 @@ export default function MangelDialog({
   // abgebrochener Dialog soll keine Dateien hinterlassen.
   const [pending, setPending] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string>();
+  // Der Schlüssel und, wo die Meldung ihn braucht, der Dateiname des Bildes,
+  // an dem es gescheitert ist.
+  const [error, setError] = useState<{ key: string; file?: string }>();
+  // Ohne Schlüssel bleibt es beim leeren Zustand — eine gescheiterte Action
+  // ohne Fehlertext hat der Dialog auch bisher nicht angezeigt.
+  const fail = (key: string | undefined, file?: string) =>
+    setError(key ? { key, file } : undefined);
 
   const isEdit = !!mangel?.id;
 
@@ -120,8 +128,12 @@ export default function MangelDialog({
    */
   const uploadPending = async (folderId: string): Promise<string[]> => {
     if (pending.length === 0) return images;
+    // Erst alle vorbereiten, dann alle hochladen: Ein Bild, das die
+    // `storage.rules` ablehnen würden, fällt so auf, bevor das erste im
+    // Storage liegt — sonst blieben die vorherigen als Karteileichen zurück.
+    const prepared = await Promise.all(pending.map(prepareMangelImage));
     const uploaded = await Promise.all(
-      pending.map((file) => uploadMangelImage(groupId, folderId, file)),
+      prepared.map((image) => uploadMangelImage(groupId, folderId, image)),
     );
     return [...images, ...uploaded];
   };
@@ -135,7 +147,11 @@ export default function MangelDialog({
         allImages = await uploadPending(mangel?.id ?? uuid());
       } catch (err) {
         console.error('Mangel: Bild-Upload fehlgeschlagen', err);
-        setError('imageUploadFailed');
+        // Ein Bild, das die `storage.rules` ohnehin abgelehnt hätten, sagt
+        // warum — alles andere (Funkloch, abgebrochene Verbindung) bleibt beim
+        // allgemeinen Hinweis.
+        if (err instanceof MangelImageError) fail(err.reason, err.fileName);
+        else fail('imageUploadFailed');
         return;
       }
       // Hochgeladenes wandert sofort in den gespeicherten Zustand — auch wenn
@@ -152,7 +168,7 @@ export default function MangelDialog({
           images: allImages,
         });
         if (!result.success) {
-          setError(result.error);
+          fail(result.error);
           return;
         }
         onClose();
@@ -172,7 +188,7 @@ export default function MangelDialog({
           images: allImages,
         });
         if (!result.success) {
-          setError(result.error);
+          fail(result.error);
           return;
         }
       }
@@ -188,7 +204,7 @@ export default function MangelDialog({
           },
         );
         if (!result.success) {
-          setError(result.error);
+          fail(result.error);
           return;
         }
       }
@@ -207,9 +223,12 @@ export default function MangelDialog({
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && (
             <Alert severity="error">
-              {t.has(`errors.${error}` as 'errors.saveFailed')
-                ? t(`errors.${error}` as 'errors.descriptionMissing')
-                : t('errors.saveFailed', { message: error })}
+              {t.has(`errors.${error.key}` as 'errors.saveFailed')
+                ? t(`errors.${error.key}` as 'errors.imageTooLarge', {
+                    name: error.file ?? '',
+                    size: MANGEL_MAX_IMAGE_BYTES / 1024 / 1024,
+                  })
+                : t('errors.saveFailed', { message: error.key })}
             </Alert>
           )}
 

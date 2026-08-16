@@ -44,9 +44,17 @@ service firebase.storage {
     // überschreiben. Gelöscht wird ausschließlich serverseitig, wenn ein Bild
     // aus dem Mangel entfernt oder der Mangel gelöscht wird.
     //
-    // Größe und Typ prüft die Regel selbst — die clientseitige Verkleinerung
-    // ist eine Bequemlichkeit, keine Schranke: Wer den Upload direkt aufruft,
-    // kommt an ihr vorbei.
+    // Die Schranke für Größe und Typ steht hier, und nur hier: Die
+    // clientseitige Verkleinerung (`compressImage`) ist eine Bequemlichkeit —
+    // wer den Upload direkt aufruft, kommt an ihr vorbei.
+    //
+    // Der Browser prüft dieselben beiden Bedingungen trotzdem vor dem Upload
+    // (`prepareMangelImage` gegen `MANGEL_MAX_IMAGE_BYTES` und
+    // `isAllowedMangelImageType` in `src/common/mangel.ts`), damit der Melder
+    // erfährt, welches Foto zu groß war. Ohne das antwortet der Storage nur
+    // mit `storage/unauthorized`. Wer die 15 MB hier ändert, ändert die
+    // Konstante mit — ein Test in `src/common/mangel.test.ts` liest diese
+    // Datei und vergleicht beide.
     match /groups/{groupId}/mangel/{mangelId}/{fileName} {
       allow create: if authorizedUser()
         && request.resource.size < 15 * 1024 * 1024

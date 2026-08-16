@@ -853,7 +853,9 @@
         "notAllowedDelete": "Only an admin may delete a defect.",
         "saveFailed": "Saving failed: {message}",
         "deleteFailed": "Deleting failed: {message}",
-        "imageUploadFailed": "A photo could not be uploaded. Please try again."
+        "imageUploadFailed": "An image could not be uploaded. Please try again.",
+        "imageTooLarge": "“{name}” is larger than {size} MB even after downscaling and was not uploaded. Please pick a smaller image.",
+        "imageTypeUnsupported": "“{name}” is not an image file and was not uploaded."
       },
       "migrate": {
         "title": "Import defects from existing trips",
