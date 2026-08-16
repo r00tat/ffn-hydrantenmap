@@ -52,9 +52,24 @@ Why measure the outbound and return legs separately? Within town it makes no dif
 1. Open **Trip log** from the menu
 2. If you are in several groups, select the group at the top
 3. The cards of the active vehicles are shown first, with the last driver, the current counter readings and a button for entering a trip directly
-4. **All trips** below holds the group-wide list — it can be filtered by vehicle, purpose, period and "defects only"
+4. **All trips** below holds the group-wide list — it can be filtered by vehicle, purpose, driver, period and "defects only"
 
 Clicking a vehicle card opens that vehicle's page with its master data, current counter readings and its trips. That page has its own link and can be shared.
+
+### Searching and filtering trips
+
+A filter bar sits above the trip list, both on the overview and on a vehicle's page:
+
+- **Search** looks at the route, destination, operation, notes, defect description, driver and vehicle. Several words all have to appear, but they may be spread across different fields. Case and umlauts do not matter: "hauptstrasse" finds "Hauptstraße"
+- **From / To** narrows the list to a period. Both boundary days are included. It is the only filter that also loads older trips — without it the list shows the most recent trips, and the search works on exactly those
+- **Driver** lists the drivers of the loaded trips
+- **Vehicle**, **purpose** and **defects only** as before
+
+All filters combine into an intersection; if no trip matches, the list says so explicitly. **Reset filters** clears everything.
+
+The filter state is kept in the address bar (`?q=…&von=…&bis=…`). It therefore survives navigating back, can be bookmarked and can be handed on — the recipient sees the same excerpt.
+
+If the chosen period covers more trips than are loaded, **Load more** appears below the list.
 
 ### Record a single trip
 

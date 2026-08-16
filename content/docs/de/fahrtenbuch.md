@@ -52,9 +52,24 @@ Warum getrennte Messung von Hin- und Rückweg? Im Ortsgebiet macht das keinen Un
 1. Öffne im Menü den Punkt **Fahrtenbuch**
 2. Wähle bei mehreren Gruppen oben die gewünschte Gruppe
 3. Oben stehen die Karten der aktiven Fahrzeuge mit letztem Fahrer, aktuellen Zählerständen und einem Direkt-Button zum Eintragen
-4. Unter **Alle Fahrten** liegt die gruppenweite Liste — sie lässt sich nach Fahrzeug, Zweck, Zeitraum und „Nur Defekte" filtern
+4. Unter **Alle Fahrten** liegt die gruppenweite Liste — sie lässt sich nach Fahrzeug, Zweck, Fahrer, Zeitraum und „Nur Defekte" filtern
 
 Ein Klick auf eine Fahrzeugkarte öffnet die Seite dieses Fahrzeugs mit seinen Stammdaten, den aktuellen Zählerständen und seinen Fahrten. Diese Seite hat einen eigenen Link und lässt sich teilen.
+
+### Fahrten suchen und filtern
+
+Über der Fahrtenliste — auf der Übersicht wie auf der Fahrzeugseite — steht ein Filterband:
+
+- **Suche** findet über Fahrstrecke, Ziel, Einsatz, Hinweise, Mangelbeschreibung, Fahrer und Fahrzeug. Mehrere Wörter müssen alle vorkommen, dürfen sich aber auf verschiedene Felder verteilen. Groß-/Kleinschreibung und Umlaute spielen keine Rolle: „hauptstrasse" findet die „Hauptstraße"
+- **Von / Bis** grenzt auf einen Zeitraum ein. Die beiden Randtage zählen mit. Als einziger Filter lädt der Zeitraum auch ältere Fahrten nach — ohne ihn zeigt die Liste die jüngsten Fahrten, und die Suche arbeitet auf genau diesen
+- **Fahrer** listet die Fahrer der geladenen Fahrten
+- **Fahrzeug**, **Zweck** und **Nur Defekte** wie bisher
+
+Alle Filter wirken zusammen und ergeben die Schnittmenge; passt keine Fahrt dazu, sagt die Liste das ausdrücklich. **Filter zurücksetzen** räumt alles weg.
+
+Der Filterzustand steht in der Adresszeile (`?q=…&von=…&bis=…`). Damit übersteht er einen Seitenwechsel mit der Zurück-Taste, lässt sich als Lesezeichen ablegen und weitergeben — der Empfänger sieht denselben Ausschnitt.
+
+Reicht der gewählte Zeitraum über mehr Fahrten, als geladen sind, steht unter der Liste **Mehr laden**.
 
 ### Einzelne Fahrt erfassen
 
