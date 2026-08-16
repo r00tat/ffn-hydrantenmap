@@ -200,10 +200,18 @@ jobs:
         run: |
           set -eo pipefail
 
+          # --memory: Der PDF-Export des Fahrtenbuchs legt sein Dokument im
+          # Speicher aus. Seit #665 geschieht das in Teilen, wodurch der
+          # Spitzenbedarf bei rund 300 MB liegt statt bei über 600 MB — aber
+          # Cloud Run lässt bis zu 80 Anfragen auf dieselbe Instanz, und die
+          # bisherigen 512Mi (der Vorgabewert, hier nie gesetzt) hatten dafür
+          # keine Reserve. Ohne das Flag behielte der Dienst stillschweigend
+          # seinen alten Wert.
           gcloud run deploy $RUN_SERVICE \
             --allow-unauthenticated \
             --image $IMAGE_TAG \
             --execution-environment gen2 \
+            --memory=1Gi \
             --max-instances=2 --region $RUN_REGION \
             --tag=${VERSION_TAG} \
             --service-account=$RUN_SERVICE_ACCOUNT \

@@ -6,10 +6,13 @@ import {
 } from '../../common/fahrtenbuch';
 import {
   buildFahrtenbuchExport,
+  chunkFahrtenbuchExport,
   exportFileName,
   formatDayLabel,
   zonedDayRange,
+  type ExportSection,
   type ExportTranslate,
+  type FahrtenbuchExportModel,
 } from './fahrtenbuchExportModel';
 
 /** Gibt Schlüssel und Werte wörtlich zurück — die Zuordnung ist damit prüfbar. */
@@ -441,5 +444,103 @@ describe('buildFahrtenbuchExport', () => {
     );
 
     expect(model.footer).toBe('export.generated(date=01.07.2025 12:30)');
+  });
+});
+
+describe('chunkFahrtenbuchExport', () => {
+  function section(
+    vehicleId: string,
+    rowCount: number,
+    overrides: Partial<ExportSection> = {},
+  ): ExportSection {
+    return {
+      vehicleId,
+      heading: `Fahrzeug ${vehicleId}`,
+      columns: [{ key: 'datum', label: 'Datum', flex: 1 }],
+      rows: Array.from({ length: rowCount }, (_, i) => ({
+        cells: [`${vehicleId}-${i}`],
+      })),
+      ...overrides,
+    };
+  }
+
+  function model(
+    sections: ExportSection[],
+    overrides: Partial<FahrtenbuchExportModel> = {},
+  ): FahrtenbuchExportModel {
+    return {
+      title: 'Fahrtenbuch FFND',
+      period: '01.01.2026 - 31.12.2026',
+      footer: 'Erstellt am …',
+      sections,
+      ...overrides,
+    };
+  }
+
+  it('gibt je Teilmodell genau einen Abschnitt aus', () => {
+    const chunks = chunkFahrtenbuchExport(
+      model([section('v1', 3), section('v2', 2)]),
+      10,
+    );
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.map((c) => c.sections.length)).toEqual([1, 1]);
+    expect(chunks.map((c) => c.sections[0].vehicleId)).toEqual(['v1', 'v2']);
+  });
+
+  it('zerlegt einen Abschnitt in Teile der vorgegebenen Größe', () => {
+    const chunks = chunkFahrtenbuchExport(model([section('v1', 250)]), 100);
+
+    expect(chunks.map((c) => c.sections[0].rows.length)).toEqual([100, 100, 50]);
+    // Keine Zeile darf verloren gehen oder doppelt vorkommen.
+    expect(
+      chunks.flatMap((c) => c.sections[0].rows.map((r) => r.cells[0])),
+    ).toEqual(Array.from({ length: 250 }, (_, i) => `v1-${i}`));
+  });
+
+  it('behält Kopf, Zeitraum und Fuß in jedem Teil', () => {
+    const chunks = chunkFahrtenbuchExport(model([section('v1', 250)]), 100);
+
+    for (const chunk of chunks) {
+      expect(chunk.title).toBe('Fahrtenbuch FFND');
+      expect(chunk.period).toBe('01.01.2026 - 31.12.2026');
+      expect(chunk.footer).toBe('Erstellt am …');
+      expect(chunk.sections[0].heading).toBe('Fahrzeug v1');
+      expect(chunk.sections[0].columns).toHaveLength(1);
+    }
+  });
+
+  it('setzt die Legende nur unter den letzten Teil eines Abschnitts', () => {
+    // Sonst stünde die Erklärung der „ca."-Werte mitten in der Tabelle
+    // desselben Fahrzeugs — einmal je Teil.
+    const chunks = chunkFahrtenbuchExport(
+      model([section('v1', 250, { hasEstimates: true })], {
+        legend: 'export.estimateLegend',
+      }),
+      100,
+    );
+
+    expect(chunks.map((c) => c.sections[0].hasEstimates)).toEqual([
+      undefined,
+      undefined,
+      true,
+    ]);
+  });
+
+  it('behält ein Fahrzeug ohne Fahrten als eigenen Teil', () => {
+    // „keine Fahrten" ist eine Aussage; ein weggelassener Abschnitt sähe wie
+    // ein vergessenes Fahrzeug aus.
+    const chunks = chunkFahrtenbuchExport(
+      model([section('v1', 0, { emptyText: 'export.noEntriesInPeriod' })]),
+      100,
+    );
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].sections[0].emptyText).toBe('export.noEntriesInPeriod');
+    expect(chunks[0].sections[0].rows).toEqual([]);
+  });
+
+  it('behandelt eine unsinnige Teilgröße wie eine Zeile je Teil', () => {
+    expect(chunkFahrtenbuchExport(model([section('v1', 3)]), 0)).toHaveLength(3);
   });
 });

@@ -435,6 +435,44 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+## Fahrtenbuch-PDF-Export
+
+Der Export ([fahrtenbuchExportActions.ts](src/components/Fahrtenbuch/fahrtenbuchExportActions.ts))
+rendert **nicht ein Dokument**, sondern Teildokumente von je 100 Tabellenzeilen,
+die [renderFahrtenbuchPdf](src/components/Fahrtenbuch/renderFahrtenbuchPdf.ts)
+mit `pdf-lib` zu einer Datei zusammenfügt.
+
+Grund ist der Speicher: `@react-pdf/renderer` hält das vollständig ausgelegte
+Dokument bis zum Schluss im Speicher, gemessen 0,3–0,5 MB je Zeile. Ein
+Jahresexport über alle Fahrzeuge kam auf ~600 MB und wurde vom Container (damals
+512Mi) abgeräumt — im Browser als `503 Service unavailable` sichtbar (#665). Am
+teuersten ist ein **einzelnes** Fahrzeug mit vielen Fahrten, weil react-pdf einen
+über viele Seiten laufenden Abschnitt beim Umbrechen wiederholt neu auslegt:
+3000 Fahrten auf einem Fahrzeug kosteten 2061 MB und 36 s, in Teilen 920 MB und
+15 s.
+
+Daran hängen drei Dinge, die zusammengehören:
+
+- **Die Seitenzahl wird nach dem Zusammenfügen gestempelt.** Ein Teildokument
+  kennt nur seine eigenen Seiten und finge sonst jedes Mal wieder bei 1 an.
+  Die Maße des Fußes (`FOOTER_*` in
+  [FahrtenbuchPdf.tsx](src/components/Fahrtenbuch/FahrtenbuchPdf.tsx)) sind
+  deshalb exportiert und werden von beiden Seiten benutzt.
+- **Teile nicht kleiner machen.** Jedes Teil beginnt eine neue Seite; unter 50
+  Zeilen wächst die Datei, ohne Speicher zu sparen.
+- **Ein Render je Instanz.** `renderFahrtenbuchPdf` serialisiert die Läufe —
+  Cloud Run lässt bis zu 80 Anfragen auf denselben Container, und ein OOM reißt
+  alle mit, nicht nur den Export.
+
+Das Speicherlimit steht auf **1Gi**, gesetzt über `--memory` in
+[cloud-run.yml](.github/workflows/cloud-run.yml). Ohne das Flag behält der
+Dienst stillschweigend seinen bisherigen Wert.
+
+Die Größenprüfung (`MAX_EXPORT_ENTRIES`, 5000) läuft als Count-Query **vor** dem
+Lesen. Die Zählung braucht dasselbe `orderBy('abfahrt', 'desc')` wie die
+Leseabfrage — sonst sucht Firestore einen Index `deleted ASC, abfahrt ASC`, den
+es nicht gibt.
+
 ## Fahrtenbuch-Wochenbericht
 
 Cloud Scheduler ruft montags 07:00 (Europe/Vienna)

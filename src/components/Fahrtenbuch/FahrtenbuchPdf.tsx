@@ -18,7 +18,24 @@ import type {
  *
  * Enthält bewusst keine eigenen Texte: alle Beschriftungen stehen im Modell,
  * das sie in der Sprache des Benutzers erzeugt.
+ *
+ * Rendert **ein Teildokument** des Exports, nicht den ganzen. Warum in Teile
+ * zerlegt wird, steht in `renderFahrtenbuchPdf.ts`; dort werden die Teile auch
+ * wieder zu einer Datei zusammengefügt. Deshalb fehlt hier die Seitenzahl: Ein
+ * Teil kennt nur seine eigenen Seiten und finge jedes Mal wieder bei 1 an. Sie
+ * wird nach dem Zusammenfügen gestempelt.
  */
+
+/**
+ * Maße des Fußes. Exportiert, weil `renderFahrtenbuchPdf` die Seitenzahl an
+ * derselben Grundlinie und am selben Rand nachträglich einsetzt — zwei
+ * getrennte Zahlenpaare wären ein sichtbar schiefer Fuß.
+ */
+export const FOOTER_FONT_SIZE = 7;
+export const FOOTER_MARGIN = 24;
+export const FOOTER_OFFSET = 20;
+/** Grauwert des Fußes (#666) als Anteil, für `pdf-lib`s `rgb()`. */
+export const FOOTER_COLOR = 0x66 / 0xff;
 
 const styles = StyleSheet.create({
   page: {
@@ -87,12 +104,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 20,
-    left: 24,
-    right: 24,
+    bottom: FOOTER_OFFSET,
+    left: FOOTER_MARGIN,
+    right: FOOTER_MARGIN,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    fontSize: 7,
+    fontSize: FOOTER_FONT_SIZE,
     color: '#666',
   },
 });
@@ -142,14 +159,9 @@ function SectionTable({ section }: { section: ExportSection }) {
 
 export interface FahrtenbuchPdfProps {
   model: FahrtenbuchExportModel;
-  /** „Seite 3/7" — als Rückruf, weil react-pdf die Seitenzahl erst beim Layout kennt. */
-  pageLabel: (page: number, total: number) => string;
 }
 
-export default function FahrtenbuchPdf({
-  model,
-  pageLabel,
-}: FahrtenbuchPdfProps) {
+export default function FahrtenbuchPdf({ model }: FahrtenbuchPdfProps) {
   return (
     <Document title={model.title}>
       {model.sections.map((section) => (
@@ -176,13 +188,9 @@ export default function FahrtenbuchPdf({
             <Text style={styles.legend}>{model.legend}</Text>
           )}
 
+          {/* Rechts bleibt frei — dort steht später die Seitenzahl. */}
           <View style={styles.footer} fixed>
             <Text>{model.footer ?? ''}</Text>
-            <Text
-              render={({ pageNumber, totalPages }) =>
-                pageLabel(pageNumber, totalPages)
-              }
-            />
           </View>
         </Page>
       ))}

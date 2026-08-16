@@ -7,13 +7,17 @@ const {
   groupGetMock,
   vehiclesGetMock,
   entriesGetMock,
+  countGetMock,
   filterSpy,
+  orderBySpy,
 } = vi.hoisted(() => ({
   actionUserRequiredMock: vi.fn(),
   groupGetMock: vi.fn(),
   vehiclesGetMock: vi.fn(),
   entriesGetMock: vi.fn(),
+  countGetMock: vi.fn(),
   filterSpy: vi.fn(),
+  orderBySpy: vi.fn(),
 }));
 
 vi.mock('../../app/auth', () => ({
@@ -38,9 +42,13 @@ vi.mock('../../server/firebase/admin', () => {
       filterSpy(field, op, value);
       return entriesQuery;
     },
-    orderBy: () => entriesQuery,
+    orderBy: (field: string, direction: string) => {
+      orderBySpy(field, direction);
+      return entriesQuery;
+    },
     limit: () => entriesQuery,
     get: () => entriesGetMock(),
+    count: () => ({ get: () => countGetMock() }),
   };
   const groupDoc = {
     get: groupGetMock,
@@ -111,6 +119,7 @@ describe('exportFahrtenbuchPdf', () => {
     groupGetMock.mockResolvedValue({ data: () => ({ name: 'FF Neusiedl' }) });
     vehiclesGetMock.mockResolvedValue(docs([VEHICLE], ['v1']));
     entriesGetMock.mockResolvedValue(docs([entry()], ['e1']));
+    countGetMock.mockResolvedValue({ data: () => ({ count: 1 }) });
   });
 
   it('liefert ein PDF mit Dateinamen und Fahrtenzahl', async () => {
@@ -183,7 +192,19 @@ describe('exportFahrtenbuchPdf', () => {
     });
   });
 
-  it('lehnt einen zu großen Zeitraum ab, statt ihn zu kürzen', async () => {
+  it('lehnt einen zu großen Zeitraum ab, bevor er die Fahrten liest', async () => {
+    // Der Grund für die Zählung: Vor #665 starb der Container beim Rendern,
+    // lange bevor diese Meldung jemanden erreichte.
+    countGetMock.mockResolvedValue({ data: () => ({ count: 5001 }) });
+
+    await expect(exportFahrtenbuchPdf(request)).resolves.toEqual({
+      success: false,
+      error: 'exportTooLarge',
+    });
+    expect(entriesGetMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt einen zu großen Zeitraum auch ab, wenn er erst beim Lesen wächst', async () => {
     entriesGetMock.mockResolvedValue(
       docs(
         Array.from({ length: 5001 }, () => entry()),
@@ -194,6 +215,14 @@ describe('exportFahrtenbuchPdf', () => {
     await expect(exportFahrtenbuchPdf(request)).resolves.toEqual({
       success: false,
       error: 'exportTooLarge',
+    });
+  });
+
+  it('zählt und liest absteigend sortiert, damit der vorhandene Index greift', () => {
+    // Ohne `orderBy` sucht Firestore einen Index `deleted ASC, abfahrt ASC`,
+    // den es nicht gibt — die Zählung scheiterte dann mit FAILED_PRECONDITION.
+    return exportFahrtenbuchPdf(request).then(() => {
+      expect(orderBySpy).toHaveBeenCalledWith('abfahrt', 'desc');
     });
   });
 
