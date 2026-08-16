@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { renderWithIntl as render } from '../../test-utils/intlRender';
 
 vi.mock('../../common/defaultKostenersatzRates', () => ({
   DEFAULT_VEHICLES: [
@@ -49,7 +51,7 @@ describe('VehicleQuickAddChips', () => {
     expect(chip).toHaveClass('MuiChip-outlined');
   });
 
-  it('disables chips for already existing vehicles', () => {
+  it('disables chips for already existing vehicles when they cannot be removed', () => {
     render(
       <VehicleQuickAddChips {...defaultProps} existingNames={['KDTFA']} />,
     );
@@ -76,5 +78,75 @@ describe('VehicleQuickAddChips', () => {
   it('does not show count badge when nothing is selected', () => {
     render(<VehicleQuickAddChips {...defaultProps} />);
     expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  describe('with onRemove', () => {
+    it('keeps existing chips enabled', () => {
+      render(
+        <VehicleQuickAddChips
+          {...defaultProps}
+          existingNames={['KDTFA']}
+          onRemove={vi.fn()}
+        />,
+      );
+      const chip = screen.getByText('KDTFA').closest('.MuiChip-root');
+      expect(chip).not.toHaveClass('Mui-disabled');
+    });
+
+    it('calls onRemove when the delete icon of an existing chip is clicked', () => {
+      const onRemove = vi.fn();
+      render(
+        <VehicleQuickAddChips
+          {...defaultProps}
+          existingNames={['KDTFA']}
+          onRemove={onRemove}
+        />,
+      );
+      fireEvent.click(
+        screen.getByLabelText('KDTFA aus dem Einsatz entfernen'),
+      );
+      expect(onRemove).toHaveBeenCalledWith('KDTFA');
+    });
+
+    it('does not add an existing vehicle again when the chip body is clicked', () => {
+      const onToggle = vi.fn();
+      render(
+        <VehicleQuickAddChips
+          {...defaultProps}
+          existingNames={['KDTFA']}
+          onToggle={onToggle}
+          onRemove={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByText('KDTFA'));
+      expect(onToggle).not.toHaveBeenCalled();
+    });
+
+    it('still adds vehicles that are not in the operation yet', () => {
+      const onToggle = vi.fn();
+      render(
+        <VehicleQuickAddChips
+          {...defaultProps}
+          existingNames={['KDTFA']}
+          onToggle={onToggle}
+          onRemove={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByText('SRF'));
+      expect(onToggle).toHaveBeenCalledWith('SRF');
+    });
+
+    it('has no delete icon on vehicles that are not in the operation', () => {
+      render(
+        <VehicleQuickAddChips
+          {...defaultProps}
+          existingNames={['KDTFA']}
+          onRemove={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByLabelText('SRF aus dem Einsatz entfernen'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

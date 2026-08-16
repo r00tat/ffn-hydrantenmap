@@ -1,20 +1,30 @@
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
+import CancelIcon from '@mui/icons-material/Cancel';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import { useTranslations } from 'next-intl';
 import { DEFAULT_VEHICLES } from '../../common/defaultKostenersatzRates';
 
 interface VehicleQuickAddChipsProps {
   selectedNames: string[];
   existingNames: string[];
   onToggle: (vehicleName: string) => void;
+  /**
+   * Wenn gesetzt, lassen sich bereits im Einsatz befindliche Fahrzeuge über das
+   * X am Chip wieder entfernen. Ohne diesen Handler bleibt der Chip — wie im
+   * Anlage-Dialog — deaktiviert, dort gibt es nichts zu entfernen.
+   */
+  onRemove?: (vehicleName: string) => void;
 }
 
 export default function VehicleQuickAddChips({
   selectedNames,
   existingNames,
   onToggle,
+  onRemove,
 }: VehicleQuickAddChipsProps) {
+  const t = useTranslations('firecallItem');
   const selectedSet = new Set(selectedNames);
   const existingSet = new Set(existingNames);
 
@@ -23,7 +33,7 @@ export default function VehicleQuickAddChips({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <LocalShippingIcon color="action" fontSize="small" />
         <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-          Fahrzeuge Neusiedl am See
+          {t('quickAddVehiclesTitle')}
         </Typography>
         {selectedNames.length > 0 && (
           <Chip
@@ -38,19 +48,31 @@ export default function VehicleQuickAddChips({
           const isExisting = existingSet.has(vehicle.name);
           const isSelected = selectedSet.has(vehicle.name);
           const isHighlighted = isSelected || isExisting;
+          const removable = isExisting && onRemove !== undefined;
+          const removeLabel = t('quickAddRemove', { name: vehicle.name });
           return (
             <Chip
               key={vehicle.name}
               label={vehicle.name}
-              onClick={() => onToggle(vehicle.name)}
+              // Ein bereits vorhandenes Fahrzeug kein zweites Mal anlegen: der
+              // Chip-Körper reagiert dann nicht, entfernt wird über das X.
+              onClick={
+                isExisting ? undefined : () => onToggle(vehicle.name)
+              }
+              onDelete={removable ? () => onRemove(vehicle.name) : undefined}
+              deleteIcon={
+                removable ? <CancelIcon aria-label={removeLabel} /> : undefined
+              }
               color={isHighlighted ? 'primary' : 'default'}
               variant={isHighlighted ? 'filled' : 'outlined'}
-              disabled={isExisting}
+              disabled={isExisting && !removable}
               size="small"
               title={
-                isExisting
-                  ? `${vehicle.name} bereits im Einsatz`
-                  : vehicle.description || vehicle.name
+                removable
+                  ? removeLabel
+                  : isExisting
+                    ? t('quickAddAlreadyAdded', { name: vehicle.name })
+                    : vehicle.description || vehicle.name
               }
             />
           );
