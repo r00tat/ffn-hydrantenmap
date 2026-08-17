@@ -1,11 +1,31 @@
-# Kopieren nach terraform.tfvars (gitignored) und Werte einsetzen.
+# Kopieren nach terraform.tfvars (gitignored) und Werte einsetzen. In der
+# Pipeline kommen dieselben Werte als TF_VAR_* aus Repository-Variablen und
+# -Secrets, dort gibt es keine terraform.tfvars.
 project               = "ffn-utils"
 build_service_account = "cloudbuild@ffn-utils.iam.gserviceaccount.com"
 github_org            = "r00tat"
 
+# Laufzeit-Konfiguration des Dienstes. Kein Geheimnis: Next.js backt die
+# NEXT_PUBLIC_*-Werte beim Build ins Client-Bundle. Die Werte stehen in
+# .env.local (NEXT_PUBLIC_FIREBASE_APIKEY, NEXT_PUBLIC_RECAPTCHA_KEY,
+# EINSATZMAPPE_IMPERSONATION_ACCOUNT) und in den Repository-Variablen.
+# Die inneren Anfuehrungszeichen der Firebase-Konfiguration muessen escaped
+# werden — HCL kennt keine einfachen Anfuehrungszeichen.
+firebase_config                    = "{\"apiKey\":\"…\",\"projectId\":\"ffn-utils\",…}"
+recaptcha_key                      = "…"
+einsatzmappe_impersonation_account = "ffn@ff-neusiedlamsee.at"
+
+# `image`, `revision_*` und `retained_tags` gehoeren NICHT hierher: Die erzeugt
+# scripts/cloud-run-tfvars.sh als cloudrun.auto.tfvars.json aus dem laufenden
+# Dienst. Ohne diesen Lauf fragt tofu beim plan nach dem Image.
+#
+#   scripts/cloud-run-tfvars.sh --service hydrantenmap-dev --project ffn-utils \
+#     --region europe-west4 --keep-branches \
+#     --out terraform/environments/dev/cloudrun.auto.tfvars.json
+
 # Bekommt dev ein eigenes GCP-Projekt, ist das hier nur die halbe Miete:
-# Zusätzlich braucht es einen zweiten Projekt-Root unter
+# Zusaetzlich braucht es einen zweiten Projekt-Root unter
 # terraform/projects/<projekt-id>/ (die Projekt-Basis gibt es einmal je
 # Projekt), einen eigenen State-Bucket in diesem Projekt und die Umstellung
-# von BASE_ROOT_DEV in den beiden Workflows. Siehe CLAUDE.md, Abschnitt
+# von BASE_ROOT in den beiden Workflows. Siehe CLAUDE.md, Abschnitt
 # "Projekt-Basis".

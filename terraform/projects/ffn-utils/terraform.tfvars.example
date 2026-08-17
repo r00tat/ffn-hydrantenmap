@@ -1,0 +1,8 @@
+# Kopieren nach terraform.tfvars (gitignored) und Werte einsetzen.
+#
+# Mehr als diese beiden Werte braucht der Projekt-Root nicht — Region, Namen,
+# Service-Account-IDs und der State-Bucket haben Vorgabewerte in variables.tf.
+# In der Pipeline kommen sie als TF_VAR_project und TF_VAR_github_org herein,
+# eine terraform.tfvars gibt es dort nicht.
+project    = "ffn-utils"
+github_org = "r00tat"
