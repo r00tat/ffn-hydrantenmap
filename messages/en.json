@@ -188,6 +188,7 @@
     "blaulichtSmsTitle": "Alarm SMS",
     "blaulichtSmsLoadError": "Alarm SMS could not be loaded (alarm id: {id}). The Alarm SMS credentials may not be configured or the alarm may no longer be available.",
     "attachments": "Attachments",
+    "attachmentsExplanation": "Stored with this operation, visible only inside the app.",
     "noAttachments": "No attachments yet",
     "labels": {
       "group": "Group",
@@ -277,6 +278,36 @@
       "pickPosition": "Pick position"
     }
   },
+  "einsatzDrive": {
+    "title": "Photos in Google Drive",
+    "explanation": "Stored at full size in the brigade's Drive, in folder \"{folder}\".",
+    "uploadButton": "Upload to Drive",
+    "uploading": "Uploading …",
+    "uploadFailed": "{count, plural, one {One file could not be uploaded to Drive.} other {# files could not be uploaded to Drive.}}",
+    "uploadStartFailed": "The upload to Drive could not be started.",
+    "openFolder": "{count, plural, =0 {Open folder in Drive} one {Open folder in Drive (1 file)} other {Open folder in Drive (# files)}}",
+    "noFiles": "No files in Drive yet.",
+    "loadFailed": "Could not load the Drive folder: {message}",
+    "notConfigured": "No Google Drive is configured for this group.",
+    "notConfiguredLink": "Set it up in the administration"
+  },
+  "adminDrive": {
+    "title": "Google Drive",
+    "intro": "Base folder in the shared drive where operation photos are stored. The app creates a subfolder per year and per operation below it. The app's service account must be a member of the shared drive with write access.",
+    "group": "Group",
+    "baseFolderId": "Folder ID",
+    "baseFolderIdHelp": "From the Drive URL: the part after /folders/",
+    "save": "Save",
+    "check": "Test connection",
+    "saved": "Saved.",
+    "saveFailed": "Saving failed: {message}",
+    "loadFailed": "Could not load the configuration: {message}",
+    "checkOk": "Found folder \"{folder}\" in \"{drive}\".",
+    "checkNotAFolder": "This ID does not point to a folder.",
+    "checkFailed": "Folder not reachable: {message}",
+    "noSharedDrive": "My Drive",
+    "noGroups": "No group available."
+  },
   "firecallElements": {
     "addPoint": "Add a point",
     "editLine": "Edit line",
@@ -348,6 +379,7 @@
     "hydrantClusters": "Hydrant clusters",
     "adminKostenersatz": "Cost recovery",
     "adminFahrtenbuch": "Trip log",
+    "adminDrive": "Google Drive",
     "pegelstaende": "Water levels",
     "deletedItems": "Deleted items",
     "hydrantCsvImport": "Hydrant CSV import",
