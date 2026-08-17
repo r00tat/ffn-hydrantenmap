@@ -24,11 +24,19 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: cloud-run-tfvars.sh --service NAME --project ID --region REGION --out FILE
+Usage: cloud-run-tfvars.sh --env dev|prod [--image IMAGE] [--version REF]
+       cloud-run-tfvars.sh --service NAME --project ID --region REGION --out FILE
                            [--image IMAGE] [--version REF]
                            [--keep N | --keep-branches]
        cloud-run-tfvars.sh --print-tag --version REF
 
+Lokal genuegt `npm run tfvars:dev` bzw. `npm run tfvars:prod`.
+
+  -e, --env NAME        Umgebung (dev|prod). Leitet Projekt, Region,
+                        Dienstnamen, Zieldatei und Aufbewahrungsregel aus
+                        terraform/environments/NAME ab — dann entfallen die
+                        vier Optionen darunter. Einzeln gesetzte Optionen
+                        haben Vorrang.
   -s, --service NAME    Name des Cloud-Run-Dienstes
   -p, --project ID      GCP-Projekt
   -r, --region REGION   Region des Dienstes
@@ -47,7 +55,7 @@ EOF
   exit "${1:-2}"
 }
 
-SERVICE="" PROJECT="" REGION="" OUT="" IMAGE="" VERSION="" KEEP="" KEEP_BRANCHES=0 PRINT_TAG=0
+ENVIRONMENT="" SERVICE="" PROJECT="" REGION="" OUT="" IMAGE="" VERSION="" KEEP="" KEEP_BRANCHES=0 PRINT_TAG=0
 
 # getopts kennt von Haus aus nur kurze Optionen. Das ':-' in der Optionsliste
 # macht '-' zu einer Option mit Argument: Aus '--keep=20' wird dann opt='-' mit
@@ -57,7 +65,7 @@ SERVICE="" PROJECT="" REGION="" OUT="" IMAGE="" VERSION="" KEEP="" KEEP_BRANCHES
 #
 # Der Doppelpunkt am Anfang schaltet getopts' eigene Fehlermeldungen ab — die
 # Faelle ':' (Wert fehlt) und '?' (unbekannt) werden unten selbst beantwortet.
-while getopts ':s:p:r:o:i:v:k:bth-:' opt; do
+while getopts ':e:s:p:r:o:i:v:k:bth-:' opt; do
   if [[ "$opt" == "-" ]]; then
     if [[ "$OPTARG" == *=* ]]; then
       opt="${OPTARG%%=*}"
@@ -65,7 +73,7 @@ while getopts ':s:p:r:o:i:v:k:bth-:' opt; do
     else
       opt="$OPTARG"
       case "$opt" in
-        service | project | region | out | image | version | keep)
+        env | service | project | region | out | image | version | keep)
           # Wert steht im naechsten Argument.
           OPTARG="${!OPTIND:-}"
           if [[ -z "$OPTARG" ]]; then
@@ -80,6 +88,7 @@ while getopts ':s:p:r:o:i:v:k:bth-:' opt; do
   fi
 
   case "$opt" in
+    e | env) ENVIRONMENT="$OPTARG" ;;
     s | service) SERVICE="$OPTARG" ;;
     p | project) PROJECT="$OPTARG" ;;
     r | region) REGION="$OPTARG" ;;
@@ -129,6 +138,49 @@ if [[ "$PRINT_TAG" -eq 1 ]]; then
   sanitize_tag "$VERSION"
   echo
   exit 0
+fi
+
+# --env leitet ab, was ohnehin schon in terraform steht: Projekt, Region und
+# Dienstname. So steht die Projekt-ID nicht ein zweites Mal in package.json und
+# der Dienstname nicht ein drittes Mal irgendwo daneben. Einzeln gesetzte
+# Optionen gewinnen, damit der Workflow weiter explizit aufrufen kann.
+if [[ -n "$ENVIRONMENT" ]]; then
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  tf_root="$repo_root/terraform/environments/$ENVIRONMENT"
+
+  if [[ ! -d "$tf_root" ]]; then
+    echo "::error::Kein Terraform-Root fuer '$ENVIRONMENT': $tf_root" >&2
+    exit 2
+  fi
+
+  # `local.service_name` traegt in dev das '-dev' — deshalb terraform fragen
+  # statt den Namen nachzubauen.
+  resolved="$(printf 'var.project\nvar.run_region\nlocal.service_name\n' \
+    | (cd "$tf_root" && tofu console 2>/dev/null) | tr -d '"')" || resolved=""
+  tf_project="" tf_region="" tf_service=""
+  { read -r tf_project; read -r tf_region; read -r tf_service; } <<<"$resolved" || true
+
+  if [[ -z "$tf_project" || -z "$tf_region" || -z "$tf_service" ]]; then
+    echo "::error::Projekt, Region und Dienstname liessen sich nicht aus ${tf_root} lesen." >&2
+    echo "::error::Dort einmal 'tofu init' laufen lassen — 'tofu console' braucht einen initialisierten Root." >&2
+    exit 2
+  fi
+
+  SERVICE="${SERVICE:-$tf_service}"
+  PROJECT="${PROJECT:-$tf_project}"
+  REGION="${REGION:-$tf_region}"
+  OUT="${OUT:-$tf_root/cloudrun.auto.tfvars.json}"
+
+  # Aufbewahrungsregel je Umgebung. Muss zu den Flags in
+  # .github/workflows/cloud-run.yml passen — dort steht sie explizit, weil der
+  # Deploy-Job das Skript vor `tofu init` aufruft und `tofu console` deshalb
+  # nicht zur Verfuegung hat.
+  if [[ -z "$KEEP" && "$KEEP_BRANCHES" -eq 0 ]]; then
+    case "$ENVIRONMENT" in
+      prod) KEEP=20 ;;
+      *) KEEP_BRANCHES=1 ;;
+    esac
+  fi
 fi
 
 [[ -n "$SERVICE" && -n "$PROJECT" && -n "$REGION" && -n "$OUT" ]] || usage

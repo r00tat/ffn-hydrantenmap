@@ -39,14 +39,14 @@ cd terraform/environments/dev      # oder prod, oder projects/ffn-utils
 # werden.
 cp terraform.tfvars.example terraform.tfvars
 
+tofu init
+
 # Nur in den Environment-Roots: Image und Traffic-Tags aus dem laufenden Dienst
 # holen. Ohne das fragt tofu beim plan nach `image`. Ohne --image bleibt das
 # laufende Image stehen — ein lokaler Apply dreht die App also nicht zurück.
-../../../scripts/cloud-run-tfvars.sh --service hydrantenmap-dev \
-  --project ffn-utils --region europe-west4 --keep-branches \
-  --out cloudrun.auto.tfvars.json
-
-tofu init
+# Aus dem Repository-Wurzelverzeichnis, nach dem init (das Skript fragt den
+# Root über `tofu console` nach Projekt, Region und Dienstnamen):
+#   npm run tfvars:dev      # bzw. npm run tfvars:prod
 tofu plan -out tfplan
 tofu apply tfplan
 ```

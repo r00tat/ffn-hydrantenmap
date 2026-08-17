@@ -18,6 +18,8 @@ npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
 npm run check        # Run all checks: typecheck, lint, tests, build
 npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
+npm run tfvars:dev   # Deploy-Variablen für terraform aus dem laufenden Dienst holen
+npm run tfvars:prod  # dito für prod (siehe „Deployment")
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
@@ -341,6 +343,13 @@ das vor jedem Plan und Apply `cloudrun.auto.tfvars.json` schreibt (gitignored):
 Das Skript ist auch die einzige Stelle, die einen Git-Ref auf einen Tag
 normalisiert (`--print-tag`); der Workflow bildet den Image-Tag darüber, statt
 die Abbildung ein zweites Mal in `sed` nachzubauen.
+
+**Lokal genügt `npm run tfvars:dev` bzw. `npm run tfvars:prod`.** Das `--env`
+des Skripts fragt den Terraform-Root per `tofu console` nach Projekt, Region
+und `local.service_name` und leitet daraus auch Zieldatei und
+Aufbewahrungsregel ab — deshalb steht in `package.json` keine Projekt-ID und
+kein Dienstname. Voraussetzung ist ein initialisierter Root (`tofu init`).
+Argumente lassen sich durchreichen: `npm run tfvars:dev -- --image … --version …`.
 
 **Ohne `--image` liest das Skript Image und Revisions-Suffix aus dem laufenden
 Dienst.** Nur deshalb kann ein Apply von Hand, der etwa Firestore-Regeln ändert,
