@@ -795,8 +795,11 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
 - **`storage.rules` wird über terraform ausgerollt**
   (`google_firebaserules_ruleset`/`_release` in
   [firebase.tf](terraform/modules/project-base/firebase.tf)), nicht über `firebase deploy`
-  — in `firebase.json` steht die Datei deshalb bewusst nicht. Eine Änderung braucht einen
-  Apply aus [terraform.yml](.github/workflows/terraform.yml).
+  — in `firebase.json` steht die Datei deshalb bewusst nicht. Die Regeln gelten für den
+  Default-Bucket `<projekt>.appspot.com`, den es je Projekt einmal gibt; sie liegen deshalb
+  im Projekt-Root und werden bei jedem Push auf main vor dem Deploy appliziert. **Dev und
+  prod teilen sich diesen Bucket** — beide Dienste tragen `ffn-utils.appspot.com` in ihrer
+  Firebase-Konfiguration.
 - Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
   braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
 
