@@ -1,39 +1,33 @@
 name: Terraform
 
+# Dieser Workflow plant, er rollt nicht mehr von selbst aus.
+#
+# Seit der Cloud-Run-Dienst in terraform liegt, ist der Deploy in
+# .github/workflows/cloud-run.yml selbst ein `tofu apply` — auf dev bei jedem
+# Push auf main, auf prod bei jedem Release-Tag. Ein zweiter automatischer
+# apply auf denselben State wäre bestenfalls redundant. Geblieben ist der
+# `workflow_dispatch`-Apply als Handgriff, den die Projekt-Basis braucht
+# (siehe "Prod zuerst applien" in CLAUDE.md).
+#
+# Der `plan` läuft auf **jedem** PR, nicht nur bei Änderungen an terraform/**.
+# Ein Merge löst seit dem Umbau einen apply über den ganzen Environment-Root
+# aus — dazu den der Projekt-Basis davor. Ob der durchgeht, hängt damit nicht
+# mehr nur am Terraform-Code im PR, sondern auch an Drift, an Rechten und an
+# allem, was jemand von Hand geändert hat. Genau das soll der Plan vorher
+# zeigen. Ein Plan ohne Änderungen kostet ~40s und kommentiert nichts.
 on:
-  # Nur main: hier laeuft apply-dev. Der plan haengt bewusst am pull_request,
-  # nicht am push. Grund: legt ein push einen NEUEN Branch an, hat GitHub keinen
-  # Vorgaenger-Commit als Vergleichsbasis (`before` ist 0000...) und wertet den
-  # paths-Filter nicht aus — der Workflow lief dann bei jedem neuen Branch,
-  # auch ohne jede Terraform-Aenderung. Beim pull_request wird der Filter gegen
-  # den PR-Diff ausgewertet und greift zuverlaessig.
-  push:
-    branches:
-      - main
-    paths:
-      - "terraform/**"
-      - "firebase/**"
-      - "storage.rules"
-      - ".github/workflows/terraform.yml"
   pull_request:
     branches:
       - main
-    paths:
-      - "terraform/**"
-      - "firebase/**"
-      - "storage.rules"
-      - ".github/workflows/terraform.yml"
-  release:
-    types:
-      - published
   workflow_dispatch:
     inputs:
       environment:
-        description: Environment
+        description: Environment (base = Projekt-Basis, siehe terraform/projects/)
         type: choice
         options:
           - dev
           - prod
+          - base
         default: dev
       mode:
         description: Mode
@@ -44,17 +38,151 @@ on:
         default: plan
 
 env:
-  # Muss zu terraform/.tool-versions passen, damit lokal und CI identisch sind.
+  # Muss zu terraform/.tool-versions und zu .github/workflows/cloud-run.yml
+  # passen, damit lokal und beide Pipelines identisch rechnen.
   TOFU_VERSION: 1.12.5
 
+  # Zuordnung Environment -> Projekt-Root. Die Projekt-Basis gibt es einmal je
+  # GCP-Projekt, nicht je Environment; dev und prod teilen sich ffn-utils,
+  # deshalb stehen links und rechts derzeit dieselben Pfade. Bekommt dev ein
+  # eigenes Projekt, wird der rechte Zweig auf dessen Root umgestellt.
+  BASE_ROOT: ${{ github.event.inputs.environment == 'prod' && 'terraform/projects/ffn-utils' || 'terraform/projects/ffn-utils' }}
+
 jobs:
-  plan:
-    name: "plan ${{ matrix.environment }}"
-    # PRs planen. Push auf main und Releases applien stattdessen in den Jobs
-    # darunter.
+  # Die Projekt-Basis hat einen eigenen Plan, weil sie keinen Environment-Root
+  # ist und die Deploy-Variablen des Cloud-Run-Dienstes nicht braucht.
+  plan-base:
+    name: "plan base"
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'plan')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'plan' && github.event.inputs.environment == 'base')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: tf-plan-base-${{ github.event.pull_request.number || github.ref_name }}
+      cancel-in-progress: true
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    env:
+      gcp_ready: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER != '' && secrets.TERRAFORM_SERVICE_ACCOUNT != '' }}
+      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
+      TF_VAR_github_org: ${{ github.repository_owner }}
+      TF_IN_AUTOMATION: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: "Authenticate to Google Cloud"
+        if: ${{ env.gcp_ready == 'true' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
+          export_environment_variables: "true"
+
+      - name: Validate without backend
+        if: ${{ env.gcp_ready != 'true' }}
+        working-directory: ${{ env.BASE_ROOT }}
+        run: |
+          tofu init -backend=false
+          tofu validate
+
+      - name: Plan
+        id: plan
+        if: ${{ env.gcp_ready == 'true' }}
+        working-directory: ${{ env.BASE_ROOT }}
+        run: |
+          set -o pipefail
+          tofu init -input=false
+          tofu validate
+          # -detailed-exitcode: 0 = keine Änderungen, 2 = Änderungen, alles
+          # andere ist ein Fehler. Damit muss der Kommentar-Step den Plantext
+          # nicht nach "No changes." absuchen.
+          set +e
+          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >>"$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
+          tofu show -no-color tfplan > plan.txt
+
+      - name: Step summary
+        if: ${{ env.gcp_ready == 'true' }}
+        working-directory: ${{ env.BASE_ROOT }}
+        run: |
+          {
+            echo "## Terraform plan — Projekt-Basis (${{ env.BASE_ROOT }})"
+            echo
+            echo '```terraform'
+            head -c 60000 plan.txt
+            echo
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment plan on PR
+        if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v8
+        env:
+          ROOT: ${{ env.BASE_ROOT }}
+          HAS_CHANGES: ${{ steps.plan.outputs.changes }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tofu-plan:base -->';
+            const hasChanges = process.env.HAS_CHANGES === 'true';
+            const plan = fs
+              .readFileSync(`${process.env.ROOT}/plan.txt`, 'utf8')
+              .slice(0, 60000);
+            const body = hasChanges
+              ? `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
+              : `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\nKeine Änderungen.`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            // Der Plan läuft auf jedem PR, auch auf solchen, die terraform
+            // nicht anfassen. Ein leerer Plan bekommt deshalb keinen eigenen
+            // Kommentar — sonst trägt jeder Dependabot-PR drei Klappboxen mit
+            // "No changes.". Ein bereits vorhandener wird aber aktualisiert,
+            // damit kein überholter Plan stehen bleibt.
+            if (!hasChanges && !existing) {
+              core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
+              return;
+            }
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  plan:
+    name: "plan ${{ matrix.environment }}"
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'plan' && github.event.inputs.environment != 'base')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -81,20 +209,11 @@ jobs:
       TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
-      # Öffentliche URL des Cloud-Run-Dienstes. Cloud Run gibt sie nicht als
-      # Attribut her, das terraform lesen könnte, und sie ist zugleich die
-      # erwartete OIDC-Audience des Scheduler-Tokens — deshalb als
-      # Repository-Variable je Umgebung. Fehlt sie, scheitert `plan` an der
-      # Meldung aus dem `validation`-Block, statt einen Scheduler-Job mit
-      # kaputter URI anzulegen.
-      #
-      # Die beiden Zweige sind absichtlich einzeln abgeschlossen und nicht als
-      # `prod && PROD || DEV` geschrieben: In GitHub-Ausdrücken liefert
-      # `A && B || C` das `C`, sobald `B` falsy ist, und eine nicht gesetzte
-      # Repository-Variable ist der leere String. Ein fehlendes
-      # RUN_SERVICE_URL_PROD hätte den Prod-Plan also mit der Dev-URL laufen
-      # lassen — an der Validierung vorbei, weil die Dev-URL gültig ist.
-      TF_VAR_run_service_url: ${{ matrix.environment == 'prod' && vars.RUN_SERVICE_URL_PROD || (matrix.environment == 'dev' && vars.RUN_SERVICE_URL_DEV || '') }}
+      TF_VAR_firebase_config: ${{ vars.NEXT_PUBLIC_FIREBASE_APIKEY }}
+      TF_VAR_recaptcha_key: ${{ vars.NEXT_PUBLIC_RECAPTCHA_KEY }}
+      TF_VAR_einsatzmappe_impersonation_account: ${{ secrets.EINSATZMAPPE_IMPERSONATION_ACCOUNT }}
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      RUN_SERVICE_BASE: ${{ vars.RUN_SERVICE }}
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -119,13 +238,35 @@ jobs:
           service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
           export_environment_variables: "true"
 
+      - name: "Set up Cloud SDK"
+        if: ${{ env.gcp_ready == 'true' }}
+        uses: google-github-actions/setup-gcloud@v3
+
       # Ohne Secrets (Fork-PRs) gibt es kein id-token und keine
-      # GCP-Credentials. validate braucht kein Backend, plan schon.
+      # GCP-Credentials. validate braucht weder Backend noch Variablen, plan
+      # beides.
       - name: Validate without backend
         if: ${{ env.gcp_ready != 'true' }}
         run: |
           tofu init -backend=false
           tofu validate
+
+      # Ohne --image: Der Plan zeigt den laufenden Dienst, nicht ein neues
+      # Image. Ein Deploy setzt das Image, siehe cloud-run.yml.
+      - name: Deploy-Variablen erzeugen
+        if: ${{ env.gcp_ready == 'true' }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -eo pipefail
+          RUN_SERVICE="$RUN_SERVICE_BASE"
+          [[ "${{ matrix.environment }}" == "prod" ]] && RUN_SERVICE="${RUN_SERVICE%-dev}"
+
+          scripts/cloud-run-tfvars.sh \
+            --service "$RUN_SERVICE" \
+            --project "$TF_VAR_project" \
+            --region "$RUN_REGION" \
+            ${{ matrix.environment == 'prod' && '--keep 20' || '--keep-branches' }} \
+            --out "terraform/environments/${{ matrix.environment }}/cloudrun.auto.tfvars.json"
 
       - name: Init
         if: ${{ env.gcp_ready == 'true' }}
@@ -140,7 +281,16 @@ jobs:
         if: ${{ env.gcp_ready == 'true' }}
         run: |
           set -o pipefail
-          tofu plan -input=false -no-color -out=tfplan
+          # Siehe plan-base: 0 = keine Änderungen, 2 = Änderungen.
+          set +e
+          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >>"$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
           tofu show -no-color tfplan > plan.txt
 
       - name: Step summary
@@ -160,21 +310,32 @@ jobs:
         uses: actions/github-script@v8
         env:
           ENVIRONMENT: ${{ matrix.environment }}
+          HAS_CHANGES: ${{ steps.plan.outputs.changes }}
         with:
           script: |
             const fs = require('fs');
             const env = process.env.ENVIRONMENT;
             const marker = `<!-- tofu-plan:${env} -->`;
+            const hasChanges = process.env.HAS_CHANGES === 'true';
             const plan = fs
               .readFileSync(`terraform/environments/${env}/plan.txt`, 'utf8')
               .slice(0, 60000);
-            const body = `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`;
+            const body = hasChanges
+              ? `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
+              : `${marker}\n### Terraform plan — \`${env}\`\n\nKeine Änderungen.`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: context.issue.number,
             });
             const existing = comments.find((c) => c.body?.includes(marker));
+
+            // Siehe plan-base: ein leerer Plan kommentiert nur dann, wenn
+            // schon ein Kommentar steht, der sonst überholt wäre.
+            if (!hasChanges && !existing) {
+              core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
+              return;
+            }
 
             if (existing) {
               await github.rest.issues.updateComment({
@@ -190,16 +351,18 @@ jobs:
               });
             }
 
-  apply-dev:
-    name: "apply dev"
+  apply:
+    name: "apply ${{ github.event.inputs.environment }}"
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'apply' && github.event.inputs.environment == 'dev')
+      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'apply'
     runs-on: ubuntu-latest
-    environment: dev
-    # Zwei gleichzeitige apply auf denselben state sind ausgeschlossen.
+    # Die Projekt-Basis wirkt auf beide Umgebungen und bekommt deshalb den
+    # Schutz der schärferen: prod.
+    environment: ${{ github.event.inputs.environment == 'base' && 'prod' || github.event.inputs.environment }}
+    # Dieselben Gruppen wie die Jobs in cloud-run.yml — zwei gleichzeitige apply
+    # auf denselben State sind ausgeschlossen.
     concurrency:
-      group: tf-apply-dev
+      group: tf-apply-${{ github.event.inputs.environment }}
       cancel-in-progress: false
     permissions:
       id-token: write
@@ -207,12 +370,17 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: terraform/environments/dev
     env:
+      # Environment-Root oder Projekt-Root, je nach Auswahl.
+      ROOT: ${{ github.event.inputs.environment == 'base' && 'terraform/projects/ffn-utils' || format('terraform/environments/{0}', github.event.inputs.environment) }}
       TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       TF_VAR_github_org: ${{ github.repository_owner }}
       TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
-      TF_VAR_run_service_url: ${{ vars.RUN_SERVICE_URL_DEV }}
+      TF_VAR_firebase_config: ${{ vars.NEXT_PUBLIC_FIREBASE_APIKEY }}
+      TF_VAR_recaptcha_key: ${{ vars.NEXT_PUBLIC_RECAPTCHA_KEY }}
+      TF_VAR_einsatzmappe_impersonation_account: ${{ secrets.EINSATZMAPPE_IMPERSONATION_ACCOUNT }}
+      RUN_REGION: ${{ vars.RUN_REGION }}
+      RUN_SERVICE_BASE: ${{ vars.RUN_SERVICE }}
       TF_IN_AUTOMATION: "true"
 
     steps:
@@ -232,55 +400,31 @@ jobs:
           service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
           export_environment_variables: "true"
 
+      - name: "Set up Cloud SDK"
+        uses: google-github-actions/setup-gcloud@v3
+
+      # Ohne --image bleibt das laufende Image stehen — ein Apply von Hand darf
+      # die App nicht auf einen alten Stand zurückdrehen. Die Projekt-Basis
+      # kennt keinen Cloud-Run-Dienst und braucht die Variablen nicht.
+      - name: Deploy-Variablen erzeugen
+        if: ${{ github.event.inputs.environment != 'base' }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -eo pipefail
+          RUN_SERVICE="$RUN_SERVICE_BASE"
+          [[ "${{ github.event.inputs.environment }}" == "prod" ]] && RUN_SERVICE="${RUN_SERVICE%-dev}"
+
+          scripts/cloud-run-tfvars.sh \
+            --service "$RUN_SERVICE" \
+            --project "$TF_VAR_project" \
+            --region "$RUN_REGION" \
+            ${{ github.event.inputs.environment == 'prod' && '--keep 20' || '--keep-branches' }} \
+            --out "$ROOT/cloudrun.auto.tfvars.json"
+
       - name: Init
+        working-directory: ${{ env.ROOT }}
         run: tofu init -input=false
 
       - name: Apply
-        run: tofu apply -input=false -no-color -auto-approve
-
-  apply-prod:
-    name: "apply prod"
-    if: >-
-      github.event_name == 'release' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'apply' && github.event.inputs.environment == 'prod')
-    runs-on: ubuntu-latest
-    environment: prod
-    concurrency:
-      group: tf-apply-prod
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
-    defaults:
-      run:
-        shell: bash
-        working-directory: terraform/environments/prod
-    env:
-      TF_VAR_project: ${{ vars.CLOUDSDK_CORE_PROJECT }}
-      TF_VAR_github_org: ${{ github.repository_owner }}
-      TF_VAR_build_service_account: ${{ secrets.TF_BUILD_SERVICE_ACCOUNT }}
-      TF_VAR_run_service_url: ${{ vars.RUN_SERVICE_URL_PROD }}
-      TF_IN_AUTOMATION: "true"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
-        with:
-          tofu_version: ${{ env.TOFU_VERSION }}
-          tofu_wrapper: false
-
-      - name: "Authenticate to Google Cloud"
-        uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.TERRAFORM_SERVICE_ACCOUNT }}
-          export_environment_variables: "true"
-
-      - name: Init
-        run: tofu init -input=false
-
-      - name: Apply
+        working-directory: ${{ env.ROOT }}
         run: tofu apply -input=false -no-color -auto-approve

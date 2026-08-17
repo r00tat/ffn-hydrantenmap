@@ -7,23 +7,37 @@ locals {
   database_name   = "(default)"
   create_database = false
 
+  service_name      = var.name
   artifact_registry = "${var.run_region}-docker.pkg.dev/${var.project}/hydrantenkarte"
+
+  # Allowlist für cronRequired. Sie enthält die Invoker **beider** Umgebungen,
+  # weil dev und prod dasselbe Projekt teilen; unterschieden werden sie über
+  # `name_suffix` des Moduls cloud-scheduler.
+  #
+  # Bewusst als Zeichenkette gebaut statt aus module.cloud_scheduler: Der
+  # Dienst liest diesen Wert, und der Scheduler braucht die URL des Dienstes —
+  # eine Referenz auf das Modul ergäbe einen Zyklus. Der `check`-Block unten
+  # hält die Konstruktion ehrlich.
+  cron_invoker_emails = join(",", [
+    for suffix in ["", "-dev"] :
+    "fahrtenbuch-report-invoker${suffix}@${var.project}.iam.gserviceaccount.com"
+  ])
 }
 
-module "project_base" {
-  count  = var.manage_project_base ? 1 : 0
-  source = "../../modules/project-base"
+# Die Projekt-Basis ist nach terraform/projects/ffn-utils umgezogen. Sie ist
+# Voraussetzung jedes Environment-Applies (Rechte des Pipeline-SA, APIs,
+# Secret-Hüllen) und gehörte deshalb nie in ein Environment: Solange sie hier
+# lag, wurde eine neue Rolle erst beim nächsten prod-Release wirksam und dev
+# scheiterte bis dahin mit 403.
+#
+# `destroy = false` ist der Kern: Die Ressourcen wechseln nur den State, sie
+# werden nicht angefasst. Der neue Root importiert dieselben Objekte.
+removed {
+  from = module.project_base
 
-  project            = var.project
-  region             = var.region
-  run_region         = var.run_region
-  name               = var.name
-  run_sa             = var.run_sa
-  deploy_sa          = var.deploy_sa
-  github_org         = var.github_org
-  github_repo        = var.github_repo
-  state_bucket       = var.state_bucket
-  storage_rules_file = "${local.repo_root}/storage.rules"
+  lifecycle {
+    destroy = false
+  }
 }
 
 module "firestore" {
@@ -49,9 +63,8 @@ module "cloudbuild" {
     "deploy-prod-on-tag" = { tag = ".*" }
   }
 
-  # Aus Variablen abgeleitet statt aus module.project_base-Outputs: so
-  # funktioniert der Root identisch, ob dieses Environment die Projekt-Basis
-  # besitzt oder sie mit einem anderen teilt.
+  # Aus Variablen abgeleitet statt aus den Outputs des Projekt-Roots: ein
+  # Environment-Root liest keinen fremden State.
   substitutions = {
     _RUN_SERVICE_ACCOUNT      = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
     _IMAGE                    = "${local.artifact_registry}/${var.name}/tag"
@@ -60,16 +73,71 @@ module "cloudbuild" {
   }
 }
 
+module "cloud_run" {
+  source = "../../modules/cloud-run"
+
+  project               = var.project
+  run_region            = var.run_region
+  name                  = local.service_name
+  service_account_email = "${var.run_sa}@${var.project}.iam.gserviceaccount.com"
+
+  # Aus scripts/cloud-run-tfvars.sh, siehe cloudrun.auto.tfvars.json.
+  image            = var.image
+  revision_suffix  = var.revision_suffix
+  revision_tag     = var.revision_tag
+  retained_tags    = var.retained_tags
+  serving_revision = var.serving_revision
+
+  env = {
+    NEXTAUTH_URL          = var.public_url
+    NEXTAUTH_URL_INTERNAL = "http://localhost:8080"
+    GOOGLE_CLOUD_PROJECT  = var.project
+    CRON_INVOKER_EMAILS   = local.cron_invoker_emails
+
+    # NEXT_PUBLIC_* landen beim Build fest im Bundle; zur Laufzeit stehen sie
+    # hier nur, weil der Server dieselben Werte für seine eigenen Aufrufe liest.
+    NEXT_PUBLIC_FIREBASE_APIKEY = var.firebase_config
+    NEXT_PUBLIC_RECAPTCHA_KEY   = var.recaptcha_key
+
+    EINSATZMAPPE_IMPERSONATION_ACCOUNT = var.einsatzmappe_impersonation_account
+  }
+
+  secret_env = {
+    AUTH_SECRET              = "AUTH_SECRET"
+    GOOGLE_SERVICE_ACCOUNT   = "GOOGLE_SERVICE_ACCOUNT"
+    BLAULICHTSMS_USERNAME    = "BLAULICHTSMS_USERNAME"
+    BLAULICHTSMS_PASSWORD    = "BLAULICHTSMS_PASSWORD"
+    BLAULICHTSMS_CUSTOMER_ID = "BLAULICHTSMS_CUSTOMER_ID"
+    SUMUP_API_KEY            = "SUMUP_API_KEY"
+    SUMUP_AFFILIATE_KEY      = "SUMUP_AFFILIATE_KEY"
+    SUMUP_MERCHANT_CODE      = "SUMUP_MERCHANT_CODE"
+  }
+
+}
+
 module "cloud_scheduler" {
   source = "../../modules/cloud-scheduler"
 
   project      = var.project
   run_region   = var.run_region
-  service_name = var.name
-  service_url  = var.run_service_url
+  service_name = module.cloud_run.name
 
-  # Der Scheduler-Job braucht cloudscheduler.googleapis.com, aktiviert von der
-  # Projekt-Basis. Ohne diese Kante könnte terraform beides gleichzeitig anlegen
-  # und der Job auf einer noch nicht aktivierten API scheitern.
-  depends_on = [module.project_base]
+  # Die Custom Domain, nicht module.cloud_run.uri: Der Dienst läuft unter
+  # einsatz.ffnd.at, und `getBaseUrl()` leitet die erwartete Audience aus dem
+  # Host des Requests ab. Ein Token auf die run.app-URL passte nicht dazu.
+  service_url = var.public_url
+
+}
+
+# Die Allowlist oben wird aus Zeichenketten gebaut, weil eine Referenz auf das
+# Scheduler-Modul einen Zyklus ergäbe. Damit die Konstruktion nicht still von
+# den tatsächlichen Namen abdriftet, wird sie hier gegengeprüft.
+check "cron_invoker_on_allowlist" {
+  assert {
+    condition = contains(
+      split(",", local.cron_invoker_emails),
+      module.cloud_scheduler.invoker_service_account_email,
+    )
+    error_message = "Der Invoker-Service-Account steht nicht auf CRON_INVOKER_EMAILS — cronRequired würde den Wochenbericht mit 403 abweisen."
+  }
 }

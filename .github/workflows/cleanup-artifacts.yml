@@ -22,8 +22,6 @@ jobs:
       run:
         shell: bash
     env:
-      RUN_SERVICE: ${{ vars.RUN_SERVICE }}
-      RUN_REGION: ${{ vars.RUN_REGION }}
       IMAGE: ${{ vars.IMAGE }}
       CLOUDSDK_CORE_PROJECT: ${{ vars.CLOUDSDK_CORE_PROJECT }}
       workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
@@ -51,15 +49,17 @@ jobs:
       - name: "Set up Cloud SDK"
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Remove Cloud Run revision tag
-        continue-on-error: true
-        run: |
-          set -eo pipefail
-          echo "Removing Cloud Run traffic tag: ${{ steps.env.outputs.VERSION_TAG }}"
-          gcloud run services update-traffic "${RUN_SERVICE}" \
-            --region "${RUN_REGION}" \
-            --remove-tags="${{ steps.env.outputs.VERSION_TAG }}"
-
+      # Den Traffic-Tag räumt hier nichts mehr weg. Seit der Dienst in
+      # terraform liegt, ist dessen `traffic`-Block autoritativ: Ein
+      # `update-traffic` von Hand ist Drift, die der nächste apply zurückdreht.
+      # Stattdessen behält scripts/cloud-run-tfvars.sh in dev nur Tags, zu denen
+      # es auf origin noch einen Branch gibt (`--keep-branches`) — der Tag eines
+      # gemergten Branches fällt damit beim nächsten Dev-Deploy von selbst weg.
+      #
+      # Das Image löschen wir weiter: Ein Branch, der über *Run workflow* auf
+      # dev ausgerollt wurde, hat eines. Ein reiner PR nicht mehr — dessen Build
+      # pusht nichts —, dann läuft der Schritt ins Leere. Deshalb
+      # continue-on-error.
       - name: Delete container image from Artifact Registry
         continue-on-error: true
         run: |

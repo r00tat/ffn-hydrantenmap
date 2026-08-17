@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "npx eslint",
     "clean:cache": "rm -rf .next/cache/turbopack .next/dev/cache/turbopack",
+    "tfvars:dev": "scripts/cloud-run-tfvars.sh --env dev",
+    "tfvars:prod": "scripts/cloud-run-tfvars.sh --env prod",
     "extract": "node_modules/typescript/bin/tsc --outDir dist src/server/harparser && node dist/server/harparser.js",
     "import": "node_modules/typescript/bin/tsc --outDir dist src/server/firestore-import && node dist/server/firestore-import.js",
     "exportImport": "node_modules/typescript/bin/tsc --outDir dist src/server/export-import && node dist/server/export-import.js",

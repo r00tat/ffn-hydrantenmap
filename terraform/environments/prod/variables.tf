@@ -49,47 +49,98 @@ variable "deploy_sa" {
   default     = "cloudbuild"
 }
 
-variable "state_bucket" {
-  description = "GCS bucket holding the terraform state"
-  type        = string
-  default     = "ffn-utils-tfstate"
-}
-
 variable "cloudbuild_disabled" {
   description = "Disable cloud build triggers"
   type        = bool
   default     = true
 }
 
-variable "manage_project_base" {
-  description = "Whether this environment owns the base infrastructure of its GCP project. Prod owns it as long as dev and prod share the project."
-  type        = bool
-  default     = true
+# Die öffentliche Adresse dieser Umgebung. Sie ist dreierlei zugleich:
+# NEXTAUTH_URL des Dienstes, Ziel des Scheduler-Aufrufs und erwartete Audience
+# des OIDC-Tokens. Deshalb genau eine Quelle statt einer Repository-Variablen
+# neben einem im Workflow verdrahteten NEXTAUTH_URL.
+variable "public_url" {
+  description = "Public base URL of the service, e.g. https://karte.example.at"
+  type        = string
+  default     = "https://einsatz.ffnd.at"
+
+  validation {
+    condition     = startswith(var.public_url, "https://")
+    error_message = "public_url muss mit https:// beginnen."
+  }
+
+  # Ein Schrägstrich am Ende wäre tödlich, nur unauffällig: Der Scheduler
+  # stellte das Token auf "https://host/" aus, während `getBaseUrl()` im Dienst
+  # den Schrägstrich abschneidet und "https://host" erwartet. Die Audience
+  # passte nicht, `cronRequired` antwortete 403, und die einzige Spur wäre jeden
+  # Montag eine Logzeile — ohne Mail und ohne Alarm.
+  validation {
+    condition     = !endswith(var.public_url, "/")
+    error_message = "public_url darf nicht mit / enden — die Audience des OIDC-Tokens müsste sonst exakt so lauten."
+  }
 }
 
-# Cloud Run stellt die öffentliche URL nicht als Attribut bereit, das terraform
-# hier lesen könnte — der Dienst wird über .github/workflows/cloud-run.yml
-# deployt. Sie ist zugleich die erwartete OIDC-Audience des Scheduler-Tokens.
-variable "run_service_url" {
-  description = "Public base URL of the Cloud Run service, e.g. https://karte.example.at"
+# ---------------------------------------------------------------------------
+# Deploy-Eingaben
+#
+# Diese fünf Werte kommen aus cloudrun.auto.tfvars.json, erzeugt von
+# scripts/cloud-run-tfvars.sh. Die Datei ist gitignored: Sie beschreibt den
+# aktuellen Deploy, nicht den gewünschten Dauerzustand.
+# ---------------------------------------------------------------------------
+
+variable "image" {
+  description = "Container image including tag"
+  type        = string
+}
+
+variable "revision_suffix" {
+  description = "Readable part of the revision name, e.g. \"v2-63-0\""
+  type        = string
+  default     = ""
+}
+
+variable "revision_tag" {
+  description = "Traffic tag for the revision created by this apply"
+  type        = string
+  default     = ""
+}
+
+variable "retained_tags" {
+  description = "Historic traffic tags that survive this apply: tag => revision"
+  type        = map(string)
+  default     = {}
+}
+
+variable "serving_revision" {
+  description = "Rollback: revision that serves the traffic. Empty means the newest one."
+  type        = string
+  default     = ""
+}
+
+# ---------------------------------------------------------------------------
+# Laufzeit-Konfiguration des Dienstes
+# ---------------------------------------------------------------------------
+
+# Kein Geheimnis: Next.js backt die NEXT_PUBLIC_*-Werte beim Build fest ins
+# Client-Bundle, die Firebase-Konfiguration steht damit ohnehin in jedem
+# Browser. Sie liegt trotzdem als Repository-Variable vor und wird von dort
+# durchgereicht, damit Build und Laufzeit dieselbe Quelle haben.
+variable "firebase_config" {
+  description = "Firebase web app configuration as JSON (repository variable NEXT_PUBLIC_FIREBASE_APIKEY)"
   type        = string
 
-  # Ohne Wert (Repository-Variable RUN_SERVICE_URL_PROD nicht gesetzt) käme ein
-  # leerer String an und der Scheduler-Job bekäme die URI "/api/...". Der Job
-  # liefe dann jede Woche ins Leere, ohne dass es auffällt — deshalb hier ein
-  # lauter Fehler statt einer stillen Fehlkonfiguration.
   validation {
-    condition     = startswith(var.run_service_url, "https://")
-    error_message = "run_service_url muss mit https:// beginnen (Repository-Variable RUN_SERVICE_URL_PROD)."
+    condition     = can(jsondecode(var.firebase_config).projectId)
+    error_message = "firebase_config muss ein JSON-Objekt mit projectId sein — sonst startet die App im Browser mit '\"projectId\" not provided in firebase.initializeApp'."
   }
+}
 
-  # Ein Schrägstrich am Ende wäre genauso tödlich, nur unauffälliger: Der
-  # Scheduler stellte das Token auf "https://host/" aus, während `getBaseUrl()`
-  # im Dienst den Schrägstrich abschneidet und "https://host" erwartet. Die
-  # Audience passte nicht, `cronRequired` antwortete 403, und die einzige Spur
-  # wäre jeden Montag eine Logzeile — ohne Mail und ohne Alarm.
-  validation {
-    condition     = !endswith(var.run_service_url, "/")
-    error_message = "run_service_url darf nicht mit / enden — die Audience des OIDC-Tokens müsste sonst exakt so lauten."
-  }
+variable "recaptcha_key" {
+  description = "Public reCAPTCHA site key (repository variable NEXT_PUBLIC_RECAPTCHA_KEY)"
+  type        = string
+}
+
+variable "einsatzmappe_impersonation_account" {
+  description = "Workspace account impersonated for Einsatzmappe and mail"
+  type        = string
 }
