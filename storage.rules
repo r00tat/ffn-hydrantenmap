@@ -16,9 +16,13 @@ function authorizedUser() {
 // Diese Datei wird über terraform ausgerollt
 // (`google_firebaserules_ruleset`/`_release` in
 // terraform/modules/project-base/firebase.tf), nicht über `firebase deploy` —
-// in `firebase.json` steht sie deshalb bewusst nicht. Eine Änderung hier
-// braucht einen terraform-Apply, ausgelöst vom Workflow `terraform.yml`, der
-// auf `storage.rules` lauscht.
+// in `firebase.json` steht sie deshalb bewusst nicht.
+//
+// Die Regeln gelten für den Default-Bucket `<projekt>.appspot.com`, den es je
+// Projekt genau einmal gibt und den sich dev und prod derzeit teilen. Sie
+// liegen deshalb im Projekt-Root (terraform/projects/<projekt-id>), der bei
+// jedem Push auf main vor dem Deploy appliziert wird — eine Änderung hier ist
+// mit dem nächsten Merge wirksam.
 service firebase.storage {
   match /b/{bucket}/o {
   	match /firecall/{firecallId}/files/{fileName} {

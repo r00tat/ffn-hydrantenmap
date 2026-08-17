@@ -18,6 +18,8 @@ npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
 npm run check        # Run all checks: typecheck, lint, tests, build
 npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
+npm run tfvars:dev   # Deploy-Variablen für terraform aus dem laufenden Dienst holen
+npm run tfvars:prod  # dito für prod (siehe „Deployment")
 NO_COLOR=1 npm run test  # Run tests without ANSI colors (easier to parse output)
 ```
 
@@ -290,6 +292,175 @@ EOF
 )"
 ```
 
+## Deployment (Cloud Run über Terraform)
+
+Der Cloud-Run-Dienst liegt in [terraform/modules/cloud-run](terraform/modules/cloud-run/);
+deployt wird mit `tofu apply`, nicht mit `gcloud run deploy`. Der Deploy-Job in
+[cloud-run.yml](.github/workflows/cloud-run.yml) baut das Image und appliziert
+anschließend den Root der Zielumgebung — dev bei jedem Push auf main, prod bei
+jedem Release-Tag.
+
+**Es gibt genau einen automatischen Applier.** [terraform.yml](.github/workflows/terraform.yml)
+plant nur noch (PRs) und hat einen `workflow_dispatch`-Apply als Handgriff. Beide
+Workflows teilen die Concurrency-Gruppe `tf-apply-<env>`, zwei gleichzeitige
+apply auf denselben State sind damit ausgeschlossen.
+
+**Aus PRs wird nicht mehr deployt.** Ein Deploy ist jetzt ein Apply, und ein
+Apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die gemeinsame
+Dev-Umgebung wäre nicht zu verantworten.
+
+### Einen Branch auf dev ausrollen
+
+*Actions → Cloud Run → Run workflow*, Branch wählen, `serving_revision` **leer
+lassen**. Das baut das Image, appliziert die Projekt-Basis und appliziert dev —
+dieselben drei Jobs wie ein Push auf main, nur für diesen Branch. Zielumgebung
+ist dev, weil sie aus `github.ref_type` abgeleitet wird; nach prod geht nur ein
+Tag. Der Branchname wird zum Traffic-Tag, die Revision ist danach unter
+`https://<tag>---<dienst>-<hash>.a.run.app` erreichbar.
+
+Ist das Feld dagegen gefüllt, ist es ein Rollback: Der Build entfällt und der
+Traffic geht auf die genannte, bereits existierende Revision.
+
+**Ein PR pusht kein Image.** Er plant nur, also würde das Image in der Registry
+liegen, ohne je eine Revision zu werden — und von keiner Aufräumregel erfasst,
+weil die an den Revisionen hängt. Gebaut wird trotzdem: Der Build ist der Test,
+dass das Image überhaupt entsteht, und trägt Lint und Tests. Steuernd ist
+`PUSHED` im Setup-env-Step von [cloud-run.yml](.github/workflows/cloud-run.yml);
+daran hängen auch der Inline-Cache und der Digest-Step, denn ohne Push gibt es
+keinen Registry-Digest.
+
+Deshalb löscht [cleanup-artifacts.yml](.github/workflows/cleanup-artifacts.yml)
+beim Schließen eines PRs auch keinen Traffic-Tag mehr — der `traffic`-Block in
+terraform ist autoritativ, und `--keep-branches` lässt den Tag eines gemergten
+Branches beim nächsten Dev-Deploy von selbst wegfallen. Das Image wird weiter
+gelöscht, weil ein von Hand ausgerollter Branch eines hat.
+
+### Revisionsnamen und Fingerabdruck
+
+Der Revisionsname wird gesetzt, nicht von Cloud Run generiert — sonst kennt
+terraform ihn beim Plan nicht und könnte keinen Traffic-Tag darauf legen. Er
+lautet `<dienst>-<version>-<fingerabdruck>`, wobei der Fingerabdruck ein Hash
+über alles ist, was ins Template einfließt (`local.template_fingerprint`).
+
+Revisionen sind unveränderlich: Ein geändertes Template unter einem schon
+vergebenen Namen wird abgelehnt. Der Fingerabdruck sorgt dafür, dass sich der
+Name genau dann ändert, wenn sich der Inhalt ändert — ein apply ohne Änderung
+legt keine neue Revision an. **Wer dem Template ein Feld hinzufügt, trägt es in
+den Fingerabdruck ein**, sonst scheitert der apply an einem Namenskonflikt.
+
+**Ausgerollt wird der Digest, nicht der Tag.** Der Build gibt
+`<image>@sha256:…` weiter (`image_ref` in [cloud-run.yml](.github/workflows/cloud-run.yml)),
+nicht `<image>:main`. Ein Tag ist veränderlich: Jeder Push auf main baut nach
+`…:main`, zwei Pushes hintereinander ergäben denselben Fingerabdruck, denselben
+Revisionsnamen und damit „no changes" — das neue Image würde nie ausgerollt.
+Mit `gcloud run deploy` fiel das nicht auf, weil gcloud jedes Mal einen frischen
+Revisionsnamen erzeugt. Der Digest ändert sich genau dann, wenn sich der Inhalt
+ändert; der Tag bleibt in der Registry als Einstieg für Menschen. Wer die
+Image-Referenz je wieder aus einem Tag bildet, bricht den Dev-Deploy —
+lautlos, weil der apply erfolgreich durchläuft.
+
+### Traffic-Tags und ihre Bereinigung
+
+Der `traffic`-Block ist autoritativ: Was nicht drinsteht, verliert seinen Tag.
+Das ist beabsichtigt, denn ein Tag macht seine Revision adressierbar und nimmt
+sie damit dauerhaft aus Cloud Runs automatischer Bereinigung (Limit 1000
+Revisionen je Dienst, 2000 Tags je Projekt und Region). Vor der Umstellung waren
+so 108 Tags in prod und 73 in dev aufgelaufen, die meisten davon Branches, die es
+längst nicht mehr gibt.
+
+Welche Tags bleiben, entscheidet [scripts/cloud-run-tfvars.sh](scripts/cloud-run-tfvars.sh),
+das vor jedem Plan und Apply `cloudrun.auto.tfvars.json` schreibt (gitignored):
+
+- **prod:** `--keep 20` — die zwanzig jüngsten Releases als Rollback-Fenster.
+- **dev:** `--keep-branches` — nur Tags, zu denen es auf origin noch einen Branch
+  gibt. Ein gemergter Branch verliert seinen Tag beim nächsten Dev-Deploy von
+  selbst.
+
+Das Skript ist auch die einzige Stelle, die einen Git-Ref auf einen Tag
+normalisiert (`--print-tag`); der Workflow bildet den Image-Tag darüber, statt
+die Abbildung ein zweites Mal in `sed` nachzubauen.
+
+**Lokal genügt `npm run tfvars:dev` bzw. `npm run tfvars:prod`.** Das `--env`
+des Skripts fragt den Terraform-Root per `tofu console` nach Projekt, Region
+und `local.service_name` und leitet daraus auch Zieldatei und
+Aufbewahrungsregel ab — deshalb steht in `package.json` keine Projekt-ID und
+kein Dienstname. Voraussetzung ist ein initialisierter Root (`tofu init`).
+Argumente lassen sich durchreichen: `npm run tfvars:dev -- --image … --version …`.
+
+**Ohne `--image` liest das Skript Image und Revisions-Suffix aus dem laufenden
+Dienst.** Nur deshalb kann ein Apply von Hand, der etwa Firestore-Regeln ändert,
+die App nicht versehentlich auf einen alten Stand zurückdrehen. Das Suffix steht
+dafür als Label `deploy-version` an der Revision.
+
+### Rollback
+
+Ein `gcloud run services update-traffic` von Hand ist **kein Rollback mehr,
+sondern Drift** — der nächste apply dreht ihn zurück. Der Weg zurück führt über
+den Workflow:
+
+*Actions → Cloud Run → Run workflow*, Feld `serving_revision` auf die
+Zielrevision (z.B. `hydrantenmap-v2-62-0-a1b2c3d4`). Ist das Feld gesetzt, wird
+der Build übersprungen — ein Rollback baut nichts, es zeigt auf eine Revision,
+die es schon gibt. Getaggte Revisionen sind vorher unter ihrer eigenen URL
+(`https://<tag>---<dienst>-<hash>.a.run.app`) prüfbar.
+
+Der Nachteil gegenüber `gcloud`: Ein Rollback dauert so lang wie ein Apply,
+Größenordnung ein bis zwei Minuten statt zehn Sekunden.
+
+### Übernahme bestehender Dienste
+
+`imports.tf` in beiden Roots holt den seit 2021 bzw. 2022 bestehenden Dienst in
+den State. Die Blöcke dürfen stehenbleiben — terraform überspringt sie, sobald
+die Ressource im State liegt — und können nach dem ersten erfolgreichen Apply in
+beiden Umgebungen entfallen.
+
+## Projekt-Basis
+
+**Ein Root je GCP-Projekt, nicht je Environment** — derzeit
+[terraform/projects/ffn-utils](terraform/projects/ffn-utils/). Dort liegt alles,
+was ein Environment-Apply bereits **vorfindet**, statt es anzulegen: die Rechte
+des Pipeline-SA, die aktivierten APIs, die Secret-Hüllen, die Registries, der
+WIF-Pool, die Storage-Regeln.
+
+Vorher gehörte das dem Prod-Root über ein `manage_project_base`-Flag. Damit hing
+eine Voraussetzung des Dev-Applies an der Release-Kadenz von prod: Eine neue
+Rolle wurde erst beim nächsten Release wirksam, und bis dahin scheiterte dev mit
+403 auf der neuen Ressource. Das galt genauso für ein neues Dev-Secret oder eine
+neu gebrauchte API. Die Regel „erst prod applien" war das Symptom, nicht die
+Lösung — sie ist ersatzlos entfallen.
+
+**Der Base-Job in [cloud-run.yml](.github/workflows/cloud-run.yml) läuft vor
+jedem Environment-Apply**, parallel zum Build. Die Reihenfolge ist damit
+erzwungen statt dokumentiert. Der `workflow_dispatch`-Apply in
+[terraform.yml](.github/workflows/terraform.yml) kennt `base` zusätzlich als
+Auswahl — gebraucht wird er nur für den Erstimport.
+
+### Wenn dev ein eigenes Projekt bekommt
+
+Die Struktur ist darauf ausgelegt und ändert sich dabei **nicht**: Es kommt ein
+zweiter Root `terraform/projects/<projekt-id>/` dazu, und `BASE_ROOT` in beiden
+Workflows zeigt für dev dorthin. Die Environment-Roots bleiben, wie sie sind.
+
+Ersatzlos entfallen dann die Kunstgriffe, die es nur gibt, weil beide sich ein
+Projekt teilen: `name_suffix` im [cloud-scheduler](terraform/modules/cloud-scheduler/),
+der zweite Eintrag in `local.cron_invoker_emails` samt `check`-Block, das `-dev`
+im Dienstnamen, die `SUMUP_*_DEV`-Secrets und die Firestore-Datenbank `ffndev`.
+`CLOUDSDK_CORE_PROJECT`, `WORKLOAD_IDENTITY_PROVIDER`, `TERRAFORM_SERVICE_ACCOUNT`,
+`GOOGLE_SERVICE_ACCOUNT`, `IMAGE` und `RUN_SERVICE` wandern vom Repository- in
+den Environment-Scope.
+
+**Wichtig dabei: nichts über die Projektgrenze reichen lassen.** Sonst kehrt
+genau dieselbe Falle als Cross-Project-Abhängigkeit zurück, nur schlimmer — ein
+Service Account kann sich im fremden Projekt keine Rechte erteilen. Betrifft drei
+Dinge, die heute geteilt sind und dann verdoppelt gehören: **State-Bucket**
+(sonst müsste prod dem Dev-SA Zugriff geben), **Artifact Registry** (sonst
+bräuchte der Dev-Runtime-SA einen Cross-Project-Reader) und der **WIF-Pool**.
+Hält man das durch, wissen die beiden Pipelines nichts mehr voneinander.
+
+Der Erstaufbau eines neuen Projekts (Projekt, Bucket, SA, WIF, erste Rollen)
+bleibt Handarbeit — er erzeugt die Credentials, mit denen terraform danach
+arbeitet.
+
 ## Testing (TDD)
 
 **For all new features, write tests first before writing implementation code.** Follow test-driven development:
@@ -556,9 +727,11 @@ Daran hängen drei Dinge, die zusammengehören:
   Cloud Run lässt bis zu 80 Anfragen auf denselben Container, und ein OOM reißt
   alle mit, nicht nur den Export.
 
-Das Speicherlimit steht auf **1Gi**, gesetzt über `--memory` in
-[cloud-run.yml](.github/workflows/cloud-run.yml). Ohne das Flag behält der
-Dienst stillschweigend seinen bisherigen Wert.
+Das Speicherlimit steht auf **1Gi**, als Vorgabewert von `memory` in
+[terraform/modules/cloud-run](terraform/modules/cloud-run/variables.tf). Vorher
+war es ein `--memory`-Flag am `gcloud run deploy`, und weil `gcloud` additiv
+arbeitet, hing der tatsächliche Wert daran, ob seit der Änderung schon einmal
+deployt wurde — prod lief nach #674 noch monatelang auf den alten 512Mi.
 
 Die Größenprüfung (`MAX_EXPORT_ENTRIES`, 5000) läuft als Count-Query **vor** dem
 Lesen. Die Zählung braucht dasselbe `orderBy('abfahrt', 'desc')` wie die
@@ -587,19 +760,20 @@ deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, De
 `"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
 Job an und der zweite `apply` scheiterte mit 409.
 
-**Prod zuerst applien.** Die API-Aktivierung (`cloudscheduler.googleapis.com`)
-und die Rolle `roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
-[project-base](terraform/modules/project-base/), und das gehört ausschließlich
-dem Root mit `manage_project_base = true` — derzeit prod. Dev appliziert aber
-schon beim Push auf main, prod erst beim Release. Nach jeder Erweiterung der
-Projekt-Basis deshalb erst prod von Hand applien (`workflow_dispatch`, mode
-`apply`, environment `prod`), sonst scheitert der Dev-Lauf mit 403 auf der neuen
-Ressource.
+Die API-Aktivierung (`cloudscheduler.googleapis.com`) und die Rolle
+`roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
+[project-base](terraform/modules/project-base/). Das liegt im Projekt-Root
+(siehe „Projekt-Basis"), der in beiden Pipelines vor jedem Environment-Apply
+läuft — eine Erweiterung ist damit sofort wirksam. Die frühere Regel „erst prod
+applien" gibt es nicht mehr.
 
-Die Allowlist `CRON_INVOKER_EMAILS` wird beim Deploy gesetzt, nicht von
-terraform. Wer eine Umgebung hinzufügt, erweitert sie in
-[cloud-run.yml](.github/workflows/cloud-run.yml) **und** setzt das passende
-`name_suffix` — sonst bekommt der neue Invoker ein 403 von `cronRequired`.
+Die Allowlist `CRON_INVOKER_EMAILS` setzt terraform als Env-Var des Dienstes
+(`local.cron_invoker_emails` im jeweiligen Root). Sie wird dort aus Zeichenketten
+gebaut statt aus `module.cloud_scheduler` gelesen: Der Dienst braucht die Liste,
+der Scheduler braucht die URL des Dienstes — eine Referenz ergäbe einen Zyklus.
+Ein `check`-Block im Root prüft deshalb nach jedem apply, dass der tatsächliche
+Invoker-SA auf der gebauten Liste steht. Wer eine Umgebung hinzufügt, erweitert
+die Suffix-Liste **und** setzt das passende `name_suffix`.
 
 **Von Hand versenden:** Im Admin-Bereich unter Fahrtenbuch → Einstellungen sitzt
 der Abschnitt „Wochenbericht versenden"
@@ -666,8 +840,11 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
 - **`storage.rules` wird über terraform ausgerollt**
   (`google_firebaserules_ruleset`/`_release` in
   [firebase.tf](terraform/modules/project-base/firebase.tf)), nicht über `firebase deploy`
-  — in `firebase.json` steht die Datei deshalb bewusst nicht. Eine Änderung braucht einen
-  Apply aus [terraform.yml](.github/workflows/terraform.yml).
+  — in `firebase.json` steht die Datei deshalb bewusst nicht. Die Regeln gelten für den
+  Default-Bucket `<projekt>.appspot.com`, den es je Projekt einmal gibt; sie liegen deshalb
+  im Projekt-Root und werden bei jedem Push auf main vor dem Deploy appliziert. **Dev und
+  prod teilen sich diesen Bucket** — beide Dienste tragen `ffn-utils.appspot.com` in ihrer
+  Firebase-Konfiguration.
 - Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
   braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
 
@@ -729,20 +906,16 @@ Required environment variables (see `.env.local`):
   (aktuell `/api/fahrtenbuch/weekly-report`). **Pflicht für diese Endpoints:**
   Ohne die Variable lehnt `cronRequired` jeden Aufruf ab (fail closed) — ein
   offener Endpoint, der Mails an gepflegte Verteilerlisten verschickt, wäre ein
-  Mail-Relay. In Cloud Run wird der Wert beim Deploy gesetzt
-  ([cloud-run.yml](.github/workflows/cloud-run.yml)), abgeleitet aus
-  `GOOGLE_CLOUD_PROJECT` und den Namen der Invoker-Service-Accounts. Die Liste
-  enthält die Invoker **beider** Umgebungen, weil Dev und Prod das Projekt
-  `ffn-utils` teilen; deren Namen unterscheidet `name_suffix` des Moduls
-  `cloud-scheduler`, und die Namen müssen dort und im Workflow gleich lauten.
+  Mail-Relay. In Cloud Run setzt terraform den Wert als Env-Var des Dienstes
+  (`local.cron_invoker_emails` im jeweiligen Root), abgeleitet aus dem Projekt
+  und den Namen der Invoker-Service-Accounts. Die Liste enthält die Invoker
+  **beider** Umgebungen, weil Dev und Prod das Projekt `ffn-utils` teilen; deren
+  Namen unterscheidet `name_suffix` des Moduls `cloud-scheduler`. Ein
+  `check`-Block im Root prüft, dass der tatsächliche Invoker auf der Liste steht.
 
   **Bewusst kein Secret-Manager-Secret:** Der Wert ist eine Kennung, kein
   Geheimnis — wer die Adresse kennt, kann kein Token dafür ausstellen, dazu
-  braucht es IAM-Rechte auf den Service Account. Als Secret hinge außerdem jedes
-  Deploy daran, dass vorher ein `terraform apply` gelaufen ist, und der
-  prod-apply (dem die Projekt-Basis und damit das Secret gehören) läuft nur bei
-  einem Release. Ein Deploy von main hätte dann mit
-  `Secret … was not found` abgebrochen.
+  braucht es IAM-Rechte auf den Service Account.
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.

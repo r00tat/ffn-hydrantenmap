@@ -43,3 +43,8 @@ terraform.rc
 # dieselben Provider-Versionen auflösen.
 
 *tfplan
+
+# Deploy-Variablen, erzeugt von scripts/cloud-run-tfvars.sh. Sie beschreiben den
+# laufenden Deploy, nicht den gewünschten Dauerzustand (von *.tfvars.json oben
+# ohnehin erfasst — hier nur, damit klar ist warum).
+environments/*/cloudrun.auto.tfvars.json
