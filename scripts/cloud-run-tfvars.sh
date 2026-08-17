@@ -29,37 +29,83 @@ Usage: cloud-run-tfvars.sh --service NAME --project ID --region REGION --out FIL
                            [--keep N | --keep-branches]
        cloud-run-tfvars.sh --print-tag --version REF
 
-  --service         Name des Cloud-Run-Dienstes
-  --project         GCP-Projekt
-  --region          Region des Dienstes
-  --out             Zieldatei (…/cloudrun.auto.tfvars.json)
-  --image           Neu gebautes Image. Fehlt es, wird das laufende übernommen.
-  --version         Git-Ref oder Version des Deploys, z.B. refs/tags/v2.63.0
-                    oder ein Branchname. Wird zu Tag und Revisions-Suffix.
-  --keep N          Die N jüngsten Tags behalten.
-  --keep-branches   Nur Tags behalten, deren Branch auf origin noch existiert.
-  --print-tag       Nur den normalisierten Tag ausgeben und beenden (kein GCP).
+  -s, --service NAME    Name des Cloud-Run-Dienstes
+  -p, --project ID      GCP-Projekt
+  -r, --region REGION   Region des Dienstes
+  -o, --out FILE        Zieldatei (…/cloudrun.auto.tfvars.json)
+  -i, --image IMAGE     Neu gebautes Image. Fehlt es, wird das laufende übernommen.
+  -v, --version REF     Git-Ref oder Version des Deploys, z.B. refs/tags/v2.63.0
+                        oder ein Branchname. Wird zu Tag und Revisions-Suffix.
+  -k, --keep N          Die N jüngsten Tags behalten.
+  -b, --keep-branches   Nur Tags behalten, deren Branch auf origin noch existiert.
+  -t, --print-tag       Nur den normalisierten Tag ausgeben und beenden (kein GCP).
+  -h, --help            Diese Hilfe.
+
+Lange Optionen nehmen ihren Wert als naechstes Argument oder mit
+Gleichheitszeichen: --keep 20 und --keep=20 sind gleichwertig.
 EOF
-  exit 2
+  exit "${1:-2}"
 }
 
 SERVICE="" PROJECT="" REGION="" OUT="" IMAGE="" VERSION="" KEEP="" KEEP_BRANCHES=0 PRINT_TAG=0
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --print-tag) PRINT_TAG=1; shift ;;
-    --service) SERVICE="$2"; shift 2 ;;
-    --project) PROJECT="$2"; shift 2 ;;
-    --region) REGION="$2"; shift 2 ;;
-    --out) OUT="$2"; shift 2 ;;
-    --image) IMAGE="$2"; shift 2 ;;
-    --version) VERSION="$2"; shift 2 ;;
-    --keep) KEEP="$2"; shift 2 ;;
-    --keep-branches) KEEP_BRANCHES=1; shift ;;
-    -h|--help) usage ;;
-    *) echo "Unbekanntes Argument: $1" >&2; usage ;;
+# getopts kennt von Haus aus nur kurze Optionen. Das ':-' in der Optionsliste
+# macht '-' zu einer Option mit Argument: Aus '--keep=20' wird dann opt='-' mit
+# OPTARG='keep=20', aus '--keep' entsprechend OPTARG='keep'. Der Block darunter
+# rechnet beides auf denselben Namen und Wert um, sodass das eigentliche case
+# lange und kurze Schreibweise gemeinsam behandelt.
+#
+# Der Doppelpunkt am Anfang schaltet getopts' eigene Fehlermeldungen ab — die
+# Faelle ':' (Wert fehlt) und '?' (unbekannt) werden unten selbst beantwortet.
+while getopts ':s:p:r:o:i:v:k:bth-:' opt; do
+  if [[ "$opt" == "-" ]]; then
+    if [[ "$OPTARG" == *=* ]]; then
+      opt="${OPTARG%%=*}"
+      OPTARG="${OPTARG#*=}"
+    else
+      opt="$OPTARG"
+      case "$opt" in
+        service | project | region | out | image | version | keep)
+          # Wert steht im naechsten Argument.
+          OPTARG="${!OPTIND:-}"
+          if [[ -z "$OPTARG" ]]; then
+            echo "::error::--${opt} braucht einen Wert." >&2
+            exit 2
+          fi
+          OPTIND=$((OPTIND + 1))
+          ;;
+        *) OPTARG="" ;;
+      esac
+    fi
+  fi
+
+  case "$opt" in
+    s | service) SERVICE="$OPTARG" ;;
+    p | project) PROJECT="$OPTARG" ;;
+    r | region) REGION="$OPTARG" ;;
+    o | out) OUT="$OPTARG" ;;
+    i | image) IMAGE="$OPTARG" ;;
+    v | version) VERSION="$OPTARG" ;;
+    k | keep) KEEP="$OPTARG" ;;
+    b | keep-branches) KEEP_BRANCHES=1 ;;
+    t | print-tag) PRINT_TAG=1 ;;
+    h | help) usage 0 ;;
+    :)
+      echo "::error::-${OPTARG} braucht einen Wert." >&2
+      exit 2
+      ;;
+    *)
+      echo "::error::Unbekannte Option: ${OPTARG:-$opt}" >&2
+      usage
+      ;;
   esac
 done
+shift $((OPTIND - 1))
+
+if [[ $# -gt 0 ]]; then
+  echo "::error::Unerwartete Argumente: $*" >&2
+  usage
+fi
 
 # Normalisiert einen Git-Ref auf einen Cloud-Run-Tag: Kleinbuchstaben, nur
 # [a-z0-9-], höchstens 30 Zeichen, kein Bindestrich am Ende. Die einzige
