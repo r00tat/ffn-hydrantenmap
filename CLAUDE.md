@@ -307,8 +307,33 @@ apply auf denselben State sind damit ausgeschlossen.
 
 **Aus PRs wird nicht mehr deployt.** Ein Deploy ist jetzt ein Apply, und ein
 Apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die gemeinsame
-Dev-Umgebung wäre nicht zu verantworten. Einen Branch auf dev ausprobieren geht
-über `workflow_dispatch` auf diesem Branch.
+Dev-Umgebung wäre nicht zu verantworten.
+
+### Einen Branch auf dev ausrollen
+
+*Actions → Cloud Run → Run workflow*, Branch wählen, `serving_revision` **leer
+lassen**. Das baut das Image, appliziert die Projekt-Basis und appliziert dev —
+dieselben drei Jobs wie ein Push auf main, nur für diesen Branch. Zielumgebung
+ist dev, weil sie aus `github.ref_type` abgeleitet wird; nach prod geht nur ein
+Tag. Der Branchname wird zum Traffic-Tag, die Revision ist danach unter
+`https://<tag>---<dienst>-<hash>.a.run.app` erreichbar.
+
+Ist das Feld dagegen gefüllt, ist es ein Rollback: Der Build entfällt und der
+Traffic geht auf die genannte, bereits existierende Revision.
+
+**Ein PR pusht kein Image.** Er plant nur, also würde das Image in der Registry
+liegen, ohne je eine Revision zu werden — und von keiner Aufräumregel erfasst,
+weil die an den Revisionen hängt. Gebaut wird trotzdem: Der Build ist der Test,
+dass das Image überhaupt entsteht, und trägt Lint und Tests. Steuernd ist
+`PUSHED` im Setup-env-Step von [cloud-run.yml](.github/workflows/cloud-run.yml);
+daran hängen auch der Inline-Cache und der Digest-Step, denn ohne Push gibt es
+keinen Registry-Digest.
+
+Deshalb löscht [cleanup-artifacts.yml](.github/workflows/cleanup-artifacts.yml)
+beim Schließen eines PRs auch keinen Traffic-Tag mehr — der `traffic`-Block in
+terraform ist autoritativ, und `--keep-branches` lässt den Tag eines gemergten
+Branches beim nächsten Dev-Deploy von selbst wegfallen. Das Image wird weiter
+gelöscht, weil ein von Hand ausgerollter Branch eines hat.
 
 ### Revisionsnamen und Fingerabdruck
 

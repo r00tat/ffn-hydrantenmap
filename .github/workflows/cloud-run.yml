@@ -1,5 +1,17 @@
 name: "Cloud Run"
 
+# Vier Wege hier hinein, und nur drei davon rollen aus:
+#
+#   Push auf main      -> Build, Projekt-Basis, Apply auf dev
+#   Release-Tag v*     -> Build, Projekt-Basis, Apply auf prod
+#   Run workflow       -> dasselbe für den gewählten Branch; auf einem Branch
+#                         geht es nach dev, auf einem Tag nach prod. Das ist
+#                         der Weg, einen Feature-Branch auf dev auszuprobieren.
+#   Pull Request       -> nur Build, Lint und Tests. Kein Apply (ungeprüfter
+#                         Terraform-Code aus einem PR-Branch gegen die geteilte
+#                         Dev-Umgebung) und deshalb auch KEIN Push in die
+#                         Registry: ein Image, das nie eine Revision wird,
+#                         gehört dort nicht hin.
 on:
   push:
     branches:
@@ -12,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       serving_revision:
-        description: "Rollback: Revision, die den Traffic bekommt (leer = die neu gebaute)"
+        description: "Leer lassen, um diesen Branch zu bauen und auf dev auszurollen. Für einen Rollback stattdessen die Revision eintragen, die den Traffic bekommen soll."
         type: string
         required: false
         default: ""
@@ -111,8 +123,19 @@ jobs:
             exit 1
           fi
 
+          # Gepusht wird nur, was auch ausgerollt wird. Ein Pull Request plant
+          # bloß; sein Image würde in der Registry liegen, ohne je eine
+          # Revision zu werden — und dort von keiner Aufräumregel erfasst, weil
+          # die an den Revisionen hängt und nicht an den Layern. Gebaut wird
+          # trotzdem, der Build ist der Test, dass das Image überhaupt entsteht.
+          #
+          # Kein `[[ … ]] && PUSHED=true` als eigenständige Zeile: Ist die
+          # Bedingung falsch, gibt die Zeile 1 zurück und `set -e` beendet den
+          # Step.
           PUSHED=false
-          [[ -n "${workload_identity_provider}" ]] && PUSHED=true
+          if [[ -n "${workload_identity_provider}" && "${GITHUB_EVENT_NAME}" != "pull_request" ]]; then
+            PUSHED=true
+          fi
 
           echo "Environment:"
           cat <<EOF | tee -a "$GITHUB_ENV" | tee -a "$GITHUB_OUTPUT"
@@ -179,7 +202,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: ${{ env.workload_identity_provider != '' }}
+          # Siehe "PUSHED" im Setup-env-Step: ein PR baut, pusht aber nicht.
+          push: ${{ steps.env.outputs.PUSHED == 'true' }}
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             DOCKER_REGISTRY=${{ env.workload_identity_provider != '' && format('{0}-docker.pkg.dev/{1}/dockerhub/', env.RUN_REGION, env.GOOGLE_CLOUD_PROJECT) || '' }}
@@ -188,8 +212,10 @@ jobs:
             NEXT_PUBLIC_OAUTH_CLIENT_ID=${{ env.NEXT_PUBLIC_OAUTH_CLIENT_ID }}
             NEXT_PUBLIC_RECAPTCHA_KEY=${{ env.NEXT_PUBLIC_RECAPTCHA_KEY }}
             NEXT_PUBLIC_BUILD_ID=${{ steps.env.outputs.VERSION }}
+          # Lesen darf der PR-Build aus der Registry, schreiben nicht — der
+          # Inline-Cache steckt im gepushten Image und entsteht ohne Push nicht.
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}
-          cache-to: ${{ env.workload_identity_provider != '' && 'type=inline' || '' }}
+          cache-to: ${{ steps.env.outputs.PUSHED == 'true' && 'type=inline' || '' }}
 
       # Terraform bekommt den Digest, nicht den Tag.
       #
@@ -205,9 +231,12 @@ jobs:
       # sagt der Fingerabdruck die Wahrheit: neues Image -> neue Revision,
       # unverändertes Image -> kein Deploy. Der Tag bleibt trotzdem in der
       # Registry, er ist der Einstieg für Menschen.
+      # Nur nach einem Push: Ohne ihn liefert die Action bestenfalls eine
+      # lokale Image-ID, und die ist keine Referenz, die Cloud Run auflösen
+      # könnte.
       - id: digest
         name: Image-Referenz auf den Digest festnageln
-        if: ${{ env.workload_identity_provider != '' }}
+        if: ${{ steps.env.outputs.PUSHED == 'true' }}
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
         run: |
