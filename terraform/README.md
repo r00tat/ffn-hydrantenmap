@@ -96,9 +96,17 @@ Bucket und Prefix stehen fest in `environments/<env>/backend.tf`. Falls `.envrc`
 | PR nach `main` | `plan` für Projekt-Basis, dev und prod, Ergebnis als PR-Kommentar |
 | `workflow_dispatch` | Root (`base`/`dev`/`prod`) und Modus wählbar |
 
-Der `plan` läuft nur bei Änderungen an `terraform/**`, `firebase/**`, `storage.rules`,
-`scripts/cloud-run-tfvars.sh` oder am Workflow selbst. `firebase/**` gehört dazu, weil Terraform
-die Rules und Index-Definitionen liest.
+Der `plan` läuft auf **jedem** PR, nicht nur bei Änderungen an `terraform/**`. Ein Merge löst
+seit dem Umbau einen `apply` über den ganzen Environment-Root aus — dazu den der Projekt-Basis
+davor. Ob der durchgeht, hängt damit nicht mehr nur am Terraform-Code im PR, sondern auch an
+Drift, an Rechten und an allem, was jemand von Hand geändert hat. Vorher war ein Deploy ein
+`gcloud run deploy` auf einen Dienst; jetzt ist der Blast Radius die ganze Umgebung.
+
+Ein Plan ohne Änderungen kostet ~40 s und **kommentiert nichts** — sonst trüge jeder
+Dependabot-PR drei Klappboxen mit „No changes.". Erkannt wird das über
+`tofu plan -detailed-exitcode` (0 = keine Änderungen, 2 = Änderungen), nicht über einen Textfund
+im Plan. Steht schon ein Plan-Kommentar am PR, wird er trotzdem aktualisiert, damit kein
+überholter Plan stehen bleibt.
 
 **Appliziert wird nicht hier, sondern beim Deploy** (`.github/workflows/cloud-run.yml`): Der
 Cloud-Run-Dienst liegt seit dem Umbau selbst in Terraform, ein Deploy ist damit ein `apply` — auf

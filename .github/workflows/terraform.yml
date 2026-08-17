@@ -8,16 +8,17 @@ name: Terraform
 # apply auf denselben State wäre bestenfalls redundant. Geblieben ist der
 # `workflow_dispatch`-Apply als Handgriff, den die Projekt-Basis braucht
 # (siehe "Prod zuerst applien" in CLAUDE.md).
+#
+# Der `plan` läuft auf **jedem** PR, nicht nur bei Änderungen an terraform/**.
+# Ein Merge löst seit dem Umbau einen apply über den ganzen Environment-Root
+# aus — dazu den der Projekt-Basis davor. Ob der durchgeht, hängt damit nicht
+# mehr nur am Terraform-Code im PR, sondern auch an Drift, an Rechten und an
+# allem, was jemand von Hand geändert hat. Genau das soll der Plan vorher
+# zeigen. Ein Plan ohne Änderungen kostet ~40s und kommentiert nichts.
 on:
   pull_request:
     branches:
       - main
-    paths:
-      - "terraform/**"
-      - "firebase/**"
-      - "storage.rules"
-      - "scripts/cloud-run-tfvars.sh"
-      - ".github/workflows/terraform.yml"
   workflow_dispatch:
     inputs:
       environment:
@@ -95,13 +96,25 @@ jobs:
           tofu validate
 
       - name: Plan
+        id: plan
         if: ${{ env.gcp_ready == 'true' }}
         working-directory: ${{ env.BASE_ROOT }}
         run: |
           set -o pipefail
           tofu init -input=false
           tofu validate
-          tofu plan -input=false -no-color -out=tfplan
+          # -detailed-exitcode: 0 = keine Änderungen, 2 = Änderungen, alles
+          # andere ist ein Fehler. Damit muss der Kommentar-Step den Plantext
+          # nicht nach "No changes." absuchen.
+          set +e
+          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >>"$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
           tofu show -no-color tfplan > plan.txt
 
       - name: Step summary
@@ -122,20 +135,34 @@ jobs:
         uses: actions/github-script@v8
         env:
           ROOT: ${{ env.BASE_ROOT }}
+          HAS_CHANGES: ${{ steps.plan.outputs.changes }}
         with:
           script: |
             const fs = require('fs');
             const marker = '<!-- tofu-plan:base -->';
+            const hasChanges = process.env.HAS_CHANGES === 'true';
             const plan = fs
               .readFileSync(`${process.env.ROOT}/plan.txt`, 'utf8')
               .slice(0, 60000);
-            const body = `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`;
+            const body = hasChanges
+              ? `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
+              : `${marker}\n### Terraform plan — \`Projekt-Basis\`\n\nKeine Änderungen.`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: context.issue.number,
             });
             const existing = comments.find((c) => c.body?.includes(marker));
+
+            // Der Plan läuft auf jedem PR, auch auf solchen, die terraform
+            // nicht anfassen. Ein leerer Plan bekommt deshalb keinen eigenen
+            // Kommentar — sonst trägt jeder Dependabot-PR drei Klappboxen mit
+            // "No changes.". Ein bereits vorhandener wird aber aktualisiert,
+            // damit kein überholter Plan stehen bleibt.
+            if (!hasChanges && !existing) {
+              core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
+              return;
+            }
 
             if (existing) {
               await github.rest.issues.updateComment({
@@ -254,7 +281,16 @@ jobs:
         if: ${{ env.gcp_ready == 'true' }}
         run: |
           set -o pipefail
-          tofu plan -input=false -no-color -out=tfplan
+          # Siehe plan-base: 0 = keine Änderungen, 2 = Änderungen.
+          set +e
+          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "changes=false" >>"$GITHUB_OUTPUT" ;;
+            2) echo "changes=true" >>"$GITHUB_OUTPUT" ;;
+            *) exit "$code" ;;
+          esac
           tofu show -no-color tfplan > plan.txt
 
       - name: Step summary
@@ -274,21 +310,32 @@ jobs:
         uses: actions/github-script@v8
         env:
           ENVIRONMENT: ${{ matrix.environment }}
+          HAS_CHANGES: ${{ steps.plan.outputs.changes }}
         with:
           script: |
             const fs = require('fs');
             const env = process.env.ENVIRONMENT;
             const marker = `<!-- tofu-plan:${env} -->`;
+            const hasChanges = process.env.HAS_CHANGES === 'true';
             const plan = fs
               .readFileSync(`terraform/environments/${env}/plan.txt`, 'utf8')
               .slice(0, 60000);
-            const body = `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`;
+            const body = hasChanges
+              ? `${marker}\n### Terraform plan — \`${env}\`\n\n<details><summary>Plan anzeigen</summary>\n\n\`\`\`terraform\n${plan}\n\`\`\`\n\n</details>`
+              : `${marker}\n### Terraform plan — \`${env}\`\n\nKeine Änderungen.`;
 
             const { data: comments } = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: context.issue.number,
             });
             const existing = comments.find((c) => c.body?.includes(marker));
+
+            // Siehe plan-base: ein leerer Plan kommentiert nur dann, wenn
+            // schon ein Kommentar steht, der sonst überholt wäre.
+            if (!hasChanges && !existing) {
+              core.info('Keine Änderungen und kein bestehender Kommentar — nichts zu tun.');
+              return;
+            }
 
             if (existing) {
               await github.rest.issues.updateComment({
