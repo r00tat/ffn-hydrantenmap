@@ -52,6 +52,9 @@ jobs:
         shell: bash
     outputs:
       image_tag: ${{ steps.env.outputs.IMAGE_TAG }}
+      # Was terraform ausrollt — siehe den Step "Image-Referenz auf den Digest
+      # festnageln". Nicht image_tag verwenden: der ist veränderlich.
+      image_ref: ${{ steps.digest.outputs.IMAGE_REF }}
       version: ${{ steps.env.outputs.VERSION }}
       version_tag: ${{ steps.env.outputs.VERSION_TAG }}
       run_service: ${{ steps.env.outputs.RUN_SERVICE }}
@@ -188,6 +191,33 @@ jobs:
           cache-from: ${{ env.workload_identity_provider != '' && format('type=registry,ref={0}:cache', env.IMAGE) || '' }}
           cache-to: ${{ env.workload_identity_provider != '' && 'type=inline' || '' }}
 
+      # Terraform bekommt den Digest, nicht den Tag.
+      #
+      # Der Revisionsname enthält einen Fingerabdruck über alles, was ins
+      # Template einfließt — darunter die Image-Referenz. Ein Tag ist aber
+      # veränderlich: Jeder Push auf main baut nach `…:main`. Zwei Pushes
+      # hintereinander ergäben denselben Fingerabdruck, denselben
+      # Revisionsnamen, damit "no changes" — und das neue Image würde nie
+      # ausgerollt. Mit `gcloud run deploy` fiel das nicht auf, weil gcloud
+      # jedes Mal einen frischen Revisionsnamen erzeugt.
+      #
+      # Der Digest ändert sich genau dann, wenn sich der Inhalt ändert. Damit
+      # sagt der Fingerabdruck die Wahrheit: neues Image -> neue Revision,
+      # unverändertes Image -> kein Deploy. Der Tag bleibt trotzdem in der
+      # Registry, er ist der Einstieg für Menschen.
+      - id: digest
+        name: Image-Referenz auf den Digest festnageln
+        if: ${{ env.workload_identity_provider != '' }}
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -eo pipefail
+          if [[ -z "$DIGEST" ]]; then
+            echo "::error::Der Build hat keinen Digest geliefert — ohne ihn wäre der Revisionsname nicht eindeutig."
+            exit 1
+          fi
+          echo "IMAGE_REF=${IMAGE}@${DIGEST}" | tee -a "$GITHUB_OUTPUT"
+
   # Die Projekt-Basis läuft vor jedem Environment-Apply, nicht als Handgriff bei
   # Gelegenheit. Sie enthält, was ein Environment-Apply bereits vorfinden muss —
   # Rechte des Pipeline-SA, aktivierte APIs, Secret-Hüllen. Solange sie am
@@ -289,6 +319,11 @@ jobs:
       RUN_REGION: ${{ vars.RUN_REGION }}
       # Leer, wenn der Build übersprungen wurde (Rollback) — dann übernimmt das
       # Skript Image und Revisions-Suffix aus dem laufenden Dienst.
+      #
+      # IMAGE_REF ist die Digest-Referenz und das, was ausgerollt wird;
+      # IMAGE_TAG steht nur noch in der Zusammenfassung, damit dort etwas
+      # Lesbares auftaucht.
+      IMAGE_REF: ${{ needs.build.outputs.image_ref }}
       IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
       VERSION: ${{ needs.build.outputs.version }}
       RUN_SERVICE_BASE: ${{ vars.RUN_SERVICE }}
@@ -329,8 +364,8 @@ jobs:
           # Ohne neues Image (Rollback) bleibt das laufende stehen; das Skript
           # liest es dann selbst aus dem Dienst.
           args=()
-          if [[ -n "$IMAGE_TAG" ]]; then
-            args+=(--image "$IMAGE_TAG" --version "$VERSION")
+          if [[ -n "$IMAGE_REF" ]]; then
+            args+=(--image "$IMAGE_REF" --version "$VERSION")
           fi
 
           scripts/cloud-run-tfvars.sh \
@@ -356,6 +391,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Image | \`${IMAGE_TAG}\` |"
+            echo "| Ausgerollt | \`${IMAGE_REF:-(unverändert)}\` |"
             echo "| Revision | \`$(tofu output -raw run_revision 2>/dev/null || echo '?')\` |"
             echo "| URL | $(tofu output -raw run_service_uri 2>/dev/null || echo '?') |"
             echo

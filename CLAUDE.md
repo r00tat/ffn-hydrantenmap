@@ -323,6 +323,17 @@ Name genau dann ändert, wenn sich der Inhalt ändert — ein apply ohne Änderu
 legt keine neue Revision an. **Wer dem Template ein Feld hinzufügt, trägt es in
 den Fingerabdruck ein**, sonst scheitert der apply an einem Namenskonflikt.
 
+**Ausgerollt wird der Digest, nicht der Tag.** Der Build gibt
+`<image>@sha256:…` weiter (`image_ref` in [cloud-run.yml](.github/workflows/cloud-run.yml)),
+nicht `<image>:main`. Ein Tag ist veränderlich: Jeder Push auf main baut nach
+`…:main`, zwei Pushes hintereinander ergäben denselben Fingerabdruck, denselben
+Revisionsnamen und damit „no changes" — das neue Image würde nie ausgerollt.
+Mit `gcloud run deploy` fiel das nicht auf, weil gcloud jedes Mal einen frischen
+Revisionsnamen erzeugt. Der Digest ändert sich genau dann, wenn sich der Inhalt
+ändert; der Tag bleibt in der Registry als Einstieg für Menschen. Wer die
+Image-Referenz je wieder aus einem Tag bildet, bricht den Dev-Deploy —
+lautlos, weil der apply erfolgreich durchläuft.
+
 ### Traffic-Tags und ihre Bereinigung
 
 Der `traffic`-Block ist autoritativ: Was nicht drinsteht, verliert seinen Tag.
