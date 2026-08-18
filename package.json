@@ -124,7 +124,7 @@
     "@types/circle-to-polygon": "^2.2.3",
     "@types/leaflet": "^1.9.22",
     "@types/lodash.debounce": "^4.0.9",
-    "@types/node": "^24.10.4",
+    "@types/node": "^26.2.0",
     "@types/react": "19.2.18",
     "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^6.0.5",
