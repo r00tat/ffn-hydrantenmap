@@ -157,6 +157,22 @@ describe('buildStatsSummary', () => {
     });
     expect(summary.distancePerTrip).toBeUndefined();
   });
+  it('lässt Öl aus der Verbrauchsnäherung heraus', () => {
+    // Öl wird nachgefüllt, nicht verfahren. Zählte es mit, stiege der
+    // rechnerische Verbrauch eines Fahrzeugs mit jedem Ölwechsel.
+    const ohneOel = buildStatsSummary(
+      [entry({ betriebsmittel: { diesel: 10 } })],
+      vehiclesById,
+    );
+    const mitOel = buildStatsSummary(
+      [entry({ betriebsmittel: { diesel: 10, oel: 5 } })],
+      vehiclesById,
+    );
+
+    expect(mitOel.consumptionPer100Km).toBe(ohneOel.consumptionPer100Km);
+    // In der Gesamtmenge steht Öl sehr wohl — es wurde ja nachgefüllt.
+    expect(mitOel.fuelLiters).toBe(15);
+  });
 });
 
 describe('buildTimeSeries', () => {

@@ -50,6 +50,8 @@ export function fuelColor(theme: Theme, fuel: string): string {
       return theme.palette.secondary.main;
     case 'adblue':
       return theme.palette.info.light;
+    case 'oel':
+      return theme.palette.warning.light;
     default:
       return theme.palette.grey[500];
   }
