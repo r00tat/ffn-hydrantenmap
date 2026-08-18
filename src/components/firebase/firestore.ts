@@ -307,6 +307,12 @@ export interface Firecall {
     to: [number, number];
   };
   attachments?: string[];
+  /**
+   * Ordner dieses Einsatzes im Google Drive der Gruppe. Wird beim ersten
+   * Foto-Upload gesetzt; bleibt die Wahrheit auch dann, wenn der Ordner in
+   * Drive später umbenannt wird.
+   */
+  driveFolderId?: string;
   autoSnapshotInterval?: number; // Minutes, 0 = disabled, default 5
   blaulichtSmsAlarmId?: string; // Legacy: primärer Alarm (bleibt für Abwärtskompatibilität)
   blaulichtSmsAlarmIds?: string[]; // Quelle der Wahrheit für zugeordnete Alarme

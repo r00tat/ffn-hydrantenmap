@@ -41,6 +41,7 @@ import {
 } from '../firebase/firestore';
 import DownloadAllButton from '../inputs/DownloadAllButton';
 import FileDisplay from '../inputs/FileDisplay';
+import EinsatzDriveFotos from '../drive/EinsatzDriveFotos';
 import FileUploader from '../inputs/FileUploader';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import { KostenersatzList } from '../Kostenersatz';
@@ -364,6 +365,9 @@ export default function EinsatzDetails() {
           <DownloadAllButton urls={firecall.attachments} />
         )}
       </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        {t('attachmentsExplanation')}
+      </Typography>
       {canWrite && (
         <FileUploader onFileUploadComplete={handleFileUploadComplete} />
       )}
@@ -397,6 +401,10 @@ export default function EinsatzDetails() {
           {t('noAttachments')}
         </Typography>
       )}
+
+      {/* Fotos im Drive — zweiter Ablageort neben den Anhängen. Bewusst direkt
+          darunter, damit der Unterschied beim Hochladen sichtbar ist. */}
+      {firecall.id && <EinsatzDriveFotos firecallId={firecall.id} />}
 
       {/* Einsatzorte */}
       <Box sx={{ mt: 3 }}>

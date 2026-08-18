@@ -13,6 +13,7 @@ import ApiIcon from '@mui/icons-material/Api';
 import ChatIcon from '@mui/icons-material/Chat';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import EditRoadIcon from '@mui/icons-material/EditRoad';
+import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import GroupIcon from '@mui/icons-material/Group';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
 import HubIcon from '@mui/icons-material/Hub';
@@ -219,6 +220,7 @@ export default function AppDrawer({
         { text: t('hydrantClusters'), icon: <HubIcon />, href: '/admin/hydrant-clusters' },
         { text: t('adminKostenersatz'), icon: <ReceiptLongIcon />, href: '/admin/kostenersatz' },
         { text: t('adminFahrtenbuch'), icon: <EditRoadIcon />, href: '/admin/fahrtenbuch' },
+        { text: t('adminDrive'), icon: <FolderSharedIcon />, href: '/admin/drive' },
         { text: t('pegelstaende'), icon: <WavesIcon />, href: '/admin/pegelstaende' },
         { text: t('deletedItems'), icon: <DeleteIcon />, href: '/admin/deleted-items' },
         { text: t('hydrantCsvImport'), icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },
