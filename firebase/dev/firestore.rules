@@ -206,6 +206,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Basisordner im Google Drive je Gruppe. Wie die Nachbar-Collections nur
+    // über Admin Server Actions erreichbar — die Ordner-ID ist zwar kein
+    // Geheimnis, aber sie soll nicht von jedem Client änderbar sein.
+    match /driveConfig/{doc=**} {
+      allow read, write: if false;
+    }
+
     // Bug reports: any authorized user may create their own report (createdBy
     // must match the auth token). Reads and modifications are admin-only.
     match /bugReport/{doc} {

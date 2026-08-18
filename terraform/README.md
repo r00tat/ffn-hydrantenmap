@@ -14,17 +14,25 @@ werden:
 modules/
 ├── project-base/        # pro GCP-Projekt einmal: APIs, Service Accounts, Registries,
 │                        # Secrets, Workload Identity, Firebase-Projekt, Storage-Rules
+├── cloud-run/           # pro Environment: der Dienst, Traffic-Tags, Rollback
 ├── firestore-env/       # pro Environment: Datenbank, Rules, Indexes, Field-Overrides
+├── cloud-scheduler/     # pro Environment: Wochenbericht-Job
 └── cloudbuild-triggers/ # pro Environment: Build-Trigger
+projects/
+└── ffn-utils/           # die Projekt-Basis, State-Prefix cloudrun/hydrantenmap/project/ffn-utils
 environments/
 ├── dev/                 # Firestore-DB ffndev, State-Prefix cloudrun/hydrantenmap/dev
 └── prod/                # Firestore-DB (default), State-Prefix cloudrun/hydrantenmap/prod
 ```
 
+**Ein Projekt-Root je GCP-Projekt, ein Environment-Root je Umgebung.** Der Projekt-Root hält, was
+ein Environment-Apply bereits vorfindet statt es anzulegen — Rechte des Pipeline-SA, APIs,
+Secret-Hüllen, Registries, WIF. Er läuft in beiden Pipelines vor jedem Environment-Apply.
+
 ### Lokal arbeiten
 
 ```bash
-cd terraform/environments/dev      # oder prod
+cd terraform/environments/dev      # oder prod, oder projects/ffn-utils
 
 # Einmalig pro Checkout/Worktree: Werte einsetzen. terraform.tfvars ist
 # gitignored und muss — wie .env.local — in jedem neuen Worktree nachgezogen
@@ -32,6 +40,13 @@ cd terraform/environments/dev      # oder prod
 cp terraform.tfvars.example terraform.tfvars
 
 tofu init
+
+# Nur in den Environment-Roots: Image und Traffic-Tags aus dem laufenden Dienst
+# holen. Ohne das fragt tofu beim plan nach `image`. Ohne --image bleibt das
+# laufende Image stehen — ein lokaler Apply dreht die App also nicht zurück.
+# Aus dem Repository-Wurzelverzeichnis, nach dem init (das Skript fragt den
+# Root über `tofu console` nach Projekt, Region und Dienstnamen):
+#   npm run tfvars:dev      # bzw. npm run tfvars:prod
 tofu plan -out tfplan
 tofu apply tfplan
 ```
@@ -41,26 +56,30 @@ geplant und appliziert werden.
 
 ### dev und prod im selben GCP-Projekt
 
-Heute liegen beide Environments im Projekt `ffn-utils`; unterschieden werden sie nur durch die
-Firestore-Datenbank (`ffndev` vs. `(default)`) und das zugehörige Rules-Release. Die
-Projekt-Basis-Ressourcen existieren pro Projekt nur einmal und gehören deshalb genau einem
-Environment. Das steuert `manage_project_base`:
+Heute liegen beide Environments im Projekt `ffn-utils`; unterschieden werden sie durch die
+Firestore-Datenbank (`ffndev` vs. `(default)`), den Dienstnamen und ein paar Suffixe. Es gibt
+deshalb genau einen Projekt-Root, auf den beide Environments zeigen.
 
-- `prod`: `true` — prod besitzt die Projekt-Basis
-- `dev`: `false` — dev teilt das Projekt mit prod
+Früher steuerte das ein `manage_project_base`-Flag, das die Projekt-Basis dem prod-Root zuschlug.
+Das koppelte eine Voraussetzung des dev-Applies an die Release-Kadenz von prod: Eine neue Rolle
+oder ein neues Secret wurde erst beim nächsten Release wirksam, bis dahin scheiterte dev mit 403.
+Der eigene Projekt-Root behebt das.
 
 ### dev auf ein eigenes GCP-Projekt umstellen
 
-In `environments/dev/terraform.tfvars`:
+1. Neuen Projekt-Root `projects/<projekt-id>/` anlegen (Kopie von `projects/ffn-utils/`, eigener
+   `backend.tf`-Prefix, `project` auf die neue ID).
+2. `BASE_ROOT` in `.github/workflows/cloud-run.yml` und `terraform.yml` für dev auf den neuen Root
+   zeigen lassen — beide Ausdrücke haben dafür bereits zwei Zweige.
+3. In `environments/dev/`: `project` und den `backend.tf`-Prefix umstellen.
+4. Repository-Secrets und -Variablen (`CLOUDSDK_CORE_PROJECT`, `WORKLOAD_IDENTITY_PROVIDER`,
+   `TERRAFORM_SERVICE_ACCOUNT`, `GOOGLE_SERVICE_ACCOUNT`, `IMAGE`, `RUN_SERVICE`) in den
+   Environment-Scope verschieben.
 
-```hcl
-project             = "<neues-projekt>"
-state_bucket        = "<neuer-state-bucket>"
-manage_project_base = true
-```
-
-Zusätzlich in `environments/dev/backend.tf` Bucket und Prefix anpassen. Am Modulcode ändert sich
-nichts.
+**Nichts über die Projektgrenze reichen lassen** — sonst kehrt dieselbe Falle als
+Cross-Project-Abhängigkeit zurück, und ein SA kann sich im fremden Projekt keine Rechte erteilen.
+Eigener State-Bucket, eigene Artifact Registry, eigener WIF-Pool je Projekt. Am Modulcode ändert
+sich nichts.
 
 ### Backend
 
@@ -74,13 +93,26 @@ Bucket und Prefix stehen fest in `environments/<env>/backend.tf`. Falls `.envrc`
 
 | Ereignis | Aktion |
 | --- | --- |
-| PR nach `main` | `plan` für dev und prod, Ergebnis als PR-Kommentar |
-| Push auf `main` | `apply` auf dev |
-| Release veröffentlicht | `apply` auf prod |
-| `workflow_dispatch` | Environment und Modus wählbar |
+| PR nach `main` | `plan` für Projekt-Basis, dev und prod, Ergebnis als PR-Kommentar |
+| `workflow_dispatch` | Root (`base`/`dev`/`prod`) und Modus wählbar |
 
-Läuft nur bei Änderungen an `terraform/**`, `firebase/**`, `storage.rules` oder am Workflow selbst.
-`firebase/**` gehört dazu, weil Terraform die Rules und Index-Definitionen liest.
+Der `plan` läuft auf **jedem** PR, nicht nur bei Änderungen an `terraform/**`. Ein Merge löst
+seit dem Umbau einen `apply` über den ganzen Environment-Root aus — dazu den der Projekt-Basis
+davor. Ob der durchgeht, hängt damit nicht mehr nur am Terraform-Code im PR, sondern auch an
+Drift, an Rechten und an allem, was jemand von Hand geändert hat. Vorher war ein Deploy ein
+`gcloud run deploy` auf einen Dienst; jetzt ist der Blast Radius die ganze Umgebung.
+
+Ein Plan ohne Änderungen kostet ~40 s und **kommentiert nichts** — sonst trüge jeder
+Dependabot-PR drei Klappboxen mit „No changes.". Erkannt wird das über
+`tofu plan -detailed-exitcode` (0 = keine Änderungen, 2 = Änderungen), nicht über einen Textfund
+im Plan. Steht schon ein Plan-Kommentar am PR, wird er trotzdem aktualisiert, damit kein
+überholter Plan stehen bleibt.
+
+**Appliziert wird nicht hier, sondern beim Deploy** (`.github/workflows/cloud-run.yml`): Der
+Cloud-Run-Dienst liegt seit dem Umbau selbst in Terraform, ein Deploy ist damit ein `apply` — auf
+dev bei jedem Push auf `main`, auf prod bei jedem Release-Tag, jeweils nach einem Apply des
+Projekt-Roots. Der `workflow_dispatch`-Apply hier bleibt als Handgriff, etwa für den Erstimport.
+Beide Workflows teilen die Concurrency-Gruppen `tf-apply-<root>`.
 
 Konfiguration im Repository:
 
@@ -100,7 +132,7 @@ Es gibt dann keinen Auth-Fehler, aber auch keinen Plan.
 Henne-Ei: Der SA, den die Pipeline benutzt, wird von Terraform selbst angelegt. Reihenfolge:
 
 ```bash
-cd terraform/environments/prod
+cd terraform/projects/ffn-utils
 tofu init
 tofu plan -out tfplan          # erwartet: nur Creates für den terraform SA
 tofu apply tfplan

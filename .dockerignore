@@ -20,7 +20,6 @@ test-results
 hars
 firebase
 cors.json
-service.yaml
 storage.rules
 vitest.config.ts
 README.md

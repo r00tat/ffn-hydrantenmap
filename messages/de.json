@@ -188,6 +188,7 @@
     "blaulichtSmsTitle": "Alarm SMS",
     "blaulichtSmsLoadError": "Alarm SMS konnte nicht geladen werden (Alarm-ID: {id}). Möglicherweise sind die Alarm-SMS-Zugangsdaten nicht konfiguriert oder der Alarm ist nicht mehr verfügbar.",
     "attachments": "Anhänge",
+    "attachmentsExplanation": "In diesem Einsatz gespeichert, nur in der App sichtbar.",
     "noAttachments": "Keine Anhänge vorhanden",
     "labels": {
       "group": "Gruppe",
@@ -277,6 +278,36 @@
       "pickPosition": "Position wählen"
     }
   },
+  "einsatzDrive": {
+    "title": "Fotos im Google Drive",
+    "explanation": "Werden im Drive der Feuerwehr im Ordner „{folder}\" in voller Größe abgelegt.",
+    "uploadButton": "Ins Drive hochladen",
+    "uploading": "Wird hochgeladen …",
+    "uploadFailed": "{count, plural, one {Eine Datei konnte nicht ins Drive geladen werden.} other {# Dateien konnten nicht ins Drive geladen werden.}}",
+    "uploadStartFailed": "Der Upload ins Drive konnte nicht gestartet werden.",
+    "openFolder": "{count, plural, =0 {Ordner in Drive öffnen} one {Ordner in Drive öffnen (1 Datei)} other {Ordner in Drive öffnen (# Dateien)}}",
+    "noFiles": "Noch keine Dateien im Drive.",
+    "loadFailed": "Drive-Ordner konnte nicht geladen werden: {message}",
+    "notConfigured": "Für diese Gruppe ist kein Google Drive hinterlegt.",
+    "notConfiguredLink": "In der Administration einrichten"
+  },
+  "adminDrive": {
+    "title": "Google Drive",
+    "intro": "Basisordner im Shared Drive, in dem die Einsatz-Fotos abgelegt werden. Darunter legt die App je Jahr und je Einsatz einen Unterordner an. Der Service Account der App muss im Shared Drive als Mitglied mit Schreibrecht eingetragen sein.",
+    "group": "Gruppe",
+    "baseFolderId": "Ordner-ID",
+    "baseFolderIdHelp": "Aus der Drive-URL: der Teil nach /folders/",
+    "save": "Speichern",
+    "check": "Verbindung prüfen",
+    "saved": "Gespeichert.",
+    "saveFailed": "Speichern fehlgeschlagen: {message}",
+    "loadFailed": "Konfiguration konnte nicht geladen werden: {message}",
+    "checkOk": "Ordner „{folder}\" in „{drive}\" gefunden.",
+    "checkNotAFolder": "Diese ID verweist nicht auf einen Ordner.",
+    "checkFailed": "Ordner nicht erreichbar: {message}",
+    "noSharedDrive": "Meine Ablage",
+    "noGroups": "Keine Gruppe verfügbar."
+  },
   "firecallElements": {
     "addPoint": "Einen Punkt hinzufügen",
     "editLine": "Linie bearbeiten",
@@ -348,6 +379,7 @@
     "hydrantClusters": "Hydrant Clusters",
     "adminKostenersatz": "Kostenersatz",
     "adminFahrtenbuch": "Fahrtenbuch",
+    "adminDrive": "Google Drive",
     "pegelstaende": "Pegelstände",
     "deletedItems": "Gelöschte Einträge",
     "hydrantCsvImport": "Hydranten CSV Import",
