@@ -1,10 +1,12 @@
+'use client';
+
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import CancelIcon from '@mui/icons-material/Cancel';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useTranslations } from 'next-intl';
-import { DEFAULT_VEHICLES } from '../../common/defaultKostenersatzRates';
+import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 
 interface VehicleQuickAddChipsProps {
   selectedNames: string[];
@@ -25,6 +27,12 @@ export default function VehicleQuickAddChips({
   onRemove,
 }: VehicleQuickAddChipsProps) {
   const t = useTranslations('firecallItem');
+  // Die Fahrzeugliste kommt aus derselben Quelle wie der Kostenersatz.
+  // `DEFAULT_VEHICLES` war eine zweite Wahrheit und schon veraltet: Dort heißt
+  // das Boot „MZB", in Firestore und in den Fahrtenbuch-Stammdaten
+  // „Mehrzweckboot" — und ein so benanntes Karten-Item fand der Namensabgleich
+  // der Sammelerfassung nicht.
+  const { vehicles } = useKostenersatzVehicles();
   const selectedSet = new Set(selectedNames);
   const existingSet = new Set(existingNames);
 
@@ -44,7 +52,7 @@ export default function VehicleQuickAddChips({
         )}
       </Box>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-        {DEFAULT_VEHICLES.map((vehicle) => {
+        {vehicles.map((vehicle) => {
           const isExisting = existingSet.has(vehicle.name);
           const isSelected = selectedSet.has(vehicle.name);
           const isHighlighted = isSelected || isExisting;
@@ -52,7 +60,7 @@ export default function VehicleQuickAddChips({
           const removeLabel = t('quickAddRemove', { name: vehicle.name });
           return (
             <Chip
-              key={vehicle.name}
+              key={vehicle.id}
               label={vehicle.name}
               // Ein bereits vorhandenes Fahrzeug kein zweites Mal anlegen: der
               // Chip-Körper reagiert dann nicht, entfernt wird über das X.

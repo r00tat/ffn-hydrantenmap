@@ -5,10 +5,13 @@ import {
   arrivalOnDepartureDay,
   counterWarnings,
   FAHRT_ZWECKE,
+  FUEL_TYPES,
+  isPropellant,
   isTimeOnlyTimestamp,
   findEntryForFirecallVehicle,
   matchVehicleByName,
   normalizeName,
+  PROPELLANTS,
   referenceCounters,
   requiresDriver,
   suggestPresetForVehicleName,
@@ -461,5 +464,22 @@ describe('suggestPresetForVehicleName', () => {
 
   it('schlägt sonst das Fahrzeug-Preset vor', () => {
     expect(suggestPresetForVehicleName('RLFA 3000/100')).toBe('fahrzeug');
+  });
+});
+
+describe('Betriebsmittel', () => {
+  it('führt Öl als vierte Art, ans Ende gestellt', () => {
+    // Die Reihenfolge bestimmt die Spaltenfolge im PDF-Export und im
+    // Wochenbericht — Öl ans Ende, damit bestehende Dokumente ihre
+    // Spaltenpositionen behalten.
+    expect(FUEL_TYPES).toEqual(['diesel', 'benzin', 'adblue', 'oel']);
+  });
+
+  it('zählt nur Diesel und Benzin als Antrieb', () => {
+    expect(PROPELLANTS).toEqual(['diesel', 'benzin']);
+    expect(isPropellant('diesel')).toBe(true);
+    expect(isPropellant('benzin')).toBe(true);
+    expect(isPropellant('adblue')).toBe(false);
+    expect(isPropellant('oel')).toBe(false);
   });
 });

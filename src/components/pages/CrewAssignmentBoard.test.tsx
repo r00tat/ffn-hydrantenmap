@@ -120,6 +120,22 @@ vi.mock('../../hooks/useVehicles', () => ({
   }),
 }));
 
+// Die Chip-Leiste und `handleAddVehicle` beziehen die Fahrzeugliste hierüber;
+// der echte Hook öffnet ein Firestore-Abo und zöge Firebase in den Test.
+vi.mock('../../hooks/useKostenersatzVehicles', () => ({
+  useKostenersatzVehicles: () => ({
+    vehicles: [
+      { id: 'kdtfa', name: 'KDTFA', rateId: '2.01', sortOrder: 1 },
+      { id: 'tlfa-4000', name: 'TLFA 4000', rateId: '2.05', sortOrder: 3 },
+      { id: 'mehrzweckboot', name: 'Mehrzweckboot', rateId: '8.01', sortOrder: 17 },
+    ],
+    vehiclesById: new Map(),
+    loading: false,
+    error: null,
+    isUsingDefaults: false,
+  }),
+}));
+
 // Der Board-Code fragt das Schreibrecht ab; der echte Hook zieht die
 // Firebase-Login-Kette (und damit server-only Module) in den Test.
 vi.mock('../../hooks/useFirecallWriteAccess', () => ({

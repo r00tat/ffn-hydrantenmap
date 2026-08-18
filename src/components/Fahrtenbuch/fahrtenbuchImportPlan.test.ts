@@ -81,8 +81,13 @@ describe('findKmCounter / defaultFuelType', () => {
     expect(findKmCounter(VEHICLE_PRESETS.boot)).toBeUndefined();
   });
 
-  it('überspringt AdBlue bei der Kraftstoffart', () => {
-    expect(defaultFuelType(['adblue', 'diesel'])).toBe('diesel');
+  it('nimmt den ersten Antriebsstoff und überspringt Zusätze', () => {
+    expect(defaultFuelType(['adblue', 'oel', 'diesel'])).toBe('diesel');
+    expect(defaultFuelType(['benzin', 'oel'])).toBe('benzin');
+  });
+
+  it('liefert nichts, wenn das Fahrzeug nur Zusätze führt', () => {
+    expect(defaultFuelType(['adblue', 'oel'])).toBeUndefined();
     expect(defaultFuelType([])).toBeUndefined();
   });
 });

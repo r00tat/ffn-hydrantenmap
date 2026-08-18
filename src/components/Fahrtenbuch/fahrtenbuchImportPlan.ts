@@ -8,6 +8,7 @@
  */
 import {
   arrivalFromTimeOnly,
+  isPropellant,
   normalizeName,
   type CounterDefinition,
   type FahrtenbuchEntry,
@@ -86,12 +87,12 @@ export function findKmCounter(
 
 /**
  * Die Kraftstoffart, in die die Spalte „Treibstoff" fällt. Die Quelle nennt
- * sie nicht; genommen wird die erste Art des Fahrzeugs, die nicht AdBlue ist.
+ * sie nicht; genommen wird der erste Antriebsstoff des Fahrzeugs.
  */
 export function defaultFuelType(
   fuelTypes: FuelType[] = [],
 ): FuelType | undefined {
-  return fuelTypes.find((f) => f !== 'adblue');
+  return fuelTypes.find(isPropellant);
 }
 
 /** Abbildung der Grund-Spalte. Alles Unbekannte wird „Sonstiges". */

@@ -452,7 +452,8 @@
     "fuel": {
       "diesel": "Diesel",
       "benzin": "Petrol",
-      "adblue": "AdBlue"
+      "adblue": "AdBlue",
+      "oel": "Oil"
     },
     "warnings": {
       "decrease": "Last known reading: {lastValue} {unit}",
