@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
@@ -132,7 +132,7 @@ jobs:
 
       - name: Comment plan on PR
         if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           ROOT: ${{ env.BASE_ROOT }}
           HAS_CHANGES: ${{ steps.plan.outputs.changes }}
@@ -221,7 +221,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
@@ -307,7 +307,7 @@ jobs:
 
       - name: Comment plan on PR
         if: ${{ env.gcp_ready == 'true' && github.event_name == 'pull_request' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           ENVIRONMENT: ${{ matrix.environment }}
           HAS_CHANGES: ${{ steps.plan.outputs.changes }}
@@ -388,7 +388,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup OpenTofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
