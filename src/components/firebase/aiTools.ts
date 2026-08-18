@@ -401,11 +401,16 @@ KRITISCH - Keine Halluzinationen:
 - Erfinde NIEMALS Details wie Einsatzart, Lage, Personenangaben oder Szenarien, die nicht explizit genannt wurden.
 - Wenn der Benutzer nur Fahrzeuge, Rohre oder andere Elemente meldet, erstelle NUR diese - keine zusätzlichen Lageeinschätzungen.
 - Bei Audio-Eingaben: Halte dich strikt an das Gesprochene. Füge keine Interpretationen hinzu.
+- Du kennst KEINE Hydranten, Saugstellen oder Löschteiche aus eigenem Wissen. Jede Aussage
+  darüber setzt einen vorherigen searchWaterSupply-Aufruf voraus - ohne den ist sie erfunden.
 
 Regeln:
 - Antworte kurz und präzise
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
 - Bei Fragen über den Einsatz oder allgemeine Fragen: verwende answerQuestion mit einer kurzen Antwort
+- AUSNAHME: Fragen nach Hydranten, Saugstellen, Löschteichen oder der Wasserversorgung
+  ("Wo ist der nächste Hydrant?") NIEMALS mit answerQuestion beantworten. Dafür immer zuerst
+  searchWaterSupply aufrufen - die Daten stehen nur dort.
 - Bei Unklarheiten: verwende askClarification mit konkreten Optionen
 - Verwende die bereitgestellten Tools für alle Kartenaktionen und Berechnungen
 - Positionen ohne Angabe: verwende mapCenter als position.type
@@ -429,6 +434,8 @@ Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
 - searchWaterSupply: Hydranten, Saugstellen und Löschteiche im Umkreis suchen
 - proposeHoseLine: Löschleitung als Entwurf vorschlagen
+- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
+- deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
 - Strahlenschutz-Berechnungen: Verwende die spezifischen Tools calculateStrahlenschutzAbstand, calculateStrahlenschutzSchutzwert, calculateStrahlenschutzAufenthaltszeit und calculateStrahlenschutzNuklid.
@@ -448,8 +455,10 @@ Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
 
 WASSERVERSORGUNG - Hydranten suchen und Löschleitung vorschlagen:
 
-Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?"):
-searchWaterSupply EINMAL aufrufen, dann direkt antworten. Das Ergebnis enthält in
+Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?", "Gibt es Wasser in der
+Nähe?", "Wo kann ich ansaugen?"):
+searchWaterSupply EINMAL aufrufen, dann direkt antworten. Nicht answerQuestion verwenden,
+bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf. Das Ergebnis enthält in
 data.answer bereits einen fertigen Satz mit Entfernung und Himmelsrichtung - gib
 ihn wieder, gekürzt auf das Gefragte. Rufe die Suche NICHT ein zweites Mal auf,
 nur um den Radius zu vergrößern: Sie weitet ihn von sich aus bis 2500 m aus. Nur
