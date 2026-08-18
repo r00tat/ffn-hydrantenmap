@@ -13,21 +13,45 @@ const oneDayCachePlugin = new ExpirationPlugin({
   purgeOnQuotaError: true,
 });
 
+/**
+ * Eigene Caching-Regeln. Sie werden in `index.ts` **vor** Serwists
+ * `defaultCache` eingehängt und gewinnen damit jeden Konflikt — die erste
+ * passende Regel entscheidet.
+ *
+ * Daraus folgt die Regel für dieses Modul: **jeder Matcher wird so eng gefasst
+ * wie möglich.** Trifft eine Regel mehr, als sie meint, verdrängt sie eine
+ * passendere aus `defaultCache` — ohne dass irgendwo ein Fehler auftaucht. Genau
+ * so kamen die beiden Google-Fonts-Stylesheets aus dem Root-Layout nie mehr aus
+ * dem Cache: das Muster war auf `*.googleapis.com` gefasst und nahm
+ * `fonts.googleapis.com` mit.
+ *
+ * Zwei Eigenheiten der Auswertung gehören dazu (`RegExpRoute` in serwist):
+ *
+ * - Bei einer **Fremd-Origin** zählt ein Regex-Treffer nur, wenn er bei Index 0
+ *   beginnt. Ein zu weites Muster ist dort also von sich aus entschärft.
+ * - Bei der **eigenen Origin** zählt ein Treffer an jeder Stelle der URL. `/icons\/`
+ *   als Regex erfasste damit auch `/_next/static/media/icons/…`. Für eigene
+ *   Pfade steht deshalb ein Funktions-Matcher mit `pathname.startsWith(…)` hier,
+ *   kein Regex.
+ */
 export const cachePatterns: RuntimeCaching[] = [
-  // fix cache for firestore.googleapis.com
+  // Google-APIs nie zwischenspeichern: Serwists Rückfall für Fremd-Origins
+  // (`cross-origin`, NetworkFirst) legte sonst Firestore-Antworten in den
+  // Cache. Zwei Einzelheiten sind Absicht und dürfen nicht wegvereinfacht
+  // werden:
+  //
+  // `fonts.googleapis.com` ist ausgenommen. Die beiden Stylesheets im
+  // Root-Layout blockieren das Rendern; unter `NetworkOnly` konnten sie bei
+  // keinem Kaltstart aus dem Cache kommen. Serwist versorgt diesen Host selbst
+  // mit `StaleWhileRevalidate` — dieser Regel gehört er nicht.
+  //
+  // Kein `networkTimeoutSeconds`. Firestores `Listen`-Kanal ist eine
+  // langlebige Verbindung, die länger offen steht als jedes sinnvolle Timeout;
+  // ein Abbruch nach 10 s riss sie regelmäßig auf und das SDK lief in
+  // Backoff-Wiederholungen.
   {
-    matcher: /https:\/\/.*.googleapis.com\/.*/i,
-    handler: new NetworkOnly({
-      networkTimeoutSeconds: 10,
-      // plugins: [
-      //   new ExpirationPlugin({
-      //     maxEntries: 16,
-      //     maxAgeSeconds: 60 * 60,
-      //     purgeOnQuotaError: !0,
-      //   }),
-      // ],
-    }),
-    // method: 'GET'
+    matcher: /^https:\/\/(?!fonts\.)[^/]+\.googleapis\.com\//i,
+    handler: new NetworkOnly(),
   },
 
   // Die anmeldefreie Gastseite darf nie aus dem Cache kommen: ein Mitglied mit
@@ -35,12 +59,18 @@ export const cachePatterns: RuntimeCaching[] = [
   // Links serviert. Ohne diesen Eintrag greift Serwists Standard (NetworkFirst
   // für Navigationen), der genau das täte.
   {
-    matcher: /\/fahrtenbuch\/teilen\/.*/i,
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith('/fahrtenbuch/teilen/'),
     handler: new NetworkOnly(),
   },
 
+  // Funktions-Matcher auf den Pfad statt Regex: als `/icons\//` erfasste die
+  // Regel jede URL der eigenen Origin, die `icons/` irgendwo enthält — etwa
+  // `/_next/static/media/icons/…`, das damit im Icon-Cache statt unter den
+  // Regeln für gebaute Assets landete.
   {
-    matcher: /icons\/.*/i,
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin && url.pathname.startsWith('/icons/'),
     handler: new CacheFirst({
       cacheName: 'icons',
       plugins: [oneDayCachePlugin],
@@ -48,43 +78,47 @@ export const cachePatterns: RuntimeCaching[] = [
   },
 
   {
-    matcher: /https:\/\/mapsneu.wien.gv.at\/basemap\/.*/i,
+    matcher: /^https:\/\/mapsneu\.wien\.gv\.at\/basemap\//i,
     handler: new CacheFirst({
       cacheName: 'basemap',
       plugins: [oneDayCachePlugin],
     }),
   },
   {
-    matcher: /https:\/\/tiles.lfrz.gv.at\/.*/i,
+    matcher: /^https:\/\/tiles\.lfrz\.gv\.at\//i,
     handler: new CacheFirst({
       cacheName: 'wisa',
       plugins: [oneDayCachePlugin],
     }),
   },
   {
-    matcher: /https:\/\/[a-z].tile.openstreetmap.org\/.*/i,
+    matcher: /^https:\/\/[a-z]\.tile\.openstreetmap\.org\//i,
     handler: new CacheFirst({
       cacheName: 'osm',
       plugins: [oneDayCachePlugin],
     }),
   },
   {
-    matcher: /https:\/\/[a-z].tile.opentopomap.org\/.*/i,
+    matcher: /^https:\/\/[a-z]\.tile\.opentopomap\.org\//i,
     handler: new CacheFirst({
       cacheName: 'opentopomap',
       plugins: [oneDayCachePlugin],
     }),
   },
 
+  // `fonts.gstatic.com` ist ausgenommen, weil Serwist dafür eine bessere Regel
+  // mitbringt: `google-fonts-webfonts` hält Schriftdateien ein Jahr, gemessen
+  // ab letzter Verwendung. Diese Regel stand davor und setzte sie auf einen Tag
+  // herunter — die Schriften wurden also täglich neu geladen.
   {
-    matcher: /https:\/\/.*.gstatic.com\/.*/i,
+    matcher: /^https:\/\/(?!fonts\.)[^/]+\.gstatic\.com\//i,
     handler: new CacheFirst({
       cacheName: 'gstatic',
       plugins: [oneDayCachePlugin],
     }),
   },
   {
-    matcher: /https:\/\/unpkg.com\/.*/i,
+    matcher: /^https:\/\/unpkg\.com\//i,
     handler: new CacheFirst({
       cacheName: 'unpkg',
       plugins: [oneDayCachePlugin],
