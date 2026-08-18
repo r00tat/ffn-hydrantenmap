@@ -280,3 +280,70 @@ export function buildHoseLineDraft({
 export function describeHoseLineDraft(draft: HoseLineDraft): string {
   return `${draft.name}: ${draft.distance} m, ${draft.hoseCount} ${draft.dimension}-Längen`;
 }
+
+const COMPASS_DIRECTIONS = [
+  'nördlich',
+  'nordöstlich',
+  'östlich',
+  'südöstlich',
+  'südlich',
+  'südwestlich',
+  'westlich',
+  'nordwestlich',
+] as const;
+
+/**
+ * Himmelsrichtung von `from` nach `to`, auf acht Sektoren gerundet.
+ *
+ * „Der nächste Hydrant ist 120 m entfernt" hilft niemandem, der auf die Karte
+ * schaut oder die Antwort nur hört — die Richtung schon.
+ */
+export function compassDirection(
+  from: GeoPositionObject,
+  to: GeoPositionObject
+): string | undefined {
+  const north = to.lat - from.lat;
+  // Längengrade rücken mit dem Breitengrad zusammen; ohne diesen Faktor
+  // zeigten alle Richtungen in unseren Breiten zu weit nach Osten/Westen.
+  const east =
+    (to.lng - from.lng) * Math.cos(((from.lat + to.lat) / 2) * (Math.PI / 180));
+
+  if (north === 0 && east === 0) return undefined;
+
+  const degrees = (Math.atan2(east, north) * 180) / Math.PI;
+  const sector = Math.round(((degrees + 360) % 360) / 45) % 8;
+  return COMPASS_DIRECTIONS[sector];
+}
+
+/** Einzeilige Beschreibung einer Entnahmestelle für die Antwort des Assistenten. */
+export function describeWaterSupplyCandidate(
+  candidate: WaterSupplyCandidate,
+  from: GeoPositionObject
+): string {
+  const direction = compassDirection(from, candidate);
+  const head = [
+    candidate.typ || WATER_SUPPLY_LABELS[candidate.kind],
+    candidate.name,
+    candidate.adresse ? `(${candidate.adresse})` : undefined,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const parts = [
+    head,
+    `${candidate.distance} m${direction ? ` ${direction}` : ''}`,
+  ];
+
+  if (candidate.dimension) parts.push(`${candidate.dimension} mm`);
+  if (candidate.statischerDruck !== undefined) {
+    parts.push(`${candidate.statischerDruck} bar statisch`);
+  }
+  if (candidate.wasserentnahme !== undefined) {
+    parts.push(`${candidate.wasserentnahme} l/min`);
+  }
+  if (candidate.fassungsvermoegen !== undefined) {
+    parts.push(`${candidate.fassungsvermoegen} m³`);
+  }
+
+  return parts.join(', ');
+}

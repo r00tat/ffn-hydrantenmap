@@ -3,7 +3,9 @@ import { GeohashCluster } from './gis-objects';
 import {
   buildHoseLineDraft,
   collectWaterSupplyCandidates,
+  compassDirection,
   describeHoseLineDraft,
+  describeWaterSupplyCandidate,
   hoseSectionCount,
   WATER_SUPPLY_KINDS,
 } from './waterSupply';
@@ -278,6 +280,84 @@ describe('buildHoseLineDraft', () => {
     const draft = buildHoseLineDraft({ source, target: einsatzort });
     expect(describeHoseLineDraft(draft)).toBe(
       'B-Leitung ÜH Hauptstraße 12: 90 m, 5 B-Längen'
+    );
+  });
+});
+
+describe('compassDirection', () => {
+  const from = { lat: 47.9482913, lng: 16.848222 };
+  const at = (dLat: number, dLng: number) => ({
+    lat: from.lat + dLat / 111320,
+    lng: from.lng + dLng / (111320 * Math.cos((from.lat * Math.PI) / 180)),
+  });
+
+  it('names the eight compass directions in German', () => {
+    expect(compassDirection(from, at(100, 0))).toBe('nördlich');
+    expect(compassDirection(from, at(100, 100))).toBe('nordöstlich');
+    expect(compassDirection(from, at(0, 100))).toBe('östlich');
+    expect(compassDirection(from, at(-100, 100))).toBe('südöstlich');
+    expect(compassDirection(from, at(-100, 0))).toBe('südlich');
+    expect(compassDirection(from, at(-100, -100))).toBe('südwestlich');
+    expect(compassDirection(from, at(0, -100))).toBe('westlich');
+    expect(compassDirection(from, at(100, -100))).toBe('nordwestlich');
+  });
+
+  it('has no direction for the same point', () => {
+    expect(compassDirection(from, from)).toBeUndefined();
+  });
+});
+
+describe('describeWaterSupplyCandidate', () => {
+  const from = { lat: 47.9482913, lng: 16.848222 };
+
+  it('describes a hydrant with distance, direction and capacity', () => {
+    const candidate = collectWaterSupplyCandidates(
+      [
+        {
+          geohash: 'a',
+          hydranten: [
+            {
+              name: 'ÖH 12',
+              lat: from.lat + metersToLat(120),
+              lng: from.lng,
+              typ: 'Überflurhydrant',
+              dimension: 100,
+              statischer_druck: 6,
+              adresse: 'Hauptstraße 12',
+            },
+          ],
+        } as any,
+      ],
+      from,
+      { radius: 500 }
+    )[0];
+
+    expect(describeWaterSupplyCandidate(candidate, from)).toBe(
+      'Überflurhydrant ÖH 12 (Hauptstraße 12), 120 m nördlich, 100 mm, 6 bar statisch'
+    );
+  });
+
+  it('falls back to the generic label when the record has no type', () => {
+    const candidate = collectWaterSupplyCandidates(
+      [
+        {
+          geohash: 'a',
+          saugstelle: [
+            {
+              name: 'Seeufer',
+              lat: from.lat,
+              lng: from.lng - 0.002,
+              wasserentnahme_l_min_: 1600,
+            },
+          ],
+        } as any,
+      ],
+      from,
+      { radius: 500 }
+    )[0];
+
+    expect(describeWaterSupplyCandidate(candidate, from)).toBe(
+      'Saugstelle Seeufer, 149 m westlich, 1600 l/min'
     );
   });
 });

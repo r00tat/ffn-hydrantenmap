@@ -56,6 +56,10 @@ vi.mock('../components/actions/maps/places', () => ({
   searchPlace: vi.fn(),
 }));
 
+vi.mock('./aiAssistant/toolHandlers', () => ({
+  executeToolCall: vi.fn(),
+}));
+
 import useAiAssistant from './useAiAssistant';
 
 describe('useAiAssistant', () => {
@@ -63,5 +67,32 @@ describe('useAiAssistant', () => {
     expect(() => {
       renderHook(() => useAiAssistant([]));
     }).not.toThrow();
+  });
+});
+
+describe('useAiAssistant loop exhaustion', () => {
+  it('falls back to the last successful tool result instead of an error', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { executeToolCall } = await import('./aiAssistant/toolHandlers');
+
+    // Ein Modell, das nie aufhört, Werkzeuge aufzurufen.
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [] } }],
+        functionCalls: () => [{ name: 'searchWaterSupply', args: {} }],
+        text: () => '',
+      },
+    });
+    (executeToolCall as any).mockResolvedValue({
+      success: true,
+      message: 'Nächste Entnahmestelle: Überflurhydrant ÖH 12, 120 m nördlich',
+      data: { answer: 'Nächste Entnahmestelle: Überflurhydrant ÖH 12' },
+    });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    const answer = await result.current.processText('wo ist der nächste hydrant');
+
+    expect(answer.success).toBe(true);
+    expect(answer.message).toContain('ÖH 12');
   });
 });

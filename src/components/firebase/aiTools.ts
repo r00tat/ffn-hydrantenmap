@@ -310,14 +310,15 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'searchWaterSupply',
     description:
-      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position and return them sorted by air line distance. Use this before proposing a hose line. Does NOT change the map.',
+      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. Does NOT change the map.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
         position: positionSchema,
         radius: {
           type: SchemaType.NUMBER,
-          description: 'Search radius in meters (default 300, max 2000)',
+          description:
+            'Fixed search radius in meters, max 2500. Only set this when the user asked for a specific radius — otherwise omit it and let the search widen automatically.',
         },
         kinds: {
           type: SchemaType.ARRAY,
@@ -446,11 +447,17 @@ Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Detai
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
 
 WASSERVERSORGUNG - Hydranten suchen und Löschleitung vorschlagen:
-Fragt der Benutzer nach einer Löschleitung, einer Wasserversorgung oder dem nächsten
-Hydranten, gilt immer dieser Ablauf:
-1. searchWaterSupply aufrufen. Ohne Angabe: position.type = einsatzort, radius 300 m.
-   Findest du nichts, den Radius schrittweise erhöhen (600 m, 1000 m), bevor du
-   aufgibst.
+
+Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?"):
+searchWaterSupply EINMAL aufrufen, dann direkt antworten. Das Ergebnis enthält in
+data.answer bereits einen fertigen Satz mit Entfernung und Himmelsrichtung - gib
+ihn wieder, gekürzt auf das Gefragte. Rufe die Suche NICHT ein zweites Mal auf,
+nur um den Radius zu vergrößern: Sie weitet ihn von sich aus bis 2500 m aus. Nur
+wenn der Benutzer ausdrücklich einen anderen Ort oder eine andere Art meint, ist
+ein zweiter Aufruf richtig.
+
+Auftrag für eine Löschleitung ("Leitung vom nächsten Hydranten zum Einsatzort"):
+1. searchWaterSupply aufrufen. Ohne Angabe: position.type = einsatzort.
 2. Aus den Treffern begründet auswählen. Die Suche liefert Distanz, Typ, Nennweite
    (dimension in mm), statischen und dynamischen Druck sowie bei Saugstellen und
    Löschteichen Entnahmemenge, Saughöhe, Fassungsvermögen und Zufluss.
@@ -462,13 +469,17 @@ Hydranten, gilt immer dieser Ablauf:
 3. proposeHoseLine mit sourceName aus dem Suchergebnis aufrufen. dimension B für
    Zubring- und Versorgungsleitungen, C nur wenn ausdrücklich ein C-Rohr oder eine
    Angriffsleitung verlangt wird. reason kurz und in ganzen Worten begründen.
-4. Danach dem Benutzer in einem Satz sagen, welche Entnahmestelle du gewählt hast,
-   wie lang die Leitung wird und wie viele Schlauchlängen das sind.
+4. Danach in einem Satz sagen, welche Entnahmestelle du gewählt hast, wie lang die
+   Leitung wird und wie viele Schlauchlängen das sind.
 
 Der Vorschlag ist NUR ein Entwurf. Er wird gestrichelt auf der Karte gezeigt und
 landet erst im Einsatz, wenn der Benutzer ihn bestätigt. Behaupte niemals, die
 Leitung sei bereits angelegt. Erfinde niemals Hydranten, Nennweiten oder Drücke -
 verwende ausschließlich, was searchWaterSupply zurückgegeben hat.
+
+Halte dich generell kurz: Jeder zusätzliche Werkzeugaufruf verzögert die Antwort,
+und nach wenigen Aufrufen bricht die Verarbeitung ab. Wiederhole nie einen Aufruf
+mit denselben Argumenten.
 
 WICHTIG - Standardverhalten bei Meldungen:
 Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage zum Einsatz stellt, handelt es sich wahrscheinlich um eine Meldung.

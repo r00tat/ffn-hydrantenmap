@@ -69,11 +69,54 @@ describe('searchWaterSupply', () => {
     expect(deps.findWaterSupply).toHaveBeenCalledWith(einsatzort, 300);
   });
 
+  it('widens the radius itself instead of letting the model retry', async () => {
+    // Nur der weiteste Ring liefert etwas — ohne Eskalation im Handler müsste
+    // das Modell erneut aufrufen und verbrennt dabei Schleifendurchläufe.
+    const findWaterSupply = vi.fn(async (_center, radius: number) =>
+      radius >= 1200
+        ? ([{ geohash: 'a', hydranten: [hydrantFern] }] as unknown as GeohashCluster[])
+        : []
+    );
+    const deps = makeDeps({ findWaterSupply });
+
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(findWaterSupply.mock.calls.map((c) => c[1])).toEqual([300, 600, 1200]);
+    expect(result.success).toBe(true);
+    expect(result.data.radius).toBe(1200);
+  });
+
+  it('stops at the first radius that finds something', async () => {
+    const deps = makeDeps();
+    await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect((deps.findWaterSupply as any).mock.calls).toHaveLength(1);
+  });
+
+  it('honours an explicit radius without widening it', async () => {
+    const deps = makeDeps({ findWaterSupply: vi.fn(async () => []) });
+    await executeToolCall(call('searchWaterSupply', { radius: 150 }), deps);
+
+    expect((deps.findWaterSupply as any).mock.calls.map((c: any[]) => c[1])).toEqual([
+      150,
+    ]);
+  });
+
+  it('answers with distance and direction so the model only has to relay it', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.message).toContain('ÜH Hauptstraße 12');
+    expect(result.message).toContain('nördlich');
+    expect(result.message).toMatch(/8[0-9] m/);
+    expect(result.data.answer).toBe(result.message);
+  });
+
   it('caps the radius so a single call cannot pull in the whole database', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply', { radius: 99999 }), deps);
 
-    expect(deps.findWaterSupply).toHaveBeenCalledWith(einsatzort, 2000);
+    expect(deps.findWaterSupply).toHaveBeenCalledWith(einsatzort, 2500);
   });
 
   it('applies kind and type filters', async () => {
@@ -98,6 +141,14 @@ describe('searchWaterSupply', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('100');
     expect(result.data.candidates).toEqual([]);
+  });
+
+  it('reports the widest radius it tried when the escalation finds nothing', async () => {
+    const deps = makeDeps({ findWaterSupply: vi.fn(async () => []) });
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('2500');
   });
 
   it('does not create any map item', async () => {

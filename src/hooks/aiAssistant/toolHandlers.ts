@@ -8,6 +8,7 @@ import {
   buildHoseLineDraft,
   collectWaterSupplyCandidates,
   describeHoseLineDraft,
+  describeWaterSupplyCandidate,
   HoseLineDraft,
   WaterSupplyCandidate,
   WaterSupplyKind,
@@ -54,9 +55,19 @@ export interface ToolHandlerDeps {
   proposeHoseLineDraft: (draft: HoseLineDraft) => void;
 }
 
+/**
+ * Radien, die `searchWaterSupply` ohne Angabe der Reihe nach probiert, bis
+ * etwas gefunden wird.
+ *
+ * Die Eskalation gehört hierher und nicht in den Prompt: Jeder Anlauf des
+ * Modells kostet einen Schleifendurchlauf, und davon gibt es fünf. Vier leere
+ * Runden hintereinander reichten, um „Zu viele Verarbeitungsschritte" zu
+ * erzeugen, statt eine Antwort zu geben.
+ */
+const WATER_SUPPLY_RADII = [300, 600, 1200, 2500];
+
 /** Obergrenzen, damit ein einzelner Tool-Call nicht die halbe Datenbank zieht. */
-const MAX_WATER_SUPPLY_RADIUS = 2000;
-const DEFAULT_WATER_SUPPLY_RADIUS = 300;
+const MAX_WATER_SUPPLY_RADIUS = 2500;
 const MAX_WATER_SUPPLY_RESULTS = 20;
 const DEFAULT_WATER_SUPPLY_RESULTS = 5;
 
@@ -375,24 +386,33 @@ export async function executeToolCall(
       const center = await resolvePosition(
         (args.position as any) || { type: 'einsatzort' }
       );
-      const radius = clamp(
-        (args.radius as number) || DEFAULT_WATER_SUPPLY_RADIUS,
-        50,
-        MAX_WATER_SUPPLY_RADIUS
-      );
       const limit = clamp(
         (args.limit as number) || DEFAULT_WATER_SUPPLY_RESULTS,
         1,
         MAX_WATER_SUPPLY_RESULTS
       );
+      // Ein ausdrücklich genannter Radius ist eine Vorgabe, kein Startwert —
+      // wer „im Umkreis von 100 m" fragt, will keine Treffer aus 2 km.
+      const radii = args.radius
+        ? [clamp(args.radius as number, 50, MAX_WATER_SUPPLY_RADIUS)]
+        : WATER_SUPPLY_RADII;
 
-      const clusters = await findWaterSupply(center, radius);
-      const candidates = collectWaterSupplyCandidates(clusters, center, {
-        radius,
-        kinds: args.kinds as WaterSupplyKind[] | undefined,
-        hydrantType: args.hydrantType as string | undefined,
-        limit,
-      });
+      let candidates: WaterSupplyCandidate[] = [];
+      let radius = radii[radii.length - 1];
+
+      for (const currentRadius of radii) {
+        const clusters = await findWaterSupply(center, currentRadius);
+        candidates = collectWaterSupplyCandidates(clusters, center, {
+          radius: currentRadius,
+          kinds: args.kinds as WaterSupplyKind[] | undefined,
+          hydrantType: args.hydrantType as string | undefined,
+          limit,
+        });
+        if (candidates.length > 0) {
+          radius = currentRadius;
+          break;
+        }
+      }
 
       waterSupplyResults.current = candidates;
 
@@ -404,13 +424,23 @@ export async function executeToolCall(
         };
       }
 
-      const nearest = candidates[0];
+      // Die fertige Antwort steht schon hier, damit das Modell sie nur noch
+      // weitergeben muss und keine zweite Runde für die Auswahl braucht.
+      const [nearest, ...others] = candidates;
+      const answer = [
+        `Nächste Entnahmestelle: ${describeWaterSupplyCandidate(
+          nearest,
+          center
+        )}`,
+        ...others
+          .slice(0, 3)
+          .map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
+      ].join('. ');
+
       return {
         success: true,
-        message: `${candidates.length} Entnahmestellen gefunden, nächste: ${
-          WATER_SUPPLY_LABELS[nearest.kind]
-        } ${nearest.name} (${nearest.distance} m)`,
-        data: { candidates, radius },
+        message: answer,
+        data: { candidates, radius, answer },
       };
     }
 

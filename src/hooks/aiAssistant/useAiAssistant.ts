@@ -261,6 +261,12 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
         setProcessingStatus('idle');
         console.warn('[AI] Max loop iterations reached');
+        // Ein erreichtes Limit heißt nicht, dass nichts herausgekommen ist:
+        // Meist steht die Antwort schon im letzten Werkzeugergebnis, und das
+        // wegzuwerfen wäre für den Benutzer ein Fehlschlag ohne Grund.
+        if (lastResult?.success) {
+          return { ...lastResult, isAnswer: true, draft: pendingDraft };
+        }
         return { success: false, message: 'Zu viele Verarbeitungsschritte' };
       } catch (error) {
         console.error('[AI] Processing error:', error);
