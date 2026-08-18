@@ -834,6 +834,20 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
 - **Hochgeladen wird erst beim Speichern** des Dialogs; nach einem erfolgreichen Upload
   gelten die Bilder sofort als gespeichert, damit ein zweiter Anlauf nach einem Fehler
   nicht dieselben Dateien noch einmal hochlädt.
+- **Größe und Typ sind eine Schranke der `storage.rules`** (15 MB, `image/.*`), aber der
+  Browser prüft sie vorher mit: `prepareMangelImage`
+  ([compressImage.ts](src/components/Fahrtenbuch/compressImage.ts)) verkleinert und wirft
+  dann gegen `MANGEL_MAX_IMAGE_BYTES`/`isAllowedMangelImageType` aus
+  [mangel.ts](src/common/mangel.ts). Ohne das lehnt der Storage mit
+  `storage/unauthorized` ab und der Melder liest nur „Upload fehlgeschlagen". Die Prüfung
+  steht **nach** dem Verkleinern — ein 20-MB-Handyfoto ist danach in Ordnung — und **vor**
+  dem ersten Upload, sonst lägen bei fünf Fotos die ersten vier ohne Dokument im Storage.
+  Die 15 MB stehen an zwei Orten; ein Test in `src/common/mangel.test.ts` liest
+  `storage.rules` und vergleicht.
+- **Ein Foto ohne MIME-Typ** ist kein Sonderfall, sondern kommt von manchen
+  Android-Sharetargets. Der Typ wird dann aus der Endung abgeleitet
+  (`imageTypeFromName`); vorher ging die Datei als `application/octet-stream` in den
+  Upload und lief in die Contenttype-Bedingung der Regel.
 - **Gelöscht wird serverseitig** — beim Entfernen eines einzelnen Bildes (`updateMangel`
   bekommt die vollständige Liste, was fehlt, fliegt aus dem Storage) und beim Löschen des
   Mangels.

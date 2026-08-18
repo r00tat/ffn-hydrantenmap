@@ -885,7 +885,9 @@
         "notAllowedDelete": "Nur ein Admin darf einen Mangel löschen.",
         "saveFailed": "Speichern fehlgeschlagen: {message}",
         "deleteFailed": "Löschen fehlgeschlagen: {message}",
-        "imageUploadFailed": "Ein Bild konnte nicht hochgeladen werden. Bitte erneut versuchen."
+        "imageUploadFailed": "Ein Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
+        "imageTooLarge": "„{name}“ ist auch verkleinert größer als {size} MB und wurde nicht hochgeladen. Bitte ein kleineres Bild wählen.",
+        "imageTypeUnsupported": "„{name}“ ist keine Bilddatei und wurde nicht hochgeladen."
       },
       "migrate": {
         "title": "Mängel aus bestehenden Fahrten übernehmen",

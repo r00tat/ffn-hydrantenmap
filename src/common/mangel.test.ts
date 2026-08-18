@@ -1,9 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   appendMangelNote,
   applyMangelStatus,
   buildMangelDocument,
+  isAllowedMangelImageType,
   isOpenMangel,
+  MANGEL_MAX_IMAGE_BYTES,
   MANGEL_MAX_IMAGES,
   mangelImagePath,
   openMangelCount,
@@ -440,5 +444,45 @@ describe('isOpenMangel / openMangelCount', () => {
 
   it('treats a missing status as open — a Mangel is not silently resolved', () => {
     expect(isOpenMangel(mangel({ status: undefined as never }))).toBe(true);
+  });
+});
+
+describe('Bild-Schranken spiegeln die storage.rules', () => {
+  const rules = fs.readFileSync(
+    path.join(process.cwd(), 'storage.rules'),
+    'utf8',
+  );
+  // Nur der Abschnitt des Mangel-Ordners; die Bug-Report-Anhänge daneben haben
+  // eigene Bedingungen.
+  const mangelRule =
+    rules.split('match /groups/{groupId}/mangel/')[1]?.split('match ')[0] ?? '';
+
+  it('kennt dieselbe Höchstgröße wie die Regel', () => {
+    // Zwei Zahlen an zwei Orten laufen auseinander, sobald eine von beiden
+    // angefasst wird — und dann lehnt der Storage ab, was der Browser gerade
+    // durchgewinkt hat.
+    const match = mangelRule.match(
+      /request\.resource\.size < (\d+) \* 1024 \* 1024/,
+    );
+    expect(match).not.toBeNull();
+    expect(MANGEL_MAX_IMAGE_BYTES).toBe(
+      Number(match?.[1]) * 1024 * 1024,
+    );
+  });
+
+  it('prüft denselben Contenttype wie die Regel', () => {
+    expect(mangelRule).toContain(
+      "request.resource.contentType.matches('image/.*')",
+    );
+    expect(isAllowedMangelImageType('image/jpeg')).toBe(true);
+    expect(isAllowedMangelImageType('image/heic')).toBe(true);
+    // Das ist der Fall aus der Praxis: Meldet der Browser für die gewählte
+    // Datei keinen Typ, stand hier bisher `application/octet-stream` — und der
+    // Upload scheiterte erst im Storage.
+    expect(isAllowedMangelImageType('application/octet-stream')).toBe(false);
+    expect(isAllowedMangelImageType('text/plain')).toBe(false);
+    expect(isAllowedMangelImageType('')).toBe(false);
+    // Kein Teiltreffer: Die Regel prüft die ganze Zeichenkette.
+    expect(isAllowedMangelImageType('application/image/jpeg')).toBe(false);
   });
 });

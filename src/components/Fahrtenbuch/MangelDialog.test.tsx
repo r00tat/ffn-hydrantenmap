@@ -32,7 +32,10 @@ import {
   VEHICLE_PRESETS,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
-import type { Mangel } from '../../common/mangel';
+import {
+  MANGEL_MAX_IMAGE_BYTES,
+  type Mangel,
+} from '../../common/mangel';
 import { renderWithIntl } from '../../test-utils/intlRender';
 import MangelDialog from './MangelDialog';
 
@@ -83,16 +86,27 @@ beforeEach(() => {
   changeMangelStatusMock.mockResolvedValue({ success: true, id: 'm1' });
   mangelImageUrlsMock.mockResolvedValue({ success: true, images: [] });
   uploadMangelImageMock.mockImplementation(
-    async (_groupId: string, folderId: string, file: File) =>
-      `groups/ffnd/mangel/${folderId}/${file.name}`,
+    async (
+      _groupId: string,
+      folderId: string,
+      image: { fileName: string },
+    ) => `groups/ffnd/mangel/${folderId}/${image.fileName}`,
   );
   // jsdom kennt keine Objekt-URLs; die Vorschau braucht sie.
   URL.createObjectURL = vi.fn(() => 'blob:preview');
   URL.revokeObjectURL = vi.fn();
 });
 
-const photo = () =>
-  new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' });
+const photo = () => new File(['bytes'], 'foto.jpg', { type: 'image/jpeg' });
+
+/** Ein Foto, das auch verkleinert über der Schranke der `storage.rules` bleibt. */
+const hugePhoto = () => {
+  const file = new File(['bytes'], 'gross.jpg', { type: 'image/jpeg' });
+  // jsdom legt für die tatsächlichen Bytes keinen Speicher an, das täte ein
+  // 15-MB-Array aber sehr wohl.
+  Object.defineProperty(file, 'size', { value: MANGEL_MAX_IMAGE_BYTES + 1 });
+  return file;
+};
 
 describe('MangelDialog — anlegen', () => {
   it('legt einen Mangel mit Fahrzeug und Beschreibung an', async () => {
@@ -207,6 +221,58 @@ describe('MangelDialog — anlegen', () => {
     );
     expect(createMangelMock).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('sagt bei einem zu großen Bild, welches und warum', async () => {
+    // Ohne die Prüfung im Browser lehnten die `storage.rules` den Upload mit
+    // `storage/unauthorized` ab und der Melder läse nur „Upload
+    // fehlgeschlagen" — der Grund käme nie bei ihm an.
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        vehicleId="v1"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Mangelbeschreibung/), 'x');
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), hugePhoto());
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/„gross.jpg“/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/15 MB/)).toBeInTheDocument();
+    // Nichts angefasst: kein Upload, kein Dokument.
+    expect(uploadMangelImageMock).not.toHaveBeenCalled();
+    expect(createMangelMock).not.toHaveBeenCalled();
+  });
+
+  it('lädt kein Bild hoch, wenn ein anderes abgelehnt wird', async () => {
+    // Sonst lägen die ersten Fotos ohne Dokument im Storage.
+    renderWithIntl(
+      <MangelDialog
+        open
+        groupId="ffnd"
+        vehicles={vehicles}
+        vehicleId="v1"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await userEvent.type(screen.getByLabelText(/Mangelbeschreibung/), 'x');
+    await userEvent.upload(screen.getByLabelText('Bilder wählen'), [
+      photo(),
+      hugePhoto(),
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/„gross.jpg“/)).toBeInTheDocument(),
+    );
+    expect(uploadMangelImageMock).not.toHaveBeenCalled();
   });
 
   it('zeigt beim Anlegen weder Status noch Verlauf', () => {
