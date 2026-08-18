@@ -6,8 +6,12 @@ import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebas
 import { FirecallItem } from '../../components/firebase/firestore';
 import { usePositionContext } from '../../components/providers/PositionProvider';
 import { searchPlace } from '../../components/actions/maps/places';
+import { queryClusters } from '../../components/firebase/clusterQuery';
 import { GeoPosition } from '../../common/geo';
+import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import { defaultPosition } from '../constants';
+import { useFirecall } from '../useFirecall';
+import { useHoseLineDraft } from '../useHoseLineDraft';
 import useFirecallItemAdd from '../useFirecallItemAdd';
 import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
@@ -22,8 +26,12 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   const [position, isPositionSet] = usePositionContext();
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
-  
+  const firecall = useFirecall();
+  const { proposeDraft } = useHoseLineDraft();
+
   const interactionsRef = useRef<AiInteraction[]>([]);
+  /** Treffer der letzten Umkreissuche, siehe `ToolHandlerDeps` */
+  const waterSupplyResultsRef = useRef<WaterSupplyCandidate[]>([]);
   const chatHistoryRef = useRef<Content[]>([]);
   const lastActivityRef = useRef<number>(0);
   
@@ -63,6 +71,13 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         case 'userPosition':
           return isPositionSet ? { lat: position.lat, lng: position.lng } : defaultPos;
 
+        case 'einsatzort':
+          // Ein Einsatz ohne gesetzten Einsatzort ist der Normalfall in den
+          // ersten Minuten — dann ist die Kartenmitte die beste Näherung.
+          return firecall.lat && firecall.lng
+            ? { lat: firecall.lat, lng: firecall.lng }
+            : defaultPos;
+
         case 'nearItem':
           if (positionSpec.itemName) {
             const target = existingItems.find(
@@ -97,7 +112,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           return defaultPos;
       }
     },
-    [existingItems, isPositionSet, map, position]
+    [existingItems, firecall.lat, firecall.lng, isPositionSet, map, position]
   );
 
   const sendToGemini = useCallback(
@@ -133,6 +148,10 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       let iterations = 0;
       const MAX_LOOP_ITERATIONS = 5;
       let lastResult: AiAssistantResult | null = null;
+      // Der Entwurf überlebt die restlichen Schleifendurchläufe: Das Modell
+      // antwortet nach dem Tool-Call noch mit Text, und erst diese Antwort
+      // erreicht die Oberfläche.
+      let pendingDraft: HoseLineDraft | undefined;
 
       try {
         while (iterations < MAX_LOOP_ITERATIONS) {
@@ -187,6 +206,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               message: text || lastResult?.message || 'Aktion ausgeführt',
               isAnswer: !!text,
               createdItemId: lastResult?.createdItemId,
+              draft: pendingDraft,
             };
           }
 
@@ -200,6 +220,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             setLastCreatedItem,
             map,
             defaultPosition,
+            findWaterSupply: queryClusters,
+            waterSupplyResults: waterSupplyResultsRef,
+            proposeHoseLineDraft: proposeDraft,
           };
 
           setProcessingStatus('executing');
@@ -226,6 +249,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               }
             });
             lastResult = execResult;
+            if (execResult.draft) {
+              pendingDraft = execResult.draft;
+            }
           }
 
           // Add function responses to history and continue loop
@@ -242,7 +268,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         return { success: false, message: 'Fehler bei der Verarbeitung' };
       }
     },
-    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem]
+    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDraft]
   );
 
   const transcribeAudio = useCallback(

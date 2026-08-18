@@ -2,7 +2,17 @@ import { FunctionCall } from 'firebase/ai';
 import { evaluate } from 'mathjs';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { searchPlace } from '../../components/actions/maps/places';
-import { GeoPosition } from '../../common/geo';
+import { GeoPosition, GeoPositionObject } from '../../common/geo';
+import { GeohashCluster } from '../../common/gis-objects';
+import {
+  buildHoseLineDraft,
+  collectWaterSupplyCandidates,
+  describeHoseLineDraft,
+  HoseLineDraft,
+  WaterSupplyCandidate,
+  WaterSupplyKind,
+  WATER_SUPPLY_LABELS,
+} from '../../common/waterSupply';
 import { AiAssistantResult } from './types';
 import {
   calculateInverseSquareLaw,
@@ -29,6 +39,29 @@ export interface ToolHandlerDeps {
   setLastCreatedItem: (item: { id: string; type: string } | null) => void;
   map: { getCenter: () => { lat: number; lng: number }; panTo: (latlng: [number, number]) => void } | null;
   defaultPosition: { lat: number; lng: number };
+  /** Geohash-Umkreissuche über die Cluster-Sammlung (`clusters6`) */
+  findWaterSupply: (
+    center: GeoPositionObject,
+    radiusInM: number
+  ) => Promise<GeohashCluster[]>;
+  /**
+   * Treffer der letzten `searchWaterSupply`. `proposeHoseLine` löst darüber
+   * `sourceName` auf, statt dem Modell Koordinaten abzuverlangen — die
+   * erfindet es sonst.
+   */
+  waterSupplyResults: { current: WaterSupplyCandidate[] };
+  /** Leitungsvorschlag anzeigen, ohne ihn anzulegen */
+  proposeHoseLineDraft: (draft: HoseLineDraft) => void;
+}
+
+/** Obergrenzen, damit ein einzelner Tool-Call nicht die halbe Datenbank zieht. */
+const MAX_WATER_SUPPLY_RADIUS = 2000;
+const DEFAULT_WATER_SUPPLY_RADIUS = 300;
+const MAX_WATER_SUPPLY_RESULTS = 20;
+const DEFAULT_WATER_SUPPLY_RESULTS = 5;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function formatValue(value: number): string {
@@ -66,6 +99,9 @@ export async function executeToolCall(
     setLastCreatedItem,
     map,
     defaultPosition,
+    findWaterSupply,
+    waterSupplyResults,
+    proposeHoseLineDraft,
   } = deps;
 
   switch (call.name) {
@@ -332,6 +368,112 @@ export async function executeToolCall(
         message: `Strahlenschutz (${nuclide.name}): ${label} = ${formatValue(result.value)} ${unit}`, 
         isAnswer: true,
         data: { nuclide: nuclide.name, field: result.field, value: result.value, unit }
+      };
+    }
+
+    case 'searchWaterSupply': {
+      const center = await resolvePosition(
+        (args.position as any) || { type: 'einsatzort' }
+      );
+      const radius = clamp(
+        (args.radius as number) || DEFAULT_WATER_SUPPLY_RADIUS,
+        50,
+        MAX_WATER_SUPPLY_RADIUS
+      );
+      const limit = clamp(
+        (args.limit as number) || DEFAULT_WATER_SUPPLY_RESULTS,
+        1,
+        MAX_WATER_SUPPLY_RESULTS
+      );
+
+      const clusters = await findWaterSupply(center, radius);
+      const candidates = collectWaterSupplyCandidates(clusters, center, {
+        radius,
+        kinds: args.kinds as WaterSupplyKind[] | undefined,
+        hydrantType: args.hydrantType as string | undefined,
+        limit,
+      });
+
+      waterSupplyResults.current = candidates;
+
+      if (candidates.length === 0) {
+        return {
+          success: false,
+          message: `Keine Wasserentnahmestelle im Umkreis von ${radius} m gefunden`,
+          data: { candidates: [], radius },
+        };
+      }
+
+      const nearest = candidates[0];
+      return {
+        success: true,
+        message: `${candidates.length} Entnahmestellen gefunden, nächste: ${
+          WATER_SUPPLY_LABELS[nearest.kind]
+        } ${nearest.name} (${nearest.distance} m)`,
+        data: { candidates, radius },
+      };
+    }
+
+    case 'proposeHoseLine': {
+      const sourceName = args.sourceName as string | undefined;
+      const sourcePosition = args.sourcePosition as
+        | { lat?: number; lng?: number }
+        | undefined;
+
+      let source:
+        | ({ kind?: WaterSupplyKind; name?: string } & GeoPositionObject)
+        | undefined;
+
+      if (sourceName) {
+        const needle = sourceName.toLocaleLowerCase('de');
+        const found = waterSupplyResults.current.find((candidate) =>
+          candidate.name.toLocaleLowerCase('de').includes(needle)
+        );
+        if (!found) {
+          return {
+            success: false,
+            message: `"${sourceName}" ist in der letzten Umkreissuche nicht enthalten. Zuerst searchWaterSupply aufrufen.`,
+          };
+        }
+        source = {
+          kind: found.kind,
+          name: found.name,
+          lat: found.lat,
+          lng: found.lng,
+        };
+      } else if (
+        typeof sourcePosition?.lat === 'number' &&
+        typeof sourcePosition?.lng === 'number'
+      ) {
+        source = { lat: sourcePosition.lat, lng: sourcePosition.lng };
+      }
+
+      if (!source) {
+        return {
+          success: false,
+          message:
+            'Keine Entnahmestelle angegeben. Zuerst searchWaterSupply aufrufen und sourceName aus dem Ergebnis verwenden.',
+        };
+      }
+
+      const target = await resolvePosition(
+        (args.target as any) || { type: 'einsatzort' }
+      );
+
+      const draft = buildHoseLineDraft({
+        source,
+        target,
+        dimension: args.dimension as string | undefined,
+        name: args.name as string | undefined,
+        reason: args.reason as string | undefined,
+      });
+
+      proposeHoseLineDraft(draft);
+
+      return {
+        success: true,
+        message: `Vorschlag: ${describeHoseLineDraft(draft)}`,
+        draft,
       };
     }
 

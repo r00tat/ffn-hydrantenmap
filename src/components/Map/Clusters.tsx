@@ -1,12 +1,3 @@
-import {
-  collection,
-  endAt,
-  getDocs,
-  orderBy,
-  query,
-  startAt,
-} from 'firebase/firestore';
-import { geohashQueryBounds } from 'geofire-common';
 import { useEffect, useState } from 'react';
 import { LayerGroup, LayersControl, useMap, useMapEvent } from 'react-leaflet';
 import {
@@ -18,7 +9,7 @@ import {
   Saugstelle,
 } from '../../common/gis-objects';
 import { defaultPosition } from '../../hooks/constants';
-import { db } from '../firebase/firebase';
+import { queryClusters } from '../firebase/clusterQuery';
 import GefahrObjekteLayer from './layers/GefahrObjekteLayer';
 import HydrantenLabelsLayer from './layers/HydrantenLabelsLayer';
 import HydrantenLayer from './layers/HydrantenLayer';
@@ -26,38 +17,6 @@ import LoeschteicheLayer from './layers/LoeschteichLayer';
 import RisikoObjekteLayer from './layers/RisikoObjekteLayer';
 import SaugstellenLayer from './layers/SaugstellenLayer';
 import L from 'leaflet';
-
-export async function queryClusters(center: L.LatLng, radiusInM: number) {
-  const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
-  // console.info(`bounds: ${JSON.stringify(bounds)}`);
-
-  const snapshots = await Promise.all(
-    bounds.map((b) =>
-      getDocs(
-        query(
-          collection(db, 'clusters6'),
-          orderBy('geohash'),
-          startAt(b[0]),
-          endAt(b[1])
-        )
-      )
-    )
-  );
-
-  // Collect all the query results together into a single list
-
-  // console.info(
-  //   `got ${snapshots
-  //     .map((snap) => snap.docs.length)
-  //     .reduce((p, c) => p + c, 0)} clusters`
-  // );
-
-  const clusters: GeohashCluster[] = snapshots
-    .map((snap) => snap.docs)
-    .flat()
-    .map((doc) => doc.data() as GeohashCluster);
-  return clusters;
-}
 
 function filterRecords<T>(
   matchingDocs: GeohashCluster[],

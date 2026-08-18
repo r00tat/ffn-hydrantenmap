@@ -45,6 +45,7 @@ vi.mock('./useFirecallItemUpdate', () => ({
 
 vi.mock('./useFirecall', () => ({
   useFirecallId: vi.fn(() => 'test-firecall'),
+  useFirecall: vi.fn(() => ({ id: 'test-firecall', name: 'Test' })),
 }));
 
 vi.mock('./useMapEditor', () => ({

@@ -1590,7 +1590,12 @@
     "questionPlaceholder": "z.B. 'Wie viele Fahrzeuge sind im Einsatz?' oder 'Erstelle Abschnitt Nord'",
     "questionGeneric": "Frage",
     "questionGenericPlaceholder": "Stelle Fragen oder Aufgaben zum Einsatz",
-    "send": "Senden"
+    "send": "Senden",
+    "undo": "Rückgängig",
+    "draftConfirm": "Übernehmen",
+    "draftDiscard": "Verwerfen",
+    "draftAdded": "Leitung übernommen",
+    "draftFailed": "Leitung konnte nicht angelegt werden"
   },
   "blaulichtSms": {
     "title": "Alarm-SMS-Einsätze",

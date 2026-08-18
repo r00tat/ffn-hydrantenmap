@@ -1,3 +1,5 @@
+import { HoseLineDraft } from '../../common/waterSupply';
+
 export interface AiInteraction {
   timestamp: number;
   action: string;
@@ -50,6 +52,11 @@ export interface AiAssistantResult {
   createdItemId?: string;
   isAnswer?: boolean;
   data?: any; // Structured data for the AI to process
+  /**
+   * Leitungsvorschlag, der noch bestätigt werden muss. Solange gesetzt, zeigt
+   * der Toast „Übernehmen"/„Verwerfen" statt automatisch zu verschwinden.
+   */
+  draft?: HoseLineDraft;
   clarification?: {
     question: string;
     options: string[];
