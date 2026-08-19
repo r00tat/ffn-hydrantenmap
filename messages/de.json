@@ -455,7 +455,8 @@
     "fuel": {
       "diesel": "Diesel",
       "benzin": "Benzin",
-      "adblue": "AdBlue"
+      "adblue": "AdBlue",
+      "oel": "Öl"
     },
     "warnings": {
       "decrease": "Letzter bekannter Stand: {lastValue} {unit}",
@@ -1596,7 +1597,14 @@
     "questionPlaceholder": "z.B. 'Wie viele Fahrzeuge sind im Einsatz?' oder 'Erstelle Abschnitt Nord'",
     "questionGeneric": "Frage",
     "questionGenericPlaceholder": "Stelle Fragen oder Aufgaben zum Einsatz",
-    "send": "Senden"
+    "send": "Senden",
+    "undo": "Rückgängig",
+    "draftConfirm": "Übernehmen",
+    "draftDiscard": "Verwerfen",
+    "draftAdded": "{count, plural, one {Leitung übernommen} other {# Leitungen übernommen}}",
+    "draftFailed": "Leitung konnte nicht angelegt werden",
+    "draftConfirmAll": "Alle {count} übernehmen",
+    "draftDiscardAll": "Alle verwerfen"
   },
   "blaulichtSms": {
     "title": "Alarm-SMS-Einsätze",

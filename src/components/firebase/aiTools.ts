@@ -6,8 +6,18 @@ const positionSchema = {
   properties: {
     type: {
       type: SchemaType.STRING,
-      enum: ['mapCenter', 'userPosition', 'nearItem', 'address', 'coordinates'],
-      description: 'How to resolve the position',
+      enum: [
+        'auto',
+        'mapCenter',
+        'userPosition',
+        'einsatzort',
+        'atItem',
+        'nearItem',
+        'address',
+        'coordinates',
+      ],
+      description:
+        'How to resolve the position. auto = the user position if known, otherwise the Einsatzort, otherwise the map centre — the right default for measurements. userPosition = the device GPS position. einsatzort = the position of the current firecall. atItem = exactly at an existing map item (use for "from the TLFA"), nearItem = next to it (use when placing a NEW item beside it). Every type falls back to the map centre when its source is unavailable.',
     },
     itemName: {
       type: SchemaType.STRING,
@@ -300,6 +310,80 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: 'searchWaterSupply',
+    description:
+      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. It also draws a hose line DRAFT to EVERY result it returns, so do not call proposeHoseLine afterwards unless a different source or dimension is wanted. Nothing is persisted; the user confirms or discards the drafts.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        position: positionSchema,
+        radius: {
+          type: SchemaType.NUMBER,
+          description:
+            'Fixed search radius in meters, max 2500. Only set this when the user asked for a specific radius — otherwise omit it and let the search widen automatically.',
+        },
+        kinds: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.STRING,
+            enum: ['hydrant', 'saugstelle', 'loeschteich'],
+          },
+          description:
+            'Restrict to these kinds of water supply. Omit to search all of them.',
+        },
+        hydrantType: {
+          type: SchemaType.STRING,
+          description:
+            'Only hydrants whose type contains this text, e.g. "Überflur" or "Unterflur". Only applies to hydrants.',
+        },
+        limit: {
+          type: SchemaType.NUMBER,
+          description:
+            'How many water supply points to return AND describe, nearest first (default 5, max 20). Raise it when the user wants an overview or more options ("zeig mir mehr Hydranten", "welche gibt es noch?") and call the search again with the higher value — that is a different call, not a repeat.',
+        },
+      },
+    },
+  },
+  {
+    name: 'proposeHoseLine',
+    description:
+      'Propose a hose line (Löschleitung) from a water supply point to a target as a DRAFT. The draft is drawn on the map but is NOT part of the firecall until the user confirms it. Always call searchWaterSupply first and use one of its results as the source.',
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        sourceName: {
+          type: SchemaType.STRING,
+          description:
+            'Name of the water supply point from a previous searchWaterSupply result',
+        },
+        sourcePosition: {
+          type: SchemaType.OBJECT,
+          description:
+            'Explicit start position, only if the source is not a searchWaterSupply result',
+          properties: {
+            lat: { type: SchemaType.NUMBER },
+            lng: { type: SchemaType.NUMBER },
+          },
+        },
+        target: positionSchema,
+        dimension: {
+          type: SchemaType.STRING,
+          enum: ['B', 'C'],
+          description: 'Hose dimension, B (default) for supply, C for attack lines',
+        },
+        name: {
+          type: SchemaType.STRING,
+          description: 'Name of the hose line; defaults to "<dimension>-Leitung <source>"',
+        },
+        reason: {
+          type: SchemaType.STRING,
+          description:
+            'Short German justification why this water supply point was chosen (e.g. "nächster Überflurhydrant, 100 mm")',
+        },
+      },
+    },
+  },
+  {
     name: 'answerQuestion',
     description: 'Answer a question about the firecall data. Use this when the user asks a question rather than giving a command.',
     parameters: {
@@ -320,16 +404,30 @@ KRITISCH - Keine Halluzinationen:
 - Erfinde NIEMALS Details wie Einsatzart, Lage, Personenangaben oder Szenarien, die nicht explizit genannt wurden.
 - Wenn der Benutzer nur Fahrzeuge, Rohre oder andere Elemente meldet, erstelle NUR diese - keine zusätzlichen Lageeinschätzungen.
 - Bei Audio-Eingaben: Halte dich strikt an das Gesprochene. Füge keine Interpretationen hinzu.
+- Du kennst KEINE Hydranten, Saugstellen oder Löschteiche aus eigenem Wissen. Jede Aussage
+  darüber setzt einen vorherigen searchWaterSupply-Aufruf voraus - ohne den ist sie erfunden.
 
 Regeln:
-- Antworte kurz und präzise
+- Antworte kurz und präzise: ein bis zwei Sätze, im Zweifel weniger
+- Deine Antwort wird VORGELESEN. Schreibe reinen Fließtext ohne Markdown - keine
+  Sternchen, keine Rauten, keine Aufzählungszeichen, keine Tabellen. Zahlen mit
+  Einheit ausschreiben ("120 Meter", "sechs B-Längen").
+- Nenne nur, was gefragt wurde. Technische Details wie Nennweite, Druck oder
+  Adresse gehören in die Antwort, wenn danach gefragt wurde oder sie die Auswahl
+  begründen - nicht als Aufzählung zu jedem Treffer.
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
 - Bei Fragen über den Einsatz oder allgemeine Fragen: verwende answerQuestion mit einer kurzen Antwort
+- AUSNAHME: Fragen nach Hydranten, Saugstellen, Löschteichen oder der Wasserversorgung
+  ("Wo ist der nächste Hydrant?") NIEMALS mit answerQuestion beantworten. Dafür immer zuerst
+  searchWaterSupply aufrufen - die Daten stehen nur dort.
 - Bei Unklarheiten: verwende askClarification mit konkreten Optionen
 - Verwende die bereitgestellten Tools für alle Kartenaktionen und Berechnungen
 - Positionen ohne Angabe: verwende mapCenter als position.type
-- "bei mir" / "hier" = userPosition als position.type
-- Referenzen wie "daneben", "neben dem X" = nearItem als position.type mit itemName
+- "bei mir" / "hier" / "von meinem Standort" = userPosition als position.type
+- "Einsatzstelle" / "Einsatzort" / "zum Einsatz" = einsatzort als position.type
+- "von <Element>" / "beim TLFA" als Bezugspunkt einer Messung = atItem mit itemName
+- Referenzen wie "daneben", "neben dem X" zum PLATZIEREN = nearItem mit itemName
+- Ohne jede Ortsangabe bei einer Messung oder Suche: auto als position.type
 - Für Adresssuche: verwende searchAddress (erstellt Marker und schwenkt Karte dorthin)
 
 Verfügbare Elemente:
@@ -345,6 +443,10 @@ Verfügbare Elemente:
 
 Aktionen:
 - searchAddress: Adresse suchen, Marker erstellen und Karte dorthin schwenken
+- searchWaterSupply: Hydranten, Saugstellen und Löschteiche im Umkreis suchen
+- proposeHoseLine: Löschleitung als Entwurf vorschlagen
+- updateItem: Bestehendes Element ändern (Name, Farbe, Beschreibung, Position)
+- deleteItem: Bestehendes Element löschen
 - answerQuestion: Fragen zum Einsatz beantworten (z.B. "Wie viele Fahrzeuge?", "Wann ist das TLFA eingetroffen?")
 - calculate: Allgemeine Berechnungen mit mathjs (z.B. Wasserverbrauch, Mannschaftsstärke)
 - Strahlenschutz-Berechnungen: Verwende die spezifischen Tools calculateStrahlenschutzAbstand, calculateStrahlenschutzSchutzwert, calculateStrahlenschutzAufenthaltszeit und calculateStrahlenschutzNuklid.
@@ -361,6 +463,64 @@ Der Kontext enthält existingItems mit allen aktuellen Elementen und deren Detai
 - Taktische Einheiten: Name, Art (Trupp/Gruppe/Zug/Abschnitt/etc.), Feuerwehr, Mannschaftsstärke, Einheitsführer, ATS-Träger
 
 Für Referenzen auf bestehende Elemente nutze itemName oder itemId.
+
+WASSERVERSORGUNG - Hydranten suchen und Löschleitung vorschlagen:
+
+Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?", "Gibt es Wasser in der
+Nähe?", "Wo kann ich ansaugen?"):
+searchWaterSupply EINMAL aufrufen, dann direkt antworten. Nicht answerQuestion verwenden,
+bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf.
+
+Der Bezugspunkt entscheidet über das Ergebnis, also setze position bewusst:
+- "von meinem Standort", "bei mir", "hier" -> position.type = userPosition
+- "vom Einsatzort", "von der Einsatzstelle" -> position.type = einsatzort
+- "vom TLFA", "von der Einsatzleitung", "von <Fahrzeug/Element>" -> position.type =
+  atItem mit itemName (der genaue Punkt des Elements, NICHT nearItem)
+- ohne Angabe -> position weglassen; die Suche nimmt dann den Standort des
+  Benutzers, ersatzweise den Einsatzort.
+Das Ergebnis nennt in data.origin.label, worauf es tatsächlich hinauslief. Sag das
+im Antwortsatz mit ("von deinem Standort aus", "vom Einsatzort aus") - besonders
+wenn dort "der Kartenmitte" steht, denn dann fehlten Standort und Einsatzort.
+Will der Benutzer danach mehr Entnahmestellen sehen ("und welche noch?", "zeig mir
+mehr"), rufe searchWaterSupply erneut mit einem höheren limit auf (z.B. 10). Das ist
+kein wiederholter Aufruf, sondern ein anderer - die Ergebnisliste ist nach Entfernung
+sortiert und limit steuert, wie viele davon du genannt bekommst.
+Die Suche zeichnet dabei zu JEDER gefundenen Entnahmestelle einen Leitungsvorschlag
+ein - so viele, wie limit zurückgibt. Erwähne sie in einem Halbsatz ("drei Leitungen
+eingezeichnet, die kürzeste 120 Meter") und rufe dafür NICHT zusätzlich
+proposeHoseLine auf. proposeHoseLine brauchst du nur, wenn eine ANDERE Entnahmestelle
+oder eine andere Dimension gewünscht ist; es ersetzt dann alle Vorschläge der Suche. Das Ergebnis enthält in
+data.answer bereits einen fertigen Satz mit Entfernung und Himmelsrichtung - gib
+ihn wieder, gekürzt auf das Gefragte. Rufe die Suche NICHT ein zweites Mal auf,
+nur um den Radius zu vergrößern: Sie weitet ihn von sich aus bis 2500 m aus. Nur
+wenn der Benutzer ausdrücklich einen anderen Ort oder eine andere Art meint, ist
+ein zweiter Aufruf richtig.
+
+Auftrag für eine Löschleitung ("Leitung vom nächsten Hydranten zum Einsatzort"):
+1. searchWaterSupply aufrufen. Ohne Angabe: position.type = einsatzort.
+2. Aus den Treffern begründet auswählen. Die Suche liefert Distanz, Typ, Nennweite
+   (dimension in mm), statischen und dynamischen Druck sowie bei Saugstellen und
+   Löschteichen Entnahmemenge, Saughöhe, Fassungsvermögen und Zufluss.
+   - "nächster" -> kleinste Distanz
+   - "stärkster" / "leistungsfähigster" -> größte Nennweite bzw. Entnahmemenge,
+     Distanz nachrangig
+   - Ein Füllhydrant ist zum Befüllen von Tanklöschfahrzeugen gedacht, nicht für
+     eine Zubringleitung.
+3. proposeHoseLine mit sourceName aus dem Suchergebnis aufrufen. dimension B für
+   Zubring- und Versorgungsleitungen, C nur wenn ausdrücklich ein C-Rohr oder eine
+   Angriffsleitung verlangt wird. reason kurz und in ganzen Worten begründen.
+4. Danach in einem Satz sagen, welche Entnahmestelle du gewählt hast, wie lang die
+   Leitung wird und wie viele Schlauchlängen das sind.
+
+Der Vorschlag ist NUR ein Entwurf. Er wird gestrichelt auf der Karte gezeigt und
+landet erst im Einsatz, wenn der Benutzer ihn bestätigt. Behaupte niemals, die
+Leitung sei bereits angelegt. Erfinde niemals Hydranten, Nennweiten oder Drücke -
+verwende ausschließlich, was searchWaterSupply zurückgegeben hat.
+
+Halte dich generell kurz: Jeder zusätzliche Werkzeugaufruf verzögert die Antwort,
+und nach wenigen Aufrufen bricht die Verarbeitung ab. Wiederhole nie einen Aufruf
+mit exakt denselben Argumenten - ein Aufruf mit geändertem limit, Radius, Ort oder
+Filter ist dagegen ausdrücklich erlaubt.
 
 WICHTIG - Standardverhalten bei Meldungen:
 Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage zum Einsatz stellt, handelt es sich wahrscheinlich um eine Meldung.

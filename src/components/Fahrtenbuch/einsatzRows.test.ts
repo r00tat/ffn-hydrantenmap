@@ -360,26 +360,42 @@ describe('unitsWithoutVehicle', () => {
       unitsWithoutVehicle({
         fzgItems: [
           { id: 'i1', name: 'RLFA 3000/100' },
-          { id: 'i2', name: 'WLA-Bergung' },
-          { id: 'i3', name: 'WLA-Logistik' },
+          { id: 'i2', name: 'TLFA 4000' },
         ],
         crew: [],
         vehicles: [vehicle],
       }),
-    ).toEqual(['WLA-Bergung', 'WLA-Logistik']);
+    ).toEqual(['TLFA 4000']);
   });
 
   it('nennt jede Einheit nur einmal', () => {
     expect(
       unitsWithoutVehicle({
         fzgItems: [
-          { id: 'i1', name: 'WLA-Bergung' },
-          { id: 'i2', name: 'WLA-Bergung' },
+          { id: 'i1', name: 'TLFA 4000' },
+          { id: 'i2', name: 'TLFA 4000' },
         ],
         crew: [],
         vehicles: [vehicle],
       }),
-    ).toEqual(['WLA-Bergung']);
+    ).toEqual(['TLFA 4000']);
+  });
+
+  it('meldet Anhänger und Wechselladeaufbauten nicht', () => {
+    // Sie fahren nicht selbst und führen kein eigenes Fahrtenbuch. Als Hinweis
+    // wären sie Rauschen und ließen ein wirklich fehlendes Fahrzeug untergehen.
+    expect(
+      unitsWithoutVehicle({
+        fzgItems: [
+          { id: 'i1', name: 'WLA-Bergung' },
+          { id: 'i2', name: 'WLA-Logistik' },
+          { id: 'i3', name: 'Bootsanhänger' },
+          { id: 'i4', name: 'Öl Einachsanhänger' },
+        ],
+        crew: [],
+        vehicles: [vehicle],
+      }),
+    ).toEqual([]);
   });
 
   it('erfasst auch Einheiten, die nur über die Mannschaftszuordnung bekannt sind', () => {
@@ -387,11 +403,11 @@ describe('unitsWithoutVehicle', () => {
       unitsWithoutVehicle({
         fzgItems: [],
         crew: [
-          { name: 'Max Muster', vehicleId: 'i9', vehicleName: 'WLA-Bergung' },
+          { name: 'Max Muster', vehicleId: 'i9', vehicleName: 'TLFA 4000' },
         ],
         vehicles: [vehicle],
       }),
-    ).toEqual(['WLA-Bergung']);
+    ).toEqual(['TLFA 4000']);
   });
 
   it('meldet nichts, wenn jede Einheit ein Fahrzeug hat', () => {

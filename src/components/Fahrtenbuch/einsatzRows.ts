@@ -5,6 +5,7 @@ import {
   isTimeOnlyTimestamp,
   matchVehicleByName,
   normalizeName,
+  suggestPresetForVehicleName,
   timeOnSameDay,
   validateEntryInput,
   type CounterDefinition,
@@ -320,12 +321,23 @@ export function buildEinsatzRows(
  * den Stammdaten anders geschrieben steht, wäre es eine Lücke im Nachweis. Ein
  * Hinweis in der Oberfläche macht den Unterschied sichtbar, ohne die Liste mit
  * Zeilen zu füllen, die niemand ausfüllen kann.
+ *
+ * Anhänger und Wechselladeaufbauten sind davon ausgenommen: Sie fahren nicht
+ * selbst und führen kein eigenes Fahrtenbuch, im Hinweis wären sie Rauschen und
+ * ließen ein wirklich fehlendes Fahrzeug untergehen. Erkannt werden sie an
+ * derselben Namensregel, die beim Import über das Zähler-Preset entscheidet
+ * (`suggestPresetForVehicleName`, Preset „Ohne Zähler"). Zwei Antworten auf die
+ * Frage, ob eine Einheit ein eigenes Fahrtenbuch führt, wären der Fehler.
  */
 export function unitsWithoutVehicle(
   source: Pick<EinsatzRowSource, 'fzgItems' | 'crew' | 'vehicles'>,
 ): string[] {
   const names = einsatzUnits(source.fzgItems, source.crew)
+    // Erst gegen die Stammdaten, dann gegen die Namensregel: Ein Anhänger, der
+    // doch in den Stammdaten steht, bekommt eine Zeile und darf schon deshalb
+    // nicht im Hinweis stehen.
     .filter((item) => !matchVehicleByName(source.vehicles, item.name ?? ''))
+    .filter((item) => suggestPresetForVehicleName(item.name ?? '') !== 'none')
     .map((item) => (item.name ?? '').trim())
     .filter(Boolean);
   // Dieselbe Einheit kann zweimal auf der Karte stehen; im Hinweis genügt sie

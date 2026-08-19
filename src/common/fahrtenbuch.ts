@@ -42,8 +42,20 @@ export interface FahrtenbuchConfig {
 export type CounterMode = 'startEnd' | 'reading';
 export type CounterChangeWarning = 'decrease' | 'anyChange' | 'none';
 
-export type FuelType = 'diesel' | 'benzin' | 'adblue';
-export const FUEL_TYPES: FuelType[] = ['diesel', 'benzin', 'adblue'];
+export type FuelType = 'diesel' | 'benzin' | 'adblue' | 'oel';
+export const FUEL_TYPES: FuelType[] = ['diesel', 'benzin', 'adblue', 'oel'];
+
+/**
+ * Antriebsstoffe. AdBlue und Öl werden nachgefüllt, treiben aber nichts an —
+ * sie gehören weder in die Verbrauchsnäherung (l/100 km) noch in die Auswahl
+ * der Kraftstoffspalte beim PDF-Import. Vor diesem Begriff stand an drei
+ * Stellen ein eigenes `!== 'adblue'`; Öl wäre durch jede davon durchgerutscht.
+ */
+export const PROPELLANTS: FuelType[] = ['diesel', 'benzin'];
+
+export function isPropellant(fuel: FuelType): boolean {
+  return PROPELLANTS.includes(fuel);
+}
 
 export type FahrtZweck = 'einsatz' | 'uebung' | 'versorgung' | 'sonstiges';
 export const FAHRT_ZWECKE: FahrtZweck[] = [

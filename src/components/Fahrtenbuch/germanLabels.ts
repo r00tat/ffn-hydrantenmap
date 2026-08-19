@@ -24,6 +24,7 @@ export const FUEL_LABELS: Record<FuelType, string> = {
   diesel: 'Diesel',
   benzin: 'Benzin',
   adblue: 'AdBlue',
+  oel: 'Öl',
 };
 
 /** Einheit der Betriebsmittelmengen — wie `fahrtenbuch.fuelUnit` im Katalog. */

@@ -12,6 +12,7 @@
 import {
   FAHRT_ZWECKE,
   FUEL_TYPES,
+  PROPELLANTS,
   type FahrtZweck,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
@@ -33,9 +34,6 @@ import {
 import { zonedParts } from './zonedDay';
 
 export type VehicleLookup = Map<string, FahrtenbuchVehicle>;
-
-/** Kraftstoffe für die Verbrauchsnäherung — AdBlue ist ein Zusatz, kein Antrieb. */
-const CONSUMPTION_FUELS: FuelType[] = ['diesel', 'benzin'];
 
 /** Schlüssel der Sammelreihe, wenn mehr Stapel anfallen als sinnvoll lesbar. */
 export const OTHER_STACK_KEY = '__other';
@@ -165,7 +163,7 @@ export function buildStatsSummary(
   }));
 
   const distance = counters.get(DISTANCE_UNIT);
-  const consumptionLiters = CONSUMPTION_FUELS.reduce(
+  const consumptionLiters = PROPELLANTS.reduce(
     (sum, fuel) => sum + (fuels.get(fuel) ?? 0),
     0,
   );
@@ -712,7 +710,7 @@ export function buildFuelStats(
   const result = [...perVehicle.values()]
     .filter((stat) => stat.fuelLiters > 0 || stat.distanceKm > 0)
     .map((stat) => {
-      const consumptionLiters = CONSUMPTION_FUELS.reduce(
+      const consumptionLiters = PROPELLANTS.reduce(
         (sum, fuel) => sum + (stat.liters[fuel] ?? 0),
         0,
       );

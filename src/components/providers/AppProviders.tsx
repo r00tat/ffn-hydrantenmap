@@ -27,6 +27,7 @@ import CapacitorBackButton from './CapacitorBackButton';
 import ErrorBoundary from './ErrorBoundary';
 import FirecallLayerProvider from './FirecallLayerProvider';
 import FirecallProvider from './FirecallProvider';
+import HoseLineDraftProvider from './HoseLineDraftProvider';
 import MapEditorProvider from './MapEditorProvider';
 import SnackbarProvider from './SnackbarProvider';
 
@@ -74,22 +75,24 @@ function LogedinApp({ children }: AppProps) {
                 <BugReportProvider>
                   <MapEditorProvider>
                     <FirecallLayerProvider>
-                      <AppDrawer
-                        isOpen={isDrawerOpen}
-                        setIsOpen={setIsDrawerOpen}
-                      />
+                      <HoseLineDraftProvider>
+                        <AppDrawer
+                          isOpen={isDrawerOpen}
+                          setIsOpen={setIsDrawerOpen}
+                        />
 
-                      <HeaderBar
-                        isDrawerOpen={isDrawerOpen}
-                        setIsDrawerOpen={setIsDrawerOpen}
-                      />
-                      <ChatMessageDisplay />
-                      <Box
-                        className="print-content-root"
-                        sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
-                      >
-                        {children}
-                      </Box>
+                        <HeaderBar
+                          isDrawerOpen={isDrawerOpen}
+                          setIsDrawerOpen={setIsDrawerOpen}
+                        />
+                        <ChatMessageDisplay />
+                        <Box
+                          className="print-content-root"
+                          sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}
+                        >
+                          {children}
+                        </Box>
+                      </HoseLineDraftProvider>
                     </FirecallLayerProvider>
                   </MapEditorProvider>
                 </BugReportProvider>

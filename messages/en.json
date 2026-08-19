@@ -455,7 +455,8 @@
     "fuel": {
       "diesel": "Diesel",
       "benzin": "Petrol",
-      "adblue": "AdBlue"
+      "adblue": "AdBlue",
+      "oel": "Oil"
     },
     "warnings": {
       "decrease": "Last known reading: {lastValue} {unit}",
@@ -1596,7 +1597,14 @@
     "questionPlaceholder": "e.g. 'How many vehicles are deployed?' or 'Create section North'",
     "questionGeneric": "Question",
     "questionGenericPlaceholder": "Ask questions or assign tasks about the operation",
-    "send": "Send"
+    "send": "Send",
+    "undo": "Undo",
+    "draftConfirm": "Apply",
+    "draftDiscard": "Discard",
+    "draftAdded": "{count, plural, one {Hose line added} other {# hose lines added}}",
+    "draftFailed": "Hose line could not be created",
+    "draftConfirmAll": "Apply all {count}",
+    "draftDiscardAll": "Discard all"
   },
   "blaulichtSms": {
     "title": "Alarm SMS",

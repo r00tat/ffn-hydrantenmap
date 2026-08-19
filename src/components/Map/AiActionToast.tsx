@@ -4,6 +4,7 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect } from 'react';
 import { speakMessage } from '../../common/speech';
 
@@ -13,6 +14,8 @@ export interface AiToastState {
   severity: 'success' | 'warning' | 'error';
   showUndo?: boolean;
   clarificationOptions?: string[];
+  /** Anzahl der Leitungsvorschläge, die auf Bestätigung warten */
+  draftCount?: number;
 }
 
 export interface AiActionToastProps {
@@ -20,6 +23,8 @@ export interface AiActionToastProps {
   onClose: () => void;
   onUndo?: () => void;
   onClarificationSelect?: (option: string) => void;
+  onDraftConfirm?: () => void;
+  onDraftDiscard?: () => void;
 }
 
 export default function AiActionToast({
@@ -27,8 +32,19 @@ export default function AiActionToast({
   onClose,
   onUndo,
   onClarificationSelect,
+  onDraftConfirm,
+  onDraftDiscard,
 }: AiActionToastProps) {
-  const { open, message, severity, showUndo, clarificationOptions } = state;
+  const t = useTranslations('ai');
+  const {
+    open,
+    message,
+    severity,
+    showUndo,
+    clarificationOptions,
+    draftCount = 0,
+  } = state;
+  const showDraftConfirm = draftCount > 0;
 
   // Speak error and warning messages
   useEffect(() => {
@@ -58,7 +74,20 @@ export default function AiActionToast({
     [onClarificationSelect, onClose]
   );
 
-  const autoHideDuration = clarificationOptions ? null : 5000;
+  const handleDraftConfirm = useCallback(() => {
+    onDraftConfirm?.();
+    onClose();
+  }, [onClose, onDraftConfirm]);
+
+  const handleDraftDiscard = useCallback(() => {
+    onDraftDiscard?.();
+    onClose();
+  }, [onClose, onDraftDiscard]);
+
+  // Ein Vorschlag darf nicht wegblinken, bevor er beantwortet ist — sonst
+  // bliebe der Entwurf auf der Karte liegen, ohne Weg ihn loszuwerden.
+  const autoHideDuration =
+    clarificationOptions || showDraftConfirm ? null : 5000;
 
   return (
     <Snackbar
@@ -73,14 +102,34 @@ export default function AiActionToast({
         variant="filled"
         sx={{ width: '100%' }}
         action={
-          showUndo && !clarificationOptions ? (
+          showUndo && !clarificationOptions && !showDraftConfirm ? (
             <Button color="inherit" size="small" onClick={handleUndo}>
-              Rückgängig
+              {t('undo')}
             </Button>
           ) : undefined
         }
       >
         {message}
+        {showDraftConfirm && (
+          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Button
+              size="small"
+              variant="contained"
+              color="inherit"
+              onClick={handleDraftConfirm}
+            >
+              {draftCount > 1 ? t('draftConfirmAll', { count: draftCount }) : t('draftConfirm')}
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="inherit"
+              onClick={handleDraftDiscard}
+            >
+              {draftCount > 1 ? t('draftDiscardAll') : t('draftDiscard')}
+            </Button>
+          </Stack>
+        )}
         {clarificationOptions && clarificationOptions.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
             {clarificationOptions.map((option) => (
