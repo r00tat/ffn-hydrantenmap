@@ -11,6 +11,7 @@ function driver(partial: Partial<DriverStat>): DriverStat {
     key: 'p1',
     name: 'Max Muster',
     trips: 1,
+    sharedTrips: 0,
     durationMinutes: 60,
     counterTotals: {},
     vehicleCount: 1,

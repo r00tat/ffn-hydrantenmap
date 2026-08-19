@@ -445,3 +445,178 @@ describe('buildFuelStats', () => {
     expect(stats.perVehicle.map((v) => v.vehicleId)).toEqual(['v1']);
   });
 });
+
+describe('buildDriverStats mit Zusatzfahrern', () => {
+  const twoHoursHundredKm = {
+    abfahrt: '2025-03-14T08:00:00.000Z',
+    ankunft: '2025-03-14T10:00:00.000Z',
+    counters: { km: { start: 1000, end: 1100 } },
+  };
+
+  it('teilt Kilometer und Dauer gleichmäßig', () => {
+    const stats = buildDriverStats(
+      [
+        entry({
+          ...twoHoursHundredKm,
+          driverName: 'Max Muster',
+          coDrivers: [{ name: 'Anna Bauer' }],
+        }),
+      ],
+      vehiclesById,
+    );
+
+    expect(stats).toHaveLength(2);
+    for (const stat of stats) {
+      expect(stat.trips).toBe(1);
+      expect(stat.sharedTrips).toBe(1);
+      expect(stat.counterTotals.km).toBe(50);
+      expect(stat.durationMinutes).toBe(60);
+    }
+  });
+
+  it('lässt eine Fahrt mit einem Fahrer unverändert', () => {
+    const [stat] = buildDriverStats(
+      [entry({ ...twoHoursHundredKm, driverName: 'Max Muster' })],
+      vehiclesById,
+    );
+    expect(stat.trips).toBe(1);
+    expect(stat.sharedTrips).toBe(0);
+    expect(stat.counterTotals.km).toBe(100);
+    expect(stat.durationMinutes).toBe(120);
+  });
+
+  it('zählt Defekt und Zweck ganz — ein Defekt ist nicht teilbar', () => {
+    const stats = buildDriverStats(
+      [
+        entry({
+          driverName: 'Max Muster',
+          coDrivers: [{ name: 'Anna Bauer' }],
+          zweck: 'einsatz',
+          defekt: true,
+        }),
+      ],
+      vehiclesById,
+    );
+    expect(stats).toHaveLength(2);
+    for (const stat of stats) {
+      expect(stat.defects).toBe(1);
+      expect(stat.zwecke.einsatz).toBe(1);
+    }
+  });
+
+  it('nimmt den Zusatzfahrer als eigene Zeile auf', () => {
+    const stats = buildDriverStats(
+      [entry({ driverName: 'Max Muster', coDrivers: [{ name: 'Anna Bauer' }] })],
+      vehiclesById,
+    );
+    expect(stats.map((s) => s.name).sort()).toEqual(['Anna Bauer', 'Max Muster']);
+  });
+});
+
+describe('Fahrer-Aufteilung summiert auf die Gesamtsumme', () => {
+  const shared = entry({
+    driverName: 'Max Muster',
+    coDrivers: [{ name: 'Anna Bauer' }],
+    counters: { km: { start: 1000, end: 1100 } },
+  });
+
+  it('buildBreakdown nach Fahrer', () => {
+    const slices = buildBreakdown([shared], {
+      vehiclesById,
+      metric: 'unit:km',
+      dimension: 'driver',
+    });
+    expect(slices).toHaveLength(2);
+    expect(slices.reduce((sum, slice) => sum + slice.value, 0)).toBe(100);
+    for (const slice of slices) expect(slice.trips).toBe(1);
+  });
+
+  it('buildTimeSeries gestapelt nach Fahrer', () => {
+    const series = buildTimeSeries([shared], {
+      vehiclesById,
+      metric: 'unit:km',
+      granularity: 'month',
+      timeZone: vienna,
+      from: '2025-03-01',
+      to: '2025-03-31',
+      stackBy: 'driver',
+    });
+    expect(series.stacks).toHaveLength(2);
+    expect(series.total).toBe(100);
+  });
+
+  it('lässt die Aufteilung nach Fahrzeug ungeteilt', () => {
+    const slices = buildBreakdown([shared], {
+      vehiclesById,
+      metric: 'unit:km',
+      dimension: 'vehicle',
+    });
+    expect(slices).toHaveLength(1);
+    expect(slices[0].value).toBe(100);
+  });
+});
+
+describe('Kennzahlen bei gesetztem Fahrerfilter', () => {
+  const shared = entry({
+    driverName: 'Max Muster',
+    coDrivers: [{ name: 'Anna Bauer' }],
+    abfahrt: '2025-03-14T08:00:00.000Z',
+    ankunft: '2025-03-14T10:00:00.000Z',
+    counters: { km: { start: 1000, end: 1100 } },
+    betriebsmittel: { diesel: 20 },
+  });
+
+  it('rechnet Strecke, Dauer und Menge anteilig, die Fahrtenzahl ganz', () => {
+    const summary = buildStatsSummary([shared], vehiclesById, {
+      driverKey: 'anna bauer',
+    });
+    expect(summary.trips).toBe(1);
+    expect(summary.durationMinutes).toBe(60);
+    expect(summary.counterTotals).toEqual([{ unit: 'km', value: 50, trips: 1 }]);
+    expect(summary.fuelLiters).toBe(10);
+    // Der Verbrauch ist ein Verhältnis und ändert sich durch die Teilung nicht.
+    expect(summary.consumptionPer100Km).toBe(20);
+  });
+
+  it('rechnet ohne Fahrerfilter unverändert', () => {
+    const summary = buildStatsSummary([shared], vehiclesById);
+    expect(summary.durationMinutes).toBe(120);
+    expect(summary.counterTotals).toEqual([{ unit: 'km', value: 100, trips: 1 }]);
+    expect(summary.fuelLiters).toBe(20);
+    expect(summary.consumptionPer100Km).toBe(20);
+  });
+
+  it('rechnet die Zeitreihe anteilig', () => {
+    const series = buildTimeSeries([shared], {
+      vehiclesById,
+      metric: 'unit:km',
+      granularity: 'month',
+      timeZone: vienna,
+      from: '2025-03-01',
+      to: '2025-03-31',
+      driverKey: 'anna bauer',
+    });
+    expect(series.total).toBe(50);
+  });
+
+  it('zeigt bei Aufteilung nach Fahrer nur den gefilterten Fahrer', () => {
+    const series = buildTimeSeries([shared], {
+      vehiclesById,
+      metric: 'unit:km',
+      granularity: 'month',
+      timeZone: vienna,
+      from: '2025-03-01',
+      to: '2025-03-31',
+      stackBy: 'driver',
+      driverKey: 'anna bauer',
+    });
+    expect(series.stacks.map((s) => s.key)).toEqual(['anna bauer']);
+    expect(series.total).toBe(50);
+  });
+
+  it('lässt buildFuelStats ungeteilt — es wertet je Fahrzeug aus', () => {
+    const stats = buildFuelStats([shared], vehiclesById);
+    expect(stats.totals.diesel).toBe(20);
+    expect(stats.perVehicle[0].distanceKm).toBe(100);
+  });
+});
