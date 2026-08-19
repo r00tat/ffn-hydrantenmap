@@ -151,6 +151,50 @@ describe('searchWaterSupply', () => {
     expect(result.message).toContain('2500');
   });
 
+  it('describes every candidate it returns, not a fixed handful', async () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      name: `H${i}`,
+      lat: einsatzort.lat + metersToLat(20 * (i + 1)),
+      lng: einsatzort.lng,
+    }));
+    const deps = makeDeps({
+      findWaterSupply: vi.fn(
+        async () =>
+          [{ geohash: 'a', hydranten: many }] as unknown as GeohashCluster[]
+      ),
+    });
+
+    const result = await executeToolCall(
+      call('searchWaterSupply', { limit: 8 }),
+      deps
+    );
+
+    for (const hydrant of many) {
+      expect(result.message).toContain(hydrant.name);
+    }
+    expect(result.data.candidates).toHaveLength(8);
+  });
+
+  it('keeps the answer short by default', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      name: `H${i}`,
+      lat: einsatzort.lat + metersToLat(20 * (i + 1)),
+      lng: einsatzort.lng,
+    }));
+    const deps = makeDeps({
+      findWaterSupply: vi.fn(
+        async () =>
+          [{ geohash: 'a', hydranten: many }] as unknown as GeohashCluster[]
+      ),
+    });
+
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.data.candidates).toHaveLength(5);
+    expect(result.message).toContain('H4');
+    expect(result.message).not.toContain('H5');
+  });
+
   it('does not create any map item', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);

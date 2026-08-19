@@ -426,15 +426,17 @@ export async function executeToolCall(
 
       // Die fertige Antwort steht schon hier, damit das Modell sie nur noch
       // weitergeben muss und keine zweite Runde für die Auswahl braucht.
+      // Beschrieben wird jede zurückgegebene Entnahmestelle — wie viele das
+      // sind, steuert `limit`. Eine feste Obergrenze hier machte den
+      // Parameter wirkungslos: Das Modell bekäme mehr Kandidaten, könnte sie
+      // aber nicht vorlesen.
       const [nearest, ...others] = candidates;
       const answerParts = [
         `Nächste Entnahmestelle: ${describeWaterSupplyCandidate(
           nearest,
           center
         )}`,
-        ...others
-          .slice(0, 3)
-          .map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
+        ...others.map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
       ];
 
       // Die Leitung zur nächstgelegenen Entnahmestelle wird gleich mit

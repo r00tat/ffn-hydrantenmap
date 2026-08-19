@@ -336,7 +336,8 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
         },
         limit: {
           type: SchemaType.NUMBER,
-          description: 'Maximum number of results (default 5, max 20)',
+          description:
+            'How many water supply points to return AND describe, nearest first (default 5, max 20). Raise it when the user wants an overview or more options ("zeig mir mehr Hydranten", "welche gibt es noch?") and call the search again with the higher value — that is a different call, not a repeat.',
         },
       },
     },
@@ -459,6 +460,10 @@ Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?", "Gibt es Wasser
 Nähe?", "Wo kann ich ansaugen?"):
 searchWaterSupply EINMAL aufrufen, dann direkt antworten. Nicht answerQuestion verwenden,
 bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf.
+Will der Benutzer danach mehr Entnahmestellen sehen ("und welche noch?", "zeig mir
+mehr"), rufe searchWaterSupply erneut mit einem höheren limit auf (z.B. 10). Das ist
+kein wiederholter Aufruf, sondern ein anderer - die Ergebnisliste ist nach Entfernung
+sortiert und limit steuert, wie viele davon du genannt bekommst.
 Die Suche zeichnet dabei bereits einen Leitungsvorschlag zur nächstgelegenen
 Entnahmestelle ein. Erwähne ihn in einem Halbsatz ("Leitung ist eingezeichnet, X m,
 Y B-Längen - übernehmen oder verwerfen") und rufe dafür NICHT zusätzlich
@@ -493,7 +498,8 @@ verwende ausschließlich, was searchWaterSupply zurückgegeben hat.
 
 Halte dich generell kurz: Jeder zusätzliche Werkzeugaufruf verzögert die Antwort,
 und nach wenigen Aufrufen bricht die Verarbeitung ab. Wiederhole nie einen Aufruf
-mit denselben Argumenten.
+mit exakt denselben Argumenten - ein Aufruf mit geändertem limit, Radius, Ort oder
+Filter ist dagegen ausdrücklich erlaubt.
 
 WICHTIG - Standardverhalten bei Meldungen:
 Wenn der Benutzer keine bestimmte Funktion aufruft und keine Frage zum Einsatz stellt, handelt es sich wahrscheinlich um eine Meldung.
