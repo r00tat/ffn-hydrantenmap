@@ -65,3 +65,16 @@ export interface AiAssistantResult {
 
 export const MEMORY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 export const MAX_INTERACTIONS = 10;
+
+/**
+ * Aufgelöste Bezugsposition samt Bezeichnung dessen, was tatsächlich verwendet
+ * wurde — inklusive des Rückfalls, wenn die gewünschte Angabe fehlte.
+ */
+export interface ResolvedOrigin {
+  lat: number;
+  lng: number;
+  /** mapCenter | auto | userPosition | einsatzort | atItem | nearItem | address | coordinates */
+  type: string;
+  /** Deutsche Bezeichnung im Dativ, z.B. „deinem Standort" */
+  label: string;
+}

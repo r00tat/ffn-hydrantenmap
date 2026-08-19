@@ -7,15 +7,17 @@ const positionSchema = {
     type: {
       type: SchemaType.STRING,
       enum: [
+        'auto',
         'mapCenter',
         'userPosition',
         'einsatzort',
+        'atItem',
         'nearItem',
         'address',
         'coordinates',
       ],
       description:
-        'How to resolve the position. einsatzort = the position of the current firecall (Einsatzstelle); falls back to the map center when the firecall has no position.',
+        'How to resolve the position. auto = the user position if known, otherwise the Einsatzort, otherwise the map centre — the right default for measurements. userPosition = the device GPS position. einsatzort = the position of the current firecall. atItem = exactly at an existing map item (use for "from the TLFA"), nearItem = next to it (use when placing a NEW item beside it). Every type falls back to the map centre when its source is unavailable.',
     },
     itemName: {
       type: SchemaType.STRING,
@@ -421,9 +423,11 @@ Regeln:
 - Bei Unklarheiten: verwende askClarification mit konkreten Optionen
 - Verwende die bereitgestellten Tools für alle Kartenaktionen und Berechnungen
 - Positionen ohne Angabe: verwende mapCenter als position.type
-- "bei mir" / "hier" = userPosition als position.type
+- "bei mir" / "hier" / "von meinem Standort" = userPosition als position.type
 - "Einsatzstelle" / "Einsatzort" / "zum Einsatz" = einsatzort als position.type
-- Referenzen wie "daneben", "neben dem X" = nearItem als position.type mit itemName
+- "von <Element>" / "beim TLFA" als Bezugspunkt einer Messung = atItem mit itemName
+- Referenzen wie "daneben", "neben dem X" zum PLATZIEREN = nearItem mit itemName
+- Ohne jede Ortsangabe bei einer Messung oder Suche: auto als position.type
 - Für Adresssuche: verwende searchAddress (erstellt Marker und schwenkt Karte dorthin)
 
 Verfügbare Elemente:
@@ -466,6 +470,17 @@ Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?", "Gibt es Wasser
 Nähe?", "Wo kann ich ansaugen?"):
 searchWaterSupply EINMAL aufrufen, dann direkt antworten. Nicht answerQuestion verwenden,
 bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf.
+
+Der Bezugspunkt entscheidet über das Ergebnis, also setze position bewusst:
+- "von meinem Standort", "bei mir", "hier" -> position.type = userPosition
+- "vom Einsatzort", "von der Einsatzstelle" -> position.type = einsatzort
+- "vom TLFA", "von der Einsatzleitung", "von <Fahrzeug/Element>" -> position.type =
+  atItem mit itemName (der genaue Punkt des Elements, NICHT nearItem)
+- ohne Angabe -> position weglassen; die Suche nimmt dann den Standort des
+  Benutzers, ersatzweise den Einsatzort.
+Das Ergebnis nennt in data.origin.label, worauf es tatsächlich hinauslief. Sag das
+im Antwortsatz mit ("von deinem Standort aus", "vom Einsatzort aus") - besonders
+wenn dort "der Kartenmitte" steht, denn dann fehlten Standort und Einsatzort.
 Will der Benutzer danach mehr Entnahmestellen sehen ("und welche noch?", "zeig mir
 mehr"), rufe searchWaterSupply erneut mit einem höheren limit auf (z.B. 10). Das ist
 kein wiederholter Aufruf, sondern ein anderer - die Ergebnisliste ist nach Entfernung

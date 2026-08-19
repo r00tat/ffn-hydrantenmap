@@ -14,7 +14,8 @@ import {
   WaterSupplyKind,
   WATER_SUPPLY_LABELS,
 } from '../../common/waterSupply';
-import { AiAssistantResult } from './types';
+import { findFirecallItemByName } from './itemLookup';
+import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
   calculateSchutzwert,
@@ -33,6 +34,16 @@ type UpdateFirecallItemFn = (item: FirecallItem) => Promise<void>;
 
 export interface ToolHandlerDeps {
   resolvePosition: ResolvePositionFn;
+  /**
+   * Wie `resolvePosition`, benennt aber zusätzlich, worauf die Angabe
+   * tatsächlich hinauslief — inklusive Rückfall. Die Wasserversorgungssuche
+   * braucht das, weil eine Messung ohne genannten Bezugspunkt wertlos ist.
+   */
+  resolveOrigin: (
+    positionSpec:
+      | { type: string; itemName?: string; address?: string; lat?: number; lng?: number }
+      | undefined
+  ) => Promise<ResolvedOrigin>;
   addFirecallItem: AddFirecallItemFn;
   updateFirecallItem: UpdateFirecallItemFn;
   existingItems: FirecallItem[];
@@ -78,6 +89,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/** Nur Art und Bezeichnung an das Modell geben, nicht die Koordinaten. */
+function originInfo(origin: ResolvedOrigin) {
+  return { type: origin.type, label: origin.label };
+}
+
 function formatValue(value: number): string {
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
@@ -106,6 +122,7 @@ export async function executeToolCall(
   const args = call.args as Record<string, unknown>;
   const {
     resolvePosition,
+    resolveOrigin,
     addFirecallItem,
     updateFirecallItem,
     existingItems,
@@ -386,9 +403,10 @@ export async function executeToolCall(
     }
 
     case 'searchWaterSupply': {
-      const center = await resolvePosition(
-        (args.position as any) || { type: 'einsatzort' }
+      const origin = await resolveOrigin(
+        (args.position as any) || { type: 'auto' }
       );
+      const center = { lat: origin.lat, lng: origin.lng };
       const limit = clamp(
         (args.limit as number) || DEFAULT_WATER_SUPPLY_RESULTS,
         1,
@@ -422,8 +440,8 @@ export async function executeToolCall(
       if (candidates.length === 0) {
         return {
           success: false,
-          message: `Keine Wasserentnahmestelle im Umkreis von ${radius} m gefunden`,
-          data: { candidates: [], radius },
+          message: `Keine Wasserentnahmestelle im Umkreis von ${radius} m um ${origin.label} gefunden`,
+          data: { candidates: [], radius, origin: originInfo(origin) },
         };
       }
 
@@ -435,6 +453,7 @@ export async function executeToolCall(
       // aber nicht vorlesen.
       const [nearest, ...others] = candidates;
       const answerParts = [
+        `Gemessen von ${origin.label}`,
         `Nächste Entnahmestelle: ${describeWaterSupplyCandidate(
           nearest,
           center
@@ -478,7 +497,7 @@ export async function executeToolCall(
       return {
         success: true,
         message: answer,
-        data: { candidates, radius, answer },
+        data: { candidates, radius, answer, origin: originInfo(origin) },
         drafts: drafts.length > 0 ? drafts : undefined,
       };
     }
@@ -525,8 +544,8 @@ export async function executeToolCall(
         };
       }
 
-      const target = await resolvePosition(
-        (args.target as any) || { type: 'einsatzort' }
+      const target = await resolveOrigin(
+        (args.target as any) || { type: 'auto' }
       );
 
       const draft = buildHoseLineDraft({
@@ -599,9 +618,9 @@ function findItem(
     return existingItems.find((i) => i.id === itemId);
   }
   if (itemName) {
-    return existingItems.find((i) =>
-      i.name?.toLowerCase().includes(itemName.toLowerCase())
-    );
+    // Dieselbe Suche wie beim Bezugspunkt: „lösche das TLFA Neusiedl" muss
+    // dasselbe Element finden wie „Hydranten beim TLFA Neusiedl".
+    return findFirecallItemByName(existingItems, itemName);
   }
   if (lastCreatedItem) {
     return existingItems.find((i) => i.id === lastCreatedItem.id);

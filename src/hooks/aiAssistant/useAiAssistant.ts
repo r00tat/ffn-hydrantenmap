@@ -10,6 +10,8 @@ import { queryClusters } from '../../components/firebase/clusterQuery';
 import { GeoPosition } from '../../common/geo';
 import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import { defaultPosition } from '../constants';
+import { findFirecallItemByName } from './itemLookup';
+import { ResolvedOrigin } from './types';
 import { useFirecall } from '../useFirecall';
 import { useHoseLineDraft } from '../useHoseLineDraft';
 import useFirecallItemAdd from '../useFirecallItemAdd';
@@ -55,40 +57,69 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     lastActivityRef.current = now;
   }, []);
 
-  const resolvePosition = useCallback(
+  /**
+   * Positionsangabe auflösen und dabei benennen, worauf sie tatsächlich
+   * hinauslief. Die Bezeichnung ist kein Beiwerk: Fällt eine Angabe auf die
+   * Kartenmitte zurück, weil weder Standort noch Einsatzort gesetzt sind, muss
+   * die Antwort das sagen — sonst wundert man sich, warum die Leitungen
+   * irgendwo im Nirgendwo beginnen.
+   */
+  const resolveOrigin = useCallback(
     async (
       positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
-    ): Promise<{ lat: number; lng: number }> => {
+    ): Promise<ResolvedOrigin> => {
       const center = map ? map.getCenter() : defaultPosition;
-      const defaultPos = { lat: center.lat, lng: center.lng };
+      const mapCenter: ResolvedOrigin = {
+        lat: center.lat,
+        lng: center.lng,
+        type: 'mapCenter',
+        label: 'der Kartenmitte',
+      };
 
-      if (!positionSpec) return defaultPos;
+      const userPosition: ResolvedOrigin | undefined = isPositionSet
+        ? { lat: position.lat, lng: position.lng, type: 'userPosition', label: 'deinem Standort' }
+        : undefined;
+      const einsatzort: ResolvedOrigin | undefined =
+        firecall.lat && firecall.lng
+          ? { lat: firecall.lat, lng: firecall.lng, type: 'einsatzort', label: 'dem Einsatzort' }
+          : undefined;
+
+      if (!positionSpec) return mapCenter;
 
       switch (positionSpec.type) {
         case 'mapCenter':
-          return defaultPos;
+          return mapCenter;
+
+        case 'auto':
+          // Wer im Einsatz nach dem nächsten Hydranten fragt, meint fast immer
+          // „von hier aus". Der Einsatzort ist die Näherung, wenn kein GPS
+          // steht; die Kartenmitte erst, wenn auch der fehlt.
+          return userPosition ?? einsatzort ?? mapCenter;
 
         case 'userPosition':
-          return isPositionSet ? { lat: position.lat, lng: position.lng } : defaultPos;
+          return userPosition ?? einsatzort ?? mapCenter;
 
         case 'einsatzort':
-          // Ein Einsatz ohne gesetzten Einsatzort ist der Normalfall in den
-          // ersten Minuten — dann ist die Kartenmitte die beste Näherung.
-          return firecall.lat && firecall.lng
-            ? { lat: firecall.lat, lng: firecall.lng }
-            : defaultPos;
+          // Ein Einsatz ohne gesetzten Einsatzort ist in den ersten Minuten
+          // der Normalfall.
+          return einsatzort ?? userPosition ?? mapCenter;
 
-        case 'nearItem':
-          if (positionSpec.itemName) {
-            const target = existingItems.find(
-              (i) => i.name?.toLowerCase().includes(positionSpec.itemName!.toLowerCase())
-            );
-            if (target?.lat && target?.lng) {
-              const offset = 20 / 111320;
-              return { lat: target.lat + offset, lng: target.lng + offset };
-            }
+        case 'atItem':
+        case 'nearItem': {
+          const target = findFirecallItemByName(existingItems, positionSpec.itemName);
+          if (target?.lat && target?.lng) {
+            // `nearItem` setzt daneben (zum Platzieren neuer Elemente),
+            // `atItem` genau darauf (als Bezugspunkt einer Messung).
+            const offset = positionSpec.type === 'nearItem' ? 20 / 111320 : 0;
+            return {
+              lat: target.lat + offset,
+              lng: target.lng + offset,
+              type: positionSpec.type,
+              label: `"${target.name}"`,
+            };
           }
-          return defaultPos;
+          return mapCenter;
+        }
 
         case 'address':
           if (positionSpec.address) {
@@ -97,22 +128,42 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               maxResults: 1,
             });
             if (results[0]) {
-              return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+              return {
+                lat: parseFloat(results[0].lat),
+                lng: parseFloat(results[0].lon),
+                type: 'address',
+                label: `"${positionSpec.address}"`,
+              };
             }
           }
-          return defaultPos;
+          return mapCenter;
 
         case 'coordinates':
           if (positionSpec.lat !== undefined && positionSpec.lng !== undefined) {
-            return { lat: positionSpec.lat, lng: positionSpec.lng };
+            return {
+              lat: positionSpec.lat,
+              lng: positionSpec.lng,
+              type: 'coordinates',
+              label: 'den angegebenen Koordinaten',
+            };
           }
-          return defaultPos;
+          return mapCenter;
 
         default:
-          return defaultPos;
+          return mapCenter;
       }
     },
     [existingItems, firecall.lat, firecall.lng, isPositionSet, map, position]
+  );
+
+  const resolvePosition = useCallback(
+    async (
+      positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
+    ): Promise<{ lat: number; lng: number }> => {
+      const { lat, lng } = await resolveOrigin(positionSpec);
+      return { lat, lng };
+    },
+    [resolveOrigin]
   );
 
   const sendToGemini = useCallback(
@@ -220,6 +271,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             setLastCreatedItem,
             map,
             defaultPosition,
+            resolveOrigin,
             findWaterSupply: queryClusters,
             waterSupplyResults: waterSupplyResultsRef,
             proposeHoseLineDrafts: proposeDrafts,
@@ -274,7 +326,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         return { success: false, message: 'Fehler bei der Verarbeitung' };
       }
     },
-    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts]
+    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts, resolveOrigin]
   );
 
   const transcribeAudio = useCallback(

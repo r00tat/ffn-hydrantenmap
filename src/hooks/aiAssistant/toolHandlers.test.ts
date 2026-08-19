@@ -26,6 +26,11 @@ const hydrantFern = {
 function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
   return {
     resolvePosition: vi.fn(async () => einsatzort),
+    resolveOrigin: vi.fn(async () => ({
+      ...einsatzort,
+      type: 'einsatzort',
+      label: 'dem Einsatzort',
+    })),
     addFirecallItem: vi.fn(async () => ({ id: 'new-id' })),
     updateFirecallItem: vi.fn(async () => {}),
     existingItems: [],
@@ -61,12 +66,53 @@ describe('searchWaterSupply', () => {
     expect(deps.waterSupplyResults.current).toHaveLength(2);
   });
 
-  it('defaults to the Einsatzort and a 300 m radius', async () => {
+  it('defaults to the automatic origin and a 300 m radius', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
 
-    expect(deps.resolvePosition).toHaveBeenCalledWith({ type: 'einsatzort' });
+    expect(deps.resolveOrigin).toHaveBeenCalledWith({ type: 'auto' });
     expect(deps.findWaterSupply).toHaveBeenCalledWith(einsatzort, 300);
+  });
+
+  it('names the origin it measured from', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.message).toContain('dem Einsatzort');
+    expect(result.data.origin).toEqual({
+      type: 'einsatzort',
+      label: 'dem Einsatzort',
+    });
+  });
+
+  it('says so when it fell back to the map centre', async () => {
+    // Der stille Rückfall war die Ursache dafür, dass Leitungen an der
+    // Kartenmitte statt am Einsatzort begannen, ohne dass es jemand sah.
+    const deps = makeDeps({
+      resolveOrigin: vi.fn(async () => ({
+        ...einsatzort,
+        type: 'mapCenter',
+        label: 'der Kartenmitte',
+      })),
+    });
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.message).toContain('der Kartenmitte');
+  });
+
+  it('passes an explicit origin through', async () => {
+    const deps = makeDeps();
+    await executeToolCall(
+      call('searchWaterSupply', {
+        position: { type: 'atItem', itemName: 'TLFA Neusiedl' },
+      }),
+      deps
+    );
+
+    expect(deps.resolveOrigin).toHaveBeenCalledWith({
+      type: 'atItem',
+      itemName: 'TLFA Neusiedl',
+    });
   });
 
   it('widens the radius itself instead of letting the model retry', async () => {
@@ -383,16 +429,16 @@ describe('proposeHoseLine', () => {
     expect(calls[1][0][0].dimension).toBe('C');
   });
 
-  it('targets the Einsatzort by default', async () => {
+  it('targets the automatic origin by default', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
-    (deps.resolvePosition as any).mockClear();
+    (deps.resolveOrigin as any).mockClear();
 
     await executeToolCall(
       call('proposeHoseLine', { sourceName: 'ÜH Hauptstraße 12' }),
       deps
     );
 
-    expect(deps.resolvePosition).toHaveBeenCalledWith({ type: 'einsatzort' });
+    expect(deps.resolveOrigin).toHaveBeenCalledWith({ type: 'auto' });
   });
 });
