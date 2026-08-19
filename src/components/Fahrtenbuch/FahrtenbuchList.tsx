@@ -26,6 +26,7 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
+  driverNamesOf,
   FAHRT_ZWECKE,
   type FahrtZweck,
   type FahrtenbuchEntry,
@@ -71,6 +72,28 @@ export interface FahrtenbuchListProps {
    */
   onEdit?: (entry: FahrtenbuchEntry) => void;
   onDelete?: (entry: FahrtenbuchEntry) => void;
+}
+
+/**
+ * Die Fahrer einer Fahrt in einer schmalen Spalte: Hauptfahrer im Klartext,
+ * der Rest als Zahl mit allen Namen im Tooltip. Alle Namen ausgeschrieben
+ * machten die Zelle in einer Tabelle mit acht Spalten mehrzeilig.
+ */
+function DriverCell({ entry }: { entry: FahrtenbuchEntry }) {
+  const t = useTranslations('fahrtenbuch');
+  const count = (entry.coDrivers ?? []).filter((ref) => ref.name?.trim()).length;
+  if (count === 0) return <>{entry.driverName}</>;
+  const all = driverNamesOf(entry);
+  return (
+    <Tooltip title={all}>
+      <Box component="span" aria-label={all} sx={{ whiteSpace: 'nowrap' }}>
+        {entry.driverName}{' '}
+        <Box component="span" sx={{ color: 'text.secondary' }}>
+          {t('moreDrivers', { count })}
+        </Box>
+      </Box>
+    </Tooltip>
+  );
 }
 
 export default function FahrtenbuchList({
@@ -346,7 +369,9 @@ export default function FahrtenbuchList({
                   {!hideVehicleFilter && (
                     <TableCell sx={tightCell}>{entry.vehicleName}</TableCell>
                   )}
-                  <TableCell sx={tightCell}>{entry.driverName}</TableCell>
+                  <TableCell sx={tightCell}>
+                    <DriverCell entry={entry} />
+                  </TableCell>
                   <TableCell sx={tightCell}>
                     {t(`zwecke.${entry.zweck}` as 'zwecke.einsatz')}
                   </TableCell>
