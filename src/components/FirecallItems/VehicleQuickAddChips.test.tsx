@@ -5,12 +5,18 @@ import { screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { renderWithIntl as render } from '../../test-utils/intlRender';
 
-vi.mock('../../common/defaultKostenersatzRates', () => ({
-  DEFAULT_VEHICLES: [
-    { name: 'KDTFA', rateId: '2.01', description: 'Kommando', sortOrder: 1 },
-    { name: 'TLFA 4000', rateId: '2.05', description: 'Tank1', sortOrder: 3 },
-    { name: 'SRF', rateId: '2.10', description: 'Rüst', sortOrder: 5 },
-  ],
+vi.mock('../../hooks/useKostenersatzVehicles', () => ({
+  useKostenersatzVehicles: () => ({
+    vehicles: [
+      { id: 'kdtfa', name: 'KDTFA', rateId: '2.01', description: 'Kommando', sortOrder: 1 },
+      { id: 'srf', name: 'SRF', rateId: '2.10', description: 'Rüst', sortOrder: 5 },
+      { id: 'mehrzweckboot', name: 'Mehrzweckboot', rateId: '8.01', sortOrder: 17 },
+    ],
+    vehiclesById: new Map(),
+    loading: false,
+    error: null,
+    isUsingDefaults: false,
+  }),
 }));
 
 import VehicleQuickAddChips from './VehicleQuickAddChips';
@@ -22,11 +28,14 @@ describe('VehicleQuickAddChips', () => {
     onToggle: vi.fn(),
   };
 
-  it('renders all default vehicles as chips', () => {
+  it('rendert die geladenen Kostenersatz-Fahrzeuge als Chips', () => {
     render(<VehicleQuickAddChips {...defaultProps} />);
     expect(screen.getByText('KDTFA')).toBeInTheDocument();
-    expect(screen.getByText('TLFA 4000')).toBeInTheDocument();
     expect(screen.getByText('SRF')).toBeInTheDocument();
+    // Das Boot heißt in Firestore und im Fahrtenbuch „Mehrzweckboot". Legte der
+    // Chip weiterhin „MZB" an, fände matchVehicleByName es nicht und die
+    // Sammelerfassung des Einsatzes bliebe ohne Zeile dafür.
+    expect(screen.getByText('Mehrzweckboot')).toBeInTheDocument();
   });
 
   it('calls onToggle when a chip is clicked', () => {

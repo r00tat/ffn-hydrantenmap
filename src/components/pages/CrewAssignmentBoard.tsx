@@ -41,7 +41,7 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable } from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
-import { DEFAULT_VEHICLES } from '../../common/defaultKostenersatzRates';
+import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
 import useCrewAssignments, {
   BlaulichtSmsRecipient,
 } from '../../hooks/useCrewAssignments';
@@ -226,6 +226,7 @@ export default function CrewAssignmentBoard({
   const [vehicleToRemove, setVehicleToRemove] = useState<Fzg | undefined>();
   const canWrite = useFirecallWriteAccess();
   const { vehicles } = useVehicles();
+  const { vehicles: kostenersatzVehicles } = useKostenersatzVehicles();
   const firecall = useFirecall();
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
@@ -274,7 +275,10 @@ export default function CrewAssignmentBoard({
 
   const handleAddVehicle = useCallback(
     (vehicleName: string) => {
-      const vehicle = DEFAULT_VEHICLES.find((v) => v.name === vehicleName);
+      // Dieselbe Quelle wie die Chip-Leiste: Käme die Liste hier weiterhin aus
+      // `DEFAULT_VEHICLES`, legte ein Chip mit einem dort unbekannten Namen —
+      // etwa „Mehrzweckboot" — gar kein Item an.
+      const vehicle = kostenersatzVehicles.find((v) => v.name === vehicleName);
       if (!vehicle) return;
       addFirecallItem({
         type: 'vehicle',
@@ -285,7 +289,7 @@ export default function CrewAssignmentBoard({
         lng: firecall?.lng ?? 0,
       } as Fzg);
     },
-    [addFirecallItem, firecall],
+    [addFirecallItem, firecall, kostenersatzVehicles],
   );
 
   const crewOnVehicleToRemove = useMemo(

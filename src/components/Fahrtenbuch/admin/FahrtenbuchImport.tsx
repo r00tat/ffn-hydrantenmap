@@ -22,6 +22,7 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   FUEL_TYPES,
+  isPropellant,
   matchVehicleByName,
   normalizeName,
   type FuelType,
@@ -364,7 +365,7 @@ export default function FahrtenbuchImport({
         </TextField>
         {/* Nur nötig, wenn das Fahrzeug mehr als eine Kraftstoffart führt —
             die Quelle nennt in der Spalte „Treibstoff" keine. */}
-        {(vehicle?.fuelTypes ?? []).filter((f) => f !== 'adblue').length > 1 && (
+        {(vehicle?.fuelTypes ?? []).filter(isPropellant).length > 1 && (
           <TextField
             select
             size="small"
@@ -374,7 +375,7 @@ export default function FahrtenbuchImport({
             sx={{ minWidth: 180 }}
           >
             {FUEL_TYPES.filter(
-              (f) => f !== 'adblue' && (vehicle?.fuelTypes ?? []).includes(f),
+              (f) => isPropellant(f) && (vehicle?.fuelTypes ?? []).includes(f),
             ).map((f) => (
               <MenuItem key={f} value={f}>
                 {t(`fuel.${f}` as 'fuel.diesel')}
