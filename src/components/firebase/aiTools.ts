@@ -310,7 +310,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'searchWaterSupply',
     description:
-      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. Does NOT change the map.',
+      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. It also draws a hose line DRAFT to the nearest one, so do not call proposeHoseLine afterwards unless a different source or dimension is wanted. Nothing is persisted; the user confirms or discards the draft.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -458,7 +458,12 @@ WASSERVERSORGUNG - Hydranten suchen und Löschleitung vorschlagen:
 Frage nach einer Entnahmestelle ("Wo ist der nächste Hydrant?", "Gibt es Wasser in der
 Nähe?", "Wo kann ich ansaugen?"):
 searchWaterSupply EINMAL aufrufen, dann direkt antworten. Nicht answerQuestion verwenden,
-bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf. Das Ergebnis enthält in
+bevor die Suche gelaufen ist - du hast die Hydrantendaten nicht im Kopf.
+Die Suche zeichnet dabei bereits einen Leitungsvorschlag zur nächstgelegenen
+Entnahmestelle ein. Erwähne ihn in einem Halbsatz ("Leitung ist eingezeichnet, X m,
+Y B-Längen - übernehmen oder verwerfen") und rufe dafür NICHT zusätzlich
+proposeHoseLine auf. proposeHoseLine brauchst du nur, wenn eine ANDERE Entnahmestelle
+oder eine andere Dimension gewünscht ist. Das Ergebnis enthält in
 data.answer bereits einen fertigen Satz mit Entfernung und Himmelsrichtung - gib
 ihn wieder, gekürzt auf das Gefragte. Rufe die Suche NICHT ein zweites Mal auf,
 nur um den Radius zu vergrößern: Sie weitet ihn von sich aus bis 2500 m aus. Nur

@@ -156,6 +156,58 @@ describe('searchWaterSupply', () => {
     await executeToolCall(call('searchWaterSupply'), deps);
     expect(deps.addFirecallItem).not.toHaveBeenCalled();
   });
+
+  it('shows a draft to the nearest candidate right away', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(deps.proposeHoseLineDraft).toHaveBeenCalledTimes(1);
+    const proposed: HoseLineDraft = (deps.proposeHoseLineDraft as any).mock
+      .calls[0][0];
+    expect(proposed.source).toEqual({
+      kind: 'hydrant',
+      name: 'ÜH Hauptstraße 12',
+    });
+    expect(proposed.positions[0]).toEqual([hydrantNah.lat, hydrantNah.lng]);
+    expect(proposed.positions[proposed.positions.length - 1]).toEqual([
+      einsatzort.lat,
+      einsatzort.lng,
+    ]);
+    expect(result.draft).toBe(proposed);
+    // Der Entwurf ist ein Vorschlag, kein Element: nichts wird gespeichert.
+    expect(deps.addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('mentions the draft in the answer so the model relays it', async () => {
+    const deps = makeDeps();
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.message).toContain('Leitungsvorschlag');
+    expect(result.message).toMatch(/B-Längen/);
+  });
+
+  it('proposes nothing when the search came up empty', async () => {
+    const deps = makeDeps({ findWaterSupply: vi.fn(async () => []) });
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+    expect(result.draft).toBeUndefined();
+  });
+
+  it('proposes no line when the nearest candidate sits on the search position', async () => {
+    const deps = makeDeps({
+      findWaterSupply: vi.fn(
+        async () =>
+          [
+            { geohash: 'a', hydranten: [{ name: 'H0', ...einsatzort }] },
+          ] as unknown as GeohashCluster[]
+      ),
+    });
+    const result = await executeToolCall(call('searchWaterSupply'), deps);
+
+    expect(result.success).toBe(true);
+    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+  });
 });
 
 describe('proposeHoseLine', () => {
@@ -164,6 +216,7 @@ describe('proposeHoseLine', () => {
   it('proposes a draft from a previously found hydrant without persisting it', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
+    (deps.proposeHoseLineDraft as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', {
@@ -190,6 +243,7 @@ describe('proposeHoseLine', () => {
   it('matches the source name case insensitively and partially', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
+    (deps.proposeHoseLineDraft as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', { sourceName: 'hauptstrasse' }),
@@ -233,6 +287,7 @@ describe('proposeHoseLine', () => {
   it('fails when the named source was never returned by a search', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
+    (deps.proposeHoseLineDraft as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', { sourceName: 'Hydrant Marktplatz' }),
@@ -242,6 +297,22 @@ describe('proposeHoseLine', () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain('Hydrant Marktplatz');
     expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+  });
+
+  it('replaces the draft the search proposed', async () => {
+    const deps = makeDeps();
+    await executeToolCall(call('searchWaterSupply'), deps);
+
+    await executeToolCall(
+      call('proposeHoseLine', { sourceName: 'Seegasse', dimension: 'C' }),
+      deps
+    );
+
+    const calls = (deps.proposeHoseLineDraft as any).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][0].source.name).toBe('ÜH Hauptstraße 12');
+    expect(calls[1][0].source.name).toBe('UH Seegasse 3');
+    expect(calls[1][0].dimension).toBe('C');
   });
 
   it('targets the Einsatzort by default', async () => {

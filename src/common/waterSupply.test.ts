@@ -6,6 +6,8 @@ import {
   compassDirection,
   describeHoseLineDraft,
   describeWaterSupplyCandidate,
+  hoseLineDraftLabel,
+  hoseLineDraftMidpoint,
   hoseSectionCount,
   WATER_SUPPLY_KINDS,
 } from './waterSupply';
@@ -281,6 +283,32 @@ describe('buildHoseLineDraft', () => {
     expect(describeHoseLineDraft(draft)).toBe(
       'B-Leitung ÜH Hauptstraße 12: 90 m, 5 B-Längen'
     );
+  });
+
+  it('carries a short label for the map, without the name', () => {
+    // Auf der Karte steht der Name schon am Hydranten; das Etikett an der
+    // Linie hat nur Platz für das, was man im Einsatz braucht.
+    const draft = buildHoseLineDraft({ source, target: einsatzort });
+    expect(hoseLineDraftLabel(draft)).toBe('90 m · 5 × B');
+  });
+
+  it('finds the midpoint of the line for the label', () => {
+    const draft = buildHoseLineDraft({ source, target: einsatzort });
+    const [lat, lng] = hoseLineDraftMidpoint(draft);
+    expect(lat).toBeCloseTo((source.lat + einsatzort.lat) / 2, 6);
+    expect(lng).toBeCloseTo(einsatzort.lng, 6);
+  });
+
+  it('puts the label on the longest segment of a routed line', () => {
+    const via = { lat: einsatzort.lat + metersToLat(45), lng: einsatzort.lng };
+    const draft = buildHoseLineDraft({
+      source: { ...source, lat: einsatzort.lat + metersToLat(400) },
+      target: einsatzort,
+      via: [via],
+    });
+    const [lat] = hoseLineDraftMidpoint(draft);
+    // Das lange Stück liegt zwischen Quelle (400 m) und Zwischenpunkt (45 m).
+    expect(lat).toBeCloseTo(einsatzort.lat + metersToLat(222.5), 5);
   });
 });
 

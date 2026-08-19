@@ -427,7 +427,7 @@ export async function executeToolCall(
       // Die fertige Antwort steht schon hier, damit das Modell sie nur noch
       // weitergeben muss und keine zweite Runde für die Auswahl braucht.
       const [nearest, ...others] = candidates;
-      const answer = [
+      const answerParts = [
         `Nächste Entnahmestelle: ${describeWaterSupplyCandidate(
           nearest,
           center
@@ -435,12 +435,35 @@ export async function executeToolCall(
         ...others
           .slice(0, 3)
           .map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
-      ].join('. ');
+      ];
+
+      // Die Leitung zur nächstgelegenen Entnahmestelle wird gleich mit
+      // gezeichnet: „Wo ist der nächste Hydrant?" zielt im Einsatz auf die
+      // Wasserversorgung, nicht auf eine Ortsangabe. Sie kostet nichts — ein
+      // Entwurf ist erst nach dem Bestätigen ein Element, und ein
+      // ungewollter verschwindet mit „Verwerfen".
+      let draft: HoseLineDraft | undefined;
+      if (nearest.distance > 0) {
+        draft = buildHoseLineDraft({
+          source: nearest,
+          target: center,
+          reason: `${WATER_SUPPLY_LABELS[nearest.kind]} ${nearest.name}, ${
+            nearest.distance
+          } m entfernt`,
+        });
+        proposeHoseLineDraft(draft);
+        answerParts.push(
+          `Leitungsvorschlag eingezeichnet: ${describeHoseLineDraft(draft)}`
+        );
+      }
+
+      const answer = answerParts.join('. ');
 
       return {
         success: true,
         message: answer,
         data: { candidates, radius, answer },
+        draft,
       };
     }
 

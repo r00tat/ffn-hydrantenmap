@@ -347,3 +347,39 @@ export function describeWaterSupplyCandidate(
 
   return parts.join(', ');
 }
+
+/**
+ * Kurzes Etikett für die Linie auf der Karte: nur Länge und Schlauchanzahl.
+ * Der Name steht bereits am Hydranten, und auf der Karte zählt, was man im
+ * Einsatz sofort braucht.
+ */
+export function hoseLineDraftLabel(draft: HoseLineDraft): string {
+  return `${draft.distance} m · ${draft.hoseCount} × ${draft.dimension}`;
+}
+
+/**
+ * Punkt für das Etikett: die Mitte des längsten Teilstücks. Bei einer geraden
+ * Leitung ist das die Streckenmitte; bei einer geknickten sitzt es dort, wo
+ * am meisten Platz ist, statt auf einem Knick.
+ */
+export function hoseLineDraftMidpoint(draft: HoseLineDraft): LatLngPosition {
+  const { positions } = draft;
+  if (positions.length < 2) return positions[0];
+
+  let bestIndex = 1;
+  let bestLength = -1;
+  for (let i = 1; i < positions.length; i++) {
+    const length = haversine(
+      { lat: positions[i - 1][0], lng: positions[i - 1][1] },
+      { lat: positions[i][0], lng: positions[i][1] }
+    );
+    if (length > bestLength) {
+      bestLength = length;
+      bestIndex = i;
+    }
+  }
+
+  const a = positions[bestIndex - 1];
+  const b = positions[bestIndex];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
