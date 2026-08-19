@@ -4,10 +4,12 @@ import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import {
   arrivalOnDepartureDay,
+  FAHRTENBUCH_MAX_CO_DRIVERS,
   referenceCounters,
   validateEntryInput,
   type CounterDefinition,
   type CounterReading,
+  type FahrtenbuchDriverRef,
   type FahrtenbuchEntry,
   type FahrtZweck,
   type FuelType,
@@ -128,6 +130,9 @@ export function useEntryFormState({
   );
   const [driverName, setDriverName] = useState(entry?.driverName ?? '');
   const [driverId, setDriverId] = useState<string | undefined>(entry?.driverId);
+  const [coDrivers, setCoDrivers] = useState<FahrtenbuchDriverRef[]>(
+    entry?.coDrivers ?? [],
+  );
   const [zweck, setZweck] = useState<FahrtZweck>(entry?.zweck ?? 'sonstiges');
   const [firecallId, setFirecallId] = useState<string | undefined>(
     entry?.firecallId,
@@ -196,6 +201,11 @@ export function useEntryFormState({
 
   const errorMessage = (error: string) => {
     const [key, counterId] = error.split(':');
+    // Die einzige Meldung mit einem Platzhalter, der nicht von einem Zähler
+    // kommt — ohne diesen Zweig stünde „{count}" im Text.
+    if (key === 'coDriversTooMany') {
+      return t('errors.coDriversTooMany', { count: FAHRTENBUCH_MAX_CO_DRIVERS });
+    }
     if (counterId) {
       return t(`errors.${key}` as 'errors.counterMissing', {
         counter: counterLabel(counterId),
@@ -237,6 +247,15 @@ export function useEntryFormState({
     setDriverId(id);
   };
 
+  /**
+   * Die Zusatzfahrer als Ganzes setzen. Das Chip-Feld liefert bei jeder
+   * Änderung die vollständige Liste; einzelne Zugänge und Abgänge nachzuhalten
+   * wäre Zustand, der auseinanderlaufen kann.
+   */
+  const changeCoDrivers = (refs: FahrtenbuchDriverRef[]) => {
+    setCoDrivers(refs);
+  };
+
   const submit = async (): Promise<EntryFormSubmitResult> => {
     // Kein vehicleName: der Server leitet ihn aus dem geladenen Fahrzeug ab,
     // damit Name und Zähler nicht auseinanderlaufen können.
@@ -244,6 +263,7 @@ export function useEntryFormState({
       vehicleId: selectedVehicleId,
       driverId,
       driverName,
+      coDrivers,
       zweck,
       firecallId: zweck === 'einsatz' ? firecallId : undefined,
       firecallName:
@@ -298,6 +318,8 @@ export function useEntryFormState({
     driverName,
     driverId,
     changeDriver,
+    coDrivers,
+    changeCoDrivers,
     zweck,
     setZweck,
     firecallId,

@@ -8,7 +8,11 @@ import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import { useTranslations } from 'next-intl';
-import { FAHRT_ZWECKE, type FahrtZweck } from '../../common/fahrtenbuch';
+import {
+  FAHRT_ZWECKE,
+  requiresDriver,
+  type FahrtZweck,
+} from '../../common/fahrtenbuch';
 import CounterFields from './CounterFields';
 import {
   fromLocalInput,
@@ -88,6 +92,37 @@ export default function FahrtenbuchEntryFields({
                 )}
               />
             </Grid>
+            {/* Nur bei einer Einheit, die überhaupt einen Fahrer hat: Bei einem
+                Anhänger verwirft der Server die Angabe, und die Oberfläche soll
+                nicht anbieten, was verworfen wird. */}
+            {requiresDriver(form.definitions) && (
+              <Grid size={{ xs: 12 }}>
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  options={persons.map((p) => p.name)}
+                  value={form.coDrivers.map((ref) => ref.name)}
+                  onChange={(_, values) =>
+                    form.changeCoDrivers(
+                      values.map((name) => {
+                        const person = persons.find((p) => p.name === name);
+                        return person?.id
+                          ? { id: person.id, name: person.name }
+                          : { name };
+                      }),
+                    )
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t('coDrivers')}
+                      helperText={t('coDriversHint')}
+                      error={form.errors.includes('coDriversTooMany')}
+                    />
+                  )}
+                />
+              </Grid>
+            )}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 select

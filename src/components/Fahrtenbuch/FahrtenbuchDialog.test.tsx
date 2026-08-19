@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   VEHICLE_PRESETS,
   type FahrtenbuchEntry,
+  type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
 import { renderWithIntl } from '../../test-utils/intlRender';
@@ -391,6 +392,54 @@ describe('FahrtenbuchDialog', () => {
     expect(createMock.mock.calls[0][1]).toMatchObject({
       firecallId: undefined,
       firecallName: undefined,
+    });
+  });
+});
+
+describe('FahrtenbuchDialog — Zusatzfahrer', () => {
+  const trailer = vehicle({ id: 'v3', name: 'Anhänger', counters: [] });
+  const anna: FahrtenbuchPerson = {
+    id: 'p2',
+    name: 'Anna Bauer',
+    active: true,
+    createdAt: '',
+    createdBy: '',
+    updatedAt: '',
+    updatedBy: '',
+  };
+
+  it('zeigt das Zusatzfahrer-Feld bei einem Fahrzeug mit Zähler', () => {
+    renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+    expect(screen.getByLabelText('Zusatzfahrer')).toBeInTheDocument();
+  });
+
+  it('zeigt kein Zusatzfahrer-Feld bei einer Einheit ohne Zähler', () => {
+    renderWithIntl(
+      <FahrtenbuchDialog {...baseProps} vehicles={[trailer]} vehicleId="v3" />,
+    );
+    expect(screen.queryByLabelText('Zusatzfahrer')).not.toBeInTheDocument();
+  });
+
+  it('speichert einen ausgewählten Zusatzfahrer mit Personen-ID', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        persons={[anna]}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await user.click(screen.getByLabelText('Zusatzfahrer'));
+    await user.click(await screen.findByRole('option', { name: 'Anna Bauer' }));
+    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      coDrivers: [{ id: 'p2', name: 'Anna Bauer' }],
     });
   });
 });
