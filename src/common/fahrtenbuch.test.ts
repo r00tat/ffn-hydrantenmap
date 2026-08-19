@@ -4,7 +4,9 @@ import {
   arrivalFromTimeOnly,
   arrivalOnDepartureDay,
   counterWarnings,
+  driverNamesOf,
   FAHRT_ZWECKE,
+  FAHRTENBUCH_MAX_CO_DRIVERS,
   isTimeOnlyTimestamp,
   findEntryForFirecallVehicle,
   matchVehicleByName,
@@ -14,6 +16,9 @@ import {
   suggestPresetForVehicleName,
   validateEntryInput,
   VEHICLE_PRESETS,
+  type CounterDefinition,
+  type EntryInput,
+  type FahrtenbuchDriverRef,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
 } from './fahrtenbuch';
@@ -461,5 +466,74 @@ describe('suggestPresetForVehicleName', () => {
 
   it('schlägt sonst das Fahrzeug-Preset vor', () => {
     expect(suggestPresetForVehicleName('RLFA 3000/100')).toBe('fahrzeug');
+  });
+});
+
+describe('validateEntryInput mit Zusatzfahrern', () => {
+  const kmCounter: CounterDefinition = {
+    id: 'km',
+    label: 'Kilometerstand',
+    unit: 'km',
+    mode: 'startEnd',
+    changeWarning: 'decrease',
+    required: true,
+  };
+
+  const baseInput = (coDrivers?: FahrtenbuchDriverRef[]): EntryInput => ({
+    vehicleId: 'v1',
+    driverName: 'Max Muster',
+    coDrivers,
+    zweck: 'uebung',
+    ziel: 'Übungsgelände',
+    abfahrt: '2026-08-18T08:00:00.000Z',
+    ankunft: '2026-08-18T09:00:00.000Z',
+    counters: { km: { start: 1000, end: 1050 } },
+  });
+
+  const names = (count: number): FahrtenbuchDriverRef[] =>
+    Array.from({ length: count }, (_, index) => ({ name: `Fahrer ${index}` }));
+
+  it('akzeptiert die Höchstzahl an Zusatzfahrern', () => {
+    expect(
+      validateEntryInput([kmCounter], baseInput(names(FAHRTENBUCH_MAX_CO_DRIVERS))),
+    ).toEqual([]);
+  });
+
+  it('lehnt einen Zusatzfahrer über der Höchstzahl ab', () => {
+    expect(
+      validateEntryInput(
+        [kmCounter],
+        baseInput(names(FAHRTENBUCH_MAX_CO_DRIVERS + 1)),
+      ),
+    ).toContain('coDriversTooMany');
+  });
+
+  it('zählt nur Zusatzfahrer mit Namen — leere Einträge sind kein Fehler', () => {
+    const coDrivers = [...names(FAHRTENBUCH_MAX_CO_DRIVERS), { name: '   ' }];
+    expect(validateEntryInput([kmCounter], baseInput(coDrivers))).toEqual([]);
+  });
+
+  it('ersetzt den Hauptfahrer nicht', () => {
+    const input = { ...baseInput([{ name: 'Anna Bauer' }]), driverName: '' };
+    expect(validateEntryInput([kmCounter], input)).toContain('driverMissing');
+  });
+});
+
+describe('driverNamesOf', () => {
+  it('verbindet Haupt- und Zusatzfahrer, Hauptfahrer zuerst', () => {
+    expect(
+      driverNamesOf({
+        driverName: 'Max Muster',
+        coDrivers: [{ name: 'Anna Bauer' }, { name: ' Eva Klein ' }],
+      }),
+    ).toBe('Max Muster, Anna Bauer, Eva Klein');
+  });
+
+  it('gibt nur den Hauptfahrer ohne Zusatzfahrer', () => {
+    expect(driverNamesOf({ driverName: 'Max Muster' })).toBe('Max Muster');
+  });
+
+  it('gibt eine leere Zeichenkette bei einer Einheit ohne Fahrer', () => {
+    expect(driverNamesOf({ driverName: '' })).toBe('');
   });
 });
