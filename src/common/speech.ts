@@ -1,4 +1,5 @@
 import { auth } from '../components/firebase/firebase';
+import { stripMarkdownForSpeech } from './speechText';
 
 let audioElement: HTMLAudioElement | null = null;
 
@@ -60,10 +61,15 @@ function speakWithBrowserTTS(message: string): void {
 }
 
 export async function speakMessage(message: string): Promise<void> {
+  // Beide Stimmen bekommen reinen Text und kennen kein Markdown — ohne das
+  // liest die Ausgabe die Sternchen des Modells mit vor.
+  const spoken = stripMarkdownForSpeech(message);
+  if (!spoken) return;
+
   // Try Cloud TTS first, fall back to browser TTS
-  const success = await speakWithCloudTTS(message);
+  const success = await speakWithCloudTTS(spoken);
   if (!success) {
-    speakWithBrowserTTS(message);
+    speakWithBrowserTTS(spoken);
   }
 }
 

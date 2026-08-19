@@ -6,66 +6,112 @@ import { HoseLineDraft } from '../common/waterSupply';
 import useFirecallItemAdd from './useFirecallItemAdd';
 
 export interface HoseLineDraftContextType {
-  /** Der offene Vorschlag, oder `null`, wenn gerade keiner aussteht. */
-  draft: HoseLineDraft | null;
-  /** Vorschlag anzeigen. Ein vorheriger Vorschlag wird ersetzt. */
-  proposeDraft: (draft: HoseLineDraft) => void;
-  /** Vorschlag als `connection` in den Einsatz übernehmen. */
-  confirmDraft: () => Promise<string | undefined>;
-  discardDraft: () => void;
+  /** Die offenen Vorschläge, nach Entfernung sortiert; leer, wenn keiner aussteht. */
+  drafts: HoseLineDraft[];
+  /** Eine ganze Vorschlagsrunde anzeigen. Die vorherige Runde wird ersetzt. */
+  proposeDrafts: (drafts: HoseLineDraft[]) => void;
+  /** Einen Vorschlag als `connection` übernehmen; die übrigen bleiben stehen. */
+  confirmDraft: (id: string) => Promise<string | undefined>;
+  /** Alle Vorschläge übernehmen, gibt die Anzahl der angelegten Leitungen zurück. */
+  confirmAllDrafts: () => Promise<number>;
+  discardDraft: (id: string) => void;
+  discardAllDrafts: () => void;
 }
 
+const noop = () => {};
+
 /**
- * Ohne Provider ist der Entwurf ein No-Op: Der KI-Assistent hängt auch in der
+ * Ohne Provider sind die Entwürfe ein No-Op: Der KI-Assistent hängt auch in der
  * Tagebuch-Ansicht, und ein fehlender Provider darf ihn nicht mitreißen.
  */
 export const HoseLineDraftContext = createContext<HoseLineDraftContextType>({
-  draft: null,
-  proposeDraft: () => {},
+  drafts: [],
+  proposeDrafts: noop,
   confirmDraft: async () => undefined,
-  discardDraft: () => {},
+  confirmAllDrafts: async () => 0,
+  discardDraft: noop,
+  discardAllDrafts: noop,
 });
 
 export function useHoseLineDraft(): HoseLineDraftContextType {
   return useContext(HoseLineDraftContext);
 }
 
+function toConnection(draft: HoseLineDraft): Connection {
+  const [firstPosition] = draft.positions;
+  const lastPosition = draft.positions[draft.positions.length - 1];
+
+  return {
+    type: 'connection',
+    name: draft.name,
+    beschreibung: draft.reason,
+    dimension: draft.dimension,
+    oneHozeLength: draft.oneHozeLength,
+    lat: firstPosition[0],
+    lng: firstPosition[1],
+    destLat: lastPosition[0],
+    destLng: lastPosition[1],
+    positions: JSON.stringify(draft.positions),
+    distance: draft.distance,
+  };
+}
+
 export function useHoseLineDraftValue(): HoseLineDraftContextType {
-  const [draft, setDraft] = useState<HoseLineDraft | null>(null);
+  const [drafts, setDrafts] = useState<HoseLineDraft[]>([]);
   const addFirecallItem = useFirecallItemAdd();
 
-  const proposeDraft = useCallback((newDraft: HoseLineDraft) => {
-    setDraft(newDraft);
+  const proposeDrafts = useCallback((newDrafts: HoseLineDraft[]) => {
+    setDrafts(newDrafts);
   }, []);
 
-  const discardDraft = useCallback(() => setDraft(null), []);
+  const discardDraft = useCallback((id: string) => {
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+  }, []);
 
-  const confirmDraft = useCallback(async () => {
-    if (!draft) return undefined;
-    const [firstPosition] = draft.positions;
-    const lastPosition = draft.positions[draft.positions.length - 1];
+  const discardAllDrafts = useCallback(() => setDrafts([]), []);
 
-    const item: Connection = {
-      type: 'connection',
-      name: draft.name,
-      beschreibung: draft.reason,
-      dimension: draft.dimension,
-      oneHozeLength: draft.oneHozeLength,
-      lat: firstPosition[0],
-      lng: firstPosition[1],
-      destLat: lastPosition[0],
-      destLng: lastPosition[1],
-      positions: JSON.stringify(draft.positions),
-      distance: draft.distance,
-    };
+  const confirmDraft = useCallback(
+    async (id: string) => {
+      const draft = drafts.find((d) => d.id === id);
+      if (!draft) return undefined;
 
-    const ref = await addFirecallItem(item);
-    setDraft(null);
-    return ref.id;
-  }, [addFirecallItem, draft]);
+      const ref = await addFirecallItem(toConnection(draft));
+      // Erst nach dem erfolgreichen Anlegen entfernen — schlägt das Speichern
+      // fehl, bleibt der Vorschlag für einen zweiten Versuch stehen.
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      return ref.id;
+    },
+    [addFirecallItem, drafts]
+  );
+
+  const confirmAllDrafts = useCallback(async () => {
+    let created = 0;
+    for (const draft of drafts) {
+      // Nacheinander statt parallel: Jede Leitung schreibt ein Dokument und
+      // einen Audit-Eintrag, und ein Fehler soll die übrigen nicht mitreißen.
+      await addFirecallItem(toConnection(draft));
+      created++;
+      setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+    }
+    return created;
+  }, [addFirecallItem, drafts]);
 
   return useMemo(
-    () => ({ draft, proposeDraft, confirmDraft, discardDraft }),
-    [confirmDraft, discardDraft, draft, proposeDraft]
+    () => ({
+      drafts,
+      proposeDrafts,
+      confirmDraft,
+      confirmAllDrafts,
+      discardDraft,
+      discardAllDrafts,
+    }),
+    [
+      confirmAllDrafts,
+      confirmDraft,
+      discardAllDrafts,
+      discardDraft,
+      drafts,
+      proposeDrafts,
+    ]
   );
 }

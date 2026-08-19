@@ -53,10 +53,10 @@ export interface AiAssistantResult {
   isAnswer?: boolean;
   data?: any; // Structured data for the AI to process
   /**
-   * Leitungsvorschlag, der noch bestätigt werden muss. Solange gesetzt, zeigt
-   * der Toast „Übernehmen"/„Verwerfen" statt automatisch zu verschwinden.
+   * Leitungsvorschläge, die noch bestätigt werden müssen. Solange gesetzt,
+   * zeigt der Toast „Übernehmen"/„Verwerfen" statt automatisch zu verschwinden.
    */
-  draft?: HoseLineDraft;
+  drafts?: HoseLineDraft[];
   clarification?: {
     question: string;
     options: string[];

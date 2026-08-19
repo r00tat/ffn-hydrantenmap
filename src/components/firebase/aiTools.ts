@@ -310,7 +310,7 @@ export const AI_TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: 'searchWaterSupply',
     description:
-      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. It also draws a hose line DRAFT to the nearest one, so do not call proposeHoseLine afterwards unless a different source or dimension is wanted. Nothing is persisted; the user confirms or discards the draft.',
+      'Search for water supply points (Hydranten, Saugstellen, Löschteiche) around a position, sorted by air line distance. Widens the radius on its own (300/600/1200/2500 m) until it finds something, so ONE call is enough — never repeat it just to search farther. The result contains a ready-made German answer in data.answer. It also draws a hose line DRAFT to EVERY result it returns, so do not call proposeHoseLine afterwards unless a different source or dimension is wanted. Nothing is persisted; the user confirms or discards the drafts.',
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -406,7 +406,13 @@ KRITISCH - Keine Halluzinationen:
   darüber setzt einen vorherigen searchWaterSupply-Aufruf voraus - ohne den ist sie erfunden.
 
 Regeln:
-- Antworte kurz und präzise
+- Antworte kurz und präzise: ein bis zwei Sätze, im Zweifel weniger
+- Deine Antwort wird VORGELESEN. Schreibe reinen Fließtext ohne Markdown - keine
+  Sternchen, keine Rauten, keine Aufzählungszeichen, keine Tabellen. Zahlen mit
+  Einheit ausschreiben ("120 Meter", "sechs B-Längen").
+- Nenne nur, was gefragt wurde. Technische Details wie Nennweite, Druck oder
+  Adresse gehören in die Antwort, wenn danach gefragt wurde oder sie die Auswahl
+  begründen - nicht als Aufzählung zu jedem Treffer.
 - Führe Aktionen sofort aus, wenn der Befehl klar ist
 - Bei Fragen über den Einsatz oder allgemeine Fragen: verwende answerQuestion mit einer kurzen Antwort
 - AUSNAHME: Fragen nach Hydranten, Saugstellen, Löschteichen oder der Wasserversorgung
@@ -464,11 +470,11 @@ Will der Benutzer danach mehr Entnahmestellen sehen ("und welche noch?", "zeig m
 mehr"), rufe searchWaterSupply erneut mit einem höheren limit auf (z.B. 10). Das ist
 kein wiederholter Aufruf, sondern ein anderer - die Ergebnisliste ist nach Entfernung
 sortiert und limit steuert, wie viele davon du genannt bekommst.
-Die Suche zeichnet dabei bereits einen Leitungsvorschlag zur nächstgelegenen
-Entnahmestelle ein. Erwähne ihn in einem Halbsatz ("Leitung ist eingezeichnet, X m,
-Y B-Längen - übernehmen oder verwerfen") und rufe dafür NICHT zusätzlich
+Die Suche zeichnet dabei zu JEDER gefundenen Entnahmestelle einen Leitungsvorschlag
+ein - so viele, wie limit zurückgibt. Erwähne sie in einem Halbsatz ("drei Leitungen
+eingezeichnet, die kürzeste 120 Meter") und rufe dafür NICHT zusätzlich
 proposeHoseLine auf. proposeHoseLine brauchst du nur, wenn eine ANDERE Entnahmestelle
-oder eine andere Dimension gewünscht ist. Das Ergebnis enthält in
+oder eine andere Dimension gewünscht ist; es ersetzt dann alle Vorschläge der Suche. Das Ergebnis enthält in
 data.answer bereits einen fertigen Satz mit Entfernung und Himmelsrichtung - gib
 ihn wieder, gekürzt auf das Gefragte. Rufe die Suche NICHT ein zweites Mal auf,
 nur um den Radius zu vergrößern: Sie weitet ihn von sich aus bis 2500 m aus. Nur

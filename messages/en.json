@@ -1594,8 +1594,10 @@
     "undo": "Undo",
     "draftConfirm": "Apply",
     "draftDiscard": "Discard",
-    "draftAdded": "Hose line added",
-    "draftFailed": "Hose line could not be created"
+    "draftAdded": "{count, plural, one {Hose line added} other {# hose lines added}}",
+    "draftFailed": "Hose line could not be created",
+    "draftConfirmAll": "Apply all {count}",
+    "draftDiscardAll": "Discard all"
   },
   "blaulichtSms": {
     "title": "Alarm SMS",

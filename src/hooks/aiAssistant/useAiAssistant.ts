@@ -27,7 +27,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
   const firecall = useFirecall();
-  const { proposeDraft } = useHoseLineDraft();
+  const { proposeDrafts } = useHoseLineDraft();
 
   const interactionsRef = useRef<AiInteraction[]>([]);
   /** Treffer der letzten Umkreissuche, siehe `ToolHandlerDeps` */
@@ -151,7 +151,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       // Der Entwurf überlebt die restlichen Schleifendurchläufe: Das Modell
       // antwortet nach dem Tool-Call noch mit Text, und erst diese Antwort
       // erreicht die Oberfläche.
-      let pendingDraft: HoseLineDraft | undefined;
+      let pendingDrafts: HoseLineDraft[] | undefined;
 
       try {
         while (iterations < MAX_LOOP_ITERATIONS) {
@@ -206,7 +206,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               message: text || lastResult?.message || 'Aktion ausgeführt',
               isAnswer: !!text,
               createdItemId: lastResult?.createdItemId,
-              draft: pendingDraft,
+              drafts: pendingDrafts,
             };
           }
 
@@ -222,7 +222,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             defaultPosition,
             findWaterSupply: queryClusters,
             waterSupplyResults: waterSupplyResultsRef,
-            proposeHoseLineDraft: proposeDraft,
+            proposeHoseLineDrafts: proposeDrafts,
           };
 
           setProcessingStatus('executing');
@@ -249,8 +249,8 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
               }
             });
             lastResult = execResult;
-            if (execResult.draft) {
-              pendingDraft = execResult.draft;
+            if (execResult.drafts) {
+              pendingDrafts = execResult.drafts;
             }
           }
 
@@ -265,7 +265,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         // Meist steht die Antwort schon im letzten Werkzeugergebnis, und das
         // wegzuwerfen wäre für den Benutzer ein Fehlschlag ohne Grund.
         if (lastResult?.success) {
-          return { ...lastResult, isAnswer: true, draft: pendingDraft };
+          return { ...lastResult, isAnswer: true, drafts: pendingDrafts };
         }
         return { success: false, message: 'Zu viele Verarbeitungsschritte' };
       } catch (error) {
@@ -274,7 +274,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         return { success: false, message: 'Fehler bei der Verarbeitung' };
       }
     },
-    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDraft]
+    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts]
   );
 
   const transcribeAudio = useCallback(

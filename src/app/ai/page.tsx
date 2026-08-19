@@ -31,7 +31,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AiAssistantResult | null>(null);
   const { processText } = useAiAssistant(firecallItems);
-  const { confirmDraft, discardDraft } = useHoseLineDraft();
+  const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
 
   const askQuestion = useCallback(async () => {
     if (!question.trim()) return;
@@ -64,9 +64,11 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
   const applyDraft = useCallback(async () => {
     setIsLoading(true);
     try {
-      await confirmDraft();
+      const created = await confirmAllDrafts();
       setResult((prev) =>
-        prev ? { ...prev, draft: undefined, message: t('draftAdded') } : prev
+        prev
+          ? { ...prev, drafts: undefined, message: t('draftAdded', { count: created }) }
+          : prev
       );
     } catch {
       // Der Entwurf bleibt bestehen, damit ein zweiter Versuch möglich ist.
@@ -76,12 +78,12 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
     } finally {
       setIsLoading(false);
     }
-  }, [confirmDraft, t]);
+  }, [confirmAllDrafts, t]);
 
   const dropDraft = useCallback(() => {
-    discardDraft();
-    setResult((prev) => (prev ? { ...prev, draft: undefined } : prev));
-  }, [discardDraft]);
+    discardAllDrafts();
+    setResult((prev) => (prev ? { ...prev, drafts: undefined } : prev));
+  }, [discardAllDrafts]);
 
   return (
     <>
@@ -117,7 +119,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
             variant="outlined"
           >
             {result.message}
-            {result.draft && (
+            {result.drafts && result.drafts.length > 0 && (
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 <Button
                   size="small"
@@ -125,7 +127,9 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
                   onClick={applyDraft}
                   disabled={isLoading}
                 >
-                  {t('draftConfirm')}
+                  {result.drafts.length > 1
+                    ? t('draftConfirmAll', { count: result.drafts.length })
+                    : t('draftConfirm')}
                 </Button>
                 <Button
                   size="small"
@@ -133,7 +137,9 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
                   onClick={dropDraft}
                   disabled={isLoading}
                 >
-                  {t('draftDiscard')}
+                  {result.drafts.length > 1
+                    ? t('draftDiscardAll')
+                    : t('draftDiscard')}
                 </Button>
               </Stack>
             )}

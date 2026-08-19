@@ -59,7 +59,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const t = useTranslations('ai');
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
-  const { confirmDraft, discardDraft } = useHoseLineDraft();
+  const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -77,7 +77,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
       severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
       showUndo: result.success && !!result.createdItemId,
       clarificationOptions: result.clarification?.options,
-      showDraftConfirm: !!result.draft,
+      draftCount: result.drafts?.length ?? 0,
     });
     // Speak answers from the AI
     if (result.isAnswer && result.message) {
@@ -165,18 +165,23 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
   const handleDraftConfirm = useCallback(async () => {
     try {
-      const id = await confirmDraft();
-      if (id) {
-        setToast({ open: true, message: t('draftAdded'), severity: 'success' });
+      const created = await confirmAllDrafts();
+      if (created > 0) {
+        setToast({
+          open: true,
+          message: t('draftAdded', { count: created }),
+          severity: 'success',
+        });
       }
     } catch {
+      // Was schon angelegt wurde, bleibt; der Rest steht weiter als Entwurf.
       setToast({ open: true, message: t('draftFailed'), severity: 'error' });
     }
-  }, [confirmDraft, t]);
+  }, [confirmAllDrafts, t]);
 
   const handleDraftDiscard = useCallback(() => {
-    discardDraft();
-  }, [discardDraft]);
+    discardAllDrafts();
+  }, [discardAllDrafts]);
 
   const isRecording = recorderState === 'recording';
   const isProcessing = recorderState === 'processing' || isAiProcessing;

@@ -1594,8 +1594,10 @@
     "undo": "Rückgängig",
     "draftConfirm": "Übernehmen",
     "draftDiscard": "Verwerfen",
-    "draftAdded": "Leitung übernommen",
-    "draftFailed": "Leitung konnte nicht angelegt werden"
+    "draftAdded": "{count, plural, one {Leitung übernommen} other {# Leitungen übernommen}}",
+    "draftFailed": "Leitung konnte nicht angelegt werden",
+    "draftConfirmAll": "Alle {count} übernehmen",
+    "draftDiscardAll": "Alle verwerfen"
   },
   "blaulichtSms": {
     "title": "Alarm-SMS-Einsätze",

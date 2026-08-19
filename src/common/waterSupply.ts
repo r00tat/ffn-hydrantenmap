@@ -211,6 +211,13 @@ export function hoseSectionCount(
  * reines Kopieren bleibt.
  */
 export interface HoseLineDraft {
+  /**
+   * Stabile Kennung innerhalb einer Vorschlagsrunde. Sie leitet sich aus
+   * Quelle, Ziel und Dimension ab, damit derselbe Vorschlag zweimal gebaut
+   * dieselbe Kennung trägt — React braucht sie als Key, und Übernehmen und
+   * Verwerfen sprechen einen einzelnen Vorschlag darüber an.
+   */
+  id: string;
   name: string;
   dimension: string;
   oneHozeLength: number;
@@ -263,6 +270,11 @@ export function buildHoseLineDraft({
   distance = Math.round(distance);
 
   return {
+    id: [
+      dim,
+      source.name || `${source.lat.toFixed(5)},${source.lng.toFixed(5)}`,
+      `${target.lat.toFixed(5)},${target.lng.toFixed(5)}`,
+    ].join('|'),
     name: name || [`${dim}-Leitung`, source.name].filter(Boolean).join(' '),
     dimension: dim,
     oneHozeLength: hoseLength,

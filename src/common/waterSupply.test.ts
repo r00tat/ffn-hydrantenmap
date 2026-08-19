@@ -232,6 +232,25 @@ describe('buildHoseLineDraft', () => {
     distance: 90,
   };
 
+  it('gives every draft a stable id derived from its source', () => {
+    const a = buildHoseLineDraft({ source, target: einsatzort });
+    const b = buildHoseLineDraft({ source, target: einsatzort });
+    const other = buildHoseLineDraft({
+      source: { ...source, name: 'UH Seegasse 3' },
+      target: einsatzort,
+    });
+
+    expect(a.id).toBe(b.id);
+    expect(a.id).not.toBe(other.id);
+    expect(a.id).toBeTruthy();
+  });
+
+  it('distinguishes drafts of different dimension from the same source', () => {
+    const b = buildHoseLineDraft({ source, target: einsatzort });
+    const c = buildHoseLineDraft({ source, target: einsatzort, dimension: 'C' });
+    expect(b.id).not.toBe(c.id);
+  });
+
   it('builds a straight draft from source to target', () => {
     const draft = buildHoseLineDraft({ source, target: einsatzort });
 

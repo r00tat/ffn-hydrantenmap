@@ -6,7 +6,7 @@ import { FirecallItem } from '../components/firebase/firestore';
 import { buildHoseLineDraft, HoseLineDraft } from '../common/waterSupply';
 
 const addFirecallItem = vi.fn(async (item: FirecallItem) => ({
-  id: 'connection-1',
+  id: `connection-${item.name}`,
   item,
 }));
 
@@ -21,15 +21,16 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <HoseLineDraftProvider>{children}</HoseLineDraftProvider>
 );
 
-const draft: HoseLineDraft = buildHoseLineDraft({
-  source: {
-    kind: 'hydrant',
-    name: 'ÜH Hauptstraße 12',
-    lat: 47.949,
-    lng: 16.8482,
-  },
-  target: { lat: 47.9482913, lng: 16.848222 },
+const target = { lat: 47.9482913, lng: 16.848222 };
+
+const draftA: HoseLineDraft = buildHoseLineDraft({
+  source: { kind: 'hydrant', name: 'ÜH Hauptstraße 12', lat: 47.949, lng: 16.8482 },
+  target,
   reason: 'nächster Überflurhydrant',
+});
+const draftB: HoseLineDraft = buildHoseLineDraft({
+  source: { kind: 'hydrant', name: 'UH Seegasse 3', lat: 47.9495, lng: 16.849 },
+  target,
 });
 
 describe('useHoseLineDraft', () => {
@@ -37,83 +38,107 @@ describe('useHoseLineDraft', () => {
 
   it('is a no-op without a provider so the assistant still works without a map', () => {
     const { result } = renderHook(() => useHoseLineDraft());
-    expect(result.current.draft).toBeNull();
-    expect(() => result.current.proposeDraft(draft)).not.toThrow();
+    expect(result.current.drafts).toEqual([]);
+    expect(() => result.current.proposeDrafts([draftA])).not.toThrow();
   });
 
-  it('holds a proposed draft without writing it to the firecall', () => {
+  it('holds several proposals at once without writing them to the firecall', () => {
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
 
-    act(() => result.current.proposeDraft(draft));
+    act(() => result.current.proposeDrafts([draftA, draftB]));
 
-    expect(result.current.draft).toEqual(draft);
+    expect(result.current.drafts).toEqual([draftA, draftB]);
     expect(addFirecallItem).not.toHaveBeenCalled();
   });
 
-  it('replaces an earlier draft instead of stacking proposals', () => {
+  it('replaces the previous round instead of stacking proposals', () => {
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
-    const second = { ...draft, name: 'C-Leitung' };
 
-    act(() => result.current.proposeDraft(draft));
-    act(() => result.current.proposeDraft(second));
+    act(() => result.current.proposeDrafts([draftA, draftB]));
+    act(() => result.current.proposeDrafts([draftB]));
 
-    expect(result.current.draft).toEqual(second);
+    expect(result.current.drafts).toEqual([draftB]);
   });
 
-  it('creates a connection item on confirm and clears the draft', async () => {
+  it('creates a connection for a single draft and leaves the others standing', async () => {
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
 
-    act(() => result.current.proposeDraft(draft));
-    let id: string | undefined;
+    act(() => result.current.proposeDrafts([draftA, draftB]));
     await act(async () => {
-      id = await result.current.confirmDraft();
+      expect(await result.current.confirmDraft(draftA.id)).toBeTruthy();
     });
 
-    expect(id).toBe('connection-1');
     expect(addFirecallItem).toHaveBeenCalledTimes(1);
     const item = addFirecallItem.mock.calls[0][0] as any;
     expect(item.type).toBe('connection');
-    expect(item.name).toBe(draft.name);
+    expect(item.name).toBe(draftA.name);
     expect(item.dimension).toBe('B');
     expect(item.oneHozeLength).toBe(20);
-    expect(item.distance).toBe(draft.distance);
+    expect(item.distance).toBe(draftA.distance);
     expect(item.beschreibung).toBe('nächster Überflurhydrant');
-    expect(JSON.parse(item.positions)).toEqual(draft.positions);
-    expect([item.lat, item.lng]).toEqual(draft.positions[0]);
+    expect(JSON.parse(item.positions)).toEqual(draftA.positions);
+    expect([item.lat, item.lng]).toEqual(draftA.positions[0]);
     expect([item.destLat, item.destLng]).toEqual(
-      draft.positions[draft.positions.length - 1]
+      draftA.positions[draftA.positions.length - 1]
     );
-    expect(result.current.draft).toBeNull();
+    expect(result.current.drafts).toEqual([draftB]);
   });
 
-  it('does nothing when confirming without a draft', async () => {
+  it('creates one connection per draft when all are confirmed', async () => {
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
 
+    act(() => result.current.proposeDrafts([draftA, draftB]));
     await act(async () => {
-      expect(await result.current.confirmDraft()).toBeUndefined();
+      expect(await result.current.confirmAllDrafts()).toBe(2);
     });
+
+    expect(addFirecallItem).toHaveBeenCalledTimes(2);
+    expect(result.current.drafts).toEqual([]);
+  });
+
+  it('does nothing when confirming an unknown draft', async () => {
+    const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
+
+    act(() => result.current.proposeDrafts([draftA]));
+    await act(async () => {
+      expect(await result.current.confirmDraft('gibt-es-nicht')).toBeUndefined();
+    });
+
     expect(addFirecallItem).not.toHaveBeenCalled();
+    expect(result.current.drafts).toEqual([draftA]);
   });
 
   it('keeps the draft when saving fails so the user can retry', async () => {
     addFirecallItem.mockRejectedValueOnce(new Error('offline'));
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
 
-    act(() => result.current.proposeDraft(draft));
+    act(() => result.current.proposeDrafts([draftA]));
     await act(async () => {
-      await expect(result.current.confirmDraft()).rejects.toThrow('offline');
+      await expect(result.current.confirmDraft(draftA.id)).rejects.toThrow(
+        'offline'
+      );
     });
 
-    expect(result.current.draft).toEqual(draft);
+    expect(result.current.drafts).toEqual([draftA]);
   });
 
-  it('drops the draft on discard', () => {
+  it('drops a single draft on discard', () => {
     const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
 
-    act(() => result.current.proposeDraft(draft));
-    act(() => result.current.discardDraft());
+    act(() => result.current.proposeDrafts([draftA, draftB]));
+    act(() => result.current.discardDraft(draftA.id));
 
-    expect(result.current.draft).toBeNull();
+    expect(result.current.drafts).toEqual([draftB]);
+    expect(addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('drops everything on discard all', () => {
+    const { result } = renderHook(() => useHoseLineDraft(), { wrapper });
+
+    act(() => result.current.proposeDrafts([draftA, draftB]));
+    act(() => result.current.discardAllDrafts());
+
+    expect(result.current.drafts).toEqual([]);
     expect(addFirecallItem).not.toHaveBeenCalled();
   });
 });

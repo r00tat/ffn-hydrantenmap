@@ -14,8 +14,8 @@ export interface AiToastState {
   severity: 'success' | 'warning' | 'error';
   showUndo?: boolean;
   clarificationOptions?: string[];
-  /** Ein Leitungsvorschlag wartet auf Bestätigung */
-  showDraftConfirm?: boolean;
+  /** Anzahl der Leitungsvorschläge, die auf Bestätigung warten */
+  draftCount?: number;
 }
 
 export interface AiActionToastProps {
@@ -42,8 +42,9 @@ export default function AiActionToast({
     severity,
     showUndo,
     clarificationOptions,
-    showDraftConfirm,
+    draftCount = 0,
   } = state;
+  const showDraftConfirm = draftCount > 0;
 
   // Speak error and warning messages
   useEffect(() => {
@@ -117,7 +118,7 @@ export default function AiActionToast({
               color="inherit"
               onClick={handleDraftConfirm}
             >
-              {t('draftConfirm')}
+              {draftCount > 1 ? t('draftConfirmAll', { count: draftCount }) : t('draftConfirm')}
             </Button>
             <Button
               size="small"
@@ -125,7 +126,7 @@ export default function AiActionToast({
               color="inherit"
               onClick={handleDraftDiscard}
             >
-              {t('draftDiscard')}
+              {draftCount > 1 ? t('draftDiscardAll') : t('draftDiscard')}
             </Button>
           </Stack>
         )}

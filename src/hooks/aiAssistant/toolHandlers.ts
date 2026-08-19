@@ -51,8 +51,11 @@ export interface ToolHandlerDeps {
    * erfindet es sonst.
    */
   waterSupplyResults: { current: WaterSupplyCandidate[] };
-  /** Leitungsvorschlag anzeigen, ohne ihn anzulegen */
-  proposeHoseLineDraft: (draft: HoseLineDraft) => void;
+  /**
+   * Eine ganze Runde Leitungsvorschläge anzeigen, ohne sie anzulegen. Die
+   * vorherige Runde wird dabei ersetzt.
+   */
+  proposeHoseLineDrafts: (drafts: HoseLineDraft[]) => void;
 }
 
 /**
@@ -112,7 +115,7 @@ export async function executeToolCall(
     defaultPosition,
     findWaterSupply,
     waterSupplyResults,
-    proposeHoseLineDraft,
+    proposeHoseLineDrafts,
   } = deps;
 
   switch (call.name) {
@@ -439,23 +442,34 @@ export async function executeToolCall(
         ...others.map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
       ];
 
-      // Die Leitung zur nächstgelegenen Entnahmestelle wird gleich mit
-      // gezeichnet: „Wo ist der nächste Hydrant?" zielt im Einsatz auf die
-      // Wasserversorgung, nicht auf eine Ortsangabe. Sie kostet nichts — ein
-      // Entwurf ist erst nach dem Bestätigen ein Element, und ein
-      // ungewollter verschwindet mit „Verwerfen".
-      let draft: HoseLineDraft | undefined;
-      if (nearest.distance > 0) {
-        draft = buildHoseLineDraft({
-          source: nearest,
-          target: center,
-          reason: `${WATER_SUPPLY_LABELS[nearest.kind]} ${nearest.name}, ${
-            nearest.distance
-          } m entfernt`,
-        });
-        proposeHoseLineDraft(draft);
+      // Zu JEDER gefundenen Entnahmestelle wird eine Leitung eingezeichnet,
+      // nicht nur zur nächsten: „Wo ist der nächste Hydrant?" zielt im Einsatz
+      // auf die Wasserversorgung, und welcher Anschluss der brauchbare ist,
+      // entscheidet die Lage vor Ort — nicht die Luftlinie. Wie viele es sind,
+      // steuert `limit`. Es kostet nichts: Ein Entwurf ist erst nach dem
+      // Bestätigen ein Element, und ungewollte verschwinden mit „Verwerfen".
+      const drafts = candidates
+        .filter((candidate) => candidate.distance > 0)
+        .map((candidate) =>
+          buildHoseLineDraft({
+            source: candidate,
+            target: center,
+            reason: `${WATER_SUPPLY_LABELS[candidate.kind]} ${candidate.name}, ${
+              candidate.distance
+            } m entfernt`,
+          })
+        );
+
+      if (drafts.length > 0) {
+        proposeHoseLineDrafts(drafts);
         answerParts.push(
-          `Leitungsvorschlag eingezeichnet: ${describeHoseLineDraft(draft)}`
+          drafts.length === 1
+            ? `Leitungsvorschlag eingezeichnet: ${describeHoseLineDraft(
+                drafts[0]
+              )}`
+            : `${drafts.length} Leitungsvorschläge eingezeichnet, kürzester: ${describeHoseLineDraft(
+                drafts[0]
+              )}`
         );
       }
 
@@ -465,7 +479,7 @@ export async function executeToolCall(
         success: true,
         message: answer,
         data: { candidates, radius, answer },
-        draft,
+        drafts: drafts.length > 0 ? drafts : undefined,
       };
     }
 
@@ -523,12 +537,15 @@ export async function executeToolCall(
         reason: args.reason as string | undefined,
       });
 
-      proposeHoseLineDraft(draft);
+      // Ein ausdrücklich verlangter Vorschlag ersetzt die Runde aus der Suche:
+      // Wer „Leitung von der Saugstelle" sagt, will nicht daneben noch fünf
+      // Hydrantenleitungen liegen haben.
+      proposeHoseLineDrafts([draft]);
 
       return {
         success: true,
         message: `Vorschlag: ${describeHoseLineDraft(draft)}`,
-        draft,
+        drafts: [draft],
       };
     }
 

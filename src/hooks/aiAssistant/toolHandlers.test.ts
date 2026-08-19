@@ -40,7 +40,7 @@ function makeDeps(overrides: Partial<ToolHandlerDeps> = {}): ToolHandlerDeps {
         ] as unknown as GeohashCluster[]
     ),
     waterSupplyResults: { current: [] as WaterSupplyCandidate[] },
-    proposeHoseLineDraft: vi.fn(),
+    proposeHoseLineDrafts: vi.fn(),
     ...overrides,
   } as ToolHandlerDeps;
 }
@@ -201,32 +201,50 @@ describe('searchWaterSupply', () => {
     expect(deps.addFirecallItem).not.toHaveBeenCalled();
   });
 
-  it('shows a draft to the nearest candidate right away', async () => {
+  it('proposes one draft per candidate, nearest first', async () => {
     const deps = makeDeps();
     const result = await executeToolCall(call('searchWaterSupply'), deps);
 
-    expect(deps.proposeHoseLineDraft).toHaveBeenCalledTimes(1);
-    const proposed: HoseLineDraft = (deps.proposeHoseLineDraft as any).mock
+    expect(deps.proposeHoseLineDrafts).toHaveBeenCalledTimes(1);
+    const proposed: HoseLineDraft[] = (deps.proposeHoseLineDrafts as any).mock
       .calls[0][0];
-    expect(proposed.source).toEqual({
-      kind: 'hydrant',
-      name: 'ÜH Hauptstraße 12',
-    });
-    expect(proposed.positions[0]).toEqual([hydrantNah.lat, hydrantNah.lng]);
-    expect(proposed.positions[proposed.positions.length - 1]).toEqual([
-      einsatzort.lat,
-      einsatzort.lng,
+    expect(proposed.map((d) => d.source?.name)).toEqual([
+      'ÜH Hauptstraße 12',
+      'UH Seegasse 3',
     ]);
-    expect(result.draft).toBe(proposed);
-    // Der Entwurf ist ein Vorschlag, kein Element: nichts wird gespeichert.
+    expect(proposed[0].positions[0]).toEqual([hydrantNah.lat, hydrantNah.lng]);
+    expect(proposed[0].positions[1]).toEqual([einsatzort.lat, einsatzort.lng]);
+    expect(result.drafts).toBe(proposed);
+    // Entwürfe sind Vorschläge, keine Elemente: nichts wird gespeichert.
     expect(deps.addFirecallItem).not.toHaveBeenCalled();
+  });
+
+  it('proposes as many drafts as the limit asked for', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      name: `H${i}`,
+      lat: einsatzort.lat + metersToLat(20 * (i + 1)),
+      lng: einsatzort.lng,
+    }));
+    const deps = makeDeps({
+      findWaterSupply: vi.fn(
+        async () =>
+          [{ geohash: 'a', hydranten: many }] as unknown as GeohashCluster[]
+      ),
+    });
+
+    await executeToolCall(call('searchWaterSupply', { limit: 6 }), deps);
+
+    const proposed: HoseLineDraft[] = (deps.proposeHoseLineDrafts as any).mock
+      .calls[0][0];
+    expect(proposed).toHaveLength(6);
+    expect(new Set(proposed.map((d) => d.id)).size).toBe(6);
   });
 
   it('mentions the draft in the answer so the model relays it', async () => {
     const deps = makeDeps();
     const result = await executeToolCall(call('searchWaterSupply'), deps);
 
-    expect(result.message).toContain('Leitungsvorschlag');
+    expect(result.message).toMatch(/Leitungsvorschl(ag|äge)/);
     expect(result.message).toMatch(/B-Längen/);
   });
 
@@ -234,11 +252,11 @@ describe('searchWaterSupply', () => {
     const deps = makeDeps({ findWaterSupply: vi.fn(async () => []) });
     const result = await executeToolCall(call('searchWaterSupply'), deps);
 
-    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
-    expect(result.draft).toBeUndefined();
+    expect(deps.proposeHoseLineDrafts).not.toHaveBeenCalled();
+    expect(result.drafts).toBeUndefined();
   });
 
-  it('proposes no line when the nearest candidate sits on the search position', async () => {
+  it('skips candidates that sit on the search position', async () => {
     const deps = makeDeps({
       findWaterSupply: vi.fn(
         async () =>
@@ -250,7 +268,7 @@ describe('searchWaterSupply', () => {
     const result = await executeToolCall(call('searchWaterSupply'), deps);
 
     expect(result.success).toBe(true);
-    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+    expect(deps.proposeHoseLineDrafts).not.toHaveBeenCalled();
   });
 });
 
@@ -260,7 +278,7 @@ describe('proposeHoseLine', () => {
   it('proposes a draft from a previously found hydrant without persisting it', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
-    (deps.proposeHoseLineDraft as any).mockClear();
+    (deps.proposeHoseLineDrafts as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', {
@@ -272,22 +290,23 @@ describe('proposeHoseLine', () => {
 
     expect(result.success).toBe(true);
     expect(deps.addFirecallItem).not.toHaveBeenCalled();
-    expect(deps.proposeHoseLineDraft).toHaveBeenCalledTimes(1);
+    expect(deps.proposeHoseLineDrafts).toHaveBeenCalledTimes(1);
 
-    const draft: HoseLineDraft = (deps.proposeHoseLineDraft as any).mock.calls[0][0];
+    const [draft]: HoseLineDraft[] = (deps.proposeHoseLineDrafts as any).mock
+      .calls[0][0];
     expect(draft.dimension).toBe('B');
     expect(draft.distance).toBeGreaterThan(70);
     expect(draft.distance).toBeLessThan(90);
     expect(draft.hoseCount).toBe(4);
     expect(draft.source).toEqual({ kind: 'hydrant', name: 'ÜH Hauptstraße 12' });
     expect(draft.reason).toBe('nächster Überflurhydrant, 100 mm');
-    expect(result.draft).toBe(draft);
+    expect(result.drafts?.[0]).toBe(draft);
   });
 
   it('matches the source name case insensitively and partially', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
-    (deps.proposeHoseLineDraft as any).mockClear();
+    (deps.proposeHoseLineDrafts as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', { sourceName: 'hauptstrasse' }),
@@ -314,7 +333,8 @@ describe('proposeHoseLine', () => {
     );
 
     expect(result.success).toBe(true);
-    const draft: HoseLineDraft = (deps.proposeHoseLineDraft as any).mock.calls[0][0];
+    const [draft]: HoseLineDraft[] = (deps.proposeHoseLineDrafts as any).mock
+      .calls[0][0];
     expect(draft.name).toBe('Angriffsleitung');
     expect(draft.dimension).toBe('C');
     expect(draft.source).toBeUndefined();
@@ -325,13 +345,13 @@ describe('proposeHoseLine', () => {
     const result = await executeToolCall(call('proposeHoseLine', {}), deps);
 
     expect(result.success).toBe(false);
-    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+    expect(deps.proposeHoseLineDrafts).not.toHaveBeenCalled();
   });
 
   it('fails when the named source was never returned by a search', async () => {
     const deps = makeDeps();
     await executeToolCall(call('searchWaterSupply'), deps);
-    (deps.proposeHoseLineDraft as any).mockClear();
+    (deps.proposeHoseLineDrafts as any).mockClear();
 
     const result = await executeToolCall(
       call('proposeHoseLine', { sourceName: 'Hydrant Marktplatz' }),
@@ -340,7 +360,7 @@ describe('proposeHoseLine', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('Hydrant Marktplatz');
-    expect(deps.proposeHoseLineDraft).not.toHaveBeenCalled();
+    expect(deps.proposeHoseLineDrafts).not.toHaveBeenCalled();
   });
 
   it('replaces the draft the search proposed', async () => {
@@ -352,11 +372,15 @@ describe('proposeHoseLine', () => {
       deps
     );
 
-    const calls = (deps.proposeHoseLineDraft as any).mock.calls;
+    const calls = (deps.proposeHoseLineDrafts as any).mock.calls;
     expect(calls).toHaveLength(2);
-    expect(calls[0][0].source.name).toBe('ÜH Hauptstraße 12');
-    expect(calls[1][0].source.name).toBe('UH Seegasse 3');
-    expect(calls[1][0].dimension).toBe('C');
+    expect(calls[0][0].map((d: HoseLineDraft) => d.source?.name)).toEqual([
+      'ÜH Hauptstraße 12',
+      'UH Seegasse 3',
+    ]);
+    expect(calls[1][0]).toHaveLength(1);
+    expect(calls[1][0][0].source.name).toBe('UH Seegasse 3');
+    expect(calls[1][0][0].dimension).toBe('C');
   });
 
   it('targets the Einsatzort by default', async () => {
