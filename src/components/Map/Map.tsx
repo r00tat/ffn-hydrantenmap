@@ -28,6 +28,7 @@ import FitBoundsToItems from './FitBoundsToItems';
 import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
+import HoseLineDraftLayer from './layers/HoseLineDraftLayer';
 import LayerErrorBoundary from './layers/LayerErrorBoundary';
 import LiveLocationLayer from './layers/LiveLocationLayer';
 import LocationsLayer from './layers/LocationsLayer';
@@ -216,6 +217,9 @@ export default function Map() {
         {/* <FullscreenControl /> */}
         <FitBoundsToItems />
         <UpdateMapPosition />
+        <LayerErrorBoundary name="Leitungsvorschlag">
+          <HoseLineDraftLayer />
+        </LayerErrorBoundary>
         <LeitungsProvider>
           <DrawingProvider>
             <ActionButtons />

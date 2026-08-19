@@ -7,10 +7,13 @@ import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { SxProps, Theme } from '@mui/material/styles';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useAudioRecorder from '../../hooks/useAudioRecorder';
 import useAiAssistant from '../../hooks/useAiAssistant';
+import { useHoseLineDraft } from '../../hooks/useHoseLineDraft';
 import { FirecallItem } from '../firebase/firestore';
+import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
 import AiActionToast, { AiToastState } from './AiActionToast';
 import { speakMessage } from '../../common/speech';
 
@@ -53,8 +56,10 @@ function playStopBeep() {
 }
 
 export default function AiAssistantButton({ firecallItems, containerSx }: AiAssistantButtonProps) {
+  const t = useTranslations('ai');
   const { state: recorderState, startRecording, stopRecording, error: recorderError } = useAudioRecorder();
   const { processAudio, processText, undoLastAction, processingStatus } = useAiAssistant(firecallItems);
+  const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
 
   const [toast, setToast] = useState<AiToastState>({
     open: false,
@@ -64,6 +69,21 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const [isAiProcessing, setIsAiProcessing] = useState(false);
 
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showResult = useCallback((result: AiAssistantResult) => {
+    setToast({
+      open: true,
+      message: result.message,
+      severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
+      showUndo: result.success && !!result.createdItemId,
+      clarificationOptions: result.clarification?.options,
+      draftCount: result.drafts?.length ?? 0,
+    });
+    // Speak answers from the AI
+    if (result.isAnswer && result.message) {
+      speakMessage(result.message);
+    }
+  }, []);
 
   // Show recorder errors - reacting to external state change from hook
   useEffect(() => {
@@ -94,18 +114,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
       setIsAiProcessing(true);
       try {
-        const result = await processAudio(audio);
-        setToast({
-          open: true,
-          message: result.message,
-          severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-          showUndo: result.success && !!result.createdItemId,
-          clarificationOptions: result.clarification?.options,
-        });
-        // Speak answers from the AI
-        if (result.isAnswer && result.message) {
-          speakMessage(result.message);
-        }
+        showResult(await processAudio(audio));
       } finally {
         setIsAiProcessing(false);
       }
@@ -121,25 +130,14 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         if (audio) {
           setIsAiProcessing(true);
           try {
-            const result = await processAudio(audio);
-            setToast({
-              open: true,
-              message: result.message,
-              severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-              showUndo: result.success && !!result.createdItemId,
-              clarificationOptions: result.clarification?.options,
-            });
-            // Speak answers from the AI
-            if (result.isAnswer && result.message) {
-              speakMessage(result.message);
-            }
+            showResult(await processAudio(audio));
           } finally {
             setIsAiProcessing(false);
           }
         }
       }, MAX_RECORDING_TIME_MS);
     }
-  }, [processAudio, recorderState, startRecording, stopRecording]);
+  }, [processAudio, recorderState, showResult, startRecording, stopRecording]);
 
   const handleToastClose = useCallback(() => {
     setToast((prev) => ({ ...prev, open: false }));
@@ -159,21 +157,31 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const handleClarificationSelect = useCallback(async (option: string) => {
     setIsAiProcessing(true);
     try {
-      const result = await processText(option);
-      setToast({
-        open: true,
-        message: result.message,
-        severity: result.success ? 'success' : result.clarification ? 'warning' : 'error',
-        showUndo: result.success && !!result.createdItemId,
-        clarificationOptions: result.clarification?.options,
-      });
-      if (result.isAnswer && result.message) {
-        speakMessage(result.message);
-      }
+      showResult(await processText(option));
     } finally {
       setIsAiProcessing(false);
     }
-  }, [processText]);
+  }, [processText, showResult]);
+
+  const handleDraftConfirm = useCallback(async () => {
+    try {
+      const created = await confirmAllDrafts();
+      if (created > 0) {
+        setToast({
+          open: true,
+          message: t('draftAdded', { count: created }),
+          severity: 'success',
+        });
+      }
+    } catch {
+      // Was schon angelegt wurde, bleibt; der Rest steht weiter als Entwurf.
+      setToast({ open: true, message: t('draftFailed'), severity: 'error' });
+    }
+  }, [confirmAllDrafts, t]);
+
+  const handleDraftDiscard = useCallback(() => {
+    discardAllDrafts();
+  }, [discardAllDrafts]);
 
   const isRecording = recorderState === 'recording';
   const isProcessing = recorderState === 'processing' || isAiProcessing;
@@ -257,6 +265,8 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         onClose={handleToastClose}
         onUndo={handleUndo}
         onClarificationSelect={handleClarificationSelect}
+        onDraftConfirm={handleDraftConfirm}
+        onDraftDiscard={handleDraftDiscard}
       />
     </>
   );

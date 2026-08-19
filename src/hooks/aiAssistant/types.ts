@@ -1,3 +1,5 @@
+import { HoseLineDraft } from '../../common/waterSupply';
+
 export interface AiInteraction {
   timestamp: number;
   action: string;
@@ -50,6 +52,11 @@ export interface AiAssistantResult {
   createdItemId?: string;
   isAnswer?: boolean;
   data?: any; // Structured data for the AI to process
+  /**
+   * Leitungsvorschläge, die noch bestätigt werden müssen. Solange gesetzt,
+   * zeigt der Toast „Übernehmen"/„Verwerfen" statt automatisch zu verschwinden.
+   */
+  drafts?: HoseLineDraft[];
   clarification?: {
     question: string;
     options: string[];
@@ -58,3 +65,16 @@ export interface AiAssistantResult {
 
 export const MEMORY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 export const MAX_INTERACTIONS = 10;
+
+/**
+ * Aufgelöste Bezugsposition samt Bezeichnung dessen, was tatsächlich verwendet
+ * wurde — inklusive des Rückfalls, wenn die gewünschte Angabe fehlte.
+ */
+export interface ResolvedOrigin {
+  lat: number;
+  lng: number;
+  /** mapCenter | auto | userPosition | einsatzort | atItem | nearItem | address | coordinates */
+  type: string;
+  /** Deutsche Bezeichnung im Dativ, z.B. „deinem Standort" */
+  label: string;
+}

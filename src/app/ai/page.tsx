@@ -16,6 +16,7 @@ import { useCallback, useState } from 'react';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useFirecallItems } from '../../components/firebase/firestoreHooks';
 import useAiAssistant from '../../hooks/useAiAssistant';
+import { useHoseLineDraft } from '../../hooks/useHoseLineDraft';
 import { AiAssistantResult } from '../../hooks/aiAssistant/types';
 import { useFirecallAIQueryStream } from './aiQuery';
 import { instructionSet } from './assistantInstructions';
@@ -30,6 +31,7 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AiAssistantResult | null>(null);
   const { processText } = useAiAssistant(firecallItems);
+  const { confirmAllDrafts, discardAllDrafts } = useHoseLineDraft();
 
   const askQuestion = useCallback(async () => {
     if (!question.trim()) return;
@@ -56,6 +58,32 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
       setIsLoading(false);
     }
   }, [processText]);
+
+  // Ohne Karte ist der Vorschlag hier nur Text — bestätigen muss man ihn
+  // trotzdem können, sonst bliebe er unbeantwortet im Entwurf hängen.
+  const applyDraft = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const created = await confirmAllDrafts();
+      setResult((prev) =>
+        prev
+          ? { ...prev, drafts: undefined, message: t('draftAdded', { count: created }) }
+          : prev
+      );
+    } catch {
+      // Der Entwurf bleibt bestehen, damit ein zweiter Versuch möglich ist.
+      setResult((prev) =>
+        prev ? { ...prev, success: false, message: t('draftFailed') } : prev
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [confirmAllDrafts, t]);
+
+  const dropDraft = useCallback(() => {
+    discardAllDrafts();
+    setResult((prev) => (prev ? { ...prev, drafts: undefined } : prev));
+  }, [discardAllDrafts]);
 
   return (
     <>
@@ -91,6 +119,30 @@ function AssistantQuery({ firecallItems }: { firecallItems: FirecallItem[] }) {
             variant="outlined"
           >
             {result.message}
+            {result.drafts && result.drafts.length > 0 && (
+              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={applyDraft}
+                  disabled={isLoading}
+                >
+                  {result.drafts.length > 1
+                    ? t('draftConfirmAll', { count: result.drafts.length })
+                    : t('draftConfirm')}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={dropDraft}
+                  disabled={isLoading}
+                >
+                  {result.drafts.length > 1
+                    ? t('draftDiscardAll')
+                    : t('draftDiscard')}
+                </Button>
+              </Stack>
+            )}
             {result.clarification?.options && result.clarification.options.length > 0 && (
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                 {result.clarification.options.map((option) => (

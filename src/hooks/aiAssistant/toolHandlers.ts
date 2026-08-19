@@ -2,8 +2,20 @@ import { FunctionCall } from 'firebase/ai';
 import { evaluate } from 'mathjs';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { searchPlace } from '../../components/actions/maps/places';
-import { GeoPosition } from '../../common/geo';
-import { AiAssistantResult } from './types';
+import { GeoPosition, GeoPositionObject } from '../../common/geo';
+import { GeohashCluster } from '../../common/gis-objects';
+import {
+  buildHoseLineDraft,
+  collectWaterSupplyCandidates,
+  describeHoseLineDraft,
+  describeWaterSupplyCandidate,
+  HoseLineDraft,
+  WaterSupplyCandidate,
+  WaterSupplyKind,
+  WATER_SUPPLY_LABELS,
+} from '../../common/waterSupply';
+import { findFirecallItemByName } from './itemLookup';
+import { AiAssistantResult, ResolvedOrigin } from './types';
 import {
   calculateInverseSquareLaw,
   calculateSchutzwert,
@@ -22,6 +34,16 @@ type UpdateFirecallItemFn = (item: FirecallItem) => Promise<void>;
 
 export interface ToolHandlerDeps {
   resolvePosition: ResolvePositionFn;
+  /**
+   * Wie `resolvePosition`, benennt aber zusätzlich, worauf die Angabe
+   * tatsächlich hinauslief — inklusive Rückfall. Die Wasserversorgungssuche
+   * braucht das, weil eine Messung ohne genannten Bezugspunkt wertlos ist.
+   */
+  resolveOrigin: (
+    positionSpec:
+      | { type: string; itemName?: string; address?: string; lat?: number; lng?: number }
+      | undefined
+  ) => Promise<ResolvedOrigin>;
   addFirecallItem: AddFirecallItemFn;
   updateFirecallItem: UpdateFirecallItemFn;
   existingItems: FirecallItem[];
@@ -29,6 +51,47 @@ export interface ToolHandlerDeps {
   setLastCreatedItem: (item: { id: string; type: string } | null) => void;
   map: { getCenter: () => { lat: number; lng: number }; panTo: (latlng: [number, number]) => void } | null;
   defaultPosition: { lat: number; lng: number };
+  /** Geohash-Umkreissuche über die Cluster-Sammlung (`clusters6`) */
+  findWaterSupply: (
+    center: GeoPositionObject,
+    radiusInM: number
+  ) => Promise<GeohashCluster[]>;
+  /**
+   * Treffer der letzten `searchWaterSupply`. `proposeHoseLine` löst darüber
+   * `sourceName` auf, statt dem Modell Koordinaten abzuverlangen — die
+   * erfindet es sonst.
+   */
+  waterSupplyResults: { current: WaterSupplyCandidate[] };
+  /**
+   * Eine ganze Runde Leitungsvorschläge anzeigen, ohne sie anzulegen. Die
+   * vorherige Runde wird dabei ersetzt.
+   */
+  proposeHoseLineDrafts: (drafts: HoseLineDraft[]) => void;
+}
+
+/**
+ * Radien, die `searchWaterSupply` ohne Angabe der Reihe nach probiert, bis
+ * etwas gefunden wird.
+ *
+ * Die Eskalation gehört hierher und nicht in den Prompt: Jeder Anlauf des
+ * Modells kostet einen Schleifendurchlauf, und davon gibt es fünf. Vier leere
+ * Runden hintereinander reichten, um „Zu viele Verarbeitungsschritte" zu
+ * erzeugen, statt eine Antwort zu geben.
+ */
+const WATER_SUPPLY_RADII = [300, 600, 1200, 2500];
+
+/** Obergrenzen, damit ein einzelner Tool-Call nicht die halbe Datenbank zieht. */
+const MAX_WATER_SUPPLY_RADIUS = 2500;
+const MAX_WATER_SUPPLY_RESULTS = 20;
+const DEFAULT_WATER_SUPPLY_RESULTS = 5;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+/** Nur Art und Bezeichnung an das Modell geben, nicht die Koordinaten. */
+function originInfo(origin: ResolvedOrigin) {
+  return { type: origin.type, label: origin.label };
 }
 
 function formatValue(value: number): string {
@@ -59,6 +122,7 @@ export async function executeToolCall(
   const args = call.args as Record<string, unknown>;
   const {
     resolvePosition,
+    resolveOrigin,
     addFirecallItem,
     updateFirecallItem,
     existingItems,
@@ -66,6 +130,9 @@ export async function executeToolCall(
     setLastCreatedItem,
     map,
     defaultPosition,
+    findWaterSupply,
+    waterSupplyResults,
+    proposeHoseLineDrafts,
   } = deps;
 
   switch (call.name) {
@@ -335,6 +402,172 @@ export async function executeToolCall(
       };
     }
 
+    case 'searchWaterSupply': {
+      const origin = await resolveOrigin(
+        (args.position as any) || { type: 'auto' }
+      );
+      const center = { lat: origin.lat, lng: origin.lng };
+      const limit = clamp(
+        (args.limit as number) || DEFAULT_WATER_SUPPLY_RESULTS,
+        1,
+        MAX_WATER_SUPPLY_RESULTS
+      );
+      // Ein ausdrücklich genannter Radius ist eine Vorgabe, kein Startwert —
+      // wer „im Umkreis von 100 m" fragt, will keine Treffer aus 2 km.
+      const radii = args.radius
+        ? [clamp(args.radius as number, 50, MAX_WATER_SUPPLY_RADIUS)]
+        : WATER_SUPPLY_RADII;
+
+      let candidates: WaterSupplyCandidate[] = [];
+      let radius = radii[radii.length - 1];
+
+      for (const currentRadius of radii) {
+        const clusters = await findWaterSupply(center, currentRadius);
+        candidates = collectWaterSupplyCandidates(clusters, center, {
+          radius: currentRadius,
+          kinds: args.kinds as WaterSupplyKind[] | undefined,
+          hydrantType: args.hydrantType as string | undefined,
+          limit,
+        });
+        if (candidates.length > 0) {
+          radius = currentRadius;
+          break;
+        }
+      }
+
+      waterSupplyResults.current = candidates;
+
+      if (candidates.length === 0) {
+        return {
+          success: false,
+          message: `Keine Wasserentnahmestelle im Umkreis von ${radius} m um ${origin.label} gefunden`,
+          data: { candidates: [], radius, origin: originInfo(origin) },
+        };
+      }
+
+      // Die fertige Antwort steht schon hier, damit das Modell sie nur noch
+      // weitergeben muss und keine zweite Runde für die Auswahl braucht.
+      // Beschrieben wird jede zurückgegebene Entnahmestelle — wie viele das
+      // sind, steuert `limit`. Eine feste Obergrenze hier machte den
+      // Parameter wirkungslos: Das Modell bekäme mehr Kandidaten, könnte sie
+      // aber nicht vorlesen.
+      const [nearest, ...others] = candidates;
+      const answerParts = [
+        `Gemessen von ${origin.label}`,
+        `Nächste Entnahmestelle: ${describeWaterSupplyCandidate(
+          nearest,
+          center
+        )}`,
+        ...others.map((c) => `weiter: ${describeWaterSupplyCandidate(c, center)}`),
+      ];
+
+      // Zu JEDER gefundenen Entnahmestelle wird eine Leitung eingezeichnet,
+      // nicht nur zur nächsten: „Wo ist der nächste Hydrant?" zielt im Einsatz
+      // auf die Wasserversorgung, und welcher Anschluss der brauchbare ist,
+      // entscheidet die Lage vor Ort — nicht die Luftlinie. Wie viele es sind,
+      // steuert `limit`. Es kostet nichts: Ein Entwurf ist erst nach dem
+      // Bestätigen ein Element, und ungewollte verschwinden mit „Verwerfen".
+      const drafts = candidates
+        .filter((candidate) => candidate.distance > 0)
+        .map((candidate) =>
+          buildHoseLineDraft({
+            source: candidate,
+            target: center,
+            reason: `${WATER_SUPPLY_LABELS[candidate.kind]} ${candidate.name}, ${
+              candidate.distance
+            } m entfernt`,
+          })
+        );
+
+      if (drafts.length > 0) {
+        proposeHoseLineDrafts(drafts);
+        answerParts.push(
+          drafts.length === 1
+            ? `Leitungsvorschlag eingezeichnet: ${describeHoseLineDraft(
+                drafts[0]
+              )}`
+            : `${drafts.length} Leitungsvorschläge eingezeichnet, kürzester: ${describeHoseLineDraft(
+                drafts[0]
+              )}`
+        );
+      }
+
+      const answer = answerParts.join('. ');
+
+      return {
+        success: true,
+        message: answer,
+        data: { candidates, radius, answer, origin: originInfo(origin) },
+        drafts: drafts.length > 0 ? drafts : undefined,
+      };
+    }
+
+    case 'proposeHoseLine': {
+      const sourceName = args.sourceName as string | undefined;
+      const sourcePosition = args.sourcePosition as
+        | { lat?: number; lng?: number }
+        | undefined;
+
+      let source:
+        | ({ kind?: WaterSupplyKind; name?: string } & GeoPositionObject)
+        | undefined;
+
+      if (sourceName) {
+        const needle = sourceName.toLocaleLowerCase('de');
+        const found = waterSupplyResults.current.find((candidate) =>
+          candidate.name.toLocaleLowerCase('de').includes(needle)
+        );
+        if (!found) {
+          return {
+            success: false,
+            message: `"${sourceName}" ist in der letzten Umkreissuche nicht enthalten. Zuerst searchWaterSupply aufrufen.`,
+          };
+        }
+        source = {
+          kind: found.kind,
+          name: found.name,
+          lat: found.lat,
+          lng: found.lng,
+        };
+      } else if (
+        typeof sourcePosition?.lat === 'number' &&
+        typeof sourcePosition?.lng === 'number'
+      ) {
+        source = { lat: sourcePosition.lat, lng: sourcePosition.lng };
+      }
+
+      if (!source) {
+        return {
+          success: false,
+          message:
+            'Keine Entnahmestelle angegeben. Zuerst searchWaterSupply aufrufen und sourceName aus dem Ergebnis verwenden.',
+        };
+      }
+
+      const target = await resolveOrigin(
+        (args.target as any) || { type: 'auto' }
+      );
+
+      const draft = buildHoseLineDraft({
+        source,
+        target,
+        dimension: args.dimension as string | undefined,
+        name: args.name as string | undefined,
+        reason: args.reason as string | undefined,
+      });
+
+      // Ein ausdrücklich verlangter Vorschlag ersetzt die Runde aus der Suche:
+      // Wer „Leitung von der Saugstelle" sagt, will nicht daneben noch fünf
+      // Hydrantenleitungen liegen haben.
+      proposeHoseLineDrafts([draft]);
+
+      return {
+        success: true,
+        message: `Vorschlag: ${describeHoseLineDraft(draft)}`,
+        drafts: [draft],
+      };
+    }
+
     case 'searchAddress': {
       const address = args.address as string;
       const shouldCreateMarker = args.createMarker !== false;
@@ -385,9 +618,9 @@ function findItem(
     return existingItems.find((i) => i.id === itemId);
   }
   if (itemName) {
-    return existingItems.find((i) =>
-      i.name?.toLowerCase().includes(itemName.toLowerCase())
-    );
+    // Dieselbe Suche wie beim Bezugspunkt: „lösche das TLFA Neusiedl" muss
+    // dasselbe Element finden wie „Hydranten beim TLFA Neusiedl".
+    return findFirecallItemByName(existingItems, itemName);
   }
   if (lastCreatedItem) {
     return existingItems.find((i) => i.id === lastCreatedItem.id);
