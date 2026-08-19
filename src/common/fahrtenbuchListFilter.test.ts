@@ -387,3 +387,46 @@ describe('hasActiveFahrtenbuchListFilter', () => {
     );
   });
 });
+
+describe('Zusatzfahrer in Filter und Suche', () => {
+  const shared = entry({ coDrivers: [{ id: 'p2', name: 'Anna Bauer' }] });
+
+  it('nimmt Zusatzfahrer in den Suchtext', () => {
+    expect(entrySearchText(shared)).toContain('anna bauer');
+  });
+
+  it('findet die Fahrt über den Namen eines Zusatzfahrers', () => {
+    expect(
+      filterFahrtenbuchEntries([shared], filter({ search: 'Anna' }), TZ),
+    ).toHaveLength(1);
+  });
+
+  it('findet die Fahrt über den Fahrerfilter eines Zusatzfahrers', () => {
+    expect(
+      filterFahrtenbuchEntries([shared], filter({ driverKey: 'p2' }), TZ),
+    ).toHaveLength(1);
+  });
+
+  it('findet die Fahrt weiterhin über den Hauptfahrer', () => {
+    expect(
+      filterFahrtenbuchEntries(
+        [shared],
+        filter({ driverKey: 'max mustermann' }),
+        TZ,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('lässt einen unbeteiligten Fahrer nicht durch', () => {
+    expect(
+      filterFahrtenbuchEntries([shared], filter({ driverKey: 'p9' }), TZ),
+    ).toHaveLength(0);
+  });
+
+  it('stellt Zusatzfahrer zur Auswahl', () => {
+    expect(driverOptionsOf([shared])).toEqual([
+      { key: 'p2', name: 'Anna Bauer' },
+      { key: 'max mustermann', name: 'Max Mustermann' },
+    ]);
+  });
+});

@@ -15,7 +15,7 @@ import {
   type FahrtZweck,
   type FahrtenbuchEntry,
 } from './fahrtenbuch';
-import { driverKeyOf } from './fahrtenbuchStats';
+import { driverSharesOf } from './fahrtenbuchStats';
 import { zonedDayRange, zonedParts } from './zonedDay';
 
 export interface FahrtenbuchListFilter {
@@ -83,8 +83,8 @@ export function normalizeSearch(value: string): string {
 /**
  * Der durchsuchbare Text einer Fahrt.
  *
- * Neben Fahrstrecke, Einsatz und den beiden Textfeldern auch Fahrer und
- * Fahrzeug: Das Suchfeld steht über einer Tabelle, in der beides als Spalte
+ * Neben Fahrstrecke, Einsatz und den beiden Textfeldern auch Fahrer samt
+ * Zusatzfahrern und Fahrzeug: Das Suchfeld steht über einer Tabelle, in der beides als Spalte
  * sichtbar ist — eine Suche, die den dort gelesenen Namen nicht findet, wirkt
  * kaputt. `ziel` und `firecallName` stehen beide drin, weil die Spalte bei
  * einer Einsatzfahrt ohne Ziel den Einsatznamen zeigt.
@@ -97,6 +97,9 @@ export function entrySearchText(entry: FahrtenbuchEntry): string {
       entry.hinweise,
       entry.mangel,
       entry.driverName,
+      // Wer nur mitgefahren ist, steht in der Fahrer-Spalte hinter „+1" und
+      // muss über die Suche zu finden sein.
+      ...(entry.coDrivers ?? []).map((ref) => ref.name),
       entry.vehicleName,
     ]
       .filter(Boolean)
@@ -129,7 +132,10 @@ export function filterFahrtenbuchEntries(
     if (filter.vehicleId && entry.vehicleId !== filter.vehicleId) return false;
     if (filter.zweck && entry.zweck !== filter.zweck) return false;
     if (filter.onlyDefects && !entry.defekt) return false;
-    if (filter.driverKey && driverKeyOf(entry) !== filter.driverKey) {
+    if (
+      filter.driverKey &&
+      !driverSharesOf(entry).some((s) => s.key === filter.driverKey)
+    ) {
       return false;
     }
     if (filter.from || filter.to) {
@@ -188,11 +194,11 @@ export interface DriverOption {
 export function driverOptionsOf(entries: FahrtenbuchEntry[]): DriverOption[] {
   const byKey = new Map<string, string>();
   for (const entry of entries) {
-    const key = driverKeyOf(entry);
-    const name = entry.driverName?.trim();
-    // Ohne Fahrer (Anhänger) gibt es nichts auszuwählen.
-    if (!key || !name) continue;
-    if (!byKey.has(key)) byKey.set(key, name);
+    // Ohne Fahrer (Anhänger) gibt es nichts auszuwählen; ein Zusatzfahrer ist
+    // dagegen auswählbar, sonst fände er seine Fahrten nicht wieder.
+    for (const driver of driverSharesOf(entry)) {
+      if (!byKey.has(driver.key)) byKey.set(driver.key, driver.name);
+    }
   }
   return [...byKey.entries()]
     .map(([key, name]) => ({ key, name }))
