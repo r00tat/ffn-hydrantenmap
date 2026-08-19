@@ -111,3 +111,42 @@ describe('StatsDriverTable', () => {
     expect(onDriverClick).toHaveBeenCalledWith('p2');
   });
 });
+
+describe('StatsDriverTable — geteilte Fahrten', () => {
+  it('zeigt die Spalte und den Wert', () => {
+    renderWithIntl(
+      <StatsDriverTable
+        drivers={[driver({ name: 'Max Muster', trips: 5, sharedTrips: 2 })]}
+        units={['km']}
+      />,
+    );
+    expect(screen.getByText('davon geteilt')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('lässt die Zelle leer, wenn nichts geteilt wurde', () => {
+    renderWithIntl(
+      <StatsDriverTable
+        drivers={[driver({ name: 'Max Muster', trips: 5, sharedTrips: 0 })]}
+        units={[]}
+      />,
+    );
+    const cells = within(screen.getByRole('table')).getAllByRole('cell');
+    expect(cells[2].textContent).toBe('');
+  });
+
+  it('sortiert nach der Zahl der geteilten Fahrten', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <StatsDriverTable
+        drivers={[
+          driver({ key: 'p1', name: 'Anna', trips: 9, sharedTrips: 1 }),
+          driver({ key: 'p2', name: 'Max', trips: 3, sharedTrips: 3 }),
+        ]}
+        units={[]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'davon geteilt' }));
+    expect(rowNames()[0]).toContain('Max');
+  });
+});

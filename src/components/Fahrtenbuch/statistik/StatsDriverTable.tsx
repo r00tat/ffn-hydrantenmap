@@ -24,7 +24,13 @@ export interface StatsDriverTableProps {
   maxRows?: number;
 }
 
-type SortKey = 'name' | 'trips' | 'duration' | 'lastEntry' | `unit:${string}`;
+type SortKey =
+  | 'name'
+  | 'trips'
+  | 'sharedTrips'
+  | 'duration'
+  | 'lastEntry'
+  | `unit:${string}`;
 
 /**
  * Fahrer-Auswertung: wer wie viel gefahren ist — und wer seit wann nicht mehr.
@@ -32,6 +38,12 @@ type SortKey = 'name' | 'trips' | 'duration' | 'lastEntry' | `unit:${string}`;
  * Sortierbar, weil „Top Fahrer" mehrere Fragen sind: die meisten Fahrten, die
  * meisten Kilometer oder die längste Zeit im Fahrzeug. Die Spalte „letzte
  * Fahrt" beantwortet die Gegenfrage nach der Fahrpraxis.
+ *
+ * Strecke und Zeit sind auf einer Fahrt mit mehreren Fahrern geteilt, die
+ * Fahrtenzahl zählt für jeden Beteiligten ganz. Die Spalte „davon geteilt"
+ * macht sichtbar, wie viele Fahrten betroffen sind — sonst wäre nicht
+ * erklärbar, warum die Fahrten-Spalte sich auf mehr als die Gesamtzahl der
+ * Fahrten summiert.
  */
 export default function StatsDriverTable({
   drivers,
@@ -49,6 +61,7 @@ export default function StatsDriverTable({
     const value = (driver: DriverStat): number | string => {
       if (sortKey === 'name') return driver.name.toLowerCase();
       if (sortKey === 'trips') return driver.trips;
+      if (sortKey === 'sharedTrips') return driver.sharedTrips;
       if (sortKey === 'duration') return driver.durationMinutes;
       if (sortKey === 'lastEntry') return driver.lastEntryAt ?? '';
       return driver.counterTotals[sortKey.slice('unit:'.length)] ?? 0;
@@ -114,6 +127,7 @@ export default function StatsDriverTable({
             <TableRow>
               {header('name', t('stats.driverTable.name'), 'left')}
               {header('trips', t('stats.kpi.trips'), 'right')}
+              {header('sharedTrips', t('stats.driverTable.sharedTrips'), 'right')}
               {units.map((unit) => header(`unit:${unit}`, unit, 'right'))}
               {header('duration', t('stats.kpi.duration'), 'right')}
               <TableCell align="right">{t('stats.driverTable.vehicles')}</TableCell>
@@ -133,6 +147,11 @@ export default function StatsDriverTable({
                 >
                   <TableCell>{driver.name}</TableCell>
                   <TableCell align="right">{format.number(driver.trips)}</TableCell>
+                  {/* Leer bei 0: Die Spalte betrifft die Minderheit der Fahrten
+                      und soll die Tabelle nicht mit Nullen füllen. */}
+                  <TableCell align="right">
+                    {driver.sharedTrips > 0 ? format.number(driver.sharedTrips) : ''}
+                  </TableCell>
                   {units.map((unit) => (
                     <TableCell align="right" key={unit}>
                       {format.number(driver.counterTotals[unit] ?? 0, {

@@ -148,8 +148,8 @@ export default function FahrtenbuchStatistikPage({
   );
 
   const summary = useMemo(
-    () => buildStatsSummary(filtered, vehiclesById),
-    [filtered, vehiclesById],
+    () => buildStatsSummary(filtered, vehiclesById, { driverKey: filter.driverKey }),
+    [filtered, vehiclesById, filter.driverKey],
   );
   const timeSeries = useMemo(
     () =>
@@ -161,8 +161,19 @@ export default function FahrtenbuchStatistikPage({
         from: filter.from,
         to: filter.to,
         stackBy,
+        driverKey: filter.driverKey,
       }),
-    [filtered, vehiclesById, metric, granularity, timeZone, filter.from, filter.to, stackBy],
+    [
+      filtered,
+      vehiclesById,
+      metric,
+      granularity,
+      timeZone,
+      filter.from,
+      filter.to,
+      stackBy,
+      filter.driverKey,
+    ],
   );
   const fuelSeries = useMemo(
     () =>
@@ -174,21 +185,47 @@ export default function FahrtenbuchStatistikPage({
         from: filter.from,
         to: filter.to,
         stackBy: 'fuel',
+        driverKey: filter.driverKey,
       }),
-    [filtered, vehiclesById, granularity, timeZone, filter.from, filter.to],
+    [
+      filtered,
+      vehiclesById,
+      granularity,
+      timeZone,
+      filter.from,
+      filter.to,
+      filter.driverKey,
+    ],
   );
   const weekdaySeries = useMemo(
-    () => buildWeekdaySeries(filtered, { vehiclesById, metric, timeZone }),
-    [filtered, vehiclesById, metric, timeZone],
+    () =>
+      buildWeekdaySeries(filtered, {
+        vehiclesById,
+        metric,
+        timeZone,
+        driverKey: filter.driverKey,
+      }),
+    [filtered, vehiclesById, metric, timeZone, filter.driverKey],
   );
   const zweckSlices = useMemo(
-    () => buildBreakdown(filtered, { vehiclesById, metric, dimension: 'zweck' }),
-    [filtered, vehiclesById, metric],
+    () =>
+      buildBreakdown(filtered, {
+        vehiclesById,
+        metric,
+        dimension: 'zweck',
+        driverKey: filter.driverKey,
+      }),
+    [filtered, vehiclesById, metric, filter.driverKey],
   );
   const vehicleSlices = useMemo(
     () =>
-      buildBreakdown(filtered, { vehiclesById, metric, dimension: 'vehicle' }),
-    [filtered, vehiclesById, metric],
+      buildBreakdown(filtered, {
+        vehiclesById,
+        metric,
+        dimension: 'vehicle',
+        driverKey: filter.driverKey,
+      }),
+    [filtered, vehiclesById, metric, filter.driverKey],
   );
   const drivers = useMemo(
     () => buildDriverStats(filtered, vehiclesById),
@@ -372,6 +409,15 @@ export default function FahrtenbuchStatistikPage({
       {entries.length >= MAX_ENTRIES && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           {t('stats.tooManyEntries', { count: MAX_ENTRIES })}
+        </Alert>
+      )}
+
+      {/* Ohne diesen Hinweis stünde bei gesetztem Fahrerfilter eine Zahl über
+          der Fahrer-Tabelle, die kleiner ist als die Summe aller Fahrten —
+          ohne dass zu sehen wäre, warum. */}
+      {driverName && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {t('stats.sharedForDriver', { name: driverName })}
         </Alert>
       )}
 
