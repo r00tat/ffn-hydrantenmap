@@ -3,6 +3,7 @@
 import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Alert from '@mui/material/Alert';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -42,6 +43,7 @@ import CounterFields from './CounterFields';
 import {
   buildEinsatzRows,
   einsatzTimes,
+  entryInputsFromRows,
   kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
@@ -53,6 +55,7 @@ import {
 } from './einsatzRows';
 import { createFahrtenbuchEntries } from './fahrtenbuchActions';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
+import type { EntryFormPerson } from './useEntryFormState';
 
 /** Wandelt einen ISO-Zeitstempel in den Wert für `datetime-local` um. */
 function toLocalInput(iso: string): string {
@@ -70,6 +73,11 @@ function fromLocalInput(value: string): string {
 export interface EinsatzFahrtenbuchViewProps {
   groupId: string;
   vehicles: FahrtenbuchVehicle[];
+  /**
+   * Die aktiven Personen der Gruppe — Auswahlliste für die Zusatzfahrer.
+   * Kommt von außen: Die Ansicht liest nichts selbst aus Firestore.
+   */
+  persons: EntryFormPerson[];
   rows: EinsatzRow[];
   /** Die Zeiten des Kopfblocks — sie gelten für alle Fahrzeuge. */
   times: EinsatzTimes;
@@ -148,6 +156,7 @@ function KmPreviewText({
  */
 export function EinsatzFahrtenbuchView({
   vehicles,
+  persons,
   rows,
   times,
   unitsWithoutVehicle: withoutVehicle,
@@ -310,18 +319,45 @@ export function EinsatzFahrtenbuchView({
                 ) : (
                   <>
                     {needsDriver ? (
-                      <TextField
-                        size="small"
-                        label={t('driver')}
-                        value={row.driverName}
-                        sx={{ flexGrow: 1, minWidth: 160 }}
-                        onChange={(e) =>
-                          onChangeRow(row.key, {
-                            driverName: e.target.value,
-                            driverId: undefined,
-                          })
-                        }
-                      />
+                      <>
+                        <TextField
+                          size="small"
+                          label={t('driver')}
+                          value={row.driverName}
+                          sx={{ flexGrow: 1, minWidth: 160 }}
+                          onChange={(e) =>
+                            onChangeRow(row.key, {
+                              driverName: e.target.value,
+                              driverId: undefined,
+                            })
+                          }
+                        />
+                        {/* Nichts vorbelegt: Die gemeldete Mannschaft eines
+                            Fahrzeugs ist nicht seine Fahrerliste. */}
+                        <Autocomplete
+                          multiple
+                          freeSolo
+                          size="small"
+                          options={persons.map((p) => p.name)}
+                          value={(row.coDrivers ?? []).map((ref) => ref.name)}
+                          sx={{ flexGrow: 1, minWidth: 200 }}
+                          onChange={(_, values) =>
+                            onChangeRow(row.key, {
+                              coDrivers: values.map((name) => {
+                                const person = persons.find(
+                                  (p) => p.name === name,
+                                );
+                                return person?.id
+                                  ? { id: person.id, name: person.name }
+                                  : { name };
+                              }),
+                            })
+                          }
+                          renderInput={(params) => (
+                            <TextField {...params} label={t('coDrivers')} />
+                          )}
+                        />
+                      </>
                     ) : (
                       <Box sx={{ flexGrow: 1 }} />
                     )}
@@ -700,21 +736,9 @@ export default function EinsatzFahrtenbuch({
       return;
     }
 
-    // Kein vehicleName: der Server leitet ihn aus dem geladenen Fahrzeug ab.
     const result = await createFahrtenbuchEntries(
       groupId,
-      ready.map((row) => ({
-        vehicleId: row.vehicleId,
-        driverId: row.driverId,
-        driverName: row.driverName,
-        zweck: 'einsatz' as const,
-        firecallId,
-        firecallName,
-        ziel: firecallName,
-        abfahrt: row.abfahrt,
-        ankunft: row.ankunft,
-        counters: row.counters,
-      })),
+      entryInputsFromRows(ready, { firecallId, firecallName }),
     );
 
     setSaving(false);
@@ -746,6 +770,7 @@ export default function EinsatzFahrtenbuch({
       <EinsatzFahrtenbuchView
         groupId={groupId ?? ''}
         vehicles={activeVehicles}
+        persons={activePersons}
         rows={rows}
         times={times}
         unitsWithoutVehicle={withoutVehicle}

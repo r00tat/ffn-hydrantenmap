@@ -97,6 +97,7 @@ const boot: FahrtenbuchVehicle = {
 const baseProps = {
   groupId: 'ffnd',
   vehicles: [vehicle],
+  persons: [],
   times: {
     abfahrt: '2026-08-03T10:00:00.000Z',
     ankunft: '2026-08-03T12:00:00.000Z',
@@ -535,5 +536,54 @@ describe('EinsatzFahrtenbuch — Sammelerfassung ohne Endstand', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('schon erfasst');
     expect(alert).not.toHaveTextContent('konnte nicht gespeichert werden');
+  });
+});
+
+describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
+  const persons = [{ id: 'p2', name: 'Anna Bauer' }];
+
+  it('zeigt ein Zusatzfahrer-Feld für ein Fahrzeug mit Fahrer', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView {...baseProps} persons={persons} rows={[row()]} />,
+    );
+    expect(screen.getByLabelText('Zusatzfahrer')).toBeInTheDocument();
+  });
+
+  it('meldet eine Auswahl über onChangeRow', async () => {
+    const user = userEvent.setup();
+    const onChangeRow = vi.fn();
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        persons={persons}
+        rows={[row()]}
+        onChangeRow={onChangeRow}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Zusatzfahrer'));
+    await user.click(await screen.findByRole('option', { name: 'Anna Bauer' }));
+
+    expect(onChangeRow).toHaveBeenCalledWith('i1', {
+      coDrivers: [{ id: 'p2', name: 'Anna Bauer' }],
+    });
+  });
+
+  it('zeigt bei einer Einheit ohne Zähler kein Zusatzfahrer-Feld', () => {
+    const trailer: FahrtenbuchVehicle = {
+      ...vehicle,
+      id: 'gv9',
+      name: 'Anhänger',
+      counters: [],
+    };
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        persons={persons}
+        vehicles={[trailer]}
+        rows={[row({ vehicleId: 'gv9', vehicleName: 'Anhänger' })]}
+      />,
+    );
+    expect(screen.queryByLabelText('Zusatzfahrer')).not.toBeInTheDocument();
   });
 });

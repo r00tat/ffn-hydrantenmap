@@ -8,6 +8,7 @@ import {
 import {
   buildEinsatzRows,
   einsatzTimes,
+  entryInputsFromRows,
   kmPreview,
   mergeRowEdits,
   partitionEinsatzRows,
@@ -598,6 +599,16 @@ describe('mergeRowEdits', () => {
     expect(merged[0].driverName).toBe('J. Müller');
   });
 
+  it('behält eingetippte Zusatzfahrer', () => {
+    const merged = mergeRowEdits(
+      [row()],
+      { i1: { coDrivers: [{ name: 'Anna Bauer' }] } },
+      [],
+      'f1',
+    );
+    expect(merged[0].coDrivers).toEqual([{ name: 'Anna Bauer' }]);
+  });
+
   it('bestimmt den bestehenden Eintrag neu und übernimmt ihn nicht aus den Eingaben', () => {
     // Sonst ließe sich die Duplikatserkennung über eine untergeschobene
     // Eingabe umgehen — oder eine Zeile behielte einen Eintrag, den ein
@@ -934,5 +945,50 @@ describe('partitionEinsatzRows — automatische Endstände', () => {
       ESTIMATE_24,
     );
     expect(result.ready).toHaveLength(1);
+  });
+});
+
+describe('entryInputsFromRows', () => {
+  it('übersetzt eine Zeile in einen Eintrags-Input', () => {
+    const [input] = entryInputsFromRows([row()], {
+      firecallId: 'f1',
+      firecallName: 'Brand B2',
+    });
+    expect(input).toEqual({
+      vehicleId: 'gv1',
+      driverId: undefined,
+      driverName: 'Max Mustermann',
+      zweck: 'einsatz',
+      firecallId: 'f1',
+      firecallName: 'Brand B2',
+      ziel: 'Brand B2',
+      abfahrt: '2026-08-03T10:00:00.000Z',
+      ankunft: '2026-08-03T12:00:00.000Z',
+      counters: { km: { start: 1000, end: 1050 } },
+    });
+  });
+
+  it('gibt den Fahrzeugnamen nicht mit — den leitet der Server ab', () => {
+    const [input] = entryInputsFromRows([row()], {
+      firecallId: 'f1',
+      firecallName: 'Brand B2',
+    });
+    expect(input).not.toHaveProperty('vehicleName');
+  });
+
+  it('reicht Zusatzfahrer weiter', () => {
+    const [input] = entryInputsFromRows(
+      [row({ coDrivers: [{ id: 'p2', name: 'Anna Bauer' }] })],
+      { firecallId: 'f1', firecallName: 'Brand B2' },
+    );
+    expect(input.coDrivers).toEqual([{ id: 'p2', name: 'Anna Bauer' }]);
+  });
+
+  it('lässt coDrivers weg, wenn die Zeile keine hat', () => {
+    const [input] = entryInputsFromRows([row()], {
+      firecallId: 'f1',
+      firecallName: 'Brand B2',
+    });
+    expect('coDrivers' in input).toBe(false);
   });
 });

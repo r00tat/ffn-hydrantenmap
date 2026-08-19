@@ -9,10 +9,12 @@ import {
   validateEntryInput,
   type CounterDefinition,
   type CounterReading,
+  type FahrtenbuchDriverRef,
   type FahrtenbuchEntry,
   type FahrtenbuchPerson,
   type FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import type { FahrtenbuchEntryInput } from './entryLogic';
 import {
   autoFillCounterEnds,
   isKmCounter,
@@ -67,6 +69,12 @@ export interface EinsatzRow {
   vehicleName: string;
   driverId?: string;
   driverName: string;
+  /**
+   * Zusatzfahrer dieser Zeile. Nichts wird vorbelegt: Die über BlaulichtSMS
+   * gemeldete Mannschaft eines Fahrzeugs ist nicht seine Fahrerliste — eine
+   * Vorbelegung daraus erzeugte systematisch falsche Anteile in der Statistik.
+   */
+  coDrivers?: FahrtenbuchDriverRef[];
   abfahrt: string;
   ankunft: string;
   counters: Record<string, CounterReading>;
@@ -481,6 +489,39 @@ export function partitionEinsatzRows(
   }
 
   return partition;
+}
+
+/**
+ * Die Eintrags-Inputs zu den erfassungsbereiten Zeilen.
+ *
+ * Kein `vehicleName`: Den leitet der Server aus dem geladenen Fahrzeug ab,
+ * damit Name und Zähler nicht auseinanderlaufen können. Der Einsatzname ist
+ * gleichzeitig das Ziel — der Einsatz benennt, wohin die Fahrt ging.
+ *
+ * Stand vorher inline in der Oberfläche und war damit von keinem Test erreicht.
+ * Hier ist sie prüfbar, und ein neues Feld am Eintrag kann auf dem Weg nicht
+ * mehr unbemerkt verlorengehen.
+ */
+export function entryInputsFromRows(
+  rows: EinsatzRow[],
+  options: { firecallId: string; firecallName: string },
+): FahrtenbuchEntryInput[] {
+  return rows.map((row) => {
+    const input: FahrtenbuchEntryInput = {
+      vehicleId: row.vehicleId,
+      driverId: row.driverId,
+      driverName: row.driverName,
+      zweck: 'einsatz',
+      firecallId: options.firecallId,
+      firecallName: options.firecallName,
+      ziel: options.firecallName,
+      abfahrt: row.abfahrt,
+      ankunft: row.ankunft,
+      counters: row.counters,
+    };
+    if (row.coDrivers?.length) input.coDrivers = row.coDrivers;
+    return input;
+  });
 }
 
 /**
