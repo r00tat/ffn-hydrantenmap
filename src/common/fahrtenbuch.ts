@@ -161,6 +161,32 @@ export interface FahrtenbuchDriverRef {
 }
 
 /**
+ * Die Kennungen, unter denen ein Fahrer wiedererkannt wird: seine Personen-ID
+ * und sein normalisierter Name.
+ *
+ * Beide zusammen, weil ein Mensch auf einer Fahrt in zwei Gestalten auftreten
+ * kann — als verknüpfte Person beim Hauptfahrer und als frei eingetippter Name
+ * beim Zusatzfahrer. Nur über die ID verglichen, stünde er zweimal in der
+ * Fahrt, und jeder von beiden bekäme die Hälfte der Strecke.
+ *
+ * Dass damit zwei verschiedene Personen mit gleichem Namen zusammenfallen, ist
+ * bewusst in Kauf genommen: `driverKeyOf` führt sie in der Statistik ohnehin
+ * unter einem Schlüssel. Eine hier anders getroffene Entscheidung würde nur
+ * dort auseinanderlaufen.
+ *
+ * Steht in diesem Basismodul, weil beide Seiten dieselbe Regel brauchen: der
+ * Schreibpfad (`sanitizeCoDrivers`) und die Statistik (`driverSharesOf`).
+ */
+export function driverIdentities(ref: { id?: string; name: string }): string[] {
+  const tokens: string[] = [];
+  const id = ref.id?.trim();
+  if (id) tokens.push(`id:${id}`);
+  const normalized = normalizeName(ref.name ?? '');
+  if (normalized) tokens.push(`name:${normalized}`);
+  return tokens;
+}
+
+/**
  * Alle Fahrer einer Fahrt als ein Text, Hauptfahrer zuerst.
  *
  * Für Nachweisdokument und Wochenbericht: Beide zeigen die Fahrer in der

@@ -8,6 +8,8 @@ import {
   counterDiffsByUnit,
   counterUnitsOf,
   driverKeyOf,
+  driverSharesOf,
+  entryDriverShare,
   entryDurationMinutes,
   entryFuelLiters,
   filterStatsEntries,
@@ -364,5 +366,115 @@ describe('hasEstimatedCounter', () => {
         entry({ counterSources: { km: 'route', pumpe: 'unchanged' } }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('driverSharesOf', () => {
+  type Drivers = Pick<FahrtenbuchEntry, 'driverId' | 'driverName' | 'coDrivers'>;
+  const drivers = (overrides: Partial<Drivers> = {}): Drivers => ({
+    driverName: 'Max Muster',
+    ...overrides,
+  });
+
+  it('gibt einem einzelnen Fahrer den ganzen Anteil', () => {
+    expect(driverSharesOf(drivers())).toEqual([
+      { key: 'max muster', name: 'Max Muster', share: 1 },
+    ]);
+  });
+
+  it('bevorzugt die Personen-ID als Schlüssel', () => {
+    expect(driverSharesOf(drivers({ driverId: 'p1' }))).toEqual([
+      { key: 'p1', name: 'Max Muster', share: 1 },
+    ]);
+  });
+
+  it('teilt gleichmäßig auf drei Fahrer, Hauptfahrer zuerst', () => {
+    const shares = driverSharesOf(
+      drivers({ coDrivers: [{ name: 'Anna Bauer' }, { id: 'p3', name: 'Eva K.' }] }),
+    );
+    expect(shares.map((s) => s.key)).toEqual(['max muster', 'anna bauer', 'p3']);
+    for (const share of shares) expect(share.share).toBeCloseTo(1 / 3);
+  });
+
+  it('ist leer bei einer Einheit ohne Fahrer', () => {
+    expect(driverSharesOf(drivers({ driverName: '' }))).toEqual([]);
+  });
+
+  it('führt einen doppelt genannten Fahrer nur einmal', () => {
+    expect(
+      driverSharesOf(drivers({ driverId: 'p1', coDrivers: [{ id: 'p1', name: 'Max M.' }] })),
+    ).toEqual([{ key: 'p1', name: 'Max Muster', share: 1 }]);
+  });
+
+  it('erkennt den Hauptfahrer auch an einem frei eingetippten Namen', () => {
+    // Altdaten: verknüpfte Person als Hauptfahrer, derselbe Mensch als Name
+    // daneben. Zwei Anteile wären hier die Hälfte zu wenig für ihn.
+    expect(
+      driverSharesOf(
+        drivers({ driverId: 'p1', coDrivers: [{ name: 'max  MUSTER' }] }),
+      ),
+    ).toEqual([{ key: 'p1', name: 'Max Muster', share: 1 }]);
+  });
+
+  it('überspringt Zusatzfahrer ohne Namen', () => {
+    expect(driverSharesOf(drivers({ coDrivers: [{ name: '  ' }] }))).toEqual([
+      { key: 'max muster', name: 'Max Muster', share: 1 },
+    ]);
+  });
+
+  it('gibt Zusatzfahrer auch ohne Hauptfahrer aus', () => {
+    expect(
+      driverSharesOf(drivers({ driverName: '', coDrivers: [{ name: 'Anna Bauer' }] })),
+    ).toEqual([{ key: 'anna bauer', name: 'Anna Bauer', share: 1 }]);
+  });
+});
+
+describe('entryDriverShare', () => {
+  const shared = {
+    driverName: 'Max Muster',
+    coDrivers: [{ name: 'Anna Bauer' }],
+  };
+
+  it('ist 1 ohne Fahrerbezug', () => {
+    expect(entryDriverShare(shared, undefined)).toBe(1);
+  });
+
+  it('ist der Anteil des genannten Fahrers', () => {
+    expect(entryDriverShare(shared, 'anna bauer')).toBe(0.5);
+  });
+
+  it('ist 0 für einen unbeteiligten Fahrer', () => {
+    expect(entryDriverShare(shared, 'eva k')).toBe(0);
+  });
+});
+
+describe('filterStatsEntries: Fahrerfilter über alle Beteiligten', () => {
+  const base = { from: '2025-01-01', to: '2025-12-31', vehicleIds: [], zwecke: [] };
+  const shared = entry({
+    id: 's',
+    driverName: 'Max Muster',
+    coDrivers: [{ name: 'Anna Bauer' }],
+  });
+
+  it('findet die Fahrt über den Zusatzfahrer', () => {
+    expect(
+      filterStatsEntries([shared], { ...base, driverKey: 'anna bauer' }, vienna).map(
+        (e) => e.id,
+      ),
+    ).toEqual(['s']);
+  });
+
+  it('findet die Fahrt weiterhin über den Hauptfahrer', () => {
+    expect(
+      filterStatsEntries([shared], { ...base, driverKey: 'max muster' }, vienna).map(
+        (e) => e.id,
+      ),
+    ).toEqual(['s']);
+  });
+
+  it('lässt einen unbeteiligten Fahrer nicht durch', () => {
+    expect(
+      filterStatsEntries([shared], { ...base, driverKey: 'eva k' }, vienna),
+    ).toEqual([]);
   });
 });
