@@ -1,10 +1,13 @@
 import {
   applyCounterDiffs,
   FUEL_TYPES,
+  normalizeName,
+  requiresDriver,
   validateEntryInput,
   type CounterDefinition,
   type CounterReading,
   type CounterSource,
+  type FahrtenbuchDriverRef,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
   type FahrtZweck,
@@ -20,6 +23,7 @@ export interface FahrtenbuchEntryInput {
   vehicleId: string;
   driverId?: string;
   driverName: string;
+  coDrivers?: FahrtenbuchDriverRef[];
   zweck: FahrtZweck;
   firecallId?: string;
   firecallName?: string;
@@ -116,6 +120,71 @@ function sanitizeBetriebsmittel(
 }
 
 /**
+ * Die Kennungen, unter denen ein Fahrer wiedererkannt wird: seine Personen-ID
+ * und sein normalisierter Name.
+ *
+ * Beide zusammen, weil ein Mensch auf einer Fahrt in zwei Gestalten auftreten
+ * kann — als verknüpfte Person beim Hauptfahrer und als frei eingetippter Name
+ * beim Zusatzfahrer. Nur über die ID verglichen, stünde er zweimal in der
+ * Fahrt, und jeder bekäme die Hälfte der Strecke.
+ *
+ * Dass damit zwei verschiedene Personen mit gleichem Namen zusammenfallen, ist
+ * bewusst in Kauf genommen: `driverKeyOf` führt sie in der Statistik ohnehin
+ * unter einem Schlüssel. Eine hier getroffene andere Entscheidung würde nur
+ * dort auseinanderlaufen.
+ */
+function driverIdentities(ref: { id?: string; name: string }): string[] {
+  const tokens: string[] = [];
+  const id = ref.id?.trim();
+  if (id) tokens.push(`id:${id}`);
+  const normalized = normalizeName(ref.name ?? '');
+  if (normalized) tokens.push(`name:${normalized}`);
+  return tokens;
+}
+
+/**
+ * Die Zusatzfahrer, wie sie ins Dokument dürfen.
+ *
+ * Entdoppelt wird über denselben Schlüssel, unter dem die Statistik die Fahrten
+ * einer Person zusammenführt: Personen-ID, sonst normalisierter Name. Ohne das
+ * zählte derselbe Mensch als zwei Fahrer, und alle Anteile dieser Fahrt wären
+ * falsch. Wer dem Hauptfahrer entspricht, fällt weg.
+ *
+ * Bei einer Einheit ohne Fahrer (Anhänger, Wechselladeaufbau) fällt die ganze
+ * Liste weg: Was gezogen wird, hat keine Fahrer.
+ *
+ * Der Schlüssel wird hier von Hand gebildet und nicht über `driverKeyOf`
+ * gelesen — das steht in `fahrtenbuchStats.ts`, und der Schreibpfad soll nicht
+ * von der Statistik abhängen.
+ */
+function sanitizeCoDrivers(
+  definitions: CounterDefinition[],
+  input: Pick<FahrtenbuchEntryInput, 'driverId' | 'driverName' | 'coDrivers'>,
+): FahrtenbuchDriverRef[] {
+  if (!requiresDriver(definitions)) return [];
+
+  const seen = new Set<string>();
+  const isKnown = (ref: { id?: string; name: string }): boolean =>
+    driverIdentities(ref).some((token) => seen.has(token));
+  const remember = (ref: { id?: string; name: string }): void => {
+    for (const token of driverIdentities(ref)) seen.add(token);
+  };
+
+  remember({ id: input.driverId, name: input.driverName ?? '' });
+  const result: FahrtenbuchDriverRef[] = [];
+  for (const ref of input.coDrivers ?? []) {
+    const name = ref?.name?.trim();
+    if (!name) continue;
+    const candidate = { id: ref.id?.trim(), name };
+    if (driverIdentities(candidate).length === 0) continue;
+    if (isKnown(candidate)) continue;
+    remember(candidate);
+    result.push(candidate.id ? { id: candidate.id, name } : { name });
+  }
+  return result;
+}
+
+/**
  * Baut das zu speichernde Dokument. Systemfelder werden immer serverseitig
  * gesetzt, Clientwerte dafür verworfen. Wirft bei ungültiger Eingabe.
  */
@@ -151,6 +220,7 @@ export function buildEntryDocument(
     {
       vehicleId: input.vehicleId,
       driverName: input.driverName,
+      coDrivers: input.coDrivers,
       zweck: input.zweck,
       ziel: input.ziel,
       // Nur der Einsatzbezug, der auch ins Dokument kommt, darf das Ziel
@@ -188,6 +258,8 @@ export function buildEntryDocument(
   };
 
   if (input.driverId) doc.driverId = input.driverId;
+  const coDrivers = sanitizeCoDrivers(definitions, input);
+  if (coDrivers.length > 0) doc.coDrivers = coDrivers;
   if (isEinsatz && input.firecallId) doc.firecallId = input.firecallId;
   if (isEinsatz && input.firecallName) doc.firecallName = input.firecallName;
   const betriebsmittel = sanitizeBetriebsmittel(input.betriebsmittel);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FAHRTENBUCH_MAX_CO_DRIVERS,
   VEHICLE_PRESETS,
   type CounterReading,
   type CounterSource,
@@ -540,5 +541,99 @@ describe('computeVehicleCache', () => {
     expect(computeVehicleCache({ ...entry, driverName: '' })).toMatchObject({
       lastDriverName: null,
     });
+  });
+});
+
+describe('buildEntryDocument: Zusatzfahrer', () => {
+  const TRAILER = { name: 'Anhänger', counters: [] };
+
+  it('übernimmt Zusatzfahrer mit getrimmten Namen', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      { ...input, coDrivers: [{ id: 'p2', name: ' Anna Bauer ' }] },
+      'ffnd',
+      actor,
+    );
+    expect(doc.coDrivers).toEqual([{ id: 'p2', name: 'Anna Bauer' }]);
+  });
+
+  it('schreibt kein leeres coDrivers-Feld', () => {
+    const doc = buildEntryDocument(VEHICLE, { ...input, coDrivers: [] }, 'ffnd', actor);
+    expect('coDrivers' in doc).toBe(false);
+  });
+
+  it('verwirft Zusatzfahrer ohne Namen', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      { ...input, coDrivers: [{ name: '  ' }, { name: 'Anna Bauer' }] },
+      'ffnd',
+      actor,
+    );
+    expect(doc.coDrivers).toEqual([{ name: 'Anna Bauer' }]);
+  });
+
+  it('entdoppelt nach Personen-ID', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      {
+        ...input,
+        coDrivers: [
+          { id: 'p2', name: 'Anna Bauer' },
+          { id: 'p2', name: 'A. Bauer' },
+        ],
+      },
+      'ffnd',
+      actor,
+    );
+    expect(doc.coDrivers).toEqual([{ id: 'p2', name: 'Anna Bauer' }]);
+  });
+
+  it('entdoppelt frei eingetippte Namen unabhängig von Schreibweise', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      { ...input, coDrivers: [{ name: 'Anna  BAUER' }, { name: 'anna bauer' }] },
+      'ffnd',
+      actor,
+    );
+    expect(doc.coDrivers).toEqual([{ name: 'Anna  BAUER' }]);
+  });
+
+  it('verwirft einen Zusatzfahrer, der der Hauptfahrer ist', () => {
+    const doc = buildEntryDocument(
+      VEHICLE,
+      {
+        ...input,
+        coDrivers: [{ id: 'p1', name: 'Max M.' }, { name: 'max mustermann' }],
+      },
+      'ffnd',
+      actor,
+    );
+    expect('coDrivers' in doc).toBe(false);
+  });
+
+  it('verwirft Zusatzfahrer bei einer Einheit ohne Fahrer', () => {
+    const doc = buildEntryDocument(
+      TRAILER,
+      {
+        ...input,
+        driverId: undefined,
+        driverName: '',
+        counters: {},
+        coDrivers: [{ name: 'Anna Bauer' }],
+      },
+      'ffnd',
+      actor,
+    );
+    expect('coDrivers' in doc).toBe(false);
+  });
+
+  it('wirft über der Höchstzahl', () => {
+    const coDrivers = Array.from(
+      { length: FAHRTENBUCH_MAX_CO_DRIVERS + 1 },
+      (_, index) => ({ name: `Fahrer ${index}` }),
+    );
+    expect(() =>
+      buildEntryDocument(VEHICLE, { ...input, coDrivers }, 'ffnd', actor),
+    ).toThrow(/coDriversTooMany/);
   });
 });
