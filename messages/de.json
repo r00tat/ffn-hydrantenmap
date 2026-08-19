@@ -412,6 +412,9 @@
     "vehicle": "Fahrzeug",
     "kennzeichen": "Kennzeichen",
     "driver": "Fahrer",
+    "coDrivers": "Zusatzfahrer",
+    "coDriversHint": "Weitere Personen, die sich auf dieser Fahrt abgewechselt haben. Strecke und Fahrzeit werden in der Statistik gleichmäßig geteilt.",
+    "moreDrivers": "+{count}",
     "zweck": "Fahrtzweck",
     "firecall": "Einsatz",
     "firecallManual": "Einsatz wählen oder frei eingeben",
@@ -461,6 +464,7 @@
     "errors": {
       "vehicleMissing": "Bitte ein Fahrzeug wählen.",
       "driverMissing": "Bitte einen Fahrer angeben.",
+      "coDriversTooMany": "Höchstens {count} Zusatzfahrer je Fahrt.",
       "abfahrtInvalid": "Abfahrtszeitpunkt ist ungültig.",
       "ankunftInvalid": "Ankunftszeitpunkt ist ungültig.",
       "ankunftBeforeAbfahrt": "Die Ankunft liegt vor der Abfahrt.",
@@ -578,6 +582,7 @@
       "byVehicle": "Nach Fahrzeug",
       "byWeekday": "Nach Wochentag",
       "drivers": "Fahrer",
+      "sharedForDriver": "Werte anteilig für {name}: Bei einer Fahrt mit mehreren Fahrern zählt der eigene Anteil an Strecke, Zeit und Menge. Die Fahrtenzahl zählt ganz.",
       "drillHint": "Ein Klick auf einen Balken zeigt diesen Zeitabschnitt im Detail.",
       "noData": "Keine Daten im gewählten Ausschnitt.",
       "tooManyEntries": "Es werden nur die ersten {count} Fahrten des Zeitraums ausgewertet. Bitte den Zeitraum eingrenzen.",
@@ -604,6 +609,7 @@
       },
       "driverTable": {
         "name": "Fahrer",
+        "sharedTrips": "davon geteilt",
         "vehicles": "Fahrzeuge",
         "lastTrip": "Letzte Fahrt",
         "truncated": "Zeigt {shown} von {total} Fahrern."
