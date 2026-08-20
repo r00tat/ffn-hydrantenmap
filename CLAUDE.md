@@ -16,6 +16,7 @@ npm run lint         # ESLint validation
 npm run typecheck    # TypeScript type check (TypeScript 7)
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
+npm run test:coverage # Run Vitest with coverage report (coverage/)
 npm run check        # Run all checks: typecheck, lint, tests, build
 npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
 npm run tfvars:dev   # Deploy-Variablen für terraform aus dem laufenden Dienst holen
