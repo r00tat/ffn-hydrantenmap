@@ -8,6 +8,13 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Über der Vorgabe von 5s. Die Dialog-Tests fahren mit `userEvent` ganze
+    // MUI-Formulare durch und liegen unter Volllast schon ohne Coverage bei gut
+    // 2s; die Instrumentierung von coverage-v8 legt rund 40% drauf und der
+    // CI-Runner ist langsamer als jede Entwicklermaschine. Bei 5s kippte davon
+    // der langsamste Test (FahrtenbuchDialog, "frei eingegebener Einsatz ohne
+    // ID") in CI über die Grenze — nicht hängend, nur zu knapp bemessen.
+    testTimeout: 15_000,
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     server: {
