@@ -18,6 +18,8 @@ import {
   FirecallItem,
 } from '../components/firebase/firestore';
 import { computeAllFields } from '../common/computeFieldValue';
+import { ensureConnectionRouting } from '../components/FirecallItems/elements/connection/ensureConnectionRouting';
+import { isStreetRoutingItem } from '../components/FirecallItems/elements/connection/streetRouting';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
@@ -61,6 +63,13 @@ export default function useFirecallItemUpdate() {
           newData,
           { merge: false }
         );
+
+        // Das Straßen-Routing hängt an Feldern, die hier gespeichert werden:
+        // an der Option selbst, am Profil und an den Punkten. Alle drei können
+        // sich mit diesem Schreibvorgang geändert haben.
+        if (isStreetRoutingItem(item.type) && !item.deleted) {
+          await ensureConnectionRouting(firecallId, newData);
+        }
 
         // When a layer is deleted, cascade to all items in that layer
         if (item.type === 'layer' && item.deleted === true && item.id) {

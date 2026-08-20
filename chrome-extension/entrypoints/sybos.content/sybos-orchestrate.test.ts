@@ -270,13 +270,14 @@ describe('buildMaterialSelectionParams', () => {
       { id: 'v2', name: 'Unbekannt' },
     ];
 
-    const { params, matched, notFound } = buildMaterialSelectionParams(
-      doc,
-      vehicles
-    );
+    const { params, matched, notFound, vehicleNamesBySybosId } =
+      buildMaterialSelectionParams(doc, vehicles);
 
     expect(matched).toEqual(['SRF']);
     expect(notFound).toEqual(['Unbekannt']);
+    // Step 2 needs to know which SYBOS device belongs to which EK vehicle —
+    // the Material edit form keys its fields by the same device id.
+    expect(vehicleNamesBySybosId).toEqual({ '2006': ['SRF'] });
     expect(params.get('deleted[2006]')).toBe('2006');
     expect(params.has('deleted[46143]')).toBe(false);
     // Step 1 (device selection) is submitted with action_save — this is what
@@ -294,37 +295,159 @@ describe('buildMaterialSelectionParams', () => {
 
 // --- buildMaterialAssignmentParams ----------------------------------------
 
+/** A Material edit form line: name cell plus the Anzahl/km input. */
+function materialEditDoc(
+  lines: { key: string; name?: string }[],
+  extraFields = ''
+): Document {
+  const rows = lines
+    .map(
+      (line) =>
+        '<tr>' +
+        `<td>${line.name ?? ''}</td>` +
+        `<td><input type="text" name="WAESanzahl[${line.key}]" value="1"></td>` +
+        '</tr>'
+    )
+    .join('');
+  return makeDoc(
+    `<form name="frmMain">${extraFields}<table><tbody>${rows}</tbody></table></form>`
+  );
+}
+
 describe('buildMaterialAssignmentParams', () => {
   it('serializes the form as-is with the submit markers', () => {
     const doc = makeDoc(
       '<form name="frmMain"><input type="hidden" name="amount_123" value="1"></form>'
     );
 
-    const { params } = buildMaterialAssignmentParams(doc);
+    const { params } = buildMaterialAssignmentParams(doc, { vehicles: [] });
 
     expect(params.get('amount_123')).toBe('1');
     expect(params.get('action_next')).toBe('action_next');
     expect(params.get('patMultipleChoice')).toBe('true');
   });
 
-  it('forces every WAESanzahl[<id>] field to 5, leaving other fields untouched', () => {
-    const doc = makeDoc(
-      '<form name="frmMain">' +
-        '<input type="hidden" name="WAESanzahl[2004]" value="1">' +
-        '<input type="hidden" name="WAESanzahl[46143]" value="99">' +
-        '<input type="hidden" name="amount_123" value="1">' +
-        '</form>'
+  it('setzt je Zeile die Kilometer des zugehörigen Fahrzeugs', () => {
+    const doc = materialEditDoc([
+      { key: '2004', name: 'SRF' },
+      { key: '46143', name: 'RLFA 3000/100' },
+    ]);
+
+    const { params, kilometers } = buildMaterialAssignmentParams(doc, {
+      vehicles: [
+        { id: 'v1', name: 'SRF', kilometers: 12 },
+        { id: 'v2', name: 'RLFA 3000/100', kilometers: 7 },
+      ],
+      vehicleNamesBySybosId: { '2004': ['SRF'], '46143': ['RLFA 3000/100'] },
+    });
+
+    expect(params.get('WAESanzahl[2004]')).toBe('12');
+    expect(params.get('WAESanzahl[46143]')).toBe('7');
+    expect(kilometers).toEqual([
+      { label: 'SRF', km: 12 },
+      { label: 'RLFA 3000/100', km: 7 },
+    ]);
+  });
+
+  it('rundet auf ganze Kilometer — SYBOS nimmt hier keine Kommazahl', () => {
+    const doc = materialEditDoc([{ key: '2004', name: 'SRF' }]);
+
+    const { params } = buildMaterialAssignmentParams(doc, {
+      vehicles: [{ id: 'v1', name: 'SRF', kilometers: 12.6 }],
+      vehicleNamesBySybosId: { '2004': ['SRF'] },
+    });
+
+    expect(params.get('WAESanzahl[2004]')).toBe('13');
+  });
+
+  it('erkennt die Zeile auch ohne Zuordnung aus Schritt 1 am Namen', () => {
+    const doc = materialEditDoc([{ key: '2004', name: 'WLF-K Neusiedl am See' }]);
+
+    const { params } = buildMaterialAssignmentParams(doc, {
+      vehicles: [{ id: 'v1', name: 'WLF-K', kilometers: 9 }],
+    });
+
+    expect(params.get('WAESanzahl[2004]')).toBe('9');
+  });
+
+  it('lässt die Zeile unverändert, wenn es keine Kilometer gibt', () => {
+    const doc = materialEditDoc([{ key: '2004', name: 'MZB' }]);
+
+    const { params, kilometers } = buildMaterialAssignmentParams(doc, {
+      vehicles: [
+        { id: 'v1', name: 'MZB', kilometersMissing: 'noCounter' },
+      ],
+      vehicleNamesBySybosId: { '2004': ['MZB'] },
+    });
+
+    // SYBOS-Vorbelegung bleibt stehen — kein geratener Wert.
+    expect(params.get('WAESanzahl[2004]')).toBe('1');
+    expect(kilometers).toEqual([{ label: 'MZB', missing: 'noCounter' }]);
+  });
+
+  it('meldet eine Zeile, deren Fahrzeug nicht zu erkennen ist', () => {
+    const doc = materialEditDoc([{ key: '2004', name: 'Tragkraftspritze' }]);
+
+    const { params, kilometers } = buildMaterialAssignmentParams(doc, {
+      vehicles: [{ id: 'v1', name: 'SRF', kilometers: 12 }],
+    });
+
+    expect(params.get('WAESanzahl[2004]')).toBe('1');
+    expect(kilometers).toEqual([
+      { label: 'Tragkraftspritze', missing: 'unknownLine' },
+    ]);
+  });
+
+  it('trägt nichts ein, wenn eine Zeile auf mehrere Fahrzeuge passt', () => {
+    const doc = materialEditDoc([{ key: '2004', name: 'SRF' }]);
+
+    const { params, kilometers } = buildMaterialAssignmentParams(doc, {
+      vehicles: [
+        { id: 'v1', name: 'SRF', kilometers: 12 },
+        { id: 'v2', name: 'SRF', kilometers: 20 },
+      ],
+      vehicleNamesBySybosId: { '2004': ['SRF', 'SRF'] },
+    });
+
+    expect(params.get('WAESanzahl[2004]')).toBe('1');
+    expect(kilometers[0]?.missing).toBe('ambiguousLine');
+  });
+
+  it('lässt Felder außerhalb der Anzahl-Spalte unberührt', () => {
+    const doc = materialEditDoc(
+      [{ key: '2004', name: 'SRF' }],
+      '<input type="hidden" name="amount_123" value="1">'
     );
 
-    const { params } = buildMaterialAssignmentParams(doc);
+    const { params } = buildMaterialAssignmentParams(doc, {
+      vehicles: [{ id: 'v1', name: 'SRF', kilometers: 12 }],
+      vehicleNamesBySybosId: { '2004': ['SRF'] },
+    });
 
-    expect(params.get('WAESanzahl[2004]')).toBe('5');
-    expect(params.get('WAESanzahl[46143]')).toBe('5');
     expect(params.get('amount_123')).toBe('1');
+  });
+
+  it('fügt kein Feld hinzu, das ein Browser-Submit nicht schicken würde', () => {
+    const doc = makeDoc(
+      '<form name="frmMain"><table><tbody><tr>' +
+        '<td>SRF</td>' +
+        '<td><input type="text" name="WAESanzahl[2004]" value="1" disabled></td>' +
+        '</tr></tbody></table></form>'
+    );
+
+    const { params, kilometers } = buildMaterialAssignmentParams(doc, {
+      vehicles: [{ id: 'v1', name: 'SRF', kilometers: 12 }],
+      vehicleNamesBySybosId: { '2004': ['SRF'] },
+    });
+
+    expect(params.has('WAESanzahl[2004]')).toBe(false);
+    expect(kilometers).toEqual([]);
   });
 
   it('throws when the document has no form', () => {
     const doc = makeDoc('<div>no form here</div>');
-    expect(() => buildMaterialAssignmentParams(doc)).toThrow(/form/i);
+    expect(() =>
+      buildMaterialAssignmentParams(doc, { vehicles: [] })
+    ).toThrow(/form/i);
   });
 });

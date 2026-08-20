@@ -305,6 +305,17 @@ plant nur noch (PRs) und hat einen `workflow_dispatch`-Apply als Handgriff. Beid
 Workflows teilen die Concurrency-Gruppe `tf-apply-<env>`, zwei gleichzeitige
 apply auf denselben State sind damit ausgeschlossen.
 
+**Der Plan läuft ohne State-Lock** (`-lock=false`). Ein Plan liest den State und
+schreibt ihn nicht; mit Lock scheitert er sofort mit `412 conditionNotMet`,
+sobald irgendwo ein apply läuft. Die Concurrency-Gruppen der Plan-Jobs sind
+per-PR und wissen von `tf-apply-<env>` nichts — der Apply der Projekt-Basis
+läuft bei jedem Push auf main und traf so wiederholt die Plans offener PRs
+(#702). Der Preis ist ein Plan gegen einen State, der sich gerade ändert: Er
+kann veraltet sein, und was er zeigt, ist ohnehin nie eine Zusage für den
+späteren apply. Ein Plan gegen einen fremden apply anzuhalten würde den
+PR-Check nur so lange blockieren, wie der apply dauert, und danach dasselbe
+Ergebnis liefern.
+
 **Aus PRs wird nicht mehr deployt.** Ein Deploy ist jetzt ein Apply, und ein
 Apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die gemeinsame
 Dev-Umgebung wäre nicht zu verantworten.
@@ -668,6 +679,36 @@ Alternativ im Admin-Panel unter `/admin/bug-reports`
 ([src/app/admin/bug-reports/](src/app/admin/bug-reports/)), wo sich auch Status und
 Empfänger-E-Mails (`appConfig/bugReport`) pflegen lassen.
 
+### Bearbeitung: Felder, Verlauf, Kommentare
+
+Neben dem Status sind `githubIssue`, `assignee` und `internalNote` am Report pflegbar.
+Dazu kommt der Verlauf in der Subcollection **`bugReport/{id}/comments`**.
+
+- **Ein Eintrag ist entweder ein Kommentar oder eine Feldänderung**
+  (`entryType`, [bugReport.ts](src/common/bugReport.ts)). Beides landet in derselben
+  Subcollection, weil beides dieselbe Frage beantwortet: was ist mit dem Report passiert.
+  Ein Array im Dokument wäre die Alternative gewesen — dann schreibt jeder Kommentar das
+  ganze Dokument neu, samt Logs und Screenshot-Pfaden.
+- **Jede Feldänderung erzeugt ihren Verlaufseintrag in derselben Action**
+  (`updateBugReportAction`). Wer ein weiteres Feld pflegbar macht, trägt es in
+  `BUG_REPORT_TRACKED_FIELDS` ein — sonst ändert es sich lautlos.
+- **Eine Änderung ohne Unterschied schreibt nichts.** `computeBugReportChanges` vergleicht
+  gegen den gespeicherten Stand; ohne das erzeugte jedes Speichern im Dialog einen leeren
+  Eintrag. Ein geleertes Feld fliegt per `FieldValue.delete()` aus dem Dokument.
+- **`visibility` ist für den Melder vorgesehen, wird aber nur als `internal` geschrieben.**
+  Eine Ansicht für den Melder gibt es (noch) nicht. Das Feld steht trotzdem von Anfang an
+  am Eintrag: Ob ein bereits geschriebener Kommentar für fremde Augen gedacht war, lässt
+  sich nachträglich nicht mehr feststellen.
+- **`githubIssue` wird beim Speichern zur URL normalisiert**
+  ([bugReportTracking.ts](src/common/bugReportTracking.ts)), eingegeben werden darf auch
+  `#704`. Angezeigt wird wieder die Kurzform. Das Anlegen des Issues läuft über einen
+  vorbefüllten `issues/new`-Link, nicht über die GitHub-API — dafür bräuchte der Dienst
+  ein Token, und angelegt wird das Issue ohnehin von Hand.
+- **Die Subcollection ist für Clients gesperrt** (`allow read, write: if false` in beiden
+  `firestore.rules`). Ohne die explizite Regel wäre sie es auch — Regeln kaskadieren
+  nicht —, aber interne Notizen sollen nicht daran hängen, dass niemand `{doc=**}`
+  daraus macht.
+
 ### Screenshot-Aufnahme
 
 Der Dialog wird für die Aufnahme nur **ausgeblendet** (`display: none`), nicht
@@ -892,6 +933,66 @@ Feuerwehr, Struktur `<Basisordner>/YYYY/YYYY-MM-DD_Einsatzname`.
 - **`driveFolderId` am Einsatz ist die Wahrheit**, nicht der Ordnername. Wird
   der Einsatz umbenannt oder umdatiert, benennt der nächste Upload den Ordner um
   bzw. verschiebt ihn in den richtigen Jahresordner.
+
+## Straßen-Routing für Leitungen und Linien
+
+Eine Lösch- oder Zubringerleitung (`connection`) und eine Linie (`line`) folgen
+auf Wunsch dem Straßenverlauf statt der Luftlinie: Feld
+**„Routing über Straße"**, Standard bleibt die direkte Verbindung.
+
+- **Das Profil wählt nur die Linie** (Feld `routingProfile`, `walk`/`drive`).
+  Eine Schlauchleitung hat kein solches Feld und bleibt beim Fußgänger-Profil —
+  ein Schlauch folgt der Straße, fährt aber nicht. Bei der Linie kann beides
+  gemeint sein: eine Strecke zu Fuß oder eine Anfahrt, für die Einbahnen und
+  Abbiegeverbote gelten.
+- **`routingPreference` gehört nur zum Auto-Profil.** Die Routes API nimmt es
+  allein für `DRIVE` und `TWO_WHEELER` und lehnt den Aufruf sonst ab — bei `WALK`
+  muss es weg. Die Geometrie kommt als `GEO_JSON_LINESTRING`, damit kein
+  Polyline-Decoder nötig ist; GeoJSON zählt `[lng, lat]`.
+- **Ein Aufruf für die ganze Leitung**, nicht einer je Abschnitt: Die Punkte
+  dazwischen gehen als `intermediates` mit, die Antwort liefert je Abschnitt
+  eine eigene Polyline. Über 25 Punkte wird in Blöcke geteilt, die sich um einen
+  Punkt überlappen.
+- **Die gesetzten Punkte bleiben Teil der Linie** (`stitchRoutedPositions` in
+  [routedPath.ts](src/components/FirecallItems/elements/connection/routedPath.ts)).
+  Google setzt Start und Ziel eines Abschnitts auf die Straße; die Strecke von
+  dort zum tatsächlichen Punkt ist die Zuführung (Hydrant → Straße) und zählt
+  für die Schlauchlängen mit. Eine Leitung führt **durch** den Verteiler, nicht
+  an ihm vorbei.
+- **Die Geometrie steht am Element** (`routedPositions`), zusammen mit der
+  Signatur aus Punkten **und Profil**, für die sie gilt (`routedFor`). Das Profil
+  gehört mit hinein: Ein Wechsel von Fuß auf Auto ändert die Route, ohne einen
+  Punkt zu verschieben. Nur so zeichnet die Karte ohne Routing-Aufruf — ein
+  Aufruf je Änderung, keiner je Render. Geroutet wird deshalb an den
+  Mutationsstellen
+  (`ensureConnectionRouting`): beim Zeichnen
+  ([Leitungen/context.tsx](src/components/Map/Leitungen/context.tsx)), beim
+  Verschieben, Einfügen und Löschen eines Punktes
+  ([positions.ts](src/components/FirecallItems/elements/connection/positions.ts))
+  und beim Speichern aus dem Dialog
+  ([useFirecallItemUpdate.ts](src/hooks/useFirecallItemUpdate.ts)).
+- **`distance` ist die Länge der gezeichneten Linie**, gemessen mit derselben
+  `calculateDistance` wie die Luftlinie. Die Meter der Routes API bleiben
+  ungenutzt: Sie kennen die Zuführungen nicht, und eine angezeigte Länge, die
+  nicht zur Linie gehört, wäre im Einsatz irreführend.
+- **Fällt das Routing aus, bleibt das Element** und trägt die Luftlinie samt
+  Hinweis im Popup (`routingFailed`). Die Signatur wird auch beim Fehlschlag
+  gesetzt — sonst liefe bei jeder weiteren Änderung ein neuer Versuch.
+- **Über `MAX_ROUTING_POINTS` (50) wird nicht geroutet.** Die Schranke ist die in
+  der Action, gegen alles, was aus dem Browser kommt; die Prüfung im Browser ist
+  nur die Abkürzung dorthin. Wer die Option an einer Linie mit hunderten Punkten
+  einschaltet — etwa an einer GPS-Aufzeichnung — sieht sofort die Luftlinie mit
+  Hinweis, statt auf eine Ablehnung zu warten, die schon feststeht. Von selbst
+  routet eine Aufzeichnung nie: `streetRouting` setzt der Recorder nicht, und
+  ohne die Option ist `routingTodo` bei jedem Messpunkt `'none'`.
+- **Die Felder liegen an `MultiPointItem`/`FirecallMultiPoint`**, angeboten
+  werden sie nur in `fields()` von Leitung und Linie. `data()` ist die Grundlage
+  jedes Schreibvorgangs — ein Feld, das dort fehlt, löscht ein Speichern aus dem
+  Dialog (`setDoc` ohne `merge`).
+- Die Server-Action darf **kein Leaflet** importieren (`window is not defined`).
+  Deshalb die Trennung: `routedPath.ts` ist reine Geometrie für beide Seiten,
+  `streetRouting.ts` liest die Felder am Element, `ensureConnectionRouting.ts`
+  schreibt nach Firestore.
 
 ## German Terminology
 

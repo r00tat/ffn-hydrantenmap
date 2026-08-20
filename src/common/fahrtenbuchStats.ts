@@ -403,7 +403,9 @@ export function bucketDayRange(
   }
   if (granularity === 'month') {
     if (!/^\d{4}-\d{2}$/.test(key)) return undefined;
-    const [year, month] = key.split('-').map(Number);
+    const [yearPart, monthPart] = key.split('-');
+    const year = Number(yearPart);
+    const month = Number(monthPart);
     if (month < 1 || month > 12) return undefined;
     return {
       from: `${key}-01`,

@@ -2,8 +2,9 @@ import { Icon, IconOptions } from 'leaflet';
 import React, { ReactNode } from 'react';
 import { LatLngPosition } from '../../../common/geo';
 import { Connection, Line } from '../../firebase/firestore';
+import { SimpleMap } from '../../../common/types';
 import { leafletIcons } from '../icons';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
 export class FirecallLine extends FirecallMultiPoint {
@@ -31,7 +32,7 @@ export class FirecallLine extends FirecallMultiPoint {
   }
 
   public info(): string {
-    return `Länge: ${Math.round(this.distance || 0)}m`;
+    return `Länge: ${Math.round(this.distance || 0)}m${this.routingHint()}`;
   }
 
   public static factory(): FirecallItemBase {
@@ -42,6 +43,31 @@ export class FirecallLine extends FirecallMultiPoint {
     return {
       ...super.fields(),
       opacity: 'Deckkraft (in Prozent)',
+      streetRouting: 'Routing über Straße',
+      routingProfile: 'Routing-Profil',
+    };
+  }
+
+  public fieldTypes(): { [fieldName: string]: string } {
+    return {
+      ...super.fieldTypes(),
+      streetRouting: 'boolean',
+      routingProfile: 'select',
+    };
+  }
+
+  /**
+   * Die Linie kann beides sein: eine Strecke zu Fuß und eine Anfahrt. Für die
+   * Anfahrt zählen Einbahnen und Abbiegeverbote, dafür sind Fußwege und
+   * Fußgängerzonen kein gültiger Weg.
+   */
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      ...super.selectValues(),
+      routingProfile: {
+        walk: 'Fußgänger (ignoriert Einbahnen)',
+        drive: 'Auto (folgt der Fahrtrichtung)',
+      },
     };
   }
 
@@ -61,6 +87,7 @@ export class FirecallLine extends FirecallMultiPoint {
         </b>
         <br />
         {Math.round(this.distance || 0)}m
+        {this.routingHint()}
       </>
     );
   }

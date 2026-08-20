@@ -312,6 +312,62 @@ describe('CrewAssignmentBoard', () => {
     expect(screen.queryByText(/Fritz Nein \(/)).not.toBeInTheDocument();
   });
 
+  describe('adding a person', () => {
+    const typePersonName = async (text: string) => {
+      const userEvent = (await import('@testing-library/user-event')).default;
+      const user = userEvent.setup();
+      const input = screen.getByLabelText('Weitere Person hinzufügen');
+      await user.click(input);
+      await user.type(input, text);
+      return user;
+    };
+
+    // Ohne expliziten Hint leitet Chromium die Tastaturaktion selbst ab, findet
+    // ein nachfolgendes fokussierbares Element und wählt IME_ACTION_NEXT. Die
+    // Aktion behandelt der Browser intern — Fokus weiter, kein
+    // Tastenereignis —, der Enter-Handler liefe also nie (#712).
+    it('declares an explicit enter key hint so Android sends Enter instead of advancing focus', () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      expect(screen.getByLabelText('Weitere Person hinzufügen')).toHaveAttribute(
+        'enterkeyhint',
+        'done',
+      );
+    });
+
+    it('assigns a typed name that matches an offered recipient to that recipient', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await typePersonName('Nina Ausstehend');
+      await user.keyboard('{Enter}');
+      expect(mockAddPersonFromRecipient).toHaveBeenCalledWith({
+        id: 'r4',
+        name: 'Nina Ausstehend',
+        participation: 'pending',
+      });
+      expect(mockAddManualPerson).not.toHaveBeenCalled();
+    });
+
+    it('adds an unknown name as a manual entry', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await typePersonName('Hans Vorbeigekommen');
+      await user.keyboard('{Enter}');
+      expect(mockAddManualPerson).toHaveBeenCalledWith('Hans Vorbeigekommen');
+      expect(mockAddPersonFromRecipient).not.toHaveBeenCalled();
+    });
+
+    // Der halb getippte Name darf nicht zusätzlich als manuelle Person landen.
+    it('adds only the recipient when an option is picked with the keyboard', async () => {
+      render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+      const user = await typePersonName('Nina');
+      await user.keyboard('{ArrowDown}{Enter}');
+      expect(mockAddPersonFromRecipient).toHaveBeenCalledWith({
+        id: 'r4',
+        name: 'Nina Ausstehend',
+        participation: 'pending',
+      });
+      expect(mockAddManualPerson).not.toHaveBeenCalled();
+    });
+  });
+
   describe('removing a vehicle', () => {
     const removeVehicle = async (name: string) => {
       const userEvent = (await import('@testing-library/user-event')).default;
