@@ -67,6 +67,7 @@ vi.mock('../../server/firebase/admin', () => {
   const entriesCollection = {
     where: () => entriesCollection,
     orderBy: () => entriesCollection,
+    limit: () => entriesCollection,
     get: entriesQueryGetMock,
   };
   const groupDoc = {
@@ -185,7 +186,7 @@ describe('createMangel', () => {
     mangelQueryGetMock.mockResolvedValue(openMangel(['open', 'inProgress']));
     await createMangel('ffnd', { vehicleId: 'v1', description: 'x' });
     expect(vehicleSetMock).toHaveBeenCalledWith(
-      { openMangelCount: 2 },
+      expect.objectContaining({ openMangelCount: 2 }),
       { merge: true },
     );
   });
@@ -315,7 +316,42 @@ describe('changeMangelStatus', () => {
     mangelQueryGetMock.mockResolvedValue(openMangel(['resolved']));
     await changeMangelStatus('ffnd', 'm1', 'resolved');
     expect(vehicleSetMock).toHaveBeenCalledWith(
-      { openMangelCount: 0 },
+      expect.objectContaining({ openMangelCount: 0 }),
+      { merge: true },
+    );
+  });
+
+  it('merkt sich den Mangel der letzten Fahrt auch nach dem Beheben', async () => {
+    // #706: Ohne diesen Vermerk nahm das Beheben nur den Mängelzähler weg und
+    // gab damit „Defekt gemeldet" frei — das Beheben machte den Hinweis nicht
+    // weg, sondern erst sichtbar.
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [
+        {
+          id: 'e1',
+          data: () => ({
+            abfahrt: '2026-08-01T08:00:00.000Z',
+            driverName: 'Bernd Beispiel',
+            defekt: true,
+            counters: {},
+          }),
+        },
+      ],
+    });
+    mangelQueryGetMock.mockResolvedValue({
+      docs: [
+        { id: 'm1', data: () => ({ ...EXISTING, status: 'resolved', entryId: 'e1' }) },
+      ],
+    });
+
+    await changeMangelStatus('ffnd', 'm1', 'resolved');
+
+    expect(vehicleSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openMangelCount: 0,
+        lastEntryHasDefect: true,
+        lastEntryMangelId: 'm1',
+      }),
       { merge: true },
     );
   });
@@ -494,7 +530,7 @@ describe('deleteMangel', () => {
     expect(result.success).toBe(true);
     expect(mangelDocDeleteMock).toHaveBeenCalled();
     expect(vehicleSetMock).toHaveBeenCalledWith(
-      { openMangelCount: 0 },
+      expect.objectContaining({ openMangelCount: 0 }),
       { merge: true },
     );
   });

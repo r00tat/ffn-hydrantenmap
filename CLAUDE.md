@@ -846,6 +846,33 @@ ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
 zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
 am Status-Code.
 
+## Fahrzeug-Cache im Fahrtenbuch
+
+Zählerstände, letzte Fahrt, Defekt-Hinweis und Mängelzähler stehen am
+Fahrzeugdokument, damit die Übersicht sie zeigen kann, ohne alle Fahrten und
+Mängel der Gruppe zu laden. Geschrieben wird der Cache an genau einer Stelle:
+`refreshVehicleCache` in [mangelStore.ts](src/components/Fahrtenbuch/mangelStore.ts),
+aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
+
+- **Eine Funktion für beide Hälften**, weil sie sich überschneiden:
+  `lastEntryMangelId` sagt, ob es zur jüngsten Fahrt einen Mangeldatensatz
+  gibt, und ändert sich sowohl mit der Fahrt als auch mit den Mängeln. Zwei
+  Auffrischungen, die je nur ihre Hälfte kennen, ließen genau die Widersprüche
+  zu, aus denen #706 entstand.
+- **Geschrieben wird mit `merge: true`**, deshalb setzt die Funktion *alle*
+  Felder — ein weggelassenes ließe den alten Wert stehen. Wer ein Feld
+  hinzufügt, trägt es dort ein.
+- **„Defekt gemeldet" ist der Rückfall für Altdaten**, nicht die zweite Anzeige
+  neben dem Mängelzähler. Die Regel steht in
+  [defectHint.ts](src/components/Fahrtenbuch/defectHint.ts) und gilt für
+  Fahrzeugkarte und Fahrzeugseite gleichermaßen: Gibt es zur letzten Fahrt
+  einen Mangeldatensatz, spricht dieser — offen über den Zähler, behoben gar
+  nicht mehr. Vorher verdeckte der Zähler den Hinweis nur, und das Beheben des
+  letzten Mangels machte ihn nicht weg, sondern erst sichtbar.
+- **`undefined` heißt „nie geschrieben", nicht „nein".** Fahrzeuge, deren Cache
+  älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
+  und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
+
 ## Mangel-Bilder
 
 Zu einem Fahrzeugmangel gehören Fotos (`Mangel.images`, [mangel.ts](src/common/mangel.ts)).

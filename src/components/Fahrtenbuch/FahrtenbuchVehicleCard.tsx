@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import { useFormatter, useTranslations } from 'next-intl';
 import Link from 'next/link';
 import type { FahrtenbuchVehicle } from '../../common/fahrtenbuch';
+import { showDefectHint } from './defectHint';
 
 export interface FahrtenbuchVehicleCardProps {
   groupId: string;
@@ -32,6 +33,12 @@ export interface FahrtenbuchVehicleCardProps {
    * wurde — der serverseitig gepflegte Zähler am Fahrzeug gewinnt.
    */
   openMangelCount?: number;
+  /**
+   * Ob es zur letzten Fahrt einen Mangeldatensatz gibt, abgeleitet aus den
+   * geladenen Mängeln der Gruppe. Nur der Rückfall für Fahrzeuge, deren Cache
+   * `lastEntryMangelId` noch nicht kennt — siehe `showDefectHint`.
+   */
+  lastEntryHasMangel?: boolean;
   onAddTrip: (vehicleId: string) => void;
 }
 
@@ -47,6 +54,7 @@ export default function FahrtenbuchVehicleCard({
   lastEntryHasDefect,
   lastDriverName,
   openMangelCount,
+  lastEntryHasMangel,
   onAddTrip,
 }: FahrtenbuchVehicleCardProps) {
   const t = useTranslations('fahrtenbuch');
@@ -70,10 +78,12 @@ export default function FahrtenbuchVehicleCard({
   // die Ableitung aus den geladenen Mängeln ist nur der Rückfall für
   // Fahrzeuge, an denen das Feld noch nie geschrieben wurde.
   const openMangel = vehicle.openMangelCount ?? openMangelCount ?? 0;
-  // Der Defekt-Hinweis der letzten Fahrt tritt hinter den Mängelzähler
-  // zurück, sobald es einen gibt: „2 offene Mängel" sagt alles, was
-  // „Defekt gemeldet" sagt, und zusätzlich, wie viel Arbeit offen ist.
-  const showLegacyDefect = hasDefect && openMangel === 0;
+  const showLegacyDefect = showDefectHint({
+    hasDefect,
+    openMangelCount: openMangel,
+    lastEntryMangelId: vehicle.lastEntryMangelId,
+    lastEntryHasMangel,
+  });
 
   return (
     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
