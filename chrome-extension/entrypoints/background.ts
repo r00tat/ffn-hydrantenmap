@@ -181,7 +181,12 @@ export default defineBackground({
     }
 
     async function getFirecallList(): Promise<{
-      firecalls: { id: string; name?: string; date?: string }[];
+      firecalls: {
+        id: string;
+        name?: string;
+        date?: string;
+        description?: string;
+      }[];
     }> {
       if (!currentUser) return { firecalls: [] };
 
@@ -192,8 +197,20 @@ export default defineBackground({
 
       const toEntry = (
         id: string,
-        data: { name?: string; date?: string; deleted?: boolean },
-      ) => ({ id, name: data.name, date: data.date });
+        data: {
+          name?: string;
+          date?: string;
+          description?: string;
+          deleted?: boolean;
+        },
+      ) => ({
+        id,
+        name: data.name,
+        date: data.date,
+        // The panel matches the SYBOS Einsatzstichwort against name AND
+        // description — the name alone is often just "Brand".
+        description: data.description,
+      });
 
       if (firecallClaim) {
         const snap = await getDoc(doc(firestore, 'call', firecallClaim));
@@ -201,6 +218,7 @@ export default defineBackground({
         const data = snap.data() as {
           name?: string;
           date?: string;
+          description?: string;
           deleted?: boolean;
         };
         if (data.deleted) return { firecalls: [] };
@@ -220,7 +238,10 @@ export default defineBackground({
       );
       const snapshot = await getDocs(q);
       const list = snapshot.docs.map((d) =>
-        toEntry(d.id, d.data() as { name?: string; date?: string }),
+        toEntry(
+          d.id,
+          d.data() as { name?: string; date?: string; description?: string },
+        ),
       );
 
       const { selectedFirecallId } = await chrome.storage.local.get(
@@ -236,6 +257,7 @@ export default defineBackground({
             const data = sel.data() as {
               name?: string;
               date?: string;
+              description?: string;
               deleted?: boolean;
             };
             if (!data.deleted) {

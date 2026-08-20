@@ -4,6 +4,7 @@ export interface FirecallListEntry {
   id: string;
   name?: string;
   date?: string;
+  description?: string;
 }
 
 /**
@@ -26,6 +27,15 @@ export function renderFirecallSelect(
     select.disabled = true;
   }
 
+  // Without a (still existing) selection the browser would show the first
+  // entry as if it were chosen — a lie the user then transfers crew into.
+  const hasSelection = firecalls.some((fc) => fc.id === selectedId);
+  if (firecalls.length > 0 && !hasSelection) {
+    const placeholder = el('option', { value: '' }, '– Einsatz wählen –');
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+  }
+
   for (const fc of firecalls) {
     const dateText = fc.date
       ? new Date(fc.date).toLocaleDateString('de-AT')
@@ -39,6 +49,7 @@ export function renderFirecallSelect(
   }
 
   select.addEventListener('change', () => {
+    if (!select.value) return;
     onChange(select.value);
   });
 

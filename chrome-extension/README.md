@@ -6,6 +6,10 @@ Chrome Extension (Manifest V3) für die Einsatzkarte der FF Neusiedl am See. Bie
 
 - **Popup**: Login via Google OAuth, Einsatz-Auswahl, Übersicht (Name, Status, Fahrzeuge), Tagebuch-Liste und neuer Eintrag
 - **Sybos Content Script**: Einklappbares Widget auf `sybos.lfv-bgld.at` mit aktuellem Einsatz und Link zur Einsatzkarte
+- **Einsatz-Abgleich**: Das Widget liest Datum, Beginn, Stichwort, Einsatzart und Ort
+  des offenen SYBOS-Einsatzes und vergleicht sie mit den Einsätzen der Einsatzkarte.
+  Passt die Auswahl nicht, warnt das Panel vor dem Übertragen und bietet den besser
+  passenden Einsatz per Klick an (siehe `firecall-matching.ts`)
 - **Echtzeit**: Firestore-Subscriptions für Live-Updates von Einsätzen und Tagebucheinträgen
 
 ## Tech Stack

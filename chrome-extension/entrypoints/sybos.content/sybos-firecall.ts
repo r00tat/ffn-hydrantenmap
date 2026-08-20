@@ -8,8 +8,20 @@ import { renderPersonnelSection } from './sybos-section-personnel';
 import { renderVehicleTableSection } from './sybos-section-vehicle-table';
 import { renderMannschaftEditSection } from './sybos-section-mannschaft-edit';
 import { renderVehicleListSection } from './sybos-section-vehicle-list';
+import { renderFirecallMatchSection } from './sybos-section-firecall-match';
+import { readSybosEinsatzContext } from './sybos-einsatz-context';
+import {
+  evaluateFirecallSelection,
+  type FirecallMatchEvaluation,
+} from './firecall-matching';
 
 const EINSATZKARTE_URL = 'https://einsatz.ffnd.at';
+
+const NO_MATCH: FirecallMatchEvaluation = {
+  verdict: 'unknown',
+  best: null,
+  selected: null,
+};
 
 interface Firecall {
   id: string;
@@ -18,23 +30,44 @@ interface Firecall {
   date?: string;
 }
 
+/** Store the selection and re-render everything from it. */
+async function selectFirecall(id: string): Promise<void> {
+  await chrome.storage.local.set({ selectedFirecallId: id });
+  await loadFirecall();
+}
+
 function showFirecall(
   content: HTMLElement,
-  fc: Firecall,
+  fc: Firecall | null,
   firecallList: FirecallListEntry[] | null,
+  matchEvaluation: FirecallMatchEvaluation,
 ): void {
   // Einsatz selector (or fallback to read-only name on list error)
   if (firecallList) {
-    renderFirecallSelect(content, firecallList, fc.id, async (newId) => {
-      if (newId === fc.id) return;
-      await chrome.storage.local.set({ selectedFirecallId: newId });
-      await loadFirecall();
+    renderFirecallSelect(content, firecallList, fc?.id ?? null, async (newId) => {
+      if (newId === fc?.id) return;
+      await selectFirecall(newId);
     });
   } else {
     const nameField = el('div', { className: 'ek-field' });
     nameField.appendChild(el('label', {}, 'Einsatz'));
-    nameField.appendChild(el('strong', {}, fc.name || '–'));
+    nameField.appendChild(el('strong', {}, fc?.name || '–'));
     content.appendChild(nameField);
+  }
+
+  // Verdict on the selection, directly under the selector and above every
+  // transfer button — a wrong Einsatz has to be seen before, not after.
+  renderFirecallMatchSection(content, matchEvaluation, (id) => {
+    void selectFirecall(id);
+  });
+
+  // Without a selected Einsatz there is nothing to show or transfer; the
+  // selector and the suggestion above are the way out of that state.
+  if (!fc) {
+    content.appendChild(
+      el('div', { className: 'ek-status' }, 'Kein aktiver Einsatz'),
+    );
+    return;
   }
 
   // Description (optional)
@@ -99,18 +132,30 @@ export async function loadFirecall(): Promise<void> {
       return;
     }
 
-    if (!fcResp.firecall) {
-      showStatus('Kein aktiver Einsatz');
-      return;
-    }
-
     const firecallList: FirecallListEntry[] | null =
       listResp && !listResp.error && Array.isArray(listResp.firecalls)
         ? listResp.firecalls
         : null;
 
+    const firecall: Firecall | null = fcResp.firecall ?? null;
+
+    if (!firecall && !firecallList) {
+      showStatus('Kein aktiver Einsatz');
+      return;
+    }
+
+    // Read the SYBOS page before the panel is re-rendered, so the scrape sees
+    // the page's own form fields and nothing of our own markup.
+    const matchEvaluation = firecallList
+      ? evaluateFirecallSelection(
+          readSybosEinsatzContext(),
+          firecallList,
+          firecall?.id ?? null,
+        )
+      : NO_MATCH;
+
     renderContent((content) =>
-      showFirecall(content, fcResp.firecall, firecallList),
+      showFirecall(content, firecall, firecallList, matchEvaluation),
     );
   } catch (err) {
     showStatus('Fehler beim Laden');
