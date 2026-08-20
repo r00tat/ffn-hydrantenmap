@@ -193,6 +193,14 @@ describe('driverKeyOf', () => {
     );
   });
 
+  it('merges a swapped name order onto one driver', () => {
+    // Die Fahrt aus dem Einsatz trägt „Nachname Vorname", die manuell
+    // eingetragene „Vorname Nachname" — in der Statistik ist das ein Mensch.
+    expect(driverKeyOf(entry({ driverName: 'Muster Max' }))).toBe(
+      driverKeyOf(entry({ driverName: 'Max Muster' })),
+    );
+  });
+
   it('is empty for a unit without a driver', () => {
     expect(driverKeyOf(entry({ driverName: '' }))).toBe('');
   });
@@ -412,6 +420,14 @@ describe('driverSharesOf', () => {
     expect(
       driverSharesOf(
         drivers({ driverId: 'p1', coDrivers: [{ name: 'max  MUSTER' }] }),
+      ),
+    ).toEqual([{ key: 'p1', name: 'Max Muster', share: 1 }]);
+  });
+
+  it('erkennt denselben Menschen in gedrehter Namensreihenfolge', () => {
+    expect(
+      driverSharesOf(
+        drivers({ driverId: 'p1', coDrivers: [{ name: 'Muster Max' }] }),
       ),
     ).toEqual([{ key: 'p1', name: 'Max Muster', share: 1 }]);
   });

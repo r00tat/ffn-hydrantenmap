@@ -1,5 +1,5 @@
 import {
-  normalizeName,
+  normalizePersonName,
   type FahrtenbuchPerson,
 } from '../../common/fahrtenbuch';
 
@@ -231,8 +231,11 @@ function changesFor(
 ): PersonImportChange[] {
   const changes: PersonImportChange[] = [];
   // Der Name über die Normalisierung: sonst meldet jeder Import dieselben
-  // Zeilen, nur weil Groß-/Kleinschreibung oder Leerzeichen abweichen.
-  if (normalizeName(record.name) !== normalizeName(person.name)) {
+  // Zeilen, nur weil Groß-/Kleinschreibung, Leerzeichen oder die Reihenfolge
+  // von Vor- und Nachname abweichen. BlaulichtSMS liefert „Nachname Vorname",
+  // die Personenliste führt „Vorname Nachname" — ein „name"-Change hier würde
+  // die gepflegte Schreibweise bei jedem Import überschreiben.
+  if (normalizePersonName(record.name) !== normalizePersonName(person.name)) {
     changes.push('name');
   }
   // Eine leere CSV-Spalte ist keine Änderung — sie würde sonst einen im
@@ -305,9 +308,9 @@ export function planPersonCsvImport(
       };
     }
 
-    const normalized = normalizeName(record.name);
+    const normalized = normalizePersonName(record.name);
     const sameName = existing.filter(
-      (p) => p.id && normalizeName(p.name) === normalized,
+      (p) => p.id && normalizePersonName(p.name) === normalized,
     );
     const unlinked = sameName.filter((p) => !p.blaulichtSmsRecipientId);
     const free = unlinked.filter((p) => !claimedPersonIds.has(p.id as string));

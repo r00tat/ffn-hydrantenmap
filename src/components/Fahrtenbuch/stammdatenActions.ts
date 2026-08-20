@@ -6,7 +6,7 @@ import {
   FAHRTENBUCH_CONFIG_COLLECTION_ID,
   FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
-  normalizeName,
+  normalizePersonName,
   VEHICLE_PRESETS,
   type FahrtenbuchConfig,
   type FahrtenbuchPerson,
@@ -493,7 +493,7 @@ export async function createInactivePersons(
           note: '',
           ...stamps(session.user.id),
         });
-        personIds[normalizeName(name)] = ref.id;
+        personIds[normalizePersonName(name)] = ref.id;
       }
       await batch.commit();
     }

@@ -9,7 +9,7 @@
 import {
   arrivalFromTimeOnly,
   isPropellant,
-  normalizeName,
+  normalizePersonName,
   type CounterDefinition,
   type FahrtenbuchEntry,
   type FahrtenbuchPerson,
@@ -261,7 +261,10 @@ export function planFahrtenbuchImport(
   const personByName = new Map(
     persons
       .filter((p) => p.id)
-      .map((p) => [normalizeName(p.name), p as FahrtenbuchPerson & { id: string }]),
+      .map((p) => [
+        normalizePersonName(p.name),
+        p as FahrtenbuchPerson & { id: string },
+      ]),
   );
 
   // Bestand einmal indizieren statt je Zeile zu suchen.
@@ -308,7 +311,7 @@ export function planFahrtenbuchImport(
     );
     if (problem) return { ...common, state: 'problem' as const, problem };
 
-    const person = personByName.get(normalizeName(values.driverName));
+    const person = personByName.get(normalizePersonName(values.driverName));
     const betriebsmittel: Partial<Record<FuelType, number>> = {};
     if (row.treibstoff !== undefined && fuel) betriebsmittel[fuel] = row.treibstoff;
     if (row.adBlue !== undefined && (vehicle.fuelTypes ?? []).includes('adblue')) {
@@ -354,7 +357,7 @@ export function unknownDriverNames(rows: ImportPlanRow[]): string[] {
   for (const row of rows) {
     if (row.state !== 'unknownDriver' || !row.input) continue;
     const name = row.input.driverName.trim();
-    const key = normalizeName(name);
+    const key = normalizePersonName(name);
     if (!name || seen.has(key)) continue;
     seen.add(key);
     names.push(name);
@@ -371,9 +374,9 @@ export interface InactivePersonPlan {
 
 /**
  * Teilt die gemeldeten Fahrernamen in „gibt es schon" und „muss angelegt
- * werden". Verglichen wird über `normalizeName`, also so, wie auch die Vorschau
- * Fahrer und Person zusammenbringt — sonst legte der Import eine zweite Person
- * für einen Namen an, den er selbst als Treffer anzeigt.
+ * werden". Verglichen wird über `normalizePersonName`, also so, wie auch die
+ * Vorschau Fahrer und Person zusammenbringt — sonst legte der Import eine
+ * zweite Person für einen Namen an, den er selbst als Treffer anzeigt.
  */
 export function planInactivePersons(
   names: string[],
@@ -382,14 +385,14 @@ export function planInactivePersons(
   const byName = new Map(
     persons
       .filter((p) => p.id)
-      .map((p) => [normalizeName(p.name), p.id as string]),
+      .map((p) => [normalizePersonName(p.name), p.id as string]),
   );
   const create: string[] = [];
   const existing: Record<string, string> = {};
   const seen = new Set<string>();
   for (const raw of names) {
     const name = (raw ?? '').trim();
-    const key = normalizeName(name);
+    const key = normalizePersonName(name);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const id = byName.get(key);
