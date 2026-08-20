@@ -273,6 +273,40 @@ export default function CrewAssignmentBoard({
     [t],
   );
 
+  // Die Autocomplete liefert bei Auswahl aus der Liste das Melder-Objekt, bei
+  // Enter auf frei getippten Text (freeSolo) nur den String. Beides läuft
+  // bewusst durch dieselbe Stelle statt über einen eigenen Enter-Handler am
+  // Eingabefeld: Ein solcher Handler lief zusätzlich zur Auswahl von MUI und
+  // legte den halb getippten Namen als zweite, manuelle Person an.
+  //
+  // Ein getippter Name, der einen angebotenen Melder trifft, wird diesem
+  // zugeordnet statt manuell angelegt — sonst hängt der Eintrag nicht an der
+  // Melder-ID und stünde doppelt in der Liste, sobald die Person im
+  // BlaulichtSMS-Alarm doch noch zusagt (`syncFromAlarms` erkennt sie nur an
+  // ihrer `recipientId`).
+  const handleAddPerson = useCallback(
+    (value: BlaulichtSmsRecipient | string | null) => {
+      if (!value) return;
+      if (typeof value !== 'string') {
+        addPersonFromRecipient(value);
+        setNewPersonName('');
+        return;
+      }
+      const name = value.trim();
+      if (!name) return;
+      const recipient = additionalPersonOptions.find(
+        (o) => o.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (recipient) {
+        addPersonFromRecipient(recipient);
+      } else {
+        addManualPerson(name);
+      }
+      setNewPersonName('');
+    },
+    [addManualPerson, addPersonFromRecipient, additionalPersonOptions],
+  );
+
   const handleAddVehicle = useCallback(
     (vehicleName: string) => {
       // Dieselbe Quelle wie die Chip-Leiste: Käme die Liste hier weiterhin aus
@@ -471,25 +505,24 @@ export default function CrewAssignmentBoard({
           inputValue={newPersonName}
           onInputChange={(_e, value) => setNewPersonName(value)}
           onChange={(_e, value) => {
-            if (value && typeof value !== 'string') {
-              addPersonFromRecipient(value);
-              setNewPersonName('');
-            }
+            handleAddPerson(value);
           }}
           renderInput={(params) => (
             <TextField
               {...params}
               label={t('additionalPersons')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newPersonName.trim()) {
-                  const isOption = additionalPersonOptions.some(
-                    (o) => o.name === newPersonName.trim(),
-                  );
-                  if (!isOption) {
-                    addManualPerson(newPersonName);
-                    setNewPersonName('');
-                  }
-                }
+              slotProps={{
+                ...params.slotProps,
+                htmlInput: {
+                  ...params.slotProps.htmlInput,
+                  // Ohne expliziten Hint leitet Chromium die Tastaturaktion
+                  // selbst ab: Es findet ein nachfolgendes fokussierbares
+                  // Element und wählt IME_ACTION_NEXT. Diese Aktion behandelt
+                  // der Browser intern — er setzt den Fokus weiter und schickt
+                  // *kein* Tastenereignis an die Seite. Enter erreichte den
+                  // Handler damit unter Android nie (#712).
+                  enterKeyHint: 'done',
+                },
               }}
             />
           )}

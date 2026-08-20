@@ -16,6 +16,7 @@ npm run lint         # ESLint validation
 npm run typecheck    # TypeScript type check (TypeScript 7)
 npm run test         # Run Vitest tests once
 npm run test:watch   # Run Vitest in watch mode
+npm run test:coverage # Run Vitest with coverage report (coverage/)
 npm run check        # Run all checks: typecheck, lint, tests, build
 npm run clean:cache  # Turbopack-Caches löschen (siehe unten)
 npm run tfvars:dev   # Deploy-Variablen für terraform aus dem laufenden Dienst holen
@@ -304,6 +305,17 @@ jedem Release-Tag.
 plant nur noch (PRs) und hat einen `workflow_dispatch`-Apply als Handgriff. Beide
 Workflows teilen die Concurrency-Gruppe `tf-apply-<env>`, zwei gleichzeitige
 apply auf denselben State sind damit ausgeschlossen.
+
+**Der Plan läuft ohne State-Lock** (`-lock=false`). Ein Plan liest den State und
+schreibt ihn nicht; mit Lock scheitert er sofort mit `412 conditionNotMet`,
+sobald irgendwo ein apply läuft. Die Concurrency-Gruppen der Plan-Jobs sind
+per-PR und wissen von `tf-apply-<env>` nichts — der Apply der Projekt-Basis
+läuft bei jedem Push auf main und traf so wiederholt die Plans offener PRs
+(#702). Der Preis ist ein Plan gegen einen State, der sich gerade ändert: Er
+kann veraltet sein, und was er zeigt, ist ohnehin nie eine Zusage für den
+späteren apply. Ein Plan gegen einen fremden apply anzuhalten würde den
+PR-Check nur so lange blockieren, wie der apply dauert, und danach dasselbe
+Ergebnis liefern.
 
 **Aus PRs wird nicht mehr deployt.** Ein Deploy ist jetzt ein Apply, und ein
 Apply mit ungeprüftem Terraform-Code aus einem PR-Branch gegen die gemeinsame

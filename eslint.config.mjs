@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     '**/.next/**',
     '.worktrees/**',
     'out/**',
+    // Vitest-Coverage-Report: generierte HTML-/JS-Dateien von istanbul.
+    'coverage/**',
     'build/**',
     'next-env.d.ts',
     // Root JS/MJS config files use eslint-config-next's bundled Babel parser whose

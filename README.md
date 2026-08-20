@@ -1,5 +1,7 @@
 # Einsatzkarte der Freiwilligen Feuerwehr Neusiedl am See
 
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fr00tat%2Fffn-hydrantenmap%2Fbadges%2Fcoverage-badge.json)](https://github.com/r00tat/ffn-hydrantenmap/actions/workflows/cloud-run.yml)
+
 Dieses Repository ermöglicht es Hydranten auf einer Karte darzustellen. Ziel ist es möglichst leicht im Einsatzfall Hydranten lokalisieren zu können.
 
 Für eingeloggte Benutzer bietet es darüber hinaus die Möglichkeit einer Lageführung und eines Einsatztagebuchs.
@@ -92,7 +94,25 @@ npm run dev          # Development Server (Turbopack)
 npm run build        # Production Build (Webpack)
 npm run start        # Production Server starten
 npm run lint         # ESLint Validierung
+npm test             # Vitest einmalig ausführen
+npm run test:coverage # Tests mit Coverage-Report (coverage/)
 ```
+
+### Coverage
+
+`npm run test:coverage` schreibt nach `coverage/`: `lcov.info` für die
+Coverage-Anzeige in der IDE (z.B. VSCode „Coverage Gutters"), `lcov-report/index.html`
+als durchklickbaren Report und `coverage-summary.json` als Grundlage für CI.
+
+In CI läuft der Report im Build-Job von [cloud-run.yml](.github/workflows/cloud-run.yml)
+mit. Der Job `Coverage` schreibt daraus die Tabelle in die Job-Summary und bei einem
+Pull Request zusätzlich einen Kommentar mit der Abdeckung der geänderten Dateien und
+dem Delta gegenüber main. Der Vergleichsstand und der Wert für das Badge oben liegen
+auf dem verwaisten Branch `badges`, den [scripts/publish-coverage-badge.sh](scripts/publish-coverage-badge.sh)
+bei jedem Push auf main fortschreibt.
+
+Fehlgeschlagene Tests erscheinen ohne weiteres Zutun als Annotation an der betroffenen
+Codezeile — Vitest hängt in CI automatisch seinen `github-actions`-Reporter an.
 
 ## Android App
 
