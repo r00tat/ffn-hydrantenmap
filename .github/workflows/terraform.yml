@@ -107,7 +107,11 @@ jobs:
           # andere ist ein Fehler. Damit muss der Kommentar-Step den Plantext
           # nicht nach "No changes." absuchen.
           set +e
-          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          # -lock=false: Ein Plan liest den State, er schreibt ihn nicht.
+          # Mit Lock scheitert er sofort mit 412, sobald irgendwo ein apply
+          # läuft — und der Apply der Projekt-Basis läuft bei jedem Push auf
+          # main, traf also wiederholt die Plans offener PRs (#702).
+          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan
           code=$?
           set -e
           case "$code" in
@@ -283,7 +287,8 @@ jobs:
           set -o pipefail
           # Siehe plan-base: 0 = keine Änderungen, 2 = Änderungen.
           set +e
-          tofu plan -input=false -no-color -detailed-exitcode -out=tfplan
+          # -lock=false wie bei plan-base: ein Plan liest nur.
+          tofu plan -input=false -no-color -detailed-exitcode -lock=false -out=tfplan
           code=$?
           set -e
           case "$code" in
