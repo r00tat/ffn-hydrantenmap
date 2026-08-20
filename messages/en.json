@@ -1018,7 +1018,8 @@
       "beschreibung": "Description",
       "showLabel": "Show label",
       "showLabels": "Show labels",
-      "streetRouting": "Route along streets"
+      "streetRouting": "Route along streets",
+      "routingProfile": "Routing profile"
     },
     "itemGroups": {
       "tactical": "Operational tactics",

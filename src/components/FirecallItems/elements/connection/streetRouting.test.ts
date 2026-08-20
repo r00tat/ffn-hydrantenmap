@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { LatLngPosition } from '../../../../common/geo';
 import type { Connection } from '../../../firebase/firestore';
 
-import { positionsSignature } from './routedPath';
+import { routingSignature } from './routedPath';
 import { connectionDisplayPositions, routingTodo } from './streetRouting';
 
 const hydrant: LatLngPosition = [47.9482, 16.8482];
@@ -34,15 +34,39 @@ const routedConnection = (overrides: Partial<Connection> = {}) =>
   connection({
     streetRouting: 'true',
     routedPositions: JSON.stringify(routed),
-    routedFor: positionsSignature(points),
+    routedFor: routingSignature(points, 'walk'),
     ...overrides,
   });
 
 describe('routingTodo', () => {
-  it('lässt andere Elementtypen unberührt', () => {
+  it('lässt Elementtypen ohne die Option unberührt', () => {
+    // Eine Fläche hat keinen Verlauf, den man routen könnte.
     expect(
       routingTodo(connection({ type: 'area' as Connection['type'] }))
     ).toBe('none');
+  });
+
+  it('gilt auch für die normale Linie', () => {
+    expect(
+      routingTodo(
+        connection({
+          type: 'line' as Connection['type'],
+          streetRouting: 'true',
+        })
+      )
+    ).toBe('route');
+  });
+
+  it('routet neu, wenn das Profil gewechselt wird', () => {
+    // Von Fuß auf Auto ändert die Route, ohne dass ein Punkt bewegt wurde.
+    expect(
+      routingTodo(
+        routedConnection({
+          type: 'line' as Connection['type'],
+          routingProfile: 'drive',
+        })
+      )
+    ).toBe('route');
   });
 
   it('tut ohne die Option nichts', () => {
@@ -86,7 +110,7 @@ describe('routingTodo', () => {
         connection({
           streetRouting: 'true',
           routingFailed: 'true',
-          routedFor: positionsSignature(points),
+          routedFor: routingSignature(points, 'walk'),
         })
       )
     ).toBe('none');

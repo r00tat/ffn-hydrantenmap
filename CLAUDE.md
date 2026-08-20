@@ -893,19 +893,21 @@ Feuerwehr, Struktur `<Basisordner>/YYYY/YYYY-MM-DD_Einsatzname`.
   der Einsatz umbenannt oder umdatiert, benennt der nächste Upload den Ordner um
   bzw. verschiebt ihn in den richtigen Jahresordner.
 
-## Straßen-Routing für Leitungen
+## Straßen-Routing für Leitungen und Linien
 
-Eine Lösch- oder Zubringerleitung (`connection`) folgt auf Wunsch dem
-Straßenverlauf statt der Luftlinie: Feld **„Routing über Straße"** an der
-Leitung, Standard bleibt die direkte Verbindung.
+Eine Lösch- oder Zubringerleitung (`connection`) und eine Linie (`line`) folgen
+auf Wunsch dem Straßenverlauf statt der Luftlinie: Feld
+**„Routing über Straße"**, Standard bleibt die direkte Verbindung.
 
-- **Fußgänger-Profil** (`travelMode: 'WALK'`) in
-  [routes.ts](src/components/actions/maps/routes.ts): Ein Schlauch folgt der
-  Straße, hält sich aber nicht an Einbahnen und Abbiegeverbote.
-  `routingPreference` darf dabei **nicht** mitgeschickt werden — die Routes API
-  nimmt es nur für `DRIVE` und `TWO_WHEELER` und lehnt den Aufruf sonst ab.
-  Die Geometrie kommt als `GEO_JSON_LINESTRING`, damit kein Polyline-Decoder
-  nötig ist; GeoJSON zählt `[lng, lat]`.
+- **Das Profil wählt nur die Linie** (Feld `routingProfile`, `walk`/`drive`).
+  Eine Schlauchleitung hat kein solches Feld und bleibt beim Fußgänger-Profil —
+  ein Schlauch folgt der Straße, fährt aber nicht. Bei der Linie kann beides
+  gemeint sein: eine Strecke zu Fuß oder eine Anfahrt, für die Einbahnen und
+  Abbiegeverbote gelten.
+- **`routingPreference` gehört nur zum Auto-Profil.** Die Routes API nimmt es
+  allein für `DRIVE` und `TWO_WHEELER` und lehnt den Aufruf sonst ab — bei `WALK`
+  muss es weg. Die Geometrie kommt als `GEO_JSON_LINESTRING`, damit kein
+  Polyline-Decoder nötig ist; GeoJSON zählt `[lng, lat]`.
 - **Ein Aufruf für die ganze Leitung**, nicht einer je Abschnitt: Die Punkte
   dazwischen gehen als `intermediates` mit, die Antwort liefert je Abschnitt
   eine eigene Polyline. Über 25 Punkte wird in Blöcke geteilt, die sich um einen
@@ -917,9 +919,11 @@ Leitung, Standard bleibt die direkte Verbindung.
   für die Schlauchlängen mit. Eine Leitung führt **durch** den Verteiler, nicht
   an ihm vorbei.
 - **Die Geometrie steht am Element** (`routedPositions`), zusammen mit der
-  Signatur der Punkte, aus denen sie berechnet wurde (`routedFor`). Nur so
-  zeichnet die Karte ohne Routing-Aufruf — ein Aufruf je Änderung, keiner je
-  Render. Geroutet wird deshalb an den Mutationsstellen
+  Signatur aus Punkten **und Profil**, für die sie gilt (`routedFor`). Das Profil
+  gehört mit hinein: Ein Wechsel von Fuß auf Auto ändert die Route, ohne einen
+  Punkt zu verschieben. Nur so zeichnet die Karte ohne Routing-Aufruf — ein
+  Aufruf je Änderung, keiner je Render. Geroutet wird deshalb an den
+  Mutationsstellen
   (`ensureConnectionRouting`): beim Zeichnen
   ([Leitungen/context.tsx](src/components/Map/Leitungen/context.tsx)), beim
   Verschieben, Einfügen und Löschen eines Punktes
@@ -930,9 +934,17 @@ Leitung, Standard bleibt die direkte Verbindung.
   `calculateDistance` wie die Luftlinie. Die Meter der Routes API bleiben
   ungenutzt: Sie kennen die Zuführungen nicht, und eine angezeigte Länge, die
   nicht zur Linie gehört, wäre im Einsatz irreführend.
-- **Fällt das Routing aus, bleibt die Leitung** und trägt die Luftlinie samt
+- **Fällt das Routing aus, bleibt das Element** und trägt die Luftlinie samt
   Hinweis im Popup (`routingFailed`). Die Signatur wird auch beim Fehlschlag
   gesetzt — sonst liefe bei jeder weiteren Änderung ein neuer Versuch.
+- **Über `MAX_ROUTING_POINTS` (50) wird nicht geroutet**, geprüft im Browser
+  *und* in der Action. Eine GPS-Aufzeichnung ist eine `line` und wächst mit jedem
+  Messpunkt; ohne die Schranke im Browser ginge je Messpunkt eine Anfrage über
+  die Leitung, die sicher abgelehnt wird.
+- **Die Felder liegen an `MultiPointItem`/`FirecallMultiPoint`**, angeboten
+  werden sie nur in `fields()` von Leitung und Linie. `data()` ist die Grundlage
+  jedes Schreibvorgangs — ein Feld, das dort fehlt, löscht ein Speichern aus dem
+  Dialog (`setDoc` ohne `merge`).
 - Die Server-Action darf **kein Leaflet** importieren (`window is not defined`).
   Deshalb die Trennung: `routedPath.ts` ist reine Geometrie für beide Seiten,
   `streetRouting.ts` liest die Felder am Element, `ensureConnectionRouting.ts`

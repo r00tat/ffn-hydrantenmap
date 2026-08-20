@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import type { LatLngPosition } from '../../../common/geo';
-import type { Connection } from '../../firebase/firestore';
+import type { Line } from '../../firebase/firestore';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({}));
@@ -25,82 +25,91 @@ vi.mock('../../../hooks/useMapEditor', () => ({
 }));
 
 import { routingSignature } from './connection/routedPath';
-import { FirecallConnection } from './FirecallConnection';
+import { FirecallLine } from './FirecallLine';
 
-const hydrant: LatLngPosition = [47.9482, 16.8482];
-const rohr: LatLngPosition = [47.9502, 16.8512];
-const points: LatLngPosition[] = [hydrant, rohr];
-/** Straßenverlauf mit Zuführung — deutlich länger als die Luftlinie. */
+const start: LatLngPosition = [47.9482, 16.8482];
+const end: LatLngPosition = [47.9502, 16.8512];
+const points: LatLngPosition[] = [start, end];
+/** Straßenverlauf mit Zuführung — was das Routing zurückgibt. */
 const routed: LatLngPosition[] = [
-  hydrant,
+  start,
   [47.9484, 16.8486],
   [47.949, 16.853],
   [47.9499, 16.8509],
-  rohr,
+  end,
 ];
 
-const connection = (overrides: Partial<Connection> = {}) =>
-  new FirecallConnection({
-    id: 'leitung-1',
-    type: 'connection',
-    name: 'Zubringleitung',
-    lat: hydrant[0],
-    lng: hydrant[1],
-    destLat: rohr[0],
-    destLng: rohr[1],
+const line = (overrides: Partial<Line> = {}) =>
+  new FirecallLine({
+    id: 'linie-1',
+    type: 'line',
+    name: 'Anfahrt',
+    lat: start[0],
+    lng: start[1],
+    destLat: end[0],
+    destLng: end[1],
     positions: JSON.stringify(points),
-    distance: 260,
+    distance: 420,
     ...overrides,
-  } as Connection);
+  } as Line);
 
-describe('FirecallConnection', () => {
-  it('bietet das Straßen-Routing als Feld an', () => {
-    const item = connection();
+describe('FirecallLine', () => {
+  it('bietet Straßen-Routing und Profil als Felder an', () => {
+    const item = line();
     expect(item.fields().streetRouting).toBeTruthy();
     expect(item.fieldTypes().streetRouting).toBe('boolean');
+    expect(item.fieldTypes().routingProfile).toBe('select');
+    // Anders als die Leitung: Eine Linie kann eine Anfahrt sein.
+    expect(Object.keys(item.selectValues().routingProfile)).toEqual([
+      'walk',
+      'drive',
+    ]);
   });
 
-  it('trägt Option und geroutete Geometrie durch das Speichern', () => {
+  it('trägt Option, Profil und Geometrie durch das Speichern', () => {
     // `data()` ist die Grundlage jedes Schreibvorgangs — was hier fehlt, löscht
     // ein Speichern aus dem Dialog (setDoc ohne merge).
-    const data = connection({
+    const data = line({
       streetRouting: 'true',
+      routingProfile: 'drive',
       routedPositions: JSON.stringify(routed),
-      routedFor: routingSignature(points, 'walk'),
-      routingFailed: 'false',
+      routedFor: routingSignature(points, 'drive'),
     }).data();
 
     expect(data.streetRouting).toBe('true');
+    expect(data.routingProfile).toBe('drive');
     expect(JSON.parse(data.routedPositions || '[]')).toEqual(routed);
-    expect(data.routedFor).toBe(routingSignature(points, 'walk'));
-    expect(data.routingFailed).toBe('false');
+    expect(data.routedFor).toBe(routingSignature(points, 'drive'));
   });
 
   it('zeichnet ohne die Option die direkte Verbindung', () => {
-    expect(connection().displayPositions()).toEqual(points);
+    expect(line().displayPositions()).toEqual(points);
   });
 
   it('zeichnet mit der Option den gespeicherten Straßenverlauf', () => {
     expect(
-      connection({
+      line({
         streetRouting: 'true',
+        routingProfile: 'drive',
         routedPositions: JSON.stringify(routed),
-        routedFor: routingSignature(points, 'walk'),
+        routedFor: routingSignature(points, 'drive'),
       }).displayPositions()
     ).toEqual(routed);
   });
 
-  it('rechnet die Schlauchlängen aus der gespeicherten Länge', () => {
-    // 260 m auf 20-m-Schläuche sind 13 Längen.
-    const item = connection({ dimension: 'B', oneHozeLength: 20 });
-    expect(item.info()).toContain('260m');
-    expect(item.info()).toContain('13 B-Längen');
+  it('zeichnet die Luftlinie, wenn die Geometrie zu einem anderen Profil gehört', () => {
+    expect(
+      line({
+        streetRouting: 'true',
+        routingProfile: 'drive',
+        routedPositions: JSON.stringify(routed),
+        routedFor: routingSignature(points, 'walk'),
+      }).displayPositions()
+    ).toEqual(points);
   });
 
   it('weist die Luftlinie aus, wenn das Routing ausgefallen ist', () => {
-    // Ohne den Hinweis wird eine zu kurze Meterangabe für die Wahrheit
-    // genommen — und es fehlen Schläuche.
-    const item = connection({
+    const item = line({
       streetRouting: 'true',
       routingFailed: 'true',
       routedFor: routingSignature(points, 'walk'),
@@ -109,11 +118,12 @@ describe('FirecallConnection', () => {
   });
 
   it('weist nichts aus, solange das Routing trägt', () => {
-    const item = connection({
+    const item = line({
       streetRouting: 'true',
       routedPositions: JSON.stringify(routed),
       routedFor: routingSignature(points, 'walk'),
     });
+    expect(item.info()).toContain('420m');
     expect(item.info()).not.toContain('Luftlinie');
   });
 });

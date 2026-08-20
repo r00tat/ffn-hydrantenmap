@@ -3,7 +3,11 @@
 import { LatLngPosition } from '../../../../common/geo';
 import { Connection, MultiPointItem } from '../../../firebase/firestore';
 import { getConnectionPositions } from './distance';
-import { positionsSignature } from './routedPath';
+import {
+  RoutingProfile,
+  routingProfile,
+  routingSignature,
+} from './routedPath';
 
 /**
  * Straßen-Routing einer Leitung: gespeicherte Geometrie, ihre Gültigkeit und
@@ -13,9 +17,30 @@ import { positionsSignature } from './routedPath';
  * routen — ein Aufruf je Änderung, keiner je Render.
  */
 
+/**
+ * Elementtypen mit der Option. Die Leitung braucht sie für die Schlauchstrecke,
+ * die Linie für eine Wegberechnung entlang der Straße. Eine Fläche hat keinen
+ * Verlauf, den man routen könnte.
+ */
+const STREET_ROUTING_TYPES = ['connection', 'line'];
+
+export const isStreetRoutingItem = (type?: string): boolean =>
+  !!type && STREET_ROUTING_TYPES.includes(type);
+
 /** `'true'`/`'false'` wie bei allen booleschen Feldern der Elemente. */
 export const isStreetRoutingEnabled = (item: MultiPointItem): boolean =>
   (item as Connection).streetRouting === 'true';
+
+/**
+ * Das gewählte Profil. Die Leitung hat kein Feld dafür und bleibt damit beim
+ * Fußgänger-Profil — ein Schlauch fährt nicht.
+ */
+export const itemRoutingProfile = (item: MultiPointItem): RoutingProfile =>
+  routingProfile((item as Connection).routingProfile);
+
+/** Die Signatur, für die eine gespeicherte Geometrie gelten muss. */
+export const itemRoutingSignature = (item: MultiPointItem): string =>
+  routingSignature(getConnectionPositions(item), itemRoutingProfile(item));
 
 const parsePositions = (value?: string): LatLngPosition[] | undefined => {
   if (!value) return undefined;
@@ -40,8 +65,7 @@ export function routedPositions(
 ): LatLngPosition[] | undefined {
   const connection = item as Connection;
   if (!isStreetRoutingEnabled(item)) return undefined;
-  if (connection.routedFor !== positionsSignature(getConnectionPositions(item)))
-    return undefined;
+  if (connection.routedFor !== itemRoutingSignature(item)) return undefined;
   return parsePositions(connection.routedPositions);
 }
 
@@ -62,7 +86,7 @@ export function isStreetRoutingFallback(item: MultiPointItem): boolean {
   return (
     isStreetRoutingEnabled(item) &&
     connection.routingFailed === 'true' &&
-    connection.routedFor === positionsSignature(getConnectionPositions(item))
+    connection.routedFor === itemRoutingSignature(item)
   );
 }
 
@@ -85,7 +109,7 @@ const hasStoredRouting = (item: MultiPointItem): boolean => {
  * gescheitert ist, wird nicht bei jeder weiteren Änderung erneut versucht.
  */
 export function routingTodo(item: MultiPointItem): RoutingTodo {
-  if (item.type !== 'connection') return 'none';
+  if (!isStreetRoutingItem(item.type)) return 'none';
 
   if (!isStreetRoutingEnabled(item) || getConnectionPositions(item).length < 2) {
     return hasStoredRouting(item) ? 'clear' : 'none';

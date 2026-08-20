@@ -2,8 +2,12 @@
 
 import { actionUserAuthorizedForFirecall } from '../../../../app/auth';
 import type { LatLngPosition } from '../../../../common/geo';
-import { computeWalkingRouteLegs } from '../../../actions/maps/routes';
-import { MAX_ROUTING_POINTS, stitchRoutedPositions } from './routedPath';
+import { computeRouteLegsGeometry } from '../../../actions/maps/routes';
+import {
+  MAX_ROUTING_POINTS,
+  routingProfile,
+  stitchRoutedPositions,
+} from './routedPath';
 
 function isValidPosition(position: unknown): position is LatLngPosition {
   return (
@@ -30,7 +34,8 @@ function isValidPosition(position: unknown): position is LatLngPosition {
  */
 export async function computeStreetRoutedPositions(
   firecallId: string,
-  positions: LatLngPosition[]
+  positions: LatLngPosition[],
+  profile?: string
 ): Promise<LatLngPosition[] | undefined> {
   await actionUserAuthorizedForFirecall(firecallId, { requireWrite: true });
 
@@ -50,8 +55,10 @@ export async function computeStreetRoutedPositions(
     return undefined;
   }
 
-  const legs = await computeWalkingRouteLegs(
-    positions.map(([lat, lng]) => ({ lat, lng }))
+  const legs = await computeRouteLegsGeometry(
+    positions.map(([lat, lng]) => ({ lat, lng })),
+    // Alles Unbekannte gilt als Fuß — das Feld kommt aus dem Browser.
+    routingProfile(profile) === 'drive' ? 'DRIVE' : 'WALK'
   );
   if (!legs) {
     return undefined;

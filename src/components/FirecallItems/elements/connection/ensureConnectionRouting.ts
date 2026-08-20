@@ -1,6 +1,7 @@
 'use client';
 
 import { doc } from 'firebase/firestore';
+import { LatLngPosition } from '../../../../common/geo';
 import { setDoc } from '../../../../lib/firestoreClient';
 import { firestore } from '../../../firebase/firebase';
 import {
@@ -9,8 +10,12 @@ import {
   MultiPointItem,
 } from '../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from './distance';
-import { positionsSignature } from './routedPath';
-import { routingTodo } from './streetRouting';
+import { MAX_ROUTING_POINTS } from './routedPath';
+import {
+  itemRoutingProfile,
+  itemRoutingSignature,
+  routingTodo,
+} from './streetRouting';
 import { computeStreetRoutedPositions } from './streetRoutingAction';
 
 const clearedRouting = {
@@ -19,11 +24,38 @@ const clearedRouting = {
   routingFailed: '',
 };
 
+async function routedPositionsFor(
+  firecallId: string,
+  item: MultiPointItem,
+  positions: LatLngPosition[]
+): Promise<LatLngPosition[] | undefined> {
+  // Die Grenze steht auch in der Action, dort als Schranke gegen alles, was aus
+  // dem Browser kommt. Hier erspart sie den Aufruf: Eine GPS-Aufzeichnung
+  // wächst mit jedem Messpunkt, und jeder Schreibvorgang käme sonst mit einer
+  // Anfrage über die Leitung, die sicher abgelehnt wird.
+  if (positions.length > MAX_ROUTING_POINTS) {
+    console.warn(
+      `street routing skipped: ${positions.length} points exceed ${MAX_ROUTING_POINTS}`
+    );
+    return undefined;
+  }
+
+  return computeStreetRoutedPositions(
+    firecallId,
+    positions,
+    itemRoutingProfile(item)
+  ).catch((err) => {
+    console.error('street routing failed', err);
+    return undefined;
+  });
+}
+
 /**
- * Zieht das Straßen-Routing einer Leitung nach: nach dem Zeichnen, nach jeder
- * Änderung an den Punkten und nach dem Umschalten der Option.
+ * Zieht das Straßen-Routing einer Leitung oder Linie nach: nach dem Zeichnen,
+ * nach jeder Änderung an den Punkten und nach dem Umschalten von Option oder
+ * Profil.
  *
- * Wirft nicht. Die Änderung an der Leitung ist zu diesem Zeitpunkt schon
+ * Wirft nicht. Die Änderung am Element ist zu diesem Zeitpunkt schon
  * gespeichert; ein Ausfall des Routings darf sie nicht als Fehler erscheinen
  * lassen. Er hinterlässt stattdessen die Luftlinie und deren Kennzeichnung.
  */
@@ -41,26 +73,20 @@ export async function ensureConnectionRouting(
   if (todo === 'clear') {
     update = { ...clearedRouting, distance: airlineDistance };
   } else {
-    const routed = await computeStreetRoutedPositions(
-      firecallId,
-      positions
-    ).catch((err) => {
-      console.error('street routing failed', err);
-      return undefined;
-    });
+    const routed = await routedPositionsFor(firecallId, item, positions);
     update = routed
       ? {
           routedPositions: JSON.stringify(routed),
-          routedFor: positionsSignature(positions),
+          routedFor: itemRoutingSignature(item),
           routingFailed: '',
           distance: Math.round(calculateDistance(routed)),
         }
       : {
           routedPositions: '',
-          // Die Signatur wird auch beim Fehlschlag gesetzt: Sie hält fest, für
-          // welche Punkte das Routing nicht zu bekommen war, und verhindert
-          // damit einen Aufruf bei jeder weiteren Änderung.
-          routedFor: positionsSignature(positions),
+          // Die Signatur wird auch beim Fehlschlag gesetzt: Sie hält fest,
+          // wofür das Routing nicht zu bekommen war, und verhindert damit einen
+          // Aufruf bei jeder weiteren Änderung.
+          routedFor: itemRoutingSignature(item),
           routingFailed: 'true',
           distance: airlineDistance,
         };

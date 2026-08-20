@@ -25,7 +25,7 @@ vi.mock('./streetRoutingAction', () => ({
     computeStreetRoutedPositions(...(args as [])),
 }));
 
-import { positionsSignature } from './routedPath';
+import { MAX_ROUTING_POINTS, routingSignature } from './routedPath';
 import { ensureConnectionRouting } from './ensureConnectionRouting';
 
 const hydrant: LatLngPosition = [47.9482, 16.8482];
@@ -56,7 +56,7 @@ const routedConnection = (overrides: Partial<Connection> = {}) =>
   connection({
     streetRouting: 'true',
     routedPositions: JSON.stringify(routed),
-    routedFor: positionsSignature(points),
+    routedFor: routingSignature(points, 'walk'),
     ...overrides,
   });
 
@@ -75,11 +75,12 @@ describe('ensureConnectionRouting', () => {
 
     expect(computeStreetRoutedPositions).toHaveBeenCalledWith(
       'einsatz-1',
-      points
+      points,
+      'walk'
     );
     const value = writtenValue();
     expect(JSON.parse(value.routedPositions)).toEqual(routed);
-    expect(value.routedFor).toBe(positionsSignature(points));
+    expect(value.routedFor).toBe(routingSignature(points, 'walk'));
     expect(value.routingFailed).toBe('');
     // Der Straßenverlauf ist länger als die Luftlinie zwischen den Punkten.
     expect(value.distance).toBeGreaterThan(0);
@@ -95,6 +96,48 @@ describe('ensureConnectionRouting', () => {
     expect(value.routedPositions).toBe('');
     // Die Leitung bleibt bestehen und trägt die Luftlinien-Länge.
     expect(value.distance).toBeGreaterThan(0);
+  });
+
+  it('routet die Linie mit dem gewählten Profil', async () => {
+    computeStreetRoutedPositions.mockResolvedValue(routed);
+
+    await ensureConnectionRouting(
+      'einsatz-1',
+      connection({
+        type: 'line' as Connection['type'],
+        streetRouting: 'true',
+        routingProfile: 'drive',
+      })
+    );
+
+    expect(computeStreetRoutedPositions).toHaveBeenCalledWith(
+      'einsatz-1',
+      points,
+      'drive'
+    );
+    expect(writtenValue().routedFor).toBe(routingSignature(points, 'drive'));
+  });
+
+  it('routet zu viele Punkte nicht, sondern weist die Luftlinie aus', async () => {
+    // Eine GPS-Aufzeichnung wächst mit jedem Messpunkt; ohne die Schranke ginge
+    // je Messpunkt eine Anfrage über die Leitung, die sicher abgelehnt wird.
+    const many = Array.from(
+      { length: MAX_ROUTING_POINTS + 1 },
+      (_, i) => [47.9 + i / 10000, 16.8 + i / 10000] as LatLngPosition
+    );
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await ensureConnectionRouting(
+      'einsatz-1',
+      connection({
+        type: 'line' as Connection['type'],
+        streetRouting: 'true',
+        positions: JSON.stringify(many),
+      })
+    );
+
+    expect(computeStreetRoutedPositions).not.toHaveBeenCalled();
+    expect(writtenValue().routingFailed).toBe('true');
   });
 
   it('räumt beim Abschalten Geometrie und Kennzeichnung weg', async () => {

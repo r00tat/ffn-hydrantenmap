@@ -256,21 +256,23 @@ function legFromResponse(leg: {
   };
 }
 
+/** Die Profile, für die es einen Aufrufer gibt. */
+export type RouteTravelMode = 'WALK' | 'DRIVE';
+
 /**
- * Die Abschnitte einer Fußgänger-Route über die übergebenen Punkte, jeweils mit
- * Geometrie und Straßenstrecke — oder `undefined`, wenn der Dienst nicht
- * antwortet.
+ * Die Abschnitte einer Route über die übergebenen Punkte, jeweils mit Geometrie
+ * und Straßenstrecke — oder `undefined`, wenn der Dienst nicht antwortet.
  *
- * Fußgänger-Profil, weil eine Schlauchleitung der Straße folgt, sich aber
- * weder an Einbahnen noch an Abbiegeverbote hält. `routingPreference` bleibt
- * deshalb weg: Die Routes API nimmt es nur für `DRIVE` und `TWO_WHEELER` an und
- * lehnt den Aufruf sonst ab.
+ * `WALK` folgt der Straße, hält sich aber nicht an Einbahnen und
+ * Abbiegeverbote; das ist das Profil der Schlauchleitung. `DRIVE` gilt, wo eine
+ * Anfahrtsstrecke gemessen werden soll.
  *
  * Wirft bewusst nicht: Fällt das Routing aus, zeichnet die Karte die direkte
  * Verbindung — eine Leitung darf daran nicht verloren gehen.
  */
-export async function computeWalkingRouteLegs(
-  points: GeoPositionObject[]
+export async function computeRouteLegsGeometry(
+  points: GeoPositionObject[],
+  travelMode: RouteTravelMode
 ): Promise<RoutedLeg[] | undefined> {
   if (points.length < 2) {
     return [];
@@ -285,7 +287,10 @@ export async function computeWalkingRouteLegs(
     start += MAX_WAYPOINTS_PER_REQUEST - 1
   ) {
     const chunk = points.slice(start, start + MAX_WAYPOINTS_PER_REQUEST);
-    const chunkLegs = await computeWalkingRouteLegsChunk(chunk);
+    const chunkLegs = await computeRouteLegsGeometryChunk(
+      chunk,
+      travelMode
+    );
     if (!chunkLegs) {
       return undefined;
     }
@@ -295,15 +300,23 @@ export async function computeWalkingRouteLegs(
   return legs;
 }
 
-async function computeWalkingRouteLegsChunk(
-  points: GeoPositionObject[]
+async function computeRouteLegsGeometryChunk(
+  points: GeoPositionObject[],
+  travelMode: RouteTravelMode
 ): Promise<RoutedLeg[] | undefined> {
   const response = await callComputeRoutes(
     {
       origin: toWaypoint(points[0]),
       destination: toWaypoint(points[points.length - 1]),
       intermediates: points.slice(1, -1).map(toWaypoint),
-      travelMode: 'WALK',
+      travelMode,
+      // Nur beim Auto-Profil: Die Routes API nimmt `routingPreference` allein
+      // für `DRIVE` und `TWO_WHEELER` an und lehnt den Aufruf sonst ab.
+      // Verkehrsabhängiges Routing fiele in eine teurere SKU und änderte an der
+      // gefahrenen Strecke nichts.
+      ...(travelMode === 'DRIVE'
+        ? { routingPreference: 'TRAFFIC_UNAWARE' }
+        : {}),
       // Ohne das kommt die Geometrie als kodierte Polyline zurück und müsste
       // erst dekodiert werden.
       polylineEncoding: 'GEO_JSON_LINESTRING',
@@ -321,7 +334,7 @@ async function computeWalkingRouteLegsChunk(
   const expectedLegs = points.length - 1;
   if (!responseLegs || responseLegs.length !== expectedLegs) {
     console.error(
-      'computeWalkingRouteLegs: keine Route oder unerwartete Antwort',
+      'computeRouteLegsGeometry: keine Route oder unerwartete Antwort',
       body,
       { points }
     );
@@ -330,7 +343,7 @@ async function computeWalkingRouteLegsChunk(
 
   const legs = responseLegs.map(legFromResponse);
   if (legs.some((leg) => leg === undefined)) {
-    console.error('computeWalkingRouteLegs: Abschnitt ohne Geometrie', body, {
+    console.error('computeRouteLegsGeometry: Abschnitt ohne Geometrie', body, {
       points,
     });
     return undefined;

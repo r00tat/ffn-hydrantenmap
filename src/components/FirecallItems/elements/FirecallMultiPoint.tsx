@@ -17,6 +17,10 @@ import ConnectionMarker from './connection/ConnectionComponent';
 import { getConnectionPositions } from './connection/distance';
 import { nearestInsertIndex } from './connection/pointGeometry';
 import { addFirecallPosition } from './connection/positions';
+import {
+  connectionDisplayPositions,
+  isStreetRoutingFallback,
+} from './connection/streetRouting';
 import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 
 export class FirecallMultiPoint extends FirecallItemBase {
@@ -27,6 +31,17 @@ export class FirecallMultiPoint extends FirecallItemBase {
   distance?: number;
   color?: string;
   alwaysShowMarker?: string;
+  /**
+   * Straßen-Routing. Die Felder stehen hier und nicht erst an Leitung und Linie,
+   * weil `data()` die Grundlage jedes Schreibvorgangs ist — was dort fehlt,
+   * löscht ein Speichern aus dem Dialog. Angeboten wird die Option nur, wo sie
+   * einen Sinn hat (siehe `fields()` von `FirecallConnection`/`FirecallLine`).
+   */
+  streetRouting?: string;
+  routingProfile?: string;
+  routedPositions?: string;
+  routedFor?: string;
+  routingFailed?: string;
 
   public constructor(firecallItem?: MultiPointItem) {
     super(firecallItem);
@@ -39,6 +54,11 @@ export class FirecallMultiPoint extends FirecallItemBase {
         distance: this.distance,
         color: this.color,
         alwaysShowMarker: this.alwaysShowMarker = 'false',
+        streetRouting: this.streetRouting,
+        routingProfile: this.routingProfile,
+        routedPositions: this.routedPositions,
+        routedFor: this.routedFor,
+        routingFailed: this.routingFailed,
       } = firecallItem);
     }
   }
@@ -76,6 +96,11 @@ export class FirecallMultiPoint extends FirecallItemBase {
       distance: this.distance,
       color: this.color,
       alwaysShowMarker: this.alwaysShowMarker,
+      streetRouting: this.streetRouting,
+      routingProfile: this.routingProfile,
+      routedPositions: this.routedPositions,
+      routedFor: this.routedFor,
+      routingFailed: this.routingFailed,
     } as Connection;
   }
 
@@ -124,12 +149,22 @@ export class FirecallMultiPoint extends FirecallItemBase {
   }
 
   /**
-   * Der Verlauf, den die Karte zeichnet. Für die meisten Elemente sind das die
-   * gesetzten Punkte; eine Leitung mit Straßen-Routing zeichnet stattdessen den
-   * gerouteten Verlauf (siehe `FirecallConnection`).
+   * Der Verlauf, den die Karte zeichnet: mit aktivem Straßen-Routing der
+   * gespeicherte Straßenverlauf, sonst die gesetzten Punkte. Die Länge in
+   * `distance` gehört zu genau dieser Linie.
    */
   public displayPositions(): LatLngPosition[] {
-    return getConnectionPositions(this.data());
+    return connectionDisplayPositions(this.data());
+  }
+
+  /**
+   * Hinweis, wenn das Routing ausgefallen ist: Die Meterangabe ist dann die
+   * Luftlinie und damit zu kurz — ohne den Hinweis fehlen im Einsatz Schläuche.
+   */
+  protected routingHint(): string {
+    return isStreetRoutingFallback(this.data())
+      ? ' (Luftlinie, Straßen-Routing fehlgeschlagen)'
+      : '';
   }
   public icon(): Icon<IconOptions> {
     return leafletIcons().circle;

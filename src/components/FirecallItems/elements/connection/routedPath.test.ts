@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LatLngPosition } from '../../../../common/geo';
 import type { RoutedLeg } from '../../../actions/maps/routes';
-import { positionsSignature, stitchRoutedPositions } from './routedPath';
+import {
+  routingProfile,
+  routingSignature,
+  stitchRoutedPositions,
+} from './routedPath';
 
 const hydrant: LatLngPosition = [47.9482, 16.8482];
 const verteiler: LatLngPosition = [47.9502, 16.8512];
@@ -78,27 +82,51 @@ describe('stitchRoutedPositions', () => {
   });
 });
 
-describe('positionsSignature', () => {
+describe('routingSignature', () => {
   it('unterscheidet verschobene Punkte', () => {
-    // Die Signatur entscheidet, ob die gespeicherte Geometrie noch zu den
-    // Punkten gehört — ein verschobener Punkt muss sie ungültig machen.
-    expect(positionsSignature([hydrant, verteiler])).not.toBe(
-      positionsSignature([hydrant, [47.9503, 16.8512]])
+    // Die Signatur entscheidet, ob die gespeicherte Geometrie noch gilt — ein
+    // verschobener Punkt muss sie ungültig machen.
+    expect(routingSignature([hydrant, verteiler], 'walk')).not.toBe(
+      routingSignature([hydrant, [47.9503, 16.8512]], 'walk')
     );
   });
 
   it('unterscheidet hinzugefügte und entfernte Punkte', () => {
-    expect(positionsSignature([hydrant, verteiler])).not.toBe(
-      positionsSignature([hydrant, verteiler, rohr])
+    expect(routingSignature([hydrant, verteiler], 'walk')).not.toBe(
+      routingSignature([hydrant, verteiler, rohr], 'walk')
     );
   });
 
-  it('ist für dieselben Punkte stabil', () => {
-    expect(positionsSignature([hydrant, verteiler])).toBe(
-      positionsSignature([
-        [47.9482, 16.8482],
-        [47.9502, 16.8512],
-      ])
+  it('unterscheidet die Profile', () => {
+    // Ein Wechsel von Fuß auf Auto ändert die Route, ohne einen Punkt zu
+    // verschieben. Ohne das blieb die alte Geometrie stehen.
+    expect(routingSignature([hydrant, verteiler], 'walk')).not.toBe(
+      routingSignature([hydrant, verteiler], 'drive')
     );
+  });
+
+  it('ist für dieselbe Lage stabil', () => {
+    expect(routingSignature([hydrant, verteiler], 'walk')).toBe(
+      routingSignature(
+        [
+          [47.9482, 16.8482],
+          [47.9502, 16.8512],
+        ],
+        'walk'
+      )
+    );
+  });
+});
+
+describe('routingProfile', () => {
+  it('nimmt das Auto-Profil nur beim genauen Wert', () => {
+    expect(routingProfile('drive')).toBe('drive');
+  });
+
+  it('fällt auf Fuß zurück — der Wert kommt aus dem Browser', () => {
+    expect(routingProfile(undefined)).toBe('walk');
+    expect(routingProfile('')).toBe('walk');
+    expect(routingProfile('DRIVE')).toBe('walk');
+    expect(routingProfile('fliegen')).toBe('walk');
   });
 });

@@ -19,8 +19,8 @@ vi.mock('../../../server/firebase/project', () => ({
 
 import {
   computeRouteDistanceMeters,
+  computeRouteLegsGeometry,
   computeRouteLegsMeters,
-  computeWalkingRouteLegs,
 } from './routes';
 
 const from = { lat: 47.9482913, lng: 16.848222 };
@@ -266,7 +266,7 @@ describe('computeRouteLegsMeters', () => {
   });
 });
 
-describe('computeWalkingRouteLegs', () => {
+describe('computeRouteLegsGeometry', () => {
   const leg = (
     coordinates: [number, number][],
     distanceMeters?: number
@@ -311,7 +311,7 @@ describe('computeWalkingRouteLegs', () => {
     ]);
 
     await expect(
-      computeWalkingRouteLegs([from, to])
+      computeRouteLegsGeometry([from, to], 'WALK')
     ).resolves.toEqual([
       {
         positions: [
@@ -333,7 +333,7 @@ describe('computeWalkingRouteLegs', () => {
       ]),
     ]);
 
-    await computeWalkingRouteLegs([from, to]);
+    await computeRouteLegsGeometry([from, to], 'WALK');
 
     const [, init] = vi.mocked(fetch).mock.calls[0];
     const headers = (init as RequestInit).headers as Record<string, string>;
@@ -344,6 +344,25 @@ describe('computeWalkingRouteLegs', () => {
     expect(body.travelMode).toBe('WALK');
     expect(body.routingPreference).toBeUndefined();
     expect(body.polylineEncoding).toBe('GEO_JSON_LINESTRING');
+  });
+
+  it('schickt beim Auto-Profil routingPreference mit', async () => {
+    // Für DRIVE ist das Feld erlaubt; ohne es fiele das Routing in eine
+    // teurere, verkehrsabhängige SKU.
+    respondWithLegs([
+      leg([
+        [16.848, 47.948],
+        [16.849, 47.949],
+      ]),
+    ]);
+
+    await computeRouteLegsGeometry([from, to], 'DRIVE');
+
+    const body = JSON.parse(
+      (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(body.travelMode).toBe('DRIVE');
+    expect(body.routingPreference).toBe('TRAFFIC_UNAWARE');
   });
 
   it('schickt die Punkte dazwischen als intermediates', async () => {
@@ -359,7 +378,7 @@ describe('computeWalkingRouteLegs', () => {
       ]),
     ]);
 
-    const legs = await computeWalkingRouteLegs([from, middle, to]);
+    const legs = await computeRouteLegsGeometry([from, middle, to], 'WALK');
 
     expect(legs).toHaveLength(2);
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -387,7 +406,7 @@ describe('computeWalkingRouteLegs', () => {
       [straightLeg]
     );
 
-    const legs = await computeWalkingRouteLegs(points);
+    const legs = await computeRouteLegsGeometry(points, 'WALK');
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(legs).toHaveLength(25);
@@ -411,7 +430,7 @@ describe('computeWalkingRouteLegs', () => {
     ]);
 
     await expect(
-      computeWalkingRouteLegs([from, { lat: 47.95, lng: 16.86 }, to])
+      computeRouteLegsGeometry([from, { lat: 47.95, lng: 16.86 }, to], 'WALK')
     ).resolves.toBeUndefined();
   });
 
@@ -419,7 +438,7 @@ describe('computeWalkingRouteLegs', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     respondWithLegs([{ distanceMeters: 100 }]);
 
-    await expect(computeWalkingRouteLegs([from, to])).resolves.toBeUndefined();
+    await expect(computeRouteLegsGeometry([from, to], 'WALK')).resolves.toBeUndefined();
   });
 
   it('liefert undefined, wenn ein Block der Aufteilung ausfällt', async () => {
@@ -446,11 +465,11 @@ describe('computeWalkingRouteLegs', () => {
       } as Response;
     });
 
-    await expect(computeWalkingRouteLegs(points)).resolves.toBeUndefined();
+    await expect(computeRouteLegsGeometry(points, 'WALK')).resolves.toBeUndefined();
   });
 
   it('gibt für einen einzelnen Punkt keine Anfrage ab', async () => {
-    await expect(computeWalkingRouteLegs([from])).resolves.toEqual([]);
+    await expect(computeRouteLegsGeometry([from], 'WALK')).resolves.toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
   });
 });

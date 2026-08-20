@@ -18,6 +18,22 @@ import type { RoutedLeg } from '../../../actions/maps/routes';
  */
 export const MAX_ROUTING_POINTS = 50;
 
+/**
+ * Das Profil, mit dem geroutet wird.
+ *
+ * `walk` ist für die Schlauchleitung richtig: Sie folgt der Straße, hält sich
+ * aber nicht an Einbahnen und Abbiegeverbote. `drive` gibt es für die Linie, wo
+ * eine Anfahrtsstrecke gemessen werden soll — dort sind Fußwege und
+ * Fußgängerzonen kein gültiger Weg und die Fahrtrichtung zählt.
+ */
+export type RoutingProfile = 'walk' | 'drive';
+
+export const DEFAULT_ROUTING_PROFILE: RoutingProfile = 'walk';
+
+/** Normalisiert einen gespeicherten Feldwert; alles Unbekannte gilt als Fuß. */
+export const routingProfile = (value?: string): RoutingProfile =>
+  value === 'drive' ? 'drive' : DEFAULT_ROUTING_PROFILE;
+
 const samePosition = (a: LatLngPosition, b: LatLngPosition) =>
   a[0] === b[0] && a[1] === b[1];
 
@@ -54,13 +70,19 @@ export function stitchRoutedPositions(
 }
 
 /**
- * Erkennungszeichen der Punkte, aus denen eine gespeicherte Geometrie berechnet
- * wurde. Weicht es von den aktuellen Punkten ab, wird neu geroutet.
+ * Erkennungszeichen dessen, woraus eine gespeicherte Geometrie berechnet wurde.
+ * Weicht es von der aktuellen Lage ab, wird neu geroutet.
+ *
+ * Das Profil gehört mit hinein: Ein Wechsel von Fuß auf Auto ändert die Route,
+ * ohne einen Punkt zu verschieben — ohne das blieb die alte Geometrie stehen.
  *
  * Ohne Toleranz verglichen: Die Punkte stammen aus demselben Schreibvorgang wie
  * die Signatur, und eine Abweichung kostet nur einen Routing-Aufruf. Dieselbe
  * Überlegung wie beim Routen-Cache am Einsatz (`firecallRoute.ts`).
  */
-export function positionsSignature(positions: LatLngPosition[]): string {
-  return JSON.stringify(positions);
+export function routingSignature(
+  positions: LatLngPosition[],
+  profile: RoutingProfile
+): string {
+  return `${profile}:${JSON.stringify(positions)}`;
 }
