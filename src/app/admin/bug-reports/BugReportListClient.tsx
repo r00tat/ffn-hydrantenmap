@@ -6,6 +6,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
@@ -23,6 +24,7 @@ import {
   type BugReportKind,
   type BugReportStatus,
 } from '../../../common/bugReport';
+import { parseBugReportIssueRef } from '../../../common/bugReportTracking';
 import { formatBugReportDate } from '../../../common/bugReportDate';
 import { useSnackbar } from '../../../components/providers/SnackbarProvider';
 import BugReportConfigSection from './BugReportConfigSection';
@@ -110,6 +112,9 @@ export default function BugReportListClient({
         r.createdBy?.displayName ?? '',
         r.context?.buildId ?? '',
         r.context?.firecallName ?? '',
+        r.githubIssue ?? '',
+        r.assignee ?? '',
+        r.internalNote ?? '',
       ]
         .join(' ')
         .toLowerCase();
@@ -185,6 +190,7 @@ export default function BugReportListClient({
               <TableCell>{t('colTitle')}</TableCell>
               <TableCell>{t('colUser')}</TableCell>
               <TableCell>{t('colStatus')}</TableCell>
+              <TableCell>{t('colGithub')}</TableCell>
               <TableCell align="right">{t('colAttachments')}</TableCell>
               <TableCell>{t('colBuild')}</TableCell>
             </TableRow>
@@ -192,14 +198,14 @@ export default function BugReportListClient({
           <TableBody>
             {refreshing && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   <CircularProgress size={20} />
                 </TableCell>
               </TableRow>
             )}
             {!refreshing && filteredReports.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} align="center">
+                <TableCell colSpan={8} align="center">
                   <Typography variant="body2" sx={{ py: 2 }}>
                     {t('noReports')}
                   </Typography>
@@ -212,6 +218,7 @@ export default function BugReportListClient({
                   report.createdBy?.displayName ||
                   report.createdBy?.email ||
                   '-';
+                const issueRef = parseBugReportIssueRef(report.githubIssue);
                 return (
                   <TableRow
                     key={report.id}
@@ -245,6 +252,20 @@ export default function BugReportListClient({
                         label={t(STATUS_KEY[report.status])}
                         color={STATUS_COLOR[report.status] ?? 'default'}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {issueRef ? (
+                        <Link
+                          href={issueRef.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {issueRef.label}
+                        </Link>
+                      ) : (
+                        '-'
+                      )}
                     </TableCell>
                     <TableCell align="right">
                       {attachmentCount(report)}
