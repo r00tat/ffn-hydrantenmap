@@ -71,4 +71,33 @@ describe('renderFirecallSelect', () => {
     expect(opt.textContent).toContain('Brand');
     expect(opt.textContent).toContain('2026');
   });
+
+  it('shows a placeholder option while nothing is selected', () => {
+    const fcs: FirecallEntry[] = [
+      { id: 'a', name: 'Brand', date: '2026-05-02T10:00:00Z' },
+    ];
+    renderFirecallSelect(container, fcs, null, () => {});
+    const select = container.querySelector('select') as HTMLSelectElement;
+    expect(select.options.length).toBe(2);
+    expect(select.value).toBe('');
+    expect(select.options[0]!.textContent).toContain('wählen');
+  });
+
+  it('shows a placeholder when the selected firecall is not in the list', () => {
+    const fcs: FirecallEntry[] = [
+      { id: 'a', name: 'Brand', date: '2026-05-02T10:00:00Z' },
+    ];
+    renderFirecallSelect(container, fcs, 'gone', () => {});
+    const select = container.querySelector('select') as HTMLSelectElement;
+    expect(select.value).toBe('');
+  });
+
+  it('does not call onChange for the placeholder option', () => {
+    const onChange = vi.fn();
+    renderFirecallSelect(container, [{ id: 'a', name: 'Brand' }], null, onChange);
+    const select = container.querySelector('select') as HTMLSelectElement;
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
