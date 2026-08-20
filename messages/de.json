@@ -880,7 +880,7 @@
         "status": "Status",
         "vehicle": "Fahrzeug",
         "all": "Alle",
-        "openOnly": "Offen und in Arbeit"
+        "openAll": "Offen und in Arbeit"
       },
       "errors": {
         "vehicleMissing": "Bitte ein Fahrzeug wählen.",

@@ -18,6 +18,7 @@ import {
   MANGEL_STATUSES,
   isOpenMangel,
   type Mangel,
+  type MangelStatus,
 } from '../../common/mangel';
 import useFahrtenbuchGroup from '../../hooks/useFahrtenbuchGroup';
 import useFahrtenbuchMangel from '../../hooks/useFahrtenbuchMangel';
@@ -28,11 +29,38 @@ import MangelList from './MangelList';
 import { deleteMangel } from './mangelActions';
 
 /**
- * Der Statusfilter. `'open'` ist kein einzelner Status, sondern die
+ * Der Statusfilter. `'openAll'` ist kein einzelner Status, sondern die
  * Arbeitsliste (offen *und* in Arbeit) — genau die Sicht, mit der man die
  * Seite öffnet.
+ *
+ * Der Sammelfilter braucht dafür einen eigenen Wert: Hieße er `'open'`, gäbe es
+ * ihn zweimal in der Liste — einmal als Sammelfilter und einmal als Status
+ * `'open'`. MUI vergleicht die Auswahl über den Wert, markierte beide Einträge
+ * und zeigte im geschlossenen Feld den zuletzt gerenderten Treffer; der Filter
+ * „nur Status offen" war damit gar nicht erreichbar (#707).
  */
-type StatusFilter = 'open' | 'all' | (typeof MANGEL_STATUSES)[number];
+export type StatusFilter = 'openAll' | MangelStatus | 'all';
+
+/**
+ * Die Optionen in Anzeigereihenfolge. Ihre Werte müssen paarweise verschieden
+ * sein — ein Test in `MangelPage.test.tsx` wacht darüber.
+ */
+export const MANGEL_STATUS_FILTERS: StatusFilter[] = [
+  'openAll',
+  ...MANGEL_STATUSES,
+  'all',
+];
+
+/**
+ * Der Übersetzungsschlüssel einer Option. Die beiden Sammeleinträge stehen
+ * unter `filters.*`, die echten Status teilen sich die Beschriftungen mit Liste
+ * und Dialog.
+ */
+function statusFilterLabelKey(filter: StatusFilter) {
+  if (filter === 'openAll') return 'filters.openAll';
+  if (filter === 'all') return 'filters.all';
+  return `statuses.${filter}`;
+}
 
 /**
  * Alle Mängel der Gruppe — die Arbeitsliste des Fahrzeugverantwortlichen.
@@ -50,7 +78,7 @@ export default function MangelPage() {
   const { mangel } = useFahrtenbuchMangel(groupId);
   const searchParams = useSearchParams();
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('openAll');
   // Nur die Vorbelegung kommt aus der URL; danach führt der Benutzer den
   // Filter. Ein an die URL gebundener Filter zwänge sonst zu einer Navigation
   // für jede Änderung.
@@ -66,7 +94,7 @@ export default function MangelPage() {
       mangel.filter((item) => {
         if (vehicleFilter && item.vehicleId !== vehicleFilter) return false;
         if (statusFilter === 'all') return true;
-        if (statusFilter === 'open') return isOpenMangel(item);
+        if (statusFilter === 'openAll') return isOpenMangel(item);
         return item.status === statusFilter;
       }),
     [mangel, statusFilter, vehicleFilter],
@@ -158,13 +186,11 @@ export default function MangelPage() {
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           sx={{ minWidth: 200 }}
         >
-          <MenuItem value="open">{t('filters.openOnly')}</MenuItem>
-          {MANGEL_STATUSES.map((s) => (
-            <MenuItem key={s} value={s}>
-              {t(`statuses.${s}` as 'statuses.open')}
+          {MANGEL_STATUS_FILTERS.map((f) => (
+            <MenuItem key={f} value={f}>
+              {t(statusFilterLabelKey(f) as 'statuses.open')}
             </MenuItem>
           ))}
-          <MenuItem value="all">{t('filters.all')}</MenuItem>
         </TextField>
         <TextField
           select
