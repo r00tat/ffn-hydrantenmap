@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
@@ -20,16 +22,29 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
+  BUG_REPORT_COMMENT_MAX_LENGTH,
+  BUG_REPORT_SHORT_FIELD_MAX_LENGTH,
   type BugReport,
+  type BugReportChange,
+  type BugReportComment,
   type BugReportStatus,
+  type BugReportTrackedField,
 } from '../../../common/bugReport';
+import {
+  buildBugReportIssueDraftUrl,
+  parseBugReportIssueRef,
+} from '../../../common/bugReportTracking';
 import { formatBugReportDate } from '../../../common/bugReportDate';
 import { useSnackbar } from '../../../components/providers/SnackbarProvider';
 import {
+  addBugReportCommentAction,
   getBugReportAction,
+  listBugReportCommentsAction,
+  updateBugReportAction,
   updateBugReportStatusAction,
 } from './bugReportAdminActions';
 
@@ -44,6 +59,7 @@ interface DetailData {
   report: BugReport;
   screenshotUrls: string[];
   attachmentUrls: string[];
+  comments: BugReportComment[];
 }
 
 const STATUS_OPTIONS = [
@@ -52,6 +68,20 @@ const STATUS_OPTIONS = [
   { value: 'closed', tKey: 'statusClosed' },
   { value: 'wontfix', tKey: 'statusWontfix' },
 ] as const satisfies readonly { value: BugReportStatus; tKey: string }[];
+
+const STATUS_TKEY = {
+  open: 'statusOpen',
+  in_progress: 'statusInProgress',
+  closed: 'statusClosed',
+  wontfix: 'statusWontfix',
+} as const satisfies Record<BugReportStatus, string>;
+
+const FIELD_TKEY = {
+  status: 'fieldStatus',
+  githubIssue: 'fieldGithubIssue',
+  assignee: 'fieldAssignee',
+  internalNote: 'fieldInternalNote',
+} as const satisfies Record<BugReportTrackedField, string>;
 
 function MetadataRow({
   label,
@@ -80,6 +110,64 @@ function MetadataRow({
   );
 }
 
+/** Ein Wert im Verlauf soll eine Zeile bleiben, auch wenn er eine Notiz ist. */
+function truncate(value: string, maxLength = 80): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
+}
+
+function ChangeLine({ change }: { change: BugReportChange }) {
+  const t = useTranslations('bugReport');
+  const display = (value: string): string => {
+    if (!value) return t('valueEmpty');
+    if (change.field === 'status') {
+      const tKey = STATUS_TKEY[value as BugReportStatus];
+      return tKey ? t(tKey) : value;
+    }
+    if (change.field === 'githubIssue') {
+      return parseBugReportIssueRef(value)?.label ?? value;
+    }
+    return truncate(value);
+  };
+  return (
+    <Typography variant="body2" color="text.secondary">
+      {t('changeLine', {
+        field: t(FIELD_TKEY[change.field]),
+        from: display(change.from),
+        to: display(change.to),
+      })}
+    </Typography>
+  );
+}
+
+function HistoryEntry({ entry }: { entry: BugReportComment }) {
+  const author =
+    entry.createdBy?.displayName || entry.createdBy?.email || '-';
+  return (
+    <Box
+      sx={{
+        borderLeft: 3,
+        borderColor:
+          entry.entryType === 'change' ? 'divider' : 'primary.main',
+        pl: 1.5,
+      }}
+    >
+      <Typography variant="caption" color="text.secondary" component="div">
+        {formatBugReportDate(entry.createdAt, { withSeconds: true })} ·{' '}
+        {author}
+      </Typography>
+      {entry.entryType === 'change' ? (
+        (entry.changes ?? []).map((change, index) => (
+          <ChangeLine key={`${change.field}-${index}`} change={change} />
+        ))
+      ) : (
+        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+          {entry.text}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 export default function BugReportDetailDialog({
   reportId,
   open,
@@ -92,6 +180,19 @@ export default function BugReportDetailDialog({
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DetailData | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [githubIssue, setGithubIssue] = useState('');
+  const [assignee, setAssignee] = useState('');
+  const [internalNote, setInternalNote] = useState('');
+  const [trackingSaving, setTrackingSaving] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
+
+  const applyResult = useCallback((result: DetailData) => {
+    setData(result);
+    setGithubIssue(result.report.githubIssue ?? '');
+    setAssignee(result.report.assignee ?? '');
+    setInternalNote(result.report.internalNote ?? '');
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -104,7 +205,7 @@ export default function BugReportDetailDialog({
     getBugReportAction(reportId)
       .then((result) => {
         if (cancelled) return;
-        setData(result);
+        applyResult(result);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -118,7 +219,7 @@ export default function BugReportDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [reportId, open]);
+  }, [reportId, open, applyResult]);
 
   const handleStatusChange = useCallback(
     async (status: BugReportStatus) => {
@@ -126,10 +227,9 @@ export default function BugReportDetailDialog({
       setStatusSaving(true);
       try {
         await updateBugReportStatusAction(reportId, status);
-        setData({
-          ...data,
-          report: { ...data.report, status },
-        });
+        // Neu laden statt lokal setzen: die Änderung erzeugt einen
+        // Verlaufseintrag, der sonst erst beim nächsten Öffnen auftaucht.
+        applyResult(await getBugReportAction(reportId));
         showSnackbar(t('statusUpdated'), 'success');
         onStatusChanged();
       } catch (err) {
@@ -141,8 +241,66 @@ export default function BugReportDetailDialog({
         setStatusSaving(false);
       }
     },
-    [data, reportId, onStatusChanged, showSnackbar, t],
+    [data, reportId, onStatusChanged, showSnackbar, t, applyResult],
   );
+
+  const handleSaveTracking = useCallback(async () => {
+    if (!data) return;
+    setTrackingSaving(true);
+    try {
+      await updateBugReportAction(reportId, {
+        githubIssue,
+        assignee,
+        internalNote,
+      });
+      applyResult(await getBugReportAction(reportId));
+      showSnackbar(t('trackingSaved'), 'success');
+      onStatusChanged();
+    } catch (err) {
+      showSnackbar(
+        `${t('trackingSaveFailed')}: ${err instanceof Error ? err.message : String(err)}`,
+        'error',
+      );
+    } finally {
+      setTrackingSaving(false);
+    }
+  }, [
+    data,
+    reportId,
+    githubIssue,
+    assignee,
+    internalNote,
+    applyResult,
+    onStatusChanged,
+    showSnackbar,
+    t,
+  ]);
+
+  const handleAddComment = useCallback(async () => {
+    if (!commentText.trim()) return;
+    setCommentSaving(true);
+    try {
+      await addBugReportCommentAction(reportId, commentText);
+      const comments = await listBugReportCommentsAction(reportId);
+      setData((prev) => (prev ? { ...prev, comments } : prev));
+      setCommentText('');
+      showSnackbar(t('commentAdded'), 'success');
+    } catch (err) {
+      showSnackbar(
+        `${t('commentAddFailed')}: ${err instanceof Error ? err.message : String(err)}`,
+        'error',
+      );
+    } finally {
+      setCommentSaving(false);
+    }
+  }, [commentText, reportId, showSnackbar, t]);
+
+  const issueRef = parseBugReportIssueRef(githubIssue);
+  const trackingDirty =
+    !!data &&
+    (githubIssue !== (data.report.githubIssue ?? '') ||
+      assignee !== (data.report.assignee ?? '') ||
+      internalNote !== (data.report.internalNote ?? ''));
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -277,6 +435,147 @@ export default function BugReportDetailDialog({
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                 {data.report.description}
               </Typography>
+            </Box>
+
+            <Divider />
+
+            {/* Bearbeitung */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                {t('trackingHeader')}
+              </Typography>
+              <Stack spacing={2}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  sx={{ alignItems: 'flex-start' }}
+                >
+                  <TextField
+                    label={t('githubIssueLabel')}
+                    helperText={t('githubIssueHelper')}
+                    size="small"
+                    fullWidth
+                    value={githubIssue}
+                    onChange={(e) => setGithubIssue(e.target.value)}
+                    disabled={trackingSaving}
+                    slotProps={{
+                      htmlInput: { maxLength: BUG_REPORT_SHORT_FIELD_MAX_LENGTH },
+                    }}
+                  />
+                  {issueRef ? (
+                    <Button
+                      component="a"
+                      href={issueRef.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      startIcon={<OpenInNewIcon />}
+                      sx={{ whiteSpace: 'nowrap' }}
+                    >
+                      {t('githubIssueOpen')}
+                    </Button>
+                  ) : (
+                    <Tooltip title={t('githubIssueCreateHint')}>
+                      <Button
+                        component="a"
+                        href={buildBugReportIssueDraftUrl(data.report)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        startIcon={<GitHubIcon />}
+                        sx={{ whiteSpace: 'nowrap' }}
+                      >
+                        {t('githubIssueCreate')}
+                      </Button>
+                    </Tooltip>
+                  )}
+                </Stack>
+                <TextField
+                  label={t('assigneeLabel')}
+                  size="small"
+                  fullWidth
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  disabled={trackingSaving}
+                  slotProps={{
+                    htmlInput: { maxLength: BUG_REPORT_SHORT_FIELD_MAX_LENGTH },
+                  }}
+                />
+                <TextField
+                  label={t('internalNoteLabel')}
+                  size="small"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  value={internalNote}
+                  onChange={(e) => setInternalNote(e.target.value)}
+                  disabled={trackingSaving}
+                  slotProps={{
+                    htmlInput: { maxLength: BUG_REPORT_COMMENT_MAX_LENGTH },
+                  }}
+                />
+                <Box>
+                  <Button
+                    variant="contained"
+                    onClick={() => void handleSaveTracking()}
+                    disabled={!trackingDirty || trackingSaving}
+                    startIcon={
+                      trackingSaving ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : undefined
+                    }
+                  >
+                    {t('save')}
+                  </Button>
+                </Box>
+              </Stack>
+            </Box>
+
+            <Divider />
+
+            {/* Verlauf & Kommentare */}
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                {t('historyHeader')} ({data.comments.length})
+              </Typography>
+              {data.comments.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  {t('historyEmpty')}
+                </Typography>
+              ) : (
+                <Stack spacing={1} sx={{ mb: 2 }}>
+                  {data.comments.map((entry) => (
+                    <HistoryEntry key={entry.id} entry={entry} />
+                  ))}
+                </Stack>
+              )}
+              <TextField
+                label={t('commentAdd')}
+                placeholder={t('commentPlaceholder')}
+                helperText={t('commentInternalHint')}
+                size="small"
+                fullWidth
+                multiline
+                minRows={2}
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                disabled={commentSaving}
+                slotProps={{
+                  htmlInput: { maxLength: BUG_REPORT_COMMENT_MAX_LENGTH },
+                }}
+              />
+              <Box sx={{ mt: 1 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => void handleAddComment()}
+                  disabled={!commentText.trim() || commentSaving}
+                  startIcon={
+                    commentSaving ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : undefined
+                  }
+                >
+                  {t('commentAdd')}
+                </Button>
+              </Box>
             </Box>
 
             {/* Screenshots */}
