@@ -19,6 +19,13 @@ export const FAHRTENBUCH_CONFIG_COLLECTION_ID = 'fahrtenbuchConfig';
 /** Obergrenze für die Empfängerliste — ein Riegel gegen eine manipulierte Anfrage. */
 export const FAHRTENBUCH_MANGEL_EMAILS_MAX = 10;
 
+/**
+ * Höchstzahl der Zusatzfahrer je Fahrt — zehn Fahrer insgesamt. Ein Riegel
+ * gegen eine manipulierte Anfrage, dieselbe Bauweise wie
+ * `FAHRTENBUCH_MANGEL_EMAILS_MAX`.
+ */
+export const FAHRTENBUCH_MAX_CO_DRIVERS = 9;
+
 export interface FahrtenbuchConfig {
   groupId: string;
   /**
@@ -153,12 +160,80 @@ export interface FahrtenbuchVehicle {
   updatedBy: string;
 }
 
+/**
+ * Ein Fahrer einer Fahrt: die verknüpfte Person, sonst nur der Name.
+ *
+ * Frei eingetippte Namen sind zugelassen — bei einem Gast auf einer Übung gibt
+ * es keine Person in den Stammdaten. Der Statistik-Schlüssel fällt dann wie
+ * beim Hauptfahrer auf den normalisierten Namen zurück (`driverKeyOf`).
+ */
+export interface FahrtenbuchDriverRef {
+  id?: string;
+  name: string;
+}
+
+/**
+ * Die Kennungen, unter denen ein Fahrer wiedererkannt wird: seine Personen-ID
+ * und sein normalisierter Name.
+ *
+ * Beide zusammen, weil ein Mensch auf einer Fahrt in zwei Gestalten auftreten
+ * kann — als verknüpfte Person beim Hauptfahrer und als frei eingetippter Name
+ * beim Zusatzfahrer. Nur über die ID verglichen, stünde er zweimal in der
+ * Fahrt, und jeder von beiden bekäme die Hälfte der Strecke.
+ *
+ * Dass damit zwei verschiedene Personen mit gleichem Namen zusammenfallen, ist
+ * bewusst in Kauf genommen: `driverKeyOf` führt sie in der Statistik ohnehin
+ * unter einem Schlüssel. Eine hier anders getroffene Entscheidung würde nur
+ * dort auseinanderlaufen.
+ *
+ * Steht in diesem Basismodul, weil beide Seiten dieselbe Regel brauchen: der
+ * Schreibpfad (`sanitizeCoDrivers`) und die Statistik (`driverSharesOf`).
+ */
+export function driverIdentities(ref: { id?: string; name: string }): string[] {
+  const tokens: string[] = [];
+  const id = ref.id?.trim();
+  if (id) tokens.push(`id:${id}`);
+  const normalized = normalizeName(ref.name ?? '');
+  if (normalized) tokens.push(`name:${normalized}`);
+  return tokens;
+}
+
+/**
+ * Alle Fahrer einer Fahrt als ein Text, Hauptfahrer zuerst.
+ *
+ * Für Nachweisdokument und Wochenbericht: Beide zeigen die Fahrer in der
+ * bestehenden Fahrer-Spalte, ohne eine zweite Spalte. Die Tabelle im
+ * Querformat ist schon breit, und die große Mehrheit der Fahrten hat keinen
+ * Zusatzfahrer — eine eigene Spalte nähme allen anderen dauerhaft Platz weg.
+ */
+export function driverNamesOf(
+  entry: Pick<FahrtenbuchEntry, 'driverName' | 'coDrivers'>,
+): string {
+  return [
+    entry.driverName?.trim(),
+    ...(entry.coDrivers ?? []).map((ref) => ref.name?.trim()),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 export interface FahrtenbuchEntry {
   id?: string;
   vehicleId: string;
   vehicleName: string;
   driverId?: string;
   driverName: string;
+  /**
+   * Weitere Fahrer, die sich auf dieser Fahrt abgewechselt haben — ohne den
+   * Hauptfahrer, der in `driverName`/`driverId` steht.
+   *
+   * Bewusst additiv und nicht ein gemeinsames `drivers[]`: Ein Array mit
+   * „Index 0 ist der Hauptfahrer" bräuchte eine Migration über alle
+   * bestehenden Fahrten und versteckte die Pflicht/Optional-Unterscheidung in
+   * einer Indexkonvention. `undefined` heißt „ein Fahrer"; eine leere Liste
+   * wird nicht geschrieben.
+   */
+  coDrivers?: FahrtenbuchDriverRef[];
   zweck: FahrtZweck;
   firecallId?: string;
   firecallName?: string;
@@ -284,6 +359,7 @@ export interface CounterWarning {
 export interface EntryInput {
   vehicleId: string;
   driverName: string;
+  coDrivers?: FahrtenbuchDriverRef[];
   /** Muss einer der Werte aus `FAHRT_ZWECKE` sein. */
   zweck: string;
   ziel: string;
@@ -385,6 +461,16 @@ export function validateEntryInput(
   if (!input.vehicleId?.trim()) errors.push('vehicleMissing');
   if (!input.driverName?.trim() && requiresDriver(definitions)) {
     errors.push('driverMissing');
+  }
+  // Nur benannte Zusatzfahrer zählen: Ein leeres Chip-Feld aus der Oberfläche
+  // ist kein Fehler, es wird beim Speichern verworfen. Über der Grenze wird
+  // abgelehnt statt abgeschnitten — Namen still zu verwerfen wäre in einem
+  // Nachweisdokument schlimmer als eine Fehlermeldung.
+  const namedCoDrivers = (input.coDrivers ?? []).filter((ref) =>
+    ref?.name?.trim(),
+  );
+  if (namedCoDrivers.length > FAHRTENBUCH_MAX_CO_DRIVERS) {
+    errors.push('coDriversTooMany');
   }
   if (!FAHRT_ZWECKE.includes(input.zweck as FahrtZweck)) {
     errors.push('zweckInvalid');

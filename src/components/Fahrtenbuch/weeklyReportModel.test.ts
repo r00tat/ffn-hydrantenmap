@@ -605,3 +605,14 @@ describe('buildWeeklyReportModel', () => {
     expect(model.period.week).toBe(32);
   });
 });
+
+describe('buildWeeklyReportModel — Zusatzfahrer', () => {
+  it('nennt alle Fahrer im Feld driver', () => {
+    const model = build({
+      entries: [
+        entry({ driverName: 'Lukas Fürst', coDrivers: [{ name: 'Anna Bauer' }] }),
+      ],
+    });
+    expect(model.vehicles[0].rows[0].driver).toBe('Lukas Fürst, Anna Bauer');
+  });
+});

@@ -14,6 +14,7 @@
  */
 
 import {
+  driverNamesOf,
   FUEL_TYPES,
   type CounterDefinition,
   type CounterReading,
@@ -441,7 +442,7 @@ export function buildFahrtenbuchExport(
         cells: [
           formatDate(entry.abfahrt, timeZone),
           formatTimeRange(entry, timeZone),
-          entry.driverName ?? '',
+          driverNamesOf(entry),
           t(`zwecke.${entry.zweck}`),
           entry.ziel?.trim() || entry.firecallName || '',
           ...counterCells,

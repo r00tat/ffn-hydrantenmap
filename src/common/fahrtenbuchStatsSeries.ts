@@ -20,7 +20,8 @@ import {
 } from './fahrtenbuch';
 import {
   counterDiffsByUnit,
-  driverKeyOf,
+  driverSharesOf,
+  entryDriverShare,
   entryDurationMinutes,
   hasEstimatedCounter,
   metricValue,
@@ -105,9 +106,20 @@ function hasDiffCounter(vehicle: FahrtenbuchVehicle | undefined): boolean {
   return (vehicle?.counters ?? []).some((def) => def.mode === 'startEnd');
 }
 
+export interface BuildStatsSummaryOptions {
+  /**
+   * Der gesetzte Fahrerfilter. Ist er gesetzt, gehen Dauer,
+   * Zählerdifferenzen und getankte Mengen mit dem Anteil dieses Fahrers ein;
+   * Fahrten, Defekte und die Qualitätszahlen bleiben ganz — sie zählen
+   * Fahrten, nicht Leistung.
+   */
+  driverKey?: string;
+}
+
 export function buildStatsSummary(
   entries: FahrtenbuchEntry[],
   vehiclesById: VehicleLookup,
+  options?: BuildStatsSummaryOptions,
 ): StatsSummary {
   const counters = new Map<string, { value: number; trips: number }>();
   const fuels = new Map<FuelType, number>();
@@ -118,7 +130,8 @@ export function buildStatsSummary(
 
   for (const entry of entries) {
     const vehicle = vehiclesById.get(entry.vehicleId);
-    durationMinutes += entryDurationMinutes(entry) ?? 0;
+    const share = entryDriverShare(entry, options?.driverKey);
+    durationMinutes += (entryDurationMinutes(entry) ?? 0) * share;
     if (entry.defekt) defects += 1;
     if (hasEstimatedCounter(entry)) estimatedTrips += 1;
 
@@ -127,7 +140,7 @@ export function buildStatsSummary(
     if (units.length === 0 && hasDiffCounter(vehicle)) tripsWithoutCounter += 1;
     for (const [unit, value] of units) {
       const total = counters.get(unit) ?? { value: 0, trips: 0 };
-      total.value = round(total.value + value);
+      total.value = round(total.value + value * share);
       total.trips += 1;
       counters.set(unit, total);
     }
@@ -137,7 +150,7 @@ export function buildStatsSummary(
       if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
         continue;
       }
-      fuels.set(fuel, round((fuels.get(fuel) ?? 0) + amount));
+      fuels.set(fuel, round((fuels.get(fuel) ?? 0) + amount * share));
     }
   }
 
@@ -157,7 +170,7 @@ export function buildStatsSummary(
 
   return {
     trips: entries.length,
-    durationMinutes,
+    durationMinutes: Math.round(durationMinutes),
     counterTotals,
     fuelTotals,
     fuelLiters: round(
@@ -218,20 +231,28 @@ function stackContributions(
   vehicle: FahrtenbuchVehicle | undefined,
   metric: StatsMetric,
   stackBy: StatsStackBy,
+  driverKey?: string,
 ): StackContribution[] {
   if (stackBy === 'fuel') {
+    const share = entryDriverShare(entry, driverKey);
     const contributions: StackContribution[] = [];
     for (const fuel of FUEL_TYPES) {
       const amount = entry.betriebsmittel?.[fuel];
       if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
         continue;
       }
-      contributions.push({ key: fuel, label: fuel, value: amount });
+      contributions.push({ key: fuel, label: fuel, value: round(amount * share) });
     }
     return contributions;
   }
 
-  const value = metricValue(entry, vehicle, metric);
+  // Der Anteil greift bei allen Aufteilungen außer der nach Fahrer: Dort
+  // entsteht er unten je Fahrer und würde sonst zweimal angewandt.
+  const raw = metricValue(entry, vehicle, metric);
+  const value =
+    stackBy === 'driver'
+      ? raw
+      : round(raw * entryDriverShare(entry, driverKey));
   if (stackBy === 'none') {
     return [{ key: 'total', label: 'total', value }];
   }
@@ -247,13 +268,21 @@ function stackContributions(
       },
     ];
   }
-  const driverKey = driverKeyOf(entry);
-  if (!driverKey) {
-    return [
-      { key: NO_DRIVER_STACK_KEY, label: NO_DRIVER_STACK_KEY, value },
-    ];
+  const drivers = driverSharesOf(entry);
+  if (drivers.length === 0) {
+    return [{ key: NO_DRIVER_STACK_KEY, label: NO_DRIVER_STACK_KEY, value }];
   }
-  return [{ key: driverKey, label: entry.driverName ?? driverKey, value }];
+  // Bei gesetztem Fahrerfilter bleibt nur er übrig: Die Stapel der Mitfahrer
+  // ergäben zusammen den ganzen Wert der Fahrt, während die Kennzahl darüber
+  // nur seinen Anteil zeigt.
+  const shown = driverKey
+    ? drivers.filter((driver) => driver.key === driverKey)
+    : drivers;
+  return shown.map((driver) => ({
+    key: driver.key,
+    label: driver.name,
+    value: round(value * driver.share),
+  }));
 }
 
 /**
@@ -302,6 +331,12 @@ export interface BuildTimeSeriesOptions {
   stackBy?: StatsStackBy;
   /** Höchstzahl der Stapel bei Fahrzeugen und Fahrern; darüber „Sonstige". */
   maxStacks?: number;
+  /**
+   * Der gesetzte Fahrerfilter. Ist er gesetzt, gehen die Fahrten mit dem
+   * Anteil dieses Fahrers ein — sonst widersprächen Kennzahl und
+   * Fahrer-Tabelle einander für dieselbe Auswahl.
+   */
+  driverKey?: string;
 }
 
 export function buildTimeSeries(
@@ -317,6 +352,7 @@ export function buildTimeSeries(
     to,
     stackBy = 'none',
     maxStacks = 8,
+    driverKey,
   } = options;
 
   const buckets = bucketKeysBetween(from, to, granularity);
@@ -325,6 +361,7 @@ export function buildTimeSeries(
     metric,
     stackBy,
     maxStacks,
+    driverKey,
     buckets,
     bucketOf: (entry) => bucketKeyOf(entry.abfahrt, granularity, timeZone),
   });
@@ -335,6 +372,12 @@ interface BuildSeriesOptions {
   metric: StatsMetric;
   stackBy: StatsStackBy;
   maxStacks: number;
+  /**
+   * Der gesetzte Fahrerfilter. Ist er gesetzt, gehen die Fahrten mit dem
+   * Anteil dieses Fahrers ein — sonst widersprächen Kennzahl und
+   * Fahrer-Tabelle einander für dieselbe Auswahl.
+   */
+  driverKey?: string;
   /** Alle Abschnitte in Ausgabereihenfolge, auch die ohne Fahrt. */
   buckets: string[];
   bucketOf: (entry: FahrtenbuchEntry) => string | undefined;
@@ -344,7 +387,8 @@ function buildSeries(
   entries: FahrtenbuchEntry[],
   options: BuildSeriesOptions,
 ): StatsSeries {
-  const { vehiclesById, metric, stackBy, maxStacks, buckets, bucketOf } = options;
+  const { vehiclesById, metric, stackBy, maxStacks, driverKey, buckets, bucketOf } =
+    options;
   const stacks = new Map<string, StatsStack>();
   /** bucket → stack → Wert */
   const values = new Map<string, Map<string, number>>();
@@ -354,7 +398,13 @@ function buildSeries(
     const bucket = bucketOf(entry);
     if (!bucket || !known.has(bucket)) continue;
     const vehicle = vehiclesById.get(entry.vehicleId);
-    for (const contribution of stackContributions(entry, vehicle, metric, stackBy)) {
+    for (const contribution of stackContributions(
+      entry,
+      vehicle,
+      metric,
+      stackBy,
+      driverKey,
+    )) {
       const stack = stacks.get(contribution.key) ?? {
         key: contribution.key,
         label: contribution.label,
@@ -401,6 +451,12 @@ export interface BuildWeekdaySeriesOptions {
   timeZone: string;
   stackBy?: StatsStackBy;
   maxStacks?: number;
+  /**
+   * Der gesetzte Fahrerfilter. Ist er gesetzt, gehen die Fahrten mit dem
+   * Anteil dieses Fahrers ein — sonst widersprächen Kennzahl und
+   * Fahrer-Tabelle einander für dieselbe Auswahl.
+   */
+  driverKey?: string;
 }
 
 /** Sieben Abschnitte, `'1'` Montag bis `'7'` Sonntag. */
@@ -414,12 +470,14 @@ export function buildWeekdaySeries(
     timeZone,
     stackBy = 'zweck',
     maxStacks = 8,
+    driverKey,
   } = options;
   return buildSeries(entries, {
     vehiclesById,
     metric,
     stackBy,
     maxStacks,
+    driverKey,
     buckets: ['1', '2', '3', '4', '5', '6', '7'],
     bucketOf: (entry) => {
       const weekday = zonedParts(entry.abfahrt, timeZone)?.weekday;
@@ -439,6 +497,12 @@ export interface BuildBreakdownOptions {
   vehiclesById: VehicleLookup;
   metric: StatsMetric;
   dimension: StatsDimension;
+  /**
+   * Der gesetzte Fahrerfilter. Ist er gesetzt, gehen die Fahrten mit dem
+   * Anteil dieses Fahrers ein — sonst widersprächen Kennzahl und
+   * Fahrer-Tabelle einander für dieselbe Auswahl.
+   */
+  driverKey?: string;
 }
 
 /**
@@ -446,29 +510,38 @@ export interface BuildBreakdownOptions {
  * Abschnitt mit Fahrten, aber ohne Beitrag zur Kennzahl (ein Anhänger hat keine
  * Kilometer) bleibt mit dem Wert 0 — sonst verschwände eine erfasste Fahrt aus
  * der Auswertung.
+ *
+ * Bei der Aufteilung nach Fahrer entsteht je beteiligtem Fahrer eine Zeile mit
+ * seinem Anteil; die Summe der Zeilen bleibt damit der Gesamtwert.
  */
 export function buildBreakdown(
   entries: FahrtenbuchEntry[],
   options: BuildBreakdownOptions,
 ): StatsSlice[] {
-  const { vehiclesById, metric, dimension } = options;
+  const { vehiclesById, metric, dimension, driverKey } = options;
   const slices = new Map<string, StatsSlice>();
 
   for (const entry of entries) {
     const vehicle = vehiclesById.get(entry.vehicleId);
-    const [contribution] = stackContributions(entry, vehicle, metric, dimension);
-    if (!contribution) continue;
-    // Eine Rangliste der Fahrer ohne Fahrer wäre eine Zeile ohne Aussage.
-    if (contribution.key === NO_DRIVER_STACK_KEY) continue;
-    const slice = slices.get(contribution.key) ?? {
-      key: contribution.key,
-      label: contribution.label,
-      value: 0,
-      trips: 0,
-    };
-    slice.value = round(slice.value + contribution.value);
-    slice.trips += 1;
-    slices.set(contribution.key, slice);
+    for (const contribution of stackContributions(
+      entry,
+      vehicle,
+      metric,
+      dimension,
+      driverKey,
+    )) {
+      // Eine Rangliste der Fahrer ohne Fahrer wäre eine Zeile ohne Aussage.
+      if (contribution.key === NO_DRIVER_STACK_KEY) continue;
+      const slice = slices.get(contribution.key) ?? {
+        key: contribution.key,
+        label: contribution.label,
+        value: 0,
+        trips: 0,
+      };
+      slice.value = round(slice.value + contribution.value);
+      slice.trips += 1;
+      slices.set(contribution.key, slice);
+    }
   }
 
   if (dimension === 'zweck') {
@@ -485,6 +558,12 @@ export interface DriverStat {
   key: string;
   name: string;
   trips: number;
+  /**
+   * Fahrten, die dieser Fahrer mit anderen geteilt hat. Ohne diese Zahl wäre
+   * nicht erklärbar, warum die Fahrten-Spalte sich auf mehr als die Gesamtzahl
+   * der Fahrten summiert.
+   */
+  sharedTrips: number;
   durationMinutes: number;
   /** Je Einheit die Summe der Zählerdifferenzen. */
   counterTotals: Record<string, number>;
@@ -502,6 +581,14 @@ function emptyZwecke(): Record<FahrtZweck, number> {
 /**
  * Auswertung je Fahrer, absteigend nach Fahrten.
  *
+ * Strecke und Dauer werden auf die Fahrer einer Fahrt aufgeteilt (siehe
+ * `driverSharesOf`). Die Fahrtenzahl zählt dagegen für jeden Beteiligten ganz:
+ * „7,5 Fahrten" wäre in einer Rangliste nicht zu lesen, und „ich war bei 8
+ * Fahrten dabei" ist die Frage, die diese Spalte beantwortet. Dass sie sich
+ * damit auf mehr als die Gesamtzahl summiert, macht `sharedTrips` erklärbar.
+ *
+ * Defekte und Fahrtzwecke zählen ebenfalls ganz — ein Defekt ist nicht teilbar.
+ *
  * Einheiten ohne Fahrer (Anhänger, Wechselladeaufbau) bleiben außen vor — sie
  * werden gezogen, nicht gefahren.
  */
@@ -512,44 +599,55 @@ export function buildDriverStats(
   const stats = new Map<string, DriverStat & { vehicles: Set<string> }>();
 
   for (const entry of entries) {
-    const key = driverKeyOf(entry);
-    if (!key) continue;
-    const stat =
-      stats.get(key) ??
-      ({
-        key,
-        name: entry.driverName?.trim() || key,
-        trips: 0,
-        durationMinutes: 0,
-        counterTotals: {},
-        vehicleCount: 0,
-        defects: 0,
-        zwecke: emptyZwecke(),
-        vehicles: new Set<string>(),
-      } satisfies DriverStat & { vehicles: Set<string> });
+    const diffs = counterDiffsByUnit(entry, vehiclesById.get(entry.vehicleId));
+    const duration = entryDurationMinutes(entry) ?? 0;
 
-    stat.trips += 1;
-    stat.durationMinutes += entryDurationMinutes(entry) ?? 0;
-    if (entry.defekt) stat.defects += 1;
-    stat.vehicles.add(entry.vehicleId);
-    if (entry.zweck in stat.zwecke) stat.zwecke[entry.zweck] += 1;
-    // Die jüngste Fahrt bestimmt Schreibweise und Datum; `entries` kommt
-    // absteigend nach Abfahrt herein, die Prüfung hält aber auch andere
-    // Reihenfolgen aus.
-    if (!stat.lastEntryAt || entry.abfahrt > stat.lastEntryAt) {
-      stat.lastEntryAt = entry.abfahrt;
-      if (entry.driverName?.trim()) stat.name = entry.driverName.trim();
+    for (const driver of driverSharesOf(entry)) {
+      const stat =
+        stats.get(driver.key) ??
+        ({
+          key: driver.key,
+          name: driver.name,
+          trips: 0,
+          sharedTrips: 0,
+          durationMinutes: 0,
+          counterTotals: {},
+          vehicleCount: 0,
+          defects: 0,
+          zwecke: emptyZwecke(),
+          vehicles: new Set<string>(),
+        } satisfies DriverStat & { vehicles: Set<string> });
+
+      stat.trips += 1;
+      if (driver.share < 1) stat.sharedTrips += 1;
+      stat.durationMinutes += duration * driver.share;
+      if (entry.defekt) stat.defects += 1;
+      stat.vehicles.add(entry.vehicleId);
+      if (entry.zweck in stat.zwecke) stat.zwecke[entry.zweck] += 1;
+      // Die jüngste Fahrt bestimmt Schreibweise und Datum; `entries` kommt
+      // absteigend nach Abfahrt herein, die Prüfung hält aber auch andere
+      // Reihenfolgen aus.
+      if (!stat.lastEntryAt || entry.abfahrt > stat.lastEntryAt) {
+        stat.lastEntryAt = entry.abfahrt;
+        stat.name = driver.name;
+      }
+      for (const [unit, value] of Object.entries(diffs)) {
+        stat.counterTotals[unit] = round(
+          (stat.counterTotals[unit] ?? 0) + value * driver.share,
+        );
+      }
+      stats.set(driver.key, stat);
     }
-    for (const [unit, value] of Object.entries(
-      counterDiffsByUnit(entry, vehiclesById.get(entry.vehicleId)),
-    )) {
-      stat.counterTotals[unit] = round((stat.counterTotals[unit] ?? 0) + value);
-    }
-    stats.set(key, stat);
   }
 
   return [...stats.values()]
-    .map(({ vehicles, ...stat }) => ({ ...stat, vehicleCount: vehicles.size }))
+    .map(({ vehicles, ...stat }) => ({
+      ...stat,
+      // Erst am Ende gerundet: Drei Fahrer auf 100 Minuten ergäben sonst
+      // dreimal 33 statt 33/33/34.
+      durationMinutes: Math.round(stat.durationMinutes),
+      vehicleCount: vehicles.size,
+    }))
     .sort((a, b) => b.trips - a.trips || a.name.localeCompare(b.name));
 }
 

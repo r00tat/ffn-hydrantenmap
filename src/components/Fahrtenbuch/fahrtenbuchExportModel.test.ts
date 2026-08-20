@@ -544,3 +544,31 @@ describe('chunkFahrtenbuchExport', () => {
     expect(chunkFahrtenbuchExport(model([section('v1', 3)]), 0)).toHaveLength(3);
   });
 });
+
+describe('buildFahrtenbuchExport — Zusatzfahrer', () => {
+  it('nennt alle Fahrer in der Fahrer-Spalte', () => {
+    const result = buildFahrtenbuchExport(
+      {
+        ...baseOptions,
+        entries: [
+          entry({
+            driverName: 'Markus Scharinger',
+            coDrivers: [{ name: 'Anna Bauer' }],
+          }),
+        ],
+      },
+      t,
+    );
+    expect(result.sections[0].rows[0].cells[2]).toBe(
+      'Markus Scharinger, Anna Bauer',
+    );
+  });
+
+  it('lässt eine Fahrt mit einem Fahrer unverändert', () => {
+    const result = buildFahrtenbuchExport(
+      { ...baseOptions, entries: [entry({ driverName: 'Markus Scharinger' })] },
+      t,
+    );
+    expect(result.sections[0].rows[0].cells[2]).toBe('Markus Scharinger');
+  });
+});

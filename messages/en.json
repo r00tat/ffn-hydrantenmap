@@ -412,6 +412,9 @@
     "vehicle": "Vehicle",
     "kennzeichen": "Registration",
     "driver": "Driver",
+    "coDrivers": "Additional drivers",
+    "coDriversHint": "Further people who took turns driving on this trip. Distance and driving time are split evenly in the statistics.",
+    "moreDrivers": "+{count}",
     "zweck": "Purpose",
     "firecall": "Operation",
     "firecallManual": "Select an operation or enter one",
@@ -462,6 +465,7 @@
     "errors": {
       "vehicleMissing": "Please select a vehicle.",
       "driverMissing": "Please enter a driver.",
+      "coDriversTooMany": "At most {count} additional drivers per trip.",
       "abfahrtInvalid": "Departure time is invalid.",
       "ankunftInvalid": "Arrival time is invalid.",
       "ankunftBeforeAbfahrt": "Arrival is before departure.",
@@ -579,6 +583,7 @@
       "byVehicle": "By vehicle",
       "byWeekday": "By weekday",
       "drivers": "Drivers",
+      "sharedForDriver": "Values are the share for {name}: on a trip with several drivers, only their own share of distance, time and volume counts. The trip count counts in full.",
       "drillHint": "Click a bar to break that period down further.",
       "noData": "No data in the current selection.",
       "tooManyEntries": "Only the first {count} trips of the period are evaluated. Please narrow the period.",
@@ -605,6 +610,7 @@
       },
       "driverTable": {
         "name": "Driver",
+        "sharedTrips": "of which shared",
         "vehicles": "Vehicles",
         "lastTrip": "Last trip",
         "truncated": "Showing {shown} of {total} drivers."

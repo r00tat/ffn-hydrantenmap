@@ -342,3 +342,41 @@ describe('FahrtenbuchList — Filter', () => {
     );
   });
 });
+
+describe('FahrtenbuchList — Zusatzfahrer', () => {
+  const rlfa = vehicle({ id: 'v1', name: 'RLFA 2000' });
+
+  const renderWith = (overrides: Partial<FahrtenbuchEntry>) =>
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry(overrides)]}
+        vehicles={[rlfa]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+  it('zeigt den Hauptfahrer und die Zahl der Zusatzfahrer', () => {
+    renderWith({
+      driverName: 'Max Mustermann',
+      coDrivers: [{ name: 'Anna Bauer' }, { name: 'Eva Klein' }],
+    });
+    expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
+    expect(screen.getByText('+2')).toBeInTheDocument();
+  });
+
+  it('nennt alle Fahrer als Beschriftung der Zelle', () => {
+    renderWith({
+      driverName: 'Max Mustermann',
+      coDrivers: [{ name: 'Anna Bauer' }],
+    });
+    expect(
+      screen.getByLabelText('Max Mustermann, Anna Bauer'),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Zusatzfahrer keine Zahl', () => {
+    renderWith({ driverName: 'Max Mustermann' });
+    expect(screen.queryByText(/^\+\d+$/)).not.toBeInTheDocument();
+  });
+});

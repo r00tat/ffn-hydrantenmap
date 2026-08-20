@@ -318,3 +318,47 @@ describe('useEntryFormState', () => {
     });
   });
 });
+
+describe('Zusatzfahrer', () => {
+  it('übergibt sie an den Submit-Input', async () => {
+    const { result, onSubmit } = renderForm({ vehicleId: 'v2' });
+
+    act(() => {
+      result.current.changeDriver('Max Muster', 'p1');
+      result.current.changeCoDrivers([{ id: 'p2', name: 'Anna Bauer' }]);
+      result.current.setZiel('Übungsgelände');
+    });
+    await act(async () => {
+      await result.current.submit();
+    });
+
+    expect(submitted(onSubmit).coDrivers).toEqual([
+      { id: 'p2', name: 'Anna Bauer' },
+    ]);
+  });
+
+  it('übernimmt die Zusatzfahrer eines bearbeiteten Eintrags', () => {
+    const { result } = renderForm({
+      entry: {
+        ...existingEntry(
+          localIso(2026, 3, 10, 8, 0),
+          localIso(2026, 3, 10, 10, 30),
+        ),
+        coDrivers: [{ name: 'Anna Bauer' }],
+      },
+    });
+    expect(result.current.coDrivers).toEqual([{ name: 'Anna Bauer' }]);
+  });
+
+  it('gibt eine leere Liste, wenn der Eintrag keine hat', () => {
+    const { result } = renderForm({ vehicleId: 'v2' });
+    expect(result.current.coDrivers).toEqual([]);
+  });
+
+  it('meldet die Höchstzahl mit einer übersetzten Meldung', () => {
+    const { result } = renderForm({ vehicleId: 'v2' });
+    const message = result.current.errorMessage('coDriversTooMany');
+    expect(message).toContain('9');
+    expect(message).not.toContain('{count}');
+  });
+});

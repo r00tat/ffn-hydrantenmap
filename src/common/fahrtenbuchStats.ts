@@ -10,6 +10,7 @@
  */
 
 import {
+  driverIdentities,
   FUEL_TYPES,
   normalizeName,
   type FahrtZweck,
@@ -195,12 +196,79 @@ export function metricValue(
  * dieselbe Person.
  *
  * Leer bei einer Einheit ohne Fahrer (Anhänger, Wechselladeaufbau).
+ *
+ * Nur der Hauptfahrer. Alle Fahrer einer Fahrt samt Anteil liefert
+ * `driverSharesOf`.
  */
 export function driverKeyOf(
   entry: Pick<FahrtenbuchEntry, 'driverId' | 'driverName'>,
 ): string {
   if (entry.driverId?.trim()) return entry.driverId.trim();
   return normalizeName(entry.driverName ?? '');
+}
+
+/** Ein Fahrer einer Fahrt samt seinem Anteil daran. */
+export interface EntryDriverShare {
+  /** Schlüssel wie `driverKeyOf`: Personen-ID, sonst normalisierter Name. */
+  key: string;
+  name: string;
+  /** `1 / Anzahl der Fahrer dieser Fahrt`. */
+  share: number;
+}
+
+type EntryDrivers = Pick<
+  FahrtenbuchEntry,
+  'driverId' | 'driverName' | 'coDrivers'
+>;
+
+/**
+ * Alle Fahrer einer Fahrt mit gleichmäßigem Anteil, Hauptfahrer zuerst.
+ *
+ * Eine Fahrt, auf der sich zwei Personen abgewechselt haben, hat ihre Kilometer
+ * nur einmal. Würden sie jedem Beteiligten voll zugerechnet, wäre die Summe der
+ * Fahrer höher als die Gesamtsumme — ein nach Fahrer gestapelter Balken stünde
+ * dann über der Kennzahl, und die Differenz wäre niemandem zu erklären.
+ *
+ * Leer bei einer Einheit ohne Fahrer (Anhänger, Wechselladeaufbau).
+ *
+ * Entdoppelt wird erneut, obwohl das schon beim Schreiben passiert: Altdaten
+ * und eine spätere Umbenennung dürfen nicht zu einem halben Anteil bei einem
+ * einzigen Menschen führen.
+ */
+export function driverSharesOf(entry: EntryDrivers): EntryDriverShare[] {
+  const refs = [
+    { id: entry.driverId, name: entry.driverName ?? '' },
+    ...(entry.coDrivers ?? []),
+  ];
+  const seen = new Set<string>();
+  const drivers: { key: string; name: string }[] = [];
+  for (const ref of refs) {
+    const name = ref?.name?.trim();
+    if (!name) continue;
+    const tokens = driverIdentities({ id: ref.id, name });
+    if (tokens.length === 0 || tokens.some((token) => seen.has(token))) continue;
+    for (const token of tokens) seen.add(token);
+    drivers.push({ key: ref.id?.trim() || normalizeName(name), name });
+  }
+  const share = drivers.length > 0 ? 1 / drivers.length : 0;
+  return drivers.map((driver) => ({ ...driver, share }));
+}
+
+/**
+ * Der Anteil, mit dem eine Fahrt in eine Auswertung eingeht.
+ *
+ * Ohne Fahrerbezug die ganze Fahrt. Ist ein Fahrer genannt — der gesetzte
+ * Fahrerfilter —, sein Anteil daran: Sonst stünde über einer Fahrer-Tabelle,
+ * die 700 km ausweist, eine Kennzahl von 1000 km für dieselbe Auswahl. `0` für
+ * einen Unbeteiligten; der Filter hat solche Fahrten normalerweise schon
+ * entfernt.
+ */
+export function entryDriverShare(
+  entry: EntryDrivers,
+  driverKey: string | undefined,
+): number {
+  if (!driverKey) return 1;
+  return driverSharesOf(entry).find((s) => s.key === driverKey)?.share ?? 0;
 }
 
 /** Ob mindestens ein Endstand dieser Fahrt geschätzt und nicht belegt ist. */
@@ -231,7 +299,12 @@ export function filterStatsEntries(
     if (entry.deleted) return false;
     if (vehicleIds.size > 0 && !vehicleIds.has(entry.vehicleId)) return false;
     if (zwecke.size > 0 && !zwecke.has(entry.zweck)) return false;
-    if (filter.driverKey && driverKeyOf(entry) !== filter.driverKey) return false;
+    if (
+      filter.driverKey &&
+      !driverSharesOf(entry).some((s) => s.key === filter.driverKey)
+    ) {
+      return false;
+    }
     if (filter.onlyDefects && !entry.defekt) return false;
     const day = zonedParts(entry.abfahrt, timeZone)?.isoDay;
     if (!day) return false;

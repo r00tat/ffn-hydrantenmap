@@ -8,6 +8,7 @@
  */
 
 import {
+  driverNamesOf,
   type CounterDefinition,
   type CounterReading,
   type FahrtenbuchEntry,
@@ -356,7 +357,7 @@ export function buildWeeklyReportModel(
       return {
         date: formatDate(entry.abfahrt, timeZone),
         timeRange: formatTimeRange(entry, timeZone),
-        driver: entry.driverName?.trim() || '',
+        driver: driverNamesOf(entry),
         zweck: ZWECK_LABELS[entry.zweck] ?? entry.zweck,
         ziel: entry.ziel?.trim() || entry.firecallName?.trim() || '',
         counters,
