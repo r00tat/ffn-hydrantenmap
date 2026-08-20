@@ -6,11 +6,13 @@ import EditIcon from '@mui/icons-material/Edit';
 import InfoIcon from '@mui/icons-material/Info';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import Fab from '@mui/material/Fab';
 import FormControl from '@mui/material/FormControl';
@@ -118,6 +120,27 @@ function EinsatzCard({
           <Typography sx={{ mb: 1.5 }} color="text.secondary">
             {formatTimestamp(einsatz.date)}
           </Typography>
+          {/* Nur der positive Fall: Ein Einsatz, für den nie eine Fahrt
+              geschrieben wurde, trägt das Feld gar nicht — „0 Fahrten" wäre
+              dort eine Behauptung, die auch für einen Einsatz von vor der
+              Zählung gälte, dessen Fahrten längst im Fahrtenbuch stehen.
+              Fehlender Chip heißt „nichts bekannt", nicht „keine Fahrten".
+              Nachgezogen wird der Zähler beim Öffnen der Einsatzseite. */}
+          {!!einsatz.fahrtenbuchEntryCount && (
+            <Chip
+              component={Link}
+              href={`/einsatz/${einsatz.id}/fahrtenbuch`}
+              clickable
+              size="small"
+              color="success"
+              variant="outlined"
+              icon={<DirectionsCarIcon />}
+              sx={{ mb: 1.5 }}
+              label={t('einsaetze.fahrtenRecorded', {
+                count: einsatz.fahrtenbuchEntryCount,
+              })}
+            />
+          )}
           <Typography variant="body2">{einsatz.description}</Typography>
         </CardContent>
         <CardActions>

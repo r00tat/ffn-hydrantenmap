@@ -598,14 +598,68 @@ export function matchVehicleByName(
   return vehicles.find((v) => normalizeName(v.name) === normalized);
 }
 
+/**
+ * Die schon erfasste Fahrt dieses Fahrzeugs zu diesem Einsatz — der
+ * Duplikatsfall. Pro Einsatz fährt ein Fahrzeug einmal; eine zweite Fahrt
+ * derselben Kombination verdoppelt die Kilometer und verschiebt damit alle
+ * folgenden Zählerstände.
+ *
+ * `excludeEntryId` ist die bearbeitete Fahrt selbst: Ohne sie meldete jede
+ * Bearbeitung ihr eigenes Dokument als Duplikat.
+ */
 export function findEntryForFirecallVehicle(
   entries: FahrtenbuchEntry[],
   firecallId: string,
   vehicleId: string,
+  excludeEntryId?: string,
 ): FahrtenbuchEntry | undefined {
   return entries.find(
-    (e) => !e.deleted && e.firecallId === firecallId && e.vehicleId === vehicleId,
+    (e) =>
+      !e.deleted &&
+      e.firecallId === firecallId &&
+      e.vehicleId === vehicleId &&
+      (!excludeEntryId || e.id !== excludeEntryId),
   );
+}
+
+export interface VehicleTimeRange {
+  vehicleId: string;
+  /** ISO-Zeitstempel. */
+  abfahrt: string;
+  /** ISO-Zeitstempel. */
+  ankunft: string;
+  /** Die bearbeitete Fahrt selbst. */
+  excludeEntryId?: string;
+}
+
+/**
+ * Fahrten desselben Fahrzeugs, deren Zeitraum sich mit dem übergebenen
+ * überschneidet. Ein Fahrzeug kann nicht zweimal gleichzeitig unterwegs sein —
+ * die Überschneidung findet ein Duplikat auch dann, wenn keine Seite einen
+ * Einsatz verknüpft hat (etwa eine Fahrt aus dem Gastformular hinter einem
+ * Freigabe-Link, das den Einsatzbezug gar nicht mitschickt).
+ *
+ * Berührende Zeiträume zählen nicht: Ankunft und nächste Abfahrt auf derselben
+ * Minute sind zwei aufeinanderfolgende Fahrten, keine doppelte.
+ *
+ * Unlesbare Zeitstempel ergeben keinen Treffer. Der Aufrufer zeigt daraus einen
+ * Hinweis, und ein Hinweis auf Basis eines kaputten Datums wäre nur Rauschen.
+ */
+export function overlappingVehicleEntries(
+  entries: FahrtenbuchEntry[],
+  range: VehicleTimeRange,
+): FahrtenbuchEntry[] {
+  const start = Date.parse(range.abfahrt);
+  const end = Date.parse(range.ankunft);
+  if (Number.isNaN(start) || Number.isNaN(end)) return [];
+  return entries.filter((e) => {
+    if (e.deleted || e.vehicleId !== range.vehicleId) return false;
+    if (range.excludeEntryId && e.id === range.excludeEntryId) return false;
+    const otherStart = Date.parse(e.abfahrt ?? '');
+    const otherEnd = Date.parse(e.ankunft ?? '');
+    if (Number.isNaN(otherStart) || Number.isNaN(otherEnd)) return false;
+    return start < otherEnd && otherStart < end;
+  });
 }
 
 export function suggestPresetForVehicleName(name: string): VehiclePresetId {

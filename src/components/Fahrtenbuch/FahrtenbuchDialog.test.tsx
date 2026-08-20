@@ -135,22 +135,69 @@ describe('FahrtenbuchDialog', () => {
     expect(screen.queryByLabelText(/AdBlue/)).not.toBeInTheDocument();
   });
 
-  it('zeigt die Einsatzauswahl nicht beim Standard-Zweck Sonstiges', () => {
+  it('zeigt die Einsatzauswahl von Anfang an', () => {
+    // Die Zuordnung zu einem Einsatz ist der Regelfall und trägt die
+    // Duplikats- und Kilometerprüfungen. Stand das Feld erst hinter dem schon
+    // gesetzten Zweck „Einsatz", blieb es meist leer.
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
-    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
-  });
-
-  it('zeigt die Einsatzauswahl, sobald der Zweck Einsatz ist', () => {
-    renderWithIntl(<FahrtenbuchDialog {...baseProps} entry={existingEntry} />);
     expect(screen.getByLabelText('Einsatz')).toBeInTheDocument();
   });
 
-  it('blendet die Einsatzauswahl ein, wenn der Zweck auf Einsatz gestellt wird', async () => {
+  it('setzt den Zweck auf Einsatz, sobald ein Einsatz gewählt wird', async () => {
     const user = userEvent.setup();
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+
+    await user.click(screen.getByLabelText('Einsatz'));
+    await user.click(await screen.findByRole('option', { name: 'Brand B2' }));
+
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Einsatz');
+  });
+
+  it('räumt den gewählten Einsatz, wenn der Zweck wechselt', async () => {
+    // Was im Feld steht, muss dem entsprechen, was gespeichert wird — ein
+    // anderer Zweck speichert keine Einsatzverknüpfung.
+    const user = userEvent.setup();
+    renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+
+    await user.click(screen.getByLabelText('Einsatz'));
+    await user.click(await screen.findByRole('option', { name: 'Brand B2' }));
     await user.click(screen.getByLabelText('Fahrtzweck'));
-    await user.click(screen.getByRole('option', { name: 'Einsatz' }));
-    expect(screen.getByLabelText('Einsatz')).toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: 'Übung' }));
+
+    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Übung');
+  });
+
+  it('meldet eine für Einsatz und Fahrzeug schon erfasste Fahrt', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        entries={[
+          entry({
+            id: 'e9',
+            zweck: 'einsatz',
+            firecallId: 'f1',
+            firecallName: 'Brand B2',
+            driverName: 'Anna Bauer',
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Einsatz'));
+    await user.click(await screen.findByRole('option', { name: 'Brand B2' }));
+
+    expect(
+      screen.getByText(
+        'Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Anna Bauer/)).toBeInTheDocument();
+    // Ohne Bestätigung wird nicht gespeichert.
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it('speichert einen neuen Eintrag ohne vehicleName', async () => {

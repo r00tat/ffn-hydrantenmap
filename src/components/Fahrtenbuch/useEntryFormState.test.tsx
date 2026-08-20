@@ -158,6 +158,165 @@ describe('useEntryFormState', () => {
     });
   });
 
+  describe('Einsatz als Regelfall', () => {
+    it('setzt den Zweck auf einsatz, sobald ein Einsatz verknüpft wird', () => {
+      // Sonst verwirft `submit` die Verknüpfung stillschweigend — und eine
+      // Fahrt ohne Einsatzbezug findet keine Duplikatserkennung je wieder.
+      const { result } = renderForm();
+
+      expect(result.current.zweck).toBe('sonstiges');
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+
+      expect(result.current.zweck).toBe('einsatz');
+    });
+
+    it('lässt den Zweck bei einem nur eingetippten Namen unberührt', () => {
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall(undefined, 'Brand irgendwo'));
+
+      expect(result.current.zweck).toBe('sonstiges');
+    });
+
+    it('räumt die Verknüpfung, wenn der Zweck wechselt', () => {
+      // Was im Feld steht, muss dem entsprechen, was gespeichert wird.
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.changeZweck('uebung'));
+
+      expect(result.current.firecallId).toBeUndefined();
+      expect(result.current.firecallName).toBe('');
+    });
+
+    it('meldet einen Zweck einsatz ohne Verknüpfung', () => {
+      const { result } = renderForm();
+
+      act(() => result.current.changeZweck('einsatz'));
+      expect(result.current.firecallLinkMissing).toBe(true);
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      expect(result.current.firecallLinkMissing).toBe(false);
+    });
+  });
+
+  describe('Duplikat und Überschneidung', () => {
+    /** Eine bereits erfasste Fahrt desselben Fahrzeugs zu Einsatz f1. */
+    const booked: FahrtenbuchEntry = {
+      ...existingEntry('2026-03-10T18:00:00.000Z', '2026-03-10T20:30:00.000Z'),
+      id: 'e9',
+      vehicleId: 'v1',
+      zweck: 'einsatz',
+      firecallId: 'f1',
+      firecallName: 'Brand Hauptstraße',
+      driverName: 'Anna Bauer',
+    };
+
+    it('meldet eine schon erfasste Fahrt und speichert nicht', async () => {
+      const { result, onSubmit } = renderForm({ entries: [booked] });
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+
+      expect(result.current.duplicateEntry?.id).toBe('e9');
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(result.current.errors).toContain('duplicateFirecallEntry');
+    });
+
+    it('speichert nach Bestätigung und sagt es dem Server', async () => {
+      const { result, onSubmit } = renderForm({ entries: [booked] });
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.setDuplicateConfirmed(true));
+
+      expect(result.current.duplicateConfirmed).toBe(true);
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit.mock.calls[0][1]).toEqual({ confirmDuplicate: true });
+    });
+
+    it('nimmt die Bestätigung zurück, wenn die Auswahl wechselt', () => {
+      // Bestätigt wurde diese eine Fahrt, nicht das Formular.
+      const { result } = renderForm({ entries: [booked] });
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.setDuplicateConfirmed(true));
+      act(() => result.current.changeFirecall(undefined, ''));
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+
+      expect(result.current.duplicateConfirmed).toBe(false);
+    });
+
+    it('meldet die bearbeitete Fahrt nicht als ihr eigenes Duplikat', () => {
+      const { result } = renderForm({ entries: [booked], entry: booked });
+
+      expect(result.current.duplicateEntry).toBeUndefined();
+    });
+
+    it('warnt bei überschneidenden Zeiten desselben Fahrzeugs', () => {
+      const { result } = renderForm({ entries: [booked] });
+
+      // Mitten in den Zeitraum der bestehenden Fahrt hinein.
+      act(() => result.current.changeAbfahrt('2026-03-10T19:00:00.000Z'));
+      act(() => result.current.setAnkunft('2026-03-10T21:00:00.000Z'));
+
+      expect(result.current.overlappingEntries.map((e) => e.id)).toEqual(['e9']);
+    });
+
+    it('blockiert eine Überschneidung nicht', async () => {
+      // Zeiten sind im Einsatz oft geschätzt — ein Riegel wäre hier falsch.
+      const { result, onSubmit } = renderForm({ entries: [booked] });
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZiel('Hauptplatz'));
+      act(() => result.current.changeAbfahrt('2026-03-10T19:00:00.000Z'));
+      act(() => result.current.setAnkunft('2026-03-10T21:00:00.000Z'));
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).toHaveBeenCalled();
+    });
+  });
+
+  describe('Ankunft vor Abfahrt', () => {
+    it('meldet die verdrehte Reihenfolge sofort, nicht erst beim Speichern', () => {
+      const { result } = renderForm();
+
+      act(() => result.current.changeAbfahrt('2026-03-10T18:00:00.000Z'));
+      act(() => result.current.setAnkunft('2026-03-10T17:00:00.000Z'));
+
+      expect(result.current.timeOrderInvalid).toBe(true);
+    });
+
+    it('speichert eine Ankunft vor der Abfahrt nicht', async () => {
+      const { result, onSubmit } = renderForm();
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZiel('Hauptplatz'));
+      act(() => result.current.changeAbfahrt('2026-03-10T18:00:00.000Z'));
+      act(() => result.current.setAnkunft('2026-03-10T17:00:00.000Z'));
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(result.current.errors).toContain('ankunftBeforeAbfahrt');
+    });
+  });
+
   describe('changeDriver', () => {
     it('verwirft die Personen-ID, wenn frei weitergetippt wird', () => {
       const { result } = renderForm();
@@ -178,9 +337,9 @@ describe('useEntryFormState', () => {
 
       act(() => result.current.changeDriver('Max'));
       act(() => result.current.setZiel('Hauptplatz'));
-      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeZweck('einsatz'));
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
-      act(() => result.current.setZweck('sonstiges'));
+      act(() => result.current.changeZweck('sonstiges'));
 
       await act(async () => {
         await result.current.submit();
@@ -197,7 +356,7 @@ describe('useEntryFormState', () => {
       const { result, onSubmit } = renderForm();
 
       act(() => result.current.changeDriver('Max'));
-      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeZweck('einsatz'));
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
 
       await act(async () => {
@@ -215,7 +374,7 @@ describe('useEntryFormState', () => {
       expect(result.current.hasFirecallSelection).toBe(false);
 
       act(() => result.current.changeDriver('Max'));
-      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeZweck('einsatz'));
       // Ohne Liste gibt es keine Auswahl — die UI ruft changeFirecall dort
       // nie mit einem Namen auf, trotzdem darf nichts krachen.
       act(() => result.current.changeFirecall('f1', ''));
@@ -287,7 +446,7 @@ describe('useEntryFormState', () => {
       const { result, onSubmit } = renderForm();
 
       act(() => result.current.changeDriver('Max'));
-      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeZweck('einsatz'));
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
 
       expect(result.current.zielCoveredByFirecall).toBe(true);
@@ -305,7 +464,7 @@ describe('useEntryFormState', () => {
       const { result, onSubmit } = renderForm();
 
       act(() => result.current.changeDriver('Max'));
-      act(() => result.current.setZweck('einsatz'));
+      act(() => result.current.changeZweck('einsatz'));
       act(() => result.current.changeFirecall(undefined, 'Brand irgendwo'));
 
       expect(result.current.zielCoveredByFirecall).toBe(false);

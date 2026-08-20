@@ -17,7 +17,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   arrivalOnDepartureDay,
   requiresDriver,
@@ -53,7 +53,10 @@ import {
   type EinsatzRowIssue,
   type EinsatzTimes,
 } from './einsatzRows';
-import { createFahrtenbuchEntries } from './fahrtenbuchActions';
+import {
+  createFahrtenbuchEntries,
+  syncFirecallEntryCount,
+} from './fahrtenbuchActions';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
 import type { EntryFormPerson } from './useEntryFormState';
 
@@ -506,6 +509,21 @@ export default function EinsatzFahrtenbuch({
   // unerfasst aus, obwohl es die Einträge längst gibt.
   const entries = useFahrtenbuchEntries(memberGroupId, { firecallId });
   const { standort } = useFahrtenbuchGroupStandort(memberGroupId);
+
+  // Zieht den Fahrtenzähler am Einsatz nach, damit die Einsatz-Übersicht
+  // erfasste Fahrten auch bei Einsätzen aus der Zeit vor dem Zähler anzeigt.
+  // Hier, weil die Fahrten dieses Einsatzes ohnehin geladen sind; gezählt wird
+  // serverseitig aus dem Bestand, die Zahl hier ist nur der Anlass. Einmal je
+  // Einsatz, sonst schriebe jeder Snapshot erneut.
+  const syncedFirecallRef = useRef<string | undefined>(undefined);
+  const knownEntryCount = firecall?.fahrtenbuchEntryCount;
+  useEffect(() => {
+    if (!memberGroupId) return;
+    if (knownEntryCount === entries.length) return;
+    if (syncedFirecallRef.current === firecallId) return;
+    syncedFirecallRef.current = firecallId;
+    syncFirecallEntryCount(memberGroupId, firecallId);
+  }, [memberGroupId, firecallId, knownEntryCount, entries.length]);
 
   const fzgItems = useFirebaseCollection<Fzg>({
     collectionName: memberGroupId ? FIRECALL_COLLECTION_ID : '',

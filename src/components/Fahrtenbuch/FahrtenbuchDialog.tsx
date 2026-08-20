@@ -56,10 +56,10 @@ export default function FahrtenbuchDialog({
     entries,
     vehicleId,
     entry,
-    onSubmit: (input) =>
+    onSubmit: (input, options) =>
       entry?.id
-        ? updateFahrtenbuchEntry(groupId, entry.id, input)
-        : createFahrtenbuchEntry(groupId, input),
+        ? updateFahrtenbuchEntry(groupId, entry.id, input, options)
+        : createFahrtenbuchEntry(groupId, input, options),
   });
 
   return (

@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import {
   arrivalOnDepartureDay,
   FAHRTENBUCH_MAX_CO_DRIVERS,
+  findEntryForFirecallVehicle,
+  overlappingVehicleEntries,
   referenceCounters,
   validateEntryInput,
   type CounterDefinition,
@@ -47,6 +49,14 @@ export interface EntryFormSubmitResult {
   error?: string;
 }
 
+export interface EntryFormSubmitOptions {
+  /**
+   * Der Benutzer hat das gemeldete Duplikat ausdrücklich bestätigt. Wird an die
+   * Server-Action durchgereicht, die ohne das Flag ablehnt.
+   */
+  confirmDuplicate?: boolean;
+}
+
 export interface UseEntryFormStateOptions {
   vehicles: EntryFormVehicle[];
   /** Fehlt die Liste, gibt es keine Einsatzauswahl — der Fall der Gastseite. */
@@ -57,7 +67,10 @@ export interface UseEntryFormStateOptions {
   vehicleId?: string;
   /** Gesetzt beim Bearbeiten. */
   entry?: FahrtenbuchEntry;
-  onSubmit: (input: FahrtenbuchEntryInput) => Promise<EntryFormSubmitResult>;
+  onSubmit: (
+    input: FahrtenbuchEntryInput,
+    options: EntryFormSubmitOptions,
+  ) => Promise<EntryFormSubmitResult>;
 }
 
 /** Wandelt einen ISO-Zeitstempel in den Wert für `datetime-local` um. */
@@ -97,6 +110,7 @@ function prefillCounters(
  */
 const TRANSLATED_SAVE_ERRORS = [
   'notAllowed',
+  'duplicateFirecallEntry',
   'notInGroup',
   'entryDeleted',
   'tooManyEntries',
@@ -158,6 +172,11 @@ export function useEntryFormState({
   const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string>();
   const [saving, setSaving] = useState(false);
+  // Die bestätigte Fahrt, nicht ein bloßes Häkchen: Bestätigt wurde dieses eine
+  // Duplikat. Wechselt die Auswahl auf eine andere Fahrt, ist die Bestätigung
+  // hinfällig — und nach einem Wechsel auf einen anderen Einsatz und zurück
+  // ebenso, weil der Benutzer den Hinweis dann neu zu sehen bekommt.
+  const [confirmedDuplicateId, setConfirmedDuplicateId] = useState<string>();
 
   const vehicle = useMemo(
     () => vehicles.find((v) => v.id === selectedVehicleId),
@@ -235,9 +254,29 @@ export function useEntryFormState({
   const changeFirecall = (id: string | undefined, name: string) => {
     setFirecallId(id || undefined);
     setFirecallName(name);
+    setConfirmedDuplicateId(undefined);
     const firecall = id ? firecalls?.find((f) => f.id === id) : undefined;
+    // Die Verknüpfung setzt den Zweck mit. `submit` schickt `firecallId` nur
+    // beim Zweck `einsatz` — ohne das verlöre eine Fahrt, an der jemand einen
+    // Einsatz ausgewählt und den Zweck nicht angepasst hat, die Verknüpfung
+    // stillschweigend, und keine Duplikatserkennung fände sie je wieder.
+    if (id) setZweck('einsatz');
     if (firecall?.date) setAbfahrt(firecall.date);
     if (firecall?.abruecken) setAnkunft(firecall.abruecken);
+  };
+
+  /**
+   * Der Zweck, mit der Einsatzverknüpfung im Schlepptau: Ein anderer Zweck als
+   * `einsatz` speichert keinen Einsatz, also darf auch keiner im Feld
+   * stehenbleiben. Was zu sehen ist, muss dem entsprechen, was gespeichert wird.
+   */
+  const changeZweck = (next: FahrtZweck) => {
+    setZweck(next);
+    if (next !== 'einsatz') {
+      setFirecallId(undefined);
+      setFirecallName('');
+      setConfirmedDuplicateId(undefined);
+    }
   };
 
   /** Name und zugehörige Personen-ID immer gemeinsam setzen — sonst zeigt
@@ -256,7 +295,65 @@ export function useEntryFormState({
     setCoDrivers(refs);
   };
 
-  const submit = async (): Promise<EntryFormSubmitResult> => {
+  /**
+   * Die schon erfasste Fahrt dieses Fahrzeugs zu diesem Einsatz.
+   *
+   * Nur bei verknüpftem Einsatz: Hinter einem frei eingetippten Namen steht
+   * kein Datensatz, über den sich zwei Fahrten überhaupt zuordnen ließen.
+   */
+  const duplicateEntry = useMemo(
+    () =>
+      zweck === 'einsatz' && firecallId && selectedVehicleId
+        ? findEntryForFirecallVehicle(
+            entries,
+            firecallId,
+            selectedVehicleId,
+            entry?.id,
+          )
+        : undefined,
+    [entries, zweck, firecallId, selectedVehicleId, entry?.id],
+  );
+
+  const duplicateConfirmed =
+    !!duplicateEntry && confirmedDuplicateId === duplicateEntry.id;
+
+  /**
+   * Fahrten desselben Fahrzeugs, deren Zeitraum sich überschneidet. Nur ein
+   * Hinweis: Zeiten sind im Einsatz oft geschätzt, und ein Riegel hier würde
+   * das Nachtragen einer Fahrt verhindern, deren Zeiten nur ungenau sind.
+   * Findet auch das Duplikat einer Fahrt ohne Einsatzverknüpfung.
+   *
+   * Die schon als Duplikat gemeldete Fahrt bleibt außen vor — zweimal dieselbe
+   * Fahrt zu nennen macht den Hinweis nur unübersichtlich. Übernimmt der
+   * Einsatz seine Zeiten, wäre das der Regelfall.
+   */
+  const overlappingEntries = useMemo(
+    () =>
+      selectedVehicleId
+        ? overlappingVehicleEntries(entries, {
+            vehicleId: selectedVehicleId,
+            abfahrt,
+            ankunft,
+            excludeEntryId: entry?.id,
+          }).filter((e) => e.id !== duplicateEntry?.id)
+        : [],
+    [entries, selectedVehicleId, abfahrt, ankunft, entry?.id, duplicateEntry?.id],
+  );
+
+  /**
+   * Ankunft vor Abfahrt — abgeleitet statt erst beim Speichern gemeldet, damit
+   * das Feld sofort als falsch zu erkennen ist. Die Ablehnung selbst kommt
+   * weiter aus `validateEntryInput` und gilt damit auch serverseitig.
+   */
+  const timeOrderInvalid = useMemo(() => {
+    const start = Date.parse(abfahrt);
+    const end = Date.parse(ankunft);
+    return !Number.isNaN(start) && !Number.isNaN(end) && end < start;
+  }, [abfahrt, ankunft]);
+
+  const submit = async (
+    options: EntryFormSubmitOptions = {},
+  ): Promise<EntryFormSubmitResult> => {
     // Kein vehicleName: der Server leitet ihn aus dem geladenen Fahrzeug ab,
     // damit Name und Zähler nicht auseinanderlaufen können.
     const input: FahrtenbuchEntryInput = {
@@ -282,12 +379,19 @@ export function useEntryFormState({
     };
 
     const validationErrors = validateEntryInput(definitions, input);
+    // Das Duplikat steht bei den Fehlern und nicht bei den Warnungen: Ohne
+    // Bestätigung wird nicht gespeichert. Es ist kein Fehler der Eingabe,
+    // deshalb steht der Text der Meldung im Hinweis am Formular.
+    const confirmDuplicate = options.confirmDuplicate || duplicateConfirmed;
+    if (duplicateEntry && !confirmDuplicate) {
+      validationErrors.push('duplicateFirecallEntry');
+    }
     setErrors(validationErrors);
     setSaveError(undefined);
     if (validationErrors.length > 0) return { success: false };
 
     setSaving(true);
-    const result = await onSubmit(input);
+    const result = await onSubmit(input, { confirmDuplicate });
     setSaving(false);
     if (!result.success) {
       const known = TRANSLATED_SAVE_ERRORS.find((key) => key === result.error);
@@ -321,10 +425,25 @@ export function useEntryFormState({
     coDrivers,
     changeCoDrivers,
     zweck,
-    setZweck,
+    changeZweck,
     firecallId,
     firecallName,
     changeFirecall,
+    /**
+     * Zweck `einsatz`, aber kein Einsatz verknüpft. Der Hinweis darauf ist
+     * bewusst kein Fehler: Ein Einsatz einer anderen Feuerwehr steht nicht in
+     * der Liste, und der Freitext bleibt der Weg dafür. Ohne Verknüpfung
+     * greifen nur die Duplikatsprüfungen nicht.
+     */
+    firecallLinkMissing: zweck === 'einsatz' && !firecallId,
+    duplicateEntry,
+    duplicateConfirmed,
+    setDuplicateConfirmed: (confirmed: boolean) =>
+      setConfirmedDuplicateId(
+        confirmed ? duplicateEntry?.id : undefined,
+      ),
+    overlappingEntries,
+    timeOrderInvalid,
     /**
      * Ob der verknüpfte Einsatz das Ziel bereits benennt. Nur die Verknüpfung
      * zählt, nicht ein frei eingetippter Einsatzname — dieselbe Grenze zieht

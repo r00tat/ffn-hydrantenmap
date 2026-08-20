@@ -417,7 +417,17 @@
     "moreDrivers": "+{count}",
     "zweck": "Fahrtzweck",
     "firecall": "Einsatz",
-    "firecallManual": "Einsatz wählen oder frei eingeben",
+    "firecallHint": "Einsatz wählen oder frei eingeben — die Auswahl setzt den Zweck auf „Einsatz“",
+    "firecallLinkMissing": "Kein Einsatz aus der Liste verknüpft. Die Fahrt wird gespeichert, aber nicht auf doppelte Erfassung geprüft.",
+    "duplicate": {
+      "title": "Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst",
+      "entry": "Bereits eingetragen: {driver}, Abfahrt {time}",
+      "noDriver": "ohne Fahrer",
+      "confirm": "Diese Fahrt ist trotzdem eine zweite Ausfahrt und soll gespeichert werden"
+    },
+    "overlap": {
+      "title": "Zeitraum überschneidet sich mit einer anderen Fahrt dieses Fahrzeugs"
+    },
     "ziel": "Fahrstrecke / Ziel",
     "abfahrt": "Abfahrt",
     "ankunft": "Ankunft",
@@ -464,6 +474,7 @@
     },
     "errors": {
       "vehicleMissing": "Bitte ein Fahrzeug wählen.",
+      "duplicateFirecallEntry": "Diese Fahrt ist für diesen Einsatz und dieses Fahrzeug bereits erfasst.",
       "driverMissing": "Bitte einen Fahrer angeben.",
       "coDriversTooMany": "Höchstens {count} Zusatzfahrer je Fahrt.",
       "abfahrtInvalid": "Abfahrtszeitpunkt ist ungültig.",
@@ -1807,6 +1818,7 @@
     "detailsTooltip": "Einsatz-Details und Anhänge",
     "shareTooltip": "Link für anonymen Zugriff erstellen",
     "kostenersatzTooltip": "Kostenersatz-Berechnungen",
+    "fahrtenRecorded": "{count, plural, one {# Fahrt} other {# Fahrten}} im Fahrtenbuch",
     "deleteTitle": "Einsatz {name} {date} löschen",
     "deleteConfirm": "Einsatz {name} {date} wirklich löschen?"
   },

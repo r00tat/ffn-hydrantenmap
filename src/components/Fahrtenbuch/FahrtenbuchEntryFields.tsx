@@ -1,13 +1,14 @@
 'use client';
 
 import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import {
   FAHRT_ZWECKE,
   requiresDriver,
@@ -35,6 +36,17 @@ export default function FahrtenbuchEntryFields({
   persons,
 }: FahrtenbuchEntryFieldsProps) {
   const t = useTranslations('fahrtenbuch');
+  const format = useFormatter();
+
+  /** Fahrer und Zeitraum einer bestehenden Fahrt, für die Hinweise. */
+  const describeEntry = (entry: { driverName?: string; abfahrt: string }) =>
+    t('duplicate.entry', {
+      driver: entry.driverName?.trim() || t('duplicate.noDriver'),
+      time: format.dateTime(new Date(entry.abfahrt), {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }),
+    });
 
   return (
     <>
@@ -123,41 +135,19 @@ export default function FahrtenbuchEntryFields({
                 />
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                select
-                fullWidth
-                label={t('zweck')}
-                value={form.zweck}
-                onChange={(e) => form.setZweck(e.target.value as FahrtZweck)}
-              >
-                {FAHRT_ZWECKE.map((z) => (
-                  <MenuItem key={z} value={z}>
-                    {t(`zwecke.${z}` as 'zwecke.einsatz')}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              {/* Pflicht, solange kein Einsatz verknüpft ist: Der Einsatz
-                  benennt das Ziel selbst, jede andere Fahrt stünde sonst ohne
-                  Angabe da, wohin sie ging. */}
-              <TextField
-                fullWidth
-                required={!form.zielCoveredByFirecall}
-                label={t('ziel')}
-                error={form.errors.includes('zielMissing')}
-                value={form.ziel}
-                onChange={(e) => form.setZiel(e.target.value)}
-              />
-            </Grid>
-            {/* Ohne Einsatzliste (Gastformular) entfällt die Auswahl ganz — der
-            Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung. Ein freier
-            Name wäre dort unkontrollierter Fremdinhalt; der Server verwirft
-            ihn ohnehin. `hasFirecallSelection` statt Truthiness auf
-            `firecalls`, weil eine leere Liste („noch keine Einsätze geladen")
-            das Feld zeigen soll, `undefined` (Gastformular) aber nicht. */}
-            {form.zweck === 'einsatz' && form.hasFirecallSelection && (
+            {/* Zuerst der Einsatz, dann Zweck und Ziel: Die Zuordnung zu
+                einem Einsatz ist der Regelfall und trägt die Duplikats- und
+                Kilometerprüfungen. Stand das Feld hinter dem Ziel und nur bei
+                schon gesetztem Zweck „Einsatz", blieb es meist leer.
+
+                Ohne Einsatzliste (Gastformular) entfällt die Auswahl ganz — der
+                Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung. Ein freier
+                Name wäre dort unkontrollierter Fremdinhalt; der Server verwirft
+                ihn ohnehin. `hasFirecallSelection` statt Truthiness auf
+                `firecalls`, weil eine leere Liste („noch keine Einsätze
+                geladen") das Feld zeigen soll, `undefined` (Gastformular)
+                aber nicht. */}
+            {form.hasFirecallSelection && (
               <Grid size={{ xs: 12 }}>
                 <Autocomplete
                   freeSolo
@@ -186,12 +176,80 @@ export default function FahrtenbuchEntryFields({
                     <TextField
                       {...params}
                       label={t('firecall')}
-                      helperText={t('firecallManual')}
+                      helperText={t('firecallHint')}
                     />
                   )}
                 />
               </Grid>
             )}
+            {/* Der Duplikatshinweis steht beim Einsatzfeld, weil er von dieser
+                Auswahl kommt — und über dem Speichern-Knopf, damit er nicht
+                erst nach dem Scrollen auffällt. */}
+            {form.duplicateEntry && (
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="warning">
+                  <AlertTitle>{t('duplicate.title')}</AlertTitle>
+                  {describeEntry(form.duplicateEntry)}
+                  <FormControlLabel
+                    sx={{ display: 'block', mt: 1 }}
+                    control={
+                      <Checkbox
+                        checked={form.duplicateConfirmed}
+                        onChange={(e) =>
+                          form.setDuplicateConfirmed(e.target.checked)
+                        }
+                      />
+                    }
+                    label={t('duplicate.confirm')}
+                  />
+                </Alert>
+              </Grid>
+            )}
+            {/* Nur ein Hinweis: Zeiten sind im Einsatz oft geschätzt. Findet
+                auch das Duplikat einer Fahrt ohne Einsatzverknüpfung. */}
+            {form.overlappingEntries.length > 0 && (
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="warning">
+                  <AlertTitle>{t('overlap.title')}</AlertTitle>
+                  {form.overlappingEntries.map((e) => (
+                    <div key={e.id}>{describeEntry(e)}</div>
+                  ))}
+                </Alert>
+              </Grid>
+            )}
+            {form.firecallLinkMissing && form.hasFirecallSelection && (
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="info">{t('firecallLinkMissing')}</Alert>
+              </Grid>
+            )}
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={t('zweck')}
+                value={form.zweck}
+                onChange={(e) => form.changeZweck(e.target.value as FahrtZweck)}
+              >
+                {FAHRT_ZWECKE.map((z) => (
+                  <MenuItem key={z} value={z}>
+                    {t(`zwecke.${z}` as 'zwecke.einsatz')}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              {/* Pflicht, solange kein Einsatz verknüpft ist: Der Einsatz
+                  benennt das Ziel selbst, jede andere Fahrt stünde sonst ohne
+                  Angabe da, wohin sie ging. */}
+              <TextField
+                fullWidth
+                required={!form.zielCoveredByFirecall}
+                label={t('ziel')}
+                error={form.errors.includes('zielMissing')}
+                value={form.ziel}
+                onChange={(e) => form.setZiel(e.target.value)}
+              />
+            </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 fullWidth
@@ -201,10 +259,15 @@ export default function FahrtenbuchEntryFields({
                 onChange={(e) =>
                   form.changeAbfahrt(fromLocalInput(e.target.value))
                 }
+                error={form.timeOrderInvalid}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
+              {/* Verdrehte Zeiten sofort am Feld, nicht erst als Meldung nach
+                  dem Speichern-Versuch. Abgelehnt wird sie ohnehin — die
+                  Prüfung steht in `validateEntryInput` und gilt damit auch
+                  serverseitig. */}
               <TextField
                 fullWidth
                 type="datetime-local"
@@ -212,6 +275,12 @@ export default function FahrtenbuchEntryFields({
                 value={toLocalInput(form.ankunft)}
                 onChange={(e) =>
                   form.setAnkunft(fromLocalInput(e.target.value))
+                }
+                error={form.timeOrderInvalid}
+                helperText={
+                  form.timeOrderInvalid
+                    ? t('errors.ankunftBeforeAbfahrt')
+                    : undefined
                 }
                 slotProps={{ inputLabel: { shrink: true } }}
               />

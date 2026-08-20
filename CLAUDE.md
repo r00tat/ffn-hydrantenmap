@@ -884,6 +884,66 @@ aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
 - **`undefined` heißt „nie geschrieben", nicht „nein".** Fahrzeuge, deren Cache
   älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
   und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
+## Doppelte Fahrten zu einem Einsatz
+
+Die Fahrten eines Einsatzes entstehen von zwei Seiten: über die Sammelerfassung
+auf der Einsatzseite und über den Fahrtenbuch-Dialog. Trug jemand alle Fahrten
+ein und der Fahrer später seine eigene noch einmal, stand dieselbe Fahrt zweimal
+im Fahrtenbuch — mit doppelten Kilometern und dadurch falschen Zählerständen für
+alle folgenden Fahrten.
+
+**Duplikat heißt Einsatz + Fahrzeug.** Pro Einsatz fährt ein Fahrzeug einmal;
+mehrere Fahrzeuge und mehrere Fahrer je Fahrzeug bleiben unberührt. Die
+Erkennung sitzt in `findEntryForFirecallVehicle`
+([common/fahrtenbuch.ts](src/common/fahrtenbuch.ts)) und wird von beiden Seiten
+benutzt.
+
+- **Die Schranke steht in der Action**, nicht im Dialog:
+  `createFahrtenbuchEntry` und `updateFahrtenbuchEntry` lehnen mit
+  `duplicateFirecallEntry` ab, solange `confirmDuplicate` fehlt. Zwei Geräte
+  können dieselbe Fahrt gleichzeitig offen haben. Geprüft wird gegen
+  `doc.firecallId` und nicht gegen die Eingabe — ob die Verknüpfung am Dokument
+  landet, entscheidet `buildEntryDocument` über den Zweck, und nur was
+  gespeichert wird, kann ein Duplikat sein.
+- **Bestätigen bleibt möglich.** Es gibt Einsätze, bei denen ein Fahrzeug
+  tatsächlich zweimal ausfährt. Bestätigt wird im Formular *diese eine* Fahrt
+  (`confirmedDuplicateId` in [useEntryFormState.ts](src/components/Fahrtenbuch/useEntryFormState.ts)),
+  nicht das Formular — wechselt die Auswahl, ist die Bestätigung hinfällig.
+- **Die Zeitüberschneidung ist nur eine Warnung.** `overlappingVehicleEntries`
+  findet zwei Fahrten desselben Fahrzeugs mit überlappendem Zeitraum, also auch
+  das Duplikat einer Fahrt **ohne** Einsatzverknüpfung — etwa aus dem
+  Gastformular hinter einem Freigabe-Link, das den Einsatzbezug gar nicht
+  mitschickt. Kein Riegel: Zeiten sind im Einsatz oft geschätzt. Berührende
+  Zeiträume zählen nicht, das sind zwei aufeinanderfolgende Fahrten.
+- **Der Einsatz kommt im Formular vor Zweck und Ziel** und ist immer sichtbar,
+  nicht erst bei schon gesetztem Zweck „Einsatz" — vorher stand er hinter dem
+  Ziel und blieb deshalb meist leer. Die Auswahl setzt den Zweck auf `einsatz`:
+  `submit` schickt `firecallId` nur bei diesem Zweck, ohne das verlöre eine
+  Fahrt die Verknüpfung stillschweigend und keine Duplikatserkennung fände sie
+  je wieder. Umgekehrt räumt `changeZweck` die Verknüpfung — was im Feld steht,
+  muss dem entsprechen, was gespeichert wird. Der Freitext bleibt der Weg für
+  einen Einsatz, der nicht in der Liste steht; dass die Prüfungen dann nicht
+  greifen, sagt ein Hinweis.
+- **`fahrtenbuchEntryCount` am Einsatz** trägt die Anzeige in der
+  Einsatz-Übersicht ([Einsaetze.tsx](src/components/pages/Einsaetze.tsx)).
+  Denormalisiert wie der Routen-Cache `fahrtenbuchRoute` und aus demselben
+  Grund: Die Übersicht zeigt alle Einsätze der Gruppe auf einmal, eine Abfrage
+  je Karte wären dutzende Listener. Gezählt wird bei jedem Schreibvorgang neu
+  aus dem Bestand statt hoch- und heruntergezählt; ein Zähler, der driftet, wäre
+  schlimmer als keiner. Nur die Anzahl, keine Fahrzeug- oder Fahrernamen — das
+  Einsatz-Dokument liest jedes Gruppenmitglied, das Fahrtenbuch nur wer dort
+  Mitglied ist. Ein Fehler beim Schreiben bleibt beim Zähler und nimmt die
+  erfasste Fahrt nicht mit.
+- **Angezeigt wird nur der positive Fall.** Ein Einsatz ohne das Feld heißt
+  „nichts bekannt", nicht „keine Fahrten": Für Einsätze von vor der Zählung
+  wäre „0 Fahrten" eine falsche Aussage in genau die Richtung, die Duplikate
+  erzeugt. Nachgezogen wird der Zähler über `syncFirecallEntryCount`, sobald
+  jemand die Einsatzseite öffnet — dort sind die Fahrten dieses Einsatzes
+  ohnehin geladen. Die Anzahl aus dem Browser ist nur der Anlass, gezählt wird
+  serverseitig.
+- **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
+  `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
+  markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
 
 ## Mangel-Bilder
 

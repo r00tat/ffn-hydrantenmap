@@ -11,6 +11,7 @@ import {
   isPropellant,
   isTimeOnlyTimestamp,
   findEntryForFirecallVehicle,
+  overlappingVehicleEntries,
   matchVehicleByName,
   normalizeName,
   PROPELLANTS,
@@ -421,6 +422,102 @@ describe('findEntryForFirecallVehicle', () => {
 
   it('ignoriert gelöschte Einträge', () => {
     expect(findEntryForFirecallVehicle(entries, 'f1', 'v2')).toBeUndefined();
+  });
+
+  it('lässt den bearbeiteten Eintrag selbst außen vor', () => {
+    // Sonst meldete die Bearbeitung einer Fahrt sie selbst als Duplikat.
+    expect(
+      findEntryForFirecallVehicle(entries, 'f1', 'v1', 'e1'),
+    ).toBeUndefined();
+  });
+});
+
+describe('overlappingVehicleEntries', () => {
+  const entry = (overrides: Partial<FahrtenbuchEntry>): FahrtenbuchEntry =>
+    ({
+      id: 'e1',
+      vehicleId: 'v1',
+      deleted: false,
+      abfahrt: '2026-08-03T10:00:00.000Z',
+      ankunft: '2026-08-03T12:00:00.000Z',
+      ...overrides,
+    }) as FahrtenbuchEntry;
+
+  const existing = [entry({})];
+
+  it('meldet eine überschneidende Fahrt desselben Fahrzeugs', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found.map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('meldet eine vollständig umschlossene Fahrt', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T09:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toHaveLength(1);
+  });
+
+  it('lässt eine anschließende Fahrt zu', () => {
+    // Ankunft und nächste Abfahrt auf derselben Minute ist der Normalfall
+    // zweier aufeinanderfolgender Fahrten, keine Überschneidung.
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T12:00:00.000Z',
+      ankunft: '2026-08-03T14:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('betrachtet nur dasselbe Fahrzeug', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v2',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('ignoriert gelöschte Fahrten', () => {
+    const found = overlappingVehicleEntries([entry({ deleted: true })], {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('lässt den bearbeiteten Eintrag selbst außen vor', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+      excludeEntryId: 'e1',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('bleibt still bei unlesbaren Zeiten', () => {
+    // Eine Warnung, die auf einem kaputten Zeitstempel beruht, wäre Rauschen.
+    expect(
+      overlappingVehicleEntries(existing, {
+        vehicleId: 'v1',
+        abfahrt: '',
+        ankunft: '',
+      }),
+    ).toEqual([]);
+    expect(
+      overlappingVehicleEntries([entry({ abfahrt: 'kaputt' })], {
+        vehicleId: 'v1',
+        abfahrt: '2026-08-03T11:00:00.000Z',
+        ankunft: '2026-08-03T13:00:00.000Z',
+      }),
+    ).toEqual([]);
   });
 });
 

@@ -417,7 +417,17 @@
     "moreDrivers": "+{count}",
     "zweck": "Purpose",
     "firecall": "Operation",
-    "firecallManual": "Select an operation or enter one",
+    "firecallHint": "Select an operation or enter one — selecting it sets the purpose to \u201coperation\u201d",
+    "firecallLinkMissing": "No operation linked from the list. The trip is saved but not checked for duplicates.",
+    "duplicate": {
+      "title": "A trip for this vehicle and this operation is already recorded",
+      "entry": "Already recorded: {driver}, departure {time}",
+      "noDriver": "no driver",
+      "confirm": "This really is a second trip and should be saved"
+    },
+    "overlap": {
+      "title": "The time range overlaps another trip of this vehicle"
+    },
     "ziel": "Route / destination",
     "abfahrt": "Departure",
     "ankunft": "Arrival",
@@ -464,6 +474,7 @@
     },
     "errors": {
       "vehicleMissing": "Please select a vehicle.",
+      "duplicateFirecallEntry": "This trip is already recorded for this operation and vehicle.",
       "driverMissing": "Please enter a driver.",
       "coDriversTooMany": "At most {count} additional drivers per trip.",
       "abfahrtInvalid": "Departure time is invalid.",
@@ -1807,6 +1818,7 @@
     "detailsTooltip": "Operation details and attachments",
     "shareTooltip": "Create anonymous-access link",
     "kostenersatzTooltip": "Cost recovery calculations",
+    "fahrtenRecorded": "{count, plural, one {# trip} other {# trips}} in the logbook",
     "deleteTitle": "Delete operation {name} {date}",
     "deleteConfirm": "Really delete operation {name} {date}?"
   },

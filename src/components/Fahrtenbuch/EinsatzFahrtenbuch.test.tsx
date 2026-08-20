@@ -20,6 +20,7 @@ const firestoreData = vi.hoisted(() => ({
   activeVehicles: [] as unknown[],
   fzgItems: [] as unknown[],
   crew: [] as unknown[],
+  entries: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -37,6 +38,7 @@ vi.mock('./fahrtenbuchActions', () => ({
     skippedVehicleIds: [],
     failedVehicleIds: [],
   }),
+  syncFirecallEntryCount: vi.fn().mockResolvedValue({ success: true }),
   createFahrtenbuchEntry: vi.fn(),
   updateFahrtenbuchEntry: vi.fn(),
 }));
@@ -59,7 +61,9 @@ vi.mock('../../hooks/useFahrtenbuchVehicles', () => ({
 vi.mock('../../hooks/useFahrtenbuchPersons', () => ({
   default: () => ({ persons: [], activePersons: [] }),
 }));
-vi.mock('../../hooks/useFahrtenbuchEntries', () => ({ default: () => [] }));
+vi.mock('../../hooks/useFahrtenbuchEntries', () => ({
+  default: () => firestoreData.entries,
+}));
 vi.mock('../../hooks/useFahrtenbuchGroupStandort', () => ({
   default: () => ({
     standort: { lat: 47.9482913, lng: 16.848222 },
@@ -71,7 +75,10 @@ import type { Firecall } from '../firebase/firestore';
 import EinsatzFahrtenbuch, {
   EinsatzFahrtenbuchView,
 } from './EinsatzFahrtenbuch';
-import { createFahrtenbuchEntries } from './fahrtenbuchActions';
+import {
+  createFahrtenbuchEntries,
+  syncFirecallEntryCount,
+} from './fahrtenbuchActions';
 
 const vehicle: FahrtenbuchVehicle = {
   id: 'gv1',
@@ -585,5 +592,76 @@ describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
       />,
     );
     expect(screen.queryByLabelText('Zusatzfahrer')).not.toBeInTheDocument();
+  });
+});
+
+describe('EinsatzFahrtenbuch — Fahrtenzähler am Einsatz', () => {
+  const firecall = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: 'f1',
+      name: 'Brand',
+      group: 'ffnd',
+      date: '2026-08-03T10:00:00.000Z',
+      abruecken: '2026-08-03T12:00:00.000Z',
+      ...overrides,
+    }) as unknown as Firecall;
+
+  const booked = {
+    id: 'e1',
+    vehicleId: 'gv1',
+    firecallId: 'f1',
+    deleted: false,
+    abfahrt: '2026-08-03T10:00:00.000Z',
+    ankunft: '2026-08-03T12:00:00.000Z',
+    counters: {},
+  } as unknown as FahrtenbuchEntry;
+
+  beforeEach(() => {
+    vi.mocked(syncFirecallEntryCount).mockClear();
+    firestoreData.groups = ['ffnd'];
+    firestoreData.activeVehicles = [vehicle];
+    firestoreData.fzgItems = [{ id: 'i1', name: 'RLFA 3000/100' }];
+  });
+
+  afterEach(() => {
+    firestoreData.groups = [];
+    firestoreData.activeVehicles = [];
+    firestoreData.fzgItems = [];
+    firestoreData.entries = [];
+  });
+
+  it('zieht einen fehlenden Zähler nach', async () => {
+    // Einsätze aus der Zeit vor dem Zähler tragen das Feld nicht — die
+    // Übersicht könnte ihre Fahrten sonst nie als erfasst zeigen.
+    firestoreData.entries = [booked];
+    renderWithIntl(
+      <EinsatzFahrtenbuch firecallId="f1" firecall={firecall()} />,
+    );
+
+    await waitFor(() =>
+      expect(syncFirecallEntryCount).toHaveBeenCalledWith('ffnd', 'f1'),
+    );
+  });
+
+  it('schreibt nicht, wenn der Zähler schon stimmt', () => {
+    firestoreData.entries = [booked];
+    renderWithIntl(
+      <EinsatzFahrtenbuch
+        firecallId="f1"
+        firecall={firecall({ fahrtenbuchEntryCount: 1 })}
+      />,
+    );
+
+    expect(syncFirecallEntryCount).not.toHaveBeenCalled();
+  });
+
+  it('schreibt nicht ohne Mitgliedschaft in der Gruppe des Einsatzes', () => {
+    firestoreData.groups = ['andere'];
+    firestoreData.entries = [booked];
+    renderWithIntl(
+      <EinsatzFahrtenbuch firecallId="f1" firecall={firecall()} />,
+    );
+
+    expect(syncFirecallEntryCount).not.toHaveBeenCalled();
   });
 });
