@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-const { addMock, mangelQueryGetMock, vehicleSetMock } = vi.hoisted(() => ({
-  addMock: vi.fn(),
-  mangelQueryGetMock: vi.fn(),
-  vehicleSetMock: vi.fn(),
-}));
+const { addMock, mangelQueryGetMock, latestEntryGetMock, vehicleSetMock } =
+  vi.hoisted(() => ({
+    addMock: vi.fn(),
+    mangelQueryGetMock: vi.fn(),
+    latestEntryGetMock: vi.fn(),
+    vehicleSetMock: vi.fn(),
+  }));
 
 vi.mock('../../server/firebase/admin', () => {
   const mangelCollection = {
@@ -15,17 +17,25 @@ vi.mock('../../server/firebase/admin', () => {
     where: () => mangelCollection,
     get: mangelQueryGetMock,
   };
+  const entriesCollection = {
+    where: () => entriesCollection,
+    orderBy: () => entriesCollection,
+    limit: () => entriesCollection,
+    get: latestEntryGetMock,
+  };
   const groupDoc = {
-    collection: (name: string) =>
-      name === 'vehicle'
-        ? { doc: () => ({ get: vi.fn(), set: vehicleSetMock }) }
-        : mangelCollection,
+    collection: (name: string) => {
+      if (name === 'vehicle') {
+        return { doc: () => ({ get: vi.fn(), set: vehicleSetMock }) };
+      }
+      return name === 'mangel' ? mangelCollection : entriesCollection;
+    },
   };
   return { firestore: { collection: () => ({ doc: () => groupDoc }) } };
 });
 
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
-import { createMangelForEntry } from './mangelStore';
+import { createMangelForEntry, refreshVehicleCache } from './mangelStore';
 
 const actor = {
   userId: 'u1',
@@ -57,8 +67,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   addMock.mockResolvedValue({ id: 'm1' });
   mangelQueryGetMock.mockResolvedValue({
-    docs: [{ data: () => ({ status: 'open' }) }],
+    docs: [{ id: 'm1', data: () => ({ status: 'open' }) }],
   });
+  latestEntryGetMock.mockResolvedValue({ docs: [] });
 });
 
 describe('createMangelForEntry', () => {
@@ -115,8 +126,8 @@ describe('createMangelForEntry', () => {
   it('frischt den Mängelzähler des Fahrzeugs auf', async () => {
     mangelQueryGetMock.mockResolvedValue({
       docs: [
-        { data: () => ({ status: 'open' }) },
-        { data: () => ({ status: 'resolved' }) },
+        { id: 'm1', data: () => ({ status: 'open' }) },
+        { id: 'm2', data: () => ({ status: 'resolved' }) },
       ],
     });
     await createMangelForEntry({
@@ -127,7 +138,7 @@ describe('createMangelForEntry', () => {
       actor,
     });
     expect(vehicleSetMock).toHaveBeenCalledWith(
-      { openMangelCount: 1 },
+      expect.objectContaining({ openMangelCount: 1 }),
       { merge: true },
     );
   });
@@ -146,5 +157,80 @@ describe('createMangelForEntry', () => {
       }),
     ).rejects.toThrow(/descriptionMissing/);
     expect(addMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('refreshVehicleCache', () => {
+  const latestEntry = {
+    id: 'e1',
+    data: () => ({
+      abfahrt: '2026-08-04T08:00:00.000Z',
+      driverName: 'Bernd Beispiel',
+      defekt: true,
+      counters: { km: { start: 1000, end: 1042 } },
+    }),
+  };
+
+  it('schreibt Fahrt-Cache und Mängelzähler in einem Zug', async () => {
+    // Beide Hälften kommen aus derselben Abfragerunde: Ein Cache, in dem der
+    // Defekt der letzten Fahrt und die Mängel auseinanderlaufen, ist genau der
+    // Zustand aus #706.
+    latestEntryGetMock.mockResolvedValue({ docs: [latestEntry] });
+    mangelQueryGetMock.mockResolvedValue({
+      docs: [
+        { id: 'm1', data: () => ({ status: 'resolved', entryId: 'e1' }) },
+        { id: 'm2', data: () => ({ status: 'open', entryId: 'e0' }) },
+      ],
+    });
+
+    await refreshVehicleCache('ffnd', 'v1');
+
+    expect(vehicleSetMock).toHaveBeenCalledWith(
+      {
+        lastCounters: { km: 1042 },
+        lastEntryAt: '2026-08-04T08:00:00.000Z',
+        lastDriverName: 'Bernd Beispiel',
+        lastEntryHasDefect: true,
+        openMangelCount: 1,
+        lastEntryMangelId: 'm1',
+      },
+      { merge: true },
+    );
+  });
+
+  it('merkt sich null, wenn es zur letzten Fahrt keinen Mangel gibt', async () => {
+    // Der Altbestand: Defekt an der Fahrt, kein Vorgang dazu. Nur hier bleibt
+    // „Defekt gemeldet" die einzige Aussage.
+    latestEntryGetMock.mockResolvedValue({ docs: [latestEntry] });
+    mangelQueryGetMock.mockResolvedValue({ docs: [] });
+
+    await refreshVehicleCache('ffnd', 'v1');
+
+    expect(vehicleSetMock.mock.calls[0][0]).toMatchObject({
+      lastEntryHasDefect: true,
+      lastEntryMangelId: null,
+      openMangelCount: 0,
+    });
+  });
+
+  it('schreibt den leeren Cache für ein Fahrzeug ohne Fahrten', async () => {
+    latestEntryGetMock.mockResolvedValue({ docs: [] });
+    mangelQueryGetMock.mockResolvedValue({
+      docs: [{ id: 'm1', data: () => ({ status: 'open' }) }],
+    });
+
+    await refreshVehicleCache('ffnd', 'v1');
+
+    expect(vehicleSetMock).toHaveBeenCalledWith(
+      {
+        lastCounters: {},
+        lastEntryAt: null,
+        lastDriverName: null,
+        lastEntryHasDefect: false,
+        openMangelCount: 1,
+        lastEntryMangelId: null,
+      },
+      { merge: true },
+    );
   });
 });

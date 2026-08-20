@@ -229,6 +229,56 @@ describe('FahrtenbuchVehicleCard', () => {
     expect(screen.queryByText(/offene Mängel/)).not.toBeInTheDocument();
   });
 
+  it('schweigt, wenn der Mangel zur letzten Fahrt behoben ist', () => {
+    // #706: Vorher kam „Defekt gemeldet" genau dann zum Vorschein, wenn der
+    // letzte Mangel behoben wurde — der Zähler hatte den Hinweis bis dahin
+    // bloß verdeckt.
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({
+          lastEntryHasDefect: true,
+          openMangelCount: 0,
+          lastEntryMangelId: 'm1',
+        })}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Defekt gemeldet')).not.toBeInTheDocument();
+    expect(screen.queryByText(/offene[rn]? Mangel|offene Mängel/)).not.toBeInTheDocument();
+  });
+
+  it('zeigt den Hinweis für eine Defektfahrt ohne Mangeldatensatz', () => {
+    // Der Altbestand aus der Zeit vor der Mängelverwaltung — dafür gibt es den
+    // Hinweis.
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({
+          lastEntryHasDefect: true,
+          openMangelCount: 0,
+          lastEntryMangelId: null,
+        })}
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Defekt gemeldet')).toBeInTheDocument();
+  });
+
+  it('fällt auf die geladenen Mängel zurück, solange der Cache das Feld nicht kennt', () => {
+    // Ein Fahrzeug, dessen Cache vor `lastEntryMangelId` geschrieben wurde:
+    // Ohne den Rückfall bliebe der Hinweis bis zur nächsten Mutation stehen.
+    renderWithIntl(
+      <FahrtenbuchVehicleCard
+        groupId="ffnd"
+        vehicle={vehicle({ lastEntryHasDefect: true, openMangelCount: 0 })}
+        lastEntryHasMangel
+        onAddTrip={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Defekt gemeldet')).not.toBeInTheDocument();
+  });
+
   it('ersetzt den Defekt-Hinweis, sobald es offene Mängel gibt', () => {
     // Beide gleichzeitig wären doppelt gemoppelt: Der Zähler sagt alles, was
     // „Defekt gemeldet" sagt, und zusätzlich wie viel offen ist.

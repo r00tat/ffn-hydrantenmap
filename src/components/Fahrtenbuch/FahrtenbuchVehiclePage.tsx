@@ -27,6 +27,7 @@ import FahrtenbuchDialog from './FahrtenbuchDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import useEntryDeletion from './useEntryDeletion';
 import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
+import { showDefectHint } from './defectHint';
 
 export interface FahrtenbuchVehiclePageProps {
   groupId: string;
@@ -72,7 +73,7 @@ export default function FahrtenbuchVehiclePage({
     fromIso,
     toIso,
   });
-  const { openMangel: openMangelList } = useFahrtenbuchMangel(groupId, {
+  const { mangel, openMangel: openMangelList } = useFahrtenbuchMangel(groupId, {
     vehicleId,
   });
   const firecalls = useFahrtenbuchFirecalls(groupId);
@@ -98,6 +99,20 @@ export default function FahrtenbuchVehiclePage({
   // Der serverseitig gepflegte Zähler gewinnt; die geladenen Mängel sind der
   // Rückfall für Fahrzeuge, an denen das Feld noch nie geschrieben wurde.
   const openMangel = vehicle?.openMangelCount ?? openMangelList.length;
+
+  // `entries` ist absteigend sortiert, der erste ist die jüngste Fahrt. Ohne
+  // geladene Fahrt bleibt die Frage offen (`undefined`) — der Rückfall darf
+  // nicht als „kein Mangeldatensatz" durchgehen.
+  const lastEntryId = entries[0]?.id;
+  const lastEntryHasMangel = lastEntryId
+    ? mangel.some((m) => m.entryId === lastEntryId)
+    : undefined;
+  const showDefect = showDefectHint({
+    hasDefect: vehicle?.lastEntryHasDefect,
+    openMangelCount: openMangel,
+    lastEntryMangelId: vehicle?.lastEntryMangelId,
+    lastEntryHasMangel,
+  });
 
   if (!isAuthorized) {
     return (
@@ -163,8 +178,8 @@ export default function FahrtenbuchVehiclePage({
         )}
         {/* Derselbe sicherheitsrelevante Hinweis wie auf der Fahrzeugkarte,
             mit demselben Vorrang: der Mängelzähler, sonst der Defekt-Hinweis
-            der letzten Fahrt. */}
-        {openMangel > 0 ? (
+            der letzten Fahrt (siehe `showDefectHint`). */}
+        {openMangel > 0 && (
           <Chip
             size="small"
             color="error"
@@ -174,15 +189,14 @@ export default function FahrtenbuchVehiclePage({
             icon={<WarningAmberIcon />}
             label={tMaengel('openCount', { count: openMangel })}
           />
-        ) : (
-          vehicle?.lastEntryHasDefect && (
-            <Chip
-              size="small"
-              color="warning"
-              icon={<WarningAmberIcon />}
-              label={t('defectReported')}
-            />
-          )
+        )}
+        {showDefect && (
+          <Chip
+            size="small"
+            color="warning"
+            icon={<WarningAmberIcon />}
+            label={t('defectReported')}
+          />
         )}
         {/* Zähler kommen ausschließlich aus den Definitionen des Fahrzeugs —
             ein Anhänger ohne Zähler zeigt hier schlicht nichts. */}

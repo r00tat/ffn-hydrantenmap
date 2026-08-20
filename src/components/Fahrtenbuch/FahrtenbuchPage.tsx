@@ -40,6 +40,20 @@ import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
 const PAGE_STEP = 50;
 
 /**
+ * Ob es zur jüngsten Fahrt eines Fahrzeugs einen Mangeldatensatz gibt.
+ *
+ * `undefined` heißt „nicht zu beantworten": Liegt die letzte Fahrt außerhalb
+ * des geladenen Fensters, kennt die Seite sie nicht — das ist keine Auskunft
+ * über Mängel und darf nicht als „keiner" durchgehen.
+ */
+function lastEntryMangelKnown(
+  lastEntryId: string | undefined,
+  mangelEntryIds: Set<string>,
+): boolean | undefined {
+  return lastEntryId ? mangelEntryIds.has(lastEntryId) : undefined;
+}
+
+/**
  * Übersicht des Fahrtenbuchs: eine Karte je aktivem Fahrzeug mit Direkt-Button,
  * darunter eingeklappt die gruppenweite Fahrtenliste mit Filtern.
  */
@@ -73,7 +87,7 @@ export default function FahrtenbuchPage() {
     toIso,
   });
   const firecalls = useFahrtenbuchFirecalls(groupId);
-  const { openCountByVehicle } = useFahrtenbuchMangel(groupId);
+  const { mangel, openCountByVehicle } = useFahrtenbuchMangel(groupId);
   // Der Menüpunkt führt immer hierher; in die Sammelerfassung des laufenden
   // Einsatzes geht es über diesen Button. `unknown` heißt: kein Einsatz aktiv.
   const firecallId = useFirecallId();
@@ -97,6 +111,21 @@ export default function FahrtenbuchPage() {
     }
     return map;
   }, [entries]);
+
+  /**
+   * Fahrten, zu denen es einen Mangeldatensatz gibt. Entscheidet zusammen mit
+   * dem Fahrzeug-Cache, ob „Defekt gemeldet" noch etwas zu sagen hat — siehe
+   * `showDefectHint`.
+   */
+  const mangelEntryIds = useMemo(
+    () =>
+      new Set(
+        mangel
+          .map((m) => m.entryId)
+          .filter((id): id is string => id !== undefined),
+      ),
+    [mangel],
+  );
 
   /**
    * Auswahl im Dialog: aktive Fahrzeuge, beim Bearbeiten zusätzlich das
@@ -228,6 +257,10 @@ export default function FahrtenbuchPage() {
                   lastEntryByVehicle.get(vehicle.id as string)?.driverName
                 }
                 openMangelCount={openCountByVehicle.get(vehicle.id as string)}
+                lastEntryHasMangel={lastEntryMangelKnown(
+                  lastEntryByVehicle.get(vehicle.id as string)?.id,
+                  mangelEntryIds,
+                )}
                 onAddTrip={(vehicleId) => openDialog(vehicleId)}
               />
             </Grid>

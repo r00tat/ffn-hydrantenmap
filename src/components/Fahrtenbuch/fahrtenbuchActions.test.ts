@@ -20,6 +20,7 @@ const {
   actionUserRequiredMock,
   notifyMangelMock,
   createMangelForEntryMock,
+  refreshVehicleCacheMock,
 } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   addMock: vi.fn(),
@@ -40,6 +41,7 @@ const {
   actionUserRequiredMock: vi.fn(),
   notifyMangelMock: vi.fn(),
   createMangelForEntryMock: vi.fn(),
+  refreshVehicleCacheMock: vi.fn(),
 }));
 
 vi.mock('../../app/auth', () => ({
@@ -57,8 +59,11 @@ vi.mock('../actions/maps/routes', () => ({
 
 vi.mock('./notifyMangel', () => ({ notifyMangel: notifyMangelMock }));
 
+// Der Fahrzeug-Cache wird in `mangelStore` berechnet und dort getestet — hier
+// interessiert nur, dass er nach jeder geschriebenen Fahrt aufgefrischt wird.
 vi.mock('./mangelStore', () => ({
   createMangelForEntry: createMangelForEntryMock,
+  refreshVehicleCache: refreshVehicleCacheMock,
 }));
 
 // Ein Firestore-Stub, der drei Kollektionen bedient: `groups` (Gruppendokument
@@ -152,6 +157,7 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
     addMock.mockReset();
     vehicleGetMock.mockReset();
     vehicleSetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
 
     resolveMock.mockResolvedValue({
@@ -211,7 +217,7 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
 
   it('frischt den Zähler-Cache des Fahrzeugs auf', async () => {
     await createFahrtenbuchEntryViaShareLink('tok', input);
-    expect(vehicleSetMock).toHaveBeenCalled();
+    expect(refreshVehicleCacheMock).toHaveBeenCalledWith('ffnd', 'v1');
   });
 
   it('lehnt einen ungültigen Token mit dem Schlüssel linkInvalid ab', async () => {
@@ -283,6 +289,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     actionUserRequiredMock.mockReset();
     vehicleGetMock.mockReset();
     vehicleSetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
     entryDocGetMock.mockReset();
     entryDocSetMock.mockReset();
@@ -575,6 +582,7 @@ describe('updateFahrtenbuchEntry — Herkunft abgeleiteter Zählerstände', () =
     actionUserRequiredMock.mockReset();
     vehicleGetMock.mockReset();
     vehicleSetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
     entryDocGetMock.mockReset();
     entryDocSetMock.mockReset();
@@ -706,6 +714,7 @@ describe('importFahrtenbuchEntries', () => {
     actionUserRequiredMock.mockReset();
     vehicleGetMock.mockReset();
     vehicleSetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
     latestEntryGetMock.mockClear();
     batchSetMock.mockReset();
@@ -736,7 +745,7 @@ describe('importFahrtenbuchEntries', () => {
     expect(batchCommitMock).not.toHaveBeenCalled();
     // Ohne geschriebene Zeile darf auch der Fahrzeug-Cache nicht angefasst
     // werden.
-    expect(vehicleSetMock).not.toHaveBeenCalled();
+    expect(refreshVehicleCacheMock).not.toHaveBeenCalled();
   });
 
   it('fragt den Bestand je Fahrzeug ab und trennt die Fahrzeuge dabei', async () => {
@@ -781,7 +790,7 @@ describe('importFahrtenbuchEntries', () => {
     expect(batchCommitMock).toHaveBeenCalledTimes(1);
     // Beide Zeilen gehören demselben Fahrzeug — der Cache wird erst nach dem
     // Schreiben und nur einmal neu berechnet.
-    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+    expect(refreshVehicleCacheMock).toHaveBeenCalledTimes(1);
   });
 
   it('erkennt eine doppelt enthaltene Zeile innerhalb desselben Aufrufs', async () => {
@@ -880,7 +889,7 @@ describe('importFahrtenbuchEntries', () => {
 
     expect(result).toMatchObject({ success: true, created: 250 });
     expect(batchCommitMock).toHaveBeenCalledTimes(2);
-    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+    expect(refreshVehicleCacheMock).toHaveBeenCalledTimes(1);
   });
 
   it('meldet einen gescheiterten Block, ohne den bereits geschriebenen zu verschweigen', async () => {
@@ -908,7 +917,7 @@ describe('importFahrtenbuchEntries', () => {
       failed: 50,
     });
     // Die 200 committeten Zeilen gehören in den Fahrzeug-Cache.
-    expect(vehicleSetMock).toHaveBeenCalledTimes(1);
+    expect(refreshVehicleCacheMock).toHaveBeenCalledTimes(1);
   });
 
   it('hält nach einem gescheiterten Block die folgenden nicht auf', async () => {
@@ -932,7 +941,7 @@ describe('importFahrtenbuchEntries', () => {
   it('meldet den Import trotz gescheitertem Fahrzeug-Cache als erfolgreich', async () => {
     // Der Cache ist ein abgeleiteter Wert — die Fahrten stehen schon im
     // Fahrtenbuch und dürfen nicht als verloren gemeldet werden.
-    vehicleSetMock.mockRejectedValueOnce(new Error('5 UNAVAILABLE'));
+    refreshVehicleCacheMock.mockRejectedValueOnce(new Error('5 UNAVAILABLE'));
 
     const result = await importFahrtenbuchEntries('ffnd', [importInput()]);
 
