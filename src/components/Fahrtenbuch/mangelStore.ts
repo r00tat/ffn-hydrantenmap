@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  FAHRTENBUCH_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchEntry,
 } from '../../common/fahrtenbuch';
@@ -13,6 +14,7 @@ import {
 } from '../../common/mangel';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
+import { computeVehicleCache } from './entryLogic';
 
 /**
  * Der Firestore-Zugriff auf die Mängel — bewusst getrennt von
@@ -26,6 +28,13 @@ export function mangelRef(groupId: string) {
     .collection(GROUP_COLLECTION_ID)
     .doc(groupId)
     .collection(FAHRTENBUCH_MANGEL_COLLECTION_ID);
+}
+
+export function entriesRef(groupId: string) {
+  return firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
+    .collection(FAHRTENBUCH_COLLECTION_ID);
 }
 
 export function vehicleRef(groupId: string, vehicleId: string) {
@@ -60,24 +69,52 @@ export async function loadMangel(
 }
 
 /**
- * Schreibt die Anzahl offener Mängel am Fahrzeug neu.
+ * Schreibt den Cache am Fahrzeug neu: jüngste Fahrt und Mängel.
  *
- * Derselbe Grund wie bei `refreshVehicleCounters`: Die Fahrzeugübersicht soll
- * den Zähler zeigen, ohne alle Mängel der Gruppe zu laden. Wird nach jeder
- * Mutation aufgerufen, damit der Cache nicht driftet.
+ * Die Fahrzeugübersicht soll Zählerstände, letzten Fahrer, Defekt-Hinweis und
+ * Mängelzähler zeigen, ohne alle Fahrten und Mängel der Gruppe zu laden. Wird
+ * nach jeder Mutation an einer Fahrt *oder* an einem Mangel aufgerufen, damit
+ * der Cache nicht driftet.
+ *
+ * Beide Hälften in einem Zug und nicht in zwei Funktionen, weil sie sich
+ * überschneiden: `lastEntryMangelId` sagt, ob es zur jüngsten Fahrt einen
+ * Mangeldatensatz gibt, und ändert sich damit sowohl mit der Fahrt als auch
+ * mit den Mängeln. Zwei Auffrischungen, die je nur ihre Hälfte kennen, ließen
+ * genau die Widersprüche zu, aus denen #706 entstanden ist.
+ *
+ * Alle Felder werden immer gesetzt, nie weggelassen: Geschrieben wird mit
+ * `merge: true`, ein fehlendes Feld ließe den alten Wert stehen.
  */
-export async function refreshVehicleMangelCount(
+export async function refreshVehicleCache(
   groupId: string,
   vehicleId: string,
 ): Promise<void> {
-  const snapshot = await mangelRef(groupId)
-    .where('vehicleId', '==', vehicleId)
-    .get();
-  const count = openMangelCount(
-    snapshot.docs.map((doc) => doc.data() as Pick<Mangel, 'status'>),
-  );
+  const [entrySnapshot, mangelSnapshot] = await Promise.all([
+    entriesRef(groupId)
+      .where('vehicleId', '==', vehicleId)
+      .where('deleted', '==', false)
+      .orderBy('abfahrt', 'desc')
+      .limit(1)
+      .get(),
+    mangelRef(groupId).where('vehicleId', '==', vehicleId).get(),
+  ]);
+
+  const latestDoc = entrySnapshot.docs[0];
+  const latest = latestDoc?.data() as FahrtenbuchEntry | undefined;
+  const covering = latestDoc
+    ? mangelSnapshot.docs.find(
+        (doc) => (doc.data() as Mangel).entryId === latestDoc.id,
+      )
+    : undefined;
+
   await vehicleRef(groupId, vehicleId).set(
-    { openMangelCount: count },
+    {
+      ...computeVehicleCache(latest),
+      openMangelCount: openMangelCount(
+        mangelSnapshot.docs.map((doc) => doc.data() as Pick<Mangel, 'status'>),
+      ),
+      lastEntryMangelId: covering?.id ?? null,
+    },
     { merge: true },
   );
 }
@@ -126,6 +163,6 @@ export async function createMangelForEntry({
   );
 
   const ref = await mangelRef(groupId).add(doc);
-  await refreshVehicleMangelCount(groupId, entry.vehicleId);
+  await refreshVehicleCache(groupId, entry.vehicleId);
   return ref.id;
 }

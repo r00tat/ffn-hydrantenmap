@@ -224,6 +224,13 @@ service cloud.firestore {
       allow read, update, delete: if adminUser();
     }
 
+    // Kommentare und Verlaufseinträge zu einem Bug-Report. Sie enthalten
+    // interne Notizen und laufen ausschließlich über die Server-Actions
+    // (Admin SDK, actionAdminRequired) — kein Client liest oder schreibt hier.
+    match /bugReport/{doc}/comments/{comment} {
+      allow read, write: if false;
+    }
+
     // Application configuration documents (e.g. bug report recipient list).
     // Access is only through server-side Admin SDK actions.
     match /appConfig/{doc=**} {

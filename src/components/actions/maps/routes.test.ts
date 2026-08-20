@@ -17,7 +17,11 @@ vi.mock('../../../server/firebase/project', () => ({
   getGcpProjectId: vi.fn().mockResolvedValue('ffn-utils'),
 }));
 
-import { computeRouteDistanceMeters, computeRouteLegsMeters } from './routes';
+import {
+  computeRouteDistanceMeters,
+  computeRouteLegsGeometry,
+  computeRouteLegsMeters,
+} from './routes';
 
 const from = { lat: 47.9482913, lng: 16.848222 };
 const to = { lat: 47.98, lng: 16.9 };
@@ -259,5 +263,213 @@ describe('computeRouteLegsMeters', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(computeRouteLegsMeters(from, to)).resolves.toBeUndefined();
+  });
+});
+
+describe('computeRouteLegsGeometry', () => {
+  const leg = (
+    coordinates: [number, number][],
+    distanceMeters?: number
+  ) => ({
+    ...(distanceMeters === undefined ? {} : { distanceMeters }),
+    polyline: { geoJsonLinestring: { type: 'LineString', coordinates } },
+  });
+
+  beforeEach(() => {
+    getAccessToken.mockResolvedValue('test-token');
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  function respondWithLegs(...responses: any[][]) {
+    let call = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      const legs = responses[call++];
+      return {
+        ok: true,
+        json: async () => ({ routes: [{ legs }] }),
+      } as Response;
+    });
+  }
+
+  it('dreht die GeoJSON-Koordinaten auf lat/lng', async () => {
+    // GeoJSON zählt [lng, lat] — ungedreht landete die Leitung im Indischen
+    // Ozean statt in Neusiedl.
+    respondWithLegs([
+      leg(
+        [
+          [16.848, 47.948],
+          [16.849, 47.949],
+        ],
+        140
+      ),
+    ]);
+
+    await expect(
+      computeRouteLegsGeometry([from, to], 'WALK')
+    ).resolves.toEqual([
+      {
+        positions: [
+          [47.948, 16.848],
+          [47.949, 16.849],
+        ],
+        distanceMeters: 140,
+      },
+    ]);
+  });
+
+  it('fragt das Fußgänger-Profil ohne routingPreference ab', async () => {
+    // Die Routes API nimmt routingPreference nur für DRIVE und TWO_WHEELER an
+    // und lehnt den Aufruf sonst ab.
+    respondWithLegs([
+      leg([
+        [16.848, 47.948],
+        [16.849, 47.949],
+      ]),
+    ]);
+
+    await computeRouteLegsGeometry([from, to], 'WALK');
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers['X-Goog-FieldMask']).toBe(
+      'routes.legs.distanceMeters,routes.legs.polyline'
+    );
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.travelMode).toBe('WALK');
+    expect(body.routingPreference).toBeUndefined();
+    expect(body.polylineEncoding).toBe('GEO_JSON_LINESTRING');
+  });
+
+  it('schickt beim Auto-Profil routingPreference mit', async () => {
+    // Für DRIVE ist das Feld erlaubt; ohne es fiele das Routing in eine
+    // teurere, verkehrsabhängige SKU.
+    respondWithLegs([
+      leg([
+        [16.848, 47.948],
+        [16.849, 47.949],
+      ]),
+    ]);
+
+    await computeRouteLegsGeometry([from, to], 'DRIVE');
+
+    const body = JSON.parse(
+      (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(body.travelMode).toBe('DRIVE');
+    expect(body.routingPreference).toBe('TRAFFIC_UNAWARE');
+  });
+
+  it('schickt die Punkte dazwischen als intermediates', async () => {
+    const middle = { lat: 47.95, lng: 16.86 };
+    respondWithLegs([
+      leg([
+        [16.848, 47.948],
+        [16.86, 47.95],
+      ]),
+      leg([
+        [16.86, 47.95],
+        [16.9, 47.98],
+      ]),
+    ]);
+
+    const legs = await computeRouteLegsGeometry([from, middle, to], 'WALK');
+
+    expect(legs).toHaveLength(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(
+      (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string
+    );
+    expect(body.intermediates).toEqual([
+      { location: { latLng: { latitude: middle.lat, longitude: middle.lng } } },
+    ]);
+  });
+
+  it('teilt mehr als 25 Punkte auf mehrere Anfragen mit überlappendem Punkt auf', async () => {
+    // 26 Punkte: 25 im ersten Block (24 Abschnitte), der 25. Punkt beginnt den
+    // zweiten Block — ohne die Überlappung fehlte der Abschnitt 25→26.
+    const points = Array.from({ length: 26 }, (_, i) => ({
+      lat: 47.9 + i / 1000,
+      lng: 16.8 + i / 1000,
+    }));
+    const straightLeg = leg([
+      [16.8, 47.9],
+      [16.81, 47.91],
+    ]);
+    respondWithLegs(
+      Array.from({ length: 24 }, () => straightLeg),
+      [straightLeg]
+    );
+
+    const legs = await computeRouteLegsGeometry(points, 'WALK');
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(legs).toHaveLength(25);
+    const bodies = vi
+      .mocked(fetch)
+      .mock.calls.map(([, init]) =>
+        JSON.parse((init as RequestInit).body as string)
+      );
+    expect(bodies[0].intermediates).toHaveLength(23);
+    expect(bodies[1].origin.location.latLng.latitude).toBe(points[24].lat);
+    expect(bodies[1].destination.location.latLng.latitude).toBe(points[25].lat);
+  });
+
+  it('liefert undefined, wenn die Antwort weniger Abschnitte als Punkte hat', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    respondWithLegs([
+      leg([
+        [16.848, 47.948],
+        [16.849, 47.949],
+      ]),
+    ]);
+
+    await expect(
+      computeRouteLegsGeometry([from, { lat: 47.95, lng: 16.86 }, to], 'WALK')
+    ).resolves.toBeUndefined();
+  });
+
+  it('liefert undefined, wenn ein Abschnitt ohne Geometrie kommt', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    respondWithLegs([{ distanceMeters: 100 }]);
+
+    await expect(computeRouteLegsGeometry([from, to], 'WALK')).resolves.toBeUndefined();
+  });
+
+  it('liefert undefined, wenn ein Block der Aufteilung ausfällt', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const points = Array.from({ length: 26 }, (_, i) => ({
+      lat: 47.9 + i / 1000,
+      lng: 16.8 + i / 1000,
+    }));
+    const straightLeg = leg([
+      [16.8, 47.9],
+      [16.81, 47.91],
+    ]);
+    let call = 0;
+    vi.mocked(fetch).mockImplementation(async () => {
+      call += 1;
+      if (call === 2) {
+        return { ok: false, status: 500, text: async () => 'boom' } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          routes: [{ legs: Array.from({ length: 24 }, () => straightLeg) }],
+        }),
+      } as Response;
+    });
+
+    await expect(computeRouteLegsGeometry(points, 'WALK')).resolves.toBeUndefined();
+  });
+
+  it('gibt für einen einzelnen Punkt keine Anfrage ab', async () => {
+    await expect(computeRouteLegsGeometry([from], 'WALK')).resolves.toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

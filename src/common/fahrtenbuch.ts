@@ -154,6 +154,17 @@ export interface FahrtenbuchVehicle {
    * der nächsten Fahrt ohne Defekt — auch wenn der Mangel noch offen ist.
    */
   openMangelCount?: number;
+  /**
+   * Der Mangeldatensatz zur jüngsten Fahrt, `null` wenn es keinen gibt.
+   * `undefined` heißt „Cache stammt aus der Zeit vor diesem Feld".
+   *
+   * Trennt, was `lastEntryHasDefect` allein nicht trennen kann: Ein Defekt mit
+   * Mangeldatensatz ist ein Vorgang mit eigenem Status und spricht über den
+   * Mängelzähler — ist er behoben, gibt es nichts mehr zu zeigen. Ein Defekt
+   * ohne Mangeldatensatz stammt aus der Zeit vor der Mängelverwaltung und hat
+   * keinen Status; dort bleibt „Defekt gemeldet" die einzige Aussage.
+   */
+  lastEntryMangelId?: string | null;
   createdAt: string;
   createdBy: string;
   updatedAt: string;

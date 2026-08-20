@@ -128,7 +128,7 @@ vi.mock('../../hooks/useFahrtenbuchMangel', () => ({
 }));
 
 import { renderWithIntl } from '../../test-utils/intlRender';
-import MangelPage from './MangelPage';
+import MangelPage, { MANGEL_STATUS_FILTERS } from './MangelPage';
 
 beforeEach(() => {
   searchParamsMock.value = new URLSearchParams();
@@ -161,6 +161,39 @@ describe('MangelPage', () => {
     await userEvent.click(screen.getByRole('option', { name: 'In Arbeit' }));
     expect(screen.getByText('Lenzpumpe zieht nicht')).toBeInTheDocument();
     expect(screen.queryByText('Blinker hinten links defekt')).toBeNull();
+  });
+
+  it('bietet die Statusoptionen mit paarweise verschiedenen Werten an', () => {
+    // Zwei Optionen mit demselben Wert markiert MUI beide und eine der beiden
+    // Sichten wird unerreichbar (#707).
+    expect(new Set(MANGEL_STATUS_FILTERS).size).toBe(
+      MANGEL_STATUS_FILTERS.length,
+    );
+  });
+
+  it('markiert beim Öffnen nur den Sammelfilter', async () => {
+    renderWithIntlPage();
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent(
+      'Offen und in Arbeit',
+    );
+    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+    const selected = screen
+      .getAllByRole('option')
+      .filter((o) => o.getAttribute('aria-selected') === 'true');
+    expect(selected.map((o) => o.textContent)).toEqual(['Offen und in Arbeit']);
+  });
+
+  it('unterscheidet „Offen" vom Sammelfilter', async () => {
+    renderWithIntlPage();
+    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Offen' }));
+    expect(screen.getByText('Blinker hinten links defekt')).toBeInTheDocument();
+    // „In Arbeit" gehört nicht dazu — das ist der Unterschied zum Sammelfilter.
+    expect(screen.queryByText('Lenzpumpe zieht nicht')).toBeNull();
+    // Das geschlossene Feld zeigt die tatsächlich gewählte Option.
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveTextContent(
+      'Offen',
+    );
   });
 
   it('belegt den Fahrzeugfilter aus dem Query-Parameter vor', () => {

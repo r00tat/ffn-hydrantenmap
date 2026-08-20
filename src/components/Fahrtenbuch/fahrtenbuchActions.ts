@@ -27,12 +27,11 @@ import { actionGroupMemberRequired } from './authGuards';
 import {
   buildEntryDocument,
   canModifyEntry,
-  computeVehicleCache,
   survivingCounterSources,
   type FahrtenbuchEntryInput,
 } from './entryLogic';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
-import { createMangelForEntry } from './mangelStore';
+import { createMangelForEntry, refreshVehicleCache } from './mangelStore';
 import { notifyMangel } from './notifyMangel';
 
 export interface ActionResult {
@@ -160,30 +159,6 @@ async function resolveFirecallDistance(
 }
 
 /**
- * Schreibt den Cache der jüngsten Fahrt am Fahrzeug neu — Zählerstände,
- * Zeitpunkt, Fahrer und Defekt-Hinweis. Wird nach jedem Create, Update und
- * Delete aufgerufen, damit der Cache nicht driftet.
- *
- * Fahrer und Defekt-Hinweis gehören hierher und nicht in die Übersichtsseite:
- * die lädt nur ein Fenster der jüngsten Fahrten der Gruppe und könnte den
- * sicherheitsrelevanten Defekt-Hinweis eines lange nicht bewegten Fahrzeugs
- * sonst stillschweigend verlieren.
- */
-async function refreshVehicleCounters(groupId: string, vehicleId: string) {
-  const snapshot = await entriesRef(groupId)
-    .where('vehicleId', '==', vehicleId)
-    .where('deleted', '==', false)
-    .orderBy('abfahrt', 'desc')
-    .limit(1)
-    .get();
-
-  const latest = snapshot.docs[0]?.data() as FahrtenbuchEntry | undefined;
-  await vehicleRef(groupId, vehicleId).set(computeVehicleCache(latest), {
-    merge: true,
-  });
-}
-
-/**
  * Meldet einen mit der Fahrt erfassten Mangel an die Empfänger der Gruppe.
  *
  * Best-effort und bewusst nach dem Schreiben: Die Fahrt steht im Fahrtenbuch,
@@ -262,7 +237,7 @@ export async function createFahrtenbuchEntry(
     const doc = buildEntryDocument(vehicle, input, groupId, actor);
 
     const ref = await entriesRef(groupId).add(doc);
-    await refreshVehicleCounters(groupId, input.vehicleId);
+    await refreshVehicleCache(groupId, input.vehicleId);
     await createMangelIfReported(groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(groupId, doc, vehicle);
     return { success: true, id: ref.id };
@@ -463,7 +438,7 @@ export async function createFahrtenbuchEntries(
     if (created > 0) {
       await batch.commit();
       for (const id of writtenVehicleIds) {
-        await refreshVehicleCounters(groupId, id);
+        await refreshVehicleCache(groupId, id);
       }
     }
     return {
@@ -689,7 +664,7 @@ export async function importFahrtenbuchEntries(
     // nächsten Fahrt ohnehin neu geschrieben.
     for (const id of written) {
       try {
-        await refreshVehicleCounters(groupId, id);
+        await refreshVehicleCache(groupId, id);
       } catch (err) {
         console.error('importFahrtenbuchEntries: Fahrzeug-Cache nicht aufgefrischt', err, {
           vehicleId: id,
@@ -771,9 +746,9 @@ export async function updateFahrtenbuchEntry(
         { merge: false },
       );
 
-    await refreshVehicleCounters(groupId, input.vehicleId);
+    await refreshVehicleCache(groupId, input.vehicleId);
     if (existing.vehicleId !== input.vehicleId) {
-      await refreshVehicleCounters(groupId, existing.vehicleId);
+      await refreshVehicleCache(groupId, existing.vehicleId);
     }
     return { success: true, id: entryId };
   } catch (err) {
@@ -808,7 +783,7 @@ export async function deleteFahrtenbuchEntry(
       updatedAt: new Date().toISOString(),
       updatedBy: session.user.id,
     });
-    await refreshVehicleCounters(groupId, existing.vehicleId);
+    await refreshVehicleCache(groupId, existing.vehicleId);
     return { success: true, id: entryId };
   } catch (err) {
     console.error('deleteFahrtenbuchEntry failed', err);
@@ -855,7 +830,7 @@ export async function createFahrtenbuchEntryViaShareLink(
     );
 
     const ref = await entriesRef(link.groupId).add(doc);
-    await refreshVehicleCounters(link.groupId, input.vehicleId);
+    await refreshVehicleCache(link.groupId, input.vehicleId);
     // Auch über den Freigabelink: Wer den QR-Code am Fahrzeug nutzt, ist meist
     // genau die Person, die den Mangel bemerkt hat. Die Mail weist die Herkunft
     // aus (siehe `buildMangelEmail`), damit die Empfängerin weiß, dass hinter

@@ -23,9 +23,10 @@ import { actionErrorKey } from './actionErrorKey';
 import { actionGroupMemberRequired, assertFahrtenbuchGroup } from './authGuards';
 import { deleteMangelImages, signMangelImages } from './mangelImageStore';
 import {
+  entriesRef,
   loadMangel,
   mangelRef,
-  refreshVehicleMangelCount,
+  refreshVehicleCache,
   vehicleRef,
 } from './mangelStore';
 
@@ -42,13 +43,6 @@ export interface MangelActionResult {
  * bloß weil niemand einen Text dazugeschrieben hat.
  */
 const MIGRATED_WITHOUT_TEXT = 'Defekt gemeldet (ohne Beschreibung)';
-
-function entriesRef(groupId: string) {
-  return firestore
-    .collection(GROUP_COLLECTION_ID)
-    .doc(groupId)
-    .collection(FAHRTENBUCH_COLLECTION_ID);
-}
 
 async function loadVehicle(
   groupId: string,
@@ -105,7 +99,7 @@ export async function createMangel(
     );
 
     const ref = await mangelRef(groupId).add(doc);
-    await refreshVehicleMangelCount(groupId, input.vehicleId);
+    await refreshVehicleCache(groupId, input.vehicleId);
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createMangel failed', err);
@@ -164,7 +158,7 @@ export async function updateMangel(
     // Erst nach dem Schreiben: Scheitert das Speichern, zeigt das Dokument
     // weiterhin auf Dateien, die es noch gibt.
     if (removed.length > 0) await deleteMangelImages(removed);
-    await refreshVehicleMangelCount(groupId, mangel.vehicleId);
+    await refreshVehicleCache(groupId, mangel.vehicleId);
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('updateMangel failed', err);
@@ -257,7 +251,7 @@ export async function changeMangelStatus(
             },
         { merge: true },
       );
-    await refreshVehicleMangelCount(groupId, mangel.vehicleId);
+    await refreshVehicleCache(groupId, mangel.vehicleId);
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('changeMangelStatus failed', err);
@@ -308,7 +302,7 @@ export async function deleteMangel(
     // Dateien sind seine Anhänge. Umgekehrt bliebe bei einem Fehler ein Mangel
     // stehen, dessen Bilder schon weg sind.
     await deleteMangelImages(sanitizeMangelImages(mangel.images, groupId));
-    await refreshVehicleMangelCount(groupId, mangel.vehicleId);
+    await refreshVehicleCache(groupId, mangel.vehicleId);
     return { success: true, id: mangelId };
   } catch (err) {
     console.error('deleteMangel failed', err);
@@ -412,9 +406,9 @@ export async function migrateDefectsToMangel(
     // Zähler ist ein abgeleiteter Wert.
     for (const vehicleId of touchedVehicles) {
       try {
-        await refreshVehicleMangelCount(groupId, vehicleId);
+        await refreshVehicleCache(groupId, vehicleId);
       } catch (err) {
-        console.error('migrateDefectsToMangel: Zähler nicht aufgefrischt', err, {
+        console.error('migrateDefectsToMangel: Cache nicht aufgefrischt', err, {
           groupId,
           vehicleId,
         });

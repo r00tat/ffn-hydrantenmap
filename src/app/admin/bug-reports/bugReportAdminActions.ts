@@ -28,13 +28,21 @@ function serializeFirestoreData<T>(data: unknown): T {
 import {
   APP_CONFIG_COLLECTION,
   BUG_REPORT_COLLECTION,
+  BUG_REPORT_COMMENT_MAX_LENGTH,
+  BUG_REPORT_COMMENTS_COLLECTION,
   BUG_REPORT_CONFIG_DOC,
   DEFAULT_BUG_REPORT_CONFIG,
   type BugReport,
+  type BugReportComment,
   type BugReportConfig,
   type BugReportCreatedBy,
   type BugReportStatus,
+  type BugReportUpdateInput,
 } from '../../../common/bugReport';
+import {
+  computeBugReportChanges,
+  normalizeBugReportUpdate,
+} from '../../../common/bugReportTracking';
 
 interface AdminSessionUser {
   id: string;
@@ -63,10 +71,24 @@ export async function listBugReportsAction(): Promise<BugReport[]> {
   );
 }
 
+async function readComments(id: string): Promise<BugReportComment[]> {
+  const snap = await firestore
+    .collection(BUG_REPORT_COLLECTION)
+    .doc(id)
+    .collection(BUG_REPORT_COMMENTS_COLLECTION)
+    .orderBy('createdAt', 'asc')
+    .get();
+  return snap.docs.map(
+    (d: { id: string; data: () => Record<string, unknown> }) =>
+      serializeFirestoreData<BugReportComment>({ id: d.id, ...d.data() }),
+  );
+}
+
 export async function getBugReportAction(id: string): Promise<{
   report: BugReport;
   screenshotUrls: string[];
   attachmentUrls: string[];
+  comments: BugReportComment[];
 }> {
   await actionAdminRequired();
   const doc = await firestore.collection(BUG_REPORT_COLLECTION).doc(id).get();
@@ -98,19 +120,93 @@ export async function getBugReportAction(id: string): Promise<{
   const attachmentUrls = await Promise.all(
     (report.attachments ?? []).map(sign),
   );
-  return { report, screenshotUrls, attachmentUrls };
+  const comments = await readComments(id);
+  return { report, screenshotUrls, attachmentUrls, comments };
+}
+
+export async function listBugReportCommentsAction(
+  id: string,
+): Promise<BugReportComment[]> {
+  await actionAdminRequired();
+  return readComments(id);
+}
+
+/**
+ * Ändert Status, GitHub-Issue, Zuständigkeit und interne Notiz und schreibt
+ * dieselbe Änderung als Verlaufseintrag in die Kommentare. Ohne den Eintrag
+ * erzählte der Verlauf nur die Hälfte der Geschichte des Reports.
+ */
+export async function updateBugReportAction(
+  id: string,
+  patch: BugReportUpdateInput,
+): Promise<void> {
+  const session = await actionAdminRequired();
+  const normalized = normalizeBugReportUpdate(patch);
+  if (Object.keys(normalized).length === 0) return;
+
+  const ref = firestore.collection(BUG_REPORT_COLLECTION).doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    throw new Error(`Bug report ${id} not found`);
+  }
+  const before = (doc.data() ?? {}) as BugReport;
+  const changes = computeBugReportChanges(before, normalized);
+  // Ein Speichern ohne Änderung soll keinen leeren Verlaufseintrag erzeugen.
+  if (changes.length === 0) return;
+
+  const payload: Record<string, unknown> = {
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: toUpdatedBy(session.user),
+  };
+  for (const change of changes) {
+    // Ein geleertes Feld fliegt aus dem Dokument, statt als "" liegenzubleiben.
+    payload[change.field] =
+      change.to === '' ? FieldValue.delete() : change.to;
+  }
+  await ref.update(payload);
+
+  await ref.collection(BUG_REPORT_COMMENTS_COLLECTION).add({
+    entryType: 'change',
+    text: '',
+    changes,
+    visibility: 'internal',
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: toUpdatedBy(session.user),
+  });
+}
+
+export async function addBugReportCommentAction(
+  id: string,
+  text: string,
+): Promise<void> {
+  const session = await actionAdminRequired();
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) {
+    throw new Error('Kommentar darf nicht leer sein');
+  }
+  if (trimmed.length > BUG_REPORT_COMMENT_MAX_LENGTH) {
+    throw new Error(
+      `Kommentar ist zu lang (${trimmed.length} von maximal ${BUG_REPORT_COMMENT_MAX_LENGTH} Zeichen)`,
+    );
+  }
+  await firestore
+    .collection(BUG_REPORT_COLLECTION)
+    .doc(id)
+    .collection(BUG_REPORT_COMMENTS_COLLECTION)
+    .add({
+      entryType: 'comment',
+      text: trimmed,
+      visibility: 'internal',
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: toUpdatedBy(session.user),
+    });
 }
 
 export async function updateBugReportStatusAction(
   id: string,
   status: BugReportStatus,
 ): Promise<void> {
-  const session = await actionAdminRequired();
-  await firestore.collection(BUG_REPORT_COLLECTION).doc(id).update({
-    status,
-    updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: toUpdatedBy(session.user),
-  });
+  await updateBugReportAction(id, { status });
 }
 
 export async function getBugReportConfigAction(): Promise<BugReportConfig> {
