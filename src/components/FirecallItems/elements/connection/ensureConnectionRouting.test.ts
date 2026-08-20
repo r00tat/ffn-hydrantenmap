@@ -119,8 +119,8 @@ describe('ensureConnectionRouting', () => {
   });
 
   it('routet zu viele Punkte nicht, sondern weist die Luftlinie aus', async () => {
-    // Eine GPS-Aufzeichnung wächst mit jedem Messpunkt; ohne die Schranke ginge
-    // je Messpunkt eine Anfrage über die Leitung, die sicher abgelehnt wird.
+    // Die Action lehnt so viele Punkte ohnehin ab; der Melder soll darauf nicht
+    // erst warten müssen.
     const many = Array.from(
       { length: MAX_ROUTING_POINTS + 1 },
       (_, i) => [47.9 + i / 10000, 16.8 + i / 10000] as LatLngPosition

@@ -30,9 +30,11 @@ async function routedPositionsFor(
   positions: LatLngPosition[]
 ): Promise<LatLngPosition[] | undefined> {
   // Die Grenze steht auch in der Action, dort als Schranke gegen alles, was aus
-  // dem Browser kommt. Hier erspart sie den Aufruf: Eine GPS-Aufzeichnung
-  // wächst mit jedem Messpunkt, und jeder Schreibvorgang käme sonst mit einer
-  // Anfrage über die Leitung, die sicher abgelehnt wird.
+  // dem Browser kommt. Hier ist sie keine zweite Schranke, sondern die Antwort
+  // ohne Umweg: Wer die Option an einer Linie mit hunderten Punkten einschaltet
+  // — etwa an einer GPS-Aufzeichnung — sieht sofort die Luftlinie mit Hinweis,
+  // statt auf eine Ablehnung zu warten, die schon feststeht. Gleiches Muster wie
+  // die Größenprüfung der Mangel-Bilder im Browser.
   if (positions.length > MAX_ROUTING_POINTS) {
     console.warn(
       `street routing skipped: ${positions.length} points exceed ${MAX_ROUTING_POINTS}`

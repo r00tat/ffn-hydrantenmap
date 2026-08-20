@@ -937,10 +937,13 @@ auf Wunsch dem Straßenverlauf statt der Luftlinie: Feld
 - **Fällt das Routing aus, bleibt das Element** und trägt die Luftlinie samt
   Hinweis im Popup (`routingFailed`). Die Signatur wird auch beim Fehlschlag
   gesetzt — sonst liefe bei jeder weiteren Änderung ein neuer Versuch.
-- **Über `MAX_ROUTING_POINTS` (50) wird nicht geroutet**, geprüft im Browser
-  *und* in der Action. Eine GPS-Aufzeichnung ist eine `line` und wächst mit jedem
-  Messpunkt; ohne die Schranke im Browser ginge je Messpunkt eine Anfrage über
-  die Leitung, die sicher abgelehnt wird.
+- **Über `MAX_ROUTING_POINTS` (50) wird nicht geroutet.** Die Schranke ist die in
+  der Action, gegen alles, was aus dem Browser kommt; die Prüfung im Browser ist
+  nur die Abkürzung dorthin. Wer die Option an einer Linie mit hunderten Punkten
+  einschaltet — etwa an einer GPS-Aufzeichnung — sieht sofort die Luftlinie mit
+  Hinweis, statt auf eine Ablehnung zu warten, die schon feststeht. Von selbst
+  routet eine Aufzeichnung nie: `streetRouting` setzt der Recorder nicht, und
+  ohne die Option ist `routingTodo` bei jedem Messpunkt `'none'`.
 - **Die Felder liegen an `MultiPointItem`/`FirecallMultiPoint`**, angeboten
   werden sie nur in `fields()` von Leitung und Linie. `data()` ist die Grundlage
   jedes Schreibvorgangs — ein Feld, das dort fehlt, löscht ein Speichern aus dem
