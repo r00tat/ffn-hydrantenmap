@@ -175,7 +175,20 @@ jobs:
         run: npm run lint
 
       - name: Run tests
-        run: npm test
+        run: npm run test:coverage
+
+      # Nur die beiden JSON-Dateien: den HTML-Report und lcov.info braucht der
+      # Auswertungs-Job nicht, und ein Artifact über das ganze coverage/ wäre
+      # ein Vielfaches an Upload.
+      - name: Coverage-Report sichern
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage-summary.json
+            coverage/coverage-final.json
+          retention-days: 7
 
       - name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v3"
@@ -255,6 +268,81 @@ jobs:
   #
   # Ohne `needs`, damit sie parallel zum Build läuft: Sie hängt vom Image nicht
   # ab, und der Deploy wartet ohnehin auf beide.
+  # Die Auswertung ist bewusst ein eigener Job: Sie braucht Schreibrechte auf
+  # Repository und Pull Request, und die will der Build-Job nicht haben — der
+  # baut Images und redet mit Google Cloud. Rechte gelten je Job, deshalb bleibt
+  # der Build bei contents: read.
+  coverage:
+    name: "Coverage"
+    needs: build
+    # Auch wenn der Build rot ist: Genau dann sind die Zahlen interessant, und
+    # `reportOnFailure` in vitest.config.ts sorgt dafür, dass es sie gibt. Fehlt
+    # das Artifact — der Lauf ist vor den Tests gescheitert —, überspringen die
+    # folgenden Steps sich selbst, statt den Job ein zweites Mal rot zu färben.
+    if: ${{ !cancelled() && needs.build.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    permissions:
+      # Für den Badge-Push auf den Branch `badges` (nur auf main).
+      contents: write
+      # Für den Sticky-Kommentar am Pull Request.
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Coverage-Report holen
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-report
+          path: coverage
+
+      # Der Vergleichswert kommt aus dem Branch `badges`, den der Lauf auf main
+      # unten fortschreibt. Fehlt er (erster Lauf), bleibt der Kommentar ohne
+      # Delta — das ist kein Grund, den Job scheitern zu lassen.
+      - name: Vergleichsstand von main holen
+        id: baseline
+        if: ${{ hashFiles('coverage/coverage-summary.json') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          if gh api -H "Accept: application/vnd.github.raw" \
+               "repos/${GITHUB_REPOSITORY}/contents/coverage-summary.json?ref=badges" \
+               > coverage-summary-main.json 2>/dev/null; then
+            echo "found=true" >>"$GITHUB_OUTPUT"
+          else
+            rm -f coverage-summary-main.json
+            echo "found=false" >>"$GITHUB_OUTPUT"
+            echo "Kein Vergleichsstand auf dem Branch badges — Kommentar ohne Delta."
+          fi
+
+      - name: Kommentar und Job-Summary schreiben
+        if: ${{ hashFiles('coverage/coverage-summary.json') != '' }}
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          json-summary-path: coverage/coverage-summary.json
+          json-final-path: coverage/coverage-final.json
+          json-summary-compare-path: ${{ steps.baseline.outputs.found == 'true' && 'coverage-summary-main.json' || '' }}
+          # Im Kommentar nur die Dateien auflisten, die der PR anfasst. Bei 767
+          # Quelldateien wäre die vollständige Liste unlesbar.
+          file-coverage-mode: changes
+          comment-on: ${{ github.event_name == 'pull_request' && 'pr' || 'none' }}
+
+      # Ab hier nur auf main: Badge-Endpoint und Vergleichsstand fortschreiben.
+      # Beides liegt auf dem verwaisten Branch `badges`, damit die Historie von
+      # main nicht bei jedem Push einen Bot-Commit bekommt.
+      - name: Badge veröffentlichen
+        # Nur von einem grünen main-Lauf: ein Badge, das die Abdeckung eines
+        # gescheiterten Laufs zeigt, wäre schlechter als keines.
+        if: ${{ hashFiles('coverage/coverage-summary.json') != '' && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.result == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/publish-coverage-badge.sh
+
   base:
     name: "Projekt-Basis"
     if: ${{ github.event_name != 'pull_request' }}
