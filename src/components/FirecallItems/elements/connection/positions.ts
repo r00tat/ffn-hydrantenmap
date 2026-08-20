@@ -13,6 +13,7 @@ import {
 import { logAuditChange } from '../../../../hooks/useAuditLog';
 import { calculateArea } from '../area/area';
 import { calculateDistance, getConnectionPositions } from './distance';
+import { ensureConnectionRouting } from './ensureConnectionRouting';
 
 export async function updateFirecallPositions(
   firecallId: string,
@@ -116,5 +117,11 @@ const updateConnectionInFirestore = async (
         newValue: { distance: newValue.distance },
       });
     }
+
+    // Die Punkte haben sich geändert — ein Straßen-Routing gilt damit nicht
+    // mehr. Erst nach dem Speichern, damit die verschobene Leitung auch dann
+    // steht, wenn das Routing ausfällt; bis die neue Geometrie da ist, zeigt
+    // die Karte die direkte Verbindung.
+    await ensureConnectionRouting(firecallId, { ...fcItem, ...newValue });
   }
 };

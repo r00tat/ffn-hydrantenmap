@@ -137,25 +137,41 @@ export function parseMultiselectData(doc: Document): MultiselectRow[] {
 }
 
 /**
- * Check whether `row` corresponds to the Einsatzkarte vehicle named
- * `ekName`. Matching rules (case-insensitive, trimmed):
- *   1. `row.waname` exact match.
- *   2. `row.rufname` exact match (only when non-empty).
- *   3. `row.waname` starts with `ekName + ' '` — handles SYBOS names that
- *      carry a location suffix (e.g. "WLF-K Neusiedl am See" vs EK "WLF-K").
- * Empty `ekName` always returns `false`.
+ * Check whether the SYBOS display name `sybosName` denotes the Einsatzkarte
+ * vehicle named `ekName` (case-insensitive, trimmed): an exact match, or a
+ * SYBOS name that adds a suffix to it ("WLF-K Neusiedl am See" vs EK
+ * "WLF-K"). The trailing space is what keeps "SRF" from matching "SRFA".
+ *
+ * Empty input on either side never matches.
  */
-export function matchesVehicleName(ekName: string, row: MultiselectRow): boolean {
+export function matchesVehicleDisplayName(
+  ekName: string,
+  sybosName: string
+): boolean {
   const normalized = ekName.trim().toLowerCase();
   if (!normalized) return false;
 
-  const waname = row.waname.trim().toLowerCase();
-  if (waname === normalized) return true;
+  const candidate = sybosName.trim().toLowerCase();
+  if (!candidate) return false;
+
+  return candidate === normalized || candidate.startsWith(`${normalized} `);
+}
+
+/**
+ * Check whether `row` corresponds to the Einsatzkarte vehicle named
+ * `ekName`. Matching rules (case-insensitive, trimmed):
+ *   1. `row.waname` exact match or with a suffix
+ *      ({@link matchesVehicleDisplayName}).
+ *   2. `row.rufname` exact match (only when non-empty) — a Rufname carries no
+ *      location suffix, so the prefix rule has nothing to do here.
+ * Empty `ekName` always returns `false`.
+ */
+export function matchesVehicleName(ekName: string, row: MultiselectRow): boolean {
+  if (matchesVehicleDisplayName(ekName, row.waname)) return true;
+
+  const normalized = ekName.trim().toLowerCase();
+  if (!normalized) return false;
 
   const rufname = row.rufname.trim().toLowerCase();
-  if (rufname && rufname === normalized) return true;
-
-  if (waname.startsWith(`${normalized} `)) return true;
-
-  return false;
+  return !!rufname && rufname === normalized;
 }

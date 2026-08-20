@@ -34,7 +34,7 @@ export class FirecallConnection extends FirecallMultiPoint {
   public info(): string {
     return `Länge: ${Math.round(this.distance || 0)}m ${Math.ceil(
       (this.distance || 0) / this.oneHozeLength
-    )} ${this.dimension}-Längen`;
+    )} ${this.dimension}-Längen${this.routingHint()}`;
   }
 
   public popupFn(): ReactNode {
@@ -47,6 +47,7 @@ export class FirecallConnection extends FirecallMultiPoint {
         {Math.round(this.distance || 0)}
         m, {Math.ceil((this.distance || 0) / this.oneHozeLength)}{' '}
         {this.dimension} Schläuche
+        {this.routingHint()}
       </>
     );
   }
@@ -64,6 +65,8 @@ export class FirecallConnection extends FirecallMultiPoint {
       ...super.fields(),
       dimension: 'Dimension (B, C etc)',
       oneHozeLength: 'Länge eines Schlauches (Standard 20m)',
+      // Kein Profil zur Wahl: Ein Schlauch folgt der Straße, fährt aber nicht.
+      streetRouting: 'Routing über Straße',
     };
   }
 
@@ -71,6 +74,7 @@ export class FirecallConnection extends FirecallMultiPoint {
     return {
       ...super.fieldTypes(),
       oneHozeLength: 'number',
+      streetRouting: 'boolean',
     };
   }
 

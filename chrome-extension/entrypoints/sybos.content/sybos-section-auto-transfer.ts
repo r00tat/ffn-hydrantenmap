@@ -2,6 +2,8 @@ import { el } from './sybos-widget';
 import {
   orchestratePersonal,
   orchestrateMaterial,
+  type MaterialKmMissing,
+  type MaterialLineKm,
   type OrchestrateResult,
 } from './sybos-orchestrate';
 import { findEinsatzId, reloadUrlForEinsatz } from './sybos-post';
@@ -273,6 +275,60 @@ function renderPersonalResult(
   }
 }
 
+/**
+ * Why a line kept SYBOS's own Anzahl value. Named for the person reading the
+ * panel: they should see whether to fix a name in the Fahrtenbuch master data,
+ * to enter a missing trip, or that there is simply nothing to enter.
+ */
+const KM_MISSING_LABELS: Record<MaterialKmMissing, string> = {
+  noVehicle: 'nicht im Fahrtenbuch',
+  noEntry: 'keine Fahrt zu diesem Einsatz',
+  noCounter: 'kein Kilometerzähler',
+  unknownLine: 'Zeile keinem Fahrzeug zuzuordnen',
+  ambiguousLine: 'Name passt auf mehrere Fahrzeuge',
+};
+
+function renderKilometers(
+  resultArea: HTMLElement,
+  lines: MaterialLineKm[]
+): void {
+  const withKm = lines.filter((line) => line.km !== undefined);
+  const withoutKm = lines.filter((line) => line.km === undefined);
+
+  if (withKm.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result success' },
+        `✓ ${withKm.length}× Kilometer eingetragen`
+      )
+    );
+    appendNames(
+      resultArea,
+      withKm.map((line) => `${line.label}: ${line.km} km`)
+    );
+  }
+
+  if (withoutKm.length > 0) {
+    resultArea.appendChild(
+      el(
+        'div',
+        { className: 'ek-crew-result warning' },
+        `⚠ ${withoutKm.length}× ohne Kilometer`
+      )
+    );
+    appendNames(
+      resultArea,
+      withoutKm.map(
+        (line) =>
+          `${line.label} — ${
+            line.missing ? KM_MISSING_LABELS[line.missing] : 'unbekannt'
+          }`
+      )
+    );
+  }
+}
+
 function renderMaterialResult(
   resultArea: HTMLElement,
   result: OrchestrateResult
@@ -298,6 +354,8 @@ function renderMaterialResult(
     );
     appendNames(resultArea, result.notFound);
   }
+
+  renderKilometers(resultArea, result.kilometers);
 
   if (result.matched.length === 0 && result.notFound.length === 0) {
     resultArea.appendChild(

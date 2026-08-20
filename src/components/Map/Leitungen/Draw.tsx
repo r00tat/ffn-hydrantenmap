@@ -89,7 +89,7 @@ const LeitungenDraw = () => {
               if (index == positions.length - 1) {
                 setComplete(true);
                 leitungen.setIsDrawing(false);
-                leitungen.complete([...positions]);
+                void leitungen.complete([...positions]);
                 setPositions([]);
               }
             },

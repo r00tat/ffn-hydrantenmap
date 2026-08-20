@@ -160,7 +160,12 @@ export function parseIsoDay(
   day: string,
 ): { year: number; month: number; day: number } | undefined {
   if (!DAY_RE.test(day ?? '')) return undefined;
-  const [year, month, date] = day.split('-').map(Number);
+  // Einzeln statt `.map(Number)`: Ein Indexzugriff auf das Array ist für den
+  // Compiler `number | undefined`, obwohl DAY_RE die drei Teile garantiert.
+  const [yearPart, monthPart, datePart] = day.split('-');
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  const date = Number(datePart);
   const asUtc = Date.UTC(year, month - 1, date);
   const check = new Date(asUtc);
   // `2025-02-30` wäre sonst der 2. März — eine stille Verschiebung.
