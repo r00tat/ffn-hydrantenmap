@@ -75,6 +75,23 @@ export default function ConnectionMarker({
     record.positions,
   ]);
 
+  // Die gezeichnete Linie ist nicht immer die Reihe der Punkte: Eine Leitung mit
+  // Straßen-Routing folgt dem gespeicherten Straßenverlauf. Die Punktmarker
+  // bleiben dagegen an den gesetzten Punkten — sie sind über ihren Index
+  // verschiebbar und löschbar.
+  //
+  // `record` ist bei jedem Render eine neue Instanz (siehe `FirecallElement`),
+  // taugt also nicht als Abhängigkeit. Stattdessen die Felder, aus denen
+  // `displayPositions()` seine Antwort bildet.
+  const streetRouting = record.get<string>('streetRouting');
+  const routedFor = record.get<string>('routedFor');
+  const routedPositions = record.get<string>('routedPositions');
+  const linePositions: LatLngPosition[] = useMemo(
+    () => record.displayPositions(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [positions, streetRouting, routedFor, routedPositions]
+  );
+
   return (
     <>
       {positions
@@ -163,7 +180,7 @@ export default function ConnectionMarker({
             )
         )}
       <Polyline
-        positions={positions.filter(([pLat, pLng]) => pLat && pLng)}
+        positions={linePositions.filter(([pLat, pLng]) => pLat && pLng)}
         {...(pane ? { pane } : {})}
         pathOptions={{
           color: record.color || '#0000ff',

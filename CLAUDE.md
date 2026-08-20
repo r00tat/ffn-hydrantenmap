@@ -893,6 +893,51 @@ Feuerwehr, Struktur `<Basisordner>/YYYY/YYYY-MM-DD_Einsatzname`.
   der Einsatz umbenannt oder umdatiert, benennt der nächste Upload den Ordner um
   bzw. verschiebt ihn in den richtigen Jahresordner.
 
+## Straßen-Routing für Leitungen
+
+Eine Lösch- oder Zubringerleitung (`connection`) folgt auf Wunsch dem
+Straßenverlauf statt der Luftlinie: Feld **„Routing über Straße"** an der
+Leitung, Standard bleibt die direkte Verbindung.
+
+- **Fußgänger-Profil** (`travelMode: 'WALK'`) in
+  [routes.ts](src/components/actions/maps/routes.ts): Ein Schlauch folgt der
+  Straße, hält sich aber nicht an Einbahnen und Abbiegeverbote.
+  `routingPreference` darf dabei **nicht** mitgeschickt werden — die Routes API
+  nimmt es nur für `DRIVE` und `TWO_WHEELER` und lehnt den Aufruf sonst ab.
+  Die Geometrie kommt als `GEO_JSON_LINESTRING`, damit kein Polyline-Decoder
+  nötig ist; GeoJSON zählt `[lng, lat]`.
+- **Ein Aufruf für die ganze Leitung**, nicht einer je Abschnitt: Die Punkte
+  dazwischen gehen als `intermediates` mit, die Antwort liefert je Abschnitt
+  eine eigene Polyline. Über 25 Punkte wird in Blöcke geteilt, die sich um einen
+  Punkt überlappen.
+- **Die gesetzten Punkte bleiben Teil der Linie** (`stitchRoutedPositions` in
+  [routedPath.ts](src/components/FirecallItems/elements/connection/routedPath.ts)).
+  Google setzt Start und Ziel eines Abschnitts auf die Straße; die Strecke von
+  dort zum tatsächlichen Punkt ist die Zuführung (Hydrant → Straße) und zählt
+  für die Schlauchlängen mit. Eine Leitung führt **durch** den Verteiler, nicht
+  an ihm vorbei.
+- **Die Geometrie steht am Element** (`routedPositions`), zusammen mit der
+  Signatur der Punkte, aus denen sie berechnet wurde (`routedFor`). Nur so
+  zeichnet die Karte ohne Routing-Aufruf — ein Aufruf je Änderung, keiner je
+  Render. Geroutet wird deshalb an den Mutationsstellen
+  (`ensureConnectionRouting`): beim Zeichnen
+  ([Leitungen/context.tsx](src/components/Map/Leitungen/context.tsx)), beim
+  Verschieben, Einfügen und Löschen eines Punktes
+  ([positions.ts](src/components/FirecallItems/elements/connection/positions.ts))
+  und beim Speichern aus dem Dialog
+  ([useFirecallItemUpdate.ts](src/hooks/useFirecallItemUpdate.ts)).
+- **`distance` ist die Länge der gezeichneten Linie**, gemessen mit derselben
+  `calculateDistance` wie die Luftlinie. Die Meter der Routes API bleiben
+  ungenutzt: Sie kennen die Zuführungen nicht, und eine angezeigte Länge, die
+  nicht zur Linie gehört, wäre im Einsatz irreführend.
+- **Fällt das Routing aus, bleibt die Leitung** und trägt die Luftlinie samt
+  Hinweis im Popup (`routingFailed`). Die Signatur wird auch beim Fehlschlag
+  gesetzt — sonst liefe bei jeder weiteren Änderung ein neuer Versuch.
+- Die Server-Action darf **kein Leaflet** importieren (`window is not defined`).
+  Deshalb die Trennung: `routedPath.ts` ist reine Geometrie für beide Seiten,
+  `streetRouting.ts` liest die Felder am Element, `ensureConnectionRouting.ts`
+  schreibt nach Firestore.
+
 ## German Terminology
 
 Key domain terms used throughout the codebase:

@@ -253,6 +253,24 @@ export interface Connection extends MultiPointItem {
   type: 'connection';
   dimension?: string;
   oneHozeLength?: number;
+  /**
+   * `'true'`, wenn die Leitung dem Straßenverlauf folgen soll statt der
+   * Luftlinie zwischen den Punkten.
+   */
+  streetRouting?: string;
+  /**
+   * stringified LatLngPosition[] — der geroutete Verlauf inklusive der
+   * Zuführungen von den Punkten zur Straße. Gespeichert, damit die Karte ohne
+   * Routing-Aufruf zeichnen kann.
+   */
+  routedPositions?: string;
+  /**
+   * Signatur der Punkte, für die `routedPositions` gilt bzw. für die das
+   * Routing gescheitert ist (siehe `positionsSignature`).
+   */
+  routedFor?: string;
+  /** `'true'`, wenn das Routing ausgefallen ist und die Luftlinie gilt. */
+  routingFailed?: string;
 }
 
 export interface Area extends MultiPointItem {

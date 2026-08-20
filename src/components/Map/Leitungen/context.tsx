@@ -10,6 +10,7 @@ import {
   MultiPointItem,
 } from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
+import { ensureConnectionRouting } from '../../FirecallItems/elements/connection/ensureConnectionRouting';
 import { calculateArea } from '../../FirecallItems/elements/area/area';
 
 interface Leitungen {
@@ -19,7 +20,7 @@ interface Leitungen {
   setFirecallItem: React.Dispatch<
     React.SetStateAction<MultiPointItem | undefined>
   >;
-  complete: (positions: L.LatLng[]) => void;
+  complete: (positions: L.LatLng[]) => Promise<void>;
 }
 
 export const LeitungenContext = React.createContext<Leitungen>({
@@ -37,33 +38,42 @@ export const useLeitungsProvider = (): Leitungen => {
   const { email } = useFirebaseLogin();
 
   const complete = useCallback(
-    (positions: L.LatLng[]) => {
+    async (positions: L.LatLng[]) => {
       if (firecallItem) {
         const latLngPositions = positions.map(
           (p) => [p.lat, p.lng] as [number, number]
         );
-        addDoc(
+        const newItem = {
+          ...firecallItem,
+          lat: positions[0].lat,
+          lng: positions[0].lng,
+          user: email,
+          created: new Date().toISOString(),
+          positions: JSON.stringify(latLngPositions),
+          distance: Math.round(calculateDistance(latLngPositions)),
+          ...(firecallItem.type === 'area'
+            ? { area: Math.round(calculateArea(latLngPositions)) }
+            : {}),
+          destLat: positions[positions.length - 1].lat,
+          destLng: positions[positions.length - 1].lng,
+        };
+        const docRef = await addDoc(
           collection(
             firestore,
             FIRECALL_COLLECTION_ID,
             firecallId,
             FIRECALL_ITEMS_COLLECTION_ID
           ),
-          {
-            ...firecallItem,
-            lat: positions[0].lat,
-            lng: positions[0].lng,
-            user: email,
-            created: new Date().toISOString(),
-            positions: JSON.stringify(latLngPositions),
-            distance: Math.round(calculateDistance(latLngPositions)),
-            ...(firecallItem.type === 'area'
-              ? { area: Math.round(calculateArea(latLngPositions)) }
-              : {}),
-            destLat: positions[positions.length - 1].lat,
-            destLng: positions[positions.length - 1].lng,
-          }
+          newItem
         );
+
+        // Eine neu gezeichnete Leitung mit Straßen-Routing bekommt ihre
+        // Geometrie erst hier: Vorher gibt es keine Dokument-ID, unter der sie
+        // gespeichert werden könnte.
+        await ensureConnectionRouting(firecallId, {
+          ...newItem,
+          id: docRef.id,
+        });
       }
     },
     [email, firecallId, firecallItem]

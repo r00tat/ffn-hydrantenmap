@@ -122,6 +122,15 @@ export class FirecallMultiPoint extends FirecallItemBase {
   public titleFn(): string {
     return `${this.markerName()} ${this.name}`;
   }
+
+  /**
+   * Der Verlauf, den die Karte zeichnet. Für die meisten Elemente sind das die
+   * gesetzten Punkte; eine Leitung mit Straßen-Routing zeichnet stattdessen den
+   * gerouteten Verlauf (siehe `FirecallConnection`).
+   */
+  public displayPositions(): LatLngPosition[] {
+    return getConnectionPositions(this.data());
+  }
   public icon(): Icon<IconOptions> {
     return leafletIcons().circle;
   }
