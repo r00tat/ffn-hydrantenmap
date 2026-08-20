@@ -27,9 +27,15 @@ import {
   detectError,
 } from './sybos-post';
 import { parseSybosVehicleTable } from './sybos-vehicle-table';
+import { parseSybosMaterialLines } from './sybos-material-table';
 import { findMatchingName } from './name-matching';
 import { findMatchingVehicleOption } from './vehicle-matching';
-import { parseMultiselectData, matchesVehicleName } from './sybos-multiselect';
+import {
+  parseMultiselectData,
+  matchesVehicleName,
+  matchesVehicleDisplayName,
+} from './sybos-multiselect';
+import type { EinsatzKmMissing } from '@shared/types';
 
 const BASE = 'https://sybos.lfv-bgld.at';
 
@@ -45,6 +51,30 @@ export interface CrewAssignment {
 export interface FirecallVehicle {
   id: string;
   name: string;
+  /** Kilometres driven on this Einsatz, from the Fahrtenbuch entry. */
+  kilometers?: number;
+  /** Why there are no kilometres for this vehicle (see `fahrtenbuchEinsatzKm.ts`). */
+  kilometersMissing?: EinsatzKmMissing;
+}
+
+/**
+ * Why a material line was left as SYBOS pre-filled it. Extends the reasons the
+ * Fahrtenbuch gives by the two that only exist here: a line whose vehicle we
+ * could not name, and one that fits several vehicles at once.
+ */
+export type MaterialKmMissing =
+  | EinsatzKmMissing
+  | 'unknownLine'
+  | 'ambiguousLine';
+
+/** What happened to one line's Anzahl/km field. */
+export interface MaterialLineKm {
+  /** The vehicle's name, or the line's own label when it stayed unidentified. */
+  label: string;
+  /** The kilometres written into the line. */
+  km?: number;
+  /** Set when the line was left untouched. */
+  missing?: MaterialKmMissing;
 }
 
 /**
@@ -62,6 +92,8 @@ export interface OrchestrateResult {
   assigned: string[];
   /** Assigned persons that had no vehicle in the EK (personal flow). */
   noVehicle: string[];
+  /** Per material line: the kilometres written, or why none were (material flow). */
+  kilometers: MaterialLineKm[];
   /** Error from `detectError` or a caught exception, if the run failed. */
   error?: string;
 }
@@ -213,7 +245,19 @@ export function buildPersonalAssignmentParams(
 export function buildMaterialSelectionParams(
   doc: Document,
   vehicles: FirecallVehicle[]
-): { params: URLSearchParams; matched: string[]; notFound: string[] } {
+): {
+  params: URLSearchParams;
+  matched: string[];
+  notFound: string[];
+  /**
+   * SYBOS device id → the EK vehicle names it was selected for. Step 2 keys
+   * its per-line fields by the same id (`WAESanzahl[<id>]`), so this is the
+   * one mapping that does not depend on reading a name off the edit form.
+   * A list, not a single name: two EK vehicles can match the same device, and
+   * then there is no telling whose kilometres belong on that line.
+   */
+  vehicleNamesBySybosId: Record<string, string[]>;
+} {
   const form = findForm(doc);
   const rows = parseMultiselectData(doc);
   // SYBOS advances the selection popup to the Material edit form only on the
@@ -224,6 +268,7 @@ export function buildMaterialSelectionParams(
   const params = serializeForm(form, { action_save: 'action_save' });
 
   const matchedVehicleNames = new Set<string>();
+  const vehicleNamesBySybosId: Record<string, string[]> = {};
 
   for (const row of rows) {
     for (const field of row.hiddenFields) {
@@ -235,6 +280,9 @@ export function buildMaterialSelectionParams(
     );
     if (matchingVehicles.length > 0 && row.checkboxName) {
       params.append(row.checkboxName, row.checkboxValue);
+    }
+    if (matchingVehicles.length > 0 && row.id) {
+      vehicleNamesBySybosId[row.id] = matchingVehicles.map((v) => v.name);
     }
     for (const vehicle of matchingVehicles) {
       matchedVehicleNames.add(vehicle.name);
@@ -251,42 +299,108 @@ export function buildMaterialSelectionParams(
     }
   }
 
-  return { params, matched, notFound };
+  return { params, matched, notFound, vehicleNamesBySybosId };
 }
 
-/** Matches the "Anzahl"/km field SYBOS renders per material line. */
-const WAES_ANZAHL_PATTERN = /^WAESanzahl\[\d+\]$/;
-
-/** The default km/Anzahl value we force onto every material line. */
-const DEFAULT_MATERIAL_ANZAHL = '5';
+export interface MaterialAssignmentOptions {
+  /** The EK vehicles, carrying their Fahrtenbuch kilometres. */
+  vehicles: FirecallVehicle[];
+  /** The id → vehicle-name mapping from {@link buildMaterialSelectionParams}. */
+  vehicleNamesBySybosId?: Record<string, string[]>;
+}
 
 /**
- * Step 2 of the material flow: re-post the Material edit form with the
- * submit markers, forcing every material line's Anzahl/km field to
- * {@link DEFAULT_MATERIAL_ANZAHL} rather than trusting SYBOS's pre-filled
- * value.
+ * Which EK vehicles a material line stands for.
+ *
+ * The mapping from step 1 is asked first — it is SYBOS's own device id and
+ * involves no guessing. Only a line that is not in it (a device the Einsatz
+ * already carried before the transfer) is matched by the names read off the
+ * form.
  */
-export function buildMaterialAssignmentParams(doc: Document): {
-  params: URLSearchParams;
-} {
+function vehiclesForLine(
+  names: string[],
+  options: MaterialAssignmentOptions,
+  key: string
+): FirecallVehicle[] {
+  const fromSelection = options.vehicleNamesBySybosId?.[key];
+  if (fromSelection?.length) {
+    return fromSelection.flatMap((name) =>
+      options.vehicles.filter((vehicle) => vehicle.name === name)
+    );
+  }
+
+  return options.vehicles.filter((vehicle) =>
+    names.some((name) => matchesVehicleDisplayName(vehicle.name, name))
+  );
+}
+
+/**
+ * Step 2 of the material flow: re-post the Material edit form with the submit
+ * markers, writing each line's Anzahl/km field from the Fahrtenbuch entry of
+ * that line's vehicle.
+ *
+ * A line whose kilometres are unknown is left EXACTLY as SYBOS pre-filled it
+ * and reported instead — this used to force a flat 5 onto every line, a
+ * placeholder from before the Fahrtenbuch existed. A visibly missing number is
+ * fixable; a plausible wrong one in an Einsatzbericht is not.
+ */
+export function buildMaterialAssignmentParams(
+  doc: Document,
+  options: MaterialAssignmentOptions
+): { params: URLSearchParams; kilometers: MaterialLineKm[] } {
   const form = findForm(doc);
   const params = serializeForm(form, {
     action_next: 'action_next',
     patMultipleChoice: 'true',
   });
 
-  const anzahlKeys = new Set(
-    Array.from(params.keys()).filter((key) => WAES_ANZAHL_PATTERN.test(key))
-  );
-  for (const key of anzahlKeys) {
-    params.set(key, DEFAULT_MATERIAL_ANZAHL);
+  const kilometers: MaterialLineKm[] = [];
+
+  for (const line of parseSybosMaterialLines(form)) {
+    // A field a browser submit would not send (disabled) must not be added by
+    // us either — `FormData` left it out on purpose. Nothing to report: SYBOS
+    // does not accept a value for that line at all.
+    if (!params.has(line.field)) continue;
+
+    const matching = vehiclesForLine(line.names, options, line.key);
+    const label = line.names[0] ?? `Zeile ${line.key}`;
+
+    if (matching.length === 0) {
+      kilometers.push({ label, missing: 'unknownLine' });
+      continue;
+    }
+    if (matching.length > 1) {
+      kilometers.push({ label: matching[0]?.name ?? label, missing: 'ambiguousLine' });
+      continue;
+    }
+
+    const vehicle = matching[0]!;
+    const km = vehicle.kilometers;
+    if (km === undefined || !Number.isFinite(km)) {
+      kilometers.push({
+        label: vehicle.name,
+        missing: vehicle.kilometersMissing ?? 'noEntry',
+      });
+      continue;
+    }
+
+    // SYBOS nimmt in diesem Feld nur ganze Zahlen.
+    const rounded = Math.round(km);
+    params.set(line.field, String(rounded));
+    kilometers.push({ label: vehicle.name, km: rounded });
   }
 
-  return { params };
+  return { params, kilometers };
 }
 
 function emptyResult(): OrchestrateResult {
-  return { matched: [], notFound: [], assigned: [], noVehicle: [] };
+  return {
+    matched: [],
+    notFound: [],
+    assigned: [],
+    noVehicle: [],
+    kilometers: [],
+  };
 }
 
 function errorMessage(err: unknown): string {
@@ -389,7 +503,11 @@ export async function orchestrateMaterial(): Promise<OrchestrateResult> {
     result.notFound = selection.notFound;
 
     const doc2 = await postForm(selectUrl, selection.params);
-    const assignment = buildMaterialAssignmentParams(doc2);
+    const assignment = buildMaterialAssignmentParams(doc2, {
+      vehicles,
+      vehicleNamesBySybosId: selection.vehicleNamesBySybosId,
+    });
+    result.kilometers = assignment.kilometers;
 
     const editUrl = `${BASE}/indexFrm.php?comp=sybEinsatz&s=Material&patJustContent=1&edit=1&idParent=${id}&id=0`;
     const doc3 = await postForm(editUrl, assignment.params);

@@ -247,6 +247,30 @@ export interface MultiPointItem extends FirecallItem {
   distance?: number;
   color?: string;
   alwaysShowMarker?: string;
+  /**
+   * `'true'`, wenn der Verlauf der Straße folgen soll statt der Luftlinie
+   * zwischen den Punkten. Angeboten wird die Option an der Leitung und an der
+   * Linie; die Felder stehen hier, damit sie kein Schreibvorgang verliert.
+   */
+  streetRouting?: string;
+  /**
+   * `'walk'` (Standard) oder `'drive'`. Nur die Linie lässt das wählen — eine
+   * Schlauchleitung folgt immer dem Fußgänger-Profil.
+   */
+  routingProfile?: string;
+  /**
+   * stringified LatLngPosition[] — der geroutete Verlauf inklusive der
+   * Zuführungen von den Punkten zur Straße. Gespeichert, damit die Karte ohne
+   * Routing-Aufruf zeichnen kann.
+   */
+  routedPositions?: string;
+  /**
+   * Signatur aus Punkten und Profil, für die `routedPositions` gilt bzw. für
+   * die das Routing gescheitert ist (siehe `routingSignature`).
+   */
+  routedFor?: string;
+  /** `'true'`, wenn das Routing ausgefallen ist und die Luftlinie gilt. */
+  routingFailed?: string;
 }
 
 export interface Connection extends MultiPointItem {
