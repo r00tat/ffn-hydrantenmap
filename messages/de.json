@@ -1017,7 +1017,9 @@
       "name": "Bezeichnung",
       "beschreibung": "Beschreibung",
       "showLabel": "Label anzeigen",
-      "showLabels": "Labels anzeigen"
+      "showLabels": "Labels anzeigen",
+      "streetRouting": "Routing über Straße",
+      "routingProfile": "Routing-Profil"
     },
     "itemGroups": {
       "tactical": "Einsatztaktik",
