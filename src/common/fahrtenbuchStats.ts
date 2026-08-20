@@ -12,7 +12,7 @@
 import {
   driverIdentities,
   FUEL_TYPES,
-  normalizeName,
+  normalizePersonName,
   type FahrtZweck,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
@@ -204,7 +204,7 @@ export function driverKeyOf(
   entry: Pick<FahrtenbuchEntry, 'driverId' | 'driverName'>,
 ): string {
   if (entry.driverId?.trim()) return entry.driverId.trim();
-  return normalizeName(entry.driverName ?? '');
+  return normalizePersonName(entry.driverName ?? '');
 }
 
 /** Ein Fahrer einer Fahrt samt seinem Anteil daran. */
@@ -248,7 +248,7 @@ export function driverSharesOf(entry: EntryDrivers): EntryDriverShare[] {
     const tokens = driverIdentities({ id: ref.id, name });
     if (tokens.length === 0 || tokens.some((token) => seen.has(token))) continue;
     for (const token of tokens) seen.add(token);
-    drivers.push({ key: ref.id?.trim() || normalizeName(name), name });
+    drivers.push({ key: ref.id?.trim() || normalizePersonName(name), name });
   }
   const share = drivers.length > 0 ? 1 / drivers.length : 0;
   return drivers.map((driver) => ({ ...driver, share }));

@@ -4,7 +4,7 @@ import {
   findEntryForFirecallVehicle,
   isTimeOnlyTimestamp,
   matchVehicleByName,
-  normalizeName,
+  normalizePersonName,
   suggestPresetForVehicleName,
   timeOnSameDay,
   validateEntryInput,
@@ -106,9 +106,11 @@ function resolveDriver(
     return { driverId: byRecipient.id, driverName: byRecipient.name };
   }
 
-  const normalized = normalizeName(maschinist.name);
+  // Reihenfolge-unabhängig: aus BlaulichtSMS kommt „Nachname Vorname", die
+  // Personenliste führt „Vorname Nachname".
+  const normalized = normalizePersonName(maschinist.name);
   const byName = normalized
-    ? persons.filter((p) => normalizeName(p.name) === normalized)
+    ? persons.filter((p) => normalizePersonName(p.name) === normalized)
     : [];
   // Nur ein eindeutiger Treffer wird verknüpft — bei Namensgleichheit bliebe
   // sonst offen, welche Person gefahren ist.

@@ -375,4 +375,14 @@ describe('planInactivePersons', () => {
     expect(plan.create).toEqual(['Bert Fremd']);
     expect(plan.existing).toEqual({ 'anna muster': 'p1' });
   });
+
+  it('erkennt eine vorhandene Person in gedrehter Namensreihenfolge', () => {
+    // Sonst legte der Import eine zweite Person für denselben Menschen an.
+    const plan = planInactivePersons(
+      ['Muster Anna'],
+      [person('Anna Muster', 'p1')],
+    );
+    expect(plan.create).toEqual([]);
+    expect(plan.existing).toEqual({ 'anna muster': 'p1' });
+  });
 });

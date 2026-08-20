@@ -193,7 +193,7 @@ export function driverIdentities(ref: { id?: string; name: string }): string[] {
   const tokens: string[] = [];
   const id = ref.id?.trim();
   if (id) tokens.push(`id:${id}`);
-  const normalized = normalizeName(ref.name ?? '');
+  const normalized = normalizePersonName(ref.name ?? '');
   if (normalized) tokens.push(`name:${normalized}`);
   return tokens;
 }
@@ -576,6 +576,29 @@ export function normalizeName(name: string): string {
     .replace(/[^a-z0-9äöüß]+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+/**
+ * Der Name eines Menschen für den Vergleich — normalisiert **und** die
+ * Namensteile sortiert.
+ *
+ * BlaulichtSMS liefert die Personen als „Nachname Vorname" und in dieser Form
+ * gehen sie auch nach SYBOS; die interne Personenliste des Fahrtenbuchs führt
+ * sie als „Vorname Nachname". Ohne Sortierung träfe der Namensvergleich nicht,
+ * dieselbe Person stünde im Fahrtenbuch in zwei Varianten und Fahrerstatistik
+ * wie geteilte Anteile liefen auseinander (#705).
+ *
+ * Dass damit „Klaus Peter" und „Peter Klaus" zusammenfallen, ist in Kauf
+ * genommen: Wo daraus eine Verknüpfung entstehen würde, verlangt die
+ * aufrufende Stelle Eindeutigkeit (`resolveDriver`) und lässt einen zweiten
+ * Treffer als Freitext stehen.
+ *
+ * Nicht für Fahrzeuge — dort ist die Reihenfolge Teil des Namens.
+ */
+export function normalizePersonName(name: string): string {
+  const normalized = normalizeName(name);
+  if (!normalized) return '';
+  return normalized.split(' ').sort().join(' ');
 }
 
 export function matchVehicleByName(

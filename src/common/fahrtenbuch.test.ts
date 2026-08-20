@@ -13,6 +13,7 @@ import {
   findEntryForFirecallVehicle,
   matchVehicleByName,
   normalizeName,
+  normalizePersonName,
   PROPELLANTS,
   referenceCounters,
   requiresDriver,
@@ -372,6 +373,38 @@ describe('isTimeOnlyTimestamp', () => {
     expect(isTimeOnlyTimestamp('2026-08-03T10:00:00.000Z')).toBe(false);
     expect(isTimeOnlyTimestamp('')).toBe(false);
     expect(isTimeOnlyTimestamp(undefined)).toBe(false);
+  });
+});
+
+describe('normalizePersonName', () => {
+  it('vergleicht „Nachname Vorname" mit „Vorname Nachname"', () => {
+    // Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne
+    // Personenliste führt sie als „Vorname Nachname".
+    expect(normalizePersonName('Mustermann Max')).toBe(
+      normalizePersonName('Max Mustermann'),
+    );
+  });
+
+  it('normalisiert wie normalizeName', () => {
+    expect(normalizePersonName('  MAX   Mustermann-Huber ')).toBe(
+      normalizePersonName('mustermann huber max'),
+    );
+  });
+
+  it('unterscheidet verschiedene Namen weiterhin', () => {
+    expect(normalizePersonName('Max Mustermann')).not.toBe(
+      normalizePersonName('Maximilian Mustermann'),
+    );
+  });
+
+  it('bleibt leer bei leerer Eingabe', () => {
+    expect(normalizePersonName('   ')).toBe('');
+  });
+
+  it('behält doppelte Namensteile', () => {
+    expect(normalizePersonName('Max Max')).not.toBe(
+      normalizePersonName('Max'),
+    );
   });
 });
 
