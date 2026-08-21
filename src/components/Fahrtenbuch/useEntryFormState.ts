@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   arrivalOnDepartureDay,
   FAHRTENBUCH_MAX_CO_DRIVERS,
@@ -16,6 +16,10 @@ import {
   type FahrtZweck,
   type FuelType,
 } from '../../common/fahrtenbuch';
+import {
+  applyRoundTripToKmCounters,
+  type RoundTripDistance,
+} from '../../common/fahrtenbuchAutoFill';
 import type { FahrtenbuchEntryInput } from './entryLogic';
 
 export interface FahrtenbuchFirecallOption {
@@ -67,6 +71,19 @@ export interface UseEntryFormStateOptions {
   vehicleId?: string;
   /** Gesetzt beim Bearbeiten. */
   entry?: FahrtenbuchEntry;
+  /**
+   * Der in der App ausgewählte Einsatz — sonst der letzte, das entscheidet
+   * schon `useFirecall`. Grundlage der Vorbelegung bei einem neuen Eintrag.
+   */
+  activeFirecallId?: string;
+  /**
+   * Holt die Gesamtstrecke zum verknüpften Einsatz. Fehlt die Funktion, gibt es
+   * keinen Knopf „Fahrtstrecke berechnen" — das Gastformular hinter einem
+   * Freigabe-Link kennt keinen Einsatz.
+   */
+  resolveDistance?: (
+    firecallId: string,
+  ) => Promise<RoundTripDistance | undefined>;
   onSubmit: (
     input: FahrtenbuchEntryInput,
     options: EntryFormSubmitOptions,
@@ -104,6 +121,26 @@ function prefillCounters(
 }
 
 /**
+ * Der Einsatz, mit dem ein neuer Eintrag vorbelegt wird: der aktive, sonst der
+ * neueste der Gruppe.
+ *
+ * Die Fahrt zum laufenden Einsatz ist der Regelfall. Vorbelegt spart sie drei
+ * Eingaben — Zweck, Einsatz und die Fahrstrecke, die der verknüpfte Einsatz
+ * selbst benennt.
+ *
+ * Der aktive Einsatz kommt aus der app-weiten Auswahl, die Liste aus der Gruppe
+ * dieses Fahrtenbuchs; beides muss nicht zusammenpassen. Steht er nicht in der
+ * Liste, gilt deshalb der neueste — die Liste kommt absteigend nach Datum.
+ */
+export function defaultFirecallOption(
+  firecalls: FahrtenbuchFirecallOption[] | undefined,
+  activeFirecallId?: string,
+): FahrtenbuchFirecallOption | undefined {
+  if (!firecalls?.length) return undefined;
+  return firecalls.find((f) => f.id === activeFirecallId) ?? firecalls[0];
+}
+
+/**
  * Fehlerschlüssel, die die Server Actions unverändert zurückgeben.
  * `linkInvalid` kann nur über den Fahrtenbuch-Share-Link entstehen — der
  * eingeloggte Dialog bekommt ihn nie. Die Liste deckt beide Aufrufer ab.
@@ -136,6 +173,8 @@ export function useEntryFormState({
   entries = [],
   vehicleId,
   entry,
+  activeFirecallId,
+  resolveDistance,
   onSubmit,
 }: UseEntryFormStateOptions) {
   const t = useTranslations('fahrtenbuch');
@@ -296,6 +335,30 @@ export function useEntryFormState({
   };
 
   /**
+   * Belegt einen neuen Eintrag mit dem aktiven Einsatz vor — einmalig.
+   *
+   * Als Effekt und nicht als Anfangswert des Zustands, weil die Einsatzliste
+   * ein Firestore-Snapshot ist und beim ersten Rendern noch leer sein kann; ein
+   * `useState`-Initialisierer liefe genau dann ins Leere.
+   *
+   * Der Riegel ist `defaultAppliedRef`: Wer die Auswahl absichtlich räumt oder
+   * den Zweck wechselt, soll sie beim nächsten Snapshot nicht zurückbekommen.
+   * Beim Bearbeiten gilt ohnehin der Eintrag.
+   */
+  const defaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (entry || defaultAppliedRef.current) return;
+    const option = defaultFirecallOption(firecalls, activeFirecallId);
+    if (!option) return;
+    defaultAppliedRef.current = true;
+    changeFirecall(option.id, option.name);
+    // `changeFirecall` ist bei jedem Rendern neu und gehört deshalb nicht in
+    // die Abhängigkeiten — der Effekt hängt an der Liste, nicht an der
+    // Funktion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry, firecalls, activeFirecallId]);
+
+  /**
    * Die schon erfasste Fahrt dieses Fahrzeugs zu diesem Einsatz.
    *
    * Nur bei verknüpftem Einsatz: Hinter einem frei eingetippten Namen steht
@@ -350,6 +413,38 @@ export function useEntryFormState({
     const end = Date.parse(ankunft);
     return !Number.isNaN(start) && !Number.isNaN(end) && end < start;
   }, [abfahrt, ankunft]);
+
+  const [distanceBusy, setDistanceBusy] = useState(false);
+  const [distanceResult, setDistanceResult] = useState<{
+    roundTripKm: number;
+    source: 'route' | 'estimate';
+  }>();
+  const [distanceError, setDistanceError] = useState(false);
+
+  /**
+   * Rechnet den Kilometer-Endstand aus der Route zum Einsatz.
+   *
+   * Nur bei verknüpftem Einsatz: Hinter einem frei eingetippten Namen stehen
+   * keine Koordinaten. Überschreibt einen eingetragenen Endstand — der Knopf
+   * ist eine ausdrückliche Ansage, kein Vorbelegen.
+   */
+  const calculateDistance = async () => {
+    if (!resolveDistance || !firecallId) return;
+    setDistanceBusy(true);
+    setDistanceError(false);
+    setDistanceResult(undefined);
+    const distance = await resolveDistance(firecallId);
+    setDistanceBusy(false);
+    if (!distance) {
+      setDistanceError(true);
+      return;
+    }
+    setDistanceResult({
+      roundTripKm: distance.roundTripKm,
+      source: distance.source,
+    });
+    setCounters(applyRoundTripToKmCounters(definitions, counters, distance));
+  };
 
   const submit = async (
     options: EntryFormSubmitOptions = {},
@@ -444,6 +539,12 @@ export function useEntryFormState({
       ),
     overlappingEntries,
     timeOrderInvalid,
+    /** Ob der Knopf „Fahrtstrecke berechnen" überhaupt etwas ausrechnen kann. */
+    canCalculateDistance: !!resolveDistance && !!firecallId,
+    calculateDistance,
+    distanceBusy,
+    distanceResult,
+    distanceError,
     /**
      * Ob der verknüpfte Einsatz das Ziel bereits benennt. Nur die Verknüpfung
      * zählt, nicht ein frei eingetippter Einsatzname — dieselbe Grenze zieht

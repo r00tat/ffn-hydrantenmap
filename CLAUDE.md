@@ -54,6 +54,16 @@ Das Paket `typescript` bleibt bewusst bei **6.x**, weil `typescript@7` unter `.`
 - `next build` löst `typescript/package.json` auf und nutzt dessen `bin.tsc`, prüft also
   weiterhin mit TS 6.
 
+**Neue i18n-Schlüssel brauchen einen frischen `tsconfig.tsbuildinfo`.** Die
+Message-Typen kommen über `src/global.d.ts` aus `messages/de.json`; TS 7
+invalidiert seinen inkrementellen Cache bei einer Änderung an der JSON aber
+nicht. `npm run typecheck` meldet den eben ergänzten Schlüssel dann weiter als
+„not assignable to parameter of type NamespacedMessageKeys". Abhilfe:
+
+```bash
+rm -f tsconfig.tsbuildinfo && npm run typecheck
+```
+
 Sobald typescript-eslint auf der TS-7.1-API aufsetzt: `typescript` auf `^7` ziehen und den
 `typescript7`-Alias samt `typecheck`-Pfad entfernen.
 
@@ -924,6 +934,42 @@ benutzt.
   muss dem entsprechen, was gespeichert wird. Der Freitext bleibt der Weg für
   einen Einsatz, der nicht in der Liste steht; dass die Prüfungen dann nicht
   greifen, sagt ein Hinweis.
+- **Ein neuer Eintrag ist mit dem aktiven Einsatz vorbelegt** — sonst dem
+  neuesten der Gruppe (`defaultFirecallOption`). Damit sind Zweck, Einsatz und
+  Fahrstrecke schon gesetzt: Die Fahrt zum laufenden Einsatz ist der Regelfall,
+  und der verknüpfte Einsatz benennt das Ziel selbst. Den aktiven Einsatz liest
+  `FahrtenbuchDialog` über `useFirecallId` — nicht `useEntryFormState`, denn das
+  Gastformular hinter einem Freigabe-Link läuft ohne diesen Kontext und belegt
+  deshalb nichts vor. Angewandt wird die Vorbelegung als Effekt und nicht als
+  Anfangswert des Zustands, weil die Einsatzliste ein Firestore-Snapshot ist und
+  beim ersten Rendern leer sein kann; ein `defaultAppliedRef` sorgt dafür, dass
+  eine absichtlich geräumte Auswahl beim nächsten Snapshot nicht zurückkommt.
+  Beim Bearbeiten gilt ausschließlich der Eintrag — eine Übungsfahrt
+  nachträglich einem Einsatz zuzuordnen wäre eine stille Änderung am
+  Nachweisdokument. In Tests schaltet `firecalls: []` die Vorbelegung ab, ohne
+  die Auswahl ganz zu entfernen.
+- **Das Einsatz-Autocomplete braucht `getOptionKey`.** MUI nimmt sonst das Label
+  als React-Key, und „G1 Ölspur" gibt es jedes Jahr mehrfach — React verwarf
+  dann einen der beiden Listeneinträge.
+- **Fahrer und Zusatzfahrer sind in der Sammelerfassung Autocompletes** über
+  die Personen der Gruppe. Vorher war der Fahrer ein reines Textfeld: Der
+  Maschinist war vorbelegt, aber wer ihn korrigieren musste, tippte den Namen
+  neu und verlor die Verknüpfung zur Person — und damit ihren Anteil in der
+  Fahrerstatistik. Name und `driverId` werden immer gemeinsam gesetzt.
+- **Jede Zeile hat einen eigenen Speichern-Knopf.** Er ruft dasselbe `save()`
+  wie „Alle speichern", nur mit einer Auswahl — ein zweiter Pfad würde bei der
+  Duplikatserkennung oder der Kilometerlogik auseinanderlaufen. `saving` sperrt
+  weiter alle Knöpfe, `savingKey` sagt nur, an welchem der Spinner steht.
+- **„Fahrtstrecke berechnen" im Eintrags-Dialog** holt über
+  `firecallRoundTripDistance` dieselbe Strecke, die sich die Sammelerfassung
+  beim Speichern selbst holt — samt Routen-Cache am Einsatz, der Knopf kostet
+  also ab dem zweiten Fahrzeug keinen API-Aufruf mehr. `applyRoundTripToKmCounters`
+  **überschreibt** dabei einen eingetragenen Endstand und lässt alle anderen
+  Zähler in Ruhe; das ist die Wirkung eines Knopfdrucks, nicht die einer
+  Vorbelegung (dafür `autoFillCounterEnds`). Ohne verknüpften Einsatz gibt es
+  den Knopf nicht — hinter einem frei eingetippten Namen stehen keine
+  Koordinaten. Die Action steckt im Dialog und nicht in `useEntryFormState`,
+  damit das Gastformular ohne sie auskommt.
 - **`fahrtenbuchEntryCount` am Einsatz** trägt die Anzeige in der
   Einsatz-Übersicht ([Einsaetze.tsx](src/components/pages/Einsaetze.tsx)).
   Denormalisiert wie der Routen-Cache `fahrtenbuchRoute` und aus demselben

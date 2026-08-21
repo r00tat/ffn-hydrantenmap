@@ -221,6 +221,54 @@ async function createMangelIfReported(
   }
 }
 
+export interface FirecallDistanceResult {
+  success: boolean;
+  /** Gesamtstrecke (Hin- und Rückweg) in ganzen Kilometern. */
+  roundTripKm?: number;
+  /**
+   * Woher die Strecke stammt. Muss mit: Eine geschätzte Strecke gehört im
+   * Fahrtenbuch nachgesehen, eine gefahrene nicht.
+   */
+  source?: 'route' | 'estimate';
+  error?: string;
+}
+
+/**
+ * Die Gesamtstrecke vom Standort der Gruppe zum Einsatzort und zurück — für den
+ * Knopf „Fahrtstrecke berechnen" im Eintrags-Dialog.
+ *
+ * Die Sammelerfassung holt sich diese Strecke beim Speichern selbst; beim
+ * einzelnen Eintrag musste den Kilometerstand bisher jeder von Hand ausrechnen.
+ * Derselbe `resolveFirecallDistance`-Pfad, also auch derselbe Routen-Cache am
+ * Einsatz — der Knopf kostet ab dem zweiten Fahrzeug keinen API-Aufruf mehr.
+ *
+ * `noFirecallRoute`, wenn nichts zu ermitteln war: Einsatz einer anderen
+ * Gruppe, gelöscht oder ohne Koordinaten.
+ */
+export async function firecallRoundTripDistance(
+  groupId: string,
+  firecallId: string,
+): Promise<FirecallDistanceResult> {
+  try {
+    await actionGroupMemberRequired(groupId);
+    const standort = await loadGroupStandort(groupId);
+    const distance = await resolveFirecallDistance(
+      groupId,
+      firecallId,
+      standort,
+    );
+    if (!distance) return { success: false, error: 'noFirecallRoute' };
+    return {
+      success: true,
+      roundTripKm: distance.roundTripKm,
+      source: distance.source,
+    };
+  } catch (err) {
+    console.error('firecallRoundTripDistance failed', err);
+    return { success: false, error: actionErrorKey(err) };
+  }
+}
+
 export interface EntryWriteOptions {
   /**
    * Ein als Duplikat erkannter Eintrag wird trotzdem geschrieben.

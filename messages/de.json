@@ -417,6 +417,10 @@
     "moreDrivers": "+{count}",
     "zweck": "Fahrtzweck",
     "firecall": "Einsatz",
+    "calculateDistance": "Fahrtstrecke berechnen",
+    "calculateDistanceRoute": "{km} km gefahrene Strecke, Kilometerstand ergänzt",
+    "calculateDistanceEstimated": "ca. {km} km geschätzt (keine Route verfügbar), Kilometerstand ergänzt",
+    "calculateDistanceFailed": "Für diesen Einsatz ist keine Strecke zu ermitteln — fehlende Koordinaten am Einsatzort.",
     "firecallHint": "Einsatz wählen oder frei eingeben — die Auswahl setzt den Zweck auf „Einsatz“",
     "firecallLinkMissing": "Kein Einsatz aus der Liste verknüpft. Die Fahrt wird gespeichert, aber nicht auf doppelte Erfassung geprüft.",
     "duplicate": {
@@ -640,6 +644,7 @@
       "noGroupVehicles": "Die Gruppe dieses Einsatzes hat keine Fahrzeuge hinterlegt.",
       "notInFahrtenbuch": "Nicht im Fahrtenbuch hinterlegt und daher ohne Fahrt: {names}",
       "alreadyRecorded": "Bereits erfasst",
+      "saveRow": "Nur diese Fahrt speichern",
       "saveAll": "Alle speichern",
       "saved": "{count, plural, one {# Fahrt gespeichert} other {# Fahrten gespeichert}}",
       "skipped": "{count, plural, one {# unvollständige Zeile übersprungen} other {# unvollständige Zeilen übersprungen}}",

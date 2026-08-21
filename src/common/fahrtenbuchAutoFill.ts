@@ -103,6 +103,32 @@ export function estimatedDistance(
 }
 
 /**
+ * Setzt den Kilometer-Endstand auf Startstand plus Gesamtstrecke.
+ *
+ * Anders als `autoFillCounterEnds` **überschreibt** das einen vorhandenen
+ * Endstand und lässt alle anderen Zähler unberührt: Das ist die Wirkung des
+ * Knopfes „Fahrtstrecke berechnen", also einer ausdrücklichen Ansage. Ein
+ * Betriebsstundenzähler hat mit der Wegstrecke nichts zu tun und darf davon
+ * nicht mitgezogen werden.
+ *
+ * Ohne Startstand fehlt der Bezugswert; der Zähler bleibt dann, wie er war.
+ */
+export function applyRoundTripToKmCounters(
+  definitions: CounterDefinition[],
+  counters: Record<string, CounterReading>,
+  distance: RoundTripDistance,
+): Record<string, CounterReading> {
+  const result: Record<string, CounterReading> = { ...counters };
+  for (const def of definitions) {
+    if (!isKmCounter(def)) continue;
+    const reading = counters[def.id];
+    if (reading?.start === undefined) continue;
+    result[def.id] = withEnd(reading, reading.start + distance.roundTripKm);
+  }
+  return result;
+}
+
+/**
  * Ergänzt fehlende Endstände. Ein vom Benutzer eingetragener Wert hat immer
  * Vorrang und wird nie überschrieben.
  *

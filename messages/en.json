@@ -417,6 +417,10 @@
     "moreDrivers": "+{count}",
     "zweck": "Purpose",
     "firecall": "Operation",
+    "calculateDistance": "Calculate distance",
+    "calculateDistanceRoute": "{km} km driven, odometer filled in",
+    "calculateDistanceEstimated": "approx. {km} km estimated (no route available), odometer filled in",
+    "calculateDistanceFailed": "No distance can be determined for this operation \u2014 the location has no coordinates.",
     "firecallHint": "Select an operation or enter one — selecting it sets the purpose to \u201coperation\u201d",
     "firecallLinkMissing": "No operation linked from the list. The trip is saved but not checked for duplicates.",
     "duplicate": {
@@ -640,6 +644,7 @@
       "noGroupVehicles": "This operation's group has no vehicles configured.",
       "notInFahrtenbuch": "Not in the logbook master data, so no trip is recorded: {names}",
       "alreadyRecorded": "Already recorded",
+      "saveRow": "Save only this trip",
       "saveAll": "Save all",
       "saved": "{count, plural, one {# trip saved} other {# trips saved}}",
       "skipped": "{count, plural, one {# incomplete row skipped} other {# incomplete rows skipped}}",

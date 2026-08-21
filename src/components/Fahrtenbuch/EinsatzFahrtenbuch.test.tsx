@@ -576,6 +576,76 @@ describe('EinsatzFahrtenbuchView — Zusatzfahrer', () => {
     });
   });
 
+  it('bietet die Personen der Gruppe als Fahrer zur Auswahl', async () => {
+    // Vorher ein reines Textfeld — der Maschinist war zwar vorbelegt, aber wer
+    // ihn korrigieren musste, tippte den Namen neu und verlor die Verknüpfung
+    // zur Person.
+    const user = userEvent.setup();
+    const onChangeRow = vi.fn();
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        persons={persons}
+        rows={[row({ driverName: '' })]}
+        onChangeRow={onChangeRow}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrer'));
+    await user.click(await screen.findByRole('option', { name: 'Anna Bauer' }));
+
+    expect(onChangeRow).toHaveBeenCalledWith('i1', {
+      driverName: 'Anna Bauer',
+      driverId: 'p2',
+    });
+  });
+
+  it('zeigt den vorbelegten Maschinisten als gewählte Person', () => {
+    // `resolveDriver` übernimmt den Namen aus der internen Personenliste, also
+    // „Vorname Nachname" — nicht die Schreibweise aus BlaulichtSMS.
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        persons={persons}
+        rows={[row({ driverName: 'Anna Bauer', driverId: 'p2' })]}
+      />,
+    );
+    expect(screen.getByLabelText('Fahrer')).toHaveValue('Anna Bauer');
+  });
+
+  it('speichert eine einzelne Zeile über ihren Knopf', async () => {
+    const user = userEvent.setup();
+    const onSaveRow = vi.fn();
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row(), row({ key: 'i2' })]}
+        onSaveRow={onSaveRow}
+      />,
+    );
+
+    const buttons = screen.getAllByRole('button', {
+      name: 'Nur diese Fahrt speichern',
+    });
+    expect(buttons).toHaveLength(2);
+    await user.click(buttons[1]);
+
+    expect(onSaveRow).toHaveBeenCalledWith('i2');
+  });
+
+  it('zeigt an einer bereits erfassten Zeile keinen Speichern-Knopf', () => {
+    renderWithIntl(
+      <EinsatzFahrtenbuchView
+        {...baseProps}
+        rows={[row({ existingEntry: { id: 'e1' } as FahrtenbuchEntry })]}
+        onSaveRow={vi.fn()}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Nur diese Fahrt speichern' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('zeigt bei einer Einheit ohne Zähler kein Zusatzfahrer-Feld', () => {
     const trailer: FahrtenbuchVehicle = {
       ...vehicle,

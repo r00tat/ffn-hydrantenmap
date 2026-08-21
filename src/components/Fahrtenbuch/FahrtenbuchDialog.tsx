@@ -11,9 +11,11 @@ import type {
   FahrtenbuchPerson,
   FahrtenbuchVehicle,
 } from '../../common/fahrtenbuch';
+import { useFirecallId } from '../../hooks/useFirecall';
 import FahrtenbuchEntryFields from './FahrtenbuchEntryFields';
 import {
   createFahrtenbuchEntry,
+  firecallRoundTripDistance,
   updateFahrtenbuchEntry,
 } from './fahrtenbuchActions';
 import {
@@ -49,6 +51,10 @@ export default function FahrtenbuchDialog({
   onClose,
 }: FahrtenbuchDialogProps) {
   const t = useTranslations('fahrtenbuch');
+  // Der in der App ausgewählte Einsatz, sonst der letzte — die Unterscheidung
+  // trifft schon `useFirecall`. Gehört hierher und nicht in `useEntryFormState`:
+  // Das Gastformular hinter einem Freigabe-Link läuft ohne diesen Kontext.
+  const activeFirecallId = useFirecallId();
 
   const form = useEntryFormState({
     vehicles,
@@ -56,6 +62,15 @@ export default function FahrtenbuchDialog({
     entries,
     vehicleId,
     entry,
+    activeFirecallId,
+    resolveDistance: async (firecallId) => {
+      const result = await firecallRoundTripDistance(groupId, firecallId);
+      if (!result.success || result.roundTripKm === undefined) return undefined;
+      return {
+        roundTripKm: result.roundTripKm,
+        source: result.source ?? 'estimate',
+      };
+    },
     onSubmit: (input, options) =>
       entry?.id
         ? updateFahrtenbuchEntry(groupId, entry.id, input, options)

@@ -1,12 +1,14 @@
 'use client';
 
 import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import FormHelperText from '@mui/material/FormHelperText';
 import Grid from '@mui/material/Grid';
@@ -82,6 +84,8 @@ export interface EinsatzFahrtenbuchViewProps {
    */
   persons: EntryFormPerson[];
   rows: EinsatzRow[];
+  /** Die Zeile, die gerade gespeichert wird — für den Knopf an ihr. */
+  savingKey?: string;
   /** Die Zeiten des Kopfblocks — sie gelten für alle Fahrzeuge. */
   times: EinsatzTimes;
   /**
@@ -101,6 +105,12 @@ export interface EinsatzFahrtenbuchViewProps {
   onChangeTimes: (patch: Partial<EinsatzTimes>) => void;
   onChangeRow: (key: string, patch: Partial<EinsatzRow>) => void;
   onSave: () => void;
+  /**
+   * Speichert eine einzelne Zeile. Fünf Fahrzeuge auf einmal zu speichern ist
+   * der Regelfall, aber wer nur seine eigene Fahrt einträgt, soll nicht die
+   * unfertigen Zeilen der anderen mit abschicken müssen.
+   */
+  onSaveRow?: (key: string) => void;
   /** Öffnet die Bearbeitung eines bereits erfassten Eintrags. */
   onEditEntry?: (entry: FahrtenbuchEntry) => void;
 }
@@ -165,6 +175,7 @@ export function EinsatzFahrtenbuchView({
   unitsWithoutVehicle: withoutVehicle,
   isMember,
   saving,
+  savingKey,
   message,
   messageDetails,
   messageSeverity = 'success',
@@ -172,6 +183,7 @@ export function EinsatzFahrtenbuchView({
   onChangeTimes,
   onChangeRow,
   onSave,
+  onSaveRow,
   onEditEntry,
 }: EinsatzFahrtenbuchViewProps) {
   const t = useTranslations('fahrtenbuch');
@@ -323,17 +335,30 @@ export function EinsatzFahrtenbuchView({
                   <>
                     {needsDriver ? (
                       <>
-                        <TextField
+                        {/* Autocomplete über die Personen der Gruppe, wie im
+                            Dialog: Der vorbelegte Maschinist kommt als Person
+                            aus der internen Liste („Vorname Nachname"), und
+                            eine freie Eingabe bleibt möglich — das Fahrtenbuch
+                            erlaubt Fahrer ohne Personendatensatz. Die
+                            Personen-ID wird immer zusammen mit dem Namen
+                            gesetzt, sonst zeigte sie nach einer freien Eingabe
+                            noch auf die vorige Person. */}
+                        <Autocomplete
+                          freeSolo
                           size="small"
-                          label={t('driver')}
+                          options={persons.map((p) => p.name)}
                           value={row.driverName}
                           sx={{ flexGrow: 1, minWidth: 160 }}
-                          onChange={(e) =>
+                          onInputChange={(_, value) =>
                             onChangeRow(row.key, {
-                              driverName: e.target.value,
-                              driverId: undefined,
+                              driverName: value,
+                              driverId: persons.find((p) => p.name === value)
+                                ?.id,
                             })
                           }
+                          renderInput={(params) => (
+                            <TextField {...params} label={t('driver')} />
+                          )}
                         />
                         {/* Nichts vorbelegt: Die gemeldete Mannschaft eines
                             Fahrzeugs ist nicht seine Fahrerliste. */}
@@ -369,6 +394,25 @@ export function EinsatzFahrtenbuchView({
                       row={row}
                       autoFill={autoFill}
                     />
+                    {onSaveRow && (
+                      <Tooltip title={t('einsatz.saveRow')}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            aria-label={t('einsatz.saveRow')}
+                            disabled={saving}
+                            onClick={() => onSaveRow(row.key)}
+                          >
+                            {savingKey === row.key ? (
+                              <CircularProgress size={20} />
+                            ) : (
+                              <SaveIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
                     <Tooltip title={t('einsatz.editDetails')}>
                       <IconButton
                         size="small"
@@ -660,6 +704,9 @@ export default function EinsatzFahrtenbuch({
   );
 
   const [saving, setSaving] = useState(false);
+  // Welche Zeile gerade gespeichert wird — nur für den Spinner an ihrem Knopf.
+  // `saving` sperrt weiter alle Knöpfe: Es läuft eine Anfrage, nicht mehrere.
+  const [savingKey, setSavingKey] = useState<string>();
   const [message, setMessage] = useState<string>();
   const [messageDetails, setMessageDetails] = useState<string[]>();
   const [messageSeverity, setMessageSeverity] = useState<
@@ -734,14 +781,25 @@ export default function EinsatzFahrtenbuch({
     setMessageDetails(incomplete.map(issueMessage));
   };
 
-  const save = async () => {
+  /**
+   * Speichert die Zeilen — alle, oder mit `keys` nur die genannten.
+   *
+   * Eine einzelne Zeile geht durch denselben Pfad wie „Alle speichern":
+   * Partitionierung, Server Action, dieselbe Meldung. Ein zweiter Pfad würde
+   * bei der Duplikatserkennung oder der Kilometerlogik auseinanderlaufen.
+   */
+  const save = async (keys?: string[]) => {
     if (!groupId) return;
     setSaving(true);
+    setSavingKey(keys?.length === 1 ? keys[0] : undefined);
     setMessage(undefined);
     setMessageDetails(undefined);
 
+    const selected = keys
+      ? rows.filter((row) => keys.includes(row.key))
+      : rows;
     const { ready, incomplete } = partitionEinsatzRows(
-      rows,
+      selected,
       activeVehicles,
       firecallName,
       autoFill,
@@ -750,6 +808,7 @@ export default function EinsatzFahrtenbuch({
 
     if (ready.length === 0) {
       setSaving(false);
+      setSavingKey(undefined);
       report(0, incomplete, 0, 0);
       return;
     }
@@ -760,6 +819,7 @@ export default function EinsatzFahrtenbuch({
     );
 
     setSaving(false);
+    setSavingKey(undefined);
     if (!result.success) {
       const known = TRANSLATED_SAVE_ERRORS.find((key) => key === result.error);
       setMessageSeverity('error');
@@ -794,6 +854,7 @@ export default function EinsatzFahrtenbuch({
         unitsWithoutVehicle={withoutVehicle}
         isMember={isMember}
         saving={saving}
+        savingKey={savingKey}
         message={message}
         messageDetails={messageDetails}
         messageSeverity={messageSeverity}
@@ -802,7 +863,8 @@ export default function EinsatzFahrtenbuch({
           setTimeEdits((current) => ({ ...current, ...patch }))
         }
         onChangeRow={changeRow}
-        onSave={save}
+        onSave={() => save()}
+        onSaveRow={(key) => save([key])}
         onEditEntry={setEditEntry}
       />
       {/* Bedingt gemountet: der Dialog liest seinen Anfangszustand nur beim

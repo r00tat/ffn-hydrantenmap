@@ -2,6 +2,8 @@
 
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
+import Button from '@mui/material/Button';
+import RouteIcon from '@mui/icons-material/Route';
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -157,6 +159,13 @@ export default function FahrtenbuchEntryFields({
                   getOptionLabel={(option) =>
                     typeof option === 'string' ? option : option.name
                   }
+                  // Ohne das nimmt MUI das Label als React-Key. Zwei
+                  // gleichnamige Einsätze — „G1 Ölspur" gibt es jedes Jahr
+                  // mehrfach — kollidieren dann, und React verwirft einen der
+                  // beiden Einträge aus der Liste.
+                  getOptionKey={(option) =>
+                    typeof option === 'string' ? option : option.id
+                  }
                   value={form.firecallName}
                   onChange={(_, option) => {
                     if (option && typeof option !== 'string') {
@@ -293,6 +302,38 @@ export default function FahrtenbuchEntryFields({
                 onChange={form.setCounters}
               />
             </Grid>
+            {/* Die Sammelerfassung holt sich die Strecke beim Speichern selbst;
+                beim einzelnen Eintrag musste den Kilometerstand bisher jeder
+                von Hand ausrechnen. Nur bei verknüpftem Einsatz — hinter einem
+                frei eingetippten Namen stehen keine Koordinaten. */}
+            {form.canCalculateDistance && (
+              <Grid size={{ xs: 12 }}>
+                <Button
+                  size="small"
+                  startIcon={<RouteIcon />}
+                  onClick={form.calculateDistance}
+                  disabled={form.distanceBusy}
+                >
+                  {t('calculateDistance')}
+                </Button>
+                {form.distanceResult && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    {form.distanceResult.source === 'estimate'
+                      ? t('calculateDistanceEstimated', {
+                          km: form.distanceResult.roundTripKm,
+                        })
+                      : t('calculateDistanceRoute', {
+                          km: form.distanceResult.roundTripKm,
+                        })}
+                  </Alert>
+                )}
+                {form.distanceError && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    {t('calculateDistanceFailed')}
+                  </Alert>
+                )}
+              </Grid>
+            )}
             {(form.vehicle?.fuelTypes ?? []).map((fuel) => (
               <Grid size={{ xs: 12, sm: 4 }} key={fuel}>
                 <TextField

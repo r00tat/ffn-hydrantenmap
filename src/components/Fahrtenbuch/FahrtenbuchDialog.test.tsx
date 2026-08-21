@@ -11,6 +11,9 @@ import {
 import { renderWithIntl } from '../../test-utils/intlRender';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
 
+vi.mock('../../hooks/useFirecall', () => ({
+  useFirecallId: () => 'unknown',
+}));
 vi.mock('./fahrtenbuchActions', () => ({
   createFahrtenbuchEntry: vi.fn().mockResolvedValue({ success: true }),
   updateFahrtenbuchEntry: vi.fn().mockResolvedValue({ success: true }),
@@ -143,6 +146,51 @@ describe('FahrtenbuchDialog', () => {
     expect(screen.getByLabelText('Einsatz')).toBeInTheDocument();
   });
 
+  it('belegt einen neuen Eintrag mit dem aktiven Einsatz vor', async () => {
+    // Der Regelfall ist die Fahrt zum laufenden Einsatz. Vorbelegt spart das
+    // Zweck, Einsatz und die Fahrstrecke, die der Einsatz selbst benennt.
+    renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Einsatz')).toHaveValue('Brand B2'),
+    );
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Einsatz');
+    // Das Ziel ist damit abgedeckt und nicht mehr als Pflichtfeld markiert.
+    expect(screen.getByLabelText('Fahrstrecke / Ziel')).not.toBeRequired();
+  });
+
+  it('belegt eine Bearbeitung nicht mit dem aktiven Einsatz vor', () => {
+    // Eine Übungsfahrt beim Bearbeiten nachträglich einem Einsatz zuzuordnen
+    // wäre eine stille Änderung am Nachweisdokument.
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        entry={entry({ zweck: 'uebung', ziel: 'Übungsgelände' })}
+      />,
+    );
+    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Übung');
+  });
+
+  it('zeigt zwei gleichnamige Einsätze beide zur Auswahl', async () => {
+    // „G1 Ölspur" gibt es jedes Jahr mehrfach. Ohne eigenen Key nahm MUI den
+    // Namen und React verwarf einen der beiden Einträge.
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog
+        {...baseProps}
+        vehicleId="v1"
+        firecalls={[
+          { id: 'f1', name: 'G1 Ölspur', date: '2026-08-03T10:00:00.000Z' },
+          { id: 'f2', name: 'G1 Ölspur', date: '2025-08-03T10:00:00.000Z' },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByLabelText('Einsatz'));
+    expect(await screen.findAllByRole('option', { name: 'G1 Ölspur' })).toHaveLength(2);
+  });
+
   it('setzt den Zweck auf Einsatz, sobald ein Einsatz gewählt wird', async () => {
     const user = userEvent.setup();
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
@@ -202,7 +250,11 @@ describe('FahrtenbuchDialog', () => {
 
   it('speichert einen neuen Eintrag ohne vehicleName', async () => {
     const user = userEvent.setup();
-    renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+    // Ohne Einsatzliste, damit die Vorbelegung mit dem aktiven Einsatz hier
+    // nichts setzt — geprüft wird der Zweck als Voreinstellung.
+    renderWithIntl(
+      <FahrtenbuchDialog {...baseProps} vehicleId="v1" firecalls={[]} />,
+    );
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
     await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
@@ -357,8 +409,8 @@ describe('FahrtenbuchDialog', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Fahrtzweck'));
-    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    // Das Feld ist mit dem aktiven Einsatz vorbelegt; erst räumen, dann tippen.
+    await user.clear(screen.getByLabelText('Einsatz'));
     await user.type(screen.getByLabelText('Einsatz'), 'N/S Ölspur Hauptstraße');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
@@ -383,10 +435,9 @@ describe('FahrtenbuchDialog', () => {
       />,
     );
 
-    await user.click(screen.getByLabelText('Fahrtzweck'));
-    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
     // Tippen, nicht auswählen — trotz exakt gleichlautendem Listeneintrag darf
-    // daraus keine Verknüpfung entstehen.
+    // daraus keine Verknüpfung entstehen. Das vorbelegte Feld vorher räumen.
+    await user.clear(screen.getByLabelText('Einsatz'));
     await user.type(screen.getByLabelText('Einsatz'), 'B1 Kaminbrand');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
 import { IntlWrapper } from '../../test-utils/intlRender';
 import type { FahrtenbuchEntryInput } from './entryLogic';
 import {
+  defaultFirecallOption,
   useEntryFormState,
   type EntryFormVehicle,
   type FahrtenbuchFirecallOption,
@@ -77,26 +78,59 @@ function existingEntry(abfahrt: string, ankunft: string): FahrtenbuchEntry {
   };
 }
 
+/**
+ * `firecalls: []` ist der Weg, die Vorbelegung abzuschalten: Ohne Einsätze in
+ * der Liste gibt es nichts vorzubelegen, die Auswahl bleibt aber vorhanden
+ * (anders als `firecalls: undefined`, das Gastformular).
+ */
 function renderForm(options: Partial<UseEntryFormStateOptions> = {}) {
   const onSubmit = vi.fn().mockResolvedValue({ success: true });
-  const { result } = renderHook(
-    () =>
+  const { result, rerender } = renderHook(
+    (props: Partial<UseEntryFormStateOptions>) =>
       useEntryFormState({
         vehicles,
         firecalls,
         vehicleId: 'v1',
         onSubmit,
         ...options,
+        ...props,
       }),
-    { wrapper: IntlWrapper },
+    { wrapper: IntlWrapper, initialProps: {} },
   );
-  return { result, onSubmit };
+  return { result, onSubmit, rerender };
 }
 
 /** Der zuletzt an `onSubmit` übergebene Eintrag. */
 function submitted(onSubmit: ReturnType<typeof vi.fn>): FahrtenbuchEntryInput {
   return onSubmit.mock.calls.at(-1)![0] as FahrtenbuchEntryInput;
 }
+
+describe('defaultFirecallOption', () => {
+  const list: FahrtenbuchFirecallOption[] = [
+    { id: 'f2', name: 'Neuester' },
+    { id: 'f1', name: 'Älterer' },
+  ];
+
+  it('nimmt den aktiven Einsatz', () => {
+    expect(defaultFirecallOption(list, 'f1')?.id).toBe('f1');
+  });
+
+  it('nimmt ohne aktiven Einsatz den neuesten', () => {
+    // Die Liste kommt absteigend nach Datum.
+    expect(defaultFirecallOption(list, undefined)?.id).toBe('f2');
+  });
+
+  it('nimmt den neuesten, wenn der aktive Einsatz einer anderen Gruppe gehört', () => {
+    // Der aktive Einsatz kommt aus der App-weiten Auswahl, die Liste aus der
+    // Gruppe des Fahrtenbuchs — beides muss nicht zusammenpassen.
+    expect(defaultFirecallOption(list, 'fremd')?.id).toBe('f2');
+  });
+
+  it('ergibt ohne Liste nichts', () => {
+    expect(defaultFirecallOption([], 'f1')).toBeUndefined();
+    expect(defaultFirecallOption(undefined, 'f1')).toBeUndefined();
+  });
+});
 
 describe('useEntryFormState', () => {
   describe('changeAbfahrt', () => {
@@ -162,7 +196,7 @@ describe('useEntryFormState', () => {
     it('setzt den Zweck auf einsatz, sobald ein Einsatz verknüpft wird', () => {
       // Sonst verwirft `submit` die Verknüpfung stillschweigend — und eine
       // Fahrt ohne Einsatzbezug findet keine Duplikatserkennung je wieder.
-      const { result } = renderForm();
+      const { result } = renderForm({ firecalls: [] });
 
       expect(result.current.zweck).toBe('sonstiges');
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
@@ -171,7 +205,7 @@ describe('useEntryFormState', () => {
     });
 
     it('lässt den Zweck bei einem nur eingetippten Namen unberührt', () => {
-      const { result } = renderForm();
+      const { result } = renderForm({ firecalls: [] });
 
       act(() => result.current.changeFirecall(undefined, 'Brand irgendwo'));
 
@@ -190,13 +224,76 @@ describe('useEntryFormState', () => {
     });
 
     it('meldet einen Zweck einsatz ohne Verknüpfung', () => {
-      const { result } = renderForm();
+      const { result } = renderForm({ firecalls: [] });
 
       act(() => result.current.changeZweck('einsatz'));
       expect(result.current.firecallLinkMissing).toBe(true);
 
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
       expect(result.current.firecallLinkMissing).toBe(false);
+    });
+  });
+
+  describe('Vorbelegung mit dem aktiven Einsatz', () => {
+    it('wählt den aktiven Einsatz und setzt den Zweck', async () => {
+      // Damit muss niemand mehr Zweck, Einsatz und Fahrstrecke von Hand
+      // angeben — der Regelfall ist die Fahrt zum laufenden Einsatz.
+      const { result } = renderForm({ activeFirecallId: 'f1' });
+
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+      expect(result.current.zweck).toBe('einsatz');
+      expect(result.current.firecallName).toBe('Brand Hauptstraße');
+      // Das Ziel ist damit abgedeckt und kein Pflichtfeld mehr.
+      expect(result.current.zielCoveredByFirecall).toBe(true);
+    });
+
+    it('übernimmt die Zeiten des Einsatzes', async () => {
+      const { result } = renderForm({ activeFirecallId: 'f1' });
+
+      await waitFor(() =>
+        expect(result.current.abfahrt).toBe('2026-03-10T18:00:00.000Z'),
+      );
+      expect(result.current.ankunft).toBe('2026-03-10T20:30:00.000Z');
+    });
+
+    it('greift auch, wenn die Einsatzliste erst nachgeladen wird', async () => {
+      // `useFahrtenbuchFirecalls` ist ein Snapshot: beim ersten Rendern leer.
+      const { result, rerender } = renderForm({ firecalls: [] });
+
+      expect(result.current.firecallId).toBeUndefined();
+      rerender({ firecalls });
+
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+    });
+
+    it('lässt einen bestehenden Eintrag unberührt', () => {
+      const { result } = renderForm({
+        activeFirecallId: 'f1',
+        entry: existingEntry(
+          localIso(2026, 3, 1, 8, 0),
+          localIso(2026, 3, 1, 9, 0),
+        ),
+      });
+
+      expect(result.current.firecallId).toBeUndefined();
+      expect(result.current.zweck).toBe('sonstiges');
+    });
+
+    it('überschreibt eine vom Benutzer geräumte Auswahl nicht wieder', async () => {
+      const { result } = renderForm({ activeFirecallId: 'f1' });
+
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+      act(() => result.current.changeZweck('uebung'));
+
+      expect(result.current.firecallId).toBeUndefined();
+      expect(result.current.zweck).toBe('uebung');
+    });
+
+    it('belegt ohne Einsatzliste nichts vor (Gastformular)', () => {
+      const { result } = renderForm({ firecalls: undefined });
+
+      expect(result.current.firecallId).toBeUndefined();
+      expect(result.current.zweck).toBe('sonstiges');
     });
   });
 
@@ -264,7 +361,9 @@ describe('useEntryFormState', () => {
     });
 
     it('warnt bei überschneidenden Zeiten desselben Fahrzeugs', () => {
-      const { result } = renderForm({ entries: [booked] });
+      // Ohne Einsatzliste, damit die Fahrt nicht schon als Duplikat gilt — dann
+      // stünde sie nur im Duplikatshinweis.
+      const { result } = renderForm({ entries: [booked], firecalls: [] });
 
       // Mitten in den Zeitraum der bestehenden Fahrt hinein.
       act(() => result.current.changeAbfahrt('2026-03-10T19:00:00.000Z'));
@@ -275,7 +374,10 @@ describe('useEntryFormState', () => {
 
     it('blockiert eine Überschneidung nicht', async () => {
       // Zeiten sind im Einsatz oft geschätzt — ein Riegel wäre hier falsch.
-      const { result, onSubmit } = renderForm({ entries: [booked] });
+      const { result, onSubmit } = renderForm({
+        entries: [booked],
+        firecalls: [],
+      });
 
       act(() => result.current.changeDriver('Max'));
       act(() => result.current.setZiel('Hauptplatz'));
@@ -287,6 +389,70 @@ describe('useEntryFormState', () => {
       });
 
       expect(onSubmit).toHaveBeenCalled();
+    });
+  });
+
+  describe('Fahrtstrecke berechnen', () => {
+    it('ergänzt den Kilometerstand aus der Route', async () => {
+      const resolveDistance = vi
+        .fn()
+        .mockResolvedValue({ roundTripKm: 24, source: 'route' });
+      const { result } = renderForm({
+        vehicleId: 'v2',
+        activeFirecallId: 'f1',
+        resolveDistance,
+      });
+
+      await waitFor(() => expect(result.current.canCalculateDistance).toBe(true));
+      act(() => result.current.setCounters({ km: { start: 1000 } }));
+      await act(async () => {
+        await result.current.calculateDistance();
+      });
+
+      expect(resolveDistance).toHaveBeenCalledWith('f1');
+      expect(result.current.counters.km).toEqual({ start: 1000, end: 1024 });
+      expect(result.current.distanceResult).toEqual({
+        roundTripKm: 24,
+        source: 'route',
+      });
+    });
+
+    it('meldet einen Einsatz ohne ermittelbare Strecke', async () => {
+      const resolveDistance = vi.fn().mockResolvedValue(undefined);
+      const { result } = renderForm({
+        vehicleId: 'v2',
+        activeFirecallId: 'f1',
+        resolveDistance,
+      });
+
+      await waitFor(() => expect(result.current.canCalculateDistance).toBe(true));
+      await act(async () => {
+        await result.current.calculateDistance();
+      });
+
+      expect(result.current.distanceError).toBe(true);
+      expect(result.current.distanceResult).toBeUndefined();
+    });
+
+    it('bietet die Berechnung ohne verknüpften Einsatz nicht an', () => {
+      // Hinter einem frei eingetippten Namen stehen keine Koordinaten.
+      const { result } = renderForm({
+        vehicleId: 'v2',
+        firecalls: [],
+        resolveDistance: vi.fn(),
+      });
+
+      expect(result.current.canCalculateDistance).toBe(false);
+    });
+
+    it('bietet sie ohne Aktion gar nicht an (Gastformular)', async () => {
+      const { result } = renderForm({
+        vehicleId: 'v2',
+        activeFirecallId: 'f1',
+      });
+
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+      expect(result.current.canCalculateDistance).toBe(false);
     });
   });
 
@@ -430,7 +596,7 @@ describe('useEntryFormState', () => {
     });
 
     it('verlangt ohne verknüpften Einsatz eine Angabe zur Fahrstrecke', async () => {
-      const { result, onSubmit } = renderForm();
+      const { result, onSubmit } = renderForm({ firecalls: [] });
 
       act(() => result.current.changeDriver('Max'));
       await act(async () => {
