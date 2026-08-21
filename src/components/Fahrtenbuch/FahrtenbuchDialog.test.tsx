@@ -168,7 +168,9 @@ describe('FahrtenbuchDialog', () => {
         entry={entry({ zweck: 'uebung', ziel: 'Übungsgelände' })}
       />,
     );
-    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
+    // Beim Zweck „Übung" gibt es das Einsatzfeld gar nicht — eine Übung
+    // gehört zu keinem Einsatz.
+    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Übung');
   });
 
@@ -212,7 +214,7 @@ describe('FahrtenbuchDialog', () => {
     await user.click(screen.getByLabelText('Fahrtzweck'));
     await user.click(await screen.findByRole('option', { name: 'Übung' }));
 
-    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
+    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Übung');
   });
 
@@ -395,7 +397,10 @@ describe('FahrtenbuchDialog', () => {
     });
   });
 
-  it('speichert einen frei eingegebenen Einsatz ohne ID', async () => {
+  it('übernimmt getippten Text als Fahrtstrecke / Ziel', async () => {
+    // Hinter einem getippten Namen steht kein Einsatz. Als zweites Namensfeld
+    // wäre er nur eine weitere Stelle, an der dasselbe stehen kann; als Ziel
+    // ist er dort, wo Liste, Export und Wochenbericht ihn ohnehin lesen.
     const user = userEvent.setup();
     renderWithIntl(
       <FahrtenbuchDialog
@@ -405,20 +410,26 @@ describe('FahrtenbuchDialog', () => {
       />,
     );
 
-    // Das Feld ist mit dem aktiven Einsatz vorbelegt; erst räumen, dann tippen.
     await user.clear(screen.getByLabelText('Einsatz'));
     await user.type(screen.getByLabelText('Einsatz'), 'N/S Ölspur Hauptstraße');
+    // Erst beim Verlassen des Feldes — bis dahin kann daraus eine Auswahl
+    // werden.
+    await user.tab();
+
+    expect(screen.getByLabelText(/Fahrstrecke \/ Ziel/)).toHaveValue(
+      'N/S Ölspur Hauptstraße',
+    );
+    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
-    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(createMock.mock.calls[0][1]).toMatchObject({
       firecallId: undefined,
-      firecallName: 'N/S Ölspur Hauptstraße',
+      firecallName: undefined,
+      ziel: 'N/S Ölspur Hauptstraße',
     });
   });
 
@@ -433,20 +444,20 @@ describe('FahrtenbuchDialog', () => {
     );
 
     // Tippen, nicht auswählen — trotz exakt gleichlautendem Listeneintrag darf
-    // daraus keine Verknüpfung entstehen. Das vorbelegte Feld vorher räumen.
+    // daraus keine Verknüpfung entstehen. Der Text wird zum Ziel.
     await user.clear(screen.getByLabelText('Einsatz'));
     await user.type(screen.getByLabelText('Einsatz'), 'B1 Kaminbrand');
+    await user.tab();
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
-    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalled());
     expect(createMock.mock.calls[0][1]).toMatchObject({
       firecallId: undefined,
-      firecallName: 'B1 Kaminbrand',
+      firecallName: undefined,
+      ziel: 'B1 Kaminbrand',
     });
   });
 

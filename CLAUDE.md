@@ -961,15 +961,24 @@ benutzt.
   Gastformular hinter einem Freigabe-Link, das den Einsatzbezug gar nicht
   mitschickt. Kein Riegel: Zeiten sind im Einsatz oft geschätzt. Berührende
   Zeiträume zählen nicht, das sind zwei aufeinanderfolgende Fahrten.
-- **Der Einsatz kommt im Formular vor Zweck und Ziel** und ist immer sichtbar,
-  nicht erst bei schon gesetztem Zweck „Einsatz" — vorher stand er hinter dem
-  Ziel und blieb deshalb meist leer. Die Auswahl setzt den Zweck auf `einsatz`:
-  `submit` schickt `firecallId` nur bei diesem Zweck, ohne das verlöre eine
-  Fahrt die Verknüpfung stillschweigend und keine Duplikatserkennung fände sie
-  je wieder. Umgekehrt räumt `changeZweck` die Verknüpfung — was im Feld steht,
-  muss dem entsprechen, was gespeichert wird. Der Freitext bleibt der Weg für
-  einen Einsatz, der nicht in der Liste steht; dass die Prüfungen dann nicht
-  greifen, sagt ein Hinweis.
+- **Der Einsatz kommt im Formular hinter dem Zweck und vor dem Ziel** — vorher
+  stand er hinter dem Ziel und blieb deshalb meist leer. Gezeigt wird er nur
+  beim Zweck `einsatz`: Eine Übung oder eine Versorgungsfahrt gehört zu keinem
+  Einsatz, und `submit` verwirft die Verknüpfung dort ohnehin. Die Auswahl setzt
+  den Zweck mit auf `einsatz` — das braucht die Vorbelegung, die greift, während
+  der Zweck noch auf `sonstiges` steht. Umgekehrt räumt `changeZweck` die
+  Verknüpfung: Was im Feld steht, muss dem entsprechen, was gespeichert wird.
+- **Das Einsatzfeld hält ausschließlich verknüpfte Einsätze.** Getippter Text
+  wandert beim Verlassen des Feldes in die Fahrtstrecke
+  (`commitFirecallInput`) — nicht während des Tippens, weil daraus noch eine
+  Auswahl werden kann. Hinter einem getippten Namen steht kein Einsatz: kein
+  Ort, keine Zeiten, keine Duplikatserkennung. Als zweites Namensfeld daneben
+  wäre er nur eine weitere Stelle, an der dasselbe stehen kann; als Ziel ist er
+  dort, wo Liste, Export und Wochenbericht ihn ohnehin lesen
+  (`entry.ziel?.trim() || entry.firecallName`). `firecallName` trägt damit nur
+  noch den Namen des verknüpften Einsatzes, und `firecallInput` ist der eigene
+  Zustand des Eingabefeldes. Ein Hinweis nennt den fehlenden Bezug, wenn beim
+  Zweck `einsatz` keiner verknüpft ist.
 - **Ein neuer Eintrag ist mit dem aktiven Einsatz vorbelegt** — sonst dem
   neuesten der Gruppe (`defaultFirecallOption`). Damit sind Zweck, Einsatz und
   Fahrstrecke schon gesetzt: Die Fahrt zum laufenden Einsatz ist der Regelfall,

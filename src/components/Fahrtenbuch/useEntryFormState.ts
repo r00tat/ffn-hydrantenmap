@@ -190,11 +190,15 @@ export function useEntryFormState({
   const [firecallId, setFirecallId] = useState<string | undefined>(
     entry?.firecallId,
   );
-  // Getrennt von `firecallId`, weil ein frei eingegebener Einsatz keinen
-  // Datensatz im System hat. Beim Bearbeiten kommt der Name aus dem Eintrag
-  // und nicht aus der Einsatzliste — steht der verknüpfte Einsatz nicht mehr
-  // in den geladenen 50, bliebe das Feld sonst leer.
+  // Der Name des **verknüpften** Einsatzes, getrennt von `firecallId` geführt:
+  // Beim Bearbeiten kommt er aus dem Eintrag und nicht aus der Einsatzliste —
+  // steht der verknüpfte Einsatz nicht mehr in den geladenen 50, bliebe das
+  // Feld sonst leer. Freitext landet **nicht** hier, sondern im Ziel (siehe
+  // `commitFirecallInput`).
   const [firecallName, setFirecallName] = useState(entry?.firecallName ?? '');
+  // Was im Einsatzfeld getippt steht. Eigener Zustand, weil das Feld beim
+  // Tippen die Liste filtert, ohne dass schon etwas verknüpft ist.
+  const [firecallInput, setFirecallInput] = useState(entry?.firecallName ?? '');
   const [ziel, setZiel] = useState(entry?.ziel ?? '');
   const [abfahrt, setAbfahrt] = useState(
     entry?.abfahrt ?? new Date().toISOString(),
@@ -292,7 +296,8 @@ export function useEntryFormState({
    */
   const changeFirecall = (id: string | undefined, name: string) => {
     setFirecallId(id || undefined);
-    setFirecallName(name);
+    setFirecallName(id ? name : '');
+    setFirecallInput(id ? name : '');
     setConfirmedDuplicateId(undefined);
     const firecall = id ? firecalls?.find((f) => f.id === id) : undefined;
     // Die Verknüpfung setzt den Zweck mit. `submit` schickt `firecallId` nur
@@ -305,6 +310,26 @@ export function useEntryFormState({
   };
 
   /**
+   * Übernimmt getippten Text aus dem Einsatzfeld als Fahrtstrecke / Ziel.
+   *
+   * Hinter einem getippten Namen steht kein Einsatz — kein Ort, keine Zeiten,
+   * keine Duplikatserkennung. Als zweites Namensfeld daneben wäre er nur eine
+   * weitere Stelle, an der dasselbe stehen kann; als Ziel ist er dort, wo Liste,
+   * Export und Wochenbericht ihn ohnehin lesen. Das Einsatzfeld hält damit
+   * ausschließlich verknüpfte Einsätze.
+   *
+   * Aufgerufen beim Verlassen des Feldes: Während des Tippens filtert der Text
+   * die Liste und könnte noch zu einer Auswahl führen.
+   */
+  const commitFirecallInput = () => {
+    if (firecallId) return;
+    const text = firecallInput.trim();
+    if (!text) return;
+    setZiel(text);
+    setFirecallInput('');
+  };
+
+  /**
    * Der Zweck, mit der Einsatzverknüpfung im Schlepptau: Ein anderer Zweck als
    * `einsatz` speichert keinen Einsatz, also darf auch keiner im Feld
    * stehenbleiben. Was zu sehen ist, muss dem entsprechen, was gespeichert wird.
@@ -314,6 +339,7 @@ export function useEntryFormState({
     if (next !== 'einsatz') {
       setFirecallId(undefined);
       setFirecallName('');
+      setFirecallInput('');
       setConfirmedDuplicateId(undefined);
     }
   };
@@ -465,8 +491,12 @@ export function useEntryFormState({
       coDrivers,
       zweck,
       firecallId: zweck === 'einsatz' ? firecallId : undefined,
+      // Nur zum verknüpften Einsatz gehört ein Name. Getippter Text steht im
+      // Ziel, nicht hier.
       firecallName:
-        zweck === 'einsatz' ? firecallName.trim() || undefined : undefined,
+        zweck === 'einsatz' && firecallId
+          ? firecallName.trim() || undefined
+          : undefined,
       // Benennt der verknüpfte Einsatz das Ziel, wird das Feld nicht gezeigt —
       // dann darf auch kein alter Text von vor der Auswahl mitgehen. Liste,
       // Export und Wochenbericht fallen auf `firecallName` zurück.
@@ -533,11 +563,14 @@ export function useEntryFormState({
     changeZweck,
     firecallId,
     firecallName,
+    firecallInput,
+    setFirecallInput,
+    commitFirecallInput,
     changeFirecall,
     /**
      * Zweck `einsatz`, aber kein Einsatz verknüpft. Der Hinweis darauf ist
      * bewusst kein Fehler: Ein Einsatz einer anderen Feuerwehr steht nicht in
-     * der Liste, und der Freitext bleibt der Weg dafür. Ohne Verknüpfung
+     * der Liste, und dann benennt die Fahrtstrecke die Fahrt. Ohne Verknüpfung
      * greifen nur die Duplikatsprüfungen nicht.
      */
     firecallLinkMissing: zweck === 'einsatz' && !firecallId,

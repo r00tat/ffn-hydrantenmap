@@ -422,7 +422,7 @@
     "calculateDistanceRoute": "{km} km driven, odometer filled in",
     "calculateDistanceEstimated": "approx. {km} km estimated (no route available), odometer filled in",
     "calculateDistanceFailed": "No distance can be determined for this operation \u2014 the location has no coordinates.",
-    "firecallHint": "Select an operation or enter one — selecting it sets the purpose to \u201coperation\u201d",
+    "firecallHint": "Pick an operation from the list — typed text becomes the route / destination",
     "firecallLinkMissing": "No operation linked from the list. The trip is saved but not checked for duplicates.",
     "duplicate": {
       "title": "A trip for this vehicle and this operation is already recorded",

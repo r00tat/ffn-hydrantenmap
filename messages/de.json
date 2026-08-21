@@ -422,7 +422,7 @@
     "calculateDistanceRoute": "{km} km gefahrene Strecke, Kilometerstand ergänzt",
     "calculateDistanceEstimated": "ca. {km} km geschätzt (keine Route verfügbar), Kilometerstand ergänzt",
     "calculateDistanceFailed": "Für diesen Einsatz ist keine Strecke zu ermitteln — fehlende Koordinaten am Einsatzort.",
-    "firecallHint": "Einsatz wählen oder frei eingeben — die Auswahl setzt den Zweck auf „Einsatz“",
+    "firecallHint": "Einsatz aus der Liste wählen — getippter Text wird als Fahrtstrecke / Ziel übernommen",
     "firecallLinkMissing": "Kein Einsatz aus der Liste verknüpft. Die Fahrt wird gespeichert, aber nicht auf doppelte Erfassung geprüft.",
     "duplicate": {
       "title": "Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst",

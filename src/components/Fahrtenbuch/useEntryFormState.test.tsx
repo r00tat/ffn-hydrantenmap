@@ -297,6 +297,65 @@ describe('useEntryFormState', () => {
     });
   });
 
+  describe('Getippter Einsatz wird zum Ziel', () => {
+    it('übernimmt den Text beim Verlassen des Feldes', async () => {
+      const { result, onSubmit } = renderForm({ firecalls: [] });
+
+      act(() => result.current.changeZweck('einsatz'));
+      act(() => result.current.setFirecallInput('N/S Ölspur Hauptstraße'));
+      // Während des Tippens passiert nichts — daraus kann noch eine Auswahl
+      // werden.
+      expect(result.current.ziel).toBe('');
+
+      act(() => result.current.commitFirecallInput());
+
+      expect(result.current.ziel).toBe('N/S Ölspur Hauptstraße');
+      expect(result.current.firecallInput).toBe('');
+      expect(result.current.firecallId).toBeUndefined();
+
+      act(() => result.current.changeDriver('Max'));
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      const input = submitted(onSubmit);
+      expect(input.ziel).toBe('N/S Ölspur Hauptstraße');
+      expect(input.firecallName).toBeUndefined();
+    });
+
+    it('lässt das Ziel in Ruhe, wenn ein Einsatz verknüpft ist', async () => {
+      const { result } = renderForm({ activeFirecallId: 'f1' });
+
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+      act(() => result.current.commitFirecallInput());
+
+      // Der Name des verknüpften Einsatzes bleibt im Feld und wird nicht zum
+      // Ziel umgeschrieben.
+      expect(result.current.firecallInput).toBe('Brand Hauptstraße');
+      expect(result.current.ziel).toBe('');
+    });
+
+    it('überschreibt das Ziel nicht mit einem leeren Feld', () => {
+      const { result } = renderForm({ firecalls: [] });
+
+      act(() => result.current.setZiel('Zeughaus'));
+      act(() => result.current.changeZweck('einsatz'));
+      act(() => result.current.commitFirecallInput());
+
+      expect(result.current.ziel).toBe('Zeughaus');
+    });
+
+    it('räumt das Eingabefeld beim Zweckwechsel', () => {
+      const { result } = renderForm({ firecalls: [] });
+
+      act(() => result.current.changeZweck('einsatz'));
+      act(() => result.current.setFirecallInput('Halbfertig'));
+      act(() => result.current.changeZweck('uebung'));
+
+      expect(result.current.firecallInput).toBe('');
+    });
+  });
+
   describe('Duplikat und Überschneidung', () => {
     /** Eine bereits erfasste Fahrt desselben Fahrzeugs zu Einsatz f1. */
     const booked: FahrtenbuchEntry = {

@@ -137,19 +137,34 @@ export default function FahrtenbuchEntryFields({
                 />
               </Grid>
             )}
-            {/* Zuerst der Einsatz, dann Zweck und Ziel: Die Zuordnung zu
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                select
+                fullWidth
+                label={t('zweck')}
+                value={form.zweck}
+                onChange={(e) => form.changeZweck(e.target.value as FahrtZweck)}
+              >
+                {FAHRT_ZWECKE.map((z) => (
+                  <MenuItem key={z} value={z}>
+                    {t(`zwecke.${z}` as 'zwecke.einsatz')}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            {/* Gleich hinter dem Zweck und vor dem Ziel: Die Zuordnung zu
                 einem Einsatz ist der Regelfall und trägt die Duplikats- und
-                Kilometerprüfungen. Stand das Feld hinter dem Ziel und nur bei
-                schon gesetztem Zweck „Einsatz", blieb es meist leer.
+                Kilometerprüfungen. Stand das Feld hinter dem Ziel, blieb es
+                meist leer. Nur beim Zweck „Einsatz" — eine Übung oder eine
+                Versorgungsfahrt gehört zu keinem Einsatz, und `submit` würde
+                die Verknüpfung ohnehin verwerfen.
 
                 Ohne Einsatzliste (Gastformular) entfällt die Auswahl ganz — der
-                Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung. Ein freier
-                Name wäre dort unkontrollierter Fremdinhalt; der Server verwirft
-                ihn ohnehin. `hasFirecallSelection` statt Truthiness auf
-                `firecalls`, weil eine leere Liste („noch keine Einsätze
-                geladen") das Feld zeigen soll, `undefined` (Gastformular)
-                aber nicht. */}
-            {form.hasFirecallSelection && (
+                Zweck „Einsatz" bleibt wählbar, nur ohne Verknüpfung.
+                `hasFirecallSelection` statt Truthiness auf `firecalls`, weil
+                eine leere Liste („noch keine Einsätze geladen") das Feld zeigen
+                soll, `undefined` (Gastformular) aber nicht. */}
+            {form.zweck === 'einsatz' && form.hasFirecallSelection && (
               <Grid size={{ xs: 12 }}>
                 <Autocomplete
                   freeSolo
@@ -166,26 +181,30 @@ export default function FahrtenbuchEntryFields({
                   getOptionKey={(option) =>
                     typeof option === 'string' ? option : option.id
                   }
-                  value={form.firecallName}
+                  value={form.firecallName || null}
+                  inputValue={form.firecallInput}
                   onChange={(_, option) => {
                     if (option && typeof option !== 'string') {
                       form.changeFirecall(option.id, option.name);
                     } else {
-                      form.changeFirecall(undefined, option ?? '');
+                      form.changeFirecall(undefined, '');
                     }
                   }}
-                  // Tippen ohne Auswahl ist der manuelle Fall. Kein Abgleich gegen
-                  // die Liste: ein zufällig gleichlautender Name soll nicht
-                  // stillschweigend zu einer Verknüpfung werden.
+                  // Tippen filtert nur die Liste und verknüpft nichts: Ein
+                  // zufällig gleichlautender Name soll nicht stillschweigend zu
+                  // einer Verknüpfung werden.
                   onInputChange={(_, text, reason) => {
-                    if (reason === 'input')
-                      form.changeFirecall(undefined, text);
+                    if (reason === 'input') form.setFirecallInput(text);
                   }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label={t('firecall')}
                       helperText={t('firecallHint')}
+                      // Beim Verlassen wandert getippter Text ins Ziel — dort
+                      // liest ihn die Liste ohnehin. Nicht beim Tippen, weil
+                      // daraus noch eine Auswahl werden kann.
+                      onBlur={form.commitFirecallInput}
                     />
                   )}
                 />
@@ -231,21 +250,6 @@ export default function FahrtenbuchEntryFields({
                 <Alert severity="info">{t('firecallLinkMissing')}</Alert>
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                select
-                fullWidth
-                label={t('zweck')}
-                value={form.zweck}
-                onChange={(e) => form.changeZweck(e.target.value as FahrtZweck)}
-              >
-                {FAHRT_ZWECKE.map((z) => (
-                  <MenuItem key={z} value={z}>
-                    {t(`zwecke.${z}` as 'zwecke.einsatz')}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
             {/* Nur ohne verknüpften Einsatz — der Einsatz benennt das Ziel
                 selbst, und ein zweites Feld dafür wäre eine Angabe, die
                 niemand machen muss. Jede andere Fahrt stünde ohne das Feld
