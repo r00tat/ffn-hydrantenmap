@@ -218,6 +218,49 @@ describe('FahrtenbuchDialog', () => {
     expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Übung');
   });
 
+  it('zeigt hinter dem Zweck immer genau ein Feld', async () => {
+    // Einsatz oder Fahrtstrecke, nie beides und nie keines — sonst sprang das
+    // Formular bei jedem Wechsel des Zwecks um.
+    const user = userEvent.setup();
+    renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Einsatz')).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByLabelText(/Fahrstrecke \/ Ziel/),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Übung' }));
+
+    expect(screen.getByLabelText(/Fahrstrecke \/ Ziel/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
+  });
+
+  it('meldet eine fehlende Fahrtstrecke am Einsatzfeld', async () => {
+    // Ohne Verknüpfung steht das Einsatzfeld für die Fahrtstrecke — dann
+    // gehört die Meldung auch dorthin und nicht an ein Feld, das fehlt.
+    const user = userEvent.setup();
+    renderWithIntl(
+      <FahrtenbuchDialog {...baseProps} vehicleId="v1" firecalls={[]} />,
+    );
+
+    await user.click(screen.getByLabelText('Fahrtzweck'));
+    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Eine leere Liste heißt „Auswahl vorhanden, nur noch keine Einsätze" —
+    // das Feld steht also da und trägt die Meldung.
+    expect(screen.getByLabelText('Einsatz')).toBeInvalid();
+    expect(
+      screen.queryByLabelText(/Fahrstrecke \/ Ziel/),
+    ).not.toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it('meldet eine für Einsatz und Fahrzeug schon erfasste Fahrt', async () => {
     const user = userEvent.setup();
     renderWithIntl(
@@ -416,10 +459,12 @@ describe('FahrtenbuchDialog', () => {
     // werden.
     await user.tab();
 
-    expect(screen.getByLabelText(/Fahrstrecke \/ Ziel/)).toHaveValue(
+    // Beim Zweck „Einsatz" steht in dieser Zeile nur das Einsatzfeld — der
+    // Text bleibt dort sichtbar und wird als Fahrtstrecke gespeichert.
+    expect(screen.getByLabelText('Einsatz')).toHaveValue(
       'N/S Ölspur Hauptstraße',
     );
-    expect(screen.getByLabelText('Einsatz')).toHaveValue('');
+    expect(screen.queryByLabelText(/Fahrstrecke \/ Ziel/)).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');

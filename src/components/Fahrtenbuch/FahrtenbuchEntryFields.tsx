@@ -40,6 +40,10 @@ export default function FahrtenbuchEntryFields({
   const t = useTranslations('fahrtenbuch');
   const format = useFormatter();
 
+  // Genau eines von beiden: das Einsatzfeld oder die Fahrtstrecke.
+  const showFirecallField =
+    form.zweck === 'einsatz' && form.hasFirecallSelection;
+
   /** Fahrer und Zeitraum einer bestehenden Fahrt, für die Hinweise. */
   const describeEntry = (entry: { driverName?: string; abfahrt: string }) =>
     t('duplicate.entry', {
@@ -137,7 +141,11 @@ export default function FahrtenbuchEntryFields({
                 />
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6 }}>
+            {/* Eigene Zeile, und darunter genau ein Feld — Einsatz oder
+                Fahrtstrecke. Vorher teilte sich der Zweck die Zeile mit dem
+                Ziel und der Einsatz nahm eine ganze: Bei jedem Wechsel des
+                Zwecks sprang das Formular um. */}
+            <Grid size={{ xs: 12 }}>
               <TextField
                 select
                 fullWidth
@@ -164,7 +172,7 @@ export default function FahrtenbuchEntryFields({
                 `hasFirecallSelection` statt Truthiness auf `firecalls`, weil
                 eine leere Liste („noch keine Einsätze geladen") das Feld zeigen
                 soll, `undefined` (Gastformular) aber nicht. */}
-            {form.zweck === 'einsatz' && form.hasFirecallSelection && (
+            {showFirecallField && (
               <Grid size={{ xs: 12 }}>
                 <Autocomplete
                   freeSolo
@@ -201,6 +209,9 @@ export default function FahrtenbuchEntryFields({
                       {...params}
                       label={t('firecall')}
                       helperText={t('firecallHint')}
+                      // Ohne verknüpften Einsatz steht dieses Feld für die
+                      // Fahrtstrecke — dann gehört die Meldung auch hierher.
+                      error={form.errors.includes('zielMissing')}
                       // Beim Verlassen wandert getippter Text ins Ziel — dort
                       // liest ihn die Liste ohnehin. Nicht beim Tippen, weil
                       // daraus noch eine Auswahl werden kann.
@@ -250,14 +261,17 @@ export default function FahrtenbuchEntryFields({
                 <Alert severity="info">{t('firecallLinkMissing')}</Alert>
               </Grid>
             )}
-            {/* Nur ohne verknüpften Einsatz — der Einsatz benennt das Ziel
-                selbst, und ein zweites Feld dafür wäre eine Angabe, die
-                niemand machen muss. Jede andere Fahrt stünde ohne das Feld
-                dagegen ohne Angabe da, wohin sie ging; dort ist es Pflicht.
-                Ausgeblendet wird es nicht bloß versteckt: `submit` schickt das
-                Ziel dann leer mit, damit kein Text wirkt, den keiner sieht. */}
-            {!form.zielCoveredByFirecall && (
-              <Grid size={{ xs: 12, sm: 6 }}>
+            {/* Die Kehrseite des Einsatzfeldes: Steht das da, benennt es die
+                Fahrt — als Verknüpfung oder als getippter Text, der hier
+                ohnehin landet. Sonst ist die Fahrtstrecke die einzige Angabe
+                dazu, wohin die Fahrt ging, und damit Pflicht. Genau eines von
+                beiden ist zu sehen, deshalb springt die Zeilenzahl nicht.
+
+                Bei verknüpftem Einsatz schickt `submit` das Ziel leer mit —
+                ausgeblendet heißt nicht versteckt, es soll kein Text wirken,
+                den keiner sieht. */}
+            {!showFirecallField && (
+              <Grid size={{ xs: 12 }}>
                 <TextField
                   fullWidth
                   required

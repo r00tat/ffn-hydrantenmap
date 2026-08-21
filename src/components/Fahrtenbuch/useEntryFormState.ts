@@ -320,13 +320,16 @@ export function useEntryFormState({
    *
    * Aufgerufen beim Verlassen des Feldes: Während des Tippens filtert der Text
    * die Liste und könnte noch zu einer Auswahl führen.
+   *
+   * Der Text bleibt dabei im Feld stehen. Beim Zweck `einsatz` ist das
+   * Einsatzfeld das einzige Feld dieser Zeile — geräumt wäre die Eingabe für
+   * den Benutzer verschwunden, obwohl sie gespeichert wird.
    */
   const commitFirecallInput = () => {
     if (firecallId) return;
     const text = firecallInput.trim();
     if (!text) return;
     setZiel(text);
-    setFirecallInput('');
   };
 
   /**

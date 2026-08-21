@@ -310,7 +310,9 @@ describe('useEntryFormState', () => {
       act(() => result.current.commitFirecallInput());
 
       expect(result.current.ziel).toBe('N/S Ölspur Hauptstraße');
-      expect(result.current.firecallInput).toBe('');
+      // Der Text bleibt im Feld stehen: Beim Zweck „Einsatz" ist es das
+      // einzige Feld dieser Zeile, geräumt wäre die Eingabe verschwunden.
+      expect(result.current.firecallInput).toBe('N/S Ölspur Hauptstraße');
       expect(result.current.firecallId).toBeUndefined();
 
       act(() => result.current.changeDriver('Max'));

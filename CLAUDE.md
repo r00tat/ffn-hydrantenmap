@@ -968,10 +968,19 @@ benutzt.
   den Zweck mit auf `einsatz` — das braucht die Vorbelegung, die greift, während
   der Zweck noch auf `sonstiges` steht. Umgekehrt räumt `changeZweck` die
   Verknüpfung: Was im Feld steht, muss dem entsprechen, was gespeichert wird.
+- **Hinter dem Zweck steht immer genau ein Feld:** das Einsatzfeld beim Zweck
+  `einsatz`, sonst die Fahrtstrecke. Der Zweck hat dafür eine eigene Zeile.
+  Vorher teilte er sie mit dem Ziel und das Einsatzfeld nahm eine ganze — das
+  Formular sprang bei jedem Wechsel des Zwecks um. Ohne verknüpften Einsatz
+  steht das Einsatzfeld für die Fahrtstrecke und trägt deshalb auch die Meldung
+  `zielMissing`; sie an ein Feld zu hängen, das gerade nicht da ist, hätte
+  niemandem geholfen.
 - **Das Einsatzfeld hält ausschließlich verknüpfte Einsätze.** Getippter Text
   wandert beim Verlassen des Feldes in die Fahrtstrecke
   (`commitFirecallInput`) — nicht während des Tippens, weil daraus noch eine
-  Auswahl werden kann. Hinter einem getippten Namen steht kein Einsatz: kein
+  Auswahl werden kann. Im Feld bleibt er stehen: Beim Zweck `einsatz` ist es das
+  einzige Feld dieser Zeile, geräumt wäre die Eingabe für den Benutzer
+  verschwunden, obwohl sie gespeichert wird. Hinter einem getippten Namen steht kein Einsatz: kein
   Ort, keine Zeiten, keine Duplikatserkennung. Als zweites Namensfeld daneben
   wäre er nur eine weitere Stelle, an der dasselbe stehen kann; als Ziel ist er
   dort, wo Liste, Export und Wochenbericht ihn ohnehin lesen
