@@ -2,7 +2,7 @@ import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
 import { Connection } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
-import { foerderungSummary } from './connection/foerderung/foerderung';
+import { versorgungSummary } from './connection/versorgungSummary';
 import { FirecallItemBase } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
@@ -32,6 +32,22 @@ export class FirecallConnection extends FirecallMultiPoint {
   elevationFor?: string;
   elevationFailed?: string;
 
+  /**
+   * Pendelverkehr und Vergleich (#693). Dieselbe Begründung wie oben: alle in
+   * `data()`, keine in `fields()`.
+   */
+  versorgungsart?: Connection['versorgungsart'];
+  pendelFahrzeuge?: number;
+  pendelTankinhalt?: number;
+  pendelGeschwindigkeit?: number;
+  pendelFuellzeit?: number;
+  pendelEntleerzeit?: number;
+  pendelRoutedPositions?: string;
+  pendelRoutedFor?: string;
+  pendelRoutingFailed?: string;
+  verlegeleistung?: number;
+  pumpenRuestzeit?: number;
+
   public constructor(firecallItem?: Connection) {
     super(firecallItem);
     this.type = 'connection';
@@ -52,6 +68,17 @@ export class FirecallConnection extends FirecallMultiPoint {
         elevationProfile: this.elevationProfile,
         elevationFor: this.elevationFor,
         elevationFailed: this.elevationFailed,
+        versorgungsart: this.versorgungsart,
+        pendelFahrzeuge: this.pendelFahrzeuge,
+        pendelTankinhalt: this.pendelTankinhalt,
+        pendelGeschwindigkeit: this.pendelGeschwindigkeit,
+        pendelFuellzeit: this.pendelFuellzeit,
+        pendelEntleerzeit: this.pendelEntleerzeit,
+        pendelRoutedPositions: this.pendelRoutedPositions,
+        pendelRoutedFor: this.pendelRoutedFor,
+        pendelRoutingFailed: this.pendelRoutingFailed,
+        verlegeleistung: this.verlegeleistung,
+        pumpenRuestzeit: this.pumpenRuestzeit,
       } = firecallItem);
     }
   }
@@ -72,12 +99,12 @@ export class FirecallConnection extends FirecallMultiPoint {
   }
 
   /**
-   * Die Zusammenfassung der Förderung, falls der Rechner aktiv ist und ein
-   * Ergebnis liefert. Steht in Popup und Elementliste, damit die Pumpenzahl
-   * nicht erst im Dialog sichtbar wird.
+   * Die Zusammenfassung der gewählten Versorgungsvariante, falls der Rechner
+   * aktiv ist und ein Ergebnis liefert. Steht in Popup und Elementliste, damit
+   * Pumpenzahl bzw. Pendelmenge nicht erst im Panel sichtbar werden.
    */
   protected foerderungHint(): string {
-    const summary = foerderungSummary(this.data() as Connection);
+    const summary = versorgungSummary(this.data() as Connection);
     return summary ? `, ${summary}` : '';
   }
 
@@ -88,7 +115,7 @@ export class FirecallConnection extends FirecallMultiPoint {
   }
 
   public popupFn(): ReactNode {
-    const summary = foerderungSummary(this.data() as Connection);
+    const summary = versorgungSummary(this.data() as Connection);
     return (
       <>
         <b>
@@ -126,6 +153,17 @@ export class FirecallConnection extends FirecallMultiPoint {
       elevationProfile: this.elevationProfile,
       elevationFor: this.elevationFor,
       elevationFailed: this.elevationFailed,
+      versorgungsart: this.versorgungsart,
+      pendelFahrzeuge: this.pendelFahrzeuge,
+      pendelTankinhalt: this.pendelTankinhalt,
+      pendelGeschwindigkeit: this.pendelGeschwindigkeit,
+      pendelFuellzeit: this.pendelFuellzeit,
+      pendelEntleerzeit: this.pendelEntleerzeit,
+      pendelRoutedPositions: this.pendelRoutedPositions,
+      pendelRoutedFor: this.pendelRoutedFor,
+      pendelRoutingFailed: this.pendelRoutingFailed,
+      verlegeleistung: this.verlegeleistung,
+      pumpenRuestzeit: this.pumpenRuestzeit,
     } as Connection;
   }
 

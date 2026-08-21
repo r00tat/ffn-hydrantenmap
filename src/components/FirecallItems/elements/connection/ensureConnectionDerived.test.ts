@@ -14,6 +14,12 @@ vi.mock('./foerderung/ensureConnectionElevation', () => ({
     ensureConnectionElevation(...(args as [])),
 }));
 
+const ensureConnectionPendelRoute = vi.fn();
+vi.mock('./pendel/ensureConnectionPendelRoute', () => ({
+  ensureConnectionPendelRoute: (...args: unknown[]) =>
+    ensureConnectionPendelRoute(...(args as [])),
+}));
+
 import { ensureConnectionDerived } from './ensureConnectionDerived';
 
 const connection = (overrides: Partial<Connection> = {}): Connection =>
@@ -31,8 +37,10 @@ describe('ensureConnectionDerived', () => {
   beforeEach(() => {
     ensureConnectionRouting.mockReset();
     ensureConnectionElevation.mockReset();
+    ensureConnectionPendelRoute.mockReset();
     ensureConnectionRouting.mockResolvedValue(undefined);
     ensureConnectionElevation.mockResolvedValue(undefined);
+    ensureConnectionPendelRoute.mockResolvedValue(undefined);
   });
 
   it('routet zuerst und tastet danach ab', async () => {
@@ -45,10 +53,14 @@ describe('ensureConnectionDerived', () => {
       order.push('elevation');
       return undefined;
     });
+    ensureConnectionPendelRoute.mockImplementation(async () => {
+      order.push('pendel');
+      return undefined;
+    });
 
     await ensureConnectionDerived('einsatz-1', connection());
 
-    expect(order).toEqual(['routing', 'elevation']);
+    expect(order).toEqual(['routing', 'elevation', 'pendel']);
   });
 
   it('gibt dem Höhenprofil die vom Routing geschriebene Geometrie mit', async () => {
@@ -78,6 +90,19 @@ describe('ensureConnectionDerived', () => {
     expect(ensureConnectionElevation).toHaveBeenCalledWith(
       'einsatz-1',
       expect.objectContaining({ id: 'leitung-1' })
+    );
+  });
+
+  it('gibt der Fahrtroute ebenfalls die geroutete Geometrie mit', async () => {
+    // Die Route hängt nur an den Enden — die Enden stehen aber im Element, und
+    // eine halbe Kopie wäre eine Falle für die nächste Änderung hier.
+    ensureConnectionRouting.mockResolvedValue({ distance: 1113 });
+
+    await ensureConnectionDerived('einsatz-1', connection());
+
+    expect(ensureConnectionPendelRoute).toHaveBeenCalledWith(
+      'einsatz-1',
+      expect.objectContaining({ id: 'leitung-1', distance: 1113 })
     );
   });
 });

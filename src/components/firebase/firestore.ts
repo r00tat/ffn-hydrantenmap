@@ -326,6 +326,40 @@ export interface Connection extends MultiPointItem {
   elevationFor?: string;
   /** `'true'`, wenn die Höhenabfrage für diese Signatur gescheitert ist. */
   elevationFailed?: string;
+
+  /**
+   * Welche Variante der Löschwasserversorgung der Rechner an dieser Leitung
+   * zeigt und zusammenfasst. Fehlt das Feld, gilt `'foerderung'` — der Stand
+   * vor #693. Siehe docs/pendelverkehr.md.
+   */
+  versorgungsart?: 'foerderung' | 'pendel' | 'vergleich';
+  /** Anzahl der pendelnden Tanklöschfahrzeuge. */
+  pendelFahrzeuge?: number;
+  /** Tankinhalt je Fahrzeug in l. */
+  pendelTankinhalt?: number;
+  /** Durchschnittsgeschwindigkeit der Einsatzfahrt in km/h. */
+  pendelGeschwindigkeit?: number;
+  /** Füllzeit an der Entnahmestelle in min. */
+  pendelFuellzeit?: number;
+  /** Entleerzeit an der Einsatzstelle in min. */
+  pendelEntleerzeit?: number;
+  /**
+   * Fahrtroute des Pendelverkehrs — stringified LatLngPosition[], geroutet mit
+   * dem Profil `drive`.
+   *
+   * Ein eigener Satz Felder neben `routedPositions`: Die Fahrt ist nicht der
+   * Schlauchweg. Sie führt nur von einem Ende zum anderen, hält sich an
+   * Einbahnen und benutzt keine Fußwege.
+   */
+  pendelRoutedPositions?: string;
+  /** Signatur der Enden, für die `pendelRoutedPositions` gilt. */
+  pendelRoutedFor?: string;
+  /** `'true'`, wenn das Fahr-Routing für diese Signatur gescheitert ist. */
+  pendelRoutingFailed?: string;
+  /** Verlegeleistung einer B-Leitung in m/min — Planungswert für die Aufbauzeit. */
+  verlegeleistung?: number;
+  /** Rüstzeit je Pumpe in min — Planungswert für die Aufbauzeit. */
+  pumpenRuestzeit?: number;
 }
 
 export interface Area extends MultiPointItem {

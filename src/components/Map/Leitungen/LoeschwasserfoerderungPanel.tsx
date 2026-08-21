@@ -1,16 +1,11 @@
 'use client';
 
 import CloseIcon from '@mui/icons-material/Close';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import Accordion from '@mui/material/Accordion';
-import AccordionDetails from '@mui/material/AccordionDetails';
-import AccordionSummary from '@mui/material/AccordionSummary';
-import Alert from '@mui/material/Alert';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
@@ -20,11 +15,6 @@ import Paper from '@mui/material/Paper';
 import Portal from '@mui/material/Portal';
 import Slider from '@mui/material/Slider';
 import Switch from '@mui/material/Switch';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
@@ -46,44 +36,69 @@ import {
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import { elevationTodo } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import { ensureConnectionElevation } from '../../FirecallItems/elements/connection/foerderung/ensureConnectionElevation';
-import FoerderungProfileChart from './FoerderungProfileChart';
+import { ensureConnectionPendelRoute } from '../../FirecallItems/elements/connection/pendel/ensureConnectionPendelRoute';
+import {
+  pendelRoutingTodo,
+  versorgungsart,
+  type Versorgungsart,
+} from '../../FirecallItems/elements/connection/pendel/pendelRoute';
+import {
+  pendelParams,
+  pendelView,
+  type PendelParams,
+} from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
+import {
+  versorgungVergleich,
+  type VergleichAnnahmen,
+} from '../../FirecallItems/elements/connection/pendel/versorgungVergleich';
+import FoerderungSection from './FoerderungSection';
+import PendelSection from './PendelSection';
+import VergleichSection from './VergleichSection';
 import { buildFoerderungDiaryEntry } from './foerderungDiaryEntry';
+import { parseNumber, round } from './panelNumbers';
 
 /**
- * Der Rechner für die Löschwasserförderung an einer Leitung.
+ * Der Rechner für die Löschwasserversorgung an einer Leitung: Förderung über
+ * lange Wegstrecke, Pendelverkehr und der Vergleich der beiden.
  *
  * Ein schwebendes Panel über der Karte, **nicht modal**: Beim Schieben des
- * Reglers wandern die Pumpen auf der Leitung mit, und genau das will man dabei
- * sehen. Ein bildschirmfüllender Dialog verdeckte die Karte — am Handy war er
- * von einer eigenen Seite nicht zu unterscheiden.
+ * Reglers wandern Pumpen und Fahrtroute auf der Karte mit, und genau das will
+ * man dabei sehen. Ein bildschirmfüllender Dialog verdeckte die Karte — am
+ * Handy war er von einer eigenen Seite nicht zu unterscheiden.
  *
  * Über einen Portal an `document.body` gehängt, damit Leaflet die Klicks im
  * Panel nicht als Kartenklicks sieht. Einklappbar, weil das Panel offen bleibt,
  * während man die Karte verschiebt.
  *
+ * Hier steht nur der Rahmen: Kopfzeile, Modus, Förderrichtung, die geforderte
+ * Menge und das Speichern. Was die jeweilige Variante beantwortet, steht in
+ * `FoerderungSection`, `PendelSection` und `VergleichSection` — mit allen drei
+ * in einer Datei wären es über 1200 Zeilen.
+ *
  * Jede Änderung rechnet sofort neu, ohne zu speichern. Gespeichert wird mit
  * „Übernehmen" und beim Ablegen der Pumpen.
  */
 
-const OUTPUT_PRESSURES = [6, 8, 10];
 const FLOW_MIN = 200;
 const FLOW_MAX = 2000;
 const FLOW_STEP = 50;
+
+/**
+ * Die Aufschriften stehen hier als Paare und nicht als `t(`mode_${value}`)`:
+ * next-intl typisiert die Schlüssel statisch, ein zusammengesetzter Schlüssel
+ * ist damit kein Schlüssel.
+ */
+const MODES: { value: Versorgungsart; label: 'modeRelay' | 'modeShuttle' | 'modeComparison' }[] = [
+  { value: 'foerderung', label: 'modeRelay' },
+  { value: 'pendel', label: 'modeShuttle' },
+  { value: 'vergleich', label: 'modeComparison' },
+];
 
 export interface LoeschwasserfoerderungPanelProps {
   item: Connection;
   open: boolean;
   onClose: () => void;
 }
-
-/** Eine Zahl aus einem Textfeld; leere Eingabe behält den alten Wert. */
-const parseNumber = (value: string, fallback: number): number => {
-  const parsed = Number(value.replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const round = (value: number, digits = 1): number =>
-  Math.round(value * 10 ** digits) / 10 ** digits;
 
 export default function LoeschwasserfoerderungPanel({
   item,
@@ -102,29 +117,45 @@ export default function LoeschwasserfoerderungPanel({
   // Ergebnis sehen und nicht erst einen Schalter finden. Der Schalter bleibt für
   // den umgekehrten Weg — den Rechner an dieser Leitung wieder abzuschalten.
   const [enabled, setEnabled] = useState(true);
+  const [mode, setMode] = useState<Versorgungsart>(() => versorgungsart(item));
   const [reversed, setReversed] = useState(item.foerderungUmgekehrt === 'true');
   const [params, setParams] = useState<FoerderungParams>(() =>
     foerderungParams(item)
   );
+  const [pendel, setPendel] = useState<PendelParams>(() => pendelParams(item));
+  const [annahmen, setAnnahmen] = useState<Partial<VergleichAnnahmen>>(() => ({
+    verlegeleistung: item.verlegeleistung,
+    pumpenRuestzeit: item.pumpenRuestzeit,
+  }));
   const [manualClimb, setManualClimb] = useState(item.hoehenunterschied ?? 0);
   const [placed, setPlaced] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [elevationBusy, setElevationBusy] = useState(false);
+  const [derivedBusy, setDerivedBusy] = useState(false);
 
   // Der Rechner arbeitet auf einer Kopie mit den Werten aus dem Panel: So
   // rechnet der Regler, ohne dass jede Bewegung nach Firestore geht.
-  const view = useMemo(
+  const draft = useMemo(
     () =>
-      foerderungView(
-        {
-          ...item,
-          foerderung: enabled ? 'true' : 'false',
-          foerderungUmgekehrt: reversed ? 'true' : 'false',
-          hoehenunterschied: manualClimb,
-        } as Connection,
-        params
-      ),
-    [item, enabled, reversed, manualClimb, params]
+      ({
+        ...item,
+        foerderung: enabled ? 'true' : 'false',
+        foerderungUmgekehrt: reversed ? 'true' : 'false',
+        versorgungsart: mode,
+        hoehenunterschied: manualClimb,
+      }) as Connection,
+    [item, enabled, reversed, mode, manualClimb]
+  );
+
+  const view = useMemo(() => foerderungView(draft, params), [draft, params]);
+  // Auch im Modus „Förderung" nicht gerechnet: Der Pendelverkehr braucht die
+  // Fahrtroute, und die wird dort nicht abgefragt.
+  const pendelResult = useMemo(
+    () => pendelView(draft, pendel, params.foerderMenge),
+    [draft, pendel, params.foerderMenge]
+  );
+  const vergleich = useMemo(
+    () => versorgungVergleich(view, pendelResult, annahmen),
+    [view, pendelResult, annahmen]
   );
 
   const set = <K extends keyof FoerderungParams>(
@@ -132,58 +163,88 @@ export default function LoeschwasserfoerderungPanel({
     value: FoerderungParams[K]
   ) => setParams((previous) => ({ ...previous, [key]: value }));
 
+  const setPendelValue = <K extends keyof PendelParams>(
+    key: K,
+    value: PendelParams[K]
+  ) => setPendel((previous) => ({ ...previous, [key]: value }));
+
+  const setAnnahme = <K extends keyof VergleichAnnahmen>(
+    key: K,
+    value: number
+  ) => setAnnahmen((previous) => ({ ...previous, [key]: value }));
+
   const persist = async () => {
     await updateItem({
       ...item,
       foerderung: enabled ? 'true' : 'false',
       foerderungUmgekehrt: reversed ? 'true' : 'false',
+      versorgungsart: mode,
       ...params,
+      pendelFahrzeuge: pendel.fahrzeuge,
+      pendelTankinhalt: pendel.tankinhalt,
+      pendelGeschwindigkeit: pendel.geschwindigkeit,
+      pendelFuellzeit: pendel.fuellzeit,
+      pendelEntleerzeit: pendel.entleerzeit,
+      verlegeleistung: annahmen.verlegeleistung,
+      pumpenRuestzeit: annahmen.pumpenRuestzeit,
       hoehenunterschied: manualClimb,
     } as Connection);
   };
 
-  // Höhendaten kommen, sobald das Panel offen ist — nicht erst nach dem
-  // Speichern. Sie hängen an `foerderung === 'true'`: Eine gewöhnliche Leitung
-  // soll keine Abfrage kosten, und bis zum Einschalten gibt es folglich keine.
-  // Genau das stand bisher als „keine Höhendaten" da, obwohl es welche gibt.
+  // Höhendaten und Fahrtroute kommen, sobald das Panel offen ist — nicht erst
+  // nach dem Speichern. Beide hängen an Feldern am Element: die Höhen an
+  // `foerderung === 'true'`, die Route zusätzlich an der Versorgungsart. Eine
+  // gewöhnliche Leitung soll keine Abfrage kosten, und bis zum Einschalten gibt
+  // es folglich keine. Genau das stand bisher als „keine Höhendaten" da, obwohl
+  // es welche gibt.
   //
-  // Zwei Wege, je nachdem, was am Element steht: Ist der Rechner noch nicht
-  // gespeichert, speichert das Einschalten ihn — und `ensureConnectionDerived`
-  // zieht dabei Straßenverlauf und Höhenprofil mit nach. Steht er schon, fehlt
-  // nur das Profil, und das wird direkt geholt.
+  // Zwei Wege, je nachdem, was am Element steht: Weicht der gespeicherte Stand
+  // von dem im Panel ab, speichert das Panel — und `ensureConnectionDerived`
+  // zieht dabei Straßenverlauf, Höhenprofil und Fahrtroute mit nach. Stimmt er,
+  // fehlt nur das Abgeleitete, und das wird direkt geholt.
   //
   // `itemRef` statt `item` in den Abhängigkeiten: `item` ist bei jedem Render
   // ein neues Objekt (`record.data()`) und als Abhängigkeit eine Endlosschleife.
   const itemRef = useRef(item);
   itemRef.current = item;
   const runningRef = useRef(false);
-  const storedEnabled = item.foerderung === 'true';
-  const needsElevation =
-    elevationTodo({ ...item, foerderung: 'true' } as Connection) === 'fetch';
+  const storedItem = { ...item, foerderung: 'true', versorgungsart: mode };
+  const storedMatches =
+    item.foerderung === 'true' && versorgungsart(item) === mode;
+  const needsElevation = elevationTodo(storedItem as Connection) === 'fetch';
+  const needsPendelRoute =
+    pendelRoutingTodo(storedItem as Connection) === 'route';
 
   useEffect(() => {
     if (!open || !enabled) return;
-    if (storedEnabled && !needsElevation) return;
+    if (storedMatches && !needsElevation && !needsPendelRoute) return;
     if (runningRef.current) return;
 
     let cancelled = false;
     runningRef.current = true;
-    setElevationBusy(true);
+    setDerivedBusy(true);
     (async () => {
       try {
-        if (!storedEnabled) {
+        if (!storedMatches) {
           await persist();
         } else {
-          await ensureConnectionElevation(firecallId, {
+          const current = {
             ...itemRef.current,
             foerderung: 'true',
-          } as Connection);
+            versorgungsart: mode,
+          } as Connection;
+          if (needsElevation) {
+            await ensureConnectionElevation(firecallId, current);
+          }
+          if (needsPendelRoute) {
+            await ensureConnectionPendelRoute(firecallId, current);
+          }
         }
       } catch (err) {
-        console.error('unable to prepare foerderung', err);
+        console.error('unable to prepare versorgung', err);
       } finally {
         runningRef.current = false;
-        if (!cancelled) setElevationBusy(false);
+        if (!cancelled) setDerivedBusy(false);
       }
     })();
 
@@ -193,7 +254,15 @@ export default function LoeschwasserfoerderungPanel({
     // `persist` hängt an `item` und allen Panel-Werten und wäre bei jedem Render
     // neu; die Bedingungen oben sind vollständig.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, enabled, storedEnabled, needsElevation, firecallId]);
+  }, [
+    open,
+    enabled,
+    mode,
+    storedMatches,
+    needsElevation,
+    needsPendelRoute,
+    firecallId,
+  ]);
 
   // Speichert und lässt das Panel offen: Es ist nicht modal, und wer die Werte
   // festhält, will meist weiter an der Lage arbeiten, nicht das Panel loswerden.
@@ -340,10 +409,30 @@ export default function LoeschwasserfoerderungPanel({
 
             {view && (
               <>
-                {/* Die Richtung steht über allem anderen: Eine Leitung wird
+                {/* Welche Variante gerechnet wird, steht ganz oben: Die Frage
+                    „Leitung legen oder pendeln?" kommt vor allen Zahlen. */}
+                <ToggleButtonGroup
+                  exclusive
+                  fullWidth
+                  size="small"
+                  value={mode}
+                  onChange={(_event, value) =>
+                    value !== null && setMode(value as Versorgungsart)
+                  }
+                  sx={{ mb: 1.5 }}
+                >
+                  {MODES.map(({ value, label }) => (
+                    <ToggleButton key={value} value={value}>
+                      {t(label)}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+
+                {/* Die Richtung steht über den Zahlen: Eine Leitung wird
                     gezeichnet, wie es gerade passt, und ob es die Steigung
-                    hinauf oder hinunter geht, entscheidet über die
-                    Pumpenzahl. */}
+                    hinauf oder hinunter geht, entscheidet über die Pumpenzahl.
+                    Beim Pendelverkehr entscheidet sie, welches Ende die
+                    Entnahmestelle ist. */}
                 <Box
                   sx={{
                     display: 'flex',
@@ -391,7 +480,7 @@ export default function LoeschwasserfoerderungPanel({
                   </Tooltip>
                 </Box>
 
-                {elevationBusy && (
+                {derivedBusy && (
                   <Box sx={{ mb: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">
                       {t('elevationLoading')}
@@ -400,9 +489,10 @@ export default function LoeschwasserfoerderungPanel({
                   </Box>
                 )}
 
-                {/* Regler und Antwort stehen zusammen ganz oben: Der Zweck des
-                    Panels ist, die Pumpenzahl auf die Literleistung reagieren zu
-                    sehen. Alles Übrige liegt darunter oder in Aufklappern. */}
+                {/* Die geforderte Menge gilt für beide Varianten — sie ist die
+                    Anforderung an der Einsatzstelle und keine Eigenschaft eines
+                    Fördermittels. Deshalb steht der Regler im Rahmen und nicht
+                    in einer der Sektionen. */}
                 <Typography variant="caption" color="text.secondary">
                   {t('flow')} ({t('flowUnit')})
                 </Typography>
@@ -443,324 +533,36 @@ export default function LoeschwasserfoerderungPanel({
                   </Grid>
                 </Grid>
 
-                {view.result && (
-                  <Box sx={{ mt: 1.5 }}>
-                    <Typography variant="h5">
-                      {t('boosterPumps', {
-                        count: view.result.verstaerkerpumpen,
-                      })}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {t('endPressure')}: {round(view.result.enddruck)}{' '}
-                      {t('bar')}
-                    </Typography>
-                  </Box>
+                {mode === 'foerderung' && (
+                  <FoerderungSection
+                    item={item}
+                    view={view}
+                    params={params}
+                    onParamChange={set}
+                    manualClimb={manualClimb}
+                    onManualClimbChange={setManualClimb}
+                    elevationBusy={derivedBusy}
+                  />
                 )}
 
-                {/* Solange die Höhen noch unterwegs sind, wäre „keine
-                    Höhendaten" bloß voreilig — der Ladehinweis oben sagt es
-                    schon richtig. */}
-                {view.warnings
-                  .filter(
-                    (warning) =>
-                      !(elevationBusy && warning === 'noElevationData')
-                  )
-                  .map((warning) => (
-                    <Alert
-                      key={warning}
-                      severity={
-                        warning === 'noElevationData' ? 'info' : 'warning'
-                      }
-                      sx={{ mt: 1.5 }}
-                    >
-                      {warning === 'unknownDimension' &&
-                        t('warningUnknownDimension', {
-                          dimension: view.dimension,
-                        })}
-                      {warning === 'noElevationData' &&
-                        t('warningNoElevationData')}
-                      {warning === 'flowAbovePumpRating' &&
-                        t('warningFlowAbovePumpRating', {
-                          rating: params.pumpenNennstrom,
-                        })}
-                      {warning === 'notFeasible' && t('warningNotFeasible')}
-                    </Alert>
-                  ))}
-
-                {view.result && (
-                  <>
-                    <Grid container spacing={1} sx={{ mt: 1.5 }}>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('friction')}
-                        </Typography>
-                        <Typography variant="body2">
-                          {t('frictionPer100m', {
-                            value: round(view.frictionPer100m ?? 0, 2),
-                          })}
-                          {!view.frictionTabulated && (
-                            <Tooltip title={t('frictionDerivedHint')}>
-                              <Chip
-                                size="small"
-                                label={t('frictionDerived')}
-                                sx={{ ml: 0.5 }}
-                              />
-                            </Tooltip>
-                          )}
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('hoseCount')}
-                        </Typography>
-                        <Typography variant="body2">
-                          {t('hoseCountValue', {
-                            count: view.hoseCount,
-                            dimension: view.dimension,
-                          })}
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('frictionTotal')}
-                        </Typography>
-                        <Typography variant="body2">
-                          {round(view.result.reibungsverlustBar)} {t('bar')}
-                        </Typography>
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {t('elevationTotal')}
-                        </Typography>
-                        <Typography variant="body2">
-                          {round(view.result.hoehenverlustBar)} {t('bar')}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-
-                    <Box sx={{ mt: 1.5 }}>
-                      <FoerderungProfileChart view={view} />
-                    </Box>
-                  </>
+                {mode === 'pendel' && pendelResult && (
+                  <PendelSection
+                    view={pendelResult}
+                    params={pendel}
+                    onParamChange={setPendelValue}
+                    routeBusy={derivedBusy}
+                  />
                 )}
 
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2">{t('situation')}</Typography>
-                <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                  <Grid size={{ xs: 6 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('length')}
-                    </Typography>
-                    <Typography variant="body2">
-                      {Math.round(view.length)} m
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('dimension')}
-                    </Typography>
-                    <Typography variant="body2">{view.dimension}</Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('hoseLength')}
-                    </Typography>
-                    <Typography variant="body2">
-                      {item.oneHozeLength || 20} m
-                    </Typography>
-                  </Grid>
-                  <Grid size={{ xs: 6 }}>
-                    <TextField
-                      size="small"
-                      type="number"
-                      fullWidth
-                      disabled={hasProfile}
-                      label={`${t('elevationDifference')} (${t('metre')})`}
-                      value={hasProfile ? round(view.hoehenunterschied) : manualClimb}
-                      onChange={(event) =>
-                        setManualClimb(
-                          parseNumber(event.target.value, manualClimb)
-                        )
-                      }
-                    />
-                  </Grid>
-                </Grid>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: 'block', mt: 0.5 }}
-                >
-                  {hasProfile
-                    ? t('elevationSourceProfile')
-                    : t('elevationSourceManual')}
-                </Typography>
-                {hasProfile && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block' }}
-                  >
-                    {t('elevationLockedHint')}
-                  </Typography>
+                {mode === 'vergleich' && (
+                  <VergleichSection
+                    vergleich={vergleich}
+                    foerderung={view}
+                    pendel={pendelResult}
+                    annahmen={annahmen}
+                    onAnnahmeChange={setAnnahme}
+                  />
                 )}
-
-                <Accordion disableGutters elevation={0} sx={{ mt: 1.5 }}>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle2">
-                      {t('moreValues')}
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('outputPressure')} ({t('bar')})
-                    </Typography>
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      value={params.pumpenAusgangsdruck}
-                      onChange={(_event, value) =>
-                        value !== null &&
-                        set('pumpenAusgangsdruck', value as number)
-                      }
-                      sx={{ display: 'block', mt: 0.5, mb: 2 }}
-                    >
-                      {OUTPUT_PRESSURES.map((pressure) => (
-                        <ToggleButton key={pressure} value={pressure}>
-                          {pressure} {t('bar')}
-                        </ToggleButton>
-                      ))}
-                    </ToggleButtonGroup>
-
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          size="small"
-                          type="number"
-                          fullWidth
-                          label={`${t('targetPressure')} (${t('bar')})`}
-                          value={params.zielDruck}
-                          helperText={t('targetPressureHint')}
-                          onChange={(event) =>
-                            set(
-                              'zielDruck',
-                              parseNumber(event.target.value, params.zielDruck)
-                            )
-                          }
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          size="small"
-                          type="number"
-                          fullWidth
-                          label={`${t('inputPressure')} (${t('bar')})`}
-                          value={params.pumpenEingangsdruck}
-                          onChange={(event) =>
-                            set(
-                              'pumpenEingangsdruck',
-                              parseNumber(
-                                event.target.value,
-                                params.pumpenEingangsdruck
-                              )
-                            )
-                          }
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          size="small"
-                          type="number"
-                          fullWidth
-                          label={`${t('pumpRating')} (${t('flowUnit')})`}
-                          value={params.pumpenNennstrom}
-                          onChange={(event) =>
-                            set(
-                              'pumpenNennstrom',
-                              parseNumber(
-                                event.target.value,
-                                params.pumpenNennstrom
-                              )
-                            )
-                          }
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 6 }}>
-                        <TextField
-                          size="small"
-                          type="number"
-                          fullWidth
-                          label={t('parallelLines')}
-                          value={params.paralleleLeitungen}
-                          helperText={t('parallelLinesHint')}
-                          onChange={(event) =>
-                            set(
-                              'paralleleLeitungen',
-                              parseNumber(
-                                event.target.value,
-                                params.paralleleLeitungen
-                              )
-                            )
-                          }
-                        />
-                      </Grid>
-                    </Grid>
-                  </AccordionDetails>
-                </Accordion>
-
-                {view.result && (
-                  <Accordion disableGutters elevation={0}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography variant="subtitle2">
-                        {t('sections')}
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ px: 0 }}>
-                      <Box sx={{ overflowX: 'auto' }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell>{t('sectionFrom')}</TableCell>
-                              <TableCell>{t('sectionTo')}</TableCell>
-                              <TableCell align="right">
-                                {t('sectionElevation')}
-                              </TableCell>
-                              <TableCell align="right">
-                                {t('sectionLoss')}
-                              </TableCell>
-                              <TableCell align="right">
-                                {t('sectionEndPressure')}
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {view.result.abschnitte.map((abschnitt) => (
-                              <TableRow
-                                key={`${abschnitt.vonMeter}-${abschnitt.bisMeter}`}
-                              >
-                                <TableCell>
-                                  {Math.round(abschnitt.vonMeter)} m
-                                </TableCell>
-                                <TableCell>
-                                  {Math.round(abschnitt.bisMeter)} m
-                                </TableCell>
-                                <TableCell align="right">
-                                  {round(abschnitt.hoehenunterschied)} m
-                                </TableCell>
-                                <TableCell align="right">
-                                  {round(abschnitt.druckverlust)}
-                                </TableCell>
-                                <TableCell align="right">
-                                  {round(abschnitt.enddruck)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
-                )}
-
               </>
             )}
           </Box>
@@ -778,19 +580,24 @@ export default function LoeschwasserfoerderungPanel({
                 justifyContent: 'flex-end',
               }}
             >
-              {/* Ein disabled Button braucht im Tooltip einen span-Wrapper,
+              {/* Nur, wo Pumpen gerechnet werden. Ein „Pumpen ablegen" im
+                  Pendelverkehr legte Standorte einer Leitung ab, die gar nicht
+                  gelegt wird.
+                  Ein disabled Button braucht im Tooltip einen span-Wrapper,
                   sonst feuert er keine Events und MUI warnt. */}
-              <Tooltip title={t('placePumpsHint')}>
-                <span>
-                  <Button
-                    size="small"
-                    onClick={handlePlacePumps}
-                    disabled={!view?.result || placed}
-                  >
-                    {placed ? t('placePumpsDone') : t('placePumps')}
-                  </Button>
-                </span>
-              </Tooltip>
+              {mode !== 'pendel' && (
+                <Tooltip title={t('placePumpsHint')}>
+                  <span>
+                    <Button
+                      size="small"
+                      onClick={handlePlacePumps}
+                      disabled={!view?.result || placed}
+                    >
+                      {placed ? t('placePumpsDone') : t('placePumps')}
+                    </Button>
+                  </span>
+                </Tooltip>
+              )}
               <Button size="small" onClick={handleApply} variant="contained">
                 {t('save')}
               </Button>

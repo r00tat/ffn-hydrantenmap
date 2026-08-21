@@ -38,7 +38,21 @@ vi.mock(
   })
 );
 
+// Dasselbe gilt für die Fahrtroute des Pendelverkehrs: Server-Action plus
+// Firestore-Client. Ohne den Mock scheitert schon das Laden des Moduls.
+const ensurePendelRoute = vi.fn((_firecallId: string, _item: unknown) =>
+  Promise.resolve(undefined)
+);
+vi.mock(
+  '../../FirecallItems/elements/connection/pendel/ensureConnectionPendelRoute',
+  () => ({
+    ensureConnectionPendelRoute: (firecallId: string, item: unknown) =>
+      ensurePendelRoute(firecallId, item),
+  })
+);
+
 import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import { routingSignature } from '../../FirecallItems/elements/connection/routedPath';
 import LoeschwasserfoerderungPanel from './LoeschwasserfoerderungPanel';
 
 const entnahme: LatLngPosition = [47.9482, 16.8482];
@@ -72,6 +86,20 @@ const withProfile = (overrides: Partial<Connection> = {}): Connection => {
   } as Connection;
 };
 
+/**
+ * Dieselbe Leitung mit Profil **und** gespeicherter Fahrtroute, damit der
+ * Pendelverkehr nicht auf der Luftlinienschätzung rechnet.
+ */
+const withRoute = (overrides: Partial<Connection> = {}): Connection => {
+  const base = withProfile(overrides);
+  const endpoints = [entnahme, verteiler];
+  return {
+    ...base,
+    pendelRoutedPositions: JSON.stringify(endpoints),
+    pendelRoutedFor: routingSignature(endpoints, 'drive'),
+  } as Connection;
+};
+
 const pumpCount = () =>
   Number(
     /(\d+)/.exec(
@@ -85,6 +113,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     updateItem.mockClear();
     showSnackbar.mockClear();
     ensureElevation.mockClear();
+    ensurePendelRoute.mockClear();
   });
 
   it('zeigt Lage und Ergebnis aus dem gespeicherten Profil', () => {
@@ -106,7 +135,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     expect(pumpCount()).toBeGreaterThan(0);
   });
 
-  it('rechnet die Pumpenzahl bei einer neuen Fördermenge neu', async () => {
+  it('rechnet die Pumpenzahl bei einer neuen geforderten Menge neu', async () => {
     const user = userEvent.setup();
     renderWithIntl(
       <LoeschwasserfoerderungPanel
@@ -117,7 +146,11 @@ describe('LoeschwasserfoerderungPanel', () => {
     );
 
     const before = pumpCount();
-    const flowField = screen.getByRole('spinbutton', { name: /Fördermenge/ });
+    // Die Menge heißt „Geforderte Menge": Sie ist die Anforderung an der
+    // Einsatzstelle und gilt für Förderung wie Pendelverkehr.
+    const flowField = screen.getByRole('spinbutton', {
+      name: /Geforderte Menge/,
+    });
     await user.clear(flowField);
     await user.type(flowField, '1600');
 
@@ -352,6 +385,135 @@ describe('LoeschwasserfoerderungPanel', () => {
         expect.objectContaining({ foerderungUmgekehrt: 'true' })
       )
     );
+  });
+
+  it('schaltet auf Pendelverkehr um und rechnet dort', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    // 2000 m Fahrtroute, 2 Fahrzeuge à 2000 l, 40 km/h, 4 + 3 min ⇒ Umlauf
+    // 13 min, gedeckelt von der Entnahmestelle auf 500 l/min.
+    expect(screen.getByText(/l\/min dauerhaft/)).toBeInTheDocument();
+    expect(screen.getByText(/^Umlaufzeit: 13/)).toBeInTheDocument();
+    // Keine Pumpenzahl mehr — in dieser Lage wird keine Leitung gelegt.
+    expect(screen.queryByText(/Verstärkerpumpen?$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Pumpen als Marker ablegen' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Förderung' }));
+    expect(screen.getByText(/Verstärkerpumpen?$/)).toBeInTheDocument();
+  });
+
+  it('speichert die gewählte Versorgungsart', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute()}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Pendelverkehr' }));
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({ versorgungsart: 'pendel' })
+      )
+    );
+  });
+
+  it('warnt im Pendelverkehr, wenn die Entnahmestelle deckelt', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'pendel', pendelFahrzeuge: 8 })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Entnahmestelle gibt nur 500 l\/min her/)
+    ).toBeInTheDocument();
+    // Mit weniger Fahrzeugen greift die Schranke nicht.
+    const field = screen.getByRole('spinbutton', { name: 'Tanklöschfahrzeuge' });
+    await user.clear(field);
+    await user.type(field, '2');
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Entnahmestelle gibt nur/)
+      ).not.toBeInTheDocument()
+    );
+  });
+
+  it('stellt im Vergleich beide Varianten gegenüber und empfiehlt eine', () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'vergleich', foerderMenge: 400 })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Menge')).toBeInTheDocument();
+    expect(screen.getByText('Aufbauzeit')).toBeInTheDocument();
+    expect(screen.getByText('Gebundene Fahrzeuge')).toBeInTheDocument();
+    expect(screen.getByText('Engstelle')).toBeInTheDocument();
+    expect(
+      screen.getByText(/trägt die Lage|trägt .* dauerhaft|Entscheidung fällt/)
+    ).toBeInTheDocument();
+  });
+
+  it('kennzeichnet die Annahmen der Aufbauzeit als Planungswerte', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'vergleich' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: /Annahmen zur Aufbauzeit/ })
+    );
+    expect(screen.getByText(/stehen in keiner Unterlage/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('spinbutton', { name: /Verlegeleistung/ })
+    ).toHaveValue(100);
+  });
+
+  it('holt die Fahrtroute nach, sobald der Pendelverkehr gewählt ist', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    await waitFor(() => expect(ensurePendelRoute).toHaveBeenCalled());
+  });
+
+  it('kostet ohne Pendelverkehr keine Fahrt-Abfrage', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    await waitFor(() => expect(pumpCount()).toBeGreaterThan(0));
+    expect(ensurePendelRoute).not.toHaveBeenCalled();
   });
 
   it('nennt keine Quelle mehr im Panel', () => {

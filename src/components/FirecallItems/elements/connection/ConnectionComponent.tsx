@@ -30,6 +30,8 @@ import PointContextMenu from '../PointContextMenu';
 // aufgelöst.
 import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/LoeschwasserfoerderungPanel';
 import { foerderungView } from './foerderung/foerderung';
+import { versorgungsart } from './pendel/pendelRoute';
+import { pendelView } from './pendel/pendelverkehr';
 import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
@@ -122,6 +124,7 @@ export default function ConnectionMarker({
   const paralleleLeitungen = record.get<number>('paralleleLeitungen');
   const elevationFor = record.get<string>('elevationFor');
   const elevationProfileField = record.get<string>('elevationProfile');
+  const mode = versorgungsart(record.data() as Connection);
   const foerderungResult = useMemo(
     () =>
       foerderung === 'true'
@@ -142,6 +145,28 @@ export default function ConnectionMarker({
       paralleleLeitungen,
       elevationFor,
       elevationProfileField,
+    ]
+  );
+
+  // Die Fahrtroute des Pendelverkehrs. Sie liegt am Element und wird nur
+  // gezeichnet, nicht neu berechnet — dasselbe Muster wie beim Straßenverlauf
+  // des Schlauchs. Gezeichnet, damit die Meterzahl im Panel nachprüfbar ist:
+  // Eine Strecke, die niemand sehen kann, ist im Einsatz eine Behauptung.
+  const pendelRoutedFor = record.get<string>('pendelRoutedFor');
+  const pendelRoutedPositionsField = record.get<string>('pendelRoutedPositions');
+  const pendelFahrzeuge = record.get<number>('pendelFahrzeuge');
+  const pendelResult = useMemo(
+    () => pendelView(record.data() as Connection),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      positions,
+      foerderung,
+      foerderungUmgekehrt,
+      mode,
+      foerderMenge,
+      pendelFahrzeuge,
+      pendelRoutedFor,
+      pendelRoutedPositionsField,
     ]
   );
 
@@ -311,8 +336,32 @@ export default function ConnectionMarker({
         </Popup>
       </Polyline>
 
-      {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung. */}
-      {foerderungResult?.pumps.map((pump, index) => (
+      {/* Die Fahrtroute des Pendelverkehrs: gestrichelt und in anderer Farbe
+          als der Schlauchweg — es sind zwei verschiedene Wege. */}
+      {mode !== 'foerderung' && pendelResult?.routedPositions && (
+        <Polyline
+          positions={pendelResult.routedPositions}
+          {...(pane ? { pane } : {})}
+          pathOptions={{
+            color: '#c62828',
+            weight: 3,
+            dashArray: '8 6',
+            opacity: 0.9,
+          }}
+        >
+          <Popup>
+            <div>
+              <strong>{tf('driveDistance')}</strong>
+            </div>
+            {Math.round(pendelResult.strecke)} m
+          </Popup>
+        </Polyline>
+      )}
+
+      {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung.
+          Im reinen Pendelverkehr weichen sie — dort wird keine Leitung gelegt. */}
+      {mode !== 'pendel' &&
+        foerderungResult?.pumps.map((pump, index) => (
         <Marker
           key={`pumpe-${index}`}
           position={pump.position}
@@ -346,7 +395,7 @@ export default function ConnectionMarker({
             <PopupNavigateButton lat={pump.position[0]} lng={pump.position[1]} />
           </Popup>
         </Marker>
-      ))}
+        ))}
 
       {foerderungOpen && (
         <LoeschwasserfoerderungPanel
