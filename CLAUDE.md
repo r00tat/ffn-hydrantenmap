@@ -894,6 +894,42 @@ aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
 - **`undefined` heißt „nie geschrieben", nicht „nein".** Fahrzeuge, deren Cache
   älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
   und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
+
+## Namen in der Besatzung
+
+Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne
+Personenliste des Fahrtenbuchs führt sie als „Vorname Nachname". Beides
+nebeneinander zu zeigen ließ dieselbe Person zweimal auftreten — und war eine
+der Ursachen doppelter Fahrtenbuch-Einträge (#705).
+
+- **`personDisplayName`** ([common/fahrtenbuch.ts](src/common/fahrtenbuch.ts))
+  zeigt einen Namen in der Schreibweise der Personenliste, sobald er dort
+  **eindeutig** trifft (Vergleich über `normalizePersonName`). Ohne Treffer oder
+  bei zwei Treffern bleibt der Name, wie er kam: Vor- und Nachname aus einer
+  beliebigen Zeichenkette selbst zu erkennen geht nicht verlässlich — „Anna
+  Maria Berger" und „Berger Anna Maria" sind von außen nicht zu unterscheiden.
+- **Nur die Anzeige.** `displayAssignments` in
+  [CrewAssignmentBoard.tsx](src/components/pages/CrewAssignmentBoard.tsx) legt
+  den Namen über die gefilterten Einträge; in Firestore bleibt der gemeldete
+  Name stehen, und alle Schreibvorgänge gehen weiter über `id`/`recipientId`.
+- **Die Auswahl „Weitere Person hinzufügen" speist sich aus zwei Quellen:** den
+  Alarm-Empfängern, die nicht zugesagt haben, und der Personenliste der Gruppe.
+  Letztere ist der Grund, dass die Auswahl auch bei einem Einsatz ohne Alarm
+  Namen anbietet — oder für jemanden, der gar kein BlaulichtSMS hat.
+- **Entdoppelt wird über `normalizePersonName`**, nicht über den rohen Namen,
+  sonst stünde derselbe Mensch in gedrehter Schreibweise zweimal in der Liste.
+  Der Alarm-Empfänger hat Vorrang: Über ihn ist die Person eindeutig
+  identifiziert, über den Namen nur wahrscheinlich.
+- **Eine Person aus der Liste entsteht als Eintrag von Hand** — sie hat keine
+  Empfänger-ID. Weil dabei die gepflegte Schreibweise übernommen wird, findet
+  `resolveDriver` sie über den Namensvergleich wieder.
+- **Ein getippter Name geht denselben Weg**, wenn er eine angebotene Person
+  trifft — verglichen wieder über `normalizePersonName`, damit „Berger Anna"
+  auch „Anna Berger" trifft. Auswahl und Enter auf freiem Text laufen dazu
+  durch dasselbe `handleAddPerson`; ein eigener Enter-Handler am Eingabefeld
+  lief zusätzlich zur Auswahl von MUI und legte den halb getippten Namen als
+  zweite Person an (#712).
+
 ## Doppelte Fahrten zu einem Einsatz
 
 Die Fahrten eines Einsatzes entstehen von zwei Seiten: über die Sammelerfassung

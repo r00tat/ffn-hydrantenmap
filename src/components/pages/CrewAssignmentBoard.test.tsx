@@ -97,6 +97,17 @@ vi.mock('@dnd-kit/core', () => ({
   TouchSensor: vi.fn(),
 }));
 
+const fahrtenbuchPersons = vi.hoisted(() => ({
+  activePersons: [] as { id: string; name: string }[],
+}));
+
+vi.mock('../../hooks/useFahrtenbuchPersons', () => ({
+  default: () => ({
+    persons: fahrtenbuchPersons.activePersons,
+    activePersons: fahrtenbuchPersons.activePersons,
+  }),
+}));
+
 vi.mock('../../hooks/useCrewAssignments', () => ({
   default: () => ({
     crewAssignments: mockAssignments,
@@ -239,6 +250,7 @@ describe('CrewAssignmentBoard', () => {
     vi.clearAllMocks();
     mockUseMediaQuery.mockReturnValue(false);
     mockWriteAccess.mockReturnValue(true);
+    fahrtenbuchPersons.activePersons = [];
   });
 
   it('renders Besatzung heading', () => {
@@ -366,6 +378,73 @@ describe('CrewAssignmentBoard', () => {
       });
       expect(mockAddManualPerson).not.toHaveBeenCalled();
     });
+  });
+
+  it('bietet auch die Personen des Fahrtenbuchs zur Auswahl', async () => {
+    // Damit die Auswahl auch bei einem Einsatz ohne Alarm Namen anbietet — und
+    // für jemanden, der gar kein BlaulichtSMS hat.
+    fahrtenbuchPersons.activePersons = [{ id: 'p9', name: 'Eva Neu' }];
+    const userEvent = (await import('@testing-library/user-event')).default;
+    const user = userEvent.setup();
+    render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+
+    await user.click(screen.getByLabelText('Weitere Person hinzufügen'));
+    await user.click(await screen.findByText(/Eva Neu \(Personenliste\)/));
+
+    // Ohne Empfänger-ID entsteht der Eintrag wie eine Eingabe von Hand, aber
+    // mit der gepflegten Schreibweise.
+    expect(mockAddManualPerson).toHaveBeenCalledWith('Eva Neu');
+    expect(mockAddPersonFromRecipient).not.toHaveBeenCalled();
+  });
+
+  it('bietet eine Person nicht doppelt an, nur weil der Name gedreht ist', async () => {
+    // „Mustermann Max" aus BlaulichtSMS und „Max Mustermann" aus der
+    // Personenliste sind ein Mensch — und Max steht schon in der Besatzung.
+    fahrtenbuchPersons.activePersons = [
+      { id: 'p1', name: 'Mustermann Max' },
+      { id: 'p2', name: 'Nina Ausstehend' },
+    ];
+    const userEvent = (await import('@testing-library/user-event')).default;
+    const user = userEvent.setup();
+    render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+
+    await user.click(screen.getByLabelText('Weitere Person hinzufügen'));
+
+    expect(
+      screen.queryByText(/Mustermann Max \(Personenliste\)/),
+    ).not.toBeInTheDocument();
+    // Nina ist schon als Alarm-Empfänger dabei; der Empfänger hat Vorrang,
+    // über ihn ist die Person eindeutig identifiziert.
+    expect(
+      screen.queryByText(/Nina Ausstehend \(Personenliste\)/),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Nina Ausstehend \(ausstehend\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt die Besatzung in der Schreibweise der Personenliste', () => {
+    // Aus BlaulichtSMS kommt „Nachname Vorname"; gezeigt wird die gepflegte
+    // Schreibweise, damit dieselbe Person nicht in zwei Varianten auftaucht.
+    // Der Eintrag heißt „Max Mustermann", die Personenliste führt ihn gedreht —
+    // maßgeblich ist die Liste, egal in welcher Richtung.
+    fahrtenbuchPersons.activePersons = [{ id: 'p1', name: 'Mustermann Max' }];
+    render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+
+    expect(screen.getAllByText('Mustermann Max').length).toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(screen.queryByText('Max Mustermann')).not.toBeInTheDocument();
+  });
+
+  it('lässt einen Namen ohne Treffer unverändert', () => {
+    // Geraten wird nicht — Vor- und Nachname aus einer beliebigen Zeichenkette
+    // zu erkennen geht nicht verlässlich.
+    fahrtenbuchPersons.activePersons = [{ id: 'p9', name: 'Eva Neu' }];
+    render(<CrewAssignmentBoard alarms={[mockAlarm]} />);
+    expect(screen.getAllByText('Max Mustermann').length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   describe('removing a vehicle', () => {

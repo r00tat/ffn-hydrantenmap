@@ -202,6 +202,7 @@
   },
   "crew": {
     "title": "Besatzung",
+    "fromPersonList": "Personenliste",
     "additionalPersons": "Weitere Person hinzufügen",
     "statusDeclined": "abgelehnt",
     "statusNoAnswer": "nicht geantwortet",

@@ -612,6 +612,32 @@ export function normalizePersonName(name: string): string {
   return normalized.split(' ').sort().join(' ');
 }
 
+/**
+ * Der Name eines Menschen in der Schreibweise der internen Personenliste.
+ *
+ * Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", gepflegt sind
+ * sie als „Vorname Nachname". Wo ein Name eindeutig auf eine Person trifft,
+ * wird deren Schreibweise gezeigt — dieselbe Person soll in der Anwendung
+ * nicht in zwei Varianten auftauchen.
+ *
+ * Nicht geraten wird: Ohne Treffer bleibt der Name, wie er kam. Vor- und
+ * Nachname aus einer beliebigen Zeichenkette selbst zu erkennen geht nicht
+ * verlässlich — „Anna Maria Berger" und „Berger Anna Maria" sind von außen
+ * nicht zu unterscheiden. Zwei Treffer bleiben ebenfalls unverändert; dann
+ * wäre offen, wessen Schreibweise gilt.
+ */
+export function personDisplayName(
+  name: string,
+  persons: { name: string }[],
+): string {
+  const normalized = normalizePersonName(name);
+  if (!normalized) return name;
+  const matches = persons.filter(
+    (p) => normalizePersonName(p.name) === normalized,
+  );
+  return matches.length === 1 ? matches[0].name : name;
+}
+
 export function matchVehicleByName(
   vehicles: FahrtenbuchVehicle[],
   name: string,

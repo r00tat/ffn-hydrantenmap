@@ -42,6 +42,11 @@ import {
 import { useDraggable } from '@dnd-kit/core';
 import { BlaulichtSmsAlarm } from '../../app/blaulicht-sms/actions';
 import { useKostenersatzVehicles } from '../../hooks/useKostenersatzVehicles';
+import {
+  normalizePersonName,
+  personDisplayName,
+} from '../../common/fahrtenbuch';
+import useFahrtenbuchPersons from '../../hooks/useFahrtenbuchPersons';
 import useCrewAssignments, {
   BlaulichtSmsRecipient,
 } from '../../hooks/useCrewAssignments';
@@ -205,6 +210,21 @@ function CrewRow({
 // legacy entries created before the `source` field existed — when its
 // recipientId carries the historical `manual-` prefix. Such entries must stay
 // visible and removable even while an alarm is loaded.
+/**
+ * Ein Eintrag der Auswahl „Weitere Person hinzufügen".
+ *
+ * Zwei Quellen: die Empfänger der Alarme, die nicht zugesagt haben, und die
+ * Personenliste des Fahrtenbuchs. Letztere ist der Grund, dass die Auswahl auch
+ * bei einem Einsatz ohne Alarm — oder für jemanden, der gar kein BlaulichtSMS
+ * hat — Namen anbietet.
+ */
+interface CrewPersonOption {
+  key: string;
+  name: string;
+  /** Nur bei einem Alarm-Empfänger; die Personenliste hat keine Empfänger-ID. */
+  recipient?: BlaulichtSmsRecipient;
+}
+
 const isManualEntry = (a: CrewAssignment) =>
   a.source === 'manual' ||
   (a.source === undefined && a.recipientId.startsWith('manual-'));
@@ -228,6 +248,9 @@ export default function CrewAssignmentBoard({
   const { vehicles } = useVehicles();
   const { vehicles: kostenersatzVehicles } = useKostenersatzVehicles();
   const firecall = useFirecall();
+  // Die Personenliste der Gruppe des Einsatzes: Auswahlquelle beim Hinzufügen
+  // und Maßstab für die angezeigte Schreibweise der Namen.
+  const { activePersons } = useFahrtenbuchPersons(firecall?.group);
   const addFirecallItem = useFirecallItemAdd();
   const updateFirecallItem = useFirecallItemUpdate();
   const theme = useTheme();
@@ -239,9 +262,18 @@ export default function CrewAssignmentBoard({
   );
 
   // Recipients across all alarms who did NOT confirm (no / unknown / pending),
-  // deduped by id, excluding anyone already in the crew list.
-  const additionalPersonOptions = useMemo(() => {
+  // deduped by id, excluding anyone already in the crew list — dazu die
+  // Personenliste des Fahrtenbuchs.
+  const additionalPersonOptions = useMemo<CrewPersonOption[]>(() => {
     const alreadyAdded = new Set(crewAssignments.map((a) => a.recipientId));
+    // Über `normalizePersonName`, nicht über den rohen Namen: Aus BlaulichtSMS
+    // kommt „Nachname Vorname", die Personenliste führt „Vorname Nachname" —
+    // ohne das stünde derselbe Mensch zweimal in der Auswahl.
+    const takenNames = new Set(
+      crewAssignments.map((a) => normalizePersonName(a.name)),
+    );
+    const options: CrewPersonOption[] = [];
+
     const byId = new Map<string, BlaulichtSmsRecipient>();
     for (const alarm of alarms ?? []) {
       for (const r of alarm.recipients) {
@@ -256,8 +288,25 @@ export default function CrewAssignmentBoard({
         }
       }
     }
-    return [...byId.values()];
-  }, [alarms, crewAssignments]);
+    for (const recipient of byId.values()) {
+      options.push({
+        key: `recipient:${recipient.id}`,
+        name: recipient.name,
+        recipient,
+      });
+      takenNames.add(normalizePersonName(recipient.name));
+    }
+
+    // Der Alarm-Empfänger hat Vorrang: Über ihn ist die Person eindeutig
+    // identifiziert, über den Namen nur wahrscheinlich.
+    for (const person of activePersons) {
+      const normalized = normalizePersonName(person.name);
+      if (!normalized || takenNames.has(normalized)) continue;
+      takenNames.add(normalized);
+      options.push({ key: `person:${person.id}`, name: person.name });
+    }
+    return options;
+  }, [alarms, crewAssignments, activePersons]);
 
   const participationLabel = useCallback(
     (participation: BlaulichtSmsRecipient['participation']) => {
@@ -273,38 +322,48 @@ export default function CrewAssignmentBoard({
     [t],
   );
 
-  // Die Autocomplete liefert bei Auswahl aus der Liste das Melder-Objekt, bei
+  // Ein Eintrag entsteht über die Melder-ID, wenn es eine gibt — daran erkennt
+  // `syncFromAlarms` die Person wieder, sobald sie im BlaulichtSMS-Alarm doch
+  // noch zusagt. Aus der Personenliste gibt es keine; der Eintrag entsteht dann
+  // wie eine Eingabe von Hand, aber mit der gepflegten Schreibweise, an der
+  // `resolveDriver` ihn über den Namensvergleich wiederfindet.
+  const addFromOption = useCallback(
+    (option: CrewPersonOption) => {
+      if (option.recipient) addPersonFromRecipient(option.recipient);
+      else addManualPerson(option.name);
+    },
+    [addManualPerson, addPersonFromRecipient],
+  );
+
+  // Die Autocomplete liefert bei Auswahl aus der Liste das Options-Objekt, bei
   // Enter auf frei getippten Text (freeSolo) nur den String. Beides läuft
   // bewusst durch dieselbe Stelle statt über einen eigenen Enter-Handler am
   // Eingabefeld: Ein solcher Handler lief zusätzlich zur Auswahl von MUI und
   // legte den halb getippten Namen als zweite, manuelle Person an.
   //
-  // Ein getippter Name, der einen angebotenen Melder trifft, wird diesem
-  // zugeordnet statt manuell angelegt — sonst hängt der Eintrag nicht an der
-  // Melder-ID und stünde doppelt in der Liste, sobald die Person im
-  // BlaulichtSMS-Alarm doch noch zusagt (`syncFromAlarms` erkennt sie nur an
-  // ihrer `recipientId`).
+  // Ein getippter Name, der eine angebotene Person trifft, wird über diese
+  // angelegt statt aus dem Text — sonst fehlte die Melder-ID bzw. die
+  // gepflegte Schreibweise. Verglichen wird über `normalizePersonName`, damit
+  // „Berger Anna" auch „Anna Berger" trifft.
   const handleAddPerson = useCallback(
-    (value: BlaulichtSmsRecipient | string | null) => {
+    (value: CrewPersonOption | string | null) => {
       if (!value) return;
       if (typeof value !== 'string') {
-        addPersonFromRecipient(value);
+        addFromOption(value);
         setNewPersonName('');
         return;
       }
       const name = value.trim();
       if (!name) return;
-      const recipient = additionalPersonOptions.find(
-        (o) => o.name.toLowerCase() === name.toLowerCase(),
+      const normalized = normalizePersonName(name);
+      const option = additionalPersonOptions.find(
+        (o) => normalizePersonName(o.name) === normalized,
       );
-      if (recipient) {
-        addPersonFromRecipient(recipient);
-      } else {
-        addManualPerson(name);
-      }
+      if (option) addFromOption(option);
+      else addManualPerson(name);
       setNewPersonName('');
     },
-    [addManualPerson, addPersonFromRecipient, additionalPersonOptions],
+    [addFromOption, addManualPerson, additionalPersonOptions],
   );
 
   const handleAddVehicle = useCallback(
@@ -420,11 +479,31 @@ export default function CrewAssignmentBoard({
     });
   }, [crewAssignments, confirmedIds]);
 
-  const unassigned = validAssignments.filter((a) => a.vehicleId === null);
+  /**
+   * Dieselben Einträge, aber mit dem Namen in der Schreibweise der
+   * Personenliste („Vorname Nachname"). Aus BlaulichtSMS kommt „Nachname
+   * Vorname"; dieselbe Person soll in der Anwendung nicht in zwei Varianten
+   * auftauchen.
+   *
+   * Nur die Anzeige: In Firestore bleibt der gemeldete Name stehen, und alle
+   * Schreibvorgänge gehen weiterhin über `id`/`recipientId`. Ein Name ohne
+   * eindeutigen Treffer in der Personenliste bleibt unverändert — geraten wird
+   * nicht.
+   */
+  const displayAssignments = useMemo(
+    () =>
+      validAssignments.map((a) => ({
+        ...a,
+        name: personDisplayName(a.name, activePersons),
+      })),
+    [validAssignments, activePersons],
+  );
+
+  const unassigned = displayAssignments.filter((a) => a.vehicleId === null);
   const assignedToVehicle = useCallback(
     (vehicleId: string) =>
-      validAssignments.filter((a) => a.vehicleId === vehicleId),
-    [validAssignments],
+      displayAssignments.filter((a) => a.vehicleId === vehicleId),
+    [displayAssignments],
   );
 
   const handleDragEnd = useCallback(
@@ -497,8 +576,12 @@ export default function CrewAssignmentBoard({
             typeof option === 'string' ? option : option.name
           }
           renderOption={(props, option) => (
-            <li {...props} key={option.id}>
-              {option.name} ({participationLabel(option.participation)})
+            <li {...props} key={option.key}>
+              {option.name} (
+              {option.recipient
+                ? participationLabel(option.recipient.participation)
+                : t('fromPersonList')}
+              )
             </li>
           )}
           value={null}

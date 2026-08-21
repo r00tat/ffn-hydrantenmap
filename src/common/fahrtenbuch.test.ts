@@ -15,6 +15,7 @@ import {
   matchVehicleByName,
   normalizeName,
   normalizePersonName,
+  personDisplayName,
   PROPELLANTS,
   referenceCounters,
   requiresDriver,
@@ -406,6 +407,39 @@ describe('normalizePersonName', () => {
     expect(normalizePersonName('Max Max')).not.toBe(
       normalizePersonName('Max'),
     );
+  });
+});
+
+describe('personDisplayName', () => {
+  const persons = [{ name: 'Max Mustermann' }, { name: 'Anna Bauer' }];
+
+  it('dreht die Reihenfolge auf die der Personenliste', () => {
+    expect(personDisplayName('Mustermann Max', persons)).toBe('Max Mustermann');
+  });
+
+  it('vereinheitlicht auch Schreibweise und Leerzeichen', () => {
+    expect(personDisplayName('BAUER  anna', persons)).toBe('Anna Bauer');
+  });
+
+  it('lässt einen unbekannten Namen unverändert', () => {
+    // Vor- und Nachname aus einer beliebigen Zeichenkette selbst zu erkennen
+    // geht nicht verlässlich.
+    expect(personDisplayName('Berger Anna Maria', persons)).toBe(
+      'Berger Anna Maria',
+    );
+  });
+
+  it('lässt bei zwei Treffern den Namen stehen', () => {
+    expect(
+      personDisplayName('Mustermann Max', [
+        { name: 'Max Mustermann' },
+        { name: 'Mustermann Max' },
+      ]),
+    ).toBe('Mustermann Max');
+  });
+
+  it('lässt einen leeren Namen leer', () => {
+    expect(personDisplayName('', persons)).toBe('');
   });
 });
 

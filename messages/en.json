@@ -202,6 +202,7 @@
   },
   "crew": {
     "title": "Crew",
+    "fromPersonList": "person list",
     "additionalPersons": "Add another person",
     "statusDeclined": "declined",
     "statusNoAnswer": "no answer",
