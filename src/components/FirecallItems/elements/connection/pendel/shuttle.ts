@@ -21,8 +21,17 @@ export interface ShuttleInput {
   geschwindigkeit: number;
   /** Tankinhalt je Fahrzeug in l. */
   tankinhalt: number;
-  /** Füllzeit an der Entnahmestelle in min. */
-  fuellzeit: number;
+  /**
+   * Ergiebigkeit der Entnahmestelle in l/min.
+   *
+   * Die Füllzeit wird daraus gerechnet und **nicht** eingegeben: Eine feste
+   * Füllzeit behauptet neben einer geänderten Tankgröße stillschweigend eine
+   * Leistung, die niemand geprüft hat. `undefined`, solange sie unbekannt
+   * ist — dann wird nicht gerechnet, statt einen Wert zu raten.
+   */
+  fuellleistung?: number;
+  /** An- und Abfahren an der Entnahmestelle in min. */
+  rangierzeit: number;
   /** Entleerzeit an der Einsatzstelle in min. */
   entleerzeit: number;
   /** Anzahl der pendelnden Fahrzeuge. */
@@ -34,13 +43,20 @@ export interface ShuttleInput {
 export interface ShuttleResult {
   /** Hin und zurück in min. */
   fahrzeit: number;
+  /** Füllen plus Rangieren in min — die Zeit, in der die Entnahmestelle besetzt ist. */
+  fuellzeit: number;
   /** Fahrzeit plus Füllen plus Entleeren, in min. */
   umlaufzeit: number;
   /** Dauerhaft lieferbare Menge in l/min, Füllstelle eingerechnet. */
   menge: number;
   /** Die Menge ohne die Schranke der Füllstelle — nur zur Erklärung. */
   mengeOhneFuellstelle: number;
-  /** Was die Entnahmestelle hergibt: ein Tankinhalt je Füllzeit. */
+  /**
+   * Was die Entnahmestelle als Füllstelle hergibt: ein Tankinhalt je Füllzeit.
+   *
+   * Liegt **unter** der Ergiebigkeit, wenn Rangierzeit im Spiel ist — die
+   * Entnahmestelle ist auch dann besetzt, wenn gerade kein Wasser läuft.
+   */
   fuellstellenLeistung: number;
   /** Ob die Füllstelle und nicht die Fahrzeugzahl die Menge bestimmt. */
   begrenztDurchFuellstelle: boolean;
@@ -81,7 +97,8 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
     strecke,
     geschwindigkeit,
     tankinhalt,
-    fuellzeit,
+    fuellleistung,
+    rangierzeit,
     entleerzeit,
     fahrzeuge,
     sollMenge,
@@ -92,13 +109,17 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
     strecke < 0 ||
     !(geschwindigkeit > 0) ||
     !(tankinhalt > 0) ||
-    !(fuellzeit > 0) ||
+    !(fuellleistung !== undefined && fuellleistung > 0) ||
+    !(Number.isFinite(rangierzeit) && rangierzeit >= 0) ||
     !(entleerzeit > 0) ||
     !(fahrzeuge >= 1)
   ) {
     return undefined;
   }
 
+  // Die Füllzeit ist gerechnet, nicht gesetzt: Tankinhalt durch Ergiebigkeit,
+  // plus An- und Abfahren.
+  const fuellzeit = tankinhalt / fuellleistung + rangierzeit;
   const fahrzeit = (2 * strecke) / metrePerMinute(geschwindigkeit);
   const umlaufzeit = fahrzeit + fuellzeit + entleerzeit;
 
@@ -116,6 +137,7 @@ export function computeShuttle(input: ShuttleInput): ShuttleResult | undefined {
 
   return {
     fahrzeit,
+    fuellzeit,
     umlaufzeit,
     menge,
     mengeOhneFuellstelle,
@@ -154,13 +176,17 @@ function tippingDistance(input: ShuttleInput): number | undefined {
   const {
     geschwindigkeit,
     tankinhalt,
-    fuellzeit,
+    fuellleistung,
+    rangierzeit,
     entleerzeit,
     fahrzeuge,
     sollMenge,
   } = input;
 
   if (!(sollMenge > 0)) return undefined;
+  if (!(fuellleistung !== undefined && fuellleistung > 0)) return undefined;
+
+  const fuellzeit = tankinhalt / fuellleistung + rangierzeit;
   if (tankinhalt / fuellzeit + EPS < sollMenge) return undefined;
 
   const zulaessigeUmlaufzeit = (fahrzeuge * tankinhalt) / sollMenge;

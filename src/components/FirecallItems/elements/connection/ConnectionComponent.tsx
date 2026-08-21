@@ -31,7 +31,6 @@ import PointContextMenu from '../PointContextMenu';
 import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/LoeschwasserfoerderungPanel';
 import { foerderungView } from './foerderung/foerderung';
 import { versorgungsart } from './pendel/pendelRoute';
-import { pendelView } from './pendel/pendelverkehr';
 import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
@@ -148,27 +147,9 @@ export default function ConnectionMarker({
     ]
   );
 
-  // Die Fahrtroute des Pendelverkehrs. Sie liegt am Element und wird nur
-  // gezeichnet, nicht neu berechnet — dasselbe Muster wie beim Straßenverlauf
-  // des Schlauchs. Gezeichnet, damit die Meterzahl im Panel nachprüfbar ist:
-  // Eine Strecke, die niemand sehen kann, ist im Einsatz eine Behauptung.
-  const pendelRoutedFor = record.get<string>('pendelRoutedFor');
-  const pendelRoutedPositionsField = record.get<string>('pendelRoutedPositions');
-  const pendelFahrzeuge = record.get<number>('pendelFahrzeuge');
-  const pendelResult = useMemo(
-    () => pendelView(record.data() as Connection),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      positions,
-      foerderung,
-      foerderungUmgekehrt,
-      mode,
-      foerderMenge,
-      pendelFahrzeuge,
-      pendelRoutedFor,
-      pendelRoutedPositionsField,
-    ]
-  );
+  // Keine zweite Linie mehr für den Pendelverkehr: Die Fahrstrecke **ist** diese
+  // Leitung, mit dem Routing-Profil `drive` über alle Punkte. Siehe
+  // docs/pendelverkehr.md.
 
   return (
     <>
@@ -335,28 +316,6 @@ export default function ConnectionMarker({
           {record.popupFn()}
         </Popup>
       </Polyline>
-
-      {/* Die Fahrtroute des Pendelverkehrs: gestrichelt und in anderer Farbe
-          als der Schlauchweg — es sind zwei verschiedene Wege. */}
-      {mode !== 'foerderung' && pendelResult?.routedPositions && (
-        <Polyline
-          positions={pendelResult.routedPositions}
-          {...(pane ? { pane } : {})}
-          pathOptions={{
-            color: '#c62828',
-            weight: 3,
-            dashArray: '8 6',
-            opacity: 0.9,
-          }}
-        >
-          <Popup>
-            <div>
-              <strong>{tf('driveDistance')}</strong>
-            </div>
-            {Math.round(pendelResult.strecke)} m
-          </Popup>
-        </Polyline>
-      )}
 
       {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung.
           Im reinen Pendelverkehr weichen sie — dort wird keine Leitung gelegt. */}

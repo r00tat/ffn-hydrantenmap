@@ -6,6 +6,7 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
@@ -18,7 +19,8 @@ import type {
   PendelParams,
   PendelView,
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
-import { parseNumber, round } from './panelNumbers';
+import { parseNumber } from './panelNumbers';
+import usePanelNumber from './usePanelNumber';
 
 /**
  * Der Pendelverkehr im Panel: Umlaufzeit, dauerhaft lieferbare Menge und die
@@ -39,17 +41,21 @@ export interface PendelSectionProps {
     key: K,
     value: PendelParams[K]
   ) => void;
-  /** Solange die Fahrtroute unterwegs ist, ist die Schätzung nur vorläufig. */
-  routeBusy: boolean;
+  /** Solange die Hydrantensuche läuft, ist „keiner in der Nähe" voreilig. */
+  fuellstelleBusy: boolean;
+  /** Die Leitung auf Fahrzeug-Routing umstellen. */
+  onEnableVehicleRouting?: () => void;
 }
 
 export default function PendelSection({
   view,
   params,
   onParamChange,
-  routeBusy,
+  fuellstelleBusy,
+  onEnableVehicleRouting,
 }: PendelSectionProps) {
   const t = useTranslations('loeschwasserfoerderung');
+  const num = usePanelNumber();
   const result = view.result;
 
   return (
@@ -89,13 +95,56 @@ export default function PendelSection({
         </Grid>
       </Grid>
 
+      {/* Die Ergiebigkeit steht bei den Fahrzeugen und nicht im Aufklapper: Sie
+          deckelt die Menge und ist damit genauso entscheidend wie ihre Zahl.
+          Aus dem Hydranten in der Nähe, sonst von Hand — geraten wird sie
+          nicht. */}
+      <Grid container spacing={2} sx={{ alignItems: 'flex-start', mt: 1 }}>
+        <Grid size={{ xs: 7 }}>
+          <TextField
+            size="small"
+            type="number"
+            fullWidth
+            label={`${t('fillRate')} (${t('flowUnit')})`}
+            value={params.fuellleistung ?? ''}
+            placeholder={fuellstelleBusy ? t('fillRateSearching') : ''}
+            helperText={
+              view.fuellleistungSource === 'hydrant' && view.fuellstelle
+                ? t('fillRateFromHydrant', {
+                    name: view.fuellstelle.name,
+                    metres: view.fuellstelle.distance,
+                  })
+                : view.fuellleistungSource === 'unknown'
+                  ? t('fillRateNoHydrant')
+                  : t('fillRateManual')
+            }
+            onChange={(event) =>
+              onParamChange(
+                'fuellleistung',
+                parseNumber(event.target.value, params.fuellleistung ?? 0)
+              )
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 5 }}>
+          {view.fuellleistungSource === 'hydrant' && (
+            <Chip
+              size="small"
+              color="primary"
+              variant="outlined"
+              label={t('fillRateHydrantChip')}
+            />
+          )}
+        </Grid>
+      </Grid>
+
       {result && (
         <Box sx={{ mt: 1.5 }}>
           <Typography variant="h5">
-            {t('shuttleFlow', { value: Math.round(result.menge) })}
+            {t('shuttleFlow', { value: num(result.menge, 0) })}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {t('cycleTime')}: {round(result.umlaufzeit)} {t('minute')}
+            {t('cycleTime')}: {num(result.umlaufzeit)} {t('minute')}
           </Typography>
         </Box>
       )}
@@ -103,22 +152,36 @@ export default function PendelSection({
       {view.warnings
         // Solange die Route noch unterwegs ist, ist „geschätzt" bloß der
         // Zwischenstand und nicht die Aussage über das Ergebnis.
-        .filter((warning) => !(routeBusy && warning === 'estimatedDistance'))
+        .filter(
+          (warning) => !(fuellstelleBusy && warning === 'fillRateMissing')
+        )
         .map((warning) => (
           <Alert
             key={warning}
-            severity={warning === 'estimatedDistance' ? 'info' : 'warning'}
+            severity={warning === 'notVehicleRouted' ? 'info' : 'warning'}
             sx={{ mt: 1.5 }}
+            action={
+              warning === 'notVehicleRouted' && onEnableVehicleRouting ? (
+                <Button
+                  size="small"
+                  color="inherit"
+                  onClick={onEnableVehicleRouting}
+                >
+                  {t('enableVehicleRouting')}
+                </Button>
+              ) : undefined
+            }
           >
-            {warning === 'estimatedDistance' && t('warningEstimatedDistance')}
+            {warning === 'notVehicleRouted' && t('warningNotVehicleRouted')}
+            {warning === 'fillRateMissing' && t('warningFillRateMissing')}
             {warning === 'fillStationLimited' &&
               t('warningFillStationLimited', {
-                value: Math.round(result?.fuellstellenLeistung ?? 0),
+                value: num(result?.fuellstellenLeistung ?? 0, 0),
                 vehicles: Math.floor(result?.fahrzeugeFuellstelle ?? 0),
               })}
             {warning === 'sollMengeNotReached' &&
               t('warningRequiredFlowMissed', {
-                required: Math.round(view.sollMenge),
+                required: num(view.sollMenge, 0),
                 vehicles: result?.fahrzeugeFuerSollmenge ?? 0,
               })}
             {warning === 'notComputable' && t('warningShuttleNotComputable')}
@@ -144,12 +207,12 @@ export default function PendelSection({
               {/* `component="div"` wegen des Chips — siehe
                   FoerderungSection. */}
               <Typography variant="body2" component="div">
-                {Math.round(view.strecke)} m
-                {view.streckeSource === 'detour' && (
-                  <Tooltip title={t('driveDistanceEstimatedHint')}>
+                {num(view.strecke, 0)} m
+                {view.streckeSource === 'drawn' && (
+                  <Tooltip title={t('driveDistanceDrawnHint')}>
                     <Chip
                       size="small"
-                      label={t('driveDistanceEstimated')}
+                      label={t('driveDistanceDrawn')}
                       sx={{ ml: 0.5 }}
                     />
                   </Tooltip>
@@ -161,7 +224,7 @@ export default function PendelSection({
                 {t('driveTime')}
               </Typography>
               <Typography variant="body2">
-                {round(result.fahrzeit)} {t('minute')}
+                {num(result.fahrzeit)} {t('minute')}
               </Typography>
             </Grid>
             <Grid size={{ xs: 6 }}>
@@ -179,7 +242,7 @@ export default function PendelSection({
               <Typography variant="body2">
                 {result.kipppunkt !== undefined
                   ? t('tippingPointValue', {
-                      metres: Math.round(result.kipppunkt),
+                      metres: num(result.kipppunkt, 0),
                     })
                   : t('tippingPointNone')}
               </Typography>
@@ -195,7 +258,7 @@ export default function PendelSection({
                 {t('steadyAfter')}
               </Typography>
               <Typography variant="body2">
-                {round(result.eingeschwungenNach)} {t('minute')}
+                {num(result.eingeschwungenNach)} {t('minute')}
               </Typography>
             </Grid>
           </Grid>
@@ -246,18 +309,20 @@ export default function PendelSection({
                 size="small"
                 type="number"
                 fullWidth
-                label={`${t('fillTime')} (${t('minute')})`}
-                value={params.fuellzeit}
-                // Die Leistung, die die Zeit bedeutet: Eine geänderte
-                // Tankgröße macht eine stehengebliebene Zeit damit sichtbar,
-                // statt sie still falsch zu lassen.
-                helperText={t('rateHint', {
-                  value: Math.round(params.tankinhalt / params.fuellzeit),
-                })}
+                label={`${t('shuntTime')} (${t('minute')})`}
+                value={params.rangierzeit}
+                // Die Füllzeit ist gerechnet, nicht eingegeben: Tankinhalt
+                // durch Ergiebigkeit plus diese Zeit. Der Hinweis nennt das
+                // Ergebnis, damit die Zahl nachprüfbar bleibt.
+                helperText={
+                  result
+                    ? t('fillTimeHint', { value: num(result.fuellzeit) })
+                    : t('shuntTimeHint')
+                }
                 onChange={(event) =>
                   onParamChange(
-                    'fuellzeit',
-                    parseNumber(event.target.value, params.fuellzeit)
+                    'rangierzeit',
+                    parseNumber(event.target.value, params.rangierzeit)
                   )
                 }
               />
@@ -270,7 +335,7 @@ export default function PendelSection({
                 label={`${t('emptyTime')} (${t('minute')})`}
                 value={params.entleerzeit}
                 helperText={t('rateHint', {
-                  value: Math.round(params.tankinhalt / params.entleerzeit),
+                  value: num(params.tankinhalt / params.entleerzeit, 0),
                 })}
                 onChange={(event) =>
                   onParamChange(

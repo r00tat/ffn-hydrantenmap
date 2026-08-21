@@ -1,13 +1,9 @@
 'use client';
 
-import type { LatLngPosition } from '../../../../../common/geo';
 import type { Connection } from '../../../../firebase/firestore';
+import type { Fuellstelle } from './fuellstelle';
 import { FOERDERUNG_DEFAULTS } from '../foerderung/foerderung';
-import {
-  isPendelRelevant,
-  pendelDistance,
-  pendelRoutedPositions,
-} from './pendelRoute';
+import { isPendelRelevant, isVehicleRouted, pendelDistance } from './pendelRoute';
 import { computeShuttle, type ShuttleResult } from './shuttle';
 
 /**
@@ -30,8 +26,8 @@ export const PENDEL_DEFAULTS = {
   tankinhalt: 2000,
   /** Einsatzfahrt mit vollem Tank, gemischt Ortsgebiet und Freiland. */
   geschwindigkeit: 40,
-  /** 2000 l bei ~600 l/min plus Anfahren an der Füllstelle. */
-  fuellzeit: 4,
+  /** An- und Abfahren an der Entnahmestelle, Kupplen inbegriffen. */
+  rangierzeit: 1,
   /** 2000 l über die eigene Pumpe plus Anfahren. */
   entleerzeit: 3,
 };
@@ -40,13 +36,21 @@ export interface PendelParams {
   fahrzeuge: number;
   tankinhalt: number;
   geschwindigkeit: number;
-  fuellzeit: number;
+  /**
+   * Ergiebigkeit der Entnahmestelle in l/min. **Kein Vorgabewert**: Sie kommt
+   * aus dem Hydranten in der Nähe oder von Hand — geraten wird sie nicht, das
+   * war der Fehler der festen Füllzeit.
+   */
+  fuellleistung?: number;
+  rangierzeit: number;
   entleerzeit: number;
 }
 
 export type PendelWarning =
-  /** Die Fahrstrecke ist Luftlinie × Umwegfaktor, nicht geroutet. */
-  | 'estimatedDistance'
+  /** Die Linie ist nicht für ein Fahrzeug geroutet — die Länge ist die gezeichnete. */
+  | 'notVehicleRouted'
+  /** Die Ergiebigkeit der Entnahmestelle fehlt; ohne sie wird nicht gerechnet. */
+  | 'fillRateMissing'
   /** Die Entnahmestelle deckelt die Menge, nicht die Fahrzeugzahl. */
   | 'fillStationLimited'
   /** Die geforderte Menge wird dauerhaft nicht erreicht. */
@@ -60,9 +64,11 @@ export interface PendelView {
   sollMenge: number;
   /** Einfache Fahrstrecke in m. */
   strecke: number;
-  streckeSource: 'route' | 'detour';
-  /** Die Fahrtroute für die Karte, sofern eine gespeichert ist. */
-  routedPositions?: LatLngPosition[];
+  streckeSource: 'route' | 'drawn';
+  /** Woher die Ergiebigkeit der Entnahmestelle kommt. */
+  fuellleistungSource: 'hydrant' | 'manual' | 'unknown';
+  /** Der Hydrant, aus dem sie kommt — für die Nachprüfbarkeit im Panel. */
+  fuellstelle?: Fuellstelle;
   result?: ShuttleResult;
   warnings: PendelWarning[];
 }
@@ -71,7 +77,24 @@ export interface PendelView {
 const numberOr = (value: number | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-export function pendelParams(item: Connection): PendelParams {
+/** Übernimmt aus `overrides` nur, was tatsächlich gesetzt ist. */
+function mergeDefined(
+  base: PendelParams,
+  overrides: Partial<PendelParams>
+): PendelParams {
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+  return merged;
+}
+
+export function pendelParams(
+  item: Connection,
+  fuellstelle?: Fuellstelle
+): PendelParams {
   return {
     // Ganze Fahrzeuge, mindestens eines: Ein halbes TLF pendelt nicht, und
     // eine Null würde die Menge auf Null ziehen, statt zu sagen, dass nichts
@@ -85,7 +108,16 @@ export function pendelParams(item: Connection): PendelParams {
       item.pendelGeschwindigkeit,
       PENDEL_DEFAULTS.geschwindigkeit
     ),
-    fuellzeit: numberOr(item.pendelFuellzeit, PENDEL_DEFAULTS.fuellzeit),
+    // Der eingetragene Wert gewinnt gegen den Hydranten: Wer ihn von Hand
+    // gesetzt hat, hat einen Grund — gemessen, oder ein anderer Anschluss als
+    // der, den die GIS-Daten in der Nähe kennen.
+    fuellleistung:
+      typeof item.pendelFuellleistung === 'number' &&
+      Number.isFinite(item.pendelFuellleistung) &&
+      item.pendelFuellleistung > 0
+        ? item.pendelFuellleistung
+        : fuellstelle?.leistung,
+    rangierzeit: numberOr(item.pendelRangierzeit, PENDEL_DEFAULTS.rangierzeit),
     entleerzeit: numberOr(item.pendelEntleerzeit, PENDEL_DEFAULTS.entleerzeit),
   };
 }
@@ -101,11 +133,24 @@ export function pendelParams(item: Connection): PendelParams {
 export function pendelView(
   item: Connection,
   overrides: Partial<PendelParams> = {},
-  sollMengeOverride?: number
+  sollMengeOverride?: number,
+  fuellstelle?: Fuellstelle
 ): PendelView | undefined {
   if (!isPendelRelevant(item)) return undefined;
 
-  const params = { ...pendelParams(item), ...overrides };
+  // Nicht `{ ...base, ...overrides }`: Der Regler führt seinen Zustand als
+  // vollständiges `PendelParams`, und darin ist die Ergiebigkeit `undefined`,
+  // solange sie nicht eingetippt wurde. Ein Spread schriebe dieses `undefined`
+  // über den Wert aus dem Hydranten — der Rechner sagte dann „keine
+  // Ergiebigkeit", obwohl einer davor steht.
+  const params = mergeDefined(pendelParams(item, fuellstelle), overrides);
+  const fuellleistungSource: PendelView['fuellleistungSource'] =
+    params.fuellleistung === undefined
+      ? 'unknown'
+      : params.fuellleistung === fuellstelle?.leistung &&
+          item.pendelFuellleistung === undefined
+        ? 'hydrant'
+        : 'manual';
   const sollMenge =
     sollMengeOverride ??
     numberOr(item.foerderMenge, FOERDERUNG_DEFAULTS.foerderMenge);
@@ -117,27 +162,36 @@ export function pendelView(
       params,
       sollMenge,
       strecke: 0,
-      streckeSource: 'detour',
+      streckeSource: 'drawn',
+      fuellleistungSource,
+      fuellstelle,
       warnings: ['notComputable'],
     };
   }
-  if (distance.source === 'detour') {
-    warnings.push('estimatedDistance');
+  if (!isVehicleRouted(item)) {
+    warnings.push('notVehicleRouted');
+  }
+  if (params.fuellleistung === undefined) {
+    warnings.push('fillRateMissing');
   }
 
   const result = computeShuttle({
     strecke: distance.strecke,
     geschwindigkeit: params.geschwindigkeit,
     tankinhalt: params.tankinhalt,
-    fuellzeit: params.fuellzeit,
+    fuellleistung: params.fuellleistung,
+    rangierzeit: params.rangierzeit,
     entleerzeit: params.entleerzeit,
     fahrzeuge: params.fahrzeuge,
     sollMenge,
   });
 
-  if (!result) {
+  // Ohne Ergiebigkeit ist „nicht rechenbar" keine zweite Nachricht, sondern
+  // dieselbe — der Hinweis darüber sagt schon, was fehlt.
+  if (!result && params.fuellleistung !== undefined) {
     warnings.push('notComputable');
-  } else {
+  }
+  if (result) {
     if (result.begrenztDurchFuellstelle) warnings.push('fillStationLimited');
     if (!result.traegtSollmenge) warnings.push('sollMengeNotReached');
   }
@@ -147,7 +201,8 @@ export function pendelView(
     sollMenge,
     strecke: distance.strecke,
     streckeSource: distance.source,
-    routedPositions: pendelRoutedPositions(item),
+    fuellleistungSource,
+    fuellstelle,
     result,
     warnings,
   };
@@ -157,8 +212,11 @@ export function pendelView(
  * Die Zeile für Kartenpopup und Elementliste, oder `undefined` ohne rechenbares
  * Ergebnis.
  */
-export function pendelSummary(item: Connection): string | undefined {
-  const view = pendelView(item);
+export function pendelSummary(
+  item: Connection,
+  fuellstelle?: Fuellstelle
+): string | undefined {
+  const view = pendelView(item, {}, undefined, fuellstelle);
   if (!view?.result) return undefined;
   return `Pendelverkehr ${view.params.fahrzeuge} Fz: ${Math.round(
     view.result.menge

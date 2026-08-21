@@ -1,9 +1,10 @@
 import { Icon, IconOptions } from 'leaflet';
 import { ReactNode } from 'react';
+import { SimpleMap } from '../../../common/types';
 import { Connection } from '../../firebase/firestore';
 import { leafletIcons } from '../icons';
 import { versorgungSummary } from './connection/versorgungSummary';
-import { FirecallItemBase } from './FirecallItemBase';
+import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
 
 export class FirecallConnection extends FirecallMultiPoint {
@@ -40,11 +41,9 @@ export class FirecallConnection extends FirecallMultiPoint {
   pendelFahrzeuge?: number;
   pendelTankinhalt?: number;
   pendelGeschwindigkeit?: number;
-  pendelFuellzeit?: number;
+  pendelFuellleistung?: number;
+  pendelRangierzeit?: number;
   pendelEntleerzeit?: number;
-  pendelRoutedPositions?: string;
-  pendelRoutedFor?: string;
-  pendelRoutingFailed?: string;
   verlegeleistung?: number;
   pumpenRuestzeit?: number;
 
@@ -72,11 +71,9 @@ export class FirecallConnection extends FirecallMultiPoint {
         pendelFahrzeuge: this.pendelFahrzeuge,
         pendelTankinhalt: this.pendelTankinhalt,
         pendelGeschwindigkeit: this.pendelGeschwindigkeit,
-        pendelFuellzeit: this.pendelFuellzeit,
+        pendelFuellleistung: this.pendelFuellleistung,
+        pendelRangierzeit: this.pendelRangierzeit,
         pendelEntleerzeit: this.pendelEntleerzeit,
-        pendelRoutedPositions: this.pendelRoutedPositions,
-        pendelRoutedFor: this.pendelRoutedFor,
-        pendelRoutingFailed: this.pendelRoutingFailed,
         verlegeleistung: this.verlegeleistung,
         pumpenRuestzeit: this.pumpenRuestzeit,
       } = firecallItem);
@@ -157,11 +154,9 @@ export class FirecallConnection extends FirecallMultiPoint {
       pendelFahrzeuge: this.pendelFahrzeuge,
       pendelTankinhalt: this.pendelTankinhalt,
       pendelGeschwindigkeit: this.pendelGeschwindigkeit,
-      pendelFuellzeit: this.pendelFuellzeit,
+      pendelFuellleistung: this.pendelFuellleistung,
+      pendelRangierzeit: this.pendelRangierzeit,
       pendelEntleerzeit: this.pendelEntleerzeit,
-      pendelRoutedPositions: this.pendelRoutedPositions,
-      pendelRoutedFor: this.pendelRoutedFor,
-      pendelRoutingFailed: this.pendelRoutingFailed,
       verlegeleistung: this.verlegeleistung,
       pumpenRuestzeit: this.pumpenRuestzeit,
     } as Connection;
@@ -172,8 +167,8 @@ export class FirecallConnection extends FirecallMultiPoint {
       ...super.fields(),
       dimension: 'Dimension (B, C etc)',
       oneHozeLength: 'Länge eines Schlauches (Standard 20m)',
-      // Kein Profil zur Wahl: Ein Schlauch folgt der Straße, fährt aber nicht.
       streetRouting: 'Routing über Straße',
+      routingProfile: 'Routing-Profil',
     };
   }
 
@@ -182,6 +177,23 @@ export class FirecallConnection extends FirecallMultiPoint {
       ...super.fieldTypes(),
       oneHozeLength: 'number',
       streetRouting: 'boolean',
+      routingProfile: 'select',
+    };
+  }
+
+  /**
+   * Das Profil stand hier lange nicht zur Wahl — ein Schlauch folgt der Straße,
+   * fährt aber nicht. Mit dem Pendelverkehr ist dieselbe Linie auch die
+   * **Fahrstrecke** der Tanklöschfahrzeuge, und dafür zählen Einbahnen und
+   * Abbiegeverbote. Siehe docs/pendelverkehr.md.
+   */
+  public selectValues(): SimpleMap<SelectOptions> {
+    return {
+      ...super.selectValues(),
+      routingProfile: {
+        walk: 'Schlauch (ignoriert Einbahnen)',
+        drive: 'Fahrzeug (folgt der Fahrtrichtung)',
+      },
     };
   }
 

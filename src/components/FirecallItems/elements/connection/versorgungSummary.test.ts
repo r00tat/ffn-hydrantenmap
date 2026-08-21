@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LatLngPosition } from '../../../../common/geo';
 import type { Connection } from '../../../firebase/firestore';
-import { routingSignature } from './routedPath';
 import { versorgungSummary } from './versorgungSummary';
 
 const hydrant: LatLngPosition = [47.9482, 16.8482];
@@ -22,8 +21,7 @@ const connection = (overrides: Partial<Connection> = {}): Connection =>
     oneHozeLength: 20,
     foerderung: 'true',
     hoehenunterschied: 0,
-    pendelRoutedPositions: JSON.stringify(points),
-    pendelRoutedFor: routingSignature([hydrant, einsatzstelle], 'drive'),
+    pendelFuellleistung: 800,
     ...overrides,
   }) as Connection;
 

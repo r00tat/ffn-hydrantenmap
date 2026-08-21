@@ -38,18 +38,13 @@ vi.mock(
   })
 );
 
-// Dasselbe gilt für die Fahrtroute des Pendelverkehrs: Server-Action plus
-// Firestore-Client. Ohne den Mock scheitert schon das Laden des Moduls.
-const ensurePendelRoute = vi.fn((_firecallId: string, _item: unknown) =>
-  Promise.resolve(undefined)
-);
-vi.mock(
-  '../../FirecallItems/elements/connection/pendel/ensureConnectionPendelRoute',
-  () => ({
-    ensureConnectionPendelRoute: (firecallId: string, item: unknown) =>
-      ensurePendelRoute(firecallId, item),
-  })
-);
+// Die Hydrantensuche geht über den Firestore-Client; hier zählt nur, welche
+// Ergiebigkeit der Rechner damit bekommt.
+const HYDRANT = { name: 'HY-1', distance: 20, leistung: 800 };
+const fuellstelle = vi.fn();
+vi.mock('../../../hooks/useFuellstelle', () => ({
+  default: () => fuellstelle(),
+}));
 
 import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import { routingSignature } from '../../FirecallItems/elements/connection/routedPath';
@@ -87,18 +82,20 @@ const withProfile = (overrides: Partial<Connection> = {}): Connection => {
 };
 
 /**
- * Dieselbe Leitung mit Profil **und** gespeicherter Fahrtroute, damit der
- * Pendelverkehr nicht auf der Luftlinienschätzung rechnet.
+ * Dieselbe Leitung mit Profil, auf Fahrzeug-Routing gestellt: Im Pendelverkehr
+ * **ist** die Leitung die Fahrstrecke.
  */
-const withRoute = (overrides: Partial<Connection> = {}): Connection => {
-  const base = withProfile(overrides);
-  const endpoints = [entnahme, verteiler];
-  return {
-    ...base,
-    pendelRoutedPositions: JSON.stringify(endpoints),
-    pendelRoutedFor: routingSignature(endpoints, 'drive'),
-  } as Connection;
-};
+const withRoute = (overrides: Partial<Connection> = {}): Connection =>
+  ({
+    ...withProfile(overrides),
+    streetRouting: 'true',
+    routingProfile: 'drive',
+    routedPositions: JSON.stringify([entnahme, verteiler]),
+    routedFor: routingSignature([entnahme, verteiler], 'walk').replace(
+      'walk:',
+      'drive:'
+    ),
+  }) as Connection;
 
 const pumpCount = () =>
   Number(
@@ -113,7 +110,10 @@ describe('LoeschwasserfoerderungPanel', () => {
     updateItem.mockClear();
     showSnackbar.mockClear();
     ensureElevation.mockClear();
-    ensurePendelRoute.mockClear();
+    // `mockReset` und nicht `mockClear`: Ein Test setzt „kein Hydrant", und das
+    // dürfte sonst in alle folgenden durchschlagen.
+    fuellstelle.mockReset();
+    fuellstelle.mockReturnValue({ fuellstelle: HYDRANT, busy: false });
   });
 
   it('zeigt Lage und Ergebnis aus dem gespeicherten Profil', () => {
@@ -127,10 +127,11 @@ describe('LoeschwasserfoerderungPanel', () => {
 
     // Die Länge steht unter ihrer Beschriftung; die Abschnittstabelle nennt
     // dieselbe Zahl noch einmal, deshalb gezielt am Label entlang gesucht.
-    // Sie kommt aus der Leaflet-Messung und ist rund 2000 m, nicht exakt.
+    // Sie kommt aus der Leaflet-Messung und ist rund 2000 m, nicht exakt — und
+    // mit deutschem Tausenderpunkt, weil die Zahlen über `useFormatter` laufen.
     expect(
       screen.getByText('Länge der Leitung').nextElementSibling
-    ).toHaveTextContent(/^(19|20)\d\d m$/);
+    ).toHaveTextContent(/^(1\.9|2\.0)\d\d m$/);
     expect(screen.getByText(/EU-DEM 25 m/)).toBeInTheDocument();
     expect(pumpCount()).toBeGreaterThan(0);
   });
@@ -397,10 +398,11 @@ describe('LoeschwasserfoerderungPanel', () => {
       />
     );
 
-    // 2000 m Fahrtroute, 2 Fahrzeuge à 2000 l, 40 km/h, 4 + 3 min ⇒ Umlauf
-    // 13 min, gedeckelt von der Entnahmestelle auf 500 l/min.
+    // 2000 m, 2 Fahrzeuge à 2000 l, 40 km/h, 800 l/min am Hydranten,
+    // 1 min Rangieren, 3 min Entleeren ⇒ Umlauf 12,5 min.
     expect(screen.getByText(/l\/min dauerhaft/)).toBeInTheDocument();
-    expect(screen.getByText(/^Umlaufzeit: 13/)).toBeInTheDocument();
+    // Deutsches Dezimalkomma: Die Zahlen laufen über `useFormatter`.
+    expect(screen.getByText(/^Umlaufzeit: 12,5 min$/)).toBeInTheDocument();
     // Keine Pumpenzahl mehr — in dieser Lage wird keine Leitung gelegt.
     expect(screen.queryByText(/Verstärkerpumpen?$/)).not.toBeInTheDocument();
     expect(
@@ -441,7 +443,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     );
 
     expect(
-      screen.getByText(/Entnahmestelle gibt nur 500 l\/min her/)
+      screen.getByText(/Entnahmestelle gibt nur \d+ l\/min her/)
     ).toBeInTheDocument();
     // Mit weniger Fahrzeugen greift die Schranke nicht.
     const field = screen.getByRole('spinbutton', { name: 'Tanklöschfahrzeuge' });
@@ -451,6 +453,60 @@ describe('LoeschwasserfoerderungPanel', () => {
       expect(
         screen.queryByText(/Entnahmestelle gibt nur/)
       ).not.toBeInTheDocument()
+    );
+  });
+
+  it('nimmt die Ergiebigkeit aus dem Hydranten an der Entnahmestelle', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('spinbutton', { name: /Ergiebigkeit/ })
+    ).toHaveValue(800);
+    expect(screen.getByText(/aus HY-1, 20 m entfernt/)).toBeInTheDocument();
+  });
+
+  it('rechnet ohne Hydrant nicht, sondern fragt', async () => {
+    fuellstelle.mockReturnValue({ fuellstelle: undefined, busy: false });
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Ohne die Ergiebigkeit der Entnahmestelle/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/l\/min dauerhaft/)).not.toBeInTheDocument();
+  });
+
+  it('bietet an, die Leitung auf Fahrzeug-Routing umzustellen', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        // Ohne Fahrzeug-Routing: Die Fahrstrecke ist die gezeichnete Linie.
+        item={withProfile({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/gezeichnete Linie/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Umstellen' }));
+    await waitFor(() =>
+      expect(updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          streetRouting: 'true',
+          routingProfile: 'drive',
+        })
+      )
     );
   });
 
@@ -489,31 +545,6 @@ describe('LoeschwasserfoerderungPanel', () => {
     expect(
       screen.getByRole('spinbutton', { name: /Verlegeleistung/ })
     ).toHaveValue(100);
-  });
-
-  it('holt die Fahrtroute nach, sobald der Pendelverkehr gewählt ist', async () => {
-    renderWithIntl(
-      <LoeschwasserfoerderungPanel
-        item={withProfile({ versorgungsart: 'pendel' })}
-        open
-        onClose={() => {}}
-      />
-    );
-
-    await waitFor(() => expect(ensurePendelRoute).toHaveBeenCalled());
-  });
-
-  it('kostet ohne Pendelverkehr keine Fahrt-Abfrage', async () => {
-    renderWithIntl(
-      <LoeschwasserfoerderungPanel
-        item={withProfile()}
-        open
-        onClose={() => {}}
-      />
-    );
-
-    await waitFor(() => expect(pumpCount()).toBeGreaterThan(0));
-    expect(ensurePendelRoute).not.toHaveBeenCalled();
   });
 
   it('nennt keine Quelle mehr im Panel', () => {

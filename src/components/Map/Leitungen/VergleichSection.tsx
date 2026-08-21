@@ -22,7 +22,8 @@ import type {
   VergleichAnnahmen,
   VergleichSeite,
 } from '../../FirecallItems/elements/connection/pendel/versorgungVergleich';
-import { parseNumber, round } from './panelNumbers';
+import { parseNumber } from './panelNumbers';
+import usePanelNumber from './usePanelNumber';
 
 /**
  * „Leitung legen oder pendeln?" — die Gegenüberstellung mit der Empfehlung
@@ -52,15 +53,16 @@ export default function VergleichSection({
   onAnnahmeChange,
 }: VergleichSectionProps) {
   const t = useTranslations('loeschwasserfoerderung');
+  const num = usePanelNumber();
 
   const flow = (seite: VergleichSeite) =>
     seite.menge !== undefined
-      ? t('flowValue', { value: Math.round(seite.menge) })
+      ? t('flowValue', { value: num(seite.menge, 0) })
       : t('notAvailable');
 
   const setup = (seite: VergleichSeite) =>
     seite.aufbauzeit !== undefined
-      ? `${round(seite.aufbauzeit)} ${t('minute')}`
+      ? `${num(seite.aufbauzeit)} ${t('minute')}`
       : t('notAvailable');
 
   const vehicles = (seite: VergleichSeite) =>
@@ -73,8 +75,8 @@ export default function VergleichSection({
     ? t('bottleneckFillStation')
     : pendel?.result?.faltbehaelter
       ? t('bottleneckBuffer')
-      : pendel?.streckeSource === 'detour'
-        ? t('bottleneckEstimatedDistance')
+      : pendel?.streckeSource === 'drawn'
+        ? t('bottleneckNotVehicleRouted')
         : t('bottleneckNone');
 
   const foerderungBottleneck =
@@ -99,7 +101,7 @@ export default function VergleichSection({
         {vergleich.empfehlung === 'pendel' && t('recommendShuttle')}
         {vergleich.empfehlung === 'foerderung' && t('recommendRelay')}
         {vergleich.empfehlung === 'keine' &&
-          t('recommendNone', { required: Math.round(vergleich.sollMenge) })}
+          t('recommendNone', { required: num(vergleich.sollMenge, 0) })}
         {vergleich.empfehlung === 'unklar' && t('recommendUnclear')}
       </Alert>
 
@@ -109,7 +111,7 @@ export default function VergleichSection({
           color="text.secondary"
           sx={{ display: 'block', mt: 1 }}
         >
-          {t('tippingHint', { metres: Math.round(vergleich.kipppunkt) })}
+          {t('tippingHint', { metres: num(vergleich.kipppunkt, 0) })}
         </Typography>
       )}
 

@@ -1,6 +1,7 @@
 'use client';
 
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -28,9 +29,8 @@ import {
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import { elevationTodo } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import { ensureConnectionElevation } from '../../FirecallItems/elements/connection/foerderung/ensureConnectionElevation';
-import { ensureConnectionPendelRoute } from '../../FirecallItems/elements/connection/pendel/ensureConnectionPendelRoute';
 import {
-  pendelRoutingTodo,
+  pendelEndpoints,
   versorgungsart,
   type Versorgungsart,
 } from '../../FirecallItems/elements/connection/pendel/pendelRoute';
@@ -43,6 +43,7 @@ import {
   versorgungVergleich,
   type VergleichAnnahmen,
 } from '../../FirecallItems/elements/connection/pendel/versorgungVergleich';
+import useFuellstelle from '../../../hooks/useFuellstelle';
 import FoerderungSection from './FoerderungSection';
 import PendelSection from './PendelSection';
 import VergleichSection from './VergleichSection';
@@ -67,6 +68,13 @@ import { parseNumber, round } from './panelNumbers';
  * Jede Änderung rechnet sofort neu, ohne zu speichern. Gespeichert wird mit
  * „Übernehmen" und beim Ablegen der Pumpen.
  */
+
+/**
+ * Danach ist ein Ladehinweis keine Auskunft mehr. Höhenabfrage und Routing haben
+ * je 8 s Zeitlimit und laufen hintereinander; dazu kommen die Schreibvorgänge.
+ * Alles darüber liegt an etwas, das kein Zeitlimit hat.
+ */
+const DERIVED_TIMEOUT_MS = 30_000;
 
 const FLOW_MIN = 200;
 const FLOW_MAX = 2000;
@@ -122,6 +130,7 @@ export default function VersorgungRechner({
   const [manualClimb, setManualClimb] = useState(item.hoehenunterschied ?? 0);
   const [placed, setPlaced] = useState(false);
   const [derivedBusy, setDerivedBusy] = useState(false);
+  const [derivedTimedOut, setDerivedTimedOut] = useState(false);
 
   // Der Rechner arbeitet auf einer Kopie mit den Werten aus dem Panel: So
   // rechnet der Regler, ohne dass jede Bewegung nach Firestore geht.
@@ -137,12 +146,19 @@ export default function VersorgungRechner({
     [item, enabled, reversed, mode, manualClimb]
   );
 
+  // Die Entnahmestelle ist das erste Ende in Förderrichtung. Der Hydrant dort
+  // liefert die Ergiebigkeit, mit der gefüllt wird.
+  const entnahme = useMemo(() => pendelEndpoints(draft)?.[0], [draft]);
+  const { fuellstelle, busy: fuellstelleBusy } = useFuellstelle(
+    mode === 'foerderung' ? undefined : entnahme
+  );
+
   const view = useMemo(() => foerderungView(draft, params), [draft, params]);
   // Auch im Modus „Förderung" nicht gerechnet: Der Pendelverkehr braucht die
   // Fahrtroute, und die wird dort nicht abgefragt.
   const pendelResult = useMemo(
-    () => pendelView(draft, pendel, params.foerderMenge),
-    [draft, pendel, params.foerderMenge]
+    () => pendelView(draft, pendel, params.foerderMenge, fuellstelle),
+    [draft, pendel, params.foerderMenge, fuellstelle]
   );
   const vergleich = useMemo(
     () => versorgungVergleich(view, pendelResult, annahmen),
@@ -165,8 +181,14 @@ export default function VersorgungRechner({
   ) => setAnnahmen((previous) => ({ ...previous, [key]: value }));
 
   const persist = async () => {
+    // `itemRef.current` und nicht `item`: Der Schnappschuss aus dem Render ist
+    // älter als das, was Routing und Höhenprofil in der Zwischenzeit
+    // geschrieben haben — und `updateItem` schreibt ohne `merge`. Mit dem
+    // alten Stand löschte ein Speichern das eben geholte Höhenprofil wieder
+    // weg, die Abfrage lief erneut, und das sah aus wie ein Rechner, der nie
+    // fertig wird.
     await updateItem({
-      ...item,
+      ...itemRef.current,
       foerderung: enabled ? 'true' : 'false',
       foerderungUmgekehrt: reversed ? 'true' : 'false',
       versorgungsart: mode,
@@ -174,7 +196,14 @@ export default function VersorgungRechner({
       pendelFahrzeuge: pendel.fahrzeuge,
       pendelTankinhalt: pendel.tankinhalt,
       pendelGeschwindigkeit: pendel.geschwindigkeit,
-      pendelFuellzeit: pendel.fuellzeit,
+      // Nur der von Hand gesetzte Wert wird gespeichert. Käme der Wert aus dem
+      // Hydranten, schriebe ein Speichern ihn fest — und ein verschobener
+      // Anfangspunkt rechnete danach weiter mit dem alten Hydranten.
+      pendelFuellleistung:
+        pendelResult?.fuellleistungSource === 'manual'
+          ? pendel.fuellleistung
+          : undefined,
+      pendelRangierzeit: pendel.rangierzeit,
       pendelEntleerzeit: pendel.entleerzeit,
       verlegeleistung: annahmen.verlegeleistung,
       pumpenRuestzeit: annahmen.pumpenRuestzeit,
@@ -203,14 +232,12 @@ export default function VersorgungRechner({
   const storedMatches =
     item.foerderung === 'true' && versorgungsart(item) === mode;
   const needsElevation = elevationTodo(storedItem as Connection) === 'fetch';
-  const needsPendelRoute =
-    pendelRoutingTodo(storedItem as Connection) === 'route';
 
   useEffect(() => {
     // Kein `open` in der Bedingung: Der Rechner wird nur gerendert, wenn er
     // gebraucht wird — über der Karte vom Panel, auf der Seite von der Auswahl.
     if (!enabled) return;
-    if (storedMatches && !needsElevation && !needsPendelRoute) return;
+    if (storedMatches && !needsElevation) return;
     if (runningRef.current) return;
 
     let cancelled = false;
@@ -221,17 +248,11 @@ export default function VersorgungRechner({
         if (!storedMatches) {
           await persist();
         } else {
-          const current = {
+          await ensureConnectionElevation(firecallId, {
             ...itemRef.current,
             foerderung: 'true',
             versorgungsart: mode,
-          } as Connection;
-          if (needsElevation) {
-            await ensureConnectionElevation(firecallId, current);
-          }
-          if (needsPendelRoute) {
-            await ensureConnectionPendelRoute(firecallId, current);
-          }
+          } as Connection);
         }
       } catch (err) {
         console.error('unable to prepare versorgung', err);
@@ -247,14 +268,81 @@ export default function VersorgungRechner({
     // `persist` hängt an `item` und allen Panel-Werten und wäre bei jedem Render
     // neu; die Bedingungen oben sind vollständig.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    enabled,
-    mode,
-    storedMatches,
-    needsElevation,
-    needsPendelRoute,
-    firecallId,
-  ]);
+  }, [enabled, mode, storedMatches, needsElevation, firecallId]);
+
+  /**
+   * Der Wachhund gegen einen Ladehinweis, der nie verschwindet.
+   *
+   * Die Abfragen haben eigene Zeitlimits und fangen ihre Fehler ab; trotzdem
+   * blieb im Einsatz „Höhendaten werden abgerufen …" stehen, ohne dass ein
+   * Ergebnis kam. Was auch der Grund war — eine Antwort, die nie eintrifft, ein
+   * Schreibvorgang, der sich mit einem anderen überkreuzt —, nach dieser Zeit
+   * ist der Hinweis eine Lüge. Dann wird gesagt, dass es nicht geklappt hat,
+   * und der Rechner rechnet mit der Handeingabe weiter.
+   */
+  //
+  // Gewarnt wird nur, wenn dann auch **nichts** da ist. Im Dev-Server dauert der
+  // erste Aufruf einer Server-Action länger als das Zeitlimit, weil sie erst
+  // kompiliert wird — das Profil war da, und die Warnung war trotzdem
+  // erschienen. Eine Warnung neben einem fertigen Ergebnis ist schlimmer als
+  // keine.
+  const needsElevationRef = useRef(needsElevation);
+  needsElevationRef.current = needsElevation;
+
+  useEffect(() => {
+    if (!derivedBusy) return;
+    const timer = setTimeout(() => {
+      const stillMissing = needsElevationRef.current;
+      if (stillMissing) {
+        console.warn('versorgung: abgeleitete Daten kamen nicht rechtzeitig');
+      }
+      runningRef.current = false;
+      setDerivedBusy(false);
+      setDerivedTimedOut(stillMissing);
+    }, DERIVED_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [derivedBusy]);
+
+  /**
+   * Die Leitung auf Fahrzeug-Routing umstellen.
+   *
+   * Es ist dieselbe Linie: Im Pendelverkehr ist sie die Fahrstrecke, und dafür
+   * zählen Einbahnen und Abbiegeverbote. Gespeichert wird sofort — das Routing
+   * hängt an gespeicherten Feldern, ein Vorschauwert brächte keine Geometrie.
+   */
+  const enableVehicleRouting = async () => {
+    setDerivedBusy(true);
+    try {
+      await updateItem({
+        ...itemRef.current,
+        foerderung: 'true',
+        versorgungsart: mode,
+        streetRouting: 'true',
+        routingProfile: 'drive',
+      } as Connection);
+    } catch (err) {
+      console.error('unable to switch to vehicle routing', err);
+    } finally {
+      setDerivedBusy(false);
+    }
+  };
+
+  /** Von Hand erneut anfordern, nachdem es einmal nicht geklappt hat. */
+  const retryElevation = async () => {
+    setDerivedTimedOut(false);
+    setDerivedBusy(true);
+    try {
+      await ensureConnectionElevation(
+        firecallId,
+        { ...itemRef.current, foerderung: 'true' } as Connection,
+        { force: true }
+      );
+    } catch (err) {
+      console.error('unable to refetch elevation', err);
+    } finally {
+      setDerivedBusy(false);
+    }
+  };
 
   // Speichert und lässt das Panel offen: Es ist nicht modal, und wer die Werte
   // festhält, will meist weiter an der Lage arbeiten, nicht das Panel loswerden.
@@ -437,6 +525,22 @@ export default function VersorgungRechner({
           </Box>
             )}
 
+            {/* Der Wachhund hat zugeschlagen: Was auch der Grund war, nach
+                dieser Zeit ist ein Ladehinweis eine Lüge. */}
+            {derivedTimedOut && !derivedBusy && (
+              <Alert
+                severity="warning"
+                sx={{ mb: 1.5 }}
+                action={
+                  <Button size="small" color="inherit" onClick={retryElevation}>
+                    {t('retryElevation')}
+                  </Button>
+                }
+              >
+                {t('derivedTimedOut')}
+              </Alert>
+            )}
+
             {/* Die geforderte Menge gilt für beide Varianten — sie ist die
             Anforderung an der Einsatzstelle und keine Eigenschaft eines
             Fördermittels. Deshalb steht der Regler im Rahmen und nicht
@@ -490,15 +594,20 @@ export default function VersorgungRechner({
             manualClimb={manualClimb}
             onManualClimbChange={setManualClimb}
             elevationBusy={derivedBusy}
+            onRetryElevation={retryElevation}
           />
             )}
 
             {mode === 'pendel' && pendelResult && (
           <PendelSection
             view={pendelResult}
-            params={pendel}
+            // Die **wirksamen** Werte, nicht der Reglerzustand: Die
+            // Ergiebigkeit kommt aus dem Hydranten, solange nichts eingetippt
+            // ist, und das Feld soll sie zeigen.
+            params={pendelResult.params}
             onParamChange={setPendelValue}
-            routeBusy={derivedBusy}
+            fuellstelleBusy={fuellstelleBusy}
+            onEnableVehicleRouting={enableVehicleRouting}
           />
             )}
 

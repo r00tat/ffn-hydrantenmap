@@ -4,7 +4,7 @@ import type { LatLngPosition } from '../../../../../common/geo';
 import type { Connection } from '../../../../firebase/firestore';
 import { calculateDistance } from '../distance';
 import { routingSignature } from '../routedPath';
-import { DETOUR_FACTOR } from './pendelRoute';
+import type { Fuellstelle } from './fuellstelle';
 import {
   PENDEL_DEFAULTS,
   pendelParams,
@@ -13,14 +13,18 @@ import {
 } from './pendelverkehr';
 
 const hydrant: LatLngPosition = [47.9482, 16.8482];
-const einsatzstelle: LatLngPosition = [47.9662, 16.8662];
+/** Rund 2000 m östlich — damit greift der Prüfstein aus `shuttle.test.ts`. */
+const einsatzstelle: LatLngPosition = [
+  47.9482,
+  16.8482 + 2000 / (111_320 * Math.cos((47.9482 * Math.PI) / 180)),
+];
 const points: LatLngPosition[] = [hydrant, einsatzstelle];
 
-/** Eine Fahrtroute von genau 2000 m, damit der Prüfstein greift. */
-const fahrRoute: LatLngPosition[] = [
-  [47.9482, 16.8482],
-  [47.9482, 16.8482 + 2000 / (111320 * Math.cos((47.9482 * Math.PI) / 180))],
-];
+const fuellstelle: Fuellstelle = {
+  name: 'HY-12 Hauptstraße',
+  distance: 25,
+  leistung: 800,
+};
 
 const connection = (overrides: Partial<Connection> = {}): Connection =>
   ({
@@ -37,25 +41,44 @@ const connection = (overrides: Partial<Connection> = {}): Connection =>
     ...overrides,
   }) as Connection;
 
-const routedConnection = (overrides: Partial<Connection> = {}) =>
+/** Dieselbe Leitung, auf Fahrzeug-Routing gestellt. */
+const routed = (overrides: Partial<Connection> = {}) =>
   connection({
-    pendelRoutedPositions: JSON.stringify(fahrRoute),
-    pendelRoutedFor: routingSignature([hydrant, einsatzstelle], 'drive'),
+    streetRouting: 'true',
+    routingProfile: 'drive',
+    routedPositions: JSON.stringify(points),
+    routedFor: routingSignature(points, 'drive'),
     ...overrides,
   });
 
 describe('pendelParams', () => {
   it('füllt fehlende Werte mit den Vorbelegungen', () => {
-    expect(pendelParams(connection())).toEqual(PENDEL_DEFAULTS);
+    const params = pendelParams(connection());
+    expect(params.fahrzeuge).toBe(PENDEL_DEFAULTS.fahrzeuge);
+    expect(params.tankinhalt).toBe(PENDEL_DEFAULTS.tankinhalt);
+    expect(params.geschwindigkeit).toBe(PENDEL_DEFAULTS.geschwindigkeit);
+    expect(params.rangierzeit).toBe(PENDEL_DEFAULTS.rangierzeit);
+    expect(params.entleerzeit).toBe(PENDEL_DEFAULTS.entleerzeit);
   });
 
-  it('nimmt die gespeicherten Werte, wenn sie da sind', () => {
-    const params = pendelParams(
-      connection({ pendelFahrzeuge: 5, pendelTankinhalt: 4000 })
-    );
-    expect(params.fahrzeuge).toBe(5);
-    expect(params.tankinhalt).toBe(4000);
-    expect(params.geschwindigkeit).toBe(PENDEL_DEFAULTS.geschwindigkeit);
+  it('hat für die Ergiebigkeit **keine** Vorbelegung', () => {
+    // Der Kern der Sache: Eine feste Füllzeit war stillschweigend eine
+    // behauptete Literleistung. Ohne Datenlage wird gefragt, nicht geraten.
+    expect(pendelParams(connection()).fuellleistung).toBeUndefined();
+    expect('fuellleistung' in PENDEL_DEFAULTS).toBe(false);
+  });
+
+  it('nimmt die Ergiebigkeit aus dem Hydranten in der Nähe', () => {
+    expect(pendelParams(connection(), fuellstelle).fuellleistung).toBe(800);
+  });
+
+  it('lässt den eingetragenen Wert gegen den Hydranten gewinnen', () => {
+    // Wer ihn von Hand gesetzt hat, hat einen Grund — gemessen, oder ein
+    // anderer Anschluss als der, den die GIS-Daten kennen.
+    expect(
+      pendelParams(connection({ pendelFuellleistung: 1200 }), fuellstelle)
+        .fuellleistung
+    ).toBe(1200);
   });
 
   it('lässt keine halben Fahrzeuge und keine Null zu', () => {
@@ -73,105 +96,119 @@ describe('pendelView', () => {
   });
 
   it('rechnet auch für den Vergleich', () => {
-    expect(pendelView(connection({ versorgungsart: 'vergleich' }))).toBeDefined();
+    expect(
+      pendelView(connection({ versorgungsart: 'vergleich' }), {}, undefined, fuellstelle)
+    ).toBeDefined();
   });
 
   it('rechnet nicht ohne eingeschalteten Rechner', () => {
     expect(pendelView(connection({ foerderung: 'false' }))).toBeUndefined();
   });
 
-  it('nimmt die Länge der Fahrtroute, nicht die der Leitung', () => {
-    const view = pendelView(routedConnection());
+  it('trifft den Prüfstein mit der Ergiebigkeit des Hydranten', () => {
+    // 2000 m, 40 km/h, 2000 l, 800 l/min, 1 min Rangieren, 3 min Entleeren
+    // ⇒ Füllzeit 3,5 min, Umlauf 12,5 min, ein Fahrzeug 160 l/min.
+    const view = pendelView(
+      routed({ pendelFahrzeuge: 1 }),
+      {},
+      undefined,
+      fuellstelle
+    );
+    expect(view?.result?.fuellzeit).toBeCloseTo(3.5, 1);
+    expect(view?.result?.umlaufzeit).toBeCloseTo(12.5, 1);
+    expect(view?.result?.menge).toBeCloseTo(160, 0);
+  });
+
+  it('nennt den Hydranten als Quelle der Ergiebigkeit', () => {
+    const view = pendelView(routed(), {}, undefined, fuellstelle);
+    expect(view?.fuellleistungSource).toBe('hydrant');
+    expect(view?.fuellstelle?.name).toBe('HY-12 Hauptstraße');
+  });
+
+  it('nennt eine eingetragene Ergiebigkeit als Handeingabe', () => {
+    const view = pendelView(
+      routed({ pendelFuellleistung: 1200 }),
+      {},
+      undefined,
+      fuellstelle
+    );
+    expect(view?.fuellleistungSource).toBe('manual');
+  });
+
+  it('rechnet ohne Ergiebigkeit nicht und sagt genau das', () => {
+    const view = pendelView(routed());
+    expect(view?.fuellleistungSource).toBe('unknown');
+    expect(view?.warnings).toContain('fillRateMissing');
+    expect(view?.result).toBeUndefined();
+    // Keine zweite Meldung über dasselbe.
+    expect(view?.warnings).not.toContain('notComputable');
+  });
+
+  it('misst die Fahrstrecke an der gerouteten Leitung', () => {
+    const view = pendelView(routed(), {}, undefined, fuellstelle);
     expect(view?.streckeSource).toBe('route');
-    // Auf wenige Meter: Die Testroute ist über die Näherung „Grad je Meter"
-    // gesetzt, Leaflet misst auf dem Ellipsoid.
-    expect(view?.strecke).toBeGreaterThan(1990);
-    expect(view?.strecke).toBeLessThan(2010);
-    // Die Leitung selbst ist deutlich länger.
-    expect(calculateDistance(points)).toBeGreaterThan(2200);
+    expect(view?.strecke).toBeCloseTo(calculateDistance(points), 6);
+    expect(view?.warnings).not.toContain('notVehicleRouted');
   });
 
-  it('trifft den Prüfstein: 13 min Umlauf, 153,8 l/min mit einem Fahrzeug', () => {
+  it('weist die gezeichnete Linie als solche aus', () => {
+    const view = pendelView(connection(), {}, undefined, fuellstelle);
+    expect(view?.streckeSource).toBe('drawn');
+    expect(view?.warnings).toContain('notVehicleRouted');
+    // Gerechnet wird trotzdem — die gezeichnete Strecke ist eine Auskunft.
+    expect(view?.result).toBeDefined();
+  });
+
+  it('warnt, wenn die Entnahmestelle die Menge deckelt', () => {
     const view = pendelView(
-      routedConnection({
-        pendelFahrzeuge: 1,
-        pendelTankinhalt: 2000,
-        pendelGeschwindigkeit: 40,
-        pendelFuellzeit: 4,
-        pendelEntleerzeit: 3,
-      })
-    );
-    expect(view?.result?.umlaufzeit).toBeCloseTo(13, 1);
-    expect(view?.result?.menge).toBeCloseTo(153.8, 0);
-  });
-
-  it('weist die Luftlinienschätzung als solche aus', () => {
-    const view = pendelView(connection());
-    expect(view?.streckeSource).toBe('detour');
-    expect(view?.strecke).toBeCloseTo(
-      calculateDistance(points) * DETOUR_FACTOR,
-      6
-    );
-    expect(view?.warnings).toContain('estimatedDistance');
-  });
-
-  it('warnt, wenn die Füllstelle die Menge deckelt', () => {
-    const view = pendelView(
-      routedConnection({
-        pendelFahrzeuge: 8,
-        pendelTankinhalt: 2000,
-        pendelGeschwindigkeit: 40,
-        pendelFuellzeit: 4,
-        pendelEntleerzeit: 3,
-      })
+      routed({ pendelFahrzeuge: 8 }),
+      {},
+      undefined,
+      fuellstelle
     );
     expect(view?.warnings).toContain('fillStationLimited');
-    expect(view?.result?.menge).toBeCloseTo(500, 6);
+    expect(view?.result?.menge).toBeCloseTo(2000 / 3.5, 1);
   });
 
   it('warnt, wenn die Sollmenge nicht getragen wird', () => {
-    const view = pendelView(routedConnection({ foerderMenge: 1000 }));
+    const view = pendelView(
+      routed({ foerderMenge: 1000 }),
+      {},
+      undefined,
+      fuellstelle
+    );
     expect(view?.warnings).toContain('sollMengeNotReached');
   });
 
-  it('nimmt die Sollmenge aus der Fördermenge — dieselbe Zahl für beide Varianten', () => {
-    expect(pendelView(routedConnection({ foerderMenge: 600 }))?.sollMenge).toBe(
-      600
-    );
+  it('nimmt die Sollmenge aus der Fördermenge', () => {
+    expect(
+      pendelView(routed({ foerderMenge: 600 }), {}, undefined, fuellstelle)
+        ?.sollMenge
+    ).toBe(600);
   });
 
   it('lässt den Regler mit Überschreibungen rechnen, ohne zu speichern', () => {
-    const item = routedConnection({ pendelFahrzeuge: 1 });
-    const view = pendelView(item, { fahrzeuge: 4 });
+    const item = routed({ pendelFahrzeuge: 1 });
+    const view = pendelView(item, { fahrzeuge: 4 }, undefined, fuellstelle);
     expect(view?.params.fahrzeuge).toBe(4);
-    // Das Element bleibt unberührt.
     expect(item.pendelFahrzeuge).toBe(1);
-  });
-
-  it('gibt die Fahrtroute für die Karte weiter', () => {
-    expect(pendelView(routedConnection())?.routedPositions).toEqual(fahrRoute);
-    expect(pendelView(connection())?.routedPositions).toBeUndefined();
   });
 });
 
 describe('pendelSummary', () => {
   it('nennt Fahrzeuge und Menge', () => {
-    const summary = pendelSummary(
-      routedConnection({
-        pendelFahrzeuge: 3,
-        pendelTankinhalt: 2000,
-        pendelGeschwindigkeit: 40,
-        pendelFuellzeit: 4,
-        pendelEntleerzeit: 3,
-      })
-    );
-    expect(summary).toMatch(/3/);
-    expect(summary).toMatch(/46[12]/);
+    const summary = pendelSummary(routed({ pendelFahrzeuge: 3 }), fuellstelle);
+    expect(summary).toMatch(/3 Fz/);
+    expect(summary).toMatch(/l\/min/);
   });
 
-  it('schweigt ohne Ergebnis', () => {
+  it('schweigt ohne Ergiebigkeit', () => {
+    expect(pendelSummary(routed())).toBeUndefined();
+  });
+
+  it('schweigt ohne Pendelverkehr', () => {
     expect(
-      pendelSummary(connection({ versorgungsart: 'foerderung' }))
+      pendelSummary(connection({ versorgungsart: 'foerderung' }), fuellstelle)
     ).toBeUndefined();
   });
 });

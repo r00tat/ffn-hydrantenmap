@@ -339,23 +339,18 @@ export interface Connection extends MultiPointItem {
   pendelTankinhalt?: number;
   /** Durchschnittsgeschwindigkeit der Einsatzfahrt in km/h. */
   pendelGeschwindigkeit?: number;
-  /** Füllzeit an der Entnahmestelle in min. */
-  pendelFuellzeit?: number;
+  /**
+   * Ergiebigkeit der Entnahmestelle in l/min.
+   *
+   * Ersetzt die frühere feste Füllzeit: Die war stillschweigend die Behauptung
+   * „500 l/min an jeder Entnahmestelle". Fehlt das Feld, gilt der Hydrant in
+   * 100 m Umkreis; gibt es auch den nicht, wird gefragt statt geraten.
+   */
+  pendelFuellleistung?: number;
+  /** An- und Abfahren an der Entnahmestelle in min. */
+  pendelRangierzeit?: number;
   /** Entleerzeit an der Einsatzstelle in min. */
   pendelEntleerzeit?: number;
-  /**
-   * Fahrtroute des Pendelverkehrs — stringified LatLngPosition[], geroutet mit
-   * dem Profil `drive`.
-   *
-   * Ein eigener Satz Felder neben `routedPositions`: Die Fahrt ist nicht der
-   * Schlauchweg. Sie führt nur von einem Ende zum anderen, hält sich an
-   * Einbahnen und benutzt keine Fußwege.
-   */
-  pendelRoutedPositions?: string;
-  /** Signatur der Enden, für die `pendelRoutedPositions` gilt. */
-  pendelRoutedFor?: string;
-  /** `'true'`, wenn das Fahr-Routing für diese Signatur gescheitert ist. */
-  pendelRoutingFailed?: string;
   /** Verlegeleistung einer B-Leitung in m/min — Planungswert für die Aufbauzeit. */
   verlegeleistung?: number;
   /** Rüstzeit je Pumpe in min — Planungswert für die Aufbauzeit. */

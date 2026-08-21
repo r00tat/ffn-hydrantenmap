@@ -65,7 +65,18 @@ export interface FoerderungParams {
 
 export type FoerderungWarning =
   | 'unknownDimension'
+  /** Kein Profil vorhanden — noch nicht abgefragt oder Rechner gerade an. */
   | 'noElevationData'
+  /**
+   * Die Abfrage ist für diese Lage **gescheitert**.
+   *
+   * Eigene Warnung und nicht dasselbe wie `noElevationData`: „liegt nicht vor"
+   * und „ließ sich nicht holen" sind für den, der davorsitzt, zwei verschiedene
+   * Lagen — die zweite ist ein Anlass, es noch einmal zu versuchen. Der
+   * Unterschied war bisher im Code vorhanden (`foerderungElevationFailed`) und
+   * wurde nirgends angezeigt.
+   */
+  | 'elevationFailed'
   | 'flowAbovePumpRating'
   | 'notFeasible';
 
@@ -214,7 +225,11 @@ export function foerderungView(
   }));
 
   if (!elevations) {
-    warnings.push('noElevationData');
+    warnings.push(
+      isElevationFallback(item, drawnSamples)
+        ? 'elevationFailed'
+        : 'noElevationData'
+    );
   }
 
   const dimension = item.dimension || 'B';

@@ -6,6 +6,7 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
@@ -26,7 +27,8 @@ import type {
   FoerderungView,
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import FoerderungProfileChart from './FoerderungProfileChart';
-import { parseNumber, round } from './panelNumbers';
+import { parseNumber } from './panelNumbers';
+import usePanelNumber from './usePanelNumber';
 
 /**
  * Die Förderung über lange Wegstrecke im Panel: Pumpenzahl, Drücke,
@@ -43,6 +45,8 @@ const OUTPUT_PRESSURES = [6, 8, 10];
 export interface FoerderungSectionProps {
   item: Connection;
   view: FoerderungView;
+  /** Die Höhenabfrage von Hand erneut anstoßen. */
+  onRetryElevation?: () => void;
   params: FoerderungParams;
   onParamChange: <K extends keyof FoerderungParams>(
     key: K,
@@ -57,6 +61,7 @@ export interface FoerderungSectionProps {
 export default function FoerderungSection({
   item,
   view,
+  onRetryElevation,
   params,
   onParamChange,
   manualClimb,
@@ -64,6 +69,7 @@ export default function FoerderungSection({
   elevationBusy,
 }: FoerderungSectionProps) {
   const t = useTranslations('loeschwasserfoerderung');
+  const num = usePanelNumber();
   const hasProfile = view.elevationSource === 'profile';
 
   return (
@@ -74,22 +80,41 @@ export default function FoerderungSection({
             {t('boosterPumps', { count: view.result.verstaerkerpumpen })}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {t('endPressure')}: {round(view.result.enddruck)} {t('bar')}
+            {t('endPressure')}: {num(view.result.enddruck)} {t('bar')}
           </Typography>
         </Box>
       )}
 
       {view.warnings
-        .filter((warning) => !(elevationBusy && warning === 'noElevationData'))
+        // Solange die Höhen unterwegs sind, wäre beides voreilig — der
+        // Ladehinweis oben sagt es schon richtig.
+        .filter(
+          (warning) =>
+            !(
+              elevationBusy &&
+              (warning === 'noElevationData' || warning === 'elevationFailed')
+            )
+        )
         .map((warning) => (
           <Alert
             key={warning}
             severity={warning === 'noElevationData' ? 'info' : 'warning'}
             sx={{ mt: 1.5 }}
+            // Ein Fehlschlag ist kein Endzustand: Der Höhendienst gibt keine
+            // Verfügbarkeitszusage, und ein Aussetzer soll die Leitung nicht
+            // für immer bei der Handeingabe lassen.
+            action={
+              warning === 'elevationFailed' && onRetryElevation ? (
+                <Button size="small" color="inherit" onClick={onRetryElevation}>
+                  {t('retryElevation')}
+                </Button>
+              ) : undefined
+            }
           >
             {warning === 'unknownDimension' &&
               t('warningUnknownDimension', { dimension: view.dimension })}
             {warning === 'noElevationData' && t('warningNoElevationData')}
+            {warning === 'elevationFailed' && t('warningElevationFailed')}
             {warning === 'flowAbovePumpRating' &&
               t('warningFlowAbovePumpRating', {
                 rating: params.pumpenNennstrom,
@@ -110,7 +135,7 @@ export default function FoerderungSection({
                   ist ungültiges HTML und warnt bei der Hydration. */}
               <Typography variant="body2" component="div">
                 {t('frictionPer100m', {
-                  value: round(view.frictionPer100m ?? 0, 2),
+                  value: num(view.frictionPer100m ?? 0, 2),
                 })}
                 {!view.frictionTabulated && (
                   <Tooltip title={t('frictionDerivedHint')}>
@@ -139,7 +164,7 @@ export default function FoerderungSection({
                 {t('frictionTotal')}
               </Typography>
               <Typography variant="body2">
-                {round(view.result.reibungsverlustBar)} {t('bar')}
+                {num(view.result.reibungsverlustBar)} {t('bar')}
               </Typography>
             </Grid>
             <Grid size={{ xs: 6 }}>
@@ -147,7 +172,7 @@ export default function FoerderungSection({
                 {t('elevationTotal')}
               </Typography>
               <Typography variant="body2">
-                {round(view.result.hoehenverlustBar)} {t('bar')}
+                {num(view.result.hoehenverlustBar)} {t('bar')}
               </Typography>
             </Grid>
           </Grid>
@@ -165,7 +190,7 @@ export default function FoerderungSection({
           <Typography variant="caption" color="text.secondary">
             {t('length')}
           </Typography>
-          <Typography variant="body2">{Math.round(view.length)} m</Typography>
+          <Typography variant="body2">{num(view.length, 0)} m</Typography>
         </Grid>
         <Grid size={{ xs: 6 }}>
           <Typography variant="caption" color="text.secondary">
@@ -186,7 +211,7 @@ export default function FoerderungSection({
             fullWidth
             disabled={hasProfile}
             label={`${t('elevationDifference')} (${t('metre')})`}
-            value={hasProfile ? round(view.hoehenunterschied) : manualClimb}
+            value={hasProfile ? num(view.hoehenunterschied) : manualClimb}
             onChange={(event) =>
               onManualClimbChange(parseNumber(event.target.value, manualClimb))
             }
@@ -328,16 +353,16 @@ export default function FoerderungSection({
                     <TableRow
                       key={`${abschnitt.vonMeter}-${abschnitt.bisMeter}`}
                     >
-                      <TableCell>{Math.round(abschnitt.vonMeter)} m</TableCell>
-                      <TableCell>{Math.round(abschnitt.bisMeter)} m</TableCell>
+                      <TableCell>{num(abschnitt.vonMeter, 0)} m</TableCell>
+                      <TableCell>{num(abschnitt.bisMeter, 0)} m</TableCell>
                       <TableCell align="right">
-                        {round(abschnitt.hoehenunterschied)} m
+                        {num(abschnitt.hoehenunterschied)} m
                       </TableCell>
                       <TableCell align="right">
-                        {round(abschnitt.druckverlust)}
+                        {num(abschnitt.druckverlust)}
                       </TableCell>
                       <TableCell align="right">
-                        {round(abschnitt.enddruck)}
+                        {num(abschnitt.enddruck)}
                       </TableCell>
                     </TableRow>
                   ))}

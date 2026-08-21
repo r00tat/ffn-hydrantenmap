@@ -3,28 +3,27 @@
 import type { LatLngPosition } from '../../../../../common/geo';
 import type { Connection, MultiPointItem } from '../../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from '../distance';
-import { routingSignature } from '../routedPath';
+import { itemRoutingProfile } from '../streetRouting';
+import {
+  connectionDisplayPositions,
+  isStreetRoutingEnabled,
+  isStreetRoutingFallback,
+} from '../streetRouting';
 
 /**
- * Die Fahrstrecke des Pendelverkehrs: gespeicherte Geometrie, ihre Gültigkeit
- * und der Ersatz, wenn keine zu bekommen ist.
+ * Die Fahrstrecke des Pendelverkehrs — **die gezeichnete Leitung selbst**.
  *
- * Sie ist **nicht** die Schlauchlänge. Der Schlauch zickzackt über die
- * gesetzten Punkte und folgt der Straße, ohne sich an Einbahnen zu halten; das
- * Fahrzeug fährt die Straße, und zwar nur von einem Ende zum anderen. Deshalb
- * ein eigener Satz Felder und ein eigenes Routing mit dem Profil `drive` —
- * siehe docs/pendelverkehr.md.
- */
-
-/**
- * Umwegfaktor Straße gegen Luftlinie, wenn kein Routing zu bekommen ist.
+ * Es gab hier einmal eine zweite Geometrie: ein eigenes Routing zwischen den
+ * beiden Enden, gestrichelt neben der Leitung gezeichnet. Das war falsch
+ * gedacht. Wer eine Pendelstrecke absteckt, setzt die Punkte dorthin, wo
+ * gefahren wird — eine zweite Linie, die sich einen anderen Weg sucht, ignoriert
+ * genau diese Arbeit und behauptet eine Strecke, die niemand bestellt hat.
  *
- * #693 nennt ihn als Ersatzweg. 1,3 ist der geläufige Planungswert im verbauten
- * Gebiet. Die damit gerechnete Strecke weist sich als Schätzung aus — eine
- * geschätzte Meterzahl, die wie eine gemessene aussieht, wäre schlimmer als
- * keine.
+ * Gerechnet wird deshalb mit dem Verlauf über **alle** Punkte. Damit die Strecke
+ * der Straße folgt, wird die Leitung auf Routing mit dem Profil `drive`
+ * gestellt — dieselben Felder wie beim Schlauch, nur ein anderes Profil. Siehe
+ * docs/pendelverkehr.md.
  */
-export const DETOUR_FACTOR = 1.3;
 
 /** Die Versorgungsart, die am Element steht. */
 export type Versorgungsart = 'foerderung' | 'pendel' | 'vergleich';
@@ -42,11 +41,23 @@ export const isPendelRelevant = (item: MultiPointItem): boolean =>
   versorgungsart(item) !== 'foerderung';
 
 /**
+ * Ob der Verlauf für ein **Fahrzeug** geroutet ist.
+ *
+ * Nur dann ist die Länge eine Fahrstrecke: Das Fußgänger-Profil ignoriert
+ * Einbahnen und Abbiegeverbote und schneidet über Fußwege ab. Ein
+ * fehlgeschlagenes Routing zählt nicht mit — dann steht die Luftlinie zwischen
+ * den Punkten.
+ */
+export const isVehicleRouted = (item: MultiPointItem): boolean =>
+  isStreetRoutingEnabled(item) &&
+  itemRoutingProfile(item) === 'drive' &&
+  !isStreetRoutingFallback(item);
+
+/**
  * Die beiden Enden der Leitung, in Förderrichtung: Entnahmestelle zuerst.
  *
- * Nur die Enden, nicht alle Punkte — ein Zwischenpunkt der Schlauchleitung ist
- * kein Wegpunkt der Fahrt. Damit ändert sich die Signatur auch nicht, wenn ein
- * Punkt in der Mitte wandert, und ein Routing-Aufruf bleibt aus.
+ * Gebraucht für die Suche nach der Entnahmestelle in der Nähe und für die
+ * Beschriftung der Richtung — nicht mehr fürs Routing.
  */
 export function pendelEndpoints(
   item: MultiPointItem
@@ -63,109 +74,38 @@ export function pendelEndpoints(
     : [first, last];
 }
 
-/** Die Signatur, für die eine gespeicherte Fahrgeometrie gelten muss. */
-export function pendelRoutingSignature(item: MultiPointItem): string {
-  const endpoints = pendelEndpoints(item);
-  return endpoints ? routingSignature(endpoints, 'drive') : '';
-}
-
-const parsePositions = (value?: string): LatLngPosition[] | undefined => {
-  if (!value) return undefined;
-  try {
-    const positions = JSON.parse(value);
-    return Array.isArray(positions) && positions.length > 1
-      ? (positions as LatLngPosition[])
-      : undefined;
-  } catch (err) {
-    console.warn(`unable to parse pendel route ${err} ${value}`);
-    return undefined;
-  }
-};
-
-/**
- * Die gespeicherte Fahrtroute, sofern sie zu den aktuellen Enden gehört. Sonst
- * `undefined` — dann gilt die Luftlinie mit Umwegfaktor, bis sie nachgezogen
- * ist.
- */
-export function pendelRoutedPositions(
-  item: MultiPointItem
-): LatLngPosition[] | undefined {
-  const connection = item as Connection;
-  if (!isPendelRelevant(item)) return undefined;
-  if (connection.pendelRoutedFor !== pendelRoutingSignature(item)) {
-    return undefined;
-  }
-  return parsePositions(connection.pendelRoutedPositions);
-}
-
-/** Ob das Routing für die aktuelle Lage gescheitert ist. */
-export function isPendelRoutingFallback(item: MultiPointItem): boolean {
-  const connection = item as Connection;
-  return (
-    isPendelRelevant(item) &&
-    connection.pendelRoutingFailed === 'true' &&
-    connection.pendelRoutedFor === pendelRoutingSignature(item)
-  );
-}
-
 export interface PendelDistance {
   /** Einfache Fahrstrecke in m. */
   strecke: number;
-  /** Woher sie kommt. */
-  source: 'route' | 'detour';
+  /**
+   * Woher sie kommt: `'route'` aus dem Fahrzeug-Routing über alle Punkte,
+   * `'drawn'` aus der gezeichneten Linie ohne Routing.
+   */
+  source: 'route' | 'drawn';
 }
 
 /**
  * Die einfache Fahrstrecke und ihre Herkunft.
  *
- * Gemessen wird die Geometrie mit derselben Funktion, die auch die Luftlinie
- * misst — damit ist die angezeigte Zahl immer die der gezeichneten Linie, und
- * es braucht kein eigenes Meter-Feld am Element. Gleiches Muster wie beim
- * Schlauch-Routing.
+ * Gemessen wird der Verlauf, den die Karte zeichnet — mit Routing der
+ * Straßenverlauf über alle Punkte, sonst die Luftlinien zwischen ihnen.
+ * Dieselbe Funktion wie für die Schlauchlänge; die angezeigte Zahl ist damit
+ * immer die der gezeichneten Linie.
+ *
+ * **Kein Umwegfaktor.** Er gehörte zu der zweiten, automatisch gerouteten
+ * Linie. Auf eine Strecke, die von Hand entlang der Straße abgesteckt wurde,
+ * einen Aufschlag zu rechnen, wäre doppelt gezählt.
  */
-export function pendelDistance(item: MultiPointItem): PendelDistance | undefined {
-  const endpoints = pendelEndpoints(item);
-  if (!endpoints) return undefined;
-
-  const routed = pendelRoutedPositions(item);
-  if (routed) {
-    return { strecke: calculateDistance(routed), source: 'route' };
-  }
+export function pendelDistance(
+  item: MultiPointItem
+): PendelDistance | undefined {
+  const positions = connectionDisplayPositions(item).filter(
+    ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
+  );
+  if (positions.length < 2) return undefined;
 
   return {
-    strecke: calculateDistance(endpoints) * DETOUR_FACTOR,
-    source: 'detour',
+    strecke: calculateDistance(positions),
+    source: isVehicleRouted(item) ? 'route' : 'drawn',
   };
-}
-
-export type PendelRoutingTodo = 'none' | 'clear' | 'route';
-
-const hasStoredRoute = (item: MultiPointItem): boolean => {
-  const connection = item as Connection;
-  return !!(
-    connection.pendelRoutedPositions ||
-    connection.pendelRoutedFor ||
-    connection.pendelRoutingFailed
-  );
-};
-
-/**
- * Was an der Fahrtroute zu tun ist, nachdem sich die Leitung geändert hat.
- *
- * `'route'` nur bei tatsächlichem Bedarf: Eine Geometrie, die zu den Enden
- * passt, bleibt stehen — und ein Routing, das für genau diese Enden schon
- * gescheitert ist, wird nicht bei jeder weiteren Änderung erneut versucht.
- *
- * Solange die Versorgungsart `foerderung` ist, wird nicht geroutet: Eine
- * gewöhnliche Förderungsrechnung soll keinen zusätzlichen Aufruf kosten.
- */
-export function pendelRoutingTodo(item: MultiPointItem): PendelRoutingTodo {
-  if (!isPendelRelevant(item)) {
-    return hasStoredRoute(item) ? 'clear' : 'none';
-  }
-  if (!pendelEndpoints(item)) return hasStoredRoute(item) ? 'clear' : 'none';
-  if (pendelRoutedPositions(item) || isPendelRoutingFallback(item)) {
-    return 'none';
-  }
-  return 'route';
 }

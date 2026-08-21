@@ -15,12 +15,55 @@ Annahmen niemand nachprüfen kann, ist im Führungsvorgang wertlos.
 ## Die Formel
 
 ```
+t_füll   = V/L + t_rangier
 t_umlauf = 2·s/v + t_füll + t_entleer
 Q        = min( n·V / t_umlauf ,  V / t_füll )
 ```
 
-`s` einfache Fahrstrecke in m, `v` Geschwindigkeit, `V` Tankinhalt, `n`
-Fahrzeuge, Zeiten in Minuten, `Q` in l/min.
+`s` einfache Fahrstrecke in m, `v` Geschwindigkeit, `V` Tankinhalt, `L`
+Ergiebigkeit der Entnahmestelle in l/min, `n` Fahrzeuge, Zeiten in Minuten, `Q`
+in l/min.
+
+### Die Füllzeit ist gerechnet, nicht eingegeben
+
+Sie war einmal ein Eingabefeld mit dem Vorgabewert 4 Minuten. Das war
+stillschweigend die Behauptung **„500 l/min an jeder Entnahmestelle"** — eine
+Zahl, die aus nichts folgt und die dann die Menge des ganzen Pendelverkehrs
+deckelt. Wer den Tankinhalt auf 4000 l änderte, behauptete damit unbemerkt
+1000 l/min.
+
+Eingegeben wird deshalb die **Ergiebigkeit**, und die Füllzeit folgt daraus.
+Woher sie kommt:
+
+1. **Der Hydrant an der Entnahmestelle**, wenn einer innerhalb von **100 m**
+   steht und eine Leistungsangabe hat. 100 m ist die Weite, in der ein Fahrzeug
+   noch am Hydranten steht und nicht erst hinfährt; weiter weg wäre es eine
+   eigene Fahrstrecke, die in der Umlaufzeit fehlt. Gesucht wird über dieselbe
+   Geohash-Umkreissuche wie beim Assistenten (`queryClusters` +
+   `collectWaterSupplyCandidates`).
+2. **Die Eingabe**, wenn keiner in Reichweite ist oder die Angabe fehlt. Der
+   eingetragene Wert gewinnt immer gegen den Hydranten: Wer ihn setzt, hat einen
+   Grund — gemessen, oder ein anderer Anschluss als der, den die GIS-Daten
+   kennen.
+3. **Nichts.** Ohne Ergiebigkeit wird nicht gerechnet, sondern gefragt. Ein
+   Vorgabewert wäre genau die Annahme, die hier abgeschafft wurde.
+
+Gespeichert wird nur der von Hand gesetzte Wert. Käme der Wert aus dem
+Hydranten, schriebe ein Speichern ihn fest — und ein verschobener Anfangspunkt
+rechnete danach weiter mit dem alten Hydranten.
+
+Das Feld `leistung` des GIS-Imports ist Freitext („1074", „800 l/min", „1.200").
+Ein Punkt oder Komma mit **genau drei Ziffern dahinter** ist deutsche
+Tausendertrennung und kein Dezimaltrenner: „1.200" sind 1200 l/min, nicht 1,2.
+Ohne diesen Schritt las der Rechner am starken Hydranten die schwächste Leistung
+im Datensatz.
+
+Ein näherer Hydrant **ohne** Leistungsangabe verdrängt keinen weiter entfernten
+mit: Gesucht ist die Zahl, nicht der Hydrant.
+
+Nur Hydranten. Saugstelle und Löschteich tragen ihre Ergiebigkeit in anderen
+Feldern (`wasserentnahme`, `zufluss`) und sind ein eigener Fall — mit eigener
+Frage, ob eine Saugstelle überhaupt als Füllplatz für mehrere Fahrzeuge taugt.
 
 ### Die Füllstelle ist eine Schranke, nicht ein Summand
 
@@ -30,10 +73,15 @@ damit höchstens einen Tankinhalt je Füllzeit her, ganz unabhängig davon, wie
 viele Fahrzeuge im Umlauf sind. Ab `n > t_umlauf/t_füll` stehen die weiteren in
 der Schlange.
 
-**Prüfstein:** 2000 m, 40 km/h, 2000 l, 4 + 3 min ⇒ Umlaufzeit 13 min. Die
-Schranke ist 2000/4 = 500 l/min und greift ab 3,25 Fahrzeugen. Drei Fahrzeuge
-liefern 461,5 l/min, vier liefern nicht 615,4 sondern **500**, und zehn liefern
-auch nicht mehr. Das steht als Testzusicherung in `shuttle.test.ts`.
+Die Schranke ist ein Tankinhalt je **Füllzeit** und liegt damit unter der
+Ergiebigkeit, sobald Rangierzeit im Spiel ist: Die Entnahmestelle ist auch dann
+besetzt, wenn gerade kein Wasser läuft. Ohne Rangierzeit fallen beide zusammen.
+
+**Prüfstein:** 2000 m, 40 km/h, 2000 l, 800 l/min, 1 min Rangieren, 3 min
+Entleeren ⇒ Füllzeit 3,5 min, Umlaufzeit 12,5 min. Ein Fahrzeug liefert
+160 l/min, drei liefern 480. Die Schranke ist 2000/3,5 = 571 l/min und greift ab
+3,57 Fahrzeugen; vier liefern deshalb nicht 640 sondern **571**, und zehn
+liefern auch nicht mehr. Das steht als Testzusicherung in `shuttle.test.ts`.
 
 Ohne die Schranke wies der Regler eine Leistung aus, die keine Entnahmestelle
 hergibt — und genau der Regler ist der Zweck des Panels.
@@ -69,54 +117,49 @@ Tabellenwerte.
 | --- | --- | --- |
 | Geschwindigkeit | 40 km/h | Einsatzfahrt mit vollem Tank, Ortsgebiet und Freiland gemischt. Die Literatur rechnet Pendelverkehr mit 30 km/h im Ort bis 50 km/h im Freiland; 40 liegt dazwischen. |
 | Tankinhalt | 2000 l | untere Klasse der Tarifordnung („Tanklöschfahrzeug bis 2.000 l", s. `defaultKostenersatzRates.ts`) |
-| Füllzeit | 4 min | 2000 l bei ~600 l/min plus Anfahren und Ankuppeln an der Füllstelle |
+| **Ergiebigkeit** | **kein Vorgabewert** | Hydrant in 100 m oder Eingabe — siehe oben |
+| Rangierzeit | 1 min | An- und Abfahren an der Entnahmestelle, Kuppeln inbegriffen |
 | Entleerzeit | 3 min | 2000 l über die eigene Pumpe plus Anfahren |
 | Fahrzeuge | 2 | Der kleinste Pendelverkehr, der einer ist. |
 
-**Neben den Zeitfeldern steht die Leistung, die sie bedeuten** („entspricht
-500 l/min"). Das ist kein Beiwerk: Wer den Tankinhalt auf 4000 l ändert und die
-Füllzeit bei 4 min stehen lässt, behauptet damit 1000 l/min an der
-Entnahmestelle. Ohne die Zeile bliebe das unsichtbar.
+Neben der Rangierzeit steht die **gesamte** Füllzeit, die daraus folgt, und neben
+der Entleerzeit die Leistung, die sie bedeutet. Beides hält die Zahlen
+nachprüfbar, ohne sie zweimal eingeben zu lassen.
 
-Eine **Ableitung** der Zeiten aus Tankinhalt und Ergiebigkeit wäre möglich, ist
-aber nicht umgesetzt: Ein Einsatzleiter schätzt die Füllzeit, er rechnet sie
-nicht — und die Ergiebigkeit des Hydranten am Leitungsanfang kennt die App nicht
-verlässlich. Die Hinweiszeile leistet dasselbe, ohne eine Genauigkeit zu
-behaupten, die nicht da ist.
+## Fahrstrecke: die gezeichnete Leitung
 
-## Fahrstrecke
+Die Fahrstrecke ist **diese Leitung**, über **alle** Punkte.
 
-**Die Fahrstrecke ist nicht die Schlauchlänge.** Der Schlauch zickzackt über die
-gesetzten Punkte und folgt der Straße, ohne sich an Einbahnen zu halten; das
-Fahrzeug fährt die Straße, und zwar nur von einem Ende zum anderen.
+Es gab hier einmal eine zweite Geometrie: ein eigenes Routing zwischen den
+beiden Enden, gestrichelt neben der Leitung gezeichnet, mit Luftlinie × 1,3 als
+Ersatz. Das war falsch gedacht, und im Einsatz sofort sichtbar falsch. **Wer eine
+Pendelstrecke absteckt, setzt die Punkte dorthin, wo gefahren wird.** Eine zweite
+Linie, die sich einen eigenen Weg von Ende zu Ende sucht, ignoriert genau diese
+Arbeit, lässt die abgesteckten Zwischenpunkte liegen und behauptet eine Strecke,
+die niemand bestellt hat.
 
-Deshalb ein eigenes Routing mit dem Profil `drive` und ein eigener Satz Felder
-(`pendelRoutedPositions`, `pendelRoutedFor`, `pendelRoutingFailed`). Eine neue
-Server-Action braucht es nicht: `computeStreetRoutedPositions` nimmt das Profil
-schon als Parameter, und `routedPath.ts` kennt `'drive'`.
+Damit die Strecke der Straße folgt, wird die Leitung auf **Routing mit dem Profil
+`drive`** gestellt — dieselben Felder wie beim Schlauch, nur ein anderes Profil.
+Das Profil steht deshalb jetzt an der Leitung zur Wahl („Schlauch" /
+„Fahrzeug"); vorher gab es das bewusst nicht, weil ein Schlauch nicht fährt. Im
+Pendelverkehr fährt er.
 
-- **Nur die beiden Enden** gehen ins Routing, in Förderrichtung. Ein
-  Zwischenpunkt der Schlauchleitung ist kein Wegpunkt der Fahrt — und damit
-  ändert ein verschobener Zwischenpunkt die Signatur nicht und kostet keinen
-  Routing-Aufruf.
-- **Gemessen wird die Geometrie** clientseitig mit demselben `calculateDistance`,
-  das auch die Luftlinie misst. Die angezeigte Zahl ist damit immer die der
-  gezeichneten Linie, und es braucht kein eigenes Meter-Feld.
-- **Gezeichnet**, gestrichelt und in anderer Farbe als der Schlauchweg. Eine
-  Strecke, die niemand sehen kann, ist im Einsatz eine Behauptung; gezeichnet
-  ist sie nachprüfbar.
-- **Abgefragt nur, wenn `versorgungsart !== 'foerderung'`.** Eine gewöhnliche
-  Förderungsrechnung kostet keinen zusätzlichen Aufruf.
-- **Ausfall:** Luftlinie × **1,3**, im Panel als „geschätzt" gekennzeichnet. #693
-  nennt den Umwegfaktor als Ersatzweg; 1,3 ist der geläufige Planungswert Straße
-  gegen Luftlinie im verbauten Gebiet. Die Signatur wird auch beim Fehlschlag
-  gesetzt — sonst liefe bei jeder weiteren Änderung ein Aufruf, der schon
-  gescheitert ist.
+- **Gemessen wird `connectionDisplayPositions`** — der Verlauf, den die Karte
+  zeichnet, mit Routing der Straßenverlauf, sonst die Luftlinien zwischen den
+  Punkten. Dieselbe Funktion wie für die Schlauchlänge.
+- **Kein Umwegfaktor.** Er gehörte zur automatisch gerouteten zweiten Linie. Auf
+  eine Strecke, die von Hand entlang der Straße abgesteckt wurde, einen Aufschlag
+  zu rechnen, zählte den Umweg doppelt.
+- **Nicht für ein Fahrzeug geroutet** heißt: gerechnet wird trotzdem, mit der
+  gezeichneten Länge, und das Panel sagt es — mit einem Knopf, der die Leitung
+  umstellt. Das Fußgänger-Profil zählt dabei nicht als geroutet: Es ignoriert
+  Einbahnen und schneidet über Fußwege ab.
+- **Kein eigener Schritt** in `ensureConnectionDerived` mehr. Das Routing der
+  Leitung erledigt es.
 
-Der Schritt reiht sich in `ensureConnectionDerived` **hinter** Routing und
-Höhenprofil ein. Anders als beim Höhenprofil ist die Reihenfolge hier nicht
-zwingend: Die Route hängt nur an den Enden, nicht am gerouteten Verlauf des
-Schlauchs. Sie steht zuletzt, weil sie am seltensten gebraucht wird.
+Ein Umstellen auf `drive` ändert auch den Verlauf, an dem das **Höhenprofil**
+hängt, und zieht damit eine neue Höhenabfrage nach. Das ist richtig so: Es ist
+eine andere Linie.
 
 ## Vergleich
 
@@ -125,7 +168,7 @@ Schlauchs. Sie steht zuletzt, weil sie am seltensten gebraucht wird.
 | Menge | `Q` aus der Formel | die geforderte Menge, **wenn** die Leitung darstellbar ist |
 | Aufbauzeit | eine Umlaufzeit | `Länge·parallele / Verlegeleistung + Pumpen · Rüstzeit` |
 | Gebundene Fahrzeuge | `n` | Pumpen, die Entnahmestelle mitgezählt |
-| Engstelle | Entnahmestelle / Faltbehälter / geschätzte Strecke | „nicht darstellbar" bzw. Kupplungszahl |
+| Engstelle | Entnahmestelle / Faltbehälter / nicht geroutete Strecke | „nicht darstellbar" bzw. Kupplungszahl |
 
 Die Menge der Förderung ist **nicht** einfach die Fördermenge: Eine Leitung, die
 mit diesen Mitteln nicht zu legen ist, liefert nichts. Ohne diese Unterscheidung
@@ -177,9 +220,11 @@ Feldliste.
 
 `versorgungsart` (`'foerderung' | 'pendel' | 'vergleich'`, fehlt ⇒ `foerderung`,
 also der Stand vor #693), `pendelFahrzeuge`, `pendelTankinhalt`,
-`pendelGeschwindigkeit`, `pendelFuellzeit`, `pendelEntleerzeit`,
-`pendelRoutedPositions`, `pendelRoutedFor`, `pendelRoutingFailed`,
-`verlegeleistung`, `pumpenRuestzeit`.
+`pendelGeschwindigkeit`, `pendelFuellleistung`, `pendelRangierzeit`,
+`pendelEntleerzeit`, `verlegeleistung`, `pumpenRuestzeit`.
+
+Für die Fahrstrecke gibt es **keine** eigenen Felder: Sie steckt in
+`streetRouting` und `routingProfile` der Leitung.
 
 `foerderung === 'true'` bleibt das Tor zu allem Abgeleiteten und wird vom Öffnen
 des Panels gesetzt.
@@ -189,8 +234,8 @@ des Panels gesetzt.
 | Datei | Inhalt |
 | --- | --- |
 | `pendel/shuttle.ts` | die Formel. Reine Zahlen, kein Firestore, keine Feldnamen |
-| `pendel/pendelRoute.ts` | gespeicherte Fahrgeometrie, Signatur, Todo, Luftlinien-Ersatz |
-| `pendel/ensureConnectionPendelRoute.ts` | schreibt sie |
+| `pendel/pendelRoute.ts` | Versorgungsart, Fahrstrecke aus dem gezeichneten Verlauf, „ist das für ein Fahrzeug geroutet?" |
+| `pendel/fuellstelle.ts` | Ergiebigkeit aus dem nächsten Hydranten, Freitext-Leistung parsen |
 | `pendel/pendelverkehr.ts` | die Fassade: Felder lesen, Vorgabewerte auffüllen |
 | `pendel/versorgungVergleich.ts` | Gegenüberstellung, Empfehlung, Aufbauzeit |
 | `connection/versorgungSummary.ts` | die Zeile für Popup und Elementliste, je Modus |
@@ -218,11 +263,36 @@ es, dort ist die Leitung eine der beiden Antworten.
 
 ### Karte
 
-- Fahrtroute: gestrichelt, sichtbar bei `versorgungsart !== 'foerderung'`
 - Pumpenmarker: sichtbar bei `versorgungsart !== 'pendel'` — im Vergleich will
   man beide sehen
+- **Keine zweite Linie.** Die Fahrstrecke ist die Leitung; sie ist schon
+  gezeichnet.
 - Keine zusätzlichen Marker an den Enden: Die Enden der Leitung sind gezeichnet,
   ein Marker daneben wiederholte, was schon dasteht
+
+### Wenn die Höhendaten nicht kommen
+
+„Höhendaten werden abgerufen …" blieb im Einsatz stehen, ohne dass ein Ergebnis
+kam — und ein Fehlschlag war nicht zu sehen. Drei Ursachen, alle behoben:
+
+1. **Der Fehlschlag wurde nie angezeigt.** `foerderungElevationFailed` gab es im
+   Code, benutzt hat es niemand. Der Rechner zeigte nur das allgemeine „keine
+   Höhendaten" — und solange der Ladehinweis stand, auch das nicht. Jetzt ist
+   `elevationFailed` eine eigene Warnung mit dem Knopf **„Erneut versuchen"**:
+   „liegt nicht vor" und „ließ sich nicht holen" sind zwei verschiedene Lagen,
+   und die zweite ist ein Anlass, es noch einmal zu versuchen.
+   `ensureConnectionElevation` nimmt dafür `{ force: true }` — ohne das bliebe
+   eine Leitung nach einem einzigen Aussetzer für immer bei der Handeingabe,
+   denn genau das verhindert der Vermerk sonst absichtlich.
+2. **Das Speichern löschte das Profil wieder weg.** `persist` schrieb den
+   Schnappschuss aus dem Render, und `updateItem` schreibt ohne `merge`. War das
+   Profil zwischen Render und Speichern eingetroffen, war es danach wieder fort,
+   die Abfrage lief erneut — und das sah aus wie ein Rechner, der nie fertig
+   wird. Geschrieben wird jetzt `itemRef.current`.
+3. **Ein Wachhund.** Nach 25 s ist ein Ladehinweis eine Lüge, ganz gleich warum.
+   Dann wird gesagt, dass es nicht geklappt hat, und der Rechner rechnet mit der
+   Handeingabe weiter. Die Abfragen haben je 8 s Zeitlimit; alles darüber liegt
+   an etwas, das kein Zeitlimit hat.
 
 ## Die Seite „Löschwasserversorgung"
 
@@ -296,5 +366,6 @@ und nicht ein Rechner, dessen Ergebnis niemand festhalten kann.
   eigener Vorgang mit eigener Pflege, und ein ungepflegtes Feld ist schlimmer als
   keines.
 - **Gebundenes Personal** im Vergleich (siehe oben).
-- **Ableitung der Füllzeit** aus der Ergiebigkeit des Hydranten am
-  Leitungsanfang.
+- **Saugstelle und Löschteich als Füllstelle.** Ihre Ergiebigkeit steht in den
+  GIS-Daten (`wasserentnahme`, `zufluss`), aber ob eine Saugstelle als Füllplatz
+  für mehrere Fahrzeuge taugt, ist eine eigene Frage.

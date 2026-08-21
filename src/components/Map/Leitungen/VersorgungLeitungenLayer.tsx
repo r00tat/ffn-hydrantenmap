@@ -6,7 +6,6 @@ import { Marker, Polyline, Popup, Tooltip } from 'react-leaflet';
 import type { Connection } from '../../firebase/firestore';
 import { foerderungView } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import { versorgungsart } from '../../FirecallItems/elements/connection/pendel/pendelRoute';
-import { pendelView } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
 import { connectionDisplayPositions } from '../../FirecallItems/elements/connection/streetRouting';
 import { leafletIcons } from '../../FirecallItems/icons';
 
@@ -50,10 +49,6 @@ export default function VersorgungLeitungenLayer({
     () => (selected ? foerderungView(selected) : undefined),
     [selected]
   );
-  const pendel = useMemo(
-    () => (selected ? pendelView(selected) : undefined),
-    [selected]
-  );
   const mode = selected ? versorgungsart(selected) : 'foerderung';
 
   return (
@@ -83,24 +78,6 @@ export default function VersorgungLeitungenLayer({
           </Polyline>
         );
       })}
-
-      {/* Die Fahrtroute: gestrichelt und in anderer Farbe als der Schlauchweg
-          — es sind zwei verschiedene Wege. */}
-      {mode !== 'foerderung' && pendel?.routedPositions && (
-        <Polyline
-          positions={pendel.routedPositions}
-          pathOptions={{
-            color: '#c62828',
-            weight: 3,
-            dashArray: '8 6',
-            opacity: 0.9,
-          }}
-        >
-          <Tooltip sticky>
-            {t('driveDistance')}: {Math.round(pendel.strecke)} m
-          </Tooltip>
-        </Polyline>
-      )}
 
       {mode !== 'pendel' &&
         foerderung?.pumps.map((pump, index) => (
