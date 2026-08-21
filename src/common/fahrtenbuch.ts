@@ -632,10 +632,10 @@ export function personDisplayName(
 ): string {
   const normalized = normalizePersonName(name);
   if (!normalized) return name;
-  const matches = persons.filter(
+  const [match, ambiguous] = persons.filter(
     (p) => normalizePersonName(p.name) === normalized,
   );
-  return matches.length === 1 ? matches[0].name : name;
+  return match && !ambiguous ? match.name : name;
 }
 
 export function matchVehicleByName(

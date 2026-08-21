@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "chrome-extension/**"
+      # Die Extension importiert aus src/ (fahrtenbuch, firestore) und prüft
+      # mit strengeren Compiler-Optionen als die App (noUncheckedIndexedAccess
+      # aus der von WXT erzeugten tsconfig). Ohne src/** hier lief der Check
+      # bei einer Änderung nur in der App nicht, und der Typfehler fiel erst
+      # beim Release-Build der Extension auf.
+      - "src/**"
       - ".github/workflows/chrome-extension-ci.yml"
 
 jobs:
