@@ -67,6 +67,16 @@ export const leafletIcons = (): IconMap => {
       iconAnchor: [12, 12],
       popupAnchor: [0, 0],
     }),
+
+    // Vorgeschlagener Standort einer Verstärkerpumpe der Löschwasserförderung.
+    // Berechnet und gezeichnet, nicht gespeichert — siehe
+    // docs/loeschwasserfoerderung.md.
+    pumpe: L.icon({
+      iconUrl: `/icons/pumpe.svg`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+      popupAnchor: [0, -6],
+    }),
   });
 
   initialized = true;

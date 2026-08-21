@@ -60,13 +60,17 @@ async function routedPositionsFor(
  * Wirft nicht. Die Änderung am Element ist zu diesem Zeitpunkt schon
  * gespeichert; ein Ausfall des Routings darf sie nicht als Fehler erscheinen
  * lassen. Er hinterlässt stattdessen die Luftlinie und deren Kennzeichnung.
+ *
+ * Gibt die geschriebenen Felder zurück, damit `ensureConnectionDerived` das
+ * Höhenprofil entlang der neuen Geometrie abtasten kann, ohne sie erneut zu
+ * lesen.
  */
 export async function ensureConnectionRouting(
   firecallId: string,
   item: MultiPointItem
-): Promise<void> {
+): Promise<Record<string, string | number> | undefined> {
   const todo = routingTodo(item);
-  if (todo === 'none' || !item.id) return;
+  if (todo === 'none' || !item.id) return undefined;
 
   const positions = getConnectionPositions(item);
   const airlineDistance = Math.round(calculateDistance(positions));
@@ -105,4 +109,6 @@ export async function ensureConnectionRouting(
     update,
     { merge: true }
   ).catch((err) => console.error('unable to save street routing', err));
+
+  return update;
 }

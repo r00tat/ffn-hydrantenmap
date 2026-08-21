@@ -9,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { commitBatch, setDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
-import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
 import {
   DataSchemaField,
@@ -18,13 +17,25 @@ import {
   FirecallItem,
 } from '../components/firebase/firestore';
 import { computeAllFields } from '../common/computeFieldValue';
-import { ensureConnectionRouting } from '../components/FirecallItems/elements/connection/ensureConnectionRouting';
+import { ensureConnectionDerived } from '../components/FirecallItems/elements/connection/ensureConnectionDerived';
 import { isStreetRoutingItem } from '../components/FirecallItems/elements/connection/streetRouting';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
 import { isAuthError } from './auth/ensureFreshAuth';
+
+// Die Item-Klassen-Registry (`../components/FirecallItems/elements`) lädt alle
+// Elementklassen auf Modulebene, und mehrere davon hängen an `leaflet`. Ein
+// Import auf Modulebene hier schließt außerdem einen Kreis: Das
+// Löschwasserförderungs-Panel braucht diesen Hook, `ConnectionComponent` lädt
+// das Panel, und `FirecallMultiPoint` lädt `ConnectionComponent` — die
+// Oberklasse von `FirecallConnection` wäre beim `extends` noch undefined.
+// Deshalb erst im Callback, genau wie in `useFirecallItemAdd`.
+async function getFirecallItemClass(type: string | undefined) {
+  const { getItemClass } = await import('../components/FirecallItems/elements');
+  return getItemClass(type);
+}
 
 export default function useFirecallItemUpdate() {
   const firecallId = useFirecallId();
@@ -44,7 +55,7 @@ export default function useFirecallItemUpdate() {
         updatedAt: new Date().toISOString(),
         updatedBy: email,
       };
-      const itemClass = getItemClass(item?.type);
+      const itemClass = await getFirecallItemClass(item?.type);
       console.info(
         `update of firecall ${itemClass.firebaseCollectionName()} ${
           item.id
@@ -64,11 +75,12 @@ export default function useFirecallItemUpdate() {
           { merge: false }
         );
 
-        // Das Straßen-Routing hängt an Feldern, die hier gespeichert werden:
-        // an der Option selbst, am Profil und an den Punkten. Alle drei können
-        // sich mit diesem Schreibvorgang geändert haben.
+        // Straßen-Routing und Höhenprofil hängen an Feldern, die hier
+        // gespeichert werden: an den Optionen selbst, am Routing-Profil, an den
+        // Punkten und an der Dimension. Alle können sich mit diesem
+        // Schreibvorgang geändert haben.
         if (isStreetRoutingItem(item.type) && !item.deleted) {
-          await ensureConnectionRouting(firecallId, newData);
+          await ensureConnectionDerived(firecallId, newData);
         }
 
         // When a layer is deleted, cascade to all items in that layer
