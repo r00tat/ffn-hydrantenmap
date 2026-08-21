@@ -105,7 +105,10 @@ export default function FoerderungSection({
               <Typography variant="caption" color="text.secondary">
                 {t('friction')}
               </Typography>
-              <Typography variant="body2">
+              {/* `component="div"`: Der Chip darunter ist ein `<div>`, und
+                  `Typography` gäbe von sich aus ein `<p>` — ein div in einem p
+                  ist ungültiges HTML und warnt bei der Hydration. */}
+              <Typography variant="body2" component="div">
                 {t('frictionPer100m', {
                   value: round(view.frictionPer100m ?? 0, 2),
                 })}

@@ -17,6 +17,8 @@ const SECTIONS: Record<
   details: () => import('../../../../components/pages/EinsatzDetails'),
   fahrtenbuch: () =>
     import('../../../../components/Fahrtenbuch/EinsatzFahrtenbuchSection'),
+  loeschwasserversorgung: () =>
+    import('../../../../components/pages/LoeschwasserversorgungWrapper'),
 };
 
 export default async function EinsatzSectionPage({

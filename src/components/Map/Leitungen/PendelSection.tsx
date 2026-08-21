@@ -141,7 +141,9 @@ export default function PendelSection({
               <Typography variant="caption" color="text.secondary">
                 {t('driveDistance')}
               </Typography>
-              <Typography variant="body2">
+              {/* `component="div"` wegen des Chips — siehe
+                  FoerderungSection. */}
+              <Typography variant="body2" component="div">
                 {Math.round(view.strecke)} m
                 {view.streckeSource === 'detour' && (
                   <Tooltip title={t('driveDistanceEstimatedHint')}>

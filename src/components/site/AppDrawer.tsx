@@ -36,6 +36,7 @@ import StorageIcon from '@mui/icons-material/Storage';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import UserIcon from '@mui/icons-material/Person';
 import PrintIcon from '@mui/icons-material/Print';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import WavesIcon from '@mui/icons-material/Waves';
 import WarningIcon from '@mui/icons-material/Warning';
 import Box from '@mui/material/Box';
@@ -167,6 +168,15 @@ export default function AppDrawer({
       icon: <ReceiptLongIcon />,
       href: '/kostenersatz',
       einsatzSection: 'kostenersatz',
+    },
+    {
+      // Neben der Karte und nicht darin: Die Frage „Leitung legen oder
+      // pendeln?" kommt vor dem Zeichnen. Die Seite bringt ihre eigene
+      // schmale Karte mit.
+      text: t('loeschwasserversorgung'),
+      icon: <WaterDropIcon />,
+      href: '/loeschwasserversorgung',
+      einsatzSection: 'loeschwasserversorgung',
     },
     { text: t('chat'), icon: <ChatIcon />, href: '/chat', einsatzSection: 'chat' },
     { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },

@@ -224,6 +224,71 @@ es, dort ist die Leitung eine der beiden Antworten.
 - Keine zusätzlichen Marker an den Enden: Die Enden der Leitung sind gezeichnet,
   ein Marker daneben wiederholte, was schon dasteht
 
+## Die Seite „Löschwasserversorgung"
+
+Aus der Seitenleiste erreichbar (`/loeschwasserversorgung`, im Einsatz
+`/einsatz/<id>/loeschwasserversorgung`): Karte links, Auswahl und Rechner
+rechts.
+
+Eine eigene Seite und nicht bloß ein Verweis auf die Karte, weil die Frage
+„Leitung legen oder pendeln?" **vor** dem Zeichnen kommt. Man will eine Strecke
+abstecken, um sie zu rechnen — nicht eine Leitung anlegen, um sie später zu
+rechnen.
+
+### Der Rechner ist aus dem Panel herausgelöst
+
+`VersorgungRechner` trägt Zustand und Rechnung, aber **keinen Rahmen**. Er wird
+an zwei Stellen gebraucht und sieht dort verschieden aus:
+
+- über der Karte im schwebenden `LoeschwasserfoerderungPanel`,
+- auf der Seite in der Spalte neben der Karte.
+
+Er ist deshalb eine Flex-Spalte mit eigenem Scrollbereich und stehenbleibender
+Fußzeile; wer ihn einbettet, gibt ihm eine Höhe. Der Schalter „Rechner für diese
+Leitung verwenden" wanderte dabei aus der Panel-Kopfzeile in den Inhalt — sonst
+gäbe es ihn auf der Seite nicht, und die Kopfzeile war ohnehin voll.
+
+Das Panel zeichnet den Rechner **bedingt** statt in einem `Collapse`: Eine
+Flex-Spalte mit innerem Scrollbereich übersteht den Höhenübergang eines Collapse
+nicht. Die Fußzeile war auch vorher schon ohne Animation.
+
+### Die Karte der Seite ist nicht die Einsatzkarte
+
+`VersorgungMap` trägt Grundkarten, die Leitungen und das Zeichenwerkzeug — keine
+Hydranten-Cluster, keine Fahrzeuge, keine Wetterstationen, keine Kartenleiste.
+Zwei Gründe: Auf einer Rechenseite ist alles andere Beiwerk, und jede Ebene mehr
+ist ein Firestore-Listener und eine weitere Stelle, an der eine **zweite
+Leaflet-Instanz** stolpern kann. Wer die volle Karte braucht, hat sie eine
+Menüzeile weiter oben.
+
+Die Leitungen zeichnet `VersorgungLeitungenLayer` und bewusst **nicht**
+`ConnectionComponent`: Die bringt verschiebbare Punktmarker, Punkt-Kontextmenü,
+Bearbeiten-Knopf und ein eigenes schwebendes Panel mit. Hier wird eine Leitung
+**ausgewählt**, nicht bearbeitet.
+
+Die Seite wird wie `LayersWrapper` erst im Browser geladen (`useEffect`-Import).
+Kein `next/dynamic` im Kartenbaum — die Begründung steht in
+[docs/loeschwasserfoerderung.md](loeschwasserfoerderung.md).
+
+### Zeichnen
+
+Der `LeitungsProvider` liegt über Karte **und** Spalte: Das Zeichenwerkzeug
+steckt in der Karte, der Knopf, der es startet, steht in der Liste daneben. Die
+Vorlage hat `foerderung: 'true'` und `streetRouting: 'true'` — wer zum Rechnen
+zeichnet, will den Rechner nicht danach erst einschalten.
+
+Die neu gezeichnete Leitung wird von selbst gewählt. Dafür führt der Provider
+`lastCreatedId`; die Seite übernimmt jede ID genau einmal und passt den Zustand
+**während des Renderns** an, nicht in einem Effekt — ein Effekt gäbe eine
+Kaskade und einen Frame, in dem die neue Leitung schon da, aber noch nicht
+gewählt ist.
+
+### Nur mit laufendem Einsatz
+
+Gezeichnete Leitungen leben im Einsatz; ohne einen gibt es nichts zu listen und
+nichts zu speichern. Ohne Einsatz steht dort deshalb der Weg zur Einsatzauswahl
+und nicht ein Rechner, dessen Ergebnis niemand festhalten kann.
+
 ## Was hier nicht ist
 
 - **Tankinhalt an den Fahrzeugstammdaten** und Auswahl der Einsatzfahrzeuge. Die
