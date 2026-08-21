@@ -1,0 +1,387 @@
+# Fahrtenbuch
+
+PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug, Personennamen,
+Duplikatsprüfung und Mangel-Bilder.
+
+## Fahrtenbuch-PDF-Export
+
+Der Export ([fahrtenbuchExportActions.ts](../src/components/Fahrtenbuch/fahrtenbuchExportActions.ts))
+rendert **nicht ein Dokument**, sondern Teildokumente von je 100 Tabellenzeilen,
+die [renderFahrtenbuchPdf](../src/components/Fahrtenbuch/renderFahrtenbuchPdf.ts)
+mit `pdf-lib` zu einer Datei zusammenfügt.
+
+Grund ist der Speicher: `@react-pdf/renderer` hält das vollständig ausgelegte
+Dokument bis zum Schluss im Speicher, gemessen 0,3–0,5 MB je Zeile. Ein
+Jahresexport über alle Fahrzeuge kam auf ~600 MB und wurde vom Container (damals
+512Mi) abgeräumt — im Browser als `503 Service unavailable` sichtbar (#665). Am
+teuersten ist ein **einzelnes** Fahrzeug mit vielen Fahrten, weil react-pdf einen
+über viele Seiten laufenden Abschnitt beim Umbrechen wiederholt neu auslegt:
+3000 Fahrten auf einem Fahrzeug kosteten 2061 MB und 36 s, in Teilen 920 MB und
+15 s.
+
+Daran hängen drei Dinge, die zusammengehören:
+
+- **Die Seitenzahl wird nach dem Zusammenfügen gestempelt.** Ein Teildokument
+  kennt nur seine eigenen Seiten und finge sonst jedes Mal wieder bei 1 an.
+  Die Maße des Fußes (`FOOTER_*` in
+  [FahrtenbuchPdf.tsx](../src/components/Fahrtenbuch/FahrtenbuchPdf.tsx)) sind
+  deshalb exportiert und werden von beiden Seiten benutzt.
+- **Teile nicht kleiner machen.** Jedes Teil beginnt eine neue Seite; unter 50
+  Zeilen wächst die Datei, ohne Speicher zu sparen.
+- **Ein Render je Instanz.** `renderFahrtenbuchPdf` serialisiert die Läufe —
+  Cloud Run lässt bis zu 80 Anfragen auf denselben Container, und ein OOM reißt
+  alle mit, nicht nur den Export.
+
+Das Speicherlimit steht auf **1Gi**, als Vorgabewert von `memory` in
+[terraform/modules/cloud-run](../terraform/modules/cloud-run/variables.tf). Vorher
+war es ein `--memory`-Flag am `gcloud run deploy`, und weil `gcloud` additiv
+arbeitet, hing der tatsächliche Wert daran, ob seit der Änderung schon einmal
+deployt wurde — prod lief nach #674 noch monatelang auf den alten 512Mi.
+
+Die Größenprüfung (`MAX_EXPORT_ENTRIES`, 5000) läuft als Count-Query **vor** dem
+Lesen. Die Zählung braucht dasselbe `orderBy('abfahrt', 'desc')` wie die
+Leseabfrage — sonst sucht Firestore einen Index `deleted ASC, abfahrt ASC`, den
+es nicht gibt.
+
+## Fahrtenbuch-Wochenbericht
+
+Cloud Scheduler ruft montags 07:00 (Europe/Vienna)
+`POST /api/fahrtenbuch/weekly-report` auf. Der Lauf verschickt je Gruppe mit
+gepflegten `fahrtenbuchConfig.mangelEmails` einen Bericht über die Fahrten der
+abgeschlossenen ISO-Vorwoche — Fahrtentabelle je Fahrzeug, Wochensumme,
+Plausibilitätswarnungen zu den Zählerständen und die offenen Mängel. Empfänger
+sind dieselben wie bei der Mangel-Benachrichtigung; eine leere Liste ist die
+Abschaltung.
+
+Authentifiziert über ein OIDC-ID-Token, geprüft von
+[cronRequired](../src/server/auth/cronRequired.ts) gegen `CRON_INVOKER_EMAILS`.
+Infrastruktur im Terraform-Modul
+[cloud-scheduler](../terraform/modules/cloud-scheduler/) — in Dev bewusst
+**pausiert**, damit nicht zwei Umgebungen dieselbe Verteilerliste bemailen.
+
+Job und Invoker-Service-Account legt terraform an; nach dem `apply` ist nur noch
+der Job in Prod zu entpausieren. Dev und Prod teilen das Projekt `ffn-utils`,
+deshalb tragen die Ressourcen beider Umgebungen ein `name_suffix` (Prod `""`, Dev
+`"-dev"`) — ohne das legten beide Roots denselben Service Account und denselben
+Job an und der zweite `apply` scheiterte mit 409.
+
+Die API-Aktivierung (`cloudscheduler.googleapis.com`) und die Rolle
+`roles/cloudscheduler.admin` des Pipeline-SA hängen beide am Modul
+[project-base](../terraform/modules/project-base/). Das liegt im Projekt-Root
+(siehe „Projekt-Basis"), der in beiden Pipelines vor jedem Environment-Apply
+läuft — eine Erweiterung ist damit sofort wirksam. Die frühere Regel „erst prod
+applien" gibt es nicht mehr.
+
+Die Allowlist `CRON_INVOKER_EMAILS` setzt terraform als Env-Var des Dienstes
+(`local.cron_invoker_emails` im jeweiligen Root). Sie wird dort aus Zeichenketten
+gebaut statt aus `module.cloud_scheduler` gelesen: Der Dienst braucht die Liste,
+der Scheduler braucht die URL des Dienstes — eine Referenz ergäbe einen Zyklus.
+Ein `check`-Block im Root prüft deshalb nach jedem apply, dass der tatsächliche
+Invoker-SA auf der gebauten Liste steht. Wer eine Umgebung hinzufügt, erweitert
+die Suffix-Liste **und** setzt das passende `name_suffix`.
+
+**Von Hand versenden:** Im Admin-Bereich unter Fahrtenbuch → Einstellungen sitzt
+der Abschnitt „Wochenbericht versenden"
+([WeeklyReportSendSection](../src/components/Fahrtenbuch/admin/WeeklyReportSendSection.tsx)).
+Woche wählbar (letzte abgeschlossene voreingestellt), Empfänger vorbelegt aus
+`mangelEmails` und **nur für diesen Versand** überschreibbar — die Änderung wird
+nicht gespeichert. „Vorschau" ist der `dryRun` und verschickt nichts.
+
+Der Versand läuft über `sendWeeklyReportForGroup`, das dieselbe interne
+`runForGroup` benutzt wie der Montagslauf: Die Mail von Hand ist dieselbe
+Nachricht, nicht bloß eine gleich gebaute. Empfänger sind dort **Pflicht**, es
+gibt keinen Rückfall auf die gepflegte Liste — wer das Feld leer räumt, würde
+sonst ausgerechnet die Adressen bemailen, die er gerade entfernt hat.
+
+Die Plausibilitätswarnungen vergleichen auch gegen die letzte Fahrt **vor** dem
+Zeitraum. Nur so fällt ein falscher Kilometerstand am Wochenanfang auf — der
+Grund, aus dem es den Bericht überhaupt gibt.
+
+Zum Prüfen ohne Versand (`dryRun` baut den Bericht und gibt Betreff und
+Textfassung zurück, verschickt aber nichts):
+
+```bash
+SERVICE_URL=https://<host>
+# In Dev heißt der Invoker fahrtenbuch-report-invoker-dev (siehe name_suffix).
+TOKEN=$(gcloud auth print-identity-token \
+  --impersonate-service-account=fahrtenbuch-report-invoker@<projekt>.iam.gserviceaccount.com \
+  --audiences="$SERVICE_URL")
+curl -s -X POST "$SERVICE_URL/api/fahrtenbuch/weekly-report" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"year":2026,"week":32,"dryRun":true}' | jq
+```
+
+Ein Fehler bei einer Gruppe beendet den Lauf nicht und ergibt trotzdem 200 —
+sonst würde der Scheduler wiederholen und den erfolgreichen Gruppen die Mail
+doppelt schicken. 500 gibt es nur, wenn **keine** Gruppe eine Mail bekommen hat
+**und mindestens eine gescheitert ist**; dann ist die Wiederholung gefahrlos.
+Ein Lauf, in dem alle Gruppen übersprungen wurden (keine Empfänger gepflegt) und
+ein Lauf ohne jede konfigurierte Gruppe antworten dagegen mit 200: Da ist nichts
+zu wiederholen. Eine stumme Woche ist deshalb an den `results` zu erkennen, nicht
+am Status-Code.
+
+## Fahrzeug-Cache im Fahrtenbuch
+
+Zählerstände, letzte Fahrt, Defekt-Hinweis und Mängelzähler stehen am
+Fahrzeugdokument, damit die Übersicht sie zeigen kann, ohne alle Fahrten und
+Mängel der Gruppe zu laden. Geschrieben wird der Cache an genau einer Stelle:
+`refreshVehicleCache` in [mangelStore.ts](../src/components/Fahrtenbuch/mangelStore.ts),
+aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
+
+- **Eine Funktion für beide Hälften**, weil sie sich überschneiden:
+  `lastEntryMangelId` sagt, ob es zur jüngsten Fahrt einen Mangeldatensatz
+  gibt, und ändert sich sowohl mit der Fahrt als auch mit den Mängeln. Zwei
+  Auffrischungen, die je nur ihre Hälfte kennen, ließen genau die Widersprüche
+  zu, aus denen #706 entstand.
+- **Geschrieben wird mit `merge: true`**, deshalb setzt die Funktion *alle*
+  Felder — ein weggelassenes ließe den alten Wert stehen. Wer ein Feld
+  hinzufügt, trägt es dort ein.
+- **„Defekt gemeldet" ist der Rückfall für Altdaten**, nicht die zweite Anzeige
+  neben dem Mängelzähler. Die Regel steht in
+  [defectHint.ts](../src/components/Fahrtenbuch/defectHint.ts) und gilt für
+  Fahrzeugkarte und Fahrzeugseite gleichermaßen: Gibt es zur letzten Fahrt
+  einen Mangeldatensatz, spricht dieser — offen über den Zähler, behoben gar
+  nicht mehr. Vorher verdeckte der Zähler den Hinweis nur, und das Beheben des
+  letzten Mangels machte ihn nicht weg, sondern erst sichtbar.
+- **`undefined` heißt „nie geschrieben", nicht „nein".** Fahrzeuge, deren Cache
+  älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
+  und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
+
+## Einsatzbezug hinter dem Freigabe-Link
+
+Das Gastformular hinter `/fahrtenbuch/teilen/<token>` bietet die letzten
+Einsätze der Gruppe an (`SHARE_LINK_FIRECALL_LIMIT`, 10) und belegt einen neuen
+Eintrag mit dem neuesten vor. Wer den QR-Code am Fahrzeug nutzt, trägt fast
+immer die Fahrt zum laufenden Einsatz ein; einen „aktiven" Einsatz gibt es dort
+nicht, den kennt nur die angemeldete App.
+
+Vorher verwarf `createFahrtenbuchEntryViaShareLink` jeden mitgeschickten
+Einsatzbezug. Das war richtig, solange die Seite keine Einsätze kannte — jetzt
+kennt sie welche, und an die Stelle der Verwerfung tritt eine Prüfung:
+
+- **Der Name kommt aus dem Einsatz-Dokument, nicht aus der Anfrage**
+  (`resolveFirecallForGroup`). Hinter dem Formular steht niemand, dessen Eingabe
+  man zurechnen könnte; ein frei gesetzter Einsatzname wäre unkontrollierter
+  Fremdinhalt in einem Nachweisdokument.
+- **Der Einsatz muss zu der Gruppe des Links gehören** und darf nicht gelöscht
+  sein, sonst `firecallInvalid`. Abgelehnt statt still verworfen: Der Gast hat
+  aus einer Liste gewählt, die diese Seite geliefert hat — bliebe die Fahrt
+  stumm ohne Einsatz, hielte er sie für verknüpft.
+- **Herausgegeben wird nur Name, Alarmierung und Abrücken**
+  (`toShareLinkFirecall`). Koordinaten, Beschreibung und Alarm-IDen haben hinter
+  einem anmeldefreien Link nichts zu suchen. Die Zeiten sind der Grund, dass die
+  Auswahl überhaupt etwas spart — sie belegen Abfahrt und Ankunft vor.
+- **Die Duplikatsprüfung gilt hier auch**, und sie wiegt schwerer: Der Gast sieht
+  die Fahrten der Gruppe nicht und kann ein Duplikat vorher nicht erkennen. Die
+  Antwort der Action ist seine einzige Warnung, deshalb muss sie einen Weg nach
+  vorne lassen — `serverDuplicateKey` in
+  [useEntryFormState.ts](../src/components/Fahrtenbuch/useEntryFormState.ts) merkt
+  ein serverseitig gemeldetes Duplikat an der Einsatz/Fahrzeug-Kombination und
+  zeigt dieselbe Bestätigung wie im Dialog. Am Schlüssel und nicht an einer
+  Eintrags-ID, weil der Browser den bestehenden Eintrag hier nie gesehen hat.
+
+## Namen in der Besatzung
+
+Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne
+Personenliste des Fahrtenbuchs führt sie als „Vorname Nachname". Beides
+nebeneinander zu zeigen ließ dieselbe Person zweimal auftreten — und war eine
+der Ursachen doppelter Fahrtenbuch-Einträge (#705).
+
+- **`personDisplayName`** ([common/fahrtenbuch.ts](../src/common/fahrtenbuch.ts))
+  zeigt einen Namen in der Schreibweise der Personenliste, sobald er dort
+  **eindeutig** trifft (Vergleich über `normalizePersonName`). Ohne Treffer oder
+  bei zwei Treffern bleibt der Name, wie er kam: Vor- und Nachname aus einer
+  beliebigen Zeichenkette selbst zu erkennen geht nicht verlässlich — „Anna
+  Maria Berger" und „Berger Anna Maria" sind von außen nicht zu unterscheiden.
+- **Nur die Anzeige.** `displayAssignments` in
+  [CrewAssignmentBoard.tsx](../src/components/pages/CrewAssignmentBoard.tsx) legt
+  den Namen über die gefilterten Einträge; in Firestore bleibt der gemeldete
+  Name stehen, und alle Schreibvorgänge gehen weiter über `id`/`recipientId`.
+- **Die Auswahl „Weitere Person hinzufügen" speist sich aus zwei Quellen:** den
+  Alarm-Empfängern, die nicht zugesagt haben, und der Personenliste der Gruppe.
+  Letztere ist der Grund, dass die Auswahl auch bei einem Einsatz ohne Alarm
+  Namen anbietet — oder für jemanden, der gar kein BlaulichtSMS hat.
+- **Entdoppelt wird über `normalizePersonName`**, nicht über den rohen Namen,
+  sonst stünde derselbe Mensch in gedrehter Schreibweise zweimal in der Liste.
+  Der Alarm-Empfänger hat Vorrang: Über ihn ist die Person eindeutig
+  identifiziert, über den Namen nur wahrscheinlich.
+- **Eine Person aus der Liste entsteht als Eintrag von Hand** — sie hat keine
+  Empfänger-ID. Weil dabei die gepflegte Schreibweise übernommen wird, findet
+  `resolveDriver` sie über den Namensvergleich wieder.
+- **Ein getippter Name geht denselben Weg**, wenn er eine angebotene Person
+  trifft — verglichen wieder über `normalizePersonName`, damit „Berger Anna"
+  auch „Anna Berger" trifft. Auswahl und Enter auf freiem Text laufen dazu
+  durch dasselbe `handleAddPerson`; ein eigener Enter-Handler am Eingabefeld
+  lief zusätzlich zur Auswahl von MUI und legte den halb getippten Namen als
+  zweite Person an (#712).
+
+## Doppelte Fahrten zu einem Einsatz
+
+Die Fahrten eines Einsatzes entstehen von zwei Seiten: über die Sammelerfassung
+auf der Einsatzseite und über den Fahrtenbuch-Dialog. Trug jemand alle Fahrten
+ein und der Fahrer später seine eigene noch einmal, stand dieselbe Fahrt zweimal
+im Fahrtenbuch — mit doppelten Kilometern und dadurch falschen Zählerständen für
+alle folgenden Fahrten.
+
+**Duplikat heißt Einsatz + Fahrzeug.** Pro Einsatz fährt ein Fahrzeug einmal;
+mehrere Fahrzeuge und mehrere Fahrer je Fahrzeug bleiben unberührt. Die
+Erkennung sitzt in `findEntryForFirecallVehicle`
+([common/fahrtenbuch.ts](../src/common/fahrtenbuch.ts)) und wird von beiden Seiten
+benutzt.
+
+- **Die Schranke steht in der Action**, nicht im Dialog:
+  `createFahrtenbuchEntry` und `updateFahrtenbuchEntry` lehnen mit
+  `duplicateFirecallEntry` ab, solange `confirmDuplicate` fehlt. Zwei Geräte
+  können dieselbe Fahrt gleichzeitig offen haben. Geprüft wird gegen
+  `doc.firecallId` und nicht gegen die Eingabe — ob die Verknüpfung am Dokument
+  landet, entscheidet `buildEntryDocument` über den Zweck, und nur was
+  gespeichert wird, kann ein Duplikat sein.
+- **Bestätigen bleibt möglich.** Es gibt Einsätze, bei denen ein Fahrzeug
+  tatsächlich zweimal ausfährt. Bestätigt wird im Formular *diese eine* Fahrt
+  (`confirmedDuplicateId` in [useEntryFormState.ts](../src/components/Fahrtenbuch/useEntryFormState.ts)),
+  nicht das Formular — wechselt die Auswahl, ist die Bestätigung hinfällig.
+- **Die Zeitüberschneidung ist nur eine Warnung.** `overlappingVehicleEntries`
+  findet zwei Fahrten desselben Fahrzeugs mit überlappendem Zeitraum, also auch
+  das Duplikat einer Fahrt **ohne** Einsatzverknüpfung — etwa aus dem
+  Gastformular hinter einem Freigabe-Link, das den Einsatzbezug gar nicht
+  mitschickt. Kein Riegel: Zeiten sind im Einsatz oft geschätzt. Berührende
+  Zeiträume zählen nicht, das sind zwei aufeinanderfolgende Fahrten.
+- **Der Einsatz kommt im Formular hinter dem Zweck und vor dem Ziel** — vorher
+  stand er hinter dem Ziel und blieb deshalb meist leer. Gezeigt wird er nur
+  beim Zweck `einsatz`: Eine Übung oder eine Versorgungsfahrt gehört zu keinem
+  Einsatz, und `submit` verwirft die Verknüpfung dort ohnehin. Die Auswahl setzt
+  den Zweck mit auf `einsatz` — das braucht die Vorbelegung, die greift, während
+  der Zweck noch auf `sonstiges` steht. Umgekehrt räumt `changeZweck` die
+  Verknüpfung: Was im Feld steht, muss dem entsprechen, was gespeichert wird.
+- **Hinter dem Zweck steht immer genau ein Feld:** das Einsatzfeld beim Zweck
+  `einsatz`, sonst die Fahrtstrecke. Der Zweck hat dafür eine eigene Zeile.
+  Vorher teilte er sie mit dem Ziel und das Einsatzfeld nahm eine ganze — das
+  Formular sprang bei jedem Wechsel des Zwecks um. Ohne verknüpften Einsatz
+  steht das Einsatzfeld für die Fahrtstrecke und trägt deshalb auch die Meldung
+  `zielMissing`; sie an ein Feld zu hängen, das gerade nicht da ist, hätte
+  niemandem geholfen.
+- **Das Einsatzfeld hält ausschließlich verknüpfte Einsätze.** Getippter Text
+  wandert beim Verlassen des Feldes in die Fahrtstrecke
+  (`commitFirecallInput`) — nicht während des Tippens, weil daraus noch eine
+  Auswahl werden kann. Im Feld bleibt er stehen: Beim Zweck `einsatz` ist es das
+  einzige Feld dieser Zeile, geräumt wäre die Eingabe für den Benutzer
+  verschwunden, obwohl sie gespeichert wird. Hinter einem getippten Namen steht kein Einsatz: kein
+  Ort, keine Zeiten, keine Duplikatserkennung. Als zweites Namensfeld daneben
+  wäre er nur eine weitere Stelle, an der dasselbe stehen kann; als Ziel ist er
+  dort, wo Liste, Export und Wochenbericht ihn ohnehin lesen
+  (`entry.ziel?.trim() || entry.firecallName`). `firecallName` trägt damit nur
+  noch den Namen des verknüpften Einsatzes, und `firecallInput` ist der eigene
+  Zustand des Eingabefeldes. Ein Hinweis nennt den fehlenden Bezug, wenn beim
+  Zweck `einsatz` keiner verknüpft ist.
+- **Ein neuer Eintrag ist mit dem aktiven Einsatz vorbelegt** — sonst dem
+  neuesten der Gruppe (`defaultFirecallOption`). Damit sind Zweck, Einsatz und
+  Fahrstrecke schon gesetzt: Die Fahrt zum laufenden Einsatz ist der Regelfall,
+  und der verknüpfte Einsatz benennt das Ziel selbst. Den aktiven Einsatz liest
+  `FahrtenbuchDialog` über `useFirecallId` — nicht `useEntryFormState`, denn das
+  Gastformular hinter einem Freigabe-Link läuft ohne diesen Kontext und belegt
+  deshalb nichts vor. Angewandt wird die Vorbelegung als Effekt und nicht als
+  Anfangswert des Zustands, weil die Einsatzliste ein Firestore-Snapshot ist und
+  beim ersten Rendern leer sein kann; ein `defaultAppliedRef` sorgt dafür, dass
+  eine absichtlich geräumte Auswahl beim nächsten Snapshot nicht zurückkommt.
+  Beim Bearbeiten gilt ausschließlich der Eintrag — eine Übungsfahrt
+  nachträglich einem Einsatz zuzuordnen wäre eine stille Änderung am
+  Nachweisdokument. In Tests schaltet `firecalls: []` die Vorbelegung ab, ohne
+  die Auswahl ganz zu entfernen.
+- **Das Einsatz-Autocomplete braucht `getOptionKey`.** MUI nimmt sonst das Label
+  als React-Key, und „G1 Ölspur" gibt es jedes Jahr mehrfach — React verwarf
+  dann einen der beiden Listeneinträge.
+- **Fahrer und Zusatzfahrer sind in der Sammelerfassung Autocompletes** über
+  die Personen der Gruppe. Vorher war der Fahrer ein reines Textfeld: Der
+  Maschinist war vorbelegt, aber wer ihn korrigieren musste, tippte den Namen
+  neu und verlor die Verknüpfung zur Person — und damit ihren Anteil in der
+  Fahrerstatistik. Name und `driverId` werden immer gemeinsam gesetzt.
+- **Jede Zeile hat einen eigenen Speichern-Knopf.** Er ruft dasselbe `save()`
+  wie „Alle speichern", nur mit einer Auswahl — ein zweiter Pfad würde bei der
+  Duplikatserkennung oder der Kilometerlogik auseinanderlaufen. `saving` sperrt
+  weiter alle Knöpfe, `savingKey` sagt nur, an welchem der Spinner steht.
+- **„Fahrtstrecke berechnen" im Eintrags-Dialog** holt über
+  `firecallRoundTripDistance` dieselbe Strecke, die sich die Sammelerfassung
+  beim Speichern selbst holt — samt Routen-Cache am Einsatz, der Knopf kostet
+  also ab dem zweiten Fahrzeug keinen API-Aufruf mehr. `applyRoundTripToKmCounters`
+  **überschreibt** dabei einen eingetragenen Endstand und lässt alle anderen
+  Zähler in Ruhe; das ist die Wirkung eines Knopfdrucks, nicht die einer
+  Vorbelegung (dafür `autoFillCounterEnds`). Ohne verknüpften Einsatz gibt es
+  den Knopf nicht — hinter einem frei eingetippten Namen stehen keine
+  Koordinaten. Die Action steckt im Dialog und nicht in `useEntryFormState`,
+  damit das Gastformular ohne sie auskommt.
+- **`fahrtenbuchEntryCount` am Einsatz** trägt die Anzeige in der
+  Einsatz-Übersicht ([Einsaetze.tsx](../src/components/pages/Einsaetze.tsx)).
+  Denormalisiert wie der Routen-Cache `fahrtenbuchRoute` und aus demselben
+  Grund: Die Übersicht zeigt alle Einsätze der Gruppe auf einmal, eine Abfrage
+  je Karte wären dutzende Listener. Gezählt wird bei jedem Schreibvorgang neu
+  aus dem Bestand statt hoch- und heruntergezählt; ein Zähler, der driftet, wäre
+  schlimmer als keiner. Nur die Anzahl, keine Fahrzeug- oder Fahrernamen — das
+  Einsatz-Dokument liest jedes Gruppenmitglied, das Fahrtenbuch nur wer dort
+  Mitglied ist. Ein Fehler beim Schreiben bleibt beim Zähler und nimmt die
+  erfasste Fahrt nicht mit.
+- **Angezeigt wird nur der positive Fall.** Ein Einsatz ohne das Feld heißt
+  „nichts bekannt", nicht „keine Fahrten": Für Einsätze von vor der Zählung
+  wäre „0 Fahrten" eine falsche Aussage in genau die Richtung, die Duplikate
+  erzeugt. Nachgezogen wird der Zähler über `syncFirecallEntryCount`, sobald
+  jemand die Einsatzseite öffnet — dort sind die Fahrten dieses Einsatzes
+  ohnehin geladen. Die Anzahl aus dem Browser ist nur der Anlass, gezählt wird
+  serverseitig.
+- **Das Feld „Fahrtstrecke / Ziel" entfällt bei verknüpftem Einsatz** — der
+  Einsatz benennt das Ziel selbst. Ausgeblendet heißt dabei nicht bloß
+  versteckt: `submit` schickt `ziel` dann leer mit, sonst wirkte ein Text von
+  vor der Auswahl weiter, den niemand mehr sieht. Liste, Export und
+  Wochenbericht fallen ohnehin auf `firecallName` zurück
+  (`entry.ziel?.trim() || entry.firecallName`). Ohne Verknüpfung bleibt das Feld
+  Pflicht — dort stünde die Fahrt sonst ohne Angabe da, wohin sie ging. Die
+  Sammelerfassung schreibt weiterhin den Einsatznamen ins `ziel`
+  (`entryInputsFromRows`); beide Formen zeigen dasselbe an.
+- **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
+  `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
+  markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
+
+## Mangel-Bilder
+
+Zu einem Fahrzeugmangel gehören Fotos (`Mangel.images`, [mangel.ts](../src/common/mangel.ts)).
+Gespeichert wird der Storage-**Pfad**, nicht die URL — eine Download-URL veraltet, der
+Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{name}`.
+
+- **Gelesen wird über Signed URLs vom Server**, nicht über die Storage-Regeln: Die
+  Berechtigung hängt an der Gruppenmitgliedschaft, und die steht in Firestore. Ein
+  `firestore.get` aus einer Storage-Regel trifft immer die Default-Datenbank und gäbe in
+  der Dev-Datenbank `ffndev` die falsche Antwort. Deshalb verweigert
+  [storage.rules](../storage.rules) jedem Client das Lesen und die Action `mangelImageUrls`
+  ([mangelActions.ts](../src/components/Fahrtenbuch/mangelActions.ts)) prüft die
+  Mitgliedschaft und signiert. Gleiches Muster wie bei den Bug-Report-Anhängen.
+- **Jeder Pfad aus dem Browser wird geprüft** (`sanitizeMangelImages`) — beim Schreiben
+  *und* beim Signieren. Ohne das zeigte ein Mangel auf Dateien einer fremden Gruppe.
+- **Hochgeladen wird erst beim Speichern** des Dialogs; nach einem erfolgreichen Upload
+  gelten die Bilder sofort als gespeichert, damit ein zweiter Anlauf nach einem Fehler
+  nicht dieselben Dateien noch einmal hochlädt.
+- **Größe und Typ sind eine Schranke der `storage.rules`** (15 MB, `image/.*`), aber der
+  Browser prüft sie vorher mit: `prepareMangelImage`
+  ([compressImage.ts](../src/components/Fahrtenbuch/compressImage.ts)) verkleinert und wirft
+  dann gegen `MANGEL_MAX_IMAGE_BYTES`/`isAllowedMangelImageType` aus
+  [mangel.ts](../src/common/mangel.ts). Ohne das lehnt der Storage mit
+  `storage/unauthorized` ab und der Melder liest nur „Upload fehlgeschlagen". Die Prüfung
+  steht **nach** dem Verkleinern — ein 20-MB-Handyfoto ist danach in Ordnung — und **vor**
+  dem ersten Upload, sonst lägen bei fünf Fotos die ersten vier ohne Dokument im Storage.
+  Die 15 MB stehen an zwei Orten; ein Test in `src/common/mangel.test.ts` liest
+  `storage.rules` und vergleicht.
+- **Ein Foto ohne MIME-Typ** ist kein Sonderfall, sondern kommt von manchen
+  Android-Sharetargets. Der Typ wird dann aus der Endung abgeleitet
+  (`imageTypeFromName`); vorher ging die Datei als `application/octet-stream` in den
+  Upload und lief in die Contenttype-Bedingung der Regel.
+- **Gelöscht wird serverseitig** — beim Entfernen eines einzelnen Bildes (`updateMangel`
+  bekommt die vollständige Liste, was fehlt, fliegt aus dem Storage) und beim Löschen des
+  Mangels.
+- **`storage.rules` wird über terraform ausgerollt**
+  (`google_firebaserules_ruleset`/`_release` in
+  [firebase.tf](../terraform/modules/project-base/firebase.tf)), nicht über `firebase deploy`
+  — in `firebase.json` steht die Datei deshalb bewusst nicht. Die Regeln gelten für den
+  Default-Bucket `<projekt>.appspot.com`, den es je Projekt einmal gibt; sie liegen deshalb
+  im Projekt-Root und werden bei jedem Push auf main vor dem Deploy appliziert. **Dev und
+  prod teilen sich diesen Bucket** — beide Dienste tragen `ffn-utils.appspot.com` in ihrer
+  Firebase-Konfiguration.
+- Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
+  braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
