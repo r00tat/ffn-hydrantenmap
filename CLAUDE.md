@@ -23,6 +23,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Mangel-Bilder |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
+| [docs/loeschwasserfoerderung.md](docs/loeschwasserfoerderung.md) | Löschwasserförderung an der Leitung: Reibungstabelle und ihre Quelle, Höhendaten, Pumpenstandorte |
 
 ## Commands
 

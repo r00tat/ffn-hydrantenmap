@@ -166,8 +166,32 @@ describe('ensureConnectionRouting', () => {
     computeStreetRoutedPositions.mockRejectedValue(new Error('offline'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    // Der Fehlschlag wird zur gekennzeichneten Luftlinie, nicht zur Ausnahme.
     await expect(
       ensureConnectionRouting('einsatz-1', connection({ streetRouting: 'true' }))
+    ).resolves.toMatchObject({ routingFailed: 'true', routedPositions: '' });
+  });
+
+  it('gibt die geschriebenen Felder zurück, damit das Höhenprofil sie sieht', async () => {
+    // `ensureConnectionDerived` tastet das Höhenprofil entlang des gerouteten
+    // Verlaufs ab und braucht ihn dafür ohne zweiten Lesevorgang.
+    computeStreetRoutedPositions.mockResolvedValue(routed);
+
+    const update = await ensureConnectionRouting(
+      'einsatz-1',
+      connection({ streetRouting: 'true' })
+    );
+
+    expect(update).toMatchObject({
+      routedPositions: JSON.stringify(routed),
+      routedFor: routingSignature(points, 'walk'),
+      routingFailed: '',
+    });
+  });
+
+  it('gibt undefined zurück, wenn es nichts zu tun gibt', async () => {
+    await expect(
+      ensureConnectionRouting('einsatz-1', routedConnection())
     ).resolves.toBeUndefined();
   });
 });

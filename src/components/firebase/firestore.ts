@@ -277,6 +277,44 @@ export interface Connection extends MultiPointItem {
   type: 'connection';
   dimension?: string;
   oneHozeLength?: number;
+  /**
+   * Löschwasserförderung über lange Wegstrecke. `'true'`, wenn der Rechner an
+   * dieser Leitung aktiv ist — nur dann wird ein Höhenprofil abgefragt, eine
+   * gewöhnliche Leitung kostet keine Anfrage.
+   *
+   * Die Felder stehen an der Leitung und nicht an `MultiPointItem`: Eine Linie
+   * fördert kein Wasser. Siehe docs/loeschwasserfoerderung.md.
+   */
+  foerderung?: string;
+  /** Geforderte Fördermenge in l/min. */
+  foerderMenge?: number;
+  /** Geforderter Druck am Ende der Leitung in bar. */
+  zielDruck?: number;
+  /** Ausgangsdruck einer Pumpe in bar. */
+  pumpenAusgangsdruck?: number;
+  /** Mindest-Eingangsdruck an der nächsten Pumpe in bar. */
+  pumpenEingangsdruck?: number;
+  /** Nennförderstrom einer Pumpe in l/min. */
+  pumpenNennstrom?: number;
+  /**
+   * Anzahl parallel gelegter Leitungen. Wirkt zweifach in Gegenrichtung: bei
+   * der Fördermenge als Teiler (jede Leitung trägt Q/n), beim Schlauchbedarf
+   * als Faktor.
+   */
+  paralleleLeitungen?: number;
+  /**
+   * Höhenunterschied Anfang → Ende in m. Ersatzwert, der **nur** ohne
+   * Höhenprofil greift — liegt eines vor, rechnet die Hydraulik abschnittsweise
+   * damit, und eine Kuppe in der Mitte erzwingt eine Pumpe, auch wenn Anfang
+   * und Ende gleich hoch liegen.
+   */
+  hoehenunterschied?: number;
+  /** stringified number[] — Höhen in m an den Abtastpunkten. */
+  elevationProfile?: string;
+  /** Signatur der Abtastung, für die `elevationProfile` gilt. */
+  elevationFor?: string;
+  /** `'true'`, wenn die Höhenabfrage für diese Signatur gescheitert ist. */
+  elevationFailed?: string;
 }
 
 export interface Area extends MultiPointItem {

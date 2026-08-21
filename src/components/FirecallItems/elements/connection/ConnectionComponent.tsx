@@ -1,10 +1,12 @@
 import AddIcon from '@mui/icons-material/Add';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import CircleIcon from '@mui/icons-material/Circle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
+import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
@@ -19,6 +21,7 @@ import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import PointContextMenu from '../PointContextMenu';
+import { foerderungView } from './foerderung/foerderung';
 import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
@@ -26,6 +29,18 @@ import {
   insertedPointPosition,
   updateFirecallPositions,
 } from './positions';
+
+/**
+ * Erst beim Öffnen geladen. Ohne den dynamischen Import entsteht ein
+ * Importzyklus: Der Dialog braucht `useFirecallItemUpdate`, das über
+ * `elements/index.tsx` an `FirecallConnection` hängt — und `FirecallMultiPoint`,
+ * dessen Oberklasse, lädt diese Datei hier. `FirecallMultiPoint` wäre dann beim
+ * `extends` noch undefined. Nebeneffekt: Die Tabellen und das Diagramm liegen
+ * nicht im Karten-Bundle.
+ */
+const LoeschwasserfoerderungDialog = dynamic(
+  () => import('../../../Map/Leitungen/LoeschwasserfoerderungDialog')
+);
 
 export interface ConnectionMarkerProps {
   record: FirecallMultiPoint;
@@ -41,6 +56,7 @@ export default function ConnectionMarker({
   onContextMenu,
 }: ConnectionMarkerProps) {
   const t = useTranslations('firecallElements');
+  const tf = useTranslations('loeschwasserfoerderung');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [point, setPoint] = useState(defaultPosition);
@@ -51,6 +67,7 @@ export default function ConnectionMarker({
     top: number;
     left: number;
   }>();
+  const [foerderungOpen, setFoerderungOpen] = useState(false);
   const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
@@ -90,6 +107,44 @@ export default function ConnectionMarker({
     () => record.displayPositions(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [positions, streetRouting, routedFor, routedPositions]
+  );
+
+  // Die Pumpenstandorte sind berechnet und werden gezeichnet, nicht
+  // gespeichert: Sie wandern damit bei jeder Änderung mit, ohne dass ungefragt
+  // Elemente in der Ebene entstehen, die vielleicht schon besetzte Standorte
+  // behaupten. Abgelegt werden sie auf Knopfdruck im Dialog. Nur das
+  // Höhenprofil liegt am Element — siehe docs/loeschwasserfoerderung.md.
+  //
+  // `record` ist bei jedem Render eine neue Instanz und taugt nicht als
+  // Abhängigkeit; stattdessen die Felder, aus denen sich das Ergebnis ergibt.
+  const foerderung = record.get<string>('foerderung');
+  const foerderMenge = record.get<number>('foerderMenge');
+  const zielDruck = record.get<number>('zielDruck');
+  const pumpenAusgangsdruck = record.get<number>('pumpenAusgangsdruck');
+  const pumpenEingangsdruck = record.get<number>('pumpenEingangsdruck');
+  const paralleleLeitungen = record.get<number>('paralleleLeitungen');
+  const elevationFor = record.get<string>('elevationFor');
+  const elevationProfileField = record.get<string>('elevationProfile');
+  const foerderungResult = useMemo(
+    () =>
+      foerderung === 'true'
+        ? foerderungView(record.data() as Connection)
+        : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      positions,
+      streetRouting,
+      routedFor,
+      routedPositions,
+      foerderung,
+      foerderMenge,
+      zielDruck,
+      pumpenAusgangsdruck,
+      pumpenEingangsdruck,
+      paralleleLeitungen,
+      elevationFor,
+      elevationProfileField,
+    ]
   );
 
   return (
@@ -243,9 +298,65 @@ export default function ConnectionMarker({
               <EditIcon />
             </IconButton>
           )}
+          {record.type === 'connection' && (
+            <Tooltip title={tf('openDialog')}>
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                aria-label={tf('openDialog')}
+                onClick={() => setFoerderungOpen(true)}
+              >
+                <WaterDropIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           {record.popupFn()}
         </Popup>
       </Polyline>
+
+      {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung. */}
+      {foerderungResult?.pumps.map((pump, index) => (
+        <Marker
+          key={`pumpe-${index}`}
+          position={pump.position}
+          icon={leafletIcons().pumpe}
+          title={
+            index === 0
+              ? tf('sourcePump')
+              : tf('pumpPopupTitle', { number: index })
+          }
+          {...(pane ? { pane } : {})}
+        >
+          <Popup>
+            <div>
+              <strong>
+                {index === 0
+                  ? tf('sourcePump')
+                  : tf('pumpPopupTitle', { number: index })}
+              </strong>
+            </div>
+            {tf('pumpPopupDistance')}: {Math.round(pump.distance)} m
+            {pump.eingangsdruck !== undefined && (
+              <>
+                <br />
+                {tf('pumpPopupInlet')}: {Math.round(pump.eingangsdruck * 10) / 10}{' '}
+                bar
+              </>
+            )}
+            <br />
+            {tf('pumpPopupOutlet')}: {Math.round(pump.ausgangsdruck * 10) / 10} bar
+            <br />
+            <PopupNavigateButton lat={pump.position[0]} lng={pump.position[1]} />
+          </Popup>
+        </Marker>
+      ))}
+
+      {foerderungOpen && (
+        <LoeschwasserfoerderungDialog
+          item={record.data() as Connection}
+          open={foerderungOpen}
+          onClose={() => setFoerderungOpen(false)}
+        />
+      )}
       {editable && (
         <PointContextMenu
           anchorPosition={

@@ -18,7 +18,7 @@ import {
   FirecallItem,
 } from '../components/firebase/firestore';
 import { computeAllFields } from '../common/computeFieldValue';
-import { ensureConnectionRouting } from '../components/FirecallItems/elements/connection/ensureConnectionRouting';
+import { ensureConnectionDerived } from '../components/FirecallItems/elements/connection/ensureConnectionDerived';
 import { isStreetRoutingItem } from '../components/FirecallItems/elements/connection/streetRouting';
 import { useSnackbar } from '../components/providers/SnackbarProvider';
 import useFirebaseLogin from './useFirebaseLogin';
@@ -64,11 +64,12 @@ export default function useFirecallItemUpdate() {
           { merge: false }
         );
 
-        // Das Straßen-Routing hängt an Feldern, die hier gespeichert werden:
-        // an der Option selbst, am Profil und an den Punkten. Alle drei können
-        // sich mit diesem Schreibvorgang geändert haben.
+        // Straßen-Routing und Höhenprofil hängen an Feldern, die hier
+        // gespeichert werden: an den Optionen selbst, am Routing-Profil, an den
+        // Punkten und an der Dimension. Alle können sich mit diesem
+        // Schreibvorgang geändert haben.
         if (isStreetRoutingItem(item.type) && !item.deleted) {
-          await ensureConnectionRouting(firecallId, newData);
+          await ensureConnectionDerived(firecallId, newData);
         }
 
         // When a layer is deleted, cascade to all items in that layer

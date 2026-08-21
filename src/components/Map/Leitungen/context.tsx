@@ -10,7 +10,7 @@ import {
   MultiPointItem,
 } from '../../firebase/firestore';
 import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
-import { ensureConnectionRouting } from '../../FirecallItems/elements/connection/ensureConnectionRouting';
+import { ensureConnectionDerived } from '../../FirecallItems/elements/connection/ensureConnectionDerived';
 import { calculateArea } from '../../FirecallItems/elements/area/area';
 
 interface Leitungen {
@@ -67,10 +67,10 @@ export const useLeitungsProvider = (): Leitungen => {
           newItem
         );
 
-        // Eine neu gezeichnete Leitung mit Straßen-Routing bekommt ihre
-        // Geometrie erst hier: Vorher gibt es keine Dokument-ID, unter der sie
-        // gespeichert werden könnte.
-        await ensureConnectionRouting(firecallId, {
+        // Eine neu gezeichnete Leitung bekommt Straßenverlauf und
+        // Höhenprofil erst hier: Vorher gibt es keine Dokument-ID, unter der
+        // sie gespeichert werden könnten.
+        await ensureConnectionDerived(firecallId, {
           ...newItem,
           id: docRef.id,
         });
