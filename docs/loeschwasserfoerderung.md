@@ -136,6 +136,35 @@ Der erste Treffer statt des weitesten für die letzte Pumpe: Auf 2000 m flach w�
 der weiteste Punkt 1950 m — 50 m vor dem Verteiler, ein unsinniger Standort. Die
 Pumpenzahl ist dieselbe, die Reserve am Ende größer.
 
+### Die Standorte werden auf der Strecke gelöst, nicht aufs Raster gerundet
+
+Gerechnet wird über die kumulierte Druckabnahme, und der Standort einer Pumpe ist
+der Streckenmeter, an dem sie einen Zielwert erreicht — **nicht** der nächste
+Abtastpunkt. Zwischen zwei Punkten verläuft die Abnahme linear, weil das Modell
+dort nichts anderes kennt; ein Standort dazwischen ist damit genauso begründet wie
+einer darauf.
+
+Das ist kein Feinschliff. Bei 1600 l/min sind die Pumpenabstände 130 m, das Profil
+ist aber nur alle 50 m abgetastet. Auf das Raster gerundet:
+
+- Aus 130 m Abstand werden 100 m — **20 Pumpen statt 16**.
+- Der letzte Abschnitt darf nur 40 m lang sein. Auf dem 50-m-Raster gibt es
+  keinen solchen Standort, und der Rechner meldete **„nicht darstellbar"**,
+  obwohl eine Pumpe 40 m vor dem Verteiler die Förderung trägt. Eine falsche
+  Aussage, nicht bloß eine ungenaue.
+
+Dasselbe gilt für die Koordinate des Pumpenpunkts auf der Karte: Sie wird zwischen
+den Abtastpunkten interpoliert, sonst verschöbe sie sich um bis zu 25 m.
+
+### `darstellbar` heißt „nicht mit diesen Mitteln", nicht „geometrisch unmöglich"
+
+Seit die Standorte stetig gelöst werden, ist geometrisch fast jede Lage
+darstellbar — eine Pumpe lässt sich überall setzen, also ist jede Steigung mit
+genügend Pumpen zu überwinden. Die echte Grenze ist deshalb nicht die Geometrie,
+sondern was ein Bezirk aufstellen kann: `MAX_PUMPS = 30`. Darüber lautet die
+Antwort „nicht mit diesen Mitteln", und dieselbe Schranke schützt die Schleife
+gegen eine Lage ohne Fortschritt.
+
 **Prüfstein:** 800 l/min flach in B 75 mit 8 bar Ausgangs- und 1,5 bar
 Eingangsdruck ergibt (8 − 1,5) / 0,01 = **650 m** Pumpenabstand. Veröffentlicht
 ist „etwa alle 600 m eine Verstärkerpumpe". Das steht als Testzusicherung in
@@ -240,6 +269,38 @@ neuer Item-Typ — und schreibt **einen** Tagebucheintrag (`type: 'diary'`). Nur
 beim Ablegen, nicht beim Rechnen: Am Regler wird probiert, nur die getroffene
 Entscheidung gehört in den Verlauf. Die Pumpe an der Entnahmestelle wird
 mitabgelegt, aber als solche benannt.
+
+## Ein Panel über der Karte, kein Dialog
+
+Der Rechner ist ein **nicht modales** Panel, das über der Karte schwebt und über
+einen Portal an `document.body` hängt. Grund: Beim Schieben des Reglers wandern
+die Pumpen auf der Leitung mit, und genau das will man dabei sehen. Ein
+bildschirmfüllender Dialog verdeckte die Karte — am Handy war er von einer eigenen
+Seite nicht zu unterscheiden.
+
+Aus demselben Grund steht die **Antwort oben**: Regler und Pumpenzahl direkt
+untereinander, alles Sekundäre darunter oder in Aufklappern. Ein Panel, in dem man
+zur Antwort scrollen muss, verfehlt seinen Zweck.
+
+### Kein lazy geladenes Modul im Kartenbaum
+
+Das Panel wird **statisch** importiert, nicht über `next/dynamic`. Ein lazy
+geladenes Modul suspendiert beim ersten Rendern; ohne eigene Suspense-Grenze
+steigt die Suspension bis zur Route, React verwirft den Teilbaum samt
+`MapContainer`, und der trifft beim Wiederaufbau auf seinen DOM-Container mit der
+alten Leaflet-Instanz. Das Ergebnis war
+`Error: Map container is being reused by another instance`, gefolgt von einem
+`TileLayer`, dessen `getPane()` `undefined` liefert — die ganze Kartenseite lief
+in die Fehlergrenze, sobald man den Rechner öffnete.
+
+Der Importzyklus, für den der dynamische Import gedacht war
+(`FirecallMultiPoint` → `ConnectionComponent` → Panel → `useFirecallItemUpdate` →
+`elements/index.tsx` → `FirecallConnection` → `FirecallMultiPoint`), ist
+stattdessen dort aufgelöst, wo `useFirecallItemAdd` es schon vorgemacht hat:
+`useFirecallItemUpdate` lädt die Item-Klassen-Registry erst im Callback.
+
+**Wer im Kartenbaum etwas lazy laden will, braucht eine eigene
+`<Suspense>`-Grenze** — sonst stirbt die Karte.
 
 ## Felder
 

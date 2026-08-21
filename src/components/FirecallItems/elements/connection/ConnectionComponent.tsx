@@ -6,7 +6,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
-import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Marker, Polyline, Popup } from 'react-leaflet';
@@ -21,6 +20,15 @@ import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
 import { FirecallMultiPoint } from '../FirecallMultiPoint';
 import PointContextMenu from '../PointContextMenu';
+// Statisch importiert, nicht über `next/dynamic`: Ein lazy geladenes Modul
+// suspendiert beim ersten Rendern, und ohne eigene Suspense-Grenze steigt die
+// Suspension bis zur Route. React verwirft dann den Teilbaum samt
+// `MapContainer`, der beim Wiederaufbau auf seinen DOM-Container mit der alten
+// Leaflet-Instanz trifft — „Map container is being reused by another instance",
+// gefolgt von einem TileLayer ohne Pane. Der Importzyklus, für den der
+// dynamische Import gedacht war, ist stattdessen in `useFirecallItemUpdate`
+// aufgelöst.
+import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/LoeschwasserfoerderungPanel';
 import { foerderungView } from './foerderung/foerderung';
 import { nearestInsertIndex } from './pointGeometry';
 import {
@@ -29,18 +37,6 @@ import {
   insertedPointPosition,
   updateFirecallPositions,
 } from './positions';
-
-/**
- * Erst beim Öffnen geladen. Ohne den dynamischen Import entsteht ein
- * Importzyklus: Der Dialog braucht `useFirecallItemUpdate`, das über
- * `elements/index.tsx` an `FirecallConnection` hängt — und `FirecallMultiPoint`,
- * dessen Oberklasse, lädt diese Datei hier. `FirecallMultiPoint` wäre dann beim
- * `extends` noch undefined. Nebeneffekt: Die Tabellen und das Diagramm liegen
- * nicht im Karten-Bundle.
- */
-const LoeschwasserfoerderungDialog = dynamic(
-  () => import('../../../Map/Leitungen/LoeschwasserfoerderungDialog')
-);
 
 export interface ConnectionMarkerProps {
   record: FirecallMultiPoint;
@@ -299,10 +295,10 @@ export default function ConnectionMarker({
             </IconButton>
           )}
           {record.type === 'connection' && (
-            <Tooltip title={tf('openDialog')}>
+            <Tooltip title={tf('openCalculator')}>
               <IconButton
                 sx={{ marginLeft: 'auto', float: 'right' }}
-                aria-label={tf('openDialog')}
+                aria-label={tf('openCalculator')}
                 onClick={() => setFoerderungOpen(true)}
               >
                 <WaterDropIcon />
@@ -351,7 +347,7 @@ export default function ConnectionMarker({
       ))}
 
       {foerderungOpen && (
-        <LoeschwasserfoerderungDialog
+        <LoeschwasserfoerderungPanel
           item={record.data() as Connection}
           open={foerderungOpen}
           onClose={() => setFoerderungOpen(false)}

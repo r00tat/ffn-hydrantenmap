@@ -9,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { commitBatch, setDoc } from '../lib/firestoreClient';
 import { useCallback } from 'react';
-import { getItemClass } from '../components/FirecallItems/elements';
 import { firestore } from '../components/firebase/firebase';
 import {
   DataSchemaField,
@@ -25,6 +24,18 @@ import useFirebaseLogin from './useFirebaseLogin';
 import { useFirecallId } from './useFirecall';
 import { useAuditLog } from './useAuditLog';
 import { isAuthError } from './auth/ensureFreshAuth';
+
+// Die Item-Klassen-Registry (`../components/FirecallItems/elements`) lädt alle
+// Elementklassen auf Modulebene, und mehrere davon hängen an `leaflet`. Ein
+// Import auf Modulebene hier schließt außerdem einen Kreis: Das
+// Löschwasserförderungs-Panel braucht diesen Hook, `ConnectionComponent` lädt
+// das Panel, und `FirecallMultiPoint` lädt `ConnectionComponent` — die
+// Oberklasse von `FirecallConnection` wäre beim `extends` noch undefined.
+// Deshalb erst im Callback, genau wie in `useFirecallItemAdd`.
+async function getFirecallItemClass(type: string | undefined) {
+  const { getItemClass } = await import('../components/FirecallItems/elements');
+  return getItemClass(type);
+}
 
 export default function useFirecallItemUpdate() {
   const firecallId = useFirecallId();
@@ -44,7 +55,7 @@ export default function useFirecallItemUpdate() {
         updatedAt: new Date().toISOString(),
         updatedBy: email,
       };
-      const itemClass = getItemClass(item?.type);
+      const itemClass = await getFirecallItemClass(item?.type);
       console.info(
         `update of firecall ${itemClass.firebaseCollectionName()} ${
           item.id

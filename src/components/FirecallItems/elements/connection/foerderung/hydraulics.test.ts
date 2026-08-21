@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { computeFoerderung, type FoerderungProfilePoint } from './hydraulics';
+import {
+  computeFoerderung,
+  MAX_PUMPS,
+  type FoerderungProfilePoint,
+} from './hydraulics';
 
 /**
  * Höhenprofil mit gleichmäßiger Steigung. Schrittweite 10 m, damit die
@@ -49,7 +53,7 @@ describe('computeFoerderung', () => {
     // (8 − 1,5) / 0,01 = 650 m. Veröffentlicht ist „etwa alle 600 m eine
     // Verstärkerpumpe" bei 800 l/min in der Ebene.
     const result = computeFoerderung(input(profile(2000)));
-    expect(result.pumps[1].distance).toBe(650);
+    expect(result.pumps[1].distance).toBeCloseTo(650, 6);
     expect(result.pumps[1].eingangsdruck).toBeCloseTo(1.5, 6);
     expect(result.verstaerkerpumpen).toBe(3);
   });
@@ -68,7 +72,7 @@ describe('computeFoerderung', () => {
     // Der weiteste erreichbare Punkt wäre 1950 m — 50 m vor dem Ende.
     const result = computeFoerderung(input(profile(2000)));
     const letzte = result.pumps[result.pumps.length - 1];
-    expect(letzte.distance).toBe(1800);
+    expect(letzte.distance).toBeCloseTo(1800, 6);
   });
 
   it('braucht bei Steigung mehr Pumpen als in der Ebene', () => {
@@ -88,8 +92,11 @@ describe('computeFoerderung', () => {
     expect(fallend.hoehenverlustBar).toBeCloseTo(-10, 6);
   });
 
-  it('meldet eine Steigung als nicht darstellbar, die der Ausgangsdruck nicht hergibt', () => {
-    // Letzter Abschnitt steigt 30 m: 6,0 + 3,0 + 0,1 = 9,1 > 8 bar
+  it('setzt die Pumpe mitten in eine Steigung, statt sie aufs Raster zu runden', () => {
+    // Letzter Abschnitt steigt 30 m auf 10 m Strecke. Vom letzten Abtastpunkt
+    // (100 m) aus wären 6,0 + 3,0 + 0,1 = 9,1 bar nötig — mehr als die 8 bar
+    // Ausgangsdruck. Eine Pumpe im Hang trägt die Förderung trotzdem, und genau
+    // die muss der Rechner finden: gerundet meldete er „nicht darstellbar".
     const result = computeFoerderung(
       input([
         { distance: 0, elevation: 0 },
@@ -97,15 +104,61 @@ describe('computeFoerderung', () => {
         { distance: 110, elevation: 30 },
       ])
     );
+    expect(result.darstellbar).toBe(true);
+    expect(result.verstaerkerpumpen).toBe(1);
+    // Der Standort liegt zwischen den Abtastpunkten, nicht auf einem.
+    expect(result.pumps[1].distance).toBeGreaterThan(100);
+    expect(result.pumps[1].distance).toBeLessThan(110);
+    expect(result.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
+  });
+
+  it('löst die Pumpenabstände unabhängig vom Abtastraster', () => {
+    // 1600 l/min in B 75 sind 5,00 bar je 100 m, also 0,05 bar/m: Abstände von
+    // 130 m. Auf einem 50-m-Raster würden daraus 100 m — 20 Pumpen statt 16 —
+    // und der letzte Abschnitt (40 m) hätte auf dem Raster keinen Standort.
+    const grob: FoerderungProfilePoint[] = [];
+    for (let distance = 0; distance <= 2000; distance += 50) {
+      grob.push({ distance, elevation: 130 });
+    }
+    const result = computeFoerderung({
+      profile: grob,
+      frictionBarPerMeter: 0.05,
+      ausgangsdruck: 8,
+      eingangsdruck: 1.5,
+      zieldruck: 6,
+    });
+
+    expect(result.pumps[1].distance).toBeCloseTo(130, 6);
+    expect(result.verstaerkerpumpen).toBeLessThanOrEqual(17);
+    expect(result.darstellbar).toBe(true);
+    expect(result.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
+  });
+
+  it('meldet nicht darstellbar, wenn mehr Pumpen nötig wären als aufzustellen sind', () => {
+    // Sehr steile, lange Steigung: geometrisch mit genügend Pumpen machbar,
+    // praktisch nicht. Die Grenze ist deshalb die Pumpenzahl, nicht die Geometrie.
+    // 6 km mit 30 % Steigung: 1800 m Höhe sind allein 180 bar, dazu 60 bar
+    // Reibung. Bei 6,5 bar nutzbarem Druck je Pumpe sind das rund 37.
+    const steil: FoerderungProfilePoint[] = [];
+    for (let distance = 0; distance <= 6000; distance += 50) {
+      steil.push({ distance, elevation: distance * 0.3 });
+    }
+    const result = computeFoerderung({
+      profile: steil,
+      frictionBarPerMeter: 0.01,
+      ausgangsdruck: 8,
+      eingangsdruck: 1.5,
+      zieldruck: 6,
+    });
+    expect(result.verstaerkerpumpen).toBeGreaterThan(MAX_PUMPS - 1);
     expect(result.darstellbar).toBe(false);
-    expect(result.enddruck).toBeLessThan(6);
   });
 
   it('gibt je Abschnitt Grenzen, Höhenunterschied und Enddruck aus', () => {
     const result = computeFoerderung(input(profile(2000)));
     expect(result.abschnitte).toHaveLength(result.pumps.length);
     expect(result.abschnitte[0].vonMeter).toBe(0);
-    expect(result.abschnitte[0].bisMeter).toBe(650);
+    expect(result.abschnitte[0].bisMeter).toBeCloseTo(650, 6);
     expect(result.abschnitte[0].hoehenunterschied).toBeCloseTo(0, 6);
     expect(result.abschnitte[0].druckverlust).toBeCloseTo(6.5, 6);
     // Zwischenabschnitte enden auf dem Mindest-Eingangsdruck, weil die Pumpe am
@@ -113,7 +166,7 @@ describe('computeFoerderung', () => {
     expect(result.abschnitte[0].enddruck).toBeCloseTo(1.5, 6);
     // Der letzte Abschnitt endet auf dem Zieldruck oder darüber.
     const letzter = result.abschnitte[result.abschnitte.length - 1];
-    expect(letzter.bisMeter).toBe(2000);
+    expect(letzter.bisMeter).toBeCloseTo(2000, 6);
     expect(letzter.enddruck).toBeGreaterThanOrEqual(6 - 1e-9);
   });
 

@@ -95,6 +95,34 @@ export interface FoerderungView {
   warnings: FoerderungWarning[];
 }
 
+/**
+ * Die Koordinate an einem Streckenmeter, linear zwischen den Abtastpunkten.
+ *
+ * Die Pumpenstandorte werden auf der Strecke gelöst und liegen deshalb meist
+ * **zwischen** zwei Abtastpunkten — auf den nächsten zu runden verschöbe sie um
+ * bis zu 25 m.
+ */
+function positionAtDistance(
+  samples: { position: LatLngPosition; distance: number }[],
+  distance: number
+): LatLngPosition {
+  if (samples.length === 0) return [0, 0];
+  if (distance <= samples[0].distance) return samples[0].position;
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i].distance >= distance) {
+      const span = samples[i].distance - samples[i - 1].distance;
+      const ratio = span > 0 ? (distance - samples[i - 1].distance) / span : 0;
+      return [
+        samples[i - 1].position[0] +
+          (samples[i].position[0] - samples[i - 1].position[0]) * ratio,
+        samples[i - 1].position[1] +
+          (samples[i].position[1] - samples[i - 1].position[1]) * ratio,
+      ];
+    }
+  }
+  return samples[samples.length - 1].position;
+}
+
 /** Eine Zahl aus dem Feld, oder die Vorbelegung. Nur endliche Werte zählen. */
 const numberOr = (value: number | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -213,7 +241,7 @@ export function foerderungView(
       Math.ceil(length / (item.oneHozeLength || DEFAULT_HOSE_LENGTH)) *
       params.paralleleLeitungen,
     pumps: (result?.pumps ?? []).map((pump) => ({
-      position: samples[pump.index].position,
+      position: positionAtDistance(samples, pump.distance),
       distance: pump.distance,
       eingangsdruck: pump.eingangsdruck,
       ausgangsdruck: pump.ausgangsdruck,

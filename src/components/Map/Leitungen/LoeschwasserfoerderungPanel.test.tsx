@@ -16,8 +16,13 @@ vi.mock('../../../hooks/useFirecallItemUpdate', () => ({
   default: () => updateItem,
 }));
 
+const showSnackbar = vi.fn();
+vi.mock('../../providers/SnackbarProvider', () => ({
+  useSnackbar: () => showSnackbar,
+}));
+
 import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
-import LoeschwasserfoerderungDialog from './LoeschwasserfoerderungDialog';
+import LoeschwasserfoerderungPanel from './LoeschwasserfoerderungPanel';
 
 const entnahme: LatLngPosition = [47.9482, 16.8482];
 /** Rund 2000 m nach Norden — lang genug für mehrere Verstärkerpumpen. */
@@ -57,15 +62,16 @@ const pumpCount = () =>
     )?.[1] ?? 0
   );
 
-describe('LoeschwasserfoerderungDialog', () => {
+describe('LoeschwasserfoerderungPanel', () => {
   beforeEach(() => {
     addItem.mockClear();
     updateItem.mockClear();
+    showSnackbar.mockClear();
   });
 
   it('zeigt Lage und Ergebnis aus dem gespeicherten Profil', () => {
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile()}
         open
         onClose={() => {}}
@@ -85,7 +91,7 @@ describe('LoeschwasserfoerderungDialog', () => {
   it('rechnet die Pumpenzahl bei einer neuen Fördermenge neu', async () => {
     const user = userEvent.setup();
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile({ foerderMenge: 400 })}
         open
         onClose={() => {}}
@@ -102,7 +108,7 @@ describe('LoeschwasserfoerderungDialog', () => {
 
   it('warnt ohne Höhendaten und gibt das Höhenfeld frei', () => {
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={connection()}
         open
         onClose={() => {}}
@@ -117,7 +123,7 @@ describe('LoeschwasserfoerderungDialog', () => {
 
   it('sperrt das Höhenfeld, solange ein Profil vorliegt', () => {
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile()}
         open
         onClose={() => {}}
@@ -131,7 +137,7 @@ describe('LoeschwasserfoerderungDialog', () => {
 
   it('nennt den Grund, wenn die Dimension keinen Reibungswert hat', () => {
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile({ dimension: 'Storz' })}
         open
         onClose={() => {}}
@@ -148,7 +154,7 @@ describe('LoeschwasserfoerderungDialog', () => {
     const user = userEvent.setup();
     const item = withProfile();
     renderWithIntl(
-      <LoeschwasserfoerderungDialog item={item} open onClose={() => {}} />
+      <LoeschwasserfoerderungPanel item={item} open onClose={() => {}} />
     );
 
     const pumps = pumpCount() + 1; // plus die Pumpe an der Entnahmestelle
@@ -172,11 +178,13 @@ describe('LoeschwasserfoerderungDialog', () => {
     );
   });
 
-  it('speichert die Parameter beim Übernehmen und schließt', async () => {
+  it('speichert die Parameter beim Übernehmen und bleibt offen', async () => {
+    // Das Panel ist nicht modal: Wer die Werte festhält, arbeitet meist weiter
+    // an der Lage und will es nicht erst wieder aufmachen müssen.
     const user = userEvent.setup();
     const onClose = vi.fn();
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile()}
         open
         onClose={onClose}
@@ -185,21 +193,62 @@ describe('LoeschwasserfoerderungDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
 
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(updateItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        foerderung: 'true',
-        foerderMenge: 1000,
-        zielDruck: 6,
-        pumpenAusgangsdruck: 8,
-      })
+    await waitFor(() =>
+      expect(updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          foerderung: 'true',
+          foerderMenge: 1000,
+          zielDruck: 6,
+          pumpenAusgangsdruck: 8,
+        })
+      )
     );
+    expect(onClose).not.toHaveBeenCalled();
+    expect(showSnackbar).toHaveBeenCalled();
+  });
+
+  it('rendert nichts, wenn es geschlossen ist', () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open={false}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.queryByText('Löschwasserförderung')).not.toBeInTheDocument();
+  });
+
+  it('klappt den Inhalt ein und lässt die Kopfzeile stehen', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={() => {}} />
+    );
+
+    expect(pumpCount()).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Einklappen' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Übernehmen' })).not.toBeInTheDocument()
+    );
+    // Die Kopfzeile bleibt, damit man es wieder aufklappen kann.
+    expect(screen.getByRole('button', { name: 'Ausklappen' })).toBeInTheDocument();
+  });
+
+  it('schließt über das Kreuz', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel item={withProfile()} open onClose={onClose} />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('rechnet nicht, solange der Rechner abgeschaltet ist', async () => {
     const user = userEvent.setup();
     renderWithIntl(
-      <LoeschwasserfoerderungDialog
+      <LoeschwasserfoerderungPanel
         item={withProfile({ foerderung: 'false' })}
         open
         onClose={() => {}}

@@ -24,6 +24,19 @@ export const BAR_PER_METER_ELEVATION = 0.1;
  */
 const EPS = 1e-9;
 
+/**
+ * Obergrenze der Pumpen, jenseits derer nicht mehr gerechnet, sondern gewarnt
+ * wird.
+ *
+ * Seit die Standorte auf der Strecke gelöst werden und nicht auf einem
+ * Abtastraster, ist geometrisch fast jede Lage darstellbar — man kann eine Pumpe
+ * überall setzen, also lässt sich jede Steigung mit genügend Pumpen überwinden.
+ * Die echte Grenze ist deshalb nicht die Geometrie, sondern das, was ein Bezirk
+ * aufstellen kann. Darüber ist die Antwort nicht „geht nicht", sondern „nicht
+ * mit diesen Mitteln".
+ */
+export const MAX_PUMPS = 30;
+
 export interface FoerderungProfilePoint {
   /** Streckenmeter ab der Entnahmestelle. */
   distance: number;
@@ -40,10 +53,17 @@ export interface FoerderungInput {
 }
 
 export interface FoerderungPump {
-  /** Streckenmeter ab der Entnahmestelle; 0 ist die Entnahmestelle selbst. */
+  /**
+   * Streckenmeter ab der Entnahmestelle; 0 ist die Entnahmestelle selbst.
+   *
+   * Auf der Strecke gerechnet, **nicht** auf einen Abtastpunkt gerundet. Das
+   * Raster ist 50 m grob; bei 1600 l/min sind die Pumpenabstände nur 130 m, und
+   * gerundet würde daraus 100 m — 20 Pumpen statt 16. Schlimmer noch: Der letzte
+   * Abschnitt darf dann nur 40 m lang sein, auf dem Raster gibt es keinen
+   * solchen Punkt, und der Rechner meldete „nicht darstellbar", obwohl eine
+   * Pumpe 40 m vor dem Verteiler die Förderung trägt.
+   */
   distance: number;
-  /** Index im übergebenen Profil — für die Position auf der Karte. */
-  index: number;
   /** Druck, mit dem das Wasser ankommt; an der Entnahmestelle undefined. */
   eingangsdruck?: number;
   ausgangsdruck: number;
@@ -86,39 +106,90 @@ const lossBetween = (
   (to.elevation - from.elevation) * BAR_PER_METER_ELEVATION;
 
 /**
- * Der Druck, der an jedem Punkt nötig wäre, um das Ende mit dem Zieldruck zu
- * erreichen — ohne weitere Pumpe. Rückwärts gerechnet, weil die Vorgabe am Ende
- * steht und nicht am Anfang.
+ * Die kumulierte Druckabnahme ab der Entnahmestelle, je Abtastpunkt.
  *
- * Ohne diesen Lauf schöpft ein reines Vorwärts-Greedy den Mindest-Eingangsdruck
- * aus und erreicht das Ende unter dem Zieldruck — es würde eine Pumpe zu wenig
- * ausweisen.
+ * Damit wird aus „welcher Abtastpunkt ist erreichbar" ein „bei welchem
+ * Streckenmeter ist der Druck aufgebraucht" — der Standort einer Pumpe muss
+ * nicht auf einem Abtastpunkt liegen. Zwischen zwei Punkten verläuft die
+ * Abnahme linear, weil das Modell zwischen ihnen nichts anderes kennt.
  */
-function pressureNeeded(
+function cumulativeDrop(
   profile: FoerderungProfilePoint[],
-  frictionBarPerMeter: number,
-  zieldruck: number
+  frictionBarPerMeter: number
 ): number[] {
-  const need = new Array<number>(profile.length);
-  need[profile.length - 1] = zieldruck;
-  for (let i = profile.length - 2; i >= 0; i -= 1) {
-    need[i] =
-      need[i + 1] + lossBetween(profile[i], profile[i + 1], frictionBarPerMeter);
+  const drop = [0];
+  for (let i = 1; i < profile.length; i += 1) {
+    drop.push(
+      drop[i - 1] + lossBetween(profile[i - 1], profile[i], frictionBarPerMeter)
+    );
   }
-  return need;
+  return drop;
 }
 
 /**
- * Wo die Verstärkerpumpen stehen müssen und mit welchem Druck.
- *
- * Vorwärts von der Entnahmestelle, wie es gelehrt wird: „wie weit komme ich mit
- * 8 bar, bis nur noch 1,5 bar Eingangsdruck übrig sind". Die nächste Pumpe
- * steht am **ersten** Punkt, von dem aus das Ende noch mit dem Zieldruck
- * erreichbar ist, sonst am **weitesten** erreichbaren. Der erste Treffer für
- * die letzte Pumpe: Auf 2000 m flach wäre der weiteste Punkt 1950 m — 50 m vor
- * dem Verteiler, ein unsinniger Standort. Die Pumpenzahl ist dieselbe, die
- * Reserve am Ende größer.
+ * Der erste Streckenmeter ab `fromDistance`, an dem die kumulierte Abnahme
+ * `targetDrop` erreicht — oder `undefined`, wenn sie das bis zum Ende nicht tut
+ * (ein Gefälle kann die Abnahme auch zurückgehen lassen).
  */
+function distanceAtDrop(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  targetDrop: number,
+  fromDistance: number
+): number | undefined {
+  for (let i = 1; i < profile.length; i += 1) {
+    if (profile[i].distance <= fromDistance) continue;
+    const spanDrop = drop[i] - drop[i - 1];
+    if (drop[i] + EPS < targetDrop) continue;
+    if (spanDrop <= 0) {
+      // Abschnitt ohne Abnahme: Der Zielwert liegt bereits am Anfang.
+      return Math.max(profile[i - 1].distance, fromDistance);
+    }
+    const ratio = (targetDrop - drop[i - 1]) / spanDrop;
+    const distance =
+      profile[i - 1].distance +
+      (profile[i].distance - profile[i - 1].distance) * Math.min(1, Math.max(0, ratio));
+    return Math.max(distance, fromDistance);
+  }
+  return undefined;
+}
+
+/** Die Höhe an einem beliebigen Streckenmeter, linear zwischen den Punkten. */
+function elevationAt(
+  profile: FoerderungProfilePoint[],
+  distance: number
+): number {
+  if (distance <= profile[0].distance) return profile[0].elevation;
+  for (let i = 1; i < profile.length; i += 1) {
+    if (profile[i].distance >= distance) {
+      const span = profile[i].distance - profile[i - 1].distance;
+      const ratio = span > 0 ? (distance - profile[i - 1].distance) / span : 0;
+      return (
+        profile[i - 1].elevation +
+        (profile[i].elevation - profile[i - 1].elevation) * ratio
+      );
+    }
+  }
+  return profile[profile.length - 1].elevation;
+}
+
+/** Die kumulierte Abnahme an einem beliebigen Streckenmeter. */
+function dropAt(
+  profile: FoerderungProfilePoint[],
+  drop: number[],
+  distance: number
+): number {
+  if (distance <= profile[0].distance) return 0;
+  for (let i = 1; i < profile.length; i += 1) {
+    if (profile[i].distance >= distance) {
+      const span = profile[i].distance - profile[i - 1].distance;
+      const ratio = span > 0 ? (distance - profile[i - 1].distance) / span : 0;
+      return drop[i - 1] + (drop[i] - drop[i - 1]) * ratio;
+    }
+  }
+  return drop[drop.length - 1];
+}
+
 export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   const {
     profile,
@@ -129,73 +200,83 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
   } = input;
 
   const last = profile.length - 1;
-  const need = pressureNeeded(profile, frictionBarPerMeter, zieldruck);
+  const totalDistance = profile[last].distance;
+  const drop = cumulativeDrop(profile, frictionBarPerMeter);
+  const totalDrop = drop[last];
 
-  const pumps: FoerderungPump[] = [{ distance: 0, index: 0, ausgangsdruck }];
+  const pumps: FoerderungPump[] = [{ distance: 0, ausgangsdruck }];
   const abschnitte: FoerderungAbschnitt[] = [];
   let darstellbar = true;
   let enddruck = ausgangsdruck;
-  let current = 0;
 
-  // Höchstens eine Pumpe je Abtastpunkt. Die Schranke fängt eine Lage ab, in
-  // der kein Fortschritt zustande kommt, statt endlos zu laufen.
-  for (let guard = 0; guard <= profile.length; guard += 1) {
-    // Reicht der Ausgangsdruck bis zum Ende, ist die Leitung fertig.
-    if (need[current] <= ausgangsdruck + EPS) {
-      const druckverlust = need[current] - zieldruck;
-      enddruck = ausgangsdruck - druckverlust;
-      abschnitte.push({
-        vonMeter: profile[current].distance,
-        bisMeter: profile[last].distance,
-        hoehenunterschied: profile[last].elevation - profile[current].elevation,
-        druckverlust,
-        enddruck,
-      });
-      break;
-    }
+  let currentDistance = 0;
+  let currentDrop = 0;
 
-    let pressure = ausgangsdruck;
-    let next = -1;
-    let nextPressure = 0;
-    // `i < last`: Am Ende der Leitung steht der Verteiler, keine Pumpe.
-    for (let i = current + 1; i < last; i += 1) {
-      pressure -= lossBetween(profile[i - 1], profile[i], frictionBarPerMeter);
-      if (pressure < eingangsdruck - EPS) break;
-      next = i;
-      nextPressure = pressure;
-      if (need[i] <= ausgangsdruck + EPS) break;
-    }
-
-    if (next < 0) {
-      // Nicht einmal der nächste Abtastpunkt ist mit dem Mindest-Eingangsdruck
-      // erreichbar — meist eine Steigung, die der Ausgangsdruck nicht hergibt.
-      const druckverlust = need[current] - zieldruck;
-      enddruck = ausgangsdruck - druckverlust;
-      darstellbar = false;
-      abschnitte.push({
-        vonMeter: profile[current].distance,
-        bisMeter: profile[last].distance,
-        hoehenunterschied: profile[last].elevation - profile[current].elevation,
-        druckverlust,
-        enddruck,
-      });
-      break;
-    }
-
+  const pushAbschnitt = (
+    toDistance: number,
+    toDrop: number,
+    fromDistance: number,
+    fromDrop: number
+  ) => {
+    const druckverlust = toDrop - fromDrop;
     abschnitte.push({
-      vonMeter: profile[current].distance,
-      bisMeter: profile[next].distance,
-      hoehenunterschied: profile[next].elevation - profile[current].elevation,
-      druckverlust: ausgangsdruck - nextPressure,
-      enddruck: nextPressure,
+      vonMeter: fromDistance,
+      bisMeter: toDistance,
+      hoehenunterschied:
+        elevationAt(profile, toDistance) - elevationAt(profile, fromDistance),
+      druckverlust,
+      enddruck: ausgangsdruck - druckverlust,
     });
+  };
+
+  let exceeded = false;
+  for (let guard = 0; ; guard += 1) {
+    if (guard > MAX_PUMPS) {
+      // Mehr Pumpen, als eine Lage trägt — und gleichzeitig der Schutz gegen
+      // eine Schleife, die keinen Fortschritt macht.
+      exceeded = true;
+      enddruck = ausgangsdruck - (totalDrop - currentDrop);
+      break;
+    }
+    // Reicht der Ausgangsdruck bis zum Ende, ist die Leitung fertig.
+    if (totalDrop - currentDrop <= ausgangsdruck - zieldruck + EPS) {
+      enddruck = ausgangsdruck - (totalDrop - currentDrop);
+      pushAbschnitt(totalDistance, totalDrop, currentDistance, currentDrop);
+      break;
+    }
+
+    // Der weiteste erreichbare Punkt, und der erste, von dem aus das Ende noch
+    // mit dem Zieldruck erreichbar ist. Der frühere von beiden gewinnt: Auf
+    // 2000 m flach wäre der weiteste 1950 m — 50 m vor dem Verteiler, ein
+    // unsinniger Standort. Die Pumpenzahl ist dieselbe, die Reserve größer.
+    const reachDrop = currentDrop + (ausgangsdruck - eingangsdruck);
+    const endReachableDrop = totalDrop - (ausgangsdruck - zieldruck);
+    const targetDrop = Math.min(reachDrop, endReachableDrop);
+
+    const nextDistance = distanceAtDrop(
+      profile,
+      drop,
+      targetDrop,
+      currentDistance
+    );
+
+    if (nextDistance === undefined || nextDistance >= totalDistance - EPS) {
+      // Kein Standort vor dem Verteiler, von dem aus es weitergeht.
+      darstellbar = false;
+      enddruck = ausgangsdruck - (totalDrop - currentDrop);
+      pushAbschnitt(totalDistance, totalDrop, currentDistance, currentDrop);
+      break;
+    }
+
+    const nextDrop = dropAt(profile, drop, nextDistance);
+    pushAbschnitt(nextDistance, nextDrop, currentDistance, currentDrop);
     pumps.push({
-      distance: profile[next].distance,
-      index: next,
-      eingangsdruck: nextPressure,
+      distance: nextDistance,
+      eingangsdruck: ausgangsdruck - (nextDrop - currentDrop),
       ausgangsdruck,
     });
-    current = next;
+    currentDistance = nextDistance;
+    currentDrop = nextDrop;
   }
 
   return {
@@ -208,6 +289,6 @@ export function computeFoerderung(input: FoerderungInput): FoerderungResult {
       (profile[last].elevation - profile[0].elevation) *
       BAR_PER_METER_ELEVATION,
     enddruck,
-    darstellbar: darstellbar && enddruck >= zieldruck - EPS,
+    darstellbar: darstellbar && !exceeded && enddruck >= zieldruck - EPS,
   };
 }
