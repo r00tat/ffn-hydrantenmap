@@ -16,7 +16,12 @@ Führungsvorgang wertlos.
 - **Gegenprüfung:** Wikipedia, „Löschwasserförderung über lange Wegstrecken"
   (deutsche Werte).
 - **Höhendaten:** EU-DEM 25 m (Copernicus) über
-  [OpenTopoData](https://www.opentopodata.org/). Namensnennung im Dialog.
+  [OpenTopoData](https://www.opentopodata.org/). Namensnennung im Panel, an der
+  Zeile zur Höhenquelle.
+
+Die Reibungsquelle steht **hier** und nicht mehr im Panel: Sie gehört zur
+Nachprüfbarkeit der Zahlen, nicht in die Bedienung. Im Panel war sie eine Zeile,
+die bei jedem Blick mitgelesen werden musste, ohne je gebraucht zu werden.
 
 ## Reibungsverlust B 75, bar je 100 m
 
@@ -180,6 +185,29 @@ mit einer einzigen Pumpe auskommt, „1 Verstärkerpumpe" melden.
 B-Leitungen bei 800 l/min ergeben so 0,25 bar/100 m — veröffentlicht sind „etwa
 0,3 bar" gegen 1,0 bar bei einer Leitung.
 
+## Förderrichtung
+
+Eine Leitung wird gezeichnet, wie es gerade passt — ob das Wasser am ersten oder
+am letzten Punkt entnommen wird, steht damit **nicht** fest. Für die Rechnung ist
+das keine Nebensache: Das Vorzeichen jeder Steigung hängt daran, und damit die
+Pumpenzahl.
+
+Vorbelegt ist die Zeichenrichtung, erster Punkt ⇒ Entnahmestelle. Umgekehrt wird
+über `foerderungUmgekehrt` am Element, im Panel sichtbar als „Punkt n → Punkt 1"
+samt beiden Höhen und einem Knopf zum Umkehren. Auch die Achse des Höhenprofils
+läuft immer in Förderrichtung und trägt „Entnahme" und „Ziel" an ihren Enden.
+
+**Gedreht wird nur die Rechnung, nicht die Geometrie.** Die Abtastung bleibt in
+Zeichenrichtung, und damit bleibt die Signatur `elevationFor` gültig: Ein
+Umkehren kostet keine neue Höhenabfrage. `foerderungView` rechnet dazu die
+Abtastpunkte auf `Länge − Streckenmeter` um und dreht sie mit den Höhen zusammen
+herum; alles danach — Hydraulik, Diagramm, Kartenpositionen — arbeitet
+unverändert in Förderrichtung.
+
+Die Punkte des Elements zu drehen wäre teurer und unschärfer: Es würde
+`positions` **und** `routedPositions` ändern, die Punktnummern in den Popups
+vertauschen und jedes Umkehren mit einer neuen Höhenabfrage bezahlen.
+
 ## Höhendaten
 
 ### Warum nicht Burgenland GIS
@@ -224,6 +252,30 @@ das erste Secret dieser Art im Deployment.
   kostet keine Anfrage.
 - Ein einzelner Punkt ohne Höhe verwirft die ganze Anfrage: Ein Profil mit
   Löchern ergibt Druckwerte, die im Einsatz niemand nachprüfen kann.
+
+### Eingeschaltet mit dem Öffnen, Höhen sofort
+
+Die Höhenabfrage hängt an `foerderung === 'true'` — sonst kostete jede
+gewöhnliche Leitung eine Anfrage. Solange dieses Feld erst durch „Übernehmen"
+gesetzt wurde, stand beim Öffnen des Rechners „keine Höhendaten verfügbar", und
+zwar auch dort, wo es welche gibt. Das war die falsche Antwort auf die erste
+Frage, die der Rechner beantworten soll.
+
+Deshalb schaltet das **Öffnen** den Rechner ein und speichert das. Zwei Wege, je
+nachdem, was am Element steht:
+
+- Noch nicht eingeschaltet ⇒ das Panel speichert, und `ensureConnectionDerived`
+  zieht dabei Straßenverlauf und Höhenprofil nach.
+- Eingeschaltet, aber ohne Profil ⇒ das Panel ruft `ensureConnectionElevation`
+  direkt; gespeichert wird nichts.
+
+Solange die Abfrage läuft, steht ein Ladehinweis, und die Warnung „keine
+Höhendaten" wird zurückgehalten — sie wäre zu diesem Zeitpunkt bloß voreilig.
+
+Der Schalter in der Kopfzeile bleibt für den umgekehrten Weg: den Rechner an
+dieser Leitung wieder abzuschalten. Dass das Speichern die Pumpen auch auf der
+Karte und die Zusammenfassung am Element sichtbar macht, ist der Zweck und kein
+Nebeneffekt — so war die Entscheidung „Ergebnis an der Leitung mitführen".
 
 ### Reihenfolge: erst Routing, dann Höhen
 
@@ -310,9 +362,10 @@ dort fehlt, löscht ein Speichern aus dem Dialog (`setDoc` ohne `merge`). In
 `fields()` erscheinen sie **nicht** — sie gehören in den eigenen Dialog, nicht in
 die generische Feldliste.
 
-`foerderung`, `foerderMenge`, `zielDruck`, `pumpenAusgangsdruck`,
-`pumpenEingangsdruck`, `pumpenNennstrom`, `paralleleLeitungen`,
-`hoehenunterschied`, `elevationProfile`, `elevationFor`, `elevationFailed`.
+`foerderung`, `foerderungUmgekehrt`, `foerderMenge`, `zielDruck`,
+`pumpenAusgangsdruck`, `pumpenEingangsdruck`, `pumpenNennstrom`,
+`paralleleLeitungen`, `hoehenunterschied`, `elevationProfile`, `elevationFor`,
+`elevationFailed`.
 
 ## Was hier nicht ist
 

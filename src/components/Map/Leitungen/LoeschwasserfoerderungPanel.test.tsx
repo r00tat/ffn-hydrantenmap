@@ -21,6 +21,23 @@ vi.mock('../../providers/SnackbarProvider', () => ({
   useSnackbar: () => showSnackbar,
 }));
 
+vi.mock('../../../hooks/useFirecall', () => ({
+  useFirecallId: () => 'einsatz-1',
+}));
+
+// Die Höhenabfrage ist ein Netzaufruf über eine Server-Action und hängt am
+// Firestore-Client; hier zählt nur, **dass** das Panel sie von selbst auslöst.
+const ensureElevation = vi.fn((_firecallId: string, _item: unknown) =>
+  Promise.resolve(undefined)
+);
+vi.mock(
+  '../../FirecallItems/elements/connection/foerderung/ensureConnectionElevation',
+  () => ({
+    ensureConnectionElevation: (firecallId: string, item: unknown) =>
+      ensureElevation(firecallId, item),
+  })
+);
+
 import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import LoeschwasserfoerderungPanel from './LoeschwasserfoerderungPanel';
 
@@ -67,6 +84,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     addItem.mockClear();
     updateItem.mockClear();
     showSnackbar.mockClear();
+    ensureElevation.mockClear();
   });
 
   it('zeigt Lage und Ergebnis aus dem gespeicherten Profil', () => {
@@ -106,7 +124,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     await waitFor(() => expect(pumpCount()).toBeGreaterThan(before));
   });
 
-  it('warnt ohne Höhendaten und gibt das Höhenfeld frei', () => {
+  it('warnt ohne Höhendaten und gibt das Höhenfeld frei', async () => {
     renderWithIntl(
       <LoeschwasserfoerderungPanel
         item={connection()}
@@ -115,7 +133,11 @@ describe('LoeschwasserfoerderungPanel', () => {
       />
     );
 
-    expect(screen.getByText(/Keine Höhendaten verfügbar/)).toBeInTheDocument();
+    // Erst nachdem die Abfrage durch ist: Solange sie läuft, steht der
+    // Ladehinweis da und nicht die Warnung.
+    expect(
+      await screen.findByText(/Keine Höhendaten verfügbar/)
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('spinbutton', { name: /Höhenunterschied/ })
     ).toBeEnabled();
@@ -245,7 +267,7 @@ describe('LoeschwasserfoerderungPanel', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('rechnet nicht, solange der Rechner abgeschaltet ist', async () => {
+  it('rechnet ab dem Öffnen und hört mit dem Schalter auf', async () => {
     const user = userEvent.setup();
     renderWithIntl(
       <LoeschwasserfoerderungPanel
@@ -255,11 +277,91 @@ describe('LoeschwasserfoerderungPanel', () => {
       />
     );
 
-    expect(screen.queryByText(/Verstärkerpumpen?$/)).not.toBeInTheDocument();
+    // Das Öffnen schaltet ein — ohne Zutun steht das Ergebnis da.
+    expect(pumpCount()).toBeGreaterThan(0);
 
     await user.click(
       screen.getByLabelText('Rechner für diese Leitung verwenden')
     );
+    await waitFor(() =>
+      expect(screen.queryByText(/Verstärkerpumpen?$/)).not.toBeInTheDocument()
+    );
+  });
+
+  it('schaltet den Rechner mit dem Öffnen ein und hält das fest', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile({ foerderung: undefined })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    // Sonst stünde der Rechner nur im Panel auf „an": Die Pumpen an der Karte
+    // und die Zusammenfassung am Element hängen am gespeicherten Feld.
+    await waitFor(() =>
+      expect(updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({ foerderung: 'true' })
+      )
+    );
+  });
+
+  it('holt fehlende Höhendaten beim Öffnen, ohne Speichern', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={connection()}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    await waitFor(() => expect(ensureElevation).toHaveBeenCalledTimes(1));
+    expect(updateItem).not.toHaveBeenCalled();
+  });
+
+  it('fragt nicht erneut ab, wenn das Profil schon vorliegt', async () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open
+        onClose={() => {}}
+      />
+    );
+
     await waitFor(() => expect(pumpCount()).toBeGreaterThan(0));
+    expect(ensureElevation).not.toHaveBeenCalled();
+  });
+
+  it('zeigt die Förderrichtung und kehrt sie um', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Punkt 1 → Punkt 2')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Richtung umkehren/ }));
+    expect(screen.getByText('Punkt 2 → Punkt 1')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({ foerderungUmgekehrt: 'true' })
+      )
+    );
+  });
+
+  it('nennt keine Quelle mehr im Panel', () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile()}
+        open
+        onClose={() => {}}
+      />
+    );
+    expect(screen.queryByText(/Ausbildungsunterlage/)).not.toBeInTheDocument();
   });
 });

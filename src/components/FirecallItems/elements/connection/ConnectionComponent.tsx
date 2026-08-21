@@ -114,6 +114,7 @@ export default function ConnectionMarker({
   // `record` ist bei jedem Render eine neue Instanz und taugt nicht als
   // Abhängigkeit; stattdessen die Felder, aus denen sich das Ergebnis ergibt.
   const foerderung = record.get<string>('foerderung');
+  const foerderungUmgekehrt = record.get<string>('foerderungUmgekehrt');
   const foerderMenge = record.get<number>('foerderMenge');
   const zielDruck = record.get<number>('zielDruck');
   const pumpenAusgangsdruck = record.get<number>('pumpenAusgangsdruck');
@@ -133,6 +134,7 @@ export default function ConnectionMarker({
       routedFor,
       routedPositions,
       foerderung,
+      foerderungUmgekehrt,
       foerderMenge,
       zielDruck,
       pumpenAusgangsdruck,

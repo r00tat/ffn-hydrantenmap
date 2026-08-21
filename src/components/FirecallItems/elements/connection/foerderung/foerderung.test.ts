@@ -177,3 +177,87 @@ describe('foerderungSummary', () => {
     );
   });
 });
+
+describe('Förderrichtung', () => {
+  /**
+   * Eine Leitung, die auf ihrer Länge um 15 m steigt — der Fall, in dem die
+   * Richtung überhaupt einen Unterschied macht.
+   */
+  const steigend = (overrides: Partial<Connection> = {}, climb = 15) => {
+    const base = connection({ foerderung: 'true', ...overrides });
+    const samples = foerderungSamples(base);
+    const last = samples[samples.length - 1].distance;
+    return connection({
+      foerderung: 'true',
+      ...overrides,
+      elevationProfile: JSON.stringify(
+        samples.map((s) => 130 + (climb * s.distance) / last)
+      ),
+      elevationFor: elevationSignature(samples),
+    });
+  };
+
+  it('fördert vorbelegt vom ersten zum letzten Punkt', () => {
+    const view = foerderungView(steigend());
+    expect(view?.reversed).toBe(false);
+    expect(view?.hoehenunterschied).toBeCloseTo(15, 6);
+    expect(view?.profile[0].elevation).toBeCloseTo(130, 6);
+  });
+
+  it('dreht mit foerderungUmgekehrt Höhenprofil und Vorzeichen', () => {
+    const view = foerderungView(steigend({ foerderungUmgekehrt: 'true' }));
+    expect(view?.reversed).toBe(true);
+    expect(view?.hoehenunterschied).toBeCloseTo(-15, 6);
+    expect(view?.profile[0].elevation).toBeCloseTo(145, 6);
+    expect(view?.profile[view!.profile.length - 1].elevation).toBeCloseTo(
+      130,
+      6
+    );
+    // Die Streckenmeter laufen weiter aufsteigend von 0 bis zur Länge.
+    expect(view?.profile[0].distance).toBe(0);
+    expect(
+      view?.profile[view!.profile.length - 1].distance
+    ).toBeGreaterThan(0);
+  });
+
+  it('behält das gespeicherte Profil beim Umkehren — keine neue Abfrage', () => {
+    const view = foerderungView(steigend({ foerderungUmgekehrt: 'true' }));
+    expect(view?.elevationSource).toBe('profile');
+    expect(view?.warnings).not.toContain('noElevationData');
+  });
+
+  it('setzt die Pumpe an der Entnahmestelle an das andere Ende', () => {
+    const hin = foerderungView(steigend());
+    const zurueck = foerderungView(steigend({ foerderungUmgekehrt: 'true' }));
+    expect(hin?.pumps[0].position[0]).toBeCloseTo(entnahme[0], 6);
+    expect(zurueck?.pumps[0].position[0]).toBeCloseTo(verteiler[0], 6);
+  });
+
+  it('braucht bergab weniger Pumpen als bergauf', () => {
+    // 60 m auf 2000 m sind 6 bar Höhenanteil. Erst ab dieser Größe schlägt die
+    // Richtung auf die Pumpenzahl durch: Bei 15 m sind es 1,5 bar, und die
+    // gehen im Sprung von 6,5 bar je Pumpenabschnitt unter.
+    const hin = foerderungView(steigend({}, 60));
+    const zurueck = foerderungView(
+      steigend({ foerderungUmgekehrt: 'true' }, 60)
+    );
+    expect(hin?.result?.hoehenverlustBar).toBeCloseTo(6, 6);
+    expect(zurueck?.result?.hoehenverlustBar).toBeCloseTo(-6, 6);
+    expect(zurueck?.result?.verstaerkerpumpen).toBeLessThan(
+      hin?.result?.verstaerkerpumpen ?? 0
+    );
+  });
+
+  it('nennt die Punktnummern der Enden in Förderrichtung', () => {
+    const drei = JSON.stringify([
+      entnahme,
+      [(entnahme[0] + verteiler[0]) / 2, entnahme[1]],
+      verteiler,
+    ]);
+    expect(foerderungView(steigend({ positions: drei }))?.pointCount).toBe(3);
+    expect(
+      foerderungView(steigend({ positions: drei, foerderungUmgekehrt: 'true' }))
+        ?.reversed
+    ).toBe(true);
+  });
+});

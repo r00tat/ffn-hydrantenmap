@@ -1,6 +1,7 @@
 'use client';
 
 import CloseIcon from '@mui/icons-material/Close';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Accordion from '@mui/material/Accordion';
@@ -14,6 +15,7 @@ import Collapse from '@mui/material/Collapse';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import LinearProgress from '@mui/material/LinearProgress';
 import Paper from '@mui/material/Paper';
 import Portal from '@mui/material/Portal';
 import Slider from '@mui/material/Slider';
@@ -31,7 +33,8 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFirecallId } from '../../../hooks/useFirecall';
 import useFirecallItemAdd from '../../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import { useSnackbar } from '../../providers/SnackbarProvider';
@@ -41,6 +44,8 @@ import {
   foerderungView,
   type FoerderungParams,
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
+import { elevationTodo } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import { ensureConnectionElevation } from '../../FirecallItems/elements/connection/foerderung/ensureConnectionElevation';
 import FoerderungProfileChart from './FoerderungProfileChart';
 import { buildFoerderungDiaryEntry } from './foerderungDiaryEntry';
 
@@ -88,17 +93,23 @@ export default function LoeschwasserfoerderungPanel({
   const t = useTranslations('loeschwasserfoerderung');
   const theme = useTheme();
   const narrow = useMediaQuery(theme.breakpoints.down('sm'));
+  const firecallId = useFirecallId();
   const updateItem = useFirecallItemUpdate();
   const addItem = useFirecallItemAdd();
   const showSnackbar = useSnackbar();
 
-  const [enabled, setEnabled] = useState(item.foerderung === 'true');
+  // Eingeschaltet, sobald der Rechner geöffnet wird: Wer ihn aufruft, will das
+  // Ergebnis sehen und nicht erst einen Schalter finden. Der Schalter bleibt für
+  // den umgekehrten Weg — den Rechner an dieser Leitung wieder abzuschalten.
+  const [enabled, setEnabled] = useState(true);
+  const [reversed, setReversed] = useState(item.foerderungUmgekehrt === 'true');
   const [params, setParams] = useState<FoerderungParams>(() =>
     foerderungParams(item)
   );
   const [manualClimb, setManualClimb] = useState(item.hoehenunterschied ?? 0);
   const [placed, setPlaced] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [elevationBusy, setElevationBusy] = useState(false);
 
   // Der Rechner arbeitet auf einer Kopie mit den Werten aus dem Panel: So
   // rechnet der Regler, ohne dass jede Bewegung nach Firestore geht.
@@ -108,11 +119,12 @@ export default function LoeschwasserfoerderungPanel({
         {
           ...item,
           foerderung: enabled ? 'true' : 'false',
+          foerderungUmgekehrt: reversed ? 'true' : 'false',
           hoehenunterschied: manualClimb,
         } as Connection,
         params
       ),
-    [item, enabled, manualClimb, params]
+    [item, enabled, reversed, manualClimb, params]
   );
 
   const set = <K extends keyof FoerderungParams>(
@@ -124,10 +136,64 @@ export default function LoeschwasserfoerderungPanel({
     await updateItem({
       ...item,
       foerderung: enabled ? 'true' : 'false',
+      foerderungUmgekehrt: reversed ? 'true' : 'false',
       ...params,
       hoehenunterschied: manualClimb,
     } as Connection);
   };
+
+  // Höhendaten kommen, sobald das Panel offen ist — nicht erst nach dem
+  // Speichern. Sie hängen an `foerderung === 'true'`: Eine gewöhnliche Leitung
+  // soll keine Abfrage kosten, und bis zum Einschalten gibt es folglich keine.
+  // Genau das stand bisher als „keine Höhendaten" da, obwohl es welche gibt.
+  //
+  // Zwei Wege, je nachdem, was am Element steht: Ist der Rechner noch nicht
+  // gespeichert, speichert das Einschalten ihn — und `ensureConnectionDerived`
+  // zieht dabei Straßenverlauf und Höhenprofil mit nach. Steht er schon, fehlt
+  // nur das Profil, und das wird direkt geholt.
+  //
+  // `itemRef` statt `item` in den Abhängigkeiten: `item` ist bei jedem Render
+  // ein neues Objekt (`record.data()`) und als Abhängigkeit eine Endlosschleife.
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const runningRef = useRef(false);
+  const storedEnabled = item.foerderung === 'true';
+  const needsElevation =
+    elevationTodo({ ...item, foerderung: 'true' } as Connection) === 'fetch';
+
+  useEffect(() => {
+    if (!open || !enabled) return;
+    if (storedEnabled && !needsElevation) return;
+    if (runningRef.current) return;
+
+    let cancelled = false;
+    runningRef.current = true;
+    setElevationBusy(true);
+    (async () => {
+      try {
+        if (!storedEnabled) {
+          await persist();
+        } else {
+          await ensureConnectionElevation(firecallId, {
+            ...itemRef.current,
+            foerderung: 'true',
+          } as Connection);
+        }
+      } catch (err) {
+        console.error('unable to prepare foerderung', err);
+      } finally {
+        runningRef.current = false;
+        if (!cancelled) setElevationBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // `persist` hängt an `item` und allen Panel-Werten und wäre bei jedem Render
+    // neu; die Bedingungen oben sind vollständig.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, enabled, storedEnabled, needsElevation, firecallId]);
 
   // Speichert und lässt das Panel offen: Es ist nicht modal, und wer die Werte
   // festhält, will meist weiter an der Lage arbeiten, nicht das Panel loswerden.
@@ -274,6 +340,66 @@ export default function LoeschwasserfoerderungPanel({
 
             {view && (
               <>
+                {/* Die Richtung steht über allem anderen: Eine Leitung wird
+                    gezeichnet, wie es gerade passt, und ob es die Steigung
+                    hinauf oder hinunter geht, entscheidet über die
+                    Pumpenzahl. */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    mb: 1.5,
+                  }}
+                >
+                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('direction')}
+                    </Typography>
+                    <Typography variant="body2">
+                      {t('directionPoints', {
+                        from: view.reversed ? view.pointCount : 1,
+                        to: view.reversed ? 1 : view.pointCount,
+                      })}
+                    </Typography>
+                    {hasProfile && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block' }}
+                      >
+                        {t('directionElevations', {
+                          from: Math.round(view.profile[0].elevation),
+                          to: Math.round(
+                            view.profile[view.profile.length - 1].elevation
+                          ),
+                        })}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Tooltip title={t('directionHint')}>
+                    <Button
+                      size="small"
+                      startIcon={<SwapHorizIcon />}
+                      // Sonst wird der Hinweis aus dem Tooltip zum
+                      // Zugänglichkeitsnamen und verdeckt die Aufschrift.
+                      aria-label={t('reverseDirection')}
+                      onClick={() => setReversed((previous) => !previous)}
+                    >
+                      {t('reverseDirection')}
+                    </Button>
+                  </Tooltip>
+                </Box>
+
+                {elevationBusy && (
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('elevationLoading')}
+                    </Typography>
+                    <LinearProgress />
+                  </Box>
+                )}
+
                 {/* Regler und Antwort stehen zusammen ganz oben: Der Zweck des
                     Panels ist, die Pumpenzahl auf die Literleistung reagieren zu
                     sehen. Alles Übrige liegt darunter oder in Aufklappern. */}
@@ -331,25 +457,35 @@ export default function LoeschwasserfoerderungPanel({
                   </Box>
                 )}
 
-                {view.warnings.map((warning) => (
-                  <Alert
-                    key={warning}
-                    severity={warning === 'noElevationData' ? 'info' : 'warning'}
-                    sx={{ mt: 1.5 }}
-                  >
-                    {warning === 'unknownDimension' &&
-                      t('warningUnknownDimension', {
-                        dimension: view.dimension,
-                      })}
-                    {warning === 'noElevationData' &&
-                      t('warningNoElevationData')}
-                    {warning === 'flowAbovePumpRating' &&
-                      t('warningFlowAbovePumpRating', {
-                        rating: params.pumpenNennstrom,
-                      })}
-                    {warning === 'notFeasible' && t('warningNotFeasible')}
-                  </Alert>
-                ))}
+                {/* Solange die Höhen noch unterwegs sind, wäre „keine
+                    Höhendaten" bloß voreilig — der Ladehinweis oben sagt es
+                    schon richtig. */}
+                {view.warnings
+                  .filter(
+                    (warning) =>
+                      !(elevationBusy && warning === 'noElevationData')
+                  )
+                  .map((warning) => (
+                    <Alert
+                      key={warning}
+                      severity={
+                        warning === 'noElevationData' ? 'info' : 'warning'
+                      }
+                      sx={{ mt: 1.5 }}
+                    >
+                      {warning === 'unknownDimension' &&
+                        t('warningUnknownDimension', {
+                          dimension: view.dimension,
+                        })}
+                      {warning === 'noElevationData' &&
+                        t('warningNoElevationData')}
+                      {warning === 'flowAbovePumpRating' &&
+                        t('warningFlowAbovePumpRating', {
+                          rating: params.pumpenNennstrom,
+                        })}
+                      {warning === 'notFeasible' && t('warningNotFeasible')}
+                    </Alert>
+                  ))}
 
                 {view.result && (
                   <>
@@ -625,13 +761,6 @@ export default function LoeschwasserfoerderungPanel({
                   </Accordion>
                 )}
 
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: 'block', mt: 1.5 }}
-                >
-                  {t('source')}
-                </Typography>
               </>
             )}
           </Box>

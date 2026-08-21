@@ -17,6 +17,16 @@ export const isFoerderungEnabled = (item: MultiPointItem): boolean =>
   (item as Connection).foerderung === 'true';
 
 /**
+ * Ob vom letzten zum ersten Punkt gefördert wird.
+ *
+ * Steht hier neben `isFoerderungEnabled`, betrifft aber **nur** die Rechnung:
+ * Die Abtastung und damit die Signatur des Höhenprofils bleiben in
+ * Zeichenrichtung, sonst würde jedes Umkehren eine neue Höhenabfrage auslösen.
+ */
+export const isFoerderungReversed = (item: MultiPointItem): boolean =>
+  (item as Connection).foerderungUmgekehrt === 'true';
+
+/**
  * Die Abtastpunkte, zu denen ein Profil gehört: entlang des gezeichneten
  * Verlaufs, also mit aktivem Straßen-Routing entlang der Straße.
  */

@@ -286,6 +286,17 @@ export interface Connection extends MultiPointItem {
    * fördert kein Wasser. Siehe docs/loeschwasserfoerderung.md.
    */
   foerderung?: string;
+  /**
+   * `'true'`, wenn vom **letzten** zum ersten Punkt gefördert wird.
+   *
+   * Eine Leitung wird gezeichnet, wie es gerade passt; wo das Wasser herkommt,
+   * steht damit nicht fest. Die Richtung entscheidet über das Vorzeichen jeder
+   * Steigung und damit über die Pumpenzahl — sie ist deshalb ein eigenes Feld
+   * und nicht die Zeichenrichtung. Umgekehrt wird nur gerechnet, nicht die
+   * Geometrie gedreht: Das gespeicherte Höhenprofil bleibt gültig, ein Umkehren
+   * kostet keine neue Abfrage.
+   */
+  foerderungUmgekehrt?: string;
   /** Geforderte Fördermenge in l/min. */
   foerderMenge?: number;
   /** Geforderter Druck am Ende der Leitung in bar. */

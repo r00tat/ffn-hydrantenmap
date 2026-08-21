@@ -41,6 +41,18 @@ export default function FoerderungProfileChart({
   // Eine ebene Leitung hätte sonst keine Spanne und damit eine Division durch 0.
   const span = maxElevation - minElevation || 1;
 
+  // Die Höhenachse trägt nur die Enden der Spanne. Bei einer ebenen Leitung —
+  // etwa ohne Höhendaten und ohne eingegebenen Unterschied — sind beide Enden
+  // dieselbe Zahl; dann steht sie einmal da. Zwei Marken mit gleichem Wert
+  // wären auch zwei Kinder mit gleichem Schlüssel.
+  const axisMarks =
+    maxElevation === minElevation
+      ? [{ id: 'flat', elevation: maxElevation }]
+      : [
+          { id: 'max', elevation: maxElevation },
+          { id: 'min', elevation: minElevation },
+        ];
+
   const x = (distance: number) =>
     PADDING.left + (distance / maxDistance) * plotWidth;
   const y = (elevation: number) =>
@@ -79,10 +91,9 @@ export default function FoerderungProfileChart({
           strokeWidth={1.5}
         />
 
-        {/* Höhenachse: nur Anfang und Ende der Spanne, mehr braucht es nicht. */}
-        {[maxElevation, minElevation].map((elevation) => (
+        {axisMarks.map(({ id, elevation }) => (
           <text
-            key={elevation}
+            key={id}
             x={PADDING.left - 6}
             y={y(elevation) + 4}
             textAnchor="end"
@@ -116,13 +127,15 @@ export default function FoerderungProfileChart({
           </g>
         ))}
 
+        {/* Die Achse läuft immer in Förderrichtung, deshalb stehen hier die
+            Enden mit Namen und nicht bloß die Streckenmeter. */}
         <text
           x={PADDING.left}
           y={HEIGHT - 6}
           fontSize={10}
           fill={theme.palette.text.secondary}
         >
-          0 m
+          {t('chartSource')} · 0 m
         </text>
         <text
           x={WIDTH - PADDING.right}
@@ -131,7 +144,7 @@ export default function FoerderungProfileChart({
           fontSize={10}
           fill={theme.palette.text.secondary}
         >
-          {Math.round(maxDistance)} m
+          {t('chartTarget')} · {Math.round(maxDistance)} m
         </text>
       </svg>
     </Box>

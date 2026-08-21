@@ -20,6 +20,7 @@ export class FirecallConnection extends FirecallMultiPoint {
    * gehören in den eigenen Dialog, nicht in die generische Feldliste.
    */
   foerderung?: string;
+  foerderungUmgekehrt?: string;
   foerderMenge?: number;
   zielDruck?: number;
   pumpenAusgangsdruck?: number;
@@ -40,6 +41,7 @@ export class FirecallConnection extends FirecallMultiPoint {
     if (firecallItem) {
       ({
         foerderung: this.foerderung,
+        foerderungUmgekehrt: this.foerderungUmgekehrt,
         foerderMenge: this.foerderMenge,
         zielDruck: this.zielDruck,
         pumpenAusgangsdruck: this.pumpenAusgangsdruck,
@@ -113,6 +115,7 @@ export class FirecallConnection extends FirecallMultiPoint {
       dimension: this.dimension || 'B',
       oneHozeLength: this.oneHozeLength || 20,
       foerderung: this.foerderung,
+      foerderungUmgekehrt: this.foerderungUmgekehrt,
       foerderMenge: this.foerderMenge,
       zielDruck: this.zielDruck,
       pumpenAusgangsdruck: this.pumpenAusgangsdruck,

@@ -2,12 +2,13 @@
 
 import type { LatLngPosition } from '../../../../../common/geo';
 import type { Connection } from '../../../../firebase/firestore';
-import { calculateDistance } from '../distance';
+import { calculateDistance, getConnectionPositions } from '../distance';
 import { connectionDisplayPositions } from '../streetRouting';
 import {
   foerderungSamples,
   isElevationFallback,
   isFoerderungEnabled,
+  isFoerderungReversed,
   storedElevations,
 } from './elevationProfile';
 import { frictionLossPer100m, isTabulatedDimension } from './frictionLoss';
@@ -79,8 +80,12 @@ export interface FoerderungView {
   params: FoerderungParams;
   /** Länge der gezeichneten Linie in m. */
   length: number;
-  /** Höhenunterschied Anfang → Ende in m. */
+  /** Höhenunterschied Entnahme → Ziel in m, in Förderrichtung gezählt. */
   hoehenunterschied: number;
+  /** Ob vom letzten zum ersten gezeichneten Punkt gefördert wird. */
+  reversed: boolean;
+  /** Anzahl der gezeichneten Punkte — benennt die Enden der Förderrichtung. */
+  pointCount: number;
   elevationSource: 'profile' | 'manual';
   /** Reibungsverlust in bar je 100 m; `undefined` bei unbekannter Dimension. */
   frictionPer100m?: number;
@@ -175,14 +180,30 @@ export function foerderungView(
   const params = { ...foerderungParams(item), ...overrides };
   const warnings: FoerderungWarning[] = [];
 
-  const samples = foerderungSamples(item);
+  const drawnSamples = foerderungSamples(item);
   const length = calculateDistance(connectionDisplayPositions(item));
-  const elevations = storedElevations(item, samples);
+  const storedProfile = storedElevations(item, drawnSamples);
+
+  // Ab hier wird in Förderrichtung gerechnet: Bei umgekehrter Richtung zählen
+  // die Streckenmeter vom letzten Punkt aus, Koordinaten und Höhen wandern mit.
+  // Gedreht wird nur diese Sicht, nicht die Abtastung — die Signatur des
+  // gespeicherten Profils bleibt damit gültig.
+  const reversed = isFoerderungReversed(item);
+  const lastDistance = drawnSamples[drawnSamples.length - 1]?.distance ?? 0;
+  const samples = reversed
+    ? drawnSamples
+        .map(({ position, distance }) => ({
+          position,
+          distance: lastDistance - distance,
+        }))
+        .reverse()
+    : drawnSamples;
+  const elevations =
+    storedProfile && reversed ? [...storedProfile].reverse() : storedProfile;
 
   // Ohne Profil gilt die Handeingabe als Gesamtdifferenz, linear verteilt.
   // Zwischenkuppen sind dann unbekannt — der Dialog sagt das.
   const manualClimb = numberOr(item.hoehenunterschied, 0);
-  const lastDistance = samples[samples.length - 1]?.distance ?? 0;
   const profile: FoerderungProfilePoint[] = samples.map((sample, index) => ({
     distance: sample.distance,
     elevation: elevations
@@ -229,6 +250,8 @@ export function foerderungView(
     hoehenunterschied: elevations
       ? elevations[elevations.length - 1] - elevations[0]
       : manualClimb,
+    reversed,
+    pointCount: getConnectionPositions(item).length,
     elevationSource: elevations ? 'profile' : 'manual',
     frictionPer100m,
     frictionTabulated: isTabulatedDimension(dimension),
