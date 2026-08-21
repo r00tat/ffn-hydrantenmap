@@ -53,10 +53,50 @@ export interface ShareLinkPerson {
   name: string;
 }
 
+/**
+ * Ein Einsatz für die Auswahl auf der Gastseite.
+ *
+ * Bewusst nur Name und Zeiten: Koordinaten, Beschreibung und Alarm-IDen haben
+ * hinter einem anmeldefreien Link nichts zu suchen. Die Zeiten sind der Grund,
+ * warum die Auswahl überhaupt etwas spart — sie belegen Abfahrt und Ankunft vor.
+ */
+export interface ShareLinkFirecall {
+  id: string;
+  name: string;
+  /** Alarmierungszeitpunkt (`firecall.date`). */
+  date?: string;
+  abruecken?: string;
+}
+
+export function toShareLinkFirecall(firecall: {
+  id?: string;
+  name?: string;
+  date?: string;
+  abruecken?: string;
+}): ShareLinkFirecall {
+  return {
+    id: firecall.id as string,
+    name: firecall.name ?? '',
+    date: firecall.date,
+    abruecken: firecall.abruecken,
+  };
+}
+
+/**
+ * Wie viele Einsätze die Gastseite zur Auswahl bekommt.
+ *
+ * Kürzer als die 50 der angemeldeten Seite: Wer über den QR-Code am Fahrzeug
+ * einträgt, trägt eine Fahrt von heute ein, nicht eine von vor einem Jahr — und
+ * hinter einem anmeldefreien Link soll nicht die halbe Einsatzhistorie stehen.
+ */
+export const SHARE_LINK_FIRECALL_LIMIT = 10;
+
 export interface ShareLinkFormData {
   groupName: string;
   vehicles: ShareLinkVehicle[];
   persons: ShareLinkPerson[];
+  /** Die letzten Einsätze der Gruppe, neuester zuerst. */
+  firecalls: ShareLinkFirecall[];
 }
 
 /**

@@ -42,7 +42,21 @@ const data: ShareLinkFormData = {
     },
   ],
   persons: [{ id: 'p1', name: 'Max Mustermann' }],
+  firecalls: [
+    {
+      id: 'f1',
+      name: 'Brand B2',
+      date: '2026-08-03T10:00:00.000Z',
+      abruecken: '2026-08-03T12:00:00.000Z',
+    },
+  ],
 };
+
+/**
+ * Eine Gruppe ohne Einsätze. Dann belegt das Formular keinen vor, und die
+ * Fahrtstrecke ist das Feld, das die Fahrt benennt.
+ */
+const dataWithoutFirecalls: ShareLinkFormData = { ...data, firecalls: [] };
 
 /**
  * Füllt ein Feld in einem Rutsch, statt Zeichen für Zeichen zu tippen. Das
@@ -136,11 +150,6 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
-    );
     await pasteInto(user, screen.getByLabelText('Hinweise'), 'Tank halb voll');
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
     await pasteInto(
@@ -168,11 +177,6 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
-    );
     await user.click(screen.getByLabelText('Defekt oder Mangel'));
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
@@ -183,10 +187,12 @@ describe('ShareLinkEntryForm', () => {
   });
 
   it('verlangt eine Angabe zur Fahrstrecke', async () => {
-    // Ohne Einsatzauswahl ist das Feld die einzige Auskunft darüber, wohin die
-    // Fahrt ging — der Freigabelink kennt keine Einsätze.
+    // Ohne verknüpften Einsatz ist das Feld die einzige Auskunft darüber, wohin
+    // die Fahrt ging.
     const user = userEvent.setup();
-    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+    renderWithIntl(
+      <ShareLinkEntryForm token="tok" data={dataWithoutFirecalls} />,
+    );
 
     await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
     await pasteInto(
@@ -202,14 +208,113 @@ describe('ShareLinkEntryForm', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  it('bietet keine Einsatzauswahl an, auch beim Zweck Einsatz', async () => {
-    const user = userEvent.setup();
+  it('belegt den neuesten Einsatz der Gruppe vor', async () => {
+    // Wer den QR-Code am Fahrzeug nutzt, trägt fast immer die Fahrt zum
+    // laufenden Einsatz ein. Einen „aktiven" Einsatz gibt es hier nicht — die
+    // App-Auswahl braucht eine Anmeldung.
     renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
 
-    await user.click(screen.getByLabelText('Fahrtzweck'));
-    await user.click(await screen.findByRole('option', { name: 'Einsatz' }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Einsatz')).toHaveValue('Brand B2'),
+    );
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Einsatz');
+    // Der Einsatz benennt die Fahrt, das Feld dafür entfällt.
+    expect(
+      screen.queryByLabelText(/Fahrstrecke \/ Ziel/),
+    ).not.toBeInTheDocument();
+  });
 
+  it('schickt den gewählten Einsatz mit', async () => {
+    const user = userEvent.setup();
+    createMock.mockResolvedValue({ success: true, id: 'e1' });
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      zweck: 'einsatz',
+      firecallId: 'f1',
+    });
+  });
+
+  it('belegt ohne Einsätze der Gruppe nichts vor', async () => {
+    renderWithIntl(
+      <ShareLinkEntryForm token="tok" data={dataWithoutFirecalls} />,
+    );
+
+    // Ohne Einsätze bleibt der Zweck auf „Sonstiges" und die Fahrtstrecke ist
+    // das Feld, das die Fahrt benennt.
+    expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Sonstiges');
+    expect(screen.getByLabelText(/Fahrstrecke \/ Ziel/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Einsatz')).not.toBeInTheDocument();
+  });
+
+  it('nimmt getippten Text als Fahrtstrecke, wenn kein Einsatz passt', async () => {
+    const user = userEvent.setup();
+    createMock.mockResolvedValue({ success: true, id: 'e1' });
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    const einsatz = await screen.findByLabelText('Einsatz');
+    await user.clear(einsatz);
+    await pasteInto(user, einsatz, 'Ölspur Umfahrung');
+    await user.tab();
+
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    expect(createMock.mock.calls[0][1]).toMatchObject({
+      firecallId: undefined,
+      ziel: 'Ölspur Umfahrung',
+    });
+  });
+
+  it('bestätigt ein vom Server gemeldetes Duplikat', async () => {
+    // Der Gast sieht die Fahrten der Gruppe nicht; die Antwort der Action ist
+    // seine einzige Warnung — und muss trotzdem einen Weg nach vorne lassen.
+    const user = userEvent.setup();
+    createMock.mockResolvedValueOnce({
+      success: false,
+      error: 'duplicateFirecallEntry',
+    });
+    renderWithIntl(<ShareLinkEntryForm token="tok" data={data} />);
+
+    await pasteInto(user, screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    await pasteInto(
+      user,
+      await screen.findByLabelText('Kilometerstand — Ende'),
+      '1250',
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    expect(
+      await screen.findByText(
+        'Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst',
+      ),
+    ).toBeInTheDocument();
+
+    createMock.mockResolvedValueOnce({ success: true, id: 'e1' });
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: /trotzdem eine zweite Ausfahrt/,
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+    expect(createMock.mock.calls[1][2]).toEqual({ confirmDuplicate: true });
   });
 
   it('belegt den Startzähler aus dem Fahrzeug-Cache vor', async () => {
@@ -236,11 +341,6 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
-    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
@@ -265,11 +365,6 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
-    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
     expect(
@@ -290,11 +385,6 @@ describe('ShareLinkEntryForm', () => {
       user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
-    );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
     );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 
@@ -337,11 +427,6 @@ describe('ShareLinkEntryForm', () => {
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
     );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
-    );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
     await user.click(
       await screen.findByRole('button', { name: 'Weitere Fahrt erfassen' }),
@@ -379,11 +464,6 @@ describe('ShareLinkEntryForm', () => {
       user,
       await screen.findByLabelText('Kilometerstand — Ende'),
       '1250',
-    );
-    await pasteInto(
-      user,
-      screen.getByLabelText(/Fahrstrecke \/ Ziel/),
-      'Hauptplatz',
     );
     await user.click(screen.getByRole('button', { name: 'Fahrt eintragen' }));
 

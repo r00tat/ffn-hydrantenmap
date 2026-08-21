@@ -157,6 +157,7 @@ const TRANSLATED_SAVE_ERRORS = [
   'vehicleNotFound',
   'invalidEntry',
   'shareSaveFailed',
+  'firecallInvalid',
 ] as const;
 
 export type EntryFormState = ReturnType<typeof useEntryFormState>;
@@ -215,11 +216,15 @@ export function useEntryFormState({
   const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string>();
   const [saving, setSaving] = useState(false);
-  // Die bestätigte Fahrt, nicht ein bloßes Häkchen: Bestätigt wurde dieses eine
-  // Duplikat. Wechselt die Auswahl auf eine andere Fahrt, ist die Bestätigung
-  // hinfällig — und nach einem Wechsel auf einen anderen Einsatz und zurück
-  // ebenso, weil der Benutzer den Hinweis dann neu zu sehen bekommt.
-  const [confirmedDuplicateId, setConfirmedDuplicateId] = useState<string>();
+  // Bestätigt wird eine Einsatz/Fahrzeug-Kombination, nicht das Formular:
+  // Wechselt eines von beiden, ist die Bestätigung hinfällig. Der Schlüssel
+  // statt einer Eintrags-ID, weil auch die Server-Antwort ein Duplikat melden
+  // kann, dessen Eintrag der Browser nie gesehen hat (Gastseite).
+  const [confirmedDuplicateKey, setConfirmedDuplicateKey] = useState<string>();
+  // Ein Duplikat, das erst die Server-Action gemeldet hat — für die Gastseite
+  // der einzige Weg, davon zu erfahren, und im Dialog der Fall, dass ein
+  // anderes Gerät die Fahrt inzwischen erfasst hat.
+  const [serverDuplicateKey, setServerDuplicateKey] = useState<string>();
 
   const vehicle = useMemo(
     () => vehicles.find((v) => v.id === selectedVehicleId),
@@ -298,7 +303,7 @@ export function useEntryFormState({
     setFirecallId(id || undefined);
     setFirecallName(id ? name : '');
     setFirecallInput(id ? name : '');
-    setConfirmedDuplicateId(undefined);
+    setConfirmedDuplicateKey(undefined);
     const firecall = id ? firecalls?.find((f) => f.id === id) : undefined;
     // Die Verknüpfung setzt den Zweck mit. `submit` schickt `firecallId` nur
     // beim Zweck `einsatz` — ohne das verlöre eine Fahrt, an der jemand einen
@@ -343,7 +348,7 @@ export function useEntryFormState({
       setFirecallId(undefined);
       setFirecallName('');
       setFirecallInput('');
-      setConfirmedDuplicateId(undefined);
+      setConfirmedDuplicateKey(undefined);
     }
   };
 
@@ -406,8 +411,21 @@ export function useEntryFormState({
     [entries, zweck, firecallId, selectedVehicleId, entry?.id],
   );
 
+  /** Die Kombination, um die es geht — Grundlage jeder Bestätigung. */
+  const duplicateKey =
+    firecallId && selectedVehicleId
+      ? `${firecallId}:${selectedVehicleId}`
+      : undefined;
+
+  /**
+   * Ob für diese Kombination ein Duplikat gemeldet ist — aus dem eigenen
+   * Snapshot oder von der Server-Action.
+   */
+  const duplicateReported =
+    !!duplicateEntry || (!!duplicateKey && serverDuplicateKey === duplicateKey);
+
   const duplicateConfirmed =
-    !!duplicateEntry && confirmedDuplicateId === duplicateEntry.id;
+    duplicateReported && !!duplicateKey && confirmedDuplicateKey === duplicateKey;
 
   /**
    * Fahrten desselben Fahrzeugs, deren Zeitraum sich überschneidet. Nur ein
@@ -521,7 +539,7 @@ export function useEntryFormState({
     // Bestätigung wird nicht gespeichert. Es ist kein Fehler der Eingabe,
     // deshalb steht der Text der Meldung im Hinweis am Formular.
     const confirmDuplicate = options.confirmDuplicate || duplicateConfirmed;
-    if (duplicateEntry && !confirmDuplicate) {
+    if (duplicateReported && !confirmDuplicate) {
       validationErrors.push('duplicateFirecallEntry');
     }
     setErrors(validationErrors);
@@ -532,6 +550,12 @@ export function useEntryFormState({
     const result = await onSubmit(input, { confirmDuplicate });
     setSaving(false);
     if (!result.success) {
+      // Die Server-Antwort ist auf der Gastseite die einzige Quelle für ein
+      // Duplikat; gemerkt an der Kombination, damit die Bestätigung mit ihr
+      // wieder verfällt.
+      if (result.error === 'duplicateFirecallEntry' && duplicateKey) {
+        setServerDuplicateKey(duplicateKey);
+      }
       const known = TRANSLATED_SAVE_ERRORS.find((key) => key === result.error);
       setSaveError(
         known
@@ -578,11 +602,10 @@ export function useEntryFormState({
      */
     firecallLinkMissing: zweck === 'einsatz' && !firecallId,
     duplicateEntry,
+    duplicateReported,
     duplicateConfirmed,
     setDuplicateConfirmed: (confirmed: boolean) =>
-      setConfirmedDuplicateId(
-        confirmed ? duplicateEntry?.id : undefined,
-      ),
+      setConfirmedDuplicateKey(confirmed ? duplicateKey : undefined),
     overlappingEntries,
     timeOrderInvalid,
     /** Ob der Knopf „Fahrtstrecke berechnen" überhaupt etwas ausrechnen kann. */

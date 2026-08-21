@@ -224,11 +224,15 @@ export default function FahrtenbuchEntryFields({
             {/* Der Duplikatshinweis steht beim Einsatzfeld, weil er von dieser
                 Auswahl kommt — und über dem Speichern-Knopf, damit er nicht
                 erst nach dem Scrollen auffällt. */}
-            {form.duplicateEntry && (
+            {form.duplicateReported && (
               <Grid size={{ xs: 12 }}>
                 <Alert severity="warning">
                   <AlertTitle>{t('duplicate.title')}</AlertTitle>
-                  {describeEntry(form.duplicateEntry)}
+                  {/* Auf der Gastseite kennt der Browser die bestehende Fahrt
+                      nicht — dann bleibt es beim Titel und der Bestätigung. */}
+                  {form.duplicateEntry
+                    ? describeEntry(form.duplicateEntry)
+                    : t('duplicate.unknownEntry')}
                   <FormControlLabel
                     sx={{ display: 'block', mt: 1 }}
                     control={

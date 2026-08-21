@@ -3,24 +3,39 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // `server-only` wirft außerhalb einer Server-Umgebung.
 vi.mock('server-only', () => ({}));
 
-const { groupGetMock, vehicleGetMock, personGetMock } = vi.hoisted(() => ({
-  groupGetMock: vi.fn(),
-  vehicleGetMock: vi.fn(),
-  personGetMock: vi.fn(),
-}));
+const { groupGetMock, vehicleGetMock, personGetMock, firecallGetMock } =
+  vi.hoisted(() => ({
+    groupGetMock: vi.fn(),
+    vehicleGetMock: vi.fn(),
+    personGetMock: vi.fn(),
+    firecallGetMock: vi.fn(),
+  }));
 
-vi.mock('../firebase/admin', () => ({
-  firestore: {
-    collection: () => ({
-      doc: () => ({
-        get: groupGetMock,
-        collection: (id: string) => ({
-          get: id === 'vehicle' ? vehicleGetMock : personGetMock,
-        }),
-      }),
-    }),
-  },
-}));
+// Zwei Kollektionen: `groups` mit dem Gruppendokument und seinen
+// Subcollections, und `call` als Abfrage über die letzten Einsätze.
+vi.mock('../firebase/admin', () => {
+  const firecallQuery: Record<string, unknown> = {
+    where: () => firecallQuery,
+    orderBy: () => firecallQuery,
+    limit: () => firecallQuery,
+    get: () => firecallGetMock(),
+  };
+  return {
+    firestore: {
+      collection: (name: string) =>
+        name === 'call'
+          ? firecallQuery
+          : {
+              doc: () => ({
+                get: groupGetMock,
+                collection: (id: string) => ({
+                  get: id === 'vehicle' ? vehicleGetMock : personGetMock,
+                }),
+              }),
+            },
+    },
+  };
+});
 
 import { loadShareFormData } from './loadShareFormData';
 
@@ -40,6 +55,8 @@ describe('loadShareFormData', () => {
     groupGetMock.mockReset();
     vehicleGetMock.mockReset();
     personGetMock.mockReset();
+    firecallGetMock.mockReset();
+    firecallGetMock.mockResolvedValue(snapshot([]));
     groupGetMock.mockResolvedValue({ data: () => ({ name: 'FF Neusiedl' }) });
     vehicleGetMock.mockResolvedValue(snapshot([]));
     personGetMock.mockResolvedValue(snapshot([]));
@@ -199,5 +216,34 @@ describe('loadShareFormData', () => {
     );
     const data = await loadShareFormData('ffnd');
     expect(data.vehicles.map((v) => v.name)).toEqual(['KDO', 'TLF', 'MTF']);
+  });
+
+  it('gibt von Einsätzen nur Name und Zeiten weiter', async () => {
+    // Koordinaten, Beschreibung und Alarm-IDen haben hinter einem
+    // anmeldefreien Link nichts zu suchen.
+    firecallGetMock.mockResolvedValue(
+      snapshot([
+        {
+          id: 'f1',
+          name: 'Brand B2',
+          date: '2026-08-03T10:00:00.000Z',
+          abruecken: '2026-08-03T12:00:00.000Z',
+          description: 'Vollbrand Dachstuhl',
+          lat: 47.98,
+          lng: 16.9,
+          group: 'ffnd',
+          blaulichtSmsAlarmIds: ['a1'],
+        },
+      ]),
+    );
+    const data = await loadShareFormData('ffnd');
+    expect(data.firecalls).toEqual([
+      {
+        id: 'f1',
+        name: 'Brand B2',
+        date: '2026-08-03T10:00:00.000Z',
+        abruecken: '2026-08-03T12:00:00.000Z',
+      },
+    ]);
   });
 });

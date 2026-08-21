@@ -427,6 +427,7 @@
     "duplicate": {
       "title": "A trip for this vehicle and this operation is already recorded",
       "entry": "Already recorded: {driver}, departure {time}",
+      "unknownEntry": "A trip for this vehicle and this operation is already recorded.",
       "noDriver": "no driver",
       "confirm": "This really is a second trip and should be saved"
     },
@@ -500,6 +501,7 @@
       "deleteFailed": "Deleting failed: {message}",
       "linkInvalid": "This link is no longer valid.",
       "vehicleNotFound": "The selected vehicle is no longer available.",
+      "firecallInvalid": "This operation does not belong to this fire department.",
       "invalidEntry": "The entry is incomplete or invalid.",
       "shareSaveFailed": "The trip could not be saved. Please try again later.",
       "exportRangeInvalid": "The period is invalid — “to” is before “from”.",

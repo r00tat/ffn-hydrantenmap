@@ -427,6 +427,7 @@
     "duplicate": {
       "title": "Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst",
       "entry": "Bereits eingetragen: {driver}, Abfahrt {time}",
+      "unknownEntry": "Für dieses Fahrzeug ist zu diesem Einsatz schon eine Fahrt erfasst.",
       "noDriver": "ohne Fahrer",
       "confirm": "Diese Fahrt ist trotzdem eine zweite Ausfahrt und soll gespeichert werden"
     },
@@ -500,6 +501,7 @@
       "deleteFailed": "Löschen fehlgeschlagen: {message}",
       "linkInvalid": "Dieser Link ist nicht mehr gültig.",
       "vehicleNotFound": "Das gewählte Fahrzeug ist nicht mehr verfügbar.",
+      "firecallInvalid": "Dieser Einsatz gehört nicht zu dieser Feuerwehr.",
       "invalidEntry": "Die Eingaben sind unvollständig oder ungültig.",
       "shareSaveFailed": "Die Fahrt konnte nicht gespeichert werden. Bitte später erneut versuchen.",
       "exportRangeInvalid": "Der Zeitraum ist ungültig — „Bis“ liegt vor „Von“.",

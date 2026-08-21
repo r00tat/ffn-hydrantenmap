@@ -54,6 +54,9 @@ export interface ActionResult {
  */
 function shareErrorKey(err: unknown): string {
   if (err instanceof ApiException && err.status === 404) return 'linkInvalid';
+  if (err instanceof Error && err.message === FIRECALL_NOT_IN_GROUP) {
+    return 'firecallInvalid';
+  }
   const message = err instanceof Error ? err.message : String(err);
   if (/^vehicle .* not found in group /.test(message)) return 'vehicleNotFound';
   if (/^invalid fahrtenbuch entry: /.test(message)) return 'invalidEntry';
@@ -219,6 +222,38 @@ async function createMangelIfReported(
       vehicleId: entry.vehicleId,
     });
   }
+}
+
+/**
+ * Der Einsatz, den ein Gast über den Freigabe-Link gewählt hat, gehört nicht zu
+ * der Gruppe des Links. Eigene Meldung statt stiller Verwerfung: Der Gast hat
+ * aus einer Liste gewählt, die diese Seite geliefert hat — bleibt die Fahrt
+ * stumm ohne Einsatz, hielte er sie für verknüpft.
+ */
+const FIRECALL_NOT_IN_GROUP = 'firecall not in group';
+
+/**
+ * Prüft den vom Browser genannten Einsatz gegen die Gruppe und liefert seinen
+ * Namen aus dem Dokument.
+ *
+ * Der Name kommt bewusst **nicht** aus der Anfrage: Auf der Gastseite steht
+ * hinter dem Formular niemand, dessen Eingabe man zurechnen könnte, und ein
+ * frei gesetzter Einsatzname wäre unkontrollierter Fremdinhalt in einem
+ * Nachweisdokument.
+ */
+async function resolveFirecallForGroup(
+  groupId: string,
+  firecallId: string,
+): Promise<string> {
+  const doc = await firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .get();
+  const firecall = doc.exists ? (doc.data() as Firecall) : undefined;
+  if (!firecall || firecall.deleted === true || firecall.group !== groupId) {
+    throw new Error(FIRECALL_NOT_IN_GROUP);
+  }
+  return firecall.name ?? '';
 }
 
 export interface FirecallDistanceResult {
@@ -1011,10 +1046,22 @@ export async function deleteFahrtenbuchEntry(
 export async function createFahrtenbuchEntryViaShareLink(
   token: string,
   input: FahrtenbuchEntryInput,
+  options: EntryWriteOptions = {},
 ): Promise<ActionResult> {
   try {
     const link = await resolveFahrtenbuchShareLink(token);
     const vehicle = await loadVehicle(link.groupId, input.vehicleId);
+
+    // Die Gastseite bietet die letzten Einsätze der Gruppe an — der genannte
+    // muss aber zu *dieser* Gruppe gehören, und sein Name kommt aus dem
+    // Dokument, nicht aus der Anfrage.
+    const firecallId =
+      input.zweck === 'einsatz' && input.firecallId
+        ? input.firecallId
+        : undefined;
+    const firecallName = firecallId
+      ? await resolveFirecallForGroup(link.groupId, firecallId)
+      : undefined;
 
     // Kein Benutzer dahinter: Das Präfix macht die Herkunft im Eintrag
     // sichtbar und sperrt gleichzeitig `canModifyEntry` für alle außer
@@ -1029,17 +1076,25 @@ export async function createFahrtenbuchEntryViaShareLink(
 
     const doc = buildEntryDocument(
       vehicle,
-      {
-        ...input,
-        // Die Gastseite lädt keine Einsätze. Ein mitgeschickter Einsatzbezug
-        // wäre untergeschoben, also wird er hier verworfen und nicht bloß
-        // clientseitig weggelassen.
-        firecallId: undefined,
-        firecallName: undefined,
-      },
+      { ...input, firecallId, firecallName },
       link.groupId,
       actor,
     );
+
+    // Derselbe Riegel wie im angemeldeten Dialog. Hier wiegt er schwerer: Der
+    // Gast sieht die Fahrten der Gruppe nicht und kann ein Duplikat vorher
+    // nicht erkennen — die Meldung der Action ist seine einzige Warnung.
+    if (
+      doc.firecallId &&
+      !options.confirmDuplicate &&
+      (await hasEntryForFirecallVehicle(
+        link.groupId,
+        doc.firecallId,
+        doc.vehicleId,
+      ))
+    ) {
+      return { success: false, error: 'duplicateFirecallEntry' };
+    }
 
     const ref = await entriesRef(link.groupId).add(doc);
     await refreshVehicleCache(link.groupId, input.vehicleId);
@@ -1049,6 +1104,9 @@ export async function createFahrtenbuchEntryViaShareLink(
     // dem Namen kein angemeldetes Mitglied steht.
     await createMangelIfReported(link.groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(link.groupId, doc, vehicle);
+    if (doc.firecallId) {
+      await refreshFirecallEntryCount(link.groupId, doc.firecallId);
+    }
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createFahrtenbuchEntryViaShareLink failed', err);

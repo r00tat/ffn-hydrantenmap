@@ -895,6 +895,39 @@ aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
   älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
   und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
 
+## Einsatzbezug hinter dem Freigabe-Link
+
+Das Gastformular hinter `/fahrtenbuch/teilen/<token>` bietet die letzten
+Einsätze der Gruppe an (`SHARE_LINK_FIRECALL_LIMIT`, 10) und belegt einen neuen
+Eintrag mit dem neuesten vor. Wer den QR-Code am Fahrzeug nutzt, trägt fast
+immer die Fahrt zum laufenden Einsatz ein; einen „aktiven" Einsatz gibt es dort
+nicht, den kennt nur die angemeldete App.
+
+Vorher verwarf `createFahrtenbuchEntryViaShareLink` jeden mitgeschickten
+Einsatzbezug. Das war richtig, solange die Seite keine Einsätze kannte — jetzt
+kennt sie welche, und an die Stelle der Verwerfung tritt eine Prüfung:
+
+- **Der Name kommt aus dem Einsatz-Dokument, nicht aus der Anfrage**
+  (`resolveFirecallForGroup`). Hinter dem Formular steht niemand, dessen Eingabe
+  man zurechnen könnte; ein frei gesetzter Einsatzname wäre unkontrollierter
+  Fremdinhalt in einem Nachweisdokument.
+- **Der Einsatz muss zu der Gruppe des Links gehören** und darf nicht gelöscht
+  sein, sonst `firecallInvalid`. Abgelehnt statt still verworfen: Der Gast hat
+  aus einer Liste gewählt, die diese Seite geliefert hat — bliebe die Fahrt
+  stumm ohne Einsatz, hielte er sie für verknüpft.
+- **Herausgegeben wird nur Name, Alarmierung und Abrücken**
+  (`toShareLinkFirecall`). Koordinaten, Beschreibung und Alarm-IDen haben hinter
+  einem anmeldefreien Link nichts zu suchen. Die Zeiten sind der Grund, dass die
+  Auswahl überhaupt etwas spart — sie belegen Abfahrt und Ankunft vor.
+- **Die Duplikatsprüfung gilt hier auch**, und sie wiegt schwerer: Der Gast sieht
+  die Fahrten der Gruppe nicht und kann ein Duplikat vorher nicht erkennen. Die
+  Antwort der Action ist seine einzige Warnung, deshalb muss sie einen Weg nach
+  vorne lassen — `serverDuplicateKey` in
+  [useEntryFormState.ts](src/components/Fahrtenbuch/useEntryFormState.ts) merkt
+  ein serverseitig gemeldetes Duplikat an der Einsatz/Fahrzeug-Kombination und
+  zeigt dieselbe Bestätigung wie im Dialog. Am Schlüssel und nicht an einer
+  Eintrags-ID, weil der Browser den bestehenden Eintrag hier nie gesehen hat.
+
 ## Namen in der Besatzung
 
 Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne

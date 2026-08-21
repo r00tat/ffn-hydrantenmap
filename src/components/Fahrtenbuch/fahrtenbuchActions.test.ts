@@ -159,6 +159,10 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
     vehicleSetMock.mockReset();
     refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
+    firecallGetMock.mockReset();
+    firecallSetMock.mockReset();
+    firecallGetMock.mockResolvedValue({ exists: false });
+    firecallSetMock.mockResolvedValue(undefined);
 
     resolveMock.mockResolvedValue({
       token: 'tok',
@@ -203,16 +207,109 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
     expect(doc.deleted).toBe(false);
   });
 
-  it('schreibt keinen Einsatzbezug, auch wenn einer mitgeschickt wird', async () => {
+  it('nimmt den Namen des Einsatzes aus dem Dokument, nicht aus der Anfrage', async () => {
+    // Hinter dem Gastformular steht niemand, dessen Eingabe man zurechnen
+    // könnte — ein frei gesetzter Einsatzname wäre unkontrollierter Fremdinhalt
+    // in einem Nachweisdokument.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand Hauptplatz' }),
+    });
+
     await createFahrtenbuchEntryViaShareLink('tok', {
       ...input,
       zweck: 'einsatz',
+      firecallId: 'fc1',
+      firecallName: 'Untergeschoben',
+    });
+
+    const doc = addMock.mock.calls[0][0];
+    expect(doc.firecallId).toBe('fc1');
+    expect(doc.firecallName).toBe('Brand Hauptplatz');
+  });
+
+  it('lehnt einen Einsatz einer anderen Gruppe ab', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'andere', name: 'Fremder Einsatz' }),
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toEqual({ success: false, error: 'firecallInvalid' });
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt einen gelöschten Einsatz ab', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand', deleted: true }),
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toEqual({ success: false, error: 'firecallInvalid' });
+  });
+
+  it('verwirft den Einsatzbezug bei einem anderen Zweck', async () => {
+    await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
       firecallId: 'fc1',
       firecallName: 'Brand',
     });
     const doc = addMock.mock.calls[0][0];
     expect(doc).not.toHaveProperty('firecallId');
     expect(doc).not.toHaveProperty('firecallName');
+  });
+
+  it('lehnt eine zweite Fahrt desselben Fahrzeugs zum selben Einsatz ab', async () => {
+    // Der Gast sieht die Fahrten der Gruppe nicht und kann ein Duplikat vorher
+    // nicht erkennen — die Meldung der Action ist seine einzige Warnung.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand' }),
+    });
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [{ id: 'e1', data: () => ({ vehicleId: 'v1' }) }],
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'duplicateFirecallEntry',
+    });
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('schreibt sie nach Bestätigung', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand' }),
+    });
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [{ id: 'e1', data: () => ({ vehicleId: 'v1' }) }],
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink(
+      'tok',
+      { ...input, zweck: 'einsatz', firecallId: 'fc1' },
+      { confirmDuplicate: true },
+    );
+
+    expect(result).toMatchObject({ success: true });
   });
 
   it('frischt den Zähler-Cache des Fahrzeugs auf', async () => {
