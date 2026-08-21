@@ -155,8 +155,8 @@ describe('FahrtenbuchDialog', () => {
       expect(screen.getByLabelText('Einsatz')).toHaveValue('Brand B2'),
     );
     expect(screen.getByLabelText('Fahrtzweck')).toHaveTextContent('Einsatz');
-    // Das Ziel ist damit abgedeckt und nicht mehr als Pflichtfeld markiert.
-    expect(screen.getByLabelText('Fahrstrecke / Ziel')).not.toBeRequired();
+    // Das Ziel benennt der Einsatz selbst — das Feld entfällt ganz.
+    expect(screen.queryByLabelText('Fahrstrecke / Ziel')).not.toBeInTheDocument();
   });
 
   it('belegt eine Bearbeitung nicht mit dem aktiven Einsatz vor', () => {
@@ -257,6 +257,7 @@ describe('FahrtenbuchDialog', () => {
     );
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
+    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
     await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -300,7 +301,6 @@ describe('FahrtenbuchDialog', () => {
     const startField = screen.getByLabelText(/Kilometerstand — Start/);
     await user.clear(startField);
     await user.type(startField, '900');
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '950');
 
     expect(
@@ -315,7 +315,6 @@ describe('FahrtenbuchDialog', () => {
     const user = userEvent.setup();
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -344,7 +343,6 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -363,7 +361,6 @@ describe('FahrtenbuchDialog', () => {
     renderWithIntl(<FahrtenbuchDialog {...baseProps} vehicleId="v1" />);
 
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -388,7 +385,6 @@ describe('FahrtenbuchDialog', () => {
     await user.click(await screen.findByRole('option', { name: 'B1 Kaminbrand' }));
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
@@ -414,6 +410,7 @@ describe('FahrtenbuchDialog', () => {
     await user.type(screen.getByLabelText('Einsatz'), 'N/S Ölspur Hauptstraße');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
     await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -441,6 +438,7 @@ describe('FahrtenbuchDialog', () => {
     await user.type(screen.getByLabelText('Einsatz'), 'B1 Kaminbrand');
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
     await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -482,6 +480,7 @@ describe('FahrtenbuchDialog', () => {
     await user.click(await screen.findByRole('option', { name: 'Übung' }));
 
     await user.type(screen.getByLabelText('Fahrer'), 'Paul');
+    // Ohne verknüpften Einsatz ist das Ziel Pflicht.
     await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -531,7 +530,6 @@ describe('FahrtenbuchDialog — Zusatzfahrer', () => {
     await user.type(screen.getByLabelText('Fahrer'), 'Max Mustermann');
     await user.click(screen.getByLabelText('Zusatzfahrer'));
     await user.click(await screen.findByRole('option', { name: 'Anna Bauer' }));
-    await user.type(screen.getByLabelText(/Fahrstrecke \/ Ziel/), 'Hauptplatz');
     await user.type(screen.getByLabelText(/Kilometerstand — Ende/), '1042');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 

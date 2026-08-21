@@ -414,6 +414,13 @@ export function useEntryFormState({
     return !Number.isNaN(start) && !Number.isNaN(end) && end < start;
   }, [abfahrt, ankunft]);
 
+  /**
+   * Ob der verknüpfte Einsatz das Ziel bereits benennt. Nur die Verknüpfung
+   * zählt, nicht ein frei eingetippter Einsatzname — dieselbe Grenze zieht
+   * `validateEntryInput`.
+   */
+  const zielCoveredByFirecall = zweck === 'einsatz' && !!firecallId;
+
   const [distanceBusy, setDistanceBusy] = useState(false);
   const [distanceResult, setDistanceResult] = useState<{
     roundTripKm: number;
@@ -460,7 +467,10 @@ export function useEntryFormState({
       firecallId: zweck === 'einsatz' ? firecallId : undefined,
       firecallName:
         zweck === 'einsatz' ? firecallName.trim() || undefined : undefined,
-      ziel,
+      // Benennt der verknüpfte Einsatz das Ziel, wird das Feld nicht gezeigt —
+      // dann darf auch kein alter Text von vor der Auswahl mitgehen. Liste,
+      // Export und Wochenbericht fallen auf `firecallName` zurück.
+      ziel: zielCoveredByFirecall ? '' : ziel,
       abfahrt,
       ankunft,
       counters,
@@ -545,13 +555,7 @@ export function useEntryFormState({
     distanceBusy,
     distanceResult,
     distanceError,
-    /**
-     * Ob der verknüpfte Einsatz das Ziel bereits benennt. Nur die Verknüpfung
-     * zählt, nicht ein frei eingetippter Einsatzname — dieselbe Grenze zieht
-     * `validateEntryInput`, und das Feld soll nicht als freiwillig aussehen,
-     * wenn der Server es verlangt.
-     */
-    zielCoveredByFirecall: zweck === 'einsatz' && !!firecallId,
+    zielCoveredByFirecall,
     ziel,
     setZiel,
     abfahrt,

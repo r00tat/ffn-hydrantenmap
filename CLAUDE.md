@@ -1023,6 +1023,15 @@ benutzt.
   jemand die Einsatzseite öffnet — dort sind die Fahrten dieses Einsatzes
   ohnehin geladen. Die Anzahl aus dem Browser ist nur der Anlass, gezählt wird
   serverseitig.
+- **Das Feld „Fahrtstrecke / Ziel" entfällt bei verknüpftem Einsatz** — der
+  Einsatz benennt das Ziel selbst. Ausgeblendet heißt dabei nicht bloß
+  versteckt: `submit` schickt `ziel` dann leer mit, sonst wirkte ein Text von
+  vor der Auswahl weiter, den niemand mehr sieht. Liste, Export und
+  Wochenbericht fallen ohnehin auf `firecallName` zurück
+  (`entry.ziel?.trim() || entry.firecallName`). Ohne Verknüpfung bleibt das Feld
+  Pflicht — dort stünde die Fahrt sonst ohne Angabe da, wohin sie ging. Die
+  Sammelerfassung schreibt weiterhin den Einsatznamen ins `ziel`
+  (`entryInputsFromRows`); beide Formen zeigen dasselbe an.
 - **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
   `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
   markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.

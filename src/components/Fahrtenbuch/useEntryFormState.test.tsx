@@ -595,6 +595,22 @@ describe('useEntryFormState', () => {
       expect(submitted(onSubmit).driverName).toBe('');
     });
 
+    it('schickt kein Ziel mit, wenn der Einsatz es benennt', async () => {
+      // Das Feld ist dann nicht zu sehen; ein Text von vor der Auswahl darf
+      // nicht stillschweigend weiterwirken.
+      const { result, onSubmit } = renderForm({ activeFirecallId: 'f1' });
+
+      act(() => result.current.changeDriver('Max'));
+      act(() => result.current.setZiel('Hauptplatz'));
+      await waitFor(() => expect(result.current.firecallId).toBe('f1'));
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(submitted(onSubmit).ziel).toBe('');
+    });
+
     it('verlangt ohne verknüpften Einsatz eine Angabe zur Fahrstrecke', async () => {
       const { result, onSubmit } = renderForm({ firecalls: [] });
 
