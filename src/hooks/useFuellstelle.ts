@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import type { LatLngPosition } from '../common/geo';
 import {
   FUELLSTELLE_RADIUS,
-  nearestFuellstelle,
-  type Fuellstelle,
+  lookupFuellstelle,
+  type FuellstelleLookup,
 } from '../components/FirecallItems/elements/connection/pendel/fuellstelle';
 import { queryClusters } from '../components/firebase/clusterQuery';
 
@@ -17,16 +17,17 @@ import { queryClusters } from '../components/firebase/clusterQuery';
  * „Löschwasserversorgung" und im Panel, und beide sollen keine Kartenebene
  * laden müssen.
  *
- * `undefined` heißt „keiner in Reichweite" **oder** „noch nicht gesucht" —
- * `busy` unterscheidet das. Ohne diese Unterscheidung stünde beim Öffnen kurz
- * „kein Hydrant in der Nähe", und das ist die falsche Antwort auf eine Frage,
- * die noch offen ist.
+ * `fuellstelle` ist `undefined`, wenn keiner mit Leistungsangabe in Reichweite
+ * ist **oder** noch nicht gesucht wurde — `busy` unterscheidet das. Ohne diese
+ * Unterscheidung stünde beim Öffnen kurz „kein Hydrant in der Nähe", und das
+ * ist die falsche Antwort auf eine Frage, die noch offen ist. `naechsterHydrant`
+ * kommt daneben zurück, damit die Meldung sagen kann, welcher Hydrant gefunden
+ * wurde, dem aber die Leistung fehlt.
  */
-export default function useFuellstelle(position?: LatLngPosition): {
-  fuellstelle?: Fuellstelle;
-  busy: boolean;
-} {
-  const [fuellstelle, setFuellstelle] = useState<Fuellstelle>();
+export default function useFuellstelle(
+  position?: LatLngPosition
+): FuellstelleLookup & { busy: boolean } {
+  const [lookup, setLookup] = useState<FuellstelleLookup>({});
   const [busy, setBusy] = useState(false);
 
   // Die Koordinaten als Zahlen in den Abhängigkeiten: `position` ist bei jedem
@@ -36,7 +37,7 @@ export default function useFuellstelle(position?: LatLngPosition): {
 
   useEffect(() => {
     if (lat === undefined || lng === undefined) {
-      setFuellstelle(undefined);
+      setLookup({});
       return;
     }
 
@@ -49,11 +50,11 @@ export default function useFuellstelle(position?: LatLngPosition): {
           FUELLSTELLE_RADIUS
         );
         if (!cancelled) {
-          setFuellstelle(nearestFuellstelle(clusters, { lat, lng }));
+          setLookup(lookupFuellstelle(clusters, { lat, lng }));
         }
       } catch (err) {
         console.error('unable to look up fuellstelle', err);
-        if (!cancelled) setFuellstelle(undefined);
+        if (!cancelled) setLookup({});
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -64,5 +65,5 @@ export default function useFuellstelle(position?: LatLngPosition): {
     };
   }, [lat, lng]);
 
-  return { fuellstelle, busy };
+  return { ...lookup, busy };
 }

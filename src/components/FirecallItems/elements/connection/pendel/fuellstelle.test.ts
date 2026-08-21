@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GeohashCluster } from '../../../../../common/gis-objects';
 import {
   FUELLSTELLE_RADIUS,
-  nearestFuellstelle,
+  lookupFuellstelle,
   parseLeistung,
 } from './fuellstelle';
 
@@ -52,51 +52,79 @@ describe('parseLeistung', () => {
   });
 });
 
-describe('nearestFuellstelle', () => {
+describe('lookupFuellstelle', () => {
   it('nimmt den nächsten Hydranten mit Leistungsangabe', () => {
-    const result = nearestFuellstelle(
+    const { fuellstelle } = lookupFuellstelle(
       cluster([
         { name: 'HY-2', ...north(60), typ: 'Überflurhydrant', leistung: '900' },
         { name: 'HY-1', ...north(30), typ: 'Überflurhydrant', leistung: '1200' },
       ]),
       entnahme
     );
-    expect(result?.name).toBe('HY-1');
-    expect(result?.leistung).toBe(1200);
-    expect(result?.distance).toBeLessThan(40);
+    expect(fuellstelle?.name).toBe('HY-1');
+    expect(fuellstelle?.leistung).toBe(1200);
+    expect(fuellstelle?.distance).toBeLessThan(40);
   });
 
   it('überspringt einen näheren Hydranten ohne Leistungsangabe', () => {
     // Gesucht ist die Zahl, nicht der Hydrant: Ein näherer ohne Angabe hilft
     // beim Rechnen nicht.
-    const result = nearestFuellstelle(
+    const { fuellstelle, naechsterHydrant } = lookupFuellstelle(
       cluster([
         { name: 'ohne Angabe', ...north(20), typ: 'Überflurhydrant' },
-        { name: 'mit Angabe', ...north(70), typ: 'Überflurhydrant', leistung: '800' },
+        {
+          name: 'mit Angabe',
+          ...north(70),
+          typ: 'Überflurhydrant',
+          leistung: '800',
+        },
       ]),
       entnahme
     );
-    expect(result?.name).toBe('mit Angabe');
-    expect(result?.leistung).toBe(800);
+    expect(fuellstelle?.name).toBe('mit Angabe');
+    expect(fuellstelle?.leistung).toBe(800);
+    // Der nähere wird trotzdem benannt: Er ist es, den man auf der Karte sieht.
+    expect(naechsterHydrant?.name).toBe('ohne Angabe');
+  });
+
+  it('nennt den Hydranten, dem die Leistungsangabe fehlt', () => {
+    // Der Normalfall in den Daten: `leistung` ist ein leerer String, denn das
+    // Feld steht in keinem GIS-Import. Ohne diese Unterscheidung meldete der
+    // Rechner „kein Hydrant in 100 m", während einer sichtbar daneben stand.
+    const { fuellstelle, naechsterHydrant } = lookupFuellstelle(
+      cluster([
+        { name: 'HY44', ...north(20), typ: 'Überflurhydrant', leistung: '' },
+      ]),
+      entnahme
+    );
+    expect(fuellstelle).toBeUndefined();
+    expect(naechsterHydrant?.name).toBe('HY44');
+    expect(naechsterHydrant?.distance).toBeLessThan(30);
   });
 
   it('sieht nichts jenseits des Radius', () => {
-    const result = nearestFuellstelle(
+    const result = lookupFuellstelle(
       cluster([
-        { name: 'zu weit', ...north(150), typ: 'Überflurhydrant', leistung: '900' },
+        {
+          name: 'zu weit',
+          ...north(150),
+          typ: 'Überflurhydrant',
+          leistung: '900',
+        },
       ]),
       entnahme
     );
-    expect(result).toBeUndefined();
+    expect(result.fuellstelle).toBeUndefined();
+    expect(result.naechsterHydrant).toBeUndefined();
   });
 
   it('nimmt den Radius aus dem Aufruf', () => {
     const hydranten = [
       { name: 'HY', ...north(150), typ: 'Überflurhydrant', leistung: '900' },
     ];
-    expect(nearestFuellstelle(cluster(hydranten), entnahme, 200)?.name).toBe(
-      'HY'
-    );
+    expect(
+      lookupFuellstelle(cluster(hydranten), entnahme, 200).fuellstelle?.name
+    ).toBe('HY');
   });
 
   it('hat 100 m als Reichweite', () => {
@@ -109,14 +137,19 @@ describe('nearestFuellstelle', () => {
     const clusters = [
       {
         geohash: 'u2m',
-        saugstelle: [{ name: 'Kanal', ...north(20), wasserentnahme_l_min_: 1000 }],
+        saugstelle: [
+          { name: 'Kanal', ...north(20), wasserentnahme_l_min_: 1000 },
+        ],
         loeschteich: [{ name: 'Teich', ...north(25), zufluss_l_min_: 400 }],
       } as unknown as GeohashCluster,
     ];
-    expect(nearestFuellstelle(clusters, entnahme)).toBeUndefined();
+    expect(lookupFuellstelle(clusters, entnahme).fuellstelle).toBeUndefined();
+    expect(
+      lookupFuellstelle(clusters, entnahme).naechsterHydrant
+    ).toBeUndefined();
   });
 
   it('gibt ohne Cluster nichts zurück', () => {
-    expect(nearestFuellstelle([], entnahme)).toBeUndefined();
+    expect(lookupFuellstelle([], entnahme)).toEqual({});
   });
 });

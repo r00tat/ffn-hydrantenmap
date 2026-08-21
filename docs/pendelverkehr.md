@@ -61,6 +61,42 @@ im Datensatz.
 Ein näherer Hydrant **ohne** Leistungsangabe verdrängt keinen weiter entfernten
 mit: Gesucht ist die Zahl, nicht der Hydrant.
 
+#### „Kein Hydrant" und „Hydrant ohne Leistungsangabe" sind zwei Meldungen
+
+`leistung` steht in **keinem** GIS-Import. Das Feld wird von Hand gepflegt und
+vom CSV-Import über `preservedFields` gerettet — im Datenbestand ist es meist ein
+leerer String. Der Regelfall ist deshalb nicht „kein Hydrant in der Nähe",
+sondern „der Hydrant daneben hat keine Zahl".
+
+`lookupFuellstelle` gibt beides zurück: die Füllstelle mit Leistungsangabe, und
+in jedem Fall den nächsten Hydranten. Eine Meldung, die beides zu „Kein Hydrant
+mit Leistungsangabe in 100 m" zusammenfasst, widerspricht dem, was der Melder
+auf der Karte vor sich hat, und lässt offen, ob die Suche überhaupt gelaufen ist.
+
+#### Die Umkreissuche fand unter 500 m gar nichts
+
+`geohashQueryBounds` wählt die Genauigkeit der Grenzen nach dem Radius: je
+kleiner der Kreis, desto **länger** die Präfixe. Unter etwa 500 m sind sie
+siebenstellig — die Dokumente in `clusters6` tragen aber immer einen
+**sechsstelligen** Geohash. Und `'u2ebz1' < 'u2ebz1n'`: Die Kachel, in der man
+selbst steht, liegt lexikografisch vor der Untergrenze ihres eigenen Bereichs
+und fällt aus der Abfrage heraus.
+
+Der 100-m-Radius der Füllstellensuche lag voll in dieser Lücke und lieferte
+**null** Cluster — nicht zu wenige. Der Rechner meldete deshalb „kein Hydrant",
+während zwei davor standen.
+
+`clusterQueryBounds` ([src/common/clusterGeohash.ts](../src/common/clusterGeohash.ts))
+kürzt die Grenzen auf sechs Zeichen und sortiert die dabei zusammenfallenden
+Bereiche aus. Das vergrößert den abgefragten Bereich, und das ist die richtige
+Richtung: Die Grenzen decken ohnehin mehr ab als den Radius, auf Distanz filtert
+der Aufrufer.
+
+Dasselbe traf den KI-Assistenten: Seine Suche nach Wasserentnahmestellen beginnt
+bei 300 m, also ebenfalls siebenstellig. Sie fand nie etwas und eskalierte
+stillschweigend auf 600 m — dort greifen sechsstellige Grenzen, und es sah nach
+einer Suche aus, die einfach weiter schauen musste.
+
 Nur Hydranten. Saugstelle und Löschteich tragen ihre Ergiebigkeit in anderen
 Feldern (`wasserentnahme`, `zufluss`) und sind ein eigener Fall — mit eigener
 Frage, ob eine Saugstelle überhaupt als Füllplatz für mehrere Fahrzeuge taugt.
@@ -236,6 +272,7 @@ des Panels gesetzt.
 | `pendel/shuttle.ts` | die Formel. Reine Zahlen, kein Firestore, keine Feldnamen |
 | `pendel/pendelRoute.ts` | Versorgungsart, Fahrstrecke aus dem gezeichneten Verlauf, „ist das für ein Fahrzeug geroutet?" |
 | `pendel/fuellstelle.ts` | Ergiebigkeit aus dem nächsten Hydranten, Freitext-Leistung parsen |
+| `common/clusterGeohash.ts` | Geohash-Grenzen der Umkreissuche, auf die Länge der Cluster-Dokumente gekürzt |
 | `pendel/pendelverkehr.ts` | die Fassade: Felder lesen, Vorgabewerte auffüllen |
 | `pendel/versorgungVergleich.ts` | Gegenüberstellung, Empfehlung, Aufbauzeit |
 | `connection/versorgungSummary.ts` | die Zeile für Popup und Elementliste, je Modus |

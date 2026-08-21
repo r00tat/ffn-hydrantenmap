@@ -485,6 +485,34 @@ describe('LoeschwasserfoerderungPanel', () => {
       screen.getByText(/Ohne die Ergiebigkeit der Entnahmestelle/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/l\/min dauerhaft/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Kein Hydrant in 100 m um die Entnahmestelle/)
+    ).toBeInTheDocument();
+  });
+
+  it('nennt den Hydranten, dem die Leistungsangabe fehlt', async () => {
+    // Der Normalfall in den Daten. „Kein Hydrant in 100 m" widerspricht dem,
+    // was der Melder auf der Karte vor sich hat, und lässt offen, ob die Suche
+    // überhaupt gelaufen ist.
+    fuellstelle.mockReturnValue({
+      fuellstelle: undefined,
+      naechsterHydrant: { name: 'HY44', distance: 12 },
+      busy: false,
+    });
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withRoute({ versorgungsart: 'pendel' })}
+        open
+        onClose={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/HY44 in 12 m hat keine Leistungsangabe/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Kein Hydrant in 100 m/)
+    ).not.toBeInTheDocument();
   });
 
   it('bietet an, die Leitung auf Fahrzeug-Routing umzustellen', async () => {

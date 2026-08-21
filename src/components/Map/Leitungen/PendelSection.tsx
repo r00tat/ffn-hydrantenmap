@@ -19,6 +19,7 @@ import type {
   PendelParams,
   PendelView,
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
+import type { HydrantOhneLeistung } from '../../FirecallItems/elements/connection/pendel/fuellstelle';
 import { parseNumber } from './panelNumbers';
 import usePanelNumber from './usePanelNumber';
 
@@ -43,6 +44,14 @@ export interface PendelSectionProps {
   ) => void;
   /** Solange die Hydrantensuche läuft, ist „keiner in der Nähe" voreilig. */
   fuellstelleBusy: boolean;
+  /**
+   * Der nächste Hydrant, wenn er keine Leistungsangabe trägt.
+   *
+   * Damit die Meldung sagen kann, *welcher* gefunden wurde. „Kein Hydrant in
+   * 100 m" widerspricht dem, was auf der Karte steht, und lässt offen, ob die
+   * Suche überhaupt gelaufen ist.
+   */
+  naechsterHydrant?: HydrantOhneLeistung;
   /** Die Leitung auf Fahrzeug-Routing umstellen. */
   onEnableVehicleRouting?: () => void;
 }
@@ -52,6 +61,7 @@ export default function PendelSection({
   params,
   onParamChange,
   fuellstelleBusy,
+  naechsterHydrant,
   onEnableVehicleRouting,
 }: PendelSectionProps) {
   const t = useTranslations('loeschwasserfoerderung');
@@ -114,9 +124,14 @@ export default function PendelSection({
                     name: view.fuellstelle.name,
                     metres: view.fuellstelle.distance,
                   })
-                : view.fuellleistungSource === 'unknown'
-                  ? t('fillRateNoHydrant')
-                  : t('fillRateManual')
+                : view.fuellleistungSource === 'manual'
+                  ? t('fillRateManual')
+                  : naechsterHydrant
+                    ? t('fillRateHydrantWithoutRate', {
+                        name: naechsterHydrant.name,
+                        metres: naechsterHydrant.distance,
+                      })
+                    : t('fillRateNoHydrant')
             }
             onChange={(event) =>
               onParamChange(

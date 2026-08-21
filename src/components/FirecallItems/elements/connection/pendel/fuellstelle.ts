@@ -67,36 +67,71 @@ export interface Fuellstelle {
   leistung: number;
 }
 
+/** Ein Hydrant in Reichweite, dessen Leistung aber nicht bekannt ist. */
+export interface HydrantOhneLeistung {
+  name: string;
+  /** Luftlinie zur Entnahmestelle in m. */
+  distance: number;
+}
+
+export interface FuellstelleLookup {
+  /** Der nächste Hydrant **mit** Leistungsangabe, wenn es einen gibt. */
+  fuellstelle?: Fuellstelle;
+  /**
+   * Der nächste Hydrant überhaupt, auch ohne Leistungsangabe.
+   *
+   * Getrennt geführt, weil „hier steht kein Hydrant" und „hier steht einer,
+   * aber seine Leistung ist nicht erfasst" zwei verschiedene Lagen sind. Die
+   * erste heißt: andere Entnahmestelle suchen. Die zweite heißt: die Zahl
+   * eintragen — und sie ist der Normalfall, denn `leistung` steht in keiner
+   * GIS-Quelle, sondern wird von Hand gepflegt und beim CSV-Import erhalten.
+   * Eine Meldung, die beides zusammenfasst, widerspricht dem, was der Melder
+   * vor sich auf der Karte sieht.
+   */
+  naechsterHydrant?: HydrantOhneLeistung;
+}
+
 /**
- * Der nächste Hydrant **mit** Leistungsangabe innerhalb des Radius, oder
- * `undefined`.
+ * Die Entnahmestelle in Reichweite: Leistungsangabe, wenn vorhanden, und in
+ * jedem Fall der nächste Hydrant.
  *
  * Ein näherer Hydrant ohne Leistungsangabe verdrängt keinen weiter entfernten
  * mit: Gesucht ist die Zahl, nicht der Hydrant. Nur Hydranten — eine Saugstelle
  * oder ein Löschteich tragen ihre Ergiebigkeit in anderen Feldern und sind ein
  * eigener Fall, siehe docs/pendelverkehr.md.
  */
-export function nearestFuellstelle(
+export function lookupFuellstelle(
   clusters: GeohashCluster[],
   target: GeoPositionObject,
   radius = FUELLSTELLE_RADIUS
-): Fuellstelle | undefined {
+): FuellstelleLookup {
   const candidates: WaterSupplyCandidate[] = collectWaterSupplyCandidates(
     clusters,
     target,
     { radius, kinds: ['hydrant'] }
   );
 
+  const result: FuellstelleLookup = {};
+
   for (const candidate of candidates) {
+    // Nach Distanz sortiert, der erste ist der nächste.
+    if (!result.naechsterHydrant) {
+      result.naechsterHydrant = {
+        name: candidate.name,
+        distance: candidate.distance,
+      };
+    }
+
     const leistung = parseLeistung(candidate.leistung);
     if (leistung !== undefined) {
-      return {
+      result.fuellstelle = {
         name: candidate.name,
         distance: candidate.distance,
         leistung,
       };
+      break;
     }
   }
 
-  return undefined;
+  return result;
 }

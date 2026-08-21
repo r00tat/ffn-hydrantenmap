@@ -149,9 +149,11 @@ export default function VersorgungRechner({
   // Die Entnahmestelle ist das erste Ende in Förderrichtung. Der Hydrant dort
   // liefert die Ergiebigkeit, mit der gefüllt wird.
   const entnahme = useMemo(() => pendelEndpoints(draft)?.[0], [draft]);
-  const { fuellstelle, busy: fuellstelleBusy } = useFuellstelle(
-    mode === 'foerderung' ? undefined : entnahme
-  );
+  const {
+    fuellstelle,
+    naechsterHydrant,
+    busy: fuellstelleBusy,
+  } = useFuellstelle(mode === 'foerderung' ? undefined : entnahme);
 
   const view = useMemo(() => foerderungView(draft, params), [draft, params]);
   // Auch im Modus „Förderung" nicht gerechnet: Der Pendelverkehr braucht die
@@ -607,6 +609,7 @@ export default function VersorgungRechner({
             params={pendelResult.params}
             onParamChange={setPendelValue}
             fuellstelleBusy={fuellstelleBusy}
+            naechsterHydrant={naechsterHydrant}
             onEnableVehicleRouting={enableVehicleRouting}
           />
             )}
