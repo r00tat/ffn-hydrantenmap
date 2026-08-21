@@ -25,6 +25,7 @@ import {
   isPropellant,
   matchVehicleByName,
   normalizeName,
+  normalizePersonName,
   type FuelType,
 } from '../../../common/fahrtenbuch';
 import useFahrtenbuchEntries from '../../../hooks/useFahrtenbuchEntries';
@@ -239,7 +240,7 @@ export default function FahrtenbuchImport({
       const inputs = chosen.map((r) => {
         const input = r.input!;
         if (input.driverId) return input;
-        const personId = personIds[normalizeName(input.driverName)];
+        const personId = personIds[normalizePersonName(input.driverName)];
         return personId ? { ...input, driverId: personId } : input;
       });
 

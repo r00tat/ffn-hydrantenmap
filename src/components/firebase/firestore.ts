@@ -330,6 +330,17 @@ export interface Firecall {
     from: [number, number];
     to: [number, number];
   };
+  /**
+   * Anzahl der im Fahrtenbuch erfassten Fahrten zu diesem Einsatz.
+   *
+   * Denormalisiert wie `fahrtenbuchRoute`, geschrieben von den
+   * Fahrtenbuch-Actions bei jedem Anlegen, Bearbeiten und Löschen. Die
+   * Einsatz-Übersicht zeigt damit ohne eigene Abfrage, ob die Fahrten schon
+   * erfasst sind — sonst trägt sie jemand ein zweites Mal ein. Nur die Anzahl:
+   * Das Einsatz-Dokument liest jedes Gruppenmitglied, das Fahrtenbuch nur wer
+   * dort Mitglied ist.
+   */
+  fahrtenbuchEntryCount?: number;
   attachments?: string[];
   /**
    * Ordner dieses Einsatzes im Google Drive der Gruppe. Wird beim ersten

@@ -150,6 +150,51 @@ describe('buildEinsatzRows', () => {
     expect(rows[0].driverId).toBe('p1');
   });
 
+  it('matcht den Namen auch in gedrehter Reihenfolge', () => {
+    // BlaulichtSMS liefert „Nachname Vorname", die Personenliste führt
+    // „Vorname Nachname". Ohne Empfänger-ID greift nur der Namensvergleich.
+    const withoutRecipient = { ...person, blaulichtSmsRecipientId: undefined };
+    const rows = buildEinsatzRows({
+      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100' }],
+      crew: [
+        {
+          name: 'Mustermann Max',
+          vehicleId: 'i1',
+          funktion: 'Maschinist',
+        },
+      ],
+      vehicles: [vehicle],
+      persons: [withoutRecipient],
+      entries: [],
+      firecall,
+    }, TIMES);
+    expect(rows[0].driverId).toBe('p1');
+    // Der Name aus der Personenliste gewinnt — damit ist die Schreibweise im
+    // Fahrtenbuch durchgehend dieselbe.
+    expect(rows[0].driverName).toBe('Max Mustermann');
+  });
+
+  it('verknüpft bei zwei gleichnamigen Personen nicht', () => {
+    const a = { ...person, id: 'p1', blaulichtSmsRecipientId: undefined };
+    const b = { ...person, id: 'p2', blaulichtSmsRecipientId: undefined };
+    const rows = buildEinsatzRows({
+      fzgItems: [{ id: 'i1', name: 'RLFA 3000/100' }],
+      crew: [
+        {
+          name: 'Mustermann Max',
+          vehicleId: 'i1',
+          funktion: 'Maschinist',
+        },
+      ],
+      vehicles: [vehicle],
+      persons: [a, b],
+      entries: [],
+      firecall,
+    }, TIMES);
+    expect(rows[0].driverId).toBeUndefined();
+    expect(rows[0].driverName).toBe('Mustermann Max');
+  });
+
   it('nutzt den Crew-Namen als Freitext, wenn keine Person passt', () => {
     const rows = buildEinsatzRows({
       fzgItems: [{ id: 'i1', name: 'RLFA 3000/100' }],

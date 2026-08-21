@@ -33,15 +33,19 @@ function ShareLinkFormBody({
   const t = useTranslations('fahrtenbuchShare');
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // `firecalls` bleibt undefiniert — daran erkennt `FahrtenbuchEntryFields`,
-  // dass es keine Einsatzauswahl anbieten darf.
   const form = useEntryFormState({
     vehicles: data.vehicles,
+    // Die letzten Einsätze der Gruppe. Damit ist ein neuer Eintrag mit dem
+    // neuesten vorbelegt — wer den QR-Code am Fahrzeug nutzt, trägt fast immer
+    // die Fahrt zum laufenden Einsatz ein. Einen „aktiven" Einsatz gibt es
+    // hier nicht, die App-Auswahl braucht eine Anmeldung.
+    firecalls: data.firecalls,
     // Der Link gewinnt gegen den Einzelfahrzeug-Fall — beide sagen dasselbe,
     // wenn die Gruppe nur ein Fahrzeug hat.
     vehicleId:
       vehicleId ?? (data.vehicles.length === 1 ? data.vehicles[0].id : undefined),
-    onSubmit: (input) => createFahrtenbuchEntryViaShareLink(token, input),
+    onSubmit: (input, options) =>
+      createFahrtenbuchEntryViaShareLink(token, input, options),
   });
 
   return (

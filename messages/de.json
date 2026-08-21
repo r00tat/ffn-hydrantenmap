@@ -202,6 +202,7 @@
   },
   "crew": {
     "title": "Besatzung",
+    "fromPersonList": "Personenliste",
     "additionalPersons": "Weitere Person hinzufügen",
     "statusDeclined": "abgelehnt",
     "statusNoAnswer": "nicht geantwortet",
@@ -417,7 +418,22 @@
     "moreDrivers": "+{count}",
     "zweck": "Fahrtzweck",
     "firecall": "Einsatz",
-    "firecallManual": "Einsatz wählen oder frei eingeben",
+    "calculateDistance": "Fahrtstrecke berechnen",
+    "calculateDistanceRoute": "{km} km gefahrene Strecke, Kilometerstand ergänzt",
+    "calculateDistanceEstimated": "ca. {km} km geschätzt (keine Route verfügbar), Kilometerstand ergänzt",
+    "calculateDistanceFailed": "Für diesen Einsatz ist keine Strecke zu ermitteln — fehlende Koordinaten am Einsatzort.",
+    "firecallHint": "Einsatz aus der Liste wählen — getippter Text wird als Fahrtstrecke / Ziel übernommen",
+    "firecallLinkMissing": "Kein Einsatz aus der Liste verknüpft. Die Fahrt wird gespeichert, aber nicht auf doppelte Erfassung geprüft.",
+    "duplicate": {
+      "title": "Für dieses Fahrzeug ist die Fahrt zu diesem Einsatz schon erfasst",
+      "entry": "Bereits eingetragen: {driver}, Abfahrt {time}",
+      "unknownEntry": "Für dieses Fahrzeug ist zu diesem Einsatz schon eine Fahrt erfasst.",
+      "noDriver": "ohne Fahrer",
+      "confirm": "Diese Fahrt ist trotzdem eine zweite Ausfahrt und soll gespeichert werden"
+    },
+    "overlap": {
+      "title": "Zeitraum überschneidet sich mit einer anderen Fahrt dieses Fahrzeugs"
+    },
     "ziel": "Fahrstrecke / Ziel",
     "abfahrt": "Abfahrt",
     "ankunft": "Ankunft",
@@ -464,6 +480,7 @@
     },
     "errors": {
       "vehicleMissing": "Bitte ein Fahrzeug wählen.",
+      "duplicateFirecallEntry": "Diese Fahrt ist für diesen Einsatz und dieses Fahrzeug bereits erfasst.",
       "driverMissing": "Bitte einen Fahrer angeben.",
       "coDriversTooMany": "Höchstens {count} Zusatzfahrer je Fahrt.",
       "abfahrtInvalid": "Abfahrtszeitpunkt ist ungültig.",
@@ -484,6 +501,7 @@
       "deleteFailed": "Löschen fehlgeschlagen: {message}",
       "linkInvalid": "Dieser Link ist nicht mehr gültig.",
       "vehicleNotFound": "Das gewählte Fahrzeug ist nicht mehr verfügbar.",
+      "firecallInvalid": "Dieser Einsatz gehört nicht zu dieser Feuerwehr.",
       "invalidEntry": "Die Eingaben sind unvollständig oder ungültig.",
       "shareSaveFailed": "Die Fahrt konnte nicht gespeichert werden. Bitte später erneut versuchen.",
       "exportRangeInvalid": "Der Zeitraum ist ungültig — „Bis“ liegt vor „Von“.",
@@ -629,6 +647,7 @@
       "noGroupVehicles": "Die Gruppe dieses Einsatzes hat keine Fahrzeuge hinterlegt.",
       "notInFahrtenbuch": "Nicht im Fahrtenbuch hinterlegt und daher ohne Fahrt: {names}",
       "alreadyRecorded": "Bereits erfasst",
+      "saveRow": "Nur diese Fahrt speichern",
       "saveAll": "Alle speichern",
       "saved": "{count, plural, one {# Fahrt gespeichert} other {# Fahrten gespeichert}}",
       "skipped": "{count, plural, one {# unvollständige Zeile übersprungen} other {# unvollständige Zeilen übersprungen}}",
@@ -1807,6 +1826,7 @@
     "detailsTooltip": "Einsatz-Details und Anhänge",
     "shareTooltip": "Link für anonymen Zugriff erstellen",
     "kostenersatzTooltip": "Kostenersatz-Berechnungen",
+    "fahrtenRecorded": "{count, plural, one {# Fahrt} other {# Fahrten}} im Fahrtenbuch",
     "deleteTitle": "Einsatz {name} {date} löschen",
     "deleteConfirm": "Einsatz {name} {date} wirklich löschen?"
   },

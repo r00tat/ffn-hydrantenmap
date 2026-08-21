@@ -220,6 +220,35 @@ describe('planPersonCsvImport', () => {
     expect(plan.rows[1].action).toBe('create');
   });
 
+  it('verknüpft auch bei gedrehter Namensreihenfolge', () => {
+    // BlaulichtSMS liefert „Nachname Vorname", die Personenliste führt
+    // „Vorname Nachname" — dieselbe Person, kein zweiter Datensatz.
+    const plan = planPersonCsvImport(
+      [{ id: 'r1', name: 'Mustermann Max', phone: '', email: '', note: '' }],
+      [person({ id: 'p1', name: 'Max Mustermann' })],
+    );
+    expect(plan.rows[0]).toMatchObject({
+      recipientId: 'r1',
+      action: 'link',
+      personId: 'p1',
+    });
+  });
+
+  it('meldet die gedrehte Reihenfolge nicht als Namensänderung', () => {
+    // Sonst überschriebe jeder Import die gepflegte Schreibweise.
+    const plan = planPersonCsvImport(
+      [{ id: 'r1', name: 'Mustermann Max', phone: '', email: '', note: '' }],
+      [
+        person({
+          id: 'p1',
+          name: 'Max Mustermann',
+          blaulichtSmsRecipientId: 'r1',
+        }),
+      ],
+    );
+    expect(plan.rows[0]).toMatchObject({ action: 'unchanged', changes: [] });
+  });
+
   it('meldet eine verknüpfte Person ohne Abweichung als unverändert', () => {
     const plan = planPersonCsvImport(records, [
       person({

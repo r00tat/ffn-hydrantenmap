@@ -202,6 +202,7 @@
   },
   "crew": {
     "title": "Crew",
+    "fromPersonList": "person list",
     "additionalPersons": "Add another person",
     "statusDeclined": "declined",
     "statusNoAnswer": "no answer",
@@ -417,7 +418,22 @@
     "moreDrivers": "+{count}",
     "zweck": "Purpose",
     "firecall": "Operation",
-    "firecallManual": "Select an operation or enter one",
+    "calculateDistance": "Calculate distance",
+    "calculateDistanceRoute": "{km} km driven, odometer filled in",
+    "calculateDistanceEstimated": "approx. {km} km estimated (no route available), odometer filled in",
+    "calculateDistanceFailed": "No distance can be determined for this operation \u2014 the location has no coordinates.",
+    "firecallHint": "Pick an operation from the list — typed text becomes the route / destination",
+    "firecallLinkMissing": "No operation linked from the list. The trip is saved but not checked for duplicates.",
+    "duplicate": {
+      "title": "A trip for this vehicle and this operation is already recorded",
+      "entry": "Already recorded: {driver}, departure {time}",
+      "unknownEntry": "A trip for this vehicle and this operation is already recorded.",
+      "noDriver": "no driver",
+      "confirm": "This really is a second trip and should be saved"
+    },
+    "overlap": {
+      "title": "The time range overlaps another trip of this vehicle"
+    },
     "ziel": "Route / destination",
     "abfahrt": "Departure",
     "ankunft": "Arrival",
@@ -464,6 +480,7 @@
     },
     "errors": {
       "vehicleMissing": "Please select a vehicle.",
+      "duplicateFirecallEntry": "This trip is already recorded for this operation and vehicle.",
       "driverMissing": "Please enter a driver.",
       "coDriversTooMany": "At most {count} additional drivers per trip.",
       "abfahrtInvalid": "Departure time is invalid.",
@@ -484,6 +501,7 @@
       "deleteFailed": "Deleting failed: {message}",
       "linkInvalid": "This link is no longer valid.",
       "vehicleNotFound": "The selected vehicle is no longer available.",
+      "firecallInvalid": "This operation does not belong to this fire department.",
       "invalidEntry": "The entry is incomplete or invalid.",
       "shareSaveFailed": "The trip could not be saved. Please try again later.",
       "exportRangeInvalid": "The period is invalid — “to” is before “from”.",
@@ -629,6 +647,7 @@
       "noGroupVehicles": "This operation's group has no vehicles configured.",
       "notInFahrtenbuch": "Not in the logbook master data, so no trip is recorded: {names}",
       "alreadyRecorded": "Already recorded",
+      "saveRow": "Save only this trip",
       "saveAll": "Save all",
       "saved": "{count, plural, one {# trip saved} other {# trips saved}}",
       "skipped": "{count, plural, one {# incomplete row skipped} other {# incomplete rows skipped}}",
@@ -1807,6 +1826,7 @@
     "detailsTooltip": "Operation details and attachments",
     "shareTooltip": "Create anonymous-access link",
     "kostenersatzTooltip": "Cost recovery calculations",
+    "fahrtenRecorded": "{count, plural, one {# trip} other {# trips}} in the logbook",
     "deleteTitle": "Delete operation {name} {date}",
     "deleteConfirm": "Really delete operation {name} {date}?"
   },

@@ -54,6 +54,9 @@ export interface ActionResult {
  */
 function shareErrorKey(err: unknown): string {
   if (err instanceof ApiException && err.status === 404) return 'linkInvalid';
+  if (err instanceof Error && err.message === FIRECALL_NOT_IN_GROUP) {
+    return 'firecallInvalid';
+  }
   const message = err instanceof Error ? err.message : String(err);
   if (/^vehicle .* not found in group /.test(message)) return 'vehicleNotFound';
   if (/^invalid fahrtenbuch entry: /.test(message)) return 'invalidEntry';
@@ -221,9 +224,185 @@ async function createMangelIfReported(
   }
 }
 
+/**
+ * Der Einsatz, den ein Gast über den Freigabe-Link gewählt hat, gehört nicht zu
+ * der Gruppe des Links. Eigene Meldung statt stiller Verwerfung: Der Gast hat
+ * aus einer Liste gewählt, die diese Seite geliefert hat — bleibt die Fahrt
+ * stumm ohne Einsatz, hielte er sie für verknüpft.
+ */
+const FIRECALL_NOT_IN_GROUP = 'firecall not in group';
+
+/**
+ * Prüft den vom Browser genannten Einsatz gegen die Gruppe und liefert seinen
+ * Namen aus dem Dokument.
+ *
+ * Der Name kommt bewusst **nicht** aus der Anfrage: Auf der Gastseite steht
+ * hinter dem Formular niemand, dessen Eingabe man zurechnen könnte, und ein
+ * frei gesetzter Einsatzname wäre unkontrollierter Fremdinhalt in einem
+ * Nachweisdokument.
+ */
+async function resolveFirecallForGroup(
+  groupId: string,
+  firecallId: string,
+): Promise<string> {
+  const doc = await firestore
+    .collection(FIRECALL_COLLECTION_ID)
+    .doc(firecallId)
+    .get();
+  const firecall = doc.exists ? (doc.data() as Firecall) : undefined;
+  if (!firecall || firecall.deleted === true || firecall.group !== groupId) {
+    throw new Error(FIRECALL_NOT_IN_GROUP);
+  }
+  return firecall.name ?? '';
+}
+
+export interface FirecallDistanceResult {
+  success: boolean;
+  /** Gesamtstrecke (Hin- und Rückweg) in ganzen Kilometern. */
+  roundTripKm?: number;
+  /**
+   * Woher die Strecke stammt. Muss mit: Eine geschätzte Strecke gehört im
+   * Fahrtenbuch nachgesehen, eine gefahrene nicht.
+   */
+  source?: 'route' | 'estimate';
+  error?: string;
+}
+
+/**
+ * Die Gesamtstrecke vom Standort der Gruppe zum Einsatzort und zurück — für den
+ * Knopf „Fahrtstrecke berechnen" im Eintrags-Dialog.
+ *
+ * Die Sammelerfassung holt sich diese Strecke beim Speichern selbst; beim
+ * einzelnen Eintrag musste den Kilometerstand bisher jeder von Hand ausrechnen.
+ * Derselbe `resolveFirecallDistance`-Pfad, also auch derselbe Routen-Cache am
+ * Einsatz — der Knopf kostet ab dem zweiten Fahrzeug keinen API-Aufruf mehr.
+ *
+ * `noFirecallRoute`, wenn nichts zu ermitteln war: Einsatz einer anderen
+ * Gruppe, gelöscht oder ohne Koordinaten.
+ */
+export async function firecallRoundTripDistance(
+  groupId: string,
+  firecallId: string,
+): Promise<FirecallDistanceResult> {
+  try {
+    await actionGroupMemberRequired(groupId);
+    const standort = await loadGroupStandort(groupId);
+    const distance = await resolveFirecallDistance(
+      groupId,
+      firecallId,
+      standort,
+    );
+    if (!distance) return { success: false, error: 'noFirecallRoute' };
+    return {
+      success: true,
+      roundTripKm: distance.roundTripKm,
+      source: distance.source,
+    };
+  } catch (err) {
+    console.error('firecallRoundTripDistance failed', err);
+    return { success: false, error: actionErrorKey(err) };
+  }
+}
+
+export interface EntryWriteOptions {
+  /**
+   * Ein als Duplikat erkannter Eintrag wird trotzdem geschrieben.
+   *
+   * Ohne das Flag lehnt die Action ab. Die Schranke gehört hierher und nicht
+   * allein in den Dialog: Zwei Geräte können dieselbe Fahrt gleichzeitig offen
+   * haben, und eine doppelt erfasste Fahrt verdoppelt nicht nur die Kilometer,
+   * sondern verschiebt über den Zähler-Cache alle folgenden Zählerstände.
+   *
+   * Bestätigt wird bewusst nicht stillschweigend: Es gibt Einsätze, bei denen
+   * ein Fahrzeug tatsächlich zweimal ausfährt.
+   */
+  confirmDuplicate?: boolean;
+}
+
+/** Fahrt eines Einsatzes, so weit der Duplikatscheck sie braucht. */
+interface FirecallEntryRef {
+  id: string;
+  vehicleId: string;
+}
+
+/**
+ * Die nicht gelöschten Fahrten eines Einsatzes.
+ *
+ * Gefiltert wird nur über `firecallId` und `deleted` — das Fahrzeug kommt im
+ * Speicher dazu. Damit reicht der bestehende Index, und dieselbe Abfrage
+ * bedient Duplikatscheck, Sammelerfassung und Zähler am Einsatz.
+ */
+async function entriesForFirecall(
+  groupId: string,
+  firecallId: string,
+): Promise<FirecallEntryRef[]> {
+  const snapshot = await entriesRef(groupId)
+    .where('firecallId', '==', firecallId)
+    .where('deleted', '==', false)
+    .get();
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    vehicleId: (doc.data() as FahrtenbuchEntry).vehicleId,
+  }));
+}
+
+/**
+ * Ob dieses Fahrzeug zu diesem Einsatz schon eine andere Fahrt hat.
+ *
+ * `excludeEntryId` ist die bearbeitete Fahrt selbst — ohne sie meldete jede
+ * Bearbeitung ihr eigenes Dokument als Duplikat.
+ */
+async function hasEntryForFirecallVehicle(
+  groupId: string,
+  firecallId: string,
+  vehicleId: string,
+  excludeEntryId?: string,
+): Promise<boolean> {
+  const entries = await entriesForFirecall(groupId, firecallId);
+  return entries.some(
+    (e) => e.vehicleId === vehicleId && e.id !== excludeEntryId,
+  );
+}
+
+/**
+ * Schreibt die Anzahl erfasster Fahrten an das Einsatz-Dokument.
+ *
+ * Denormalisiert wie schon der Routen-Cache `fahrtenbuchRoute`, und aus
+ * demselben Grund: Die Einsatz-Übersicht zeigt alle Einsätze der Gruppe auf
+ * einmal. Eine Abfrage je Karte wären dutzende Listener; ein Feld am Einsatz
+ * ist mit den Karten schon geladen. Gezählt wird jedes Mal aus dem Bestand
+ * statt hoch- und heruntergezählt — ein Zähler, der driftet, wäre schlimmer
+ * als keiner.
+ *
+ * Nur die Anzahl, keine Fahrzeug- oder Fahrernamen: Das Einsatz-Dokument liest
+ * jedes Gruppenmitglied, das Fahrtenbuch nur wer dort Mitglied ist.
+ *
+ * Ein Fehler bleibt hier: Der Zähler ist eine Anzeigehilfe, die erfasste Fahrt
+ * ist der Nachweis. Ein Wurf würde sonst eine geschriebene Fahrt als
+ * gescheitert melden.
+ */
+async function refreshFirecallEntryCount(groupId: string, firecallId: string) {
+  try {
+    const ref = firestore.collection(FIRECALL_COLLECTION_ID).doc(firecallId);
+    const doc = await ref.get();
+    if (!doc.exists) return;
+    // Wie bei `resolveFirecallDistance`: Der Guard der Action prüft nur die
+    // eigene Gruppenmitgliedschaft, nicht wem dieser Einsatz gehört.
+    if ((doc.data() as Firecall).group !== groupId) return;
+    const entries = await entriesForFirecall(groupId, firecallId);
+    await ref.set({ fahrtenbuchEntryCount: entries.length }, { merge: true });
+  } catch (err) {
+    console.error('refreshFirecallEntryCount failed', err, {
+      groupId,
+      firecallId,
+    });
+  }
+}
+
 export async function createFahrtenbuchEntry(
   groupId: string,
   input: FahrtenbuchEntryInput,
+  options: EntryWriteOptions = {},
 ): Promise<ActionResult> {
   try {
     const session = await actionGroupMemberRequired(groupId);
@@ -236,13 +415,53 @@ export async function createFahrtenbuchEntry(
     };
     const doc = buildEntryDocument(vehicle, input, groupId, actor);
 
+    // Gegen `doc.firecallId` geprüft, nicht gegen die Eingabe: Ob die
+    // Verknüpfung am Dokument landet, entscheidet `buildEntryDocument` über den
+    // Zweck. Nur was gespeichert wird, kann ein Duplikat sein.
+    if (
+      doc.firecallId &&
+      !options.confirmDuplicate &&
+      (await hasEntryForFirecallVehicle(groupId, doc.firecallId, doc.vehicleId))
+    ) {
+      return { success: false, error: 'duplicateFirecallEntry' };
+    }
+
     const ref = await entriesRef(groupId).add(doc);
     await refreshVehicleCache(groupId, input.vehicleId);
+    if (doc.firecallId) {
+      await refreshFirecallEntryCount(groupId, doc.firecallId);
+    }
     await createMangelIfReported(groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(groupId, doc, vehicle);
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createFahrtenbuchEntry failed', err);
+    return { success: false, error: actionErrorKey(err) };
+  }
+}
+
+/**
+ * Zieht den Fahrtenzähler am Einsatz nach.
+ *
+ * Für Einsätze aus der Zeit vor dem Zähler: Ihre Fahrten stehen im
+ * Fahrtenbuch, das Feld am Einsatz fehlt, und die Übersicht könnte sie nicht
+ * als erfasst zeigen. Aufgerufen wird das dort, wo die Fahrten dieses Einsatzes
+ * ohnehin geladen sind — auf der Einsatzseite.
+ *
+ * Die übergebene Anzahl wird bewusst nicht entgegengenommen: Gezählt wird
+ * serverseitig aus dem Bestand. Ein Client, der eine Zahl behaupten dürfte,
+ * könnte die Übersicht beliebig färben.
+ */
+export async function syncFirecallEntryCount(
+  groupId: string,
+  firecallId: string,
+): Promise<ActionResult> {
+  try {
+    await actionGroupMemberRequired(groupId);
+    await refreshFirecallEntryCount(groupId, firecallId);
+    return { success: true };
+  } catch (err) {
+    console.error('syncFirecallEntryCount failed', err);
     return { success: false, error: actionErrorKey(err) };
   }
 }
@@ -288,13 +507,8 @@ async function vehiclesWithEntryForFirecall(
   groupId: string,
   firecallId: string,
 ): Promise<Set<string>> {
-  const snapshot = await entriesRef(groupId)
-    .where('firecallId', '==', firecallId)
-    .where('deleted', '==', false)
-    .get();
-  return new Set(
-    snapshot.docs.map((doc) => (doc.data() as FahrtenbuchEntry).vehicleId),
-  );
+  const entries = await entriesForFirecall(groupId, firecallId);
+  return new Set(entries.map((entry) => entry.vehicleId));
 }
 
 /** Legt mehrere Einträge an — die Sammelerfassung im Einsatz. */
@@ -381,6 +595,7 @@ export async function createFahrtenbuchEntries(
     let distanceSource: 'route' | 'estimate' | undefined;
     const failedVehicleIds: string[] = [];
     const writtenVehicleIds = new Set<string>();
+    const writtenFirecallIds = new Set<string>();
     for (const input of accepted) {
       const vehicle = vehicles.get(input.vehicleId)!;
       const distance = input.firecallId ? distances.get(input.firecallId) : undefined;
@@ -415,6 +630,7 @@ export async function createFahrtenbuchEntries(
         batch.set(entriesRef(groupId).doc(), doc);
         created += 1;
         writtenVehicleIds.add(input.vehicleId);
+        if (doc.firecallId) writtenFirecallIds.add(doc.firecallId);
         // Nur melden, wenn die Strecke auch in einen Zählerstand eingegangen
         // ist. Sonst behauptete die Oberfläche „20 km je Fahrzeug", obwohl nur
         // ein Boot gespeichert wurde oder alle Fahrer ihren Endstand selbst
@@ -439,6 +655,9 @@ export async function createFahrtenbuchEntries(
       await batch.commit();
       for (const id of writtenVehicleIds) {
         await refreshVehicleCache(groupId, id);
+      }
+      for (const id of writtenFirecallIds) {
+        await refreshFirecallEntryCount(groupId, id);
       }
     }
     return {
@@ -688,6 +907,7 @@ export async function updateFahrtenbuchEntry(
   groupId: string,
   entryId: string,
   input: FahrtenbuchEntryInput,
+  options: EntryWriteOptions = {},
 ): Promise<ActionResult> {
   try {
     const session = await actionGroupMemberRequired(groupId);
@@ -739,6 +959,21 @@ export async function updateFahrtenbuchEntry(
       },
     );
 
+    // Eine Bearbeitung kann eine Fahrt in eine schon belegte
+    // Einsatz/Fahrzeug-Kombination hineinschieben — auch das ist ein Duplikat.
+    if (
+      rebuilt.firecallId &&
+      !options.confirmDuplicate &&
+      (await hasEntryForFirecallVehicle(
+        groupId,
+        rebuilt.firecallId,
+        rebuilt.vehicleId,
+        entryId,
+      ))
+    ) {
+      return { success: false, error: 'duplicateFirecallEntry' };
+    }
+
     await entriesRef(groupId)
       .doc(entryId)
       .set(
@@ -749,6 +984,15 @@ export async function updateFahrtenbuchEntry(
     await refreshVehicleCache(groupId, input.vehicleId);
     if (existing.vehicleId !== input.vehicleId) {
       await refreshVehicleCache(groupId, existing.vehicleId);
+    }
+    // Beide Einsätze: Wird die Verknüpfung umgehängt oder entfernt, ist auch
+    // der Zähler des vorigen Einsatzes falsch geworden.
+    for (const firecallId of new Set(
+      [existing.firecallId, rebuilt.firecallId].filter(
+        (id): id is string => !!id,
+      ),
+    )) {
+      await refreshFirecallEntryCount(groupId, firecallId);
     }
     return { success: true, id: entryId };
   } catch (err) {
@@ -784,6 +1028,9 @@ export async function deleteFahrtenbuchEntry(
       updatedBy: session.user.id,
     });
     await refreshVehicleCache(groupId, existing.vehicleId);
+    if (existing.firecallId) {
+      await refreshFirecallEntryCount(groupId, existing.firecallId);
+    }
     return { success: true, id: entryId };
   } catch (err) {
     console.error('deleteFahrtenbuchEntry failed', err);
@@ -799,10 +1046,22 @@ export async function deleteFahrtenbuchEntry(
 export async function createFahrtenbuchEntryViaShareLink(
   token: string,
   input: FahrtenbuchEntryInput,
+  options: EntryWriteOptions = {},
 ): Promise<ActionResult> {
   try {
     const link = await resolveFahrtenbuchShareLink(token);
     const vehicle = await loadVehicle(link.groupId, input.vehicleId);
+
+    // Die Gastseite bietet die letzten Einsätze der Gruppe an — der genannte
+    // muss aber zu *dieser* Gruppe gehören, und sein Name kommt aus dem
+    // Dokument, nicht aus der Anfrage.
+    const firecallId =
+      input.zweck === 'einsatz' && input.firecallId
+        ? input.firecallId
+        : undefined;
+    const firecallName = firecallId
+      ? await resolveFirecallForGroup(link.groupId, firecallId)
+      : undefined;
 
     // Kein Benutzer dahinter: Das Präfix macht die Herkunft im Eintrag
     // sichtbar und sperrt gleichzeitig `canModifyEntry` für alle außer
@@ -817,17 +1076,25 @@ export async function createFahrtenbuchEntryViaShareLink(
 
     const doc = buildEntryDocument(
       vehicle,
-      {
-        ...input,
-        // Die Gastseite lädt keine Einsätze. Ein mitgeschickter Einsatzbezug
-        // wäre untergeschoben, also wird er hier verworfen und nicht bloß
-        // clientseitig weggelassen.
-        firecallId: undefined,
-        firecallName: undefined,
-      },
+      { ...input, firecallId, firecallName },
       link.groupId,
       actor,
     );
+
+    // Derselbe Riegel wie im angemeldeten Dialog. Hier wiegt er schwerer: Der
+    // Gast sieht die Fahrten der Gruppe nicht und kann ein Duplikat vorher
+    // nicht erkennen — die Meldung der Action ist seine einzige Warnung.
+    if (
+      doc.firecallId &&
+      !options.confirmDuplicate &&
+      (await hasEntryForFirecallVehicle(
+        link.groupId,
+        doc.firecallId,
+        doc.vehicleId,
+      ))
+    ) {
+      return { success: false, error: 'duplicateFirecallEntry' };
+    }
 
     const ref = await entriesRef(link.groupId).add(doc);
     await refreshVehicleCache(link.groupId, input.vehicleId);
@@ -837,6 +1104,9 @@ export async function createFahrtenbuchEntryViaShareLink(
     // dem Namen kein angemeldetes Mitglied steht.
     await createMangelIfReported(link.groupId, ref.id, doc, vehicle, actor);
     await notifyMangelIfReported(link.groupId, doc, vehicle);
+    if (doc.firecallId) {
+      await refreshFirecallEntryCount(link.groupId, doc.firecallId);
+    }
     return { success: true, id: ref.id };
   } catch (err) {
     console.error('createFahrtenbuchEntryViaShareLink failed', err);

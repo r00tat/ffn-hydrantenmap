@@ -39,6 +39,9 @@ beforeEach(() => {
 
 // `fahrtenbuchActions` ist 'use server'/'server-only' und lässt sich im Test
 // nicht laden — der Eintrags-Dialog zieht das Modul mit herein.
+vi.mock('../../hooks/useFirecall', () => ({
+  useFirecallId: () => 'unknown',
+}));
 vi.mock('./fahrtenbuchActions', () => ({
   createFahrtenbuchEntry: vi.fn().mockResolvedValue({ success: true }),
   updateFahrtenbuchEntry: vi.fn().mockResolvedValue({ success: true }),

@@ -54,6 +54,16 @@ Das Paket `typescript` bleibt bewusst bei **6.x**, weil `typescript@7` unter `.`
 - `next build` löst `typescript/package.json` auf und nutzt dessen `bin.tsc`, prüft also
   weiterhin mit TS 6.
 
+**Neue i18n-Schlüssel brauchen einen frischen `tsconfig.tsbuildinfo`.** Die
+Message-Typen kommen über `src/global.d.ts` aus `messages/de.json`; TS 7
+invalidiert seinen inkrementellen Cache bei einer Änderung an der JSON aber
+nicht. `npm run typecheck` meldet den eben ergänzten Schlüssel dann weiter als
+„not assignable to parameter of type NamespacedMessageKeys". Abhilfe:
+
+```bash
+rm -f tsconfig.tsbuildinfo && npm run typecheck
+```
+
 Sobald typescript-eslint auf der TS-7.1-API aufsetzt: `typescript` auf `^7` ziehen und den
 `typescript7`-Alias samt `typecheck`-Pfad entfernen.
 
@@ -884,6 +894,198 @@ aufgerufen nach jeder Mutation an einer **Fahrt oder einem Mangel**.
 - **`undefined` heißt „nie geschrieben", nicht „nein".** Fahrzeuge, deren Cache
   älter ist als ein Feld, fallen auf die Ableitung aus den geladenen Fahrten
   und Mängeln zurück; ein gecachtes `null`/`false`/`0` tut das nicht.
+
+## Einsatzbezug hinter dem Freigabe-Link
+
+Das Gastformular hinter `/fahrtenbuch/teilen/<token>` bietet die letzten
+Einsätze der Gruppe an (`SHARE_LINK_FIRECALL_LIMIT`, 10) und belegt einen neuen
+Eintrag mit dem neuesten vor. Wer den QR-Code am Fahrzeug nutzt, trägt fast
+immer die Fahrt zum laufenden Einsatz ein; einen „aktiven" Einsatz gibt es dort
+nicht, den kennt nur die angemeldete App.
+
+Vorher verwarf `createFahrtenbuchEntryViaShareLink` jeden mitgeschickten
+Einsatzbezug. Das war richtig, solange die Seite keine Einsätze kannte — jetzt
+kennt sie welche, und an die Stelle der Verwerfung tritt eine Prüfung:
+
+- **Der Name kommt aus dem Einsatz-Dokument, nicht aus der Anfrage**
+  (`resolveFirecallForGroup`). Hinter dem Formular steht niemand, dessen Eingabe
+  man zurechnen könnte; ein frei gesetzter Einsatzname wäre unkontrollierter
+  Fremdinhalt in einem Nachweisdokument.
+- **Der Einsatz muss zu der Gruppe des Links gehören** und darf nicht gelöscht
+  sein, sonst `firecallInvalid`. Abgelehnt statt still verworfen: Der Gast hat
+  aus einer Liste gewählt, die diese Seite geliefert hat — bliebe die Fahrt
+  stumm ohne Einsatz, hielte er sie für verknüpft.
+- **Herausgegeben wird nur Name, Alarmierung und Abrücken**
+  (`toShareLinkFirecall`). Koordinaten, Beschreibung und Alarm-IDen haben hinter
+  einem anmeldefreien Link nichts zu suchen. Die Zeiten sind der Grund, dass die
+  Auswahl überhaupt etwas spart — sie belegen Abfahrt und Ankunft vor.
+- **Die Duplikatsprüfung gilt hier auch**, und sie wiegt schwerer: Der Gast sieht
+  die Fahrten der Gruppe nicht und kann ein Duplikat vorher nicht erkennen. Die
+  Antwort der Action ist seine einzige Warnung, deshalb muss sie einen Weg nach
+  vorne lassen — `serverDuplicateKey` in
+  [useEntryFormState.ts](src/components/Fahrtenbuch/useEntryFormState.ts) merkt
+  ein serverseitig gemeldetes Duplikat an der Einsatz/Fahrzeug-Kombination und
+  zeigt dieselbe Bestätigung wie im Dialog. Am Schlüssel und nicht an einer
+  Eintrags-ID, weil der Browser den bestehenden Eintrag hier nie gesehen hat.
+
+## Namen in der Besatzung
+
+Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne
+Personenliste des Fahrtenbuchs führt sie als „Vorname Nachname". Beides
+nebeneinander zu zeigen ließ dieselbe Person zweimal auftreten — und war eine
+der Ursachen doppelter Fahrtenbuch-Einträge (#705).
+
+- **`personDisplayName`** ([common/fahrtenbuch.ts](src/common/fahrtenbuch.ts))
+  zeigt einen Namen in der Schreibweise der Personenliste, sobald er dort
+  **eindeutig** trifft (Vergleich über `normalizePersonName`). Ohne Treffer oder
+  bei zwei Treffern bleibt der Name, wie er kam: Vor- und Nachname aus einer
+  beliebigen Zeichenkette selbst zu erkennen geht nicht verlässlich — „Anna
+  Maria Berger" und „Berger Anna Maria" sind von außen nicht zu unterscheiden.
+- **Nur die Anzeige.** `displayAssignments` in
+  [CrewAssignmentBoard.tsx](src/components/pages/CrewAssignmentBoard.tsx) legt
+  den Namen über die gefilterten Einträge; in Firestore bleibt der gemeldete
+  Name stehen, und alle Schreibvorgänge gehen weiter über `id`/`recipientId`.
+- **Die Auswahl „Weitere Person hinzufügen" speist sich aus zwei Quellen:** den
+  Alarm-Empfängern, die nicht zugesagt haben, und der Personenliste der Gruppe.
+  Letztere ist der Grund, dass die Auswahl auch bei einem Einsatz ohne Alarm
+  Namen anbietet — oder für jemanden, der gar kein BlaulichtSMS hat.
+- **Entdoppelt wird über `normalizePersonName`**, nicht über den rohen Namen,
+  sonst stünde derselbe Mensch in gedrehter Schreibweise zweimal in der Liste.
+  Der Alarm-Empfänger hat Vorrang: Über ihn ist die Person eindeutig
+  identifiziert, über den Namen nur wahrscheinlich.
+- **Eine Person aus der Liste entsteht als Eintrag von Hand** — sie hat keine
+  Empfänger-ID. Weil dabei die gepflegte Schreibweise übernommen wird, findet
+  `resolveDriver` sie über den Namensvergleich wieder.
+- **Ein getippter Name geht denselben Weg**, wenn er eine angebotene Person
+  trifft — verglichen wieder über `normalizePersonName`, damit „Berger Anna"
+  auch „Anna Berger" trifft. Auswahl und Enter auf freiem Text laufen dazu
+  durch dasselbe `handleAddPerson`; ein eigener Enter-Handler am Eingabefeld
+  lief zusätzlich zur Auswahl von MUI und legte den halb getippten Namen als
+  zweite Person an (#712).
+
+## Doppelte Fahrten zu einem Einsatz
+
+Die Fahrten eines Einsatzes entstehen von zwei Seiten: über die Sammelerfassung
+auf der Einsatzseite und über den Fahrtenbuch-Dialog. Trug jemand alle Fahrten
+ein und der Fahrer später seine eigene noch einmal, stand dieselbe Fahrt zweimal
+im Fahrtenbuch — mit doppelten Kilometern und dadurch falschen Zählerständen für
+alle folgenden Fahrten.
+
+**Duplikat heißt Einsatz + Fahrzeug.** Pro Einsatz fährt ein Fahrzeug einmal;
+mehrere Fahrzeuge und mehrere Fahrer je Fahrzeug bleiben unberührt. Die
+Erkennung sitzt in `findEntryForFirecallVehicle`
+([common/fahrtenbuch.ts](src/common/fahrtenbuch.ts)) und wird von beiden Seiten
+benutzt.
+
+- **Die Schranke steht in der Action**, nicht im Dialog:
+  `createFahrtenbuchEntry` und `updateFahrtenbuchEntry` lehnen mit
+  `duplicateFirecallEntry` ab, solange `confirmDuplicate` fehlt. Zwei Geräte
+  können dieselbe Fahrt gleichzeitig offen haben. Geprüft wird gegen
+  `doc.firecallId` und nicht gegen die Eingabe — ob die Verknüpfung am Dokument
+  landet, entscheidet `buildEntryDocument` über den Zweck, und nur was
+  gespeichert wird, kann ein Duplikat sein.
+- **Bestätigen bleibt möglich.** Es gibt Einsätze, bei denen ein Fahrzeug
+  tatsächlich zweimal ausfährt. Bestätigt wird im Formular *diese eine* Fahrt
+  (`confirmedDuplicateId` in [useEntryFormState.ts](src/components/Fahrtenbuch/useEntryFormState.ts)),
+  nicht das Formular — wechselt die Auswahl, ist die Bestätigung hinfällig.
+- **Die Zeitüberschneidung ist nur eine Warnung.** `overlappingVehicleEntries`
+  findet zwei Fahrten desselben Fahrzeugs mit überlappendem Zeitraum, also auch
+  das Duplikat einer Fahrt **ohne** Einsatzverknüpfung — etwa aus dem
+  Gastformular hinter einem Freigabe-Link, das den Einsatzbezug gar nicht
+  mitschickt. Kein Riegel: Zeiten sind im Einsatz oft geschätzt. Berührende
+  Zeiträume zählen nicht, das sind zwei aufeinanderfolgende Fahrten.
+- **Der Einsatz kommt im Formular hinter dem Zweck und vor dem Ziel** — vorher
+  stand er hinter dem Ziel und blieb deshalb meist leer. Gezeigt wird er nur
+  beim Zweck `einsatz`: Eine Übung oder eine Versorgungsfahrt gehört zu keinem
+  Einsatz, und `submit` verwirft die Verknüpfung dort ohnehin. Die Auswahl setzt
+  den Zweck mit auf `einsatz` — das braucht die Vorbelegung, die greift, während
+  der Zweck noch auf `sonstiges` steht. Umgekehrt räumt `changeZweck` die
+  Verknüpfung: Was im Feld steht, muss dem entsprechen, was gespeichert wird.
+- **Hinter dem Zweck steht immer genau ein Feld:** das Einsatzfeld beim Zweck
+  `einsatz`, sonst die Fahrtstrecke. Der Zweck hat dafür eine eigene Zeile.
+  Vorher teilte er sie mit dem Ziel und das Einsatzfeld nahm eine ganze — das
+  Formular sprang bei jedem Wechsel des Zwecks um. Ohne verknüpften Einsatz
+  steht das Einsatzfeld für die Fahrtstrecke und trägt deshalb auch die Meldung
+  `zielMissing`; sie an ein Feld zu hängen, das gerade nicht da ist, hätte
+  niemandem geholfen.
+- **Das Einsatzfeld hält ausschließlich verknüpfte Einsätze.** Getippter Text
+  wandert beim Verlassen des Feldes in die Fahrtstrecke
+  (`commitFirecallInput`) — nicht während des Tippens, weil daraus noch eine
+  Auswahl werden kann. Im Feld bleibt er stehen: Beim Zweck `einsatz` ist es das
+  einzige Feld dieser Zeile, geräumt wäre die Eingabe für den Benutzer
+  verschwunden, obwohl sie gespeichert wird. Hinter einem getippten Namen steht kein Einsatz: kein
+  Ort, keine Zeiten, keine Duplikatserkennung. Als zweites Namensfeld daneben
+  wäre er nur eine weitere Stelle, an der dasselbe stehen kann; als Ziel ist er
+  dort, wo Liste, Export und Wochenbericht ihn ohnehin lesen
+  (`entry.ziel?.trim() || entry.firecallName`). `firecallName` trägt damit nur
+  noch den Namen des verknüpften Einsatzes, und `firecallInput` ist der eigene
+  Zustand des Eingabefeldes. Ein Hinweis nennt den fehlenden Bezug, wenn beim
+  Zweck `einsatz` keiner verknüpft ist.
+- **Ein neuer Eintrag ist mit dem aktiven Einsatz vorbelegt** — sonst dem
+  neuesten der Gruppe (`defaultFirecallOption`). Damit sind Zweck, Einsatz und
+  Fahrstrecke schon gesetzt: Die Fahrt zum laufenden Einsatz ist der Regelfall,
+  und der verknüpfte Einsatz benennt das Ziel selbst. Den aktiven Einsatz liest
+  `FahrtenbuchDialog` über `useFirecallId` — nicht `useEntryFormState`, denn das
+  Gastformular hinter einem Freigabe-Link läuft ohne diesen Kontext und belegt
+  deshalb nichts vor. Angewandt wird die Vorbelegung als Effekt und nicht als
+  Anfangswert des Zustands, weil die Einsatzliste ein Firestore-Snapshot ist und
+  beim ersten Rendern leer sein kann; ein `defaultAppliedRef` sorgt dafür, dass
+  eine absichtlich geräumte Auswahl beim nächsten Snapshot nicht zurückkommt.
+  Beim Bearbeiten gilt ausschließlich der Eintrag — eine Übungsfahrt
+  nachträglich einem Einsatz zuzuordnen wäre eine stille Änderung am
+  Nachweisdokument. In Tests schaltet `firecalls: []` die Vorbelegung ab, ohne
+  die Auswahl ganz zu entfernen.
+- **Das Einsatz-Autocomplete braucht `getOptionKey`.** MUI nimmt sonst das Label
+  als React-Key, und „G1 Ölspur" gibt es jedes Jahr mehrfach — React verwarf
+  dann einen der beiden Listeneinträge.
+- **Fahrer und Zusatzfahrer sind in der Sammelerfassung Autocompletes** über
+  die Personen der Gruppe. Vorher war der Fahrer ein reines Textfeld: Der
+  Maschinist war vorbelegt, aber wer ihn korrigieren musste, tippte den Namen
+  neu und verlor die Verknüpfung zur Person — und damit ihren Anteil in der
+  Fahrerstatistik. Name und `driverId` werden immer gemeinsam gesetzt.
+- **Jede Zeile hat einen eigenen Speichern-Knopf.** Er ruft dasselbe `save()`
+  wie „Alle speichern", nur mit einer Auswahl — ein zweiter Pfad würde bei der
+  Duplikatserkennung oder der Kilometerlogik auseinanderlaufen. `saving` sperrt
+  weiter alle Knöpfe, `savingKey` sagt nur, an welchem der Spinner steht.
+- **„Fahrtstrecke berechnen" im Eintrags-Dialog** holt über
+  `firecallRoundTripDistance` dieselbe Strecke, die sich die Sammelerfassung
+  beim Speichern selbst holt — samt Routen-Cache am Einsatz, der Knopf kostet
+  also ab dem zweiten Fahrzeug keinen API-Aufruf mehr. `applyRoundTripToKmCounters`
+  **überschreibt** dabei einen eingetragenen Endstand und lässt alle anderen
+  Zähler in Ruhe; das ist die Wirkung eines Knopfdrucks, nicht die einer
+  Vorbelegung (dafür `autoFillCounterEnds`). Ohne verknüpften Einsatz gibt es
+  den Knopf nicht — hinter einem frei eingetippten Namen stehen keine
+  Koordinaten. Die Action steckt im Dialog und nicht in `useEntryFormState`,
+  damit das Gastformular ohne sie auskommt.
+- **`fahrtenbuchEntryCount` am Einsatz** trägt die Anzeige in der
+  Einsatz-Übersicht ([Einsaetze.tsx](src/components/pages/Einsaetze.tsx)).
+  Denormalisiert wie der Routen-Cache `fahrtenbuchRoute` und aus demselben
+  Grund: Die Übersicht zeigt alle Einsätze der Gruppe auf einmal, eine Abfrage
+  je Karte wären dutzende Listener. Gezählt wird bei jedem Schreibvorgang neu
+  aus dem Bestand statt hoch- und heruntergezählt; ein Zähler, der driftet, wäre
+  schlimmer als keiner. Nur die Anzahl, keine Fahrzeug- oder Fahrernamen — das
+  Einsatz-Dokument liest jedes Gruppenmitglied, das Fahrtenbuch nur wer dort
+  Mitglied ist. Ein Fehler beim Schreiben bleibt beim Zähler und nimmt die
+  erfasste Fahrt nicht mit.
+- **Angezeigt wird nur der positive Fall.** Ein Einsatz ohne das Feld heißt
+  „nichts bekannt", nicht „keine Fahrten": Für Einsätze von vor der Zählung
+  wäre „0 Fahrten" eine falsche Aussage in genau die Richtung, die Duplikate
+  erzeugt. Nachgezogen wird der Zähler über `syncFirecallEntryCount`, sobald
+  jemand die Einsatzseite öffnet — dort sind die Fahrten dieses Einsatzes
+  ohnehin geladen. Die Anzahl aus dem Browser ist nur der Anlass, gezählt wird
+  serverseitig.
+- **Das Feld „Fahrtstrecke / Ziel" entfällt bei verknüpftem Einsatz** — der
+  Einsatz benennt das Ziel selbst. Ausgeblendet heißt dabei nicht bloß
+  versteckt: `submit` schickt `ziel` dann leer mit, sonst wirkte ein Text von
+  vor der Auswahl weiter, den niemand mehr sieht. Liste, Export und
+  Wochenbericht fallen ohnehin auf `firecallName` zurück
+  (`entry.ziel?.trim() || entry.firecallName`). Ohne Verknüpfung bleibt das Feld
+  Pflicht — dort stünde die Fahrt sonst ohne Angabe da, wohin sie ging. Die
+  Sammelerfassung schreibt weiterhin den Einsatznamen ins `ziel`
+  (`entryInputsFromRows`); beide Formen zeigen dasselbe an.
+- **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
+  `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
+  markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
 
 ## Mangel-Bilder
 

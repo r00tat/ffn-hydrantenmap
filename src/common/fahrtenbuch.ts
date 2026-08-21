@@ -204,7 +204,7 @@ export function driverIdentities(ref: { id?: string; name: string }): string[] {
   const tokens: string[] = [];
   const id = ref.id?.trim();
   if (id) tokens.push(`id:${id}`);
-  const normalized = normalizeName(ref.name ?? '');
+  const normalized = normalizePersonName(ref.name ?? '');
   if (normalized) tokens.push(`name:${normalized}`);
   return tokens;
 }
@@ -589,6 +589,55 @@ export function normalizeName(name: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/**
+ * Der Name eines Menschen für den Vergleich — normalisiert **und** die
+ * Namensteile sortiert.
+ *
+ * BlaulichtSMS liefert die Personen als „Nachname Vorname" und in dieser Form
+ * gehen sie auch nach SYBOS; die interne Personenliste des Fahrtenbuchs führt
+ * sie als „Vorname Nachname". Ohne Sortierung träfe der Namensvergleich nicht,
+ * dieselbe Person stünde im Fahrtenbuch in zwei Varianten und Fahrerstatistik
+ * wie geteilte Anteile liefen auseinander (#705).
+ *
+ * Dass damit „Klaus Peter" und „Peter Klaus" zusammenfallen, ist in Kauf
+ * genommen: Wo daraus eine Verknüpfung entstehen würde, verlangt die
+ * aufrufende Stelle Eindeutigkeit (`resolveDriver`) und lässt einen zweiten
+ * Treffer als Freitext stehen.
+ *
+ * Nicht für Fahrzeuge — dort ist die Reihenfolge Teil des Namens.
+ */
+export function normalizePersonName(name: string): string {
+  const normalized = normalizeName(name);
+  if (!normalized) return '';
+  return normalized.split(' ').sort().join(' ');
+}
+
+/**
+ * Der Name eines Menschen in der Schreibweise der internen Personenliste.
+ *
+ * Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", gepflegt sind
+ * sie als „Vorname Nachname". Wo ein Name eindeutig auf eine Person trifft,
+ * wird deren Schreibweise gezeigt — dieselbe Person soll in der Anwendung
+ * nicht in zwei Varianten auftauchen.
+ *
+ * Nicht geraten wird: Ohne Treffer bleibt der Name, wie er kam. Vor- und
+ * Nachname aus einer beliebigen Zeichenkette selbst zu erkennen geht nicht
+ * verlässlich — „Anna Maria Berger" und „Berger Anna Maria" sind von außen
+ * nicht zu unterscheiden. Zwei Treffer bleiben ebenfalls unverändert; dann
+ * wäre offen, wessen Schreibweise gilt.
+ */
+export function personDisplayName(
+  name: string,
+  persons: { name: string }[],
+): string {
+  const normalized = normalizePersonName(name);
+  if (!normalized) return name;
+  const matches = persons.filter(
+    (p) => normalizePersonName(p.name) === normalized,
+  );
+  return matches.length === 1 ? matches[0].name : name;
+}
+
 export function matchVehicleByName(
   vehicles: FahrtenbuchVehicle[],
   name: string,
@@ -598,14 +647,68 @@ export function matchVehicleByName(
   return vehicles.find((v) => normalizeName(v.name) === normalized);
 }
 
+/**
+ * Die schon erfasste Fahrt dieses Fahrzeugs zu diesem Einsatz — der
+ * Duplikatsfall. Pro Einsatz fährt ein Fahrzeug einmal; eine zweite Fahrt
+ * derselben Kombination verdoppelt die Kilometer und verschiebt damit alle
+ * folgenden Zählerstände.
+ *
+ * `excludeEntryId` ist die bearbeitete Fahrt selbst: Ohne sie meldete jede
+ * Bearbeitung ihr eigenes Dokument als Duplikat.
+ */
 export function findEntryForFirecallVehicle(
   entries: FahrtenbuchEntry[],
   firecallId: string,
   vehicleId: string,
+  excludeEntryId?: string,
 ): FahrtenbuchEntry | undefined {
   return entries.find(
-    (e) => !e.deleted && e.firecallId === firecallId && e.vehicleId === vehicleId,
+    (e) =>
+      !e.deleted &&
+      e.firecallId === firecallId &&
+      e.vehicleId === vehicleId &&
+      (!excludeEntryId || e.id !== excludeEntryId),
   );
+}
+
+export interface VehicleTimeRange {
+  vehicleId: string;
+  /** ISO-Zeitstempel. */
+  abfahrt: string;
+  /** ISO-Zeitstempel. */
+  ankunft: string;
+  /** Die bearbeitete Fahrt selbst. */
+  excludeEntryId?: string;
+}
+
+/**
+ * Fahrten desselben Fahrzeugs, deren Zeitraum sich mit dem übergebenen
+ * überschneidet. Ein Fahrzeug kann nicht zweimal gleichzeitig unterwegs sein —
+ * die Überschneidung findet ein Duplikat auch dann, wenn keine Seite einen
+ * Einsatz verknüpft hat (etwa eine Fahrt aus dem Gastformular hinter einem
+ * Freigabe-Link, das den Einsatzbezug gar nicht mitschickt).
+ *
+ * Berührende Zeiträume zählen nicht: Ankunft und nächste Abfahrt auf derselben
+ * Minute sind zwei aufeinanderfolgende Fahrten, keine doppelte.
+ *
+ * Unlesbare Zeitstempel ergeben keinen Treffer. Der Aufrufer zeigt daraus einen
+ * Hinweis, und ein Hinweis auf Basis eines kaputten Datums wäre nur Rauschen.
+ */
+export function overlappingVehicleEntries(
+  entries: FahrtenbuchEntry[],
+  range: VehicleTimeRange,
+): FahrtenbuchEntry[] {
+  const start = Date.parse(range.abfahrt);
+  const end = Date.parse(range.ankunft);
+  if (Number.isNaN(start) || Number.isNaN(end)) return [];
+  return entries.filter((e) => {
+    if (e.deleted || e.vehicleId !== range.vehicleId) return false;
+    if (range.excludeEntryId && e.id === range.excludeEntryId) return false;
+    const otherStart = Date.parse(e.abfahrt ?? '');
+    const otherEnd = Date.parse(e.ankunft ?? '');
+    if (Number.isNaN(otherStart) || Number.isNaN(otherEnd)) return false;
+    return start < otherEnd && otherStart < end;
+  });
 }
 
 export function suggestPresetForVehicleName(name: string): VehiclePresetId {

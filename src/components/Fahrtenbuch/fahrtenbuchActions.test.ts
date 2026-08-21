@@ -159,6 +159,10 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
     vehicleSetMock.mockReset();
     refreshVehicleCacheMock.mockReset();
     entriesQueryGetMock.mockReset();
+    firecallGetMock.mockReset();
+    firecallSetMock.mockReset();
+    firecallGetMock.mockResolvedValue({ exists: false });
+    firecallSetMock.mockResolvedValue(undefined);
 
     resolveMock.mockResolvedValue({
       token: 'tok',
@@ -203,16 +207,109 @@ describe('createFahrtenbuchEntryViaShareLink', () => {
     expect(doc.deleted).toBe(false);
   });
 
-  it('schreibt keinen Einsatzbezug, auch wenn einer mitgeschickt wird', async () => {
+  it('nimmt den Namen des Einsatzes aus dem Dokument, nicht aus der Anfrage', async () => {
+    // Hinter dem Gastformular steht niemand, dessen Eingabe man zurechnen
+    // könnte — ein frei gesetzter Einsatzname wäre unkontrollierter Fremdinhalt
+    // in einem Nachweisdokument.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand Hauptplatz' }),
+    });
+
     await createFahrtenbuchEntryViaShareLink('tok', {
       ...input,
       zweck: 'einsatz',
+      firecallId: 'fc1',
+      firecallName: 'Untergeschoben',
+    });
+
+    const doc = addMock.mock.calls[0][0];
+    expect(doc.firecallId).toBe('fc1');
+    expect(doc.firecallName).toBe('Brand Hauptplatz');
+  });
+
+  it('lehnt einen Einsatz einer anderen Gruppe ab', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'andere', name: 'Fremder Einsatz' }),
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toEqual({ success: false, error: 'firecallInvalid' });
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt einen gelöschten Einsatz ab', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand', deleted: true }),
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toEqual({ success: false, error: 'firecallInvalid' });
+  });
+
+  it('verwirft den Einsatzbezug bei einem anderen Zweck', async () => {
+    await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
       firecallId: 'fc1',
       firecallName: 'Brand',
     });
     const doc = addMock.mock.calls[0][0];
     expect(doc).not.toHaveProperty('firecallId');
     expect(doc).not.toHaveProperty('firecallName');
+  });
+
+  it('lehnt eine zweite Fahrt desselben Fahrzeugs zum selben Einsatz ab', async () => {
+    // Der Gast sieht die Fahrten der Gruppe nicht und kann ein Duplikat vorher
+    // nicht erkennen — die Meldung der Action ist seine einzige Warnung.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand' }),
+    });
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [{ id: 'e1', data: () => ({ vehicleId: 'v1' }) }],
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink('tok', {
+      ...input,
+      zweck: 'einsatz',
+      firecallId: 'fc1',
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'duplicateFirecallEntry',
+    });
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('schreibt sie nach Bestätigung', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd', name: 'Brand' }),
+    });
+    entriesQueryGetMock.mockResolvedValue({
+      docs: [{ id: 'e1', data: () => ({ vehicleId: 'v1' }) }],
+    });
+
+    const result = await createFahrtenbuchEntryViaShareLink(
+      'tok',
+      { ...input, zweck: 'einsatz', firecallId: 'fc1' },
+      { confirmDuplicate: true },
+    );
+
+    expect(result).toMatchObject({ success: true });
   });
 
   it('frischt den Zähler-Cache des Fahrzeugs auf', async () => {
@@ -284,6 +381,16 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     counters: { km: { start: 1000 } },
     ...overrides,
   });
+
+  /**
+   * Nur die Schreibvorgänge am Einsatz, die den Routen-Cache betreffen. An
+   * dasselbe Dokument geht auch der Fahrtenzähler; ohne die Trennung prüften
+   * die Cache-Tests bloß, dass überhaupt nichts geschrieben wurde.
+   */
+  const routeWrites = () =>
+    firecallSetMock.mock.calls.filter(
+      ([data]) => (data as Record<string, unknown>)?.fahrtenbuchRoute,
+    );
 
   beforeEach(() => {
     actionUserRequiredMock.mockReset();
@@ -374,7 +481,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
     const result = await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
 
     expect(routeMock).not.toHaveBeenCalled();
-    expect(firecallSetMock).not.toHaveBeenCalled();
+    expect(routeWrites()).toEqual([]);
     expect(result.success).toBe(true);
     expect(result.created).toBe(1);
     // 4 km Hinweg + 6 km Rückweg aus dem Cache -> 10 km.
@@ -475,7 +582,7 @@ describe('createFahrtenbuchEntries — Route zum Einsatzort', () => {
 
     await createFahrtenbuchEntries('ffnd', [einsatzEntry('v1')]);
 
-    expect(firecallSetMock).not.toHaveBeenCalled();
+    expect(routeWrites()).toEqual([]);
   });
 
   it('meldet keine Gesamtstrecke, wenn alle Endstände von Hand eingetragen wurden', async () => {
@@ -1207,5 +1314,219 @@ describe('Mangel aus einer Fahrt', () => {
 
     expect(result).toMatchObject({ success: true, created: 1 });
     expect(createMangelForEntryMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Duplikat: dieselbe Fahrt zweimal zu einem Einsatz', () => {
+  const einsatzInput = {
+    ...input,
+    zweck: 'einsatz' as const,
+    firecallId: 'f1',
+    firecallName: 'Brand Hauptplatz',
+  };
+
+  beforeEach(() => {
+    actionUserRequiredMock.mockReset();
+    vehicleGetMock.mockReset();
+    vehicleSetMock.mockReset();
+    entriesQueryGetMock.mockReset();
+    latestEntryGetMock.mockReset();
+    entryDocGetMock.mockReset();
+    entryDocSetMock.mockReset();
+    firecallGetMock.mockReset();
+    firecallSetMock.mockReset();
+    addMock.mockReset();
+    notifyMangelMock.mockReset();
+    createMangelForEntryMock.mockReset();
+
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    latestEntryGetMock.mockResolvedValue({ docs: [] });
+    addMock.mockResolvedValue({ id: 'e2' });
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd' }),
+    });
+    firecallSetMock.mockResolvedValue(undefined);
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+  });
+
+  /** Ein bestehender Eintrag desselben Einsatzes, wie ihn die Abfrage liefert. */
+  const existingForFirecall = (id: string, vehicleId: string) => ({
+    docs: [{ id, data: () => ({ vehicleId, firecallId: 'f1', deleted: false }) }],
+  });
+
+  it('lehnt eine zweite Fahrt desselben Fahrzeugs zum selben Einsatz ab', async () => {
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e1', 'v1'));
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'duplicateFirecallEntry',
+    });
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('schreibt sie nach ausdrücklicher Bestätigung', async () => {
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e1', 'v1'));
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput, {
+      confirmDuplicate: true,
+    });
+
+    expect(result).toMatchObject({ success: true, id: 'e2' });
+    expect(addMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lässt ein anderes Fahrzeug zum selben Einsatz durch', async () => {
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e1', 'v9'));
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
+
+    expect(result).toMatchObject({ success: true });
+  });
+
+  it('prüft nicht ohne verknüpften Einsatz', async () => {
+    // Eine Übung trägt keine Einsatzverknüpfung — hier gibt es kein Duplikat
+    // in diesem Sinn, und eine Abfrage wäre überflüssig.
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e1', 'v1'));
+
+    const result = await createFahrtenbuchEntry('ffnd', input);
+
+    expect(result).toMatchObject({ success: true });
+  });
+
+  it('meldet beim Bearbeiten nicht die Fahrt selbst', async () => {
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        ...einsatzInput,
+        vehicleName: 'RLFA 2000',
+        group: 'ffnd',
+        deleted: false,
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+        createdAt: '2026-08-04T07:00:00.000Z',
+      }),
+    });
+    entryDocSetMock.mockResolvedValue(undefined);
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e1', 'v1'));
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', einsatzInput);
+
+    expect(result).toMatchObject({ success: true, id: 'e1' });
+  });
+
+  it('lehnt beim Bearbeiten ein Verschieben auf eine belegte Kombination ab', async () => {
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        ...einsatzInput,
+        vehicleName: 'RLFA 2000',
+        group: 'ffnd',
+        deleted: false,
+        createdBy: 'u1',
+        createdByName: 'Max Mustermann',
+        createdAt: '2026-08-04T07:00:00.000Z',
+      }),
+    });
+    entryDocSetMock.mockResolvedValue(undefined);
+    // Eine andere Fahrt belegt die Kombination schon.
+    entriesQueryGetMock.mockResolvedValue(existingForFirecall('e7', 'v1'));
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', einsatzInput);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'duplicateFirecallEntry',
+    });
+    expect(entryDocSetMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Fahrtenzähler am Einsatz', () => {
+  const einsatzInput = {
+    ...input,
+    zweck: 'einsatz' as const,
+    firecallId: 'f1',
+    firecallName: 'Brand Hauptplatz',
+  };
+
+  beforeEach(() => {
+    actionUserRequiredMock.mockReset();
+    vehicleGetMock.mockReset();
+    vehicleSetMock.mockReset();
+    entriesQueryGetMock.mockReset();
+    latestEntryGetMock.mockReset();
+    firecallGetMock.mockReset();
+    firecallSetMock.mockReset();
+    addMock.mockReset();
+    notifyMangelMock.mockReset();
+    createMangelForEntryMock.mockReset();
+
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    latestEntryGetMock.mockResolvedValue({ docs: [] });
+    addMock.mockResolvedValue({ id: 'e2' });
+    firecallSetMock.mockResolvedValue(undefined);
+  });
+
+  it('schreibt die Anzahl der Fahrten an den Einsatz', async () => {
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'ffnd' }),
+    });
+    // Erst der Duplikatscheck (leer), dann die Zählung nach dem Schreiben.
+    entriesQueryGetMock
+      .mockResolvedValueOnce({ docs: [] })
+      .mockResolvedValue({
+        docs: [
+          { id: 'e2', data: () => ({ vehicleId: 'v1' }) },
+          { id: 'e3', data: () => ({ vehicleId: 'v2' }) },
+        ],
+      });
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
+
+    expect(result).toMatchObject({ success: true });
+    expect(firecallSetMock).toHaveBeenCalledWith(
+      { fahrtenbuchEntryCount: 2 },
+      { merge: true },
+    );
+  });
+
+  it('schreibt nicht an einen Einsatz einer anderen Gruppe', async () => {
+    // Der Guard der Action prüft nur die eigene Gruppenmitgliedschaft, nicht
+    // wem der Einsatz gehört.
+    firecallGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ group: 'andere' }),
+    });
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
+
+    expect(result).toMatchObject({ success: true });
+    expect(firecallSetMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt die Fahrt stehen, wenn der Zähler nicht geschrieben werden kann', async () => {
+    // Der Zähler ist eine Anzeigehilfe. Ein Fehler dort darf die erfasste
+    // Fahrt nicht mitnehmen.
+    firecallGetMock.mockRejectedValue(new Error('Firestore weg'));
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+
+    const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
+
+    expect(result).toMatchObject({ success: true, id: 'e2' });
   });
 });

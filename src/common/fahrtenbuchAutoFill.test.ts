@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { VEHICLE_PRESETS, type CounterDefinition } from './fahrtenbuch';
 import {
+  applyRoundTripToKmCounters,
   autoFillCounterEnds,
   estimateRoundTripKm,
   estimatedDistance,
@@ -93,6 +94,38 @@ describe('isKmCounter', () => {
   it('lehnt Zähler ohne Kilometereinheit und reine Ablesungen ab', () => {
     expect(isKmCounter(boot[0])).toBe(false);
     expect(isKmCounter({ ...km[0], mode: 'reading' })).toBe(false);
+  });
+});
+
+describe('applyRoundTripToKmCounters', () => {
+  it('setzt den Endstand auf Start plus Gesamtstrecke', () => {
+    expect(
+      applyRoundTripToKmCounters(km, { km: { start: 1000 } }, ROUTE_24),
+    ).toEqual({ km: { start: 1000, end: 1024 } });
+  });
+
+  it('überschreibt einen vorhandenen Endstand', () => {
+    // Der Knopf „Fahrtstrecke berechnen" ist eine ausdrückliche Ansage, kein
+    // Vorbelegen — anders als `autoFillCounterEnds`.
+    expect(
+      applyRoundTripToKmCounters(
+        km,
+        { km: { start: 1000, end: 1005 } },
+        ROUTE_24,
+      ),
+    ).toEqual({ km: { start: 1000, end: 1024 } });
+  });
+
+  it('lässt andere Zähler unberührt', () => {
+    // Betriebsstunden haben mit der Wegstrecke nichts zu tun.
+    const counters = { betriebsstundenBb: { start: 20 } };
+    expect(applyRoundTripToKmCounters(boot, counters, ROUTE_24)).toEqual(
+      counters,
+    );
+  });
+
+  it('lässt den Zähler ohne Startstand, wie er ist', () => {
+    expect(applyRoundTripToKmCounters(km, {}, ROUTE_24)).toEqual({});
   });
 });
 

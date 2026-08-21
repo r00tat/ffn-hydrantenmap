@@ -11,8 +11,11 @@ import {
   isPropellant,
   isTimeOnlyTimestamp,
   findEntryForFirecallVehicle,
+  overlappingVehicleEntries,
   matchVehicleByName,
   normalizeName,
+  normalizePersonName,
+  personDisplayName,
   PROPELLANTS,
   referenceCounters,
   requiresDriver,
@@ -375,6 +378,71 @@ describe('isTimeOnlyTimestamp', () => {
   });
 });
 
+describe('normalizePersonName', () => {
+  it('vergleicht „Nachname Vorname" mit „Vorname Nachname"', () => {
+    // Aus BlaulichtSMS kommen die Personen als „Nachname Vorname", die interne
+    // Personenliste führt sie als „Vorname Nachname".
+    expect(normalizePersonName('Mustermann Max')).toBe(
+      normalizePersonName('Max Mustermann'),
+    );
+  });
+
+  it('normalisiert wie normalizeName', () => {
+    expect(normalizePersonName('  MAX   Mustermann-Huber ')).toBe(
+      normalizePersonName('mustermann huber max'),
+    );
+  });
+
+  it('unterscheidet verschiedene Namen weiterhin', () => {
+    expect(normalizePersonName('Max Mustermann')).not.toBe(
+      normalizePersonName('Maximilian Mustermann'),
+    );
+  });
+
+  it('bleibt leer bei leerer Eingabe', () => {
+    expect(normalizePersonName('   ')).toBe('');
+  });
+
+  it('behält doppelte Namensteile', () => {
+    expect(normalizePersonName('Max Max')).not.toBe(
+      normalizePersonName('Max'),
+    );
+  });
+});
+
+describe('personDisplayName', () => {
+  const persons = [{ name: 'Max Mustermann' }, { name: 'Anna Bauer' }];
+
+  it('dreht die Reihenfolge auf die der Personenliste', () => {
+    expect(personDisplayName('Mustermann Max', persons)).toBe('Max Mustermann');
+  });
+
+  it('vereinheitlicht auch Schreibweise und Leerzeichen', () => {
+    expect(personDisplayName('BAUER  anna', persons)).toBe('Anna Bauer');
+  });
+
+  it('lässt einen unbekannten Namen unverändert', () => {
+    // Vor- und Nachname aus einer beliebigen Zeichenkette selbst zu erkennen
+    // geht nicht verlässlich.
+    expect(personDisplayName('Berger Anna Maria', persons)).toBe(
+      'Berger Anna Maria',
+    );
+  });
+
+  it('lässt bei zwei Treffern den Namen stehen', () => {
+    expect(
+      personDisplayName('Mustermann Max', [
+        { name: 'Max Mustermann' },
+        { name: 'Mustermann Max' },
+      ]),
+    ).toBe('Mustermann Max');
+  });
+
+  it('lässt einen leeren Namen leer', () => {
+    expect(personDisplayName('', persons)).toBe('');
+  });
+});
+
 describe('normalizeName und matchVehicleByName', () => {
   it('normalisiert Groß-/Kleinschreibung, Sonderzeichen und Mehrfach-Leerzeichen', () => {
     expect(normalizeName('  RLFA-3000/100  ')).toBe(
@@ -421,6 +489,102 @@ describe('findEntryForFirecallVehicle', () => {
 
   it('ignoriert gelöschte Einträge', () => {
     expect(findEntryForFirecallVehicle(entries, 'f1', 'v2')).toBeUndefined();
+  });
+
+  it('lässt den bearbeiteten Eintrag selbst außen vor', () => {
+    // Sonst meldete die Bearbeitung einer Fahrt sie selbst als Duplikat.
+    expect(
+      findEntryForFirecallVehicle(entries, 'f1', 'v1', 'e1'),
+    ).toBeUndefined();
+  });
+});
+
+describe('overlappingVehicleEntries', () => {
+  const entry = (overrides: Partial<FahrtenbuchEntry>): FahrtenbuchEntry =>
+    ({
+      id: 'e1',
+      vehicleId: 'v1',
+      deleted: false,
+      abfahrt: '2026-08-03T10:00:00.000Z',
+      ankunft: '2026-08-03T12:00:00.000Z',
+      ...overrides,
+    }) as FahrtenbuchEntry;
+
+  const existing = [entry({})];
+
+  it('meldet eine überschneidende Fahrt desselben Fahrzeugs', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found.map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('meldet eine vollständig umschlossene Fahrt', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T09:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toHaveLength(1);
+  });
+
+  it('lässt eine anschließende Fahrt zu', () => {
+    // Ankunft und nächste Abfahrt auf derselben Minute ist der Normalfall
+    // zweier aufeinanderfolgender Fahrten, keine Überschneidung.
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T12:00:00.000Z',
+      ankunft: '2026-08-03T14:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('betrachtet nur dasselbe Fahrzeug', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v2',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('ignoriert gelöschte Fahrten', () => {
+    const found = overlappingVehicleEntries([entry({ deleted: true })], {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('lässt den bearbeiteten Eintrag selbst außen vor', () => {
+    const found = overlappingVehicleEntries(existing, {
+      vehicleId: 'v1',
+      abfahrt: '2026-08-03T11:00:00.000Z',
+      ankunft: '2026-08-03T13:00:00.000Z',
+      excludeEntryId: 'e1',
+    });
+    expect(found).toEqual([]);
+  });
+
+  it('bleibt still bei unlesbaren Zeiten', () => {
+    // Eine Warnung, die auf einem kaputten Zeitstempel beruht, wäre Rauschen.
+    expect(
+      overlappingVehicleEntries(existing, {
+        vehicleId: 'v1',
+        abfahrt: '',
+        ankunft: '',
+      }),
+    ).toEqual([]);
+    expect(
+      overlappingVehicleEntries([entry({ abfahrt: 'kaputt' })], {
+        vehicleId: 'v1',
+        abfahrt: '2026-08-03T11:00:00.000Z',
+        ankunft: '2026-08-03T13:00:00.000Z',
+      }),
+    ).toEqual([]);
   });
 });
 
