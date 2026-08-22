@@ -21,6 +21,15 @@ interface Leitungen {
     React.SetStateAction<MultiPointItem | undefined>
   >;
   complete: (positions: L.LatLng[]) => Promise<void>;
+  /**
+   * Die Dokument-ID der zuletzt gezeichneten Linie.
+   *
+   * Steht hier und wird nicht als Rückgabewert von `complete` gereicht: Wer sie
+   * braucht, ruft `complete` nicht selbst — das tut das Zeichenwerkzeug. Die
+   * Seite „Löschwasserversorgung" wählt damit die neu gezeichnete Leitung von
+   * selbst aus, statt sie in der Liste suchen zu lassen.
+   */
+  lastCreatedId?: string;
 }
 
 export const LeitungenContext = React.createContext<Leitungen>({
@@ -34,6 +43,7 @@ export interface LeitungsProviderProps {
 export const useLeitungsProvider = (): Leitungen => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [firecallItem, setFirecallItem] = useState<MultiPointItem>();
+  const [lastCreatedId, setLastCreatedId] = useState<string>();
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
 
@@ -67,6 +77,11 @@ export const useLeitungsProvider = (): Leitungen => {
           newItem
         );
 
+        // Gesetzt, bevor das Abgeleitete nachgezogen wird: Die Auswahl auf der
+        // Seite soll nicht auf Routing und Höhenprofil warten — der Rechner
+        // zeigt sie an, sobald sie da sind.
+        setLastCreatedId(docRef.id);
+
         // Eine neu gezeichnete Leitung bekommt Straßenverlauf und
         // Höhenprofil erst hier: Vorher gibt es keine Dokument-ID, unter der
         // sie gespeichert werden könnten.
@@ -79,7 +94,14 @@ export const useLeitungsProvider = (): Leitungen => {
     [email, firecallId, firecallItem]
   );
 
-  return { isDrawing, setIsDrawing, firecallItem, setFirecallItem, complete };
+  return {
+    isDrawing,
+    setIsDrawing,
+    firecallItem,
+    setFirecallItem,
+    complete,
+    lastCreatedId,
+  };
 };
 
 export const LeitungsProvider: FC<LeitungsProviderProps> = ({ children }) => {

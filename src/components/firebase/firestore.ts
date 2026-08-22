@@ -326,6 +326,35 @@ export interface Connection extends MultiPointItem {
   elevationFor?: string;
   /** `'true'`, wenn die Höhenabfrage für diese Signatur gescheitert ist. */
   elevationFailed?: string;
+
+  /**
+   * Welche Variante der Löschwasserversorgung der Rechner an dieser Leitung
+   * zeigt und zusammenfasst. Fehlt das Feld, gilt `'foerderung'` — der Stand
+   * vor #693. Siehe docs/pendelverkehr.md.
+   */
+  versorgungsart?: 'foerderung' | 'pendel' | 'vergleich';
+  /** Anzahl der pendelnden Tanklöschfahrzeuge. */
+  pendelFahrzeuge?: number;
+  /** Tankinhalt je Fahrzeug in l. */
+  pendelTankinhalt?: number;
+  /** Durchschnittsgeschwindigkeit der Einsatzfahrt in km/h. */
+  pendelGeschwindigkeit?: number;
+  /**
+   * Ergiebigkeit der Entnahmestelle in l/min.
+   *
+   * Ersetzt die frühere feste Füllzeit: Die war stillschweigend die Behauptung
+   * „500 l/min an jeder Entnahmestelle". Fehlt das Feld, gilt der Hydrant in
+   * 100 m Umkreis; gibt es auch den nicht, wird gefragt statt geraten.
+   */
+  pendelFuellleistung?: number;
+  /** An- und Abfahren an der Entnahmestelle in min. */
+  pendelRangierzeit?: number;
+  /** Entleerzeit an der Einsatzstelle in min. */
+  pendelEntleerzeit?: number;
+  /** Verlegeleistung einer B-Leitung in m/min — Planungswert für die Aufbauzeit. */
+  verlegeleistung?: number;
+  /** Rüstzeit je Pumpe in min — Planungswert für die Aufbauzeit. */
+  pumpenRuestzeit?: number;
 }
 
 export interface Area extends MultiPointItem {

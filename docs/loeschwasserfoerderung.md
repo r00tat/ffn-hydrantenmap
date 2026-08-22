@@ -375,4 +375,6 @@ die generische Feldliste.
 - Ableitung der Fördermenge aus den `rohr`-Items. 1000 l/min ist die normale
   Fördermenge; eine Ableitung bräuchte außerdem eine Regel, welches Rohr an
   welcher Leitung hängt.
-- Der Vergleich mit dem Pendelverkehr (#693).
+- Der Vergleich mit dem Pendelverkehr steht in
+  [docs/pendelverkehr.md](pendelverkehr.md) — er hängt an derselben Leitung und
+  wird im selben Panel gerechnet.

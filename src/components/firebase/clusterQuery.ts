@@ -6,7 +6,7 @@ import {
   query,
   startAt,
 } from 'firebase/firestore';
-import { geohashQueryBounds } from 'geofire-common';
+import { clusterQueryBounds } from '../../common/clusterGeohash';
 import { GeohashCluster } from '../../common/gis-objects';
 import { db } from './firebase';
 
@@ -19,13 +19,15 @@ import { db } from './firebase';
  * Kartenbaum mit.
  *
  * Die Bounds decken mehr ab als den Radius — auf Distanz filtern muss der
- * Aufrufer (siehe `collectWaterSupplyCandidates`).
+ * Aufrufer (siehe `collectWaterSupplyCandidates`). Zugeschnitten werden sie auf
+ * die Geohash-Länge der Dokumente, siehe `clusterQueryBounds`; ohne diesen
+ * Schnitt liefert ein Radius unter 500 m gar keinen Treffer.
  */
 export async function queryClusters(
   center: { lat: number; lng: number },
   radiusInM: number
 ): Promise<GeohashCluster[]> {
-  const bounds = geohashQueryBounds([center.lat, center.lng], radiusInM);
+  const bounds = clusterQueryBounds(center, radiusInM);
 
   const snapshots = await Promise.all(
     bounds.map((b) =>

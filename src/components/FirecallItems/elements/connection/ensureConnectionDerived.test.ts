@@ -45,7 +45,6 @@ describe('ensureConnectionDerived', () => {
       order.push('elevation');
       return undefined;
     });
-
     await ensureConnectionDerived('einsatz-1', connection());
 
     expect(order).toEqual(['routing', 'elevation']);
@@ -79,5 +78,15 @@ describe('ensureConnectionDerived', () => {
       'einsatz-1',
       expect.objectContaining({ id: 'leitung-1' })
     );
+  });
+
+  it('braucht keinen eigenen Schritt für den Pendelverkehr', async () => {
+    // Seine Fahrstrecke ist diese Leitung, geroutet mit dem Profil `drive` —
+    // das erledigt derselbe erste Schritt. Es gab hier einmal ein zweites
+    // Routing zwischen den Enden; das ignorierte die abgesteckten
+    // Zwischenpunkte.
+    await ensureConnectionDerived('einsatz-1', connection());
+    expect(ensureConnectionRouting).toHaveBeenCalledTimes(1);
+    expect(ensureConnectionElevation).toHaveBeenCalledTimes(1);
   });
 });

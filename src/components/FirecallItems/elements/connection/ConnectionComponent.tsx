@@ -30,6 +30,7 @@ import PointContextMenu from '../PointContextMenu';
 // aufgelöst.
 import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/LoeschwasserfoerderungPanel';
 import { foerderungView } from './foerderung/foerderung';
+import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
 import {
   addFirecallPosition,
@@ -122,6 +123,7 @@ export default function ConnectionMarker({
   const paralleleLeitungen = record.get<number>('paralleleLeitungen');
   const elevationFor = record.get<string>('elevationFor');
   const elevationProfileField = record.get<string>('elevationProfile');
+  const mode = versorgungsart(record.data() as Connection);
   const foerderungResult = useMemo(
     () =>
       foerderung === 'true'
@@ -144,6 +146,10 @@ export default function ConnectionMarker({
       elevationProfileField,
     ]
   );
+
+  // Keine zweite Linie mehr für den Pendelverkehr: Die Fahrstrecke **ist** diese
+  // Leitung, mit dem Routing-Profil `drive` über alle Punkte. Siehe
+  // docs/pendelverkehr.md.
 
   return (
     <>
@@ -311,8 +317,10 @@ export default function ConnectionMarker({
         </Popup>
       </Polyline>
 
-      {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung. */}
-      {foerderungResult?.pumps.map((pump, index) => (
+      {/* Berechnet, nicht gespeichert: Die Standorte wandern mit der Leitung.
+          Im reinen Pendelverkehr weichen sie — dort wird keine Leitung gelegt. */}
+      {mode !== 'pendel' &&
+        foerderungResult?.pumps.map((pump, index) => (
         <Marker
           key={`pumpe-${index}`}
           position={pump.position}
@@ -346,7 +354,7 @@ export default function ConnectionMarker({
             <PopupNavigateButton lat={pump.position[0]} lng={pump.position[1]} />
           </Popup>
         </Marker>
-      ))}
+        ))}
 
       {foerderungOpen && (
         <LoeschwasserfoerderungPanel

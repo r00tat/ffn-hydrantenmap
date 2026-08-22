@@ -13,6 +13,7 @@ import {
   elevationSignature,
   elevationTodo,
   foerderungSamples,
+  isFoerderungEnabled,
 } from './elevationProfile';
 
 const clearedElevation = {
@@ -36,10 +37,21 @@ const clearedElevation = {
  */
 export async function ensureConnectionElevation(
   firecallId: string,
-  item: MultiPointItem
+  item: MultiPointItem,
+  /**
+   * `force`: auch dann abfragen, wenn für diese Abtastung schon ein Fehlschlag
+   * vermerkt ist. Das ist der Knopf „erneut versuchen" im Rechner — ohne ihn
+   * bliebe eine Leitung nach einem einzigen Aussetzer des Höhendienstes für
+   * immer bei der Handeingabe, denn genau das verhindert der Vermerk sonst
+   * absichtlich.
+   */
+  { force = false }: { force?: boolean } = {}
 ): Promise<Record<string, string> | undefined> {
   const todo = elevationTodo(item);
-  if (todo === 'none' || !item.id) return undefined;
+  if (!item.id) return undefined;
+  if (todo === 'none' && !(force && isFoerderungEnabled(item))) {
+    return undefined;
+  }
 
   let update: Record<string, string>;
   if (todo === 'clear') {
