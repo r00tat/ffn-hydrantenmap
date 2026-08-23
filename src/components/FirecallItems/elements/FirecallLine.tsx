@@ -3,6 +3,7 @@ import React, { ReactNode } from 'react';
 import { LatLngPosition } from '../../../common/geo';
 import { Connection, Line } from '../../firebase/firestore';
 import { SimpleMap } from '../../../common/types';
+import { dammbauSummary } from './damm/sandsack';
 import { leafletIcons } from '../icons';
 import { FirecallItemBase, SelectOptions } from './FirecallItemBase';
 import { FirecallMultiPoint } from './FirecallMultiPoint';
@@ -10,11 +11,62 @@ import { FirecallMultiPoint } from './FirecallMultiPoint';
 export class FirecallLine extends FirecallMultiPoint {
   opacity?: number;
 
+  /**
+   * Sandsackbedarf für den Dammbau (#694).
+   *
+   * Die Felder stehen hier und nicht an `FirecallMultiPoint`: Eine Leitung ist
+   * kein Damm. Sie gehören alle in `data()` — das ist die Grundlage jedes
+   * Schreibvorgangs, und was dort fehlt, löscht ein Speichern aus dem Dialog
+   * (`setDoc` ohne `merge`). In `fields()` erscheinen sie dagegen **nicht**: Sie
+   * gehören in den eigenen Rechner, nicht in die generische Feldliste. Gleiche
+   * Aufteilung wie bei der Löschwasserförderung an der Leitung.
+   */
+  dammbau?: string;
+  dammHoehe?: number;
+  freibord?: number;
+  dammBauweise?: Line['dammBauweise'];
+  dammBoeschung?: number;
+  sackFormat?: string;
+  sackFuellgrad?: number;
+  sandDichte?: number;
+  dammReserve?: number;
+  dammVorgabe?: Line['dammVorgabe'];
+  dammPersonal?: number;
+  dammZielzeit?: number;
+  fuellTrichter?: string;
+  saeckeRoedeln?: string;
+  transportWeite?: number;
+  lkwNutzlast?: number;
+  fuellLeistung?: number;
+  transportLeistung?: number;
+  verbauLeistung?: number;
+
   public constructor(firecallItem?: Line) {
     super(firecallItem as unknown as Connection);
     this.type = 'line';
     if (firecallItem) {
-      ({ opacity: this.opacity } = firecallItem);
+      ({
+        opacity: this.opacity,
+        dammbau: this.dammbau,
+        dammHoehe: this.dammHoehe,
+        freibord: this.freibord,
+        dammBauweise: this.dammBauweise,
+        dammBoeschung: this.dammBoeschung,
+        sackFormat: this.sackFormat,
+        sackFuellgrad: this.sackFuellgrad,
+        sandDichte: this.sandDichte,
+        dammReserve: this.dammReserve,
+        dammVorgabe: this.dammVorgabe,
+        dammPersonal: this.dammPersonal,
+        dammZielzeit: this.dammZielzeit,
+        fuellTrichter: this.fuellTrichter,
+        saeckeRoedeln: this.saeckeRoedeln,
+        transportWeite: this.transportWeite,
+        lkwNutzlast: this.lkwNutzlast,
+        fuellLeistung: this.fuellLeistung,
+        transportLeistung: this.transportLeistung,
+        verbauLeistung: this.verbauLeistung,
+      } = firecallItem);
     }
     this.color = firecallItem?.color || 'green';
   }
@@ -24,7 +76,17 @@ export class FirecallLine extends FirecallMultiPoint {
   }
 
   public markerName() {
-    return 'Linie';
+    return this.dammbau === 'true' ? 'Dammlinie' : 'Linie';
+  }
+
+  /**
+   * Die Zusammenfassung des Sandsackbedarfs, falls der Rechner aktiv ist und
+   * eine Strecke gezeichnet ist. Steht in Popup und Elementliste, damit die
+   * Sackzahl nicht erst im Panel sichtbar wird.
+   */
+  protected dammbauHint(): string {
+    const summary = dammbauSummary(this.data());
+    return summary ? `, ${summary}` : '';
   }
 
   public icon(): Icon<IconOptions> {
@@ -32,7 +94,9 @@ export class FirecallLine extends FirecallMultiPoint {
   }
 
   public info(): string {
-    return `Länge: ${Math.round(this.distance || 0)}m${this.routingHint()}`;
+    return `Länge: ${Math.round(
+      this.distance || 0
+    )}m${this.routingHint()}${this.dammbauHint()}`;
   }
 
   public static factory(): FirecallItemBase {
@@ -76,10 +140,30 @@ export class FirecallLine extends FirecallMultiPoint {
       ...super.data(),
       type: 'line',
       opacity: this.opacity,
+      dammbau: this.dammbau,
+      dammHoehe: this.dammHoehe,
+      freibord: this.freibord,
+      dammBauweise: this.dammBauweise,
+      dammBoeschung: this.dammBoeschung,
+      sackFormat: this.sackFormat,
+      sackFuellgrad: this.sackFuellgrad,
+      sandDichte: this.sandDichte,
+      dammReserve: this.dammReserve,
+      dammVorgabe: this.dammVorgabe,
+      dammPersonal: this.dammPersonal,
+      dammZielzeit: this.dammZielzeit,
+      fuellTrichter: this.fuellTrichter,
+      saeckeRoedeln: this.saeckeRoedeln,
+      transportWeite: this.transportWeite,
+      lkwNutzlast: this.lkwNutzlast,
+      fuellLeistung: this.fuellLeistung,
+      transportLeistung: this.transportLeistung,
+      verbauLeistung: this.verbauLeistung,
     } as unknown as Line;
   }
 
   public popupFn(): ReactNode {
+    const summary = dammbauSummary(this.data());
     return (
       <>
         <b>
@@ -88,6 +172,12 @@ export class FirecallLine extends FirecallMultiPoint {
         <br />
         {Math.round(this.distance || 0)}m
         {this.routingHint()}
+        {summary && (
+          <>
+            <br />
+            {summary}
+          </>
+        )}
       </>
     );
   }

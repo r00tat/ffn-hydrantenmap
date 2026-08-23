@@ -25,6 +25,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
 | [docs/loeschwasserfoerderung.md](docs/loeschwasserfoerderung.md) | Löschwasserförderung an der Leitung: Reibungstabelle und ihre Quelle, Höhendaten, Pumpenstandorte |
 | [docs/pendelverkehr.md](docs/pendelverkehr.md) | Pendelverkehr an der Leitung und der Vergleich mit der Förderung: Umlaufformel, Füllstellen-Schranke, Fahrt-Routing, Planungswerte der Aufbauzeit, Seite „Löschwasserversorgung" |
+| [docs/dammbau-sandsaecke.md](docs/dammbau-sandsaecke.md) | Sandsackbedarf für den Dammbau an der Linie: Verlege- und Befüllleistungstabellen der Lehrunterlage LU TE3 und ihre Gegenprüfung, Bauweisen, Freibord, Logistik, Summe über mehrere Dammabschnitte |
 
 ## Commands
 

@@ -368,6 +368,70 @@ export interface Area extends MultiPointItem {
 export interface Line extends MultiPointItem {
   type: 'line';
   opacity?: number;
+
+  /**
+   * Sandsackbedarf für den Dammbau bei Hochwasser. `'true'`, wenn der Rechner an
+   * dieser Linie aktiv ist — dann ist die Linie eine **Dammlinie**.
+   *
+   * Die Felder stehen an der Linie und nicht an `MultiPointItem`: Eine Leitung
+   * ist kein Damm. Dieselbe Aufteilung wie bei der Löschwasserförderung, die an
+   * `Connection` hängt. Siehe docs/dammbau-sandsaecke.md.
+   */
+  dammbau?: string;
+  /** Geplante Dammhöhe in m. */
+  dammHoehe?: number;
+  /**
+   * Sicherheitszuschlag über dem erwarteten Wasserstand in m.
+   *
+   * Kein zweites Höhenfeld: Die Dammhöhe ist die Eingabe, das Freibord sagt,
+   * welcher Wasserstand damit noch gehalten wird. Umgekehrt gerechnet gäbe es
+   * zwei Wahrheiten für dieselbe Höhe.
+   */
+  freibord?: number;
+  /** Bauweise: Pyramidenstapel, Notdamm, einreihiger Wall, Dammbalken-Ersatz. */
+  dammBauweise?: 'pyramide' | 'notdamm' | 'einfach' | 'dammbalken';
+  /**
+   * Basisbreite je Meter Höhe.
+   *
+   * Nur gesetzt, wenn von Hand gerechnet werden soll: Der Bedarf des
+   * Pyramidenstapels kommt aus der Verlegetabelle der Lehrunterlage, ein Wert
+   * hier schaltet auf die Geometrie um. Gleiches Muster wie `hoehenunterschied`
+   * an der Leitung — Handeingabe schlägt die abgeleitete Quelle.
+   */
+  dammBoeschung?: number;
+  /** Leeres Sackmaß in cm, Schlüssel in `SACK_FORMATE`. */
+  sackFormat?: string;
+  /** Füllgrad des Sackes in %. */
+  sackFuellgrad?: number;
+  /** Schüttdichte des Sandes in t/m³. */
+  sandDichte?: number;
+  /** Sackreserve in % für Bruch und Fehlfüllung. */
+  dammReserve?: number;
+  /**
+   * Was von Personal und Zeit vorgegeben ist — das andere wird gerechnet.
+   *
+   * `'personal'`: Kräfte eingetragen, Bauzeit ist das Ergebnis.
+   * `'zeit'`: Fertigstellung eingetragen, Personalbedarf ist das Ergebnis.
+   */
+  dammVorgabe?: 'personal' | 'zeit';
+  /** Eingesetzte Kräfte. Gilt bei `dammVorgabe: 'personal'`. */
+  dammPersonal?: number;
+  /** Gewünschte Fertigstellungszeit in h. Gilt bei `dammVorgabe: 'zeit'`. */
+  dammZielzeit?: number;
+  /** `'true'`, wenn beim Füllen eine Füllhilfe im Einsatz ist. */
+  fuellTrichter?: string;
+  /** `'true'`, wenn die Säcke zugebunden werden (halbiert die Füllleistung). */
+  saeckeRoedeln?: string;
+  /** Trageweite der Sandsackkette in m. */
+  transportWeite?: number;
+  /** Nutzlast eines LKW in t. */
+  lkwNutzlast?: number;
+  /** Säcke je Person und Stunde beim Füllen — Handeingabe statt Tabelle. */
+  fuellLeistung?: number;
+  /** Säcke je Person und Stunde beim Transport — Handeingabe statt Tabelle. */
+  transportLeistung?: number;
+  /** Säcke je Person und Stunde beim Verlegen — Handeingabe statt Tabelle. */
+  verbauLeistung?: number;
 }
 
 export interface Circle extends FirecallItem {
