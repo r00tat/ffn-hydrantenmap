@@ -16,6 +16,7 @@ import EditRoadIcon from '@mui/icons-material/EditRoad';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
+import FoundationIcon from '@mui/icons-material/Foundation';
 import GroupIcon from '@mui/icons-material/Group';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import HelpCenterIcon from '@mui/icons-material/HelpCenter';
@@ -218,6 +219,14 @@ export default function AppDrawer({
           icon: <WaterDropIcon />,
           href: '/loeschwasserversorgung',
           einsatzSection: 'loeschwasserversorgung',
+        },
+        {
+          // Aus demselben Grund neben der Karte: „Reichen Säcke und Kräfte für
+          // diese Strecke?" kommt vor dem Zeichnen der Dammlinie.
+          text: t('dammbau'),
+          icon: <FoundationIcon />,
+          href: '/dammbau',
+          einsatzSection: 'dammbau',
         },
       ],
     },

@@ -1,9 +1,24 @@
 # Sandsackbedarf für den Dammbau
 
 Der Rechner hängt an der gezeichneten **Linie** (`line`): Länge und Verlauf liegen
-dort schon, mit aktivem Straßen-Routing als tatsächlicher Straßenverlauf.
-Eingestiegen wird über das Fundament-Symbol im Popup der Linie; eine Linie mit
-aktivem Rechner heißt in Popup und Elementliste „Dammlinie".
+dort schon, mit aktivem Straßen-Routing als tatsächlicher Straßenverlauf. Eine
+Linie mit aktivem Rechner heißt in Popup und Elementliste „Dammlinie".
+
+Zwei Wege hinein, genau wie bei der Löschwasserversorgung:
+
+- **Auf der Karte** über das Fundament-Symbol im Popup der Linie — das
+  schwebende Panel neben der Lage, wenn die Linie schon da ist.
+- **Über die Seite „Dammbau"** aus der Seitenleiste
+  ([components/pages/Dammbau.tsx](../src/components/pages/Dammbau.tsx)): schmale
+  Karte links, Liste der Abschnitte und Rechner rechts. Diese Seite ist der Weg,
+  wenn noch nichts gezeichnet ist — die Frage „reichen Säcke und Kräfte für diese
+  Strecke?" kommt **vor** dem Zeichnen. Der Knopf „Dammlinie einzeichnen" steckt
+  eine Strecke ab, die dabei entstehende Linie ist sofort gewählt und gerechnet.
+
+Beide zeigen denselben Rechner (`SandsackRechner`); nur der Rahmen ist ein
+anderer. Die Karte der Seite ist bewusst nicht die Einsatzkarte, sondern die
+schmale [RechnerMap](../src/components/Map/RechnerMap.tsx), die sie mit der Seite
+„Löschwasserversorgung" teilt.
 
 Warum an der Linie und nicht an der Leitung: Eine Dammlinie führt kein Wasser.
 Dieselbe Aufteilung wie umgekehrt bei der Löschwasserförderung, die an
@@ -83,9 +98,31 @@ das rasche Umleiten von Oberflächenwasser, nicht für einen Damm.
 
 **Basis = 3 × Höhe.** Das ist der in der Hochwasser-Fachliteratur verbreitete
 Faustwert für einen freistehenden Sandsackdamm — flacher gebaut kippt er, steiler
-gebaut sickert er durch. Er steht im Rechner als Feld „Basisbreite je m Höhe" und
-ist überschreibbar: Wer an eine Mauer anbaut und nur eine wasserseitige Böschung
-braucht, setzt 2.
+gebaut sickert er durch.
+
+Im Rechner steht das als Feld **„Basisbreite (× Höhe)"**. Der Wert ist ein
+**Faktor auf die Dammhöhe**, keine Länge und keine Rate je Meter:
+
+| Basisbreite | bei 0,5 m Höhe | bei 1 m Höhe | bei 1,5 m Höhe |
+| --- | --- | --- | --- |
+| 2 | 1,00 m | 2,00 m | 3,00 m |
+| **3** | **1,50 m** | **3,00 m** | **4,50 m** |
+| 4 | 2,00 m | 4,00 m | 6,00 m |
+
+Die Böschung je Seite folgt daraus: `(Basis − Krone) / 2` waagrecht auf die
+Dammhöhe senkrecht. Bei 3 und 1 m Höhe sind das 1,25 m je Seite, also etwa 1:1,25
+— eine Neigung, die man mit Säcken noch bauen kann.
+
+Zwei Dinge macht das Feld sichtbar, die sonst versteckt wären: Die Sackzahl wächst
+**überproportional** mit der Höhe (weil die Basis mitwächst), und wer an eine Mauer
+anbaut und nur eine wasserseitige Böschung braucht, kommt mit 2 aus und spart ein
+Drittel. Damit die Wirkung nicht erst in der Sackzahl auffällt, zeichnet der
+Rechner den Querschnitt **maßstäblich** mit — gleicher Maßstab in Breite und Höhe,
+sonst beantwortete das Bild die Frage falsch. Siehe
+[DammQuerschnittChart](../src/components/Map/Damm/DammQuerschnittChart.tsx).
+
+Unter der Kronenbreite kann die Basis nicht liegen: Bei sehr kleiner Höhe gilt
+`Basis = max(Faktor × Höhe, Krone)`.
 
 **Dammbalken-Ersatz** ist der Verbau einer Öffnung — Tor, Hofeinfahrt, Türstock.
 Er steckt zwischen den Wangen und braucht keine Böschung, aber zwei Sacklängen

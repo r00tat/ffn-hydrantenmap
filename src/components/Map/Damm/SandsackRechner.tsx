@@ -35,6 +35,7 @@ import {
 } from '../../FirecallItems/elements/damm/sandsack';
 import { useSnackbar } from '../../providers/SnackbarProvider';
 import { parseNumber, round } from '../panelNumbers';
+import DammQuerschnittChart from './DammQuerschnittChart';
 import SandsackErgebnis from './SandsackErgebnis';
 
 /**
@@ -172,14 +173,18 @@ export default function SandsackRechner({
     showSnackbar(t('requestedMessage'), 'success');
   };
 
-  /** Ein Zahlenfeld für einen der Leistungswerte. */
+  /**
+   * Ein Zahlenfeld für einen der Parameter. `hint` hängt einen Tooltip an — für
+   * die Werte, deren Aufschrift allein nicht sagt, was sie bedeuten.
+   */
   const zahl = (
     key: keyof DammbauParams,
     label: string,
     step = 1,
-    unit?: string
-  ) => (
-    <Grid size={{ xs: 6 }}>
+    unit?: string,
+    hint?: string
+  ) => {
+    const feld = (
       <TextField
         size="small"
         type="number"
@@ -197,8 +202,13 @@ export default function SandsackRechner({
           )
         }
       />
-    </Grid>
-  );
+    );
+    return (
+      <Grid size={{ xs: 6 }}>
+        {hint ? <Tooltip title={hint}>{feld}</Tooltip> : feld}
+      </Grid>
+    );
+  };
 
   return (
     <Box
@@ -320,7 +330,13 @@ export default function SandsackRechner({
                 </Tooltip>
               </Grid>
               {params.dammBauweise === 'pyramide' &&
-                zahl('dammBoeschung', t('slope'), 0.5)}
+                zahl(
+                  'dammBoeschung',
+                  t('slope'),
+                  0.5,
+                  t('unitTimesHeight'),
+                  t('slopeHint')
+                )}
               <Grid size={{ xs: 6 }}>
                 <TextField
                   select
@@ -341,6 +357,18 @@ export default function SandsackRechner({
               {zahl('dammPersonal', t('personnel'), 1)}
               {zahl('dammZielzeit', t('targetTime'), 0.5, t('unitH'))}
             </Grid>
+
+            {/* Das Bild steht **vor** den Zahlen: Es beantwortet, was
+                Bauweise und Basisbreite geometrisch bedeuten — und diese Frage
+                kommt vor der Sackzahl. */}
+            <Typography
+              variant="subtitle2"
+              sx={{ mt: 2, mb: 0.5 }}
+              color="text.secondary"
+            >
+              {t('crossSectionChart')}
+            </Typography>
+            <DammQuerschnittChart view={view} />
 
             <SandsackErgebnis view={view} summe={summe} />
 
