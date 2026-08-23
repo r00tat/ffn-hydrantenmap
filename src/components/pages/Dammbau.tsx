@@ -207,7 +207,7 @@ function DammbauInhalt() {
                 {Math.round(summe.laenge)} {t('unitM')} ·{' '}
                 {summe.saeckeBestellen} {t('materialBags')} ·{' '}
                 {round(summe.sandMasse)} {t('unitT')} {t('materialSand')} ·{' '}
-                {summe.fuhren} {t('trucks')}
+                {summe.lkwFuhrenSaecke} {t('trucks')}
               </Typography>
             </Alert>
           )}

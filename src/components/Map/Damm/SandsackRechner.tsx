@@ -30,6 +30,7 @@ import {
   SACK_FORMAT_KEYS,
   dammbauParams,
   dammbauView,
+  nachTabelle,
   type DammBauweise,
   type DammbauParams,
 } from '../../FirecallItems/elements/damm/sandsack';
@@ -62,21 +63,55 @@ const HOEHE_STEP = 0.1;
  */
 const BAUWEISE_LABELS: Record<
   DammBauweise,
-  'methodEinfach' | 'methodPyramide' | 'methodDammbalken'
+  | 'methodPyramide'
+  | 'methodNotdamm'
+  | 'methodEinfach'
+  | 'methodDammbalken'
 > = {
-  einfach: 'methodEinfach',
   pyramide: 'methodPyramide',
+  notdamm: 'methodNotdamm',
+  einfach: 'methodEinfach',
   dammbalken: 'methodDammbalken',
 };
 
 const FORMAT_LABELS: Record<
   string,
-  'bagFormat_30x60' | 'bagFormat_40x60' | 'bagFormat_30x50'
+  'bagFormat_30x60' | 'bagFormat_40x70'
 > = {
   '30x60': 'bagFormat_30x60',
-  '40x60': 'bagFormat_40x60',
-  '30x50': 'bagFormat_30x50',
+  '40x70': 'bagFormat_40x70',
 };
+
+/**
+ * Die Reglerwerte als Felder am Element.
+ *
+ * Zwei Übersetzungen stecken darin: Die Schalter liegen im Firestore als
+ * `'true'`/`'false'` und nicht als Wahrheitswerte — so wie alle anderen
+ * Schalter an einem Element auch. Und die Handeingaben, die nicht gesetzt sind,
+ * werden zu `undefined`: Ein geschriebener Wert wäre eine Handeingabe und
+ * schaltete den Rechner von der Tabelle auf die Geometrie um.
+ */
+function gespeichert(params: DammbauParams, enabled: boolean): Partial<Line> {
+  const {
+    fuellTrichter,
+    saeckeRoedeln,
+    dammBoeschung,
+    fuellLeistung,
+    transportLeistung,
+    verbauLeistung,
+    ...rest
+  } = params;
+  return {
+    ...rest,
+    dammbau: enabled ? 'true' : 'false',
+    fuellTrichter: fuellTrichter ? 'true' : 'false',
+    saeckeRoedeln: saeckeRoedeln ? 'true' : 'false',
+    dammBoeschung,
+    fuellLeistung,
+    transportLeistung,
+    verbauLeistung,
+  };
+}
 
 export interface SandsackRechnerProps {
   item: Line;
@@ -107,7 +142,8 @@ export default function SandsackRechner({
   const [requested, setRequested] = useState(false);
 
   const draft = useMemo(
-    () => ({ ...item, dammbau: enabled ? 'true' : 'false' }) as Line,
+    () =>
+      ({ ...item, dammbau: enabled ? 'true' : 'false' }) as unknown as Line,
     [item, enabled]
   );
   const view = useMemo(() => dammbauView(draft, params), [draft, params]);
@@ -117,10 +153,7 @@ export default function SandsackRechner({
   // anderes als die Zeilen darüber.
   const summe = useMemo(() => {
     const andere = linien.filter((linie) => linie.id !== item.id);
-    return dammSumme([
-      ...andere,
-      { ...item, dammbau: enabled ? 'true' : 'false', ...params } as Line,
-    ]);
+    return dammSumme([...andere, { ...item, ...gespeichert(params, enabled) }]);
   }, [linien, item, enabled, params]);
 
   const set = <K extends keyof DammbauParams>(
@@ -129,11 +162,7 @@ export default function SandsackRechner({
   ) => setParams((previous) => ({ ...previous, [key]: value }));
 
   const persist = async () => {
-    await updateItem({
-      ...item,
-      dammbau: enabled ? 'true' : 'false',
-      ...params,
-    } as Line);
+    await updateItem({ ...item, ...gespeichert(params, enabled) });
   };
 
   const handleApply = async () => {
@@ -156,7 +185,9 @@ export default function SandsackRechner({
             t('diarySection', { metres, height, method }),
           bags: (count, order) => t('diaryBags', { count, order }),
           sand: (tons, cubic) => t('diarySand', { tons, cubic }),
-          trucks: (count) => t('diaryTrucks', { count }),
+          pallets: (count) => t('diaryPallets', { count }),
+          trucksBags: (count) => t('diaryTrucksBags', { count }),
+          trucksSand: (count) => t('diaryTrucksSand', { count }),
           foil: (area) => t('diaryFoil', { area }),
           work: (hours, personal) => t('diaryWork', { hours, personal }),
           targetTime: (hours, personal) =>
@@ -182,25 +213,33 @@ export default function SandsackRechner({
     label: string,
     step = 1,
     unit?: string,
-    hint?: string
+    hint?: string,
+    /**
+     * Ob ein leeres Feld erlaubt ist. Bei den Handeingaben ist es der
+     * Normalfall — leer heißt „aus der Tabelle rechnen".
+     */
+    optional = false
   ) => {
+    const wert = params[key] as number | undefined;
     const feld = (
       <TextField
         size="small"
         type="number"
         fullWidth
         label={unit ? `${label} (${unit})` : label}
-        value={params[key] as number}
+        value={wert ?? ''}
         slotProps={{ htmlInput: { step } }}
-        onChange={(event) =>
+        onChange={(event) => {
+          const eingabe = event.target.value;
+          if (optional && eingabe.trim() === '') {
+            set(key, undefined as DammbauParams[typeof key]);
+            return;
+          }
           set(
             key,
-            parseNumber(
-              event.target.value,
-              params[key] as number
-            ) as DammbauParams[typeof key]
-          )
-        }
+            parseNumber(eingabe, wert ?? 0) as DammbauParams[typeof key]
+          );
+        }}
       />
     );
     return (
@@ -209,6 +248,29 @@ export default function SandsackRechner({
       </Grid>
     );
   };
+
+  /** Ein Schalter für einen der Wahrheitswert-Parameter. */
+  const schalter = (
+    key: 'fuellTrichter' | 'saeckeRoedeln',
+    label: string,
+    hint: string
+  ) => (
+    <Grid size={{ xs: 12 }}>
+      <Tooltip title={hint}>
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={params[key]}
+              slotProps={{ input: { 'aria-label': label } }}
+              onChange={(event) => set(key, event.target.checked)}
+            />
+          }
+          label={<Typography variant="body2">{label}</Typography>}
+        />
+      </Tooltip>
+    </Grid>
+  );
 
   return (
     <Box
@@ -329,13 +391,14 @@ export default function SandsackRechner({
                   </Box>
                 </Tooltip>
               </Grid>
-              {params.dammBauweise === 'pyramide' &&
+              {nachTabelle(params.dammBauweise) &&
                 zahl(
                   'dammBoeschung',
                   t('slope'),
                   0.5,
                   t('unitTimesHeight'),
-                  t('slopeHint')
+                  t('slopeHint'),
+                  true
                 )}
               <Grid size={{ xs: 6 }}>
                 <TextField
@@ -356,6 +419,16 @@ export default function SandsackRechner({
               {zahl('sackFuellgrad', t('fillLevel'), 1, t('unitPercent'))}
               {zahl('dammPersonal', t('personnel'), 1)}
               {zahl('dammZielzeit', t('targetTime'), 0.5, t('unitH'))}
+              {zahl(
+                'transportWeite',
+                t('carryDistance'),
+                5,
+                t('unitM'),
+                t('carryDistanceHint')
+              )}
+              {zahl('lkwNutzlast', t('truckPayload'), 1, t('unitT'))}
+              {schalter('fuellTrichter', t('funnel'), t('funnelHint'))}
+              {schalter('saeckeRoedeln', t('tie'), t('tieHint'))}
             </Grid>
 
             {/* Das Bild steht **vor** den Zahlen: Es beantwortet, was
@@ -383,22 +456,40 @@ export default function SandsackRechner({
               </AccordionSummary>
               <AccordionDetails>
                 <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('sourceHint')}
+                    </Typography>
+                  </Grid>
+                  {/* Leer heißt: aus den Tabellen der Lehrunterlage rechnen.
+                      Ein eingetragener Wert schlägt sie — für die Füllanlage,
+                      die die Unterlage nicht kennt. */}
                   {zahl(
                     'fuellLeistung',
                     t('fillRate'),
                     5,
-                    t('unitBagsPerHour')
+                    t('unitBagsPerHour'),
+                    undefined,
+                    true
                   )}
                   {zahl(
                     'transportLeistung',
                     t('transportRate'),
                     5,
-                    t('unitBagsPerHour')
+                    t('unitBagsPerHour'),
+                    undefined,
+                    true
                   )}
-                  {zahl('verbauLeistung', t('layRate'), 5, t('unitBagsPerHour'))}
+                  {zahl(
+                    'verbauLeistung',
+                    t('layRate'),
+                    5,
+                    t('unitBagsPerHour'),
+                    undefined,
+                    true
+                  )}
                   {zahl('sandDichte', t('sandDensity'), 0.1, t('unitTPerM3'))}
                   {zahl('dammReserve', t('reserve'), 5, t('unitPercent'))}
-                  {zahl('fuhrenVolumen', t('truckVolume'), 1, t('unitM3'))}
                 </Grid>
               </AccordionDetails>
             </Accordion>

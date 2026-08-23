@@ -80,10 +80,14 @@ export default function DammQuerschnittChart({
    * auf ihrer Höhe ist — dieselbe Interpolation, aus der die Querschnittsfläche
    * kommt.
    */
-  const lagenHoehe = format.hoehe;
-  const lagenZahl = Math.ceil(hoehe / lagenHoehe);
+  // Die Lagenhöhe folgt aus dem verlegten Volumen und der Grundfläche des
+  // Sackes: Ein voller gefüllter Sack liegt höher, ein größeres Format flacher.
+  const grundflaeche = format.laenge * format.breite;
+  const lagenHoehe =
+    grundflaeche > 0 ? bedarf.verlegtesVolumen / grundflaeche : 0;
+  const lagenZahl = lagenHoehe > 0 ? Math.ceil(hoehe / lagenHoehe) : 0;
   const lagen =
-    lagenZahl <= MAX_DRAWN_LAYERS
+    lagenHoehe > 0 && lagenZahl <= MAX_DRAWN_LAYERS
       ? Array.from({ length: lagenZahl }, (_unused, index) => {
           const unten = index * lagenHoehe;
           const oben = Math.min(hoehe, unten + lagenHoehe);

@@ -388,9 +388,16 @@ export interface Line extends MultiPointItem {
    * zwei Wahrheiten für dieselbe Höhe.
    */
   freibord?: number;
-  /** Querschnitt des Dammes: einreihiger Wall, Pyramidenstapel, Dammbalken. */
-  dammBauweise?: 'einfach' | 'pyramide' | 'dammbalken';
-  /** Basisbreite je Meter Höhe beim Pyramidenstapel. */
+  /** Bauweise: Pyramidenstapel, Notdamm, einreihiger Wall, Dammbalken-Ersatz. */
+  dammBauweise?: 'pyramide' | 'notdamm' | 'einfach' | 'dammbalken';
+  /**
+   * Basisbreite je Meter Höhe.
+   *
+   * Nur gesetzt, wenn von Hand gerechnet werden soll: Der Bedarf des
+   * Pyramidenstapels kommt aus der Verlegetabelle der Lehrunterlage, ein Wert
+   * hier schaltet auf die Geometrie um. Gleiches Muster wie `hoehenunterschied`
+   * an der Leitung — Handeingabe schlägt die abgeleitete Quelle.
+   */
   dammBoeschung?: number;
   /** Leeres Sackmaß in cm, Schlüssel in `SACK_FORMATE`. */
   sackFormat?: string;
@@ -404,14 +411,20 @@ export interface Line extends MultiPointItem {
   dammPersonal?: number;
   /** Gewünschte Fertigstellungszeit in h. */
   dammZielzeit?: number;
-  /** Säcke je Person und Stunde beim Füllen. */
+  /** `'true'`, wenn beim Füllen eine Füllhilfe im Einsatz ist. */
+  fuellTrichter?: string;
+  /** `'true'`, wenn die Säcke zugebunden werden (halbiert die Füllleistung). */
+  saeckeRoedeln?: string;
+  /** Trageweite der Sandsackkette in m. */
+  transportWeite?: number;
+  /** Nutzlast eines LKW in t. */
+  lkwNutzlast?: number;
+  /** Säcke je Person und Stunde beim Füllen — Handeingabe statt Tabelle. */
   fuellLeistung?: number;
-  /** Säcke je Person und Stunde beim Transport. */
+  /** Säcke je Person und Stunde beim Transport — Handeingabe statt Tabelle. */
   transportLeistung?: number;
-  /** Säcke je Person und Stunde beim Verlegen. */
+  /** Säcke je Person und Stunde beim Verlegen — Handeingabe statt Tabelle. */
   verbauLeistung?: number;
-  /** Ladevolumen einer LKW-Fuhre Sand in m³. */
-  fuhrenVolumen?: number;
 }
 
 export interface Circle extends FirecallItem {

@@ -14,7 +14,9 @@ const labels: DammbauDiaryLabels = {
     `Abschnitt: ${laenge} m, ${hoehe} m hoch, ${bauweise}`,
   bags: (count, reserve) => `Sandsäcke: ${count} (Anforderung ${reserve})`,
   sand: (tons, cubic) => `Sand: ${tons} t (${cubic} m³)`,
-  trucks: (count) => `LKW-Fuhren: ${count}`,
+  pallets: (count) => `Paletten: ${count}`,
+  trucksBags: (count) => `LKW-Fuhren Säcke: ${count}`,
+  trucksSand: (count) => `LKW-Fuhren Sand: ${count}`,
   foil: (squareMetres) => `Folie: ${squareMetres} m²`,
   work: (hours, personal) => `Bauzeit: ${hours} h mit ${personal} Kräften`,
   targetTime: (hours, personal) => `Für ${hours} h: ${personal} Kräfte`,
@@ -64,7 +66,9 @@ describe('buildDammbauDiaryEntry', () => {
     expect(text).toContain('Sandsäcke:');
     expect(text).toContain('Anforderung');
     expect(text).toContain('Sand:');
-    expect(text).toContain('LKW-Fuhren:');
+    expect(text).toContain('Paletten:');
+    expect(text).toContain('LKW-Fuhren Säcke:');
+    expect(text).toContain('LKW-Fuhren Sand:');
     expect(text).toContain('Folie:');
     expect(text).toContain('Bauzeit:');
     expect(text).toContain('Für');
@@ -80,7 +84,8 @@ describe('buildDammbauDiaryEntry', () => {
     }).beschreibung!;
     // Keine Nachkommastellen bei Stückzahlen, keine Bruchteile eines Sackes
     expect(text).not.toMatch(/Sandsäcke: \d+\.\d/);
-    expect(text).not.toMatch(/LKW-Fuhren: \d+\.\d/);
+    expect(text).not.toMatch(/LKW-Fuhren Säcke: \d+\.\d/);
+    expect(text).not.toMatch(/Paletten: \d+\.\d/);
   });
 
   it('hängt die Summe an, sobald es mehr als einen Abschnitt gibt', () => {

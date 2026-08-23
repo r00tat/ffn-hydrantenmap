@@ -103,8 +103,99 @@ describe('DammbauPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Einreihiger Wall' }));
     await waitFor(() =>
-      expect(screen.getByText(/nur bis 50 cm/)).toBeInTheDocument()
+      expect(
+        screen.getByText(/einreihige Anordnungen bis 30 cm/)
+      ).toBeInTheDocument()
     );
+  });
+
+  it('weist die Verlegetabelle als Herkunft der Sackzahl aus', () => {
+    renderWithIntl(
+      <DammbauPanel item={line({ dammHoehe: 1 })} open onClose={() => {}} />
+    );
+    expect(
+      screen.getByText(/^aus der Verlegetabelle — Lehrunterlage/)
+    ).toBeInTheDocument();
+    // 120 Säcke je Meter bei 1 m Höhe, rund 200 m Linie
+    expect(saecke()).toBeGreaterThan(23_000);
+    expect(saecke()).toBeLessThan(25_000);
+  });
+
+  it('rechnet den Notdamm mit der Hälfte der Säcke', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <DammbauPanel item={line({ dammHoehe: 1 })} open onClose={() => {}} />
+    );
+
+    const stapel = saecke();
+    await user.click(screen.getByRole('button', { name: 'Notdamm' }));
+    await waitFor(() => expect(saecke()).toBeLessThan(stapel));
+    expect(saecke()).toBeCloseTo(stapel / 2, -1);
+  });
+
+  it('schaltet mit einer eingetragenen Basisbreite auf die Geometrie um', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <DammbauPanel item={line({ dammHoehe: 1 })} open onClose={() => {}} />
+    );
+
+    await user.type(
+      screen.getByRole('spinbutton', { name: /Basisbreite/ }),
+      '3'
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/^über die Böschung gerechnet$/)
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByText(/^Gerechnet wird über die eingetragene Basisbreite/)
+    ).toBeInTheDocument();
+  });
+
+  it('macht Füllhilfe und Zubinden in der Bauzeit sichtbar', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<DammbauPanel item={line()} open onClose={() => {}} />);
+
+    const bauzeit = () => Number.parseFloat(wert('Bauzeit'));
+    const ohne = bauzeit();
+
+    await user.click(screen.getByLabelText(/Füllhilfe/));
+    await waitFor(() => expect(bauzeit()).toBeLessThan(ohne));
+
+    await user.click(screen.getByLabelText(/zubinden/));
+    await waitFor(() => expect(bauzeit()).toBeGreaterThan(ohne));
+  });
+
+  it('rechnet die Trageweite in die Transportleistung', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<DammbauPanel item={line()} open onClose={() => {}} />);
+
+    // 80 Säcke je Person und Stunde auf 10 m
+    expect(wert('Transport je Person und Stunde')).toMatch(/^80 /);
+
+    const weite = screen.getByRole('spinbutton', {
+      name: /Trageweite der Kette/,
+    });
+    await user.clear(weite);
+    await user.type(weite, '40');
+
+    await waitFor(() =>
+      expect(wert('Transport je Person und Stunde')).toMatch(/^20 /)
+    );
+    expect(wert('Helfer für die Kette')).toMatch(/^40 /);
+  });
+
+  it('nennt Paletten und LKW-Fuhren nach der Unterlage', () => {
+    renderWithIntl(
+      <DammbauPanel item={line({ dammHoehe: 1 })} open onClose={() => {}} />
+    );
+    // 50 Säcke je Palette, 10 Paletten je LKW
+    const paletten = Number(/(\d+)/.exec(wert('Paletten'))?.[1] ?? 0);
+    expect(paletten).toBe(Math.ceil(saecke() / 50));
+    expect(
+      Number(/(\d+)/.exec(wert('LKW-Fuhren gefüllte Säcke'))?.[1] ?? 0)
+    ).toBe(Math.ceil(paletten / 10));
   });
 
   it('speichert die Werte an der Linie', async () => {
@@ -118,7 +209,16 @@ describe('DammbauPanel', () => {
       id: 'linie-1',
       dammbau: 'true',
       dammBauweise: 'pyramide',
+      // Die Schalter liegen am Element als Zeichenkette.
+      fuellTrichter: 'false',
+      saeckeRoedeln: 'false',
     });
+    // Ohne Handeingabe bleibt die Böschung leer — sonst schaltete ein
+    // Speichern den Rechner von der Tabelle auf die Geometrie um.
+    expect(updateItem.mock.calls[0][0]).toHaveProperty(
+      'dammBoeschung',
+      undefined
+    );
     expect(showSnackbar).toHaveBeenCalledWith(
       'Dammlinie gespeichert',
       'success'
@@ -138,7 +238,8 @@ describe('DammbauPanel', () => {
     expect(entry.type).toBe('diary');
     expect(entry.name).toContain('Uferstraße');
     expect(entry.beschreibung).toContain('Sandsäcke:');
-    expect(entry.beschreibung).toContain('LKW-Fuhren:');
+    expect(entry.beschreibung).toContain('Paletten:');
+    expect(entry.beschreibung).toContain('LKW-Fuhren gefüllte Säcke:');
     // Nur ein Abschnitt: Die Summe wäre eine Wiederholung.
     expect(entry.beschreibung).not.toContain('Summe über');
   });

@@ -32,10 +32,13 @@ export class FirecallLine extends FirecallMultiPoint {
   dammReserve?: number;
   dammPersonal?: number;
   dammZielzeit?: number;
+  fuellTrichter?: string;
+  saeckeRoedeln?: string;
+  transportWeite?: number;
+  lkwNutzlast?: number;
   fuellLeistung?: number;
   transportLeistung?: number;
   verbauLeistung?: number;
-  fuhrenVolumen?: number;
 
   public constructor(firecallItem?: Line) {
     super(firecallItem as unknown as Connection);
@@ -54,10 +57,13 @@ export class FirecallLine extends FirecallMultiPoint {
         dammReserve: this.dammReserve,
         dammPersonal: this.dammPersonal,
         dammZielzeit: this.dammZielzeit,
+        fuellTrichter: this.fuellTrichter,
+        saeckeRoedeln: this.saeckeRoedeln,
+        transportWeite: this.transportWeite,
+        lkwNutzlast: this.lkwNutzlast,
         fuellLeistung: this.fuellLeistung,
         transportLeistung: this.transportLeistung,
         verbauLeistung: this.verbauLeistung,
-        fuhrenVolumen: this.fuhrenVolumen,
       } = firecallItem);
     }
     this.color = firecallItem?.color || 'green';
@@ -143,10 +149,13 @@ export class FirecallLine extends FirecallMultiPoint {
       dammReserve: this.dammReserve,
       dammPersonal: this.dammPersonal,
       dammZielzeit: this.dammZielzeit,
+      fuellTrichter: this.fuellTrichter,
+      saeckeRoedeln: this.saeckeRoedeln,
+      transportWeite: this.transportWeite,
+      lkwNutzlast: this.lkwNutzlast,
       fuellLeistung: this.fuellLeistung,
       transportLeistung: this.transportLeistung,
       verbauLeistung: this.verbauLeistung,
-      fuhrenVolumen: this.fuhrenVolumen,
     } as unknown as Line;
   }
 

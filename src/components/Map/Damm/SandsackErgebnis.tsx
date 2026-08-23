@@ -34,20 +34,27 @@ const WARN_LABELS: Record<
   DammWarning,
   | 'warnKeineStrecke'
   | 'warnEinfachZuHoch'
-  | 'warnHoeheUngewoehnlich'
+  | 'warnUeberTabelle'
   | 'warnFuellgradHoch'
+  | 'warnSackZuSchwer'
   | 'warnFreibordUeberHoehe'
   | 'warnKeinPersonal'
   | 'warnZielzeitVerfehlt'
+  | 'warnGeometrieStattTabelle'
 > = {
   keineStrecke: 'warnKeineStrecke',
   einfachZuHoch: 'warnEinfachZuHoch',
-  hoeheUngewoehnlich: 'warnHoeheUngewoehnlich',
+  ueberTabelle: 'warnUeberTabelle',
   fuellgradHoch: 'warnFuellgradHoch',
+  sackZuSchwer: 'warnSackZuSchwer',
   freibordUeberHoehe: 'warnFreibordUeberHoehe',
   keinPersonal: 'warnKeinPersonal',
   zielzeitVerfehlt: 'warnZielzeitVerfehlt',
+  geometrieStattTabelle: 'warnGeometrieStattTabelle',
 };
+
+/** Nur ein Hinweis, keine Warnung: Da ist nichts falsch, nur anders gerechnet. */
+const HINWEISE: DammWarning[] = ['keineStrecke', 'geometrieStattTabelle'];
 
 export interface SandsackErgebnisProps {
   view: DammbauView;
@@ -108,7 +115,7 @@ export default function SandsackErgebnis({
       {bedarf.warnings.map((warning) => (
         <Alert
           key={warning}
-          severity={warning === 'keineStrecke' ? 'info' : 'warning'}
+          severity={HINWEISE.includes(warning) ? 'info' : 'warning'}
           sx={{ mt: 1.5 }}
         >
           {t(WARN_LABELS[warning])}
@@ -116,6 +123,13 @@ export default function SandsackErgebnis({
       ))}
 
       <Abschnitt title={t('sectionBags')} />
+      {/* Woher die Sackzahl kommt, steht über ihr: Tabelle oder Handeingabe ist
+          der Unterschied zwischen einer belegten und einer gerechneten Zahl. */}
+      <Typography variant="caption" color="text.secondary" component="div">
+        {bedarf.saeckeSource === 'tabelle'
+          ? `${t('sourceTable')} — ${t('tableReference')}`
+          : t('sourceGeometry')}
+      </Typography>
       <Table size="small">
         <TableBody>
           <Zeile label={t('bags')} value={stk(bedarf.saecke)} />
@@ -128,12 +142,19 @@ export default function SandsackErgebnis({
             value={`${round(bedarf.masseJeSack)} ${t('unitKg')}`}
           />
           <Zeile
+            label={t('bagWeightWet')}
+            value={`${round(bedarf.masseJeSackNass)} ${t('unitKg')}`}
+          />
+          <Zeile
+            label={t('bagsPerCubicMetre')}
+            value={stk(bedarf.saeckeJeKubikmeter)}
+          />
+          <Zeile
             label={t('sand')}
             value={`${round(bedarf.sandMasse)} ${t('unitT')} (${round(
               bedarf.sandVolumen
             )} ${t('unitM3')})`}
           />
-          <Zeile label={t('trucks')} value={stk(bedarf.fuhren)} />
           <Zeile
             label={t('crossSection')}
             value={`${round(bedarf.querschnitt.flaeche, 2)} ${t('unitM2')}`}
@@ -159,12 +180,40 @@ export default function SandsackErgebnis({
             label={t('buildTime')}
             value={`${round(bedarf.bauzeit)} ${t('unitH')}`}
           />
+          <Zeile
+            label={t('throughput')}
+            value={`${Math.round(bedarf.durchsatz)} ${t('unitPieces')}`}
+          />
           <Zeile label={t('split')} value={verteilung} />
           <Zeile
             label={t('personnelForTarget')}
             value={`${bedarf.personalFuerZielzeit} ${t(
               'unitPersons'
             )} (${round(params.dammZielzeit)} ${t('unitH')})`}
+          />
+          <Zeile
+            label={t('chainHelpers')}
+            value={`${bedarf.kettenHelfer} ${t('unitPersons')}`}
+          />
+          {/* Die wirksamen Leistungswerte: Sie hängen an Truppgröße, Füllhilfe,
+              Zubinden und Trageweite und sind deshalb keine Konstanten. */}
+          <Zeile
+            label={t('fillRate')}
+            value={`${round(bedarf.leistung.fuellen)} ${t(
+              'unitBagsPerHourPerson'
+            )}`}
+          />
+          <Zeile
+            label={t('transportRate')}
+            value={`${round(bedarf.leistung.transport)} ${t(
+              'unitBagsPerHourPerson'
+            )}`}
+          />
+          <Zeile
+            label={t('layRate')}
+            value={`${round(bedarf.leistung.verbauen)} ${t(
+              'unitBagsPerHourPerson'
+            )}`}
           />
         </TableBody>
       </Table>
@@ -182,7 +231,15 @@ export default function SandsackErgebnis({
             label={t('materialSand')}
             value={`${round(bedarf.sandMasse)} ${t('unitT')}`}
           />
-          <Zeile label={t('materialTrucks')} value={stk(bedarf.fuhren)} />
+          <Zeile label={t('pallets')} value={stk(bedarf.paletten)} />
+          <Zeile
+            label={t('trucksBags')}
+            value={stk(bedarf.lkwFuhrenSaecke)}
+          />
+          <Zeile
+            label={t('materialTrucks')}
+            value={stk(bedarf.lkwFuhrenSand)}
+          />
           <Zeile
             label={t('materialFoil')}
             value={`${Math.round(bedarf.folieFlaeche)} ${t('unitM2')}`}
@@ -217,7 +274,11 @@ export default function SandsackErgebnis({
                 label={t('totalSand')}
                 value={`${round(summe.sandMasse)} ${t('unitT')}`}
               />
-              <Zeile label={t('totalTrucks')} value={stk(summe.fuhren)} />
+              <Zeile label={t('pallets')} value={stk(summe.paletten)} />
+              <Zeile
+                label={t('totalTrucks')}
+                value={stk(summe.lkwFuhrenSaecke)}
+              />
               <Zeile
                 label={t('totalFoil')}
                 value={`${Math.round(summe.folieFlaeche)} ${t('unitM2')}`}

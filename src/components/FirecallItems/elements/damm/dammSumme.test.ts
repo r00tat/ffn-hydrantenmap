@@ -62,16 +62,23 @@ describe('dammSumme', () => {
     );
     // Aufgerundet wird über die Gesamtmenge, nicht je Abschnitt: Ein halb
     // beladener LKW fährt nicht zweimal.
-    expect(summe.fuhren).toBe(Math.ceil(summe.sandVolumen / 8));
+    expect(summe.paletten).toBe(Math.ceil(summe.saecke / 50));
+    expect(summe.lkwFuhrenSaecke).toBe(Math.ceil(summe.paletten / 10));
+    expect(summe.lkwFuhrenSand).toBe(Math.ceil(summe.sandMasse / 10));
   });
 
-  it('rechnet die Bauzeit aus allen Personenstunden und allen Kräften', () => {
+  it('nimmt die Bauzeit des längsten Abschnitts, nicht die Summe', () => {
+    // Jeder Abschnitt hat seine eigene Mannschaft, und die Abschnitte werden
+    // gleichzeitig gebaut — fertig ist der Damm, wenn der letzte steht.
     const summe = dammSumme([
-      line({ name: 'A', dammPersonal: 10 }),
-      line({ name: 'B', dammPersonal: 6 }),
+      line({ name: 'A', meter: 100, dammHoehe: 1, dammPersonal: 10 }),
+      line({ name: 'B', meter: 20, dammHoehe: 0.5, dammPersonal: 6 }),
     ])!;
     expect(summe.personal).toBe(16);
-    expect(summe.bauzeit).toBeCloseTo(summe.personenstunden / 16, 6);
+    expect(summe.bauzeit).toBe(
+      Math.max(...summe.abschnitte.map((a) => a.bedarf.bauzeit))
+    );
+    expect(summe.bauzeit).toBe(summe.abschnitte[0].bedarf.bauzeit);
   });
 
   it('bleibt ohne Kräfte bei einer Bauzeit von null', () => {
@@ -82,8 +89,8 @@ describe('dammSumme', () => {
 
   it('sammelt die Warnungen der Abschnitte ohne Doppelnennung', () => {
     const summe = dammSumme([
-      line({ name: 'A', dammBauweise: 'einfach', dammHoehe: 1 }),
-      line({ name: 'B', dammBauweise: 'einfach', dammHoehe: 1.2 }),
+      line({ name: 'A', dammBauweise: 'einfach', dammHoehe: 0.6 }),
+      line({ name: 'B', dammBauweise: 'einfach', dammHoehe: 0.8 }),
     ])!;
     expect(summe.warnings.filter((w) => w === 'einfachZuHoch')).toHaveLength(1);
   });

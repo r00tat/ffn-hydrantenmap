@@ -12,7 +12,9 @@ export interface DammbauDiaryLabels {
   section: (laenge: number, hoehe: number, bauweise: string) => string;
   bags: (count: number, reserve: number) => string;
   sand: (tons: number, cubic: number) => string;
-  trucks: (count: number) => string;
+  pallets: (count: number) => string;
+  trucksBags: (count: number) => string;
+  trucksSand: (count: number) => string;
   foil: (squareMetres: number) => string;
   work: (hours: number, personal: number) => string;
   targetTime: (hours: number, personal: number) => string;
@@ -57,7 +59,9 @@ export function buildDammbauDiaryEntry(input: DammbauDiaryInput): Diary {
     ),
     labels.bags(bedarf.saecke, bedarf.saeckeBestellen),
     labels.sand(round(bedarf.sandMasse), round(bedarf.sandVolumen)),
-    labels.trucks(bedarf.fuhren),
+    labels.pallets(bedarf.paletten),
+    labels.trucksBags(bedarf.lkwFuhrenSaecke),
+    labels.trucksSand(bedarf.lkwFuhrenSand),
     labels.foil(Math.round(bedarf.folieFlaeche)),
     labels.work(round(bedarf.bauzeit), Math.round(params.dammPersonal)),
     labels.targetTime(
@@ -74,7 +78,7 @@ export function buildDammbauDiaryEntry(input: DammbauDiaryInput): Diary {
       labels.totalTitle(summe.abschnitte.length),
       labels.totalBags(summe.saeckeBestellen),
       labels.totalSand(round(summe.sandMasse)),
-      labels.totalTrucks(summe.fuhren)
+      labels.totalTrucks(summe.lkwFuhrenSaecke)
     );
   }
 
