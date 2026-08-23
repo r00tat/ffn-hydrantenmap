@@ -32,6 +32,7 @@ import {
   dammbauView,
   nachTabelle,
   type DammBauweise,
+  type DammVorgabe,
   type DammbauParams,
 } from '../../FirecallItems/elements/damm/sandsack';
 import { useSnackbar } from '../../providers/SnackbarProvider';
@@ -81,6 +82,15 @@ const FORMAT_LABELS: Record<
   '30x60': 'bagFormat_30x60',
   '40x70': 'bagFormat_40x70',
 };
+
+/** Welches von Personal und Zeit eingegeben wird — das andere wird gerechnet. */
+const VORGABEN: {
+  value: DammVorgabe;
+  label: 'givenPersonnel' | 'givenTime';
+}[] = [
+  { value: 'personal', label: 'givenPersonnel' },
+  { value: 'zeit', label: 'givenTime' },
+];
 
 /**
  * Die Reglerwerte als Felder am Element.
@@ -178,24 +188,43 @@ export default function SandsackRechner({
         view,
         timestamp: new Date().toISOString(),
         bauweiseLabel: t(BAUWEISE_LABELS[params.dammBauweise]),
+        formatLabel: t(FORMAT_LABELS[params.sackFormat] ?? 'bagFormat_30x60'),
         summe,
         labels: {
           title: (name) => t('diaryTitle', { name }),
           section: (metres, height, method) =>
             t('diarySection', { metres, height, method }),
-          bags: (count, order) => t('diaryBags', { count, order }),
+          bags: (order, needed, reserve) =>
+            t('diaryBags', { order, needed, reserve }),
           sand: (tons, cubic) => t('diarySand', { tons, cubic }),
           pallets: (count) => t('diaryPallets', { count }),
           trucksBags: (count) => t('diaryTrucksBags', { count }),
           trucksSand: (count) => t('diaryTrucksSand', { count }),
           foil: (area) => t('diaryFoil', { area }),
+          bagFormat: (format, fillLevel, weightWet) =>
+            t('diaryBagFormat', { format, fillLevel, weightWet }),
+          tools: (shovels, funnels) =>
+            t('diaryTools', { shovels, funnels }),
+          waterLevel: (level, freeboard) =>
+            t('diaryWaterLevel', { level, freeboard }),
+          crossSection: (base, crown, layers) =>
+            t('diaryCrossSection', { base, crown, layers }),
+          split: (fill, transport, lay) =>
+            t('diarySplit', { fill, transport, lay }),
+          carry: (metres, helpers) => t('diaryCarry', { metres, helpers }),
+          source:
+            view.bedarf.saeckeSource === 'tabelle'
+              ? t('diarySourceTable')
+              : t('diarySourceGeometry'),
+          funnel: t('diaryFunnel'),
+          tie: t('diaryTie'),
           work: (hours, personal) => t('diaryWork', { hours, personal }),
-          targetTime: (hours, personal) =>
-            t('diaryTargetTime', { hours, personal }),
           totalTitle: (count) => t('diaryTotalTitle', { count }),
           totalBags: (count) => t('diaryTotalBags', { count }),
           totalSand: (tons) => t('diaryTotalSand', { tons }),
           totalTrucks: (count) => t('diaryTotalTrucks', { count }),
+          totalPersonnel: (count, hours) =>
+            t('diaryTotalPersonnel', { count, hours }),
         },
       })
     );
@@ -417,8 +446,6 @@ export default function SandsackRechner({
                 </TextField>
               </Grid>
               {zahl('sackFuellgrad', t('fillLevel'), 1, t('unitPercent'))}
-              {zahl('dammPersonal', t('personnel'), 1)}
-              {zahl('dammZielzeit', t('targetTime'), 0.5, t('unitH'))}
               {zahl(
                 'transportWeite',
                 t('carryDistance'),
@@ -429,6 +456,42 @@ export default function SandsackRechner({
               {zahl('lkwNutzlast', t('truckPayload'), 1, t('unitT'))}
               {schalter('fuellTrichter', t('funnel'), t('funnelHint'))}
               {schalter('saeckeRoedeln', t('tie'), t('tieHint'))}
+
+              {/* Zuletzt, weil es aus allem darüber folgt: Trageweite,
+                  Füllhilfe und Zubinden bestimmen die Leistungswerte, und aus
+                  denen ergibt sich, wie lange es mit den Kräften dauert — oder
+                  wie viele Kräfte für die Zeit nötig sind.
+
+                  Genau eines von beiden: Beides einzugeben hieße, dieselbe
+                  Rechnung zweimal in verschiedene Richtungen zu führen. */}
+              <Grid size={{ xs: 6 }}>
+                <Tooltip title={t('givenHint')}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('given')}
+                    </Typography>
+                    <ToggleButtonGroup
+                      exclusive
+                      fullWidth
+                      size="small"
+                      value={params.dammVorgabe}
+                      onChange={(_event, value) =>
+                        value !== null &&
+                        set('dammVorgabe', value as DammVorgabe)
+                      }
+                    >
+                      {VORGABEN.map(({ value, label }) => (
+                        <ToggleButton key={value} value={value}>
+                          {t(label)}
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                  </Box>
+                </Tooltip>
+              </Grid>
+              {params.dammVorgabe === 'personal'
+                ? zahl('dammPersonal', t('personnel'), 1)
+                : zahl('dammZielzeit', t('targetTime'), 0.5, t('unitH'))}
             </Grid>
 
             {/* Das Bild steht **vor** den Zahlen: Es beantwortet, was

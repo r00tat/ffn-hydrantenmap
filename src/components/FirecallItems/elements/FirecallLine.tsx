@@ -30,6 +30,7 @@ export class FirecallLine extends FirecallMultiPoint {
   sackFuellgrad?: number;
   sandDichte?: number;
   dammReserve?: number;
+  dammVorgabe?: Line['dammVorgabe'];
   dammPersonal?: number;
   dammZielzeit?: number;
   fuellTrichter?: string;
@@ -55,6 +56,7 @@ export class FirecallLine extends FirecallMultiPoint {
         sackFuellgrad: this.sackFuellgrad,
         sandDichte: this.sandDichte,
         dammReserve: this.dammReserve,
+        dammVorgabe: this.dammVorgabe,
         dammPersonal: this.dammPersonal,
         dammZielzeit: this.dammZielzeit,
         fuellTrichter: this.fuellTrichter,
@@ -147,6 +149,7 @@ export class FirecallLine extends FirecallMultiPoint {
       sackFuellgrad: this.sackFuellgrad,
       sandDichte: this.sandDichte,
       dammReserve: this.dammReserve,
+      dammVorgabe: this.dammVorgabe,
       dammPersonal: this.dammPersonal,
       dammZielzeit: this.dammZielzeit,
       fuellTrichter: this.fuellTrichter,

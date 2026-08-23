@@ -52,7 +52,7 @@ const line = (overrides: Partial<Line> = {}): Line =>
 const wert = (label: string) =>
   screen.getByText(label).closest('tr')?.lastElementChild?.textContent ?? '';
 
-const saecke = () => Number(/(\d+)/.exec(wert('Säcke verbaut'))?.[1] ?? 0);
+const saecke = () => Number(/(\d+)/.exec(wert('Säcke im Damm'))?.[1] ?? 0);
 
 describe('DammbauPanel', () => {
   beforeEach(() => {
@@ -80,7 +80,25 @@ describe('DammbauPanel', () => {
       /^(19|20|21)\d m$/
     );
     expect(saecke()).toBeGreaterThan(0);
-    expect(wert('Bauzeit')).toMatch(/h$/);
+    // Vorgegeben sind die Kräfte, gerechnet wird die Bauzeit.
+    expect(wert('Bauzeit (gerechnet)')).toMatch(/h$/);
+  });
+
+  it('rechnet auf Vorgabe der Fertigstellung die Kräfte statt der Bauzeit', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(<DammbauPanel item={line()} open onClose={() => {}} />);
+
+    await user.click(screen.getByRole('button', { name: 'Fertigstellung' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Kräfte (gerechnet)')).toBeInTheDocument()
+    );
+    // Das Eingabefeld hat gewechselt: jetzt die Zeit, nicht die Kräfte.
+    expect(
+      screen.getByRole('spinbutton', { name: /Fertig in/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: /^Kräfte/ })).toBeNull();
+    expect(Number(/(\d+)/.exec(wert('Kräfte (gerechnet)'))?.[1] ?? 0)).toBeGreaterThan(0);
   });
 
   it('rechnet die Sackzahl bei einer größeren Dammhöhe neu', async () => {
@@ -157,7 +175,7 @@ describe('DammbauPanel', () => {
     const user = userEvent.setup();
     renderWithIntl(<DammbauPanel item={line()} open onClose={() => {}} />);
 
-    const bauzeit = () => Number.parseFloat(wert('Bauzeit'));
+    const bauzeit = () => Number.parseFloat(wert('Bauzeit (gerechnet)'));
     const ohne = bauzeit();
 
     await user.click(screen.getByLabelText(/Füllhilfe/));
@@ -238,6 +256,9 @@ describe('DammbauPanel', () => {
     expect(entry.type).toBe('diary');
     expect(entry.name).toContain('Uferstraße');
     expect(entry.beschreibung).toContain('Sandsäcke:');
+    // Der Eintrag ist eine Anforderung: Die Menge mit Reserve steht zuerst.
+    expect(entry.beschreibung).toMatch(/Sandsäcke: \d+ anfordern/);
+    expect(entry.beschreibung).not.toContain('verbaut');
     expect(entry.beschreibung).toContain('Paletten:');
     expect(entry.beschreibung).toContain('LKW-Fuhren gefüllte Säcke:');
     // Nur ein Abschnitt: Die Summe wäre eine Wiederholung.

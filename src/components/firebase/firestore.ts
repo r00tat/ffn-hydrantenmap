@@ -407,9 +407,16 @@ export interface Line extends MultiPointItem {
   sandDichte?: number;
   /** Sackreserve in % für Bruch und Fehlfüllung. */
   dammReserve?: number;
-  /** Eingesetzte Kräfte. */
+  /**
+   * Was von Personal und Zeit vorgegeben ist — das andere wird gerechnet.
+   *
+   * `'personal'`: Kräfte eingetragen, Bauzeit ist das Ergebnis.
+   * `'zeit'`: Fertigstellung eingetragen, Personalbedarf ist das Ergebnis.
+   */
+  dammVorgabe?: 'personal' | 'zeit';
+  /** Eingesetzte Kräfte. Gilt bei `dammVorgabe: 'personal'`. */
   dammPersonal?: number;
-  /** Gewünschte Fertigstellungszeit in h. */
+  /** Gewünschte Fertigstellungszeit in h. Gilt bei `dammVorgabe: 'zeit'`. */
   dammZielzeit?: number;
   /** `'true'`, wenn beim Füllen eine Füllhilfe im Einsatz ist. */
   fuellTrichter?: string;

@@ -209,6 +209,16 @@ function DammbauInhalt() {
                 {round(summe.sandMasse)} {t('unitT')} {t('materialSand')} ·{' '}
                 {summe.lkwFuhrenSaecke} {t('trucks')}
               </Typography>
+              {/* Das Personal steht als eigene Zeile und nicht in der Reihe
+                  darüber: Es ist die zweite Nachforderung neben dem Material,
+                  und gebraucht wird die **Summe** über alle Abschnitte — nicht
+                  die des Abschnitts, den man gerade angeklickt hat. */}
+              <Typography variant="body2">
+                <strong>
+                  {summe.personal} {t('unitPersons')}
+                </strong>{' '}
+                — {t('totalBuildTime')} {round(summe.bauzeit)} {t('unitH')}
+              </Typography>
             </Alert>
           )}
 

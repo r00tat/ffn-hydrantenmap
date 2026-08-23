@@ -176,21 +176,32 @@ export default function SandsackErgebnis({
             label={t('personHours')}
             value={`${round(bedarf.personenstunden)} ${t('unitH')}`}
           />
-          <Zeile
-            label={t('buildTime')}
-            value={`${round(bedarf.bauzeit)} ${t('unitH')}`}
-          />
+          {/* Die gerechnete Größe steht als solche da: Was eingegeben wurde,
+              muss der Rechner nicht zurückmelden. */}
+          {bedarf.vorgabe === 'personal' ? (
+            <Zeile
+              label={t('resultBuildTime')}
+              value={`${round(bedarf.bauzeit)} ${t('unitH')}`}
+            />
+          ) : (
+            <>
+              <Zeile
+                label={t('resultPersonnel')}
+                value={`${bedarf.kraefte} ${t('unitPersons')}`}
+              />
+              <Zeile
+                label={t('buildTime')}
+                value={`${round(bedarf.bauzeit)} ${t('unitH')} (${t(
+                  'targetTime'
+                )} ${round(params.dammZielzeit)} ${t('unitH')})`}
+              />
+            </>
+          )}
           <Zeile
             label={t('throughput')}
             value={`${Math.round(bedarf.durchsatz)} ${t('unitPieces')}`}
           />
           <Zeile label={t('split')} value={verteilung} />
-          <Zeile
-            label={t('personnelForTarget')}
-            value={`${bedarf.personalFuerZielzeit} ${t(
-              'unitPersons'
-            )} (${round(params.dammZielzeit)} ${t('unitH')})`}
-          />
           <Zeile
             label={t('chainHelpers')}
             value={`${bedarf.kettenHelfer} ${t('unitPersons')}`}
@@ -244,13 +255,10 @@ export default function SandsackErgebnis({
             label={t('materialFoil')}
             value={`${Math.round(bedarf.folieFlaeche)} ${t('unitM2')}`}
           />
-          <Zeile
-            label={t('materialShovels')}
-            value={stk(bedarf.personalVerteilung.fuellen)}
-          />
+          <Zeile label={t('materialShovels')} value={stk(bedarf.schaufeln)} />
           <Zeile
             label={t('materialFunnels')}
-            value={stk(Math.ceil(bedarf.personalVerteilung.fuellen / 2))}
+            value={stk(bedarf.fuellhilfen)}
           />
         </TableBody>
       </Table>

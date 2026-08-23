@@ -205,6 +205,34 @@ describe('Dammbau', () => {
     expect(screen.getByText(/2 Abschnitte/)).toBeInTheDocument();
   });
 
+  it('nennt die Summe der benötigten Kräfte über alle Abschnitte', () => {
+    // Zwei Abschnitte mit je 12 Kräften (Vorbelegung) sind 24 nachzufordern.
+    linien = [line(), line({ id: 'linie-2', name: 'Hofeinfahrt' })];
+    renderWithIntl(<Dammbau />);
+
+    expect(screen.getByText('24 Kräfte')).toBeInTheDocument();
+  });
+
+  it('summiert auch die Kräfte, die aus einer Zielzeit gerechnet sind', () => {
+    linien = [
+      line({ dammPersonal: 10 }),
+      line({
+        id: 'linie-2',
+        name: 'Hofeinfahrt',
+        dammVorgabe: 'zeit',
+        dammZielzeit: 4,
+        // Bei Vorgabe der Zeit zählt nicht dieser Wert, sondern der gerechnete.
+        dammPersonal: 1,
+      }),
+    ];
+    renderWithIntl(<Dammbau />);
+
+    const kraefte = Number(
+      /(\d+) Kräfte/.exec(document.body.textContent ?? '')?.[1] ?? 0
+    );
+    expect(kraefte).toBeGreaterThan(11);
+  });
+
   it('lässt den Gesamtbedarf bei einem einzigen Abschnitt weg', () => {
     linien = [line()];
     renderWithIntl(<Dammbau />);

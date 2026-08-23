@@ -25,6 +25,7 @@ const basis = {
   laenge: 100,
   hoehe: 1,
   bauweise: 'pyramide' as const,
+  vorgabe: 'personal' as const,
   format,
   fuellgrad: 66,
   sandDichte: 1.5,
@@ -303,15 +304,49 @@ describe('Personal und Bauzeit', () => {
     expect(weit.kettenHelfer).toBe(40);
   });
 
-  it('nennt das Personal für die gewünschte Fertigstellungszeit', () => {
-    const r = sandsackBedarf(basis);
-    expect(r.personalFuerZielzeit).toBeGreaterThan(basis.personal);
-    // Mit dieser Mannschaft trägt es dann auch
-    const mit = sandsackBedarf({
+  it('nennt bei Vorgabe der Zeit das Personal statt umgekehrt', () => {
+    const r = sandsackBedarf({ ...basis, vorgabe: 'zeit', zielzeit: 4 });
+    expect(r.vorgabe).toBe('zeit');
+    // Die gerechnete Mannschaft hält die Zielzeit …
+    expect(r.bauzeit).toBeLessThanOrEqual(4);
+    // … und ist die kleinste, die das tut.
+    const einerWeniger = sandsackBedarf({
       ...basis,
-      personal: r.personalFuerZielzeit,
+      personal: r.kraefte - 1,
     });
-    expect(mit.bauzeit).toBeLessThanOrEqual(basis.zielzeit);
+    expect(einerWeniger.bauzeit).toBeGreaterThan(4);
+  });
+
+  it('ignoriert bei Vorgabe der Zeit die eingetragenen Kräfte', () => {
+    const a = sandsackBedarf({ ...basis, vorgabe: 'zeit', personal: 2 });
+    const b = sandsackBedarf({ ...basis, vorgabe: 'zeit', personal: 400 });
+    expect(a.kraefte).toBe(b.kraefte);
+  });
+
+  it('ignoriert bei Vorgabe der Kräfte die eingetragene Zielzeit', () => {
+    const a = sandsackBedarf({ ...basis, zielzeit: 1 });
+    const b = sandsackBedarf({ ...basis, zielzeit: 100 });
+    expect(a.bauzeit).toBe(b.bauzeit);
+    expect(a.kraefte).toBe(12);
+  });
+
+  it('rechnet die Leistungswerte mit der gerechneten Mannschaft', () => {
+    // Die Füllleistung je Person hängt an der Truppgröße — sie muss zu den
+    // Kräften passen, die herauskommen, nicht zu den eingetragenen.
+    const r = sandsackBedarf({ ...basis, vorgabe: 'zeit', zielzeit: 4 });
+    const gegenprobe = sandsackBedarf({ ...basis, personal: r.kraefte });
+    expect(r.leistung.fuellen).toBe(gegenprobe.leistung.fuellen);
+    expect(r.personalVerteilung).toEqual(gegenprobe.personalVerteilung);
+  });
+
+  it('meldet eine Zielzeit, die keine Mannschaft hält', () => {
+    const r = sandsackBedarf({
+      ...basis,
+      vorgabe: 'zeit',
+      zielzeit: 0.05,
+    });
+    expect(r.kraefte).toBe(0);
+    expect(r.warnings).toContain('zielzeitVerfehlt');
   });
 
   it('lässt die Leistungswerte von Hand überschreiben', () => {
@@ -324,13 +359,15 @@ describe('Personal und Bauzeit', () => {
   it('kommt ohne Personal ohne Division durch Null aus', () => {
     const r = sandsackBedarf({ ...basis, personal: 0 });
     expect(r.bauzeit).toBe(0);
+    expect(r.kraefte).toBe(0);
     expect(r.warnings).toContain('keinPersonal');
   });
 
-  it('warnt, wenn die Zielzeit mit den Kräften nicht zu halten ist', () => {
+  it('warnt bei Vorgabe der Kräfte nicht über die Zielzeit', () => {
+    // Bei vorgegebenen Kräften ist die Bauzeit die Antwort, keine Verfehlung.
     expect(
       sandsackBedarf({ ...basis, personal: 4, zielzeit: 2 }).warnings
-    ).toContain('zielzeitVerfehlt');
+    ).not.toContain('zielzeitVerfehlt');
   });
 });
 
@@ -402,6 +439,8 @@ describe('dammbauParams', () => {
   it('füllt fehlende Felder mit den Vorbelegungen', () => {
     const params = dammbauParams({ type: 'line', name: 'Damm' } as Line);
     expect(params).toMatchObject(DAMM_DEFAULTS);
+    // Vorgegeben sind die Kräfte — im Einsatz ist zuerst bekannt, wer da ist.
+    expect(params.dammVorgabe).toBe('personal');
     // Ohne Handeingabe rechnet die Tabelle.
     expect(params.dammBoeschung).toBeUndefined();
     expect(params.fuellLeistung).toBeUndefined();
@@ -418,8 +457,10 @@ describe('dammbauParams', () => {
       fuellTrichter: 'true',
       saeckeRoedeln: 'true',
       dammBoeschung: 2.5,
+      dammVorgabe: 'zeit',
     } as Line);
     expect(params.dammHoehe).toBe(1.2);
+    expect(params.dammVorgabe).toBe('zeit');
     expect(params.dammPersonal).toBe(DAMM_DEFAULTS.dammPersonal);
     expect(params.sackFormat).toBe('40x70');
     expect(params.dammBauweise).toBe('notdamm');

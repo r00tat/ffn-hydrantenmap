@@ -305,11 +305,34 @@ Rundung der Tabelle.
 ```
 Personenstunden je Sack = 1/Füllen + 1/Transport + 1/Verlegen
 Bauzeit                 = Säcke × Personenstunden je Sack / Kräfte
-Kräfte für die Zielzeit  = kleinste Mannschaft, die die Zielzeit hält
 ```
 
 Die Kräfte verteilen sich nach dem Arbeitsanfall auf die drei Tätigkeiten (nach
 größten Resten, damit die Summe die eingetragene Zahl trifft).
+
+### Vorgegeben wird eines von beiden
+
+Personal und Zeit sind **eine** Gleichung. Beides einzugeben und beides
+zurückzubekommen hieße, dieselbe Rechnung zweimal in verschiedene Richtungen zu
+führen und zwei Zahlen zu erhalten, von denen keine gilt. Deshalb gibt es im
+Rechner einen Umschalter:
+
+| Vorgabe | Eingabe | Ergebnis |
+| --- | --- | --- |
+| **Kräfte** (Vorbelegung) | eingesetzte Kräfte | Bauzeit |
+| **Fertigstellung** | gewünschte Zeit | Personalbedarf |
+
+Vorbelegt sind die **Kräfte**: Im Einsatz ist zuerst bekannt, wer da ist — die
+Frage lautet dann, wie lange es dauert. Wer von der anderen Seite kommt
+(„der Damm muss bis 22 Uhr stehen"), schaltet um.
+
+Bei Vorgabe der Zeit wird die **kleinste** Mannschaft gesucht, die sie hält. Das
+geht, weil die Bauzeit monoton mit dem Personal fällt — und sie fällt schneller
+als bloß umgekehrt proportional, weil die Füllleistung je Person mit der
+Truppgröße steigt. Genau deshalb hängen auch Leistungswerte und Kräfteverteilung
+an der **gerechneten** Mannschaft und nicht an einer eingetragenen: Ein Trupp von
+40 füllt anders als einer von 12. Hält keine Mannschaft die Zeit, sagt der
+Rechner das statt eine Zahl zu nennen.
 
 **Die Probe ist die Unterlage selbst.** 100 m Damm mit 1 m Höhe sind 12.000
 Säcke. Bei 80 Säcken je Person und Stunde und 10 Helfern entfallen
@@ -371,13 +394,26 @@ anderes als die Zeilen darüber.
 Abschnitt hat seine eigene Mannschaft, und die Abschnitte werden gleichzeitig
 gebaut. Fertig ist der Damm, wenn der letzte steht.
 
+**Beim Personal zählt die Summe.** Nachgefordert werden Kräfte genauso wie
+Material, und gebraucht wird die Zahl über **alle** Abschnitte — nicht die des
+Abschnitts, den man gerade angeklickt hat. Sie steht deshalb als eigene Zeile im
+Gesamtbedarf auf der Seite, in der Summentabelle des Rechners und im
+Tagebucheintrag der Materialanforderung.
+
+Gezählt werden die **wirksamen** Kräfte je Abschnitt: die eingetragenen, wo die
+Kräfte vorgegeben sind, und die gerechneten, wo die Fertigstellung vorgegeben
+ist. Bei gemischten Vorgaben ist die Summe damit die Antwort auf „wie viele
+brauchen wir insgesamt?".
+
 ## Wohin das Ergebnis geht
 
 Der Rechner schreibt **nichts von selbst**. Am Regler wird probiert; in den
 Verlauf gehört die Menge, die tatsächlich abgesetzt wurde. Auf Knopfdruck legt
 „Materialanforderung ins Tagebuch" **einen** Eintrag der Art `M` im
 Einsatztagebuch ab, mit Abschnitt, Sackzahl, Sandmenge, Paletten, Fuhren, Folie,
-Bauzeit und — bei mehreren Abschnitten — der Gesamtsumme.
+Bauzeit samt Kräften und — bei mehreren Abschnitten — der Gesamtsumme. Es steht
+nur **eine** Zeile für Personal und Zeit darin: die wirksame Kombination, egal
+welche der beiden vorgegeben war.
 
 Die Parameter selbst liegen an der Linie und werden mit „Übernehmen" gespeichert.
 Damit steht die geplante Dammlinie samt Bedarf in der Lagekarte und ist nach dem

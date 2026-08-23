@@ -44,7 +44,7 @@ export interface DammSumme {
   lkwFuhrenSand: number;
   /** Folienbedarf in m². */
   folieFlaeche: number;
-  /** Alle eingetragenen Kräfte zusammen. */
+  /** Alle wirksamen Kräfte zusammen — eingetragen oder gerechnet. */
   personal: number;
   /** Bauzeit in h des längsten Abschnitts — die Ketten arbeiten gleichzeitig. */
   bauzeit: number;
@@ -91,7 +91,9 @@ export function dammSumme(items: FirecallItem[]): DammSumme | undefined {
   const sandVolumen = sum((a) => a.bedarf.sandVolumen);
   const sandMasse = sum((a) => a.bedarf.sandMasse);
   const saecke = sum((a) => a.bedarf.saecke);
-  const personal = sum((a) => a.params.dammPersonal);
+  // Die **wirksamen** Kräfte je Abschnitt, nicht die eingetragenen: Wo die
+  // Fertigstellung vorgegeben ist, ist der Personalbedarf gerechnet.
+  const personal = sum((a) => a.bedarf.kraefte);
 
   // Die Bauzeit summiert sich, sie teilt sich nicht: Jeder Abschnitt hat seine
   // eigene Kette mit seinen eigenen Kräften, und die Ketten arbeiten

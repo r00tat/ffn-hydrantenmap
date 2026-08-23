@@ -29,6 +29,16 @@ import {
  * Führungsvorgang wertlos.
  */
 
+/**
+ * Was von Personal und Zeit vorgegeben ist.
+ *
+ * Genau eines von beiden: Sind die Kräfte bekannt, ist die Bauzeit die Antwort;
+ * ist die Fertigstellung vorgegeben, ist der Personalbedarf die Antwort. Beides
+ * einzugeben hieße, dieselbe Rechnung zweimal in verschiedene Richtungen zu
+ * führen und zwei Zahlen zu bekommen, von denen keine gilt.
+ */
+export type DammVorgabe = 'personal' | 'zeit';
+
 export type DammBauweise =
   /** Pyramidenstapel — die Bauweise der Tabelle. */
   | 'pyramide'
@@ -347,8 +357,14 @@ export interface SandsackInput {
   sandDichte: number;
   /** Sackreserve in %. */
   reserve: number;
+  /**
+   * Was vorgegeben ist. Das andere wird gerechnet — beides einzugeben und
+   * beides zurückzubekommen wäre eine Rechnung im Kreis.
+   */
+  vorgabe: DammVorgabe;
+  /** Eingesetzte Kräfte. Gilt nur bei `vorgabe: 'personal'`. */
   personal: number;
-  /** Gewünschte Fertigstellungszeit in h. */
+  /** Gewünschte Fertigstellungszeit in h. Gilt nur bei `vorgabe: 'zeit'`. */
   zielzeit: number;
   /** Füllhilfe im Einsatz. */
   trichter: boolean;
@@ -397,6 +413,10 @@ export interface SandsackBedarf {
   lkwFuhrenSand: number;
   /** Folienbedarf in m². */
   folieFlaeche: number;
+  /** Schaufeln — eine je Kraft am Füllen. */
+  schaufeln: number;
+  /** Füllhilfen — eine je zwei Schaufeln, ein Halter je Paar. */
+  fuellhilfen: number;
   /** Lagen Säcke übereinander. */
   lagen: number;
   /** Wirksame Leistungswerte je Person und Stunde. */
@@ -407,10 +427,12 @@ export interface SandsackBedarf {
   personenstunden: number;
   /** Säcke je Stunde, die die Mannschaft schafft. */
   durchsatz: number;
-  /** Bauzeit in h mit dem eingetragenen Personal. */
+  /** Was vorgegeben war — das andere ist gerechnet. */
+  vorgabe: DammVorgabe;
+  /** Die wirksamen Kräfte: eingetragen oder aus der Zielzeit gerechnet. */
+  kraefte: number;
+  /** Bauzeit in h mit diesen Kräften. */
   bauzeit: number;
-  /** Kräfte, um die Zielzeit zu halten. */
-  personalFuerZielzeit: number;
   personalVerteilung: PersonalVerteilung;
   /** Helfer für die Sandsackkette — 1 je Meter Trageweite. */
   kettenHelfer: number;
@@ -476,24 +498,30 @@ export function sandsackBedarf(input: SandsackInput): SandsackBedarf {
     verbauen: input.verbauLeistung ?? VERLEGE_LEISTUNG,
   };
 
-  const aufwand = arbeitsaufwand(input.personal, quellen);
-  const personenstunden = saecke * aufwand.personenstundenJeSack;
-  const bauzeit = input.personal > 0 ? personenstunden / input.personal : 0;
-  const durchsatz = bauzeit > 0 ? saecke / bauzeit : 0;
-
   // Die kleinste Mannschaft, die die Zielzeit hält. Die Bauzeit fällt monoton
   // mit dem Personal — die Füllleistung je Person steigt mit der Truppgröße —,
   // also trägt die erste Mannschaft, die es schafft.
-  let personalFuerZielzeit = 0;
-  if (input.zielzeit > 0 && saecke > 0) {
+  const personalFuerZeit = (zielzeit: number): number => {
+    if (!(zielzeit > 0) || saecke <= 0) return 0;
     for (let p = 1; p <= MAX_PERSONAL; p += 1) {
-      const proBe = arbeitsaufwand(p, quellen);
-      if ((saecke * proBe.personenstundenJeSack) / p <= input.zielzeit) {
-        personalFuerZielzeit = p;
-        break;
-      }
+      const probe = arbeitsaufwand(p, quellen);
+      if ((saecke * probe.personenstundenJeSack) / p <= zielzeit) return p;
     }
-  }
+    return 0;
+  };
+
+  // Die wirksamen Kräfte: eingetragen oder aus der Zielzeit gerechnet. Alles
+  // Weitere hängt daran — auch die Füllleistung, denn sie steigt mit der
+  // Truppgröße. Deshalb wird der Aufwand erst danach bestimmt.
+  const kraefte =
+    input.vorgabe === 'zeit'
+      ? personalFuerZeit(input.zielzeit)
+      : Math.max(0, Math.round(input.personal));
+
+  const aufwand = arbeitsaufwand(kraefte, quellen);
+  const personenstunden = saecke * aufwand.personenstundenJeSack;
+  const bauzeit = kraefte > 0 ? personenstunden / kraefte : 0;
+  const durchsatz = bauzeit > 0 ? saecke / bauzeit : 0;
 
   if (laenge <= 0) warnings.push('keineStrecke');
   if (input.bauweise === 'einfach' && input.hoehe > EINFACH_MAX_HOEHE) {
@@ -510,10 +538,13 @@ export function sandsackBedarf(input: SandsackInput): SandsackBedarf {
   const masseJeSackNass = masseJeSack * NASS_FAKTOR;
   if (masseJeSackNass > MASSE_MAX_KG) warnings.push('sackZuSchwer');
   if (input.freibord >= input.hoehe) warnings.push('freibordUeberHoehe');
-  if (input.personal <= 0) {
+  if (input.vorgabe === 'zeit') {
+    // Nicht erreichbar heißt hier: auch mit einer Mannschaft, die niemand
+    // aufbringt, geht es nicht. Das ist die Auskunft, dass die Zielzeit fällt,
+    // nicht der Damm.
+    if (saecke > 0 && kraefte <= 0) warnings.push('zielzeitVerfehlt');
+  } else if (kraefte <= 0) {
     warnings.push('keinPersonal');
-  } else if (input.zielzeit > 0 && bauzeit > input.zielzeit) {
-    warnings.push('zielzeitVerfehlt');
   }
 
   const paletten = Math.ceil(saecke / SAECKE_JE_PALETTE);
@@ -545,13 +576,18 @@ export function sandsackBedarf(input: SandsackInput): SandsackBedarf {
       laenge *
       FOLIE_UEBERLAPPUNG *
       (2 * Math.max(0, input.hoehe) + FOLIE_ZUSCHLAG),
+    // Eine Schaufel je Füller, eine Füllhilfe je zwei — der Trupp aus der
+    // Unterlage ist „2 Schaufeln, 1 Halter".
+    schaufeln: aufwand.verteilung.fuellen,
+    fuellhilfen: Math.ceil(aufwand.verteilung.fuellen / 2),
     lagen: lagenHoehe > 0 ? Math.ceil(Math.max(0, input.hoehe) / lagenHoehe) : 0,
     leistung: aufwand.leistung,
     personenstundenJeSack: aufwand.personenstundenJeSack,
     personenstunden,
     durchsatz,
+    vorgabe: input.vorgabe,
+    kraefte,
     bauzeit,
-    personalFuerZielzeit,
     personalVerteilung: aufwand.verteilung,
     kettenHelfer: Math.max(0, Math.ceil(input.transportWeite)),
     wasserstand: Math.max(0, input.hoehe - input.freibord),
@@ -573,6 +609,11 @@ export const DAMM_DEFAULTS = {
   sandDichte: 1.5,
   /** Sackreserve in % für Bruch und Fehlfüllung. */
   dammReserve: 10,
+  /**
+   * Was vorgegeben ist. Die Kräfte, weil im Einsatz zuerst bekannt ist, wer da
+   * ist — und die Frage dann lautet, wie lange es dauert.
+   */
+  dammVorgabe: 'personal' as DammVorgabe,
   /** Eingesetzte Kräfte. */
   dammPersonal: 12,
   /** Gewünschte Fertigstellungszeit in h. */
@@ -595,6 +636,7 @@ export interface DammbauParams {
   dammHoehe: number;
   freibord: number;
   dammBauweise: DammBauweise;
+  dammVorgabe: DammVorgabe;
   /**
    * Basisbreite je m Höhe. `undefined` heißt: aus der Verlegetabelle rechnen.
    *
@@ -634,6 +676,7 @@ const optionalNumber = (value: number | undefined): number | undefined =>
 export function dammbauParams(item: Line): DammbauParams {
   const format = item.sackFormat;
   const bauweise = item.dammBauweise;
+  const vorgabe = item.dammVorgabe;
   return {
     dammHoehe: positiveOr(item.dammHoehe, DAMM_DEFAULTS.dammHoehe),
     freibord: positiveOr(item.freibord, DAMM_DEFAULTS.freibord),
@@ -641,6 +684,10 @@ export function dammbauParams(item: Line): DammbauParams {
       bauweise && DAMM_BAUWEISEN.includes(bauweise)
         ? bauweise
         : DAMM_DEFAULTS.dammBauweise,
+    dammVorgabe:
+      vorgabe === 'personal' || vorgabe === 'zeit'
+        ? vorgabe
+        : DAMM_DEFAULTS.dammVorgabe,
     dammBoeschung: optionalNumber(item.dammBoeschung),
     sackFormat:
       format && SACK_FORMATE[format] ? format : DAMM_DEFAULTS.sackFormat,
@@ -705,6 +752,7 @@ export function dammbauView(
       fuellgrad: params.sackFuellgrad,
       sandDichte: params.sandDichte,
       reserve: params.dammReserve,
+      vorgabe: params.dammVorgabe,
       personal: params.dammPersonal,
       zielzeit: params.dammZielzeit,
       trichter: params.fuellTrichter,
