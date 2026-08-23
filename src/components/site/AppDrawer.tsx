@@ -1,46 +1,51 @@
 import { mdiBiohazard } from '@mdi/js';
 import Icon from '@mdi/react';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ApiIcon from '@mui/icons-material/Api';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import BuildIcon from '@mui/icons-material/Build';
+import ChatIcon from '@mui/icons-material/Chat';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore';
-import HistoryIcon from '@mui/icons-material/History';
-import ApiIcon from '@mui/icons-material/Api';
-import ChatIcon from '@mui/icons-material/Chat';
+import DescriptionIcon from '@mui/icons-material/Description';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import EditRoadIcon from '@mui/icons-material/EditRoad';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import GroupIcon from '@mui/icons-material/Group';
+import HandymanIcon from '@mui/icons-material/Handyman';
+import HelpCenterIcon from '@mui/icons-material/HelpCenter';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlined';
+import HistoryIcon from '@mui/icons-material/History';
 import HubIcon from '@mui/icons-material/Hub';
 import InfoIcon from '@mui/icons-material/Info';
 import LayersIcon from '@mui/icons-material/Layers';
 import LibraryBooksIcon from '@mui/icons-material/LibraryBooks';
-import ListAltIcon from '@mui/icons-material/ListAlt';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import LoginIcon from '@mui/icons-material/Login';
 import MapIcon from '@mui/icons-material/Map';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import UserIcon from '@mui/icons-material/Person';
 import PinIcon from '@mui/icons-material/Pin';
 import PlaceIcon from '@mui/icons-material/Place';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import PrintIcon from '@mui/icons-material/Print';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import SmsIcon from '@mui/icons-material/Sms';
 import StorageIcon from '@mui/icons-material/Storage';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import UserIcon from '@mui/icons-material/Person';
-import PrintIcon from '@mui/icons-material/Print';
+import WarningIcon from '@mui/icons-material/Warning';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import WavesIcon from '@mui/icons-material/Waves';
-import WarningIcon from '@mui/icons-material/Warning';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
+import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -54,7 +59,8 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
 import { useBugReport } from '../bugReport/BugReportProvider';
 
-interface DrawerItem {
+/** Ein anklickbarer Menüpunkt — Link oder Aktion. */
+interface DrawerLink {
   text: string;
   icon: React.ReactNode;
   href: string;
@@ -62,23 +68,80 @@ interface DrawerItem {
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
-  children?: DrawerItem[];
   /** When set, render as a non-link clickable that invokes this handler. */
   onClick?: () => void;
 }
 
-function resolveHref(
-  item: DrawerItem,
-  firecallId: string | undefined,
-): string {
-  if (
-    item.einsatzSection != null &&
-    firecallId &&
-    firecallId !== 'unknown'
-  ) {
+/**
+ * Eine Gruppe ist ein reiner Aufklapper ohne eigenes Ziel. Die Übersichtsseiten
+ * mancher Gruppen (etwa /schadstoff) bleiben über die URL erreichbar.
+ */
+interface DrawerGroup {
+  text: string;
+  icon: React.ReactNode;
+  children: DrawerLink[];
+}
+
+function resolveHref(item: DrawerLink, firecallId: string | undefined): string {
+  if (item.einsatzSection != null && firecallId && firecallId !== 'unknown') {
     return `/einsatz/${firecallId}${item.einsatzSection ? `/${item.einsatzSection}` : ''}`;
   }
   return item.href;
+}
+
+/** Zustand direkt nach einem Seitenwechsel: nur die aktive Gruppe ist offen. */
+function defaultOpen(group?: string): Record<string, boolean> {
+  return group ? { [group]: true } : {};
+}
+
+/**
+ * Eindeutige Kennung eines Menüpunkts. Zwei Punkte können dasselbe Ziel haben —
+ * ohne laufenden Einsatz zeigen „Karte" und „Details" beide auf `/` —, markiert
+ * werden darf aber nur einer.
+ */
+function itemKey(text: string, group?: string): string {
+  return `${group ?? ''}|${text}`;
+}
+
+/**
+ * Trifft der Link die aktuelle Seite? `/fahrtenbuch` passt auch auf
+ * `/fahrtenbuch/maengel`, damit Unterseiten ihre Gruppe öffnen — welcher der
+ * passenden Links markiert wird, entscheidet {@link findActive}.
+ */
+function isActiveCandidate(pathname: string, href: string): boolean {
+  if (!href || href === '#') return false;
+  if (pathname === href) return true;
+  return href !== '/' && pathname.startsWith(`${href}/`);
+}
+
+/**
+ * Der längste passende Link gewinnt: auf `/fahrtenbuch/maengel` ist damit nur
+ * „Mängel" markiert und nicht zusätzlich das „Fahrtenbuch".
+ */
+function findActive(
+  directItems: DrawerLink[],
+  groups: DrawerGroup[],
+  firecallId: string | undefined,
+  pathname: string,
+): { key?: string; group?: string } {
+  let best: { key?: string; group?: string } = {};
+  let bestLength = -1;
+
+  const consider = (item: DrawerLink, group?: string) => {
+    const href = resolveHref(item, firecallId);
+    if (!isActiveCandidate(pathname, href)) return;
+    // Bei gleich langem Ziel gewinnt der erste Eintrag der Reihenfolge.
+    if (href.length <= bestLength) return;
+    bestLength = href.length;
+    best = { key: itemKey(item.text, group), group };
+  };
+
+  directItems.forEach((item) => consider(item));
+  groups.forEach((group) =>
+    group.children.forEach((child) => consider(child, group.text)),
+  );
+
+  return best;
 }
 
 export default function AppDrawer({
@@ -108,84 +171,127 @@ export default function AppDrawer({
   const t = useTranslations('drawer');
   const bugReport = useBugReport();
 
-  const drawerItems: DrawerItem[] = [
+  /** Immer ohne Aufklappen erreichbar. */
+  const directItems: DrawerLink[] = [
     { text: t('map'), icon: <MapIcon />, href: '/', einsatzSection: '' },
-    { text: t('details'), icon: <InfoIcon />, href: '/', einsatzSection: 'details' },
+    {
+      text: t('details'),
+      icon: <InfoIcon />,
+      href: '/',
+      einsatzSection: 'details',
+    },
     {
       text: t('firecalls'),
       icon: <LocalFireDepartmentIcon />,
       href: '/einsaetze',
     },
-    { text: t('layers'), icon: <LayersIcon />, href: '/ebenen', einsatzSection: 'ebenen' },
-    { text: t('units'), icon: <DirectionsCarIcon />, href: '/einsatzmittel', einsatzSection: 'einsatzmittel' },
+  ];
+
+  const groups: DrawerGroup[] = [
     {
-      text: t('diary'),
-      icon: <LibraryBooksIcon />,
-      href: '/tagebuch',
-      einsatzSection: 'tagebuch',
-    },
-    // { text: 'Tabelle', icon: <ListAltIcon />, href: '/sheet' },
-    {
-      text: t('locations'),
-      icon: <PlaceIcon />,
-      href: '/einsatzorte',
-      einsatzSection: 'einsatzorte',
-    },
-    {
-      text: t('blaulichtSms'),
-      icon: <SmsIcon />,
-      href: '/blaulicht-sms',
-    },
-    {
-      text: t('kennzeichen'),
-      icon: <PinIcon />,
-      href: '/kennzeichen',
-    },
-    {
-      text: t('geschaeftsbuch'),
-      icon: <MenuBookIcon />,
-      href: '/geschaeftsbuch',
-      einsatzSection: 'geschaeftsbuch',
-    },
-    {
-      // Ohne `einsatzSection`: das Fahrtenbuch ist keine Einsatz-Ansicht, es
-      // wird auch ohne laufenden Einsatz geführt. Der Weg in die
-      // Einsatz-Sammelerfassung führt über den Button auf der Fahrtenbuch-Seite.
-      text: t('fahrtenbuch'),
-      icon: <EditRoadIcon />,
-      href: '/fahrtenbuch',
+      text: t('groupSituation'),
+      icon: <MyLocationIcon />,
+      children: [
+        {
+          text: t('layers'),
+          icon: <LayersIcon />,
+          href: '/ebenen',
+          einsatzSection: 'ebenen',
+        },
+        {
+          text: t('units'),
+          icon: <DirectionsCarIcon />,
+          href: '/einsatzmittel',
+          einsatzSection: 'einsatzmittel',
+        },
+        {
+          text: t('locations'),
+          icon: <PlaceIcon />,
+          href: '/einsatzorte',
+          einsatzSection: 'einsatzorte',
+        },
+        {
+          // Neben der Karte und nicht darin: Die Frage „Leitung legen oder
+          // pendeln?" kommt vor dem Zeichnen. Die Seite bringt ihre eigene
+          // schmale Karte mit.
+          text: t('loeschwasserversorgung'),
+          icon: <WaterDropIcon />,
+          href: '/loeschwasserversorgung',
+          einsatzSection: 'loeschwasserversorgung',
+        },
+      ],
     },
     {
-      // Eigener Menüpunkt und nicht nur ein Button im Fahrtenbuch: Die
-      // Mängelliste ist die Arbeitsliste des Fahrzeugverantwortlichen und wird
-      // unabhängig vom Erfassen einer Fahrt geöffnet.
-      text: t('maengel'),
-      icon: <BuildIcon />,
-      href: '/fahrtenbuch/maengel',
+      text: t('groupOperationDocs'),
+      icon: <DescriptionIcon />,
+      children: [
+        {
+          text: t('diary'),
+          icon: <LibraryBooksIcon />,
+          href: '/tagebuch',
+          einsatzSection: 'tagebuch',
+        },
+        {
+          text: t('geschaeftsbuch'),
+          icon: <MenuBookIcon />,
+          href: '/geschaeftsbuch',
+          einsatzSection: 'geschaeftsbuch',
+        },
+        {
+          text: t('kostenersatz'),
+          icon: <ReceiptLongIcon />,
+          href: '/kostenersatz',
+          einsatzSection: 'kostenersatz',
+        },
+        {
+          text: t('chat'),
+          icon: <ChatIcon />,
+          href: '/chat',
+          einsatzSection: 'chat',
+        },
+        {
+          text: t('print'),
+          icon: <PrintIcon />,
+          href: '/print',
+          einsatzSection: 'print',
+        },
+      ],
     },
     {
-      text: t('kostenersatz'),
-      icon: <ReceiptLongIcon />,
-      href: '/kostenersatz',
-      einsatzSection: 'kostenersatz',
+      text: t('groupVehicles'),
+      icon: <LocalShippingIcon />,
+      children: [
+        {
+          // Ohne `einsatzSection`: das Fahrtenbuch ist keine Einsatz-Ansicht, es
+          // wird auch ohne laufenden Einsatz geführt. Der Weg in die
+          // Einsatz-Sammelerfassung führt über den Button auf der
+          // Fahrtenbuch-Seite.
+          text: t('fahrtenbuch'),
+          icon: <EditRoadIcon />,
+          href: '/fahrtenbuch',
+        },
+        {
+          // Eigener Menüpunkt und nicht nur ein Button im Fahrtenbuch: Die
+          // Mängelliste ist die Arbeitsliste des Fahrzeugverantwortlichen und
+          // wird unabhängig vom Erfassen einer Fahrt geöffnet.
+          text: t('maengel'),
+          icon: <BuildIcon />,
+          href: '/fahrtenbuch/maengel',
+        },
+      ],
     },
     {
-      // Neben der Karte und nicht darin: Die Frage „Leitung legen oder
-      // pendeln?" kommt vor dem Zeichnen. Die Seite bringt ihre eigene
-      // schmale Karte mit.
-      text: t('loeschwasserversorgung'),
-      icon: <WaterDropIcon />,
-      href: '/loeschwasserversorgung',
-      einsatzSection: 'loeschwasserversorgung',
+      text: t('groupTools'),
+      icon: <HandymanIcon />,
+      children: [
+        { text: t('blaulichtSms'), icon: <SmsIcon />, href: '/blaulicht-sms' },
+        { text: t('kennzeichen'), icon: <PinIcon />, href: '/kennzeichen' },
+        { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },
+      ],
     },
-    { text: t('chat'), icon: <ChatIcon />, href: '/chat', einsatzSection: 'chat' },
-    { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },
-    { text: t('print'), icon: <PrintIcon />, href: '/print', einsatzSection: 'print' },
     {
       text: t('hazmat'),
       icon: <Icon path={mdiBiohazard} size={1} />,
-      href: '/schadstoff',
-      einsatzSection: 'schadstoff',
       children: [
         {
           // Schadstoffdatenbank ist einsatzunabhängig — immer globaler Link.
@@ -215,136 +321,214 @@ export default function AppDrawer({
         },
       ],
     },
-    { text: t('tokens'), icon: <ApiIcon />, href: '/tokens' },
-    { text: t('auditLog'), icon: <HistoryIcon />, href: '/auditlog', admin: true },
-    { text: t('users'), icon: <UserIcon />, href: '/users', admin: true },
-    { text: t('groups'), icon: <GroupIcon />, href: '/groups', admin: true },
     {
       text: t('admin'),
       icon: <AdminPanelSettingsIcon />,
-      href: '/admin',
-      admin: true,
       children: [
-        { text: t('adminActions'), icon: <BuildIcon />, href: '/admin/actions' },
-        { text: t('gisDataPipeline'), icon: <StorageIcon />, href: '/admin/gis-data' },
-        { text: t('hydrantClusters'), icon: <HubIcon />, href: '/admin/hydrant-clusters' },
-        { text: t('adminKostenersatz'), icon: <ReceiptLongIcon />, href: '/admin/kostenersatz' },
-        { text: t('adminFahrtenbuch'), icon: <EditRoadIcon />, href: '/admin/fahrtenbuch' },
-        { text: t('adminDrive'), icon: <FolderSharedIcon />, href: '/admin/drive' },
-        { text: t('pegelstaende'), icon: <WavesIcon />, href: '/admin/pegelstaende' },
-        { text: t('deletedItems'), icon: <DeleteIcon />, href: '/admin/deleted-items' },
-        { text: t('hydrantCsvImport'), icon: <CloudUploadIcon />, href: '/admin/hydranten-csv-import' },
-        { text: t('bugReports'), icon: <BugReportIcon />, href: '/admin/bug-reports' },
+        // Tokens sind kein Admin-Recht: die Gruppe erscheint daher auch für
+        // Nicht-Admins, dann mit diesem einen Eintrag.
+        { text: t('tokens'), icon: <ApiIcon />, href: '/tokens' },
+        { text: t('users'), icon: <UserIcon />, href: '/users', admin: true },
+        { text: t('groups'), icon: <GroupIcon />, href: '/groups', admin: true },
+        {
+          text: t('auditLog'),
+          icon: <HistoryIcon />,
+          href: '/auditlog',
+          admin: true,
+        },
+        {
+          text: t('adminActions'),
+          icon: <BuildIcon />,
+          href: '/admin/actions',
+          admin: true,
+        },
+        {
+          text: t('gisDataPipeline'),
+          icon: <StorageIcon />,
+          href: '/admin/gis-data',
+          admin: true,
+        },
+        {
+          text: t('hydrantClusters'),
+          icon: <HubIcon />,
+          href: '/admin/hydrant-clusters',
+          admin: true,
+        },
+        {
+          text: t('adminKostenersatz'),
+          icon: <ReceiptLongIcon />,
+          href: '/admin/kostenersatz',
+          admin: true,
+        },
+        {
+          text: t('adminFahrtenbuch'),
+          icon: <EditRoadIcon />,
+          href: '/admin/fahrtenbuch',
+          admin: true,
+        },
+        {
+          text: t('adminDrive'),
+          icon: <FolderSharedIcon />,
+          href: '/admin/drive',
+          admin: true,
+        },
+        {
+          text: t('pegelstaende'),
+          icon: <WavesIcon />,
+          href: '/admin/pegelstaende',
+          admin: true,
+        },
+        {
+          text: t('deletedItems'),
+          icon: <DeleteIcon />,
+          href: '/admin/deleted-items',
+          admin: true,
+        },
+        {
+          text: t('hydrantCsvImport'),
+          icon: <CloudUploadIcon />,
+          href: '/admin/hydranten-csv-import',
+          admin: true,
+        },
+        {
+          text: t('bugReports'),
+          icon: <BugReportIcon />,
+          href: '/admin/bug-reports',
+          admin: true,
+        },
       ],
     },
     {
-      text: t('feedbackBugReport'),
-      icon: <BugReportIcon />,
-      href: '#',
-      onClick: () => bugReport.open(),
+      text: t('groupHelpAccount'),
+      icon: <HelpCenterIcon />,
+      children: [
+        {
+          text: t('documentation'),
+          icon: <HelpOutlineIcon />,
+          href: '/docs',
+        },
+        {
+          text: t('feedbackBugReport'),
+          icon: <BugReportIcon />,
+          href: '#',
+          onClick: () => bugReport.open(),
+        },
+        {
+          text: t('profile'),
+          icon: <AccountCircleIcon />,
+          href: '/profile',
+          signedInOnly: true,
+        },
+        { text: t('about'), icon: <InfoIcon />, href: '/about' },
+        { text: t('login'), icon: <LoginIcon />, href: '/login' },
+      ],
     },
-    { text: t('documentation'), icon: <HelpOutlineIcon />, href: '/docs' },
-    { text: t('login'), icon: <LoginIcon />, href: '/login' },
-    {
-      text: t('profile'),
-      icon: <AccountCircleIcon />,
-      href: '/profile',
-      signedInOnly: true,
-    },
-    { text: t('about'), icon: <InfoIcon />, href: '/about' },
   ];
 
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    if (!pathname) return initial;
-    for (const item of drawerItems) {
-      if (!item.children) continue;
-      const prefixes = [item.href];
-      if (item.einsatzSection != null && firecallId && firecallId !== 'unknown') {
-        prefixes.push(
-          `/einsatz/${firecallId}${item.einsatzSection ? `/${item.einsatzSection}` : ''}`,
-        );
-      }
-      if (prefixes.some((p) => p && pathname.startsWith(p))) {
-        initial[item.text] = true;
-      }
-    }
-    return initial;
-  });
+  const active = findActive(directItems, groups, firecallId, pathname ?? '');
+  const activeGroup = active.group;
 
-  const toggleMenu = useCallback((text: string) => {
-    setOpenMenus((prev) => ({ ...prev, [text]: !prev[text] }));
-  }, []);
+  // Der Aufklapp-Zustand wird zusammen mit der Gruppe gespeichert, für die er
+  // gilt. Führt die aktuelle Seite in eine andere Gruppe, ist der gemerkte
+  // Zustand ungültig und es gilt wieder „nur die aktive Gruppe offen".
+  const [openState, setOpenState] = useState<{
+    group?: string;
+    open: Record<string, boolean>;
+  }>({ open: {} });
+
+  const openGroups =
+    openState.group === activeGroup ? openState.open : defaultOpen(activeGroup);
+
+  // Ohne useCallback: der React Compiler memoisiert selbst, und `activeGroup`
+  // als Dependency kann er nicht als stabil nachweisen.
+  const toggleGroup = (text: string) => {
+    setOpenState((prev) => {
+      const base =
+        prev.group === activeGroup ? prev.open : defaultOpen(activeGroup);
+      return { group: activeGroup, open: { ...base, [text]: !base[text] } };
+    });
+  };
+
+  const isVisible = useCallback(
+    (item: DrawerLink) =>
+      (isAdmin || !item.admin) && (isSignedIn || !item.signedInOnly),
+    [isAdmin, isSignedIn],
+  );
+
+  const renderLink = (item: DrawerLink, groupText?: string) => {
+    const sx = groupText ? { pl: 4 } : undefined;
+
+    if (item.onClick) {
+      return (
+        <ListItemButton
+          key={item.text}
+          sx={sx}
+          onClick={() => {
+            item.onClick!();
+            setIsOpen(false);
+          }}
+        >
+          <ListItemIcon>{item.icon}</ListItemIcon>
+          <ListItemText primary={item.text} />
+        </ListItemButton>
+      );
+    }
+
+    const resolvedHref = resolveHref(item, firecallId);
+    const selected = active.key === itemKey(item.text, groupText);
+
+    return (
+      <Link href={resolvedHref} passHref key={item.text}>
+        <ListItemButton
+          sx={sx}
+          selected={selected}
+          aria-current={selected ? 'page' : undefined}
+          onClick={toggleDrawer}
+        >
+          <ListItemIcon>{item.icon}</ListItemIcon>
+          <ListItemText primary={item.text} />
+        </ListItemButton>
+      </Link>
+    );
+  };
 
   return (
     <div>
       <Drawer anchor="left" open={isOpen} onClose={toggleDrawer}>
-        <Box
-          sx={{ width: 250 }}
-          role="presentation"
-          onKeyDown={toggleDrawer}
-        >
+        <Box sx={{ width: 250 }} role="presentation" onKeyDown={toggleDrawer}>
           <List>
-            {drawerItems
-              .filter((item) => isAdmin || !item.admin)
-              .filter((item) => isSignedIn || !item.signedInOnly)
-              .map((item) => {
-                if (item.children) {
-                  const open = !!openMenus[item.text];
-                  return (
-                    <React.Fragment key={item.text}>
-                      <ListItemButton onClick={() => toggleMenu(item.text)}>
-                        <ListItemIcon>{item.icon}</ListItemIcon>
-                        <ListItemText primary={item.text} />
-                        {open ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                      <Collapse in={open} timeout="auto" unmountOnExit>
-                        <List component="div" disablePadding>
-                          {item.children.map((child) => {
-                            const childHref = resolveHref(child, firecallId);
-                            return (
-                              <Link href={childHref} passHref key={child.text}>
-                                <ListItemButton
-                                  sx={{ pl: 4 }}
-                                  onClick={toggleDrawer}
-                                >
-                                  <ListItemIcon>{child.icon}</ListItemIcon>
-                                  <ListItemText primary={child.text} />
-                                </ListItemButton>
-                              </Link>
-                            );
-                          })}
-                        </List>
-                      </Collapse>
-                    </React.Fragment>
-                  );
-                }
+            {directItems.filter(isVisible).map((item) => renderLink(item))}
 
-                if (item.onClick) {
-                  return (
-                    <ListItemButton
-                      key={item.text}
-                      onClick={() => {
-                        item.onClick!();
-                        setIsOpen(false);
-                      }}
-                    >
-                      <ListItemIcon>{item.icon}</ListItemIcon>
-                      <ListItemText primary={item.text} />
-                    </ListItemButton>
-                  );
-                }
+            <Divider sx={{ my: 1 }} />
 
-                const resolvedHref = resolveHref(item, firecallId);
-                return (
-                  <Link href={resolvedHref} passHref key={item.text}>
-                    <ListItemButton onClick={toggleDrawer}>
-                      <ListItemIcon>{item.icon}</ListItemIcon>
-                      <ListItemText primary={item.text} />
-                    </ListItemButton>
-                  </Link>
-                );
-              })}
+            {groups.map((group) => {
+              const children = group.children.filter(isVisible);
+              if (children.length === 0) return null;
+
+              const open = !!openGroups[group.text];
+              // Zugeklappt übernimmt der Gruppenkopf die Markierung, damit auch
+              // dann sichtbar bleibt, wo man gerade steht.
+              const marked = !open && activeGroup === group.text;
+
+              return (
+                <React.Fragment key={group.text}>
+                  <ListItemButton
+                    onClick={() => toggleGroup(group.text)}
+                    selected={marked}
+                    aria-current={marked ? true : undefined}
+                  >
+                    <ListItemIcon>{group.icon}</ListItemIcon>
+                    <ListItemText primary={group.text} />
+                    {open ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                  <Collapse in={open} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {children.map((child) => renderLink(child, group.text))}
+                    </List>
+                  </Collapse>
+                </React.Fragment>
+              );
+            })}
           </List>
         </Box>
       </Drawer>
