@@ -368,6 +368,50 @@ export interface Area extends MultiPointItem {
 export interface Line extends MultiPointItem {
   type: 'line';
   opacity?: number;
+
+  /**
+   * Sandsackbedarf für den Dammbau bei Hochwasser. `'true'`, wenn der Rechner an
+   * dieser Linie aktiv ist — dann ist die Linie eine **Dammlinie**.
+   *
+   * Die Felder stehen an der Linie und nicht an `MultiPointItem`: Eine Leitung
+   * ist kein Damm. Dieselbe Aufteilung wie bei der Löschwasserförderung, die an
+   * `Connection` hängt. Siehe docs/dammbau-sandsaecke.md.
+   */
+  dammbau?: string;
+  /** Geplante Dammhöhe in m. */
+  dammHoehe?: number;
+  /**
+   * Sicherheitszuschlag über dem erwarteten Wasserstand in m.
+   *
+   * Kein zweites Höhenfeld: Die Dammhöhe ist die Eingabe, das Freibord sagt,
+   * welcher Wasserstand damit noch gehalten wird. Umgekehrt gerechnet gäbe es
+   * zwei Wahrheiten für dieselbe Höhe.
+   */
+  freibord?: number;
+  /** Querschnitt des Dammes: einreihiger Wall, Pyramidenstapel, Dammbalken. */
+  dammBauweise?: 'einfach' | 'pyramide' | 'dammbalken';
+  /** Basisbreite je Meter Höhe beim Pyramidenstapel. */
+  dammBoeschung?: number;
+  /** Leeres Sackmaß in cm, Schlüssel in `SACK_FORMATE`. */
+  sackFormat?: string;
+  /** Füllgrad des Sackes in %. */
+  sackFuellgrad?: number;
+  /** Schüttdichte des Sandes in t/m³. */
+  sandDichte?: number;
+  /** Sackreserve in % für Bruch und Fehlfüllung. */
+  dammReserve?: number;
+  /** Eingesetzte Kräfte. */
+  dammPersonal?: number;
+  /** Gewünschte Fertigstellungszeit in h. */
+  dammZielzeit?: number;
+  /** Säcke je Person und Stunde beim Füllen. */
+  fuellLeistung?: number;
+  /** Säcke je Person und Stunde beim Transport. */
+  transportLeistung?: number;
+  /** Säcke je Person und Stunde beim Verlegen. */
+  verbauLeistung?: number;
+  /** Ladevolumen einer LKW-Fuhre Sand in m³. */
+  fuhrenVolumen?: number;
 }
 
 export interface Circle extends FirecallItem {

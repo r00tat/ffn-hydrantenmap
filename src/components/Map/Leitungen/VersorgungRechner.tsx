@@ -48,7 +48,7 @@ import FoerderungSection from './FoerderungSection';
 import PendelSection from './PendelSection';
 import VergleichSection from './VergleichSection';
 import { buildFoerderungDiaryEntry } from './foerderungDiaryEntry';
-import { parseNumber, round } from './panelNumbers';
+import { parseNumber, round } from '../panelNumbers';
 
 /**
  * Der Rechner für die Löschwasserversorgung einer Leitung: Förderung über lange

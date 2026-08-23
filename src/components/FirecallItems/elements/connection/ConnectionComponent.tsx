@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import FoundationIcon from '@mui/icons-material/Foundation';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import CircleIcon from '@mui/icons-material/Circle';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -14,7 +15,7 @@ import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
-import { Connection, FirecallItem } from '../../../firebase/firestore';
+import { Connection, FirecallItem, Line } from '../../../firebase/firestore';
 import type { LeafletMouseEvent } from 'leaflet';
 import { leafletIcons } from '../../icons';
 import { PopupNavigateButton } from '../FirecallItemBase';
@@ -29,6 +30,8 @@ import PointContextMenu from '../PointContextMenu';
 // dynamische Import gedacht war, ist stattdessen in `useFirecallItemUpdate`
 // aufgelöst.
 import LoeschwasserfoerderungPanel from '../../../Map/Leitungen/LoeschwasserfoerderungPanel';
+// Aus demselben Grund statisch importiert wie das Panel darüber.
+import DammbauPanel from '../../../Map/Damm/DammbauPanel';
 import { foerderungView } from './foerderung/foerderung';
 import { versorgungsart } from './pendel/pendelRoute';
 import { nearestInsertIndex } from './pointGeometry';
@@ -54,6 +57,7 @@ export default function ConnectionMarker({
 }: ConnectionMarkerProps) {
   const t = useTranslations('firecallElements');
   const tf = useTranslations('loeschwasserfoerderung');
+  const td = useTranslations('dammbau');
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [point, setPoint] = useState(defaultPosition);
@@ -65,6 +69,7 @@ export default function ConnectionMarker({
     left: number;
   }>();
   const [foerderungOpen, setFoerderungOpen] = useState(false);
+  const [dammbauOpen, setDammbauOpen] = useState(false);
   const editable = useMapEditable();
 
   const positions: LatLngPosition[] = useMemo(() => {
@@ -302,6 +307,20 @@ export default function ConnectionMarker({
               <EditIcon />
             </IconButton>
           )}
+          {/* Der Sandsackrechner hängt an der Linie und nicht an der Leitung:
+              Eine Dammlinie führt kein Wasser. Siehe
+              docs/dammbau-sandsaecke.md. */}
+          {record.type === 'line' && (
+            <Tooltip title={td('openCalculator')}>
+              <IconButton
+                sx={{ marginLeft: 'auto', float: 'right' }}
+                aria-label={td('openCalculator')}
+                onClick={() => setDammbauOpen(true)}
+              >
+                <FoundationIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           {record.type === 'connection' && (
             <Tooltip title={tf('openCalculator')}>
               <IconButton
@@ -361,6 +380,13 @@ export default function ConnectionMarker({
           item={record.data() as Connection}
           open={foerderungOpen}
           onClose={() => setFoerderungOpen(false)}
+        />
+      )}
+      {dammbauOpen && (
+        <DammbauPanel
+          item={record.data() as unknown as Line}
+          open={dammbauOpen}
+          onClose={() => setDammbauOpen(false)}
         />
       )}
       {editable && (

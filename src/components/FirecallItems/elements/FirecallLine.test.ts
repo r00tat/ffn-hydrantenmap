@@ -117,6 +117,57 @@ describe('FirecallLine', () => {
     expect(item.info()).toContain('Luftlinie');
   });
 
+  it('trägt die Dammbau-Felder durch das Speichern', () => {
+    // Wie oben: Was in `data()` fehlt, löscht ein Speichern aus dem Dialog.
+    const data = line({
+      dammbau: 'true',
+      dammHoehe: 1.2,
+      freibord: 0.4,
+      dammBauweise: 'einfach',
+      dammBoeschung: 2.5,
+      sackFormat: '40x60',
+      sackFuellgrad: 70,
+      sandDichte: 1.6,
+      dammReserve: 15,
+      dammPersonal: 20,
+      dammZielzeit: 3,
+      fuellLeistung: 45,
+      transportLeistung: 55,
+      verbauLeistung: 65,
+      fuhrenVolumen: 10,
+    }).data();
+
+    expect(data).toMatchObject({
+      dammbau: 'true',
+      dammHoehe: 1.2,
+      freibord: 0.4,
+      dammBauweise: 'einfach',
+      dammBoeschung: 2.5,
+      sackFormat: '40x60',
+      sackFuellgrad: 70,
+      sandDichte: 1.6,
+      dammReserve: 15,
+      dammPersonal: 20,
+      dammZielzeit: 3,
+      fuellLeistung: 45,
+      transportLeistung: 55,
+      verbauLeistung: 65,
+      fuhrenVolumen: 10,
+    });
+  });
+
+  it('heißt Dammlinie und nennt den Sandsackbedarf, sobald der Rechner läuft', () => {
+    const item = line({ dammbau: 'true', dammHoehe: 1 });
+    expect(item.markerName()).toBe('Dammlinie');
+    expect(item.info()).toContain('Sandsäcke');
+  });
+
+  it('bleibt eine Linie ohne den Rechner', () => {
+    const item = line();
+    expect(item.markerName()).toBe('Linie');
+    expect(item.info()).not.toContain('Sandsäcke');
+  });
+
   it('weist nichts aus, solange das Routing trägt', () => {
     const item = line({
       streetRouting: 'true',

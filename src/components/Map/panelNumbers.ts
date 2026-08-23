@@ -1,6 +1,7 @@
 /**
- * Zahlen aus Textfeldern und fürs Anzeigen — geteilt von den drei Sektionen des
- * Panels, damit dieselbe Eingabe überall dasselbe bedeutet.
+ * Zahlen aus Textfeldern und fürs Anzeigen — geteilt von allen Rechner-Panels
+ * über der Karte (Löschwasserversorgung, Sandsackbedarf), damit dieselbe
+ * Eingabe überall dasselbe bedeutet.
  */
 
 /** Eine Zahl aus einem Textfeld; unbrauchbare Eingabe behält den alten Wert. */

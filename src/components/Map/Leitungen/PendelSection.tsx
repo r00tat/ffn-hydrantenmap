@@ -20,7 +20,7 @@ import type {
   PendelView,
 } from '../../FirecallItems/elements/connection/pendel/pendelverkehr';
 import type { HydrantOhneLeistung } from '../../FirecallItems/elements/connection/pendel/fuellstelle';
-import { parseNumber } from './panelNumbers';
+import { parseNumber } from '../panelNumbers';
 import usePanelNumber from './usePanelNumber';
 
 /**

@@ -22,7 +22,7 @@ import type {
   VergleichAnnahmen,
   VergleichSeite,
 } from '../../FirecallItems/elements/connection/pendel/versorgungVergleich';
-import { parseNumber } from './panelNumbers';
+import { parseNumber } from '../panelNumbers';
 import usePanelNumber from './usePanelNumber';
 
 /**

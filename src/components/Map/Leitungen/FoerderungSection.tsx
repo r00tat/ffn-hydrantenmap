@@ -27,7 +27,7 @@ import type {
   FoerderungView,
 } from '../../FirecallItems/elements/connection/foerderung/foerderung';
 import FoerderungProfileChart from './FoerderungProfileChart';
-import { parseNumber } from './panelNumbers';
+import { parseNumber } from '../panelNumbers';
 import usePanelNumber from './usePanelNumber';
 
 /**
