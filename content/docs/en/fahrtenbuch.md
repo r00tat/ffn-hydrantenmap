@@ -242,6 +242,18 @@ Unknown drivers are created as deactivated persons so the trip has a driver with
 
 - **See and record trips** Members of the respective group
 - **Bulk entry for an operation** Members of the group the operation belongs to
-- **Change or delete a trip** Only the creator of the trip or an administrator
+- **Change or delete a trip** Only the creator of the trip, an equipment officer of the group or an administrator
 - **Entry via the QR code** Anyone holding the link — recording only, no insight into existing trips
-- **Master data, trip log link and import** Administrators only
+- **Maintain vehicles and people** Administrators and equipment officers of the group
+- **Trip log link, import and group settings** Administrators only
+
+## Equipment officers
+
+Normally only the person who recorded a trip may correct it. In addition, an
+administrator can appoint **equipment officers** per fire brigade: they may
+change any trip of their brigade after the fact — a mistyped odometer reading,
+for example — and maintain its vehicles and people.
+
+Equipment officers are appointed in the trip log administration under
+"Settings". Only members of the respective brigade can be selected.
+

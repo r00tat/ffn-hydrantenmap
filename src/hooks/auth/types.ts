@@ -33,6 +33,8 @@ export interface LoginData {
   expiration?: string;
   idToken?: string;
   groups?: string[];
+  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
+  fahrtenbuchGeraetemeister?: string[];
   isRefreshing?: boolean;
   myGroups: Group[];
   needsReLogin?: boolean;
