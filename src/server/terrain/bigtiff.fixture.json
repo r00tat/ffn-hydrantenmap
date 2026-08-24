@@ -1,0 +1,27 @@
+{
+  "source": "https://data.bev.gv.at/download/ALS/DTM/20190915/CRS3035RES50000mN2750000E4800000.tif",
+  "attribution": "Datenquelle: Bundesamt für Eich- und Vermessungswesen (BEV)",
+  "license": "CC BY 4.0",
+  "note": "Kopf der Originaldatei unverändert übernommen, alle Kachelverzeichnis-Einträge auf Länge 0 gesetzt ausser dem einen enthaltenen. Die Kacheldaten sind unverändert. Damit prüft der Test echtes BigTIFF und echtes TIFF-LZW und nicht nur unsere eigenen Annahmen.",
+  "width": 50001,
+  "height": 50001,
+  "tileWidth": 256,
+  "tileHeight": 256,
+  "tileCols": 196,
+  "tileCount": 38416,
+  "compression": 5,
+  "sampleFormat": 3,
+  "bitsPerSample": 32,
+  "nodata": -9999,
+  "pixelScale": [1, 1, 0],
+  "tiepoint": [0, 0, 0, 4799999.5, 2800000.5, 0],
+  "tile": {
+    "index": 13461,
+    "byteLength": 206990,
+    "pixels": 65536,
+    "minHeight": 164.488037,
+    "maxHeight": 171.027649,
+    "meanHeight": 169.658236,
+    "firstValue": 170.8839
+  }
+}
