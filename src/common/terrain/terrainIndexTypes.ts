@@ -48,17 +48,48 @@ export interface TerrainSourceInfo {
   attribution: string;
 }
 
+/**
+ * Der Zuschlag, der EVRF2000-Höhen in müA (Adria) überführt — das System, in
+ * dem die Pegelstände geführt werden.
+ *
+ * **Ein Festwert genügt nicht.** Über das Burgenland schwankt der Zuschlag
+ * zwischen 0,337 m und 0,487 m, also um 15 cm, mit einem systematischen
+ * Nord-Süd-Trend von 8 cm. Bei Wassertiefen von 0,3–1 m wäre das ein
+ * erheblicher Anteil.
+ *
+ * Die Werte stammen aus dem amtlichen BEV-Höhen-Grid (EPSG:9275, „GHA height
+ * to EVRF2000 Austria height"), nicht aus einer eigenen Regression, und sind
+ * auf ein grobes Gitter neu abgetastet: das Feld ist mit etwa 1 mm je
+ * Kilometer so glatt, dass 5 km Abstand unter einem Millimeter kosten.
+ *
+ * `Adria = EVRF2000 + offset`.
+ */
+export interface AdriaOffsetGrid {
+  /** Südwestliche Ecke des Gitters in Grad (WGS84). */
+  latMin: number;
+  lonMin: number;
+  latStep: number;
+  lonStep: number;
+  cols: number;
+  rows: number;
+  /**
+   * Zuschlag in Millimetern, `uint8` mit Basis: `offsetMm = baseMm + wert`.
+   * Zeilen von Süd nach Nord, base64.
+   */
+  baseMm: number;
+  values: string;
+  /** Kennwerte zur Anzeige und Plausibilitätsprüfung. */
+  meanM: number;
+  minM: number;
+  maxM: number;
+  sourcePoints: number;
+}
+
 export interface TerrainIndex {
   version: number;
   crs: 'EPSG:3035';
   heightDatum: 'EVRF2000';
-  /**
-   * Zuschlag auf die Höhen, um müA (Adria) zu erhalten — das System der
-   * Pegelstände. Aus der Kalibrierung gegen die Burgenland-Gemeindedaten.
-   */
-  adriaOffsetM: number;
-  adriaOffsetSdM: number;
-  adriaOffsetSamples: number;
+  adriaOffset: AdriaOffsetGrid;
   source: TerrainSourceInfo;
   produced: string;
   levels: TerrainLevel[];

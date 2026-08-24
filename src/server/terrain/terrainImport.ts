@@ -13,7 +13,10 @@ import {
   type BlockRef,
   type LaeaBounds,
 } from '../../common/terrain/grid';
-import type { TerrainIndex } from '../../common/terrain/terrainIndexTypes';
+import type {
+  AdriaOffsetGrid,
+  TerrainIndex,
+} from '../../common/terrain/terrainIndexTypes';
 import { bevFetchRange, bevTileInfo } from './bevSource';
 import { buildBlock, decimate, memoTileReader } from './blockBuilder';
 import { burgenlandBlocks, burgenlandGemeinden, gemeindenBounds } from './burgenlandBoundary';
@@ -244,32 +247,30 @@ async function buildOverview(
   return written;
 }
 
-interface CalibrationFile {
-  adriaOffsetM: number;
-  adriaOffsetSdM: number;
-  adriaOffsetSamples: number;
-}
-
-/** Der gemessene Adria-Offset, oder der Vorgabewert mit Warnung. */
-async function readCalibration(cacheDir: string): Promise<CalibrationFile> {
+/**
+ * Das Versatzgitter EVRF2000 → müA aus `npm run terrainCalibrate`.
+ *
+ * Ohne die Datei bricht der Import ab, statt einen Festwert zu erfinden: über
+ * das Burgenland schwankt der Zuschlag um 15 cm, und ein geratener Skalar
+ * würde im Wasserstandsmodell später als Messwert gelesen.
+ */
+async function readCalibration(cacheDir: string): Promise<AdriaOffsetGrid> {
   const file = path.join(cacheDir, 'terrain-calibration.json');
   try {
-    return JSON.parse(await readFile(file, 'utf8')) as CalibrationFile;
+    return JSON.parse(await readFile(file, 'utf8')) as AdriaOffsetGrid;
   } catch {
-    console.warn(
-      'WARNUNG: keine terrain-calibration.json — es gilt der aus einer einzigen\n' +
-        '  Messstelle abgeleitete Wert 0,39 m. Für das Wasserstandsmodell ist das\n' +
-        '  zu wenig; erst `npm run terrainCalibrate` laufen lassen. Für Höhenlinien\n' +
-        '  und Löschwasserförderung ist es ohne Belang (dort zählen Differenzen).'
+    throw new Error(
+      `${file} fehlt. Erst \`npm run terrainCalibrate\` laufen lassen — ` +
+        'das Versatzgitter EVRF2000 → müA kommt aus dem amtlichen ' +
+        'BEV-Höhen-Grid und wird nicht geraten.'
     );
-    return { adriaOffsetM: 0.39, adriaOffsetSdM: 0.1, adriaOffsetSamples: 1024 };
   }
 }
 
 function buildIndex(
   bounds: Record<'detail' | 'overview', LaeaBounds>,
   blocks: Record<'detail' | 'overview', BlockRef[]>,
-  calibration: CalibrationFile,
+  adriaOffset: AdriaOffsetGrid,
   produced: string
 ): TerrainIndex {
   const levels = LEVEL_SPECS.map((spec) => {
@@ -297,9 +298,7 @@ function buildIndex(
     version: TERRAIN_VERSION,
     crs: 'EPSG:3035',
     heightDatum: 'EVRF2000',
-    adriaOffsetM: calibration.adriaOffsetM,
-    adriaOffsetSdM: calibration.adriaOffsetSdM,
-    adriaOffsetSamples: calibration.adriaOffsetSamples,
+    adriaOffset,
     source: TERRAIN_SOURCE,
     produced,
     levels,
