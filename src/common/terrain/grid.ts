@@ -56,15 +56,27 @@ export const blockForLatLng = (
  * Die Zeilen laufen von Nord nach Süd wie im Bild, die Blockkante `n` ist die
  * **untere** — daher die Umkehrung in `row`.
  *
- * Die Mitte von Pixel (0,0) liegt auf der Nordwestecke des Blocks, nicht einen
- * halben Pixel davon entfernt. Das ist die Konvention der BEV-Quelldateien: ihr
- * Georeferenz-Tiepoint liegt auf einer halben Pixelgrenze (`4799999.5`), die
- * Quellpixelmitten also auf ganzen Metern. Läge unser Gitter um einen halben
- * Pixel versetzt, fiele jede Blockpixelmitte genau zwischen zwei Quellpixel und
- * die Zuordnung entschiede das Gleitkommarauschen.
+ * Pixelmitten liegen auf ganzen Metern. Das ist die Konvention der
+ * BEV-Quelldateien: ihr Georeferenz-Tiepoint liegt auf einer halben
+ * Pixelgrenze (`4799999.5`), die Quellpixelmitten also auf ganzen Metern. Läge
+ * unser Gitter um einen halben Pixel versetzt, fiele jede Blockpixelmitte
+ * genau zwischen zwei Quellpixel und die Zuordnung entschiede das
+ * Gleitkommarauschen.
  *
- * Die Blöcke pflastern trotzdem lückenlos: Pixel `sizePx-1` eines Blocks und
- * Pixel `0` des nächsten liegen genau eine Rasterweite auseinander.
+ * **Das Pixelgitter ist an der Südwestecke ausgerichtet**, nicht an der
+ * Nordwestecke: Spalte 0 liegt auf `block.e`, Zeile `sizePx-1` auf `block.n`.
+ * Die Mitten spannen damit `[e, e + sizeM - res]` × `[n, n + sizeM - res]`, und
+ * `blockForPoint` findet mit `Math.floor` auf **beiden** Achsen den Block, in
+ * dem eine Pixelmitte liegt.
+ *
+ * Mit der Nordwest-Ausrichtung war das für eine Zeile je Block nicht der Fall:
+ * die Mitte auf `n = block.n + sizeM` gehörte rechnerisch schon zum nördlichen
+ * Nachbarblock, dessen Zeilen sie aber nicht enthielten. Das ergab eine
+ * Rasterweite breite Zeile ohne Höhe je Blockgrenze — in Höhenlinien ein
+ * feiner Riss, im Profil ein einzelnes `null`.
+ *
+ * Die Blöcke pflastern lückenlos: Pixel `sizePx-1` eines Blocks und Pixel `0`
+ * des nächsten liegen genau eine Rasterweite auseinander.
  */
 export function pixelInBlock(
   point: LaeaPoint,
@@ -73,7 +85,7 @@ export function pixelInBlock(
 ): { col: number; row: number } {
   return {
     col: (point.e - block.e) / resolutionM,
-    row: (block.n + block.sizeM - point.n) / resolutionM,
+    row: (block.n + block.sizeM - resolutionM - point.n) / resolutionM,
   };
 }
 
@@ -86,7 +98,7 @@ export function blockPixelCenter(
 ): LaeaPoint {
   return {
     e: block.e + col * resolutionM,
-    n: block.n + block.sizeM - row * resolutionM,
+    n: block.n + block.sizeM - resolutionM - row * resolutionM,
   };
 }
 

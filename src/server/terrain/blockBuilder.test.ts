@@ -75,8 +75,10 @@ const syntheticTile = (index: number): Float32Array => {
 
 describe('buildBlock', () => {
   it('ordnet jedes Blockpixel dem richtigen Quellpixel zu', async () => {
-    // Block deckt die Nordwestecke der Quelldatei ab: Quellspalten 0..255,
-    // Quellzeilen 0..255.
+    // Das Pixelgitter ist an der Südwestecke ausgerichtet: die nördlichste
+    // Pixelmitte liegt auf `n + sizeM - res`, also eine Rasterweite unter der
+    // Blockkante. Dieser Block liest damit Quellspalten 0..255 und
+    // Quellzeilen 1..256.
     const block = { e: 4_800_000, n: 2_799_744, sizeM: 256 };
     const heights = await buildBlock({
       block,
@@ -86,19 +88,19 @@ describe('buildBlock', () => {
     });
 
     expect(heights).toHaveLength(256 * 256);
-    // Nordwestpixel des Blocks: Quellspalte 0, Quellzeile 0.
-    expect(heights[0]).toBeCloseTo(1000, 3);
+    // Nordwestpixel des Blocks: Quellspalte 0, Quellzeile 1.
+    expect(heights[0]).toBeCloseTo(1000.001, 4);
     // Ein Pixel weiter östlich ⇒ Quellspalte 1.
-    expect(heights[1]).toBeCloseTo(1001, 3);
-    // Ein Pixel weiter südlich ⇒ Quellzeile 1.
-    expect(heights[256]).toBeCloseTo(1000.001, 4);
-    // Südostpixel des Blocks: Quellspalte 255, Quellzeile 255.
-    expect(heights[255 * 256 + 255]).toBeCloseTo(1255.255, 3);
+    expect(heights[1]).toBeCloseTo(1001.001, 4);
+    // Ein Pixel weiter südlich ⇒ Quellzeile 2.
+    expect(heights[256]).toBeCloseTo(1000.002, 4);
+    // Südostpixel des Blocks: Quellspalte 255, Quellzeile 256.
+    expect(heights[255 * 256 + 255]).toBeCloseTo(1255.256, 3);
   });
 
   it('greift über Kachelgrenzen hinweg auf die richtige Kachel zu', async () => {
     // Block über der Mitte der Quelldatei, damit alle vier Kacheln beteiligt
-    // sind: Quellspalten 128..383, Quellzeilen 128..383.
+    // sind: Quellspalten 128..383, Quellzeilen 129..384.
     const block = { e: 4_800_128, n: 2_799_616, sizeM: 256 };
     const heights = await buildBlock({
       block,
@@ -106,8 +108,8 @@ describe('buildBlock', () => {
       readTileAt: async (index) => syntheticTile(index),
       resolutionM: 1,
     });
-    expect(heights[0]).toBeCloseTo(1128.128, 3);
-    expect(heights[255 * 256 + 255]).toBeCloseTo(1383.383, 3);
+    expect(heights[0]).toBeCloseTo(1128.129, 3);
+    expect(heights[255 * 256 + 255]).toBeCloseTo(1383.384, 3);
   });
 
   it('lässt Pixel außerhalb der Quelldatei als nodata stehen', async () => {

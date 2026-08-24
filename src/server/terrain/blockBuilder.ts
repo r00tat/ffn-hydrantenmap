@@ -77,8 +77,9 @@ export async function buildBlock({
   const sizePx = Math.round(block.sizeM / resolutionM);
   const out = new Float32Array(sizePx * sizePx).fill(Number.NaN);
 
-  // Quellpixelbereich des Blocks. Die Nordwestecke ist die Mitte von Pixel
-  // (0,0) des Blocks, siehe `pixelInBlock`.
+  // Quellpixelbereich des Blocks, ausgehend von der Mitte seines Pixels (0,0)
+  // — der nordwestlichen Pixelmitte, nicht der Blockecke (siehe
+  // `pixelInBlock`: das Gitter ist an der Südwestecke ausgerichtet).
   const first = sourcePixelIndex(
     blockPixelCenter(block, 0, 0, resolutionM),
     info

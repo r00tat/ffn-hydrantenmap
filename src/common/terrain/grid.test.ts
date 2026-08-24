@@ -49,18 +49,34 @@ describe('blockForPoint', () => {
 describe('pixelInBlock / blockPixelCenter', () => {
   const block = { e: 4834000, n: 2782000, sizeM: 1000 };
 
-  it('setzt den Ursprung in die Nordwestecke', () => {
-    expect(pixelInBlock({ e: 4834000, n: 2783000 }, block, 1)).toEqual({
+  it('legt Zeile 0 auf die nördlichste Pixelmitte', () => {
+    // Nicht auf `n + sizeM`: die Mitten spannen `[n, n + sizeM - res]`.
+    expect(pixelInBlock({ e: 4834000, n: 2782999 }, block, 1)).toEqual({
       col: 0,
       row: 0,
     });
   });
 
-  it('zählt Zeilen nach Süden', () => {
+  it('zählt Zeilen nach Süden bis zur Blockkante', () => {
     expect(pixelInBlock({ e: 4834000, n: 2782000 }, block, 1)).toEqual({
       col: 0,
-      row: 1000,
+      row: 999,
     });
+  });
+
+  it('ordnet jede Pixelmitte über blockForPoint demselben Block zu', () => {
+    // Der Grund für die Südwest-Ausrichtung: mit `Math.floor` auf beiden
+    // Achsen muss jede Pixelmitte in genau dem Block landen, dessen Zeilen
+    // und Spalten sie enthalten. Mit der Nordwest-Ausrichtung fiel dabei die
+    // Zeile auf `n + sizeM` durch — eine Rasterweite ohne Höhe je Blockgrenze.
+    for (const col of [0, 1, 500, 999]) {
+      for (const row of [0, 1, 500, 999]) {
+        const center = blockPixelCenter(block, col, row, 1);
+        const found = blockForPoint(center, 1000);
+        expect(found).toEqual(block);
+        expect(pixelInBlock(center, found, 1)).toEqual({ col, row });
+      }
+    }
   });
 
   it('ist über die Pixelmitte umkehrbar', () => {
@@ -84,6 +100,13 @@ describe('pixelInBlock / blockPixelCenter', () => {
     const letztes = blockPixelCenter(block, 999, 0, 1);
     const erstes = blockPixelCenter(rechts, 0, 0, 1);
     expect(erstes.e - letztes.e).toBe(1);
+
+    // Dasselbe nach Norden: letzte Zeile des oberen Blocks an erste Zeile
+    // dieses Blocks.
+    const oben = { e: block.e, n: block.n + 1000, sizeM: 1000 };
+    expect(
+      blockPixelCenter(oben, 0, 999, 1).n - blockPixelCenter(block, 0, 0, 1).n
+    ).toBe(1);
   });
 });
 
