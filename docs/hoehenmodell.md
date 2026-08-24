@@ -261,7 +261,9 @@ Der Cache-Ordner enthält:
 
 Der Ausschnitt kommt aus den **Gemeindeflächen**, nicht aus einer Bounding-Box: die Box
 hätte 12.080 Blöcke, die Flächen 4.385. Ein Block zu viel kostet ein halbes MB, ein Block zu
-wenig ein Loch in der Karte — bei Zweifel wird der Block aufgenommen.
+wenig ein Loch in der Karte — bei Zweifel wird der Block aufgenommen. Die Gemeindeflächen
+sind dabei nur die **Maske**, keine Ladeeinheit: geladen wird immer blockweise über
+Range-Requests, und der Import läuft über die Blockliste, nicht über Gemeinden.
 
 Die Übersichtsstufe wird aus den **rohen** Detailblöcken dezimiert, nicht aus den PNGs: sonst
 läge die Quantisierung der Detailstufe zweimal im Ergebnis.
@@ -311,8 +313,9 @@ und zwei Instanzen wären zwei Kopien derselben Kacheln.
 - Fehlt einer der vier Nachbarn, ist das Ergebnis `null`. Aus drei Werten interpoliert wäre
   es eine erfundene Höhe, und die ist in einem Profil nicht von einer echten zu
   unterscheiden.
-- Die Abfrage nimmt je Punkt die **feinste** verfügbare Stufe. An der Landesgrenze und bei
-  einem gemeindeweisen Rollout läge sonst die halbe Strecke ohne Höhe da. Welche Stufe
+- Die Abfrage nimmt je Punkt die **feinste** verfügbare Stufe. An der Landesgrenze und
+  solange erst die Übersichtsstufe hochgeladen ist, läge sonst die halbe Strecke ohne
+  Höhe da. Welche Stufe
   geantwortet hat, steht in `TerrainSample.level` und wird im Rechner ausgewiesen.
 - Höhenlinien werden auf einem **zusammengesetzten** Gitter über den ganzen Ausschnitt
   gerechnet, nicht blockweise: sonst wäre jede Linie an jeder Blockgrenze in eine eigene

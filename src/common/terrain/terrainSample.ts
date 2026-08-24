@@ -121,10 +121,10 @@ export async function sampleTerrainAt(
  * Höhen zu einer Folge von Positionen.
  *
  * Je Position wird die feinste verfügbare Stufe genommen, nicht durchgehend
- * eine — an der Landesgrenze und bei einem gemeindeweisen Rollout läge sonst
- * die halbe Strecke ohne Höhe da. Welche Stufe geantwortet hat, steht in
- * `level` und gehört in die Anzeige: ein Profil aus zwei Stufen ist brauchbar,
- * aber der Betrachter soll es wissen.
+ * eine — an der Landesgrenze und solange erst die Übersichtsstufe hochgeladen
+ * ist, läge sonst die halbe Strecke ohne Höhe da. Welche Stufe geantwortet
+ * hat, steht in `level` und gehört in die Anzeige: ein Profil aus zwei Stufen
+ * ist brauchbar, aber der Betrachter soll es wissen.
  */
 export async function sampleTerrain(
   store: BlockStore,
