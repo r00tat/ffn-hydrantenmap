@@ -1,4 +1,7 @@
+import { availableBlocks } from '../common/terrain/availability';
 import { BlockStore } from '../common/terrain/blockStore';
+import { blockId } from '../common/terrain/grid';
+import { terrainLevel } from '../common/terrain/terrainIndexTypes';
 import { terrainContours } from '../common/terrain/terrainContours';
 import { sampleTerrain } from '../common/terrain/terrainSample';
 import type {
@@ -36,11 +39,7 @@ async function handle(request: TerrainRequest): Promise<void> {
         id: request.id,
         ok: true,
         op: 'contours',
-        lines: await terrainContours(
-          store,
-          request.bounds,
-          request.equidistanceM
-        ),
+        ...(await terrainContours(store, request.bounds, request.equidistanceM)),
       });
       return;
     case 'prefetch': {
@@ -49,6 +48,17 @@ async function handle(request: TerrainRequest): Promise<void> {
         request.blockIds
       );
       post({ id: request.id, ok: true, op: 'prefetch', loaded, failed });
+      return;
+    }
+    case 'blocks': {
+      const index = await store.index();
+      const level = index ? terrainLevel(index, request.level) : undefined;
+      post({
+        id: request.id,
+        ok: true,
+        op: 'blocks',
+        blockIds: level ? availableBlocks(level).map(blockId) : [],
+      });
       return;
     }
   }

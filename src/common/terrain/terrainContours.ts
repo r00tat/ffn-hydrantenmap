@@ -15,7 +15,11 @@ import {
   type TerrainIndex,
   type TerrainLevel,
 } from './terrainIndexTypes';
-import type { ContourLine, TerrainBoundsLatLng } from './terrainTypes';
+import type {
+  ContourLine,
+  ContourResult,
+  TerrainBoundsLatLng,
+} from './terrainTypes';
 
 /**
  * Höhenlinien für einen Kartenausschnitt.
@@ -167,16 +171,22 @@ export async function terrainContours(
   store: BlockStore,
   bounds: TerrainBoundsLatLng,
   equidistanceM: number
-): Promise<ContourLine[]> {
+): Promise<ContourResult> {
   const index = await store.index();
-  if (!index) return [];
+  if (!index) return { lines: [] };
 
   const hull = laeaHull(bounds);
   const level = chooseContourLevel(index, hull);
-  if (!level) return [];
+  if (!level) return { lines: [] };
+
+  const found: ContourResult = {
+    lines: [],
+    level: level.id,
+    resolutionM: level.resolutionM,
+  };
 
   const mosaic = await buildMosaic(store, level, hull);
-  if (!mosaic) return [];
+  if (!mosaic) return found;
 
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -185,7 +195,7 @@ export async function terrainContours(
     if (value < min) min = value;
     if (value > max) max = value;
   }
-  if (!Number.isFinite(min) || !Number.isFinite(max)) return [];
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return found;
 
   const heights = (row: number, col: number): number | undefined => {
     const value = mosaic.values[row * mosaic.cols + col];
@@ -199,7 +209,7 @@ export async function terrainContours(
       n: (mosaic.rowMax - point.row) * res,
     });
 
-  const lines: ContourLine[] = [];
+  const lines: ContourLine[] = found.lines;
   for (const threshold of contourThresholds(min, max, equidistanceM)) {
     const chains = chainSegments(
       marchingSquares(heights, mosaic.cols, mosaic.rows, threshold)
@@ -220,5 +230,5 @@ export async function terrainContours(
       });
     }
   }
-  return lines;
+  return found;
 }

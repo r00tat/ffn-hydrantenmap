@@ -1,7 +1,7 @@
 import type { LatLngPosition } from '../geo';
 import type { TerrainLevelId } from './terrainIndexTypes';
 import type {
-  ContourLine,
+  ContourResult,
   TerrainBoundsLatLng,
   TerrainRequest,
   TerrainResponse,
@@ -38,11 +38,13 @@ export interface TerrainClient {
   contours(
     bounds: TerrainBoundsLatLng,
     equidistanceM: number
-  ): Promise<ContourLine[]>;
+  ): Promise<ContourResult>;
   prefetch(
     levelId: TerrainLevelId,
     blockIds: string[]
   ): Promise<{ loaded: number; failed: number }>;
+  /** Die Namen aller vorhandenen Blöcke einer Stufe. */
+  blocks(levelId: TerrainLevelId): Promise<string[]>;
 }
 
 /**
@@ -143,7 +145,11 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
         REQUEST_TIMEOUT_MS
       );
       if (!response.ok || response.op !== 'contours') throw unexpected(response);
-      return response.lines;
+      return {
+        lines: response.lines,
+        level: response.level,
+        resolutionM: response.resolutionM,
+      };
     },
 
     async prefetch(levelId, blockIds) {
@@ -156,6 +162,15 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
       );
       if (!response.ok || response.op !== 'prefetch') throw unexpected(response);
       return { loaded: response.loaded, failed: response.failed };
+    },
+
+    async blocks(levelId) {
+      const response = await send(
+        { op: 'blocks', level: levelId },
+        REQUEST_TIMEOUT_MS
+      );
+      if (!response.ok || response.op !== 'blocks') throw unexpected(response);
+      return response.blockIds;
     },
   };
 }

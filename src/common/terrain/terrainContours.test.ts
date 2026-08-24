@@ -195,10 +195,18 @@ describe('chooseContourLevel', () => {
 describe('terrainContours', () => {
   it('zieht eine Linie durchgehend über die Blockgrenzen', async () => {
     const store = harness(detailLevel());
-    const lines = await terrainContours(store, window20m, 5);
+    const { lines, level, resolutionM } = await terrainContours(
+      store,
+      window20m,
+      5
+    );
 
     // Höhen 2 bis 18 im Fenster, Äquidistanz 5 ⇒ Schwellen 5, 10, 15.
     expect(lines.map((line) => line.heightM)).toEqual([5, 10, 15]);
+    // Stufe und Rasterweite kommen mit: die Legende muss sagen können, wie
+    // genau die Linien sind.
+    expect(level).toBe('detail');
+    expect(resolutionM).toBe(1);
     // Genau eine Linie je Schwelle: blockweise gerechnet wären es fünf,
     // eine je Blockspalte.
     for (const line of lines) {
@@ -209,7 +217,7 @@ describe('terrainContours', () => {
 
   it('läuft ost-west, wie es das Höhenfeld vorgibt', async () => {
     const store = harness(detailLevel());
-    const [line] = await terrainContours(store, window20m, 5);
+    const [line] = (await terrainContours(store, window20m, 5)).lines;
     const lats = line.points.map((point) => point[0]);
     const lngs = line.points.map((point) => point[1]);
     // Die Linie überstreicht deutlich mehr Länge als Breite.
@@ -224,7 +232,7 @@ describe('terrainContours', () => {
     const store = harness(
       detailLevel((col, row) => !(col === 2 && row === 2))
     );
-    const lines = await terrainContours(store, window20m, 5);
+    const { lines } = await terrainContours(store, window20m, 5);
     const perHeight = new Map<number, number>();
     for (const line of lines) {
       perHeight.set(line.heightM, (perHeight.get(line.heightM) ?? 0) + 1);
@@ -242,6 +250,6 @@ describe('terrainContours', () => {
         throw new Error('darf nicht aufgerufen werden');
       },
     });
-    expect(await terrainContours(store, window20m, 5)).toEqual([]);
+    expect(await terrainContours(store, window20m, 5)).toEqual({ lines: [] });
   });
 });

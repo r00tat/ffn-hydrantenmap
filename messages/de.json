@@ -2430,5 +2430,28 @@
     "selectHint": "Eine Leitung in der Liste oder auf der Karte wählen, um sie zu berechnen.",
     "title": "Löschwasserversorgung",
     "toFirecalls": "Zur Einsatzauswahl"
+  },
+  "hoehenlinien": {
+    "layerName": "Höhenlinien",
+    "equidistance": "Äquidistanz",
+    "automatic": "automatisch",
+    "meters": "{value} m",
+    "grid": "Raster {value} m",
+    "level": "Stufe {level}",
+    "levelDetail": "Detail",
+    "levelOverview": "Übersicht",
+    "heightDatum": "Höhensystem {datum}",
+    "attribution": "Datenquelle: Bundesamt für Eich- und Vermessungswesen (BEV) — CC BY 4.0",
+    "noData": "Für diesen Ausschnitt liegen keine Höhendaten vor.",
+    "loading": "Höhenlinien werden berechnet …",
+    "failed": "Höhenlinien konnten nicht berechnet werden.",
+    "lineCount": "{count, plural, one {# Linie} other {# Linien}}",
+    "offlineTitle": "Höhenmodell offline laden",
+    "offlineDescription": "Übersichtsstufe für das ganze Burgenland, rund {size} MB.",
+    "offlineStart": "Laden",
+    "offlineProgress": "{loaded} von {total} Blöcken geladen",
+    "offlineDone": "{loaded} Blöcke geladen, {failed} nicht verfügbar.",
+    "offlineFailed": "Das Höhenmodell konnte nicht geladen werden.",
+    "offlineUnavailable": "Es sind keine Kacheln zum Vorladen verzeichnet."
   }
 }

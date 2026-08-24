@@ -31,6 +31,21 @@ export interface ContourLine {
   closed: boolean;
 }
 
+/**
+ * Das Ergebnis einer Höhenlinien-Abfrage.
+ *
+ * Stufe und Rasterweite gehören dazu, nicht nur die Linien: die Legende muss
+ * sagen können, ob 1 m oder 10 m Raster dahintersteht. Ohne die Angabe sieht
+ * eine Linie aus der Übersichtsstufe genauso genau aus wie eine aus der
+ * Detailstufe.
+ */
+export interface ContourResult {
+  lines: ContourLine[];
+  /** `undefined`, wenn keine Stufe geantwortet hat. */
+  level?: TerrainLevelId;
+  resolutionM?: number;
+}
+
 export interface TerrainBoundsLatLng {
   south: number;
   west: number;
@@ -51,10 +66,19 @@ export type TerrainRequest =
       op: 'prefetch';
       level: TerrainLevelId;
       blockIds: string[];
-    };
+    }
+  /**
+   * Die vorhandenen Blöcke einer Stufe.
+   *
+   * Beantwortet der Worker, nicht der Hauptthread: er hält den Index, und eine
+   * zweite Stelle, die `index.json` liest, wäre eine zweite Stelle, die von
+   * einer neuen Version überrascht wird.
+   */
+  | { id: number; op: 'blocks'; level: TerrainLevelId };
 
 export type TerrainResponse =
   | { id: number; ok: true; op: 'sample'; samples: (TerrainSample | null)[] }
-  | { id: number; ok: true; op: 'contours'; lines: ContourLine[] }
+  | ({ id: number; ok: true; op: 'contours' } & ContourResult)
   | { id: number; ok: true; op: 'prefetch'; loaded: number; failed: number }
+  | { id: number; ok: true; op: 'blocks'; blockIds: string[] }
   | { id: number; ok: false; error: string };

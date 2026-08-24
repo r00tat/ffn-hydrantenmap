@@ -65,7 +65,11 @@ describe('createTerrainClient', () => {
     });
     fake.reply({ id: 1, ok: true, op: 'sample', samples: [null] });
 
-    await expect(second).resolves.toHaveLength(1);
+    await expect(second).resolves.toEqual({
+      lines: [{ heightM: 130, points: [[47.9, 16.8]], closed: false }],
+      level: undefined,
+      resolutionM: undefined,
+    });
     await expect(first).resolves.toEqual([null]);
   });
 

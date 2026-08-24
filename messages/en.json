@@ -2430,5 +2430,28 @@
     "selectHint": "Pick a hose line from the list or on the map to calculate it.",
     "title": "Water supply",
     "toFirecalls": "To the operations"
+  },
+  "hoehenlinien": {
+    "layerName": "Contour lines",
+    "equidistance": "Contour interval",
+    "automatic": "automatic",
+    "meters": "{value} m",
+    "grid": "Grid {value} m",
+    "level": "Level {level}",
+    "levelDetail": "detail",
+    "levelOverview": "overview",
+    "heightDatum": "Height datum {datum}",
+    "attribution": "Data source: Bundesamt für Eich- und Vermessungswesen (BEV) — CC BY 4.0",
+    "noData": "No elevation data available for this view.",
+    "loading": "Computing contour lines …",
+    "failed": "Contour lines could not be computed.",
+    "lineCount": "{count, plural, one {# line} other {# lines}}",
+    "offlineTitle": "Download elevation model for offline use",
+    "offlineDescription": "Overview level for all of Burgenland, about {size} MB.",
+    "offlineStart": "Download",
+    "offlineProgress": "{loaded} of {total} blocks loaded",
+    "offlineDone": "{loaded} blocks loaded, {failed} unavailable.",
+    "offlineFailed": "The elevation model could not be downloaded.",
+    "offlineUnavailable": "No tiles are listed for pre-loading."
   }
 }
