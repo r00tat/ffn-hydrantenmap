@@ -6,10 +6,16 @@ import {
 } from '../../common/terrain/availability';
 import { NODATA_ENCODED } from '../../common/terrain/encoding';
 import {
+  terrainBlockPath,
+  TERRAIN_INDEX_PATH,
+  TERRAIN_VERSION,
+} from '../../common/terrain/terrainPaths';
+import {
   bevSourceTile,
   bevSourceTileName,
   blockId,
   blockPixelCenter,
+  parseBlockId,
   type BlockRef,
   type LaeaBounds,
 } from '../../common/terrain/grid';
@@ -25,9 +31,7 @@ import {
   blockSizeM,
   LEVEL_SPECS,
   levelSpec,
-  TERRAIN_PREFIX,
   TERRAIN_SOURCE,
-  TERRAIN_VERSION,
   toTerrainLevel,
   type LevelSpec,
 } from './terrainLevels';
@@ -251,7 +255,7 @@ async function buildOverview(
  * Das Versatzgitter EVRF2000 → müA aus `npm run terrainCalibrate`.
  *
  * Ohne die Datei bricht der Import ab, statt einen Festwert zu erfinden: über
- * das Burgenland schwankt der Zuschlag um 15 cm, und ein geratener Skalar
+ * das Burgenland schwankt der Zuschlag um 13,9 cm, und ein geratener Skalar
  * würde im Wasserstandsmodell später als Messwert gelesen.
  */
 async function readCalibration(cacheDir: string): Promise<AdriaOffsetGrid> {
@@ -326,8 +330,13 @@ async function upload(cacheDir: string, index: TerrainIndex): Promise<void> {
   for (const level of index.levels) {
     for (const block of await blocksOf(cacheDir, level.id)) {
       const local = path.join(cacheDir, 'out', level.id, `${block}.png`);
+      const ref = parseBlockId(block);
+      if (!ref) throw new Error(`Unlesbarer Blockname: ${block}`);
       await bucket.upload(local, {
-        destination: `${TERRAIN_PREFIX}/${level.id}/${block}.png`,
+        // Bewusst über `pathTemplate` der Stufe und nicht selbst gebaut: der
+        // Client liest denselben Wert aus dem Index. Zwei Formeln würden erst
+        // nach dem Rollout auffallen, und dann als 404 auf jeder Kachel.
+        destination: terrainBlockPath(level, ref),
         metadata: {
           contentType: 'image/png',
           // Der Pfad ist versioniert, die Inhalte sind damit unveränderlich.
@@ -338,7 +347,7 @@ async function upload(cacheDir: string, index: TerrainIndex): Promise<void> {
     console.log(`upload: Stufe ${level.id} übertragen`);
   }
 
-  await bucket.file(`${TERRAIN_PREFIX}/index.json`).save(
+  await bucket.file(TERRAIN_INDEX_PATH).save(
     JSON.stringify(index),
     {
       metadata: {

@@ -16,8 +16,9 @@ import { proj4, EPSG_DEFINITIONS } from '../../common/wgs-convert';
  * ihrer eigenen Streuung von 0,097 m. Die amtliche Größe gewinnt.
  *
  * **Ein Festwert genügt nicht.** Über das Burgenland schwankt der Zuschlag
- * zwischen 0,337 m und 0,487 m, mit einem systematischen Nord-Süd-Trend von
- * 8 cm. Bei Wassertiefen von 0,3–1 m ist das ein erheblicher Anteil.
+ * zwischen 0,337 m und 0,476 m, mit einem systematischen Nord-Süd-Trend von
+ * 9,8 cm und einem West-Ost-Trend von 6,0 cm. Bei Wassertiefen von 0,3–1 m ist
+ * das ein erheblicher Anteil.
  *
  * Neu abgetastet wird auf ein grobes Gitter: das Feld ist mit etwa 1 mm je
  * Kilometer so glatt, dass 5 km Abstand unter einem Millimeter kosten und in

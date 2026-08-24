@@ -10,7 +10,7 @@ import type { AdriaOffsetGrid } from './terrainIndexTypes';
  * 0,4 m zu hoch — bei Wassertiefen von 0,3–1 m der Unterschied zwischen
  * „Straße frei" und „Straße unter Wasser".
  *
- * Kein Festwert, weil der Zuschlag über das Burgenland um 15 cm schwankt.
+ * Kein Festwert, weil der Zuschlag über das Burgenland um 13,9 cm schwankt.
  */
 
 const decodeValues = (values: string): Uint8Array => {

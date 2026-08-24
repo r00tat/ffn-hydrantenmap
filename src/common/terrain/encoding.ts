@@ -12,7 +12,7 @@ import type { TerrainLevel } from './terrainIndexTypes';
  * Fläche, wo überhaupt keine Daten vorliegen.
  */
 
-/** 0xFFFFFF — bei `step` 0,05 m entspräche das 838.860,75 m, also nie eine echte Höhe. */
+/** 0xFFFFFF — bei `step` 0,1 m entspräche das 1.677.721,5 m, also nie eine echte Höhe. */
 export const NODATA_ENCODED = 0xffffff;
 
 export type HeightEncoding = Pick<

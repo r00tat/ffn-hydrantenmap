@@ -39,8 +39,6 @@ import { BEV_EPOCH } from './bevSource';
  * liegen grob 1,5 GiB.
  */
 
-export const TERRAIN_VERSION = 1;
-export const TERRAIN_PREFIX = `terrain/v${TERRAIN_VERSION}`;
 
 export const TERRAIN_SOURCE: TerrainSourceInfo = {
   name: 'BEV ALS-DGM 1 m',

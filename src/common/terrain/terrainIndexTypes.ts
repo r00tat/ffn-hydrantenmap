@@ -53,9 +53,9 @@ export interface TerrainSourceInfo {
  * dem die Pegelstände geführt werden.
  *
  * **Ein Festwert genügt nicht.** Über das Burgenland schwankt der Zuschlag
- * zwischen 0,337 m und 0,487 m, also um 15 cm, mit einem systematischen
- * Nord-Süd-Trend von 8 cm. Bei Wassertiefen von 0,3–1 m wäre das ein
- * erheblicher Anteil.
+ * zwischen 0,337 m und 0,476 m, also um 13,9 cm, und zwar nicht zufällig: von
+ * Süd nach Nord wächst er um 9,8 cm, von West nach Ost um 6,0 cm. Bei
+ * Wassertiefen von 0,3–1 m wäre das ein erheblicher Anteil.
  *
  * Die Werte stammen aus dem amtlichen BEV-Höhen-Grid (EPSG:9275, „GHA height
  * to EVRF2000 Austria height"), nicht aus einer eigenen Regression, und sind
