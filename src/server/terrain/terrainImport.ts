@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { NODATA_ENCODED } from '../../common/terrain/encoding';
 import {
@@ -84,6 +84,31 @@ const exists = async (file: string): Promise<boolean> => {
   }
 };
 
+/**
+ * Ein roher Block aus dem Cache, oder `undefined`.
+ *
+ * Die Länge wird geprüft: ein Abbruch mitten im Schreiben hinterlässt eine
+ * abgeschnittene Datei, und die läge sonst als stiller Datenfehler in der
+ * Kachel — halbe Zeilen, verschobenes Gelände, kein Fehler nirgends. Eine
+ * unbrauchbare Datei wird neu geladen statt gelesen.
+ */
+async function readRawBlock(
+  file: string,
+  pixels: number
+): Promise<Float32Array | undefined> {
+  if (!(await exists(file))) return undefined;
+  const bytes = await readFile(file);
+  if (bytes.byteLength !== pixels * 4) {
+    console.warn(
+      `${file}: ${bytes.byteLength} statt ${pixels * 4} Byte — wird verworfen`
+    );
+    return undefined;
+  }
+  return new Float32Array(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  );
+}
+
 /** Rohhöhen eines Detailblocks, aus dem Cache oder frisch aus der Quelle. */
 async function detailHeights(
   block: BlockRef,
@@ -91,12 +116,8 @@ async function detailHeights(
   cacheDir: string
 ): Promise<Float32Array> {
   const file = rawPath(cacheDir, block);
-  if (await exists(file)) {
-    const bytes = await readFile(file);
-    return new Float32Array(
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-    );
-  }
+  const cached = await readRawBlock(file, spec.blockPx * spec.blockPx);
+  if (cached) return cached;
 
   // Die Quellkachel bestimmt sich aus der Blockmitte; ein 1-km-Block liegt
   // immer vollständig in einer 50-km-Kachel, weil beide Gitter auf 1000 m
@@ -113,7 +134,10 @@ async function detailHeights(
   });
 
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, Buffer.from(heights.buffer));
+  // Über `.tmp` und `rename`: ein Abbruch mitten im Schreiben hinterließe
+  // sonst eine halbe Datei, die beim nächsten Lauf als fertig gilt.
+  await writeFile(`${file}.tmp`, Buffer.from(heights.buffer));
+  await rename(`${file}.tmp`, file);
   return heights;
 }
 
@@ -229,18 +253,15 @@ async function buildOverview(
           sizeM: detailSize,
         };
         const file = rawPath(cacheDir, child);
-        if (!(await exists(file))) {
+        const heights = await readRawBlock(
+          file,
+          detail.blockPx * detail.blockPx
+        );
+        if (!heights) {
           // Nur ein Kind, das zum Land gehört, macht den Block unvollständig.
           if (candidateIds.has(blockId(child))) missing += 1;
           continue;
         }
-        const bytes = await readFile(file);
-        const heights = new Float32Array(
-          bytes.buffer.slice(
-            bytes.byteOffset,
-            bytes.byteOffset + bytes.byteLength
-          )
-        );
         anyData = true;
         for (let row = 0; row < detail.blockPx; row += 1) {
           fine.set(

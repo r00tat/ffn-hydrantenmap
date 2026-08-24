@@ -1,3 +1,4 @@
+import { rename } from 'node:fs/promises';
 import sharp from 'sharp';
 import {
   encodeHeight,
@@ -16,6 +17,10 @@ import {
  *
  * Drei Kanäle ohne Alpha: eine deckende Kachel kann nicht von einer
  * Alpha-Vormultiplikation verfälscht werden.
+ *
+ * Geschrieben wird über eine `.tmp`-Datei und ein `rename`. Ein Abbruch
+ * mitten im Schreiben hinterließe sonst eine halbe Kachel — und weil der
+ * Import eine vorhandene Kachel überspringt, bliebe sie für immer halb.
  */
 export async function writeTerrainPng(
   heights: Float32Array,
@@ -40,9 +45,11 @@ export async function writeTerrainPng(
     rgb[i * 3 + 2] = b;
   }
 
+  const temp = `${target}.tmp`;
   await sharp(rgb, { raw: { width: sizePx, height: sizePx, channels: 3 } })
     .png({ compressionLevel: 9, effort: 10, palette: false })
-    .toFile(target);
+    .toFile(temp);
+  await rename(temp, target);
 }
 
 /** Eine Terrain-RGB-Kachel wieder als Höhen lesen — für Prüfungen und Tests. */

@@ -1,6 +1,8 @@
+import { open } from 'node:fs/promises';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { BEV_TILE_PX } from '../../common/terrain/grid';
-import type { BigTiffInfo } from './bigtiff';
+import { readBigTiffInfo, type BigTiffInfo, type FetchRange } from './bigtiff';
 import { buildBlock, decimate, memoTileReader } from './blockBuilder';
 
 describe('decimate', () => {
@@ -122,6 +124,42 @@ describe('buildBlock', () => {
     expect(heights.every((value) => Number.isNaN(value))).toBe(true);
   });
 
+  it('fordert die Kacheln eines Blocks gleichzeitig an', async () => {
+    // Nacheinander geladen kostet ein 1-km-Block bis zu 25 Rundreisen
+    // hintereinander — das ist der Unterschied zwischen einem Import über
+    // Nacht und einem über eine Stunde.
+    let inFlight = 0;
+    let peak = 0;
+    await buildBlock({
+      block: { e: 4_800_128, n: 2_799_616, sizeM: 256 },
+      info,
+      readTileAt: async (index) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return syntheticTile(index);
+      },
+      resolutionM: 1,
+    });
+    // Vier berührte Kacheln, alle gleichzeitig unterwegs.
+    expect(peak).toBe(4);
+  });
+
+  it('liest jede Kachel genau einmal, auch ohne Memo', async () => {
+    const seen = new Map<number, number>();
+    await buildBlock({
+      block: { e: 4_800_128, n: 2_799_616, sizeM: 256 },
+      info,
+      readTileAt: async (index) => {
+        seen.set(index, (seen.get(index) ?? 0) + 1);
+        return syntheticTile(index);
+      },
+      resolutionM: 1,
+    });
+    expect([...seen.values()]).toEqual([1, 1, 1, 1]);
+  });
+
   it('lässt Pixel leerer Kacheln als nodata stehen', async () => {
     const heights = await buildBlock({
       block: { e: 4_800_000, n: 2_799_744, sizeM: 256 },
@@ -157,6 +195,49 @@ describe('memoTileReader', () => {
     await reader(0);
     // ByteCount 0 ⇒ readTile fragt gar nicht erst an.
     expect(fetchRange).not.toHaveBeenCalled();
+  });
+
+  it('holt eine gleichzeitig zweimal angeforderte Kachel nur einmal', async () => {
+    // Die echte Quelle: `buildBlock` fordert alle Kacheln eines Blocks
+    // gleichzeitig an. Ein Cache, der erst nach dem `await` schreibt, lädt
+    // dieselbe Kachel dann doppelt.
+    const dir = path.dirname(new URL(import.meta.url).pathname);
+    const handle = await open(path.join(dir, 'bigtiff.fixture.tif'), 'r');
+    try {
+      let requests = 0;
+      const fileRange: FetchRange = async (from, to) => {
+        requests += 1;
+        const buffer = Buffer.alloc(to - from + 1);
+        const { bytesRead } = await handle.read(buffer, 0, buffer.length, from);
+        return new Uint8Array(buffer.subarray(0, bytesRead));
+      };
+      const fixtureInfo = await readBigTiffInfo(fileRange);
+      const index = fixtureInfo.tileByteCounts.findIndex((count) => count > 0);
+      expect(index).toBeGreaterThanOrEqual(0);
+
+      requests = 0;
+      const reader = memoTileReader(fixtureInfo, fileRange);
+      const [first, second] = await Promise.all([reader(index), reader(index)]);
+      expect(requests).toBe(1);
+      expect(first).toBe(second);
+    } finally {
+      await handle.close();
+    }
+  });
+
+  it('merkt sich einen Fehlschlag nicht', async () => {
+    let calls = 0;
+    const failing = memoTileReader(
+      { ...info, tileByteCounts: BigUint64Array.from([8, 0, 0, 0], BigInt) },
+      async () => {
+        calls += 1;
+        throw new Error('Netz weg');
+      }
+    );
+    await expect(failing(0)).rejects.toThrow('Netz weg');
+    await expect(failing(0)).rejects.toThrow('Netz weg');
+    // Zweiter Versuch, nicht das gemerkte Scheitern von vorhin.
+    expect(calls).toBe(2);
   });
 
   it('reicht denselben Wert bei wiederholtem Zugriff heraus', async () => {

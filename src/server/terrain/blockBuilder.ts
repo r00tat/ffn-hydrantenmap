@@ -27,17 +27,27 @@ export type TileReader = (index: number) => Promise<Float32Array | undefined>;
  * Ein 1-km-Block berührt bis zu 5 × 5 = 25 interne Kacheln, und jede Pixelzeile
  * greift auf mehrere davon zu. Ohne Cache würde derselbe Range-Request
  * tausendfach wiederholt.
+ *
+ * Gemerkt wird das **Promise**, nicht der Wert: `buildBlock` fordert die
+ * Kacheln eines Blocks gleichzeitig an, und zwei gleichzeitige Anfragen auf
+ * dieselbe Kachel würden sie sonst beide laden. Ein Fehlschlag fällt aus dem
+ * Cache, damit er wiederholbar bleibt.
  */
 export function memoTileReader(
   info: BigTiffInfo,
   fetchRange: FetchRange
 ): TileReader {
-  const cache = new Map<number, Float32Array | undefined>();
-  return async (index) => {
-    if (!cache.has(index)) {
-      cache.set(index, await readTile(info, index, fetchRange));
+  const cache = new Map<number, Promise<Float32Array | undefined>>();
+  return (index) => {
+    let pending = cache.get(index);
+    if (!pending) {
+      pending = readTile(info, index, fetchRange).catch((err: unknown) => {
+        cache.delete(index);
+        throw err;
+      });
+      cache.set(index, pending);
     }
-    return cache.get(index);
+    return pending;
   };
 }
 
@@ -92,36 +102,56 @@ export async function buildBlock({
   const tileFirstRow = Math.floor(rowOffset / BEV_TILE_PX);
   const tileLastRow = Math.floor((rowOffset + sizePx - 1) / BEV_TILE_PX);
 
+  const touched: { tileRow: number; tileCol: number }[] = [];
   for (let tileRow = tileFirstRow; tileRow <= tileLastRow; tileRow += 1) {
     if (tileRow < 0 || tileRow >= info.tileRows) continue;
     for (let tileCol = tileFirstCol; tileCol <= tileLastCol; tileCol += 1) {
       if (tileCol < 0 || tileCol >= info.tileCols) continue;
+      touched.push({ tileRow, tileCol });
+    }
+  }
 
-      const tile = await readTileAt(tileRow * info.tileCols + tileCol);
-      if (!tile) continue;
+  /**
+   * Erst alle Kacheln anfordern, dann kopieren.
+   *
+   * Eine nach der anderen geladen kostet ein 1-km-Block bis zu 25 Rundreisen
+   * hintereinander, und über 4.385 Blöcke ist das der Import. Wie viele davon
+   * wirklich gleichzeitig laufen, entscheidet die Ratenbegrenzung in
+   * `bevSource`, nicht diese Schleife.
+   */
+  const tiles = new Map<number, Float32Array | undefined>();
+  await Promise.all(
+    touched.map(async ({ tileRow, tileCol }) => {
+      const index = tileRow * info.tileCols + tileCol;
+      tiles.set(index, await readTileAt(index));
+    })
+  );
 
-      // Überlappung von Kachel und Block, in globalen Quellpixeln.
-      const srcColFrom = Math.max(tileCol * BEV_TILE_PX, colOffset);
-      const srcColTo = Math.min(
-        (tileCol + 1) * BEV_TILE_PX - 1,
-        colOffset + sizePx - 1,
-        info.width - 1
-      );
-      const srcRowFrom = Math.max(tileRow * BEV_TILE_PX, rowOffset);
-      const srcRowTo = Math.min(
-        (tileRow + 1) * BEV_TILE_PX - 1,
-        rowOffset + sizePx - 1,
-        info.height - 1
-      );
+  for (const { tileRow, tileCol } of touched) {
+    const tile = tiles.get(tileRow * info.tileCols + tileCol);
+    if (!tile) continue;
 
-      for (let srcRow = srcRowFrom; srcRow <= srcRowTo; srcRow += 1) {
-        const tileRowBase = (srcRow - tileRow * BEV_TILE_PX) * info.tileWidth;
-        const outRowBase = (srcRow - rowOffset) * sizePx;
-        for (let srcCol = srcColFrom; srcCol <= srcColTo; srcCol += 1) {
-          const value = tile[tileRowBase + (srcCol - tileCol * BEV_TILE_PX)];
-          if (value !== undefined && value > NODATA_THRESHOLD) {
-            out[outRowBase + (srcCol - colOffset)] = value;
-          }
+    // Überlappung von Kachel und Block, in globalen Quellpixeln.
+    const srcColFrom = Math.max(tileCol * BEV_TILE_PX, colOffset);
+    const srcColTo = Math.min(
+      (tileCol + 1) * BEV_TILE_PX - 1,
+      colOffset + sizePx - 1,
+      info.width - 1
+    );
+    const srcRowFrom = Math.max(tileRow * BEV_TILE_PX, rowOffset);
+    const srcRowTo = Math.min(
+      (tileRow + 1) * BEV_TILE_PX - 1,
+      rowOffset + sizePx - 1,
+      info.height - 1
+    );
+
+    for (let srcRow = srcRowFrom; srcRow <= srcRowTo; srcRow += 1) {
+      const tileRowBase = (srcRow - tileRow * BEV_TILE_PX) * info.tileWidth;
+      const outRowBase = (srcRow - rowOffset) * sizePx;
+      for (let srcCol = srcColFrom; srcCol <= srcColTo; srcCol += 1) {
+        const value = tile[tileRowBase + (srcCol - tileCol * BEV_TILE_PX)];
+        if (value !== undefined && value > NODATA_THRESHOLD) {
+          out[outRowBase + (srcCol - colOffset)] = value;
         }
       }
     }

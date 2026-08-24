@@ -210,11 +210,33 @@ npm run terrainImport -- --cache .terrain-cache --level detail --limit 5 --no-up
 ```
 
 - Der Import ist **wiederaufsetzbar**: fertige Kacheln im Cache werden nicht neu gebaut.
-  Ein Abbruch kostet nur die laufende Kachel.
+  Ein Abbruch kostet nur die laufende Kachel. `Strg-C` ist der vorgesehene Weg, ihn zu
+  unterbrechen — derselbe Befehl setzt fort, wo er stand.
+- **Geschrieben wird über `.tmp` und `rename`**, sowohl die rohen `.f32` als auch die PNGs.
+  Ohne das hinterließe ein Abbruch mitten im Schreiben eine halbe Datei, die beim nächsten
+  Lauf als fertig gilt: eine löchrige Kachel oder verschobenes Gelände, ohne dass irgendwo
+  ein Fehler gemeldet wird. Beim Lesen wird die Länge zusätzlich geprüft — eine
+  abgeschnittene Rohdatei aus einem älteren Lauf wird verworfen und neu geladen.
 - `--no-upload` baut ohne Anmeldedaten; der Firebase-Admin wird erst im Upload-Zweig
   importiert.
 - Ohne `terrain-calibration.json` **bricht der Import ab**, statt einen Festwert zu
   erfinden. Ein geratener Skalar würde im Wasserstandsmodell später als Messwert gelesen.
+
+### Wie schnell er läuft
+
+Ein Block kostet rund **eine Sekunde**: etwa 400 ms für seine bis zu 25 Quellkacheln, 200 ms
+LZW-Dekodierung, 85 ms PNG. Landesweit sind das etwa 1,5 Stunden.
+
+Der Engpass war lange keiner von beiden. Bis dahin holte `buildBlock` die Kacheln **eine
+nach der anderen**, und die Ratenbegrenzung schrieb 100 ms Mindestabstand vor — 25 Kacheln
+hintereinander waren damit 2,5 s Wartezeit je Block, in der Praxis 5 bis 12 s. Gemessen
+liefert der BEV-Dienst eine Kachel in 45 ms, bei acht gleichzeitigen Anfragen in 13 ms.
+Seither fordert `buildBlock` die Kacheln eines Blocks **gleichzeitig** an; wie viele davon
+wirklich laufen, entscheidet allein die Ratenbegrenzung in
+[bevSource.ts](../src/server/terrain/bevSource.ts) (acht gleichzeitig, 25 ms Abstand).
+
+Damit ist der Import CPU-gebunden, nicht netzgebunden. Mehr Parallelität beim Laden bringt
+nichts mehr — über acht gleichzeitige Anfragen wird der Dienst langsamer, nicht schneller.
 
 ### Die Reihenfolge ist nicht frei
 
