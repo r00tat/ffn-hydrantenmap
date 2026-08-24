@@ -26,6 +26,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/loeschwasserfoerderung.md](docs/loeschwasserfoerderung.md) | Löschwasserförderung an der Leitung: Reibungstabelle und ihre Quelle, Höhendaten, Pumpenstandorte |
 | [docs/pendelverkehr.md](docs/pendelverkehr.md) | Pendelverkehr an der Leitung und der Vergleich mit der Förderung: Umlaufformel, Füllstellen-Schranke, Fahrt-Routing, Planungswerte der Aufbauzeit, Seite „Löschwasserversorgung" |
 | [docs/dammbau-sandsaecke.md](docs/dammbau-sandsaecke.md) | Sandsackbedarf für den Dammbau an der Linie: Verlege- und Befüllleistungstabellen der Lehrunterlage LU TE3 und ihre Gegenprüfung, Bauweisen, Freibord, Logistik, Summe über mehrere Dammabschnitte |
+| [docs/hoehenmodell.md](docs/hoehenmodell.md) | Eigenes Höhenmodell: BEV-Datenquelle, Höhendatum und Kalibrierung, Kachelschema, Import und Höhenlinien |
 
 ## Commands
 
@@ -70,6 +71,8 @@ npm run extract <har-file> <prefix>   # Parse HAR files from Burgenland GIS
 npm run import <type> <csv-file>      # Import CSV to Firestore
 npm run clusterHydrants               # Generate geohashed clusters
 npm run updateClusters                # Update cluster data in Firestore
+npm run terrainCalibrate              # Versatzgitter EVRF2000 → müA, s. docs/hoehenmodell.md
+npm run terrainImport                 # Terrainkacheln aus dem BEV-ALS-DGM bauen und hochladen
 ```
 
 ## Git Worktrees
