@@ -1,12 +1,19 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import type { TerrainLevelId } from '../../common/terrain/terrainIndexTypes';
+import { contourRampCss } from './layers/hoehenlinien';
 
 /**
  * Was die gezeichneten Linien bedeuten.
+ *
+ * Die Farbrampe ist auf den sichtbaren Ausschnitt gedehnt — deshalb ist diese
+ * Legende kein Beiwerk: ohne die beiden Höhen an ihren Enden ist die Farbe
+ * eine Ordnung ohne Werte, und nach dem nächsten Verschieben der Karte steht
+ * derselbe Ton für eine andere Höhe.
  *
  * Neben der Äquidistanz stehen Rasterweite und Stufe: eine Linie aus der
  * Übersichtsstufe sieht auf der Karte genauso genau aus wie eine aus der
@@ -21,6 +28,9 @@ export interface HoehenlinienLegendeProps {
   level?: TerrainLevelId;
   resolutionM?: number;
   lineCount: number;
+  /** Tiefste und höchste Höhe im Ausschnitt, die Enden der Farbrampe. */
+  minM?: number;
+  maxM?: number;
   status: 'loading' | 'ready' | 'empty' | 'failed';
 }
 
@@ -29,9 +39,16 @@ export default function HoehenlinienLegende({
   level,
   resolutionM,
   lineCount,
+  minM,
+  maxM,
   status,
 }: HoehenlinienLegendeProps) {
   const t = useTranslations('hoehenlinien');
+  const format = useFormatter();
+  const theme = useTheme();
+
+  const height = (value: number) =>
+    format.number(value, { maximumFractionDigits: 1 });
 
   return (
     <Box
@@ -66,6 +83,41 @@ export default function HoehenlinienLegende({
           {t('failed')}
         </Typography>
       )}
+
+      {status === 'ready' && minM !== undefined && maxM !== undefined && (
+        <Box sx={{ maxWidth: 200 }}>
+          <Box
+            sx={{
+              height: 8,
+              borderRadius: 0.5,
+              border: `1px solid ${theme.palette.divider}`,
+              background: contourRampCss(theme.palette.mode === 'dark'),
+            }}
+          />
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 1,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              {t('meters', { value: height(minM) })}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('meters', { value: height(maxM) })}
+            </Typography>
+          </Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block' }}
+          >
+            {t('rampCaption')}
+          </Typography>
+        </Box>
+      )}
+
       {status === 'ready' && (
         <Typography
           variant="caption"

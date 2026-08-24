@@ -378,6 +378,41 @@ und zwei Instanzen wären zwei Kopien derselben Kacheln.
   gerechnet, nicht blockweise: sonst wäre jede Linie an jeder Blockgrenze in eine eigene
   zerlegt. Die Stufe wählt ein Zellbudget (2,5 Mio. Zellen) statt einer Zoomschwelle.
 
+### Darstellung der Höhenlinien
+
+Die Regeln stehen in [src/components/Map/layers/hoehenlinien.ts](../src/components/Map/layers/hoehenlinien.ts),
+ohne React und Leaflet, damit sie für sich prüfbar sind.
+
+**Die Farbe kommt aus der Höhe im sichtbaren Ausschnitt**, nicht aus einer festen Spanne.
+Das ist eine Entscheidung gegen die klassische Höhenschichtfarbe, und der Grund steht im
+Gelände: gemessen über die Übersichtsstufe reicht das Modell von 106,1 m bis 882,2 m, ein
+Quadratkilometer Seewinkel bei Podersdorf deckt davon 5,7 m ab und der Wagram westlich von
+Neusiedl — das steilste Gelände im Ausrückebereich — 58,7 m. Auf eine feste Rampe über
+776 m gerechnet bekämen im Einsatzgebiet alle Linien praktisch denselben Ton. Die Spanne
+des Ausschnitts liefert `terrainContours` als `minM`/`maxM` mit; sie ist weiter als die
+Linien, weil die tiefste Linie über dem tiefsten Punkt liegt.
+
+Die Rampe läuft über den **Farbton** (Petrol → Grün → Oliv → Rotbraun), nicht über die
+Helligkeit. Ein Verlauf hell→dunkel verschwindet je nach Untergrund an einem der beiden
+Enden — auf dem Luftbild das dunkle, auf der hellen Karte das helle.
+
+**Der Preis dieser Wahl sind zwei Angaben, die deshalb Pflichtteil sind und nicht Beiwerk:**
+
+- Die **Legende** beschriftet die Enden der Rampe in Metern. Ohne sie ist die Farbe eine
+  Ordnung ohne Werte, und nach dem nächsten Verschieben der Karte steht derselbe Ton für
+  eine andere Höhe.
+- Die **Höhe an der Linie**, gesetzt über `labelAnchors` und `thinLabels`. Gerechnet wird in
+  Bildschirmpixeln, nicht in Koordinaten: ob zwei Beschriftungen aneinanderstoßen, hängt am
+  Zoom. Kurze Linien bleiben unbeschriftet, lange bekommen mehrere; je Rasterzelle bleibt
+  eine stehen, und lange Linien kommen zuerst dran.
+
+**Zähllinien hängen an der Äquidistanz, nicht am ganzen Meter** (`indexInterval`: 0,5 m → 2,
+1 → 5, 2 → 10, 5 → 25, 10 → 50). Bei 10 m Äquidistanz ist sonst jede Höhe ein ganzer Meter,
+also jede Linie eine Zähllinie — und jede bekäme eine Beschriftung.
+
+Ob eine Fläche eine Kuppe oder eine Senke ist, sagt die Farbe mit: der innere Ring einer
+Senke ist kühler als der Ring außen herum. Böschungsschraffen sind deshalb nicht nötig.
+
 ## Löschwasserförderung
 
 Die Förderung nimmt zuerst das eigene Modell und fällt auf OpenTopoData (EU-DEM 25 m)

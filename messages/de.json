@@ -2446,6 +2446,7 @@
     "loading": "Höhenlinien werden berechnet …",
     "failed": "Höhenlinien konnten nicht berechnet werden.",
     "lineCount": "{count, plural, one {# Linie} other {# Linien}}",
+    "rampCaption": "Farbe nach Höhe im Ausschnitt",
     "offlineTitle": "Höhenmodell offline laden",
     "offlineDescription": "Übersichtsstufe für das ganze Burgenland, rund {size} MB.",
     "offlineStart": "Laden",

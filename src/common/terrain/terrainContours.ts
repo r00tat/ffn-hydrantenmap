@@ -196,6 +196,8 @@ export async function terrainContours(
     if (value > max) max = value;
   }
   if (!Number.isFinite(min) || !Number.isFinite(max)) return found;
+  found.minM = min;
+  found.maxM = max;
 
   const heights = (row: number, col: number): number | undefined => {
     const value = mosaic.values[row * mosaic.cols + col];

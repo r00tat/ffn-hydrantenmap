@@ -242,6 +242,16 @@ describe('terrainContours', () => {
     expect(perHeight.get(10)).toBe(2);
   });
 
+  it('meldet die Höhenspanne des Ausschnitts, nicht nur die Linien', async () => {
+    // Die Farbrampe der Karte wird darauf gedehnt und die Legende beschriftet
+    // damit ihre Enden. Ohne die Spanne hat die Farbe keinen Bezug — und die
+    // tiefste Höhe liegt unter der tiefsten Linie, die höchste darüber.
+    const store = harness(detailLevel());
+    const { minM, maxM } = await terrainContours(store, window20m, 5);
+    expect(minM).toBeLessThan(5);
+    expect(maxM).toBeGreaterThan(15);
+  });
+
   it('gibt ohne Index keine Linien', async () => {
     const store = new BlockStore({
       bucket: 'test-bucket',

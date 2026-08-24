@@ -44,6 +44,15 @@ export interface ContourResult {
   /** `undefined`, wenn keine Stufe geantwortet hat. */
   level?: TerrainLevelId;
   resolutionM?: number;
+  /**
+   * Tiefste und höchste Höhe im Ausschnitt, nicht die der Linien.
+   *
+   * Darauf dehnt die Karte ihre Farbrampe, und damit beschriftet die Legende
+   * deren Enden. Die Spanne ist weiter als die Linien: die tiefste Linie liegt
+   * über dem tiefsten Punkt, die höchste unter dem höchsten.
+   */
+  minM?: number;
+  maxM?: number;
 }
 
 export interface TerrainBoundsLatLng {

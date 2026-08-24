@@ -149,6 +149,8 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
         lines: response.lines,
         level: response.level,
         resolutionM: response.resolutionM,
+        minM: response.minM,
+        maxM: response.maxM,
       };
     },
 

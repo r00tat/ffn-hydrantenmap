@@ -22,6 +22,17 @@ const fakeMap = {
       getEast: () => 16.86,
     }),
   }),
+  /**
+   * Eine gerade Projektion reicht: die Setzung der Beschriftungen rechnet in
+   * Bildschirmpixeln, und was sie von der Karte braucht, ist nur ein
+   * umkehrbarer Zusammenhang zwischen Koordinate und Pixel.
+   */
+  latLngToContainerPoint: ([lat, lng]: [number, number]) => ({
+    x: (lng - 16.84) * 100_000,
+    y: (47.95 - lat) * 100_000,
+  }),
+  containerPointToLatLng: ([x, y]: [number, number]) =>
+    [47.95 - y / 100_000, 16.84 + x / 100_000] as [number, number],
   on: (name: string, fn: (event: unknown) => void) => {
     const set = handlers.get(name) ?? new Set();
     set.add(fn);
@@ -41,13 +52,30 @@ vi.mock('react-leaflet', () => ({
   LayerGroup: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="layergroup">{children}</div>
   ),
-  Polyline: ({ positions }: { positions: unknown[] }) => (
-    <div data-testid="polyline" data-points={positions.length} />
+  Polyline: ({
+    positions,
+    pathOptions,
+  }: {
+    positions: unknown[];
+    pathOptions: { color: string; weight: number };
+  }) => (
+    <div
+      data-testid="polyline"
+      data-points={positions.length}
+      data-color={pathOptions.color}
+      data-weight={pathOptions.weight}
+    />
+  ),
+  Marker: ({ icon }: { icon: { html: string } }) => (
+    <div data-testid="label" dangerouslySetInnerHTML={{ __html: icon.html }} />
   ),
 }));
 
 vi.mock('leaflet', () => ({
-  default: { canvas: () => ({ marker: 'canvas' }) },
+  default: {
+    canvas: () => ({ marker: 'canvas' }),
+    divIcon: (options: unknown) => options,
+  },
 }));
 
 const contours = vi.fn<(...args: unknown[]) => Promise<ContourResult>>();
@@ -77,6 +105,9 @@ const result = (count: number): ContourResult => ({
   })),
   level: 'detail',
   resolutionM: 1,
+  // Die Spanne ist weiter als die Linien — so kommt sie auch aus dem Worker.
+  minM: 129.2,
+  maxM: 133.4,
 });
 
 const enable = () => fire('overlayadd', { name: HOEHENLINIEN_LAYER_NAME });
@@ -229,6 +260,48 @@ describe('HoehenlinienLayer', () => {
     resolveFirst(result(7));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.getAllByTestId('polyline')).toHaveLength(2);
+  });
+
+  it('beschriftet die Zähllinien mit ihrer Höhe', async () => {
+    renderWithIntl(<HoehenlinienLayer />);
+    enable();
+
+    // Höhen 130, 131, 132 bei 1 m Äquidistanz: Zähllinien stehen alle 5 m,
+    // also ist nur die 130 eine. Wäre jede Linie beschriftet, stünden bei
+    // 0,5 m Äquidistanz dutzende Zahlen übereinander.
+    await waitFor(() =>
+      expect(screen.getAllByText('130').length).toBeGreaterThan(0)
+    );
+    expect(screen.queryByText('131')).not.toBeInTheDocument();
+    expect(screen.queryByText('132')).not.toBeInTheDocument();
+  });
+
+  it('gibt der tiefsten und der höchsten Linie verschiedene Farben', async () => {
+    renderWithIntl(<HoehenlinienLayer />);
+    enable();
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('polyline')).toHaveLength(3)
+    );
+    const farben = screen
+      .getAllByTestId('polyline')
+      .map((el) => el.getAttribute('data-color'));
+    expect(new Set(farben).size).toBe(3);
+  });
+
+  it('beschriftet die Enden der Farbrampe in Metern', async () => {
+    renderWithIntl(<HoehenlinienLayer />);
+    enable();
+
+    // Ohne diese beiden Zahlen ist die Farbe eine Ordnung ohne Werte: die
+    // Rampe ist auf den Ausschnitt gedehnt, nicht auf eine feste Spanne.
+    await waitFor(() =>
+      expect(screen.getByText('129,2 m')).toBeInTheDocument()
+    );
+    expect(screen.getByText('133,4 m')).toBeInTheDocument();
+    expect(
+      screen.getByText('Farbe nach Höhe im Ausschnitt')
+    ).toBeInTheDocument();
   });
 
   it('hört auf zu zeichnen, wenn der Layer abgeschaltet wird', async () => {

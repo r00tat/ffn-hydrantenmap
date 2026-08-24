@@ -2446,6 +2446,7 @@
     "loading": "Computing contour lines …",
     "failed": "Contour lines could not be computed.",
     "lineCount": "{count, plural, one {# line} other {# lines}}",
+    "rampCaption": "Colour by elevation in view",
     "offlineTitle": "Download elevation model for offline use",
     "offlineDescription": "Overview level for all of Burgenland, about {size} MB.",
     "offlineStart": "Download",
