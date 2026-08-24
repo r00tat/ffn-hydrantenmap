@@ -50,10 +50,21 @@ export const blockForLatLng = (
 ): BlockRef => blockForPoint(wgs84ToLaea(position), sizeM);
 
 /**
- * Pixelkoordinate innerhalb eines Blocks, Ursprung oben links.
+ * Pixelkoordinate innerhalb eines Blocks, Ursprung oben links. Ganzzahlige
+ * Werte bezeichnen **Pixelmitten**.
  *
  * Die Zeilen laufen von Nord nach Süd wie im Bild, die Blockkante `n` ist die
  * **untere** — daher die Umkehrung in `row`.
+ *
+ * Die Mitte von Pixel (0,0) liegt auf der Nordwestecke des Blocks, nicht einen
+ * halben Pixel davon entfernt. Das ist die Konvention der BEV-Quelldateien: ihr
+ * Georeferenz-Tiepoint liegt auf einer halben Pixelgrenze (`4799999.5`), die
+ * Quellpixelmitten also auf ganzen Metern. Läge unser Gitter um einen halben
+ * Pixel versetzt, fiele jede Blockpixelmitte genau zwischen zwei Quellpixel und
+ * die Zuordnung entschiede das Gleitkommarauschen.
+ *
+ * Die Blöcke pflastern trotzdem lückenlos: Pixel `sizePx-1` eines Blocks und
+ * Pixel `0` des nächsten liegen genau eine Rasterweite auseinander.
  */
 export function pixelInBlock(
   point: LaeaPoint,
@@ -74,8 +85,26 @@ export function blockPixelCenter(
   resolutionM: number
 ): LaeaPoint {
   return {
-    e: block.e + (col + 0.5) * resolutionM,
-    n: block.n + block.sizeM - (row + 0.5) * resolutionM,
+    e: block.e + col * resolutionM,
+    n: block.n + block.sizeM - row * resolutionM,
+  };
+}
+
+/**
+ * Globaler Quellpixel-Index eines LAEA-Punkts in einem Raster, dessen
+ * Tiepoint die **Ecke** von Pixel (0,0) bezeichnet (GeoTIFF
+ * `RasterPixelIsArea`). Ganzzahlig gerundet, weil die Mitten bei unserem
+ * Blockgitter exakt zusammenfallen und nur Gleitkommarauschen bleibt.
+ */
+export function sourcePixelIndex(
+  point: LaeaPoint,
+  origin: { originE: number; originN: number; pixelSizeM: number }
+): { col: number; row: number } {
+  // `+ 0` normalisiert das `-0`, das `Math.round` für kleine negative Werte
+  // liefert: als Index harmlos, beim Vergleichen überraschend.
+  return {
+    col: Math.round((point.e - origin.originE) / origin.pixelSizeM - 0.5) + 0,
+    row: Math.round((origin.originN - point.n) / origin.pixelSizeM - 0.5) + 0,
   };
 }
 

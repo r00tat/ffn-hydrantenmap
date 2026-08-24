@@ -11,6 +11,7 @@ import {
   blocksForBounds,
   parseBlockId,
   pixelInBlock,
+  sourcePixelIndex,
 } from './grid';
 
 describe('blockId / parseBlockId', () => {
@@ -65,8 +66,53 @@ describe('pixelInBlock / blockPixelCenter', () => {
   it('ist über die Pixelmitte umkehrbar', () => {
     const center = blockPixelCenter(block, 123, 456, 1);
     const { col, row } = pixelInBlock(center, block, 1);
-    expect(col).toBeCloseTo(123.5, 9);
-    expect(row).toBeCloseTo(456.5, 9);
+    expect(col).toBeCloseTo(123, 9);
+    expect(row).toBeCloseTo(456, 9);
+  });
+
+  it('legt Pixelmitten auf ganze Meter, wie die BEV-Quelldaten', () => {
+    // Der BEV-Tiepoint liegt bei 4799999.5, die Quellpixelmitten also auf
+    // ganzen Metern. Läge unser Gitter um einen halben Pixel versetzt, fiele
+    // jede Blockpixelmitte genau zwischen zwei Quellpixel.
+    for (const col of [0, 1, 999]) {
+      expect(blockPixelCenter(block, col, 0, 1).e % 1).toBe(0);
+    }
+  });
+
+  it('pflastert lückenlos über die Blockgrenze', () => {
+    const rechts = { e: block.e + 1000, n: block.n, sizeM: 1000 };
+    const letztes = blockPixelCenter(block, 999, 0, 1);
+    const erstes = blockPixelCenter(rechts, 0, 0, 1);
+    expect(erstes.e - letztes.e).toBe(1);
+  });
+});
+
+describe('sourcePixelIndex', () => {
+  // Georeferenzierung der echten BEV-Kachel N2750000E4800000.
+  const origin = { originE: 4_799_999.5, originN: 2_800_000.5, pixelSizeM: 1 };
+
+  it('bildet die Ecke von Pixel (0,0) auf Index 0 ab', () => {
+    expect(sourcePixelIndex({ e: 4_800_000, n: 2_800_000 }, origin)).toEqual({
+      col: 0,
+      row: 0,
+    });
+  });
+
+  it('rundet Gleitkommarauschen weg statt es abzuschneiden', () => {
+    const leichtDarunter = { e: 4_800_000 - 1e-9, n: 2_800_000 + 1e-9 };
+    expect(sourcePixelIndex(leichtDarunter, origin)).toEqual({
+      col: 0,
+      row: 0,
+    });
+  });
+
+  it('trifft den verifizierten Referenzpunkt', () => {
+    const { col, row } = sourcePixelIndex(
+      { e: 4_834_137.14, n: 2_782_474.81 },
+      origin
+    );
+    expect(col).toBe(34137);
+    expect(row).toBe(17525);
   });
 });
 
