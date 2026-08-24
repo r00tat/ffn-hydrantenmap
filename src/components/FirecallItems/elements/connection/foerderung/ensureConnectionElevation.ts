@@ -14,10 +14,14 @@ import { fetchElevations } from './elevationAction';
 import {
   elevationSignature,
   elevationTodo,
-  FALLBACK_SAMPLE_SPACING_M,
   foerderungSamples,
   isFoerderungEnabled,
 } from './elevationProfile';
+import {
+  FALLBACK_SAMPLING,
+  FINE_SAMPLING,
+  type ElevationSample,
+} from './elevationSampling';
 
 const clearedElevation = {
   elevationProfile: '',
@@ -120,14 +124,26 @@ export async function ensureConnectionElevation(
   if (todo === 'clear') {
     update = { ...clearedElevation };
   } else {
-    const samples = foerderungSamples(item);
-    const positions = samples.map(({ position }) => position);
-    const spacingM = FALLBACK_SAMPLE_SPACING_M;
-    const signature = elevationSignature(samples, spacingM);
+    // Jede Quelle hat ihre eigene Abtastung, und gespeichert wird die
+    // Signatur der **tatsächlich verwendeten** — sonst gehört das Profil zu
+    // einer Abtastung, die es nie gab.
+    const fine = foerderungSamples(item, FINE_SAMPLING);
+    let samples: ElevationSample[] = fine;
+    let spacingM = FINE_SAMPLING.spacingM;
+    let lookup = await terrainElevations(
+      fine.map(({ position }) => position)
+    );
 
-    const lookup =
-      (await terrainElevations(positions)) ??
-      (await openTopoElevations(firecallId, positions));
+    if (!lookup) {
+      samples = foerderungSamples(item, FALLBACK_SAMPLING);
+      spacingM = FALLBACK_SAMPLING.spacingM;
+      lookup = await openTopoElevations(
+        firecallId,
+        samples.map(({ position }) => position)
+      );
+    }
+
+    const signature = elevationSignature(samples, spacingM);
 
     update = lookup
       ? {
@@ -145,7 +161,8 @@ export async function ensureConnectionElevation(
           elevationProfile: '',
           // Die Signatur wird auch beim Fehlschlag gesetzt: Sie hält fest, wofür
           // die Höhen nicht zu bekommen waren, und verhindert damit eine neue
-          // Abfrage bei jeder weiteren Änderung.
+          // Abfrage bei jeder weiteren Änderung. Es ist die Signatur der
+          // Rückfallebene, denn die war der letzte Versuch.
           elevationFor: signature,
           elevationFailed: 'true',
           elevationSource: '',

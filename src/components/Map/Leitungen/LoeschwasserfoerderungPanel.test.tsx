@@ -46,15 +46,13 @@ vi.mock('../../../hooks/useFuellstelle', () => ({
   default: () => fuellstelle(),
 }));
 
-import {
-  elevationSignature,
-  FALLBACK_SAMPLE_SPACING_M,
-  foerderungSamples,
-} from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import { FINE_SAMPLING } from '../../FirecallItems/elements/connection/foerderung/elevationSampling';
 
-
+/** Signatur zur gewünschten, feinen Abtastung. */
 const signature = (samples: Parameters<typeof elevationSignature>[0]) =>
-  elevationSignature(samples, FALLBACK_SAMPLE_SPACING_M);
+  elevationSignature(samples, FINE_SAMPLING.spacingM);
+
 import { routingSignature } from '../../FirecallItems/elements/connection/routedPath';
 import LoeschwasserfoerderungPanel from './LoeschwasserfoerderungPanel';
 
@@ -86,6 +84,7 @@ const withProfile = (overrides: Partial<Connection> = {}): Connection => {
     ...base,
     elevationProfile: JSON.stringify(samples.map(() => 130)),
     elevationFor: signature(samples),
+    elevationSpacing: String(FINE_SAMPLING.spacingM),
   } as Connection;
 };
 
@@ -144,6 +143,8 @@ describe('LoeschwasserfoerderungPanel', () => {
     // ausgewiesen: sonst ist eine Abweichung gegenüber einem früheren
     // Ergebnis nicht zuordenbar.
     expect(screen.getByText(/EU-DEM 25 m/)).toBeInTheDocument();
+    // …mit der Abtastweite, die am Element steht.
+    expect(screen.getByText(/alle 10 m abgetastet/)).toBeInTheDocument();
     expect(pumpCount()).toBeGreaterThan(0);
   });
 
@@ -383,14 +384,13 @@ describe('LoeschwasserfoerderungPanel', () => {
         item={withProfile({
           elevationSource: 'terrain',
           elevationLevel: 'detail',
-          elevationSpacing: String(FALLBACK_SAMPLE_SPACING_M),
         })}
         open
         onClose={() => {}}
       />
     );
     expect(
-      screen.getByText(/BEV ALS-DGM, 1 m Raster.*alle 50 m abgetastet/)
+      screen.getByText(/BEV ALS-DGM, 1 m Raster.*alle 10 m abgetastet/)
     ).toBeInTheDocument();
     // Die alte, festverdrahtete Angabe darf nicht mehr dastehen.
     expect(screen.queryByText(/EU-DEM 25 m/)).not.toBeInTheDocument();

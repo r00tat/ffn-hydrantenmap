@@ -3,9 +3,12 @@
 import type { Connection, MultiPointItem } from '../../../../firebase/firestore';
 import { connectionDisplayPositions } from '../streetRouting';
 import {
+  FALLBACK_SAMPLING,
+  FINE_SAMPLING,
   sampleAlongPath,
   TARGET_SAMPLE_SPACING_M,
   type ElevationSample,
+  type SamplingOptions,
 } from './elevationSampling';
 
 /**
@@ -33,9 +36,16 @@ export const isFoerderungReversed = (item: MultiPointItem): boolean =>
 /**
  * Die Abtastpunkte, zu denen ein Profil gehört: entlang des gezeichneten
  * Verlaufs, also mit aktivem Straßen-Routing entlang der Straße.
+ *
+ * Die Vorgabe ist die **feine** Abtastung: das ist ab jetzt die gewünschte.
+ * Die grobe kommt nur noch über einen ausdrücklichen Aufruf — aus der
+ * Rückfallebene und beim Prüfen eines gespeicherten Profils.
  */
-export const foerderungSamples = (item: MultiPointItem): ElevationSample[] =>
-  sampleAlongPath(connectionDisplayPositions(item));
+export const foerderungSamples = (
+  item: MultiPointItem,
+  options: SamplingOptions = FINE_SAMPLING
+): ElevationSample[] =>
+  sampleAlongPath(connectionDisplayPositions(item), options);
 
 /**
  * Abtastweite der Rückfallebene, und die Vorgabe für Profile ohne
@@ -78,6 +88,19 @@ const storedSpacing = (connection: Connection): number => {
     : FALLBACK_SAMPLE_SPACING_M;
 };
 
+/**
+ * Die Abtastung, mit der ein gespeichertes Profil entstanden ist.
+ *
+ * Rekonstruiert wird über die Abtastweite, weil nur sie am Element steht. Eine
+ * unbekannte Weite — handgesetzt oder aus einer späteren Version — bekommt den
+ * vorsichtigen Deckel: zu wenige Punkte machen die Signatur ungültig und
+ * kosten eine Abfrage, zu viele wären ein Dokument, das nicht mehr passt.
+ */
+const samplingFor = (spacingM: number): SamplingOptions =>
+  [FINE_SAMPLING, FALLBACK_SAMPLING].find(
+    (sampling) => sampling.spacingM === spacingM
+  ) ?? { spacingM, maxSamples: FALLBACK_SAMPLING.maxSamples };
+
 export interface StoredElevationProfile {
   /** Höhen in m an den Abtastpunkten, in Zeichenrichtung. */
   elevations: number[];
@@ -108,7 +131,11 @@ export function storedElevations(
   if (!connection.elevationProfile) return undefined;
 
   const spacingM = storedSpacing(connection);
-  const samples = foerderungSamples(item);
+  // Mit der **gespeicherten** Abtastung nachgebildet, nicht mit der
+  // gewünschten: ein Profil aus der Rückfallebene mit 50 m bleibt damit
+  // gültig, auch wenn ab jetzt feiner abgetastet wird. Sonst liefe die
+  // Abfrage bei jedem Render erneut.
+  const samples = foerderungSamples(item, samplingFor(spacingM));
   if (connection.elevationFor !== elevationSignature(samples, spacingM)) {
     return undefined;
   }
@@ -148,9 +175,10 @@ export function isElevationFallback(item: MultiPointItem): boolean {
   const connection = item as Connection;
   if (!isFoerderungEnabled(item)) return false;
   if (connection.elevationFailed !== 'true') return false;
+  const spacingM = storedSpacing(connection);
   return (
     connection.elevationFor ===
-    elevationSignature(foerderungSamples(item), storedSpacing(connection))
+    elevationSignature(foerderungSamples(item, samplingFor(spacingM)), spacingM)
   );
 }
 

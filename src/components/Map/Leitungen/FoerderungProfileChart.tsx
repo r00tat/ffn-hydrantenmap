@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import { useTranslations } from 'next-intl';
 import type { FoerderungView } from '../../FirecallItems/elements/connection/foerderung/foerderung';
+import { thinProfile } from './thinProfile';
 
 /**
  * Höhenprofil einer Leitung mit den vorgeschlagenen Pumpenstandorten.
@@ -28,7 +29,11 @@ export default function FoerderungProfileChart({
   const t = useTranslations('loeschwasserfoerderung');
   const theme = useTheme();
 
-  const { profile, pumps } = view;
+  const { pumps } = view;
+  // Ausgedünnt, aber mit erhaltenen Hoch- und Tiefpunkten: mit der feinen
+  // Abtastung kommen bis zu 5.000 Punkte an, und die Kuppen sind genau das,
+  // was nicht verloren gehen darf. Siehe `thinProfile`.
+  const profile = thinProfile(view.profile);
   if (profile.length < 2) return null;
 
   const plotWidth = WIDTH - PADDING.left - PADDING.right;
