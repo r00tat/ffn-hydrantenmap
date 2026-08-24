@@ -22,6 +22,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import type { Connection } from '../../firebase/firestore';
+import { FALLBACK_SAMPLE_SPACING_M } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
 import type {
   FoerderungParams,
   FoerderungView,
@@ -71,6 +72,23 @@ export default function FoerderungSection({
   const t = useTranslations('loeschwasserfoerderung');
   const num = usePanelNumber();
   const hasProfile = view.elevationSource === 'profile';
+
+  /**
+   * Woher die Höhen kommen und wie fein abgetastet wurde.
+   *
+   * Der Satz nennt Quelle **und** Rasterweite: 10 m Übersichtsstufe ist ein
+   * anderes Versprechen als 1 m, und wer eine Kuppe sucht, muss den
+   * Unterschied kennen. Ohne die Angabe ist eine Abweichung gegenüber einem
+   * früheren Ergebnis nicht zuordenbar.
+   */
+  const elevationSourceText = t(
+    view.elevationOrigin === 'terrain'
+      ? view.elevationLevel === 'overview'
+        ? 'elevationSourceTerrainOverview'
+        : 'elevationSourceTerrain'
+      : 'elevationSourceProfile',
+    { spacing: view.elevationSpacingM ?? FALLBACK_SAMPLE_SPACING_M }
+  );
 
   return (
     <>
@@ -223,9 +241,7 @@ export default function FoerderungSection({
         color="text.secondary"
         sx={{ display: 'block', mt: 0.5 }}
       >
-        {hasProfile
-          ? t('elevationSourceProfile')
-          : t('elevationSourceManual')}
+        {hasProfile ? elevationSourceText : t('elevationSourceManual')}
       </Typography>
       {hasProfile && (
         <Typography

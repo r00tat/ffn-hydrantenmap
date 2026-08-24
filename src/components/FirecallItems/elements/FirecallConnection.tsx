@@ -32,6 +32,9 @@ export class FirecallConnection extends FirecallMultiPoint {
   elevationProfile?: string;
   elevationFor?: string;
   elevationFailed?: string;
+  elevationSource?: Connection['elevationSource'];
+  elevationLevel?: Connection['elevationLevel'];
+  elevationSpacing?: string;
 
   /**
    * Pendelverkehr und Vergleich (#693). Dieselbe Begründung wie oben: alle in
@@ -67,6 +70,9 @@ export class FirecallConnection extends FirecallMultiPoint {
         elevationProfile: this.elevationProfile,
         elevationFor: this.elevationFor,
         elevationFailed: this.elevationFailed,
+        elevationSource: this.elevationSource,
+        elevationLevel: this.elevationLevel,
+        elevationSpacing: this.elevationSpacing,
         versorgungsart: this.versorgungsart,
         pendelFahrzeuge: this.pendelFahrzeuge,
         pendelTankinhalt: this.pendelTankinhalt,
@@ -150,6 +156,9 @@ export class FirecallConnection extends FirecallMultiPoint {
       elevationProfile: this.elevationProfile,
       elevationFor: this.elevationFor,
       elevationFailed: this.elevationFailed,
+      elevationSource: this.elevationSource,
+      elevationLevel: this.elevationLevel,
+      elevationSpacing: this.elevationSpacing,
       versorgungsart: this.versorgungsart,
       pendelFahrzeuge: this.pendelFahrzeuge,
       pendelTankinhalt: this.pendelTankinhalt,

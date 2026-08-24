@@ -11,6 +11,7 @@ import PasskeyManager from '../auth/PasskeyManager';
 import { auth } from '../firebase/firebase';
 import LanguageSelector from '../i18n/LanguageSelector';
 import DebugLoggingSwitch from '../logging/DebugLoggingSwitch';
+import HoehenmodellOffline from './HoehenmodellOffline';
 
 const CONTACT_EMAIL = 'hydrantenmap@ff-neusiedlamsee.at';
 
@@ -129,6 +130,10 @@ export default function ProfileUi() {
 
       <Box sx={{ mt: 2 }}>
         <DebugLoggingSwitch />
+      </Box>
+
+      <Box sx={{ mt: 2 }}>
+        <HoehenmodellOffline />
       </Box>
     </Box>
   );

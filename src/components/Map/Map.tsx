@@ -30,6 +30,8 @@ import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
 import HoseLineDraftLayer from './layers/HoseLineDraftLayer';
 import LayerErrorBoundary from './layers/LayerErrorBoundary';
+import HoehenlinienLayer from './layers/HoehenlinienLayer';
+import { HOEHENLINIEN_LAYER_NAME } from './layers/hoehenlinien';
 import LiveLocationLayer from './layers/LiveLocationLayer';
 import LocationsLayer from './layers/LocationsLayer';
 import DistanceMarker from './markers/DistanceMarker';
@@ -170,6 +172,11 @@ export default function Map() {
           <LayersControl.Overlay name={STRECKENKILOMETER_LAYER_NAME}>
             <LayerErrorBoundary name={STRECKENKILOMETER_LAYER_NAME}>
               <StreckenkilometerLayer />
+            </LayerErrorBoundary>
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name={HOEHENLINIEN_LAYER_NAME}>
+            <LayerErrorBoundary name={HOEHENLINIEN_LAYER_NAME}>
+              <HoehenlinienLayer />
             </LayerErrorBoundary>
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)

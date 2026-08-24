@@ -5,11 +5,17 @@ import type { Connection } from '../../../../firebase/firestore';
 import {
   elevationSignature,
   elevationTodo,
+  FALLBACK_SAMPLE_SPACING_M,
   foerderungSamples,
   isElevationFallback,
   isFoerderungEnabled,
   storedElevations,
 } from './elevationProfile';
+import { FALLBACK_SAMPLING, FINE_SAMPLING } from './elevationSampling';
+
+/** Signatur zur gewünschten, feinen Abtastung. */
+const signature = (samples: Parameters<typeof elevationSignature>[0]) =>
+  elevationSignature(samples, FINE_SAMPLING.spacingM);
 
 const entnahme: LatLngPosition = [47.9482, 16.8482];
 const verteiler: LatLngPosition = [47.9582, 16.8482];
@@ -26,7 +32,7 @@ const connection = (overrides: Partial<Connection> = {}): Connection =>
     ...overrides,
   }) as Connection;
 
-/** Eine Leitung mit gültigem, zur Lage passendem Profil. */
+/** Eine Leitung mit gültigem, zur Lage passendem Profil aus dem eigenen Modell. */
 const withProfile = (elevations?: number[]) => {
   const item = connection({ foerderung: 'true' });
   const samples = foerderungSamples(item);
@@ -36,9 +42,30 @@ const withProfile = (elevations?: number[]) => {
     item: connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify(values),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
+      elevationSpacing: String(FINE_SAMPLING.spacingM),
+      elevationSource: 'terrain',
+      elevationLevel: 'detail',
     }),
     values,
+  };
+};
+
+/**
+ * Dieselbe Leitung mit einem Profil aus der Rückfallebene: grobe Abtastung,
+ * kein `elevationSpacing` — so sind alle Profile entstanden, die es vor dem
+ * eigenen Höhenmodell gab.
+ */
+const withLegacyProfile = () => {
+  const item = connection({ foerderung: 'true' });
+  const samples = foerderungSamples(item, FALLBACK_SAMPLING);
+  return {
+    samples,
+    item: connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 200)),
+      elevationFor: elevationSignature(samples, FALLBACK_SAMPLE_SPACING_M),
+    }),
   };
 };
 
@@ -56,14 +83,16 @@ describe('elevationSignature', () => {
     const lang = foerderungSamples(
       connection({ positions: JSON.stringify([entnahme, [47.98, 16.8482]]) })
     );
-    expect(elevationSignature(kurz)).not.toBe(elevationSignature(lang));
+    expect(signature(kurz)).not.toBe(signature(lang));
   });
 });
 
 describe('storedElevations', () => {
   it('gibt die Höhen zurück, wenn sie zur Abtastung passen', () => {
     const { item, samples, values } = withProfile();
-    expect(storedElevations(item, samples)).toEqual(values);
+    expect(storedElevations(item)?.elevations).toEqual(values);
+    expect(storedElevations(item)?.spacingM).toBe(FINE_SAMPLING.spacingM);
+    expect(storedElevations(item)?.source).toBe('terrain');
   });
 
   it('verwirft ein Profil mit falscher Anzahl', () => {
@@ -71,9 +100,9 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify([130, 131]),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 
   it('verwirft ein Profil mit Löchern', () => {
@@ -83,17 +112,75 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify(values),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 
   it('verwirft ein Profil zu einer anderen Lage', () => {
-    const { item } = withProfile();
-    const andere = foerderungSamples(
-      connection({ positions: JSON.stringify([entnahme, [47.98, 16.8482]]) })
+    const { samples } = withProfile();
+    // Dieselben Höhen, aber die Signatur einer längeren Leitung.
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 130)),
+      elevationFor: signature(
+        foerderungSamples(
+          connection({
+            positions: JSON.stringify([entnahme, [47.98, 16.8482]]),
+          })
+        )
+      ),
+    });
+    expect(storedElevations(item)).toBeUndefined();
+  });
+
+  it('verwirft ein Profil mit anderer Abtastweite', () => {
+    const { samples } = withProfile();
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 130)),
+      // Die Signatur gilt für 10 m, das Feld behauptet 50 m.
+      elevationFor: signature(samples),
+      elevationSpacing: String(FALLBACK_SAMPLE_SPACING_M),
+    });
+    expect(storedElevations(item)).toBeUndefined();
+  });
+
+  it('unterscheidet Signaturen nach der Abtastweite', () => {
+    const item = connection({ foerderung: 'true' });
+    const fein = foerderungSamples(item, FINE_SAMPLING);
+    const grob = foerderungSamples(item, FALLBACK_SAMPLING);
+    expect(
+      elevationSignature(fein, FINE_SAMPLING.spacingM)
+    ).not.toBe(elevationSignature(grob, FALLBACK_SAMPLE_SPACING_M));
+    // Auch bei gleichen Punkten: dieselben Koordinaten mit anderer Weite sind
+    // ein anderes Profil.
+    expect(elevationSignature(fein, 10)).not.toBe(
+      elevationSignature(fein, 50)
     );
-    expect(storedElevations(item, andere)).toBeUndefined();
+  });
+
+  it('erkennt ein Profil aus der Rückfallebene als gültig', () => {
+    // Ohne `elevationSpacing` gilt 50 m, und die Punkte werden mit **dieser**
+    // Weite nachgebildet. Sonst passte die gewünschte feine Abtastung nie zur
+    // gespeicherten groben und die Karte fragte bei jedem Render neu ab.
+    const { item } = withLegacyProfile();
+    expect(storedElevations(item)?.source).toBe('opentopodata');
+    expect(storedElevations(item)?.spacingM).toBe(FALLBACK_SAMPLE_SPACING_M);
+    expect(elevationTodo(item)).toBe('none');
+  });
+
+  it('führt Quelle und Stufe des eigenen Modells mit', () => {
+    const { item } = withProfile();
+    expect(storedElevations(item)?.source).toBe('terrain');
+    expect(storedElevations(item)?.level).toBe('detail');
+  });
+
+  it('tastet feiner ab als die Rückfallebene', () => {
+    // Der Sinn des feineren Rasters: mehr Stützpunkte auf derselben Leitung.
+    expect(withProfile().samples.length).toBeGreaterThan(
+      withLegacyProfile().samples.length
+    );
   });
 
   it('verwirft unlesbares JSON', () => {
@@ -101,28 +188,34 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: '{nope',
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 });
 
 describe('isElevationFallback', () => {
   it('gilt nur für einen Fehlschlag zur aktuellen Lage', () => {
-    const samples = foerderungSamples(connection({ foerderung: 'true' }));
+    // Ein Fehlschlag hält die Signatur des letzten Versuchs fest, und das ist
+    // die Rückfallebene mit ihrer groben Abtastung.
+    const samples = foerderungSamples(
+      connection({ foerderung: 'true' }),
+      FALLBACK_SAMPLING
+    );
     const gescheitert = connection({
       foerderung: 'true',
       elevationFailed: 'true',
-      elevationFor: elevationSignature(samples),
+      elevationFor: elevationSignature(samples, FALLBACK_SAMPLE_SPACING_M),
+      elevationSpacing: String(FALLBACK_SAMPLE_SPACING_M),
     });
-    expect(isElevationFallback(gescheitert, samples)).toBe(true);
+    expect(isElevationFallback(gescheitert)).toBe(true);
 
     const veraltet = connection({
       foerderung: 'true',
       elevationFailed: 'true',
       elevationFor: 'alte-signatur',
     });
-    expect(isElevationFallback(veraltet, samples)).toBe(false);
+    expect(isElevationFallback(veraltet)).toBe(false);
   });
 });
 

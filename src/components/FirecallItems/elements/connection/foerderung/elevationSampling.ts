@@ -17,8 +17,37 @@ import { toLatLng } from '../../../../../hooks/leafletFunctions';
  */
 export const MAX_ELEVATION_SAMPLES = 100;
 
-/** Angestrebter Abstand der Abtastpunkte in m. */
+/** Angestrebter Abstand der Abtastpunkte in m in der Rückfallebene. */
 export const TARGET_SAMPLE_SPACING_M = 50;
+
+export interface SamplingOptions {
+  spacingM: number;
+  maxSamples: number;
+}
+
+/**
+ * Feine Abtastung auf dem eigenen Höhenmodell.
+ *
+ * 1-m-Raster trägt 10 m Abstand; feiner abzutasten hieße, dieselbe Rasterzelle
+ * mehrfach zu lesen. Der Deckel von 5.000 Punkten begrenzt das gespeicherte
+ * Profil auf etwa 35 KB JSON — weit unter dem Firestore-Dokumentlimit, und
+ * 50 km Leitung sind außerhalb jeder Einsatzwirklichkeit.
+ */
+export const FINE_SAMPLING: SamplingOptions = {
+  spacingM: 10,
+  maxSamples: 5000,
+};
+
+/**
+ * Gröbere Abtastung für die Rückfallebene.
+ *
+ * OpenTopoData nimmt 100 Punkte je Anfrage; die Grenze bleibt, solange die
+ * Rückfallebene existiert.
+ */
+export const FALLBACK_SAMPLING: SamplingOptions = {
+  spacingM: TARGET_SAMPLE_SPACING_M,
+  maxSamples: MAX_ELEVATION_SAMPLES,
+};
 
 export interface ElevationSample {
   position: LatLngPosition;
@@ -26,7 +55,10 @@ export interface ElevationSample {
   distance: number;
 }
 
-/** Lineare Interpolation zwischen zwei Punkten. Auf 50 m ist das exakt genug. */
+/**
+ * Lineare Interpolation zwischen zwei Punkten. Auf den hier gebrauchten
+ * Abständen — 10 bis 100 m — ist das exakt genug.
+ */
 const between = (
   from: LatLngPosition,
   to: LatLngPosition,
@@ -39,14 +71,17 @@ const between = (
 /**
  * Gleichabständige Abtastpunkte auf der Polylinie, Anfang und Ende immer dabei.
  *
- * Über 5 km wächst der Abstand über die angestrebten 50 m hinaus, weil der
- * Deckel bei `MAX_ELEVATION_SAMPLES` liegt (10 km ⇒ 100 m). Das ist die
- * richtige Seite des Kompromisses: Eine Zubringleitung über 10 km ist ohnehin
- * außergewöhnlich, und eine Kuppe, die auf 100 m nicht auffällt, verschiebt
- * einen Pumpenstandort um weniger als eine B-Länge.
+ * Jenseits von `maxSamples * spacingM` wächst der Abstand über den
+ * angestrebten hinaus, weil der Deckel greift. Das ist die richtige Seite des
+ * Kompromisses: eine Kuppe, die auf dem gedehnten Abstand nicht auffällt,
+ * verschiebt einen Pumpenstandort um weniger als eine B-Länge.
+ *
+ * Die Vorgabe bleibt die gröbere Abtastung, damit ein Aufrufer ohne Angabe
+ * nicht unversehens 5.000 Punkte anfordert.
  */
 export function sampleAlongPath(
-  positions: LatLngPosition[]
+  positions: LatLngPosition[],
+  options: SamplingOptions = FALLBACK_SAMPLING
 ): ElevationSample[] {
   const points = positions.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
@@ -74,8 +109,8 @@ export function sampleAlongPath(
   }
 
   const count = Math.min(
-    MAX_ELEVATION_SAMPLES,
-    Math.max(2, Math.round(length / TARGET_SAMPLE_SPACING_M) + 1)
+    options.maxSamples,
+    Math.max(2, Math.round(length / options.spacingM) + 1)
   );
   const step = length / (count - 1);
 

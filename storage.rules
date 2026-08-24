@@ -66,6 +66,28 @@ service firebase.storage {
       allow read, update, delete: if false;
     }
 
+    // Terrain-Kacheln des eigenen Höhenmodells.
+    //
+    // Lesen ohne Anmeldung ist Absicht und die einzige Ausnahme in dieser
+    // Datei. Zwei Gründe:
+    //
+    // Es sind offene Geodaten — BEV ALS-DGM unter CC BY 4.0, unverändert
+    // umkodiert. Es gibt keinen Vertraulichkeitsgrund; die Namensnennung
+    // erfolgt in der Legende und auf der Datenschutzseite.
+    //
+    // Und es sind über 4.000 Kacheln. Ein authentifizierter Zugriff bräuchte
+    // je Kachel ein Download-Token, das mit dem Service-Worker-Cache nicht
+    // vereinbar ist: die URL müsste je Sitzung anders lauten und der Cache
+    // liefe leer. Genau dieser Cache trägt aber den Hochwasserfall, in dem das
+    // Netz schlecht ist.
+    //
+    // Geschrieben wird ausschließlich über das Admin-SDK im Import-Skript
+    // (`npm run terrainImport`), nie aus der App.
+    match /terrain/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import type { LatLngPosition } from '../../../../../common/geo';
 import {
+  FALLBACK_SAMPLING,
+  FINE_SAMPLING,
   MAX_ELEVATION_SAMPLES,
   sampleAlongPath,
   TARGET_SAMPLE_SPACING_M,
@@ -70,6 +72,33 @@ describe('sampleAlongPath', () => {
     // Irgendein Abtastpunkt muss östlich vom Anfang liegen, sonst wurde der
     // Knick übersprungen.
     expect(samples.some((sample) => sample.position[1] > start[1])).toBe(true);
+  });
+
+  it('tastet mit der feinen Vorgabe alle 10 m ab', () => {
+    const samples = sampleAlongPath([start, northOf(1000)], FINE_SAMPLING);
+    expect(samples).toHaveLength(101);
+    expect(samples[1].distance - samples[0].distance).toBeCloseTo(10, 0);
+  });
+
+  it('hält den Deckel der feinen Abtastung ein', () => {
+    // 200 km wären bei 10 m Abstand 20.000 Punkte; der Deckel greift.
+    const samples = sampleAlongPath([start, northOf(200_000)], FINE_SAMPLING);
+    expect(samples).toHaveLength(FINE_SAMPLING.maxSamples);
+  });
+
+  it('bleibt ohne Angabe bei der groben Vorgabe', () => {
+    // Damit fordert ein Aufrufer ohne Angabe nicht unversehens 5.000 Punkte an.
+    expect(sampleAlongPath([start, northOf(20_000)])).toHaveLength(
+      MAX_ELEVATION_SAMPLES
+    );
+    expect(FALLBACK_SAMPLING.spacingM).toBe(TARGET_SAMPLE_SPACING_M);
+  });
+
+  it('gibt auf derselben Leitung mehr Punkte als die grobe Abtastung', () => {
+    const line: [LatLngPosition, LatLngPosition] = [start, northOf(2000)];
+    expect(sampleAlongPath(line, FINE_SAMPLING).length).toBeGreaterThan(
+      sampleAlongPath(line, FALLBACK_SAMPLING).length
+    );
   });
 
   it('verträgt zu wenige oder unbrauchbare Punkte', () => {

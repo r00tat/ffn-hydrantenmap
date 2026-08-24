@@ -232,13 +232,28 @@ export default function Datenschutz() {
           </li>
           <li>
             <b>Land Burgenland</b> (GIS Burgenland) – Orthofoto, Naturgefahren,
-            Schutzgebiete
+            Schutzgebiete, Gemeindegrenzen (CC BY 4.0)
           </li>
           <li>
             <b>Bundesministerium für Land- und Forstwirtschaft</b> (WISA) –
             Hochwasser- und Risikokarten
           </li>
         </ul>
+      </Typography>
+      <Typography
+        component="div"
+        sx={{
+          marginBottom: '16px',
+        }}
+      >
+        Höhenlinien und Höhenprofile beruhen auf dem{' '}
+        <b>Airborne-Laserscan-Geländemodell (ALS-DGM, 1 m)</b> des{' '}
+        <b>Bundesamts für Eich- und Vermessungswesen (BEV)</b>, samt dem
+        amtlichen Höhen-Grid für die Umrechnung auf Gebrauchshöhen (müA).
+        Datenquelle: Bundesamt für Eich- und Vermessungswesen (BEV) – CC BY 4.0.
+        Diese Daten werden <b>nicht</b> im Betrieb beim BEV abgerufen: sie
+        werden einmalig aufbereitet und aus dem eigenen Speicher ausgeliefert.
+        Beim Anzeigen von Höhenlinien geht daher keine Anfrage an das BEV.
       </Typography>
       <Typography
         sx={{

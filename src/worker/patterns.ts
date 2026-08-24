@@ -35,6 +35,37 @@ const oneDayCachePlugin = new ExpirationPlugin({
  *   kein Regex.
  */
 export const cachePatterns: RuntimeCaching[] = [
+  // Terrain-Kacheln des eigenen Höhenmodells.
+  //
+  // **Diese Regel muss vor der googleapis-Regel darunter stehen.** Firebase
+  // Storage liegt auf `firebasestorage.googleapis.com`, fällt also unter deren
+  // `NetworkOnly` — die Kacheln kämen nie in den Cache, und zwar ohne dass
+  // irgendwo ein Fehler auftaucht. Genau der Cache trägt aber den
+  // Hochwasserfall, in dem das Netz schlecht ist.
+  //
+  // Eigener `ExpirationPlugin` statt `oneDayCachePlugin`: 64 Einträge und ein
+  // Tag sind für Höhenkacheln unbrauchbar. 512 Einträge fassen die
+  // landesweite Übersichtsstufe plus einen Arbeitsvorrat an Detailblöcken,
+  // und 90 Tage passen dazu, dass der Kachelpfad versioniert ist — die
+  // Inhalte ändern sich innerhalb einer Version nicht.
+  //
+  // Funktions-Matcher und kein Regex: geprüft werden Host und Pfad getrennt.
+  {
+    matcher: ({ url }) =>
+      url.hostname === 'firebasestorage.googleapis.com' &&
+      url.pathname.includes('/o/terrain%2F'),
+    handler: new CacheFirst({
+      cacheName: 'terrain',
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 512,
+          maxAgeSeconds: 60 * 60 * 24 * 90,
+          purgeOnQuotaError: true,
+        }),
+      ],
+    }),
+  },
+
   // Google-APIs nie zwischenspeichern: Serwists Rückfall für Fremd-Origins
   // (`cross-origin`, NetworkFirst) legte sonst Firestore-Antworten in den
   // Cache. Zwei Einzelheiten sind Absicht und dürfen nicht wegvereinfacht

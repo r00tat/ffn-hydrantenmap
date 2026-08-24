@@ -47,6 +47,12 @@ vi.mock('../../../hooks/useFuellstelle', () => ({
 }));
 
 import { elevationSignature, foerderungSamples } from '../../FirecallItems/elements/connection/foerderung/elevationProfile';
+import { FINE_SAMPLING } from '../../FirecallItems/elements/connection/foerderung/elevationSampling';
+
+/** Signatur zur gewünschten, feinen Abtastung. */
+const signature = (samples: Parameters<typeof elevationSignature>[0]) =>
+  elevationSignature(samples, FINE_SAMPLING.spacingM);
+
 import { routingSignature } from '../../FirecallItems/elements/connection/routedPath';
 import LoeschwasserfoerderungPanel from './LoeschwasserfoerderungPanel';
 
@@ -77,7 +83,8 @@ const withProfile = (overrides: Partial<Connection> = {}): Connection => {
   return {
     ...base,
     elevationProfile: JSON.stringify(samples.map(() => 130)),
-    elevationFor: elevationSignature(samples),
+    elevationFor: signature(samples),
+    elevationSpacing: String(FINE_SAMPLING.spacingM),
   } as Connection;
 };
 
@@ -132,7 +139,12 @@ describe('LoeschwasserfoerderungPanel', () => {
     expect(
       screen.getByText('Länge der Leitung').nextElementSibling
     ).toHaveTextContent(/^(1\.9|2\.0)\d\d m$/);
+    // Ohne `elevationSource` gilt die Rückfallebene, und sie wird als solche
+    // ausgewiesen: sonst ist eine Abweichung gegenüber einem früheren
+    // Ergebnis nicht zuordenbar.
     expect(screen.getByText(/EU-DEM 25 m/)).toBeInTheDocument();
+    // …mit der Abtastweite, die am Element steht.
+    expect(screen.getByText(/alle 10 m abgetastet/)).toBeInTheDocument();
     expect(pumpCount()).toBeGreaterThan(0);
   });
 
@@ -364,6 +376,41 @@ describe('LoeschwasserfoerderungPanel', () => {
 
     await waitFor(() => expect(pumpCount()).toBeGreaterThan(0));
     expect(ensureElevation).not.toHaveBeenCalled();
+  });
+
+  it('weist aus, dass die Höhen aus dem eigenen Modell kommen', () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile({
+          elevationSource: 'terrain',
+          elevationLevel: 'detail',
+        })}
+        open
+        onClose={() => {}}
+      />
+    );
+    expect(
+      screen.getByText(/BEV ALS-DGM, 1 m Raster.*alle 10 m abgetastet/)
+    ).toBeInTheDocument();
+    // Die alte, festverdrahtete Angabe darf nicht mehr dastehen.
+    expect(screen.queryByText(/EU-DEM 25 m/)).not.toBeInTheDocument();
+  });
+
+  it('nennt die Übersichtsstufe, wenn sie geantwortet hat', () => {
+    renderWithIntl(
+      <LoeschwasserfoerderungPanel
+        item={withProfile({
+          elevationSource: 'terrain',
+          elevationLevel: 'overview',
+        })}
+        open
+        onClose={() => {}}
+      />
+    );
+    // 10 m Raster ist ein anderes Versprechen als 1 m.
+    expect(
+      screen.getByText(/Übersichtsstufe, 10 m Raster/)
+    ).toBeInTheDocument();
   });
 
   it('zeigt die Förderrichtung und kehrt sie um', async () => {

@@ -8,6 +8,8 @@ import {
   FIRECALL_ITEMS_COLLECTION_ID,
   type MultiPointItem,
 } from '../../../../firebase/firestore';
+import type { LatLngPosition } from '../../../../../common/geo';
+import { terrainClient } from '../../../../../common/terrain/terrainClient';
 import { fetchElevations } from './elevationAction';
 import {
   elevationSignature,
@@ -15,12 +17,77 @@ import {
   foerderungSamples,
   isFoerderungEnabled,
 } from './elevationProfile';
+import {
+  FALLBACK_SAMPLING,
+  FINE_SAMPLING,
+  type ElevationSample,
+} from './elevationSampling';
 
 const clearedElevation = {
   elevationProfile: '',
   elevationFor: '',
   elevationFailed: '',
+  elevationSource: '',
+  elevationLevel: '',
+  elevationSpacing: '',
 };
+
+interface ElevationLookup {
+  elevations: number[];
+  source: 'terrain' | 'opentopodata';
+  level?: 'detail' | 'overview';
+}
+
+/**
+ * Höhen aus dem eigenen Höhenmodell.
+ *
+ * Zuerst gefragt, weil es 1 m Raster hat gegen 25 m bei EU-DEM und an keiner
+ * fremden Verfügbarkeitszusage hängt. Es kann aber Lücken haben — außerhalb des
+ * Burgenlands gibt es keine Kacheln —, und ein einzelner fehlender Wert macht
+ * das ganze Profil ungültig: ein löchriges Profil erzeugt Drücke, die niemand
+ * nachprüfen kann.
+ *
+ * Wirft nicht. Ohne Worker (Server, Test) und bei jedem Fehler gilt die
+ * Rückfallebene.
+ */
+async function terrainElevations(
+  positions: LatLngPosition[]
+): Promise<ElevationLookup | undefined> {
+  try {
+    const samples = await terrainClient().sample(positions);
+    if (samples.some((sample) => sample === null)) return undefined;
+    const filled = samples.filter((sample) => sample !== null);
+    if (filled.length !== positions.length) return undefined;
+    return {
+      elevations: filled.map((sample) => sample.heightM),
+      // Die **gröbste** gelieferte Stufe: sie bestimmt, wie genau das Profil
+      // insgesamt ist. Die feinste zu nennen wäre geschmeichelt.
+      level: filled.some((sample) => sample.level === 'overview')
+        ? 'overview'
+        : 'detail',
+      source: 'terrain',
+    };
+  } catch (err) {
+    console.warn('own terrain model unavailable', err);
+    return undefined;
+  }
+}
+
+/** Höhen aus OpenTopoData über die Server-Action. Wirft nicht. */
+async function openTopoElevations(
+  firecallId: string,
+  positions: LatLngPosition[]
+): Promise<ElevationLookup | undefined> {
+  const elevations = await fetchElevations(firecallId, positions).catch(
+    (err) => {
+      console.error('elevation lookup failed', err);
+      return undefined;
+    }
+  );
+  return elevations
+    ? { elevations, source: 'opentopodata' }
+    : undefined;
+}
 
 /**
  * Zieht das Höhenprofil einer Leitung nach: nach dem Zeichnen, nach jeder
@@ -57,28 +124,50 @@ export async function ensureConnectionElevation(
   if (todo === 'clear') {
     update = { ...clearedElevation };
   } else {
-    const samples = foerderungSamples(item);
-    const elevations = await fetchElevations(
-      firecallId,
-      samples.map(({ position }) => position)
-    ).catch((err) => {
-      console.error('elevation lookup failed', err);
-      return undefined;
-    });
+    // Jede Quelle hat ihre eigene Abtastung, und gespeichert wird die
+    // Signatur der **tatsächlich verwendeten** — sonst gehört das Profil zu
+    // einer Abtastung, die es nie gab.
+    const fine = foerderungSamples(item, FINE_SAMPLING);
+    let samples: ElevationSample[] = fine;
+    let spacingM = FINE_SAMPLING.spacingM;
+    let lookup = await terrainElevations(
+      fine.map(({ position }) => position)
+    );
 
-    update = elevations
+    if (!lookup) {
+      samples = foerderungSamples(item, FALLBACK_SAMPLING);
+      spacingM = FALLBACK_SAMPLING.spacingM;
+      lookup = await openTopoElevations(
+        firecallId,
+        samples.map(({ position }) => position)
+      );
+    }
+
+    const signature = elevationSignature(samples, spacingM);
+
+    update = lookup
       ? {
-          elevationProfile: JSON.stringify(elevations),
-          elevationFor: elevationSignature(samples),
+          elevationProfile: JSON.stringify(lookup.elevations),
+          elevationFor: signature,
           elevationFailed: '',
+          elevationSource: lookup.source,
+          // Leer statt weggelassen: geschrieben wird mit `merge`, und ein
+          // weggelassenes Feld ließe die Stufe einer früheren Terrain-Abfrage
+          // an einem Profil aus der Rückfallebene stehen.
+          elevationLevel: lookup.level ?? '',
+          elevationSpacing: String(spacingM),
         }
       : {
           elevationProfile: '',
           // Die Signatur wird auch beim Fehlschlag gesetzt: Sie hält fest, wofür
           // die Höhen nicht zu bekommen waren, und verhindert damit eine neue
-          // Abfrage bei jeder weiteren Änderung.
-          elevationFor: elevationSignature(samples),
+          // Abfrage bei jeder weiteren Änderung. Es ist die Signatur der
+          // Rückfallebene, denn die war der letzte Versuch.
+          elevationFor: signature,
           elevationFailed: 'true',
+          elevationSource: '',
+          elevationLevel: '',
+          elevationSpacing: String(spacingM),
         };
   }
 

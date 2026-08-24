@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { LatLngPosition } from '../../../../../common/geo';
 import type { Connection } from '../../../../firebase/firestore';
 import { elevationSignature, foerderungSamples } from './elevationProfile';
+import { FINE_SAMPLING } from './elevationSampling';
+
+/** Signatur zur gewünschten, feinen Abtastung. */
+const signature = (samples: Parameters<typeof elevationSignature>[0]) =>
+  elevationSignature(samples, FINE_SAMPLING.spacingM);
 import {
   FOERDERUNG_DEFAULTS,
   foerderungSummary,
@@ -36,7 +41,8 @@ const flach = (overrides: Partial<Connection> = {}) => {
     foerderung: 'true',
     ...overrides,
     elevationProfile: JSON.stringify(samples.map(() => 130)),
-    elevationFor: elevationSignature(samples),
+    elevationFor: signature(samples),
+    elevationSpacing: String(FINE_SAMPLING.spacingM),
   });
 };
 
@@ -168,7 +174,8 @@ describe('foerderungSummary', () => {
     const withProfile = {
       ...item,
       elevationProfile: JSON.stringify(samples.map(() => 130)),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
+      elevationSpacing: String(FINE_SAMPLING.spacingM),
     } as Connection;
     const view = foerderungView(withProfile);
     expect(view?.result?.verstaerkerpumpen).toBe(1);
@@ -193,7 +200,8 @@ describe('Förderrichtung', () => {
       elevationProfile: JSON.stringify(
         samples.map((s) => 130 + (climb * s.distance) / last)
       ),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
+      elevationSpacing: String(FINE_SAMPLING.spacingM),
     });
   };
 
