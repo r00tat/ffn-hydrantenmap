@@ -31,6 +31,7 @@ import {
   type FahrtenbuchEntryInput,
 } from './entryLogic';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
+import { isFahrtenbuchManager } from './managerPermissions';
 import { createMangelForEntry, refreshVehicleCache } from './mangelStore';
 import { notifyMangel } from './notifyMangel';
 
@@ -922,7 +923,13 @@ export async function updateFahrtenbuchEntry(
     if (existing.deleted) {
       return { success: false, error: 'entryDeleted' };
     }
-    if (!canModifyEntry(existing, session.user.id, session.user.isAdmin)) {
+    if (
+      !canModifyEntry(
+        existing,
+        session.user.id,
+        isFahrtenbuchManager(groupId, session.user),
+      )
+    ) {
       return { success: false, error: 'notAllowed' };
     }
 
@@ -1018,7 +1025,13 @@ export async function deleteFahrtenbuchEntry(
     if (existing.deleted) {
       return { success: false, error: 'entryDeleted' };
     }
-    if (!canModifyEntry(existing, session.user.id, session.user.isAdmin)) {
+    if (
+      !canModifyEntry(
+        existing,
+        session.user.id,
+        isFahrtenbuchManager(groupId, session.user),
+      )
+    ) {
       return { success: false, error: 'notAllowed' };
     }
 

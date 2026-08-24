@@ -311,12 +311,18 @@ export function survivingCounterSources(
   return result;
 }
 
+/**
+ * Wer einen bestehenden Eintrag ändern oder löschen darf: sein Ersteller, oder
+ * wer die Gruppe verwalten darf (`isFahrtenbuchManager` — Admin oder
+ * Gerätemeister). Den zweiten Teil entscheidet der Aufrufer und übergibt ihn
+ * als `canManage`, damit diese Funktion rein bleibt.
+ */
 export function canModifyEntry(
   entry: Pick<FahrtenbuchEntry, 'createdBy'>,
   userId: string,
-  isAdmin: boolean,
+  canManage: boolean,
 ): boolean {
-  return isAdmin || entry.createdBy === userId;
+  return canManage || entry.createdBy === userId;
 }
 
 /** Endwerte des jüngsten Eintrags — der Cache `vehicle.lastCounters`. */

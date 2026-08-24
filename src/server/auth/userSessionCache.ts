@@ -2,6 +2,8 @@ export interface CacheableUserData {
   isAuthorized: boolean;
   isAdmin: boolean;
   groups: string[];
+  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
+  fahrtenbuchGeraetemeister?: string[];
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;

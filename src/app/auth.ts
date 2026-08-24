@@ -62,6 +62,8 @@ declare module 'next-auth' {
       isAuthorized: boolean;
       isAdmin: boolean;
       groups: string[];
+      /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
+      fahrtenbuchGeraetemeister?: string[];
       /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
       firecall?: string;
       /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
@@ -158,6 +160,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           session.user.isAuthorized = userData.isAuthorized;
           session.user.isAdmin = userData.isAdmin;
           session.user.groups = userData.groups;
+          session.user.fahrtenbuchGeraetemeister =
+            userData.fahrtenbuchGeraetemeister;
           session.user.firecall = userData.firecall;
           session.user.firecallWrite = userData.firecallWrite;
           session.user.firecallExpiresAt = userData.firecallExpiresAt;

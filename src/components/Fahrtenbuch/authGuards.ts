@@ -3,6 +3,7 @@ import 'server-only';
 import { ApiException } from '../../app/api/errors';
 import { actionUserRequired } from '../../app/auth';
 import { NON_TENANT_GROUP_IDS } from '../../app/groups/groupTypes';
+import { isFahrtenbuchManager } from './managerPermissions';
 
 /**
  * Prüft, ob die Gruppen-ID ein echter Mandant ist — die Sperre für alle
@@ -45,6 +46,27 @@ export async function actionGroupMemberRequired(groupId: string) {
     throw new ApiException(`user is not a member of group ${groupId}`, {
       status: 403,
     });
+  }
+  return session;
+}
+
+/**
+ * Stellt sicher, dass der Benutzer das Fahrtenbuch dieser Gruppe verwalten
+ * darf — Admin oder eingetragener Gerätemeister der Gruppe.
+ *
+ * Tritt an die Stelle von `actionAdminRequired()` in den Fahrzeug- und
+ * Personen-Actions. Bewusst *nicht* in den Actions für Gruppeneinstellungen,
+ * Mangel-Empfänger, Share-Links und PDF-Import: Die bleiben admin-only, und
+ * nur ein Admin vergibt die Rolle selbst.
+ */
+export async function actionFahrtenbuchManagerRequired(groupId: string) {
+  const session = await actionUserRequired();
+  assertFahrtenbuchGroup(groupId);
+  if (!isFahrtenbuchManager(groupId, session.user)) {
+    throw new ApiException(
+      `user may not manage Fahrtenbuch of group ${groupId}`,
+      { status: 403 },
+    );
   }
   return session;
 }

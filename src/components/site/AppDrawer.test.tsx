@@ -7,7 +7,13 @@ import userEvent from '@testing-library/user-event';
 import deMessages from '../../../messages/de.json';
 
 const pathnameMock = vi.fn<() => string>(() => '/');
-const firebaseLoginMock = vi.fn(() => ({ isAdmin: true, isSignedIn: true }));
+const firebaseLoginMock = vi.fn<
+  () => {
+    isAdmin: boolean;
+    isSignedIn: boolean;
+    fahrtenbuchGeraetemeister?: string[];
+  }
+>(() => ({ isAdmin: true, isSignedIn: true }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathnameMock(),
@@ -199,6 +205,31 @@ describe('AppDrawer Berechtigungen', () => {
     expect(screen.getByText('Tokens')).toBeInTheDocument();
     expect(screen.queryByText('Users')).toBeNull();
     expect(screen.queryByText('Audit Log')).toBeNull();
+  });
+
+  it('zeigt die Fahrtenbuch-Verwaltung auch einem Gerätemeister ohne Adminrecht', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({
+      isAdmin: false,
+      isSignedIn: true,
+      fahrtenbuchGeraetemeister: ['ffnd'],
+    });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Administration'));
+    expect(screen.getByText('Fahrtenbuch-Verwaltung')).toBeInTheDocument();
+    expect(screen.queryByText('Users')).toBeNull();
+  });
+
+  it('verbirgt die Fahrtenbuch-Verwaltung ohne jede Rolle', async () => {
+    pathnameMock.mockReturnValue('/');
+    firebaseLoginMock.mockReturnValue({ isAdmin: false, isSignedIn: true });
+    const user = userEvent.setup();
+    renderDrawer();
+
+    await user.click(screen.getByText('Administration'));
+    expect(screen.queryByText('Fahrtenbuch-Verwaltung')).toBeNull();
   });
 
   it('zeigt den Profil-Eintrag nur angemeldet', async () => {

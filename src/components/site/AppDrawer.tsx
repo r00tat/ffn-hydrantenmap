@@ -58,6 +58,7 @@ import { usePathname } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import { useFirecallId } from '../../hooks/useFirecall';
+import { hasAnyFahrtenbuchManagerRole } from '../Fahrtenbuch/managerPermissions';
 import { useBugReport } from '../bugReport/BugReportProvider';
 
 /** Ein anklickbarer Menüpunkt — Link oder Aktion. */
@@ -66,6 +67,11 @@ interface DrawerLink {
   icon: React.ReactNode;
   href: string;
   admin?: boolean;
+  /**
+   * Sichtbar für Admins *und* Fahrtenbuch-Gerätemeister. Nicht über `admin`
+   * abbildbar, weil dieses Flag ein Dutzend anderer Einträge steuert.
+   */
+  fahrtenbuchAdmin?: boolean;
   signedInOnly?: boolean;
   /** When set, the link points to /einsatz/[firecallId]/[einsatzSection] */
   einsatzSection?: string;
@@ -166,7 +172,8 @@ export default function AppDrawer({
     },
     [setIsOpen],
   );
-  const { isAdmin, isSignedIn } = useFirebaseLogin();
+  const { isAdmin, isSignedIn, fahrtenbuchGeraetemeister } =
+    useFirebaseLogin();
   const firecallId = useFirecallId();
   const pathname = usePathname();
   const t = useTranslations('drawer');
@@ -373,7 +380,7 @@ export default function AppDrawer({
           text: t('adminFahrtenbuch'),
           icon: <EditRoadIcon />,
           href: '/admin/fahrtenbuch',
-          admin: true,
+          fahrtenbuchAdmin: true,
         },
         {
           text: t('adminDrive'),
@@ -460,8 +467,11 @@ export default function AppDrawer({
 
   const isVisible = useCallback(
     (item: DrawerLink) =>
-      (isAdmin || !item.admin) && (isSignedIn || !item.signedInOnly),
-    [isAdmin, isSignedIn],
+      (isAdmin || !item.admin) &&
+      (!item.fahrtenbuchAdmin ||
+        hasAnyFahrtenbuchManagerRole({ isAdmin, fahrtenbuchGeraetemeister })) &&
+      (isSignedIn || !item.signedInOnly),
+    [isAdmin, isSignedIn, fahrtenbuchGeraetemeister],
   );
 
   const renderLink = (item: DrawerLink, groupText?: string) => {
