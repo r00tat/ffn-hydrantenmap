@@ -15,7 +15,10 @@ import type {
 import HoehenlinienControl from '../HoehenlinienControl';
 import HoehenlinienLegende from '../HoehenlinienLegende';
 import {
+  contourCasingColor,
+  contourCasingWeight,
   contourColor,
+  contourLabelColor,
   contourLabelText,
   contourWeight,
   EQUIDISTANCE_STORAGE_KEY,
@@ -194,6 +197,12 @@ export default function HoehenlinienLayer() {
 
   const shown = status === 'ready' && visible;
 
+  /** Die Zähllinien — sie tragen die Kontur und die Beschriftung. */
+  const indexLines = useMemo(
+    () => lines.filter((line) => isIndexContour(line.heightM, equidistanceM)),
+    [lines, equidistanceM]
+  );
+
   /**
    * Die Höhe an der Linie.
    *
@@ -208,9 +217,9 @@ export default function HoehenlinienLayer() {
     // Lange Linien zuerst: beim Ausdünnen gewinnt die erste je Rasterzelle,
     // und ein durchgehender Höhenzug ist die nützlichere Beschriftung als ein
     // kurzer Ring daneben.
-    const ordered = [...lines]
-      .filter((line) => isIndexContour(line.heightM, equidistanceM))
-      .sort((a, b) => b.points.length - a.points.length);
+    const ordered = [...indexLines].sort(
+      (a, b) => b.points.length - a.points.length
+    );
 
     for (const line of ordered) {
       const screen = line.points.map((point) =>
@@ -230,7 +239,7 @@ export default function HoehenlinienLayer() {
     }
 
     return thinLabels(candidates, LABEL_CELL_PX);
-  }, [shown, lines, equidistanceM, map]);
+  }, [shown, indexLines, map]);
 
   const chooseEquidistance = useCallback((next: EquidistanceChoice) => {
     setChoice(next);
@@ -245,6 +254,24 @@ export default function HoehenlinienLayer() {
       Wiedereinschalten stünden sonst für einen Moment die Linien des alten
       Ausschnitts an der falschen Stelle. */}
       <LayerGroup attribution={t('attribution')}>
+        {/* Die Konturen zuerst und vollständig: der Canvas-Renderer zeichnet
+        in der Reihenfolge der Layer, und eine Kontur, die nach ihrer Linie
+        käme, läge über der Nachbarlinie. */}
+        {(shown ? indexLines : []).map((line, index) => (
+          <Polyline
+            key={`kontur-${line.heightM}-${index}`}
+            positions={line.points}
+            pathOptions={{
+              renderer,
+              color: contourCasingColor(dark),
+              weight: contourCasingWeight(line.heightM, equidistanceM),
+              opacity: 1,
+              className: 'hoehenlinie-kontur',
+              fill: false,
+            }}
+          />
+        ))}
+
         {(shown ? lines : []).map((line, index) => (
           <Polyline
             key={`${line.heightM}-${index}`}
@@ -253,7 +280,8 @@ export default function HoehenlinienLayer() {
               renderer,
               color: contourColor(line.heightM, minM, maxM, dark),
               weight: contourWeight(line.heightM, equidistanceM),
-              opacity: 0.9,
+              opacity: 1,
+              className: 'hoehenlinie',
               // Höhenlinien sind Linien, keine Flächen — ein gefüllter
               // geschlossener Ring würde die Karte darunter verdecken.
               fill: false,
@@ -281,7 +309,7 @@ export default function HoehenlinienLayer() {
                 )}deg);
                 white-space:nowrap;
                 font: 600 11px/1 ${theme.typography.fontFamily};
-                color:${contourColor(label.heightM, minM, maxM, dark)};
+                color:${contourLabelColor(label.heightM, minM, maxM, dark)};
                 text-shadow:
                   -1.5px 0 ${theme.palette.background.paper},
                   1.5px 0 ${theme.palette.background.paper},

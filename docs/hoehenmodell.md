@@ -392,9 +392,20 @@ Neusiedl — das steilste Gelände im Ausrückebereich — 58,7 m. Auf eine fest
 des Ausschnitts liefert `terrainContours` als `minM`/`maxM` mit; sie ist weiter als die
 Linien, weil die tiefste Linie über dem tiefsten Punkt liegt.
 
-Die Rampe läuft über den **Farbton** (Petrol → Grün → Oliv → Rotbraun), nicht über die
-Helligkeit. Ein Verlauf hell→dunkel verschwindet je nach Untergrund an einem der beiden
+Die Rampe läuft über den **Farbton** (Cyan → Grün → Bernstein → Orange → Rot), nicht über
+die Helligkeit. Ein Verlauf hell→dunkel verschwindet je nach Untergrund an einem der beiden
 Enden — auf dem Luftbild das dunkle, auf der hellen Karte das helle.
+
+Die Töne sind **kräftig und hell**, nicht gedeckt. Eine Höhenlinie ist gut einen Pixel breit
+und liegt über Luftbild oder Karte, nicht auf weißem Papier; gedeckte Farben, die auf einem
+Entwurf noch angenehm wirken, verschwinden dort. Den Kontrast nach unten liefert nicht die
+Linienfarbe, sondern eine **Kontur** unter der Linie (`contourCasingColor`, halbdurchlässiges
+Schwarz) — das Mittel, mit dem jede Karte über Bildmaterial arbeitet. Sie liegt nur unter den
+Zähllinien: unter jeder Linie wäre sie bei 0,5 m Äquidistanz die doppelte Zeichenlast, und
+ein Ausschnitt im flachen Gelände hat dort über tausend Linienstücke.
+
+Die **Beschriftung** nimmt den Farbton ihrer Linie, aber auf eine lesbare Helligkeit gebracht
+(`contourLabelColor`): ein Strich verzeiht schwachen Kontrast, eine Ziffer nicht.
 
 **Der Preis dieser Wahl sind zwei Angaben, die deshalb Pflichtteil sind und nicht Beiwerk:**
 

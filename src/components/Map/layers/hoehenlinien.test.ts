@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  contourCasingColor,
+  contourCasingWeight,
   contourColor,
+  contourLabelColor,
   contourLabelText,
   contourRampCss,
   contourWeight,
@@ -121,6 +124,65 @@ describe('contourWeight', () => {
   it('zeichnet Zähllinien stärker als Zwischenlinien', () => {
     expect(contourWeight(120, 0.5)).toBeGreaterThan(contourWeight(120.5, 0.5));
     expect(contourWeight(150, 10)).toBeGreaterThan(contourWeight(140, 10));
+  });
+});
+
+/** Relative Helligkeit nach WCAG. */
+const luminance = (hex: string): number => {
+  const channel = (offset: number) => {
+    const v = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+};
+
+describe('contourCasingWeight', () => {
+  it('ist breiter als die Linie, die darauf liegt', () => {
+    // Sonst ist die Kontur unter der Linie nicht zu sehen.
+    expect(contourCasingWeight(120, 0.5)).toBeGreaterThan(
+      contourWeight(120, 0.5)
+    );
+  });
+});
+
+describe('contourCasingColor', () => {
+  it('ist in beiden Themes dunkel und durchscheinend', () => {
+    // Deckend gezeichnet würde sie die Karte darunter verdecken; die Kontur
+    // soll den Kontrast bringen, nicht die Karte ersetzen.
+    for (const dark of [false, true]) {
+      expect(contourCasingColor(dark)).toMatch(/^rgba\(0, 0, 0, 0\.\d+\)$/);
+    }
+  });
+});
+
+describe('contourLabelColor', () => {
+  it('ist auf hellem Grund deutlich dunkler als die Linie', () => {
+    // Die Linienfarben sind hell gewählt, damit sie über dem Luftbild stehen.
+    // Als Text auf hellem Grund wäre dasselbe Bernstein nicht zu entziffern.
+    for (const height of [118, 120, 122, 124]) {
+      const linie = luminance(contourColor(height, 118, 124, false));
+      const text = luminance(contourLabelColor(height, 118, 124, false));
+      // Ein Ton, der schon dunkel genug ist — das Rot am oberen Ende —, bleibt
+      // wie er ist; abgedunkelt wird nur, was zu hell wäre.
+      expect(text).toBeLessThanOrEqual(linie);
+      expect(text).toBeLessThanOrEqual(0.23);
+    }
+  });
+
+  it('ist auf dunklem Grund hell genug', () => {
+    for (const height of [118, 120, 122, 124]) {
+      expect(
+        luminance(contourLabelColor(height, 118, 124, true))
+      ).toBeGreaterThanOrEqual(0.45);
+    }
+  });
+
+  it('behält die Ordnung der Rampe', () => {
+    // Die Beschriftung soll noch zu ihrer Linie gehören: gleiche Höhe,
+    // gleicher Farbton.
+    expect(contourLabelColor(118, 118, 124, false)).not.toBe(
+      contourLabelColor(124, 118, 124, false)
+    );
   });
 });
 

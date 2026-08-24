@@ -57,13 +57,14 @@ vi.mock('react-leaflet', () => ({
     pathOptions,
   }: {
     positions: unknown[];
-    pathOptions: { color: string; weight: number };
+    pathOptions: { color: string; weight: number; className: string };
   }) => (
     <div
       data-testid="polyline"
       data-points={positions.length}
       data-color={pathOptions.color}
       data-weight={pathOptions.weight}
+      data-class={pathOptions.className}
     />
   ),
   Marker: ({ icon }: { icon: { html: string } }) => (
@@ -112,6 +113,20 @@ const result = (count: number): ContourResult => ({
 
 const enable = () => fire('overlayadd', { name: HOEHENLINIEN_LAYER_NAME });
 
+/**
+ * Nur die Höhenlinien selbst. Unter den Zähllinien liegt je eine Kontur, die
+ * denselben Weg zeichnet — sie ist kein zweiter Höhenwert.
+ */
+const linien = () =>
+  screen
+    .getAllByTestId('polyline')
+    .filter((el) => el.getAttribute('data-class') === 'hoehenlinie');
+
+const konturen = () =>
+  screen
+    .queryAllByTestId('polyline')
+    .filter((el) => el.getAttribute('data-class') === 'hoehenlinie-kontur');
+
 beforeEach(() => {
   handlers.clear();
   contours.mockReset();
@@ -143,9 +158,7 @@ describe('HoehenlinienLayer', () => {
       // Zoom 17 ⇒ 1 m Äquidistanz.
       1
     );
-    await waitFor(() =>
-      expect(screen.getAllByTestId('polyline')).toHaveLength(3)
-    );
+    await waitFor(() => expect(linien()).toHaveLength(3));
   });
 
   it('sagt es, wenn für den Ausschnitt keine Höhendaten vorliegen', async () => {
@@ -251,15 +264,13 @@ describe('HoehenlinienLayer', () => {
     zoom = 15;
     fire('moveend', {});
     await waitFor(() => expect(contours).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(screen.getAllByTestId('polyline')).toHaveLength(2)
-    );
+    await waitFor(() => expect(linien()).toHaveLength(2));
 
     // Jetzt trifft die alte Antwort ein. Sie gehört zu einem Ausschnitt, der
     // nicht mehr zu sehen ist, und darf die neuere nicht verdrängen.
     resolveFirst(result(7));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.getAllByTestId('polyline')).toHaveLength(2);
+    expect(linien()).toHaveLength(2);
   });
 
   it('beschriftet die Zähllinien mit ihrer Höhe', async () => {
@@ -280,12 +291,8 @@ describe('HoehenlinienLayer', () => {
     renderWithIntl(<HoehenlinienLayer />);
     enable();
 
-    await waitFor(() =>
-      expect(screen.getAllByTestId('polyline')).toHaveLength(3)
-    );
-    const farben = screen
-      .getAllByTestId('polyline')
-      .map((el) => el.getAttribute('data-color'));
+    await waitFor(() => expect(linien()).toHaveLength(3));
+    const farben = linien().map((el) => el.getAttribute('data-color'));
     expect(new Set(farben).size).toBe(3);
   });
 
@@ -304,12 +311,26 @@ describe('HoehenlinienLayer', () => {
     ).toBeInTheDocument();
   });
 
+  it('legt eine Kontur unter die Zähllinien, aber nicht unter jede Linie', async () => {
+    renderWithIntl(<HoehenlinienLayer />);
+    enable();
+
+    // Ohne Kontur steht eine helle Linie auf einem hellen Luftbild ohne
+    // Kontrast da. Unter jeder Linie wäre sie bei 0,5 m Äquidistanz aber die
+    // doppelte Zeichenlast — deshalb nur unter der 130.
+    await waitFor(() => expect(linien()).toHaveLength(3));
+    expect(konturen()).toHaveLength(1);
+    const kontur = konturen()[0];
+    const linie = linien().find((el) => el.getAttribute('data-weight') === '2');
+    expect(Number(kontur.getAttribute('data-weight'))).toBeGreaterThan(
+      Number(linie?.getAttribute('data-weight'))
+    );
+  });
+
   it('hört auf zu zeichnen, wenn der Layer abgeschaltet wird', async () => {
     renderWithIntl(<HoehenlinienLayer />);
     enable();
-    await waitFor(() =>
-      expect(screen.getAllByTestId('polyline')).toHaveLength(3)
-    );
+    await waitFor(() => expect(linien()).toHaveLength(3));
 
     fire('overlayremove', { name: HOEHENLINIEN_LAYER_NAME });
     await waitFor(() =>

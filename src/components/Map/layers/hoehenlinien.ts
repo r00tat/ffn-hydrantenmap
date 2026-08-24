@@ -105,8 +105,29 @@ export function contourWeight(
   heightM: number,
   equidistanceM: number
 ): number {
-  return isIndexContour(heightM, equidistanceM) ? 1.6 : 0.8;
+  return isIndexContour(heightM, equidistanceM) ? 2 : 1.1;
 }
+
+/**
+ * Breite der Kontur unter einer Zähllinie.
+ *
+ * Nur unter den Zähllinien, nicht unter allen: ein Ausschnitt im flachen
+ * Gelände hat bei 0,5 m Äquidistanz über tausend Linienstücke, und jede
+ * doppelt gezeichnet lässt das Verschieben der Karte ruckeln.
+ */
+export const contourCasingWeight = (heightM: number, equidistanceM: number) =>
+  contourWeight(heightM, equidistanceM) + 2.4;
+
+/**
+ * Farbe der Kontur: dunkel unter hellen Linien.
+ *
+ * Ohne sie steht eine helle Linie auf einem hellen Luftbild — Schnee, Beton,
+ * Stoppelfeld — ohne Kontrast da. Die Kontur ist das Mittel, das jede Karte
+ * über Bildmaterial verwendet; sie bringt für die Lesbarkeit mehr als jede
+ * Farbwahl.
+ */
+export const contourCasingColor = (dark: boolean): string =>
+  dark ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.5)';
 
 /**
  * Die Farbrampe der Höhenlinien: kühl für tief, warm für hoch.
@@ -121,31 +142,37 @@ export function contourWeight(
  * damit auf hellem Kartenhintergrund wie auf dem Luftbild gleich gut zu sehen.
  * Ein Verlauf hell→dunkel würde am einen Ende jeweils verschwinden.
  *
+ * Die Töne sind **kräftig und hell** gewählt, nicht gedeckt: eine Höhenlinie
+ * ist gut einen Pixel breit und liegt über Luftbild oder Karte, nicht auf
+ * weißem Papier. Gedeckte Farben, die auf einem Bildschirmentwurf noch
+ * angenehm wirken, verschwinden dort. Den Kontrast nach unten liefert die
+ * Kontur (`contourCasingColor`), nicht die Linienfarbe.
+ *
  * Was die Farbe bedeutet, steht nur in der Legende — deshalb ist sie
  * Pflichtteil dieser Darstellung und nicht Beiwerk.
  */
 type Stop = readonly [number, number, number];
 
 const RAMP_LIGHT: readonly Stop[] = [
-  [26, 106, 122], // Petrol — der tiefste Punkt im Ausschnitt
-  [47, 116, 87], // Grün
-  [124, 116, 42], // Oliv
-  [166, 84, 30], // Orangebraun
-  [140, 47, 30], // Rotbraun — der höchste Punkt
+  [0, 169, 201], // Cyan — der tiefste Punkt im Ausschnitt
+  [23, 184, 74], // Grün
+  [224, 180, 0], // Bernstein
+  [242, 118, 12], // Orange
+  [232, 52, 42], // Rot — der höchste Punkt
 ];
 
 /**
- * Für das dunkle Theme aufgehellt und leicht entsättigt.
+ * Für das dunkle Theme aufgehellt.
  *
  * Dieselben Farbtöne in derselben Reihenfolge: die Legende zeigt in beiden
  * Themes dieselbe Aussage, nur mit anderem Kontrast.
  */
 const RAMP_DARK: readonly Stop[] = [
-  [88, 186, 200],
-  [116, 190, 140],
-  [198, 186, 96],
-  [230, 148, 84],
-  [226, 108, 84],
+  [64, 216, 240],
+  [92, 224, 122],
+  [245, 215, 74],
+  [255, 160, 77],
+  [255, 107, 94],
 ];
 
 const hex = (value: number): string =>
@@ -196,6 +223,56 @@ export function contourRampCss(dark: boolean): string {
       ).toFixed(0)}%`
   );
   return `linear-gradient(to right, ${parts.join(', ')})`;
+}
+
+/** Relative Helligkeit nach WCAG, für den Kontrast der Beschriftung. */
+function luminance([r, g, b]: readonly [number, number, number]): number {
+  const channel = (value: number) => {
+    const v = value / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+  );
+}
+
+const parseHex = (hex: string): [number, number, number] => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+];
+
+/**
+ * Farbe der Beschriftung an einer Linie.
+ *
+ * Der Farbton der Linie, aber auf eine Helligkeit gebracht, bei der Text
+ * lesbar bleibt: die Linienfarben sind hell gewählt, damit sie über dem
+ * Luftbild stehen — als Text auf hellem Grund wäre dasselbe Bernstein nicht
+ * mehr zu entziffern. Ein Strich verzeiht schwachen Kontrast, eine Ziffer
+ * nicht.
+ */
+export function contourLabelColor(
+  heightM: number,
+  minM: number,
+  maxM: number,
+  dark: boolean
+): string {
+  const rgb = parseHex(contourColor(heightM, minM, maxM, dark));
+  // Auf hellem Grund abdunkeln, auf dunklem aufhellen — in Schritten, damit
+  // der Farbton erhalten bleibt und nicht in Grau kippt.
+  let adjusted: [number, number, number] = [...rgb];
+  for (let step = 0; step < 12; step += 1) {
+    const value = luminance(adjusted);
+    if (dark ? value >= 0.5 : value <= 0.22) break;
+    adjusted = dark
+      ? [
+          adjusted[0] + (255 - adjusted[0]) * 0.18,
+          adjusted[1] + (255 - adjusted[1]) * 0.18,
+          adjusted[2] + (255 - adjusted[2]) * 0.18,
+        ]
+      : [adjusted[0] * 0.82, adjusted[1] * 0.82, adjusted[2] * 0.82];
+  }
+  return `#${hex(adjusted[0])}${hex(adjusted[1])}${hex(adjusted[2])}`;
 }
 
 /**
