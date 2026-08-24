@@ -270,6 +270,41 @@ Schritte 2 und 3 bauen nichts Neues, weil die Kacheln im Cache liegen — sie la
 Zwischen 2 und 3 fällt jede Abfrage in der Detailstufe auf die Übersicht zurück, weil
 `hasBlock` für fehlende Blöcke `false` liefert.
 
+### Upload
+
+Der Upload braucht zwei Umgebungsvariablen. Das Skript ist einfaches Node und liest
+`.env.local` **nicht** von selbst:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=config/service_account.json
+export GOOGLE_CLOUD_PROJECT=ffn-utils
+
+npm run terrainImport -- --cache .terrain-cache --level overview
+npm run terrainImport -- --cache .terrain-cache --level detail
+```
+
+- Ziel ist der Default-Bucket `<projekt>.appspot.com`. Den gibt es je Projekt genau einmal,
+  dev und prod teilen ihn sich — die Kacheln werden also nur einmal hochgeladen und von
+  beiden Umgebungen gelesen. Liegt `NEXT_PUBLIC_FIREBASE_APIKEY` in der Umgebung, prüft der
+  Import den Bucket gegen die Client-Konfiguration und bricht bei Abweichung ab.
+- **Schon übertragene Kacheln werden übersprungen.** Der Upload listet den Prefix einmal auf
+  und überträgt nur, was fehlt; ein Abbruch kostet damit nichts. Übersprungen wird anhand des
+  Zielpfads, und der trägt die Modellversion. Wer innerhalb einer Version neu kodiert hat,
+  braucht `--reupload`.
+- Übertragen wird zu acht gleichzeitig. Der Index geht immer zuletzt und immer vollständig
+  hoch — er beschreibt, was im Cache liegt.
+- Das Dienstkonto braucht Schreibrecht auf den Bucket (`roles/storage.objectAdmin`). Gelesen
+  wird ohne Anmeldung, siehe unten.
+
+**Die Leseregel muss ausgerollt sein.** `terrain/` ist in [storage.rules](../storage.rules)
+öffentlich lesbar, aber diese Datei geht über **Terraform** live, nicht über
+`firebase deploy` — mit dem nächsten Merge auf `main`. Vor dem Merge kann hochgeladen werden
+(das Admin-SDK geht an den Regeln vorbei), nur lesen kann der Client die Kacheln dann noch
+nicht.
+
+Umfang: die Detailstufe sind rund **1,5 GB** in 4.385 Objekten, die Übersicht rund **60 MB**
+in höchstens 144.
+
 Der Cache-Ordner enthält:
 
 | Eintrag | Inhalt |

@@ -3,7 +3,9 @@ import path from 'node:path';
 import { NODATA_ENCODED } from '../../common/terrain/encoding';
 import {
   terrainBlockPath,
+  terrainBucket,
   TERRAIN_INDEX_PATH,
+  TERRAIN_PREFIX,
 } from '../../common/terrain/terrainPaths';
 import {
   bevSourceTile,
@@ -23,6 +25,7 @@ import { buildBlock, decimate, memoTileReader } from './blockBuilder';
 import { burgenlandBlocks, burgenlandGemeinden, gemeindenBounds } from './burgenlandBoundary';
 import { writeTerrainPng } from './pngWriter';
 import { buildIndex } from './terrainIndex';
+import { blocksToUpload, runPooled } from './uploadPlan';
 import {
   blockSizeM,
   LEVEL_SPECS,
@@ -33,14 +36,14 @@ import {
 /**
  * Erzeugt die Terrain-Kacheln des Höhenmodells aus dem BEV-ALS-DGM.
  *
- * Wiederaufnehmbar: bereits erzeugte Kacheln werden übersprungen. Die
- * dekodierten 1-m-Rohhöhen bleiben als `.f32` im Cache liegen — damit kostet
- * ein Neukodieren mit anderer Präzision Minuten statt eines neuen
- * 15-GB-Downloads.
+ * Wiederaufnehmbar: bereits erzeugte Kacheln werden übersprungen, ebenso
+ * bereits übertragene. Die dekodierten 1-m-Rohhöhen bleiben als `.f32` im
+ * Cache liegen — damit kostet ein Neukodieren mit anderer Präzision Minuten
+ * statt eines neuen 15-GB-Downloads.
  *
  * Aufruf:
  *   npm run terrainImport -- [--cache <dir>] [--level detail|overview|all]
- *                            [--limit <n>] [--no-upload]
+ *                            [--limit <n>] [--no-upload] [--reupload]
  */
 
 interface Options {
@@ -48,6 +51,8 @@ interface Options {
   level: 'detail' | 'overview' | 'all';
   limit: number;
   upload: boolean;
+  /** Auch Kacheln übertragen, die im Speicher schon liegen. */
+  reupload: boolean;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -56,6 +61,7 @@ function parseArgs(argv: string[]): Options {
     level: 'all',
     limit: Number.POSITIVE_INFINITY,
     upload: true,
+    reupload: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -64,10 +70,19 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--limit') options.limit = Number(argv[(i += 1)]);
     else if (arg === '--no-upload') options.upload = false;
     else if (arg === '--upload') options.upload = true;
+    else if (arg === '--reupload') options.reupload = true;
     else throw new Error(`Unbekannte Option: ${arg}`);
   }
   return options;
 }
+
+/**
+ * Gleichzeitige Uploads.
+ *
+ * Nacheinander übertragen kostet je Kachel eine volle Rundreise; bei 4.385
+ * Kacheln ist das der Unterschied zwischen Minuten und einer Stunde.
+ */
+const UPLOAD_PARALLEL = 8;
 
 const rawPath = (cacheDir: string, block: BlockRef) =>
   path.join(cacheDir, 'raw', `${blockId(block)}.f32`);
@@ -331,7 +346,8 @@ async function readCalibration(cacheDir: string): Promise<AdriaOffsetGrid> {
 async function upload(
   cacheDir: string,
   index: TerrainIndex,
-  levels: Options['level']
+  levels: Options['level'],
+  reupload: boolean
 ): Promise<void> {
   // Erst hier importiert, damit ein Lauf mit `--no-upload` ohne Anmeldedaten
   // funktioniert.
@@ -348,30 +364,72 @@ async function upload(
       'Projekt-ID unbekannt: GOOGLE_CLOUD_PROJECT oder NEXT_PUBLIC_FIREBASE_PROJECT_ID setzen'
     );
   }
-  const bucket = getStorage().bucket(`${projectId}.appspot.com`);
+  const bucketName = `${projectId}.appspot.com`;
+
+  // Gegenprobe gegen die Client-Konfiguration, wenn sie in der Umgebung
+  // liegt: Der Client bildet den Bucket aus `NEXT_PUBLIC_FIREBASE_APIKEY`
+  // (siehe `terrainBucket`). Ein Upload in einen anderen Bucket fällt sonst
+  // erst nach Stunden auf — und dann als 404 auf jeder Kachel.
+  const clientBucket = terrainBucket();
+  if (clientBucket && clientBucket !== bucketName) {
+    throw new Error(
+      `Bucket ${bucketName} (aus Projekt ${projectId}), der Client liest aber ` +
+        `${clientBucket} aus NEXT_PUBLIC_FIREBASE_APIKEY. Einer von beiden ist falsch.`
+    );
+  }
+
+  const bucket = getStorage().bucket(bucketName);
 
   for (const level of index.levels) {
     if (levels !== 'all' && level.id !== levels) {
       console.log(`upload: Stufe ${level.id} übersprungen (--level ${levels})`);
       continue;
     }
-    for (const block of await blocksOf(cacheDir, level.id)) {
-      const local = path.join(cacheDir, 'out', level.id, `${block}.png`);
+    // Bewusst über `pathTemplate` der Stufe und nicht selbst gebaut: der
+    // Client liest denselben Wert aus dem Index. Zwei Formeln würden erst
+    // nach dem Rollout auffallen, und dann als 404 auf jeder Kachel.
+    const destinationOf = (block: string): string => {
       const ref = parseBlockId(block);
       if (!ref) throw new Error(`Unlesbarer Blockname: ${block}`);
-      await bucket.upload(local, {
-        // Bewusst über `pathTemplate` der Stufe und nicht selbst gebaut: der
-        // Client liest denselben Wert aus dem Index. Zwei Formeln würden erst
-        // nach dem Rollout auffallen, und dann als 404 auf jeder Kachel.
-        destination: terrainBlockPath(level, ref),
+      return terrainBlockPath(level, ref);
+    };
+
+    // Einmal auflisten statt je Kachel nachfragen: 4.385 Einzelabfragen
+    // kosteten mehr als der Upload selbst.
+    const prefix = `${TERRAIN_PREFIX}/${level.pathTemplate.split('/')[0]}/`;
+    const [remoteFiles] = await bucket.getFiles({ prefix });
+    const remote = new Set(remoteFiles.map((file) => file.name));
+
+    const plan = blocksToUpload(
+      await blocksOf(cacheDir, level.id),
+      remote,
+      destinationOf,
+      reupload
+    );
+    if (plan.skipped > 0) {
+      console.log(
+        `upload: Stufe ${level.id} — ${plan.skipped} Kacheln liegen schon im Speicher`
+      );
+    }
+
+    let done = 0;
+    await runPooled(plan.upload, UPLOAD_PARALLEL, async (block) => {
+      await bucket.upload(path.join(cacheDir, 'out', level.id, `${block}.png`), {
+        destination: destinationOf(block),
         metadata: {
           contentType: 'image/png',
           // Der Pfad ist versioniert, die Inhalte sind damit unveränderlich.
           cacheControl: 'public, max-age=31536000, immutable',
         },
       });
-    }
-    console.log(`upload: Stufe ${level.id} übertragen`);
+      done += 1;
+      if (done % 100 === 0) {
+        console.log(`upload: ${level.id} ${done}/${plan.upload.length}`);
+      }
+    });
+    console.log(
+      `upload: Stufe ${level.id} übertragen (${plan.upload.length} Kacheln)`
+    );
   }
 
   await bucket.file(TERRAIN_INDEX_PATH).save(
@@ -463,7 +521,9 @@ async function main(): Promise<void> {
   await writeFile(indexFile, JSON.stringify(index, null, 2));
   console.log(`index.json geschrieben: ${indexFile}`);
 
-  if (options.upload) await upload(options.cacheDir, index, options.level);
+  if (options.upload) {
+    await upload(options.cacheDir, index, options.level, options.reupload);
+  }
   else console.log('Upload übersprungen (--no-upload)');
 }
 
