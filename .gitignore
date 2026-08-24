@@ -196,3 +196,7 @@ certificates
 .claude/scheduled_tasks.lock
 *.aab
 /docs/superpowers/**/*.md
+
+# Cache des Höhenmodell-Imports: Quellverzeichnisse, rohe Blöcke und die
+# fertigen Kacheln. Gigabytes, und jederzeit neu erzeugbar.
+/.terrain-cache/

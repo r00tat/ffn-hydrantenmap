@@ -216,6 +216,38 @@ npm run terrainImport -- --cache .terrain-cache --level detail --limit 5 --no-up
 - Ohne `terrain-calibration.json` **bricht der Import ab**, statt einen Festwert zu
   erfinden. Ein geratener Skalar würde im Wasserstandsmodell später als Messwert gelesen.
 
+### Die Reihenfolge ist nicht frei
+
+**Die Übersichtsstufe wird aus den rohen Detailblöcken dezimiert.** Sie ist damit keine
+billige erste Etappe: `--level overview` auf einem leeren Cache lädt nichts herunter und
+schreibt nichts. Die Quelldaten müssen zuerst da sein.
+
+Ein Übersichtsblock deckt 100 Detailblöcke ab, und geschrieben wird er nur, wenn **alle**
+Kinder vorliegen, die zum Land gehören. Andernfalls hätte die Kachel ein Loch — und weil ein
+fertiger Block beim nächsten Lauf übersprungen wird, bliebe das Loch für immer. Der Import
+meldet solche Blöcke als „zurückgestellt".
+
+### Rollout in Etappen
+
+`--level` beschränkt auch den **Upload**. Der Index geht immer vollständig hoch; er beschreibt
+ohnehin, was im Cache liegt. Damit lässt sich die Übersichtsstufe zuerst ausrollen, ohne auf
+die 1,5 GiB der Detailstufe zu warten:
+
+```bash
+# 1. Alles bauen, nichts hochladen. Der lange Teil.
+npm run terrainImport -- --cache .terrain-cache --level all --no-upload
+
+# 2. Übersichtsstufe hoch — die Karte zeigt landesweit Höhenlinien.
+npm run terrainImport -- --cache .terrain-cache --level overview
+
+# 3. Detailstufe hinterher.
+npm run terrainImport -- --cache .terrain-cache --level detail
+```
+
+Schritte 2 und 3 bauen nichts Neues, weil die Kacheln im Cache liegen — sie laden nur hoch.
+Zwischen 2 und 3 fällt jede Abfrage in der Detailstufe auf die Übersicht zurück, weil
+`hasBlock` für fehlende Blöcke `false` liefert.
+
 Der Cache-Ordner enthält:
 
 | Eintrag | Inhalt |
@@ -233,6 +265,13 @@ wenig ein Loch in der Karte — bei Zweifel wird der Block aufgenommen.
 
 Die Übersichtsstufe wird aus den **rohen** Detailblöcken dezimiert, nicht aus den PNGs: sonst
 läge die Quantisierung der Detailstufe zweimal im Ergebnis.
+
+**Der Index wird aus dem Ausgabeverzeichnis gebaut**, nicht aus dem, was der laufende Import
+erzeugt hat. Sonst schriebe ein Lauf mit `--level detail` eine leere Übersichts-Bitmap und
+die schon hochgeladenen Übersichtskacheln wären für jeden Client verschwunden; ein Lauf mit
+`--level overview` meldete umgekehrt alle 4.385 Kandidaten der Detailstufe als vorhanden, und
+jeder Client hätte sie einzeln als 404 abgeholt. Siehe
+[src/server/terrain/terrainIndex.ts](../src/server/terrain/terrainIndex.ts).
 
 ## Auslieferung und Version
 

@@ -1,14 +1,9 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import {
-  encodeAvailability,
-  availabilityCell,
-} from '../../common/terrain/availability';
 import { NODATA_ENCODED } from '../../common/terrain/encoding';
 import {
   terrainBlockPath,
   TERRAIN_INDEX_PATH,
-  TERRAIN_VERSION,
 } from '../../common/terrain/terrainPaths';
 import {
   bevSourceTile,
@@ -27,12 +22,11 @@ import { bevFetchRange, bevTileInfo } from './bevSource';
 import { buildBlock, decimate, memoTileReader } from './blockBuilder';
 import { burgenlandBlocks, burgenlandGemeinden, gemeindenBounds } from './burgenlandBoundary';
 import { writeTerrainPng } from './pngWriter';
+import { buildIndex } from './terrainIndex';
 import {
   blockSizeM,
   LEVEL_SPECS,
   levelSpec,
-  TERRAIN_SOURCE,
-  toTerrainLevel,
   type LevelSpec,
 } from './terrainLevels';
 
@@ -169,8 +163,23 @@ async function buildDetail(
  * liegen schon auf Platte, und ein zweiter Download derselben Daten wäre
  * verschwendete Bandbreite eines kostenlos bereitgestellten Dienstes.
  */
+/**
+ * Die Übersichtsstufe aus den rohen Detailblöcken.
+ *
+ * **Geschrieben wird nur ein vollständiger Block.** Ein Übersichtsblock deckt
+ * 100 Detailblöcke ab; fehlt davon einer, der zum Land gehört, hätte die
+ * Kachel ein Loch — und weil ein fertiger Block beim nächsten Lauf
+ * übersprungen wird, bliebe das Loch für immer. Genau das passiert bei einem
+ * Import in Etappen oder nach einem Abbruch.
+ *
+ * „Vollständig" heißt: alle Kinder, die überhaupt zum Land gehören. Blöcke
+ * jenseits der Landesgrenze entstehen nie und dürfen einen Übersichtsblock
+ * nicht dauerhaft verhindern.
+ */
 async function buildOverview(
   detailBlocks: BlockRef[],
+  /** Alle Detailblöcke, die zum Land gehören — nicht nur die schon gebauten. */
+  candidates: BlockRef[],
   cacheDir: string,
   limit: number
 ): Promise<BlockRef[]> {
@@ -179,6 +188,8 @@ async function buildOverview(
   const size = blockSizeM(spec);
   const detailSize = blockSizeM(detail);
   const perSide = size / detailSize;
+
+  const candidateIds = new Set(candidates.map(blockId));
 
   const wanted = new Map<string, BlockRef>();
   for (const block of detailBlocks) {
@@ -191,6 +202,7 @@ async function buildOverview(
   }
 
   const written: BlockRef[] = [];
+  let incomplete = 0;
   for (const parent of wanted.values()) {
     if (written.length >= limit) break;
     const target = outPath(cacheDir, spec, parent);
@@ -205,6 +217,7 @@ async function buildOverview(
     const fineSide = perSide * detail.blockPx;
     const fine = new Float32Array(fineSide * fineSide).fill(Number.NaN);
     let anyData = false;
+    let missing = 0;
 
     for (let dy = 0; dy < perSide; dy += 1) {
       for (let dx = 0; dx < perSide; dx += 1) {
@@ -216,7 +229,11 @@ async function buildOverview(
           sizeM: detailSize,
         };
         const file = rawPath(cacheDir, child);
-        if (!(await exists(file))) continue;
+        if (!(await exists(file))) {
+          // Nur ein Kind, das zum Land gehört, macht den Block unvollständig.
+          if (candidateIds.has(blockId(child))) missing += 1;
+          continue;
+        }
         const bytes = await readFile(file);
         const heights = new Float32Array(
           bytes.buffer.slice(
@@ -235,6 +252,12 @@ async function buildOverview(
     }
 
     if (!anyData) continue;
+    if (missing > 0) {
+      // Später erneut, wenn die Detailstufe vollständig ist. Jetzt geschrieben
+      // wäre der Block für immer löchrig.
+      incomplete += 1;
+      continue;
+    }
 
     const coarse = decimate(fine, fineSide, spec.decimateFactor);
     await mkdir(path.dirname(target), { recursive: true });
@@ -247,7 +270,12 @@ async function buildOverview(
     written.push(parent);
   }
 
-  console.log(`overview: ${written.length} Kacheln geschrieben`);
+  console.log(
+    `overview: ${written.length} Kacheln geschrieben` +
+      (incomplete > 0
+        ? `, ${incomplete} zurückgestellt (Detailstufe noch unvollständig)`
+        : '')
+  );
   return written;
 }
 
@@ -271,45 +299,19 @@ async function readCalibration(cacheDir: string): Promise<AdriaOffsetGrid> {
   }
 }
 
-function buildIndex(
-  bounds: Record<'detail' | 'overview', LaeaBounds>,
-  blocks: Record<'detail' | 'overview', BlockRef[]>,
-  adriaOffset: AdriaOffsetGrid,
-  produced: string
-): TerrainIndex {
-  const levels = LEVEL_SPECS.map((spec) => {
-    const levelBounds = bounds[spec.id];
-    const size = blockSizeM(spec);
-    const cols = (levelBounds.eMax - levelBounds.eMin) / size;
-    const rows = (levelBounds.nMax - levelBounds.nMin) / size;
-    const present = new Set(
-      blocks[spec.id].map((block) => {
-        const cell = availabilityCell(
-          { bounds: levelBounds, blockSizeM: size },
-          block
-        );
-        return `${cell.col},${cell.row}`;
-      })
-    );
-    return toTerrainLevel(
-      spec,
-      levelBounds,
-      encodeAvailability(cols, rows, (col, row) => present.has(`${col},${row}`))
-    );
-  });
-
-  return {
-    version: TERRAIN_VERSION,
-    crs: 'EPSG:3035',
-    heightDatum: 'EVRF2000',
-    adriaOffset,
-    source: TERRAIN_SOURCE,
-    produced,
-    levels,
-  };
-}
-
-async function upload(cacheDir: string, index: TerrainIndex): Promise<void> {
+/**
+ * Kacheln und Index in den Speicher.
+ *
+ * `levels` beschränkt die **Kacheln** auf die gewählte Stufe, der Index geht
+ * immer vollständig hoch — er beschreibt ohnehin, was im Cache liegt. Damit
+ * ist ein Rollout in Etappen möglich: erst die Übersichtsstufe hoch, damit die
+ * Karte landesweit etwas zeigt, die Detailstufe danach.
+ */
+async function upload(
+  cacheDir: string,
+  index: TerrainIndex,
+  levels: Options['level']
+): Promise<void> {
   // Erst hier importiert, damit ein Lauf mit `--no-upload` ohne Anmeldedaten
   // funktioniert.
   const { getApps, initializeApp } = await import('firebase-admin/app');
@@ -328,6 +330,10 @@ async function upload(cacheDir: string, index: TerrainIndex): Promise<void> {
   const bucket = getStorage().bucket(`${projectId}.appspot.com`);
 
   for (const level of index.levels) {
+    if (levels !== 'all' && level.id !== levels) {
+      console.log(`upload: Stufe ${level.id} übersprungen (--level ${levels})`);
+      continue;
+    }
     for (const block of await blocksOf(cacheDir, level.id)) {
       const local = path.join(cacheDir, 'out', level.id, `${block}.png`);
       const ref = parseBlockId(block);
@@ -406,14 +412,27 @@ async function main(): Promise<void> {
       ? candidates
       : await buildDetail(candidates, options.cacheDir, options.limit);
 
-  const overviewBlocks =
-    options.level === 'detail'
-      ? []
-      : await buildOverview(detailBlocks, options.cacheDir, options.limit);
+  // Das Ergebnis wird nicht weiterverwendet: der Index liest aus dem
+  // Verzeichnis. `buildOverview` meldet selbst, wie viele Kacheln entstanden
+  // sind.
+  if (options.level !== 'detail') {
+    await buildOverview(
+      detailBlocks,
+      candidates,
+      options.cacheDir,
+      options.limit
+    );
+  }
 
+  // Aus dem Ausgabeverzeichnis, nicht aus `detailBlocks`/`overviewBlocks`:
+  // der Index muss beschreiben, was vorliegt, nicht was dieser Lauf gebaut
+  // hat. Siehe `buildIndex`.
   const index = buildIndex(
     { detail: detailBounds, overview: overviewBounds },
-    { detail: detailBlocks, overview: overviewBlocks },
+    {
+      detail: await blocksOf(options.cacheDir, 'detail'),
+      overview: await blocksOf(options.cacheDir, 'overview'),
+    },
     await readCalibration(options.cacheDir),
     new Date().toISOString()
   );
@@ -423,7 +442,7 @@ async function main(): Promise<void> {
   await writeFile(indexFile, JSON.stringify(index, null, 2));
   console.log(`index.json geschrieben: ${indexFile}`);
 
-  if (options.upload) await upload(options.cacheDir, index);
+  if (options.upload) await upload(options.cacheDir, index, options.level);
   else console.log('Upload übersprungen (--no-upload)');
 }
 
