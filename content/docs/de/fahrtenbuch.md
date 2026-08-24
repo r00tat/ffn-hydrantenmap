@@ -242,6 +242,18 @@ Unbekannte Fahrer werden als deaktivierte Personen angelegt, damit die Fahrt ein
 
 - **Fahrten sehen und erfassen** Mitglieder der jeweiligen Gruppe
 - **Sammelerfassung zum Einsatz** Mitglieder der Gruppe, zu der der Einsatz gehört
-- **Fahrt ändern oder löschen** Nur der Ersteller der Fahrt oder ein Administrator
+- **Fahrt ändern oder löschen** Nur der Ersteller der Fahrt, ein Gerätemeister der Gruppe oder ein Administrator
 - **Erfassung über den QR-Code** Jeder mit dem Link — ausschließlich erfassen, kein Einblick in bestehende Fahrten
-- **Stammdaten, Fahrtenbuch-Link und Import** Nur Administratoren
+- **Fahrzeuge und Personen pflegen** Administratoren und Gerätemeister der Gruppe
+- **Fahrtenbuch-Link, Import und Gruppeneinstellungen** Nur Administratoren
+
+## Gerätemeister
+
+Fahrten korrigieren darf normalerweise nur, wer sie erfasst hat. Zusätzlich
+kann ein Administrator je Feuerwehr **Gerätemeister** eintragen: Sie dürfen
+jede Fahrt ihrer Feuerwehr nachträglich ändern — etwa einen falsch erfassten
+Kilometerstand — und die Fahrzeuge und Personen pflegen.
+
+Eingetragen werden Gerätemeister in der Fahrtenbuch-Verwaltung unter
+„Einstellungen". Wählbar sind nur Mitglieder der jeweiligen Feuerwehr.
+

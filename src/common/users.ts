@@ -7,6 +7,17 @@ export interface FirebaseUserInfo {
   messaging?: string[];
   groups?: string[];
   isAdmin?: boolean;
+  /**
+   * Gruppen, in denen dieser Benutzer Gerätemeister ist: Er darf dort jeden
+   * Fahrtenbucheintrag korrigieren und die Fahrzeuge und Personen pflegen.
+   *
+   * Steht am Benutzerdokument und nicht an der Gruppenkonfiguration, damit die
+   * Rolle denselben Weg in die Session nimmt wie `isAdmin` und `groups` — und
+   * damit ohne zusätzlichen Firestore-Read auch im Client bekannt ist. Nur das
+   * Admin SDK schreibt hier; die Firestore-Regel für `/user/{uid}` erlaubt dem
+   * Benutzer ausschließlich das Lesen.
+   */
+  fahrtenbuchGeraetemeister?: string[];
   /** Einsatz-Gast: der einzige Einsatz, auf den dieser Benutzer Zugriff hat. */
   firecall?: string;
   /**

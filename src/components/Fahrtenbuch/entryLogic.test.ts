@@ -472,7 +472,7 @@ describe('canModifyEntry', () => {
     expect(canModifyEntry(entry, 'u1', false)).toBe(true);
   });
 
-  it('erlaubt einem Admin', () => {
+  it('erlaubt einem Verwalter der Gruppe', () => {
     expect(canModifyEntry(entry, 'u2', true)).toBe(true);
   });
 

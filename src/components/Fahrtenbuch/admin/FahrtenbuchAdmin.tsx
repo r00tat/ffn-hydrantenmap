@@ -9,10 +9,12 @@ import Tabs from '@mui/material/Tabs';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import useFahrtenbuchGroup from '../../../hooks/useFahrtenbuchGroup';
-import AdminGuard from '../../site/AdminGuard';
+import useFirebaseLogin from '../../../hooks/useFirebaseLogin';
+import FahrtenbuchAdminGuard from './FahrtenbuchAdminGuard';
 import FahrtenbuchImport from './FahrtenbuchImport';
+import GeraetemeisterSettings from './GeraetemeisterSettings';
 import GroupSettings from './GroupSettings';
 import MangelMigration from './MangelMigration';
 import MangelNotificationSettings from './MangelNotificationSettings';
@@ -21,6 +23,34 @@ import ShareLinkSection from './ShareLinkSection';
 import VehicleAdmin from './VehicleAdmin';
 import WeeklyReportSendSection from './WeeklyReportSendSection';
 
+type AdminTabKey =
+  | 'vehicles'
+  | 'persons'
+  | 'settings'
+  | 'shareLink'
+  | 'pdfImport';
+
+/**
+ * Nur Admins sehen alle Reiter. Ein Gerätemeister pflegt Fahrzeuge und
+ * Personen; Einstellungen, Share-Links und PDF-Import bleiben admin-only.
+ */
+const MANAGER_TABS: AdminTabKey[] = ['vehicles', 'persons'];
+const ADMIN_TABS: AdminTabKey[] = [
+  'vehicles',
+  'persons',
+  'settings',
+  'shareLink',
+  'pdfImport',
+];
+
+const TAB_LABEL_KEYS = {
+  vehicles: 'admin.vehicles',
+  persons: 'admin.persons',
+  settings: 'admin.settings',
+  shareLink: 'shareLink.heading',
+  pdfImport: 'admin.pdfImport.tab',
+} as const;
+
 /**
  * Klammer über die Stammdaten: Gruppenauswahl plus Tabs für Fahrzeuge und
  * Personen. Die Gruppen kommen aus `useFahrtenbuchGroup`, damit hier dieselben
@@ -28,14 +58,26 @@ import WeeklyReportSendSection from './WeeklyReportSendSection';
  */
 export default function FahrtenbuchAdmin() {
   const t = useTranslations('fahrtenbuch');
-  const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
-  const [tab, setTab] = useState(0);
+  const { groups: allGroups, groupId, setGroupId } = useFahrtenbuchGroup();
+  const { isAdmin, fahrtenbuchGeraetemeister } = useFirebaseLogin();
+  // Ein Gerätemeister verwaltet nur die Gruppen, in denen er eingetragen ist.
+  // Das ist keine Sicherheitsgrenze — die ist
+  // `actionFahrtenbuchManagerRequired` in den Server Actions.
+  const groups = useMemo(
+    () =>
+      isAdmin
+        ? allGroups
+        : allGroups.filter((g) => fahrtenbuchGeraetemeister?.includes(g.id)),
+    [allGroups, isAdmin, fahrtenbuchGeraetemeister],
+  );
+  const tabs = isAdmin ? ADMIN_TABS : MANAGER_TABS;
+  const [tab, setTab] = useState<AdminTabKey>('vehicles');
   // Fällt eine Gruppe aus den Claims, ohne dass die Auswahl nachzieht, ist die
   // ID immer noch besser als ein leerer Name.
   const groupName = groups.find((g) => g.id === groupId)?.name ?? groupId ?? '';
 
   return (
-    <AdminGuard>
+    <FahrtenbuchAdminGuard>
       {/* `xl` statt `lg`: Bei 1200px Inhaltsbreite bleiben auf einem großen
           Display zwei Spalten und breite leere Ränder. Die Fahrzeug- und
           Personentabellen gewinnen durch die Breite ebenso. */}
@@ -65,32 +107,32 @@ export default function FahrtenbuchAdmin() {
           </TextField>
         </Stack>
 
-        {groups.length === 0 || !groupId ? (
+        {groups.length === 0 ||
+        !groupId ||
+        !groups.some((g) => g.id === groupId) ? (
           <Typography color="text.secondary">{t('admin.noGroups')}</Typography>
         ) : (
           <>
             <Tabs
               value={tab}
-              onChange={(_, value) => setTab(value)}
+              onChange={(_, value: AdminTabKey) => setTab(value)}
               sx={{ mb: 2 }}
             >
-              <Tab label={t('admin.vehicles')} />
-              <Tab label={t('admin.persons')} />
-              <Tab label={t('admin.settings')} />
-              <Tab label={t('shareLink.heading')} />
-              <Tab label={t('admin.pdfImport.tab')} />
+              {tabs.map((key) => (
+                <Tab key={key} value={key} label={t(TAB_LABEL_KEYS[key])} />
+              ))}
             </Tabs>
 
             {/* `key` verwirft Dialog- und Meldungszustand beim Gruppenwechsel,
                 damit keine Meldung der vorigen Gruppe stehen bleibt. */}
-            {tab === 0 && (
+            {tab === 'vehicles' && (
               <VehicleAdmin
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}
               />
             )}
-            {tab === 1 && (
+            {tab === 'persons' && (
               <PersonAdmin
                 key={groupId}
                 groupId={groupId}
@@ -103,7 +145,7 @@ export default function FahrtenbuchAdmin() {
 
                 Die Breite steuert dieser Container und nicht die Karte: So
                 füllen sie ihre Spalte, statt in ihr zu schwimmen. */}
-            {tab === 2 && (
+            {tab === 'settings' && (
               <Box
                 key={groupId}
                 sx={{
@@ -132,6 +174,7 @@ export default function FahrtenbuchAdmin() {
               >
                 <GroupSettings groupId={groupId} />
                 <MangelNotificationSettings groupId={groupId} />
+                <GeraetemeisterSettings groupId={groupId} />
                 {/* Folgt den Empfängern, weil der Versand sie vorbelegt: Die
                     Nachbarschaft macht den Unterschied zwischen einmaliger
                     Überschreibung und dauerhafter Pflege sichtbar. */}
@@ -139,14 +182,14 @@ export default function FahrtenbuchAdmin() {
                 <MangelMigration groupId={groupId} />
               </Box>
             )}
-            {tab === 3 && (
+            {tab === 'shareLink' && (
               <ShareLinkSection
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}
               />
             )}
-            {tab === 4 && (
+            {tab === 'pdfImport' && (
               <FahrtenbuchImport
                 key={groupId}
                 groupId={groupId}
@@ -156,6 +199,6 @@ export default function FahrtenbuchAdmin() {
           </>
         )}
       </Container>
-    </AdminGuard>
+    </FahrtenbuchAdminGuard>
   );
 }

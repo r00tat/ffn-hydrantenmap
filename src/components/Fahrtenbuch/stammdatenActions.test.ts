@@ -3,8 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const actionAdminRequiredMock = vi.fn();
+// `actionFahrtenbuchManagerRequired` läuft hier echt und ruft `actionUserRequired`.
+const actionUserRequiredMock = vi.fn();
 vi.mock('../../app/auth', () => ({
   actionAdminRequired: () => actionAdminRequiredMock(),
+  actionUserRequired: () => actionUserRequiredMock(),
 }));
 
 const { setMock, getMock, docMock, collectionMock } = vi.hoisted(() => ({
@@ -24,6 +27,7 @@ import {
   getFahrtenbuchMangelEmails,
   saveFahrtenbuchGroupStandort,
   saveFahrtenbuchMangelEmails,
+  saveFahrtenbuchPerson,
 } from './stammdatenActions';
 
 const adminSession = { user: { id: 'admin1', isAdmin: true } };
@@ -32,6 +36,9 @@ describe('saveFahrtenbuchGroupStandort', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'admin1', isAdmin: true, groups: ['allUsers'] },
+    });
     setMock.mockResolvedValue(undefined);
     docMock.mockReturnValue({ set: setMock });
     collectionMock.mockReturnValue({ doc: docMock });
@@ -92,6 +99,9 @@ describe('Mangel-Empfänger', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'admin1', isAdmin: true, groups: ['allUsers'] },
+    });
     setMock.mockResolvedValue(undefined);
     getMock.mockResolvedValue({ exists: false });
     docMock.mockReturnValue({ set: setMock, get: getMock });
@@ -198,5 +208,88 @@ describe('Mangel-Empfänger', () => {
 
     expect(result).toEqual({ success: false, error: 'kein Admin' });
     expect(setMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Gerätemeister-Zugriff auf die Stammdaten', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setMock.mockResolvedValue(undefined);
+    docMock.mockReturnValue({
+      set: setMock,
+      get: getMock,
+      collection: collectionMock,
+    });
+    collectionMock.mockReturnValue({ doc: docMock });
+  });
+
+  it('lässt einen Gerätemeister eine Person speichern', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+
+    const result = await saveFahrtenbuchPerson('ffnd', 'p1', {
+      name: 'Mustermann Max',
+      active: true,
+    });
+
+    expect(result).toEqual({ success: true, id: 'p1' });
+    expect(setMock).toHaveBeenCalled();
+  });
+
+  it('weist ein einfaches Gruppenmitglied ab', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+    });
+
+    const result = await saveFahrtenbuchPerson('ffnd', 'p1', {
+      name: 'Mustermann Max',
+      active: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('weist den Gerätemeister einer anderen Gruppe ab', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g2',
+        isAdmin: false,
+        groups: ['ffnd', 'ffxy'],
+        fahrtenbuchGeraetemeister: ['ffxy'],
+      },
+    });
+
+    const result = await saveFahrtenbuchPerson('ffnd', 'p1', {
+      name: 'Mustermann Max',
+      active: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt den Gerätemeister nicht an die Mangel-Empfänger', async () => {
+    // Die Einstellungen bleiben admin-only — sonst könnte sich ein
+    // Gerätemeister selbst aus der Benachrichtigung nehmen.
+    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+
+    const result = await saveFahrtenbuchMangelEmails('ffnd', ['a@b.c']);
+
+    expect(result.success).toBe(false);
   });
 });

@@ -21,7 +21,10 @@ import {
 } from '../../common/kostenersatz';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
-import { assertFahrtenbuchGroup } from './authGuards';
+import {
+  actionFahrtenbuchManagerRequired,
+  assertFahrtenbuchGroup,
+} from './authGuards';
 import { planInactivePersons } from './fahrtenbuchImportPlan';
 import {
   fieldsForChanges,
@@ -97,8 +100,7 @@ export async function saveFahrtenbuchVehicle(
   >,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
     const now = new Date().toISOString();
     const payload = {
       name: data.name.trim(),
@@ -138,8 +140,7 @@ export async function deleteFahrtenbuchVehicle(
   vehicleId: string,
 ): Promise<StammdatenResult> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionFahrtenbuchManagerRequired(groupId);
     await vehiclesRef(groupId).doc(vehicleId).delete();
     return { success: true, id: vehicleId };
   } catch (err) {
@@ -157,8 +158,7 @@ export async function saveFahrtenbuchPerson(
   >,
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
     const now = new Date().toISOString();
     const payload = {
       name: data.name.trim(),
@@ -192,8 +192,7 @@ export async function deleteFahrtenbuchPerson(
   personId: string,
 ): Promise<StammdatenResult> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionFahrtenbuchManagerRequired(groupId);
     await personsRef(groupId).doc(personId).delete();
     return { success: true, id: personId };
   } catch (err) {
@@ -218,8 +217,7 @@ export async function previewVehicleImport(
   groupId: string,
 ): Promise<{ success: boolean; rows: VehicleImportPlanRow[]; error?: string }> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionFahrtenbuchManagerRequired(groupId);
     const [source, existing] = await Promise.all([
       loadKostenersatzVehicles(),
       loadVehicles(groupId),
@@ -242,8 +240,7 @@ export async function importVehiclesFromKostenersatz(
   error?: string;
 }> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
     const [source, existing] = await Promise.all([
       loadKostenersatzVehicles(),
       loadVehicles(groupId),
@@ -299,8 +296,7 @@ export async function previewPersonCsvImport(
   csvText: string,
 ): Promise<PersonImportPreview> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    await actionFahrtenbuchManagerRequired(groupId);
     const { records, errors } = parseRecipientCsv(csvText);
     const plan = planPersonCsvImport(records, await loadPersons(groupId));
     return {
@@ -343,8 +339,7 @@ export async function importPersonsFromCsv(
   selection: PersonImportSelection,
 ): Promise<PersonImportResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
     const { records } = parseRecipientCsv(csvText);
     const plan = planPersonCsvImport(records, await loadPersons(groupId));
     // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
@@ -464,8 +459,7 @@ export async function createInactivePersons(
   names: string[],
 ): Promise<InactivePersonsResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
     // Server-Action-Argumente sind Client-Eingabe — der Typ ist zur Laufzeit
     // weg, also darf hier nichts als Array vorausgesetzt werden.
     const list = (Array.isArray(names) ? names : []).filter(

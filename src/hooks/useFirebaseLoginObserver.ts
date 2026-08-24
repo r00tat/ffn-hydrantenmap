@@ -87,6 +87,10 @@ export default function useFirebaseLoginObserver(): LoginStatus {
   const derivedFirecallWrite = hasSessionAuth
     ? (session.user.firecallWrite ?? loginStatus.firecallWrite)
     : loginStatus.firecallWrite;
+  const derivedGeraetemeister = hasSessionAuth
+    ? (session.user.fahrtenbuchGeraetemeister ??
+      loginStatus.fahrtenbuchGeraetemeister)
+    : loginStatus.fahrtenbuchGeraetemeister;
 
   const serverLogin = useCallback(async () => {
     const token = await auth.currentUser?.getIdToken();
@@ -395,6 +399,7 @@ export default function useFirebaseLoginObserver(): LoginStatus {
     groups: derivedGroups,
     firecall: derivedFirecall,
     firecallWrite: derivedFirecallWrite,
+    fahrtenbuchGeraetemeister: derivedGeraetemeister,
     myGroups,
     refresh,
     signOut: fbSignOut,

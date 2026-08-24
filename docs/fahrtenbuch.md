@@ -385,3 +385,47 @@ Pfad nicht. Dateien liegen unter `groups/{groupId}/mangel/{mangelId}/{uuid}-{nam
   Firebase-Konfiguration.
 - Die Liste zeigt nur die **Anzahl** der Bilder, der Dialog die Vorschaubilder: Jedes Bild
   braucht eine eigene Signatur, für eine ganze Tabelle wären das dutzende Aufrufe.
+
+## Gerätemeister
+
+Ein Admin trägt je Gruppe Gerätemeister ein (Einstellungen-Tab der
+Fahrtenbuch-Verwaltung). Sie dürfen zusätzlich zum Admin jeden Eintrag ihrer
+Gruppe korrigieren und die Fahrzeuge und Personen pflegen — nicht aber die
+Gruppeneinstellungen, die Share-Links, den PDF-Import oder das Löschen von
+Mängeln.
+
+Die Rolle steht als Liste von Gruppen-IDs **am Benutzerdokument**
+(`user/{uid}.fahrtenbuchGeraetemeister`) und nicht an `fahrtenbuchConfig`, wo
+die Mangel-Empfänger liegen. Grund ist der Leseweg: `fahrtenbuchConfig` ist für
+Clients gesperrt, also bräuchte jeder Guard einen zusätzlichen Firestore-Read
+und jede Seite, die die Rolle kennen muss — Drawer, Seitenschutz,
+Bearbeiten-Knöpfe — einen Server-Action-Roundtrip. Am Benutzerdokument nimmt
+die Rolle denselben Weg wie `isAdmin` und `groups`: über `getUserSessionData`
+in die Session und von dort in den Client.
+
+Manipulationssicher ist das, weil `/user/{uid}` in den Regeln nur `read`
+erlaubt und der Catch-all am Dateiende Schreibrechte an `adminUser()` bindet —
+dasselbe Dokument trägt schon heute `isAdmin`.
+
+Drei Dinge, die daran hängen:
+
+- **Kein Custom Claim.** Die Firestore-Regeln brauchen die Rolle nicht:
+  Fahrzeuge, Personen und Einträge werden ausschließlich über Server Actions
+  mit dem Admin SDK geschrieben. Ein Claim erzwänge dagegen einen
+  Token-Refresh bei jeder Rollenänderung.
+- **`arrayUnion`/`arrayRemove` statt Liste neu schreiben.** Zwei Admins, die
+  gleichzeitig zwei *verschiedene* Gruppen pflegen, fassen dasselbe
+  Benutzerdokument an und überschrieben sich sonst gegenseitig.
+- **`userSessionCache.invalidate()` nicht vergessen.** Ohne die Invalidierung
+  in `saveFahrtenbuchGeraetemeister` bliebe eine Rollenänderung bis zum
+  Cache-Ablauf wirkungslos — dieselbe Falle wie in `updateUser.ts`.
+
+Die Entscheidung fällt an genau einer Stelle:
+`isFahrtenbuchManager(groupId, user)` in
+[managerPermissions.ts](../src/components/Fahrtenbuch/managerPermissions.ts).
+Sie liegt bewusst nicht in `entryLogic.ts` — auch der Drawer braucht sie, und
+der zöge sonst das Eintrags-Validierungsmodul in sein Bundle. Die Asymmetrie
+darin ist Absicht: Der Gerätemeister braucht die Mitgliedschaft in der Gruppe,
+der Admin nicht (sonst nähme man ihm ein Recht, das er unter
+`actionAdminRequired()` in den Stammdaten-Actions immer hatte).
+

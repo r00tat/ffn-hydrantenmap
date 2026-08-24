@@ -16,6 +16,8 @@ export interface AutoProvisionedUser {
   isAuthorized: boolean;
   isAdmin: boolean;
   groups: string[];
+  /** Gruppen, in denen der Benutzer Fahrtenbuch-Gerätemeister ist. */
+  fahrtenbuchGeraetemeister?: string[];
   firecall?: string;
   /** Schreibrecht eines Einsatz-Gasts, siehe `guestCanWrite`. */
   firecallWrite?: boolean;
@@ -125,6 +127,7 @@ export async function getUserSessionData(
       isAuthorized: !!userData.authorized,
       isAdmin: !!userData.isAdmin,
       groups: uniqueArray(['allUsers', ...(userData.groups || [])]),
+      fahrtenbuchGeraetemeister: userData.fahrtenbuchGeraetemeister ?? [],
       firecall: userData.firecall,
       firecallWrite: guestCanWrite(userData),
       firecallExpiresAt: userData.firecallExpiresAt,

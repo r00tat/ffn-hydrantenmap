@@ -111,6 +111,7 @@ import {
   createFahrtenbuchEntries,
   createFahrtenbuchEntry,
   createFahrtenbuchEntryViaShareLink,
+  deleteFahrtenbuchEntry,
   importFahrtenbuchEntries,
   updateFahrtenbuchEntry,
 } from './fahrtenbuchActions';
@@ -1528,5 +1529,92 @@ describe('Fahrtenzähler am Einsatz', () => {
     const result = await createFahrtenbuchEntry('ffnd', einsatzInput);
 
     expect(result).toMatchObject({ success: true, id: 'e2' });
+  });
+});
+
+describe('Gerätemeister korrigiert fremde Einträge', () => {
+  const foreignEntry = {
+    vehicleId: 'v1',
+    driverName: 'Anna Bauer',
+    zweck: 'uebung' as const,
+    ziel: 'Zeughaus',
+    abfahrt: '2026-08-05T08:00:00.000Z',
+    ankunft: '2026-08-05T09:00:00.000Z',
+    counters: { km: { start: 1000, end: 1020, diff: 20 } },
+    group: 'ffnd',
+    deleted: false,
+    createdAt: '2026-08-05T09:05:00.000Z',
+    createdBy: 'someoneElse',
+    createdByName: 'Anna Bauer',
+    updatedAt: '2026-08-05T09:05:00.000Z',
+    updatedBy: 'someoneElse',
+  };
+
+  const geraetemeisterSession = {
+    user: {
+      id: 'g1',
+      name: 'Max Mustermann',
+      email: 'max@ffn.at',
+      isAdmin: false,
+      groups: ['ffnd'],
+      fahrtenbuchGeraetemeister: ['ffnd'],
+    },
+  };
+
+  beforeEach(() => {
+    actionUserRequiredMock.mockReset();
+    vehicleGetMock.mockReset();
+    vehicleSetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
+    entriesQueryGetMock.mockReset();
+    entryDocGetMock.mockReset();
+    entryDocSetMock.mockReset();
+
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => foreignEntry,
+    });
+    entryDocSetMock.mockResolvedValue(undefined);
+  });
+
+  it('lässt den Gerätemeister einen fremden Eintrag ändern', async () => {
+    actionUserRequiredMock.mockResolvedValue(geraetemeisterSession);
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result.success).toBe(true);
+    expect(entryDocSetMock).toHaveBeenCalled();
+  });
+
+  it('weist ein einfaches Gruppenmitglied bei einem fremden Eintrag ab', async () => {
+    // SESSION ist u1 ohne Adminrecht und ohne Gerätemeister-Eintrag.
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result).toEqual({ success: false, error: 'notAllowed' });
+    expect(entryDocSetMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt den Gerätemeister einen fremden Eintrag löschen', async () => {
+    actionUserRequiredMock.mockResolvedValue(geraetemeisterSession);
+
+    const result = await deleteFahrtenbuchEntry('ffnd', 'e1');
+
+    expect(result).toEqual({ success: true, id: 'e1' });
+  });
+
+  it('weist ein einfaches Gruppenmitglied beim Löschen ab', async () => {
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+
+    const result = await deleteFahrtenbuchEntry('ffnd', 'e1');
+
+    expect(result).toEqual({ success: false, error: 'notAllowed' });
   });
 });
