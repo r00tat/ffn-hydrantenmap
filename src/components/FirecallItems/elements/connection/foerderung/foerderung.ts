@@ -98,6 +98,19 @@ export interface FoerderungView {
   /** Anzahl der gezeichneten Punkte — benennt die Enden der Förderrichtung. */
   pointCount: number;
   elevationSource: 'profile' | 'manual';
+  /**
+   * Woher die Höhen des Profils stammen — eigenes Modell oder Rückfallebene.
+   * `undefined`, solange gar kein Profil vorliegt.
+   *
+   * Getrennt von `elevationSource`: das sagt, **ob** gemessene Höhen vorliegen,
+   * das hier sagt **woher**. Ohne die Angabe ist eine Abweichung gegenüber
+   * einem früheren Ergebnis nicht zuordenbar.
+   */
+  elevationOrigin?: NonNullable<Connection['elevationSource']>;
+  /** Welche Stufe des eigenen Höhenmodells geantwortet hat. */
+  elevationLevel?: Connection['elevationLevel'];
+  /** Abtastweite des Profils in m. */
+  elevationSpacingM?: number;
   /** Reibungsverlust in bar je 100 m; `undefined` bei unbekannter Dimension. */
   frictionPer100m?: number;
   /** Ob der Reibungswert aus der Tabelle stammt oder abgeleitet ist. */
@@ -191,9 +204,12 @@ export function foerderungView(
   const params = { ...foerderungParams(item), ...overrides };
   const warnings: FoerderungWarning[] = [];
 
-  const drawnSamples = foerderungSamples(item);
   const length = calculateDistance(connectionDisplayPositions(item));
-  const storedProfile = storedElevations(item, drawnSamples);
+  const stored = storedElevations(item);
+  // Ohne gültiges Profil wird die Abtastung hier gebildet: die Streckenmeter
+  // braucht die Rechnung auch dann, um die Handeingabe linear zu verteilen.
+  const drawnSamples = stored?.samples ?? foerderungSamples(item);
+  const storedProfile = stored?.elevations;
 
   // Ab hier wird in Förderrichtung gerechnet: Bei umgekehrter Richtung zählen
   // die Streckenmeter vom letzten Punkt aus, Koordinaten und Höhen wandern mit.
@@ -226,9 +242,7 @@ export function foerderungView(
 
   if (!elevations) {
     warnings.push(
-      isElevationFallback(item, drawnSamples)
-        ? 'elevationFailed'
-        : 'noElevationData'
+      isElevationFallback(item) ? 'elevationFailed' : 'noElevationData'
     );
   }
 
@@ -268,6 +282,9 @@ export function foerderungView(
     reversed,
     pointCount: getConnectionPositions(item).length,
     elevationSource: elevations ? 'profile' : 'manual',
+    elevationOrigin: stored?.source,
+    elevationLevel: stored?.level,
+    elevationSpacingM: stored?.spacingM,
     frictionPer100m,
     frictionTabulated: isTabulatedDimension(dimension),
     dimension,
@@ -291,7 +308,7 @@ export function foerderungView(
 
 /** Ob die Höhenabfrage für die aktuelle Lage gescheitert ist. */
 export const foerderungElevationFailed = (item: Connection): boolean =>
-  isElevationFallback(item, foerderungSamples(item));
+  isElevationFallback(item);
 
 /**
  * Die Zeile für Kartenpopup und Elementliste, oder `undefined` ohne aktiven

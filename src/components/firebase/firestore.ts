@@ -326,6 +326,26 @@ export interface Connection extends MultiPointItem {
   elevationFor?: string;
   /** `'true'`, wenn die Höhenabfrage für diese Signatur gescheitert ist. */
   elevationFailed?: string;
+  /**
+   * Woher die gespeicherten Höhen kommen.
+   *
+   * `'terrain'` ist das eigene Höhenmodell (BEV ALS-DGM, 1 m),
+   * `'opentopodata'` die Rückfallebene (EU-DEM, 25 m). Steht am Element und
+   * wird im Rechner ausgewiesen: ohne diese Angabe ist eine Abweichung
+   * gegenüber einem früheren Ergebnis nicht zuordenbar.
+   */
+  elevationSource?: 'terrain' | 'opentopodata';
+  /** Welche Stufe des eigenen Höhenmodells geantwortet hat. */
+  elevationLevel?: 'detail' | 'overview';
+  /**
+   * Abtastweite des gespeicherten Profils in m, als String wie alle
+   * Zahlenfelder der Elemente.
+   *
+   * Gehört zum gespeicherten Zustand, damit ein Profil aus einer gröberen
+   * Abtastung als gültig erkannt wird, statt bei jedem Render neu abgefragt zu
+   * werden.
+   */
+  elevationSpacing?: string;
 
   /**
    * Welche Variante der Löschwasserversorgung der Rechner an dieser Leitung

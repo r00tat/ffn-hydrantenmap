@@ -5,11 +5,16 @@ import type { Connection } from '../../../../firebase/firestore';
 import {
   elevationSignature,
   elevationTodo,
+  FALLBACK_SAMPLE_SPACING_M,
   foerderungSamples,
   isElevationFallback,
   isFoerderungEnabled,
   storedElevations,
 } from './elevationProfile';
+
+/** Die Abtastweite, mit der dieser Block arbeitet. */
+const signature = (samples: Parameters<typeof elevationSignature>[0]) =>
+  elevationSignature(samples, FALLBACK_SAMPLE_SPACING_M);
 
 const entnahme: LatLngPosition = [47.9482, 16.8482];
 const verteiler: LatLngPosition = [47.9582, 16.8482];
@@ -36,7 +41,7 @@ const withProfile = (elevations?: number[]) => {
     item: connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify(values),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     }),
     values,
   };
@@ -56,14 +61,18 @@ describe('elevationSignature', () => {
     const lang = foerderungSamples(
       connection({ positions: JSON.stringify([entnahme, [47.98, 16.8482]]) })
     );
-    expect(elevationSignature(kurz)).not.toBe(elevationSignature(lang));
+    expect(signature(kurz)).not.toBe(signature(lang));
   });
 });
 
 describe('storedElevations', () => {
   it('gibt die Höhen zurück, wenn sie zur Abtastung passen', () => {
     const { item, samples, values } = withProfile();
-    expect(storedElevations(item, samples)).toEqual(values);
+    expect(storedElevations(item)?.elevations).toEqual(values);
+    expect(storedElevations(item)?.spacingM).toBe(FALLBACK_SAMPLE_SPACING_M);
+    // Ohne `elevationSource` gilt die Rückfallebene: so sind alle Profile
+    // entstanden, die es vor dem eigenen Höhenmodell gab.
+    expect(storedElevations(item)?.source).toBe('opentopodata');
   });
 
   it('verwirft ein Profil mit falscher Anzahl', () => {
@@ -71,9 +80,9 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify([130, 131]),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 
   it('verwirft ein Profil mit Löchern', () => {
@@ -83,17 +92,65 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: JSON.stringify(values),
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 
   it('verwirft ein Profil zu einer anderen Lage', () => {
-    const { item } = withProfile();
-    const andere = foerderungSamples(
-      connection({ positions: JSON.stringify([entnahme, [47.98, 16.8482]]) })
-    );
-    expect(storedElevations(item, andere)).toBeUndefined();
+    const { samples } = withProfile();
+    // Dieselben Höhen, aber die Signatur einer längeren Leitung.
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 130)),
+      elevationFor: signature(
+        foerderungSamples(
+          connection({
+            positions: JSON.stringify([entnahme, [47.98, 16.8482]]),
+          })
+        )
+      ),
+    });
+    expect(storedElevations(item)).toBeUndefined();
+  });
+
+  it('verwirft ein Profil mit anderer Abtastweite', () => {
+    const { samples } = withProfile();
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 130)),
+      elevationFor: signature(samples),
+      // Die Signatur gilt für 50 m, das Feld behauptet 10 m.
+      elevationSpacing: '10',
+    });
+    expect(storedElevations(item)).toBeUndefined();
+  });
+
+  it('erkennt ein Profil aus der Rückfallebene als gültig', () => {
+    const { samples } = withProfile();
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 200)),
+      elevationFor: signature(samples),
+      elevationSpacing: String(FALLBACK_SAMPLE_SPACING_M),
+      elevationSource: 'opentopodata',
+    });
+    expect(storedElevations(item)?.source).toBe('opentopodata');
+    expect(elevationTodo(item)).toBe('none');
+  });
+
+  it('führt Quelle und Stufe des eigenen Modells mit', () => {
+    const { samples } = withProfile();
+    const item = connection({
+      foerderung: 'true',
+      elevationProfile: JSON.stringify(samples.map(() => 200)),
+      elevationFor: signature(samples),
+      elevationSpacing: String(FALLBACK_SAMPLE_SPACING_M),
+      elevationSource: 'terrain',
+      elevationLevel: 'detail',
+    });
+    expect(storedElevations(item)?.source).toBe('terrain');
+    expect(storedElevations(item)?.level).toBe('detail');
   });
 
   it('verwirft unlesbares JSON', () => {
@@ -101,9 +158,9 @@ describe('storedElevations', () => {
     const item = connection({
       foerderung: 'true',
       elevationProfile: '{nope',
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(storedElevations(item, samples)).toBeUndefined();
+    expect(storedElevations(item)).toBeUndefined();
   });
 });
 
@@ -113,16 +170,16 @@ describe('isElevationFallback', () => {
     const gescheitert = connection({
       foerderung: 'true',
       elevationFailed: 'true',
-      elevationFor: elevationSignature(samples),
+      elevationFor: signature(samples),
     });
-    expect(isElevationFallback(gescheitert, samples)).toBe(true);
+    expect(isElevationFallback(gescheitert)).toBe(true);
 
     const veraltet = connection({
       foerderung: 'true',
       elevationFailed: 'true',
       elevationFor: 'alte-signatur',
     });
-    expect(isElevationFallback(veraltet, samples)).toBe(false);
+    expect(isElevationFallback(veraltet)).toBe(false);
   });
 });
 
