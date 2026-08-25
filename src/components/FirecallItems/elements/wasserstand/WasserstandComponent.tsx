@@ -7,12 +7,14 @@ import L from 'leaflet';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Marker, Polygon, Popup } from 'react-leaflet';
+import type { LatLngPosition } from '../../../../common/geo';
 import { terrainClient } from '../../../../common/terrain/terrainClient';
 import {
   parseWasserBaender,
   wasserstandLevelM,
   wasserstandStale,
 } from '../../../../common/terrain/wasserstand';
+import { defaultPosition } from '../../../../hooks/constants';
 import useFirecallItemUpdate from '../../../../hooks/useFirecallItemUpdate';
 import { useMapEditable } from '../../../../hooks/useMapEditor';
 import { FirecallItem } from '../../../firebase/firestore';
@@ -27,8 +29,8 @@ import { PopupNavigateButton } from '../FirecallItemBase';
 import type { FirecallWasserstand } from '../FirecallWasserstand';
 
 /**
- * Ein Wasserstands-Szenario: Marker am Saatpunkt, dazu die gespeicherten
- * Tiefenstufen als Polygone.
+ * Ein Wasserausbreitungs-Szenario: Marker am Saatpunkt, dazu die
+ * gespeicherten Tiefenstufen als Polygone.
  *
  * **Je Band ein Polygon mit allen seinen Ringen und `fillRule: 'evenodd'`.**
  * Damit sind trockene Inseln — Gebäude, Anhöhen — von selbst Löcher, ohne die
@@ -54,6 +56,16 @@ export default function WasserstandComponent({
   selectItem,
   pane,
 }: WasserstandComponentProps) {
+  /**
+   * `pane` **nur setzen, wenn es eines gibt.**
+   *
+   * `L.setOptions` kopiert jede eigene Eigenschaft, auch eine mit dem Wert
+   * `undefined` — ein `pane={undefined}` überschreibt damit die Vorbelegung
+   * (`markerPane` bzw. `overlayPane`) und `map.getPane(undefined)` gibt
+   * `undefined` zurück. Leaflet stirbt dann in `appendChild`. Getroffen hat es
+   * die Vorschau beim Setzen des Punktes, die ohne `pane` zeichnet.
+   */
+  const paneProps = pane ? { pane } : {};
   const t = useTranslations('wasserstand');
   const editable = useMapEditable();
   const updateItem = useFirecallItemUpdate();
@@ -61,6 +73,16 @@ export default function WasserstandComponent({
   const [depth, setDepth] = useState<number>();
 
   const item = useMemo(() => record.data(), [record]);
+  /**
+   * Beim Setzen eines neuen Elements zeichnet `AddFirecallItem` eine Vorschau,
+   * die noch keine Koordinaten trägt. Derselbe Rückfall wie im Standardmarker
+   * (`FirecallItemDefault`) — ohne ihn bekäme Leaflet `undefined` als
+   * Koordinate.
+   */
+  const position: LatLngPosition = [
+    record.lat ?? defaultPosition.lat,
+    record.lng ?? defaultPosition.lng,
+  ];
   const baender = useMemo(() => parseWasserBaender(item), [item]);
   const levelM = wasserstandLevelM(item);
   const stale = wasserstandStale(item);
@@ -88,7 +110,7 @@ export default function WasserstandComponent({
           <Polygon
             key={`band-${band.tiefeM}`}
             positions={band.ringe}
-            pane={pane}
+            {...paneProps}
             pathOptions={{
               color: bandColor(band.tiefeM),
               fillColor: bandColor(band.tiefeM),
@@ -122,10 +144,10 @@ export default function WasserstandComponent({
       )}
 
       <Marker
-        position={[record.lat, record.lng]}
+        position={position}
         icon={leafletIcons().wasserstand}
         title={record.titleFn()}
-        pane={pane}
+        {...paneProps}
         draggable={editable}
         autoPan={false}
         eventHandlers={{

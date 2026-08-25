@@ -51,9 +51,9 @@ describe('Hochwasser', () => {
     firecall.value = { id: 'fc1' };
     szenarien.value = [];
     renderWithIntl(<Hochwasser />);
-    expect(screen.getByText(/Noch kein Szenario/)).toBeInTheDocument();
+    expect(screen.getByText(/Noch keine Wasserausbreitung/)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /Wasserstand einzeichnen/ })
+      screen.getByRole('button', { name: /Wasserausbreitung einzeichnen/ })
     ).toBeInTheDocument();
   });
 

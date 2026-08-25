@@ -13,7 +13,12 @@ import { MarkerRenderOptions } from './marker/FirecallItemDefault';
 import WasserstandComponent from './wasserstand/WasserstandComponent';
 
 /**
- * Ein Wasserstands-Szenario auf der Karte.
+ * Eine Wasserausbreitung auf der Karte.
+ *
+ * Sichtbar heißt das Element **Wasserausbreitung** und nicht „Wasserstand":
+ * gesucht ist die überflutete Fläche, der Wasserstand ist nur die Eingabe
+ * dahin. Der Item-Typ, die Feldnamen und der Übersetzungs-Namensraum bleiben
+ * `wasserstand` — sie stehen in gespeicherten Dokumenten.
  *
  * Punkt-Element wie `assp` — der Punkt ist Saatpunkt **und** Höhenbezug. Die
  * Fläche kommt aus den gespeicherten Ringen und nicht aus einer Rechnung beim
@@ -90,7 +95,7 @@ export class FirecallWasserstand extends FirecallItemBase {
   }
 
   public markerName(): string {
-    return 'Wasserstand';
+    return 'Wasserausbreitung';
   }
 
   public fields(): SimpleMap<string> {
@@ -124,11 +129,11 @@ export class FirecallWasserstand extends FirecallItemBase {
   }
 
   public dialogText(): ReactNode {
-    return <>Wasserstand {this.name}</>;
+    return <>Wasserausbreitung {this.name}</>;
   }
 
   public titleFn(): string {
-    return `Wasserstand ${this.name}\n${this.info()}`;
+    return `Wasserausbreitung ${this.name}\n${this.info()}`;
   }
 
   public icon(): Icon<IconOptions> {

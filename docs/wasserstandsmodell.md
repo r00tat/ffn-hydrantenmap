@@ -7,6 +7,22 @@ dem eigenen Höhenmodell aus [#729](https://github.com/r00tat/ffn-hydrantenmap/p
 Hier steht das „warum", das sich aus dem Code nicht ableiten lässt. Was der Code tut, steht
 im Code — `src/common/terrain/floodFill.ts`, `floodBands.ts`, `wasserstand.ts`.
 
+## 0. Wie das Ding heißt
+
+Sichtbar heißt das Element **Wasserausbreitung**, nicht „Wasserstand". Gesucht ist die
+überflutete **Fläche**; der Wasserstand ist nur die Eingabe dahin. „Wasserstand" als Name des
+Elements ließ im Element-Auswahldialog offen, was danach passiert — man hätte ein Feld zum
+Eintragen einer Zahl erwartet, nicht eine gerechnete Fläche.
+
+Der Item-Typ (`wasserstand`), die Feldnamen (`wasser*`) und der Übersetzungs-Namensraum
+bleiben dabei, wie sie sind: Sie stehen in gespeicherten Firestore-Dokumenten, und ein
+Umbenennen wäre eine Migration ohne Gegenwert. Das **Modell** heißt weiter
+Wasserstandsmodell — es ist über einen Wasserstand parametrisiert.
+
+Wo im Text ein Wasserstand gemeint ist — die Höhe `h`, die Zahl in müA —, steht weiter
+„Wasserstand". Das ist kein Widerspruch, sondern die Unterscheidung zwischen der Eingabe und
+dem Ergebnis.
+
 ## 1. Was das Modell ist und was nicht
 
 Eine **statische Badewanne**: Zu einem Wasserstand `h` gilt eine Zelle als überflutet, wenn
