@@ -18,6 +18,11 @@ vi.mock('./SearchButton', () => ({ default: () => null }));
 vi.mock('../firebase/firestoreHooks', () => ({
   useFirecallItems: () => [],
 }));
+// Die Ebenen entscheiden, welche Objekte die 3D-Ansicht bekommt; der Hook zieht
+// dafür Firestore herein.
+vi.mock('../../hooks/useFirecallLayers', () => ({
+  useFirecallLayers: () => ({}),
+}));
 
 const { default: MapActionButtons, threeDFabBottom } = await import(
   './MapActionButtons'

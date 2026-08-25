@@ -64,6 +64,13 @@ export interface Gelaende3dDialogOptions {
   baseLayerName?: string;
   items: FirecallItem[];
   equidistanceM: number;
+  /**
+   * Ob die Höhenlinien beim Öffnen eingeschaltet sind.
+   *
+   * Folgt der Überlagerung in der Karte: wer sie dort abgeschaltet hat, will
+   * sie hier nicht plötzlich wieder sehen.
+   */
+  showContours?: boolean;
 }
 
 type Status = 'loading' | 'ready' | 'empty' | 'failed' | 'noWebgl';
@@ -85,6 +92,7 @@ export default function Gelaende3dDialog({
   baseLayerName,
   items,
   equidistanceM,
+  showContours: contoursInitially = true,
 }: Gelaende3dDialogOptions) {
   const t = useTranslations('gelaende3d');
   const theme = useTheme();
@@ -101,7 +109,7 @@ export default function Gelaende3dDialog({
   const [status, setStatus] = useState<Status>('loading');
   const [mesh, setMesh] = useState<TerrainMesh | undefined>();
   const [exaggeration, setExaggeration] = useState(1);
-  const [showContours, setShowContours] = useState(true);
+  const [showContours, setShowContours] = useState(contoursInitially);
   const [azimuth, setAzimuth] = useState(0);
   const [attempt, setAttempt] = useState(0);
 
@@ -191,6 +199,7 @@ export default function Gelaende3dDialog({
           contourLabels(contours.lines, projector, equidistanceM),
           (heightM) => contourLabelColor(heightM, min, max, dark)
         );
+        scene.setContoursVisible(contoursInitially);
       } catch (err) {
         console.error('3D-Ansicht konnte nicht aufgebaut werden', err);
         if (!cancelled) setStatus('failed');

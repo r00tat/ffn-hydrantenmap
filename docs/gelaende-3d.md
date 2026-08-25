@@ -189,6 +189,13 @@ Die Ringe werden nach **Even-odd** in Umrisse und Löcher zerlegt (`ringPolygons
 hieße, dass die überflutete Fläche in 3D eine andere wäre als in der Karte, und
 eine Insel im Hochwasser ist genau die Stelle, auf die man schaut.
 
+Die Ringe werden auf den Ausschnitt **zugeschnitten** (Sutherland-Hodgman gegen
+den Rahmen der Szene). Eine Flutfläche endet nicht am Kartenrand — sie ist über
+einen Umkreis gerechnet, der weit darüber hinausgehen kann. Ungeschnitten
+spannte sie die Szene auf, ohne dass mehr zu sehen wäre: das Gelände hört am
+Rand des Netzes auf, das Wasser liefe ins Leere weiter, und der Blick zöge sich
+auf einen blauen Fleck zurück.
+
 Der Spiegel schreibt **nicht in den Tiefenpuffer** (`depthWrite: false`): sonst
 verdeckte er Leitungen und Marken, die hinter ihm liegen. Sichtbar ist er von
 beiden Seiten — man schaut auch von unterhalb des Spiegels auf die Lage, wenn
@@ -234,6 +241,24 @@ sinngemäß für die Marken, die ganz außerhalb der überhöhten Gruppe hängen
 
 Leitungen und Höhenlinien brauchen die Korrektur nicht: ihre Strichstärke ist
 eine Bildschirmgröße (`LineMaterial`) und von der Szenenskalierung unberührt.
+
+## Die Ansicht zeigt dieselbe Lage wie die Karte
+
+Ausgeblendete Ebenen bleiben in 3D ausgeblendet. Wer eine Ebene abschaltet, hat
+sie abgeschaltet — sie hier trotzdem zu zeigen wäre ein zweites, abweichendes
+Lagebild, und genau das darf im Einsatz nicht passieren. Dasselbe gilt für die
+Höhenlinien: ist die Überlagerung in der Karte aus, öffnet die Ansicht mit
+ausgeschaltetem Schalter.
+
+Die Sichtbarkeit steckt in **Leaflets** Layer-Steuerung, nicht in React, und ist
+nur über `overlayadd`/`overlayremove` zu erfahren. Die melden aber ausschließlich
+Änderungen, nie den Anfangszustand. `visibleItems.ts` legt deshalb für alles,
+worüber noch keine Meldung kam, dieselbe Vorbelegung zugrunde wie
+`FirecallLayer.tsx`: Ebenen sind an, sofern nicht `defaultVisible === 'false'`
+am Datensatz steht; die Höhenlinien sind aus.
+
+Objekte ohne Ebene — und solche, deren Ebene gelöscht wurde — hängen an der
+Überlagerung „Einsatz", dieselbe Regel wie in `FirecallItemsLayer.tsx`.
 
 ## Der Knopf in der Karte
 

@@ -40,6 +40,8 @@ export interface SceneProjector {
   toScene(position: LatLngPosition): ScenePoint;
   /** Geländehöhe in m, `undefined` außerhalb des Netzes oder über einem Loch. */
   groundAt(point: ScenePoint): number | undefined;
+  /** Halbe Kantenlängen der Szene — der Rahmen, auf den zugeschnitten wird. */
+  extent: { halfWidthM: number; halfDepthM: number };
 }
 
 export function sceneProjector(mesh: TerrainMesh): SceneProjector {
@@ -50,6 +52,8 @@ export function sceneProjector(mesh: TerrainMesh): SceneProjector {
   const halfDepth = mesh.depthM / 2;
 
   return {
+    extent: { halfWidthM: halfWidth, halfDepthM: halfDepth },
+
     toScene([lat, lng]) {
       return {
         x: (mercatorX(lng) - cx) * scale,
@@ -266,6 +270,79 @@ export interface WaterSurface {
   polygons: WaterPolygon[];
 }
 
+/**
+ * Einen Ring an einer achsparallelen Halbebene abschneiden (Sutherland-Hodgman).
+ *
+ * Der Rahmen ist konvex, deshalb reichen vier solche Schnitte nacheinander.
+ */
+const clipHalfPlane = (
+  ring: ScenePoint[],
+  inside: (point: ScenePoint) => boolean,
+  cut: (a: ScenePoint, b: ScenePoint) => ScenePoint
+): ScenePoint[] => {
+  const out: ScenePoint[] = [];
+  for (let i = 0; i < ring.length; i += 1) {
+    const current = ring[i];
+    const previous = ring[(i + ring.length - 1) % ring.length];
+    const currentIn = inside(current);
+    const previousIn = inside(previous);
+    if (currentIn) {
+      if (!previousIn) out.push(cut(previous, current));
+      out.push(current);
+    } else if (previousIn) {
+      out.push(cut(previous, current));
+    }
+  }
+  return out;
+};
+
+/**
+ * Einen Ring auf den Ausschnitt zuschneiden.
+ *
+ * Eine Flutfläche endet nicht am Kartenrand — sie ist über einen Umkreis
+ * gerechnet, der weit über den Ausschnitt hinausgehen kann. Ungeschnitten
+ * spannte sie die Szene auf, ohne dass dabei mehr zu sehen wäre: das Gelände
+ * hört am Rand des Netzes auf, das Wasser liefe ins Leere weiter, und der Blick
+ * zöge sich auf einen blauen Fleck zurück.
+ */
+export function clipRingToExtent(
+  ring: ScenePoint[],
+  halfWidthM: number,
+  halfDepthM: number
+): ScenePoint[] {
+  const lerp = (a: ScenePoint, b: ScenePoint, t: number): ScenePoint => ({
+    x: a.x + (b.x - a.x) * t,
+    z: a.z + (b.z - a.z) * t,
+  });
+  let out = ring;
+  const edges: [
+    (point: ScenePoint) => boolean,
+    (a: ScenePoint, b: ScenePoint) => ScenePoint,
+  ][] = [
+    [
+      (p) => p.x >= -halfWidthM,
+      (a, b) => lerp(a, b, (-halfWidthM - a.x) / (b.x - a.x)),
+    ],
+    [
+      (p) => p.x <= halfWidthM,
+      (a, b) => lerp(a, b, (halfWidthM - a.x) / (b.x - a.x)),
+    ],
+    [
+      (p) => p.z >= -halfDepthM,
+      (a, b) => lerp(a, b, (-halfDepthM - a.z) / (b.z - a.z)),
+    ],
+    [
+      (p) => p.z <= halfDepthM,
+      (a, b) => lerp(a, b, (halfDepthM - a.z) / (b.z - a.z)),
+    ],
+  ];
+  for (const [inside, cut] of edges) {
+    if (!out.length) return [];
+    out = clipHalfPlane(out, inside, cut);
+  }
+  return out;
+}
+
 /** Fläche eines Rings, Betrag. Nur zum Vergleich, nicht zum Anzeigen. */
 const ringArea = (ring: ScenePoint[]): number => {
   let sum = 0;
@@ -360,9 +437,16 @@ export function waterSurfaces(
     const wasserstand = item as Wasserstand;
     const levelM = wasserstandLevelM(wasserstand);
     if (levelM === undefined) continue;
-    const rings = wasserstandFlaeche(wasserstand).map((ring) =>
-      ring.map((position) => projector.toScene(position))
-    );
+    const { halfWidthM, halfDepthM } = projector.extent;
+    const rings = wasserstandFlaeche(wasserstand)
+      .map((ring) =>
+        clipRingToExtent(
+          ring.map((position) => projector.toScene(position)),
+          halfWidthM,
+          halfDepthM
+        )
+      )
+      .filter((ring) => ring.length >= 3);
     const polygons = ringPolygons(rings);
     if (!polygons.length) continue;
     out.push({

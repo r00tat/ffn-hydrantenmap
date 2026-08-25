@@ -11,7 +11,8 @@ import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useFirecallLayers } from '../../hooks/useFirecallLayers';
 import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import { useFirecallItems } from '../firebase/firestoreHooks';
@@ -19,8 +20,16 @@ import AddFirecallItem from './AddFirecallItem';
 import AiAssistantButton from './AiAssistantButton';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
-import { equidistanceForZoom } from './layers/hoehenlinien';
+import {
+  equidistanceForZoom,
+  HOEHENLINIEN_LAYER_NAME,
+} from './layers/hoehenlinien';
 import { availableLayers } from './tiles';
+import {
+  isOverlayVisible,
+  visibleItems,
+  type OverlayStates,
+} from './Gelaende3d/visibleItems';
 
 /**
  * Dynamisch geladen: `three` und die Szene liegen damit in einem eigenen
@@ -74,21 +83,37 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   } = useMapEditor();
   const canEdit = useMapEditorCanEdit();
   const firecallItems = useFirecallItems();
+  const firecallLayers = useFirecallLayers();
   const [show3d, setShow3d] = useState(false);
   const [baseLayerName, setBaseLayerName] = useState(
     Object.values(availableLayers)[0]?.name
   );
+  const [overlays, setOverlays] = useState<OverlayStates>({});
 
-  // Der aktive Grundlayer steht nur an der Layer-Steuerung von Leaflet; die
-  // 3D-Ansicht braucht seinen Namen, um dieselben Kacheln als Textur zu holen.
+  // Grundlayer und Überlagerungen stehen nur an Leaflets Layer-Steuerung. Die
+  // 3D-Ansicht braucht den Grundlayer für die Textur und die Überlagerungen,
+  // um dieselbe Lage zu zeigen wie die Karte — sonst wären es zwei Lagebilder.
   useEffect(() => {
     const onBaseLayer = (event: L.LayersControlEvent) =>
       setBaseLayerName(event.name);
+    const onOverlay = (visible: boolean) => (event: L.LayersControlEvent) =>
+      setOverlays((prev) => ({ ...prev, [event.name]: visible }));
+    const onAdd = onOverlay(true);
+    const onRemove = onOverlay(false);
     map.on('baselayerchange', onBaseLayer as L.LeafletEventHandlerFn);
+    map.on('overlayadd', onAdd as L.LeafletEventHandlerFn);
+    map.on('overlayremove', onRemove as L.LeafletEventHandlerFn);
     return () => {
       map.off('baselayerchange', onBaseLayer as L.LeafletEventHandlerFn);
+      map.off('overlayadd', onAdd as L.LeafletEventHandlerFn);
+      map.off('overlayremove', onRemove as L.LeafletEventHandlerFn);
     };
   }, [map]);
+
+  const items3d = useMemo(
+    () => visibleItems(firecallItems, firecallLayers, overlays),
+    [firecallItems, firecallLayers, overlays]
+  );
 
   return (
     <>
@@ -196,8 +221,13 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           }}
           zoom={map.getZoom()}
           baseLayerName={baseLayerName}
-          items={firecallItems}
+          items={items3d}
           equidistanceM={equidistanceForZoom(map.getZoom())}
+          showContours={isOverlayVisible(
+            HOEHENLINIEN_LAYER_NAME,
+            overlays,
+            false
+          )}
         />
       )}
     </>

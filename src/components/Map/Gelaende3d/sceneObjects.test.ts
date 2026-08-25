@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mercatorX, mercatorY } from '../../../common/terrain/terrainMesh';
 import type { TerrainMesh } from '../../../common/terrain/terrainTypes';
 import {
+  clipRingToExtent,
   contourLabels,
   contourPaths,
   markerPlacements,
@@ -259,5 +260,40 @@ describe('contourLabels', () => {
     const projector = sceneProjector(testMesh());
     const labels = contourLabels([line(115)], projector, 1);
     expect(labels[0].heightM).toBe(115);
+  });
+});
+
+describe('clipRingToExtent', () => {
+  it('lässt einen Ring innerhalb des Rahmens unverändert', () => {
+    const ring = [
+      { x: -10, z: -10 },
+      { x: 10, z: -10 },
+      { x: 10, z: 10 },
+    ];
+    expect(clipRingToExtent(ring, 100, 100)).toEqual(ring);
+  });
+
+  it('schneidet einen Ring auf den Rahmen zu', () => {
+    // Ein Ring, der weit über den Ausschnitt hinausreicht.
+    const ring = [
+      { x: -1000, z: -1000 },
+      { x: 1000, z: -1000 },
+      { x: 1000, z: 1000 },
+      { x: -1000, z: 1000 },
+    ];
+    const clipped = clipRingToExtent(ring, 50, 30);
+    expect(clipped.every((p) => Math.abs(p.x) <= 50 + 1e-9)).toBe(true);
+    expect(clipped.every((p) => Math.abs(p.z) <= 30 + 1e-9)).toBe(true);
+    // Aus dem großen Ring wird genau der Rahmen.
+    expect(clipped).toHaveLength(4);
+  });
+
+  it('lässt einen Ring ganz außerhalb verschwinden', () => {
+    const ring = [
+      { x: 500, z: 500 },
+      { x: 600, z: 500 },
+      { x: 600, z: 600 },
+    ];
+    expect(clipRingToExtent(ring, 100, 100)).toHaveLength(0);
   });
 });
