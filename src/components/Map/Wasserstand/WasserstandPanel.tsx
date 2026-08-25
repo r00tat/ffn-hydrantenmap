@@ -28,12 +28,15 @@ export interface WasserstandPanelProps {
   item: Wasserstand;
   open: boolean;
   onClose: () => void;
+  /** Gerade angelegt: einmal von selbst rechnen. */
+  autoStart?: boolean;
 }
 
 export default function WasserstandPanel({
   item,
   open,
   onClose,
+  autoStart,
 }: WasserstandPanelProps) {
   const t = useTranslations('wasserstand');
   const theme = useTheme();
@@ -101,7 +104,9 @@ export default function WasserstandPanel({
           </Tooltip>
         </Box>
 
-        {!collapsed && <WasserstandRechner item={item} />}
+        {!collapsed && (
+          <WasserstandRechner item={item} autoStart={autoStart} />
+        )}
       </Paper>
     </Portal>
   );

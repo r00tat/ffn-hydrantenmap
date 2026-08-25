@@ -108,6 +108,7 @@ async function handle(request: TerrainRequest): Promise<void> {
           request.level,
           {
             abort,
+            maxRadiusM: request.maxRadiusM,
             onProgress: ({ blocks, cells }) =>
               post({
                 id: request.id,

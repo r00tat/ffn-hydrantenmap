@@ -82,6 +82,26 @@ Fehlgriff. Genau dafür gibt es zwei Rückmeldungen: `seedAboveLevel`, wenn scho
 über `h` liegt, und die Warnung „Saatpunkt liegt vermutlich nicht im Gewässer" unter
 `MIN_PLAUSIBLE_CELLS` = 3 Zellen.
 
+## 2a. Was beim Anlegen passiert
+
+Die Basishöhe wird **beim Anlegen** abgetastet, nicht erst beim ersten Blick in den Rechner.
+Ohne das stand dort „Für den Saatpunkt liegt keine Geländehöhe vor" — auf einen Punkt, der
+gerade gesetzt wurde. Die Höhe lag vor, sie war nur niemandem abgefragt worden. Die Abfrage
+steckt in `wasserstandBasis` und wird von allen drei Wegen benutzt, auf denen ein Punkt
+entsteht oder sich bewegt: Karte, Seite „Hochwasser", Verschieben des Markers.
+
+Liefert das Höhenmodell nichts — offline, jenseits der Landesgrenze —, wird das Element
+**trotzdem** angelegt; der Rechner bietet dann „Basishöhe neu bestimmen" an. Es gar nicht
+anzulegen wäre der schlechtere Tausch.
+
+Danach öffnet sich der Rechner von selbst und rechnet einmal. Sonst muss man den eben
+gesetzten Marker erst anklicken und im Popup ein Symbol treffen — drei Klicks für etwas, das
+man mit dem Setzen des Punktes schon verlangt hat.
+
+Das Merkmal „gerade angelegt" ist **clientlokal und flüchtig**, kein Feld am Element. Am
+Element würde es auf jedem Gerät, das die Karte öffnet, einen Lauf auslösen und dabei Kacheln
+laden. Gerechnet wird beim Anlegen, und zwar dort, wo angelegt wurde.
+
 ## 3. Warum die Basishöhe gespeichert wird
 
 `wasserBasisHoehe` und `wasserBasisStufe` stehen am Element, nicht nur im Speicher des
@@ -265,6 +285,30 @@ Mosaik über die ganze Fläche wären bei 120 km² und 1 m Raster rund 480 MB; s
 ein Fenster von (blockPx+1)² im Speicher, und weil die Segmente in globalen Koordinaten
 entstehen, verkettet `chainSegments` über Blockkanten hinweg.
 
+**Warum die Ringe von selbst geschlossen sein müssen.** Ein Fenster deckt die
+Marching-Squares-Zellen ab, deren **nordwestlicher** Stützpunkt in seinem Block liegt — daher
+die Überlappung nach Ost und Süd. Die Grenze am West- und Nordrand des gefluteten Bereichs
+liegt damit in den Fenstern der westlichen und nördlichen Nachbarn. Fehlen die — jenseits der
+Landesgrenze, am Rechenbudget abgebrochen, Kachel nicht geladen —, fehlt dieses Randstück: Der
+Höhenzug bleibt offen, und ein offener Zug, dessen Enden verbunden werden, ist auf der Karte
+eine **gerade Sehne quer über das Gelände**, entgegen jeder Höhenlinie. Genau das war zu
+sehen: eine Wasserfläche, die an der Kante geradlinig den Hang hinauflief.
+
+Zwei Dinge stellen das ab:
+
+1. Die Fenster werden **auch über die West-, Nord- und Nordwest-Nachbarn** der gefluteten
+   Blöcke gelegt, auch wenn es diese Blöcke gar nicht gibt. Jede Zelle bleibt dabei in genau
+   einem Fenster — doppelte Segmente würden die Verkettung zerstören.
+2. Was nicht gelesen werden kann — fehlender Block, `nodata` —, gilt in dieser Stufe als
+   **trocken** und nicht als „keine Daten". Damit überspringt Marching Squares die Zelle
+   nicht, sondern legt die Grenze auf die Zellkante: Die Fläche endet dort, wo die Daten
+   enden, und das ist die Wahrheit. Dass sie größer sein kann, steht als Warnung daneben.
+
+Auf einem so vollständigen Gitter liefert Marching Squares nur geschlossene Ringe. Bleibt doch
+einer offen, ist das ein Fehler und keine Datenlage: Er wird nur bei einer Lücke von wenigen
+Zellen geschlossen (Rundungsrauschen der Verkettung) und sonst **verworfen**. Eine falsche
+Fläche ist schlimmer als eine fehlende.
+
 ## 11. Die Budgets und was am Budget passiert
 
 | Stufe | Budget | Fläche | Datenmenge |
@@ -288,6 +332,34 @@ Wird das Budget erreicht, steht `wasserAbbruch: 'budget'` am Element, und Panel 
 sagen „Fläche am Rechenbudget abgeschnitten — sie ist möglicherweise größer." Eine
 abgeschnittene Fläche, die wie eine vollständige aussieht, wäre eine falsche Aussage über das
 Einsatzgebiet.
+
+## 11a. Der Umkreis
+
+Neben dem Rechenbudget gibt es einen **Umkreis** um den Saatpunkt
+(`wasserRadius`, Vorbelegung 3 km, `0` heißt unbegrenzt).
+
+Der Grund ist eine Eigenschaft der Badewanne, die in der Lage sofort auffällt:
+**sie läuft über ein Seebecken hinweg weiter.** Der Neusiedler See liegt unter jedem
+Hochwasserstand seiner Zuflüsse; eine Füllung, die einen Zufluss als Saatpunkt hat, füllt erst
+den See und wächst dann an seinem gegenüberliegenden Ufer weiter. Fachlich ist das nicht
+falsch — bei diesem Wasserstand *wäre* das alles Wasser —, aber es ist nicht die Frage, die
+gestellt wurde, und es kostet das gesamte Kachelbudget für Flächen, die niemand ansieht.
+
+Das Rechenbudget begrenzt zwar auch, aber in **Kacheln**, und eine Kachelzahl ist keine
+Aussage über das Einsatzgebiet: welcher Teil der Fläche fehlt, hängt davon ab, in welcher
+Reihenfolge die Suche gelaufen ist. Ein Umkreis ist dagegen eine Angabe, die im Einsatz zur
+Hand ist und deren Wirkung man ansieht.
+
+Zwei Stellen prüfen ihn, und die zweite ist die wichtigere:
+
+- **je Zelle**, vor dem Fluten — so endet die Fläche genau am Umkreis;
+- **je Block**, vor dem Laden — liegt schon die nächstgelegene Ecke eines Blockrechtecks
+  außerhalb, wird die Kachel nicht geholt. Das ist der eigentliche Gewinn: nicht nur eine
+  kleinere Fläche, sondern weniger Daten.
+
+Ein am Umkreis abgeschnittenes Ergebnis trägt `wasserAbbruch: 'radius'` und wird als Hinweis
+ausgewiesen — nicht als Fehler, denn die Begrenzung war gewollt. Der Umkreis steckt in der
+Signatur: eine andere Reichweite ist eine andere Fläche.
 
 ## 12. Die Grenze des konstanten Wasserspiegels
 
@@ -332,6 +404,14 @@ Das Ergebnis wird auf 0,1 m gerundet — die Schrittweite des Höhenreglers. Ein
 Über der Reichweite des Reglers (2 m) wird **gewarnt, nicht gekappt**: „Wassertiefe plus
 Freibord übersteigt 2 m — ein Sandsackverbau ist hier das falsche Mittel." Auf 2 m zu kappen
 hieße, eine unhaltbare Zahl als haltbar auszugeben.
+
+**Die Tiefe im Popup schlägt die Stufe.** Klickt man in die Fläche, nennt das Popup die
+Tiefenstufe **aus der gemessenen Tiefe**, nicht aus dem angeklickten Polygon. Die Polygone
+sind ausgedünnt, und kleine Ringe der tieferen Stufen fallen unter die Mindestfläche — dann
+liegt der Klick im Ring einer flacheren Stufe, während die Tiefe an der Stelle größer ist.
+Beides nebeneinander zu zeigen ergab einen Widerspruch im selben Popup („für PKW nicht
+befahrbar (0,3–0,7 m)" neben „Tiefe an dieser Stelle 1,10 m"). Die Messung ist die genauere
+Aussage; die Stufe des Polygons gilt nur, wenn keine Messung möglich war.
 
 **Herkunft.** `dammHoeheQuelle: 'wasserstand'` und `dammWasserstandId` stehen am Element und
 überleben einen Neustart; die Materialanforderung im Einsatztagebuch trägt „(aus

@@ -44,9 +44,9 @@ export interface LaufState {
 export interface WasserstandLauf {
   state: LaufState;
   /** Grober Lauf, danach automatisch fein, wenn die Fläche klein genug ist. */
-  start(item: Wasserstand, zuschlag: number): Promise<void>;
+  start(item: Wasserstand, zuschlag: number, radiusM: number): Promise<void>;
   /** Feinlauf von Hand, wenn die Fläche über der Schwelle lag. */
-  refine(item: Wasserstand, zuschlag: number): Promise<void>;
+  refine(item: Wasserstand, zuschlag: number, radiusM: number): Promise<void>;
   abort(): void;
   reset(): void;
 }
@@ -60,6 +60,7 @@ export default function useWasserstandLauf(): WasserstandLauf {
     async (
       item: Wasserstand,
       zuschlag: number,
+      radiusM: number,
       levelId: TerrainLevelId
     ): Promise<FloodSummary | undefined> => {
       const basis = item.wasserBasisHoehe;
@@ -77,18 +78,20 @@ export default function useWasserstandLauf(): WasserstandLauf {
       const heightM = basis + zuschlag;
       setState({ phase: 'running', level: levelId });
 
-      const handle = terrainClient().flood(
-        seed,
-        heightM,
-        levelId,
-        (progress) =>
-          setState((previous) => ({ ...previous, progress, level: levelId }))
-      );
+      const handle = terrainClient().flood(seed, heightM, levelId, {
+        maxRadiusM: radiusM,
+        onProgress: (progress) =>
+          setState((previous) => ({ ...previous, progress, level: levelId })),
+      });
       abortRef.current = handle.abort;
 
       try {
         const summary = await handle.result;
-        const draft: Wasserstand = { ...item, wasserZuschlag: zuschlag };
+        const draft: Wasserstand = {
+          ...item,
+          wasserZuschlag: zuschlag,
+          wasserRadius: radiusM,
+        };
         const gerechnet: Wasserstand = {
           ...draft,
           wasserBaender: serialiseWasserBaender(summary.baender),
@@ -124,19 +127,24 @@ export default function useWasserstandLauf(): WasserstandLauf {
   );
 
   const start = useCallback(
-    async (item: Wasserstand, zuschlag: number) => {
-      const coarse = await run(item, zuschlag, 'overview');
+    async (item: Wasserstand, zuschlag: number, radiusM: number) => {
+      const coarse = await run(item, zuschlag, radiusM, 'overview');
       if (!coarse || coarse.cells === 0) return;
       if (coarse.areaM2 <= AUTO_DETAIL_MAX_M2) {
-        await run({ ...item, wasserZuschlag: zuschlag }, zuschlag, 'detail');
+        await run(
+          { ...item, wasserZuschlag: zuschlag, wasserRadius: radiusM },
+          zuschlag,
+          radiusM,
+          'detail'
+        );
       }
     },
     [run]
   );
 
   const refine = useCallback(
-    async (item: Wasserstand, zuschlag: number) => {
-      await run(item, zuschlag, 'detail');
+    async (item: Wasserstand, zuschlag: number, radiusM: number) => {
+      await run(item, zuschlag, radiusM, 'detail');
     },
     [run]
   );

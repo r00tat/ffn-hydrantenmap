@@ -59,6 +59,14 @@ export const SIMPLIFY_STEPS_CELLS = [0.5, 1, 2, 4, 8];
 /** Trockene Zellen werden auf diesen Wert gedeckelt. Siehe oben. */
 const DRY_CAP_M = -0.01;
 
+/**
+ * Größte Lücke, die noch als Rundungsfehler der Verkettung gilt.
+ *
+ * `chainSegments` rastert die Endpunkte auf ein Tausendstel Zelle; zwei
+ * Zellen sind weit jenseits davon und damit ein echtes Loch im Gitter.
+ */
+const MAX_CHAIN_GAP_CELLS = 2;
+
 export interface FloodBand {
   tiefeM: number;
   ringe: LatLngPosition[][];
@@ -180,10 +188,18 @@ export async function floodBands(
     col: number,
     row: number
   ): number => {
-    if (!block) return Number.NaN;
+    // Unlesbar heißt **trocken**, nicht „keine Daten".
+    //
+    // Mit `NaN` überspringt Marching Squares die Zelle, der Höhenzug bleibt
+    // offen, und ein offener Zug wurde unten durch Verbinden der Enden
+    // geschlossen — eine gerade Sehne quer über das Gelände, entgegen jeder
+    // Höhenlinie. Als trocken gelesen schließt sich der Ring an der
+    // Zellkante: Die Fläche endet dort, wo die Daten enden, und das ist die
+    // Wahrheit. Dass sie größer sein kann, steht als Warnung daneben.
+    if (!block) return DRY_CAP_M;
     const cell = row * px + col;
     const height = decodeHeight(block.heights[cell], level);
-    if (height === undefined) return Number.NaN;
+    if (height === undefined) return DRY_CAP_M;
     const raw = waterLevelM - height;
     const flooded =
       tile !== undefined &&
@@ -199,10 +215,7 @@ export async function floodBands(
    * indiziert. Ein Nachschlagen je Zelle wäre bei 1000 × 1000 eine Million
    * Suchen je Block.
    */
-  const buildWindow = async (
-    tile: FloodTile
-  ): Promise<DepthWindow | undefined> => {
-    const ref = tile.ref;
+  const buildWindow = async (ref: BlockRef): Promise<DepthWindow | undefined> => {
     const eastRef: BlockRef = { ...ref, e: ref.e + ref.sizeM };
     const southRef: BlockRef = { ...ref, n: ref.n - ref.sizeM };
     const southEastRef: BlockRef = {
@@ -217,7 +230,10 @@ export async function floodBands(
       source.block(fill.levelId, southRef),
       source.block(fill.levelId, southEastRef),
     ]);
-    if (!self) return undefined;
+    // **Nicht** `if (!self) return`: Ein Fenster über einem Block, den es nicht
+    // gibt, trägt in seiner Überlappungsspalte die Zellen des geflutenen
+    // Nachbarn — und genau dort verläuft die Grenze, die sonst fehlte.
+    if (!self && !east && !south && !southEast) return undefined;
 
     const selfTile = fill.blocks.get(blockId(ref));
     const eastTile = fill.blocks.get(blockId(eastRef));
@@ -259,11 +275,47 @@ export async function floodBands(
   const segments = new Map<number, ContourSegment[]>();
   for (const depth of BAND_DEPTHS_M) segments.set(depth, []);
 
-  const tiles = [...fill.blocks.values()];
+  /**
+   * Die Blöcke, über die ein Fenster gelegt wird.
+   *
+   * Ein Fenster deckt die Marching-Squares-Zellen ab, deren **nordwestlicher**
+   * Stützpunkt in seinem Block liegt — daher die Überlappung nach Ost und Süd.
+   * Die Grenze am **West**- und **Nordrand** des gefluteten Bereichs liegt
+   * damit in den Fenstern der westlichen und nördlichen Nachbarn. Fehlen die
+   * — jenseits der Landesgrenze, am Rechenbudget abgebrochen, Kachel nicht
+   * geladen —, fehlte bisher dieses Randstück, der Höhenzug blieb offen und
+   * wurde mit einer geraden Sehne geschlossen.
+   *
+   * Deshalb werden sie mitgenommen: Selbst, West, Nord und Nordwest. Jede
+   * Zelle bleibt dabei in **genau einem** Fenster, doppelte Segmente würden
+   * die Verkettung zerstören.
+   */
+  const windowRefs = (): BlockRef[] => {
+    const wanted = new Map<string, BlockRef>();
+    for (const tile of fill.blocks.values()) {
+      const { ref } = tile;
+      for (const [de, dn] of [
+        [0, 0],
+        [-1, 0],
+        [0, 1],
+        [-1, 1],
+      ] as const) {
+        const candidate: BlockRef = {
+          e: ref.e + de * ref.sizeM,
+          n: ref.n + dn * ref.sizeM,
+          sizeM: ref.sizeM,
+        };
+        wanted.set(blockId(candidate), candidate);
+      }
+    }
+    return [...wanted.values()];
+  };
+
+  const refs = windowRefs();
   let done = 0;
-  for (const tile of tiles) {
+  for (const ref of refs) {
     if (options.abort?.()) return empty;
-    const window = await buildWindow(tile);
+    const window = await buildWindow(ref);
     if (window) {
       const grid = (row: number, col: number): number | undefined => {
         const value = window.depth[row * window.size + col];
@@ -287,7 +339,7 @@ export async function floodBands(
       }
     }
     done += 1;
-    options.onProgress?.({ blocks: done, total: tiles.length });
+    options.onProgress?.({ blocks: done, total: refs.length });
   }
 
   // Ringe je Schwelle, ausgedünnt bis das Punktbudget passt.
@@ -302,13 +354,32 @@ export async function floodBands(
       const chains = chainSegments(segments.get(depth) as ContourSegment[]);
       const ringe: LatLngPosition[][] = [];
       for (const chain of chains) {
-        // Offene Züge entstehen nur am Rand des Modells oder am Budget — beides
-        // ist schon als „Fläche möglicherweise größer" gemeldet. Geschlossen
-        // werden sie durch Verbinden der Enden; ein offener Zug wäre als
-        // Fläche nicht zeichenbar.
-        const closedPoints = chain.closed
-          ? chain.points
-          : [...chain.points, chain.points[0]];
+        // Ein offener Zug **darf** hier nicht mehr auftreten: die Fenster
+        // decken jede Zelle am Rand des gefluteten Bereichs ab, und Unlesbares
+        // gilt als trocken — auf einem vollständigen Gitter liefert Marching
+        // Squares nur geschlossene Ringe.
+        //
+        // Bleibt doch einer offen, wird er nur geschlossen, wenn die Lücke
+        // wenige Zellen groß ist (Gleitkommarauschen in der Verkettung). Eine
+        // weite Lücke wird **verworfen**: sie mit einer Sehne zu schließen
+        // zeichnete eine Wasserfläche quer über trockenes Gelände, und eine
+        // falsche Fläche ist schlimmer als eine fehlende. Dass die Fläche
+        // größer sein kann, steht ohnehin als Warnung daneben.
+        let closedPoints = chain.points;
+        if (!chain.closed) {
+          const first = chain.points[0];
+          const last = chain.points[chain.points.length - 1];
+          const gap = Math.hypot(last.col - first.col, last.row - first.row);
+          if (gap > MAX_CHAIN_GAP_CELLS) {
+            console.warn(
+              `Wasserausbreitung: offener Höhenzug bei ${depth} m, ` +
+                `Lücke ${gap.toFixed(1)} Zellen — verworfen`
+            );
+            dropped += 1;
+            continue;
+          }
+          closedPoints = [...chain.points, first];
+        }
         if (ringAreaCells(closedPoints) * res * res < MIN_RING_AREA_M2) {
           dropped += 1;
           continue;

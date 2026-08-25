@@ -128,9 +128,9 @@ describe('createTerrainClient', () => {
     const fake = fakeWorker();
     const client = createTerrainClient(fake.worker);
     const progress: FloodProgress[] = [];
-    const handle = client.flood([47.9, 16.8], 100, 'overview', (p) =>
-      progress.push(p)
-    );
+    const handle = client.flood([47.9, 16.8], 100, 'overview', {
+      onProgress: (p) => progress.push(p),
+    });
 
     const id = (fake.sent[0] as { id: number }).id;
     fake.reply({

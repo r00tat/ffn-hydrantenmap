@@ -9,12 +9,15 @@ import Slider from '@mui/material/Slider';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LatLngPosition } from '../../../common/geo';
 import { terrainClient } from '../../../common/terrain/terrainClient';
 import {
   AUTO_DETAIL_MAX_M2,
   MIN_PLAUSIBLE_CELLS,
+  RADIUS_MAX,
+  RADIUS_MIN,
+  RADIUS_STEP,
   wasserstandParams,
   wasserstandStale,
   ZUSCHLAG_MAX,
@@ -25,6 +28,7 @@ import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
 import useWasserstandLauf from '../../../hooks/useWasserstandLauf';
 import type { Wasserstand } from '../../firebase/firestore';
 import { parseNumber, round } from '../panelNumbers';
+import { wasserstandBasis } from './wasserstandAnlegen';
 import WasserstandLegende from './WasserstandLegende';
 
 /**
@@ -45,14 +49,25 @@ const DETAIL_TILE_MB = 0.35;
 
 export interface WasserstandRechnerProps {
   item: Wasserstand;
+  /**
+   * Gerade angelegt: einmal von selbst rechnen.
+   *
+   * Nur beim Anlegen und nur auf dem Gerät, das angelegt hat — sonst würde
+   * jedes Gerät, das die Karte öffnet, Kacheln nachladen.
+   */
+  autoStart?: boolean;
 }
 
-export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
+export default function WasserstandRechner({
+  item,
+  autoStart,
+}: WasserstandRechnerProps) {
   const t = useTranslations('wasserstand');
   const updateItem = useFirecallItemUpdate();
   const lauf = useWasserstandLauf();
   const params = useMemo(() => wasserstandParams(item), [item]);
   const [zuschlag, setZuschlag] = useState(params.zuschlag);
+  const [radius, setRadius] = useState(params.radiusM);
   const [adria, setAdria] = useState<number>();
 
   const levelM =
@@ -95,22 +110,29 @@ export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
 
   const redetermineBase = useCallback(async () => {
     if (!seed) return;
-    try {
-      const [sample] = await terrainClient().sample([seed]);
-      if (!sample) return;
-      const updated: Wasserstand = {
-        ...item,
-        wasserBasisHoehe: sample.heightM,
-        wasserBasisStufe: sample.level,
-      };
-      await updateItem(updated);
-    } catch (err) {
-      console.error('Basishöhe konnte nicht bestimmt werden', err);
-    }
+    const basis = await wasserstandBasis(seed);
+    if (!basis) return;
+    await updateItem({ ...item, ...basis });
   }, [item, seed, updateItem]);
 
   const summary = lauf.state.summary;
   const running = lauf.state.phase === 'running';
+
+  /**
+   * Der Lauf beim Anlegen — genau einmal.
+   *
+   * Der Wächter ist ein Ref und keine Abhängigkeit: `lauf` ist bei jedem
+   * Rendern ein neues Objekt, und ein Effekt, der daran hängt, würde in einer
+   * Schleife rechnen.
+   */
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoDone.current) return;
+    if (params.basisHoehe === undefined || item.wasserBaender) return;
+    autoDone.current = true;
+    void lauf.start(item, zuschlag, radius);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, params.basisHoehe, item.wasserBaender]);
   const detailTiles = Math.max(
     1,
     Math.round((item.wasserFlaecheM2 ?? 0) / 1_000_000)
@@ -169,6 +191,36 @@ export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
           />
         </Box>
 
+        <Typography variant="subtitle2" sx={{ mt: 1.5 }} gutterBottom>
+          {t('radius')}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Slider
+            value={radius}
+            min={RADIUS_MIN}
+            max={RADIUS_MAX}
+            step={RADIUS_STEP}
+            valueLabelDisplay="auto"
+            valueLabelFormat={(value: number) =>
+              value === 0 ? t('radiusUnlimited') : `${(value / 1000).toFixed(1)} km`
+            }
+            onChange={(_event, value) => setRadius(value as number)}
+            sx={{ flexGrow: 1 }}
+          />
+          <TextField
+            size="small"
+            value={radius}
+            onChange={(event) =>
+              setRadius(round(parseNumber(event.target.value, radius), 0))
+            }
+            sx={{ width: 110 }}
+            slotProps={{ htmlInput: { 'aria-label': t('radius') } }}
+          />
+        </Box>
+        <Typography variant="caption" color="text.secondary" component="div">
+          {radius === 0 ? t('radiusUnlimitedHint') : t('radiusHint')}
+        </Typography>
+
         {levelM !== undefined && (
           <Typography variant="body2" color="text.secondary" component="div">
             {t('waterLevel', { value: levelM.toFixed(2) })}
@@ -226,6 +278,14 @@ export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
             </Alert>
           )}
 
+        {item.wasserAbbruch === 'radius' && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            {t('warnRadius', {
+              value: ((item.wasserRadius ?? 0) / 1000).toFixed(1),
+            })}
+          </Alert>
+        )}
+
         {wasserstandStale(item) && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             {t('stale')}
@@ -254,7 +314,7 @@ export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
                   variant="outlined"
                   sx={{ mt: 1 }}
                   disabled={running}
-                  onClick={() => void lauf.refine(item, zuschlag)}
+                  onClick={() => void lauf.refine(item, zuschlag, radius)}
                 >
                   {t('refine')} —{' '}
                   {t('refineCost', {
@@ -290,7 +350,7 @@ export default function WasserstandRechner({ item }: WasserstandRechnerProps) {
         <Button
           variant="contained"
           disabled={running || params.basisHoehe === undefined || !seed}
-          onClick={() => void lauf.start(item, zuschlag)}
+          onClick={() => void lauf.start(item, zuschlag, radius)}
         >
           {running ? t('computing') : t('compute')}
         </Button>

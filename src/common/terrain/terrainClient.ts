@@ -44,6 +44,12 @@ const PREFETCH_TIMEOUT_MIN_MS = 60_000;
  */
 const FLOOD_IDLE_TIMEOUT_MS = 30_000;
 
+export interface FloodOptions {
+  /** Umkreis um den Saatpunkt in m; 0 oder fehlend heißt unbegrenzt. */
+  maxRadiusM?: number;
+  onProgress?: (progress: FloodProgress) => void;
+}
+
 export interface FloodHandle {
   result: Promise<FloodSummary>;
   /** Bricht den Lauf ab; `result` wird mit `aborted` abgelehnt. */
@@ -66,7 +72,7 @@ export interface TerrainClient {
     seed: LatLngPosition,
     heightM: number,
     levelId: TerrainLevelId,
-    onProgress?: (progress: FloodProgress) => void
+    options?: FloodOptions
   ): FloodHandle;
   /** Zuschlag EVRF2000 → müA, `null` außerhalb des Gitters. */
   adria(positions: LatLngPosition[]): Promise<(number | null)[]>;
@@ -229,15 +235,21 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
       return response.blockIds;
     },
 
-    flood(seed, heightM, levelId, onProgress) {
+    flood(seed, heightM, levelId, options) {
       // Die Nummer, die `send` als nächste vergibt. Der Abbruch muss sie
       // kennen, bevor die Antwort da ist — deshalb hier gelesen und nicht
       // aus dem Ergebnis genommen.
       const id = nextId;
       const result = send(
-        { op: 'flood', seed, heightM, level: levelId },
+        {
+          op: 'flood',
+          seed,
+          heightM,
+          level: levelId,
+          maxRadiusM: options?.maxRadiusM,
+        },
         FLOOD_IDLE_TIMEOUT_MS,
-        onProgress
+        options?.onProgress
       ).then((response) => {
         if (!response.ok || response.op !== 'flood') throw unexpected(response);
         return response.result;

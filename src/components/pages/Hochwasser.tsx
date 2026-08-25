@@ -15,12 +15,12 @@ import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { terrainClient } from '../../common/terrain/terrainClient';
 import { wasserstandStale } from '../../common/terrain/wasserstand';
 import { defaultPosition } from '../../hooks/constants';
 import { useFirecall } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import useWasserstandSzenarien from '../../hooks/useWasserstandSzenarien';
+import { wasserstandBasis } from '../Map/Wasserstand/wasserstandAnlegen';
 import WasserstandMap from '../Map/Wasserstand/WasserstandMap';
 import WasserstandRechner from '../Map/Wasserstand/WasserstandRechner';
 import { usePositionContext } from '../providers/PositionProvider';
@@ -74,6 +74,15 @@ function HochwasserInhalt() {
     [szenarien, selectedId]
   );
 
+  /**
+   * Das eben angelegte Element: dort rechnet der Rechner von selbst.
+   *
+   * Hier steht die Id beim Anlegen zur Hand — das clientlokale Merkmal aus
+   * `wasserstandAnlegen` braucht nur die Karte, wo das Element erst über den
+   * Firestore-Listener ankommt.
+   */
+  const [autoStart, setAutoStart] = useState<string>();
+
   return (
     <Box
       sx={{
@@ -109,25 +118,7 @@ function HochwasserInhalt() {
             sx={{ mt: 1 }}
             onClick={async () => {
               const centre = position ?? defaultPosition;
-              let basis:
-                | { wasserBasisHoehe: number; wasserBasisStufe: string }
-                | undefined;
-              try {
-                const [sample] = await terrainClient().sample([
-                  [centre.lat, centre.lng],
-                ]);
-                if (sample) {
-                  basis = {
-                    wasserBasisHoehe: sample.heightM,
-                    wasserBasisStufe: sample.level,
-                  };
-                }
-              } catch (err) {
-                // Ohne Höhenmodell wird das Element trotzdem angelegt: der
-                // Rechner bietet „Basishöhe neu bestimmen" an, sobald es da
-                // ist. Es gar nicht anzulegen wäre der schlechtere Tausch.
-                console.warn('Basishöhe beim Anlegen nicht verfügbar', err);
-              }
+              const basis = await wasserstandBasis([centre.lat, centre.lng]);
               const created = await addItem({
                 type: 'wasserstand',
                 name: t('layerName'),
@@ -136,7 +127,10 @@ function HochwasserInhalt() {
                 datum: new Date().toISOString(),
                 ...(basis ?? {}),
               });
-              if (created?.id) setSelectedId(created.id);
+              if (created?.id) {
+                setSelectedId(created.id);
+                setAutoStart(created.id);
+              }
             }}
           >
             {t('drawSeed')}
@@ -182,7 +176,10 @@ function HochwasserInhalt() {
 
         {selected && (
           <Box sx={{ minHeight: 0, flexGrow: 1, display: 'flex' }}>
-            <WasserstandRechner item={selected} />
+            <WasserstandRechner
+              item={selected}
+              autoStart={autoStart === selected.id}
+            />
           </Box>
         )}
       </Paper>

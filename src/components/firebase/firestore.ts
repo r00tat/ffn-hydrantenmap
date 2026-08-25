@@ -470,6 +470,14 @@ export interface Line extends MultiPointItem {
 export interface Wasserstand extends FirecallItem {
   /** Zuschlag in m über der Geländehöhe am Saatpunkt. */
   wasserZuschlag?: number;
+  /**
+   * Umkreis der Berechnung in m um den Saatpunkt. 0 heißt unbegrenzt.
+   *
+   * Eine Badewanne läuft über ein Seebecken hinaus weiter — der Neusiedler See
+   * liegt unter jedem Hochwasserstand seiner Zuflüsse. Der Umkreis grenzt die
+   * Rechnung auf den Bereich ein, um den es geht, und spart dabei Kacheln.
+   */
+  wasserRadius?: number;
   /** Geländehöhe am Saatpunkt in EVRF2000, beim Setzen abgetastet. */
   wasserBasisHoehe?: number;
   wasserBasisStufe?: string;

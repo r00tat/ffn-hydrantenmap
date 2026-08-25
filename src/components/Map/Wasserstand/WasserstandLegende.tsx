@@ -92,6 +92,17 @@ export default function WasserstandLegende({
           {t('staleShort')}
         </Typography>
       )}
+      {item.wasserAbbruch === 'radius' && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block' }}
+        >
+          {t('warnRadius', {
+            value: ((item.wasserRadius ?? 0) / 1000).toFixed(1),
+          })}
+        </Typography>
+      )}
       {item.wasserAbbruch === 'budget' && (
         <Typography variant="caption" color="error" sx={{ display: 'block' }}>
           {t('warnBudget')}

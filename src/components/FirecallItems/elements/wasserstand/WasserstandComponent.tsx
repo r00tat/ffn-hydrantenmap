@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Marker, Polygon, Popup } from 'react-leaflet';
 import type { LatLngPosition } from '../../../../common/geo';
 import { terrainClient } from '../../../../common/terrain/terrainClient';
@@ -23,9 +23,14 @@ import {
   bandColor,
   bandForDepth,
 } from '../../../Map/Wasserstand/wasserstandFarben';
+import {
+  istFrischAngelegt,
+  vergissFrischAngelegt,
+  wasserstandBasis,
+} from '../../../Map/Wasserstand/wasserstandAnlegen';
 import WasserstandPanel from '../../../Map/Wasserstand/WasserstandPanel';
 import { leafletIcons } from '../../icons';
-import { PopupNavigateButton } from '../FirecallItemBase';
+import { FirecallItemPopup } from '../FirecallItemBase';
 import type { FirecallWasserstand } from '../FirecallWasserstand';
 
 /**
@@ -69,8 +74,25 @@ export default function WasserstandComponent({
   const t = useTranslations('wasserstand');
   const editable = useMapEditable();
   const updateItem = useFirecallItemUpdate();
-  const [panelOpen, setPanelOpen] = useState(false);
+  /**
+   * Gerade angelegt heißt: Rechner auf und rechnen.
+   *
+   * Ohne das muss man den eben gesetzten Marker erst anklicken und dann im
+   * Popup das Symbol treffen — drei Klicks für etwas, das man mit dem Setzen
+   * des Punktes schon verlangt hat.
+   *
+   * Die Frage steckt im **Anfangswert** eines Zustands und nicht in einem
+   * Effekt: ein `setState` im Effekt löst eine zweite Renderrunde aus. Sie
+   * verbraucht dabei nichts — abgeräumt wird unten im Effekt, damit ein
+   * doppelt aufgerufenes Rendern zweimal dieselbe Antwort bekommt.
+   */
+  const [frisch] = useState(() => istFrischAngelegt(record.id));
+  const [panelOpen, setPanelOpen] = useState(frisch);
   const [depth, setDepth] = useState<number>();
+
+  useEffect(() => {
+    if (record.id) vergissFrischAngelegt(record.id);
+  }, [record.id]);
 
   const item = useMemo(() => record.data(), [record]);
   /**
@@ -129,15 +151,29 @@ export default function WasserstandComponent({
             <Popup>
               <b>{t('bandPopupTitle', { name: record.name || '' })}</b>
               <br />
-              {/* Der Schlüssel kommt aus der Tabelle und wird **nicht**
+              {/* Die Stufe kommt aus der **gemessenen** Tiefe, wenn eine
+                  vorliegt, und nur sonst aus dem angeklickten Polygon.
+                  Andernfalls widersprechen sich die beiden Zeilen: die
+                  Polygone sind ausgedünnt und kleine Ringe der tieferen
+                  Stufen fallen weg, der angeklickte Ring ist dann der einer
+                  flacheren Stufe als die Tiefe an der Stelle.
+
+                  Der Schlüssel kommt aus der Tabelle und wird **nicht**
                   zusammengesetzt: next-intl typisiert die Schlüssel statisch,
                   ein zusammengesetzter ist damit kein Schlüssel. Dieselbe
                   Regel wie bei den Bauweisen im Sandsackrechner. */}
-              {t(BAND_LABEL_KEYS[band.tiefeM] as 'band0')}
-              <br />
-              {depth !== undefined &&
-                bandForDepth(depth) !== undefined &&
-                t('exactDepth', { value: depth.toFixed(2) })}
+              {t(
+                BAND_LABEL_KEYS[
+                  (depth !== undefined ? bandForDepth(depth)?.tiefeM : undefined) ??
+                    band.tiefeM
+                ] as 'band0'
+              )}
+              {depth !== undefined && bandForDepth(depth) !== undefined && (
+                <>
+                  <br />
+                  {t('exactDepth', { value: depth.toFixed(2) })}
+                </>
+              )}
             </Popup>
           </Polygon>
         )
@@ -157,34 +193,25 @@ export default function WasserstandComponent({
           // trägt die Basishöhe) und wird als solches gekennzeichnet — nicht
           // stillschweigend nachgerechnet.
           dragend: async (event) => {
-            const position = (event.target as L.Marker).getLatLng();
-            let basis: { heightM: number; level: string } | undefined;
-            try {
-              const [sample] = await terrainClient().sample([
-                [position.lat, position.lng],
-              ]);
-              if (sample) {
-                basis = { heightM: sample.heightM, level: sample.level };
-              }
-            } catch {
-              basis = undefined;
-            }
+            const moved = (event.target as L.Marker).getLatLng();
+            const basis = await wasserstandBasis([moved.lat, moved.lng]);
             await updateItem({
               ...item,
-              lat: position.lat,
-              lng: position.lng,
-              ...(basis
-                ? {
-                    wasserBasisHoehe: basis.heightM,
-                    wasserBasisStufe: basis.level,
-                  }
-                : {}),
+              lat: moved.lat,
+              lng: moved.lng,
+              ...(basis ?? {}),
             });
           },
         }}
       >
-        <Popup>
-          <PopupNavigateButton lat={record.lat} lng={record.lng} />
+        {/* `FirecallItemPopup` und nicht ein blankes `Popup`: daran hängt der
+            Bearbeiten-Knopf, und über den Dialog wird auch gelöscht. Ohne ihn
+            war das Element weder zu bearbeiten noch zu löschen. */}
+        <FirecallItemPopup
+          onClick={() => selectItem(item)}
+          lat={position[0]}
+          lng={position[1]}
+        >
           <Tooltip title={t('openPanel')}>
             <IconButton
               sx={{ marginLeft: 'auto', float: 'right' }}
@@ -193,9 +220,7 @@ export default function WasserstandComponent({
               <WaterDropIcon />
             </IconButton>
           </Tooltip>
-          <b onDoubleClick={() => selectItem(item)}>
-            {record.name || t('layerName')}
-          </b>
+          <b>{record.name || t('layerName')}</b>
           <br />
           {record.info()}
           {stale && (
@@ -204,12 +229,13 @@ export default function WasserstandComponent({
               <i>{t('staleShort')}</i>
             </>
           )}
-        </Popup>
+        </FirecallItemPopup>
       </Marker>
 
       <WasserstandPanel
         item={item}
         open={panelOpen}
+        autoStart={frisch}
         onClose={() => setPanelOpen(false)}
       />
     </>

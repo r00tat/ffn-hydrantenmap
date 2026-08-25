@@ -33,6 +33,16 @@ export const WASSERSTAND_DEFAULTS = {
    * Frage im Einsatz gestellt wird („Pegel plus 50 cm").
    */
   zuschlag: 0.5,
+  /**
+   * 3 km Umkreis.
+   *
+   * Nicht unbegrenzt: Ohne Umkreis läuft die Füllung über den Neusiedler See
+   * hinweg weiter — der liegt unter jedem Hochwasserstand seiner Zuflüsse — und
+   * endet erst am Rechenbudget. Ein Budget in Kacheln ist aber keine Aussage
+   * über das Einsatzgebiet, ein Umkreis schon. 3 km deckt eine
+   * Ortsgebiets-Lage ab und lässt sich am Regler vergrößern.
+   */
+  radiusM: 3000,
   farbe: '#1565c0',
   deckkraft: 45,
 };
@@ -40,6 +50,11 @@ export const WASSERSTAND_DEFAULTS = {
 export const ZUSCHLAG_MIN = 0;
 export const ZUSCHLAG_MAX = 3;
 export const ZUSCHLAG_STEP = 0.1;
+
+/** Umkreis in m. `RADIUS_MIN` = 0 heißt „unbegrenzt". */
+export const RADIUS_MIN = 0;
+export const RADIUS_MAX = 20_000;
+export const RADIUS_STEP = 250;
 
 /** Ab dieser Fläche läuft die Feinrechnung nicht mehr von selbst. */
 export const AUTO_DETAIL_MAX_M2 = 15_000_000;
@@ -52,6 +67,8 @@ export const MIN_PLAUSIBLE_CELLS = 3;
 
 export interface WasserstandParams {
   zuschlag: number;
+  /** Umkreis in m; 0 heißt unbegrenzt. */
+  radiusM: number;
   basisHoehe?: number;
   basisStufe?: TerrainLevelId;
 }
@@ -67,6 +84,13 @@ export function wasserstandParams(item: Wasserstand): WasserstandParams {
     zuschlag: Math.max(
       ZUSCHLAG_MIN,
       numberOr(item.wasserZuschlag, WASSERSTAND_DEFAULTS.zuschlag)
+    ),
+    radiusM: Math.min(
+      RADIUS_MAX,
+      Math.max(
+        RADIUS_MIN,
+        numberOr(item.wasserRadius, WASSERSTAND_DEFAULTS.radiusM)
+      )
     ),
     basisHoehe:
       typeof item.wasserBasisHoehe === 'number' &&
@@ -109,6 +133,9 @@ export function wasserstandSignature(
     item.lng?.toFixed(6),
     params.basisHoehe?.toFixed(3) ?? '-',
     params.zuschlag.toFixed(3),
+    // Der Umkreis gehört in die Signatur: eine andere Reichweite ist eine
+    // andere Fläche.
+    params.radiusM.toFixed(0),
     levelId,
   ].join('|');
 }

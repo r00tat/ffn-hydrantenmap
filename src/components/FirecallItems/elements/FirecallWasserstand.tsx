@@ -26,6 +26,7 @@ import WasserstandComponent from './wasserstand/WasserstandComponent';
  */
 export class FirecallWasserstand extends FirecallItemBase {
   wasserZuschlag?: number;
+  wasserRadius?: number;
   wasserBasisHoehe?: number;
   wasserBasisStufe?: string;
   wasserBaender?: string;
@@ -48,6 +49,7 @@ export class FirecallWasserstand extends FirecallItemBase {
     this.type = 'wasserstand';
     ({
       wasserZuschlag: this.wasserZuschlag = WASSERSTAND_DEFAULTS.zuschlag,
+      wasserRadius: this.wasserRadius = WASSERSTAND_DEFAULTS.radiusM,
       wasserBasisHoehe: this.wasserBasisHoehe,
       wasserBasisStufe: this.wasserBasisStufe,
       wasserBaender: this.wasserBaender,
@@ -75,6 +77,7 @@ export class FirecallWasserstand extends FirecallItemBase {
     return {
       ...super.data(),
       wasserZuschlag: this.wasserZuschlag,
+      wasserRadius: this.wasserRadius,
       wasserBasisHoehe: this.wasserBasisHoehe,
       wasserBasisStufe: this.wasserBasisStufe,
       wasserBaender: this.wasserBaender,
@@ -102,6 +105,7 @@ export class FirecallWasserstand extends FirecallItemBase {
     return {
       ...super.fields(),
       wasserZuschlag: 'Zuschlag über Basishöhe (m)',
+      wasserRadius: 'Umkreis der Berechnung (m, 0 = unbegrenzt)',
       color: 'Farbe (HTML bzw. Englisch)',
       opacity: 'Deckkraft (in Prozent)',
     };
@@ -111,6 +115,7 @@ export class FirecallWasserstand extends FirecallItemBase {
     return {
       ...super.fieldTypes(),
       wasserZuschlag: 'number',
+      wasserRadius: 'number',
       opacity: 'number',
       color: 'color',
     };

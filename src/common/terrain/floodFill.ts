@@ -89,7 +89,7 @@ export interface FloodResult {
   /** Hülle der gefluteten Zellmitten in LAEA, `undefined` bei leerer Fläche. */
   bounds?: LaeaBounds;
   longestAxisM: number;
-  truncated: 'none' | 'budget';
+  truncated: 'none' | 'budget' | 'radius';
   /** Kacheln, die es laut Index gibt, die aber nicht geladen werden konnten. */
   missingBlocks: number;
   /** Kacheln jenseits der Modellabdeckung — der Rand des Modells. */
@@ -99,6 +99,16 @@ export interface FloodResult {
 
 export interface FloodOptions {
   budgetBlocks?: number;
+  /**
+   * Umkreis um den Saatpunkt in m, über den hinaus nicht geflutet wird.
+   *
+   * `0` oder nicht gesetzt heißt unbegrenzt. Gebraucht wird er, weil eine
+   * Badewanne über ein Seebecken hinweg weiterläuft: Der Neusiedler See liegt
+   * unter jedem Hochwasserstand der Zuflüsse, und die Fläche wächst dann über
+   * den Bereich hinaus, um den es geht. Ein Umkreis ist die Angabe, die im
+   * Einsatz zur Hand ist — anders als ein Rechenbudget in Kacheln.
+   */
+  maxRadiusM?: number;
   onProgress?: (progress: { blocks: number; cells: number }) => void;
   abort?: () => boolean;
 }
@@ -154,6 +164,9 @@ export async function floodFill(
   const res = level.resolutionM;
   const px = level.blockPx;
   const budget = options.budgetBlocks ?? FLOOD_BUDGET_BLOCKS[levelId];
+  const radiusM =
+    options.maxRadiusM && options.maxRadiusM > 0 ? options.maxRadiusM : 0;
+  const radiusSq = radiusM * radiusM;
 
   const point = wgs84ToLaea(seed);
   const seedRef = blockForPoint(point, level.blockSizeM);
@@ -193,11 +206,25 @@ export async function floodFill(
   let maxDepth = 0;
   let missingBlocks = 0;
   let edgeBlocks = 0;
-  let truncated: 'none' | 'budget' = 'none';
+  let truncated: 'none' | 'budget' | 'radius' = 'none';
   let eMin = Number.POSITIVE_INFINITY;
   let eMax = Number.NEGATIVE_INFINITY;
   let nMin = Number.POSITIVE_INFINITY;
   let nMax = Number.NEGATIVE_INFINITY;
+
+  /**
+   * Ob ein Block vollständig jenseits des Umkreises liegt.
+   *
+   * Geprüft wird der **nächstgelegene** Punkt des Blockrechtecks: liegt schon
+   * der außerhalb, kann keine Zelle des Blocks innerhalb liegen.
+   */
+  const blockOutsideRadius = (ref: BlockRef): boolean => {
+    const nearestE = Math.min(Math.max(point.e, ref.e), ref.e + ref.sizeM);
+    const nearestN = Math.min(Math.max(point.n, ref.n), ref.n + ref.sizeM);
+    const de = nearestE - point.e;
+    const dn = nearestN - point.n;
+    return de * de + dn * dn > radiusSq;
+  };
 
   const tileFor = (ref: BlockRef): FloodTile => {
     const key = blockId(ref);
@@ -237,6 +264,14 @@ export async function floodFill(
 
     const ref = refs.get(key) as BlockRef;
 
+    // Ein Block, der komplett außerhalb des Umkreises liegt, wird nicht
+    // geladen. Das ist der eigentliche Gewinn des Umkreises: nicht nur eine
+    // kleinere Fläche, sondern weniger Kacheln.
+    if (radiusM > 0 && blockOutsideRadius(ref)) {
+      truncated = truncated === 'budget' ? 'budget' : 'radius';
+      continue;
+    }
+
     // Budget gegen **neue** Blöcke: ein zweiter Durchlauf über einen bekannten
     // Block kostet keine Kachel.
     if (!tiles.has(key) && tiles.size >= budget) {
@@ -263,15 +298,27 @@ export async function floodFill(
       const height = decodeHeight(block.heights[cell], level);
       if (height === undefined || height > waterLevelM) continue;
 
+      const c = cell % px;
+      const r = (cell - c) / px;
+      const centre = blockPixelCenter(ref, c, r, res);
+
+      // Der Umkreis wird **vor** dem Fluten geprüft: eine Zelle jenseits davon
+      // wird nicht geflutet und breitet sich auch nicht weiter aus.
+      if (radiusM > 0) {
+        const de = centre.e - point.e;
+        const dn = centre.n - point.n;
+        if (de * de + dn * dn > radiusSq) {
+          truncated = truncated === 'budget' ? 'budget' : 'radius';
+          continue;
+        }
+      }
+
       setBit(tile.bits, cell);
       tile.cells += 1;
       cells += 1;
       const depth = waterLevelM - height;
       if (depth > maxDepth) maxDepth = depth;
 
-      const c = cell % px;
-      const r = (cell - c) / px;
-      const centre = blockPixelCenter(ref, c, r, res);
       if (centre.e < eMin) eMin = centre.e;
       if (centre.e > eMax) eMax = centre.e;
       if (centre.n < nMin) nMin = centre.n;

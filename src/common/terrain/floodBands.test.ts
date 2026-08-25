@@ -19,6 +19,24 @@ const offsets = (blockPx: number) => {
   };
 };
 
+/**
+ * Ringfläche in m², über eine ebene Näherung auf 48° Breite.
+ *
+ * Reicht für die Unterscheidung „ganzes Quadrat" gegen „halbes Quadrat"; eine
+ * geodätische Fläche wäre hier Genauigkeit ohne Aussage.
+ */
+const ringFlaecheM2 = (ring: [number, number][]): number => {
+  const mLat = 111_320;
+  const mLng = 111_320 * Math.cos((47.95 * Math.PI) / 180);
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    sum +=
+      (ring[j][1] - ring[0][1]) * mLng * ((ring[i][0] - ring[0][0]) * mLat) -
+      (ring[i][1] - ring[0][1]) * mLng * ((ring[j][0] - ring[0][0]) * mLat);
+  }
+  return Math.abs(sum) / 2;
+};
+
 describe('floodBands', () => {
   it('liefert je Tiefenstufe geschlossene Ringe', async () => {
     // Mulde 12 × 12 m auf 98 m, Rand 105 m. Bei h = 100 sind das 2 m Tiefe,
@@ -120,6 +138,35 @@ describe('floodBands', () => {
     );
     expect(grob.toleranzM).toBeGreaterThan(0.5);
     expect(grob.punkte).toBeLessThan(fein.punkte);
+  });
+
+  it('schließt den Ring am Rand des Modells, ohne Sehne quer durchs Gelände', async () => {
+    // Die Mulde läuft bis an den Rand des Gitters: westlich und nördlich des
+    // gefluteten Blocks gibt es keine Kachel. Dort fehlte bisher das
+    // Randstück, der Höhenzug blieb offen und wurde mit einer geraden Sehne
+    // geschlossen — auf der Karte eine Wasserfläche quer über den Hang.
+    const { c, k } = offsets(16);
+    const h = terrainHarness({
+      blockPx: 16,
+      grid: 2,
+      height: (col, row) => (c(col) < 16 && k(row) < 16 ? 98 : 105),
+      // Nur der südwestliche Block existiert.
+      exists: (col, row) => col === 0 && row === 0,
+    });
+    const seed = h.latLngOfCell(h.e0 + 1, -(h.n0 + 1));
+    const fill = await floodFill(h.store, seed, 100, 'detail');
+    expect(fill.cells).toBe(256);
+    expect(fill.edgeBlocks).toBeGreaterThan(0);
+
+    const bands = await floodBands(h.store, fill, 100);
+    const ringe = bands.baender.find((b) => b.tiefeM === 0)?.ringe ?? [];
+    expect(ringe).toHaveLength(1);
+    expect(ringe[0][0]).toEqual(ringe[0][ringe[0].length - 1]);
+
+    // Der geflutete Block ist 16 × 16 m. Ein an zwei Seiten offener Ring, mit
+    // einer Sehne geschlossen, wäre etwa ein halbes Quadrat — die Fläche
+    // unterscheidet die beiden Fälle deutlich.
+    expect(ringFlaecheM2(ringe[0])).toBeGreaterThan(200);
   });
 
   it('pointInRings folgt der Even-odd-Regel', () => {

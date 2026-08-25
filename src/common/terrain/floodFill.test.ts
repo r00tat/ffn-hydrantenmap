@@ -130,6 +130,39 @@ describe('floodFill', () => {
     expect(result.blocks.size).toBeLessThanOrEqual(2);
   });
 
+  it('begrenzt die Ausbreitung auf den Umkreis und sagt es', async () => {
+    // Ebene auf 99 m über 4 × 4 Blöcke à 8 m: ohne Umkreis liefe die Füllung
+    // über das ganze Gitter. Mit 5 m Umkreis bleibt eine Scheibe um den
+    // Saatpunkt.
+    const h = terrainHarness({ blockPx: 8, grid: 4, height: () => 99 });
+    // Nicht auf eine Blockkante (Vielfaches von 8): der Hin- und Rückweg über
+    // WGS84 schiebt sie sonst in den Nachbarblock.
+    const seed = h.latLngOfCell(h.e0 + 17, -(h.n0 + 17));
+    const ohne = await floodFill(h.store, seed, 100, 'detail');
+    const mit = await floodFill(h.store, seed, 100, 'detail', {
+      maxRadiusM: 5,
+    });
+
+    expect(mit.cells).toBeLessThan(ohne.cells);
+    expect(mit.truncated).toBe('radius');
+    // Eine Kreisscheibe mit r = 5 m auf einem 1-m-Raster: π·25 ≈ 79 Zellen,
+    // gezählt werden die Zellmitten innerhalb des Umkreises.
+    expect(mit.cells).toBeGreaterThan(60);
+    expect(mit.cells).toBeLessThan(100);
+    // Keine Zelle liegt weiter als der Umkreis vom Saatpunkt entfernt.
+    expect(mit.longestAxisM).toBeLessThanOrEqual(2 * 5 + 1);
+  });
+
+  it('lädt keine Kacheln, die ganz außerhalb des Umkreises liegen', async () => {
+    const h = terrainHarness({ blockPx: 8, grid: 4, height: () => 99 });
+    const seed = h.latLngOfCell(h.e0 + 4, -(h.n0 + 4));
+    const mit = await floodFill(h.store, seed, 100, 'detail', {
+      maxRadiusM: 3,
+    });
+    // 3 m um eine Position im ersten Block: kein anderer Block wird berührt.
+    expect(mit.blocks.size).toBe(1);
+  });
+
   it('nennt den Grund, wenn der Saatpunkt über dem Wasserstand liegt', async () => {
     const h = terrainHarness({ blockPx: 8, grid: 1, height: () => 105 });
     const seed = h.latLngOfCell(h.e0 + 1, -(h.n0 + 1));

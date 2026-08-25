@@ -75,7 +75,7 @@ export interface FloodSummary {
   areaM2: number;
   maxDepthM: number;
   longestAxisM: number;
-  truncated: 'none' | 'budget';
+  truncated: 'none' | 'budget' | 'radius';
   missingBlocks: number;
   edgeBlocks: number;
   reason?: FloodReason;
@@ -126,6 +126,8 @@ export type TerrainRequest =
       /** Wasserstand in EVRF2000 — dieselbe Skala wie `TerrainSample.heightM`. */
       heightM: number;
       level: TerrainLevelId;
+      /** Umkreis um den Saatpunkt in m; 0 oder fehlend heißt unbegrenzt. */
+      maxRadiusM?: number;
     }
   /**
    * Abbruch eines laufenden Flutlaufs.
