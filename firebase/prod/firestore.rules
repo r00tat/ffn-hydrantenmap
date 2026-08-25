@@ -316,6 +316,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // OAuth/MCP: Authorization-Server-Daten.
+    //
+    // Rein serverseitig. Hier liegen Client-Registrierungen, Authorization
+    // Codes, Refresh Tokens (nur Hashes) und die Einwilligungen. Kein Client
+    // hat hier etwas zu suchen — gelesen und geschrieben wird ausschließlich
+    // über das Admin SDK. Wie bei `passkey` und `fahrtenbuchShareLink` gilt:
+    // Regeln sind additiv, der abschließende Catch-all lässt Admins weiterhin
+    // lesen. Das ist vertretbar, weil hier keine Geheimnisse im Klartext
+    // stehen, sondern nur deren Hashes.
+    match /oauthClients/{clientId} {
+      allow read, write: if false;
+    }
+    match /oauthAuthCodes/{codeHash} {
+      allow read, write: if false;
+    }
+    match /oauthRefreshTokens/{tokenHash} {
+      allow read, write: if false;
+    }
+    match /oauthConsents/{consentId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if adminUser();
     }

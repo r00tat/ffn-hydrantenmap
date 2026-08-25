@@ -1,5 +1,4 @@
 import 'server-only';
-import { DecodedIdToken } from 'firebase-admin/auth';
 import { ApiException } from '../../app/api/errors';
 import {
   Firecall,
@@ -26,8 +25,18 @@ export interface VerifyFirecallOptions {
   requireWrite?: boolean;
 }
 
+/**
+ * Nur die UID wird gebraucht. Absichtlich nicht auf `DecodedIdToken` verengt:
+ * Neben den API-Routen mit Firebase-Token ruft auch der MCP-Server hier an,
+ * und dessen Identität stammt aus einem geprüften OAuth-Access-Token, nicht
+ * aus einem Firebase-Token. Ein `DecodedIdToken` erfüllt diese Form weiterhin.
+ */
+export interface FirecallAuthorizationSubject {
+  uid: string;
+}
+
 export async function verifyUserAuthorizedForFirecall(
-  user: DecodedIdToken,
+  user: FirecallAuthorizationSubject,
   firecallId: string,
   options: VerifyFirecallOptions = {}
 ): Promise<Firecall> {

@@ -29,6 +29,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/hoehenmodell.md](docs/hoehenmodell.md) | Eigenes Höhenmodell: BEV-Datenquelle, Höhendatum und Kalibrierung, Kachelschema, Import und Höhenlinien |
 | [docs/gelaende-3d.md](docs/gelaende-3d.md) | 3D-Ansicht des Geländes: Mesh in Mercator, lokal-metrische Szene, Überhöhung, Textur aus den Kartenkacheln |
 | [docs/wasserstandsmodell.md](docs/wasserstandsmodell.md) | Wasserstandsmodell: Flutfüllung, Bänder am Element, Signatur, Kopplung an den Sandsackrechner |
+| [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
 
 ## Commands
 
@@ -410,6 +411,7 @@ ein — sonst scheitert die Registrierung vollständig. Details:
 - `clusters6` - Geohashed hydrant clusters
 - `bugReport` - In-App Bug-Reports & Feature-Requests (siehe unten)
 - `appConfig` - App-weite Konfiguration (u.a. Dokument `bugReport` mit Empfänger-E-Mails)
+- `oauthClients`, `oauthAuthCodes`, `oauthRefreshTokens`, `oauthConsents` - OAuth-Authorization-Server des MCP-Zugangs, rein serverseitig (siehe [docs/mcp-server.md](docs/mcp-server.md))
 
 ## Bug Reports / Feedback
 
@@ -449,6 +451,11 @@ Required environment variables (see `.env.local`):
 - `CRON_OIDC_AUDIENCE` (optional) — erwartete Audience des OIDC-Tokens. Ohne
   Angabe gilt `getBaseUrl()`. Nötig, wenn Cloud Scheduler auf die
   `run.app`-URL zeigt, die App aber unter der Custom Domain läuft.
+- `MCP_OAUTH_SIGNING_KEY` — RSA-Privatschlüssel (PKCS#8 PEM) des
+  OAuth-Authorization-Servers. In der Cloud aus dem Secret Manager, lokal als
+  Umgebungsvariable. Siehe [docs/mcp-server.md](docs/mcp-server.md).
+- `MCP_WRITE_ENABLED` — schaltet die schreibenden MCP-Tools frei. In dev an,
+  in prod zunächst aus.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
