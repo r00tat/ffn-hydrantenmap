@@ -5,10 +5,10 @@ import {
   activeOverlays,
   findLayerConfig,
   tileGrid,
+  TILE_PX,
   tileUrl,
-  MIN_WMS_ZOOM,
   wmsBlocks,
-  WMS_BLOCK_PX,
+  WMS_TILE_PX,
   wmsUrl,
 } from './terrainTexture';
 
@@ -67,8 +67,8 @@ describe('wmsUrl', () => {
     const url = wmsUrl(overlayLayers.oberflaechenwasser, box);
     expect(url).toContain('VERSION=1.1.1');
     expect(url).not.toContain('CRS=');
-    expect(url).toContain(`WIDTH=${WMS_BLOCK_PX}`);
-    expect(url).toContain(`HEIGHT=${WMS_BLOCK_PX}`);
+    expect(url).toContain(`WIDTH=${WMS_TILE_PX}`);
+    expect(url).toContain(`HEIGHT=${WMS_TILE_PX}`);
     expect(url).toContain('LAYERS=ofa_maxd');
     expect(url).toContain('TRANSPARENT=TRUE');
   });
@@ -78,59 +78,46 @@ describe('wmsBlocks', () => {
   /** Der übliche Fall: ein Bildschirmausschnitt, Textur auf 2048 px gedeckelt. */
   const grid = tileGrid(neusiedl, 19, undefined, 2048);
 
-  it('deckt das Bild lückenlos ab und beginnt oben links', () => {
-    const blocks = wmsBlocks(grid);
-    const size = blocks[0].sizePx;
-    expect(blocks).toHaveLength(
-      Math.ceil(grid.widthPx / size) * Math.ceil(grid.heightPx / size)
-    );
-    expect(blocks[0].dx).toBe(0);
-    expect(blocks[0].dy).toBe(0);
-    expect(blocks[0].box.xMin).toBeCloseTo(grid.merc.xMin, 6);
-    expect(blocks[0].box.yMax).toBeCloseTo(grid.merc.yMax, 6);
-  });
-
-  it('fragt feiner an als die Textur ist', () => {
-    // Die Textur landet bei diesem Ausschnitt auf Stufe 15; der Dienst liefert
-    // erst ab Stufe 16. Ohne die feinere Anfrage fehlte die Ebene ganz.
-    expect(grid.z).toBeLessThan(MIN_WMS_ZOOM);
-    expect(wmsBlocks(grid)[0].sizePx).toBeLessThan(WMS_BLOCK_PX);
-  });
-
-  it('hält jeden Block quadratisch und in derselben Auflösung', () => {
-    const blocks = wmsBlocks(grid);
-    const first = blocks[0].box.xMax - blocks[0].box.xMin;
-    for (const block of blocks) {
-      const width = block.box.xMax - block.box.xMin;
-      const height = block.box.yMax - block.box.yMin;
-      // Ein angeschnittener Block hätte einen anderen Maßstab, und den lehnt
-      // der Dienst ab.
-      expect(width).toBeCloseTo(first, 6);
-      expect(height).toBeCloseTo(width, 6);
+  it('liegt auf Leaflets Kachelraster', () => {
+    // Der Dienst ist ein Kachel-Cache und lehnt jedes andere Rechteck ab. Ein
+    // 512er-Feld deckt 2 × 2 Kacheln ab, sein Rechteck ist also eine Kachel des
+    // 256er-Rasters eine Stufe gröber.
+    const span = (2 * 20_037_508.342789244) / 2 ** (grid.z - 1);
+    for (const block of wmsBlocks(grid)) {
+      const index = (block.box.xMin + 20_037_508.342789244) / span;
+      expect(index).toBeCloseTo(Math.round(index), 6);
+      expect(block.box.xMax - block.box.xMin).toBeCloseTo(span, 6);
+      expect(block.box.yMax - block.box.yMin).toBeCloseTo(span, 6);
     }
   });
 
-  it('deckt sich mit dem Maßstab der Textur', () => {
-    const resolution = (grid.merc.xMax - grid.merc.xMin) / grid.widthPx;
-    const block = wmsBlocks(grid)[0];
-    // Was der Block im Bild einnimmt, muss er auch in Metern abdecken.
-    expect(block.box.xMax - block.box.xMin).toBeCloseTo(
-      block.sizePx * resolution,
-      6
-    );
+  it('deckt den ganzen Ausschnitt ab', () => {
+    const blocks = wmsBlocks(grid);
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(Math.min(...blocks.map((b) => b.dx))).toBeLessThanOrEqual(0);
+    expect(Math.min(...blocks.map((b) => b.dy))).toBeLessThanOrEqual(0);
+    expect(
+      Math.max(...blocks.map((b) => b.dx + b.sizePx))
+    ).toBeGreaterThanOrEqual(grid.widthPx);
+    expect(
+      Math.max(...blocks.map((b) => b.dy + b.sizePx))
+    ).toBeGreaterThanOrEqual(grid.heightPx);
   });
 
-  it('lässt die Ebene weg, statt hunderte Anfragen zu stellen', () => {
-    // Ein weit gezogener Ausschnitt: die Textur wird grob, der Dienst bliebe
-    // fein, und für dieselbe Fläche kämen über zweihundert Blöcke zusammen.
-    const wide = tileGrid(
-      { south: 47.5, west: 16.2, north: 48.2, east: 17.2 },
-      19,
-      undefined,
-      2048
-    );
-    expect(wide.z).toBeLessThan(grid.z);
-    expect(wmsBlocks(wide)).toHaveLength(0);
+  it('zeichnet unverändert ein, ohne zu skalieren', () => {
+    // 512 Texturpixel entfallen auf ein Feld — dieselbe Auflösung wie die
+    // Kacheln daneben.
+    for (const block of wmsBlocks(grid)) {
+      expect(block.sizePx).toBe(WMS_TILE_PX);
+      expect(block.sizePx).toBe(2 * TILE_PX);
+    }
+  });
+
+  it('setzt die Ziel-Ecke auf ein Vielfaches der Kachelbreite', () => {
+    for (const block of wmsBlocks(grid)) {
+      expect(Math.abs(block.dx) % TILE_PX).toBe(0);
+      expect(Math.abs(block.dy) % TILE_PX).toBe(0);
+    }
   });
 });
 

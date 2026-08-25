@@ -100,32 +100,39 @@ die Karte, damit sie ins Pixelbudget passt — es kämen also durchweg die falsc
 Kacheln, und zwar plausibel aussehende. Die URLs werden deshalb aus der
 Konfiguration in `tiles.ts` mit `L.Util.template` gebaut.
 
-### Der WMS lässt sich nicht als ein Bild anfragen
+### Der WMS ist ein Kachel-Cache und nimmt nur sein eigenes Raster
 
 Naheliegend wäre für einen WMS ein einzelnes `GetMap` über das ganze
-Mercator-Rechteck gewesen — kein Kachelschema, eine Anfrage. Der WISA-Dienst
-(`tiles.lfrz.gv.at`), der die Hochwasser-Gefahrenkarten liefert, macht das nicht
-mit. Drei seiner Bedingungen sind gemessen, nicht dokumentiert:
+Mercator-Rechteck gewesen — kein Kachelschema, eine Anfrage. Das funktioniert
+nicht, und der Grund ist keine Größen- oder Maßstabsgrenze, sondern die Natur
+des Dienstes: `tiles.lfrz.gv.at`, der die Hochwasser-Gefahrenkarten liefert,
+ist ein **Kachel-Cache**. Er beantwortet ausschließlich Anfragen, die genau auf
+seinem Raster liegen; jedes andere Rechteck bekommt `400 Bad Request` — an
+derselben Stelle, in derselben Auflösung, nur um einen halben Kachelschritt
+versetzt.
+
+Das Raster ist das von Leaflet, und die Anfrage ist deshalb die, die
+`WMSTileLayer` in `Map.tsx` von sich aus stellt:
 
 - **Version 1.1.1 mit `SRS`.** Auf 1.3.0 mit `CRS` antwortet er `400`.
-- **Genau 512 × 512 Pixel.** 256 wird ebenso abgelehnt wie 1024 oder 2048. Das
-  ist die Größe, die Leaflet mit `tileSize={512}` schickt.
-- **Mindestens Zoomstufe 16** (rund 2,4 m je Pixel). Gröber lehnt er ab.
+- **512 × 512 Pixel** (`tileSize: 512` in der Kartenkonfiguration). 256 wird
+  ebenso abgelehnt wie 1024.
+- **Auf dem Kachelraster ausgerichtet.** Ein Feld mit 512 px deckt genau
+  2 × 2 Kacheln des 256er-Rasters ab und kommt in doppelter Auflösung zurück;
+  sein Rechteck ist damit eine Kachel des 256er-Rasters **eine Stufe gröber**.
+  Genau so rechnet `wmsBlocks()`.
 
-Die letzte Bedingung ist die unangenehme: die Textur ist auf 2048 px gedeckelt
-und landet bei einem Bildschirmausschnitt typischerweise auf **Stufe 15**. Die
-Überlagerung wird deshalb **feiner angefragt, als die Textur ist**, und beim
-Zeichnen verkleinert — für den üblichen Ausschnitt sind das rund 15 Blöcke. Ohne
-das fehlte sie im Normalfall vollständig, und zwar lautlos: eine abgelehnte
-Kachel wird übergangen, damit eine einzelne Lücke nicht das ganze Bild kostet.
+Weil auf ein solches Feld 512 Texturpixel entfallen, wird es unverändert
+eingezeichnet — nichts wird skaliert. Beginnt die Textur auf einer ungeraden
+Kachel, ragt das erste Feld nach links oben hinaus; das Canvas schneidet ab.
 
-Je gröber die Textur, desto mehr Blöcke fallen für dieselbe Fläche an. Über
-`MAX_WMS_BLOCKS` bleibt die Ebene weg, statt zweihundert Anfragen zu stellen für
-ein Bild, das in dieser Auflösung niemand ansieht.
+Ausgerichtet liefert der Dienst von Stufe 8 bis 19. Die Textur bleibt durch
+`maxNativeZoom` der Grundkarte ohnehin darunter, eine eigene Schranke braucht es
+also nicht.
 
 Das Orthofoto Burgenland (`gisenterprise.bgld.gv.at`) ist genügsamer und nimmt
-beide Versionen und freie Größen — es läuft trotzdem über denselben Weg, damit
-es nur einen gibt.
+beide Versionen und freie Rechtecke — es läuft trotzdem über denselben Weg,
+damit es nur einen gibt.
 
 **Die eingeblendeten Überlagerungen kommen mit** und werden über das Kartenbild
 gezeichnet: Hochwasser-Gefahrenkarten, Risikogebiete, Adressen. Ohne sie zeigte
