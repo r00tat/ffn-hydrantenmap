@@ -18,8 +18,15 @@ vi.mock('./SearchButton', () => ({ default: () => null }));
 vi.mock('../firebase/firestoreHooks', () => ({
   useFirecallItems: () => [],
 }));
+// Die Ebenen entscheiden, welche Objekte die 3D-Ansicht bekommt; der Hook zieht
+// dafür Firestore herein.
+vi.mock('../../hooks/useFirecallLayers', () => ({
+  useFirecallLayers: () => ({}),
+}));
 
-const { default: MapActionButtons } = await import('./MapActionButtons');
+const { default: MapActionButtons, threeDFabBottom } = await import(
+  './MapActionButtons'
+);
 
 function renderButtons(options: Partial<MapEditorOptions> = {}) {
   const value: MapEditorOptions = {
@@ -40,9 +47,15 @@ function renderButtons(options: Partial<MapEditorOptions> = {}) {
     setLastSelectedLayer: vi.fn(),
     ...options,
   };
+  /* Nur, was die Komponente anfasst: den Wechsel des Grundlayers beobachtet
+     sie für die 3D-Ansicht, die Ausmaße liest sie erst beim Öffnen. */
+  const map = {
+    on: vi.fn(),
+    off: vi.fn(),
+  } as unknown as L.Map;
   return renderWithIntl(
     <MapEditorContext.Provider value={value}>
-      <MapActionButtons map={{} as L.Map} />
+      <MapActionButtons map={map} />
     </MapEditorContext.Provider>
   );
 }
@@ -70,5 +83,28 @@ describe('MapActionButtons', () => {
 
     expect(screen.getByTestId('HistoryIcon')).toBeVisible();
     expect(screen.queryByTestId('EditIcon')).toBeNull();
+  });
+});
+
+describe('threeDFabBottom', () => {
+  it('rückt beim Bearbeiten über den Assistenten', () => {
+    expect(threeDFabBottom({ editable: true, canEdit: true })).toBe(224);
+  });
+
+  it('rückt ohne Bearbeiten direkt über die Gruppe unten', () => {
+    // Suche, Aufzeichnung und Assistent gibt es dann nicht — der Knopf hinge
+    // sonst über einer Lücke.
+    expect(threeDFabBottom({ editable: false, canEdit: true })).toBe(120);
+  });
+
+  it('rückt über den Verlauf-Knopf, auch ohne Schreibrecht', () => {
+    expect(
+      threeDFabBottom({ editable: false, canEdit: false, historyId: 'h1' })
+    ).toBe(120);
+  });
+
+  it('rückt ganz nach unten, wenn darunter nichts steht', () => {
+    // Nur-Lese-Gast ohne Verlauf: die Gruppe unten rechts bleibt leer.
+    expect(threeDFabBottom({ editable: false, canEdit: false })).toBe(64);
   });
 });

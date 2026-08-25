@@ -116,6 +116,7 @@
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "simplify-js": "^1.2.4",
+    "three": "^0.185.1",
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
@@ -129,6 +130,7 @@
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^24.10.4",
     "@types/react": "19.2.18",
+    "@types/three": "^0.185.4",
     "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^6.1.0",
     "@vitest/coverage-v8": "^4.1.11",

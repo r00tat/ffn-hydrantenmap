@@ -50,6 +50,36 @@ describe('createTerrainClient', () => {
     ]);
   });
 
+  it('reicht mesh durch', async () => {
+    const fake = fakeWorker();
+    const client = createTerrainClient(fake.worker);
+
+    const promise = client.mesh(
+      { south: 47, west: 16, north: 48, east: 17 },
+      64
+    );
+    expect(fake.sent[0]).toMatchObject({ op: 'mesh', id: 1, maxVertices: 64 });
+
+    fake.reply({
+      id: 1,
+      ok: true,
+      op: 'mesh',
+      mesh: { cols: 2, rows: 2 } as never,
+    });
+
+    await expect(promise).resolves.toMatchObject({ cols: 2, rows: 2 });
+  });
+
+  it('gibt undefined weiter, wenn kein Gelände vorliegt', async () => {
+    const fake = fakeWorker();
+    const client = createTerrainClient(fake.worker);
+
+    const promise = client.mesh({ south: 47, west: 16, north: 48, east: 17 });
+    fake.reply({ id: 1, ok: true, op: 'mesh', mesh: undefined });
+
+    await expect(promise).resolves.toBeUndefined();
+  });
+
   it('ordnet Antworten auch in vertauschter Reihenfolge zu', async () => {
     const fake = fakeWorker();
     const client = createTerrainClient(fake.worker);
