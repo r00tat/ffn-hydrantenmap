@@ -121,26 +121,127 @@ export function tileUrl(
 }
 
 /**
- * Ein einzelnes GetMap über den ganzen Ausschnitt für WMS-Layer.
+ * Kantenlänge einer WMS-Anfrage.
  *
- * Der WMS kennt kein Kachelschema; ein Bild über das Mercator-Rechteck ist
- * zugleich weniger Verkehr als 64 Einzelanfragen.
+ * **Nicht frei wählbar.** Der WISA-Dienst (`tiles.lfrz.gv.at`), der die
+ * Hochwasser-Gefahrenkarten liefert, beantwortet jede andere Größe mit
+ * `400 Bad Request` — 256 px ebenso wie 1024 oder 2048. 512 ist genau das, was
+ * Leaflet mit `tileSize={512}` schickt, und damit das Einzige, was der Dienst
+ * kennt. Ein einzelnes GetMap über den ganzen Ausschnitt kann deshalb nicht
+ * funktionieren, so naheliegend es wäre.
+ *
+ * Der Dienst hat außerdem eine Maßstabsgrenze: unterhalb von Zoomstufe 16
+ * (rund 2,4 m je Pixel) lehnt er ebenfalls ab. Ein weit gezogener Ausschnitt
+ * bekommt die Gefahrenkarte also nicht — genau wie die Karte selbst.
  */
-export function wmsUrl(config: TileConfig, grid: TileGrid): string {
+export const WMS_BLOCK_PX = 512;
+
+/** Ein Mercator-Rechteck. */
+export interface MercBox {
+  xMin: number;
+  yMin: number;
+  xMax: number;
+  yMax: number;
+}
+
+/**
+ * Ein GetMap über ein Teilstück des Ausschnitts.
+ *
+ * **Version 1.1.1 mit `SRS`, nicht 1.3.0 mit `CRS`** — dieselbe Anfrage, die
+ * Leaflets `WMSTileLayer` von sich aus stellt. Der WISA-Dienst beantwortet
+ * 1.3.0 mit `400`; die Überlagerungen fehlten dann in der Textur, ohne dass es
+ * irgendwo auffiele. Was in der Karte geht, muss hier gehen.
+ */
+export function wmsUrl(
+  config: TileConfig,
+  box: MercBox,
+  sizePx: number = WMS_BLOCK_PX
+): string {
   const params = new URLSearchParams({
     SERVICE: 'WMS',
-    VERSION: '1.3.0',
+    VERSION: '1.1.1',
     REQUEST: 'GetMap',
-    CRS: 'EPSG:3857',
+    SRS: 'EPSG:3857',
     LAYERS: String(config.options?.layers ?? ''),
     STYLES: '',
     FORMAT: String(config.options?.format ?? 'image/jpeg'),
     TRANSPARENT: config.options?.transparent ? 'TRUE' : 'FALSE',
-    WIDTH: String(grid.widthPx),
-    HEIGHT: String(grid.heightPx),
-    BBOX: `${grid.merc.xMin},${grid.merc.yMin},${grid.merc.xMax},${grid.merc.yMax}`,
+    WIDTH: String(sizePx),
+    HEIGHT: String(sizePx),
+    BBOX: `${box.xMin},${box.yMin},${box.xMax},${box.yMax}`,
   });
   return `${config.url}${config.url.includes('?') ? '' : '?'}${params}`;
+}
+
+/**
+ * Feinste Zoomstufe, unterhalb derer der WMS nichts liefert.
+ *
+ * Der WISA-Dienst hat eine Maßstabsgrenze und lehnt gröber als Stufe 16 (rund
+ * 2,4 m je Pixel) mit `400` ab. Die Textur läuft aber fast immer gröber — sie
+ * ist auf 2048 px gedeckelt, ein Bildschirmausschnitt landet damit typischerweise
+ * bei Stufe 15. Die Überlagerung wird deshalb **feiner angefragt als die Textur
+ * ist** und verkleinert eingezeichnet. Ohne das fehlt sie im üblichen Fall
+ * vollständig — und zwar lautlos.
+ */
+export const MIN_WMS_ZOOM = 16;
+
+/**
+ * Obergrenze der Anfragen je Überlagerung.
+ *
+ * Je gröber die Textur, desto mehr Blöcke werden für dieselbe Fläche gebraucht.
+ * Bei Stufe 13 wären es schon über zweihundert Anfragen für ein Bild, das
+ * niemand in dieser Auflösung ansieht — dann bleibt die Überlagerung besser weg.
+ */
+export const MAX_WMS_BLOCKS = 64;
+
+export interface WmsBlock {
+  /** Ziel im Canvas, in Texturpixeln. */
+  dx: number;
+  dy: number;
+  /** Kantenlänge im Canvas — kleiner als `WMS_BLOCK_PX`, wenn verkleinert wird. */
+  sizePx: number;
+  box: MercBox;
+}
+
+/**
+ * Die Teilstücke, in die eine WMS-Ebene zerlegt wird.
+ *
+ * Quadrate von `WMS_BLOCK_PX`, angefragt in mindestens `MIN_WMS_ZOOM` und beim
+ * Zeichnen auf die Auflösung der Textur verkleinert. Das letzte Stück je Reihe
+ * und Spalte ragt über den Rand hinaus — es wird trotzdem in voller Größe
+ * angefragt, weil eine angeschnittene Anfrage einen anderen Maßstab hätte und
+ * der Dienst sie ablehnte. Was überhängt, schneidet das Canvas ab.
+ *
+ * Eine leere Liste heißt: für diesen Ausschnitt lohnt die Überlagerung nicht.
+ */
+export function wmsBlocks(grid: TileGrid): WmsBlock[] {
+  const resolution = (grid.merc.xMax - grid.merc.xMin) / grid.widthPx;
+  // Zweierpotenz, damit die Blöcke auf ganze Texturpixel fallen.
+  const factor = 2 ** Math.max(0, MIN_WMS_ZOOM - grid.z);
+  const sizePx = WMS_BLOCK_PX / factor;
+  const span = WMS_BLOCK_PX * (resolution / factor);
+
+  const cols = Math.ceil(grid.widthPx / sizePx);
+  const rows = Math.ceil(grid.heightPx / sizePx);
+  if (cols * rows > MAX_WMS_BLOCKS) return [];
+
+  const blocks: WmsBlock[] = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const dx = col * sizePx;
+      const dy = row * sizePx;
+      const xMin = grid.merc.xMin + dx * resolution;
+      // Im Bild läuft y nach unten, in Mercator nach oben.
+      const yMax = grid.merc.yMax - dy * resolution;
+      blocks.push({
+        dx,
+        dy,
+        sizePx,
+        box: { xMin, xMax: xMin + span, yMin: yMax - span, yMax },
+      });
+    }
+  }
+  return blocks;
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -169,11 +270,21 @@ async function drawLayer(
   grid: TileGrid
 ): Promise<void> {
   if (config.type === 'WMS') {
-    await loadImage(wmsUrl(config, grid))
-      .then((image) =>
-        ctx.drawImage(image, 0, 0, grid.widthPx, grid.heightPx)
+    await Promise.all(
+      wmsBlocks(grid).map((block) =>
+        loadImage(wmsUrl(config, block.box))
+          .then((image) => {
+            ctx.drawImage(
+              image,
+              block.dx,
+              block.dy,
+              block.sizePx,
+              block.sizePx
+            );
+          })
+          .catch(() => undefined)
       )
-      .catch(() => undefined);
+    );
     return;
   }
 

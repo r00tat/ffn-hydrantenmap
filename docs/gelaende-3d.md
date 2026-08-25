@@ -100,9 +100,32 @@ die Karte, damit sie ins Pixelbudget passt — es kämen also durchweg die falsc
 Kacheln, und zwar plausibel aussehende. Die URLs werden deshalb aus der
 Konfiguration in `tiles.ts` mit `L.Util.template` gebaut.
 
-WMS-Layer (Orthofoto Burgenland, die Gefahrenkarten) kennen kein Kachelschema;
-für sie geht ein einzelnes `GetMap` über das ganze Mercator-Rechteck — zugleich
-weniger Verkehr als 64 Einzelanfragen.
+### Der WMS lässt sich nicht als ein Bild anfragen
+
+Naheliegend wäre für einen WMS ein einzelnes `GetMap` über das ganze
+Mercator-Rechteck gewesen — kein Kachelschema, eine Anfrage. Der WISA-Dienst
+(`tiles.lfrz.gv.at`), der die Hochwasser-Gefahrenkarten liefert, macht das nicht
+mit. Drei seiner Bedingungen sind gemessen, nicht dokumentiert:
+
+- **Version 1.1.1 mit `SRS`.** Auf 1.3.0 mit `CRS` antwortet er `400`.
+- **Genau 512 × 512 Pixel.** 256 wird ebenso abgelehnt wie 1024 oder 2048. Das
+  ist die Größe, die Leaflet mit `tileSize={512}` schickt.
+- **Mindestens Zoomstufe 16** (rund 2,4 m je Pixel). Gröber lehnt er ab.
+
+Die letzte Bedingung ist die unangenehme: die Textur ist auf 2048 px gedeckelt
+und landet bei einem Bildschirmausschnitt typischerweise auf **Stufe 15**. Die
+Überlagerung wird deshalb **feiner angefragt, als die Textur ist**, und beim
+Zeichnen verkleinert — für den üblichen Ausschnitt sind das rund 15 Blöcke. Ohne
+das fehlte sie im Normalfall vollständig, und zwar lautlos: eine abgelehnte
+Kachel wird übergangen, damit eine einzelne Lücke nicht das ganze Bild kostet.
+
+Je gröber die Textur, desto mehr Blöcke fallen für dieselbe Fläche an. Über
+`MAX_WMS_BLOCKS` bleibt die Ebene weg, statt zweihundert Anfragen zu stellen für
+ein Bild, das in dieser Auflösung niemand ansieht.
+
+Das Orthofoto Burgenland (`gisenterprise.bgld.gv.at`) ist genügsamer und nimmt
+beide Versionen und freie Größen — es läuft trotzdem über denselben Weg, damit
+es nur einen gibt.
 
 **Die eingeblendeten Überlagerungen kommen mit** und werden über das Kartenbild
 gezeichnet: Hochwasser-Gefahrenkarten, Risikogebiete, Adressen. Ohne sie zeigte
