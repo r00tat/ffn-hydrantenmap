@@ -110,18 +110,6 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           </Tooltip>
         )}
 
-        <Tooltip title={t3d('open')}>
-          <Fab
-            color="default"
-            aria-label="3d"
-            size="medium"
-            style={{ marginLeft: 8 }}
-            onClick={() => setShow3d(true)}
-          >
-            <ThreeDRotationIcon />
-          </Fab>
-        </Tooltip>
-
         {historyId && (
           <Tooltip title={t('historyLockedEdit')}>
             <Fab
@@ -144,6 +132,25 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       )}
       <AddFirecallItem />
       {editable && <AiAssistantButton firecallItems={firecallItems} />}
+
+      {/* Eigener Platz über dem Assistenten und nicht in der Gruppe unten
+          rechts: dort stehen die primären Funktionen — Anlegen, Bearbeiten,
+          Verlauf. Die 3D-Ansicht ist eine Sicht auf die Lage, keine Arbeit an
+          ihr, und ein gleich großer Knopf daneben stellte sie auf eine Stufe
+          damit. */}
+      <Box sx={{ position: 'absolute', bottom: 224, right: 16 }}>
+        <Tooltip title={t3d('open')}>
+          <Fab
+            color="default"
+            aria-label="3d"
+            size="small"
+            onClick={() => setShow3d(true)}
+          >
+            <ThreeDRotationIcon />
+          </Fab>
+        </Tooltip>
+      </Box>
+
       {show3d && (
         <Gelaende3dDialog
           open={show3d}

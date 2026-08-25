@@ -10,8 +10,19 @@ import {
   MIN_PITCH_DEG,
   START_PITCH_DEG,
 } from './gelaende3d';
+import { BADGE_ASPECT, markerBadge } from './markerBadge';
 import type { MarkerPlacement, PumpPlacement } from './sceneObjects';
 import type { TileGrid } from './terrainTexture';
+
+/**
+ * Höhe einer Marke, gemessen an der Bildhöhe.
+ *
+ * Bei `sizeAttenuation: false` ist die Größe eines Sprites ein Anteil des
+ * Bildes. 7,5 % sind auf einem Tablet rund 60 px — groß genug, dass das Symbol
+ * darin zu erkennen ist, und klein genug, dass dreißig davon das Gelände nicht
+ * zudecken.
+ */
+const MARKER_PX = 0.075;
 
 /**
  * Die three-Szene der 3D-Ansicht.
@@ -61,6 +72,27 @@ export function createGelaende3dScene(
   controls.enableDamping = false;
   controls.minPolarAngle = ((90 - MAX_PITCH_DEG) * Math.PI) / 180;
   controls.maxPolarAngle = ((90 - MIN_PITCH_DEG) * Math.PI) / 180;
+
+  // Verschieben gehört zur Ansicht, nicht nur Drehen und Zoomen: ein Ausschnitt
+  // über ein Einsatzgebiet ist größer als das, was aus einem Blickpunkt zu
+  // sehen ist. Ausdrücklich gesetzt und nicht den Vorgaben überlassen, damit
+  // ein Versionswechsel von three die Bedienung nicht still ändert.
+  controls.enablePan = true;
+  controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.PAN,
+  };
+  // Ein Finger dreht, zwei Finger verschieben und zoomen — sonst käme man auf
+  // dem Tablet nicht vom Fleck.
+  controls.touches = {
+    ONE: THREE.TOUCH.ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN,
+  };
+  // Verschoben wird **entlang des Geländes**, nicht in der Bildebene. In der
+  // Bildebene geschoben steigt der Blickpunkt bei gekippter Kamera mit und man
+  // hebt sich unbemerkt vom Boden ab.
+  controls.screenSpacePanning = false;
 
   // Streiflicht aus Nordwest — die Richtung, in der Schummerung gelesen wird.
   const sun = new THREE.DirectionalLight(0xffffff, 2.2);
@@ -217,21 +249,31 @@ export function createGelaende3dScene(
       const stemMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
       disposables.push(stemMaterial);
       for (const placement of next) {
-        const map = new THREE.TextureLoader().load(placement.iconUrl, () =>
-          requestRender()
-        );
         const spriteMaterial = new THREE.SpriteMaterial({
-          map,
           // Konstante Bildschirmgröße: eine Marke soll aus jeder Entfernung
           // lesbar bleiben, sonst verschwindet sie im weit gezogenen Ausschnitt.
           sizeAttenuation: false,
           depthTest: false,
         });
-        disposables.push(spriteMaterial, map);
+        disposables.push(spriteMaterial);
         const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(0.045, 0.045, 1);
+        sprite.scale.set(MARKER_PX * BADGE_ASPECT, MARKER_PX, 1);
+        // Der Ankerpunkt sitzt an der Spitze der Nadel, nicht in ihrer Mitte:
+        // sonst zeigte die Marke nicht auf ihren Standort, sondern schwebte
+        // mittig darüber.
+        sprite.center.set(0.5, 0);
         sprite.userData.placement = placement;
         markerGroup.add(sprite);
+
+        void markerBadge(placement.iconUrl).then((canvas) => {
+          if (!alive) return;
+          const map = new THREE.CanvasTexture(canvas);
+          map.colorSpace = THREE.SRGBColorSpace;
+          disposables.push(map);
+          spriteMaterial.map = map;
+          spriteMaterial.needsUpdate = true;
+          requestRender();
+        });
 
         // Der Stiel: ohne ihn schwebt oder versinkt das Symbol je nach
         // Blickwinkel, und der Standort ist nicht mehr ablesbar.

@@ -112,6 +112,56 @@ der Burgenland-WMS senden `Access-Control-Allow-Origin` — geprüft.
 Eine Kachel, die nicht lädt, bleibt **neutral grau**. Schwarz wäre von einem
 Loch im Gelände nicht zu unterscheiden.
 
+## Bedienung: Drehen **und** Verschieben
+
+Ein Ausschnitt über ein Einsatzgebiet ist größer als das, was aus einem
+Blickpunkt zu sehen ist. Drehen und Zoomen allein reichen deshalb nicht — man
+muss sich auch über das Gelände bewegen können.
+
+| Eingabe | Wirkung |
+| --- | --- |
+| linke Maustaste | drehen |
+| rechte Maustaste | verschieben |
+| Mausrad / mittlere Taste | zoomen |
+| ein Finger | drehen |
+| zwei Finger | verschieben und zoomen |
+
+Die Zuordnung ist in `gelaende3dScene.ts` **ausdrücklich gesetzt** und nicht den
+Vorgaben von `OrbitControls` überlassen: ein Versionswechsel von three soll die
+Bedienung nicht still ändern.
+
+`screenSpacePanning` steht auf `false`, verschoben wird also entlang des
+Geländes und nicht in der Bildebene. In der Bildebene geschoben steigt der
+Blickpunkt bei gekippter Kamera mit, und man hebt sich unbemerkt vom Boden ab.
+
+## Die Marken sind eigene Symbole, nicht die der Karte
+
+Die Kartensymbole taugen in der Szene nicht. Sie sind für die Aufsicht
+gezeichnet — teils als Nadel, deren Spitze der Ankerpunkt ist, teils als 24 px
+großes Quadrat ohne eigenen Rand. Schräg von der Seite und vor einem Luftbild
+als Untergrund verschwinden sie darin.
+
+`markerBadge.ts` zeichnet deshalb je Symbol eine eigene Marke: eine weiße Nadel
+mit dunklem Rand und Schlagschatten, das Kartensymbol mittig darin. Das Symbol
+bleibt dasselbe wie in der Karte — nur der Träger ist ein anderer, und das
+Objekt bleibt wiedererkennbar.
+
+Drei Einzelheiten daran sind Absicht:
+
+- **Der Ankerpunkt sitzt an der Spitze**, nicht in der Mitte des Sprites. Sonst
+  zeigte die Marke nicht auf ihren Standort, sondern schwebte mittig darüber.
+- **Ohne Symbol bleibt ein Punkt stehen.** Eine leere weiße Platte wäre von
+  einem Ladefehler nicht zu unterscheiden.
+- **Ein Symbol, das nach 5 s nicht geladen ist, gilt als nicht vorhanden.** Ohne
+  diese Frist hinge die Marke an einem Abruf, der weder `load` noch `error`
+  meldet — und weil das Bild erst nach dem Symbol gezeichnet wird, bliebe die
+  Marke unsichtbar. Ein Objekt, das im Gelände fehlt, ist schlimmer als eines
+  ohne sein Symbol.
+
+Gezeichnete Marken liegen je Symbol-URL in einem Vorrat: ein Einsatz hat leicht
+dreißig Objekte desselben Typs, und ohne ihn wäre jedes ein eigener Bildabruf
+und eine eigene Textur.
+
 ## Budgets
 
 | Größe | Wert | Begründung |
