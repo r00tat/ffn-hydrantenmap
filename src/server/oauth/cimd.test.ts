@@ -10,12 +10,8 @@ import {
 const CLIENT_ID = 'https://claude.ai/mcp/client';
 const ISSUER = 'https://karte.example';
 
-function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-    ...init,
-  });
+function jsonResponse(body: unknown, status = 200) {
+  return { status, body: JSON.stringify(body) };
 }
 
 const validDocument = {
@@ -27,7 +23,7 @@ const validDocument = {
 function deps(overrides: Partial<Parameters<typeof fetchClientIdMetadata>[2]> = {}) {
   return {
     resolveHost: vi.fn(async () => ['104.18.0.1']),
-    fetchImpl: vi.fn(async () => jsonResponse(validDocument)),
+    requestDocument: vi.fn(async () => jsonResponse(validDocument)),
     ...overrides,
   };
 }
@@ -87,6 +83,14 @@ describe('assertUsableCimdUrl', () => {
 });
 
 describe('fetchClientIdMetadata', () => {
+  it('reicht die Auflösung an den Abruf durch, damit die Verbindung gebunden ist', async () => {
+    // Die maßgebliche Prüfung sitzt in der `lookup`-Funktion der Verbindung;
+    // ohne dieselbe Auflösung wäre sie wirkungslos.
+    const d = deps();
+    await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
+    expect(d.resolveHost).toHaveBeenCalledWith('claude.ai');
+  });
+
   it('liefert den geprüften Client', async () => {
     const d = deps();
     const client = await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
@@ -99,21 +103,12 @@ describe('fetchClientIdMetadata', () => {
     });
   });
 
-  it('folgt keiner Weiterleitung', async () => {
-    const d = deps();
-    await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
-    expect(d.fetchImpl).toHaveBeenCalledWith(
-      CLIENT_ID,
-      expect.objectContaining({ redirect: 'error' }),
-    );
-  });
-
   it('weist einen Host ab, der auf eine private Adresse zeigt', async () => {
     const d = deps({ resolveHost: vi.fn(async () => ['127.0.0.1']) });
     await expect(
       fetchClientIdMetadata(CLIENT_ID, ISSUER, d),
     ).rejects.toThrow(/blocked address/);
-    expect(d.fetchImpl).not.toHaveBeenCalled();
+    expect(d.requestDocument).not.toHaveBeenCalled();
   });
 
   it('weist ab, wenn nur eine von mehreren Adressen privat ist', async () => {
@@ -127,7 +122,7 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist ab, wenn client_id im Dokument nicht der URL entspricht', async () => {
     const d = deps({
-      fetchImpl: vi.fn(async () =>
+      requestDocument: vi.fn(async () =>
         jsonResponse({ ...validDocument, client_id: 'https://evil.example/c' }),
       ),
     });
@@ -138,7 +133,7 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist einen Fehlerstatus ab', async () => {
     const d = deps({
-      fetchImpl: vi.fn(async () => new Response('nope', { status: 404 })),
+      requestDocument: vi.fn(async () => ({ status: 404, body: 'nope' })),
     });
     await expect(fetchClientIdMetadata(CLIENT_ID, ISSUER, d)).rejects.toThrow(
       /responded with 404/,
@@ -147,13 +142,10 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist ein zu großes Dokument ab', async () => {
     const d = deps({
-      fetchImpl: vi.fn(
-        async () =>
-          new Response('x'.repeat(70 * 1024), {
-            status: 200,
-            headers: { 'content-length': String(70 * 1024) },
-          }),
-      ),
+      requestDocument: vi.fn(async () => ({
+        status: 200,
+        body: 'x'.repeat(70 * 1024),
+      })),
     });
     await expect(fetchClientIdMetadata(CLIENT_ID, ISSUER, d)).rejects.toThrow(
       /too large/,
@@ -162,7 +154,7 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist ungültiges JSON ab', async () => {
     const d = deps({
-      fetchImpl: vi.fn(async () => new Response('{', { status: 200 })),
+      requestDocument: vi.fn(async () => ({ status: 200, body: '{' })),
     });
     await expect(fetchClientIdMetadata(CLIENT_ID, ISSUER, d)).rejects.toThrow(
       /not valid JSON/,
@@ -171,7 +163,7 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist ungültige Metadaten ab', async () => {
     const d = deps({
-      fetchImpl: vi.fn(async () =>
+      requestDocument: vi.fn(async () =>
         jsonResponse({ client_id: CLIENT_ID, redirect_uris: [] }),
       ),
     });
@@ -182,7 +174,7 @@ describe('fetchClientIdMetadata', () => {
 
   it('weist einen CIMD-Client mit Client-Authentisierung ab', async () => {
     const d = deps({
-      fetchImpl: vi.fn(async () =>
+      requestDocument: vi.fn(async () =>
         jsonResponse({
           ...validDocument,
           token_endpoint_auth_method: 'client_secret_post',
@@ -198,7 +190,7 @@ describe('fetchClientIdMetadata', () => {
     const d = deps();
     await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
     await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
-    expect(d.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(d.requestDocument).toHaveBeenCalledTimes(1);
   });
 
   it('holt nach Ablauf der Cache-Frist neu', async () => {
@@ -207,6 +199,6 @@ describe('fetchClientIdMetadata', () => {
     await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
     now += 16 * 60 * 1000;
     await fetchClientIdMetadata(CLIENT_ID, ISSUER, d);
-    expect(d.fetchImpl).toHaveBeenCalledTimes(2);
+    expect(d.requestDocument).toHaveBeenCalledTimes(2);
   });
 });

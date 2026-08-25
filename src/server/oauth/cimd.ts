@@ -1,9 +1,15 @@
-import { lookup } from 'dns/promises';
 import type { OAuthClient } from './types';
 import {
   ClientMetadataError,
   normalizeClientMetadata,
 } from './clientMetadata';
+import {
+  CimdRequestError,
+  defaultResolveHost,
+  requestCimdDocument,
+  type CimdResponse,
+  type HostResolver,
+} from './cimdRequest';
 import { isBlockedAddress, isBlockedHostname } from './ssrf';
 
 /**
@@ -17,8 +23,18 @@ import { isBlockedAddress, isBlockedHostname } from './ssrf';
  *
  * Der Abruf ist der gefährlichste Teil des ganzen Servers: Die URL bestimmt
  * der Aufrufer. Deshalb HTTPS-Pflicht, kein Folgen von Weiterleitungen,
- * Timeout, Größenlimit, SSRF-Filter auf der aufgelösten Adresse — und die
- * Forderung, dass `client_id` im Dokument exakt der Abruf-URL entspricht.
+ * Timeout, Größenlimit, SSRF-Filter — und die Forderung, dass `client_id` im
+ * Dokument exakt der Abruf-URL entspricht.
+ *
+ * Der SSRF-Filter greift **zweimal**, und das ist kein Gürtel-und-Hosenträger:
+ *
+ * 1. Hier, vor dem Verbindungsaufbau — das fängt den offensichtlichen Fall früh
+ *    ab und liefert eine verständliche Meldung.
+ * 2. In der `lookup`-Funktion der Verbindung selbst (`cimdRequest.ts`) — und
+ *    **erst das** schließt die Lücke. Eine Prüfung allein vor dem Aufruf hilft
+ *    nicht: Der HTTP-Client löst den Namen noch einmal auf, und ein Angreifer
+ *    mit eigenem DNS-Server und kurzer TTL antwortet beim zweiten Mal mit einer
+ *    internen Adresse (DNS Rebinding).
  */
 
 const CIMD_TIMEOUT_MS = 5_000;
@@ -27,9 +43,13 @@ const CIMD_CACHE_TTL_MS = 15 * 60 * 1000;
 const CIMD_CACHE_MAX_ENTRIES = 200;
 
 export interface CimdDependencies {
-  fetchImpl?: typeof fetch;
+  /**
+   * Der eigentliche Abruf. In Tests ersetzt; die Vorgabe bindet die Verbindung
+   * an die geprüfte Adresse (siehe `cimdRequest.ts`).
+   */
+  requestDocument?: (url: URL) => Promise<CimdResponse>;
   /** Auflösung des Hostnamens; ausgetauscht in Tests. */
-  resolveHost?: (hostname: string) => Promise<string[]>;
+  resolveHost?: HostResolver;
   now?: () => number;
 }
 
@@ -50,11 +70,6 @@ export function resetCimdCache(): void {
 /** Ist diese `client_id` eine CIMD-URL (und kein DCR-Bezeichner)? */
 export function isCimdClientId(clientId: string): boolean {
   return /^https:\/\//i.test(clientId);
-}
-
-async function defaultResolveHost(hostname: string): Promise<string[]> {
-  const results = await lookup(hostname, { all: true, verbatim: true });
-  return results.map((entry) => entry.address);
 }
 
 /**
@@ -108,6 +123,9 @@ export async function fetchClientIdMetadata(
   const url = assertUsableCimdUrl(clientId);
   const resolveHost = deps.resolveHost ?? defaultResolveHost;
 
+  // Vorprüfung: der offensichtliche Fall wird abgefangen, bevor überhaupt eine
+  // Verbindung aufgebaut wird. Verlassen wird sich darauf nicht — die
+  // maßgebliche Prüfung sitzt in der `lookup`-Funktion der Verbindung.
   let addresses: string[];
   try {
     addresses = await resolveHost(url.hostname);
@@ -117,9 +135,6 @@ export async function fetchClientIdMetadata(
   if (addresses.length === 0) {
     throw new CimdError(`could not resolve ${url.hostname}`);
   }
-  // ALLE aufgelösten Adressen müssen öffentlich sein. Es reicht nicht, die
-  // erste zu prüfen: Ein Angreifer kann mehrere A-Records setzen und darauf
-  // spekulieren, dass der Verbindungsaufbau eine andere wählt.
   const blocked = addresses.find((address) => isBlockedAddress(address));
   if (blocked) {
     throw new CimdError(
@@ -127,39 +142,33 @@ export async function fetchClientIdMetadata(
     );
   }
 
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CIMD_TIMEOUT_MS);
-  let response: Response;
+  const requestDocument =
+    deps.requestDocument ??
+    ((target: URL) =>
+      requestCimdDocument(target, {
+        timeoutMs: CIMD_TIMEOUT_MS,
+        maxBytes: CIMD_MAX_BYTES,
+        resolveHost,
+      }));
+
+  let response: CimdResponse;
   try {
-    response = await fetchImpl(url.toString(), {
-      // Keine Weiterleitungen: Eine 302 auf eine interne Adresse führte am
-      // gesamten SSRF-Filter vorbei, weil der nur die ursprüngliche URL sieht.
-      redirect: 'error',
-      signal: controller.signal,
-      headers: { accept: 'application/json' },
-      cache: 'no-store',
-    });
+    response = await requestDocument(url);
   } catch (err) {
     throw new CimdError(
-      `could not fetch client id metadata: ${(err as Error).message}`,
+      err instanceof CimdRequestError
+        ? err.message
+        : `could not fetch client id metadata: ${(err as Error).message}`,
     );
-  } finally {
-    clearTimeout(timer);
   }
 
-  if (!response.ok) {
+  if (response.status !== 200) {
     throw new CimdError(
       `client id metadata document responded with ${response.status}`,
     );
   }
 
-  const declaredLength = Number(response.headers.get('content-length') || '0');
-  if (declaredLength > CIMD_MAX_BYTES) {
-    throw new CimdError('client id metadata document is too large');
-  }
-
-  const body = await response.text();
+  const body = response.body;
   if (body.length > CIMD_MAX_BYTES) {
     throw new CimdError('client id metadata document is too large');
   }

@@ -71,18 +71,38 @@ Werkzeug, um aus dem Cloud-Run-Container heraus interne Adressen abzufragen —
 allen voran den Metadaten-Server unter `169.254.169.254`, der Tokens des
 Dienst-Kontos ausgibt.
 
-`src/server/oauth/cimd.ts` und `ssrf.ts` setzen deshalb:
+`src/server/oauth/cimd.ts`, `cimdRequest.ts` und `ssrf.ts` setzen deshalb:
 
 - nur HTTPS, kein Standard-abweichender Port, keine Zugangsdaten in der URL,
   kein Fragment;
-- **`redirect: 'error'`** — eine 302 auf eine interne Adresse führte am
-  gesamten Filter vorbei, weil der nur die ursprüngliche URL sieht;
-- DNS-Auflösung vor dem Abruf und Prüfung **aller** aufgelösten Adressen. Es
-  reicht nicht, die erste zu prüfen: Ein Angreifer kann mehrere A-Records
-  setzen und darauf spekulieren, dass der Verbindungsaufbau eine andere wählt;
-- Timeout (5 s) und Größenlimit (64 KiB);
+- **die Verbindung ist an die geprüfte Adresse gebunden.** Das ist der Kern,
+  und eine Prüfung vor dem Abruf allein reicht dafür nicht: Ein HTTP-Client
+  löst den Namen selbst noch einmal auf, und zwischen Prüfung und
+  Verbindungsaufbau liegt ein Zeitfenster. Ein Angreifer mit eigenem
+  DNS-Server und kurzer TTL antwortet beim ersten Mal öffentlich und beim
+  zweiten Mal intern — **DNS Rebinding**; die Prüfung hätte genau die Adresse
+  gesehen, die nicht verwendet wird. Deshalb läuft der Abruf über
+  `https.request` mit eigener `lookup`-Funktion: Die Prüfung sitzt *in* der
+  Auflösung, die die Verbindung benutzt. Die TLS-Prüfung bleibt vollständig,
+  weil der `servername` weiterhin aus dem Host der URL kommt und nicht aus der
+  Adresse;
+- Prüfung **aller** aufgelösten Adressen, nicht nur der ersten: Ein Angreifer
+  kann mehrere A-Records setzen und darauf spekulieren, dass der
+  Verbindungsaufbau eine andere wählt. Ist eine gesperrt, wird der ganze Satz
+  verworfen;
+- **keine Weiterleitungen** — `https.request` folgt ihnen von sich aus nicht,
+  und ohne 200 bricht der Aufrufer ab. Eine 302 auf eine interne Adresse führte
+  sonst am Filter vorbei, weil der nur die erste URL sieht;
+- Timeout (5 s) und Größenlimit (64 KiB), Letzteres **beim Lesen** und nicht
+  erst am fertigen Körper — ein `content-length`-Header ist eine Behauptung des
+  Gegenübers;
 - `client_id` im Dokument **muss exakt** der Abruf-URL entsprechen. Ohne diese
   Bindung könnte jeder ein fremdes Dokument als seine `client_id` ausgeben.
+
+Zusätzlich prüft `fetchClientIdMetadata` die Adressen schon vor dem
+Verbindungsaufbau. Das ist keine zweite Verteidigungslinie, sondern Bequemlichkeit:
+Der offensichtliche Fall wird früh und mit verständlicher Meldung abgewiesen.
+Verlassen wird sich darauf nicht.
 
 ## Sicherheits-Muss-Kriterien und wo sie stehen
 
