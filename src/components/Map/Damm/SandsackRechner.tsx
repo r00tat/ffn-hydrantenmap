@@ -17,13 +17,24 @@ import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Menu from '@mui/material/Menu';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import type { LatLngPosition } from '../../../common/geo';
+import { terrainClient } from '../../../common/terrain/terrainClient';
 import useDammLinien from '../../../hooks/useDammLinien';
 import useFirecallItemAdd from '../../../hooks/useFirecallItemAdd';
 import useFirecallItemUpdate from '../../../hooks/useFirecallItemUpdate';
+import useWasserstandSzenarien from '../../../hooks/useWasserstandSzenarien';
 import type { Line } from '../../firebase/firestore';
+import { calculateDistance } from '../../FirecallItems/elements/connection/distance';
+import { connectionDisplayPositions } from '../../FirecallItems/elements/connection/streetRouting';
 import { dammSumme } from '../../FirecallItems/elements/damm/dammSumme';
+import {
+  dammHoeheAusWasserstand,
+  wasserstandeFuerLinie,
+} from '../../FirecallItems/elements/damm/dammWasserstand';
 import { buildDammbauDiaryEntry } from '../../FirecallItems/elements/damm/dammbauDiaryEntry';
 import {
   DAMM_BAUWEISEN,
@@ -101,7 +112,19 @@ const VORGABEN: {
  * werden zu `undefined`: Ein geschriebener Wert wäre eine Handeingabe und
  * schaltete den Rechner von der Tabelle auf die Geometrie um.
  */
-function gespeichert(params: DammbauParams, enabled: boolean): Partial<Line> {
+/**
+ * Der Entwurf als Feldsatz des Elements.
+ *
+ * `wasserQuelle` kommt nicht aus den Reglerwerten, sondern daneben: es ist die
+ * **Herkunft** der Höhe, nicht ihre Eingabe. Leere Strings filtert
+ * `useFirecallItemUpdate` heraus — damit löscht eine Handeingabe die Herkunft,
+ * ohne dass es einen eigenen Löschweg braucht.
+ */
+function gespeichert(
+  params: DammbauParams,
+  enabled: boolean,
+  wasserQuelle?: { id?: string }
+): Partial<Line> {
   const {
     fuellTrichter,
     saeckeRoedeln,
@@ -120,6 +143,8 @@ function gespeichert(params: DammbauParams, enabled: boolean): Partial<Line> {
     fuellLeistung,
     transportLeistung,
     verbauLeistung,
+    dammHoeheQuelle: wasserQuelle ? 'wasserstand' : '',
+    dammWasserstandId: wasserQuelle?.id ?? '',
   };
 }
 
@@ -150,6 +175,12 @@ export default function SandsackRechner({
     dammbauParams(item)
   );
   const [requested, setRequested] = useState(false);
+  const tWasser = useTranslations('wasserstand');
+  const szenarien = useWasserstandSzenarien();
+  const [wasserMenu, setWasserMenu] = useState<HTMLElement | null>(null);
+  const [wasserHerkunft, setWasserHerkunft] = useState<string>();
+  const [wasserHinweis, setWasserHinweis] = useState<string>();
+  const [wasserQuelle, setWasserQuelle] = useState<{ id?: string }>();
 
   const draft = useMemo(
     () =>
@@ -163,16 +194,109 @@ export default function SandsackRechner({
   // anderes als die Zeilen darüber.
   const summe = useMemo(() => {
     const andere = linien.filter((linie) => linie.id !== item.id);
-    return dammSumme([...andere, { ...item, ...gespeichert(params, enabled) }]);
-  }, [linien, item, enabled, params]);
+    return dammSumme([
+      ...andere,
+      { ...item, ...gespeichert(params, enabled, wasserQuelle) },
+    ]);
+  }, [linien, item, enabled, params, wasserQuelle]);
 
   const set = <K extends keyof DammbauParams>(
     key: K,
     value: DammbauParams[K]
   ) => setParams((previous) => ({ ...previous, [key]: value }));
 
+  /**
+   * Abtastung alle 10 m — dieselbe Weite wie das Höhenprofil der
+   * Löschwasserförderung, und dieselbe Trasse: mit aktivem Straßen-Routing der
+   * tatsächliche Straßenverlauf.
+   */
+  const abtastPunkte = useCallback((): LatLngPosition[] => {
+    const positions = connectionDisplayPositions(item);
+    const points: LatLngPosition[] = [];
+    for (let index = 0; index + 1 < positions.length; index += 1) {
+      const from = positions[index];
+      const to = positions[index + 1];
+      const meters = calculateDistance([from, to]);
+      const steps = Math.max(1, Math.round(meters / 10));
+      for (let step = 0; step < steps; step += 1) {
+        const f = step / steps;
+        points.push([
+          from[0] + (to[0] - from[0]) * f,
+          from[1] + (to[1] - from[1]) * f,
+        ]);
+      }
+    }
+    if (positions.length > 0) points.push(positions[positions.length - 1]);
+    return points;
+  }, [item]);
+
+  const uebernehmeWasserstand = useCallback(
+    async (szenario: (typeof szenarien)[number]) => {
+      setWasserMenu(null);
+      setWasserHinweis(undefined);
+      const positions = abtastPunkte();
+      let samples: { position: LatLngPosition; heightM: number }[] = [];
+      try {
+        const heights = await terrainClient().sample(positions);
+        samples = positions
+          .map((position, index) => ({ position, height: heights[index] }))
+          .filter((entry) => entry.height !== null)
+          .map((entry) => ({
+            position: entry.position,
+            heightM: (entry.height as { heightM: number }).heightM,
+          }));
+      } catch (err) {
+        console.error('Höhen entlang der Dammlinie nicht verfügbar', err);
+        setWasserHinweis(tWasser('failed'));
+        return;
+      }
+
+      const result = dammHoeheAusWasserstand({
+        item,
+        szenario,
+        samples,
+        freibord: params.freibord,
+        maxHoehe: HOEHE_MAX,
+      });
+      if (result.keinWasserstand) {
+        setWasserHinweis(tWasser('warnNoBase'));
+        return;
+      }
+      if (result.trocken || result.dammHoehe === undefined) {
+        setWasserHinweis(tWasser('lineDry'));
+        return;
+      }
+      set('dammHoehe', result.dammHoehe);
+      setWasserQuelle({ id: szenario.id });
+      setWasserHerkunft(
+        tWasser('takenFrom', {
+          name: szenario.name || tWasser('layerName'),
+          level: (result.wasserstandM ?? 0).toFixed(2),
+          grid: szenario.wasserStufe === 'detail' ? 1 : 10,
+        })
+      );
+      if (result.ueberMax) {
+        setWasserHinweis(tWasser('overMax', { value: HOEHE_MAX }));
+      }
+    },
+    // `set` ist über `setParams` stabil und steht absichtlich nicht in der
+    // Liste — es würde die Funktion bei jedem Rendern neu erzeugen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [abtastPunkte, item, params.freibord, szenarien, tWasser]
+  );
+
+  /** Eine Höhe von Hand löscht die Herkunft: sie kommt dann nicht mehr aus dem Modell. */
+  const setHoeheVonHand = (value: number) => {
+    setWasserQuelle(undefined);
+    setWasserHerkunft(undefined);
+    set('dammHoehe', value);
+  };
+
   const persist = async () => {
-    await updateItem({ ...item, ...gespeichert(params, enabled) });
+    await updateItem({
+      ...item,
+      ...gespeichert(params, enabled, wasserQuelle),
+    });
   };
 
   const handleApply = async () => {
@@ -216,6 +340,10 @@ export default function SandsackRechner({
             view.bedarf.saeckeSource === 'tabelle'
               ? t('diarySourceTable')
               : t('diarySourceGeometry'),
+          heightSource:
+            wasserQuelle || item.dammHoeheQuelle === 'wasserstand'
+              ? tWasser('heightFromModel')
+              : undefined,
           funnel: t('diaryFunnel'),
           tie: t('diaryTie'),
           work: (hours, personal) => t('diaryWork', { hours, personal }),
@@ -381,7 +509,7 @@ export default function SandsackRechner({
                   valueLabelDisplay="auto"
                   aria-label={t('height')}
                   onChange={(_event, value) =>
-                    set('dammHoehe', value as number)
+                    setHoeheVonHand(value as number)
                   }
                 />
               </Grid>
@@ -394,14 +522,81 @@ export default function SandsackRechner({
                   value={params.dammHoehe}
                   slotProps={{ htmlInput: { step: 0.1 } }}
                   onChange={(event) =>
-                    set(
-                      'dammHoehe',
+                    setHoeheVonHand(
                       parseNumber(event.target.value, params.dammHoehe)
                     )
                   }
                 />
               </Grid>
             </Grid>
+
+            {/* Die Höhe aus dem Wasserstandsmodell statt aus der Schätzung.
+                Der Tooltip liegt um ein `<span>`, weil der Knopf `disabled`
+                sein kann; die `Typography` tragen `component="div"` — beides
+                Hausregeln aus CLAUDE.md. */}
+            <Box sx={{ mt: 0.5 }}>
+              <Tooltip title={tWasser('takeWaterLevel')}>
+                <span>
+                  <Button
+                    size="small"
+                    startIcon={<WaterDropIcon />}
+                    disabled={szenarien.length === 0}
+                    onClick={(event) => {
+                      const geordnet = wasserstandeFuerLinie(
+                        szenarien,
+                        abtastPunkte()
+                      );
+                      if (geordnet.length === 1) {
+                        void uebernehmeWasserstand(geordnet[0]);
+                        return;
+                      }
+                      setWasserMenu(event.currentTarget);
+                    }}
+                  >
+                    {tWasser('takeWaterLevel')}
+                  </Button>
+                </span>
+              </Tooltip>
+              {szenarien.length === 0 && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="div"
+                >
+                  {tWasser('noScenario')}
+                </Typography>
+              )}
+              {wasserHerkunft && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  component="div"
+                >
+                  {wasserHerkunft}
+                </Typography>
+              )}
+              {wasserHinweis && (
+                <Typography variant="caption" color="error" component="div">
+                  {wasserHinweis}
+                </Typography>
+              )}
+              <Menu
+                anchorEl={wasserMenu}
+                open={Boolean(wasserMenu)}
+                onClose={() => setWasserMenu(null)}
+              >
+                {wasserstandeFuerLinie(szenarien, abtastPunkte()).map(
+                  (szenario) => (
+                    <MenuItem
+                      key={szenario.id}
+                      onClick={() => void uebernehmeWasserstand(szenario)}
+                    >
+                      {szenario.name || tWasser('layerName')}
+                    </MenuItem>
+                  )
+                )}
+              </Menu>
+            </Box>
 
             {/* Das Freibord sagt, welcher Wasserstand mit dieser Höhe noch
                 gehalten wird. Die Dammhöhe bleibt die Eingabe: Sonst gäbe es

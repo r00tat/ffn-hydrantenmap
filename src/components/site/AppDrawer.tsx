@@ -17,6 +17,7 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import FolderSharedIcon from '@mui/icons-material/FolderShared';
 import FoundationIcon from '@mui/icons-material/Foundation';
+import FloodIcon from '@mui/icons-material/Flood';
 import GroupIcon from '@mui/icons-material/Group';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import HelpCenterIcon from '@mui/icons-material/HelpCenter';
@@ -234,6 +235,14 @@ export default function AppDrawer({
           icon: <FoundationIcon />,
           href: '/dammbau',
           einsatzSection: 'dammbau',
+        },
+        {
+          // Die Frage nach der überfluteten Fläche steht vor dem Dammbau: sie
+          // sagt erst, wo überhaupt ein Damm gebraucht wird.
+          text: t('hochwasser'),
+          icon: <FloodIcon />,
+          href: '/hochwasser',
+          einsatzSection: 'hochwasser',
         },
       ],
     },

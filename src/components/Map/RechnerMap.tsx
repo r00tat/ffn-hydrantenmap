@@ -11,8 +11,9 @@ import {
   WMSTileLayer,
   useMap,
 } from 'react-leaflet';
+import type { LatLngPosition } from '../../common/geo';
 import { defaultPosition } from '../../hooks/constants';
-import type { MultiPointItem } from '../firebase/firestore';
+import type { FirecallItem, MultiPointItem } from '../firebase/firestore';
 import { getConnectionPositions } from '../FirecallItems/elements/connection/distance';
 import LeitungenDraw from './Leitungen/Draw';
 import { availableLayers } from './tiles';
@@ -36,7 +37,7 @@ import { availableLayers } from './tiles';
 
 export interface RechnerMapProps {
   /** Die Elemente, auf die die Karte einmal einrückt. */
-  items: MultiPointItem[];
+  items: (MultiPointItem | FirecallItem)[];
   children: ReactNode;
 }
 
@@ -46,14 +47,20 @@ export interface RechnerMapProps {
  * Nur beim ersten Mal je Anzahl: Ein Nachrücken bei jeder Änderung riss die
  * Karte unter der Hand weg, während man einen Punkt betrachtet.
  */
-function FitToItems({ items }: { items: MultiPointItem[] }) {
+function FitToItems({ items }: { items: (MultiPointItem | FirecallItem)[] }) {
   const map = useMap();
   const bounds = useMemo(() => {
-    const points = items.flatMap((item) =>
-      getConnectionPositions(item).filter(
+    const points = items.flatMap((item) => {
+      const positions = getConnectionPositions(item as MultiPointItem).filter(
         ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
-      )
-    );
+      );
+      // Ein Punkt-Element hat keine Punktliste, aber eine Position. Ohne diesen
+      // Zweig rückte die Karte auf einer Seite mit nur Punkt-Elementen nie ein.
+      if (positions.length > 0) return positions;
+      return Number.isFinite(item.lat) && Number.isFinite(item.lng)
+        ? [[item.lat, item.lng] as LatLngPosition]
+        : [];
+    });
     return points.length > 0 ? L.latLngBounds(points) : undefined;
   }, [items]);
 

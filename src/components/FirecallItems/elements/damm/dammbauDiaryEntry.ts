@@ -35,6 +35,15 @@ export interface DammbauDiaryLabels {
   carry: (metres: number, helpers: number) => string;
   /** Woher die Sackzahl kommt — Tabelle oder Handeingabe. */
   source: string;
+  /**
+   * Woher die Dammhöhe kommt — nur gesetzt, wenn sie aus dem
+   * Wasserstandsmodell übernommen wurde.
+   *
+   * Als Text und nicht als Schalter: dieser Builder trägt keinen einzigen
+   * eigenen Satz, alle Wörter kommen vom Aufrufer. Ein hier eingebauter
+   * deutscher String wäre in der englischen Fassung deutsch.
+   */
+  heightSource?: string;
   /** Nur wenn eine Füllhilfe im Einsatz ist. */
   funnel: string;
   /** Nur wenn die Säcke zugebunden werden. */
@@ -78,11 +87,13 @@ export function buildDammbauDiaryEntry(input: DammbauDiaryInput): Diary {
   const lines = [
     // Erst der Damm, dann das Material, dann die Kräfte — in der Reihenfolge,
     // in der die Anforderung gelesen wird.
+    // Woher die Höhe kommt, gehört in die Materialanforderung: eine Zahl aus
+    // dem Modell ist im Führungsvorgang etwas anderes als eine geschätzte.
     labels.section(
       Math.round(view.laenge),
       round(params.dammHoehe, 2),
       input.bauweiseLabel
-    ),
+    ) + (labels.heightSource ? ` (${labels.heightSource})` : ''),
     labels.waterLevel(
       round(bedarf.wasserstand, 2),
       round(params.freibord, 2)

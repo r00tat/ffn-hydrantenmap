@@ -26,6 +26,13 @@ export const leafletIcons = (): IconMap => {
       popupAnchor: [0, -25],
     }),
 
+    wasserstand: L.icon({
+      iconUrl: `/icons/wasserstand.svg`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+      popupAnchor: [0, -25],
+    }),
+
     el: L.icon({
       iconUrl: `/icons/el.svg`,
       iconSize: [30, 30],

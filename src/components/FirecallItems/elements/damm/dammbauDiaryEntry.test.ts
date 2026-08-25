@@ -177,6 +177,30 @@ describe('buildDammbauDiaryEntry', () => {
     expect(text).toContain('Kräfte gesamt:');
   });
 
+  it('nennt die Herkunft, wenn die Höhe aus dem Modell kommt', () => {
+    const text = buildDammbauDiaryEntry({
+      dammName: 'Uferstraße',
+      view,
+      timestamp: '2026-08-23T10:00:00.000Z',
+      bauweiseLabel: 'Pyramidenstapel',
+      formatLabel: '30 × 60 cm',
+      labels: { ...labels, heightSource: 'aus Wasserstandsmodell' },
+    }).beschreibung!;
+    expect(text).toContain('aus Wasserstandsmodell');
+  });
+
+  it('nennt keine Herkunft, wenn die Höhe von Hand kommt', () => {
+    const text = buildDammbauDiaryEntry({
+      dammName: 'Uferstraße',
+      view,
+      timestamp: '2026-08-23T10:00:00.000Z',
+      bauweiseLabel: 'Pyramidenstapel',
+      formatLabel: '30 × 60 cm',
+      labels,
+    }).beschreibung!;
+    expect(text).not.toContain('aus Wasserstandsmodell');
+  });
+
   it('lässt die Summe weg, wenn es nur diesen Abschnitt gibt', () => {
     const summe = dammSumme([line({ name: 'Uferstraße' })]);
     const text = buildDammbauDiaryEntry({
