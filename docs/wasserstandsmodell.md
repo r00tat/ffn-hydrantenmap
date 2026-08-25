@@ -54,7 +54,7 @@ Wasserstand und Datenquelle. Eine Fläche ohne diese Angaben wird als Tatsache g
 
 Bedient wird so: Punkt ins Gewässer setzen, Zuschlag wählen. Der Wasserstand ist
 
-```
+```text
 h = Geländehöhe am Saatpunkt + Zuschlag
 ```
 
@@ -68,7 +68,7 @@ es ist die **heikelste Größe** des ganzen Höhenmodells.
 Mit dem angeklickten Punkt rechnet das Modell nur mit **Differenzen von Höhen desselben
 Modells**. Der Adria-Versatz kürzt sich vollständig heraus:
 
-```
+```text
 Tiefe = h − Gelände = (Gelände am Saatpunkt + Zuschlag) − Gelände
 ```
 
@@ -336,7 +336,7 @@ Einsatzgebiet.
 ## 11a. Der Umkreis
 
 Neben dem Rechenbudget gibt es einen **Umkreis** um den Saatpunkt
-(`wasserRadius`, Vorbelegung 3 km, `0` heißt unbegrenzt).
+(`wasserRadius`, Vorbelegung 500 m, `0` heißt unbegrenzt).
 
 Der Grund ist eine Eigenschaft der Badewanne, die in der Lage sofort auffällt:
 **sie läuft über ein Seebecken hinweg weiter.** Der Neusiedler See liegt unter jedem
@@ -384,7 +384,7 @@ An der Dammlinie steht „Wasserstand aus dem Modell". Der Knopf tastet die Tras
 — mit aktivem Straßen-Routing den tatsächlichen Verlauf, dieselbe Weite wie das Höhenprofil
 der Löschwasserförderung — und setzt
 
-```
+```text
 Dammhöhe = größte Wassertiefe entlang der Linie + Freibord
 ```
 

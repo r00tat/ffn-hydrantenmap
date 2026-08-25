@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Wasserstand } from '../../components/firebase/firestore';
 import {
   parseWasserBaender,
+  RADIUS_MAX,
+  RADIUS_MIN,
   serialiseWasserBaender,
   WASSERSTAND_DEFAULTS,
   WASSERSTAND_MODEL_VERSION,
@@ -33,6 +35,25 @@ describe('wasserstand', () => {
   it('nimmt die Vorbelegung, wenn kein Zuschlag gesetzt ist', () => {
     const params = wasserstandParams(szenario({ wasserZuschlag: undefined }));
     expect(params.zuschlag).toBe(WASSERSTAND_DEFAULTS.zuschlag);
+  });
+
+  it('begrenzt den Umkreis auf den Bereich des Reglers', () => {
+    expect(wasserstandParams(szenario({ wasserRadius: undefined })).radiusM).toBe(
+      WASSERSTAND_DEFAULTS.radiusM
+    );
+    expect(wasserstandParams(szenario({ wasserRadius: -5 })).radiusM).toBe(
+      RADIUS_MIN
+    );
+    expect(wasserstandParams(szenario({ wasserRadius: 999_999 })).radiusM).toBe(
+      RADIUS_MAX
+    );
+  });
+
+  it('die Vorbelegung des Umkreises bleibt in der Nahumgebung', () => {
+    // Nicht der Wert selbst ist die Aussage, sondern die Größenordnung: die
+    // Vorbelegung darf nicht ungefragt Kacheln über Kilometer laden.
+    expect(WASSERSTAND_DEFAULTS.radiusM).toBeGreaterThan(0);
+    expect(WASSERSTAND_DEFAULTS.radiusM).toBeLessThanOrEqual(1000);
   });
 
   it('die Signatur schlägt bei jeder Eingabe um', () => {

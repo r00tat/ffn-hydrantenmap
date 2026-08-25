@@ -39,10 +39,12 @@ export const WASSERSTAND_DEFAULTS = {
    * Nicht unbegrenzt: Ohne Umkreis läuft die Füllung über den Neusiedler See
    * hinweg weiter — der liegt unter jedem Hochwasserstand seiner Zuflüsse — und
    * endet erst am Rechenbudget. Ein Budget in Kacheln ist aber keine Aussage
-   * über das Einsatzgebiet, ein Umkreis schon. 3 km deckt eine
-   * Ortsgebiets-Lage ab und lässt sich am Regler vergrößern.
+   * über das Einsatzgebiet, ein Umkreis schon. 500 m deckt die unmittelbare
+   * Umgebung des Saatpunkts ab, rechnet schnell und lässt sich am Regler
+   * vergrößern — die Vorbelegung ist bewusst klein gewählt, weil ein zu
+   * großer Umkreis Kacheln lädt, die niemand angesehen hat.
    */
-  radiusM: 3000,
+  radiusM: 500,
   farbe: '#1565c0',
   deckkraft: 45,
 };

@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { wasserstandSignature } from '../../../common/terrain/wasserstand';
+import {
+  WASSERSTAND_DEFAULTS,
+  wasserstandSignature,
+} from '../../../common/terrain/wasserstand';
 import { renderWithIntl } from '../../../test-utils/intlRender';
 import type { Wasserstand } from '../../firebase/firestore';
 import WasserstandRechner from './WasserstandRechner';
@@ -42,6 +45,17 @@ describe('WasserstandRechner', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/116\.30/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Berechnen/ })).toBeEnabled();
+  });
+
+  it('nennt die Einheit am Umkreis und am Zuschlag', () => {
+    renderWithIntl(<WasserstandRechner item={szenario()} />);
+    const umkreis = screen.getByLabelText(
+      'Umkreis der Berechnung in m'
+    ) as HTMLInputElement;
+    expect(umkreis.value).toBe(`${WASSERSTAND_DEFAULTS.radiusM}`);
+    expect(screen.getByLabelText('Zuschlag in m')).toBeInTheDocument();
+    // Das „m" steht als Endung im Feld, nicht nur in der Überschrift.
+    expect(screen.getAllByText('m').length).toBeGreaterThanOrEqual(2);
   });
 
   it('ohne Basishöhe wird nicht gerechnet', () => {

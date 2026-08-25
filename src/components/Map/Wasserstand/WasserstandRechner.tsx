@@ -4,6 +4,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import InputAdornment from '@mui/material/InputAdornment';
 import LinearProgress from '@mui/material/LinearProgress';
 import Slider from '@mui/material/Slider';
 import TextField from '@mui/material/TextField';
@@ -72,6 +73,18 @@ export default function WasserstandRechner({
 
   const levelM =
     params.basisHoehe !== undefined ? params.basisHoehe + zuschlag : undefined;
+
+  /**
+   * Beschriftung des Umkreis-Reglers. Unter einem Kilometer in Metern — die
+   * Vorbelegung liegt bei 500 m, und „0,5 km" liest sich schlechter als
+   * „500 m". Darüber in km, damit die Zahl kurz bleibt.
+   */
+  const formatRadius = (value: number) =>
+    value === 0
+      ? t('radiusUnlimited')
+      : value >= 1000
+        ? `${(value / 1000).toFixed(1)} ${t('unitKilometers')}`
+        : `${value} ${t('unitMeters')}`;
 
   /**
    * Der Saatpunkt, oder `undefined` — `lat`/`lng` sind an `FirecallItem`
@@ -186,8 +199,17 @@ export default function WasserstandRechner({
             onChange={(event) =>
               setZuschlag(round(parseNumber(event.target.value, zuschlag), 2))
             }
-            sx={{ width: 90 }}
-            slotProps={{ htmlInput: { 'aria-label': t('surcharge') } }}
+            sx={{ width: 110 }}
+            slotProps={{
+              htmlInput: { 'aria-label': t('surcharge') },
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {t('unitMeters')}
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
         </Box>
 
@@ -201,9 +223,7 @@ export default function WasserstandRechner({
             max={RADIUS_MAX}
             step={RADIUS_STEP}
             valueLabelDisplay="auto"
-            valueLabelFormat={(value: number) =>
-              value === 0 ? t('radiusUnlimited') : `${(value / 1000).toFixed(1)} km`
-            }
+            valueLabelFormat={formatRadius}
             onChange={(_event, value) => setRadius(value as number)}
             sx={{ flexGrow: 1 }}
           />
@@ -213,8 +233,17 @@ export default function WasserstandRechner({
             onChange={(event) =>
               setRadius(round(parseNumber(event.target.value, radius), 0))
             }
-            sx={{ width: 110 }}
-            slotProps={{ htmlInput: { 'aria-label': t('radius') } }}
+            sx={{ width: 130 }}
+            slotProps={{
+              htmlInput: { 'aria-label': t('radius') },
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {t('unitMeters')}
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
         </Box>
         <Typography variant="caption" color="text.secondary" component="div">
@@ -280,9 +309,7 @@ export default function WasserstandRechner({
 
         {item.wasserAbbruch === 'radius' && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            {t('warnRadius', {
-              value: ((item.wasserRadius ?? 0) / 1000).toFixed(1),
-            })}
+            {t('warnRadius', { value: item.wasserRadius ?? 0 })}
           </Alert>
         )}
 

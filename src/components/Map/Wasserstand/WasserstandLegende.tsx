@@ -98,9 +98,7 @@ export default function WasserstandLegende({
           color="text.secondary"
           sx={{ display: 'block' }}
         >
-          {t('warnRadius', {
-            value: ((item.wasserRadius ?? 0) / 1000).toFixed(1),
-          })}
+          {t('warnRadius', { value: item.wasserRadius ?? 0 })}
         </Typography>
       )}
       {item.wasserAbbruch === 'budget' && (
