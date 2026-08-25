@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { mercatorX, mercatorY } from '../../../common/terrain/terrainMesh';
 import type { TerrainMesh } from '../../../common/terrain/terrainTypes';
 import {
+  contourLabels,
   contourPaths,
   markerPlacements,
   pumpPlacements,
+  ringPolygons,
   scenePath,
   sceneProjector,
+  waterSurfaces,
 } from './sceneObjects';
 
 /**
@@ -156,5 +159,105 @@ describe('contourPaths', () => {
       0
     );
     expect(paths[0].points[1]).toBeCloseTo(111, 6);
+  });
+});
+
+describe('ringPolygons', () => {
+  const square = (size: number): { x: number; z: number }[] => [
+    { x: -size, z: -size },
+    { x: size, z: -size },
+    { x: size, z: size },
+    { x: -size, z: size },
+  ];
+
+  it('erkennt einen Ring im Ring als Loch', () => {
+    const polygons = ringPolygons([square(100), square(20)]);
+    expect(polygons).toHaveLength(1);
+    expect(polygons[0].holes).toHaveLength(1);
+    expect(polygons[0].outer[1].x).toBe(100);
+  });
+
+  it('lässt getrennte Ringe getrennt', () => {
+    const shifted = square(10).map((p) => ({ x: p.x + 500, z: p.z }));
+    const polygons = ringPolygons([square(10), shifted]);
+    expect(polygons).toHaveLength(2);
+    expect(polygons.every((p) => p.holes.length === 0)).toBe(true);
+  });
+
+  it('macht aus einer Insel im Loch wieder eine Fläche', () => {
+    // Even-odd: Umriss, Loch, Insel darin.
+    const polygons = ringPolygons([square(100), square(50), square(10)]);
+    expect(polygons).toHaveLength(2);
+    const outer = polygons.find((p) => p.outer[1].x === 100);
+    expect(outer?.holes).toHaveLength(1);
+  });
+
+  it('übergeht Ringe mit weniger als drei Punkten', () => {
+    expect(
+      ringPolygons([
+        [
+          { x: 0, z: 0 },
+          { x: 1, z: 1 },
+        ],
+      ])
+    ).toHaveLength(0);
+  });
+});
+
+describe('waterSurfaces', () => {
+  it('übergeht ein Element ohne gerechnete Fläche', () => {
+    const projector = sceneProjector(testMesh());
+    const surfaces = waterSurfaces(
+      [
+        {
+          id: 'w',
+          name: 'Hochwasser',
+          type: 'wasserstand',
+          lat: 47.95,
+          lng: 16.85,
+        } as never,
+      ],
+      projector
+    );
+    expect(surfaces).toHaveLength(0);
+  });
+});
+
+describe('contourLabels', () => {
+  const line = (heightM: number) => ({
+    heightM,
+    closed: false,
+    points: [
+      [47.949, 16.849],
+      [47.95, 16.85],
+      [47.951, 16.851],
+    ] as [number, number][],
+  });
+
+  it('beschriftet nur die Zähllinien', () => {
+    const projector = sceneProjector(testMesh());
+    // Bei 1 m Äquidistanz ist jede fünfte Linie eine Zähllinie.
+    const labels = contourLabels(
+      [line(110), line(111), line(115)],
+      projector,
+      1
+    );
+    expect(labels.map((l) => l.text)).toEqual(['110', '115']);
+  });
+
+  it('dünnt gleichmäßig aus, statt vorne abzuschneiden', () => {
+    const projector = sceneProjector(testMesh());
+    const many = Array.from({ length: 40 }, (_, i) => line(5 * (i + 1)));
+    const labels = contourLabels(many, projector, 1, 4);
+    expect(labels).toHaveLength(4);
+    // Der letzte Wert stammt aus dem hinteren Teil der Liste, nicht aus den
+    // ersten vier.
+    expect(Number(labels[3].text)).toBeGreaterThan(100);
+  });
+
+  it('setzt die Angabe auf die Höhe der Linie', () => {
+    const projector = sceneProjector(testMesh());
+    const labels = contourLabels([line(115)], projector, 1);
+    expect(labels[0].heightM).toBe(115);
   });
 });

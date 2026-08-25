@@ -23,7 +23,7 @@ import type {
 } from '../../../common/terrain/terrainTypes';
 import type { FirecallItem } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
-import { contourColor } from '../layers/hoehenlinien';
+import { contourColor, contourLabelColor } from '../layers/hoehenlinien';
 import {
   chooseExaggeration,
   EXAGGERATION_MAX,
@@ -38,10 +38,12 @@ import {
 } from './gelaende3dScene';
 import {
   connectionPaths,
+  contourLabels,
   contourPaths,
   markerPlacements,
   pumpPlacements,
   sceneProjector,
+  waterSurfaces,
 } from './sceneObjects';
 import { composeTexture, findLayerConfig, tileGrid } from './terrainTexture';
 
@@ -163,6 +165,9 @@ export default function Gelaende3dDialog({
         );
         scene.setPaths(connectionPaths(items, projector), 0x2196f3, 4);
         scene.setPumps(pumpPlacements(items, projector));
+        // Der Wasserspiegel vor der Textur: er ist im Hochwasserfall die
+        // Aussage, auf die man wartet, und soll nicht auf die Kacheln warten.
+        scene.setWater(waterSurfaces(items, projector));
         setStatus('ready');
 
         const config = findLayerConfig(baseLayerName);
@@ -177,8 +182,14 @@ export default function Gelaende3dDialog({
         const dark = theme.palette.mode === 'dark';
         const min = contours.minM ?? result.minM;
         const max = contours.maxM ?? result.maxM;
-        scene.setContours(contourPaths(contours.lines, projector), (heightM) =>
-          contourColor(heightM, min, max, dark)
+        const colorOf = (heightM: number) =>
+          contourColor(heightM, min, max, dark);
+        scene.setContours(contourPaths(contours.lines, projector), colorOf);
+        // Ohne die Höhenangabe ist eine Höhenlinie nur ein Strich: man sieht,
+        // dass es steiler wird, aber nicht, worauf.
+        scene.setContourLabels(
+          contourLabels(contours.lines, projector, equidistanceM),
+          (heightM) => contourLabelColor(heightM, min, max, dark)
         );
       } catch (err) {
         console.error('3D-Ansicht konnte nicht aufgebaut werden', err);

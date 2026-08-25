@@ -168,6 +168,59 @@ eine weit entfernte nicht verschwindet. Die Größe ist ein Anteil der Bildhöhe
 eine Marke in der Karte. Größer gesetzt decken dreißig Objekte das Gelände zu,
 das sie erklären sollen.
 
+## Die Wasserflächen sind ein Spiegel, keine eingefärbte Zone
+
+Das Wasserstandsmodell ([docs/wasserstandsmodell.md](wasserstandsmodell.md))
+speichert seine Flutfläche am Element als Tiefenbänder. Die Karte färbt diese
+Bänder ein — in der Fläche ist das die einzige Möglichkeit, Tiefe zu zeigen.
+
+In der Szene ist die ehrlichere Darstellung eine **waagrechte Ebene auf der Höhe
+des Wasserstands**: das Gelände ragt daraus hervor oder eben nicht, und genau
+das ist die Frage im Hochwasserfall. Die Tiefe steht dann bereits zwischen dem
+Spiegel und dem Gelände darunter — die Bänder werden dafür nicht gebraucht. Es
+zählt nur der 0-m-Ring, also der Umriss der nassen Fläche.
+
+Der Wasserstand ist `Basishöhe + Zuschlag` in EVRF2000 — dieselbe Skala wie die
+Höhen im Netz, ohne Umrechnung. Ein Element ohne Basishöhe hat keinen Spiegel
+und wird übergangen; eine Fläche ohne Höhe wäre eine Behauptung.
+
+Die Ringe werden nach **Even-odd** in Umrisse und Löcher zerlegt (`ringPolygons`)
+— dieselbe Regel, mit der die Karte die Fläche füllt. Eine andere Regel hier
+hieße, dass die überflutete Fläche in 3D eine andere wäre als in der Karte, und
+eine Insel im Hochwasser ist genau die Stelle, auf die man schaut.
+
+Der Spiegel schreibt **nicht in den Tiefenpuffer** (`depthWrite: false`): sonst
+verdeckte er Leitungen und Marken, die hinter ihm liegen. Sichtbar ist er von
+beiden Seiten — man schaut auch von unterhalb des Spiegels auf die Lage, wenn
+die Kamera im Tal steht.
+
+Da der Spiegel flach ist, macht ihm die Überhöhung nichts: er liegt in der
+überhöhten Gruppe und wandert mit dem Gelände, bleibt aber eine Ebene.
+
+## Die Höhenlinien tragen ihre Höhe
+
+Ohne die Angabe ist eine Höhenlinie nur ein Strich — man sieht, dass es steiler
+wird, aber nicht, worauf. Beschriftet werden dieselben Linien wie in der Karte:
+die **Zähllinien** (`isIndexContour`), nicht jede. Bei 0,5 m Äquidistanz hat ein
+flacher Ausschnitt über tausend Linienstücke; jedes beschriftet wäre eine Wand
+aus Zahlen.
+
+Höchstens 60 Angaben stehen im Bild, und wenn es mehr Kandidaten gibt, wird
+**gleichmäßig ausgedünnt** statt vorne abgeschnitten — sonst wäre die eine
+Bildhälfte beschriftet und die andere nicht. Die Angabe sitzt in der Mitte des
+Zuges; an den Enden läuft eine Linie oft aus dem Bild.
+
+Gezeichnet wird der Text auf ein Canvas (`labelCanvas.ts`) — in der Szene gibt
+es kein DOM. Statt eines Kastens hinter der Zahl steht eine dunkle Kontur um
+sie: ein Kasten deckt das Gelände zu, das die Zahl erklären soll. Dieselbe
+Überlegung wie bei `contourLabelColor` in der Karte, nur mit anderem Mittel.
+
+Die Angaben hängen wie die Marken **außerhalb** der überhöhten Gruppe — ein
+Sprite darin würde von `scale.y` in die Länge gezogen und die Zahl unlesbar.
+Ihre Höhe wird bei jedem Zug am Regler neu gesetzt. Der Schalter für die
+Höhenlinien schaltet sie mit: bleiben die Zahlen ohne ihre Linien stehen,
+schweben Höhenangaben über einem Gelände, an dem nichts sie einordnet.
+
 ## Die Pumpen liegen überhöht, sind aber nicht verzerrt
 
 Die Pumpenstandorte der Löschwasserförderung gehören zum Gelände und nicht zur
@@ -235,10 +288,11 @@ die Ansicht bliebe beim Ladekreis stehen.
   möglich, ist aber keine Anforderung dieser Arbeit.
 - **Bearbeiten in 3D.** Die Ansicht zeigt; angelegt und verschoben wird in der
   Karte. Alles andere wären zwei Bedienwege für dieselbe Sache.
-- **Das Wasserstandsmodell.** Es steht in
-  [docs/wasserstandsmodell.md](wasserstandsmodell.md) und rechnet auf dem
-  LAEA-Raster; eine Darstellung seiner Bänder in der Szene ist nicht Teil dieser
-  Arbeit.
+- **Die Tiefenbänder des Wasserstandsmodells.** Die Szene zeigt den Spiegel, nicht
+  die abgestuften Zonen der Karte — die Tiefe steht zwischen Spiegel und Gelände.
+  Gerechnet wird das Modell weiterhin ausschließlich in
+  [docs/wasserstandsmodell.md](wasserstandsmodell.md); die 3D-Ansicht liest nur,
+  was am Element steht, und stößt keinen Flutlauf an.
 
 ## Datenquelle
 

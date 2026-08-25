@@ -10,8 +10,14 @@ import {
   MIN_PITCH_DEG,
   START_PITCH_DEG,
 } from './gelaende3d';
+import { labelCanvas } from './labelCanvas';
 import { BADGE_ASPECT, markerBadge } from './markerBadge';
-import type { MarkerPlacement, PumpPlacement } from './sceneObjects';
+import type {
+  MarkerPlacement,
+  PumpPlacement,
+  SceneLabel,
+  WaterSurface,
+} from './sceneObjects';
 import type { TileGrid } from './terrainTexture';
 
 /**
@@ -23,6 +29,14 @@ import type { TileGrid } from './terrainTexture';
  * decken dreißig Objekte das Gelände zu, das sie erklären sollen.
  */
 const MARKER_PX = 0.045;
+
+/**
+ * Höhe einer Beschriftung, gemessen an der Bildhöhe.
+ *
+ * Kleiner als eine Marke: die Zahl erklärt eine Linie, sie ist nicht selbst
+ * das Objekt.
+ */
+const LABEL_PX = 0.022;
 
 /**
  * Die three-Szene der 3D-Ansicht.
@@ -50,7 +64,10 @@ export interface Gelaende3dScene {
     paths: { heightM: number; points: Float32Array }[],
     colorOf: (heightM: number) => string
   ): void;
+  setContourLabels(labels: SceneLabel[], colorOf: (heightM: number) => string): void;
   setContoursVisible(visible: boolean): void;
+  /** Die überfluteten Flächen als waagrechte Wasserspiegel. */
+  setWater(surfaces: WaterSurface[]): void;
   setExaggeration(factor: number): void;
   /** Azimut der Kamera in Grad, 0 = Blick nach Norden. Für den Nordpfeil. */
   onAzimuth(handler: (deg: number) => void): void;
@@ -107,9 +124,19 @@ export function createGelaende3dScene(
   const contourGroup = new THREE.Group();
   const pathGroup = new THREE.Group();
   const pumpGroup = new THREE.Group();
-  terrainGroup.add(contourGroup, pathGroup, pumpGroup);
+  const waterGroup = new THREE.Group();
+  terrainGroup.add(contourGroup, pathGroup, pumpGroup, waterGroup);
+  /**
+   * Die Höhenangaben.
+   *
+   * Außerhalb der überhöhten Gruppe, wie die Marken: ein Sprite darin würde von
+   * `scale.y` in die Länge gezogen, und die Zahl wäre nicht mehr zu lesen. Ihre
+   * Höhe wird stattdessen bei jeder Änderung der Überhöhung neu gesetzt.
+   */
+  const labelGroup = new THREE.Group();
   scene.add(terrainGroup);
   scene.add(markerGroup);
+  scene.add(labelGroup);
 
   const disposables: { dispose(): void }[] = [];
   let surface: THREE.Mesh | undefined;
@@ -164,6 +191,15 @@ export function createGelaende3dScene(
         positions.setXYZ(1, placement.x, y, placement.z);
         positions.needsUpdate = true;
       }
+    }
+  };
+
+  /** Die Höhenangaben auf die aktuelle Überhöhung setzen. */
+  const placeLabels = (): void => {
+    for (const child of labelGroup.children) {
+      const label = child.userData.label as SceneLabel | undefined;
+      if (!label) continue;
+      child.position.set(label.x, label.heightM * exaggeration, label.z);
     }
   };
 
@@ -361,8 +397,72 @@ export function createGelaende3dScene(
       requestRender();
     },
 
+    setContourLabels(labels, colorOf) {
+      clearGroup(labelGroup);
+      for (const label of labels) {
+        const canvas = labelCanvas(label.text, colorOf(label.heightM));
+        const map = new THREE.CanvasTexture(canvas);
+        map.colorSpace = THREE.SRGBColorSpace;
+        const material = new THREE.SpriteMaterial({
+          map,
+          sizeAttenuation: false,
+          depthTest: false,
+        });
+        disposables.push(material, map);
+        const sprite = new THREE.Sprite(material);
+        const aspect = canvas.height > 0 ? canvas.width / canvas.height : 1;
+        sprite.scale.set(LABEL_PX * aspect, LABEL_PX, 1);
+        sprite.userData.label = label;
+        labelGroup.add(sprite);
+      }
+      placeLabels();
+      requestRender();
+    },
+
     setContoursVisible(visible) {
       contourGroup.visible = visible;
+      // Die Zahlen gehören zu den Linien: bleiben sie ohne ihre Linie stehen,
+      // schweben Höhenangaben über einem Gelände, an dem nichts sie einordnet.
+      labelGroup.visible = visible;
+      requestRender();
+    },
+
+    setWater(surfaces) {
+      clearGroup(waterGroup);
+      for (const surface of surfaces) {
+        const material = new THREE.MeshLambertMaterial({
+          color: new THREE.Color(surface.color).getHex(),
+          transparent: true,
+          opacity: surface.opacity,
+          // Von beiden Seiten sichtbar: man schaut auch von unterhalb des
+          // Spiegels auf die Lage, wenn die Kamera im Tal steht.
+          side: THREE.DoubleSide,
+          // Ohne Tiefenschreiben verdeckt der Spiegel nicht, was hinter ihm
+          // liegt — Leitungen und Marken bleiben durch das Wasser lesbar.
+          depthWrite: false,
+        });
+        disposables.push(material);
+        for (const polygon of surface.polygons) {
+          const shape = new THREE.Shape(
+            polygon.outer.map((point) => new THREE.Vector2(point.x, point.z))
+          );
+          for (const hole of polygon.holes) {
+            shape.holes.push(
+              new THREE.Path(
+                hole.map((point) => new THREE.Vector2(point.x, point.z))
+              )
+            );
+          }
+          const geometry = new THREE.ShapeGeometry(shape);
+          // `ShapeGeometry` liegt in der XY-Ebene; gedreht liegt sie in XZ, und
+          // aus dem y der Form wird das z der Szene.
+          geometry.rotateX(Math.PI / 2);
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.position.y = surface.levelM;
+          mesh.renderOrder = 1;
+          waterGroup.add(mesh);
+        }
+      }
       requestRender();
     },
 
@@ -371,6 +471,7 @@ export function createGelaende3dScene(
       terrainGroup.scale.y = factor;
       placeMarkers();
       placePumps();
+      placeLabels();
       requestRender();
     },
 
