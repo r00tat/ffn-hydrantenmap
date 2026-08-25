@@ -209,6 +209,27 @@ eine weit entfernte nicht verschwindet. Die Größe ist ein Anteil der Bildhöhe
 eine Marke in der Karte. Größer gesetzt decken dreißig Objekte das Gelände zu,
 das sie erklären sollen.
 
+## Die Kamera passt den ganzen Ausschnitt ein
+
+Beim Öffnen soll der Ausschnitt als Ganzes im Bild stehen. Die Einpassung
+rechnet über die umschließende Kugel und den engeren der beiden Öffnungswinkel
+(`cameraFraming` in `gelaende3d.ts`, dort geprüft). Zwei Dinge gehören dazu, und
+beide wurden anfangs übersehen:
+
+- **Das Gelände liegt nicht bei y = 0.** Die Höhen sind absolut — im
+  Einsatzgebiet 106 bis 882 m. Eine Kamerahöhe, die nur aus dem Abstand kommt,
+  steht bei einem weit hineingezoomten Ausschnitt **im** Gelände: das Bild ist
+  schwarz, und es hilft nur Herauszoomen.
+- **Die Überhöhung zählt mit.** Sie streckt die Szene um bis zum Sechsfachen.
+  Auf die unverzerrte Höhe eingepasst wäre der Ausschnitt danach zu eng.
+
+Neu eingepasst wird, solange die Ansicht **nicht von Hand bewegt** wurde: beim
+ersten Netz, bei der aus dem Relief gewählten Überhöhung und bei einer
+Größenänderung des Fensters — beim ersten Lauf hat das Canvas oft noch keine
+Fläche, das Seitenverhältnis stimmt also noch nicht. Sobald jemand gedreht oder
+geschoben hat, bleibt der Blick stehen; ein Zug am Regler oder ein gedrehtes
+Tablet darf ihn nicht wegwerfen.
+
 ## Die Wasserflächen sind ein Spiegel, keine eingefärbte Zone
 
 Das Wasserstandsmodell ([docs/wasserstandsmodell.md](wasserstandsmodell.md))

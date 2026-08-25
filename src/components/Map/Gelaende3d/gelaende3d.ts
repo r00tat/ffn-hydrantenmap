@@ -72,3 +72,65 @@ export const markerLiftM = (widthM: number): number =>
 
 /** Abstand der Leitungen und Höhenlinien von der Geländehaut. */
 export const LINE_LIFT_M = 0.5;
+
+/**
+ * Sicherheitszuschlag beim Einpassen.
+ *
+ * Die Kugel um die Szene wird knapp gerechnet; ohne den Zuschlag stößt das
+ * Gelände genau an den Bildrand.
+ */
+const FRAME_MARGIN = 1.08;
+
+export interface CameraFraming {
+  /** Abstand der Kamera vom Zielpunkt. */
+  distance: number;
+  /** Höhe des Zielpunkts — die Mitte des **überhöhten** Geländes. */
+  centerY: number;
+  near: number;
+  far: number;
+}
+
+/**
+ * Die Kamera so setzen, dass der ganze Ausschnitt im Bild ist.
+ *
+ * Zwei Dinge müssen dabei zusammenkommen, und beide wurden anfangs übersehen:
+ *
+ * - **Das Gelände liegt nicht bei y = 0.** Die Höhen sind absolut (im
+ *   Einsatzgebiet 106 bis 882 m). Eine Kamera, deren Höhe aus dem Abstand
+ *   allein kommt, steht bei einem kleinen Ausschnitt **im** Gelände — das Bild
+ *   ist dann schwarz, und es hilft nur Herauszoomen.
+ * - **Die Überhöhung zählt mit.** Sie streckt die Szene um bis zum Sechsfachen;
+ *   eine Einpassung auf die unverzerrte Höhe wäre danach zu eng.
+ *
+ * Gerechnet wird über die umschließende Kugel und den engeren der beiden
+ * Öffnungswinkel — bei einem breiten Fenster begrenzt der senkrechte, bei einem
+ * hohen der waagrechte.
+ */
+export function cameraFraming(
+  widthM: number,
+  depthM: number,
+  minM: number,
+  maxM: number,
+  exaggeration: number,
+  fovDeg: number,
+  aspect: number
+): CameraFraming {
+  const spanY = Math.max(0, maxM - minM) * exaggeration;
+  const centerY = ((minM + maxM) / 2) * exaggeration;
+  const radius = Math.max(1, 0.5 * Math.hypot(widthM, depthM, spanY));
+
+  const vFov = (fovDeg * Math.PI) / 180;
+  const safeAspect = aspect > 0 ? aspect : 1;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * safeAspect);
+  const fov = Math.min(vFov, hFov);
+
+  const distance = (radius / Math.sin(fov / 2)) * FRAME_MARGIN;
+  return {
+    distance,
+    centerY,
+    // Die Nahebene mit dem Abstand mitwachsen lassen: fest auf 1 gesetzt
+    // flimmert ein weit gezogener Ausschnitt im Tiefenpuffer.
+    near: Math.max(0.1, distance / 2000),
+    far: (distance + radius) * 4,
+  };
+}

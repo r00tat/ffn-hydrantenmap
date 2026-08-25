@@ -5,6 +5,7 @@ import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import type { TerrainMesh } from '../../../common/terrain/terrainTypes';
 import {
+  cameraFraming,
   markerLiftM,
   MAX_PITCH_DEG,
   MIN_PITCH_DEG,
@@ -143,6 +144,15 @@ export function createGelaende3dScene(
   let exaggeration = 1;
   let liftM = 10;
   let azimuthHandler: ((deg: number) => void) | undefined;
+  let framed: TerrainMesh | undefined;
+  /**
+   * Ob der Blick von Hand gesetzt wurde.
+   *
+   * Danach passt sich die Kamera nicht mehr selbst ein: ein Zug am
+   * Überhöhungsregler oder ein Drehen des Tablets darf den eingestellten Blick
+   * nicht wegwerfen.
+   */
+  let userMoved = false;
   let frame = 0;
   let alive = true;
   let resolution = new THREE.Vector2(1, 1);
@@ -159,6 +169,40 @@ export function createGelaende3dScene(
   };
 
   controls.addEventListener('change', requestRender);
+  controls.addEventListener('start', () => {
+    userMoved = true;
+  });
+
+  /**
+   * Den ganzen Ausschnitt ins Bild rücken.
+   *
+   * Die Rechnung steht in `gelaende3d.ts` und ist dort geprüft; hier wird sie
+   * nur gesetzt.
+   */
+  const frameCamera = (): void => {
+    if (!framed) return;
+    const frame = cameraFraming(
+      framed.widthM,
+      framed.depthM,
+      framed.minM,
+      framed.maxM,
+      exaggeration,
+      camera.fov,
+      camera.aspect
+    );
+    const pitch = (START_PITCH_DEG * Math.PI) / 180;
+    controls.target.set(0, frame.centerY, 0);
+    camera.position.set(
+      0,
+      frame.centerY + Math.sin(pitch) * frame.distance,
+      Math.cos(pitch) * frame.distance
+    );
+    camera.near = frame.near;
+    camera.far = frame.far;
+    camera.updateProjectionMatrix();
+    controls.update();
+    requestRender();
+  };
 
   const onContextLost = (event: Event): void => {
     // Ohne `preventDefault` stellt der Browser den Kontext nie wieder her.
@@ -249,21 +293,8 @@ export function createGelaende3dScene(
       terrainGroup.add(surface);
 
       liftM = markerLiftM(mesh.widthM);
-
-      // Blick von Süden auf die Mitte, in der Startneigung.
-      const distance = Math.max(mesh.widthM, mesh.depthM) * 1.1;
-      const pitch = (START_PITCH_DEG * Math.PI) / 180;
-      camera.position.set(
-        0,
-        Math.sin(pitch) * distance,
-        Math.cos(pitch) * distance
-      );
-      camera.near = Math.max(1, distance / 1000);
-      camera.far = distance * 10;
-      camera.updateProjectionMatrix();
-      controls.target.set(0, (mesh.minM + mesh.maxM) / 2, 0);
-      controls.update();
-      requestRender();
+      framed = mesh;
+      frameCamera();
     },
 
     setTexture(texture, mesh, grid) {
@@ -472,7 +503,11 @@ export function createGelaende3dScene(
       placeMarkers();
       placePumps();
       placeLabels();
-      requestRender();
+      // Die erste Überhöhung kommt aus dem Relief und wird gesetzt, bevor
+      // jemand die Ansicht angefasst hat; ohne die Neueinpassung wäre der
+      // Ausschnitt danach zu eng. Nach einem Eingriff bleibt der Blick stehen.
+      if (!userMoved) frameCamera();
+      else requestRender();
     },
 
     onAzimuth(handler) {
@@ -492,7 +527,10 @@ export function createGelaende3dScene(
           (object.material as LineMaterial).resolution = resolution;
         }
       });
-      requestRender();
+      // Beim ersten Lauf hat das Canvas oft noch keine Fläche; die Einpassung
+      // von davor gilt dann für ein falsches Seitenverhältnis.
+      if (!userMoved) frameCamera();
+      else requestRender();
     },
 
     dispose() {
