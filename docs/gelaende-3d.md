@@ -162,6 +162,40 @@ Gezeichnete Marken liegen je Symbol-URL in einem Vorrat: ein Einsatz hat leicht
 dreißig Objekte desselben Typs, und ohne ihn wäre jedes ein eigener Bildabruf
 und eine eigene Textur.
 
+Die Marken haben **konstante Bildschirmgröße** (`sizeAttenuation: false`), damit
+eine weit entfernte nicht verschwindet. Die Größe ist ein Anteil der Bildhöhe;
+4,5 % ergeben auf einem Tablet rund 40 px und damit dieselbe Größenordnung wie
+eine Marke in der Karte. Größer gesetzt decken dreißig Objekte das Gelände zu,
+das sie erklären sollen.
+
+## Die Pumpen liegen überhöht, sind aber nicht verzerrt
+
+Die Pumpenstandorte der Löschwasserförderung gehören zum Gelände und nicht zur
+Beschriftung: sie sollen mit dem Hang wandern und liegen deshalb in derselben
+Gruppe wie das Netz. Damit trifft sie auch deren `scale.y` — bei sechsfacher
+Überhöhung wäre aus der Kugel ein stehendes Ei.
+
+Die Skalierung wird an der Kugel selbst zurückgenommen (`radius / exaggeration`
+in y). Die **Lage** bleibt damit überhöht, die **Form** nicht. Dasselbe gilt
+sinngemäß für die Marken, die ganz außerhalb der überhöhten Gruppe hängen.
+
+Leitungen und Höhenlinien brauchen die Korrektur nicht: ihre Strichstärke ist
+eine Bildschirmgröße (`LineMaterial`) und von der Szenenskalierung unberührt.
+
+## Der Knopf in der Karte
+
+Der 3D-Knopf steht **nicht** in der Gruppe unten rechts. Dort stehen die
+primären Funktionen — Anlegen, Bearbeiten, Verlauf; die 3D-Ansicht ist eine
+Sicht auf die Lage, keine Arbeit an ihr, und ein gleich großer Knopf daneben
+stellte sie auf eine Stufe damit.
+
+Seine Höhe richtet sich danach, was tatsächlich unter ihm steht
+(`threeDFabBottom`). Die Knöpfe der rechten Spalte setzen ihre Position jeweils
+selbst, und die meisten gibt es nur im Bearbeiten-Modus: Suche (120),
+Aufzeichnung (160), Assistent (172). Ein fester Wert über dem Assistenten ließe
+den Knopf außerhalb des Bearbeitens über einer Lücke hängen; ist die Gruppe ganz
+unten leer — Nur-Lese-Gast ohne Verlauf —, rückt er bis dorthin nach.
+
 ## Budgets
 
 | Größe | Wert | Begründung |

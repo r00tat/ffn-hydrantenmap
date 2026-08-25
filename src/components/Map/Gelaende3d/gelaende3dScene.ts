@@ -18,11 +18,11 @@ import type { TileGrid } from './terrainTexture';
  * Höhe einer Marke, gemessen an der Bildhöhe.
  *
  * Bei `sizeAttenuation: false` ist die Größe eines Sprites ein Anteil des
- * Bildes. 7,5 % sind auf einem Tablet rund 60 px — groß genug, dass das Symbol
- * darin zu erkennen ist, und klein genug, dass dreißig davon das Gelände nicht
- * zudecken.
+ * Bildes. 4,5 % sind auf einem Tablet rund 40 px, die Platte darin also gut
+ * 30 px — dieselbe Größenordnung wie eine Marke in der Karte. Größer gesetzt
+ * decken dreißig Objekte das Gelände zu, das sie erklären sollen.
  */
-const MARKER_PX = 0.075;
+const MARKER_PX = 0.045;
 
 /**
  * Die three-Szene der 3D-Ansicht.
@@ -167,6 +167,23 @@ export function createGelaende3dScene(
     }
   };
 
+  /**
+   * Die Pumpen rund halten.
+   *
+   * Sie liegen in der überhöhten Gruppe, damit sie mit dem Hang wandern — und
+   * werden von deren `scale.y` sonst mitgezogen: bei sechsfacher Überhöhung
+   * wäre aus der Kugel ein stehendes Ei. Die Skalierung wird deshalb an der
+   * Kugel selbst zurückgenommen. Die **Lage** bleibt überhöht, nur die Form
+   * nicht.
+   */
+  const placePumps = (): void => {
+    for (const child of pumpGroup.children) {
+      const radius = child.userData.radius as number | undefined;
+      if (radius === undefined) continue;
+      child.scale.set(radius, radius / exaggeration, radius);
+    }
+  };
+
   /** Eine Gruppe leeren und ihre Geometrien freigeben. */
   const clearGroup = (group: THREE.Group): void => {
     group.traverse((object) => {
@@ -301,10 +318,11 @@ export function createGelaende3dScene(
       const radius = Math.max(4, liftM / 3);
       for (const pump of pumps) {
         const sphere = new THREE.Mesh(geometry, material);
-        sphere.scale.setScalar(radius);
+        sphere.userData.radius = radius;
         sphere.position.set(pump.x, pump.groundM, pump.z);
         pumpGroup.add(sphere);
       }
+      placePumps();
       requestRender();
     },
 
@@ -352,6 +370,7 @@ export function createGelaende3dScene(
       exaggeration = factor;
       terrainGroup.scale.y = factor;
       placeMarkers();
+      placePumps();
       requestRender();
     },
 

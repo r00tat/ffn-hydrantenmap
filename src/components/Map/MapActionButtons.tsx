@@ -35,6 +35,33 @@ export interface MapActionButtonsOptions {
   map: L.Map;
 }
 
+export interface ThreeDFabPosition {
+  editable: boolean;
+  canEdit: boolean;
+  historyId?: string;
+}
+
+/**
+ * Der Abstand des 3D-Knopfs vom unteren Rand.
+ *
+ * Die Knöpfe der rechten Spalte setzen ihre Höhe jeweils selbst, und die
+ * meisten davon gibt es nur im Bearbeiten-Modus: Suche (120), Aufzeichnung
+ * (160) und Assistent (172). Ein fester Wert über dem Assistenten ließe den
+ * 3D-Knopf außerhalb des Bearbeitens über einer Lücke hängen. Er rückt deshalb
+ * auf das nach, was tatsächlich unter ihm steht.
+ */
+export function threeDFabBottom({
+  editable,
+  canEdit,
+  historyId,
+}: ThreeDFabPosition): number {
+  if (editable) return 224;
+  // Die Gruppe ganz unten ist leer, wenn ein Nur-Lese-Gast ohne Verlauf
+  // zusieht — dann rückt der Knopf ganz nach unten.
+  const hasPrimaryRow = historyId !== undefined || canEdit;
+  return hasPrimaryRow ? 120 : 64;
+}
+
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const t = useTranslations('mapUi');
   const t3d = useTranslations('gelaende3d');
@@ -138,7 +165,13 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           Verlauf. Die 3D-Ansicht ist eine Sicht auf die Lage, keine Arbeit an
           ihr, und ein gleich großer Knopf daneben stellte sie auf eine Stufe
           damit. */}
-      <Box sx={{ position: 'absolute', bottom: 224, right: 16 }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: threeDFabBottom({ editable, canEdit, historyId }),
+          right: 16,
+        }}
+      >
         <Tooltip title={t3d('open')}>
           <Fab
             color="default"

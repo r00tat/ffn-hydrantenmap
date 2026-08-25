@@ -19,7 +19,9 @@ vi.mock('../firebase/firestoreHooks', () => ({
   useFirecallItems: () => [],
 }));
 
-const { default: MapActionButtons } = await import('./MapActionButtons');
+const { default: MapActionButtons, threeDFabBottom } = await import(
+  './MapActionButtons'
+);
 
 function renderButtons(options: Partial<MapEditorOptions> = {}) {
   const value: MapEditorOptions = {
@@ -76,5 +78,28 @@ describe('MapActionButtons', () => {
 
     expect(screen.getByTestId('HistoryIcon')).toBeVisible();
     expect(screen.queryByTestId('EditIcon')).toBeNull();
+  });
+});
+
+describe('threeDFabBottom', () => {
+  it('rückt beim Bearbeiten über den Assistenten', () => {
+    expect(threeDFabBottom({ editable: true, canEdit: true })).toBe(224);
+  });
+
+  it('rückt ohne Bearbeiten direkt über die Gruppe unten', () => {
+    // Suche, Aufzeichnung und Assistent gibt es dann nicht — der Knopf hinge
+    // sonst über einer Lücke.
+    expect(threeDFabBottom({ editable: false, canEdit: true })).toBe(120);
+  });
+
+  it('rückt über den Verlauf-Knopf, auch ohne Schreibrecht', () => {
+    expect(
+      threeDFabBottom({ editable: false, canEdit: false, historyId: 'h1' })
+    ).toBe(120);
+  });
+
+  it('rückt ganz nach unten, wenn darunter nichts steht', () => {
+    // Nur-Lese-Gast ohne Verlauf: die Gruppe unten rechts bleibt leer.
+    expect(threeDFabBottom({ editable: false, canEdit: false })).toBe(64);
   });
 });
