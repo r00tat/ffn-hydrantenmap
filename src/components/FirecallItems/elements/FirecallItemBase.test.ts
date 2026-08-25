@@ -31,3 +31,9 @@ describe('FirecallItemBase.contextMenuItems', () => {
     expect(item.contextMenuItems(onClose)).toBeNull();
   });
 });
+
+describe('FirecallItemBase.isRotatable', () => {
+  it('ist für Elemente ohne Drehfeld false', () => {
+    expect(new FirecallItemBase().isRotatable()).toBe(false);
+  });
+});

@@ -24,6 +24,10 @@ export class FirecallRohr extends FirecallItemBase {
     return 'Rohr';
   }
 
+  public isRotatable(): boolean {
+    return true;
+  }
+
   public fields(): { [fieldName: string]: string } {
     return {
       ...super.fields(),

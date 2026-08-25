@@ -193,6 +193,15 @@ export class FirecallItemBase {
     return 'Firecallitem';
   }
 
+  /**
+   * Darf das Element über den Griff in der Karte gedreht werden? `true` nur bei
+   * Typen, die die Drehung auch in `fields()` führen — bei allen anderen liegt
+   * `rotation` zwar im Dokument, ist aber immer '0'.
+   */
+  public isRotatable(): boolean {
+    return false;
+  }
+
   public title(): string {
     return `${this.markerName()} ${this.name}`;
   }
