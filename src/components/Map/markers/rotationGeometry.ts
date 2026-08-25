@@ -60,9 +60,17 @@ export function rotationPivotOffset(options: PivotIconOptions): PixelPoint {
 }
 
 /**
+ * Bildschirm-Peilung des Griffs bei 0° Drehung, im Uhrzeigersinn ab „oben".
+ *
+ * Der Griff hängt **unter** dem Element: über dem Marker öffnet Leaflet das
+ * Popup und deckte den Griff genau dort zu, wo man ihn greifen will.
+ */
+const HANDLE_BEARING_AT_ZERO = 180;
+
+/**
  * Winkel in Grad (0–359), auf den das Element zu drehen ist, damit der Griff
- * zum Zeiger schaut. Der Griff steht bei 0° senkrecht nach oben, gezählt wird
- * im Uhrzeigersinn — deshalb `atan2(dx, -dy)`.
+ * zum Zeiger schaut. Bei 0° zeigt der Griff senkrecht nach unten, gezählt wird
+ * im Uhrzeigersinn: liegt der Zeiger links des Drehzentrums, sind es 90°.
  *
  * `snapDegrees` rastet auf das nächste Vielfache; ohne Angabe bleibt es
  * gradgenau.
@@ -76,8 +84,11 @@ export function angleFromPointer(
   const dy = pointer.y - pivot.y;
   if (dx === 0 && dy === 0) return 0;
 
-  const degrees = (Math.atan2(dx, -dy) * 180) / Math.PI;
-  const normalized = ((degrees % 360) + 360) % 360;
+  // Peilung vom Drehzentrum zum Zeiger, im Uhrzeigersinn ab „oben".
+  const bearing = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  // Gedreht werden muss so viel, dass der Griff aus seiner Ruhelage dorthin
+  // schaut.
+  const normalized = (((bearing - HANDLE_BEARING_AT_ZERO) % 360) + 360) % 360;
   if (!snapDegrees || snapDegrees <= 0) return normalized;
   return (Math.round(normalized / snapDegrees) * snapDegrees) % 360;
 }

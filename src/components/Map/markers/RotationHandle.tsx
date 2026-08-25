@@ -51,7 +51,7 @@ export default function RotationHandle({
           `<div class="ffn-rotate-line"></div>` +
           `<div class="ffn-rotate-knob"></div>` +
           `</div>` +
-          `<div class="ffn-rotate-label" style="left:${pivotX + 14}px;top:${pivotY - 46}px"></div>`,
+          `<div class="ffn-rotate-label" style="left:${pivotX + 14}px;top:${pivotY + 30}px"></div>`,
       }),
     [pivotX, pivotY]
   );

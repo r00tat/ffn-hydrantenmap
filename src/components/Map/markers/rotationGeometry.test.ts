@@ -54,26 +54,27 @@ describe('rotationPivotOffset', () => {
 describe('angleFromPointer', () => {
   const pivot = { x: 100, y: 100 };
 
-  it('zählt vom senkrecht nach oben stehenden Griff im Uhrzeigersinn', () => {
-    expect(angleFromPointer(pivot, { x: 100, y: 60 })).toBe(0);
-    expect(angleFromPointer(pivot, { x: 140, y: 100 })).toBe(90);
-    expect(angleFromPointer(pivot, { x: 100, y: 140 })).toBe(180);
-    expect(angleFromPointer(pivot, { x: 60, y: 100 })).toBe(270);
+  it('zählt vom senkrecht nach unten hängenden Griff im Uhrzeigersinn', () => {
+    // Der Griff hängt unter dem Element, weil oben das Popup steht.
+    expect(angleFromPointer(pivot, { x: 100, y: 140 })).toBe(0);
+    expect(angleFromPointer(pivot, { x: 60, y: 100 })).toBe(90);
+    expect(angleFromPointer(pivot, { x: 100, y: 60 })).toBe(180);
+    expect(angleFromPointer(pivot, { x: 140, y: 100 })).toBe(270);
   });
 
   it('rechnet Zwischenwinkel gradgenau', () => {
-    expect(angleFromPointer(pivot, { x: 140, y: 60 })).toBeCloseTo(45);
+    expect(angleFromPointer(pivot, { x: 60, y: 140 })).toBeCloseTo(45);
   });
 
   it('rastet auf das nächste Vielfache, wenn ein Raster vorgegeben ist', () => {
-    expect(angleFromPointer(pivot, { x: 140, y: 60 }, 15)).toBe(45);
-    expect(angleFromPointer(pivot, { x: 100, y: 60 }, 15)).toBe(0);
+    expect(angleFromPointer(pivot, { x: 60, y: 140 }, 15)).toBe(45);
+    expect(angleFromPointer(pivot, { x: 100, y: 140 }, 15)).toBe(0);
     // 350° liegt näher an 345° als an 360° → kein Sprung über die Naht
-    expect(angleFromPointer(pivot, { x: 93, y: 60 }, 15)).toBe(345);
+    expect(angleFromPointer(pivot, { x: 107, y: 140 }, 15)).toBe(345);
   });
 
   it('rastet 358° auf 0 statt auf 360', () => {
-    expect(angleFromPointer(pivot, { x: 98.6, y: 60 }, 15)).toBe(0);
+    expect(angleFromPointer(pivot, { x: 101.4, y: 140 }, 15)).toBe(0);
   });
 
   it('liefert 0, wenn der Zeiger genau auf dem Drehzentrum liegt', () => {
