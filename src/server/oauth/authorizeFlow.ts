@@ -59,6 +59,29 @@ export async function resolveAuthorizeRequest(
   const resource = await getMcpResourceUrl();
   const params = parseAuthorizeParams(searchParams);
 
+  // **Die Anmeldung wird vor allem anderen geprüft**, und das ist kein
+  // Stilfrage, sondern eine Schranke: Die Auflösung der `client_id` kann bei
+  // einem CIMD-Client einen ausgehenden Abruf auslösen, dessen Ziel der
+  // Aufrufer bestimmt. Stünde sie davor, könnte jeder ohne Anmeldung den
+  // Server dazu bringen, eine beliebige Adresse abzurufen — und mit einem
+  // langsamen Gegenüber einen Request-Handler binden.
+  //
+  // Für die Anmelde-Weiterleitung wird der Client nicht gebraucht: Sie trägt
+  // nur die unveränderte Anfrage zurück. Ein fehlerhafter Aufruf bekommt
+  // seine Fehlermeldung damit erst nach der Anmeldung — angemeldet sein muss
+  // man für eine Autorisierung ohnehin.
+  const session = await auth();
+  if (!session?.user?.id) {
+    // Login-Delegation: Die Benutzer-Authentisierung bleibt bei der
+    // bestehenden Anmeldung, dieser Server stellt nur Tokens aus. Es gibt
+    // weiterhin genau eine Benutzerverwaltung.
+    const callbackUrl = `/api/oauth/authorize?${searchParams.toString()}`;
+    return {
+      kind: 'login',
+      url: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+    };
+  }
+
   if (!params.clientId) {
     return {
       kind: 'error',
@@ -97,18 +120,6 @@ export async function resolveAuthorizeRequest(
         error_description: validation.description,
         state: validation.state,
       }),
-    };
-  }
-
-  const session = await auth();
-  if (!session?.user?.id) {
-    // Login-Delegation: Die Benutzer-Authentisierung bleibt bei der
-    // bestehenden Anmeldung, dieser Server stellt nur Tokens aus. Es gibt
-    // weiterhin genau eine Benutzerverwaltung.
-    const callbackUrl = `/api/oauth/authorize?${searchParams.toString()}`;
-    return {
-      kind: 'login',
-      url: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`,
     };
   }
 

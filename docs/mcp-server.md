@@ -93,9 +93,14 @@ Dienst-Kontos ausgibt.
 - **keine Weiterleitungen** — `https.request` folgt ihnen von sich aus nicht,
   und ohne 200 bricht der Aufrufer ab. Eine 302 auf eine interne Adresse führte
   sonst am Filter vorbei, weil der nur die erste URL sieht;
-- Timeout (5 s) und Größenlimit (64 KiB), Letzteres **beim Lesen** und nicht
-  erst am fertigen Körper — ein `content-length`-Header ist eine Behauptung des
-  Gegenübers;
+- eine **absolute Frist** (5 s) über Auflösung, Verbindung und Körper zusammen.
+  Ein Leerlauf-Timeout am Socket täte das nicht: Es wird von jedem
+  eintreffenden Byte zurückgesetzt, ein Server mit einem Byte alle vier
+  Sekunden hielte die Verbindung unbegrenzt offen — und solange die
+  Namensauflösung läuft, gibt es noch gar keinen Socket, an dem es greifen
+  könnte;
+- ein Größenlimit (64 KiB) **beim Lesen** und nicht erst am fertigen Körper —
+  ein `content-length`-Header ist eine Behauptung des Gegenübers;
 - `client_id` im Dokument **muss exakt** der Abruf-URL entsprechen. Ohne diese
   Bindung könnte jeder ein fremdes Dokument als seine `client_id` ausgeben.
 
@@ -103,6 +108,22 @@ Zusätzlich prüft `fetchClientIdMetadata` die Adressen schon vor dem
 Verbindungsaufbau. Das ist keine zweite Verteidigungslinie, sondern Bequemlichkeit:
 Der offensichtliche Fall wird früh und mit verständlicher Meldung abgewiesen.
 Verlassen wird sich darauf nicht.
+
+### Wer den Abruf überhaupt auslösen kann
+
+Der wirksamste Teil ist nicht der Filter, sondern die Reihenfolge:
+`resolveAuthorizeRequest` prüft **zuerst die Anmeldung** und löst die
+`client_id` erst danach auf. Ohne diese Reihenfolge könnte jeder ohne Anmeldung
+den Server dazu bringen, eine beliebige Adresse abzurufen — und mit einem
+langsam antwortenden Gegenüber einen Request-Handler binden.
+
+Für die Anmelde-Weiterleitung wird der Client nicht gebraucht: Sie trägt nur
+die unveränderte Anfrage zurück. Ein fehlerhafter Aufruf bekommt seine
+Fehlermeldung dadurch erst nach der Anmeldung — angemeldet sein muss man für
+eine Autorisierung ohnehin.
+
+Für den angemeldeten Fall greift zusätzlich ein Rate Limit auf
+`/api/oauth/authorize` (30 je Adresse und Minute).
 
 ## Sicherheits-Muss-Kriterien und wo sie stehen
 

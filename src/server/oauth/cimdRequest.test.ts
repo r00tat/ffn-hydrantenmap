@@ -117,6 +117,22 @@ describe('requestCimdDocument', () => {
     ).rejects.toThrow(/blocked address \(127\.0\.0\.1\)/);
   });
 
+  it('bricht bei hängender Auflösung nach der Frist ab', async () => {
+    // Solange die Namensauflösung läuft, gibt es noch keinen Socket — das
+    // `timeout` von `http.request` kann hier nichts abfangen. Ohne die
+    // absolute Frist bliebe der Aufruf für immer offen, und `/api/oauth/authorize`
+    // ist ohne Anmeldung erreichbar.
+    const started = Date.now();
+    await expect(
+      requestCimdDocument(new URL('https://haengt.invalid/client'), {
+        timeoutMs: 80,
+        maxBytes: 1024,
+        resolveHost: () => new Promise<string[]>(() => {}),
+      }),
+    ).rejects.toThrow(/timed out/);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it('meldet einen Fehler als CimdRequestError', async () => {
     await expect(
       requestCimdDocument(new URL('https://nicht-vorhanden.invalid/client'), {
