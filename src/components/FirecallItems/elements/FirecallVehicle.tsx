@@ -45,6 +45,10 @@ export class FirecallVehicle extends FirecallItemBase {
     return 'Fahrzeug';
   }
 
+  public isRotatable(): boolean {
+    return true;
+  }
+
   public fields(): { [fieldName: string]: string } {
     return {
       name: 'Bezeichnung',

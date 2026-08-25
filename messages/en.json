@@ -135,7 +135,8 @@
     "addElement": "Add new element",
     "editMap": "Edit operations map",
     "disableEdit": "Disable editing",
-    "historyLockedEdit": "History loaded, editing disabled"
+    "historyLockedEdit": "History loaded, editing disabled",
+    "rotateHandle": "Drag to rotate, hold Shift for 15° steps"
   },
   "drawing": {
     "undoLast": "Undo last stroke",
