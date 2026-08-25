@@ -198,6 +198,18 @@ export class BlockStore {
     return undefined;
   }
 
+  /**
+   * Ob eine Kachel laut Index überhaupt existiert.
+   *
+   * Öffentlich für die Flutfüllung: sie muss „jenseits der Landesgrenze"
+   * von „Kachel da, aber nicht geladen" unterscheiden. Das erste ist der Rand
+   * des Modells, das zweite ein Netzfehler — und die Fläche ist in beiden
+   * Fällen möglicherweise größer, aber aus verschiedenen Gründen.
+   */
+  available(level: TerrainLevel, block: BlockRef): boolean {
+    return hasBlock(level, this.lookupFor(level), block);
+  }
+
   private blockOfLevel(
     level: TerrainLevel,
     block: BlockRef

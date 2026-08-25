@@ -452,6 +452,51 @@ export interface Line extends MultiPointItem {
   transportLeistung?: number;
   /** Säcke je Person und Stunde beim Verlegen — Handeingabe statt Tabelle. */
   verbauLeistung?: number;
+  /** Woher `dammHoehe` kommt: `wasserstand`, oder nichts bei Handeingabe. */
+  dammHoeheQuelle?: string;
+  /** Id des Szenarios, aus dem `dammHoehe` übernommen wurde. */
+  dammWasserstandId?: string;
+}
+
+/**
+ * Ein Wasserstands-Szenario: Saatpunkt plus Zuschlag, und das gerechnete
+ * Ergebnis als Polygonringe.
+ *
+ * Das Ergebnis liegt **am Element** und nicht im Speicher eines Clients: dann
+ * sehen alle in der Lageführung dieselbe Fläche, sie überlebt einen Neustart
+ * des Tablets, und sie braucht zum Zeichnen keine einzige Höhenkachel — im
+ * Hochwasserfall der eigentliche Gewinn.
+ */
+export interface Wasserstand extends FirecallItem {
+  /** Zuschlag in m über der Geländehöhe am Saatpunkt. */
+  wasserZuschlag?: number;
+  /**
+   * Umkreis der Berechnung in m um den Saatpunkt. 0 heißt unbegrenzt.
+   *
+   * Eine Badewanne läuft über ein Seebecken hinaus weiter — der Neusiedler See
+   * liegt unter jedem Hochwasserstand seiner Zuflüsse. Der Umkreis grenzt die
+   * Rechnung auf den Bereich ein, um den es geht, und spart dabei Kacheln.
+   */
+  wasserRadius?: number;
+  /** Geländehöhe am Saatpunkt in EVRF2000, beim Setzen abgetastet. */
+  wasserBasisHoehe?: number;
+  wasserBasisStufe?: string;
+  /** Tiefenstufen als kodierte Ringe, JSON — siehe `wasserstand.ts`. */
+  wasserBaender?: string;
+  wasserStufe?: string;
+  wasserFlaecheM2?: number;
+  wasserMaxTiefe?: number;
+  wasserLaengsteAchse?: number;
+  wasserGerechnetAm?: string;
+  /** Signatur der Eingaben, gegen die das Ergebnis gilt. */
+  wasserGerechnetFuer?: string;
+  wasserAbbruch?: string;
+  wasserKachelnFehlend?: number;
+  wasserRandModell?: number;
+  wasserVereinfachungM?: number;
+  wasserInselnVerworfen?: number;
+  color?: string;
+  opacity?: number;
 }
 
 export interface Circle extends FirecallItem {

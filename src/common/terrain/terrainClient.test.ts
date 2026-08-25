@@ -3,7 +3,11 @@ import {
   createTerrainClient,
   type TerrainWorkerLike,
 } from './terrainClient';
-import type { TerrainRequest, TerrainResponse } from './terrainTypes';
+import type {
+  FloodProgress,
+  TerrainRequest,
+  TerrainResponse,
+} from './terrainTypes';
 
 /** Ein Worker, der nichts von selbst tut — der Test antwortet. */
 function fakeWorker() {
@@ -118,6 +122,60 @@ describe('createTerrainClient', () => {
 
     fake.reply({ id: 1, ok: true, op: 'prefetch', loaded: 98, failed: 2 });
     await expect(promise).resolves.toEqual({ loaded: 98, failed: 2 });
+  });
+
+  it('hält eine Flutanfrage bei Fortschritt offen und meldet ihn weiter', async () => {
+    const fake = fakeWorker();
+    const client = createTerrainClient(fake.worker);
+    const progress: FloodProgress[] = [];
+    const handle = client.flood([47.9, 16.8], 100, 'overview', {
+      onProgress: (p) => progress.push(p),
+    });
+
+    const id = (fake.sent[0] as { id: number }).id;
+    fake.reply({
+      id,
+      ok: true,
+      op: 'floodProgress',
+      phase: 'fill',
+      blocks: 3,
+      cells: 42,
+    });
+    expect(progress).toEqual([
+      { phase: 'fill', blocks: 3, cells: 42, total: undefined },
+    ]);
+
+    fake.reply({
+      id,
+      ok: true,
+      op: 'flood',
+      result: {
+        levelId: 'overview',
+        resolutionM: 10,
+        baender: [],
+        toleranzM: 5,
+        inselnVerworfen: 0,
+        punkte: 0,
+        cells: 42,
+        areaM2: 4200,
+        maxDepthM: 1,
+        longestAxisM: 100,
+        truncated: 'none',
+        missingBlocks: 0,
+        edgeBlocks: 0,
+      },
+    });
+    await expect(handle.result).resolves.toMatchObject({ cells: 42 });
+  });
+
+  it('schickt beim Abbruch die Nummer des laufenden Laufs', () => {
+    const fake = fakeWorker();
+    const client = createTerrainClient(fake.worker);
+    const handle = client.flood([47.9, 16.8], 100, 'detail');
+    const id = (fake.sent[0] as { id: number }).id;
+    handle.abort();
+    expect(fake.sent[1]).toMatchObject({ op: 'floodAbort', target: id });
+    void handle.result.catch(() => undefined);
   });
 
   it('lässt alle offenen Anfragen scheitern, wenn der Worker stirbt', async () => {

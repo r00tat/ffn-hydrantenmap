@@ -2,6 +2,8 @@ import type { LatLngPosition } from '../geo';
 import type { TerrainLevelId } from './terrainIndexTypes';
 import type {
   ContourResult,
+  FloodProgress,
+  FloodSummary,
   TerrainBoundsLatLng,
   TerrainRequest,
   TerrainResponse,
@@ -33,6 +35,27 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const PREFETCH_TIMEOUT_PER_BLOCK_MS = 2_000;
 const PREFETCH_TIMEOUT_MIN_MS = 60_000;
 
+/**
+ * Zeit **ohne Fortschritt**, nach der ein Flutlauf als verloren gilt.
+ *
+ * Ein Gesamtlimit ginge hier nicht: ein Detaillauf über 120 Blöcke dauert
+ * Minuten, und jedes feste Limit wäre entweder zu kurz oder so lang, dass ein
+ * echter Aussetzer nicht mehr auffällt.
+ */
+const FLOOD_IDLE_TIMEOUT_MS = 30_000;
+
+export interface FloodOptions {
+  /** Umkreis um den Saatpunkt in m; 0 oder fehlend heißt unbegrenzt. */
+  maxRadiusM?: number;
+  onProgress?: (progress: FloodProgress) => void;
+}
+
+export interface FloodHandle {
+  result: Promise<FloodSummary>;
+  /** Bricht den Lauf ab; `result` wird mit `aborted` abgelehnt. */
+  abort(): void;
+}
+
 export interface TerrainClient {
   sample(positions: LatLngPosition[]): Promise<(TerrainSample | null)[]>;
   contours(
@@ -45,6 +68,14 @@ export interface TerrainClient {
   ): Promise<{ loaded: number; failed: number }>;
   /** Die Namen aller vorhandenen Blöcke einer Stufe. */
   blocks(levelId: TerrainLevelId): Promise<string[]>;
+  flood(
+    seed: LatLngPosition,
+    heightM: number,
+    levelId: TerrainLevelId,
+    options?: FloodOptions
+  ): FloodHandle;
+  /** Zuschlag EVRF2000 → müA, `null` außerhalb des Gitters. */
+  adria(positions: LatLngPosition[]): Promise<(number | null)[]>;
 }
 
 /**
@@ -65,6 +96,10 @@ interface Pending {
   resolve: (response: TerrainResponse) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
+  /** Frist, auf die der Zeitgeber bei Fortschritt neu gesetzt wird. */
+  timeoutMs: number;
+  op: string;
+  onProgress?: (progress: FloodProgress) => void;
 }
 
 /**
@@ -87,6 +122,23 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
     const response = event.data;
     const entry = pending.get(response.id);
     if (!entry) return;
+
+    // Fortschritt beantwortet die Anfrage nicht — er verlängert sie.
+    if (response.ok && response.op === 'floodProgress') {
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => {
+        pending.delete(response.id);
+        entry.reject(
+          new Error(
+            `Höhenmodell: ${entry.op} ohne Fortschritt nach ${entry.timeoutMs} ms`
+          )
+        );
+      }, entry.timeoutMs);
+      const { phase, blocks, cells, total } = response;
+      entry.onProgress?.({ phase, blocks, cells, total });
+      return;
+    }
+
     pending.delete(response.id);
     clearTimeout(entry.timer);
     if (response.ok) entry.resolve(response);
@@ -108,7 +160,8 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
 
   const send = (
     request: TerrainRequestBody,
-    timeoutMs: number
+    timeoutMs: number,
+    onProgress?: (progress: FloodProgress) => void
   ): Promise<TerrainResponse> => {
     const id = nextId;
     nextId += 1;
@@ -122,7 +175,14 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
           )
         );
       }, timeoutMs);
-      pending.set(id, { resolve, reject, timer });
+      pending.set(id, {
+        resolve,
+        reject,
+        timer,
+        timeoutMs,
+        op: full.op,
+        onProgress,
+      });
       worker.postMessage(full);
     });
   };
@@ -173,6 +233,44 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
       );
       if (!response.ok || response.op !== 'blocks') throw unexpected(response);
       return response.blockIds;
+    },
+
+    flood(seed, heightM, levelId, options) {
+      // Die Nummer, die `send` als nächste vergibt. Der Abbruch muss sie
+      // kennen, bevor die Antwort da ist — deshalb hier gelesen und nicht
+      // aus dem Ergebnis genommen.
+      const id = nextId;
+      const result = send(
+        {
+          op: 'flood',
+          seed,
+          heightM,
+          level: levelId,
+          maxRadiusM: options?.maxRadiusM,
+        },
+        FLOOD_IDLE_TIMEOUT_MS,
+        options?.onProgress
+      ).then((response) => {
+        if (!response.ok || response.op !== 'flood') throw unexpected(response);
+        return response.result;
+      });
+      return {
+        result,
+        abort: () => {
+          void send({ op: 'floodAbort', target: id }, REQUEST_TIMEOUT_MS).catch(
+            () => undefined
+          );
+        },
+      };
+    },
+
+    async adria(positions) {
+      const response = await send(
+        { op: 'adria', positions },
+        REQUEST_TIMEOUT_MS
+      );
+      if (!response.ok || response.op !== 'adria') throw unexpected(response);
+      return response.offsets;
     },
   };
 }

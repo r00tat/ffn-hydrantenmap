@@ -24,6 +24,12 @@ vi.mock('../../providers/SnackbarProvider', () => ({
 // Die anderen Dammabschnitte kommen über den Firestore-Client; hier zählt nur,
 // was der Rechner daraus summiert.
 const linien = vi.fn<() => Line[]>(() => []);
+// Der Sandsackrechner liest die Wasserstands-Szenarien des Einsatzes; ohne
+// Mock zöge das den echten Firestore-Listener herein.
+vi.mock('../../../hooks/useWasserstandSzenarien', () => ({
+  default: () => [],
+}));
+
 vi.mock('../../../hooks/useDammLinien', () => ({
   default: () => linien(),
 }));

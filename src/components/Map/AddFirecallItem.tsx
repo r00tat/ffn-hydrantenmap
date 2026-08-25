@@ -13,6 +13,10 @@ import { useLeitungen } from './Leitungen/context';
 import { useDrawing } from './Drawing/DrawingContext';
 import useMapEditor from '../../hooks/useMapEditor';
 import { usePositionContext } from '../providers/PositionProvider';
+import {
+  merkeFrischAngelegt,
+  wasserstandBasis,
+} from './Wasserstand/wasserstandAnlegen';
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -41,15 +45,33 @@ export default function AddFirecallItem() {
   }, [map, gotPosition, userPosition]);
 
   const saveItem = useCallback(
-    (item?: FirecallItem) => {
-      if (item) {
-        addFirecallItem({
-          datum: new Date().toISOString(),
-          lat: getDefaultPosition().lat,
-          lng: getDefaultPosition().lng,
-          ...item,
-        });
+    async (item?: FirecallItem) => {
+      if (!item) return;
+      const position = getDefaultPosition();
+      const angelegt: FirecallItem = {
+        datum: new Date().toISOString(),
+        lat: position.lat,
+        lng: position.lng,
+        ...item,
+      };
+
+      // Eine Wasserausbreitung braucht die Geländehöhe an ihrem Punkt, sonst
+      // steht im Rechner „keine Geländehöhe vor" auf einen Punkt, der gerade
+      // gesetzt wurde. Hier ist die Stelle: erst hier steht die endgültige
+      // Position fest — bei Maus der Klick, bei Touch die Kartenmitte.
+      if (angelegt.type === 'wasserstand') {
+        const basis =
+          angelegt.lat !== undefined && angelegt.lng !== undefined
+            ? await wasserstandBasis([angelegt.lat, angelegt.lng])
+            : undefined;
+        const created = await addFirecallItem({ ...angelegt, ...(basis ?? {}) });
+        // Damit sich der Rechner von selbst öffnet und gleich rechnet, statt
+        // erst über Marker-Klick und Symbol im Popup erreichbar zu sein.
+        if (created?.id) merkeFrischAngelegt(created.id);
+        return;
       }
+
+      await addFirecallItem(angelegt);
     },
     [addFirecallItem, getDefaultPosition]
   );
@@ -91,7 +113,7 @@ export default function AddFirecallItem() {
         lat: e.latlng.lat,
         lng: e.latlng.lng,
       };
-      saveItem(fzgUpdated);
+      void saveItem(fzgUpdated);
       setFzgDrawing(undefined);
     }
   });
@@ -137,7 +159,7 @@ export default function AddFirecallItem() {
             // on a touch device it is better to drop the marker and move it afterwards
             navigator.maxTouchPoints > 0
           ) {
-            saveItem({
+            void saveItem({
               ...fzg,
               lat: getDefaultPosition().lat,
               lng: getDefaultPosition().lng,

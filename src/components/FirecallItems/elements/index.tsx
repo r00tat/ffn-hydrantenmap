@@ -18,6 +18,7 @@ import { FirecallRohr } from './FirecallRohr';
 import { FirecallSpectrum } from './FirecallSpectrum';
 import { FirecallTacticalUnit } from './FirecallTacticalUnit';
 import { FirecallVehicle } from './FirecallVehicle';
+import { FirecallWasserstand } from './FirecallWasserstand';
 
 export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   fallback: FirecallItemBase,
@@ -38,6 +39,7 @@ export const fcItemClasses: { [key: string]: typeof FirecallItemBase } = {
   drawing: FirecallDrawing,
   gb: FirecallGb,
   spectrum: FirecallSpectrum,
+  wasserstand: FirecallWasserstand,
 };
 
 export const fcItemNames: { [key: string]: string } = {};

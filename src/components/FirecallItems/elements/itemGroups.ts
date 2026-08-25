@@ -27,7 +27,10 @@ export const FIRECALL_ITEM_GROUPS: readonly {
   readonly itemTypes: readonly string[];
 }[] = [
   { key: 'tactical', itemTypes: ['vehicle', 'tacticalUnit', 'el', 'assp'] },
-  { key: 'waterSupply', itemTypes: ['hydrant', 'connection', 'rohr'] },
+  {
+    key: 'waterSupply',
+    itemTypes: ['hydrant', 'connection', 'rohr', 'wasserstand'],
+  },
   { key: 'drawing', itemTypes: ['marker', 'line', 'circle', 'area', 'drawing'] },
   { key: 'documentation', itemTypes: ['diary', 'gb', 'upload'] },
   { key: 'organisation', itemTypes: ['location', 'layer'] },
