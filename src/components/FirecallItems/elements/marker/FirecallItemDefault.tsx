@@ -1,12 +1,14 @@
 import { doc } from 'firebase/firestore';
 import { setDoc } from '../../../../lib/firestoreClient';
 import L from 'leaflet';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { defaultPosition } from '../../../../hooks/constants';
 import { useFirecallId } from '../../../../hooks/useFirecall';
 import useFirebaseLogin from '../../../../hooks/useFirebaseLogin';
 import useMapEditor from '../../../../hooks/useMapEditor';
 import { RotatedMarker } from '../../../Map/markers/RotatedMarker';
+import RotationHandle from '../../../Map/markers/RotationHandle';
+import { normalizeRotation } from '../../../Map/markers/rotationGeometry';
 import { firestore } from '../../../firebase/firebase';
 import {
   DataSchemaField,
@@ -80,13 +82,54 @@ async function updateFircallItemPos(
   }
 }
 
+async function updateFirecallItemRotation(
+  firecallId: string,
+  fcItem: FirecallItem,
+  rotation: number,
+  email?: string
+) {
+  if (!fcItem.id) return;
+  // Die Drehung liegt als String im Dokument, weil das Dialogfeld einen String
+  // liefert. Gespeichert wird auf ganze Grad gerundet.
+  const newRotation = String(Math.round(rotation) % 360);
+
+  await setDoc(
+    doc(
+      firestore,
+      FIRECALL_COLLECTION_ID,
+      firecallId,
+      FIRECALL_ITEMS_COLLECTION_ID,
+      fcItem.id
+    ),
+    { rotation: newRotation },
+    { merge: true }
+  );
+
+  if (email) {
+    logAuditChange(firecallId, email, {
+      action: 'update',
+      elementType: fcItem.type,
+      elementId: fcItem.id,
+      elementName: fcItem.name || '',
+      previousValue: { rotation: fcItem.rotation },
+      newValue: { rotation: newRotation },
+    });
+  }
+}
+
 export function FirecallItemMarkerDefault({
   record,
   selectItem,
   options: { hidePopup, disableClick, heatmapColor, onContextMenu } = {},
   children,
 }: FirecallItemMarkerProps) {
-  const icon = record.icon(heatmapColor);
+  /**
+   * Memoisiert, weil die Vorschau der Drehung diese Komponente im Takt der
+   * Zeigerbewegung neu rendert: `record.icon()` baut beim Fahrzeug jedes Mal
+   * eine neue SVG-Data-URL, und ein neues Icon-Objekt lässt react-leaflet
+   * `setIcon` rufen — das Marker-Element würde 60-mal pro Sekunde ersetzt.
+   */
+  const icon = useMemo(() => record.icon(heatmapColor), [record, heatmapColor]);
   const firecallId = useFirecallId();
   const { email } = useFirebaseLogin();
   const [startPos, setStartPos] = useState<L.LatLng>(
@@ -95,7 +138,8 @@ export function FirecallItemMarkerDefault({
       record.lng || defaultPosition.lng
     )
   );
-  const { editable, selectFirecallItem } = useMapEditor();
+  const { editable, selectFirecallItem, selectedFirecallItem } =
+    useMapEditor();
 
   useEffect(() => {
     if (record.lat && record.lng) {
@@ -104,6 +148,62 @@ export function FirecallItemMarkerDefault({
       })();
     }
   }, [record.lat, record.lng]);
+
+  /**
+   * Die gezogene beziehungsweise gerade gespeicherte Drehung, zusammen mit dem
+   * Wert, den das Dokument zu Beginn des Zuges führte.
+   *
+   * Sie gilt nur so lange, wie `record.rotation` noch diesen Ausgangswert
+   * zeigt. Damit ist die Lücke zwischen Schreibvorgang und Firestore-Abo
+   * überbrückt — ohne sie springt der Marker nach dem Loslassen kurz auf die
+   * alte Drehung zurück. Führt das Dokument einen anderen Wert, ist der
+   * Schreibvorgang angekommen oder die Drehung wurde woanders geändert: dann
+   * gilt wieder das Dokument. Deshalb wird hier nichts zurückgesetzt, sondern
+   * beim Rendern verglichen.
+   */
+  const [pendingRotation, setPendingRotation] = useState<{
+    angle: number;
+    from: number;
+  }>();
+  const savedRotation = normalizeRotation(record.rotation);
+  const rotationAngle =
+    pendingRotation && pendingRotation.from === savedRotation
+      ? pendingRotation.angle
+      : savedRotation;
+
+  // Während des Zuges wird nicht geschrieben, `savedRotation` steht also still
+  // und ist der richtige Ausgangswert.
+  const handleRotationPreview = useCallback(
+    (degrees: number) => {
+      setPendingRotation({ angle: degrees, from: savedRotation });
+    },
+    [savedRotation]
+  );
+
+  const handleRotationCommit = useCallback(
+    (degrees: number) => {
+      const rounded = Math.round(degrees) % 360;
+      setPendingRotation({ angle: rounded, from: savedRotation });
+      updateFirecallItemRotation(firecallId, record, rounded, email).catch(
+        (err) => {
+          console.error('failed to save rotation', err);
+          setPendingRotation(undefined);
+        }
+      );
+    },
+    [firecallId, record, email, savedRotation]
+  );
+
+  /**
+   * `!!record.id` ist kein Zierrat: die Vorschau-Marker beim Platzieren
+   * (`AddFirecallItem`) haben keine id, und `undefined === undefined` wäre
+   * wahr — der Griff hinge am Vorschau-Element.
+   */
+  const showRotationHandle =
+    editable &&
+    record.isRotatable() &&
+    !!record.id &&
+    selectedFirecallItem?.id === record.id;
 
   return (
     <>
@@ -135,17 +235,21 @@ export function FirecallItemMarkerDefault({
               }
             : {}),
         }}
-        rotationAngle={
-          record?.rotation &&
-          !Number.isNaN(Number.parseInt(record?.rotation, 10))
-            ? Number.parseInt(record?.rotation, 10) % 360
-            : 0
-        }
+        rotationAngle={rotationAngle}
         rotationOrigin="center"
       >
         {!hidePopup && record.renderPopup(selectItem)}
         {children}
       </RotatedMarker>
+      {showRotationHandle && (
+        <RotationHandle
+          position={startPos}
+          iconOptions={icon.options}
+          rotation={rotationAngle}
+          onPreview={handleRotationPreview}
+          onCommit={handleRotationCommit}
+        />
+      )}
     </>
   );
 }

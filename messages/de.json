@@ -135,7 +135,8 @@
     "addElement": "Neues Element hinzufügen",
     "editMap": "Einsatzkarte bearbeiten",
     "disableEdit": "Bearbeiten deaktivieren",
-    "historyLockedEdit": "Historie geladen, kein Bearbeiten möglich"
+    "historyLockedEdit": "Historie geladen, kein Bearbeiten möglich",
+    "rotateHandle": "Ziehen zum Drehen, mit Shift in 15°-Schritten"
   },
   "drawing": {
     "undoLast": "Letzten Strich rückgängig",

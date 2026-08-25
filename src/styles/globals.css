@@ -194,3 +194,61 @@ div.mobile-map {
     page-break-after: avoid;
   }
 }
+
+/* Dreh-Griff am ausgewählten Kartenelement (RotationHandle).
+   Strich und Knopf hängen in Pixeln unter dem Drehzentrum — über dem Marker
+   öffnet Leaflet das Popup und deckte den Griff genau dort zu, wo man ihn
+   greifen will. Die Länge steckt bewusst hier und nicht im TypeScript, damit
+   es nur eine Quelle gibt. */
+.ffn-rotate-handle {
+  /* Nur der Knopf soll Zeiger-Ereignisse abfangen, nicht die 0x0-Hülle. */
+  pointer-events: none;
+}
+
+.ffn-rotate-pivot {
+  position: absolute;
+  transform-origin: 0 0;
+}
+
+.ffn-rotate-line {
+  position: absolute;
+  left: -1px;
+  top: 0;
+  width: 2px;
+  height: 34px;
+  background-color: #1976d2;
+}
+
+.ffn-rotate-knob {
+  position: absolute;
+  left: -7px;
+  top: 27px;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border: 2px solid #1976d2;
+  border-radius: 50%;
+  background-color: #ffffff;
+  cursor: grab;
+  pointer-events: auto;
+  /* Sonst scrollt der Browser die Seite statt zu drehen. */
+  touch-action: none;
+}
+
+.ffn-rotate-knob:active {
+  cursor: grabbing;
+}
+
+.ffn-rotate-label {
+  position: absolute;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.85);
+  color: #1976d2;
+  font: 12px/1.2 Arial, Helvetica, sans-serif;
+  white-space: nowrap;
+}
+
+.ffn-rotate-label:empty {
+  display: none;
+}

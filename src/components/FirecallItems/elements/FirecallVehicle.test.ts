@@ -67,3 +67,9 @@ describe('FirecallVehicle', () => {
     expect(vehicle.info()).toBe('1:0 ATS: 0');
   });
 });
+
+describe('FirecallVehicle.isRotatable', () => {
+  it('darf über den Griff gedreht werden', () => {
+    expect(new FirecallVehicle().isRotatable()).toBe(true);
+  });
+});
