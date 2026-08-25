@@ -100,9 +100,20 @@ die Karte, damit sie ins Pixelbudget passt — es kämen also durchweg die falsc
 Kacheln, und zwar plausibel aussehende. Die URLs werden deshalb aus der
 Konfiguration in `tiles.ts` mit `L.Util.template` gebaut.
 
-WMS-Layer (Orthofoto Burgenland) kennen kein Kachelschema; für sie geht ein
-einzelnes `GetMap` über das ganze Mercator-Rechteck — zugleich weniger Verkehr
-als 64 Einzelanfragen.
+WMS-Layer (Orthofoto Burgenland, die Gefahrenkarten) kennen kein Kachelschema;
+für sie geht ein einzelnes `GetMap` über das ganze Mercator-Rechteck — zugleich
+weniger Verkehr als 64 Einzelanfragen.
+
+**Die eingeblendeten Überlagerungen kommen mit** und werden über das Kartenbild
+gezeichnet: Hochwasser-Gefahrenkarten, Risikogebiete, Adressen. Ohne sie zeigte
+die 3D-Ansicht eine andere Lage als die Karte daneben. Gezeichnet wird
+**nacheinander** in der Reihenfolge aus `tiles.ts` — die Reihenfolge ist die
+Stapelung; parallel gezeichnet läge die Gefahrenkarte mal über und mal unter den
+Adressen, je nachdem, welche Kachel zuerst da war.
+
+Nur Kachel- und WMS-Ebenen. Die übrigen Überlagerungen — Hydranten,
+Pegelstände, Live-Standorte, Stromausfälle — sind Marken und kein Kartenbild;
+sie ließen sich nicht in eine Textur zeichnen.
 
 `crossOrigin = 'anonymous'` ist Pflicht: ohne das färbt das erste fremde Bild
 das Canvas ein („tainted"), und der Texturupload nach WebGL wirft. Das Gelände
@@ -246,9 +257,14 @@ eine Bildschirmgröße (`LineMaterial`) und von der Szenenskalierung unberührt.
 
 Ausgeblendete Ebenen bleiben in 3D ausgeblendet. Wer eine Ebene abschaltet, hat
 sie abgeschaltet — sie hier trotzdem zu zeigen wäre ein zweites, abweichendes
-Lagebild, und genau das darf im Einsatz nicht passieren. Dasselbe gilt für die
-Höhenlinien: ist die Überlagerung in der Karte aus, öffnet die Ansicht mit
-ausgeschaltetem Schalter.
+Lagebild, und genau das darf im Einsatz nicht passieren. Das gilt für die
+Einsatz-Ebenen ebenso wie für die Kartenüberlagerungen.
+
+Eine Ausnahme mit Absicht: die **Höhenlinien** sind in der 3D-Ansicht
+standardmäßig **an**, obwohl die Überlagerung in der Karte vorbelegt aus ist. In
+der Karte sind sie eine Zugabe, in der Szene sind sie der halbe Inhalt. Wer sie
+in der Karte ausdrücklich abschaltet, bekommt sie hier trotzdem nicht — nur die
+Vorbelegung ist eine andere.
 
 Die Sichtbarkeit steckt in **Leaflets** Layer-Steuerung, nicht in React, und ist
 nur über `overlayadd`/`overlayremove` zu erfahren. Die melden aber ausschließlich

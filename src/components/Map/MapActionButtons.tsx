@@ -221,12 +221,16 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           }}
           zoom={map.getZoom()}
           baseLayerName={baseLayerName}
+          overlays={overlays}
           items={items3d}
           equidistanceM={equidistanceForZoom(map.getZoom())}
           showContours={isOverlayVisible(
             HOEHENLINIEN_LAYER_NAME,
             overlays,
-            false
+            // Standardmäßig an: in der Karte sind die Höhenlinien eine Zugabe,
+            // in der 3D-Ansicht sind sie der halbe Inhalt. Wer sie in der
+            // Karte ausdrücklich abschaltet, bekommt sie hier trotzdem nicht.
+            true
           )}
         />
       )}

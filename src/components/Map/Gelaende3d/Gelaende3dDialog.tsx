@@ -45,7 +45,13 @@ import {
   sceneProjector,
   waterSurfaces,
 } from './sceneObjects';
-import { composeTexture, findLayerConfig, tileGrid } from './terrainTexture';
+import {
+  activeOverlays,
+  composeTexture,
+  findLayerConfig,
+  tileGrid,
+} from './terrainTexture';
+import type { OverlayStates } from './visibleItems';
 
 /**
  * Die 3D-Ansicht des Geländes.
@@ -62,6 +68,13 @@ export interface Gelaende3dDialogOptions {
   zoom: number;
   /** Angezeigter Name des aktiven Kartenlayers. */
   baseLayerName?: string;
+  /**
+   * Zustand der Überlagerungen aus Leaflets Layer-Steuerung.
+   *
+   * Was in der Karte über dem Kartenbild liegt — Gefahrenkarten, Adressen —
+   * gehört auch in die Textur.
+   */
+  overlays?: OverlayStates;
   items: FirecallItem[];
   equidistanceM: number;
   /**
@@ -90,6 +103,7 @@ export default function Gelaende3dDialog({
   bounds,
   zoom,
   baseLayerName,
+  overlays = {},
   items,
   equidistanceM,
   showContours: contoursInitially = true,
@@ -181,7 +195,11 @@ export default function Gelaende3dDialog({
         const config = findLayerConfig(baseLayerName);
         if (config) {
           const grid = tileGrid(bounds, zoom, config, texturePx(screenWidth));
-          const texture = await composeTexture(config, grid);
+          const texture = await composeTexture(
+            config,
+            grid,
+            activeOverlays(overlays)
+          );
           if (!cancelled) scene.setTexture(texture, result, grid);
         }
 

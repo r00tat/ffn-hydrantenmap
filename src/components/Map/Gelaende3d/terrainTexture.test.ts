@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { availableLayers } from '../tiles';
-import { findLayerConfig, tileGrid, tileUrl, wmsUrl } from './terrainTexture';
+import {
+  activeOverlays,
+  findLayerConfig,
+  tileGrid,
+  tileUrl,
+  wmsUrl,
+} from './terrainTexture';
 
 const neusiedl = { south: 47.94, west: 16.83, north: 47.96, east: 16.87 };
 
@@ -58,5 +64,39 @@ describe('findLayerConfig', () => {
 
   it('fällt ohne Namen auf den ersten Layer zurück', () => {
     expect(findLayerConfig(undefined)?.name).toBe('Orthofoto');
+  });
+});
+
+describe('activeOverlays', () => {
+  it('nimmt die von Haus aus eingeblendeten Überlagerungen', () => {
+    const names = activeOverlays({}).map((layer) => layer.name);
+    // Nur die Adressen sind vorbelegt (`enabled: true`).
+    expect(names).toEqual(['Adressen']);
+  });
+
+  it('nimmt eine eingeschaltete Gefahrenkarte dazu', () => {
+    const names = activeOverlays({
+      'Hochwasser Oberflächenwasser': true,
+    }).map((layer) => layer.name);
+    expect(names).toContain('Hochwasser Oberflächenwasser');
+    expect(names).toContain('Adressen');
+  });
+
+  it('lässt eine ausgeschaltete Überlagerung weg', () => {
+    const names = activeOverlays({ Adressen: false }).map(
+      (layer) => layer.name
+    );
+    expect(names).toEqual([]);
+  });
+
+  it('hält die Reihenfolge der Konfiguration als Stapelung', () => {
+    const names = activeOverlays({
+      'Hochwasser Oberflächenwasser': true,
+      Adressen: true,
+    }).map((layer) => layer.name);
+    // Adressen stehen in `tiles.ts` zuerst und liegen damit unten.
+    expect(names.indexOf('Adressen')).toBeLessThan(
+      names.indexOf('Hochwasser Oberflächenwasser')
+    );
   });
 });

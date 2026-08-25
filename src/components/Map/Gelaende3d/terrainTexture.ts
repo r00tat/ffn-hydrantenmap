@@ -1,7 +1,8 @@
 import L from 'leaflet';
 import type { TerrainBoundsLatLng } from '../../../common/terrain/terrainTypes';
-import { availableLayers, type TileConfig } from '../tiles';
+import { availableLayers, overlayLayers, type TileConfig } from '../tiles';
 import { MAX_TEXTURE_PX } from './gelaende3d';
+import { isOverlayVisible, type OverlayStates } from './visibleItems';
 
 /**
  * Das Kartenbild des Ausschnitts als Textur für das Geländenetz.
@@ -90,6 +91,23 @@ export function findLayerConfig(name?: string): TileConfig | undefined {
   return entries.find((layer) => layer.name === name) ?? entries[0];
 }
 
+/**
+ * Die eingeblendeten Überlagerungen, in der Reihenfolge ihrer Stapelung.
+ *
+ * Hochwasser-Gefahrenkarten, Risikogebiete, Adressen: was in der Karte über dem
+ * Kartenbild liegt, gehört auch in die Textur — sonst zeigt die 3D-Ansicht eine
+ * andere Lage als die Karte daneben.
+ *
+ * Nur die Kachel- und WMS-Ebenen. Die übrigen Überlagerungen (Hydranten,
+ * Pegelstände, Live-Standorte) sind Marken und kein Kartenbild; sie ließen sich
+ * nicht in eine Textur zeichnen.
+ */
+export function activeOverlays(overlays: OverlayStates): TileConfig[] {
+  return Object.values(overlayLayers).filter((layer) =>
+    isOverlayVisible(layer.name, overlays, layer.enabled === true)
+  );
+}
+
 /** Kachel-URL nach dem Muster aus `tiles.ts`. Leaflets Subdomain-Wahl. */
 export function tileUrl(
   config: TileConfig,
@@ -140,28 +158,23 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Das Kachelmosaik in ein Canvas zeichnen.
+ * Eine Ebene in das Canvas zeichnen.
  *
- * Eine fehlende Kachel bleibt neutral grau stehen. Schwarz wäre von einem Loch
- * im Gelände nicht zu unterscheiden.
+ * Ein WMS liefert ein Bild über das ganze Rechteck, eine Kachelebene ein Raster.
+ * Eine Kachel, die nicht kommt, wird übergangen — der Untergrund bleibt stehen.
  */
-export async function composeTexture(
+async function drawLayer(
+  ctx: CanvasRenderingContext2D,
   config: TileConfig,
   grid: TileGrid
-): Promise<HTMLCanvasElement> {
-  const canvas = document.createElement('canvas');
-  canvas.width = grid.widthPx;
-  canvas.height = grid.heightPx;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D-Kontext für die Textur nicht verfügbar');
-  ctx.fillStyle = '#9e9e9e';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+): Promise<void> {
   if (config.type === 'WMS') {
     await loadImage(wmsUrl(config, grid))
-      .then((image) => ctx.drawImage(image, 0, 0, canvas.width, canvas.height))
+      .then((image) =>
+        ctx.drawImage(image, 0, 0, grid.widthPx, grid.heightPx)
+      )
       .catch(() => undefined);
-    return canvas;
+    return;
   }
 
   const jobs: Promise<void>[] = [];
@@ -179,5 +192,33 @@ export async function composeTexture(
     }
   }
   await Promise.all(jobs);
+}
+
+/**
+ * Kartenbild und Überlagerungen in ein Canvas zeichnen.
+ *
+ * Eine fehlende Kachel bleibt neutral grau stehen. Schwarz wäre von einem Loch
+ * im Gelände nicht zu unterscheiden.
+ */
+export async function composeTexture(
+  config: TileConfig,
+  grid: TileGrid,
+  overlays: TileConfig[] = []
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  canvas.width = grid.widthPx;
+  canvas.height = grid.heightPx;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D-Kontext für die Textur nicht verfügbar');
+  ctx.fillStyle = '#9e9e9e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  await drawLayer(ctx, config, grid);
+  // Nacheinander und nicht nebenläufig: die Reihenfolge **ist** die Stapelung.
+  // Parallel gezeichnet läge die Gefahrenkarte mal über und mal unter den
+  // Adressen, je nachdem, welche Kachel zuerst da war.
+  for (const overlay of overlays) {
+    await drawLayer(ctx, overlay, grid);
+  }
   return canvas;
 }
