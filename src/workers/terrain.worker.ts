@@ -6,6 +6,7 @@ import { FloodAborted, floodFill } from '../common/terrain/floodFill';
 import { blockId } from '../common/terrain/grid';
 import { terrainLevel } from '../common/terrain/terrainIndexTypes';
 import { terrainContours } from '../common/terrain/terrainContours';
+import { terrainMesh } from '../common/terrain/terrainMesh';
 import { sampleTerrain } from '../common/terrain/terrainSample';
 import type {
   TerrainRequest,
@@ -23,8 +24,11 @@ import type {
 
 const store = new BlockStore();
 
-const post = (response: TerrainResponse): void => {
-  (self as unknown as Worker).postMessage(response);
+const post = (
+  response: TerrainResponse,
+  transfer: Transferable[] = []
+): void => {
+  (self as unknown as Worker).postMessage(response, transfer);
 };
 
 /**
@@ -53,6 +57,19 @@ async function handle(request: TerrainRequest): Promise<void> {
         ...(await terrainContours(store, request.bounds, request.equidistanceM)),
       });
       return;
+    case 'mesh': {
+      const mesh = await terrainMesh(store, request.bounds, request.maxVertices);
+      // Die drei Puffer werden übergeben, nicht kopiert: bei 65.000 Vertices
+      // sind das rund 800 KB je Abfrage, und die Karte soll beim Öffnen der
+      // Ansicht nicht stehen.
+      post(
+        { id: request.id, ok: true, op: 'mesh', mesh },
+        mesh
+          ? [mesh.positions.buffer, mesh.indices.buffer, mesh.holes.buffer]
+          : []
+      );
+      return;
+    }
     case 'prefetch': {
       const { loaded, failed } = await store.warm(
         request.level,

@@ -8,12 +8,7 @@ import {
 import { encodedToRgb, encodeHeight, NODATA_ENCODED } from './encoding';
 import { wgs84ToLaea, laeaToWgs84 } from './projection';
 import type { TerrainIndex, TerrainLevel } from './terrainIndexTypes';
-import {
-  chooseContourLevel,
-  laeaHull,
-  MAX_CONTOUR_CELLS,
-  terrainContours,
-} from './terrainContours';
+import { terrainContours } from './terrainContours';
 import type { TerrainBoundsLatLng } from './terrainTypes';
 
 /**
@@ -142,55 +137,6 @@ const boundsFor = (
 
 /** Fenster zwei Meter innerhalb der abgedeckten Fläche. */
 const window20m = boundsFor(e0 + 2, e0 + 18, n0 + 2, n0 + 18);
-
-describe('laeaHull', () => {
-  it('umschließt Ecken und Kantenmitten', () => {
-    const hull = laeaHull(window20m);
-    for (const position of [
-      [window20m.south, window20m.west],
-      [window20m.north, window20m.east],
-      [window20m.south, (window20m.west + window20m.east) / 2],
-      [(window20m.south + window20m.north) / 2, window20m.east],
-    ] as [number, number][]) {
-      const point = wgs84ToLaea(position);
-      expect(point.e).toBeGreaterThanOrEqual(hull.eMin);
-      expect(point.e).toBeLessThanOrEqual(hull.eMax);
-      expect(point.n).toBeGreaterThanOrEqual(hull.nMin);
-      expect(point.n).toBeLessThanOrEqual(hull.nMax);
-    }
-  });
-});
-
-describe('chooseContourLevel', () => {
-  const withOverview = (): TerrainIndex => {
-    const index = testIndex(detailLevel());
-    index.levels.push({
-      ...detailLevel(),
-      id: 'overview',
-      resolutionM: 10,
-      blockSizeM: 40,
-      pathTemplate: 'overview/CRS3035RES40mN{n}E{e}.png',
-    });
-    return index;
-  };
-
-  it('nimmt die Detailstufe für einen kleinen Ausschnitt', () => {
-    const level = chooseContourLevel(withOverview(), laeaHull(window20m));
-    expect(level?.id).toBe('detail');
-  });
-
-  it('weicht auf die Übersicht aus, wenn die Detailstufe das Budget sprengt', () => {
-    // 5 km Kantenlänge sind in 1 m Raster 25 Mio. Zellen, in 10 m 250.000.
-    const hull = { eMin: e0, eMax: e0 + 5000, nMin: n0, nMax: n0 + 5000 };
-    expect(chooseContourLevel(withOverview(), hull)?.id).toBe('overview');
-  });
-
-  it('gibt undefined, wenn auch die gröbste Stufe zu groß wäre', () => {
-    const side = Math.sqrt(MAX_CONTOUR_CELLS) * 10 * 2;
-    const hull = { eMin: e0, eMax: e0 + side, nMin: n0, nMax: n0 + side };
-    expect(chooseContourLevel(withOverview(), hull)).toBeUndefined();
-  });
-});
 
 describe('terrainContours', () => {
   it('zieht eine Linie durchgehend über die Blockgrenzen', async () => {

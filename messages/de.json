@@ -2541,5 +2541,24 @@
     "offlineDone": "{loaded} Blöcke geladen, {failed} nicht verfügbar.",
     "offlineFailed": "Das Höhenmodell konnte nicht geladen werden.",
     "offlineUnavailable": "Es sind keine Kacheln zum Vorladen verzeichnet."
+  },
+  "gelaende3d": {
+    "title": "Gelände in 3D",
+    "open": "Gelände in 3D ansehen",
+    "close": "Schließen",
+    "loading": "Gelände wird geladen …",
+    "noTerrain": "Für diesen Ausschnitt liegt kein Höhenmodell vor. Das Höhenmodell deckt das Burgenland ab; ohne Netz muss es vorher geladen werden.",
+    "noWebgl": "Diese Ansicht braucht WebGL. Der Browser stellt es nicht bereit.",
+    "failed": "Das Gelände konnte nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "exaggeration": "Überhöhung",
+    "exaggerationValue": "{factor}-fach überhöht",
+    "span": "{min} bis {max} m",
+    "resolution": "Raster {resolution} m",
+    "levelDetail": "Detailstufe",
+    "levelOverview": "Übersicht",
+    "contours": "Höhenlinien",
+    "attribution": "Datenquelle: Bundesamt für Eich- und Vermessungswesen (BEV)",
+    "north": "Norden"
   }
 }

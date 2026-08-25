@@ -2541,5 +2541,24 @@
     "offlineDone": "{loaded} blocks loaded, {failed} unavailable.",
     "offlineFailed": "The elevation model could not be downloaded.",
     "offlineUnavailable": "No tiles are listed for pre-loading."
+  },
+  "gelaende3d": {
+    "title": "Terrain in 3D",
+    "open": "View terrain in 3D",
+    "close": "Close",
+    "loading": "Loading terrain …",
+    "noTerrain": "No elevation model is available for this view. The model covers Burgenland; offline it has to be downloaded first.",
+    "noWebgl": "This view needs WebGL. The browser does not provide it.",
+    "failed": "The terrain could not be loaded.",
+    "retry": "Try again",
+    "exaggeration": "Vertical exaggeration",
+    "exaggerationValue": "{factor}× exaggerated",
+    "span": "{min} to {max} m",
+    "resolution": "{resolution} m grid",
+    "levelDetail": "Detail level",
+    "levelOverview": "Overview",
+    "contours": "Contour lines",
+    "attribution": "Data source: Bundesamt für Eich- und Vermessungswesen (BEV)",
+    "north": "North"
   }
 }

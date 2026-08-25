@@ -58,6 +58,38 @@ export interface ContourResult {
 }
 
 /**
+ * Das Geländenetz für die 3D-Ansicht.
+ *
+ * Koordinatenrahmen: x nach Osten, y nach oben, z nach Süden, Ursprung in der
+ * Mitte des Ausschnitts. Eine Einheit ist **ein Geländemeter** — nicht ein
+ * Mercator-Meter (siehe `groundScale` in `terrainMesh.ts`).
+ *
+ * `positions` trägt die **unverzerrte** Höhe. Die Überhöhung ist eine
+ * Darstellungsgröße und wird in der Szene als Skalierung gesetzt; so kostet ein
+ * Zug am Regler keine neue Abfrage.
+ */
+export interface TerrainMesh {
+  /** x, y, z je Vertex. Zeile 0 ist die nördlichste. */
+  positions: Float32Array;
+  indices: Uint32Array;
+  /** 1 = Vertex ohne Höhe. Dreiecke mit einem solchen Eckpunkt fehlen. */
+  holes: Uint8Array;
+  cols: number;
+  rows: number;
+  /** Kantenlängen der Szene in Geländemetern. */
+  widthM: number;
+  depthM: number;
+  minM: number;
+  maxM: number;
+  level: TerrainLevelId;
+  resolutionM: number;
+  /** Mitte des Ausschnitts — die Breite, auf der `groundScale` gerechnet ist. */
+  center: LatLngPosition;
+  /** Das Mercator-Rechteck des Netzes — Grundlage der UV-Koordinaten. */
+  merc: { xMin: number; xMax: number; yMin: number; yMax: number };
+}
+
+/**
  * Was ein Flutlauf zurückgibt.
  *
  * Bewusst **ohne** Raster: die Bänder sind das Ergebnis, gespeichert wird es am
@@ -107,6 +139,12 @@ export type TerrainRequest =
     }
   | {
       id: number;
+      op: 'mesh';
+      bounds: TerrainBoundsLatLng;
+      maxVertices?: number;
+    }
+  | {
+      id: number;
       op: 'prefetch';
       level: TerrainLevelId;
       blockIds: string[];
@@ -149,6 +187,7 @@ export type TerrainRequest =
 export type TerrainResponse =
   | { id: number; ok: true; op: 'sample'; samples: (TerrainSample | null)[] }
   | ({ id: number; ok: true; op: 'contours' } & ContourResult)
+  | { id: number; ok: true; op: 'mesh'; mesh?: TerrainMesh }
   | { id: number; ok: true; op: 'prefetch'; loaded: number; failed: number }
   | { id: number; ok: true; op: 'blocks'; blockIds: string[] }
   | { id: number; ok: true; op: 'flood'; result: FloodSummary }

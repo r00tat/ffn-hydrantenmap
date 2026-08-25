@@ -445,6 +445,8 @@ Siehe [docs/loeschwasserfoerderung.md](loeschwasserfoerderung.md).
   [docs/wasserstandsmodell.md](wasserstandsmodell.md). Es nutzt die Detailstufe und die
   Blockmathematik von hier; das Versatzgitter braucht es nur für die **Anzeige** in müA, weil
   es mit Differenzen rechnet. Die **Dammbruch-Simulation** bleibt außen vor.
+- **Die 3D-Ansicht** steht in [docs/gelaende-3d.md](gelaende-3d.md). Sie rechnet aus denselben
+  Blöcken, aber auf einem eigenen Gitter in Web Mercator.
 - **Hillshade.** Wäre aus denselben Blöcken möglich, ist aber keine Anforderung.
 - **Ein Eintrag in der Interpolations-Registry.** Das Höhenmodell ist eine Rasterquelle, kein
   interpolierter Messwert; #727 nimmt das ausdrücklich aus.

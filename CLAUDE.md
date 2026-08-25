@@ -27,6 +27,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/pendelverkehr.md](docs/pendelverkehr.md) | Pendelverkehr an der Leitung und der Vergleich mit der Förderung: Umlaufformel, Füllstellen-Schranke, Fahrt-Routing, Planungswerte der Aufbauzeit, Seite „Löschwasserversorgung" |
 | [docs/dammbau-sandsaecke.md](docs/dammbau-sandsaecke.md) | Sandsackbedarf für den Dammbau an der Linie: Verlege- und Befüllleistungstabellen der Lehrunterlage LU TE3 und ihre Gegenprüfung, Bauweisen, Freibord, Logistik, Summe über mehrere Dammabschnitte |
 | [docs/hoehenmodell.md](docs/hoehenmodell.md) | Eigenes Höhenmodell: BEV-Datenquelle, Höhendatum und Kalibrierung, Kachelschema, Import und Höhenlinien |
+| [docs/gelaende-3d.md](docs/gelaende-3d.md) | 3D-Ansicht des Geländes: Mesh in Mercator, lokal-metrische Szene, Überhöhung, Textur aus den Kartenkacheln |
 | [docs/wasserstandsmodell.md](docs/wasserstandsmodell.md) | Wasserstandsmodell: Flutfüllung, Bänder am Element, Signatur, Kopplung an den Sandsackrechner |
 
 ## Commands

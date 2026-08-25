@@ -3,12 +3,15 @@
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
+import ThreeDRotationIcon from '@mui/icons-material/ThreeDRotation';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import Box from '@mui/material/Box';
 import Fab from '@mui/material/Fab';
 import Tooltip from '@mui/material/Tooltip';
 import L from 'leaflet';
+import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 import useMapEditor, { useMapEditorCanEdit } from '../../hooks/useMapEditor';
 import LiveLocationFab from '../LiveLocation/LiveLocationFab';
 import { useFirecallItems } from '../firebase/firestoreHooks';
@@ -16,6 +19,17 @@ import AddFirecallItem from './AddFirecallItem';
 import AiAssistantButton from './AiAssistantButton';
 import RecordButton from './RecordButton';
 import SearchButton from './SearchButton';
+import { equidistanceForZoom } from './layers/hoehenlinien';
+import { availableLayers } from './tiles';
+
+/**
+ * Dynamisch geladen: `three` und die Szene liegen damit in einem eigenen
+ * Chunk. Eine gewöhnliche Kartensitzung, die die Ansicht nie öffnet, lädt
+ * nichts davon.
+ */
+const Gelaende3dDialog = dynamic(() => import('./Gelaende3d/Gelaende3dDialog'), {
+  ssr: false,
+});
 
 export interface MapActionButtonsOptions {
   map: L.Map;
@@ -23,6 +37,7 @@ export interface MapActionButtonsOptions {
 
 export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   const t = useTranslations('mapUi');
+  const t3d = useTranslations('gelaende3d');
   const {
     editable,
     setEditable,
@@ -32,6 +47,22 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
   } = useMapEditor();
   const canEdit = useMapEditorCanEdit();
   const firecallItems = useFirecallItems();
+  const [show3d, setShow3d] = useState(false);
+  const [baseLayerName, setBaseLayerName] = useState(
+    Object.values(availableLayers)[0]?.name
+  );
+
+  // Der aktive Grundlayer steht nur an der Layer-Steuerung von Leaflet; die
+  // 3D-Ansicht braucht seinen Namen, um dieselben Kacheln als Textur zu holen.
+  useEffect(() => {
+    const onBaseLayer = (event: L.LayersControlEvent) =>
+      setBaseLayerName(event.name);
+    map.on('baselayerchange', onBaseLayer as L.LeafletEventHandlerFn);
+    return () => {
+      map.off('baselayerchange', onBaseLayer as L.LeafletEventHandlerFn);
+    };
+  }, [map]);
+
   return (
     <>
       <LiveLocationFab />
@@ -79,6 +110,18 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
           </Tooltip>
         )}
 
+        <Tooltip title={t3d('open')}>
+          <Fab
+            color="default"
+            aria-label="3d"
+            size="medium"
+            style={{ marginLeft: 8 }}
+            onClick={() => setShow3d(true)}
+          >
+            <ThreeDRotationIcon />
+          </Fab>
+        </Tooltip>
+
         {historyId && (
           <Tooltip title={t('historyLockedEdit')}>
             <Fab
@@ -101,6 +144,22 @@ export default function MapActionButtons({ map }: MapActionButtonsOptions) {
       )}
       <AddFirecallItem />
       {editable && <AiAssistantButton firecallItems={firecallItems} />}
+      {show3d && (
+        <Gelaende3dDialog
+          open={show3d}
+          onClose={() => setShow3d(false)}
+          bounds={{
+            south: map.getBounds().getSouth(),
+            west: map.getBounds().getWest(),
+            north: map.getBounds().getNorth(),
+            east: map.getBounds().getEast(),
+          }}
+          zoom={map.getZoom()}
+          baseLayerName={baseLayerName}
+          items={firecallItems}
+          equidistanceM={equidistanceForZoom(map.getZoom())}
+        />
+      )}
     </>
   );
 }

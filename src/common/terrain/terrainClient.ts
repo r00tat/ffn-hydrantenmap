@@ -5,6 +5,7 @@ import type {
   FloodProgress,
   FloodSummary,
   TerrainBoundsLatLng,
+  TerrainMesh,
   TerrainRequest,
   TerrainResponse,
   TerrainSample,
@@ -62,6 +63,17 @@ export interface TerrainClient {
     bounds: TerrainBoundsLatLng,
     equidistanceM: number
   ): Promise<ContourResult>;
+  /**
+   * Das Geländenetz für die 3D-Ansicht.
+   *
+   * `undefined`, wenn für den Ausschnitt keine Stufe ins Zellbudget passt oder
+   * kein einziger Block vorliegt — die Ansicht sagt das an, statt schwarz zu
+   * bleiben.
+   */
+  mesh(
+    bounds: TerrainBoundsLatLng,
+    maxVertices?: number
+  ): Promise<TerrainMesh | undefined>;
   prefetch(
     levelId: TerrainLevelId,
     blockIds: string[]
@@ -212,6 +224,15 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
         minM: response.minM,
         maxM: response.maxM,
       };
+    },
+
+    async mesh(bounds, maxVertices) {
+      const response = await send(
+        { op: 'mesh', bounds, maxVertices },
+        REQUEST_TIMEOUT_MS
+      );
+      if (!response.ok || response.op !== 'mesh') throw unexpected(response);
+      return response.mesh;
     },
 
     async prefetch(levelId, blockIds) {

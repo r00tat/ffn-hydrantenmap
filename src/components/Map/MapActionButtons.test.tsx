@@ -40,9 +40,15 @@ function renderButtons(options: Partial<MapEditorOptions> = {}) {
     setLastSelectedLayer: vi.fn(),
     ...options,
   };
+  /* Nur, was die Komponente anfasst: den Wechsel des Grundlayers beobachtet
+     sie für die 3D-Ansicht, die Ausmaße liest sie erst beim Öffnen. */
+  const map = {
+    on: vi.fn(),
+    off: vi.fn(),
+  } as unknown as L.Map;
   return renderWithIntl(
     <MapEditorContext.Provider value={value}>
-      <MapActionButtons map={{} as L.Map} />
+      <MapActionButtons map={map} />
     </MapEditorContext.Provider>
   );
 }
