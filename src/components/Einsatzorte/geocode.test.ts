@@ -160,10 +160,18 @@ describe('geocodableAddress', () => {
     });
   });
 
-  it('lehnt eine Straße ohne Hausnummer ab', () => {
+  it('nimmt eine Straße ohne Hausnummer', () => {
     expect(
-      geocodableAddress({ street: 'Hauptpl', city: 'Eisenstadt' }),
-    ).toBeNull();
+      geocodableAddress({ street: 'Hauptplatz', city: 'Eisenstadt' })
+    ).toEqual({ street: 'Hauptplatz', number: '', city: 'Eisenstadt' });
+  });
+
+  it('nimmt eine Straße ohne Hausnummer und ohne Ort', () => {
+    expect(geocodableAddress({ street: 'Hauptplatz' })).toEqual({
+      street: 'Hauptplatz',
+      number: '',
+      city: DEFAULT_LOCATION_CITY,
+    });
   });
 
   it('lehnt eine Hausnummer ohne Straße ab', () => {
@@ -233,6 +241,19 @@ describe('geocodeTargetForChange', () => {
   });
 
   it('löst nicht aus, solange die Adresse unbrauchbar ist', () => {
-    expect(geocodeTargetForChange({}, { street: 'Hauptpl' })).toBeNull();
+    expect(geocodeTargetForChange({}, { number: '12' })).toBeNull();
+    expect(geocodeTargetForChange({}, {})).toBeNull();
+  });
+
+  it('löst erneut aus, wenn zur Straße die Hausnummer nachkommt', () => {
+    const withoutNumber = {
+      street: 'Hauptplatz',
+      number: '',
+      city: 'Eisenstadt',
+    };
+    expect(geocodeTargetForChange({}, withoutNumber)).toEqual(withoutNumber);
+    expect(
+      geocodeTargetForChange(withoutNumber, { ...withoutNumber, number: '12' })
+    ).toEqual({ street: 'Hauptplatz', number: '12', city: 'Eisenstadt' });
   });
 });

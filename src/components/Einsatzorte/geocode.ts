@@ -22,21 +22,22 @@ function trimParts(parts: Partial<AddressParts>): AddressParts {
  * Prüft, ob eine Adresse aussagekräftig genug für ein Geocoding ist, und gibt
  * sie normalisiert samt Vorgabe-Ort zurück.
  *
- * Bewusst zurückhaltend: Eine Straße ohne Hausnummer ergäbe beim Tippen im
- * Formular laufend Anfragen auf halb geschriebene Straßennamen, die den
- * Einsatzort auf einen Straßenmittelpunkt setzen würden. Ein Ort allein ist
- * dagegen brauchbar — er trifft das Ortszentrum, was für einen flächigen
- * Auftrag der richtige Startpunkt ist.
+ * Eine Straße genügt — viele Einsatzorte haben gar keine Hausnummer, und der
+ * Straßenmittelpunkt ist dort der richtige Anhaltspunkt. Kommt die Hausnummer
+ * später dazu, löst sie über {@link geocodeTargetForChange} ein weiteres
+ * Geocoding aus und schärft die Koordinate nach. Ein Ort allein trifft das
+ * Ortszentrum, was für einen flächigen Auftrag der richtige Startpunkt ist.
+ * Nur eine Hausnummer ohne Straße ergibt keine sinnvolle Suche.
  */
 export function geocodableAddress(
   parts: Partial<AddressParts>
 ): AddressParts | null {
   const { street, number, city } = trimParts(parts);
 
-  if (street && number) {
+  if (street) {
     return { street, number, city: city || DEFAULT_LOCATION_CITY };
   }
-  if (!street && !number && city) {
+  if (!number && city) {
     return { street: '', number: '', city };
   }
   return null;
@@ -76,8 +77,8 @@ export function geocodeTargetForChange(
  * angegeben ist, dient die Nähe zu Neusiedl als Entscheidungskriterium unter
  * mehreren gleichnamigen Treffern.
  *
- * Straße, Hausnummer und Ort sind einzeln optional — es muss nur mindestens
- * Straße samt Hausnummer oder ein Ort gesetzt sein.
+ * Straße, Hausnummer und Ort sind einzeln optional — es muss nur eine Straße
+ * oder ein Ort gesetzt sein.
  */
 export async function geocodeAddress(
   street: string,
