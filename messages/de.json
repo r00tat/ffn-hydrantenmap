@@ -400,7 +400,9 @@
     "radiationMeasurement": "Strahlenmessung",
     "tokens": "Tokens",
     "units": "Einsatzmittel",
-    "users": "Users"
+    "users": "Users",
+    "connectedApps": "Verbundene Anwendungen",
+    "adminMcp": "MCP-Zugänge"
   },
   "fahrtenbuch": {
     "title": "Fahrtenbuch",
@@ -1967,7 +1969,8 @@
     "geschaeftsbuch": "Geschäftsbuch",
     "wetter": "Wetter",
     "drucken": "Drucken",
-    "admin": "Administration"
+    "admin": "Administration",
+    "mcp": "MCP / Claude"
   },
   "users": {
     "title": "Benutzer",
@@ -2560,5 +2563,69 @@
     "contours": "Höhenlinien",
     "attribution": "Datenquelle: Bundesamt für Eich- und Vermessungswesen (BEV)",
     "north": "Norden"
+  },
+  "oauthConsent": {
+    "title": "{client} mit der Einsatzkarte verbinden",
+    "intro": "{client} möchte in deinem Namen auf die Einsatzkarte zugreifen. Erlaubt werden damit:",
+    "scopeEinsatzRead": "Einsätze, Elemente, Ebenen, Einsatztagebuch und Geschäftsbuch lesen",
+    "scopeEinsatzWrite": "Elemente anlegen, ändern und löschen sowie Tagebuch- und Geschäftsbucheinträge schreiben",
+    "scopeHydrantenRead": "Hydranten und Wasserentnahmestellen suchen",
+    "scopeBerechnung": "Berechnungen durchführen (Löschwasserförderung, Pendelverkehr, Sandsackbedarf, Strahlenschutz)",
+    "privacyWarning": "Die abgerufenen Daten verlassen die Einsatzkarte und werden von der verbundenen Anwendung verarbeitet — bei Claude ist das ein Anbieter mit Sitz in den USA. Dazu können Namen von Mannschaft und Meldenden gehören. Verbinde nur Anwendungen, denen du das zutraust.",
+    "writeWarning": "Diese Anwendung darf auch schreiben. Einträge, die sie anlegt, werden in der Einsatzkarte als maschinell erzeugt gekennzeichnet.",
+    "redirectTarget": "Weiterleitung an",
+    "clientIdLabel": "Client-ID",
+    "dcrHint": "Diese Anwendung hat sich selbst registriert (Dynamic Client Registration). Der Name stammt von ihr und ist nicht geprüft.",
+    "approve": "Zugriff erlauben",
+    "deny": "Ablehnen",
+    "revokeHint": "Du kannst den Zugriff jederzeit unter „Verbundene Anwendungen“ widerrufen.",
+    "errorTitle": "Verbindung nicht möglich",
+    "errorFallback": "Die Anfrage der Anwendung konnte nicht verarbeitet werden.",
+    "backToApp": "Zurück zur Einsatzkarte"
+  },
+  "connectedApps": {
+    "pageTitle": "Verbundene Anwendungen",
+    "description": "Anwendungen, denen du über den MCP-Zugang Zugriff auf die Einsatzkarte erlaubt hast.",
+    "empty": "Es ist keine Anwendung verbunden.",
+    "loading": "Wird geladen …",
+    "scopes": "Berechtigungen",
+    "grantedAt": "Erlaubt am",
+    "lastUsed": "Zuletzt verwendet",
+    "never": "noch nie",
+    "activeTokens": "{count, plural, =0 {kein gültiger Zugang} one {ein gültiger Zugang} other {# gültige Zugänge}}",
+    "revoke": "Zugriff widerrufen",
+    "revokeConfirmTitle": "Zugriff widerrufen?",
+    "revokeConfirmText": "{client} kann danach nicht mehr auf die Einsatzkarte zugreifen. Bereits ausgestellte Zugriffstoken laufen innerhalb einer Stunde ab.",
+    "revoked": "Der Zugriff wurde widerrufen.",
+    "error": "Der Zugriff konnte nicht widerrufen werden: {message}",
+    "docsLink": "Anleitung: Einsatzkarte mit Claude verbinden",
+    "mcpOrigin": "KI",
+    "mcpOriginTooltip": "Dieser Eintrag wurde von der verbundenen Anwendung „{client}\" über die MCP-Schnittstelle geschrieben, nicht von Hand."
+  },
+  "adminMcp": {
+    "pageTitle": "MCP-Zugänge",
+    "description": "Registrierte Anwendungen und aktive Zugänge des MCP-Servers.",
+    "clientsTitle": "Registrierte Anwendungen",
+    "grantsTitle": "Aktive Zugänge",
+    "clientId": "Client-ID",
+    "clientName": "Name",
+    "registeredAt": "Registriert",
+    "redirectUris": "Weiterleitungsziele",
+    "source": "Herkunft",
+    "sourceDcr": "Selbstregistrierung",
+    "sourceCimd": "Metadaten-Dokument",
+    "user": "Benutzer",
+    "scopes": "Berechtigungen",
+    "activeTokens": "Gültige Zugänge",
+    "lastUsed": "Zuletzt verwendet",
+    "never": "noch nie",
+    "noClients": "Es ist keine Anwendung registriert.",
+    "noGrants": "Es ist kein Zugang aktiv.",
+    "deleteClient": "Registrierung löschen",
+    "deleteClientConfirm": "Die Registrierung von {client} wird gelöscht. Bestehende Zugänge dieser Anwendung werden dabei ungültig.",
+    "revokeGrant": "Zugang widerrufen",
+    "revokeGrantConfirm": "Der Zugang von {client} für {user} wird widerrufen.",
+    "loading": "Wird geladen …",
+    "error": "Fehler: {message}"
   }
 }

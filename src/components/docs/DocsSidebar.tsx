@@ -22,6 +22,7 @@ const docPages = [
   { key: 'ebenen', href: '/docs/ebenen' },
   { key: 'chat', href: '/docs/chat' },
   { key: 'ki', href: '/docs/ki' },
+  { key: 'mcp', href: '/docs/mcp' },
   { key: 'blaulichtSms', href: '/docs/blaulicht-sms' },
   { key: 'schadstoff', href: '/docs/schadstoff' },
   { key: 'strahlenschutz', href: '/docs/strahlenschutz' },

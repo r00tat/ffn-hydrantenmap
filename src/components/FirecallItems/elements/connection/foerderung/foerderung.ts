@@ -1,6 +1,7 @@
 'use client';
 
 import type { LatLngPosition } from '../../../../../common/geo';
+import { FOERDERUNG_DEFAULTS } from './defaults';
 import type { Connection } from '../../../../firebase/firestore';
 import { calculateDistance, getConnectionPositions } from '../distance';
 import { connectionDisplayPositions } from '../streetRouting';
@@ -12,6 +13,8 @@ import {
   storedElevations,
 } from './elevationProfile';
 import { frictionLossPer100m, isTabulatedDimension } from './frictionLoss';
+
+export { FOERDERUNG_DEFAULTS } from './defaults';
 import {
   computeFoerderung,
   type FoerderungProfilePoint,
@@ -27,24 +30,6 @@ import {
  * Render neu. Damit gibt es nichts zu invalidieren: Ein Punkt wird verschoben,
  * das Profil wird nachgezogen, die Pumpen wandern mit.
  */
-
-/**
- * Vorbelegungen, alle belegt — Herkunft je Wert in
- * docs/loeschwasserfoerderung.md.
- */
-export const FOERDERUNG_DEFAULTS = {
-  /** Normale Fördermenge einer Zubringleitung. */
-  foerderMenge: 1000,
-  /** 5 bar Strahlrohr + 1 bar Verteiler und Löschleitung. */
-  zielDruck: 6,
-  /** PFPN 10-1000 im Dauerbetrieb; 10 bar wäre der Nennwert ohne Reserve. */
-  pumpenAusgangsdruck: 8,
-  /** Mindest-Eingangsdruck an der nächsten Pumpe. */
-  pumpenEingangsdruck: 1.5,
-  /** Nennförderstrom FPN 10-1000. */
-  pumpenNennstrom: 1000,
-  paralleleLeitungen: 1,
-};
 
 /** Länge eines Schlauches, wenn an der Leitung keine hinterlegt ist. */
 const DEFAULT_HOSE_LENGTH = 20;

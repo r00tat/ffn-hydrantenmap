@@ -54,6 +54,17 @@ export interface FirecallItem {
   creator?: string;
   created?: string;
 
+  /**
+   * Herkunft des Elements. `'mcp'` an allem, was eine verbundene Anwendung
+   * über den MCP-Server geschrieben hat — siehe `common/mcp/provenance.ts`.
+   * Ohne Angabe stammt es aus der Oberfläche.
+   */
+  source?: string;
+  /** `client_id` der schreibenden Anwendung, nur bei `source: 'mcp'`. */
+  mcpClientId?: string;
+  /** Anzeigename der schreibenden Anwendung, nur bei `source: 'mcp'`. */
+  mcpClientName?: string;
+
   fieldData?: Record<string, string | number | boolean>;
 }
 

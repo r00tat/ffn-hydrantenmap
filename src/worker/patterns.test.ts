@@ -265,3 +265,25 @@ describe('cachePatterns', () => {
     });
   });
 });
+
+describe('MCP- und OAuth-Endpunkte', () => {
+  it('kommen nie aus dem Cache', () => {
+    for (const path of [
+      '/api/mcp',
+      '/api/oauth/token',
+      '/api/oauth/authorize?client_id=x',
+      '/.well-known/oauth-protected-resource/api/mcp',
+      '/.well-known/jwks.json',
+    ]) {
+      expect(ownRuleFor(`${APP_ORIGIN}${path}`)?.handler).toBeInstanceOf(
+        NetworkOnly,
+      );
+    }
+  });
+
+  it('greift nicht auf andere API-Routen über', () => {
+    // Für die übrigen API-Routen greift keine eigene Regel — dort entscheidet
+    // Serwists `defaultCache`.
+    expect(ownRuleFor(`${APP_ORIGIN}/api/hydranten`)).toBeUndefined();
+  });
+});

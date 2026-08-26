@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import ApiIcon from '@mui/icons-material/Api';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -353,6 +354,20 @@ export default function AppDrawer({
         // Tokens sind kein Admin-Recht: die Gruppe erscheint daher auch für
         // Nicht-Admins, dann mit diesem einen Eintrag.
         { text: t('tokens'), icon: <ApiIcon />, href: '/tokens' },
+        // Wie die Tokens kein Admin-Recht: Jeder autorisierte Benutzer kann
+        // eigene Anwendungen verbinden und muss sie auch wieder loswerden.
+        {
+          text: t('connectedApps'),
+          icon: <SmartToyIcon />,
+          href: '/verbundene-anwendungen',
+          signedInOnly: true,
+        },
+        {
+          text: t('adminMcp'),
+          icon: <HubIcon />,
+          href: '/admin/mcp',
+          admin: true,
+        },
         { text: t('users'), icon: <UserIcon />, href: '/users', admin: true },
         { text: t('groups'), icon: <GroupIcon />, href: '/groups', admin: true },
         {

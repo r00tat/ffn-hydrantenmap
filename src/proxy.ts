@@ -20,10 +20,28 @@ function allowedExtensionOrigins(): string[] {
     .map((id) => `chrome-extension://${id}`);
 }
 
+/**
+ * Pfade, die ihre CORS-Header selbst setzen und deshalb hier unangetastet
+ * bleiben müssen.
+ *
+ * Der Block unten setzt `Access-Control-Allow-Origin` auf die eigene Adresse
+ * und beantwortet jeden OPTIONS-Aufruf selbst. Für die OAuth- und
+ * MCP-Endpunkte ist beides falsch: Sie werden von fremden Origins aufgerufen
+ * (claude.ai lädt die Discovery-Dokumente im Browser), brauchen `*` und im
+ * Preflight ihre eigene Header-Liste — `authorization` und
+ * `mcp-protocol-version` stehen unten nicht. Ohne diese Ausnahme scheitert der
+ * Verbindungsaufbau, und zwar erst im Browser des Nutzers.
+ */
+const SELF_MANAGED_CORS_PREFIXES = ['/api/mcp', '/api/oauth/'];
+
 export function proxy(req: NextRequest, ev: NextFetchEvent) {
   let res = NextResponse.next();
 
-  if (req.nextUrl.pathname.startsWith('/api')) {
+  const selfManaged = SELF_MANAGED_CORS_PREFIXES.some((prefix) =>
+    req.nextUrl.pathname.startsWith(prefix),
+  );
+
+  if (!selfManaged && req.nextUrl.pathname.startsWith('/api')) {
     // This logic is only applied to /api
 
     if (req.method == 'OPTIONS') {

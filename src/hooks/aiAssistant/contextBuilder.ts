@@ -1,3 +1,4 @@
+import { projectFirecallItem } from '../../common/mcp/itemDto';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { AiContext, AiContextItem, AiInteraction } from './types';
 
@@ -19,65 +20,12 @@ export function buildAiContext({
   const center = map ? map.getCenter() : defaultPosition;
   const bounds = map ? map.getBounds() : null;
 
+  // Dieselbe Projektion wie der MCP-Server (`projectFirecallItem`): Was der
+  // Browser-Assistent im Kontext sieht und was ein externer Client über MCP
+  // bekommt, soll nicht auseinanderlaufen.
   const contextItems: AiContextItem[] = existingItems
     .filter((i) => !i.deleted)
-    .map((i) => {
-      const base: AiContextItem = {
-        id: i.id!,
-        type: i.type,
-        name: i.name,
-        lat: i.lat,
-        lng: i.lng,
-      };
-
-      switch (i.type) {
-        case 'vehicle': {
-          const v = i as any;
-          if (v.fw) base.fw = v.fw;
-          if (v.besatzung) base.besatzung = v.besatzung;
-          if (v.ats) base.ats = v.ats;
-          if (v.alarmierung) base.alarmierung = v.alarmierung;
-          if (v.eintreffen) base.eintreffen = v.eintreffen;
-          if (v.abruecken) base.abruecken = v.abruecken;
-          break;
-        }
-        case 'rohr': {
-          const r = i as any;
-          if (r.art) base.art = r.art;
-          if (r.durchfluss) base.durchfluss = r.durchfluss;
-          break;
-        }
-        case 'diary': {
-          const d = i as any;
-          if (d.art) base.art = d.art;
-          if (d.datum) base.datum = d.datum;
-          if (d.von) base.von = d.von;
-          if (d.an) base.an = d.an;
-          if (d.nummer) base.nummer = d.nummer;
-          break;
-        }
-        case 'gb': {
-          const g = i as any;
-          if (g.ausgehend !== undefined) base.ausgehend = g.ausgehend;
-          if (g.datum) base.datum = g.datum;
-          if (g.von) base.von = g.von;
-          if (g.an) base.an = g.an;
-          if (g.nummer) base.nummer = g.nummer;
-          break;
-        }
-        case 'circle': {
-          const c = i as any;
-          if (c.radius) base.radius = c.radius;
-          if (c.color) base.color = c.color;
-          break;
-        }
-        default:
-          if (i.beschreibung) base.beschreibung = i.beschreibung;
-          if (i.datum) base.datum = i.datum;
-      }
-
-      return base;
-    });
+    .map((item) => projectFirecallItem(item));
 
   return {
     mapCenter: { lat: center.lat, lng: center.lng },
