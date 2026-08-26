@@ -347,15 +347,31 @@ verschiebt nur stillschweigend die Höhen. Eine neue Kachelversion wird ausgerol
 importiert und die alte Version nach einer Übergangszeit gelöscht wird. Die Kacheln selbst
 liegen mit `max-age=31536000, immutable`, der Index mit `max-age=300`.
 
-**Die Cache-Regel des Service Workers muss die erste in `cachePatterns` bleiben.** Firebase
-Storage liegt auf `firebasestorage.googleapis.com` und fiele sonst unter die bestehende
-`NetworkOnly`-Regel für `googleapis`. Die Offlinefähigkeit wäre wirkungslos, ohne dass
-irgendwo ein Fehler auftaucht. Siehe
+**Die Cache-Regeln des Service Workers müssen die ersten in `cachePatterns` bleiben.**
+Firebase Storage liegt auf `firebasestorage.googleapis.com` und fiele sonst unter die
+bestehende `NetworkOnly`-Regel für `googleapis`. Die Offlinefähigkeit wäre wirkungslos, ohne
+dass irgendwo ein Fehler auftaucht. Siehe
 [src/worker/patterns.ts](../src/worker/patterns.ts) und
 [docs/service-worker-pwa.md](service-worker-pwa.md).
 
 Ein Test in `blockStore.test.ts` hält die erzeugte URL gegen diese Regel fest: greift
 `/o/terrain%2F` nicht mehr, schlägt er fehl.
+
+**Der Index steht unter einer eigenen Regel, und zwar bewusst nicht unter `CacheFirst`.**
+Er liegt unter demselben Prefix, und eine gemeinsame Regel auf `/o/terrain%2F` nahm ihn
+mit — `CacheFirst` liefert dann bis zum Ablauf der Frist aus dem Cache und das
+`max-age=300` des Index ist wirkungslos. Ein Gerät, das den Index einmal geholt hat,
+bekommt danach jeden Nachimport erst nach Wochen zu sehen: die neuen Kacheln stehen im
+Bucket, aber die alte Verfügbarkeits-Bitmap kennt sie nicht, und `hasBlock` liefert für
+sie `false`, ohne dass irgendwo ein Fehler auftaucht. Der Index läuft deshalb unter
+`StaleWhileRevalidate` im eigenen Cache `terrain-index` — offline weiter verfügbar, online
+beim nächsten Aufruf aufgefrischt.
+
+**Die Kacheln werden 30 Tage gehalten**, nicht länger. Der Pfad ist versioniert, die
+Inhalte ändern sich innerhalb einer Version nicht — die Frist ist also kein Frischeproblem,
+sondern eine Frage des Kontingents. Bei 512 Einträgen und 0,2 bis 0,65 MB je Kachel steht
+dieser eine Cache für bis zu rund 230 MB; ein Monat trägt jede Einsatzlage und lässt Platz
+für die Übersichtsstufe des Offline-Pakets.
 
 ## Client
 

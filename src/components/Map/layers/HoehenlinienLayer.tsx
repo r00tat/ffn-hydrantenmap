@@ -142,6 +142,7 @@ export default function HoehenlinienLayer() {
   const [resolutionM, setResolutionM] = useState<number | undefined>();
   const [span, setSpan] = useState<{ minM?: number; maxM?: number }>({});
   const [status, setStatus] = useState<Status>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>();
 
   /**
    * Nummer der laufenden Anfrage. Beim Verschieben der Karte überholen sich
@@ -165,11 +166,13 @@ export default function HoehenlinienLayer() {
         setLevel(result.level);
         setResolutionM(result.resolutionM);
         setSpan({ minM: result.minM, maxM: result.maxM });
+        setErrorMessage(undefined);
         setStatus(result.lines.length > 0 ? 'ready' : 'empty');
       } catch (err) {
         console.error('Höhenlinien konnten nicht berechnet werden', err);
         if (runningRef.current !== run) return;
         setLines([]);
+        setErrorMessage(err instanceof Error ? err.message : String(err));
         setStatus('failed');
       }
     })();
@@ -343,6 +346,7 @@ export default function HoehenlinienLayer() {
             minM={span.minM}
             maxM={span.maxM}
             status={status === 'idle' ? 'loading' : status}
+            errorMessage={errorMessage}
           />
           <Box
             sx={{

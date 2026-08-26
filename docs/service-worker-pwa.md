@@ -36,3 +36,61 @@ Serwist-Precaching als auch die FCM-Background-Handler.
 - Serwist bündelt den Worker mit `esbuild-wasm` (Default auf allen Nicht-Windows-Systemen).
   Zur Laufzeit wird esbuild nicht gebraucht, weil die Route vollständig prerendered ist —
   daher fehlt es korrekt im `.next/standalone/node_modules`.
+
+## Web Worker: Turbopacks Bootstrap darf der Service Worker nicht anfassen
+
+`new Worker(new URL('…', import.meta.url))` lädt bei Turbopack nicht das eigene Modul,
+sondern einen generischen Bootstrap-Chunk `/_next/static/chunks/turbopack-worker-*.js`.
+Welche Chunks der Worker nachladen soll, steht **nicht** im Skript, sondern in seiner
+eigenen URL — und bei einem dedizierten `Worker` im **Fragment**:
+
+```js
+let i = "SharedWorker" === t.name;
+i ? d.searchParams.set("params", u)                 // SharedWorker → Query
+  : d.hash = "#params=" + encodeURIComponent(u);    // Worker → Fragment
+```
+
+Ein Fragment geht nie an den Server. Beantwortet der Service Worker die Anfrage — aus dem
+Precache, aus einem Runtime-Cache oder auch nur durchgereicht —, wird die `location` des
+Workers aus der URL der Response gesetzt, und die trägt kein Fragment. Der Bootstrap bricht
+dann mit `Missing worker bootstrap config` ab und der Worker startet überhaupt nicht.
+
+Das traf den Höhenmodell-Worker: in der Entwicklung lief alles (dort ist der Service Worker
+per `disable` aus, siehe [layout.tsx](../src/app/layout.tsx)), in Produktion startete er nie.
+Ein frisches Browserprofil funktionierte einmal — beim allerersten Aufruf kontrolliert der
+Service Worker die Seite noch nicht.
+
+Zwei Stellen halten das offen:
+
+- **`globIgnores: ['**/turbopack-worker-*.js']`** in
+  [src/app/serwist/[path]/route.ts](../src/app/serwist/[path]/route.ts) hält den Chunk aus
+  dem Precache. Der Precache verwirft beim Abgleich sogar ausdrücklich den Hash.
+- **Ein eigener `fetch`-Listener vor `serwist.addEventListeners()`** in
+  [src/worker/index.ts](../src/worker/index.ts) bricht für diesen Chunk die Weitergabe ab
+  (`stopImmediatePropagation()`). Ruft danach niemand `respondWith`, holt der Browser ihn
+  selbst — mit Fragment, genau wie ohne Service Worker.
+
+**Die Reihenfolge ist tragend.** Listener laufen in der Reihenfolge ihrer Registrierung;
+steht der Bypass hinter `addEventListeners()`, kommt Serwist zuerst zum Zug und
+`stopImmediatePropagation()` wirkt nicht mehr. Ein Test in `index.test.ts` hält das fest.
+
+Einzelne Regeln aus `defaultCache` zu entfernen genügt **nicht**: den Chunk beantworten dort
+vier, darunter die allgemeine für `.js` und ein Auffangnetz für die eigene Origin. Sie zu
+streichen änderte das Verhalten für alles andere mit.
+
+## Ein Service Worker darf die Anwendung nicht schlechter stellen als gar keiner
+
+`CacheFirst` wirft `SerwistError('no-response')`, sobald der Cache-Zugriff scheitert — der
+`fetch()` der Seite scheitert dann mit, obwohl das Netz die Antwort hätte. In DevTools sieht
+man dabei den Request des Workers mit HTTP 200 und trotzdem einen Fehler in der Anwendung.
+
+`runtimeCaching()` in [patterns.ts](../src/worker/patterns.ts) legt deshalb um **jede** Regel
+einen Rückfall aufs Netz. Dazu kommen in [index.ts](../src/worker/index.ts):
+
+- die Serwist-Einrichtung in einem `try` — wirft sie, gibt es lieber einen Worker ohne
+  Caching-Regeln als gar keinen (ohne Regel holt der Browser die Antworten selbst);
+- Listener auf `error` und `unhandledrejection`, damit ein Fehler im Worker nicht nur als
+  „Uncaught (in promise)" in der Konsole steht;
+- ein Notausstieg: die Seite kann `{ type: 'sw-reset' }` schicken, der Worker leert dann
+  seine Caches und meldet sich ab. Ohne ihn bleibt einem Benutzer nur „Website-Daten
+  löschen" — in einer installierten PWA am Telefon praktisch unauffindbar.
