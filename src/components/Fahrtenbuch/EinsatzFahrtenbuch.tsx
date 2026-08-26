@@ -60,6 +60,7 @@ import {
   syncFirecallEntryCount,
 } from './fahrtenbuchActions';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
+import useEntryPermissions from './useEntryPermissions';
 import type { EntryFormPerson } from './useEntryFormState';
 
 /** Wandelt einen ISO-Zeitstempel in den Wert für `datetime-local` um. */
@@ -113,6 +114,12 @@ export interface EinsatzFahrtenbuchViewProps {
   onSaveRow?: (key: string) => void;
   /** Öffnet die Bearbeitung eines bereits erfassten Eintrags. */
   onEditEntry?: (entry: FahrtenbuchEntry) => void;
+  /**
+   * Ob dieser Eintrag geändert werden darf — dieselbe Prüfung wie in der
+   * Fahrtenliste. Ohne sie stand der Knopf auch an der Fahrt eines Kollegen
+   * und das Speichern scheiterte erst im Dialog.
+   */
+  canModify?: (entry: FahrtenbuchEntry) => boolean;
 }
 
 /**
@@ -185,6 +192,7 @@ export function EinsatzFahrtenbuchView({
   onSave,
   onSaveRow,
   onEditEntry,
+  canModify,
 }: EinsatzFahrtenbuchViewProps) {
   const t = useTranslations('fahrtenbuch');
   // Rein visueller Zustand: welche Zeilen ihre Details zeigen. Gehört in die
@@ -319,17 +327,21 @@ export function EinsatzFahrtenbuchView({
                       label={t('einsatz.alreadyRecorded')}
                     />
                     <Box sx={{ flexGrow: 1 }} />
-                    <Tooltip title={t('editEntry')}>
-                      <IconButton
-                        size="small"
-                        aria-label={t('editEntry')}
-                        onClick={() =>
-                          row.existingEntry && onEditEntry?.(row.existingEntry)
-                        }
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {!!row.existingEntry &&
+                      (canModify?.(row.existingEntry) ?? true) && (
+                        <Tooltip title={t('editEntry')}>
+                          <IconButton
+                            size="small"
+                            aria-label={t('editEntry')}
+                            onClick={() =>
+                              row.existingEntry &&
+                              onEditEntry?.(row.existingEntry)
+                            }
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                   </>
                 ) : (
                   <>
@@ -553,6 +565,7 @@ export default function EinsatzFahrtenbuch({
   // unerfasst aus, obwohl es die Einträge längst gibt.
   const entries = useFahrtenbuchEntries(memberGroupId, { firecallId });
   const { standort } = useFahrtenbuchGroupStandort(memberGroupId);
+  const { canModify } = useEntryPermissions(memberGroupId);
 
   // Zieht den Fahrtenzähler am Einsatz nach, damit die Einsatz-Übersicht
   // erfasste Fahrten auch bei Einsätzen aus der Zeit vor dem Zähler anzeigt.
@@ -866,6 +879,7 @@ export default function EinsatzFahrtenbuch({
         onSave={() => save()}
         onSaveRow={(key) => save([key])}
         onEditEntry={setEditEntry}
+        canModify={canModify}
       />
       {/* Bedingt gemountet: der Dialog liest seinen Anfangszustand nur beim
           Mounten. */}

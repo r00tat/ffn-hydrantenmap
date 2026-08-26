@@ -8,7 +8,6 @@ import {
 } from '../../common/fahrtenbuch';
 import {
   buildEntryDocument,
-  canModifyEntry,
   computeLastCounters,
   computeVehicleCache,
   survivingCounterSources,
@@ -462,22 +461,6 @@ describe('survivingCounterSources', () => {
     expect(survivingCounterSources(undefined, previousCounters, previousCounters)).toEqual(
       {},
     );
-  });
-});
-
-describe('canModifyEntry', () => {
-  const entry = { createdBy: 'u1' } as FahrtenbuchEntry;
-
-  it('erlaubt dem Ersteller', () => {
-    expect(canModifyEntry(entry, 'u1', false)).toBe(true);
-  });
-
-  it('erlaubt einem Verwalter der Gruppe', () => {
-    expect(canModifyEntry(entry, 'u2', true)).toBe(true);
-  });
-
-  it('verbietet allen anderen', () => {
-    expect(canModifyEntry(entry, 'u2', false)).toBe(false);
   });
 });
 

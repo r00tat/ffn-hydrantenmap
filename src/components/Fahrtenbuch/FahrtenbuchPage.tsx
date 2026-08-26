@@ -34,6 +34,7 @@ import FahrtenbuchExportDialog from './FahrtenbuchExportDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import FahrtenbuchVehicleCard from './FahrtenbuchVehicleCard';
 import useEntryDeletion from './useEntryDeletion';
+import useEntryPermissions from './useEntryPermissions';
 import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
 
 /** Schrittweite von „Mehr laden" — wie auf der Fahrzeugseite. */
@@ -64,6 +65,7 @@ export default function FahrtenbuchPage() {
   const { groups, groupId, setGroupId } = useFahrtenbuchGroup();
   const { vehicles, activeVehicles } = useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
+  const { canModify } = useEntryPermissions(groupId);
   const { filter, setFilter } = useFahrtenbuchListFilter();
   const [pageSize, setPageSize] = useState(PAGE_STEP);
   const timeZone = useMemo(() => browserTimeZone(), []);
@@ -286,6 +288,7 @@ export default function FahrtenbuchPage() {
             vehicles={vehicles}
             filter={filter}
             onFilterChange={setFilter}
+            canModify={canModify}
             onEdit={(entry) => openDialog(entry.vehicleId, entry)}
             onDelete={requestDelete}
           />

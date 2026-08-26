@@ -295,6 +295,15 @@ export interface FahrtenbuchEntry {
   createdByName: string;
   updatedAt: string;
   updatedBy: string;
+  /**
+   * Anzeigename dessen, der zuletzt geändert hat.
+   *
+   * Neben `updatedBy` (der UID), weil die Liste die Änderung ausweist und dort
+   * keine Benutzerabfrage stattfinden soll — genauso wie `createdByName` neben
+   * `createdBy` steht. Optional: Einträge aus der Zeit vor diesem Feld haben
+   * es nicht, und deren Änderer ist nachträglich nicht mehr zu benennen.
+   */
+  updatedByName?: string;
 }
 
 export type VehiclePresetId = 'fahrzeug' | 'boot' | 'none';

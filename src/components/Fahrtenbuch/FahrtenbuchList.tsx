@@ -2,6 +2,8 @@
 
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import HistoryIcon from '@mui/icons-material/History';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import SearchIcon from '@mui/icons-material/Search';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import Box from '@mui/material/Box';
@@ -41,6 +43,7 @@ import {
 } from '../../common/fahrtenbuchListFilter';
 import { browserTimeZone } from '../../common/fahrtenbuchStats';
 import { counterLines, fuelLines, type CounterLine } from './entrySummary';
+import { isShareLinkEntry, wasEntryEdited } from './entryPermissions';
 
 export interface FahrtenbuchListProps {
   entries: FahrtenbuchEntry[];
@@ -72,6 +75,17 @@ export interface FahrtenbuchListProps {
    */
   onEdit?: (entry: FahrtenbuchEntry) => void;
   onDelete?: (entry: FahrtenbuchEntry) => void;
+  /**
+   * Ob dieser Eintrag geändert werden darf. Ohne die Prüfung bleiben die
+   * Knöpfe an jedem Eintrag — die Statistikseite reicht ohnehin keine Handler
+   * durch, und ein Aufrufer, der Handler ohne Prüfung übergibt, soll nicht
+   * stillschweigend alle Knöpfe verlieren.
+   *
+   * Der Aufrufer holt sie aus `useEntryPermissions`, das dieselbe Rechnung
+   * anstellt wie `mayModifyEntry` in den Actions. Hier hängt nur die Bedienung
+   * daran; abgewiesen wird serverseitig.
+   */
+  canModify?: (entry: FahrtenbuchEntry) => boolean;
 }
 
 /**
@@ -105,6 +119,7 @@ export default function FahrtenbuchList({
   onFilterChange,
   onEdit,
   onDelete,
+  canModify,
 }: FahrtenbuchListProps) {
   const t = useTranslations('fahrtenbuch');
   const format = useFormatter();
@@ -116,6 +131,26 @@ export default function FahrtenbuchList({
 
   // Der Zeitraum meint den Tag, an dem die Fahrt vor Ort begonnen hat.
   const timeZone = useMemo(() => browserTimeZone(), []);
+
+  /**
+   * „Über den Freigabe-Link erfasst von X" — der Name ist bei diesen Einträgen
+   * der getippte Fahrername und kein Benutzerkonto, deshalb steht er hinter
+   * der Herkunft und nicht als Ersteller da.
+   */
+  const shareOriginLabel = (item: FahrtenbuchEntry) => {
+    const name = item.createdByName?.trim();
+    return name ? t('viaShareLinkBy', { name }) : t('viaShareLink');
+  };
+
+  /** „Geändert am … von …" — ohne `updatedByName` nur das Wann. */
+  const editedLabel = (item: FahrtenbuchEntry) => {
+    const date = format.dateTime(new Date(item.updatedAt), {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+    const name = item.updatedByName?.trim();
+    return name ? t('editedAtBy', { date, name }) : t('editedAt', { date });
+  };
 
   const filtered = useMemo(
     () => filterFahrtenbuchEntries(entries, filter, timeZone),
@@ -398,7 +433,20 @@ export default function FahrtenbuchList({
                           <WarningAmberIcon color="warning" fontSize="small" />
                         </Tooltip>
                       )}
-                      {onEdit && (
+                      {/* Die Herkunft aus dem Freigabe-Link ist der Grund,
+                          aus dem an so einer Fahrt kein Bearbeiten-Knopf
+                          steht — ohne den Hinweis fehlte jede Erklärung. */}
+                      {isShareLinkEntry(entry) && (
+                        <Tooltip title={shareOriginLabel(entry)}>
+                          <QrCode2Icon color="disabled" fontSize="small" />
+                        </Tooltip>
+                      )}
+                      {wasEntryEdited(entry) && (
+                        <Tooltip title={editedLabel(entry)}>
+                          <HistoryIcon color="disabled" fontSize="small" />
+                        </Tooltip>
+                      )}
+                      {onEdit && (canModify?.(entry) ?? true) && (
                         <Tooltip title={t('editEntry')}>
                           <span>
                             <IconButton
@@ -410,7 +458,7 @@ export default function FahrtenbuchList({
                           </span>
                         </Tooltip>
                       )}
-                      {onDelete && (
+                      {onDelete && (canModify?.(entry) ?? true) && (
                         <Tooltip title={t('deleteEntry')}>
                           <span>
                             <IconButton

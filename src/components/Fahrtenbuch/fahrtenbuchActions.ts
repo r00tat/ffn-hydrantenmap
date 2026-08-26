@@ -4,6 +4,7 @@ import 'server-only';
 import type { Group } from '../../app/groups/groupTypes';
 import {
   FAHRTENBUCH_COLLECTION_ID,
+  FAHRTENBUCH_PERSON_COLLECTION_ID,
   FAHRTENBUCH_VEHICLE_COLLECTION_ID,
   type FahrtenbuchEntry,
   type FahrtenbuchVehicle,
@@ -26,10 +27,14 @@ import { actionErrorKey } from './actionErrorKey';
 import { actionGroupMemberRequired } from './authGuards';
 import {
   buildEntryDocument,
-  canModifyEntry,
   survivingCounterSources,
   type FahrtenbuchEntryInput,
 } from './entryLogic';
+import {
+  canModifyEntry,
+  isShareLinkEntry,
+  type EntryModifyActor,
+} from './entryPermissions';
 import { cachedRouteLegs, routeCacheEntry } from './firecallRoute';
 import { isFahrtenbuchManager } from './managerPermissions';
 import { createMangelForEntry, refreshVehicleCache } from './mangelStore';
@@ -69,6 +74,68 @@ function entriesRef(groupId: string) {
     .collection(GROUP_COLLECTION_ID)
     .doc(groupId)
     .collection(FAHRTENBUCH_COLLECTION_ID);
+}
+
+/** Die Sitzung, soweit die Änderungsberechtigung sie braucht. */
+type ModifySession = {
+  user: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    isAdmin?: boolean;
+    groups?: string[];
+    fahrtenbuchGeraetemeister?: string[];
+  };
+};
+
+/**
+ * Die Personendatensätze der Gruppe, die auf diesen Benutzer zeigen.
+ *
+ * `person.userId` ist die belastbare Verknüpfung zwischen Benutzerkonto und
+ * Fahrtenbuch-Person. Sie ist heute in kaum einem Datensatz gepflegt — deshalb
+ * bleibt der Namensvergleich in `isEntryDriver` der Rückfall, und diese Abfrage
+ * ist die Stelle, an der die Verknüpfung wirkt, sobald sie gepflegt wird.
+ */
+async function linkedPersonIds(
+  groupId: string,
+  userId: string,
+): Promise<string[]> {
+  const snapshot = await firestore
+    .collection(GROUP_COLLECTION_ID)
+    .doc(groupId)
+    .collection(FAHRTENBUCH_PERSON_COLLECTION_ID)
+    .where('userId', '==', userId)
+    .get();
+  return snapshot.docs.map((doc) => doc.id);
+}
+
+/**
+ * Darf dieser Benutzer den Eintrag ändern oder löschen?
+ *
+ * Dieselbe Entscheidung wie im Client (`canModifyEntry`), damit ein angebotener
+ * Bearbeiten-Knopf nicht am Speichern scheitert. Der Unterschied ist nur die
+ * Herkunft der Personen-Verknüpfung: Der Client hat die Personenliste ohnehin
+ * geladen, hier kostet sie einen Lesevorgang.
+ *
+ * Deshalb wird sie erst geholt, wenn die Entscheidung sonst nicht fällt — und
+ * auch dann nur bei einem Eintrag aus dem Freigabe-Link mit verknüpfter Person,
+ * dem einzigen Fall, in dem sie etwas ändern kann. Verwalter und Ersteller,
+ * also die große Mehrheit, kommen ohne die Abfrage durch.
+ */
+async function mayModifyEntry(
+  groupId: string,
+  session: ModifySession,
+  entry: FahrtenbuchEntry,
+): Promise<boolean> {
+  const canManage = isFahrtenbuchManager(groupId, session.user);
+  const actor: EntryModifyActor = {
+    userId: session.user.id,
+    userName: session.user.name ?? session.user.email ?? '',
+  };
+  if (canModifyEntry(entry, actor, canManage)) return true;
+  if (!isShareLinkEntry(entry) || !entry.driverId) return false;
+  const personIds = await linkedPersonIds(groupId, session.user.id);
+  return canModifyEntry(entry, { ...actor, personIds }, canManage);
 }
 
 function vehicleRef(groupId: string, vehicleId: string) {
@@ -923,13 +990,7 @@ export async function updateFahrtenbuchEntry(
     if (existing.deleted) {
       return { success: false, error: 'entryDeleted' };
     }
-    if (
-      !canModifyEntry(
-        existing,
-        session.user.id,
-        isFahrtenbuchManager(groupId, session.user),
-      )
-    ) {
+    if (!(await mayModifyEntry(groupId, session, existing))) {
       return { success: false, error: 'notAllowed' };
     }
 
@@ -984,7 +1045,12 @@ export async function updateFahrtenbuchEntry(
     await entriesRef(groupId)
       .doc(entryId)
       .set(
-        { ...rebuilt, updatedAt: now, updatedBy: session.user.id },
+        {
+          ...rebuilt,
+          updatedAt: now,
+          updatedBy: session.user.id,
+          updatedByName: session.user.name ?? session.user.email ?? '',
+        },
         { merge: false },
       );
 
@@ -1025,13 +1091,7 @@ export async function deleteFahrtenbuchEntry(
     if (existing.deleted) {
       return { success: false, error: 'entryDeleted' };
     }
-    if (
-      !canModifyEntry(
-        existing,
-        session.user.id,
-        isFahrtenbuchManager(groupId, session.user),
-      )
-    ) {
+    if (!(await mayModifyEntry(groupId, session, existing))) {
       return { success: false, error: 'notAllowed' };
     }
 
@@ -1039,6 +1099,7 @@ export async function deleteFahrtenbuchEntry(
       deleted: true,
       updatedAt: new Date().toISOString(),
       updatedBy: session.user.id,
+      updatedByName: session.user.name ?? session.user.email ?? '',
     });
     await refreshVehicleCache(groupId, existing.vehicleId);
     if (existing.firecallId) {
