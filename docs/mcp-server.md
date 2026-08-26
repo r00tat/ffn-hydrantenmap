@@ -130,7 +130,7 @@ Für den angemeldeten Fall greift zusätzlich ein Rate Limit auf
 | Anforderung | Ort |
 | --- | --- |
 | PKCE `S256` Pflicht, `plain` und fehlendes PKCE abgewiesen | `authorizeRequest.ts`, `pkce.ts` |
-| Redirect-URIs exakt, nur HTTPS (Ausnahme: Loopback/Private-Use bei `application_type: native`) | `redirectUri.ts` |
+| Redirect-URIs exakt, nur HTTPS (Ausnahmen: Loopback und Private-Use nach RFC 8252) | `redirectUri.ts` |
 | `resource` (RFC 8707) auf beiden Beinen, `aud` gegen die eigene MCP-URL | `authorizeRequest.ts`, `token/route.ts`, `accessToken.ts` |
 | `iss` in der Authorization Response (RFC 9207) | `buildAuthorizeRedirect` |
 | Authorization Codes: einmalig, ≤ 60 s, gebunden an Client, Redirect, PKCE, Resource | `authCodes.ts` |
@@ -143,6 +143,21 @@ Für den angemeldeten Fall greift zusätzlich ein Rate Limit auf
 Abschnitt 7.3): Claude Code öffnet einen lokalen Listener auf einem frei
 gewählten Port und kennt ihn bei der Registrierung noch nicht. Schema, Host,
 Pfad und Query müssen trotzdem exakt stimmen.
+
+**`application_type` entscheidet über den Redirect nichts.** Anfangs waren
+Loopback und Private-Use an `application_type: 'native'` gebunden. Das ging
+schief, sobald der erste echte Client kam: Claude Codes Metadaten-Dokument
+(`https://claude.ai/oauth/claude-code-client-metadata`) setzt das Feld gar
+nicht — RFC 7591 verlangt es nicht — und registriert
+`http://localhost/callback`. Der Vorgabewert `web` hat den Client damit
+ausgesperrt.
+
+Der Denkfehler dahinter wog schwerer als der Ausfall: `application_type` ist
+eine **Selbstauskunft des Clients**. Wer Loopback missbrauchen wollte, hätte
+schlicht `native` hineingeschrieben. Die Schranke hielt also genau die auf,
+die ehrlich waren, und niemanden sonst. Was Loopback tatsächlich absichert,
+ist PKCE: Ein Code, den ein anderer lokaler Prozess abfängt, ist ohne den
+`code_verifier` wertlos — und der ist hier ausnahmslos Pflicht.
 
 **Ein Access Token ist ein signiertes JWT** und wird ohne Firestore-Read
 geprüft — das zählt bei jedem einzelnen Tool-Call. Der Preis: Ein Widerruf

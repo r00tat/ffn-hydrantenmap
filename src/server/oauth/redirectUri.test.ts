@@ -7,45 +7,47 @@ import {
 } from './redirectUri';
 
 describe('isAllowedRedirectUri', () => {
-  it('nimmt HTTPS für Web-Clients', () => {
-    expect(isAllowedRedirectUri('https://claude.ai/api/callback', 'web')).toBe(
-      true,
+  it('nimmt HTTPS', () => {
+    expect(isAllowedRedirectUri('https://claude.ai/api/callback')).toBe(true);
+  });
+
+  it('weist HTTP auf einem fremden Host ab', () => {
+    expect(isAllowedRedirectUri('http://claude.ai/callback')).toBe(false);
+  });
+
+  it('nimmt Loopback, auch ohne Port', () => {
+    // Claude Code registriert genau so — ohne Port, weil der erst zur Laufzeit
+    // feststeht (RFC 8252 Abschnitt 7.3).
+    expect(isAllowedRedirectUri('http://127.0.0.1:8080/cb')).toBe(true);
+    expect(isAllowedRedirectUri('http://localhost:1455/cb')).toBe(true);
+    expect(isAllowedRedirectUri('http://localhost/callback')).toBe(true);
+    expect(isAllowedRedirectUri('http://127.0.0.1/callback')).toBe(true);
+  });
+
+  it('nimmt Private-Use-Schemata', () => {
+    expect(isAllowedRedirectUri('at.ff-neusiedl.karte:/cb')).toBe(true);
+  });
+
+  it('weist javascript: ab', () => {
+    // Kein Punkt im Schema — sonst wäre jedes Skript ein Redirect-Ziel.
+    expect(isAllowedRedirectUri('javascript:alert(1)')).toBe(false);
+  });
+
+  it('weist HTTP auf einem Host ab, der nur wie Loopback aussieht', () => {
+    expect(isAllowedRedirectUri('http://localhost.evil.example/cb')).toBe(
+      false,
     );
-  });
-
-  it('weist HTTP für Web-Clients ab', () => {
-    expect(isAllowedRedirectUri('http://claude.ai/callback', 'web')).toBe(false);
-  });
-
-  it('weist Loopback für Web-Clients ab', () => {
-    expect(isAllowedRedirectUri('http://127.0.0.1:8080/cb', 'web')).toBe(false);
-  });
-
-  it('nimmt Loopback für native Clients', () => {
-    expect(isAllowedRedirectUri('http://127.0.0.1:8080/cb', 'native')).toBe(
-      true,
+    expect(isAllowedRedirectUri('http://127.0.0.1.evil.example/cb')).toBe(
+      false,
     );
-    expect(isAllowedRedirectUri('http://localhost:1455/cb', 'native')).toBe(
-      true,
-    );
-  });
-
-  it('nimmt Private-Use-Schemata für native Clients', () => {
-    expect(isAllowedRedirectUri('at.ff-neusiedl.karte:/cb', 'native')).toBe(
-      true,
-    );
-  });
-
-  it('weist javascript: auch für native Clients ab', () => {
-    expect(isAllowedRedirectUri('javascript:alert(1)', 'native')).toBe(false);
   });
 
   it('weist eine URI mit Fragment ab', () => {
-    expect(isAllowedRedirectUri('https://claude.ai/cb#x', 'web')).toBe(false);
+    expect(isAllowedRedirectUri('https://claude.ai/cb#x')).toBe(false);
   });
 
   it('weist Unsinn ab', () => {
-    expect(isAllowedRedirectUri('kein-uri', 'web')).toBe(false);
+    expect(isAllowedRedirectUri('kein-uri')).toBe(false);
   });
 });
 

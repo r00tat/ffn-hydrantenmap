@@ -147,7 +147,7 @@ export function normalizeClientMetadata(
         `redirect_uris[${index}] must be a string`,
       );
     }
-    if (!isAllowedRedirectUri(uri, application_type)) {
+    if (!isAllowedRedirectUri(uri)) {
       throw new ClientMetadataError(
         'invalid_redirect_uri',
         `redirect_uris[${index}] is not an allowed redirect target`,

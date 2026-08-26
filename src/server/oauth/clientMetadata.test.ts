@@ -41,6 +41,32 @@ describe('normalizeClientMetadata', () => {
     expect(result.redirect_uris).toEqual(['http://127.0.0.1:1455/cb']);
   });
 
+  it('nimmt Claude Codes Metadaten-Dokument unverändert an', () => {
+    // Wörtlich der Inhalt von
+    // https://claude.ai/oauth/claude-code-client-metadata (abgerufen
+    // 2026-08-26). Entscheidend: **kein** `application_type`, dafür
+    // Loopback-Redirects ohne Port — der wird nach RFC 8252 Abschnitt 7.3
+    // erst zur Laufzeit gewählt. Ein Client, der sich nicht ausdrücklich als
+    // „native" bezeichnet, ist der Normalfall, nicht die Ausnahme.
+    //
+    // Das `client_id` des Dokuments fehlt hier bewusst: Es ist kein Eingabefeld
+    // der Normalisierung, sondern wird in `cimd.ts` gegen die Abruf-URL
+    // gebunden.
+    const result = normalizeClientMetadata({
+      client_name: 'Claude Code',
+      client_uri: 'https://claude.ai',
+      redirect_uris: ['http://localhost/callback', 'http://127.0.0.1/callback'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    });
+
+    expect(result.redirect_uris).toEqual([
+      'http://localhost/callback',
+      'http://127.0.0.1/callback',
+    ]);
+  });
+
   it('weist unbekannte grant_types ab', () => {
     expect(() =>
       normalizeClientMetadata({ ...minimal, grant_types: ['password'] }),

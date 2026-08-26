@@ -1,18 +1,33 @@
 /**
  * Prüfung der `redirect_uri` — **exakter Vergleich, keine Wildcards.**
  *
- * Nur HTTPS ist zulässig. Ausnahmen gibt es genau zwei, beide nur für Clients
- * mit `application_type: 'native'`:
+ * Zulässig sind HTTPS und zwei Ausnahmen aus RFC 8252:
  *
  * - Loopback-HTTP (`http://127.0.0.1:…`, `http://localhost:…`, `http://[::1]:…`)
- *   nach RFC 8252 Abschnitt 7.3 — Claude Code und Claude Desktop öffnen einen
- *   lokalen Listener auf einem frei gewählten Port.
- * - Private-Use-URI-Schemata (`de.example.app:/callback`) nach RFC 8252
- *   Abschnitt 7.1.
+ *   nach Abschnitt 7.3 — Claude Code und Claude Desktop öffnen einen lokalen
+ *   Listener auf einem frei gewählten Port.
+ * - Private-Use-URI-Schemata (`de.example.app:/callback`) nach Abschnitt 7.1.
  *
  * Der Port einer Loopback-Adresse wird beim Vergleich **ignoriert**, weil der
  * Client ihn erst zur Laufzeit erfährt (RFC 8252 Abschnitt 7.3). Alles andere
  * — Schema, Host, Pfad, Query — muss exakt übereinstimmen.
+ *
+ * ## Warum `application_type` hier nichts entscheidet
+ *
+ * Die beiden Ausnahmen hingen zunächst an `application_type: 'native'`. Das
+ * war doppelt falsch. Praktisch: Claude Code deklariert in seinem
+ * Metadaten-Dokument gar kein `application_type` — RFC 7591 kennt keine
+ * Pflicht dazu — und registriert `http://localhost/callback`. Der Vorgabewert
+ * `web` hat den Client damit ausgesperrt.
+ *
+ * Grundsätzlich wog schwerer: `application_type` ist eine **Selbstauskunft des
+ * Clients**. Wer Loopback missbrauchen will, schreibt `native` hinein. Die
+ * Schranke hielt also niemanden auf, den sie aufhalten sollte, und sperrte
+ * nur die aus, die ehrlich waren.
+ *
+ * Was Loopback tatsächlich absichert, ist PKCE: Ein Code, den ein anderer
+ * lokaler Prozess abfängt, ist ohne den `code_verifier` wertlos, und dieser
+ * Server verlangt PKCE mit S256 ausnahmslos.
  */
 
 export type OAuthApplicationType = 'web' | 'native';
@@ -57,10 +72,7 @@ export function isPrivateUseRedirectUri(uri: string): boolean {
  * Das ist die Prüfung bei der Client-Registrierung; der Abgleich gegen die
  * registrierten URIs beim `authorize` läuft über `matchRedirectUri`.
  */
-export function isAllowedRedirectUri(
-  uri: string,
-  applicationType: OAuthApplicationType,
-): boolean {
+export function isAllowedRedirectUri(uri: string): boolean {
   const url = parse(uri);
   if (!url) {
     return false;
@@ -74,9 +86,6 @@ export function isAllowedRedirectUri(
   }
   if (url.protocol === 'https:') {
     return true;
-  }
-  if (applicationType !== 'native') {
-    return false;
   }
   return isLoopbackRedirectUri(uri) || isPrivateUseRedirectUri(uri);
 }
