@@ -32,6 +32,15 @@ export interface HoehenlinienLegendeProps {
   minM?: number;
   maxM?: number;
   status: 'loading' | 'ready' | 'empty' | 'failed';
+  /**
+   * Die Meldung des Fehlers, der zu `failed` geführt hat.
+   *
+   * Steht mit in der Legende, weil „konnten nicht berechnet werden" allein
+   * keine Frage beantwortet: ein abgebrochener Worker, ein Zeitlimit und ein
+   * Netzfehler sehen darin gleich aus, und die Unterscheidung war zuletzt nur
+   * über die Konsole am Gerät zu bekommen.
+   */
+  errorMessage?: string;
 }
 
 export default function HoehenlinienLegende({
@@ -42,6 +51,7 @@ export default function HoehenlinienLegende({
   minM,
   maxM,
   status,
+  errorMessage,
 }: HoehenlinienLegendeProps) {
   const t = useTranslations('hoehenlinien');
   const format = useFormatter();
@@ -75,13 +85,24 @@ export default function HoehenlinienLegende({
         </Typography>
       )}
       {status === 'failed' && (
-        <Typography
-          variant="caption"
-          color="error"
-          sx={{ display: 'block' }}
-        >
-          {t('failed')}
-        </Typography>
+        <>
+          <Typography
+            variant="caption"
+            color="error"
+            sx={{ display: 'block' }}
+          >
+            {t('failed')}
+          </Typography>
+          {errorMessage && (
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ display: 'block', maxWidth: 240, opacity: 0.85 }}
+            >
+              {errorMessage}
+            </Typography>
+          )}
+        </>
       )}
 
       {status === 'ready' && minM !== undefined && maxM !== undefined && (

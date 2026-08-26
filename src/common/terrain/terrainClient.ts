@@ -126,7 +126,19 @@ export interface TerrainWorkerLike {
   onerror: ((event: { message: string }) => void) | null;
 }
 
-export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
+export function createTerrainClient(
+  worker: TerrainWorkerLike,
+  /**
+   * Wird gerufen, wenn der Worker stirbt.
+   *
+   * `terrainClient()` verwirft daraufhin seine Instanz, damit die nächste
+   * Abfrage einen frischen Worker bekommt. Ohne das bleibt ein einmal
+   * gestorbener Worker für die ganze Sitzung stehen und jede weitere Anfrage
+   * läuft ins Zeitlimit — 20 s je Neuzeichnung der Karte, ohne dass sich
+   * irgendetwas erholen könnte.
+   */
+  onWorkerError?: () => void
+): TerrainClient {
   const pending = new Map<number, Pending>();
   let nextId = 1;
 
@@ -168,6 +180,7 @@ export function createTerrainClient(worker: TerrainWorkerLike): TerrainClient {
       entry.reject(error);
     }
     pending.clear();
+    onWorkerError?.();
   };
 
   const send = (
@@ -312,10 +325,18 @@ export function terrainClient(): TerrainClient {
   }
   // Einzige Stelle mit einem Cast: `Worker` trägt `onmessage` mit
   // `MessageEvent<any>`, hier wird nur darauf geschrieben.
+  //
+  // Stirbt der Worker, wird die Instanz verworfen: die nächste Abfrage baut
+  // einen neuen. Die Karte fragt bei jedem Verschieben neu an, ein einmaliger
+  // Aussetzer heilt damit von selbst — vorher blieb die tote Instanz stehen
+  // und jede weitere Abfrage lief 20 s ins Leere.
   instance ??= createTerrainClient(
     new Worker(
       new URL('../../workers/terrain.worker.ts', import.meta.url)
-    ) as unknown as TerrainWorkerLike
+    ) as unknown as TerrainWorkerLike,
+    () => {
+      instance = undefined;
+    }
   );
   return instance;
 }
