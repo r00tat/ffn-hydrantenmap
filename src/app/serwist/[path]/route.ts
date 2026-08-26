@@ -15,8 +15,18 @@ import { serviceWorkerDefine } from '../../../server/serviceWorkerDefine';
 // ServiceWorkerGlobalScope nicht gibt — das Skript stirbt beim Auswerten und
 // die Registrierung scheitert (#663). esbuild setzt lediglich
 // `process.env.NODE_ENV` selbst ein, abgeleitet aus `minify`.
+// `globIgnores` haelt Turbopacks Worker-Bootstrap aus dem Precache. Turbopack
+// uebergibt einem dedizierten `Worker` seine Konfiguration im URL-Fragment
+// (`#params=…`), und ein Fragment geht nie an den Server. Beantwortet der
+// Service Worker die Anfrage — und der Precache tut das, er verwirft den Hash
+// beim Abgleich sogar ausdruecklich —, wird die `location` des Workers aus der
+// Response-URL gesetzt, das Fragment fehlt und der Bootstrap bricht mit
+// „Missing worker bootstrap config" ab. Der Hoehenmodell-Worker startet dann
+// gar nicht. Die Gegenstuecke dazu stehen in src/worker/patterns.ts:
+// `isWorkerBootstrap` und `runtimeCaching`.
 export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({
     swSrc: 'src/worker/index.ts',
+    globIgnores: ['**/turbopack-worker-*.js'],
     esbuildOptions: { define: serviceWorkerDefine() },
   });

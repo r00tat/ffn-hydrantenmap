@@ -9,7 +9,7 @@ import type { PrecacheEntry, SerwistGlobalConfig } from 'serwist';
 import { disableNavigationPreload, Serwist } from 'serwist';
 import { ChatMessage } from '../common/chat';
 import { parseFirebaseConfig } from './firebaseConfig';
-import { cachePatterns } from './patterns';
+import { isWorkerBootstrap, runtimeCaching } from './patterns';
 
 // This declares the value of `injectionPoint` to TypeScript.
 // `injectionPoint` is the string that will be replaced by the
@@ -23,14 +23,90 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
-  skipWaiting: true,
-  clientsClaim: true,
-  runtimeCaching: [...cachePatterns, ...defaultCache],
+// Turbopacks Worker-Bootstrap geht am Service Worker vorbei.
+//
+// **Dieser Listener muss vor `serwist.addEventListeners()` stehen.** Listener
+// laufen in der Reihenfolge ihrer Registrierung, und nur so kommt
+// `stopImmediatePropagation()` dem von Serwist zuvor. Ruft danach niemand
+// `respondWith`, holt der Browser den Chunk selbst — samt URL-Fragment, in dem
+// Turbopack die Konfiguration des Workers übergibt. Begründung ausführlich bei
+// `isWorkerBootstrap` in patterns.ts; ohne das startet der Höhenmodell-Worker
+// mit „Missing worker bootstrap config" gar nicht erst.
+//
+// Einzelne Regeln aus `defaultCache` zu entfernen reicht dafür nicht: den
+// Chunk beantworten dort vier, darunter allgemeine Auffangregeln.
+self.addEventListener('fetch', (ev) => {
+  const event = ev as FetchEvent | undefined;
+  if (!event) return;
+  try {
+    if (isWorkerBootstrap(new URL(event.request.url))) {
+      event.stopImmediatePropagation();
+    }
+  } catch (err) {
+    // Eine unbrauchbare URL darf hier nichts abbrechen — dann entscheidet
+    // eben Serwist über die Anfrage.
+    console.warn('[sw] fetch-Bypass übersprungen', err);
+  }
 });
 
-serwist.addEventListeners();
+// Ein Fehler beim Auswerten dieses Skripts heisst: keine Registrierung, und
+// jedes bereits installierte Gerät läuft auf ewig mit dem alten Worker weiter
+// (#663). Deshalb ist hier alles gefangen, was fehlschlagen kann — lieber ein
+// Worker ohne Caching-Regeln als gar keiner, denn ohne Regel holt der Browser
+// die Antworten selbst.
+try {
+  const serwist = new Serwist({
+    precacheEntries: self.__SW_MANIFEST,
+    skipWaiting: true,
+    clientsClaim: true,
+    runtimeCaching: runtimeCaching(defaultCache),
+  });
+
+  serwist.addEventListeners();
+} catch (err) {
+  console.error('[sw] Serwist konnte nicht eingerichtet werden', err);
+}
+
+// Selbstheilung: Ein Worker, der nicht mehr sinnvoll antworten kann, soll sich
+// aus dem Weg räumen, statt die Anwendung mitzunehmen. Beide Ereignisse werden
+// sonst nur als „Uncaught (in promise)" in der Konsole sichtbar und bleiben
+// ohne Folge.
+self.addEventListener('error', (event) => {
+  console.error('[sw] unbehandelter Fehler', event.message, event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('[sw] unbehandelte Rejection', event.reason);
+});
+
+/**
+ * Notausstieg für die Anwendung.
+ *
+ * Die Seite kann `{ type: 'sw-reset' }` schicken; der Worker leert dann seine
+ * Caches und meldet sich ab. Beim nächsten Laden registriert der
+ * SerwistProvider einen frischen. Ohne diesen Weg bleibt einem Benutzer nur
+ * „Website-Daten löschen" in den Browsereinstellungen — auf dem Telefon in
+ * einer installierten PWA praktisch unauffindbar.
+ */
+async function resetWorker(): Promise<void> {
+  const names = await caches.keys();
+  await Promise.all(names.map((name) => caches.delete(name)));
+  await self.registration.unregister();
+  const clients = await self.clients.matchAll({ type: 'window' });
+  for (const client of clients) client.postMessage({ type: 'sw-reset-done' });
+}
+
+addEventListener('message', (event) => {
+  const extendable = event as unknown as ExtendableMessageEvent;
+  const data = extendable.data as { type?: string } | undefined;
+  if (data?.type !== 'sw-reset') return;
+  console.warn('[sw] Zurücksetzen angefordert: Caches leeren und abmelden');
+  extendable.waitUntil(
+    resetWorker().catch((err) => {
+      console.error('[sw] Zurücksetzen gescheitert', err);
+    })
+  );
+});
 
 // Navigation Preload bleibt aus, und zwar nicht bloß unkonfiguriert, sondern
 // aktiv abgeschaltet.

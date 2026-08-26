@@ -44,3 +44,46 @@ describe('service worker: navigation preload', () => {
     );
   });
 });
+
+describe('service worker: Turbopacks Worker-Bootstrap', () => {
+  it('bricht die Weitergabe für den Bootstrap-Chunk ab', () => {
+    // Turbopack übergibt einem dedizierten Worker seine Konfiguration im
+    // URL-Fragment. Beantwortet der Service Worker die Anfrage, wird die
+    // `location` des Workers aus der Response-URL gesetzt, das Fragment fehlt
+    // und der Bootstrap bricht mit „Missing worker bootstrap config" ab.
+    expect(code).toMatch(/isWorkerBootstrap\(new URL\(event\.request\.url\)\)/);
+    expect(code).toMatch(/event\.stopImmediatePropagation\(\)/);
+  });
+
+  it('registriert den Bypass vor Serwists eigenen Listenern', () => {
+    // Listener laufen in der Reihenfolge ihrer Registrierung. Steht der Bypass
+    // hinter `addEventListeners()`, kommt Serwist zuerst zum Zug, ruft
+    // `respondWith` und `stopImmediatePropagation()` wirkt nicht mehr.
+    const bypass = code.indexOf('stopImmediatePropagation');
+    const serwistListeners = code.indexOf('addEventListeners()');
+    expect(bypass).toBeGreaterThan(-1);
+    expect(serwistListeners).toBeGreaterThan(-1);
+    expect(bypass).toBeLessThan(serwistListeners);
+  });
+});
+
+describe('service worker: Selbstheilung', () => {
+  it('überlebt eine gescheiterte Serwist-Einrichtung', () => {
+    // Wirft die Einrichtung, scheitert die Auswertung des Skripts und jedes
+    // bereits installierte Gerät bleibt auf ewig beim alten Worker (#663).
+    expect(code).toMatch(/try\s*\{[\s\S]*new Serwist\(/);
+  });
+
+  it('protokolliert unbehandelte Fehler und Rejections', () => {
+    expect(code).toMatch(/addEventListener\('error'/);
+    expect(code).toMatch(/addEventListener\('unhandledrejection'/);
+  });
+
+  it('bietet der Seite einen Notausstieg', () => {
+    // Ohne ihn bleibt einem Benutzer nur „Website-Daten löschen" — in einer
+    // installierten PWA am Telefon praktisch unauffindbar.
+    expect(code).toMatch(/'sw-reset'/);
+    expect(code).toMatch(/caches\.delete\(/);
+    expect(code).toMatch(/registration\.unregister\(\)/);
+  });
+});

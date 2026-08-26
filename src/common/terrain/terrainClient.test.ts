@@ -219,4 +219,20 @@ describe('createTerrainClient', () => {
     await expect(first).rejects.toThrow(/script error/);
     await expect(second).rejects.toThrow(/script error/);
   });
+
+  // Ohne diese Meldung bleibt eine tote Instanz für die ganze Sitzung stehen,
+  // und jede weitere Abfrage läuft 20 s ins Zeitlimit statt sich zu erholen.
+  // Genau so sah es aus, als Turbopacks Worker-Bootstrap scheiterte: erst
+  // „Worker abgebrochen", danach nur noch „contours ohne Antwort nach 20000 ms".
+  it('meldet den Tod des Workers, damit ein neuer gebaut werden kann', async () => {
+    const fake = fakeWorker();
+    const onWorkerError = vi.fn();
+    const client = createTerrainClient(fake.worker, onWorkerError);
+    const pending = client.sample([[47.9, 16.8]]);
+
+    fake.fail('Missing worker bootstrap config');
+
+    await expect(pending).rejects.toThrow(/Missing worker bootstrap config/);
+    expect(onWorkerError).toHaveBeenCalledTimes(1);
+  });
 });
