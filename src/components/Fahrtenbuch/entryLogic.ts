@@ -232,6 +232,7 @@ export function buildEntryDocument(
     createdByName: actor.userName,
     updatedAt: actor.now,
     updatedBy: actor.userId,
+    updatedByName: actor.userName,
   };
 
   if (input.driverId) doc.driverId = input.driverId;
@@ -309,20 +310,6 @@ export function survivingCounterSources(
     }
   }
   return result;
-}
-
-/**
- * Wer einen bestehenden Eintrag ändern oder löschen darf: sein Ersteller, oder
- * wer die Gruppe verwalten darf (`isFahrtenbuchManager` — Admin oder
- * Gerätemeister). Den zweiten Teil entscheidet der Aufrufer und übergibt ihn
- * als `canManage`, damit diese Funktion rein bleibt.
- */
-export function canModifyEntry(
-  entry: Pick<FahrtenbuchEntry, 'createdBy'>,
-  userId: string,
-  canManage: boolean,
-): boolean {
-  return canManage || entry.createdBy === userId;
 }
 
 /** Endwerte des jüngsten Eintrags — der Cache `vehicle.lastCounters`. */

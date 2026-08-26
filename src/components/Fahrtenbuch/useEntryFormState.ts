@@ -103,6 +103,59 @@ export function fromLocalInput(value: string): string {
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
+/** Der Datumsteil eines Zeitstempels für ein `type="date"`-Feld (lokal). */
+export function toDateInput(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return [
+    date.getFullYear(),
+    `${date.getMonth() + 1}`.padStart(2, '0'),
+    `${date.getDate()}`.padStart(2, '0'),
+  ].join('-');
+}
+
+/** Der Uhrzeitteil eines Zeitstempels für ein `type="time"`-Feld (lokal). */
+export function toTimeInput(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return [
+    `${date.getHours()}`.padStart(2, '0'),
+    `${date.getMinutes()}`.padStart(2, '0'),
+  ].join(':');
+}
+
+/**
+ * Ersetzt den Datumsteil und behält die Uhrzeit. Leere Eingabe lässt den Wert
+ * stehen — ein Datumsfeld, das man leer räumt, hat keinen Zeitstempel.
+ */
+export function withDateInput(iso: string, value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const base = new Date(iso);
+  if (!year || !month || !day || Number.isNaN(base.getTime())) return iso;
+  const next = new Date(base);
+  next.setFullYear(year, month - 1, day);
+  return next.toISOString();
+}
+
+/** Ersetzt die Uhrzeit und behält das Datum. */
+export function withTimeInput(iso: string, value: string): string {
+  const [hours, minutes] = value.split(':').map(Number);
+  const base = new Date(iso);
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(base.getTime())) {
+    return iso;
+  }
+  const next = new Date(base);
+  next.setHours(hours, minutes, 0, 0);
+  return next.toISOString();
+}
+
+/** Heute, 00:00 Uhr lokal — das Datum ohne behauptete Uhrzeit. */
+function startOfToday(): string {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now.toISOString();
+}
+
 /**
  * Startwerte aus dem Zähler-Cache des Fahrzeugs. Nur `startEnd`-Zähler haben
  * einen Startwert; ein `reading`-Zähler wird bei der Rückkehr abgelesen.
@@ -214,6 +267,27 @@ export function useEntryFormState({
   const [defekt, setDefekt] = useState(entry?.defekt ?? false);
   const [mangel, setMangel] = useState(entry?.mangel ?? '');
   const [errors, setErrors] = useState<string[]>([]);
+  /**
+   * Die Uhrzeit wurde beim Zweckwechsel geleert und ist nachzutragen.
+   *
+   * Der Zeitstempel bleibt dabei ein gültiger Wert (heute, 00:00) — ein
+   * `datetime-local`-Feld kennt kein „Datum ja, Uhrzeit nein", und ein leerer
+   * Zeitstempel zöge sich durch Dublettenprüfung, Zählerlogik und Validierung.
+   * Statt den Wert unvollständig zu machen, merkt dieses Flag, dass die
+   * Uhrzeit darin nichts behauptet: das Feld zeigt sie nicht und `submit`
+   * verweigert, bis sie eingetragen ist.
+   */
+  const [abfahrtTimeMissing, setAbfahrtTimeMissing] = useState(false);
+  const [ankunftTimeMissing, setAnkunftTimeMissing] = useState(false);
+  /**
+   * Stehen in `abfahrt`/`ankunft` die Zeiten des verknüpften Einsatzes, so wie
+   * `changeFirecall` sie vorbelegt hat?
+   *
+   * Nur dann werden sie beim Zweckwechsel geleert. Beim Bearbeiten eines
+   * bestehenden Eintrags und nach einer Eingabe von Hand sind es echte
+   * Angaben — die zu leeren zerstörte eine Zeit, die niemand nachtragen kann.
+   */
+  const firecallTimesRef = useRef(false);
   const [saveError, setSaveError] = useState<string>();
   const [saving, setSaving] = useState(false);
   // Bestätigt wird eine Einsatz/Fahrzeug-Kombination, nicht das Formular:
@@ -283,6 +357,8 @@ export function useEntryFormState({
 
   const changeAbfahrt = (next: string) => {
     setAbfahrt(next);
+    firecallTimesRef.current = false;
+    setAbfahrtTimeMissing(false);
     // Die Ankunft zieht mit dem Datum mit und behält ihre Uhrzeit — eine Fahrt
     // endet im Normalfall am Tag der Abfahrt. Ein Ende nach Mitternacht bleibt
     // über das Ankunftsfeld eintragbar.
@@ -312,6 +388,13 @@ export function useEntryFormState({
     if (id) setZweck('einsatz');
     if (firecall?.date) setAbfahrt(firecall.date);
     if (firecall?.abruecken) setAnkunft(firecall.abruecken);
+    // Nur ein tatsächlich übernommener Zeitvorschlag zählt als vorbelegt — ein
+    // Einsatz ohne Alarmierung hat die Felder nicht angefasst.
+    if (firecall?.date || firecall?.abruecken) {
+      firecallTimesRef.current = true;
+      setAbfahrtTimeMissing(false);
+      setAnkunftTimeMissing(false);
+    }
   };
 
   /**
@@ -344,12 +427,62 @@ export function useEntryFormState({
    */
   const changeZweck = (next: FahrtZweck) => {
     setZweck(next);
-    if (next !== 'einsatz') {
-      setFirecallId(undefined);
-      setFirecallName('');
-      setFirecallInput('');
-      setConfirmedDuplicateKey(undefined);
+    if (next === 'einsatz') return;
+    setFirecallId(undefined);
+    setFirecallName('');
+    setFirecallInput('');
+    setConfirmedDuplicateKey(undefined);
+    // Mit dem Einsatz geht auch sein Zeitvorschlag. Er stand da, weil ein
+    // Einsatz verknüpft war; ohne ihn ist er eine fremde Uhrzeit, die wie eine
+    // Eingabe aussieht — und genau so wurden Fahrten mit der Alarmierungszeit
+    // eines Einsatzes erfasst, zu dem sie nicht gehörten.
+    //
+    // Das Datum bleibt und wird auf heute gesetzt: Wer den Zweck wechselt,
+    // trägt fast immer eine Fahrt von heute ein. Nur die Uhrzeit ist zu
+    // ergänzen, und dass sie fehlt, ist am Feld zu sehen.
+    if (!firecallTimesRef.current) return;
+    firecallTimesRef.current = false;
+    const today = startOfToday();
+    setAbfahrt(today);
+    setAnkunft(today);
+    setAbfahrtTimeMissing(true);
+    setAnkunftTimeMissing(true);
+  };
+
+  /** Nur den Datumsteil der Abfahrt setzen; die Ankunft zieht wie immer mit. */
+  const changeAbfahrtDate = (value: string) =>
+    changeAbfahrtKeepingMissing(withDateInput(abfahrt, value));
+
+  /** Nur die Uhrzeit der Abfahrt setzen — damit ist sie nachgetragen. */
+  const changeAbfahrtTime = (value: string) => {
+    if (!value) {
+      setAbfahrtTimeMissing(true);
+      return;
     }
+    changeAbfahrt(withTimeInput(abfahrt, value));
+  };
+
+  /**
+   * Das Datum zu ändern trägt die Uhrzeit nicht nach: Wer den Tag korrigiert,
+   * hat noch nicht gesagt, wann er losgefahren ist.
+   */
+  function changeAbfahrtKeepingMissing(next: string) {
+    const missing = abfahrtTimeMissing;
+    changeAbfahrt(next);
+    setAbfahrtTimeMissing(missing);
+  }
+
+  const changeAnkunftDate = (value: string) => {
+    setAnkunft(withDateInput(ankunft, value));
+  };
+
+  const changeAnkunftTime = (value: string) => {
+    if (!value) {
+      setAnkunftTimeMissing(true);
+      return;
+    }
+    setAnkunft(withTimeInput(ankunft, value));
+    setAnkunftTimeMissing(false);
   };
 
   /** Name und zugehörige Personen-ID immer gemeinsam setzen — sonst zeigt
@@ -542,6 +675,12 @@ export function useEntryFormState({
     if (duplicateReported && !confirmDuplicate) {
       validationErrors.push('duplicateFirecallEntry');
     }
+    // Rein clientseitig: Der Zeitstempel ist gültig, nur behauptet seine
+    // Uhrzeit nichts (siehe `abfahrtTimeMissing`). Der Server kann das nicht
+    // wissen und muss es auch nicht — ohne die Angabe wird hier nicht
+    // abgeschickt.
+    if (abfahrtTimeMissing) validationErrors.push('abfahrtTimeMissing');
+    if (ankunftTimeMissing) validationErrors.push('ankunftTimeMissing');
     setErrors(validationErrors);
     setSaveError(undefined);
     if (validationErrors.length > 0) return { success: false };
@@ -619,6 +758,12 @@ export function useEntryFormState({
     setZiel,
     abfahrt,
     changeAbfahrt,
+    changeAbfahrtDate,
+    changeAbfahrtTime,
+    changeAnkunftDate,
+    changeAnkunftTime,
+    abfahrtTimeMissing,
+    ankunftTimeMissing,
     ankunft,
     setAnkunft,
     counters,

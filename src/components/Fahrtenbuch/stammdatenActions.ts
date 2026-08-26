@@ -19,6 +19,8 @@ import {
   KOSTENERSATZ_VEHICLES_COLLECTION,
   type KostenersatzVehicle,
 } from '../../common/kostenersatz';
+import { isTruthy } from '../../common/boolish';
+import { listUsers } from '../../app/api/users/listUsers';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
 import {
@@ -26,6 +28,12 @@ import {
   assertFahrtenbuchGroup,
 } from './authGuards';
 import { planInactivePersons } from './fahrtenbuchImportPlan';
+import {
+  matchPersonsToUsers,
+  type PersonUserCandidate,
+  type PersonUserLink,
+  type PersonUserMatch,
+} from './personUserMatch';
 import {
   fieldsForChanges,
   parseRecipientCsv,
@@ -614,6 +622,153 @@ export async function saveFahrtenbuchMangelEmails(
     return { success: true, id: groupId };
   } catch (err) {
     console.error('saveFahrtenbuchMangelEmails failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/** Ist dieses Benutzerkonto Mitglied der Gruppe? */
+function inGroup(user: unknown, groupId: string): boolean {
+  return (user as { groups?: string[] }).groups?.includes(groupId) === true;
+}
+
+/**
+ * Vorschlag, welche Benutzerkonten zu welcher Person gehören — für den Dialog
+ * „Bestehende Benutzer zuordnen".
+ *
+ * **Gerätemeister und Admin**, aber mit verschiedenem Blickfeld: Der
+ * Gerätemeister sieht nur Konten, die **Mitglied seiner Gruppe** sind. Die
+ * Personen seiner Feuerwehr kennt er ohnehin namentlich; die Konten anderer
+ * Feuerwehren sind nicht seine Sache, und ein Verteiler über alle Konten der App
+ * wäre etwas anderes als die Aufgabe, die er hier erledigt.
+ *
+ * Der Admin sieht alle. Er braucht es: Nur er kann eine fehlende
+ * Gruppenzugehörigkeit überhaupt richtigstellen, und ohne das Konto zu sehen
+ * wüsste er nicht, dass es sie gibt.
+ *
+ * Herausgegeben wird nur, was der Dialog zum Entscheiden braucht: Anzeigename,
+ * E-Mail und drei Merkmale (gesperrt, freigeschaltet, in der Gruppe). Kein
+ * Telefon, keine Tokens, kein Rest des Benutzerdokuments.
+ */
+export async function proposePersonUserLinks(
+  groupId: string,
+): Promise<StammdatenResult & { matches?: PersonUserMatch[] }> {
+  try {
+    const session = await actionFahrtenbuchManagerRequired(groupId);
+
+    const [personSnapshot, allUsers] = await Promise.all([
+      personsRef(groupId).get(),
+      listUsers(),
+    ]);
+    const users = session.user.isAdmin
+      ? allUsers
+      : allUsers.filter((user) => inGroup(user, groupId));
+    const persons = personSnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() }) as FahrtenbuchPerson,
+    );
+    const candidates: PersonUserCandidate[] = users.map((user) => ({
+      uid: user.uid,
+      displayName: user.displayName ?? undefined,
+      email: user.email ?? undefined,
+      disabled: user.disabled === true,
+      // Am Benutzerdokument heißt das Feld `authorized`, nicht `isAuthorized` —
+      // erst `getUserSessionData` benennt es für die Sitzung um. `isTruthy`
+      // deckt zusätzlich die älteren Dokumente ab, die „true" als Text tragen;
+      // dieselbe Behandlung wie in `auth.ts`.
+      isAuthorized: isTruthy(
+        (user as { authorized?: string | boolean }).authorized,
+      ),
+      inGroup: inGroup(user, groupId),
+    }));
+
+    return { success: true, matches: matchPersonsToUsers(persons, candidates) };
+  } catch (err) {
+    console.error('proposePersonUserLinks failed', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Speichert die vom Admin bestätigten Zuordnungen.
+ *
+ * Die Kontenliste je Person wird **gesetzt und nicht ergänzt** — nur so lässt
+ * sich eine falsche Zuordnung im Dialog auch wieder wegnehmen. Eine leere Liste
+ * ist deshalb das Lösen der Verknüpfung.
+ *
+ * Zwei Prüfungen, die der Dialog nicht ersetzen kann:
+ *
+ * - **Jede UID muss ein Konto sein.** Sonst stünde am Personendatensatz eine
+ *   Kennung, die niemandem gehört, und irgendwann gehörte sie jemandem.
+ * - **Ein Konto gehört höchstens einer Person je Gruppe.** Zwei Personen mit
+ *   demselben Konto hieße, dass zwei Fahrer denselben Eintrag ändern dürfen,
+ *   und keiner von beiden wäre es sicher.
+ */
+export async function savePersonUserLinks(
+  groupId: string,
+  links: PersonUserLink[],
+): Promise<StammdatenResult> {
+  try {
+    const session = await actionFahrtenbuchManagerRequired(groupId);
+
+    const [users, personSnapshot] = await Promise.all([
+      listUsers(),
+      personsRef(groupId).get(),
+    ]);
+    // Derselbe Zuschnitt wie im Vorschlag, und hier ist er die Grenze: Die
+    // Nutzlast kommt vom Client und kann jede Kennung nennen.
+    const selectable = session.user.isAdmin
+      ? users
+      : users.filter((user) => inGroup(user, groupId));
+    const knownUids = new Set(selectable.map((user) => user.uid));
+
+    // Wer welches Konto heute schon hat. Über die mitgeschickten Zeilen allein
+    // ließe sich ein Konto einer Person zuschlagen, die gar nicht im Aufruf
+    // steht — sie behielte es, und zwei Fahrer dürften dieselben Fahrten
+    // ändern.
+    const seen = new Map<string, string>();
+    for (const doc of personSnapshot.docs) {
+      const stored = (doc.data() as FahrtenbuchPerson).userIds ?? [];
+      for (const uid of stored) seen.set(uid, doc.id);
+    }
+    // Was dieser Aufruf neu setzt, gibt die bisherigen Ansprüche derselben
+    // Person frei — sonst kollidierte eine Zeile mit sich selbst.
+    for (const link of links) {
+      for (const [uid, owner] of [...seen]) {
+        if (owner === link.personId) seen.delete(uid);
+      }
+    }
+    const sanitized = links.map((link) => {
+      const userIds = [...new Set(link.userIds.filter((uid) => !!uid))];
+      for (const uid of userIds) {
+        if (!knownUids.has(uid)) {
+          throw new Error(`unknown user account ${uid}`);
+        }
+        const owner = seen.get(uid);
+        if (owner && owner !== link.personId) {
+          throw new Error(
+            `user account ${uid} is claimed by two persons (${owner}, ${link.personId})`,
+          );
+        }
+        seen.set(uid, link.personId);
+      }
+      return { personId: link.personId, userIds };
+    });
+
+    // Wer nicht im Dialog stand, wird nicht angefasst: Der Aufrufer schickt die
+    // Zeilen, die er gesehen hat, und ein Batch über alle Personen würde die
+    // Verknüpfungen der übrigen stillschweigend leeren.
+    const now = new Date().toISOString();
+    const batch = firestore.batch();
+    for (const link of sanitized) {
+      batch.set(
+        personsRef(groupId).doc(link.personId),
+        { userIds: link.userIds, updatedAt: now, updatedBy: session.user.id },
+        { merge: true },
+      );
+    }
+    await batch.commit();
+    return { success: true };
+  } catch (err) {
+    console.error('savePersonUserLinks failed', err);
     return { success: false, error: (err as Error).message };
   }
 }

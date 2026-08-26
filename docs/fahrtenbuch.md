@@ -1,7 +1,8 @@
 # Fahrtenbuch
 
 PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug, Personennamen,
-Duplikatsprüfung und Mangel-Bilder.
+Duplikatsprüfung, Änderungsrecht an einer Fahrt, Zeiten beim Zweckwechsel und
+Mangel-Bilder.
 
 ## Fahrtenbuch-PDF-Export
 
@@ -339,6 +340,211 @@ benutzt.
 - **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
   `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
   markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
+
+## Wer eine Fahrt korrigieren darf
+
+Entscheidend ist `canModifyEntry` in
+[entryPermissions.ts](../src/components/Fahrtenbuch/entryPermissions.ts): der
+Ersteller, ein Verwalter (`isFahrtenbuchManager` — Admin oder Gerätemeister)
+oder — nur bei Fahrten aus dem Freigabe-Link — der eingetragene Fahrer.
+
+**Der Fahrer als dritter Fall ist die Auflösung eines Widerspruchs.** Wer über
+den QR-Code am Fahrzeug einträgt, ist nicht angemeldet: `createdBy` ist
+`share:<linkId>`, `createdByName` nur der getippte Fahrername. Am Eintrag stand
+damit der eigene Name, das Ändern scheiterte aber an „nur der Ersteller darf
+ändern" — und in der Praxis kommt fast ein Drittel der Fahrten über diesen Weg.
+Ein Eintrag ohne Ersteller hat keinen, dem er gehört; der genannte Fahrer ist
+die einzige Person, die ihn zurechnen kann.
+
+Zugeordnet wird **ausschließlich über `person.userId`** — die Verknüpfung
+zwischen Benutzerkonto und Fahrtenbuch-Person, gesetzt auf der gepflegten Seite
+(Personenliste der Gruppe) und nicht von dem, der sich darauf beruft.
+
+**Kein Namensvergleich, und das ist der Kern.** Naheliegend wäre, den
+Fahrernamen am Eintrag mit dem Anzeigenamen der Sitzung zu vergleichen — der
+erste Wurf tat das und war eine Rechteausweitung. `session.user.name` ist die
+Firebase-`displayName`, und die gehört dem Benutzer selbst: Sie stammt aus einem
+Freitextfeld der Selbstregistrierung
+([StyledLogin.tsx](../src/components/firebase/StyledLogin.tsx)) und ist danach
+jederzeit über `updateProfile` änderbar — auch ohne dass diese App eine
+Oberfläche dafür anbietet, denn das Client-SDK genügt. Ein Gruppenmitglied
+könnte sich damit auf den Namen einer Kollegin umbenennen und deren über den
+QR-Code erfasste Fahrten ändern **und löschen**. In einem Nachweisdokument ist
+das genau die stille Verfälschung, gegen die die Zuordnung überhaupt da ist.
+
+Auch die Gegenrichtung trägt nicht: Hinter dem Freigabe-Link ist der Fahrername
+freie Eingabe, und der Link hängt als QR-Code am Fahrzeug. Wer ihn hat, könnte
+Einträge auf einen beliebigen Namen anlegen.
+
+**Ohne gepflegte Verknüpfung greift die Ausnahme nicht** — dann bleibt die
+Korrektur einer QR-Fahrt beim Gerätemeister und beim Admin. Lieber eine
+Korrektur, die den Gerätemeister braucht, als eine, die sich über einen selbst
+gewählten Namen erschleichen lässt.
+
+`person.userIds` ist eine **Liste**, weil sich Mitglieder mehrfach
+registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie. Die
+Abfrage läuft entsprechend über `array-contains`.
+
+Die Ausnahme gilt außerdem **nur** bei Einträgen ohne Ersteller. Bei einer
+angemeldet erfassten Fahrt bleibt es beim Ersteller — sonst dürfte der
+eingetragene Fahrer den Eintrag eines Kollegen überschreiben.
+
+Drei Dinge, die daran hängen:
+
+- **Server und Client rechnen dasselbe.** `mayModifyEntry` in den Actions und
+  `useEntryPermissions` im Client rufen dieselbe Funktion. Der Bearbeiten-Knopf
+  in der Fahrtenliste und in der Einsatz-Erfassung erscheint nur, wo das
+  Speichern durchgeht — vorher stand er an jeder Fahrt, der Dialog ging auf,
+  alles war ausfüllbar, und erst das Speichern verweigerte. Die Sicherheitsgrenze
+  bleibt die Action; der Knopf ist Bedienung.
+- **Die Personenabfrage kostet einen Lesevorgang** und wird deshalb erst
+  gestellt, wenn Verwalterrecht und Ersteller-Treffer nicht schon reichen — und
+  auch dann nur bei einem Freigabe-Link-Eintrag mit `driverId`. Verwalter und
+  Ersteller, also die Mehrheit, kommen ohne sie durch.
+- **Der Anzeigename taugt nur zur Anzeige.** `createdByName` und `updatedByName`
+  stehen am Eintrag, damit die Liste einen Namen zeigen kann, ohne eine
+  Benutzerabfrage zu stellen. Keiner der beiden darf je eine Berechtigung
+  begründen.
+- **`entryPermissions.ts` liegt nicht in `entryLogic.ts`**, aus demselben Grund
+  wie `managerPermissions.ts`: Die Liste braucht die Prädikate im Client und
+  zöge sonst das Eintrags-Validierungsmodul in ihr Bundle.
+
+**Die Änderung ist am Eintrag ausgewiesen.** `updatedByName` steht neben
+`updatedBy` (der UID), damit die Liste den Änderer nennen kann, ohne eine
+Benutzerabfrage zu stellen — dieselbe Verdopplung wie `createdByName` neben
+`createdBy`. Optional, weil Einträge aus der Zeit davor es nicht haben und ihr
+Änderer nachträglich nicht mehr zu benennen ist. Die Liste zeigt zwei stille
+Zeichen in der Aktionsspalte: ein QR-Symbol für die Herkunft aus dem
+Freigabe-Link — es ist der Grund, aus dem dort womöglich kein Bearbeiten-Knopf
+steht — und ein Verlaufssymbol mit „Geändert am … von …", sobald `updatedAt`
+von `createdAt` abweicht.
+
+## Personen den Benutzerkonten zuordnen
+
+`person.userIds` entsteht im Dialog „Bestehende Benutzer zuordnen"
+([PersonUserLinkDialog](../src/components/Fahrtenbuch/admin/PersonUserLinkDialog.tsx)),
+die Zuordnungslogik steht rein und geprüft in
+[personUserMatch.ts](../src/components/Fahrtenbuch/personUserMatch.ts).
+
+**Hier darf der Namensvergleich, was er in der Berechtigung nicht darf.** Der
+Unterschied ist, wer sich auf ihn beruft: In der Berechtigung wäre es der
+Benutzer selbst, mit einem Namen, den er sich gegeben hat. Hier ist es ein
+Vorschlag, den ein Admin sieht und bestätigt. Und ohne ihn ginge es nicht — nur
+5 von rund 110 Personendatensätzen tragen überhaupt eine E-Mail.
+
+Die Reihenfolge der Signale:
+
+- **Die gepflegte E-Mail zuerst.** Sie steht in den Stammdaten der Gruppe, ist
+  dort von Hand gepflegt und trifft auch, wenn im Konto ein Spitzname oder ein
+  alter Nachname steht. Ein E-Mail-Treffer beendet die Suche und löst damit auch
+  die Doppelregistrierung auf, bei der zwei Konten denselben Namen tragen.
+- **Sonst der Name**, normalisiert mit `normalizePersonName` (wortweise
+  sortiert, damit „Schennet Adrian" und „Adrian Schennet" dieselbe Person sind).
+
+Vier Zustände, und der Umgang mit ihnen ist der Kern:
+
+- `unique` — genau ein offenes Konto. **Vorgehakt, aber bestätigungspflichtig.**
+- `ambiguous` — **nicht vorgehakt.** Ein vorgehakter mehrdeutiger Vorschlag
+  überspränge genau die Prüfung, für die der Dialog da ist. Zwei Anlässe führen
+  hierher: mehrere gleichnamige Konten (die Doppelregistrierung) und ein Konto,
+  das auch zu einer anderen, noch unverknüpften Person passt (`contestedBy` —
+  zwei echte Menschen können denselben Namen tragen, das Konto gehört aber nur
+  einem).
+- `none` — kein Konto anzuhaken. Auch der Fall, dass ein passendes Konto
+  existiert, aber **schon einer anderen Person gehört**: Es wird nicht angeboten,
+  sondern über `takenBy` samt Namen erklärt. Es wegzugeben hieße, dass zwei
+  Fahrer dieselben Fahrten ändern dürfen; unerklärt fehlen darf es aber auch
+  nicht.
+- `linked` — **sobald ein Konto verknüpft ist.** Die Person gilt als versorgt und
+  verschwindet aus dem Arbeitsstapel, auch wenn eine Zweitregistrierung offen
+  wäre; sonst nagte die erledigte Zuordnung weiter. Das weitere Konto bleibt in
+  `candidates` und ist über „Verknüpfte Personen anzeigen" anhakbar.
+
+Sortiert wird nach Handlungsbedarf, nicht alphabetisch: Was eine Entscheidung
+braucht, steht oben.
+
+Drei Dinge, die daran hängen:
+
+- **Gerätemeister und Admin, mit verschiedenem Blickfeld.** Zuordnen darf beide
+  (`actionFahrtenbuchManagerRequired`), aber der Gerätemeister sieht nur Konten,
+  die **Mitglied seiner Gruppe** sind. Die Personen seiner Feuerwehr kennt er
+  ohnehin namentlich; die Konten anderer Feuerwehren sind nicht seine Sache, und
+  ein Verteiler über alle Konten der App wäre etwas anderes als die Aufgabe, die
+  er hier erledigt. Der Admin sieht alle — nur er kann eine fehlende
+  Gruppenzugehörigkeit richtigstellen, und ohne das Konto zu sehen wüsste er
+  nicht, dass es sie gibt.
+
+  Der Zuschnitt gilt **auch beim Speichern** und ist dort die Grenze: Die
+  Nutzlast kommt vom Client und kann jede Kennung nennen. Ein Filter, der nur im
+  Vorschlag steht, wäre keiner.
+
+  Für den Gerätemeister heißt das: Ein passendes Konto, das nicht in seiner
+  Gruppe ist, erscheint als „kein Konto gefunden". Das ist von seiner Warte
+  richtig — verknüpfen würde ihm nichts bringen, weil `actionGroupMemberRequired`
+  einem Nichtmitglied das Bearbeiten ohnehin verwehrt. Für den Admin ist dasselbe
+  Konto sichtbar und als „nicht in dieser Gruppe" markiert.
+
+- **Herausgegeben wird nur, was der Dialog zum Entscheiden braucht** —
+  Anzeigename, E-Mail und drei Merkmale (gesperrt, nicht freigeschaltet, nicht in
+  der Gruppe). Kein Telefon, keine Tokens, kein Rest des Benutzerdokuments; ein
+  Test nagelt die Whitelist fest. Die Merkmale werden **angezeigt und nicht
+  gefiltert**: Wer genau diese Arbeit macht, soll sehen, was gegen eine Zuordnung
+  spricht, statt dass ein Konto unerklärt fehlt.
+- **Gesetzt, nicht ergänzt.** `savePersonUserLinks` schreibt die Kontenliste je
+  Person vollständig; eine leere Liste löst die Verknüpfung. Nur so lässt sich
+  eine falsche Zuordnung im Dialog auch wieder wegnehmen. Geschrieben werden
+  ausschließlich die Zeilen, die der Aufrufer geschickt hat — ein Batch über alle
+  Personen würde die Verknüpfungen der übrigen stillschweigend leeren.
+- **Zwei Prüfungen, die der Dialog nicht ersetzt.** Jede UID muss ein Konto sein
+  (sonst stünde am Personendatensatz eine Kennung, die irgendwann jemandem
+  gehört), und ein Konto gehört höchstens einer Person je Gruppe (sonst dürften
+  zwei Fahrer denselben Eintrag ändern und keiner wäre es sicher). Die zweite
+  Prüfung liest dazu den **gespeicherten** Stand aller Personen und nicht nur die
+  mitgeschickten Zeilen: Sonst ließe sich ein Konto einer Person zuschlagen, die
+  im Aufruf gar nicht vorkommt — sie behielte es. Was derselbe Aufruf neu setzt,
+  gibt die bisherigen Ansprüche derselben Person frei, sonst kollidierte eine
+  Zeile mit sich selbst.
+- **Die Freischaltung steht am Benutzerdokument als `authorized`**, nicht als
+  `isAuthorized` — erst `getUserSessionData` benennt sie für die Sitzung um. Wer
+  das verwechselt, zeigt an *jedem* Konto „nicht freigeschaltet". Gelesen wird
+  mit `isTruthy`, weil ältere Dokumente „true" als Text tragen; dieselbe
+  Behandlung wie in `auth.ts`.
+
+Nach dem Speichern lädt der Dialog neu, statt seinen Zustand fortzuschreiben:
+Danach steht dort, was wirklich gespeichert ist, und ein zweites Speichern kann
+nichts doppeln.
+
+## Zeiten beim Zweckwechsel
+
+Ein neuer Eintrag wird mit dem aktiven Einsatz vorbelegt, und `changeFirecall`
+übernimmt dessen Alarmierung und Abrücken als Abfahrt und Ankunft. Wechselt der
+Zweck danach weg von `einsatz`, verwarf `changeZweck` die Verknüpfung — die
+Zeiten des Einsatzes blieben aber stehen und sahen aus wie eine Eingabe. Sie zu
+übersehen hieß, eine fremde Uhrzeit als eigene Fahrt zu erfassen.
+
+Deshalb setzt der Zweckwechsel das Datum auf **heute** und leert die
+**Uhrzeiten** von Abfahrt und Ankunft. Der Tag bleibt, weil wer den Zweck
+wechselt fast immer eine Fahrt von heute einträgt; nur die Uhrzeit ist zu
+ergänzen, und dass sie fehlt, ist am Feld zu sehen und blockiert das Speichern
+(`abfahrtTimeMissing` / `ankunftTimeMissing`).
+
+Daran hängen drei Entscheidungen:
+
+- **Datum und Uhrzeit sind getrennte Felder** (`type="date"` + `type="time"`)
+  und nicht mehr ein `datetime-local`. Ein `datetime-local` kennt kein „Datum
+  ja, Uhrzeit nein" — leer wäre der Tag mit weg, und genau der soll bleiben.
+- **Der Zeitstempel bleibt gültig** (heute, 00:00). Ein leerer Zeitstempel zöge
+  sich durch Dublettenprüfung, Überschneidungswarnung, Zählerlogik und
+  Validierung. Statt den Wert unvollständig zu machen, merken die beiden Flags,
+  dass seine Uhrzeit nichts behauptet: das Feld zeigt sie nicht, und `submit`
+  verweigert. Die Prüfung ist rein clientseitig — der Server kann den
+  Unterschied nicht sehen und muss es nicht.
+- **Nur ein vorbelegter Zeitvorschlag wird geleert**, gemerkt in
+  `firecallTimesRef`. Beim Bearbeiten eines bestehenden Eintrags und nach einer
+  Eingabe von Hand stehen echte Zeiten im Formular; die zu leeren zerstörte eine
+  Angabe, die niemand nachtragen kann. Das Datum zu korrigieren trägt die
+  Uhrzeit übrigens nicht nach — wer den Tag ändert, hat noch nicht gesagt, wann
+  er losgefahren ist.
 
 ## Mangel-Bilder
 

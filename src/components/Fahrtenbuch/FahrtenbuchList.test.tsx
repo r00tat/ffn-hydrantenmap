@@ -186,6 +186,138 @@ describe('FahrtenbuchList', () => {
     ).toBeInTheDocument();
   });
 
+  it('bietet Bearbeiten und Löschen nur bei erlaubten Einträgen an', () => {
+    // Der Fehler, aus dem das entstand: Der Knopf erschien bei jeder Fahrt und
+    // erst das Speichern meldete „nur der Ersteller darf ändern".
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[
+          entry({ id: 'e1', createdBy: 'u1', ziel: 'meine Fahrt' }),
+          entry({ id: 'e2', createdBy: 'u2', ziel: 'fremde Fahrt' }),
+        ]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        canModify={(e) => e.createdBy === 'u1'}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    const rows = screen.getAllByRole('row');
+    const own = rows.find((row) => row.textContent?.includes('meine Fahrt'))!;
+    const foreign = rows.find((row) =>
+      row.textContent?.includes('fremde Fahrt'),
+    )!;
+
+    expect(
+      within(own).getByLabelText('Fahrt bearbeiten'),
+    ).toBeInTheDocument();
+    expect(
+      within(own).getByLabelText('Fahrt löschen'),
+    ).toBeInTheDocument();
+    expect(
+      within(foreign).queryByLabelText('Fahrt bearbeiten'),
+    ).toBeNull();
+    expect(
+      within(foreign).queryByLabelText('Fahrt löschen'),
+    ).toBeNull();
+  });
+
+  it('bietet ohne canModify weiter alle Knöpfe an', () => {
+    // Die Statistikseite reicht die Liste ohne Handler durch; wer Handler
+    // übergibt, aber keine Prüfung, soll nicht stillschweigend alles verlieren.
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[entry({ createdBy: 'u2' })]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText('Fahrt bearbeiten'),
+    ).toBeInTheDocument();
+  });
+
+  it('weist eine über den Freigabe-Link erfasste Fahrt aus', () => {
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[
+          entry({
+            createdBy: 'share:0516d6a8494d',
+            createdByName: 'Adrian Schennet',
+          }),
+        ]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText('Über den Freigabe-Link erfasst von Adrian Schennet'),
+    ).toBeInTheDocument();
+  });
+
+  it('weist eine geänderte Fahrt mit Änderer aus', () => {
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[
+          entry({
+            createdAt: '2026-08-05T09:05:00.000Z',
+            updatedAt: '2026-08-06T07:30:00.000Z',
+            updatedByName: 'Paul Wölfel',
+          }),
+        ]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText(/Geändert am .* von Paul Wölfel/),
+    ).toBeInTheDocument();
+  });
+
+  it('weist eine geänderte Fahrt ohne bekannten Änderer aus', () => {
+    // Einträge aus der Zeit vor `updatedByName` — die Änderung ist belegt, der
+    // Änderer nicht mehr zu benennen.
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[
+          entry({
+            createdAt: '2026-08-05T09:05:00.000Z',
+            updatedAt: '2026-08-06T07:30:00.000Z',
+          }),
+        ]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(screen.getByLabelText(/^Geändert am [^V]*$/)).toBeInTheDocument();
+  });
+
+  it('weist eine unveränderte Fahrt nicht als geändert aus', () => {
+    renderWithIntl(
+      <FahrtenbuchList
+        entries={[
+          entry({
+            createdAt: '2026-08-05T09:05:00.000Z',
+            updatedAt: '2026-08-05T09:05:00.000Z',
+          }),
+        ]}
+        vehicles={[vehicle({ id: 'v1', name: 'RLFA 2000' })]}
+        onEdit={noop}
+        onDelete={noop}
+      />,
+    );
+
+    expect(screen.queryByLabelText(/Geändert am/)).toBeNull();
+  });
+
   it('fällt am Warnzeichen auf den allgemeinen Vermerk zurück', () => {
     // Einträge aus der Zeit vor dem eigenen Mangelfeld haben nur das Häkchen.
     renderWithIntl(

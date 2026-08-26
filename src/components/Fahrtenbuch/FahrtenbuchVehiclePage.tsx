@@ -26,6 +26,7 @@ import useFirebaseLogin from '../../hooks/useFirebaseLogin';
 import FahrtenbuchDialog from './FahrtenbuchDialog';
 import FahrtenbuchList from './FahrtenbuchList';
 import useEntryDeletion from './useEntryDeletion';
+import useEntryPermissions from './useEntryPermissions';
 import useFahrtenbuchListFilter from './useFahrtenbuchListFilter';
 import { showDefectHint } from './defectHint';
 
@@ -51,6 +52,7 @@ export default function FahrtenbuchVehiclePage({
   const { vehicles, vehiclesById, activeVehicles } =
     useFahrtenbuchVehicles(groupId);
   const { activePersons } = useFahrtenbuchPersons(groupId);
+  const { canModify } = useEntryPermissions(groupId);
   const { filter, setFilter } = useFahrtenbuchListFilter();
   const timeZone = useMemo(() => browserTimeZone(), []);
   const { fromIso, toIso } = useMemo(
@@ -228,6 +230,7 @@ export default function FahrtenbuchVehiclePage({
         hideVehicleFilter
         filter={filter}
         onFilterChange={setFilter}
+        canModify={canModify}
         onEdit={(entry) => {
           setEditEntry(entry);
           setDialogOpen(true);

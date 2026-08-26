@@ -108,7 +108,16 @@ export interface FahrtenbuchPerson {
   name: string;
   active: boolean;
   blaulichtSmsRecipientId?: string;
-  userId?: string;
+  /**
+   * Benutzerkonten dieser Person — die einzige Zuordnung, auf die sich eine
+   * Berechtigung stützen darf (siehe `entryPermissions.ts`). Gesetzt wird sie
+   * vom Gerätemeister oder Admin über „Bestehende Benutzer zuordnen", nie von
+   * dem, der sich darauf beruft.
+   *
+   * Eine Liste und kein einzelnes Feld, weil sich Mitglieder mehrfach
+   * registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie.
+   */
+  userIds?: string[];
   /** Aus dem BlaulichtSMS-CSV-Export übernommen, im Dialog korrigierbar. */
   phone?: string;
   email?: string;
@@ -295,6 +304,15 @@ export interface FahrtenbuchEntry {
   createdByName: string;
   updatedAt: string;
   updatedBy: string;
+  /**
+   * Anzeigename dessen, der zuletzt geändert hat.
+   *
+   * Neben `updatedBy` (der UID), weil die Liste die Änderung ausweist und dort
+   * keine Benutzerabfrage stattfinden soll — genauso wie `createdByName` neben
+   * `createdBy` steht. Optional: Einträge aus der Zeit vor diesem Feld haben
+   * es nicht, und deren Änderer ist nachträglich nicht mehr zu benennen.
+   */
+  updatedByName?: string;
 }
 
 export type VehiclePresetId = 'fahrzeug' | 'boot' | 'none';

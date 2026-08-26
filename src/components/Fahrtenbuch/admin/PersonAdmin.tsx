@@ -31,6 +31,7 @@ import {
   saveFahrtenbuchPerson,
 } from '../stammdatenActions';
 import PersonImportDialog from './PersonImportDialog';
+import PersonUserLinkDialog from './PersonUserLinkDialog';
 
 export default function PersonAdmin({
   groupId,
@@ -41,6 +42,7 @@ export default function PersonAdmin({
   groupName: string;
 }) {
   const t = useTranslations('fahrtenbuch');
+  const tUserLinks = useTranslations('fahrtenbuch.userLinks');
   const { persons } = useFahrtenbuchPersons(groupId);
   const [editing, setEditing] = useState<FahrtenbuchPerson | null>(null);
   const [name, setName] = useState('');
@@ -52,6 +54,7 @@ export default function PersonAdmin({
   const [dialogError, setDialogError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [linkingUsers, setLinkingUsers] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
 
   const openDialog = (person?: FahrtenbuchPerson) => {
@@ -110,6 +113,12 @@ export default function PersonAdmin({
         </Button>
         <Button onClick={() => setImporting(true)}>
           {t('admin.importPersons')}
+        </Button>
+        {/* Für jeden, der diesen Tab sieht — Gerätemeister und Admin. Wer
+            welche Konten zu sehen bekommt, entscheidet
+            `proposePersonUserLinks`, nicht diese Ansicht. */}
+        <Button onClick={() => setLinkingUsers(true)}>
+          {tUserLinks('open')}
         </Button>
       </Stack>
 
@@ -243,6 +252,14 @@ export default function PersonAdmin({
           groupId={groupId}
           groupName={groupName}
           onClose={() => setImporting(false)}
+        />
+      )}
+
+      {linkingUsers && (
+        <PersonUserLinkDialog
+          open
+          groupId={groupId}
+          onClose={() => setLinkingUsers(false)}
         />
       )}
     </>

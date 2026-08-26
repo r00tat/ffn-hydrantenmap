@@ -20,7 +20,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/service-worker-pwa.md](docs/service-worker-pwa.md) | Änderungen unter `src/worker/`, Push, Precaching |
 | [docs/auth-und-origins.md](docs/auth-und-origins.md) | Basis-URL, WebAuthn-Origins, Cron-Aufrufer |
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
-| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Mangel-Bilder, Gerätemeister-Rolle |
+| [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
 | [docs/loeschwasserfoerderung.md](docs/loeschwasserfoerderung.md) | Löschwasserförderung an der Leitung: Reibungstabelle und ihre Quelle, Höhendaten, Pumpenstandorte |

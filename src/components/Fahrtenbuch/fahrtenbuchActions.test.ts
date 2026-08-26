@@ -21,6 +21,7 @@ const {
   notifyMangelMock,
   createMangelForEntryMock,
   refreshVehicleCacheMock,
+  personQueryGetMock,
 } = vi.hoisted(() => ({
   resolveMock: vi.fn(),
   addMock: vi.fn(),
@@ -42,6 +43,10 @@ const {
   notifyMangelMock: vi.fn(),
   createMangelForEntryMock: vi.fn(),
   refreshVehicleCacheMock: vi.fn(),
+  // Die Abfrage `person.userId == <uid>` der Fahrer-Ausnahme. Eigener Mock und
+  // nicht der Eintrags-Mock: sonst beantwortete ein für einen Dublettentest
+  // gesetzter Bestand auch die Personenfrage.
+  personQueryGetMock: vi.fn(async () => ({ docs: [] as { id: string }[] })),
 }));
 
 vi.mock('../../app/auth', () => ({
@@ -90,10 +95,15 @@ vi.mock('../../server/firebase/admin', () => {
   const entriesCollection = query({}, false);
   const groupDoc = {
     get: groupGetMock,
-    collection: (name: string) =>
-      name === 'vehicle'
-        ? { doc: () => ({ get: vehicleGetMock, set: vehicleSetMock }) }
-        : entriesCollection,
+    collection: (name: string) => {
+      if (name === 'vehicle') {
+        return { doc: () => ({ get: vehicleGetMock, set: vehicleSetMock }) };
+      }
+      if (name === 'person') {
+        return { where: () => ({ get: personQueryGetMock }) };
+      }
+      return entriesCollection;
+    },
   };
   const firecallDoc = { get: firecallGetMock, set: firecallSetMock };
   return {
@@ -1616,5 +1626,134 @@ describe('Gerätemeister korrigiert fremde Einträge', () => {
     const result = await deleteFahrtenbuchEntry('ffnd', 'e1');
 
     expect(result).toEqual({ success: false, error: 'notAllowed' });
+  });
+
+  it('schreibt den Namen des Änderers mit', async () => {
+    actionUserRequiredMock.mockResolvedValue(geraetemeisterSession);
+
+    await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(entryDocSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updatedBy: 'g1',
+        updatedByName: 'Max Mustermann',
+        // Der Ersteller bleibt der ursprüngliche — geändert hat nur jemand
+        // anderer, und beides muss nebeneinander lesbar bleiben.
+        createdBy: 'someoneElse',
+        createdByName: 'Anna Bauer',
+      }),
+      { merge: false },
+    );
+  });
+});
+
+describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
+  /** Erfasst hinter dem Freigabe-Link: kein Ersteller, nur die Link-ID. */
+  const sharedEntry = {
+    vehicleId: 'v1',
+    driverId: 'p1',
+    driverName: 'Max Mustermann',
+    zweck: 'uebung' as const,
+    ziel: 'Landesfeuerwehrschule',
+    abfahrt: '2026-08-05T08:00:00.000Z',
+    ankunft: '2026-08-05T09:00:00.000Z',
+    counters: { km: { start: 1000, end: 1020, diff: 20 } },
+    group: 'ffnd',
+    deleted: false,
+    createdAt: '2026-08-05T09:05:00.000Z',
+    createdBy: 'share:0516d6a8494d',
+    createdByName: 'Max Mustermann',
+    updatedAt: '2026-08-05T09:05:00.000Z',
+    updatedBy: 'share:0516d6a8494d',
+  };
+
+  const otherMemberSession = {
+    user: {
+      id: 'u2',
+      name: 'Anna Bauer',
+      email: 'anna@ffn.at',
+      isAdmin: false,
+      groups: ['ffnd'],
+    },
+  };
+
+  const geraetemeisterSessionForShare = {
+    user: {
+      ...otherMemberSession.user,
+      fahrtenbuchGeraetemeister: ['ffnd'],
+    },
+  };
+
+  beforeEach(() => {
+    actionUserRequiredMock.mockReset();
+    vehicleGetMock.mockReset();
+    entriesQueryGetMock.mockReset();
+    entryDocGetMock.mockReset();
+    entryDocSetMock.mockReset();
+    personQueryGetMock.mockReset();
+    refreshVehicleCacheMock.mockReset();
+
+    vehicleGetMock.mockResolvedValue({
+      exists: true,
+      id: 'v1',
+      data: () => KM_VEHICLE,
+    });
+    entriesQueryGetMock.mockResolvedValue({ docs: [] });
+    entryDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => sharedEntry,
+    });
+    entryDocSetMock.mockResolvedValue(undefined);
+    personQueryGetMock.mockResolvedValue({ docs: [] });
+  });
+
+  it('lässt den über person.userId verknüpften Fahrer ändern', async () => {
+    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+    personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p1' }] });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('weist ein Mitglied ohne gepflegte Verknüpfung ab', async () => {
+    // SESSION heißt „Max Mustermann" wie der eingetragene Fahrer. Der
+    // Anzeigename gehört dem Benutzer selbst (Freitext bei der
+    // Selbstregistrierung, danach über `updateProfile` änderbar) und darf
+    // deshalb keine Berechtigung begründen.
+    actionUserRequiredMock.mockResolvedValue(SESSION);
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result).toEqual({ success: false, error: 'notAllowed' });
+    expect(entryDocSetMock).not.toHaveBeenCalled();
+  });
+
+  it('weist ein fremdes Mitglied mit anderer Verknüpfung ab', async () => {
+    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+    personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p2' }] });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result).toEqual({ success: false, error: 'notAllowed' });
+    expect(entryDocSetMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt den verknüpften Fahrer seine Fahrt auch löschen', async () => {
+    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+    personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p1' }] });
+
+    const result = await deleteFahrtenbuchEntry('ffnd', 'e1');
+
+    expect(result).toEqual({ success: true, id: 'e1' });
+  });
+
+  it('fragt die Personen-Verknüpfung beim Ersteller nicht ab', async () => {
+    // Der Lesevorgang lohnt nur, wo er etwas ändern kann.
+    actionUserRequiredMock.mockResolvedValue(geraetemeisterSessionForShare);
+
+    await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(personQueryGetMock).not.toHaveBeenCalled();
   });
 });
