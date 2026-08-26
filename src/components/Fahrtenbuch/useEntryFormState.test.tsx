@@ -223,6 +223,90 @@ describe('useEntryFormState', () => {
       expect(result.current.firecallName).toBe('');
     });
 
+    it('leert die Uhrzeiten und setzt das Datum auf heute', async () => {
+      // Der Fehler dahinter: Die Zeiten des Einsatzes blieben nach dem Wechsel
+      // stehen und sahen aus wie eine Eingabe. Übersehen hieß, eine fremde
+      // Uhrzeit als eigene Fahrt zu erfassen.
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      expect(result.current.abfahrt).toBe('2026-03-10T18:00:00.000Z');
+
+      act(() => result.current.changeZweck('sonstiges'));
+
+      expect(result.current.abfahrtTimeMissing).toBe(true);
+      expect(result.current.ankunftTimeMissing).toBe(true);
+      const today = new Date();
+      expect(new Date(result.current.abfahrt).toDateString()).toBe(
+        today.toDateString(),
+      );
+      expect(new Date(result.current.ankunft).toDateString()).toBe(
+        today.toDateString(),
+      );
+    });
+
+    it('speichert nicht, solange die Uhrzeit fehlt', async () => {
+      const { result, onSubmit } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.changeZweck('sonstiges'));
+      act(() => result.current.setZiel('Landesfeuerwehrschule'));
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(result.current.errors).toContain('abfahrtTimeMissing');
+      expect(result.current.errors).toContain('ankunftTimeMissing');
+    });
+
+    it('nimmt die Meldung mit der eingetragenen Uhrzeit zurück', () => {
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      act(() => result.current.changeZweck('sonstiges'));
+      act(() => result.current.changeAbfahrtTime('07:30'));
+      act(() => result.current.changeAnkunftTime('16:00'));
+
+      expect(result.current.abfahrtTimeMissing).toBe(false);
+      expect(result.current.ankunftTimeMissing).toBe(false);
+      const abfahrt = new Date(result.current.abfahrt);
+      expect(abfahrt.getHours()).toBe(7);
+      expect(abfahrt.getMinutes()).toBe(30);
+      expect(new Date(result.current.ankunft).getHours()).toBe(16);
+    });
+
+    it('lässt die Zeiten eines bestehenden Eintrags in Ruhe', () => {
+      // Beim Bearbeiten stehen echte, erfasste Zeiten im Formular und nicht der
+      // Vorschlag eines Einsatzes. Sie zu leeren zerstörte eine Angabe, die
+      // niemand nachtragen kann.
+      const abfahrt = localIso(2026, 3, 1, 8, 15);
+      const ankunft = localIso(2026, 3, 1, 9, 45);
+      const { result } = renderForm({
+        entry: { ...existingEntry(abfahrt, ankunft), zweck: 'einsatz' },
+      });
+
+      act(() => result.current.changeZweck('sonstiges'));
+
+      expect(result.current.abfahrt).toBe(abfahrt);
+      expect(result.current.ankunft).toBe(ankunft);
+      expect(result.current.abfahrtTimeMissing).toBe(false);
+    });
+
+    it('leert nichts, wenn die Zeiten von Hand geändert wurden', () => {
+      // Wer nach der Einsatzauswahl selbst eine Zeit eingetragen hat, hat sie
+      // gemeint — dann ist nach dem Zweckwechsel nichts nachzutragen.
+      const { result } = renderForm();
+
+      act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
+      const own = localIso(2026, 3, 10, 6, 0);
+      act(() => result.current.changeAbfahrt(own));
+      act(() => result.current.changeZweck('sonstiges'));
+
+      expect(result.current.abfahrt).toBe(own);
+      expect(result.current.abfahrtTimeMissing).toBe(false);
+    });
+
     it('meldet einen Zweck einsatz ohne Verknüpfung', () => {
       const { result } = renderForm({ firecalls: [] });
 
@@ -567,6 +651,10 @@ describe('useEntryFormState', () => {
       act(() => result.current.changeZweck('einsatz'));
       act(() => result.current.changeFirecall('f1', 'Brand Hauptstraße'));
       act(() => result.current.changeZweck('sonstiges'));
+      // Der Zweckwechsel leert die Uhrzeiten des Einsatzes — hier geht es um
+      // die verworfene Verknüpfung, also werden sie nachgetragen.
+      act(() => result.current.changeAbfahrtTime('07:30'));
+      act(() => result.current.changeAnkunftTime('16:00'));
 
       await act(async () => {
         await result.current.submit();

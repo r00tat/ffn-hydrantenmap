@@ -1,7 +1,8 @@
 # Fahrtenbuch
 
 PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug, Personennamen,
-Duplikatsprüfung und Mangel-Bilder.
+Duplikatsprüfung, Änderungsrecht an einer Fahrt, Zeiten beim Zweckwechsel und
+Mangel-Bilder.
 
 ## Fahrtenbuch-PDF-Export
 
@@ -339,6 +340,96 @@ benutzt.
 - **Ankunft vor Abfahrt** lehnt `validateEntryInput` mit
   `ankunftBeforeAbfahrt` ab und gilt damit auch serverseitig; `timeOrderInvalid`
   markiert das Feld sofort, statt die Meldung erst beim Speichern zu bringen.
+
+## Wer eine Fahrt korrigieren darf
+
+Entscheidend ist `canModifyEntry` in
+[entryPermissions.ts](../src/components/Fahrtenbuch/entryPermissions.ts): der
+Ersteller, ein Verwalter (`isFahrtenbuchManager` — Admin oder Gerätemeister)
+oder — nur bei Fahrten aus dem Freigabe-Link — der eingetragene Fahrer.
+
+**Der Fahrer als dritter Fall ist die Auflösung eines Widerspruchs.** Wer über
+den QR-Code am Fahrzeug einträgt, ist nicht angemeldet: `createdBy` ist
+`share:<linkId>`, `createdByName` nur der getippte Fahrername. Am Eintrag stand
+damit der eigene Name, das Ändern scheiterte aber an „nur der Ersteller darf
+ändern" — und in der Praxis kommt fast ein Drittel der Fahrten über diesen Weg.
+Ein Eintrag ohne Ersteller hat keinen, dem er gehört; der genannte Fahrer ist
+die einzige Person, die ihn zurechnen kann.
+
+Zugeordnet wird in dieser Reihenfolge:
+
+- **Über `person.userId`**, wenn gepflegt — die belastbare Verknüpfung zwischen
+  Benutzerkonto und Fahrtenbuch-Person. Das Feld existiert im Typ, wird aber
+  von keiner Stelle geschrieben; heute ist es in keinem Datensatz gesetzt. Es
+  ist der Weg nach vorne, nicht der heutige Weg.
+- **Sonst über den Namen**, normalisiert mit `normalizePersonName` (wortweise
+  sortiert, damit „Schennet Adrian" aus BlaulichtSMS und „Adrian Schennet" aus
+  der Personenliste dieselbe Person sind).
+
+Der Namensvergleich ist die schwächere Auskunft und gilt deshalb **nur** bei
+Einträgen ohne Ersteller. Bei einer angemeldet erfassten Fahrt bleibt es beim
+Ersteller — sonst dürfte der eingetragene Fahrer den Eintrag eines Kollegen
+überschreiben. Hinter dem Freigabe-Link ist der Fahrername freie Eingabe: wer
+dort einen fremden Namen tippt, verschenkt das Änderungsrecht an diese Person,
+er nimmt sich aber keines.
+
+Drei Dinge, die daran hängen:
+
+- **Server und Client rechnen dasselbe.** `mayModifyEntry` in den Actions und
+  `useEntryPermissions` im Client rufen dieselbe Funktion. Der Bearbeiten-Knopf
+  in der Fahrtenliste und in der Einsatz-Erfassung erscheint nur, wo das
+  Speichern durchgeht — vorher stand er an jeder Fahrt, der Dialog ging auf,
+  alles war ausfüllbar, und erst das Speichern verweigerte. Die Sicherheitsgrenze
+  bleibt die Action; der Knopf ist Bedienung.
+- **Die Personenabfrage kostet einen Lesevorgang** und wird deshalb erst
+  gestellt, wenn Verwalterrecht und Ersteller-Treffer nicht schon reichen — und
+  auch dann nur bei einem Freigabe-Link-Eintrag mit `driverId`. Verwalter und
+  Ersteller, also die Mehrheit, kommen ohne sie durch.
+- **`entryPermissions.ts` liegt nicht in `entryLogic.ts`**, aus demselben Grund
+  wie `managerPermissions.ts`: Die Liste braucht die Prädikate im Client und
+  zöge sonst das Eintrags-Validierungsmodul in ihr Bundle.
+
+**Die Änderung ist am Eintrag ausgewiesen.** `updatedByName` steht neben
+`updatedBy` (der UID), damit die Liste den Änderer nennen kann, ohne eine
+Benutzerabfrage zu stellen — dieselbe Verdopplung wie `createdByName` neben
+`createdBy`. Optional, weil Einträge aus der Zeit davor es nicht haben und ihr
+Änderer nachträglich nicht mehr zu benennen ist. Die Liste zeigt zwei stille
+Zeichen in der Aktionsspalte: ein QR-Symbol für die Herkunft aus dem
+Freigabe-Link — es ist der Grund, aus dem dort womöglich kein Bearbeiten-Knopf
+steht — und ein Verlaufssymbol mit „Geändert am … von …", sobald `updatedAt`
+von `createdAt` abweicht.
+
+## Zeiten beim Zweckwechsel
+
+Ein neuer Eintrag wird mit dem aktiven Einsatz vorbelegt, und `changeFirecall`
+übernimmt dessen Alarmierung und Abrücken als Abfahrt und Ankunft. Wechselt der
+Zweck danach weg von `einsatz`, verwarf `changeZweck` die Verknüpfung — die
+Zeiten des Einsatzes blieben aber stehen und sahen aus wie eine Eingabe. Sie zu
+übersehen hieß, eine fremde Uhrzeit als eigene Fahrt zu erfassen.
+
+Deshalb setzt der Zweckwechsel das Datum auf **heute** und leert die
+**Uhrzeiten** von Abfahrt und Ankunft. Der Tag bleibt, weil wer den Zweck
+wechselt fast immer eine Fahrt von heute einträgt; nur die Uhrzeit ist zu
+ergänzen, und dass sie fehlt, ist am Feld zu sehen und blockiert das Speichern
+(`abfahrtTimeMissing` / `ankunftTimeMissing`).
+
+Daran hängen drei Entscheidungen:
+
+- **Datum und Uhrzeit sind getrennte Felder** (`type="date"` + `type="time"`)
+  und nicht mehr ein `datetime-local`. Ein `datetime-local` kennt kein „Datum
+  ja, Uhrzeit nein" — leer wäre der Tag mit weg, und genau der soll bleiben.
+- **Der Zeitstempel bleibt gültig** (heute, 00:00). Ein leerer Zeitstempel zöge
+  sich durch Dublettenprüfung, Überschneidungswarnung, Zählerlogik und
+  Validierung. Statt den Wert unvollständig zu machen, merken die beiden Flags,
+  dass seine Uhrzeit nichts behauptet: das Feld zeigt sie nicht, und `submit`
+  verweigert. Die Prüfung ist rein clientseitig — der Server kann den
+  Unterschied nicht sehen und muss es nicht.
+- **Nur ein vorbelegter Zeitvorschlag wird geleert**, gemerkt in
+  `firecallTimesRef`. Beim Bearbeiten eines bestehenden Eintrags und nach einer
+  Eingabe von Hand stehen echte Zeiten im Formular; die zu leeren zerstörte eine
+  Angabe, die niemand nachtragen kann. Das Datum zu korrigieren trägt die
+  Uhrzeit übrigens nicht nach — wer den Tag ändert, hat noch nicht gesagt, wann
+  er losgefahren ist.
 
 ## Mangel-Bilder
 

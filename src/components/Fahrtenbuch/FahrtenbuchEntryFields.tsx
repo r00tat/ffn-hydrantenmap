@@ -18,8 +18,8 @@ import {
 } from '../../common/fahrtenbuch';
 import CounterFields from './CounterFields';
 import {
-  fromLocalInput,
-  toLocalInput,
+  toDateInput,
+  toTimeInput,
   type EntryFormPerson,
   type EntryFormState,
 } from './useEntryFormState';
@@ -286,37 +286,71 @@ export default function FahrtenbuchEntryFields({
                 />
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6 }}>
+            {/* Datum und Uhrzeit getrennt statt als `datetime-local`: Nach
+                einem Zweckwechsel weg vom Einsatz bleibt der Tag stehen und
+                nur die Uhrzeit ist nachzutragen. Ein `datetime-local` kennt
+                dieses „Datum ja, Uhrzeit nein" nicht — es wäre ganz leer und
+                der Tag mit ihm weg. */}
+            <Grid size={{ xs: 6, sm: 3 }}>
               <TextField
                 fullWidth
-                type="datetime-local"
-                label={t('abfahrt')}
-                value={toLocalInput(form.abfahrt)}
-                onChange={(e) =>
-                  form.changeAbfahrt(fromLocalInput(e.target.value))
-                }
+                type="date"
+                label={t('abfahrtDate')}
+                value={toDateInput(form.abfahrt)}
+                onChange={(e) => form.changeAbfahrtDate(e.target.value)}
                 error={form.timeOrderInvalid}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField
+                fullWidth
+                type="time"
+                label={t('abfahrtTime')}
+                value={
+                  form.abfahrtTimeMissing ? '' : toTimeInput(form.abfahrt)
+                }
+                onChange={(e) => form.changeAbfahrtTime(e.target.value)}
+                error={form.timeOrderInvalid || form.abfahrtTimeMissing}
+                helperText={
+                  form.abfahrtTimeMissing
+                    ? t('errors.abfahrtTimeMissing')
+                    : undefined
+                }
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <TextField
+                fullWidth
+                type="date"
+                label={t('ankunftDate')}
+                value={toDateInput(form.ankunft)}
+                onChange={(e) => form.changeAnkunftDate(e.target.value)}
+                error={form.timeOrderInvalid}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
               {/* Verdrehte Zeiten sofort am Feld, nicht erst als Meldung nach
                   dem Speichern-Versuch. Abgelehnt wird sie ohnehin — die
                   Prüfung steht in `validateEntryInput` und gilt damit auch
                   serverseitig. */}
               <TextField
                 fullWidth
-                type="datetime-local"
-                label={t('ankunft')}
-                value={toLocalInput(form.ankunft)}
-                onChange={(e) =>
-                  form.setAnkunft(fromLocalInput(e.target.value))
+                type="time"
+                label={t('ankunftTime')}
+                value={
+                  form.ankunftTimeMissing ? '' : toTimeInput(form.ankunft)
                 }
-                error={form.timeOrderInvalid}
+                onChange={(e) => form.changeAnkunftTime(e.target.value)}
+                error={form.timeOrderInvalid || form.ankunftTimeMissing}
                 helperText={
-                  form.timeOrderInvalid
-                    ? t('errors.ankunftBeforeAbfahrt')
-                    : undefined
+                  form.ankunftTimeMissing
+                    ? t('errors.ankunftTimeMissing')
+                    : form.timeOrderInvalid
+                      ? t('errors.ankunftBeforeAbfahrt')
+                      : undefined
                 }
                 slotProps={{ inputLabel: { shrink: true } }}
               />
