@@ -19,6 +19,7 @@ import {
   KOSTENERSATZ_VEHICLES_COLLECTION,
   type KostenersatzVehicle,
 } from '../../common/kostenersatz';
+import { isTruthy } from '../../common/boolish';
 import { listUsers } from '../../app/api/users/listUsers';
 import { firestore } from '../../server/firebase/admin';
 import { GROUP_COLLECTION_ID } from '../firebase/firestore';
@@ -657,7 +658,13 @@ export async function proposePersonUserLinks(
       displayName: user.displayName ?? undefined,
       email: user.email ?? undefined,
       disabled: user.disabled === true,
-      isAuthorized: (user as { isAuthorized?: boolean }).isAuthorized === true,
+      // Am Benutzerdokument heißt das Feld `authorized`, nicht `isAuthorized` —
+      // erst `getUserSessionData` benennt es für die Sitzung um. `isTruthy`
+      // deckt zusätzlich die älteren Dokumente ab, die „true" als Text tragen;
+      // dieselbe Behandlung wie in `auth.ts`.
+      isAuthorized: isTruthy(
+        (user as { authorized?: string | boolean }).authorized,
+      ),
       inGroup:
         (user as { groups?: string[] }).groups?.includes(groupId) === true,
     }));
@@ -692,8 +699,28 @@ export async function savePersonUserLinks(
     const session = await actionAdminRequired();
     assertFahrtenbuchGroup(groupId);
 
-    const knownUids = new Set((await listUsers()).map((user) => user.uid));
+    const [users, personSnapshot] = await Promise.all([
+      listUsers(),
+      personsRef(groupId).get(),
+    ]);
+    const knownUids = new Set(users.map((user) => user.uid));
+
+    // Wer welches Konto heute schon hat. Über die mitgeschickten Zeilen allein
+    // ließe sich ein Konto einer Person zuschlagen, die gar nicht im Aufruf
+    // steht — sie behielte es, und zwei Fahrer dürften dieselben Fahrten
+    // ändern.
     const seen = new Map<string, string>();
+    for (const doc of personSnapshot.docs) {
+      const stored = (doc.data() as FahrtenbuchPerson).userIds ?? [];
+      for (const uid of stored) seen.set(uid, doc.id);
+    }
+    // Was dieser Aufruf neu setzt, gibt die bisherigen Ansprüche derselben
+    // Person frei — sonst kollidierte eine Zeile mit sich selbst.
+    for (const link of links) {
+      for (const [uid, owner] of [...seen]) {
+        if (owner === link.personId) seen.delete(uid);
+      }
+    }
     const sanitized = links.map((link) => {
       const userIds = [...new Set(link.userIds.filter((uid) => !!uid))];
       for (const uid of userIds) {

@@ -193,6 +193,14 @@ export default function PersonUserLinkDialog({
     await reload();
   };
 
+  /** Personen-IDs als Klartextnamen — für die Hinweise am Vorschlag. */
+  const personNames = (ids: string[]) =>
+    ids
+      .map(
+        (id) => matches?.find((m) => m.personId === id)?.personName ?? id,
+      )
+      .join(', ');
+
   const statusChip = (match: PersonUserMatch) => {
     if (match.status === 'linked') {
       return <Chip size="small" color="success" label={t('linked')} />;
@@ -316,14 +324,15 @@ export default function PersonUserLinkDialog({
                         {match.contestedBy && (
                           <Typography variant="caption" color="warning.main">
                             {t('contested', {
-                              names: match.contestedBy
-                                .map(
-                                  (id) =>
-                                    matches?.find((m) => m.personId === id)
-                                      ?.personName ?? id,
-                                )
-                                .join(', '),
+                              names: personNames(match.contestedBy),
                             })}
+                          </Typography>
+                        )}
+                        {/* Ohne diesen Hinweis fehlte das Konto unerklärt:
+                            Es passt, ist aber schon vergeben. */}
+                        {match.takenBy && (
+                          <Typography variant="caption" color="text.secondary">
+                            {t('takenBy', { names: personNames(match.takenBy) })}
                           </Typography>
                         )}
                         {match.status === 'linked' && (

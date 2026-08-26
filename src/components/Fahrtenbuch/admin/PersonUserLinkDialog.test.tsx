@@ -224,6 +224,63 @@ describe('PersonUserLinkDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('erklärt ein Konto, das schon einer anderen Person gehört', async () => {
+    render([
+      {
+        personId: 'p2',
+        personName: 'Josef Haider junior',
+        status: 'none',
+        linkedUserIds: [],
+        candidates: [],
+        takenBy: ['p1'],
+      },
+      {
+        personId: 'p1',
+        personName: 'Josef Haider',
+        status: 'linked',
+        linkedUserIds: ['u1'],
+        candidates: [],
+      },
+    ]);
+
+    const line = await row('Josef Haider junior');
+    expect(
+      within(line).getByText('Ein passendes Konto ist schon zugeordnet zu: Josef Haider'),
+    ).toBeInTheDocument();
+  });
+
+  it('bietet an einer verknüpften Person das weitere Konto an', async () => {
+    // Zweitregistrierung: nicht im Arbeitsstapel, aber erreichbar.
+    render([
+      {
+        personId: 'p1',
+        personName: 'Adrian Schennet',
+        status: 'linked',
+        linkedUserIds: ['u1'],
+        candidates: [
+          { uid: 'u2', displayName: 'Adrian Schennet', email: 'zweit@ff.at' },
+        ],
+      },
+    ]);
+
+    await userEvent.click(
+      screen.getByLabelText('Verknüpfte Personen anzeigen'),
+    );
+    const line = await row('Adrian Schennet');
+    const box = within(line).getByRole('checkbox');
+    expect(box).not.toBeChecked();
+
+    await userEvent.click(box);
+    await userEvent.click(
+      screen.getByRole('button', { name: '1 Zuordnung speichern' }),
+    );
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(saveMock).toHaveBeenCalledWith('ffnd', [
+      { personId: 'p1', userIds: ['u1', 'u2'] },
+    ]);
+  });
+
   it('meldet einen fehlgeschlagenen Abruf', async () => {
     proposeMock.mockResolvedValue({ success: false, error: 'kein Admin' });
     renderWithIntl(

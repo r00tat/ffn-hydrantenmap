@@ -445,13 +445,20 @@ Vier Zustände, und der Umgang mit ihnen ist der Kern:
 
 - `unique` — genau ein offenes Konto. **Vorgehakt, aber bestätigungspflichtig.**
 - `ambiguous` — **nicht vorgehakt.** Ein vorgehakter mehrdeutiger Vorschlag
-  überspränge genau die Prüfung, für die der Dialog da ist. Drei Anlässe führen
-  hierher: mehrere gleichnamige Konten (die Doppelregistrierung), ein Konto, das
-  auch zu einer anderen Person passt (`contestedBy` — zwei echte Menschen können
-  denselben Namen tragen, das Konto gehört aber nur einem), und ein weiteres
-  Konto zu einer schon verknüpften Person.
-- `none` — kein Konto gefunden, nichts anzuhaken.
-- `linked` — verknüpft und nichts Neues dabei; standardmäßig ausgeblendet.
+  überspränge genau die Prüfung, für die der Dialog da ist. Zwei Anlässe führen
+  hierher: mehrere gleichnamige Konten (die Doppelregistrierung) und ein Konto,
+  das auch zu einer anderen, noch unverknüpften Person passt (`contestedBy` —
+  zwei echte Menschen können denselben Namen tragen, das Konto gehört aber nur
+  einem).
+- `none` — kein Konto anzuhaken. Auch der Fall, dass ein passendes Konto
+  existiert, aber **schon einer anderen Person gehört**: Es wird nicht angeboten,
+  sondern über `takenBy` samt Namen erklärt. Es wegzugeben hieße, dass zwei
+  Fahrer dieselben Fahrten ändern dürfen; unerklärt fehlen darf es aber auch
+  nicht.
+- `linked` — **sobald ein Konto verknüpft ist.** Die Person gilt als versorgt und
+  verschwindet aus dem Arbeitsstapel, auch wenn eine Zweitregistrierung offen
+  wäre; sonst nagte die erledigte Zuordnung weiter. Das weitere Konto bleibt in
+  `candidates` und ist über „Verknüpfte Personen anzeigen" anhakbar.
 
 Sortiert wird nach Handlungsbedarf, nicht alphabetisch: Was eine Entscheidung
 braucht, steht oben.
@@ -474,7 +481,17 @@ Drei Dinge, die daran hängen:
 - **Zwei Prüfungen, die der Dialog nicht ersetzt.** Jede UID muss ein Konto sein
   (sonst stünde am Personendatensatz eine Kennung, die irgendwann jemandem
   gehört), und ein Konto gehört höchstens einer Person je Gruppe (sonst dürften
-  zwei Fahrer denselben Eintrag ändern und keiner wäre es sicher).
+  zwei Fahrer denselben Eintrag ändern und keiner wäre es sicher). Die zweite
+  Prüfung liest dazu den **gespeicherten** Stand aller Personen und nicht nur die
+  mitgeschickten Zeilen: Sonst ließe sich ein Konto einer Person zuschlagen, die
+  im Aufruf gar nicht vorkommt — sie behielte es. Was derselbe Aufruf neu setzt,
+  gibt die bisherigen Ansprüche derselben Person frei, sonst kollidierte eine
+  Zeile mit sich selbst.
+- **Die Freischaltung steht am Benutzerdokument als `authorized`**, nicht als
+  `isAuthorized` — erst `getUserSessionData` benennt sie für die Sitzung um. Wer
+  das verwechselt, zeigt an *jedem* Konto „nicht freigeschaltet". Gelesen wird
+  mit `isTruthy`, weil ältere Dokumente „true" als Text tragen; dieselbe
+  Behandlung wie in `auth.ts`.
 
 Nach dem Speichern lädt der Dialog neu, statt seinen Zustand fortzuschreiben:
 Danach steht dort, was wirklich gespeichert ist, und ein zweites Speichern kann

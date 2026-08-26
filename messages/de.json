@@ -979,7 +979,8 @@
       "saveFailed": "Die Zuordnung konnte nicht gespeichert werden.",
       "showLinked": "Verknüpfte Personen anzeigen",
       "unlink": "Verknüpfung lösen",
-      "close": "Schließen"
+      "close": "Schließen",
+      "takenBy": "Ein passendes Konto ist schon zugeordnet zu: {names}"
     }
   },
   "fahrtenbuchShare": {

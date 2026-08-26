@@ -54,6 +54,13 @@ export interface PersonUserMatch {
    * Menschen können denselben Namen tragen, das Konto gehört aber nur einem.
    */
   contestedBy?: string[];
+  /**
+   * IDs von Personen, die ein passendes Konto schon verknüpft haben. Deren
+   * Konten stehen hier nicht als Kandidaten: Sie wegzugeben hieße, dass zwei
+   * Fahrer dieselben Fahrten ändern dürfen. Der Grund gehört aber angezeigt,
+   * sonst fehlt das Konto unerklärt.
+   */
+  takenBy?: string[];
 }
 
 /** Reihenfolge nach Handlungsbedarf — oben, was eine Entscheidung braucht. */
@@ -108,12 +115,33 @@ export function matchPersonsToUsers(
   // Erst alle Kandidaten sammeln, dann die Konflikte auszählen: Ob ein
   // Vorschlag umkämpft ist, lässt sich erst sagen, wenn alle Personen gesehen
   // sind.
+  // Wer welches Konto schon hat. Ein verknüpftes Konto ist vergeben und wird
+  // keiner zweiten Person angeboten.
+  const ownerOf = new Map<string, string>();
+  for (const person of withId) {
+    for (const uid of person.userIds ?? []) {
+      ownerOf.set(uid, person.id as string);
+    }
+  }
+
   const perPerson = withId.map((person) => {
+    const personId = person.id as string;
     const linkedUserIds = person.userIds ?? [];
-    const candidates = candidatesFor(person, users).filter(
-      (candidate) => !linkedUserIds.includes(candidate.uid),
+    const matching = candidatesFor(person, users);
+    const candidates = matching.filter(
+      (candidate) =>
+        !linkedUserIds.includes(candidate.uid) && !ownerOf.has(candidate.uid),
     );
-    return { person, linkedUserIds, candidates };
+    const takenBy = [
+      ...new Set(
+        matching
+          .map((candidate) => ownerOf.get(candidate.uid))
+          .filter(
+            (owner): owner is string => !!owner && owner !== personId,
+          ),
+      ),
+    ];
+    return { person, linkedUserIds, candidates, takenBy };
   });
 
   const claimants = new Map<string, string[]>();
@@ -126,7 +154,7 @@ export function matchPersonsToUsers(
     }
   }
 
-  const matches = perPerson.map(({ person, linkedUserIds, candidates }) => {
+  const matches = perPerson.map(({ person, linkedUserIds, candidates, takenBy }) => {
     const personId = person.id as string;
     const contestedBy = [
       ...new Set(
@@ -137,18 +165,21 @@ export function matchPersonsToUsers(
     ];
 
     const status: PersonUserMatchStatus =
-      candidates.length === 0
-        ? linkedUserIds.length > 0
-          ? 'linked'
-          : 'none'
-        : contestedBy.length > 0 || linkedUserIds.length > 0
-          ? // Umkämpft, oder ein Zusatz zu einer bestehenden Verknüpfung: Ob ein
-            // weiteres Konto derselben Person gehört oder eine Zweitregistrierung
-            // aufgeräumt werden sollte, entscheidet kein Namensvergleich.
-            'ambiguous'
-          : candidates.length === 1
-            ? 'unique'
-            : 'ambiguous';
+      // Ein verknüpftes Konto heißt versorgt. Weitere Kandidaten bleiben in
+      // `candidates` erreichbar, aber die Person steht nicht länger als offene
+      // Arbeit im Stapel — sonst nagte jede Zweitregistrierung nach der
+      // erledigten Zuordnung weiter.
+      linkedUserIds.length > 0
+        ? 'linked'
+        : candidates.length === 0
+          ? 'none'
+          : contestedBy.length > 0
+            ? // Umkämpft: Zwei echte Menschen können denselben Namen tragen,
+              // und welchem das Konto gehört, entscheidet kein Vergleich.
+              'ambiguous'
+            : candidates.length === 1
+              ? 'unique'
+              : 'ambiguous';
 
     const match: PersonUserMatch = {
       personId,
@@ -158,6 +189,7 @@ export function matchPersonsToUsers(
       candidates,
     };
     if (contestedBy.length > 0) match.contestedBy = contestedBy;
+    if (takenBy.length > 0) match.takenBy = takenBy;
     return match;
   });
 

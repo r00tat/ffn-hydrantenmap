@@ -979,7 +979,8 @@
       "saveFailed": "The links could not be saved.",
       "showLinked": "Show linked persons",
       "unlink": "Remove link",
-      "close": "Close"
+      "close": "Close",
+      "takenBy": "A matching account is already linked to: {names}"
     }
   },
   "fahrtenbuchShare": {

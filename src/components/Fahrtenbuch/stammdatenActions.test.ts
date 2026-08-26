@@ -372,6 +372,43 @@ describe('proposePersonUserLinks', () => {
     });
   });
 
+  it('liest die Freischaltung aus `authorized` am Benutzerdokument', async () => {
+    // Das Benutzerdokument speichert `authorized`, nicht `isAuthorized` —
+    // vorher stand deshalb an jedem Konto „nicht freigeschaltet".
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet', authorized: true },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.matches?.[0].candidates[0]?.isAuthorized).toBe(true);
+  });
+
+  it('versteht auch ein `authorized` als Zeichenkette', async () => {
+    // Ältere Dokumente tragen „true" als Text — `isTruthy` deckt beides ab,
+    // wie schon in `auth.ts`.
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet', authorized: 'true' },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.matches?.[0].candidates[0]?.isAuthorized).toBe(true);
+  });
+
+  it('meldet ein nicht freigeschaltetes Konto als solches', async () => {
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet' },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.matches?.[0].candidates[0]?.isAuthorized).toBe(false);
+  });
+
   it('gibt vom Benutzerkonto nur heraus, was der Dialog braucht', async () => {
     personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
     listUsersMock.mockResolvedValue([
@@ -380,7 +417,7 @@ describe('proposePersonUserLinks', () => {
         displayName: 'Adrian Schennet',
         email: 'a@ff.at',
         disabled: false,
-        isAuthorized: true,
+        authorized: true,
         groups: ['ffnd'],
         // Nichts davon darf beim Client landen.
         messagingTokens: ['token'],
@@ -412,6 +449,7 @@ describe('savePersonUserLinks', () => {
       set: setMock,
     });
     collectionMock.mockReturnValue({ doc: docMock });
+    getMock.mockResolvedValue({ docs: [] });
     listUsersMock.mockResolvedValue([{ uid: 'u1' }, { uid: 'u2' }]);
   });
 
@@ -497,5 +535,34 @@ describe('savePersonUserLinks', () => {
 
     expect(result.success).toBe(false);
     expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('weist ein Konto ab, das einer nicht mitgeschickten Person gehört', async () => {
+    // Die Prüfung über die mitgeschickten Zeilen allein genügt nicht: Die
+    // andere Person steht nicht im Aufruf und behielte das Konto trotzdem.
+    getMock.mockResolvedValue({
+      docs: [
+        { id: 'p2', data: () => ({ name: 'Andere', userIds: ['u1'] }) },
+      ],
+    });
+
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt eine Person ihr eigenes Konto behalten', async () => {
+    getMock.mockResolvedValue({
+      docs: [{ id: 'p1', data: () => ({ name: 'Eigen', userIds: ['u1'] }) }],
+    });
+
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1', 'u2'] },
+    ]);
+
+    expect(result.success).toBe(true);
   });
 });

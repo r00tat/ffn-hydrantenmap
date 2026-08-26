@@ -133,8 +133,10 @@ describe('matchPersonsToUsers', () => {
     expect(matches[0].linkedUserIds).toEqual(['u1']);
   });
 
-  it('schlägt für eine teilweise verknüpfte Person die fehlenden Konten vor', () => {
-    // Zweitregistrierung, die nach der ersten Zuordnung dazukam.
+  it('gilt mit einem verknüpften Konto als erledigt, hält weitere aber bereit', () => {
+    // Eine Person, die schon ein Konto hat, ist versorgt: Sie soll nicht als
+    // offene Arbeit im Stapel stehen, nur weil es eine Zweitregistrierung gibt.
+    // Zugreifbar bleibt das zweite Konto über „Verknüpfte anzeigen".
     const matches = matchPersonsToUsers(
       [person({ id: 'p1', name: 'Adrian Schennet', userIds: ['u1'] })],
       [
@@ -143,9 +145,26 @@ describe('matchPersonsToUsers', () => {
       ],
     );
 
-    expect(matches[0].status).toBe('ambiguous');
+    expect(matches[0].status).toBe('linked');
     expect(matches[0].linkedUserIds).toEqual(['u1']);
     expect(matches[0].candidates.map((c) => c.uid)).toEqual(['u2']);
+  });
+
+  it('bietet ein Konto nicht an, das schon einer anderen Person gehört', () => {
+    // Sonst nähme die zweite Person es der ersten weg, und beide dürften
+    // dieselben Fahrten ändern.
+    const matches = matchPersonsToUsers(
+      [
+        person({ id: 'p1', name: 'Josef Haider', userIds: ['u1'] }),
+        person({ id: 'p2', name: 'Josef Haider' }),
+      ],
+      [user({ uid: 'u1', displayName: 'Josef Haider' })],
+    );
+
+    const second = matches.find((m) => m.personId === 'p2')!;
+    expect(second.status).toBe('none');
+    expect(second.candidates).toEqual([]);
+    expect(second.takenBy).toEqual(['p1']);
   });
 
   it('vergibt ein Konto nicht an zwei Personen', () => {
