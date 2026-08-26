@@ -40,27 +40,36 @@ describe('isEntryDriver', () => {
     );
   });
 
-  it('trifft über den Namen, wenn die Person nicht verknüpft ist', () => {
-    expect(isEntryDriver(shared, { userName: 'Adrian Schennet' })).toBe(true);
+  it('trifft nicht über eine andere verknüpfte Person', () => {
+    expect(isEntryDriver(shared, { userId: 'u9', personIds: ['p2'] })).toBe(
+      false,
+    );
   });
 
-  it('trifft auch bei umgekehrter Schreibweise des Namens', () => {
-    // Aus BlaulichtSMS kommen Namen als „Nachname Vorname" — dieselbe Person.
-    expect(isEntryDriver(shared, { userName: 'Schennet Adrian' })).toBe(true);
+  it('trifft nicht ohne verknüpfte Person', () => {
+    // Die Verknüpfung ist die einzige Zuordnung — ohne sie bleibt die Fahrt
+    // dem Gerätemeister vorbehalten.
+    expect(isEntryDriver(shared, { userId: 'u9' })).toBe(false);
   });
 
-  it('trifft nicht bei einem anderen Fahrer', () => {
-    expect(isEntryDriver(shared, { userName: 'Paul Wölfel' })).toBe(false);
-  });
-
-  it('trifft nicht ohne Namen und ohne verknüpfte Person', () => {
-    expect(isEntryDriver(shared, {})).toBe(false);
-  });
-
-  it('trifft nicht bei leerem Fahrernamen', () => {
-    // Sonst machte ein Eintrag ohne Fahrer jeden namenlosen Aufrufer zum Fahrer.
+  it('trifft nicht über den Anzeigenamen des Aufrufers', () => {
+    // Die Firebase-`displayName` gehört dem Benutzer selbst: aus einem
+    // Freitextfeld der Selbstregistrierung und danach über `updateProfile`
+    // jederzeit änderbar. Wer sich auf den Namen einer Kollegin umbenennt,
+    // dürfte sonst deren QR-Fahrten ändern und löschen.
     expect(
-      isEntryDriver({ driverName: '' } as FahrtenbuchEntry, { userName: '' }),
+      isEntryDriver(shared, {
+        userId: 'u9',
+        ...({ userName: 'Adrian Schennet' } as object),
+      }),
+    ).toBe(false);
+  });
+
+  it('trifft nicht bei einem Eintrag ohne driverId', () => {
+    // Sonst machte ein Eintrag ohne Fahrer jeden Aufrufer ohne Verknüpfung zum
+    // Fahrer.
+    expect(
+      isEntryDriver({} as FahrtenbuchEntry, { userId: 'u9', personIds: [] }),
     ).toBe(false);
   });
 });
@@ -78,28 +87,33 @@ describe('canModifyEntry', () => {
     expect(canModifyEntry(foreign, { userId: 'u1' }, false)).toBe(false);
   });
 
-  it('erlaubt dem Fahrer einer über den QR-Code erfassten Fahrt', () => {
+  it('erlaubt dem verknüpften Fahrer einer über den QR-Code erfassten Fahrt', () => {
     expect(
-      canModifyEntry(shared, { userId: 'u9', userName: 'Adrian Schennet' }, false),
+      canModifyEntry(shared, { userId: 'u9', personIds: ['p1'] }, false),
     ).toBe(true);
   });
 
   it('verbietet einem fremden Mitglied die QR-Fahrt', () => {
     expect(
-      canModifyEntry(shared, { userId: 'u9', userName: 'Paul Wölfel' }, false),
+      canModifyEntry(shared, { userId: 'u9', personIds: ['p2'] }, false),
     ).toBe(false);
   });
 
-  it('macht den Fahrer einer angemeldet erfassten Fahrt nicht zum Bearbeiter', () => {
+  it('verbietet die QR-Fahrt ohne gepflegte Verknüpfung', () => {
+    expect(canModifyEntry(shared, { userId: 'u9' }, false)).toBe(false);
+  });
+
+  it('macht den verknüpften Fahrer einer angemeldet erfassten Fahrt nicht zum Bearbeiter', () => {
     // Die Ausnahme gilt nur für Einträge ohne Ersteller. Bei einem echten
     // Ersteller bleibt es bei ihm — sonst dürfte der eingetragene Fahrer den
     // Eintrag eines Kollegen überschreiben.
     const byOther = {
       createdBy: 'u2',
+      driverId: 'p1',
       driverName: 'Adrian Schennet',
     } as FahrtenbuchEntry;
     expect(
-      canModifyEntry(byOther, { userId: 'u9', userName: 'Adrian Schennet' }, false),
+      canModifyEntry(byOther, { userId: 'u9', personIds: ['p1'] }, false),
     ).toBe(false);
   });
 

@@ -1677,6 +1677,13 @@ describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
     },
   };
 
+  const geraetemeisterSessionForShare = {
+    user: {
+      ...otherMemberSession.user,
+      fahrtenbuchGeraetemeister: ['ffnd'],
+    },
+  };
+
   beforeEach(() => {
     actionUserRequiredMock.mockReset();
     vehicleGetMock.mockReset();
@@ -1700,24 +1707,6 @@ describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
     personQueryGetMock.mockResolvedValue({ docs: [] });
   });
 
-  it('lässt den namensgleichen Fahrer die Fahrt ändern', async () => {
-    // SESSION heißt „Max Mustermann" wie der Fahrer — ohne gepflegtes
-    // `person.userId` ist der Name die einzige Zuordnung.
-    actionUserRequiredMock.mockResolvedValue(SESSION);
-
-    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
-
-    expect(result.success).toBe(true);
-  });
-
-  it('fragt die Personen-Verknüpfung nicht ab, wenn der Name schon trifft', async () => {
-    actionUserRequiredMock.mockResolvedValue(SESSION);
-
-    await updateFahrtenbuchEntry('ffnd', 'e1', input);
-
-    expect(personQueryGetMock).not.toHaveBeenCalled();
-  });
-
   it('lässt den über person.userId verknüpften Fahrer ändern', async () => {
     actionUserRequiredMock.mockResolvedValue(otherMemberSession);
     personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p1' }] });
@@ -1727,8 +1716,12 @@ describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
     expect(result.success).toBe(true);
   });
 
-  it('weist ein fremdes Mitglied ohne Verknüpfung ab', async () => {
-    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+  it('weist ein Mitglied ohne gepflegte Verknüpfung ab', async () => {
+    // SESSION heißt „Max Mustermann" wie der eingetragene Fahrer. Der
+    // Anzeigename gehört dem Benutzer selbst (Freitext bei der
+    // Selbstregistrierung, danach über `updateProfile` änderbar) und darf
+    // deshalb keine Berechtigung begründen.
+    actionUserRequiredMock.mockResolvedValue(SESSION);
 
     const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
 
@@ -1736,11 +1729,31 @@ describe('Fahrer korrigiert seine über den QR-Code erfasste Fahrt', () => {
     expect(entryDocSetMock).not.toHaveBeenCalled();
   });
 
-  it('lässt den Fahrer seine Fahrt auch löschen', async () => {
-    actionUserRequiredMock.mockResolvedValue(SESSION);
+  it('weist ein fremdes Mitglied mit anderer Verknüpfung ab', async () => {
+    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+    personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p2' }] });
+
+    const result = await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(result).toEqual({ success: false, error: 'notAllowed' });
+    expect(entryDocSetMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt den verknüpften Fahrer seine Fahrt auch löschen', async () => {
+    actionUserRequiredMock.mockResolvedValue(otherMemberSession);
+    personQueryGetMock.mockResolvedValue({ docs: [{ id: 'p1' }] });
 
     const result = await deleteFahrtenbuchEntry('ffnd', 'e1');
 
     expect(result).toEqual({ success: true, id: 'e1' });
+  });
+
+  it('fragt die Personen-Verknüpfung beim Ersteller nicht ab', async () => {
+    // Der Lesevorgang lohnt nur, wo er etwas ändern kann.
+    actionUserRequiredMock.mockResolvedValue(geraetemeisterSessionForShare);
+
+    await updateFahrtenbuchEntry('ffnd', 'e1', input);
+
+    expect(personQueryGetMock).not.toHaveBeenCalled();
   });
 });

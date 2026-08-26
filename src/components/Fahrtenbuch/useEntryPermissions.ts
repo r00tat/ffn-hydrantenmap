@@ -13,9 +13,9 @@ import { isFahrtenbuchManager } from './managerPermissions';
  *
  * Dieselbe Rechnung wie in `mayModifyEntry` auf dem Server, mit denselben
  * Eingaben: Verwalterrecht aus der Sitzung, Ersteller-Vergleich über die UID
- * und — bei Einträgen aus dem Freigabe-Link — der Fahrer über die verknüpfte
- * Person oder den Namen. Die Personenliste ist hier ohnehin abonniert, die
- * Verknüpfung kostet also nichts extra.
+ * und — bei Einträgen aus dem Freigabe-Link — der Fahrer über die mit seinem
+ * Benutzerkonto verknüpfte Person. Die Personenliste ist hier ohnehin
+ * abonniert, die Verknüpfung kostet also nichts extra.
  *
  * Das ist Bedienkomfort, keine Sicherheitsgrenze — die steht in den Actions.
  * Ohne geladene Gruppe fällt die Antwort auf „nein": Solange nicht bekannt
@@ -23,7 +23,7 @@ import { isFahrtenbuchManager } from './managerPermissions';
  * Behauptung, die der Server gleich widerlegt.
  */
 export default function useEntryPermissions(groupId?: string) {
-  const { uid, displayName, isAdmin, groups, fahrtenbuchGeraetemeister } =
+  const { uid, isAdmin, groups, fahrtenbuchGeraetemeister } =
     useFirebaseLogin();
   const { persons } = useFahrtenbuchPersons(groupId);
 
@@ -41,13 +41,12 @@ export default function useEntryPermissions(groupId?: string) {
   const actor = useMemo<EntryModifyActor>(
     () => ({
       userId: uid,
-      userName: displayName,
       personIds: persons
         .filter((person) => person.userId && person.userId === uid)
         .map((person) => person.id)
         .filter((id): id is string => !!id),
     }),
-    [uid, displayName, persons],
+    [uid, persons],
   );
 
   const canModify = useCallback(

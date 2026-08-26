@@ -356,22 +356,37 @@ damit der eigene Name, das Ändern scheiterte aber an „nur der Ersteller darf
 Ein Eintrag ohne Ersteller hat keinen, dem er gehört; der genannte Fahrer ist
 die einzige Person, die ihn zurechnen kann.
 
-Zugeordnet wird in dieser Reihenfolge:
+Zugeordnet wird **ausschließlich über `person.userId`** — die Verknüpfung
+zwischen Benutzerkonto und Fahrtenbuch-Person, gesetzt auf der gepflegten Seite
+(Personenliste der Gruppe) und nicht von dem, der sich darauf beruft.
 
-- **Über `person.userId`**, wenn gepflegt — die belastbare Verknüpfung zwischen
-  Benutzerkonto und Fahrtenbuch-Person. Das Feld existiert im Typ, wird aber
-  von keiner Stelle geschrieben; heute ist es in keinem Datensatz gesetzt. Es
-  ist der Weg nach vorne, nicht der heutige Weg.
-- **Sonst über den Namen**, normalisiert mit `normalizePersonName` (wortweise
-  sortiert, damit „Schennet Adrian" aus BlaulichtSMS und „Adrian Schennet" aus
-  der Personenliste dieselbe Person sind).
+**Kein Namensvergleich, und das ist der Kern.** Naheliegend wäre, den
+Fahrernamen am Eintrag mit dem Anzeigenamen der Sitzung zu vergleichen — der
+erste Wurf tat das und war eine Rechteausweitung. `session.user.name` ist die
+Firebase-`displayName`, und die gehört dem Benutzer selbst: Sie stammt aus einem
+Freitextfeld der Selbstregistrierung
+([StyledLogin.tsx](../src/components/firebase/StyledLogin.tsx)) und ist danach
+jederzeit über `updateProfile` änderbar — auch ohne dass diese App eine
+Oberfläche dafür anbietet, denn das Client-SDK genügt. Ein Gruppenmitglied
+könnte sich damit auf den Namen einer Kollegin umbenennen und deren über den
+QR-Code erfasste Fahrten ändern **und löschen**. In einem Nachweisdokument ist
+das genau die stille Verfälschung, gegen die die Zuordnung überhaupt da ist.
 
-Der Namensvergleich ist die schwächere Auskunft und gilt deshalb **nur** bei
-Einträgen ohne Ersteller. Bei einer angemeldet erfassten Fahrt bleibt es beim
-Ersteller — sonst dürfte der eingetragene Fahrer den Eintrag eines Kollegen
-überschreiben. Hinter dem Freigabe-Link ist der Fahrername freie Eingabe: wer
-dort einen fremden Namen tippt, verschenkt das Änderungsrecht an diese Person,
-er nimmt sich aber keines.
+Auch die Gegenrichtung trägt nicht: Hinter dem Freigabe-Link ist der Fahrername
+freie Eingabe, und der Link hängt als QR-Code am Fahrzeug. Wer ihn hat, könnte
+Einträge auf einen beliebigen Namen anlegen.
+
+**Preis der sauberen Regel:** Ohne gepflegte Verknüpfung greift die
+Fahrer-Ausnahme nicht, und `person.userId` wird derzeit von keiner Stelle im
+Code geschrieben — das Feld existiert im Typ und ist in keinem Datensatz
+gesetzt. Bis eine Oberfläche Person und Benutzerkonto verknüpft, bleibt die
+Korrektur einer QR-Fahrt beim Gerätemeister und beim Admin. Lieber eine
+Korrektur, die den Gerätemeister braucht, als eine, die sich über einen selbst
+gewählten Namen erschleichen lässt.
+
+Die Ausnahme gilt außerdem **nur** bei Einträgen ohne Ersteller. Bei einer
+angemeldet erfassten Fahrt bleibt es beim Ersteller — sonst dürfte der
+eingetragene Fahrer den Eintrag eines Kollegen überschreiben.
 
 Drei Dinge, die daran hängen:
 
@@ -385,6 +400,10 @@ Drei Dinge, die daran hängen:
   gestellt, wenn Verwalterrecht und Ersteller-Treffer nicht schon reichen — und
   auch dann nur bei einem Freigabe-Link-Eintrag mit `driverId`. Verwalter und
   Ersteller, also die Mehrheit, kommen ohne sie durch.
+- **Der Anzeigename taugt nur zur Anzeige.** `createdByName` und `updatedByName`
+  stehen am Eintrag, damit die Liste einen Namen zeigen kann, ohne eine
+  Benutzerabfrage zu stellen. Keiner der beiden darf je eine Berechtigung
+  begründen.
 - **`entryPermissions.ts` liegt nicht in `entryLogic.ts`**, aus demselben Grund
   wie `managerPermissions.ts`: Die Liste braucht die Prädikate im Client und
   zöge sonst das Eintrags-Validierungsmodul in ihr Bundle.

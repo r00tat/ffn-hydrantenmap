@@ -91,10 +91,11 @@ type ModifySession = {
 /**
  * Die Personendatensätze der Gruppe, die auf diesen Benutzer zeigen.
  *
- * `person.userId` ist die belastbare Verknüpfung zwischen Benutzerkonto und
- * Fahrtenbuch-Person. Sie ist heute in kaum einem Datensatz gepflegt — deshalb
- * bleibt der Namensvergleich in `isEntryDriver` der Rückfall, und diese Abfrage
- * ist die Stelle, an der die Verknüpfung wirkt, sobald sie gepflegt wird.
+ * `person.userId` ist die einzige Zuordnung zwischen Benutzerkonto und
+ * Fahrtenbuch-Person, der zu trauen ist — sie wird auf der gepflegten Seite
+ * gesetzt und nicht von dem, der sich darauf beruft. Ist sie nicht gepflegt,
+ * bleibt die Fahrt dem Gerätemeister vorbehalten; einen Rückfall über den
+ * Anzeigenamen gibt es bewusst nicht (siehe `EntryModifyActor`).
  */
 async function linkedPersonIds(
   groupId: string,
@@ -118,9 +119,9 @@ async function linkedPersonIds(
  * geladen, hier kostet sie einen Lesevorgang.
  *
  * Deshalb wird sie erst geholt, wenn die Entscheidung sonst nicht fällt — und
- * auch dann nur bei einem Eintrag aus dem Freigabe-Link mit verknüpfter Person,
- * dem einzigen Fall, in dem sie etwas ändern kann. Verwalter und Ersteller,
- * also die große Mehrheit, kommen ohne die Abfrage durch.
+ * auch dann nur bei einem Eintrag aus dem Freigabe-Link mit `driverId`, dem
+ * einzigen Fall, in dem sie etwas ändern kann. Verwalter und Ersteller, also
+ * die große Mehrheit, kommen ohne die Abfrage durch.
  */
 async function mayModifyEntry(
   groupId: string,
@@ -128,10 +129,7 @@ async function mayModifyEntry(
   entry: FahrtenbuchEntry,
 ): Promise<boolean> {
   const canManage = isFahrtenbuchManager(groupId, session.user);
-  const actor: EntryModifyActor = {
-    userId: session.user.id,
-    userName: session.user.name ?? session.user.email ?? '',
-  };
+  const actor: EntryModifyActor = { userId: session.user.id };
   if (canModifyEntry(entry, actor, canManage)) return true;
   if (!isShareLinkEntry(entry) || !entry.driverId) return false;
   const personIds = await linkedPersonIds(groupId, session.user.id);

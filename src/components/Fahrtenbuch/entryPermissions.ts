@@ -13,23 +13,29 @@
  * erst das Speichern meldete „nur der Ersteller darf ändern".
  */
 
-import { normalizePersonName, type FahrtenbuchEntry } from '../../common/fahrtenbuch';
+import type { FahrtenbuchEntry } from '../../common/fahrtenbuch';
 import { SHARE_ACTOR_PREFIX } from '../../common/fahrtenbuchShare';
 
 /**
  * Der Aufrufer, soweit die Entscheidung ihn braucht.
  *
  * `personIds` sind die Personendatensätze der Gruppe, deren `userId` auf
- * diesen Benutzer zeigt — die belastbare Verknüpfung zwischen Benutzerkonto
- * und Fahrtenbuch-Person. Sie ist heute in kaum einem Datensatz gepflegt,
- * deshalb der Namensvergleich als Rückfall; sobald sie gepflegt ist, gewinnt
- * sie.
+ * diesen Benutzer zeigt — die einzige Verknüpfung zwischen Benutzerkonto und
+ * Fahrtenbuch-Person, der zu trauen ist. Sie wird auf der gepflegten Seite
+ * gesetzt (Personenliste der Gruppe) und nicht von dem, der sich darauf beruft.
+ *
+ * **Kein Namensvergleich.** Der Anzeigename einer Sitzung ist die
+ * Firebase-`displayName` und gehört dem Benutzer selbst: Sie stammt aus einem
+ * Freitextfeld der Selbstregistrierung und ist danach jederzeit über
+ * `updateProfile` änderbar — auch ohne dass diese App eine Oberfläche dafür
+ * anbietet. Ein Gruppenmitglied könnte sich also auf den Namen einer Kollegin
+ * umbenennen und deren über den QR-Code erfasste Fahrten ändern und löschen.
+ * In einem Nachweisdokument ist das genau die stille Verfälschung, gegen die
+ * die Zuordnung überhaupt da ist.
  */
 export interface EntryModifyActor {
   /** Firebase-UID des angemeldeten Benutzers. */
   userId?: string;
-  /** Anzeigename des angemeldeten Benutzers (`session.user.name`). */
-  userName?: string;
   /** IDs der Personendatensätze, die auf diesen Benutzer zeigen. */
   personIds?: string[];
 }
@@ -50,31 +56,23 @@ export function isShareLinkEntry(
 /**
  * Ist der Aufrufer der Fahrer dieser Fahrt?
  *
- * Zwei Wege, in dieser Reihenfolge:
- *
- * 1. Über `driverId` und die verknüpften Personendatensätze — eine geprüfte
- *    Zuordnung.
- * 2. Über den Namen. `normalizePersonName` vergleicht wortweise sortiert,
- *    damit „Schennet Adrian" aus BlaulichtSMS und „Adrian Schennet" aus der
- *    Personenliste dieselbe Person sind.
+ * Ausschließlich über `driverId` und die mit dem Benutzerkonto verknüpften
+ * Personendatensätze (`person.userId`). Warum nicht über den Namen, steht an
+ * `EntryModifyActor`.
  *
  * Nur der Hauptfahrer, nicht die Zusatzfahrer: Wer hinter dem QR-Code
  * einträgt, ist der Fahrer; die Mitfahrer hat er bloß genannt.
  *
- * Der Namensvergleich ist bewusst die schwächere Auskunft und wird deshalb nur
- * bei Einträgen ohne Ersteller herangezogen (siehe `canModifyEntry`). Hinter
- * dem Freigabe-Link ist der Fahrername freie Eingabe — wer dort einen fremden
- * Namen tippt, verschenkt das Änderungsrecht an diese Person, er nimmt sich
- * aber keines.
+ * Ohne gepflegte Verknüpfung ist die Antwort `false` — die Fahrt bleibt dann
+ * dem Gerätemeister und dem Admin vorbehalten. Lieber eine Korrektur, die den
+ * Gerätemeister braucht, als eine, die sich über einen selbst gewählten Namen
+ * erschleichen lässt.
  */
 export function isEntryDriver(
-  entry: Pick<FahrtenbuchEntry, 'driverId' | 'driverName'>,
+  entry: Pick<FahrtenbuchEntry, 'driverId'>,
   actor: EntryModifyActor,
 ): boolean {
-  if (entry.driverId && actor.personIds?.includes(entry.driverId)) return true;
-  const driver = normalizePersonName(entry.driverName ?? '');
-  const user = normalizePersonName(actor.userName ?? '');
-  return !!driver && driver === user;
+  return !!entry.driverId && !!actor.personIds?.includes(entry.driverId);
 }
 
 /**
@@ -87,7 +85,7 @@ export function isEntryDriver(
  * `canManage`, damit diese Funktion rein bleibt.
  */
 export function canModifyEntry(
-  entry: Pick<FahrtenbuchEntry, 'createdBy' | 'driverId' | 'driverName'>,
+  entry: Pick<FahrtenbuchEntry, 'createdBy' | 'driverId'>,
   actor: EntryModifyActor,
   canManage: boolean,
 ): boolean {
