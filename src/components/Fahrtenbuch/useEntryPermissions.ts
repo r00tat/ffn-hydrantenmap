@@ -42,7 +42,7 @@ export default function useEntryPermissions(groupId?: string) {
     () => ({
       userId: uid,
       personIds: persons
-        .filter((person) => person.userId && person.userId === uid)
+        .filter((person) => !!uid && person.userIds?.includes(uid))
         .map((person) => person.id)
         .filter((id): id is string => !!id),
     }),

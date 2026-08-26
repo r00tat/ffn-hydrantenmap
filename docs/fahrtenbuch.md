@@ -376,13 +376,14 @@ Auch die Gegenrichtung trägt nicht: Hinter dem Freigabe-Link ist der Fahrername
 freie Eingabe, und der Link hängt als QR-Code am Fahrzeug. Wer ihn hat, könnte
 Einträge auf einen beliebigen Namen anlegen.
 
-**Preis der sauberen Regel:** Ohne gepflegte Verknüpfung greift die
-Fahrer-Ausnahme nicht, und `person.userId` wird derzeit von keiner Stelle im
-Code geschrieben — das Feld existiert im Typ und ist in keinem Datensatz
-gesetzt. Bis eine Oberfläche Person und Benutzerkonto verknüpft, bleibt die
+**Ohne gepflegte Verknüpfung greift die Ausnahme nicht** — dann bleibt die
 Korrektur einer QR-Fahrt beim Gerätemeister und beim Admin. Lieber eine
 Korrektur, die den Gerätemeister braucht, als eine, die sich über einen selbst
 gewählten Namen erschleichen lässt.
+
+`person.userIds` ist eine **Liste**, weil sich Mitglieder mehrfach
+registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie. Die
+Abfrage läuft entsprechend über `array-contains`.
 
 Die Ausnahme gilt außerdem **nur** bei Einträgen ohne Ersteller. Bei einer
 angemeldet erfassten Fahrt bleibt es beim Ersteller — sonst dürfte der
@@ -417,6 +418,67 @@ Zeichen in der Aktionsspalte: ein QR-Symbol für die Herkunft aus dem
 Freigabe-Link — es ist der Grund, aus dem dort womöglich kein Bearbeiten-Knopf
 steht — und ein Verlaufssymbol mit „Geändert am … von …", sobald `updatedAt`
 von `createdAt` abweicht.
+
+## Personen den Benutzerkonten zuordnen
+
+`person.userIds` entsteht im Admin-Dialog „Bestehende Benutzer zuordnen"
+([PersonUserLinkDialog](../src/components/Fahrtenbuch/admin/PersonUserLinkDialog.tsx)),
+die Zuordnungslogik steht rein und geprüft in
+[personUserMatch.ts](../src/components/Fahrtenbuch/personUserMatch.ts).
+
+**Hier darf der Namensvergleich, was er in der Berechtigung nicht darf.** Der
+Unterschied ist, wer sich auf ihn beruft: In der Berechtigung wäre es der
+Benutzer selbst, mit einem Namen, den er sich gegeben hat. Hier ist es ein
+Vorschlag, den ein Admin sieht und bestätigt. Und ohne ihn ginge es nicht — nur
+5 von rund 110 Personendatensätzen tragen überhaupt eine E-Mail.
+
+Die Reihenfolge der Signale:
+
+- **Die gepflegte E-Mail zuerst.** Sie steht in den Stammdaten der Gruppe, ist
+  dort von Hand gepflegt und trifft auch, wenn im Konto ein Spitzname oder ein
+  alter Nachname steht. Ein E-Mail-Treffer beendet die Suche und löst damit auch
+  die Doppelregistrierung auf, bei der zwei Konten denselben Namen tragen.
+- **Sonst der Name**, normalisiert mit `normalizePersonName` (wortweise
+  sortiert, damit „Schennet Adrian" und „Adrian Schennet" dieselbe Person sind).
+
+Vier Zustände, und der Umgang mit ihnen ist der Kern:
+
+- `unique` — genau ein offenes Konto. **Vorgehakt, aber bestätigungspflichtig.**
+- `ambiguous` — **nicht vorgehakt.** Ein vorgehakter mehrdeutiger Vorschlag
+  überspränge genau die Prüfung, für die der Dialog da ist. Drei Anlässe führen
+  hierher: mehrere gleichnamige Konten (die Doppelregistrierung), ein Konto, das
+  auch zu einer anderen Person passt (`contestedBy` — zwei echte Menschen können
+  denselben Namen tragen, das Konto gehört aber nur einem), und ein weiteres
+  Konto zu einer schon verknüpften Person.
+- `none` — kein Konto gefunden, nichts anzuhaken.
+- `linked` — verknüpft und nichts Neues dabei; standardmäßig ausgeblendet.
+
+Sortiert wird nach Handlungsbedarf, nicht alphabetisch: Was eine Entscheidung
+braucht, steht oben.
+
+Drei Dinge, die daran hängen:
+
+- **Admin, nicht Gerätemeister.** Die Antwort führt Namen und E-Mail-Adressen
+  aller Benutzerkonten der App auf, weit über die Gruppe hinaus. Personen zu
+  pflegen darf der Gerätemeister; einen Verteiler über alle Konten zu sehen ist
+  etwas anderes. Herausgegeben wird nur, was der Dialog zum Entscheiden braucht
+  — Anzeigename, E-Mail und drei Merkmale (gesperrt, nicht freigeschaltet, nicht
+  in der Gruppe). Die Merkmale werden **angezeigt und nicht gefiltert**: Ein
+  Admin, der genau diese Arbeit macht, soll sehen, was gegen eine Zuordnung
+  spricht, statt dass ein Konto unerklärt fehlt.
+- **Gesetzt, nicht ergänzt.** `savePersonUserLinks` schreibt die Kontenliste je
+  Person vollständig; eine leere Liste löst die Verknüpfung. Nur so lässt sich
+  eine falsche Zuordnung im Dialog auch wieder wegnehmen. Geschrieben werden
+  ausschließlich die Zeilen, die der Aufrufer geschickt hat — ein Batch über alle
+  Personen würde die Verknüpfungen der übrigen stillschweigend leeren.
+- **Zwei Prüfungen, die der Dialog nicht ersetzt.** Jede UID muss ein Konto sein
+  (sonst stünde am Personendatensatz eine Kennung, die irgendwann jemandem
+  gehört), und ein Konto gehört höchstens einer Person je Gruppe (sonst dürften
+  zwei Fahrer denselben Eintrag ändern und keiner wäre es sicher).
+
+Nach dem Speichern lädt der Dialog neu, statt seinen Zustand fortzuschreiben:
+Danach steht dort, was wirklich gespeichert ist, und ein zweites Speichern kann
+nichts doppeln.
 
 ## Zeiten beim Zweckwechsel
 

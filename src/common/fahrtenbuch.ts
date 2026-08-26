@@ -108,7 +108,16 @@ export interface FahrtenbuchPerson {
   name: string;
   active: boolean;
   blaulichtSmsRecipientId?: string;
-  userId?: string;
+  /**
+   * Benutzerkonten dieser Person — die einzige Zuordnung, auf die sich eine
+   * Berechtigung stützen darf (siehe `entryPermissions.ts`). Gesetzt wird sie
+   * vom Admin über „Bestehende Benutzer zuordnen", nie von dem, der sich
+   * darauf beruft.
+   *
+   * Eine Liste und kein einzelnes Feld, weil sich Mitglieder mehrfach
+   * registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie.
+   */
+  userIds?: string[];
   /** Aus dem BlaulichtSMS-CSV-Export übernommen, im Dialog korrigierbar. */
   phone?: string;
   email?: string;

@@ -91,7 +91,7 @@ type ModifySession = {
 /**
  * Die Personendatensätze der Gruppe, die auf diesen Benutzer zeigen.
  *
- * `person.userId` ist die einzige Zuordnung zwischen Benutzerkonto und
+ * `person.userIds` ist die einzige Zuordnung zwischen Benutzerkonto und
  * Fahrtenbuch-Person, der zu trauen ist — sie wird auf der gepflegten Seite
  * gesetzt und nicht von dem, der sich darauf beruft. Ist sie nicht gepflegt,
  * bleibt die Fahrt dem Gerätemeister vorbehalten; einen Rückfall über den
@@ -105,7 +105,7 @@ async function linkedPersonIds(
     .collection(GROUP_COLLECTION_ID)
     .doc(groupId)
     .collection(FAHRTENBUCH_PERSON_COLLECTION_ID)
-    .where('userId', '==', userId)
+    .where('userIds', 'array-contains', userId)
     .get();
   return snapshot.docs.map((doc) => doc.id);
 }

@@ -39,7 +39,7 @@ const person: FahrtenbuchPerson = {
   phone: '+43 660 1234567',
   email: 'max@example.org',
   note: 'Zugskommandant',
-  userId: 'uid-1',
+  userIds: ['uid-1'],
   blaulichtSmsRecipientId: 'bls-1',
   createdAt: 'x',
   createdBy: 'u1',

@@ -953,6 +953,33 @@
         "result": "{created} übernommen, {skipped} bereits vorhanden.",
         "failed": "Übernahme fehlgeschlagen: {message}"
       }
+    },
+    "userLinks": {
+      "heading": "Bestehende Benutzer zuordnen",
+      "open": "Bestehende Benutzer zuordnen",
+      "intro": "Vorschlag anhand von Name und E-Mail. Bitte prüfen — bestätigt wird nur, was hier ausgewählt ist. Die Zuordnung entscheidet, wer eine über den QR-Code erfasste Fahrt selbst korrigieren darf.",
+      "person": "Person",
+      "account": "Benutzerkonto",
+      "noAccount": "Kein Konto gefunden",
+      "needsDecision": "Entscheidung nötig",
+      "proposed": "Vorschlag",
+      "linked": "Verknüpft",
+      "alreadyLinked": "{count, plural, one {# Konto verknüpft} other {# Konten verknüpft}}",
+      "contested": "Dasselbe Konto passt auch zu: {names}",
+      "additional": "Zusätzliches Konto zu einer bestehenden Verknüpfung",
+      "disabled": "gesperrt",
+      "notAuthorized": "nicht freigeschaltet",
+      "notInGroup": "nicht in dieser Gruppe",
+      "noEmail": "ohne E-Mail",
+      "apply": "Zuordnung speichern",
+      "applyCount": "{count, plural, one {# Zuordnung speichern} other {# Zuordnungen speichern}}",
+      "nothingToDo": "Es gibt nichts zuzuordnen.",
+      "saved": "{count, plural, one {# Zuordnung gespeichert.} other {# Zuordnungen gespeichert.}}",
+      "loadFailed": "Der Vorschlag konnte nicht geladen werden.",
+      "saveFailed": "Die Zuordnung konnte nicht gespeichert werden.",
+      "showLinked": "Verknüpfte Personen anzeigen",
+      "unlink": "Verknüpfung lösen",
+      "close": "Schließen"
     }
   },
   "fahrtenbuchShare": {

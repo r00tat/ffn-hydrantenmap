@@ -31,16 +31,26 @@ import {
   saveFahrtenbuchPerson,
 } from '../stammdatenActions';
 import PersonImportDialog from './PersonImportDialog';
+import PersonUserLinkDialog from './PersonUserLinkDialog';
 
 export default function PersonAdmin({
   groupId,
   groupName,
+  /**
+   * Ob der Zuordnungs-Dialog angeboten wird. Nur für Admins: Er führt Namen und
+   * E-Mail-Adressen aller Benutzerkonten der App auf, weit über die Gruppe
+   * hinaus. Die Sicherheitsgrenze ist `actionAdminRequired()` in
+   * `proposePersonUserLinks`, nicht dieses Flag.
+   */
+  canLinkUsers,
 }: {
   groupId: string;
   /** Zielgruppe im Klartext — der Import-Dialog verdeckt die Gruppenauswahl. */
   groupName: string;
+  canLinkUsers?: boolean;
 }) {
   const t = useTranslations('fahrtenbuch');
+  const tUserLinks = useTranslations('fahrtenbuch.userLinks');
   const { persons } = useFahrtenbuchPersons(groupId);
   const [editing, setEditing] = useState<FahrtenbuchPerson | null>(null);
   const [name, setName] = useState('');
@@ -52,6 +62,7 @@ export default function PersonAdmin({
   const [dialogError, setDialogError] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [linkingUsers, setLinkingUsers] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
 
   const openDialog = (person?: FahrtenbuchPerson) => {
@@ -111,6 +122,11 @@ export default function PersonAdmin({
         <Button onClick={() => setImporting(true)}>
           {t('admin.importPersons')}
         </Button>
+        {canLinkUsers && (
+          <Button onClick={() => setLinkingUsers(true)}>
+            {tUserLinks('open')}
+          </Button>
+        )}
       </Stack>
 
       {deleteError !== undefined && (
@@ -243,6 +259,14 @@ export default function PersonAdmin({
           groupId={groupId}
           groupName={groupName}
           onClose={() => setImporting(false)}
+        />
+      )}
+
+      {canLinkUsers && linkingUsers && (
+        <PersonUserLinkDialog
+          open
+          groupId={groupId}
+          onClose={() => setLinkingUsers(false)}
         />
       )}
     </>

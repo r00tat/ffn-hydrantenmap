@@ -10,21 +10,39 @@ vi.mock('../../app/auth', () => ({
   actionUserRequired: () => actionUserRequiredMock(),
 }));
 
-const { setMock, getMock, docMock, collectionMock } = vi.hoisted(() => ({
+const {
+  setMock,
+  getMock,
+  docMock,
+  collectionMock,
+  batchSetMock,
+  batchCommitMock,
+  listUsersMock,
+} = vi.hoisted(() => ({
   setMock: vi.fn(),
   getMock: vi.fn(),
   docMock: vi.fn(),
   collectionMock: vi.fn(),
+  batchSetMock: vi.fn(),
+  batchCommitMock: vi.fn(),
+  listUsersMock: vi.fn(),
+}));
+
+vi.mock('../../app/api/users/listUsers', () => ({
+  listUsers: () => listUsersMock(),
 }));
 
 vi.mock('../../server/firebase/admin', () => ({
   firestore: {
     collection: (...args: unknown[]) => collectionMock(...args),
+    batch: () => ({ set: batchSetMock, commit: batchCommitMock }),
   },
 }));
 
 import {
   getFahrtenbuchMangelEmails,
+  proposePersonUserLinks,
+  savePersonUserLinks,
   saveFahrtenbuchGroupStandort,
   saveFahrtenbuchMangelEmails,
   saveFahrtenbuchPerson,
@@ -291,5 +309,193 @@ describe('Gerätemeister-Zugriff auf die Stammdaten', () => {
     const result = await saveFahrtenbuchMangelEmails('ffnd', ['a@b.c']);
 
     expect(result.success).toBe(false);
+  });
+});
+
+
+describe('proposePersonUserLinks', () => {
+  /** `groups/<id>/person` → get(); dieselbe Kette wie `personsRef`. */
+  function personCollection(
+    persons: { id: string; data: Record<string, unknown> }[],
+  ) {
+    getMock.mockResolvedValue({
+      docs: persons.map((p) => ({ id: p.id, data: () => p.data })),
+    });
+    docMock.mockReturnValue({
+      collection: () => ({ get: getMock, doc: docMock }),
+      set: setMock,
+    });
+    collectionMock.mockReturnValue({ doc: docMock });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    batchCommitMock.mockResolvedValue(undefined);
+  });
+
+  it('verlangt Adminrechte', async () => {
+    // Die Antwort führt Namen und E-Mails aller Konten der App auf — das darf
+    // ein Gerätemeister nicht sehen.
+    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+    personCollection([]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.success).toBe(false);
+    expect(listUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('lehnt eine Nicht-Mandanten-Gruppe ab', async () => {
+    personCollection([]);
+
+    const result = await proposePersonUserLinks('allUsers');
+
+    expect(result.success).toBe(false);
+    expect(listUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('schlägt den eindeutigen Namenstreffer vor', async () => {
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet', email: 'a@ff.at' },
+      { uid: 'u2', displayName: 'Paul Wölfel' },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.success).toBe(true);
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches?.[0]).toMatchObject({
+      personId: 'p1',
+      status: 'unique',
+    });
+  });
+
+  it('gibt vom Benutzerkonto nur heraus, was der Dialog braucht', async () => {
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      {
+        uid: 'u1',
+        displayName: 'Adrian Schennet',
+        email: 'a@ff.at',
+        disabled: false,
+        isAuthorized: true,
+        groups: ['ffnd'],
+        // Nichts davon darf beim Client landen.
+        messagingTokens: ['token'],
+        phone: '+43 660 1234567',
+        photoURL: 'https://example.at/a.png',
+      },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.matches?.[0].candidates[0]).toEqual({
+      uid: 'u1',
+      displayName: 'Adrian Schennet',
+      email: 'a@ff.at',
+      disabled: false,
+      isAuthorized: true,
+      inGroup: true,
+    });
+  });
+});
+
+describe('savePersonUserLinks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    actionAdminRequiredMock.mockResolvedValue(adminSession);
+    batchCommitMock.mockResolvedValue(undefined);
+    docMock.mockReturnValue({
+      collection: () => ({ get: getMock, doc: docMock }),
+      set: setMock,
+    });
+    collectionMock.mockReturnValue({ doc: docMock });
+    listUsersMock.mockResolvedValue([{ uid: 'u1' }, { uid: 'u2' }]);
+  });
+
+  it('verlangt Adminrechte', async () => {
+    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('schreibt die bestätigten Zuordnungen', async () => {
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1', 'u2'] },
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(batchSetMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userIds: ['u1', 'u2'],
+        updatedBy: 'admin1',
+      }),
+      { merge: true },
+    );
+    expect(batchCommitMock).toHaveBeenCalled();
+  });
+
+  it('löst eine Verknüpfung mit leerer Liste', async () => {
+    // Gesetzt und nicht ergänzt — sonst ließe sich eine falsche Zuordnung im
+    // Dialog nie wieder wegnehmen.
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: [] },
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(batchSetMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userIds: [] }),
+      { merge: true },
+    );
+  });
+
+  it('weist eine unbekannte Benutzerkennung ab', async () => {
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u9'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('weist dasselbe Konto an zwei Personen ab', async () => {
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1'] },
+      { personId: 'p2', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('entdoppelt eine mehrfach genannte Kennung', async () => {
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1', 'u1'] },
+    ]);
+
+    expect(result.success).toBe(true);
+    expect(batchSetMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userIds: ['u1'] }),
+      { merge: true },
+    );
+  });
+
+  it('lehnt eine Nicht-Mandanten-Gruppe ab', async () => {
+    const result = await savePersonUserLinks('allUsers', [
+      { personId: 'p1', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
   });
 });

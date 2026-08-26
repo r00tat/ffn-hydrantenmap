@@ -953,6 +953,33 @@
         "result": "{created} imported, {skipped} already present.",
         "failed": "Import failed: {message}"
       }
+    },
+    "userLinks": {
+      "heading": "Link existing users",
+      "open": "Link existing users",
+      "intro": "Proposal based on name and email. Please review — only what is selected here is confirmed. The link decides who may correct a trip recorded via the QR code themselves.",
+      "person": "Person",
+      "account": "User account",
+      "noAccount": "No account found",
+      "needsDecision": "Decision required",
+      "proposed": "Proposal",
+      "linked": "Linked",
+      "alreadyLinked": "{count, plural, one {# account linked} other {# accounts linked}}",
+      "contested": "The same account also matches: {names}",
+      "additional": "Additional account for an existing link",
+      "disabled": "disabled",
+      "notAuthorized": "not authorized",
+      "notInGroup": "not in this group",
+      "noEmail": "no email",
+      "apply": "Save links",
+      "applyCount": "{count, plural, one {Save # link} other {Save # links}}",
+      "nothingToDo": "There is nothing to link.",
+      "saved": "{count, plural, one {Saved # link.} other {Saved # links.}}",
+      "loadFailed": "The proposal could not be loaded.",
+      "saveFailed": "The links could not be saved.",
+      "showLinked": "Show linked persons",
+      "unlink": "Remove link",
+      "close": "Close"
     }
   },
   "fahrtenbuchShare": {
