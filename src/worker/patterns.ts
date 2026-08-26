@@ -5,7 +5,6 @@ import {
   ExpirationPlugin,
   NetworkOnly,
   RouteHandler,
-  RouteMatchCallbackOptions,
   RuntimeCaching,
   StaleWhileRevalidate,
 } from 'serwist';
