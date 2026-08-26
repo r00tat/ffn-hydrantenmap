@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +35,14 @@ export default async function OauthErrorPage({
           </Typography>
         )}
       </Alert>
-      <Button component={Link} href="/" sx={{ mt: 2 }}>
+      {/*
+        Bewusst `href` statt `component={Link}`: Diese Seite ist eine Server
+        Component, und ein `next/link` als Prop wäre eine Funktion über die
+        Server-Client-Grenze — React lehnt das zur Laufzeit ab. Ein voller
+        Seitenwechsel ist hier ohnehin richtig, weil der abgebrochene
+        OAuth-Ablauf nichts hinterlassen soll.
+      */}
+      <Button href="/" sx={{ mt: 2 }}>
         {t('backToApp')}
       </Button>
     </Box>
