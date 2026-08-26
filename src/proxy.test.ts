@@ -112,3 +112,27 @@ describe('proxy CORS handling', () => {
     );
   });
 });
+
+describe('MCP- und OAuth-Endpunkte', () => {
+  // Diese Endpunkte setzen ihre CORS-Header selbst: Sie werden von fremden
+  // Origins aufgerufen und brauchen `*` sowie im Preflight `authorization` und
+  // `mcp-protocol-version`. Der Block oben überschriebe beides.
+  it('bekommt keine Access-Control-Allow-Origin vom Proxy', () => {
+    for (const path of ['/api/mcp', '/api/oauth/token', '/api/oauth/authorize']) {
+      const res = proxy(makeReq(path, { method: 'POST' }), ev);
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    }
+  });
+
+  it('beantwortet den Preflight nicht selbst', () => {
+    const res = proxy(makeReq('/api/mcp', { method: 'OPTIONS' }), ev);
+
+    expect(res.headers.get('Access-Control-Allow-Methods')).toBeNull();
+  });
+
+  it('lässt die übrigen API-Routen unverändert', () => {
+    const res = proxy(makeReq('/api/hydranten'), ev);
+
+    expect(res.headers.get('Access-Control-Allow-Origin')).not.toBeNull();
+  });
+});

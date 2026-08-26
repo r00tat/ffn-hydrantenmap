@@ -5,12 +5,10 @@ import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
 import { usePositionContext } from '../../components/providers/PositionProvider';
-import { searchPlace } from '../../components/actions/maps/places';
 import { queryClusters } from '../../components/firebase/clusterQuery';
-import { GeoPosition } from '../../common/geo';
 import { HoseLineDraft, WaterSupplyCandidate } from '../../common/waterSupply';
 import { defaultPosition } from '../constants';
-import { findFirecallItemByName } from './itemLookup';
+import { PositionSpec, resolveOriginFrom } from './resolveOrigin';
 import { ResolvedOrigin } from './types';
 import { useFirecall } from '../useFirecall';
 import { useHoseLineDraft } from '../useHoseLineDraft';
@@ -58,107 +56,47 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   }, []);
 
   /**
-   * Positionsangabe auflösen und dabei benennen, worauf sie tatsächlich
-   * hinauslief. Die Bezeichnung ist kein Beiwerk: Fällt eine Angabe auf die
-   * Kartenmitte zurück, weil weder Standort noch Einsatzort gesetzt sind, muss
-   * die Antwort das sagen — sonst wundert man sich, warum die Leitungen
-   * irgendwo im Nirgendwo beginnen.
+   * Positionsangabe auflösen — die Regeln stehen in `resolveOriginFrom` und
+   * gelten für den Browser-Assistenten und den MCP-Server gleichermaßen.
+   * Hier kommt nur der Kontext dazu, den es ausschließlich im Browser gibt:
+   * Kartenmitte und eigener Standort.
    */
   const resolveOrigin = useCallback(
-    async (
-      positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
-    ): Promise<ResolvedOrigin> => {
+    async (positionSpec: PositionSpec | undefined): Promise<ResolvedOrigin> => {
       const center = map ? map.getCenter() : defaultPosition;
-      const mapCenter: ResolvedOrigin = {
-        lat: center.lat,
-        lng: center.lng,
-        type: 'mapCenter',
-        label: 'der Kartenmitte',
-      };
-
-      const userPosition: ResolvedOrigin | undefined = isPositionSet
-        ? { lat: position.lat, lng: position.lng, type: 'userPosition', label: 'deinem Standort' }
-        : undefined;
-      const einsatzort: ResolvedOrigin | undefined =
-        firecall.lat && firecall.lng
-          ? { lat: firecall.lat, lng: firecall.lng, type: 'einsatzort', label: 'dem Einsatzort' }
-          : undefined;
-
-      if (!positionSpec) return mapCenter;
-
-      switch (positionSpec.type) {
-        case 'mapCenter':
-          return mapCenter;
-
-        case 'auto':
-          // Wer im Einsatz nach dem nächsten Hydranten fragt, meint fast immer
-          // „von hier aus". Der Einsatzort ist die Näherung, wenn kein GPS
-          // steht; die Kartenmitte erst, wenn auch der fehlt.
-          return userPosition ?? einsatzort ?? mapCenter;
-
-        case 'userPosition':
-          return userPosition ?? einsatzort ?? mapCenter;
-
-        case 'einsatzort':
-          // Ein Einsatz ohne gesetzten Einsatzort ist in den ersten Minuten
-          // der Normalfall.
-          return einsatzort ?? userPosition ?? mapCenter;
-
-        case 'atItem':
-        case 'nearItem': {
-          const target = findFirecallItemByName(existingItems, positionSpec.itemName);
-          if (target?.lat && target?.lng) {
-            // `nearItem` setzt daneben (zum Platzieren neuer Elemente),
-            // `atItem` genau darauf (als Bezugspunkt einer Messung).
-            const offset = positionSpec.type === 'nearItem' ? 20 / 111320 : 0;
-            return {
-              lat: target.lat + offset,
-              lng: target.lng + offset,
-              type: positionSpec.type,
-              label: `"${target.name}"`,
-            };
-          }
-          return mapCenter;
-        }
-
-        case 'address':
-          if (positionSpec.address) {
-            const results = await searchPlace(positionSpec.address, {
-              position: new GeoPosition(center.lat, center.lng),
-              maxResults: 1,
-            });
-            if (results[0]) {
-              return {
-                lat: parseFloat(results[0].lat),
-                lng: parseFloat(results[0].lon),
-                type: 'address',
-                label: `"${positionSpec.address}"`,
-              };
+      return resolveOriginFrom(positionSpec, {
+        fallback: {
+          lat: center.lat,
+          lng: center.lng,
+          type: 'mapCenter',
+          label: 'der Kartenmitte',
+        },
+        userPosition: isPositionSet
+          ? {
+              lat: position.lat,
+              lng: position.lng,
+              type: 'userPosition',
+              label: 'deinem Standort',
             }
-          }
-          return mapCenter;
-
-        case 'coordinates':
-          if (positionSpec.lat !== undefined && positionSpec.lng !== undefined) {
-            return {
-              lat: positionSpec.lat,
-              lng: positionSpec.lng,
-              type: 'coordinates',
-              label: 'den angegebenen Koordinaten',
-            };
-          }
-          return mapCenter;
-
-        default:
-          return mapCenter;
-      }
+          : undefined,
+        einsatzort:
+          firecall.lat && firecall.lng
+            ? {
+                lat: firecall.lat,
+                lng: firecall.lng,
+                type: 'einsatzort',
+                label: 'dem Einsatzort',
+              }
+            : undefined,
+        existingItems,
+      });
     },
     [existingItems, firecall.lat, firecall.lng, isPositionSet, map, position]
   );
 
   const resolvePosition = useCallback(
     async (
-      positionSpec: { type: string; itemName?: string; address?: string; lat?: number; lng?: number } | undefined
+      positionSpec: PositionSpec | undefined
     ): Promise<{ lat: number; lng: number }> => {
       const { lat, lng } = await resolveOrigin(positionSpec);
       return { lat, lng };

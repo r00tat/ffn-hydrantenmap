@@ -58,6 +58,7 @@ import {
   filterActiveItems,
 } from '../firebase/firestore';
 import { DownloadButton } from '../inputs/DownloadButton';
+import McpOriginChip from '../mcp/McpOriginChip';
 import {
   useHistoryPathSegments,
   useMapEditorCanEdit,
@@ -750,6 +751,7 @@ export function EinsatzTagebuch({
                     </React.Fragment>
                   ))}
                 </b>
+                <McpOriginChip item={e} />
               </Grid>
               <Grid
                 size={{ xs: 12, md: 5, lg: 3 }}

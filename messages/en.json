@@ -400,7 +400,9 @@
     "radiationMeasurement": "Radiation measurement",
     "tokens": "Tokens",
     "units": "Resources",
-    "users": "Users"
+    "users": "Users",
+    "connectedApps": "Connected applications",
+    "adminMcp": "MCP access"
   },
   "fahrtenbuch": {
     "title": "Trip log",
@@ -2005,7 +2007,8 @@
     "geschaeftsbuch": "Business log",
     "wetter": "Weather",
     "drucken": "Printing",
-    "admin": "Administration"
+    "admin": "Administration",
+    "mcp": "MCP / Claude"
   },
   "users": {
     "title": "Users",
@@ -2598,5 +2601,69 @@
     "contours": "Contour lines",
     "attribution": "Data source: Bundesamt für Eich- und Vermessungswesen (BEV)",
     "north": "North"
+  },
+  "oauthConsent": {
+    "title": "Connect {client} to the operations map",
+    "intro": "{client} wants to access the operations map on your behalf. This will allow it to:",
+    "scopeEinsatzRead": "Read operations, items, layers, the operational diary and the business logbook",
+    "scopeEinsatzWrite": "Create, change and delete items and write diary and logbook entries",
+    "scopeHydrantenRead": "Search hydrants and water supply points",
+    "scopeBerechnung": "Run calculations (water relay, shuttle traffic, sandbag demand, radiation protection)",
+    "privacyWarning": "The data retrieved leaves the operations map and is processed by the connected application — for Claude that is a provider based in the USA. This can include the names of crew members and callers. Only connect applications you trust with that.",
+    "writeWarning": "This application may also write. Entries it creates are marked as machine-generated in the operations map.",
+    "redirectTarget": "Redirects to",
+    "clientIdLabel": "Client ID",
+    "dcrHint": "This application registered itself (dynamic client registration). The name comes from the application and is not verified.",
+    "approve": "Allow access",
+    "deny": "Deny",
+    "revokeHint": "You can revoke access at any time under “Connected applications”.",
+    "errorTitle": "Cannot connect",
+    "errorFallback": "The application's request could not be processed.",
+    "backToApp": "Back to the operations map"
+  },
+  "connectedApps": {
+    "pageTitle": "Connected applications",
+    "description": "Applications you have allowed to access the operations map through the MCP interface.",
+    "empty": "No application is connected.",
+    "loading": "Loading …",
+    "scopes": "Permissions",
+    "grantedAt": "Granted on",
+    "lastUsed": "Last used",
+    "never": "never",
+    "activeTokens": "{count, plural, =0 {no valid grant} one {one valid grant} other {# valid grants}}",
+    "revoke": "Revoke access",
+    "revokeConfirmTitle": "Revoke access?",
+    "revokeConfirmText": "{client} will no longer be able to access the operations map. Access tokens already issued expire within one hour.",
+    "revoked": "Access has been revoked.",
+    "error": "Access could not be revoked: {message}",
+    "docsLink": "Guide: connecting the operations map to Claude",
+    "mcpOrigin": "AI",
+    "mcpOriginTooltip": "This entry was written by the connected application “{client}” through the MCP interface, not by hand."
+  },
+  "adminMcp": {
+    "pageTitle": "MCP access",
+    "description": "Registered applications and active grants of the MCP server.",
+    "clientsTitle": "Registered applications",
+    "grantsTitle": "Active grants",
+    "clientId": "Client ID",
+    "clientName": "Name",
+    "registeredAt": "Registered",
+    "redirectUris": "Redirect targets",
+    "source": "Source",
+    "sourceDcr": "Self-registration",
+    "sourceCimd": "Metadata document",
+    "user": "User",
+    "scopes": "Permissions",
+    "activeTokens": "Valid grants",
+    "lastUsed": "Last used",
+    "never": "never",
+    "noClients": "No application is registered.",
+    "noGrants": "No grant is active.",
+    "deleteClient": "Delete registration",
+    "deleteClientConfirm": "The registration of {client} will be deleted. Existing grants of this application become invalid.",
+    "revokeGrant": "Revoke grant",
+    "revokeGrantConfirm": "The grant of {client} for {user} will be revoked.",
+    "loading": "Loading …",
+    "error": "Error: {message}"
   }
 }

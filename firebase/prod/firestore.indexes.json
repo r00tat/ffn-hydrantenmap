@@ -123,6 +123,34 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "oauthClients",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "registered_from",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "client_id_issued_at",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "oauthRefreshTokens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "clientId",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -153,6 +181,18 @@
           "queryScope": "COLLECTION_GROUP"
         }
       ]
+    },
+    {
+      "collectionGroup": "oauthAuthCodes",
+      "fieldPath": "ttlAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "oauthRefreshTokens",
+      "fieldPath": "ttlAt",
+      "ttl": true,
+      "indexes": []
     }
   ]
 }

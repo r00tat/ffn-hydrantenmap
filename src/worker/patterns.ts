@@ -63,6 +63,27 @@ export const isWorkerBootstrap = (url: URL): boolean =>
  *   kein Regex.
  */
 export const cachePatterns: RuntimeCaching[] = [
+  // MCP- und OAuth-Endpunkte dürfen nie aus dem Cache kommen — und auch nicht
+  // in ihn hinein.
+  //
+  // `/api/mcp` trägt in jedem Aufruf ein Access Token und antwortet mit
+  // Einsatzdaten; `/.well-known/*` nennt den Issuer und den öffentlichen
+  // Signaturschlüssel. Ein zwischengespeichertes Discovery-Dokument überlebt
+  // einen Deploy mit geänderter Adresse und bricht dann den gesamten
+  // Verbindungsaufbau, ohne dass irgendwo ein Fehler auftaucht.
+  //
+  // Diese Regel muss **vor** allen anderen stehen: Die erste passende
+  // entscheidet, und Serwists Standard für Navigationen und JSON-Antworten
+  // wäre NetworkFirst — also mit Cache.
+  {
+    matcher: ({ sameOrigin, url }) =>
+      sameOrigin &&
+      (url.pathname.startsWith('/api/mcp') ||
+        url.pathname.startsWith('/api/oauth/') ||
+        url.pathname.startsWith('/.well-known/')),
+    handler: new NetworkOnly(),
+  },
+
   // Terrain-Kacheln des eigenen Höhenmodells.
   //
   // **Diese Regel muss vor der googleapis-Regel darunter stehen.** Firebase

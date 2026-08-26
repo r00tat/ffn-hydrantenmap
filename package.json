@@ -56,6 +56,7 @@
     "@mapbox/togeojson": "^0.16.2",
     "@mdi/js": "^7.4.47",
     "@mdi/react": "^1.6.1",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@mui/icons-material": "^9.3.1",
     "@mui/lab": "^9.0.0-beta.8",
     "@mui/material": "^9.3.1",
@@ -117,7 +118,8 @@
     "sharp": "^0.35.3",
     "simplify-js": "^1.2.4",
     "three": "^0.185.1",
-    "unist-util-visit": "^5.1.0"
+    "unist-util-visit": "^5.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/compat": "^2.1.0",

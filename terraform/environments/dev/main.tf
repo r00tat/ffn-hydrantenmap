@@ -92,6 +92,11 @@ module "cloud_run" {
     NEXT_PUBLIC_RECAPTCHA_KEY   = var.recaptcha_key
 
     EINSATZMAPPE_IMPERSONATION_ACCOUNT = var.einsatzmappe_impersonation_account
+
+    # Schreibende MCP-Tools. In dev an, in prod zunächst aus — der Flow soll
+    # sich erst in der Praxis bewähren, bevor eine verbundene Anwendung in
+    # echte Einsatzdaten schreibt. Siehe docs/mcp-server.md.
+    MCP_WRITE_ENABLED = "true"
   }
 
   # SumUp zeigt in dev auf die Sandbox-Zugangsdaten (Suffix _DEV), alles andere
