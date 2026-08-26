@@ -111,8 +111,8 @@ export interface FahrtenbuchPerson {
   /**
    * Benutzerkonten dieser Person — die einzige Zuordnung, auf die sich eine
    * Berechtigung stützen darf (siehe `entryPermissions.ts`). Gesetzt wird sie
-   * vom Admin über „Bestehende Benutzer zuordnen", nie von dem, der sich
-   * darauf beruft.
+   * vom Gerätemeister oder Admin über „Bestehende Benutzer zuordnen", nie von
+   * dem, der sich darauf beruft.
    *
    * Eine Liste und kein einzelnes Feld, weil sich Mitglieder mehrfach
    * registrieren: Dieselbe Person hat dann zwei Konten, und beide sind sie.

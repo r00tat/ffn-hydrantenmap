@@ -331,19 +331,63 @@ describe('proposePersonUserLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionUserRequiredMock.mockResolvedValue(adminSession);
     batchCommitMock.mockResolvedValue(undefined);
   });
 
-  it('verlangt Adminrechte', async () => {
-    // Die Antwort führt Namen und E-Mails aller Konten der App auf — das darf
-    // ein Gerätemeister nicht sehen.
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+  it('weist ab, wer die Gruppe nicht verwalten darf', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+    });
     personCollection([]);
 
     const result = await proposePersonUserLinks('ffnd');
 
     expect(result.success).toBe(false);
     expect(listUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('zeigt dem Gerätemeister nur Konten seiner Gruppe', async () => {
+    // Er darf zuordnen, aber die Konten anderer Feuerwehren sind nicht seine
+    // Sache — die Personen seiner Gruppe kennt er ohnehin namentlich.
+    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+    personCollection([
+      { id: 'p1', data: { name: 'Adrian Schennet' } },
+      { id: 'p2', data: { name: 'Fremde Person' } },
+    ]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet', groups: ['ffnd'] },
+      { uid: 'u2', displayName: 'Fremde Person', groups: ['H8VtNNVK1XXlTHrPLhXp'] },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.success).toBe(true);
+    const own = result.matches?.find((m) => m.personId === 'p1');
+    const foreign = result.matches?.find((m) => m.personId === 'p2');
+    expect(own?.candidates.map((c) => c.uid)).toEqual(['u1']);
+    expect(foreign?.status).toBe('none');
+  });
+
+  it('zeigt dem Admin auch ein Konto außerhalb der Gruppe', async () => {
+    // Nur er kann die Gruppenzugehörigkeit überhaupt richtigstellen.
+    personCollection([{ id: 'p1', data: { name: 'Adrian Schennet' } }]);
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', displayName: 'Adrian Schennet', groups: ['andere'] },
+    ]);
+
+    const result = await proposePersonUserLinks('ffnd');
+
+    expect(result.matches?.[0].candidates.map((c) => c.uid)).toEqual(['u1']);
+    expect(result.matches?.[0].candidates[0]?.inGroup).toBe(false);
   });
 
   it('lehnt eine Nicht-Mandanten-Gruppe ab', async () => {
@@ -443,6 +487,7 @@ describe('savePersonUserLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionAdminRequiredMock.mockResolvedValue(adminSession);
+    actionUserRequiredMock.mockResolvedValue(adminSession);
     batchCommitMock.mockResolvedValue(undefined);
     docMock.mockReturnValue({
       collection: () => ({ get: getMock, doc: docMock }),
@@ -453,11 +498,60 @@ describe('savePersonUserLinks', () => {
     listUsersMock.mockResolvedValue([{ uid: 'u1' }, { uid: 'u2' }]);
   });
 
-  it('verlangt Adminrechte', async () => {
-    actionAdminRequiredMock.mockRejectedValueOnce(new Error('kein Admin'));
+  it('weist ab, wer die Gruppe nicht verwalten darf', async () => {
+    actionUserRequiredMock.mockResolvedValue({
+      user: { id: 'u1', isAdmin: false, groups: ['ffnd'] },
+    });
 
     const result = await savePersonUserLinks('ffnd', [
       { personId: 'p1', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(false);
+    expect(batchCommitMock).not.toHaveBeenCalled();
+  });
+
+  it('lässt den Gerätemeister ein Konto seiner Gruppe zuordnen', async () => {
+    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', groups: ['ffnd'] },
+      { uid: 'u2', groups: ['andere'] },
+    ]);
+
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u1'] },
+    ]);
+
+    expect(result.success).toBe(true);
+  });
+
+  it('weist dem Gerätemeister ein gruppenfremdes Konto ab', async () => {
+    // Der Filter im Vorschlag allein genügt nicht — die Nutzlast kommt vom
+    // Client und kann jede Kennung nennen.
+    actionAdminRequiredMock.mockRejectedValue(new Error('kein Admin'));
+    actionUserRequiredMock.mockResolvedValue({
+      user: {
+        id: 'g1',
+        isAdmin: false,
+        groups: ['ffnd'],
+        fahrtenbuchGeraetemeister: ['ffnd'],
+      },
+    });
+    listUsersMock.mockResolvedValue([
+      { uid: 'u1', groups: ['ffnd'] },
+      { uid: 'u2', groups: ['andere'] },
+    ]);
+
+    const result = await savePersonUserLinks('ffnd', [
+      { personId: 'p1', userIds: ['u2'] },
     ]);
 
     expect(result.success).toBe(false);

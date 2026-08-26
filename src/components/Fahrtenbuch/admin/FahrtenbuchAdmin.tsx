@@ -137,7 +137,6 @@ export default function FahrtenbuchAdmin() {
                 key={groupId}
                 groupId={groupId}
                 groupName={groupName}
-                canLinkUsers={isAdmin}
               />
             )}
             {/* Der Einstellungen-Tab setzt die Abschnitte nur zusammen; jeder

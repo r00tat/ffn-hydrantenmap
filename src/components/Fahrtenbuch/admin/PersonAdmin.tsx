@@ -36,18 +36,10 @@ import PersonUserLinkDialog from './PersonUserLinkDialog';
 export default function PersonAdmin({
   groupId,
   groupName,
-  /**
-   * Ob der Zuordnungs-Dialog angeboten wird. Nur für Admins: Er führt Namen und
-   * E-Mail-Adressen aller Benutzerkonten der App auf, weit über die Gruppe
-   * hinaus. Die Sicherheitsgrenze ist `actionAdminRequired()` in
-   * `proposePersonUserLinks`, nicht dieses Flag.
-   */
-  canLinkUsers,
 }: {
   groupId: string;
   /** Zielgruppe im Klartext — der Import-Dialog verdeckt die Gruppenauswahl. */
   groupName: string;
-  canLinkUsers?: boolean;
 }) {
   const t = useTranslations('fahrtenbuch');
   const tUserLinks = useTranslations('fahrtenbuch.userLinks');
@@ -122,11 +114,12 @@ export default function PersonAdmin({
         <Button onClick={() => setImporting(true)}>
           {t('admin.importPersons')}
         </Button>
-        {canLinkUsers && (
-          <Button onClick={() => setLinkingUsers(true)}>
-            {tUserLinks('open')}
-          </Button>
-        )}
+        {/* Für jeden, der diesen Tab sieht — Gerätemeister und Admin. Wer
+            welche Konten zu sehen bekommt, entscheidet
+            `proposePersonUserLinks`, nicht diese Ansicht. */}
+        <Button onClick={() => setLinkingUsers(true)}>
+          {tUserLinks('open')}
+        </Button>
       </Stack>
 
       {deleteError !== undefined && (
@@ -262,7 +255,7 @@ export default function PersonAdmin({
         />
       )}
 
-      {canLinkUsers && linkingUsers && (
+      {linkingUsers && (
         <PersonUserLinkDialog
           open
           groupId={groupId}

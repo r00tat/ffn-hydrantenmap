@@ -6,7 +6,7 @@
  * entscheiden, wer einen Eintrag ändern darf: Der Anzeigename eines Kontos
  * gehört dem Benutzer selbst und ist jederzeit änderbar (siehe
  * `EntryModifyActor` in [entryPermissions.ts](./entryPermissions.ts)). Als
- * Vorschlag, den ein Admin sieht und bestätigt, ist derselbe Vergleich dagegen
+ * Vorschlag, den ein Verwalter sieht und bestätigt, ist derselbe Vergleich
  * genau das richtige Werkzeug — nur 5 von rund 110 Personendatensätzen tragen
  * überhaupt eine E-Mail, über den Namen geht also der Großteil der Arbeit.
  *

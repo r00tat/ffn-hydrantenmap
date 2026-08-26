@@ -626,14 +626,24 @@ export async function saveFahrtenbuchMangelEmails(
   }
 }
 
+/** Ist dieses Benutzerkonto Mitglied der Gruppe? */
+function inGroup(user: unknown, groupId: string): boolean {
+  return (user as { groups?: string[] }).groups?.includes(groupId) === true;
+}
+
 /**
- * Vorschlag, welche Benutzerkonten zu welcher Person gehören — für den
- * Admin-Dialog „Bestehende Benutzer zuordnen".
+ * Vorschlag, welche Benutzerkonten zu welcher Person gehören — für den Dialog
+ * „Bestehende Benutzer zuordnen".
  *
- * **Admin und nicht Gerätemeister.** Die Antwort führt Namen und
- * E-Mail-Adressen aller Benutzerkonten der App auf, also weit über die Gruppe
- * hinaus. Personen zu pflegen darf der Gerätemeister; einen Verteiler über alle
- * Konten zu sehen ist etwas anderes.
+ * **Gerätemeister und Admin**, aber mit verschiedenem Blickfeld: Der
+ * Gerätemeister sieht nur Konten, die **Mitglied seiner Gruppe** sind. Die
+ * Personen seiner Feuerwehr kennt er ohnehin namentlich; die Konten anderer
+ * Feuerwehren sind nicht seine Sache, und ein Verteiler über alle Konten der App
+ * wäre etwas anderes als die Aufgabe, die er hier erledigt.
+ *
+ * Der Admin sieht alle. Er braucht es: Nur er kann eine fehlende
+ * Gruppenzugehörigkeit überhaupt richtigstellen, und ohne das Konto zu sehen
+ * wüsste er nicht, dass es sie gibt.
  *
  * Herausgegeben wird nur, was der Dialog zum Entscheiden braucht: Anzeigename,
  * E-Mail und drei Merkmale (gesperrt, freigeschaltet, in der Gruppe). Kein
@@ -643,13 +653,15 @@ export async function proposePersonUserLinks(
   groupId: string,
 ): Promise<StammdatenResult & { matches?: PersonUserMatch[] }> {
   try {
-    await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
 
-    const [personSnapshot, users] = await Promise.all([
+    const [personSnapshot, allUsers] = await Promise.all([
       personsRef(groupId).get(),
       listUsers(),
     ]);
+    const users = session.user.isAdmin
+      ? allUsers
+      : allUsers.filter((user) => inGroup(user, groupId));
     const persons = personSnapshot.docs.map(
       (doc) => ({ id: doc.id, ...doc.data() }) as FahrtenbuchPerson,
     );
@@ -665,8 +677,7 @@ export async function proposePersonUserLinks(
       isAuthorized: isTruthy(
         (user as { authorized?: string | boolean }).authorized,
       ),
-      inGroup:
-        (user as { groups?: string[] }).groups?.includes(groupId) === true,
+      inGroup: inGroup(user, groupId),
     }));
 
     return { success: true, matches: matchPersonsToUsers(persons, candidates) };
@@ -696,14 +707,18 @@ export async function savePersonUserLinks(
   links: PersonUserLink[],
 ): Promise<StammdatenResult> {
   try {
-    const session = await actionAdminRequired();
-    assertFahrtenbuchGroup(groupId);
+    const session = await actionFahrtenbuchManagerRequired(groupId);
 
     const [users, personSnapshot] = await Promise.all([
       listUsers(),
       personsRef(groupId).get(),
     ]);
-    const knownUids = new Set(users.map((user) => user.uid));
+    // Derselbe Zuschnitt wie im Vorschlag, und hier ist er die Grenze: Die
+    // Nutzlast kommt vom Client und kann jede Kennung nennen.
+    const selectable = session.user.isAdmin
+      ? users
+      : users.filter((user) => inGroup(user, groupId));
+    const knownUids = new Set(selectable.map((user) => user.uid));
 
     // Wer welches Konto heute schon hat. Über die mitgeschickten Zeilen allein
     // ließe sich ein Konto einer Person zuschlagen, die gar nicht im Aufruf

@@ -421,7 +421,7 @@ von `createdAt` abweicht.
 
 ## Personen den Benutzerkonten zuordnen
 
-`person.userIds` entsteht im Admin-Dialog „Bestehende Benutzer zuordnen"
+`person.userIds` entsteht im Dialog „Bestehende Benutzer zuordnen"
 ([PersonUserLinkDialog](../src/components/Fahrtenbuch/admin/PersonUserLinkDialog.tsx)),
 die Zuordnungslogik steht rein und geprüft in
 [personUserMatch.ts](../src/components/Fahrtenbuch/personUserMatch.ts).
@@ -465,13 +465,30 @@ braucht, steht oben.
 
 Drei Dinge, die daran hängen:
 
-- **Admin, nicht Gerätemeister.** Die Antwort führt Namen und E-Mail-Adressen
-  aller Benutzerkonten der App auf, weit über die Gruppe hinaus. Personen zu
-  pflegen darf der Gerätemeister; einen Verteiler über alle Konten zu sehen ist
-  etwas anderes. Herausgegeben wird nur, was der Dialog zum Entscheiden braucht
-  — Anzeigename, E-Mail und drei Merkmale (gesperrt, nicht freigeschaltet, nicht
-  in der Gruppe). Die Merkmale werden **angezeigt und nicht gefiltert**: Ein
-  Admin, der genau diese Arbeit macht, soll sehen, was gegen eine Zuordnung
+- **Gerätemeister und Admin, mit verschiedenem Blickfeld.** Zuordnen darf beide
+  (`actionFahrtenbuchManagerRequired`), aber der Gerätemeister sieht nur Konten,
+  die **Mitglied seiner Gruppe** sind. Die Personen seiner Feuerwehr kennt er
+  ohnehin namentlich; die Konten anderer Feuerwehren sind nicht seine Sache, und
+  ein Verteiler über alle Konten der App wäre etwas anderes als die Aufgabe, die
+  er hier erledigt. Der Admin sieht alle — nur er kann eine fehlende
+  Gruppenzugehörigkeit richtigstellen, und ohne das Konto zu sehen wüsste er
+  nicht, dass es sie gibt.
+
+  Der Zuschnitt gilt **auch beim Speichern** und ist dort die Grenze: Die
+  Nutzlast kommt vom Client und kann jede Kennung nennen. Ein Filter, der nur im
+  Vorschlag steht, wäre keiner.
+
+  Für den Gerätemeister heißt das: Ein passendes Konto, das nicht in seiner
+  Gruppe ist, erscheint als „kein Konto gefunden". Das ist von seiner Warte
+  richtig — verknüpfen würde ihm nichts bringen, weil `actionGroupMemberRequired`
+  einem Nichtmitglied das Bearbeiten ohnehin verwehrt. Für den Admin ist dasselbe
+  Konto sichtbar und als „nicht in dieser Gruppe" markiert.
+
+- **Herausgegeben wird nur, was der Dialog zum Entscheiden braucht** —
+  Anzeigename, E-Mail und drei Merkmale (gesperrt, nicht freigeschaltet, nicht in
+  der Gruppe). Kein Telefon, keine Tokens, kein Rest des Benutzerdokuments; ein
+  Test nagelt die Whitelist fest. Die Merkmale werden **angezeigt und nicht
+  gefiltert**: Wer genau diese Arbeit macht, soll sehen, was gegen eine Zuordnung
   spricht, statt dass ein Konto unerklärt fehlt.
 - **Gesetzt, nicht ergänzt.** `savePersonUserLinks` schreibt die Kontenliste je
   Person vollständig; eine leere Liste löst die Verknüpfung. Nur so lässt sich

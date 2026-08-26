@@ -32,7 +32,7 @@ import type { PersonUserMatch } from '../personUserMatch';
  * Der Auswahlzustand: je Person die angehakten Konten.
  *
  * Getrennt von den Vorschlägen geführt, damit ein erneutes Laden die Arbeit des
- * Admins nicht wegwirft — und damit „nichts angehakt" ein aussagekräftiger
+ * Verwalters nicht wegwirft — und damit „nichts angehakt" ein aussagekräftiger
  * Zustand ist und nicht von „noch nicht geladen" zu unterscheiden wäre.
  */
 type Selection = Record<string, string[]>;
@@ -103,8 +103,8 @@ export interface PersonUserLinkDialogProps {
  * Ohne diese Verknüpfung darf ein Mitglied seine über den QR-Code am Fahrzeug
  * erfasste Fahrt nicht selbst korrigieren; der Namensvergleich, der sich
  * anbietet, wäre eine Rechteausweitung (siehe `personUserMatch.ts`). Hier
- * schlägt derselbe Vergleich vor und ein Admin bestätigt — das ist der
- * Unterschied.
+ * schlägt derselbe Vergleich vor und ein Verwalter — Gerätemeister oder Admin —
+ * bestätigt. Das ist der Unterschied.
  */
 export default function PersonUserLinkDialog({
   open,
