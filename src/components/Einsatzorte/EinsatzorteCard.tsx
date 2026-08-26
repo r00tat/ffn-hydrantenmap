@@ -17,7 +17,7 @@ import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
 import VehicleAutocomplete from './VehicleAutocomplete';
-import { geocodeAddress } from './geocode';
+import { geocodeAddress, geocodeTargetForChange } from './geocode';
 
 interface EinsatzorteCardProps {
   location: FirecallLocation;
@@ -69,7 +69,11 @@ export default function EinsatzorteCard({
   const [mapOpen, setMapOpen] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const geocodeRef = useRef<NodeJS.Timeout | null>(null);
-  const prevAddressRef = useRef({ street: location.street, number: location.number });
+  const prevAddressRef = useRef({
+    street: location.street,
+    number: location.number,
+    city: location.city,
+  });
   const cardRef = useRef<HTMLDivElement>(null);
   const localRef = useRef(local);
 
@@ -80,7 +84,11 @@ export default function EinsatzorteCard({
 
   useEffect(() => {
     setLocal({ ...location, id: stableId });
-    prevAddressRef.current = { street: location.street, number: location.number };
+    prevAddressRef.current = {
+      street: location.street,
+      number: location.number,
+      city: location.city,
+    };
   }, [location, stableId]);
 
   // Reset the new card state after a successful add
@@ -88,7 +96,11 @@ export default function EinsatzorteCard({
     const newId = crypto.randomUUID();
     setLocal({ ...location, id: newId });
     setResetKey((k) => k + 1);
-    prevAddressRef.current = { street: location.street, number: location.number };
+    prevAddressRef.current = {
+      street: location.street,
+      number: location.number,
+      city: location.city,
+    };
   }, [location]);
 
   // Handle card blur - save new card when focus leaves the entire card
@@ -135,29 +147,34 @@ export default function EinsatzorteCard({
 
       setLocal(updated);
 
-      // Geocode on address change (for both new and existing cards)
-      if (field === 'street' || field === 'number') {
-        const newStreet = field === 'street' ? (value as string) : local.street || '';
-        const newNumber = field === 'number' ? (value as string) : local.number || '';
+      // Geocode on address change (for both new and existing cards).
+      // Der Ort zählt mit: Wird nur er geändert, muss die Koordinate nachgezogen
+      // werden, sonst bleibt der Einsatzort im alten Ort stehen.
+      if (field === 'street' || field === 'number' || field === 'city') {
+        const changed = {
+          street: field === 'street' ? (value as string) : local.street || '',
+          number: field === 'number' ? (value as string) : local.number || '',
+          city: field === 'city' ? (value as string) : local.city || '',
+        };
+        const target = geocodeTargetForChange(prevAddressRef.current, changed);
 
-        if (
-          newStreet &&
-          newNumber &&
-          (newStreet !== prevAddressRef.current.street ||
-            newNumber !== prevAddressRef.current.number)
-        ) {
+        if (target) {
           if (geocodeRef.current) {
             clearTimeout(geocodeRef.current);
           }
 
           geocodeRef.current = setTimeout(async () => {
-            const coords = await geocodeAddress(newStreet, newNumber, local.city || 'Neusiedl am See');
+            const coords = await geocodeAddress(
+              target.street,
+              target.number,
+              target.city
+            );
             if (coords) {
               setLocal((prev) => ({ ...prev, lat: coords.lat, lng: coords.lng }));
               if (!isNew) {
                 onChange({ lat: coords.lat, lng: coords.lng });
               }
-              prevAddressRef.current = { street: newStreet, number: newNumber };
+              prevAddressRef.current = changed;
             }
           }, 1000);
         }

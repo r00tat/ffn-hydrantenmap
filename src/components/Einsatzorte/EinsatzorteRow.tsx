@@ -15,7 +15,11 @@ import { FirecallLocation, LocationStatus, Fzg } from '../firebase/firestore';
 import StatusChip from './StatusChip';
 import LocationMapPicker from './LocationMapPicker';
 import VehicleAutocomplete from './VehicleAutocomplete';
-import { geocodeAddress } from './geocode';
+import {
+  geocodableAddress,
+  geocodeAddress,
+  geocodeTargetForChange,
+} from './geocode';
 
 interface EinsatzorteRowProps {
   location: FirecallLocation;
@@ -64,7 +68,11 @@ export default function EinsatzorteRow({
   const [mapOpen, setMapOpen] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const geocodeRef = useRef<NodeJS.Timeout | null>(null);
-  const prevAddressRef = useRef({ street: location.street, number: location.number });
+  const prevAddressRef = useRef({
+    street: location.street,
+    number: location.number,
+    city: location.city,
+  });
   const rowRef = useRef<HTMLTableRowElement>(null);
   const localRef = useRef(local);
 
@@ -88,26 +96,28 @@ export default function EinsatzorteRow({
   // Sync from parent when location changes (e.g., real-time updates)
   useEffect(() => {
     setLocal({ ...location, id: stableId });
-    prevAddressRef.current = { street: location.street, number: location.number };
+    prevAddressRef.current = {
+      street: location.street,
+      number: location.number,
+      city: location.city,
+    };
   }, [location, stableId]);
 
   // Geocode on mount if existing row has address but no coordinates
   // This handles the case where a new row was added before geocoding completed
   useEffect(() => {
+    const target = geocodableAddress(location);
     if (
       !isNew &&
-      location.street &&
-      location.number &&
+      target &&
       location.lat === undefined &&
       location.lng === undefined
     ) {
-      geocodeAddress(location.street, location.number, location.city || 'Neusiedl am See').then(
-        (coords) => {
-          if (coords) {
-            onChange({ lat: coords.lat, lng: coords.lng });
-          }
+      geocodeAddress(target.street, target.number, target.city).then((coords) => {
+        if (coords) {
+          onChange({ lat: coords.lat, lng: coords.lng });
         }
-      );
+      });
     }
     // Only run on mount for existing rows
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,7 +128,11 @@ export default function EinsatzorteRow({
     const newId = crypto.randomUUID();
     setLocal({ ...location, id: newId });
     setResetKey((k) => k + 1);
-    prevAddressRef.current = { street: location.street, number: location.number };
+    prevAddressRef.current = {
+      street: location.street,
+      number: location.number,
+      city: location.city,
+    };
   }, [location]);
 
   // Handle row blur - save new row when focus leaves the entire row
@@ -179,29 +193,34 @@ export default function EinsatzorteRow({
 
       setLocal(updated);
 
-      // Geocode on address change (for both new and existing rows)
-      if (field === 'street' || field === 'number') {
-        const newStreet = field === 'street' ? (value as string) : local.street || '';
-        const newNumber = field === 'number' ? (value as string) : local.number || '';
+      // Geocode on address change (for both new and existing rows).
+      // Der Ort zählt mit: Wird nur er geändert, muss die Koordinate nachgezogen
+      // werden, sonst bleibt der Einsatzort im alten Ort stehen.
+      if (field === 'street' || field === 'number' || field === 'city') {
+        const changed = {
+          street: field === 'street' ? (value as string) : local.street || '',
+          number: field === 'number' ? (value as string) : local.number || '',
+          city: field === 'city' ? (value as string) : local.city || '',
+        };
+        const target = geocodeTargetForChange(prevAddressRef.current, changed);
 
-        if (
-          newStreet &&
-          newNumber &&
-          (newStreet !== prevAddressRef.current.street ||
-            newNumber !== prevAddressRef.current.number)
-        ) {
+        if (target) {
           if (geocodeRef.current) {
             clearTimeout(geocodeRef.current);
           }
 
           geocodeRef.current = setTimeout(async () => {
-            const coords = await geocodeAddress(newStreet, newNumber, local.city || 'Neusiedl am See');
+            const coords = await geocodeAddress(
+              target.street,
+              target.number,
+              target.city
+            );
             if (coords) {
               setLocal((prev) => ({ ...prev, lat: coords.lat, lng: coords.lng }));
               if (!isNew) {
                 onChange({ lat: coords.lat, lng: coords.lng });
               }
-              prevAddressRef.current = { street: newStreet, number: newNumber };
+              prevAddressRef.current = changed;
             }
           }, 1000);
         }

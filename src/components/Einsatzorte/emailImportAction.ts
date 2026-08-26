@@ -323,12 +323,14 @@ export async function processUnwetterEmails(
 
     // Geocode locations that have addresses
     for (const location of locationsToAdd) {
-      if (location.street && location.city) {
+      // Straße oder Ort genügt — geocodeAddress kommt auch ohne Hausnummer
+      // zurecht, und ein Ort allein trifft immerhin das Ortszentrum.
+      if (location.street || location.city) {
         try {
           const coords = await geocodeAddress(
-            location.street,
+            location.street || '',
             location.number || '',
-            location.city
+            location.city || ''
           );
           if (coords) {
             location.lat = coords.lat;
