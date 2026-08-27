@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 vi.mock('server-only', () => ({}));
@@ -94,5 +94,110 @@ describe('useAiAssistant loop exhaustion', () => {
 
     expect(answer.success).toBe(true);
     expect(answer.message).toContain('ÖH 12');
+  });
+});
+
+describe('useAiAssistant Gedächtnis', () => {
+  beforeEach(async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+  });
+
+  /** Ein Modell, das ohne Werkzeugaufruf antwortet — ein Durchlauf, fertig. */
+  async function mockPlainAnswer(text: string) {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [{ text }] } }],
+        functionCalls: () => [],
+        text: () => text,
+      },
+    });
+  }
+
+  it('behält die Historie über eine Folgefrage hinweg', async () => {
+    await mockPlainAnswer('Verstanden');
+    const { geminiModel } = await import('../components/firebase/vertexai');
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('erster Befehl');
+    await result.current.processText('und jetzt noch einmal');
+
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    // Erster Benutzerbeitrag, Antwort des Modells, neuer Benutzerbeitrag
+    expect(secondRequest.contents.length).toBeGreaterThan(1);
+    expect(JSON.stringify(secondRequest.contents)).toContain('erster Befehl');
+  });
+
+  it('vergisst die Historie erst nach dem Zeitfenster ab Ende der letzten Antwort', async () => {
+    await mockPlainAnswer('Verstanden');
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { MEMORY_TIMEOUT_MS } = await import('./aiAssistant/types');
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    const nowSpy = vi.spyOn(Date, 'now');
+
+    nowSpy.mockReturnValue(1_000_000);
+    await result.current.processText('erster Befehl');
+
+    // Knapp innerhalb des Fensters: die Historie steht noch
+    nowSpy.mockReturnValue(1_000_000 + MEMORY_TIMEOUT_MS - 1000);
+    await result.current.processText('kurz danach');
+    expect(
+      JSON.stringify((geminiModel.generateContent as any).mock.calls[1][0].contents)
+    ).toContain('erster Befehl');
+
+    // Deutlich danach: die Historie ist weg
+    nowSpy.mockReturnValue(1_000_000 + 5 * MEMORY_TIMEOUT_MS);
+    await result.current.processText('viel später');
+    const thirdRequest = (geminiModel.generateContent as any).mock.calls[2][0];
+    expect(JSON.stringify(thirdRequest.contents)).not.toContain('erster Befehl');
+
+    nowSpy.mockRestore();
+  });
+
+  it('rechnet das Zeitfenster ab dem Ende der Antwort, nicht ab ihrem Beginn', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { MEMORY_TIMEOUT_MS } = await import('./aiAssistant/types');
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValue(1_000_000);
+
+    // Eine Antwort, die selbst länger dauert als das Zeitfenster — beim
+    // Sprach-Assistenten sind zwölf Sekunden normal, ein zäher Einsatz mit
+    // mehreren Werkzeugaufrufen kann deutlich länger brauchen.
+    (geminiModel.generateContent as any).mockImplementation(async () => {
+      nowSpy.mockReturnValue((Date.now() as number) + MEMORY_TIMEOUT_MS + 30_000);
+      return {
+        response: {
+          candidates: [{ content: { role: 'model', parts: [{ text: 'Verstanden' }] } }],
+          functionCalls: () => [],
+          text: () => 'Verstanden',
+        },
+      };
+    });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('erster Befehl');
+
+    // Der Benutzer spricht zehn Sekunden nach der Antwort weiter
+    nowSpy.mockReturnValue((Date.now() as number) + 10_000);
+    await result.current.processText('und weiter');
+
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    expect(JSON.stringify(secondRequest.contents)).toContain('erster Befehl');
+    nowSpy.mockRestore();
+  });
+
+  it('meldet keinen Gedächtnisverlust, wenn es nichts zu vergessen gibt', async () => {
+    await mockPlainAnswer('Verstanden');
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('erster Befehl überhaupt');
+
+    expect(
+      info.mock.calls.some((args) => String(args[0]).includes('Memory timeout'))
+    ).toBe(false);
+    info.mockRestore();
   });
 });

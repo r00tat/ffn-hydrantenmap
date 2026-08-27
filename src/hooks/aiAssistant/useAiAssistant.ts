@@ -40,20 +40,32 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   const [processingStatus, setProcessingStatus] = useState<AiProcessingStatus>('idle');
 
   const cleanupHistory = useCallback(() => {
-    const now = Date.now();
-    // Reset complete history if last activity was more than 3 minutes ago
-    if (now - lastActivityRef.current > MEMORY_TIMEOUT_MS) {
+    const hasMemory =
+      chatHistoryRef.current.length > 0 || interactionsRef.current.length > 0;
+
+    // Das Zeitfenster läuft ab dem Ende der letzten Antwort (siehe
+    // `markInteractionDone`). Wäre es der Beginn, würde eine zähe Antwort ihre
+    // eigene Laufzeit vom Gedächtnis abziehen — bei zwölf Sekunden je
+    // Sprachbefehl ein spürbarer Anteil.
+    if (hasMemory && Date.now() - lastActivityRef.current > MEMORY_TIMEOUT_MS) {
       console.info('[AI] Memory timeout reached, resetting history');
       chatHistoryRef.current = [];
       interactionsRef.current = [];
     }
-    
+
     // Also limit the number of entries in the history to keep context window small
     if (chatHistoryRef.current.length > MAX_INTERACTIONS * 2) {
       chatHistoryRef.current = chatHistoryRef.current.slice(-MAX_INTERACTIONS * 2);
     }
-    
-    lastActivityRef.current = now;
+  }, []);
+
+  /**
+   * Ende einer Interaktion festhalten. Erst ab hier zählt das Zeitfenster des
+   * Gedächtnisses — vorher denkt das Modell noch, und diese Zeit gehört dem
+   * Gespräch, nicht der Pause danach.
+   */
+  const markInteractionDone = useCallback(() => {
+    lastActivityRef.current = Date.now();
   }, []);
 
   /**
@@ -277,9 +289,11 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         console.error('[AI] Processing error:', error);
         setProcessingStatus('idle');
         return { success: false, message: 'Fehler bei der Verarbeitung' };
+      } finally {
+        markInteractionDone();
       }
     },
-    [cleanupHistory, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts, resolveOrigin]
+    [cleanupHistory, markInteractionDone, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts, resolveOrigin]
   );
 
   const transcribeAudio = useCallback(
