@@ -37,6 +37,7 @@ import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
+import LagekarteExport from '../firebase/LagekarteExport';
 import FirecallImport from '../firebase/FirecallImport';
 import { firestore } from '../firebase/firebase';
 import { FIRECALL_COLLECTION_ID, Firecall } from '../firebase/firestore';
@@ -167,6 +168,7 @@ function EinsatzCard({
             </IconButton>
           </Tooltip>
           {einsatz.id && <FirecallExport firecallId={einsatz.id} />}
+          {einsatz.id && <LagekarteExport firecallId={einsatz.id} />}
 
           <Tooltip title={t('common.edit')}>
             <IconButton

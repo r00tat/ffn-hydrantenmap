@@ -1,5 +1,6 @@
 import { kml as kmlToGeoJSON } from '@mapbox/togeojson';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Checkbox from '@mui/material/Checkbox';
@@ -14,7 +15,13 @@ import MenuItem from '@mui/material/MenuItem';
 import Slider from '@mui/material/Slider';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { useTranslations } from 'next-intl';
 import { useCallback, useMemo, useState } from 'react';
+import {
+  isLagekarteFile,
+  parseLagekarteFile,
+} from '../../common/lagekarte/fromLagekarte';
+import type { LagekarteParseResult } from '../../common/lagekarte/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
@@ -44,12 +51,21 @@ import { explodeTracksToPoints, parseGpxFile } from './gpxParser';
 
 // --- Format detection ---
 
-type ImportFormat = 'kml' | 'gpx' | 'csv';
+type ImportFormat = 'kml' | 'gpx' | 'csv' | 'lagekarte';
 
 function detectFormat(fileName: string, content: string): ImportFormat {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'kml') return 'kml';
   if (ext === 'gpx') return 'gpx';
+  // Lagekarte-Export: JSON mit `groups` und benannten Untergruppen. Ein
+  // gewöhnliches GeoJSON hat beides nicht und landet weiterhin bei CSV.
+  if (ext === 'json' || content.trimStart().startsWith('{')) {
+    try {
+      if (isLagekarteFile(JSON.parse(content))) return 'lagekarte';
+    } catch {
+      // kein gültiges JSON — fällt unten durch
+    }
+  }
   // For .xml or unknown extensions, sniff the content for XML root element
   if (ext === 'xml' || content.trimStart().startsWith('<?xml')) {
     const lower = content.toLowerCase();
@@ -84,7 +100,17 @@ interface CsvPreviewState {
   excludedColumns: Set<number>;
 }
 
-type PreviewState = GeoJsonPreviewState | CsvPreviewState;
+interface LagekartePreviewState {
+  format: 'lagekarte';
+  result: LagekarteParseResult;
+  /** Ebenennamen, editierbar — der Index korrespondiert zu result.layers */
+  layerNames: string[];
+}
+
+type PreviewState =
+  | GeoJsonPreviewState
+  | CsvPreviewState
+  | LagekartePreviewState;
 
 // --- KML parsing ---
 
@@ -194,6 +220,7 @@ export default function LayerImport() {
   const [useMetadataAsLayerName, setUseMetadataAsLayerName] = useState(false);
   const [gpxAsPoints, setGpxAsPoints] = useState(false);
   const addFirecallItem = useFirecallItemAdd();
+  const t = useTranslations('lagekarte');
 
   // --- File select ---
   const handleFileSelect = useCallback(async (files: FileList) => {
@@ -204,7 +231,17 @@ export default function LayerImport() {
       const text = await readFileAsText(file);
       const format = detectFormat(file.name, text);
 
-      if (format === 'kml') {
+      if (format === 'lagekarte') {
+        const result = parseLagekarteFile(
+          JSON.parse(text),
+          `Import lagekarte ${formatTimestamp(new Date())}`
+        );
+        setPreview({
+          format: 'lagekarte',
+          result,
+          layerNames: result.layers.map((l) => l.name),
+        });
+      } else if (format === 'kml') {
         setPreview(parseKmlFile(text, file.name));
       } else if (format === 'gpx') {
         const gpx = parseGpxFile(text, file.name);
@@ -297,7 +334,7 @@ export default function LayerImport() {
   // --- Shared schema handler ---
   const handleSchemaChange = useCallback(
     (newSchema: DataSchemaField[]) => {
-      if (!preview) return;
+      if (!preview || preview.format === 'lagekarte') return;
       if (preview.format === 'csv') {
         setPreview({ ...preview, schema: newSchema });
       } else {
@@ -333,13 +370,15 @@ export default function LayerImport() {
         ? preview.suggestedName
         : preview.fileName.replace(/\.\w+$/, '') ||
           `CSV Import ${new Date().toLocaleDateString('de-AT')}`
-      : preview
-        ? preview.layerName
-        : '';
+      : preview?.format === 'lagekarte'
+        ? ''
+        : preview
+          ? preview.layerName
+          : '';
 
   const handleLayerNameChange = useCallback(
     (name: string) => {
-      if (!preview) return;
+      if (!preview || preview.format === 'lagekarte') return;
       if (preview.format === 'csv') {
         setPreview({ ...preview, fileName: name + '.csv' });
         setUseMetadataAsLayerName(false);
@@ -368,7 +407,40 @@ export default function LayerImport() {
     setUploadInProgress(true);
 
     try {
-      if (preview.format === 'csv') {
+      if (preview.format === 'lagekarte') {
+        const { result, layerNames } = preview;
+
+        // Nur Ebenen anlegen, die auch etwas bekommen — sonst entstehen leere
+        // Ebenen für Gruppen, die in der Lagekarte nichts enthalten.
+        const usedIndices = new Set(result.items.map((i) => i.layerIndex));
+
+        const layerIdByIndex = new Map<number, string>();
+        for (const index of [...usedIndices].sort((a, b) => a - b)) {
+          const layer = await addFirecallItem({
+            ...result.layers[index],
+            name: layerNames[index] || result.layers[index].name,
+          } as FirecallItem);
+          layerIdByIndex.set(index, layer.id);
+        }
+
+        await Promise.allSettled([
+          ...result.items.map(({ item, layerIndex }) =>
+            addFirecallItem({
+              ...item,
+              layer: layerIdByIndex.get(layerIndex),
+            } as FirecallItem)
+          ),
+          // Tagebucheinträge tragen keine Ebene — sie stehen im Einsatztagebuch,
+          // nicht auf der Karte.
+          ...result.diaries.map((diary) =>
+            addFirecallItem({ ...diary } as FirecallItem)
+          ),
+        ]);
+
+        if (result.warnings.length) {
+          console.warn('lagekarte import warnings', result.warnings);
+        }
+      } else if (preview.format === 'csv') {
         const { result, schema, headerToSchemaKey } = preview;
         const sampled = downsample(result.records, everyNth);
         const items = csvRecordsToItems(result, sampled, schema, headerToSchemaKey);
@@ -415,7 +487,9 @@ export default function LayerImport() {
     preview?.format === 'gpx' && gpxEffective ? gpxEffective : preview;
 
   const typeCounts =
-    effectivePreview && effectivePreview.format !== 'csv'
+    effectivePreview &&
+    effectivePreview.format !== 'csv' &&
+    effectivePreview.format !== 'lagekarte'
       ? effectivePreview.geoJson.features.reduce(
           (acc, f) => {
             const t = f.geometry.type;
@@ -436,8 +510,17 @@ export default function LayerImport() {
       ? Math.ceil(preview.result.records.length / everyNth)
       : 0;
 
+  const lagekarteTotalCount =
+    preview?.format === 'lagekarte'
+      ? preview.result.items.length + preview.result.diaries.length
+      : 0;
+
   const totalCount =
-    preview?.format === 'csv' ? csvValidCount : geoJsonTotalCount;
+    preview?.format === 'csv'
+      ? csvValidCount
+      : preview?.format === 'lagekarte'
+        ? lagekarteTotalCount
+        : geoJsonTotalCount;
 
   const maxHeaderRow =
     preview?.format === 'csv'
@@ -473,7 +556,9 @@ export default function LayerImport() {
       ? 'KML'
       : preview?.format === 'gpx'
         ? 'GPX'
-        : 'CSV';
+        : preview?.format === 'lagekarte'
+          ? 'Lagekarte'
+          : 'CSV';
 
   return (
     <>
@@ -490,7 +575,7 @@ export default function LayerImport() {
         Importieren
         <VisuallyHiddenInput
           type="file"
-          accept=".kml,.gpx,.xml,.csv,.tsv,.txt,text/xml,application/vnd.google-earth.kml+xml"
+          accept=".kml,.gpx,.xml,.csv,.tsv,.txt,.json,text/xml,application/json,application/vnd.google-earth.kml+xml"
           onChange={(event) => {
             (async () => {
               if (event.target.files) {
@@ -524,14 +609,16 @@ export default function LayerImport() {
             <Box
               sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}
             >
-              {/* Layer name */}
-              <TextField
-                label="Ebenenname"
-                size="small"
-                fullWidth
-                value={layerName}
-                onChange={(e) => handleLayerNameChange(e.target.value)}
-              />
+              {/* Layer name — die Lagekarte bringt ihre Ebenen selbst mit */}
+              {preview.format !== 'lagekarte' && (
+                <TextField
+                  label="Ebenenname"
+                  size="small"
+                  fullWidth
+                  value={layerName}
+                  onChange={(e) => handleLayerNameChange(e.target.value)}
+                />
+              )}
 
               {/* GPX-specific: Import mode */}
               {preview.format === 'gpx' && (
@@ -715,7 +802,7 @@ export default function LayerImport() {
               )}
 
               {/* GeoJSON formats: Type count chips */}
-              {preview.format !== 'csv' && (
+              {preview.format !== 'csv' && preview.format !== 'lagekarte' && (
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {Object.entries(typeCounts).map(([type, count]) => (
                     <Chip
@@ -750,15 +837,83 @@ export default function LayerImport() {
                   </Box>
                 )}
 
-              {/* Shared: Schema editor */}
-              <DataSchemaEditor
-                dataSchema={
-                  effectivePreview?.format !== 'csv'
-                    ? (effectivePreview?.schema ?? preview.schema)
-                    : preview.schema
-                }
-                onChange={handleSchemaChange}
-              />
+              {/* Lagekarte: Ebenen, Tagebuch und Warnungen */}
+              {preview.format === 'lagekarte' && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    {t('importLayers')}
+                  </Typography>
+                  {preview.result.layers.map((layer, index) => {
+                    const count = preview.result.items.filter(
+                      (i) => i.layerIndex === index
+                    ).length;
+                    return (
+                      <TextField
+                        key={index}
+                        fullWidth
+                        margin="dense"
+                        size="small"
+                        label={t('layerObjectCount', { count })}
+                        value={preview.layerNames[index]}
+                        onChange={(event) =>
+                          setPreview((state) =>
+                            state?.format === 'lagekarte'
+                              ? {
+                                  ...state,
+                                  layerNames: state.layerNames.map((n, i) =>
+                                    i === index ? event.target.value : n
+                                  ),
+                                }
+                              : state
+                          )
+                        }
+                      />
+                    );
+                  })}
+                  {preview.result.diaries.length > 0 && (
+                    <Chip
+                      sx={{ mt: 1, mr: 1 }}
+                      size="small"
+                      label={t('diaryCount', {
+                        count: preview.result.diaries.length,
+                      })}
+                    />
+                  )}
+                  {preview.result.warnings.length > 0 && (
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                      <Typography variant="body2" component="div">
+                        {t('warningCount', {
+                          count: preview.result.warnings.length,
+                        })}
+                      </Typography>
+                      {preview.result.warnings
+                        .slice(0, 5)
+                        .map((warning, index) => (
+                          <Typography
+                            key={index}
+                            variant="caption"
+                            component="div"
+                          >
+                            {warning}
+                          </Typography>
+                        ))}
+                    </Alert>
+                  )}
+                </Box>
+              )}
+
+              {/* Shared: Schema editor — die Lagekarte hat kein freies Schema */}
+              {preview.format !== 'lagekarte' && (
+                <DataSchemaEditor
+                  dataSchema={
+                    effectivePreview?.format !== 'csv' &&
+                    effectivePreview?.format !== 'lagekarte'
+                      ? (effectivePreview?.schema ?? preview.schema)
+                      : preview.schema
+                  }
+                  onChange={handleSchemaChange}
+                />
+              )}
             </Box>
           </DialogContent>
           <DialogActions>

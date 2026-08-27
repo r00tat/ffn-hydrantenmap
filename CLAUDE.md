@@ -30,6 +30,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/gelaende-3d.md](docs/gelaende-3d.md) | 3D-Ansicht des Geländes: Mesh in Mercator, lokal-metrische Szene, Überhöhung, Textur aus den Kartenkacheln |
 | [docs/wasserstandsmodell.md](docs/wasserstandsmodell.md) | Wasserstandsmodell: Flutfüllung, Bänder am Element, Signatur, Kopplung an den Sandsackrechner |
 | [docs/mcp-server.md](docs/mcp-server.md) | MCP-Server und OAuth 2.1: eigener Authorization Server, DCR und CIMD, Scopes, Tool-Set mit zwei Aufrufern, Signaturschlüssel und Betrieb |
+| [docs/lagekarte-austausch.md](docs/lagekarte-austausch.md) | Import und Export für lagekarte.info: beobachtetes Format, Kupplungsmarker, `ffnd`-Block, Symbolkatalog und seine Lücken |
 
 ## Commands
 
