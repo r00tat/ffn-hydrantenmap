@@ -299,3 +299,41 @@ describe('useAiAssistant Sprachbefehl', () => {
     expect(JSON.stringify(secondRequest.contents)).toContain('[Sprachbefehl]');
   });
 });
+
+describe('useAiAssistant Kontextgröße', () => {
+  beforeEach(async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [{ text: 'Erledigt' }] } }],
+        functionCalls: () => [],
+        text: () => 'Erledigt',
+      },
+    });
+  });
+
+  it('schickt den Kartenkontext kompakt, ohne Einrückung', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('Fahrzeug eintragen');
+
+    const parts = (geminiModel.generateContent as any).mock.calls[0][0].contents[0].parts;
+    const contextPart = parts.at(-1).text as string;
+    expect(contextPart).toContain('"mapCenter"');
+    expect(contextPart).not.toContain('\n  ');
+  });
+
+  it('spiegelt den Kartenkontext nicht in die Historie', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('erster Befehl');
+    await result.current.processText('zweiter Befehl');
+
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    const kontextTeile = JSON.stringify(secondRequest.contents).split('mapCenter').length - 1;
+    // Nur der Kontext des aktuellen Beitrags, nicht der des ersten Befehls
+    expect(kontextTeile).toBe(1);
+    expect(JSON.stringify(secondRequest.contents)).toContain('erster Befehl');
+  });
+});

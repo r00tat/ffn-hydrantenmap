@@ -17,7 +17,7 @@ import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
 import { executeToolCall } from './toolHandlers';
 import { buildAiContext } from './contextBuilder';
-import { stripInlineDataParts } from './chatHistory';
+import { MAP_CONTEXT_PREFIX, stripInlineDataParts, stripMapContextParts } from './chatHistory';
 import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
 
 // Ohne eigenen Transkriptionsschritt gibt es keinen Zustand „transcribing" mehr:
@@ -151,7 +151,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           position,
           interactions: interactionsRef.current,
         });
-        return `Aktueller Map-Kontext:\n${JSON.stringify(context, null, 2)}`;
+        // Kompakt statt eingerückt: Die Einrückung ist rund ein Drittel der
+        // Zeichen und trägt für das Modell nichts bei (#740).
+        return `${MAP_CONTEXT_PREFIX}\n${JSON.stringify(context)}`;
       });
 
       run.note({
@@ -237,8 +239,10 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             const text = responseText;
             
             // SAVE current session back to persistent history ref — die
-            // Audio-Blobs sind oben bereits ersetzt.
-            chatHistoryRef.current = currentContents;
+            // Audio-Blobs sind oben bereits ersetzt, der Kartenkontext geht
+            // hier heraus: Er käme sonst bei jeder Folgefrage veraltet noch
+            // einmal mit.
+            chatHistoryRef.current = stripMapContextParts(currentContents);
             
             setProcessingStatus('idle');
             console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');
