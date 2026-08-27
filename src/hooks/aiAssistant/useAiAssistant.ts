@@ -18,6 +18,7 @@ import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS }
 import { executeToolCall } from './toolHandlers';
 import { buildAiContext } from './contextBuilder';
 import { MAP_CONTEXT_PREFIX, stripInlineDataParts, stripMapContextParts } from './chatHistory';
+import { isUsableAudio } from './audioInput';
 import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
 
 // Ohne eigenen Transkriptionsschritt gibt es keinen Zustand „transcribing" mehr:
@@ -334,6 +335,16 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       const run = parentRun ?? startLatencyRun('sprachbefehl');
       run.note({ audioBytes: Math.round((audioBase64.length * 3) / 4) });
       try {
+        // Ein Fehlgriff am Aufnahmeknopf liefert eine Datei ohne Tonspur. Die
+        // schickt das Modell mit „400 invalid argument" zurück — dieselbe
+        // Wartezeit wie ein echter Befehl, am Ende aber nur eine
+        // Fehlermeldung. Hier ist die Sache in einem Zug erledigt.
+        if (!isUsableAudio(audioBase64)) {
+          console.info('[AI] Aufnahme zu kurz, kein Modellaufruf');
+          setProcessingStatus('idle');
+          return { success: false, message: 'Aufnahme zu kurz, bitte noch einmal sprechen' };
+        }
+
         // Kein eigener Transkriptionsschritt: Das Modell ist multimodal und
         // versteht den gesprochenen Befehl direkt. Der frühere Umweg über einen
         // reinen Transkriptions-Roundtrip kostete in der Messung zu #740 rund

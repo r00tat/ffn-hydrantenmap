@@ -222,6 +222,9 @@ describe('useAiAssistant Denkaufwand', () => {
   });
 });
 
+// Lang genug, um als echte Aufnahme durchzugehen (siehe `MIN_AUDIO_BYTES`).
+const AUDIO_BASE64 = 'QUJDRA'.repeat(1000);
+
 describe('useAiAssistant Sprachbefehl', () => {
   it('schickt das Audio direkt in den Werkzeug-Aufruf, ohne Transkriptionsschritt', async () => {
     const { geminiModel } = await import('../components/firebase/vertexai');
@@ -235,14 +238,14 @@ describe('useAiAssistant Sprachbefehl', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio('AAAABBBBCCCC');
+    await result.current.processAudio(AUDIO_BASE64);
 
     expect((geminiModel.generateContent as any)).toHaveBeenCalledTimes(1);
     // contents wird im Verlauf der Schleife weitergeschrieben, der
     // Benutzerbeitrag steht am Anfang.
     const parts = (geminiModel.generateContent as any).mock.calls[0][0].contents[0].parts;
     expect(parts[0]).toEqual({
-      inlineData: { mimeType: 'audio/webm', data: 'AAAABBBBCCCC' },
+      inlineData: { mimeType: 'audio/webm', data: AUDIO_BASE64 },
     });
   });
 
@@ -270,12 +273,12 @@ describe('useAiAssistant Sprachbefehl', () => {
       });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio('AAAABBBBCCCC');
+    await result.current.processAudio(AUDIO_BASE64);
 
     // Der zweite Aufruf trägt nur noch den Platzhalter — das Audio ein zweites
     // Mal hochzuladen kostete in der Messung zu #740 gut zwei Sekunden.
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
-    expect(JSON.stringify(secondRequest.contents)).not.toContain('AAAABBBBCCCC');
+    expect(JSON.stringify(secondRequest.contents)).not.toContain(AUDIO_BASE64);
     expect(JSON.stringify(secondRequest.contents)).toContain('[Sprachbefehl]');
   });
 
@@ -291,11 +294,11 @@ describe('useAiAssistant Sprachbefehl', () => {
     });
 
     const { result } = renderHook(() => useAiAssistant([]));
-    await result.current.processAudio('AAAABBBBCCCC');
+    await result.current.processAudio(AUDIO_BASE64);
     await result.current.processText('und noch eine Frage');
 
     const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
-    expect(JSON.stringify(secondRequest.contents)).not.toContain('AAAABBBBCCCC');
+    expect(JSON.stringify(secondRequest.contents)).not.toContain(AUDIO_BASE64);
     expect(JSON.stringify(secondRequest.contents)).toContain('[Sprachbefehl]');
   });
 });
@@ -335,5 +338,20 @@ describe('useAiAssistant Kontextgröße', () => {
     // Nur der Kontext des aktuellen Beitrags, nicht der des ersten Befehls
     expect(kontextTeile).toBe(1);
     expect(JSON.stringify(secondRequest.contents)).toContain('erster Befehl');
+  });
+});
+
+describe('useAiAssistant kurze Aufnahme', () => {
+  it('schickt eine Aufnahme ohne Tonspur nicht an das Modell', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    // Ein WebM-Kopf ohne Ton — Gemini antwortet darauf mit HTTP 400.
+    const answer = await result.current.processAudio('A'.repeat(600));
+
+    expect((geminiModel.generateContent as any)).not.toHaveBeenCalled();
+    expect(answer.success).toBe(false);
+    expect(answer.message).toContain('zu kurz');
   });
 });
