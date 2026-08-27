@@ -33,6 +33,7 @@ import EinsatzDialog from '../FirecallItems/EinsatzDialog';
 import ConfirmDialog from '../dialogs/ConfirmDialog';
 import FirecallShareDialog from '../firecallShare/FirecallShareDialog';
 import FirecallExport from '../firebase/FirecallExport';
+import LagekarteExport from '../firebase/LagekarteExport';
 import { firestore } from '../firebase/firebase';
 import {
   Firecall,
@@ -235,6 +236,7 @@ export default function EinsatzDetails() {
           </Button>
         </Tooltip>
         {firecall.id && <FirecallExport firecallId={firecall.id} />}
+        {firecall.id && <LagekarteExport firecallId={firecall.id} />}
         {canWrite && (
           <Tooltip title={tCommon('edit')}>
             <IconButton

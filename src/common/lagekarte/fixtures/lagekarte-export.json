@@ -1,0 +1,1433 @@
+{
+    "type": "FeatureCollection",
+    "name": "map",
+    "features": [
+        {
+            "type": "FeatureCollection",
+            "name": "zeichnungen",
+            "features": [
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.847774,
+                                    47.94575
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.847449,
+                                    47.946036
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.847164,
+                                    47.946261
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.847612,
+                                    47.945893
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.847276,
+                                    47.946174
+                                ]
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "options": {}
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 0, 255)",
+                            "weight": 3,
+                            "distanceMarkers": true,
+                            "offset": 20,
+                            "lineType": "B-Line"
+                        },
+                        "type": "polyline"
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [
+                                16.847937,
+                                47.945607
+                            ],
+                            [
+                                16.847411,
+                                47.94607
+                            ],
+                            [
+                                16.847164,
+                                47.946261
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.848133,
+                                    47.945795
+                                ]
+                            }
+                        },
+                        {
+                            "type": "Feature",
+                            "properties": {},
+                            "geometry": {
+                                "type": "Point",
+                                "coordinates": [
+                                    16.848178,
+                                    47.94583
+                                ]
+                            }
+                        }
+                    ],
+                    "properties": {
+                        "options": {}
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 102, 255)",
+                            "weight": 3,
+                            "distanceMarkers": true,
+                            "offset": 15,
+                            "lineType": "C-Line"
+                        },
+                        "type": "polyline"
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [
+                                16.848001,
+                                47.945693
+                            ],
+                            [
+                                16.848178,
+                                47.94583
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ],
+                            "filltype": "border"
+                        },
+                        "type": "polygon"
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [
+                                    16.845683,
+                                    47.947421
+                                ],
+                                [
+                                    16.8457,
+                                    47.945639
+                                ],
+                                [
+                                    16.848575,
+                                    47.944633
+                                ],
+                                [
+                                    16.849798,
+                                    47.946232
+                                ],
+                                [
+                                    16.847829,
+                                    47.947155
+                                ],
+                                [
+                                    16.845683,
+                                    47.947421
+                                ]
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ]
+                        },
+                        "type": "polyline"
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [
+                                16.846611,
+                                47.946203
+                            ],
+                            [
+                                16.846805,
+                                47.946739
+                            ],
+                            [
+                                16.846949,
+                                47.947026
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ],
+                            "filltype": "border"
+                        },
+                        "type": "rectangle"
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [
+                                    16.846198,
+                                    47.945733
+                                ],
+                                [
+                                    16.846198,
+                                    47.946814
+                                ],
+                                [
+                                    16.846885,
+                                    47.946814
+                                ],
+                                [
+                                    16.846885,
+                                    47.945733
+                                ],
+                                [
+                                    16.846198,
+                                    47.945733
+                                ]
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ],
+                            "filltype": "border"
+                        },
+                        "type": "polygon"
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [
+                                    16.846569,
+                                    47.947145
+                                ],
+                                [
+                                    16.846198,
+                                    47.946814
+                                ],
+                                [
+                                    16.845909,
+                                    47.946516
+                                ],
+                                [
+                                    16.845914,
+                                    47.946085
+                                ],
+                                [
+                                    16.846429,
+                                    47.946024
+                                ],
+                                [
+                                    16.848044,
+                                    47.946555
+                                ],
+                                [
+                                    16.847379,
+                                    47.947058
+                                ],
+                                [
+                                    16.846569,
+                                    47.947145
+                                ]
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ],
+                            "radius": "30.733471",
+                            "filltype": "border"
+                        },
+                        "type": "circle"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847604,
+                            47.947443
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "fillColor": "rgb(255, 255, 255)",
+                            "color": "rgb(0, 67, 191)",
+                            "weight": 3,
+                            "dashArray": [
+                                5,
+                                5
+                            ],
+                            "radius": "28.412553",
+                            "filltype": "border"
+                        },
+                        "type": "circle"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.848596,
+                            47.947048
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "type": "FeatureCollection",
+            "name": "fahrzeuge",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oebfv/5.01.01_grundzeichen_kraftfahrzeug.svg",
+                                    "type": "fahrzeug"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "Grundzeichen Kraftfahrzeug"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.848258,
+                            47.945542
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oebfv/5.01.01_grosstankloeschfahrzeug.svg",
+                                    "type": "fahrzeug"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "Großtanklöschfahrzeug"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847743,
+                            47.945503
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oebfv/5.01.01_kommandofahrzeug_2.svg",
+                                    "type": "fahrzeug"
+                                }
+                            },
+                            "iconMarker": true,
+                            "g": [
+                                "eg_0"
+                            ]
+                        },
+                        "infoData": {
+                            "bezeichnung": "Kommandofahrzeug",
+                            "label": "Test 123 Kdo",
+                            "informationen": "",
+                            "mannschaftAnz": "",
+                            "mannschaft": []
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.848419,
+                            47.945743
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/fahrzeuge/1.4_drehleiter.svg",
+                                    "type": "fahrzeug"
+                                }
+                            },
+                            "iconMarker": true,
+                            "g": [
+                                "eg_0"
+                            ]
+                        },
+                        "infoData": {
+                            "bezeichnung": "Drehleiter"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847411,
+                            47.945808
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "type": "FeatureCollection",
+            "name": "taktischezeichen",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oenorm/2_gruppe_oder_vergleichbare_einheit.svg",
+                                    "type": "taktischezeichen"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "0.2 Gruppe oder vergleichbare Einheit"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.846901,
+                            47.946354
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oenorm/2.1.2_formation_gruppe.svg",
+                                    "type": "taktischezeichenXL"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "2.1.2 Formation Gruppe"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847556,
+                            47.946674
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oenorm/4.2.1_atemschutzsammelplatz.svg",
+                                    "type": "taktischezeichenXL"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "4.2.1 Atemschutzsammelplatz"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847641,
+                            47.94561
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/oenorm/9.3_gefahr_brand.svg",
+                                    "type": "taktischezeichen"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "9.3 Gefahr Brand"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.84808,
+                            47.945754
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/geraete/ueberflurhydrant.svg",
+                                    "type": "geraete"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "Überflurhydrant"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847164,
+                            47.946261
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/geraete/ts.svg",
+                                    "type": "geraete"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "TS"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847411,
+                            47.94607
+                        ]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "options": {
+                            "icon": {
+                                "options": {
+                                    "iconUrl": "../src/img/geraete/strahlrohr.svg",
+                                    "type": "geraete"
+                                }
+                            },
+                            "iconMarker": true
+                        },
+                        "infoData": {
+                            "bezeichnung": "Strahlrohr"
+                        },
+                        "type": "marker"
+                    },
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [
+                            16.847985,
+                            47.945912
+                        ]
+                    }
+                }
+            ]
+        }
+    ],
+    "groups": [
+        {
+            "name": "eg_0",
+            "g_name": "Gruppe 1",
+            "disabled": false
+        }
+    ],
+    "notes": "",
+    "view": [
+        "47.946697",
+        "16.846043"
+    ],
+    "zoom": 18,
+    "colors": [],
+    "wmslayers": [],
+    "messages": [
+        {
+            "id": 1,
+            "date": "2026-08-27T18:27:42.647Z",
+            "text": "Nachricht 1",
+            "textorg": "Nachricht 1",
+            "coords": []
+        },
+        {
+            "id": 2,
+            "date": "2026-08-27T18:27:44.226Z",
+            "text": "Nachricht 2",
+            "textorg": "Nachricht 2",
+            "coords": []
+        },
+        {
+            "id": 3,
+            "date": "2026-08-27T18:27:45.744Z",
+            "text": "Nachricht 3",
+            "textorg": "Nachricht 3",
+            "coords": []
+        }
+    ],
+    "history": [
+        {
+            "name": "Einsatzbeginn",
+            "timestamp": 1787854479,
+            "sp": {
+                "data": {
+                    "type": "FeatureCollection",
+                    "name": "map",
+                    "features": [],
+                    "groups": [],
+                    "notes": ""
+                },
+                "timestamp": 1787854479
+            }
+        },
+        {
+            "name": "test",
+            "timestamp": 1787854786,
+            "sp": {
+                "data": {
+                    "type": "FeatureCollection",
+                    "name": "map",
+                    "features": [
+                        {
+                            "type": "FeatureCollection",
+                            "name": "zeichnungen",
+                            "features": [
+                                {
+                                    "type": "FeatureCollection",
+                                    "features": [
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.847774,
+                                                    47.94575
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.847449,
+                                                    47.946036
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.847164,
+                                                    47.946261
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.847612,
+                                                    47.945893
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.847276,
+                                                    47.946174
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "options": {}
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 0, 255)",
+                                            "weight": 3,
+                                            "distanceMarkers": true,
+                                            "offset": 20,
+                                            "lineType": "B-Line"
+                                        },
+                                        "type": "polyline"
+                                    },
+                                    "geometry": {
+                                        "type": "LineString",
+                                        "coordinates": [
+                                            [
+                                                16.847937,
+                                                47.945607
+                                            ],
+                                            [
+                                                16.847411,
+                                                47.94607
+                                            ],
+                                            [
+                                                16.847164,
+                                                47.946261
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "FeatureCollection",
+                                    "features": [
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.848133,
+                                                    47.945795
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "type": "Feature",
+                                            "properties": {},
+                                            "geometry": {
+                                                "type": "Point",
+                                                "coordinates": [
+                                                    16.848178,
+                                                    47.94583
+                                                ]
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "options": {}
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 102, 255)",
+                                            "weight": 3,
+                                            "distanceMarkers": true,
+                                            "offset": 15,
+                                            "lineType": "C-Line"
+                                        },
+                                        "type": "polyline"
+                                    },
+                                    "geometry": {
+                                        "type": "LineString",
+                                        "coordinates": [
+                                            [
+                                                16.848001,
+                                                47.945693
+                                            ],
+                                            [
+                                                16.848178,
+                                                47.94583
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ],
+                                            "filltype": "border"
+                                        },
+                                        "type": "polygon"
+                                    },
+                                    "geometry": {
+                                        "type": "Polygon",
+                                        "coordinates": [
+                                            [
+                                                [
+                                                    16.845683,
+                                                    47.947421
+                                                ],
+                                                [
+                                                    16.8457,
+                                                    47.945639
+                                                ],
+                                                [
+                                                    16.848575,
+                                                    47.944633
+                                                ],
+                                                [
+                                                    16.849798,
+                                                    47.946232
+                                                ],
+                                                [
+                                                    16.847829,
+                                                    47.947155
+                                                ],
+                                                [
+                                                    16.845683,
+                                                    47.947421
+                                                ]
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ]
+                                        },
+                                        "type": "polyline"
+                                    },
+                                    "geometry": {
+                                        "type": "LineString",
+                                        "coordinates": [
+                                            [
+                                                16.846611,
+                                                47.946203
+                                            ],
+                                            [
+                                                16.846805,
+                                                47.946739
+                                            ],
+                                            [
+                                                16.846949,
+                                                47.947026
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ],
+                                            "filltype": "border"
+                                        },
+                                        "type": "rectangle"
+                                    },
+                                    "geometry": {
+                                        "type": "Polygon",
+                                        "coordinates": [
+                                            [
+                                                [
+                                                    16.846198,
+                                                    47.945733
+                                                ],
+                                                [
+                                                    16.846198,
+                                                    47.946814
+                                                ],
+                                                [
+                                                    16.846885,
+                                                    47.946814
+                                                ],
+                                                [
+                                                    16.846885,
+                                                    47.945733
+                                                ],
+                                                [
+                                                    16.846198,
+                                                    47.945733
+                                                ]
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ],
+                                            "filltype": "border"
+                                        },
+                                        "type": "polygon"
+                                    },
+                                    "geometry": {
+                                        "type": "Polygon",
+                                        "coordinates": [
+                                            [
+                                                [
+                                                    16.846569,
+                                                    47.947145
+                                                ],
+                                                [
+                                                    16.846198,
+                                                    47.946814
+                                                ],
+                                                [
+                                                    16.845909,
+                                                    47.946516
+                                                ],
+                                                [
+                                                    16.845914,
+                                                    47.946085
+                                                ],
+                                                [
+                                                    16.846429,
+                                                    47.946024
+                                                ],
+                                                [
+                                                    16.848044,
+                                                    47.946555
+                                                ],
+                                                [
+                                                    16.847379,
+                                                    47.947058
+                                                ],
+                                                [
+                                                    16.846569,
+                                                    47.947145
+                                                ]
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ],
+                                            "radius": "30.733471",
+                                            "filltype": "border"
+                                        },
+                                        "type": "circle"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847604,
+                                            47.947443
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "fillColor": "rgb(255, 255, 255)",
+                                            "color": "rgb(0, 67, 191)",
+                                            "weight": 3,
+                                            "dashArray": [
+                                                5,
+                                                5
+                                            ],
+                                            "radius": "28.412553",
+                                            "filltype": "border"
+                                        },
+                                        "type": "circle"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.848596,
+                                            47.947048
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "type": "FeatureCollection",
+                            "name": "fahrzeuge",
+                            "features": [
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oebfv/5.01.01_grundzeichen_kraftfahrzeug.svg",
+                                                    "type": "fahrzeug"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Grundzeichen Kraftfahrzeug"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.848258,
+                                            47.945542
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oebfv/5.01.01_grosstankloeschfahrzeug.svg",
+                                                    "type": "fahrzeug"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Großtanklöschfahrzeug"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847743,
+                                            47.945503
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oebfv/5.01.01_kommandofahrzeug_2.svg",
+                                                    "type": "fahrzeug"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Kommandofahrzeug",
+                                            "label": "Test 123 Kdo",
+                                            "informationen": "",
+                                            "mannschaftAnz": "",
+                                            "mannschaft": []
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.848419,
+                                            47.945743
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/fahrzeuge/1.4_drehleiter.svg",
+                                                    "type": "fahrzeug"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Drehleiter"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847411,
+                                            47.945808
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "type": "FeatureCollection",
+                            "name": "taktischezeichen",
+                            "features": [
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oenorm/2_gruppe_oder_vergleichbare_einheit.svg",
+                                                    "type": "taktischezeichen"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "0.2 Gruppe oder vergleichbare Einheit"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.846901,
+                                            47.946354
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oenorm/2.1.2_formation_gruppe.svg",
+                                                    "type": "taktischezeichenXL"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "2.1.2 Formation Gruppe"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847556,
+                                            47.946674
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oenorm/4.2.1_atemschutzsammelplatz.svg",
+                                                    "type": "taktischezeichenXL"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "4.2.1 Atemschutzsammelplatz"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847641,
+                                            47.94561
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/oenorm/9.3_gefahr_brand.svg",
+                                                    "type": "taktischezeichen"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "9.3 Gefahr Brand"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.84808,
+                                            47.945754
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/geraete/ueberflurhydrant.svg",
+                                                    "type": "geraete"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Überflurhydrant"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847164,
+                                            47.946261
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/geraete/ts.svg",
+                                                    "type": "geraete"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "TS"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847411,
+                                            47.94607
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "Feature",
+                                    "properties": {
+                                        "options": {
+                                            "icon": {
+                                                "options": {
+                                                    "iconUrl": "../src/img/geraete/strahlrohr.svg",
+                                                    "type": "geraete"
+                                                }
+                                            },
+                                            "iconMarker": true
+                                        },
+                                        "infoData": {
+                                            "bezeichnung": "Strahlrohr"
+                                        },
+                                        "type": "marker"
+                                    },
+                                    "geometry": {
+                                        "type": "Point",
+                                        "coordinates": [
+                                            16.847985,
+                                            47.945912
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "groups": [
+                        {
+                            "name": "eg_0",
+                            "g_name": "Gruppe 1",
+                            "disabled": false
+                        }
+                    ],
+                    "notes": ""
+                },
+                "timestamp": 1787854786
+            }
+        }
+    ]
+}

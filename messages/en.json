@@ -2665,5 +2665,14 @@
     "revokeGrantConfirm": "The grant of {client} for {user} will be revoked.",
     "loading": "Loading …",
     "error": "Error: {message}"
+  },
+  "lagekarte": {
+    "exportTooltip": "Export for lagekarte.info",
+    "exportFailed": "The export for lagekarte.info failed.",
+    "gisFailed": "Hydrant and GIS data could not be loaded. The file contains only the drawn situation.",
+    "importLayers": "Layers from the situation map",
+    "layerObjectCount": "{count, plural, =0 {Layer name (no objects)} one {Layer name (# object)} other {Layer name (# objects)}}",
+    "diaryCount": "{count, plural, one {# diary entry} other {# diary entries}}",
+    "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}"
   }
 }
