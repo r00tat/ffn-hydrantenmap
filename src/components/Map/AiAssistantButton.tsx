@@ -16,6 +16,7 @@ import { FirecallItem } from '../firebase/firestore';
 import type { AiAssistantResult } from '../../hooks/aiAssistant/types';
 import AiActionToast, { AiToastState } from './AiActionToast';
 import { speakMessage } from '../../common/speech';
+import { LatencyRun, startLatencyRun } from '../../hooks/aiAssistant/latency';
 
 interface AiAssistantButtonProps {
   firecallItems: FirecallItem[];
@@ -70,7 +71,7 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
   const maxRecordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showResult = useCallback((result: AiAssistantResult) => {
+  const showResult = useCallback(async (result: AiAssistantResult, run?: LatencyRun) => {
     setToast({
       open: true,
       message: result.message,
@@ -79,10 +80,18 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
       clarificationOptions: result.clarification?.options,
       draftCount: result.drafts?.length ?? 0,
     });
+    run?.mark('antwort angezeigt');
     // Speak answers from the AI
     if (result.isAnswer && result.message) {
-      speakMessage(result.message);
+      // Bis zur Sprachausgabe wartet der Benutzer weiter — deshalb gehört
+      // auch dieser Schritt in die Messung (Issue #740).
+      await (run
+        ? run.phase('sprachausgabe', () => speakMessage(result.message), {
+            zeichen: result.message.length,
+          })
+        : speakMessage(result.message));
     }
+    run?.finish();
   }, []);
 
   // Show recorder errors - reacting to external state change from hook
@@ -108,13 +117,19 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
         maxRecordingTimerRef.current = null;
       }
 
+      // Der Lauf beginnt hier, weil ab hier gewartet wird — alles davor ist
+      // Aufnahmezeit und zählt nicht zur Latenz (Issue #740).
+      const run = startLatencyRun('sprachbefehl');
       playStopBeep();
-      const audio = await stopRecording();
-      if (!audio) return;
+      const audio = await run.phase('aufnahme abschließen', () => stopRecording());
+      if (!audio) {
+        run.finish();
+        return;
+      }
 
       setIsAiProcessing(true);
       try {
-        showResult(await processAudio(audio));
+        await showResult(await processAudio(audio, run), run);
       } finally {
         setIsAiProcessing(false);
       }
@@ -125,15 +140,18 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
 
       // Auto-stop after max recording time
       maxRecordingTimerRef.current = setTimeout(async () => {
+        const run = startLatencyRun('sprachbefehl (zeitlimit)');
         playStopBeep();
-        const audio = await stopRecording();
-        if (audio) {
-          setIsAiProcessing(true);
-          try {
-            showResult(await processAudio(audio));
-          } finally {
-            setIsAiProcessing(false);
-          }
+        const audio = await run.phase('aufnahme abschließen', () => stopRecording());
+        if (!audio) {
+          run.finish();
+          return;
+        }
+        setIsAiProcessing(true);
+        try {
+          await showResult(await processAudio(audio, run), run);
+        } finally {
+          setIsAiProcessing(false);
         }
       }, MAX_RECORDING_TIME_MS);
     }
@@ -155,9 +173,10 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   }, [undoLastAction]);
 
   const handleClarificationSelect = useCallback(async (option: string) => {
+    const run = startLatencyRun('rückfrage beantwortet');
     setIsAiProcessing(true);
     try {
-      showResult(await processText(option));
+      await showResult(await processText(option, run), run);
     } finally {
       setIsAiProcessing(false);
     }

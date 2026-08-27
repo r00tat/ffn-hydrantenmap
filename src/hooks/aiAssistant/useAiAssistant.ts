@@ -17,6 +17,7 @@ import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
 import { executeToolCall } from './toolHandlers';
 import { buildAiContext } from './contextBuilder';
+import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
 
 export type AiProcessingStatus = 'idle' | 'transcribing' | 'analyzing' | 'executing';
 
@@ -105,16 +106,28 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   );
 
   const sendToGemini = useCallback(
-    async (userParts: GenerateContentRequest['contents'][0]['parts']): Promise<AiAssistantResult> => {
+    async (
+      userParts: GenerateContentRequest['contents'][0]['parts'],
+      run: LatencyRun
+    ): Promise<AiAssistantResult> => {
       cleanupHistory();
 
-      const context = buildAiContext({
-        map,
-        defaultPosition,
-        existingItems,
-        isPositionSet,
-        position,
-        interactions: interactionsRef.current,
+      const contextText = run.sync('kontext bauen', () => {
+        const context = buildAiContext({
+          map,
+          defaultPosition,
+          existingItems,
+          isPositionSet,
+          position,
+          interactions: interactionsRef.current,
+        });
+        return `Aktueller Map-Kontext:\n${JSON.stringify(context, null, 2)}`;
+      });
+
+      run.note({
+        kontextZeichen: contextText.length,
+        items: existingItems.filter((i) => !i.deleted).length,
+        historieEintraege: chatHistoryRef.current.length,
       });
 
       // Prepare current session contents
@@ -122,10 +135,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         ...chatHistoryRef.current,
         {
           role: 'user',
-          parts: [
-            ...userParts,
-            { text: `Aktueller Map-Kontext:\n${JSON.stringify(context, null, 2)}` },
-          ],
+          parts: [...userParts, { text: contextText }],
         },
       ];
 
@@ -153,9 +163,12 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
           };
 
-          const result = await geminiModel.generateContent(request);
+          const result = await run.phase(`modell #${iterations}`, () =>
+            geminiModel.generateContent(request)
+          );
           const response = result.response;
-          
+          run.annotateLast(tokenDetail(response.usageMetadata));
+
           if (!response.candidates || response.candidates.length === 0) {
             throw new Error('No candidates returned from AI model');
           }
@@ -220,7 +233,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
 
           for (const fc of functionCalls) {
             console.info(`[AI] Executing tool: ${fc.name}`, fc.args);
-            const execResult = await executeToolCall(fc, toolDeps);
+            const execResult = await run.phase(`werkzeug ${fc.name}`, () =>
+              executeToolCall(fc, toolDeps)
+            );
             console.info(`[AI] Tool result (${fc.name}):`, { success: execResult.success, message: execResult.message });
             
             if (execResult.success) {
@@ -268,7 +283,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   );
 
   const transcribeAudio = useCallback(
-    async (audioBase64: string): Promise<string | null> => {
+    async (audioBase64: string, run: LatencyRun): Promise<string | null> => {
       console.info('[AI] Transcribing audio...');
       const request: GenerateContentRequest = {
         systemInstruction: 'Du bist ein Transkriptions-Assistent. Transkribiere die Audio-Eingabe wortgetreu auf Deutsch. Gib NUR den transkribierten Text zurück, keine Erklärungen oder Formatierung.',
@@ -283,7 +298,10 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
         ],
       };
 
-      const result = await geminiModel.generateContent(request);
+      const result = await run.phase('transkription', () =>
+        geminiModel.generateContent(request)
+      );
+      run.annotateLast(tokenDetail(result.response.usageMetadata));
       const text = result.response.text()?.trim();
       console.info('[AI] Transcription result:', text);
       return text || null;
@@ -292,27 +310,39 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
   );
 
   const processAudio = useCallback(
-    async (audioBase64: string): Promise<AiAssistantResult> => {
+    async (audioBase64: string, parentRun?: LatencyRun): Promise<AiAssistantResult> => {
+      // Ohne Lauf von außen (Seite /ai, Tests) misst der Hook wenigstens seinen
+      // eigenen Anteil; vom Button kommt der Lauf ab dem Loslassen.
+      const run = parentRun ?? startLatencyRun('sprachbefehl');
+      run.note({ audioBytes: Math.round((audioBase64.length * 3) / 4) });
       try {
         setProcessingStatus('transcribing');
-        const transcription = await transcribeAudio(audioBase64);
+        const transcription = await transcribeAudio(audioBase64, run);
         if (!transcription) {
           setProcessingStatus('idle');
           return { success: false, message: 'Audio konnte nicht transkribiert werden' };
         }
-        return sendToGemini([{ text: transcription }]);
+        run.note({ transkriptZeichen: transcription.length });
+        return await sendToGemini([{ text: transcription }], run);
       } catch (error) {
         console.error('[AI] Audio process error:', error);
         setProcessingStatus('idle');
         return { success: false, message: 'Fehler bei der Transkription' };
+      } finally {
+        if (!parentRun) run.finish();
       }
     },
     [transcribeAudio, sendToGemini]
   );
 
   const processText = useCallback(
-    async (text: string): Promise<AiAssistantResult> => {
-      return sendToGemini([{ text }]);
+    async (text: string, parentRun?: LatencyRun): Promise<AiAssistantResult> => {
+      const run = parentRun ?? startLatencyRun('textbefehl');
+      try {
+        return await sendToGemini([{ text }], run);
+      } finally {
+        if (!parentRun) run.finish();
+      }
     },
     [sendToGemini]
   );
