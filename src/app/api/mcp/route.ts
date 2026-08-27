@@ -1,6 +1,9 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { NextRequest } from 'next/server';
-import { getMcpResourceUrl } from '../../../server/oauth/issuer';
+import {
+  getMcpResourceUrl,
+  getOauthIssuer,
+} from '../../../server/oauth/issuer';
 import { callerKey, checkRateLimit } from '../../../server/oauth/rateLimit';
 import { createMcpServerForAuth } from '../../../server/mcp/mcpServer';
 import {
@@ -39,9 +42,13 @@ const MCP_RATE_LIMIT = 120;
 const MCP_RATE_WINDOW_MS = 60_000;
 
 async function handle(req: NextRequest): Promise<Response> {
+  // Die Basis ist der Issuer (die öffentliche Custom Domain), nicht
+  // `req.nextUrl.origin`: hinter Cloud Run steht dort die interne
+  // Container-Adresse (`https://0.0.0.0:8080`). Ein Client, der dem
+  // `WWW-Authenticate`-Header folgt, käme damit nirgends an.
   const resourceMetadataUrl = new URL(
     '/.well-known/oauth-protected-resource/api/mcp',
-    req.nextUrl.origin,
+    await getOauthIssuer(),
   ).toString();
 
   let auth;
