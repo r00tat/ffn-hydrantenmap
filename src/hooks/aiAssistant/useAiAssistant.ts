@@ -161,7 +161,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       });
 
       // Prepare current session contents
-      const currentContents: Content[] = [
+      let currentContents: Content[] = [
         ...chatHistoryRef.current,
         {
           role: 'user',
@@ -214,6 +214,13 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
           // Add model's response to session
           currentContents.push(modelContent);
 
+          // Ab jetzt hat das Modell den gesprochenen Befehl gehört und in einen
+          // Werkzeugaufruf übersetzt — für die weiteren Durchläufe reicht der
+          // Platzhalter. Das Audio erneut mitzuschicken kostete in der Messung
+          // zu #740 gut zwei Sekunden je Durchlauf, allein fürs Hochladen der
+          // rund 200 KB.
+          currentContents = stripInlineDataParts(currentContents);
+
           const functionCalls = response.functionCalls();
           let responseText = '';
           try { responseText = response.text?.() || ''; } catch { /* ignore */ }
@@ -229,9 +236,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             // No more function calls, we are done
             const text = responseText;
             
-            // SAVE current session back to persistent history ref — ohne die
-            // Audio-Blobs, siehe `stripInlineDataParts`.
-            chatHistoryRef.current = stripInlineDataParts(currentContents);
+            // SAVE current session back to persistent history ref — die
+            // Audio-Blobs sind oben bereits ersetzt.
+            chatHistoryRef.current = currentContents;
             
             setProcessingStatus('idle');
             console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');

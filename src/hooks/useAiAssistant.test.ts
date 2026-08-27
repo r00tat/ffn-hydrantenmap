@@ -246,6 +246,39 @@ describe('useAiAssistant Sprachbefehl', () => {
     });
   });
 
+  it('schickt das Audio nicht noch einmal in den zweiten Roundtrip', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    const { executeToolCall } = await import('./aiAssistant/toolHandlers');
+    (geminiModel.generateContent as any).mockReset();
+    (executeToolCall as any).mockResolvedValue({ success: true, message: 'Tagebucheintrag erstellt' });
+
+    // Erster Durchlauf ruft ein Werkzeug auf, zweiter formuliert die Antwort.
+    (geminiModel.generateContent as any)
+      .mockResolvedValueOnce({
+        response: {
+          candidates: [{ content: { role: 'model', parts: [] } }],
+          functionCalls: () => [{ name: 'createDiary', args: { name: 'Meldung' } }],
+          text: () => '',
+        },
+      })
+      .mockResolvedValueOnce({
+        response: {
+          candidates: [{ content: { role: 'model', parts: [{ text: 'Eingetragen' }] } }],
+          functionCalls: () => [],
+          text: () => 'Eingetragen',
+        },
+      });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processAudio('AAAABBBBCCCC');
+
+    // Der zweite Aufruf trägt nur noch den Platzhalter — das Audio ein zweites
+    // Mal hochzuladen kostete in der Messung zu #740 gut zwei Sekunden.
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    expect(JSON.stringify(secondRequest.contents)).not.toContain('AAAABBBBCCCC');
+    expect(JSON.stringify(secondRequest.contents)).toContain('[Sprachbefehl]');
+  });
+
   it('behält das Audio nicht in der Historie', async () => {
     const { geminiModel } = await import('../components/firebase/vertexai');
     (geminiModel.generateContent as any).mockReset();
