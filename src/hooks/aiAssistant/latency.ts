@@ -198,6 +198,7 @@ export function tokenDetail(usage?: {
   candidatesTokenCount?: number;
   thoughtsTokenCount?: number;
   totalTokenCount?: number;
+  cachedContentTokenCount?: number;
 }): LatencyDetail {
   if (!usage) return {};
   return {
@@ -205,5 +206,8 @@ export function tokenDetail(usage?: {
     antwortTokens: usage.candidatesTokenCount,
     thoughtsTokens: usage.thoughtsTokenCount,
     gesamtTokens: usage.totalTokenCount,
+    // Systemprompt und Werkzeugdeklarationen sind gut 9k Token und gehen bei
+    // jedem Aufruf mit. Ob Gemini sie implizit zwischenspeichert, steht hier.
+    cacheTokens: usage.cachedContentTokenCount,
   };
 }

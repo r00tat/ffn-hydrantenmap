@@ -1,6 +1,6 @@
 import { useCallback, useContext, useRef, useState } from 'react';
 import { LeafletContext } from '@react-leaflet/core';
-import { GenerateContentRequest, Content } from 'firebase/ai';
+import { GenerateContentRequest, Content, GenerationConfig, ThinkingLevel } from 'firebase/ai';
 import { geminiModel } from '../../components/firebase/vertexai';
 import { AI_SYSTEM_PROMPT, AI_TOOL_DECLARATIONS } from '../../components/firebase/aiTools';
 import { FirecallItem } from '../../components/firebase/firestore';
@@ -17,9 +17,27 @@ import useFirecallItemUpdate from '../useFirecallItemUpdate';
 import { AiAssistantResult, AiInteraction, MEMORY_TIMEOUT_MS, MAX_INTERACTIONS } from './types';
 import { executeToolCall } from './toolHandlers';
 import { buildAiContext } from './contextBuilder';
+import { stripInlineDataParts } from './chatHistory';
 import { LatencyRun, startLatencyRun, tokenDetail } from './latency';
 
-export type AiProcessingStatus = 'idle' | 'transcribing' | 'analyzing' | 'executing';
+// Ohne eigenen Transkriptionsschritt gibt es keinen Zustand „transcribing" mehr:
+// Der gesprochene Befehl geht direkt in die Analyse (Issue #740).
+export type AiProcessingStatus = 'idle' | 'analyzing' | 'executing';
+
+/**
+ * Der Assistent ordnet einen Satz einem Werkzeug zu und formuliert eine kurze
+ * Antwort — dafür braucht es keinen langen Gedankengang. Die Messung zu #740
+ * zeigte 382 Thinking-Token im ersten Roundtrip und 108 in der Transkription,
+ * beides Wartezeit ohne erkennbaren Gewinn. Ganz abschalten wäre riskant: Die
+ * Auswahl unter 32 Werkzeugen samt Positionsauflösung ist keine reine
+ * Formsache, deshalb die niedrige Stufe statt keiner.
+ */
+/** Format, in dem `useAudioRecorder` aufnimmt. */
+const AUDIO_MIME_TYPE = 'audio/webm';
+
+const AI_GENERATION_CONFIG: GenerationConfig = {
+  thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+};
 
 export default function useAiAssistant(existingItems: FirecallItem[]) {
   const leafletContext = useContext(LeafletContext);
@@ -173,6 +191,7 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             contents: currentContents,
             tools: [{ functionDeclarations: AI_TOOL_DECLARATIONS }],
             toolConfig: { functionCallingConfig: { mode: 'AUTO' } },
+            generationConfig: AI_GENERATION_CONFIG,
           };
 
           const result = await run.phase(`modell #${iterations}`, () =>
@@ -210,8 +229,9 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
             // No more function calls, we are done
             const text = responseText;
             
-            // SAVE current session back to persistent history ref
-            chatHistoryRef.current = currentContents;
+            // SAVE current session back to persistent history ref — ohne die
+            // Audio-Blobs, siehe `stripInlineDataParts`.
+            chatHistoryRef.current = stripInlineDataParts(currentContents);
             
             setProcessingStatus('idle');
             console.info('[AI] Interaction complete. Final message:', text || 'Aktion ausgeführt');
@@ -296,33 +316,6 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
     [cleanupHistory, markInteractionDone, existingItems, isPositionSet, map, position, resolvePosition, addFirecallItem, updateFirecallItem, lastCreatedItem, proposeDrafts, resolveOrigin]
   );
 
-  const transcribeAudio = useCallback(
-    async (audioBase64: string, run: LatencyRun): Promise<string | null> => {
-      console.info('[AI] Transcribing audio...');
-      const request: GenerateContentRequest = {
-        systemInstruction: 'Du bist ein Transkriptions-Assistent. Transkribiere die Audio-Eingabe wortgetreu auf Deutsch. Gib NUR den transkribierten Text zurück, keine Erklärungen oder Formatierung.',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType: 'audio/webm', data: audioBase64 } },
-              { text: 'Transkribiere diese Audio-Aufnahme wortgetreu.' },
-            ],
-          },
-        ],
-      };
-
-      const result = await run.phase('transkription', () =>
-        geminiModel.generateContent(request)
-      );
-      run.annotateLast(tokenDetail(result.response.usageMetadata));
-      const text = result.response.text()?.trim();
-      console.info('[AI] Transcription result:', text);
-      return text || null;
-    },
-    []
-  );
-
   const processAudio = useCallback(
     async (audioBase64: string, parentRun?: LatencyRun): Promise<AiAssistantResult> => {
       // Ohne Lauf von außen (Seite /ai, Tests) misst der Hook wenigstens seinen
@@ -330,23 +323,29 @@ export default function useAiAssistant(existingItems: FirecallItem[]) {
       const run = parentRun ?? startLatencyRun('sprachbefehl');
       run.note({ audioBytes: Math.round((audioBase64.length * 3) / 4) });
       try {
-        setProcessingStatus('transcribing');
-        const transcription = await transcribeAudio(audioBase64, run);
-        if (!transcription) {
-          setProcessingStatus('idle');
-          return { success: false, message: 'Audio konnte nicht transkribiert werden' };
-        }
-        run.note({ transkriptZeichen: transcription.length });
-        return await sendToGemini([{ text: transcription }], run);
+        // Kein eigener Transkriptionsschritt: Das Modell ist multimodal und
+        // versteht den gesprochenen Befehl direkt. Der frühere Umweg über einen
+        // reinen Transkriptions-Roundtrip kostete in der Messung zu #740 rund
+        // vier Sekunden — ein Drittel der gesamten Wartezeit — ohne dass sein
+        // Ergebnis für etwas anderes gebraucht wurde als für den nächsten
+        // Aufruf. Was das Modell verstanden hat, steht in den Werkzeugargumenten
+        // und wird dort protokolliert.
+        return await sendToGemini(
+          [
+            { inlineData: { mimeType: AUDIO_MIME_TYPE, data: audioBase64 } },
+            { text: 'Das Gesagte ist der Befehl des Benutzers. Führe ihn aus.' },
+          ],
+          run
+        );
       } catch (error) {
         console.error('[AI] Audio process error:', error);
         setProcessingStatus('idle');
-        return { success: false, message: 'Fehler bei der Transkription' };
+        return { success: false, message: 'Sprachbefehl konnte nicht verarbeitet werden' };
       } finally {
         if (!parentRun) run.finish();
       }
     },
-    [transcribeAudio, sendToGemini]
+    [sendToGemini]
   );
 
   const processText = useCallback(

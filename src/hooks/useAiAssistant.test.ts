@@ -201,3 +201,68 @@ describe('useAiAssistant Gedächtnis', () => {
     info.mockRestore();
   });
 });
+
+describe('useAiAssistant Denkaufwand', () => {
+  it('begrenzt das Nachdenken des Modells auf die niedrige Stufe', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [{ text: 'Verstanden' }] } }],
+        functionCalls: () => [],
+        text: () => 'Verstanden',
+      },
+    });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processText('Fahrzeug eintragen');
+
+    const request = (geminiModel.generateContent as any).mock.calls[0][0];
+    expect(request.generationConfig?.thinkingConfig?.thinkingLevel).toBe('LOW');
+  });
+});
+
+describe('useAiAssistant Sprachbefehl', () => {
+  it('schickt das Audio direkt in den Werkzeug-Aufruf, ohne Transkriptionsschritt', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [{ text: 'Eingetragen' }] } }],
+        functionCalls: () => [],
+        text: () => 'Eingetragen',
+      },
+    });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processAudio('AAAABBBBCCCC');
+
+    expect((geminiModel.generateContent as any)).toHaveBeenCalledTimes(1);
+    // contents wird im Verlauf der Schleife weitergeschrieben, der
+    // Benutzerbeitrag steht am Anfang.
+    const parts = (geminiModel.generateContent as any).mock.calls[0][0].contents[0].parts;
+    expect(parts[0]).toEqual({
+      inlineData: { mimeType: 'audio/webm', data: 'AAAABBBBCCCC' },
+    });
+  });
+
+  it('behält das Audio nicht in der Historie', async () => {
+    const { geminiModel } = await import('../components/firebase/vertexai');
+    (geminiModel.generateContent as any).mockReset();
+    (geminiModel.generateContent as any).mockResolvedValue({
+      response: {
+        candidates: [{ content: { role: 'model', parts: [{ text: 'Eingetragen' }] } }],
+        functionCalls: () => [],
+        text: () => 'Eingetragen',
+      },
+    });
+
+    const { result } = renderHook(() => useAiAssistant([]));
+    await result.current.processAudio('AAAABBBBCCCC');
+    await result.current.processText('und noch eine Frage');
+
+    const secondRequest = (geminiModel.generateContent as any).mock.calls[1][0];
+    expect(JSON.stringify(secondRequest.contents)).not.toContain('AAAABBBBCCCC');
+    expect(JSON.stringify(secondRequest.contents)).toContain('[Sprachbefehl]');
+  });
+});

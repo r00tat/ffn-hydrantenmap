@@ -170,12 +170,14 @@ describe('tokenDetail', () => {
         candidatesTokenCount: 42,
         thoughtsTokenCount: 310,
         totalTokenCount: 6152,
+        cachedContentTokenCount: 4096,
       })
     ).toEqual({
       promptTokens: 5800,
       antwortTokens: 42,
       thoughtsTokens: 310,
       gesamtTokens: 6152,
+      cacheTokens: 4096,
     });
   });
 

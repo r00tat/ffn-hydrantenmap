@@ -206,7 +206,6 @@ export default function AiAssistantButton({ firecallItems, containerSx }: AiAssi
   const isProcessing = recorderState === 'processing' || isAiProcessing;
 
   const statusLabels: Record<string, string> = {
-    transcribing: 'Transkribiere...',
     analyzing: 'Analysiere...',
     executing: 'Führe aus...',
   };
