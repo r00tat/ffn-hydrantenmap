@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getBaseUrl } from '../../../../server/auth/baseUrl';
 import { resolveAuthorizeRequest } from '../../../../server/oauth/authorizeFlow';
 import { callerKey, checkRateLimit } from '../../../../server/oauth/rateLimit';
 import { oauthError } from '../../../../server/oauth/responses';
@@ -42,16 +43,27 @@ export async function GET(req: NextRequest) {
 
   const outcome = await resolveAuthorizeRequest(req.nextUrl.searchParams);
 
+  // Die eigenen Ziele (Anmeldung, Consent, Fehlerseite) werden gegen die
+  // öffentliche Basis-URL aufgelöst, nicht gegen `req.nextUrl.origin`: Hinter
+  // Cloud Run steht dort die interne Container-Adresse (`https://0.0.0.0:8080`),
+  // die Custom Domain kommt nur über die Forwarded-Header des Requests
+  // (siehe `getBaseUrl`, `docs/auth-und-origins.md`). Eine Weiterleitung
+  // dorthin ist für den Browser eine Sackgasse und bricht den ganzen Flow.
+  //
+  // Für `kind: 'redirect'` ist `outcome.url` die absolute, geprüfte
+  // `redirect_uri` des Clients — die Basis bleibt dort ohne Wirkung.
+  const baseUrl = await getBaseUrl();
+
   switch (outcome.kind) {
     case 'redirect':
     case 'login':
-      return NextResponse.redirect(new URL(outcome.url, req.nextUrl.origin), {
+      return NextResponse.redirect(new URL(outcome.url, baseUrl), {
         status: 302,
         headers: { 'cache-control': 'no-store' },
       });
     case 'consent':
       return NextResponse.redirect(
-        new URL(`/oauth/consent?${outcome.query}`, req.nextUrl.origin),
+        new URL(`/oauth/consent?${outcome.query}`, baseUrl),
         { status: 302, headers: { 'cache-control': 'no-store' } },
       );
     case 'error':
@@ -61,7 +73,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(
         new URL(
           `/oauth/fehler?error=${encodeURIComponent(outcome.error)}&description=${encodeURIComponent(outcome.description)}`,
-          req.nextUrl.origin,
+          baseUrl,
         ),
         { status: 302, headers: { 'cache-control': 'no-store' } },
       );

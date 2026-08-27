@@ -24,6 +24,23 @@ braucht (z.B. `*.nip.io` mit TLS für Gerätetests), trägt sie explizit in
 Wird eine Origin abgelehnt, protokolliert `requestOrigin()` sie zusammen mit der
 Allowlist — der Aufrufer sieht sonst nur `passkey: request origin is not allowed`.
 
+## `req.nextUrl.origin` ist nicht die öffentliche Adresse
+
+**In einem Route Handler nie `req.nextUrl.origin` als Basis einer Weiterleitung
+oder eines nach außen gegebenen Links verwenden.** Next.js baut `nextUrl` aus der
+Adresse, auf die der Server hört — im Container von Cloud Run ist das
+`0.0.0.0:8080`, und mit `X-Forwarded-Proto: https` entsteht daraus ein
+`https://0.0.0.0:8080`. Lokal fällt das nicht auf, weil dort beides
+zusammenfällt.
+
+Sichtbar geworden ist es am OAuth-Flow des MCP-Zugangs: `/api/oauth/authorize`
+leitete auf `https://0.0.0.0:8080/oauth/consent?…` weiter, womit der Browser in
+einer Sackgasse landete, und der `WWW-Authenticate`-Header von `/api/mcp` wies
+auf einen Resource-Metadata-Pfad unter derselben Adresse. Beide nehmen jetzt
+`getBaseUrl()` bzw. `getOauthIssuer()` als Basis. Eine relative `Location` wäre
+zwar auch zulässig (RFC 7231), aber die absolute URL ist dieselbe, die schon im
+Issuer und in der Discovery steht — eine Quelle für alle.
+
 ## CRON_INVOKER_EMAILS
 
 `CRON_INVOKER_EMAILS` ist eine komma-separierte Allowlist der
