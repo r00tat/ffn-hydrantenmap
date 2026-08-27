@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AUDIO_BITS_PER_SECOND } from './constants';
 
 export type RecordingState = 'idle' | 'recording' | 'processing';
 
@@ -40,6 +41,7 @@ export default function useAudioRecorder(): AudioRecorderResult {
 
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
       });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];

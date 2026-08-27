@@ -63,7 +63,13 @@ export interface AiAssistantResult {
   };
 }
 
-export const MEMORY_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+/**
+ * Wie lange das Gespräch nach der letzten Antwort im Gedächtnis bleibt.
+ * Gemessen wird ab dem *Ende* der letzten Antwort: Zwischen zwei Sätzen an den
+ * Assistenten liegt am Einsatzort oft die eigentliche Arbeit, und wer dann
+ * „und wie weit ist das?" nachschiebt, meint noch immer dieselbe Sache.
+ */
+export const MEMORY_TIMEOUT_MS = 15 * 60 * 1000; // 15 Minuten
 export const MAX_INTERACTIONS = 10;
 
 /**
