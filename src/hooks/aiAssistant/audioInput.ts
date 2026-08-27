@@ -1,12 +1,17 @@
+import { AUDIO_BITS_PER_SECOND } from '../constants';
+
+/** Kürzestes Wort, das noch ein Befehl sein könnte („ja", „stopp"). */
+const MIN_AUDIO_SECONDS = 0.25;
+
 /**
  * Kleinste Aufnahme, die noch einen gesprochenen Befehl enthalten kann.
  *
- * `useAudioRecorder` nimmt mit Opus in WebM auf; gemessen an echten Befehlen
- * sind das rund 23 KB je Sekunde. 4 KB entsprechen also etwa 0,2 Sekunden —
- * kürzer als jedes gesprochene Wort und deutlich mehr als der Containerkopf
- * allein, der beim versehentlichen Doppelklick auf den Aufnahmeknopf entsteht.
+ * Abgeleitet aus der Aufnahmebitrate, damit beides nicht auseinanderläuft: Bei
+ * 32 kbit/s sind das 1000 Byte. Ein WebM-Containerkopf ohne Tonspur — das
+ * Ergebnis eines Fehlgriffs am Aufnahmeknopf — bleibt darunter, eine echte
+ * Viertelsekunde Sprache liegt mit dem Kopf zusammen darüber.
  */
-export const MIN_AUDIO_BYTES = 4096;
+export const MIN_AUDIO_BYTES = Math.round((AUDIO_BITS_PER_SECOND / 8) * MIN_AUDIO_SECONDS);
 
 /**
  * Enthält die Aufnahme genug, um sie an das Modell zu schicken?
