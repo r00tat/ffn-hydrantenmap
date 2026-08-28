@@ -23,7 +23,7 @@ import {
 } from 'react-leaflet';
 import L, { LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { availableLayers, overlayLayers } from '../Map/tiles';
+import { availableLayers, overlayLayers, wmsTileSize } from '../Map/tiles';
 import Clusters from '../Map/Clusters';
 import { DistanceLayer } from '../Map/layers/DistanceLayer';
 import FirecallLayer from '../Map/layers/FirecallLayer';
@@ -261,7 +261,7 @@ export default function LocationMapPicker({
                     key={key}
                     format={layer.options.format}
                     transparent={layer.options.transparent}
-                    tileSize={512}
+                    tileSize={wmsTileSize(layer)}
                     uppercase={layer.options.uppercase}
                   />
                 </LayersControl.Overlay>
