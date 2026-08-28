@@ -52,16 +52,20 @@ vi.mock('../lib/firestoreClient', () => ({
 }));
 
 import {
+  type BackupWarning,
   type FirecallExport,
   type ExportDrawingItem,
   type ExportHistoryEntry,
   type ExportFirecallAttachment,
+  BACKUP_VERSION,
   blobFromBase64String,
   exportFirecall,
   importFirecall,
 } from './useExport';
 import { writeBatch, getDocs } from 'firebase/firestore';
-import { addDoc } from '../lib/firestoreClient';
+import { getBlob, getMetadata, ref } from 'firebase/storage';
+import { addDoc, updateDoc } from '../lib/firestoreClient';
+import { uploadFile } from '../components/inputs/FileUploader';
 
 describe('useExport', () => {
   beforeEach(() => {
@@ -172,8 +176,80 @@ describe('useExport', () => {
 
       await exportFirecall('test-id');
 
-      // Should call getDocs for: items, chat, layers, history, locations, kostenersatz, auditlog (7 calls)
-      expect(getDocsMock).toHaveBeenCalledTimes(7);
+      // items, chat, layers, history, locations, kostenersatz, auditlog, crew
+      expect(getDocsMock).toHaveBeenCalledTimes(8);
+    });
+
+    it('should stamp the backup version', async () => {
+      (getDocs as Mock).mockResolvedValue({ docs: [] });
+
+      const result = await exportFirecall('test-id');
+
+      expect(result.backupVersion).toBe(BACKUP_VERSION);
+    });
+
+    it('should export the crew assignments', async () => {
+      (getDocs as Mock).mockImplementation((col: { path?: string }) =>
+        Promise.resolve({
+          docs: col?.path?.endsWith('crew')
+            ? [
+                {
+                  id: 'crew1',
+                  data: () => ({
+                    recipientId: 'r1',
+                    name: 'Max Mustermann',
+                    vehicleId: 'v1',
+                    vehicleName: 'HLFA1',
+                    funktion: 'Maschinist',
+                  }),
+                },
+              ]
+            : [],
+        })
+      );
+
+      const result = await exportFirecall('test-id');
+
+      expect(result.crew).toEqual([
+        {
+          id: 'crew1',
+          recipientId: 'r1',
+          name: 'Max Mustermann',
+          vehicleId: 'v1',
+          vehicleName: 'HLFA1',
+          funktion: 'Maschinist',
+        },
+      ]);
+    });
+
+    it('should warn instead of silently dropping an attachment it cannot download', async () => {
+      (getDocs as Mock).mockImplementation((col: { path?: string }) =>
+        Promise.resolve({
+          docs: col?.path?.endsWith('item')
+            ? [
+                {
+                  id: 'm1',
+                  data: () => ({
+                    name: 'Marker',
+                    type: 'marker',
+                    attachments: ['/firecall/old/files/uuid-plan.pdf'],
+                  }),
+                },
+              ]
+            : [],
+        })
+      );
+      (ref as Mock).mockReturnValue({ name: 'uuid-plan.pdf' });
+      (getBlob as Mock).mockRejectedValue(new Error('storage offline'));
+      (getMetadata as Mock).mockResolvedValue({
+        contentType: 'application/pdf',
+      });
+
+      const warnings: BackupWarning[] = [];
+      await exportFirecall('test-id', (w) => warnings.push(w));
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe('attachmentDownloadFailed');
     });
   });
 
@@ -346,6 +422,236 @@ describe('useExport', () => {
       };
 
       await expect(importFirecall(firecallData)).resolves.toBeDefined();
+    });
+
+    it('should import the crew assignments', async () => {
+      const firecallData: FirecallExport = {
+        name: 'Crew Import',
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+        crew: [
+          {
+            id: 'crew1',
+            recipientId: 'r1',
+            name: 'Max Mustermann',
+            vehicleId: 'v1',
+            vehicleName: 'HLFA1',
+            funktion: 'Maschinist',
+          },
+        ],
+      };
+
+      await importFirecall(firecallData);
+
+      const written = mockBatchSet.mock.calls.map(
+        (call: any[]) => call[1]
+      ) as Record<string, any>[];
+      expect(
+        written.find((data) => data && data.name === 'Max Mustermann')
+      ).toBeDefined();
+    });
+
+    it('should give re-uploaded attachments a fresh uuid prefix', async () => {
+      // Without the prefix two attachments named alike overwrite each other,
+      // and a re-export would chop 37 characters off the bare name.
+      (uploadFile as Mock).mockImplementation((_id: string, name: string) => ({
+        toString: () => `/firecall/new-firecall-id/files/${name}`,
+      }));
+
+      const firecallData: FirecallExport = {
+        name: 'Attachment Import',
+        items: [
+          {
+            id: 'm1',
+            name: 'Marker',
+            type: 'marker',
+            attachments: [
+              { name: 'plan.pdf', mimeType: 'application/pdf', data: btoa('a') },
+              { name: 'plan.pdf', mimeType: 'application/pdf', data: btoa('b') },
+            ],
+          } as any,
+        ],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+      };
+
+      await importFirecall(firecallData);
+
+      const uploadedNames = (uploadFile as Mock).mock.calls.map(
+        (call: any[]) => call[1] as string
+      );
+      expect(uploadedNames).toHaveLength(2);
+      for (const name of uploadedNames) {
+        expect(name).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-plan\.pdf$/
+        );
+      }
+      // both files must survive, not overwrite each other
+      expect(uploadedNames[0]).not.toBe(uploadedNames[1]);
+    });
+
+    it('should warn when an attachment cannot be uploaded', async () => {
+      (uploadFile as Mock).mockRejectedValue(new Error('quota exceeded'));
+
+      const warnings: BackupWarning[] = [];
+      await importFirecall(
+        {
+          name: 'Attachment Import',
+          items: [],
+          chat: [],
+          layers: [],
+          history: [],
+          locations: [],
+          kostenersatz: [],
+          auditlog: [],
+          firecallAttachments: [
+            {
+              name: 'plan.pdf',
+              mimeType: 'application/pdf',
+              data: btoa('a'),
+              originalUrl: '/firecall/old/files/uuid-plan.pdf',
+            },
+          ],
+        },
+        { onWarning: (w) => warnings.push(w) }
+      );
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].code).toBe('attachmentUploadFailed');
+    });
+
+    it('should not carry stale attachment urls into the copy', async () => {
+      // The old urls point at the source firecall's files — if the re-upload
+      // fails, the copy must not silently claim the original's attachments.
+      (uploadFile as Mock).mockRejectedValue(new Error('quota exceeded'));
+
+      await importFirecall({
+        name: 'Attachment Import',
+        attachments: ['/firecall/old/files/uuid-plan.pdf'],
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+        firecallAttachments: [
+          {
+            name: 'plan.pdf',
+            mimeType: 'application/pdf',
+            data: btoa('a'),
+            originalUrl: '/firecall/old/files/uuid-plan.pdf',
+          },
+        ],
+      });
+
+      const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
+      expect(created.attachments).toEqual([]);
+      expect(updateDoc).not.toHaveBeenCalledWith(expect.anything(), {
+        attachments: ['/firecall/old/files/uuid-plan.pdf'],
+      });
+    });
+
+    it('should keep the attachment urls of a backup without embedded files', async () => {
+      // Older backups carry no base64 payload. Restore happens in the same
+      // project, so the existing urls stay valid and must survive.
+      await importFirecall({
+        name: 'Legacy Import',
+        attachments: ['/firecall/old/files/uuid-plan.pdf'],
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+      });
+
+      const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
+      expect(created.attachments).toEqual(['/firecall/old/files/uuid-plan.pdf']);
+    });
+
+    it('should write the target group and drop copy-invalid fields', async () => {
+      await importFirecall(
+        {
+          name: 'Group Import',
+          group: 'ffnd',
+          backupVersion: BACKUP_VERSION,
+          fahrtenbuchEntryCount: 3,
+          fahrtenbuchRoute: {
+            outboundM: 800,
+            returnM: 800,
+            from: [47.9, 16.8],
+            to: [47.94, 16.85],
+          },
+          items: [],
+          chat: [],
+          layers: [],
+          history: [],
+          locations: [],
+          kostenersatz: [],
+          auditlog: [],
+        },
+        { group: 'ffpodersdorf' }
+      );
+
+      const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
+      expect(created.group).toBe('ffpodersdorf');
+      // the copy has no Fahrtenbuch entries of its own
+      expect(created).not.toHaveProperty('fahrtenbuchEntryCount');
+      // the route cache is about the Einsatzort and stays valid
+      expect(created.fahrtenbuchRoute).toBeDefined();
+      // the version belongs to the file, not to the firecall document
+      expect(created).not.toHaveProperty('backupVersion');
+      // subcollections must not end up as arrays on the document
+      expect(created).not.toHaveProperty('items');
+      expect(created).not.toHaveProperty('crew');
+    });
+
+    it('should keep the group from the file when no target group is given', async () => {
+      await importFirecall({
+        name: 'Group Import',
+        group: 'ffnd',
+        items: [],
+        chat: [],
+        layers: [],
+        history: [],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+      });
+
+      const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
+      expect(created.group).toBe('ffnd');
+    });
+
+    it('should warn about a backup from a newer app version', async () => {
+      const warnings: BackupWarning[] = [];
+      await importFirecall(
+        {
+          name: 'Future Import',
+          backupVersion: BACKUP_VERSION + 1,
+          items: [],
+          chat: [],
+          layers: [],
+          history: [],
+          locations: [],
+          kostenersatz: [],
+          auditlog: [],
+        },
+        { onWarning: (w) => warnings.push(w) }
+      );
+
+      expect(warnings.map((w) => w.code)).toContain('newerBackupVersion');
     });
   });
 });

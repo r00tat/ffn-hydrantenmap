@@ -13,6 +13,7 @@ import {
   getStorage,
   ref,
 } from 'firebase/storage';
+import { displayFileName } from '../../common/attachmentName';
 import { downloadBlob } from '../firebase/download';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
@@ -34,7 +35,7 @@ export interface FileDisplayProps {
 export async function downloadStorageFile(url: string) {
   const fileRef = ref(storage, url);
   const blob = await getBlob(fileRef);
-  downloadBlob(blob, fileRef.name.substring(37));
+  downloadBlob(blob, displayFileName(fileRef.name));
 }
 
 export async function deleteStorageObject(url: string) {
@@ -72,13 +73,15 @@ export default function FileDisplay({
     <>
       <Link href={imageUrl || '#'} target="_blank" rel="noopener noreferrer" underline="hover">
         {(!isImage || showTitleIfImage) && (
-          <Typography component="span">{fileRef.name.substring(37)}</Typography>
+          <Typography component="span">
+            {displayFileName(fileRef.name)}
+          </Typography>
         )}
         {isImage && imageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={imageUrl}
-            alt={fileRef.name.substring(37)}
+            alt={displayFileName(fileRef.name)}
             style={{
               maxWidth: imageSize,
               maxHeight: imageSize,
@@ -116,7 +119,7 @@ export default function FileDisplay({
       {confirmDelete && (
         <ConfirmDialog
           title={t('deleteAttachment')}
-          text={`Anhang ${fileRef.name.substring(37)} löschen?`}
+          text={`Anhang ${displayFileName(fileRef.name)} löschen?`}
           onConfirm={async (confirmed) => {
             if (confirmed) {
               await deleteStorageObject(url);

@@ -2131,6 +2131,26 @@
     "deleteTitle": "Einsatz {name} {date} löschen",
     "deleteConfirm": "Einsatz {name} {date} wirklich löschen?"
   },
+  "backup": {
+    "exportTooltip": "Einsatz als Sicherung herunterladen",
+    "exporting": "Sicherung wird erstellt …",
+    "exportFailed": "Sicherung fehlgeschlagen: {error}",
+    "importButton": "Einsatz importieren",
+    "importTitle": "Einsatz importieren",
+    "importSource": "Aus der Datei: {name}",
+    "targetGroup": "Zielgruppe",
+    "targetGroupHelp": "Der Einsatz wird als Kopie in dieser Gruppe angelegt.",
+    "fileGroup": "Gruppe in der Datei: {group}",
+    "importAction": "Importieren",
+    "importing": "Import läuft …",
+    "importSuccess": "Einsatz „{name}“ importiert.",
+    "importFailed": "Import fehlgeschlagen: {error}",
+    "fileInvalid": "Die Datei ist keine gültige Einsatz-Sicherung.",
+    "warningsTitle": "{count, plural, one {# Warnung} other {# Warnungen}}",
+    "warningAttachmentDownloadFailed": "Anhang „{file}“ konnte nicht gesichert werden.",
+    "warningAttachmentUploadFailed": "Anhang „{file}“ konnte nicht hochgeladen werden.",
+    "warningNewerBackupVersion": "Die Datei stammt aus einer neueren Version der App — möglicherweise fehlen Daten."
+  },
   "geschaeftsbuch": {
     "title": "Geschäftsbuch",
     "downloadCsvTooltip": "Geschäftsbuch als CSV herunterladen",

@@ -2131,6 +2131,26 @@
     "deleteTitle": "Delete operation {name} {date}",
     "deleteConfirm": "Really delete operation {name} {date}?"
   },
+  "backup": {
+    "exportTooltip": "Download the Einsatz as a backup",
+    "exporting": "Creating backup …",
+    "exportFailed": "Backup failed: {error}",
+    "importButton": "Import Einsatz",
+    "importTitle": "Import Einsatz",
+    "importSource": "From the file: {name}",
+    "targetGroup": "Target group",
+    "targetGroupHelp": "The Einsatz is created as a copy in this group.",
+    "fileGroup": "Group in the file: {group}",
+    "importAction": "Import",
+    "importing": "Importing …",
+    "importSuccess": "Einsatz “{name}” imported.",
+    "importFailed": "Import failed: {error}",
+    "fileInvalid": "The file is not a valid Einsatz backup.",
+    "warningsTitle": "{count, plural, one {# warning} other {# warnings}}",
+    "warningAttachmentDownloadFailed": "Attachment “{file}” could not be backed up.",
+    "warningAttachmentUploadFailed": "Attachment “{file}” could not be uploaded.",
+    "warningNewerBackupVersion": "The file comes from a newer version of the app — data may be missing."
+  },
   "geschaeftsbuch": {
     "title": "Business log",
     "downloadCsvTooltip": "Download business log as CSV",

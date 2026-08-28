@@ -13,6 +13,7 @@ import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
 import {
   AuditLogEntry,
+  CrewAssignment,
   DrawingStroke,
   FcAttachment,
   FcItemAttachment,
@@ -20,6 +21,7 @@ import {
   Firecall,
   FIRECALL_AUDITLOG_COLLECTION_ID,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_CREW_COLLECTION_ID,
   FIRECALL_HISTORY_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FIRECALL_LAYERS_COLLECTION_ID,
@@ -35,7 +37,60 @@ import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../common/kostenersatz';
-import { allSettled } from '../common/promise';
+import { displayFileName, storageFileName } from '../common/attachmentName';
+
+/**
+ * Format des Sicherungs-JSON. Wird beim Export mitgeschrieben, damit ein
+ * künftiger Import eine ältere Datei erkennen und migrieren kann. Dateien ohne
+ * das Feld stammen aus der Zeit davor und gelten als Version 1.
+ */
+export const BACKUP_VERSION = 1;
+
+/**
+ * Was beim Sichern oder Zurückspielen nicht geklappt hat.
+ *
+ * Vorher verschwanden solche Fehler in einem `console.warn`: Ein Anhang, der
+ * sich nicht herunterladen ließ, fehlte im Backup, und die Datei sah dabei
+ * vollständig aus. Bei einer Sicherungsfunktion ist genau das die gefährlichste
+ * Eigenschaft, deshalb reicht der Aufrufer einen `onWarning`-Rückruf herein und
+ * zeigt die Meldungen an.
+ */
+export interface BackupWarning {
+  code:
+    | 'attachmentDownloadFailed'
+    | 'attachmentUploadFailed'
+    | 'newerBackupVersion';
+  /** Dateiname bzw. Fundstelle, soweit bekannt. */
+  file?: string;
+  detail?: string;
+}
+
+export type BackupWarningHandler = (warning: BackupWarning) => void;
+
+/**
+ * Wie `Promise.allSettled`, meldet Fehlschläge aber nach oben statt sie nur zu
+ * protokollieren.
+ */
+async function settleReporting<T>(
+  tasks: { label: string; run: () => Promise<T> }[],
+  code: BackupWarning['code'],
+  onWarning?: BackupWarningHandler
+): Promise<T[]> {
+  const results = await Promise.allSettled(tasks.map((task) => task.run()));
+
+  return results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') {
+      return [result.value];
+    }
+    console.warn(result.reason);
+    onWarning?.({
+      code,
+      file: tasks[index].label,
+      detail: `${result.reason}`,
+    });
+    return [];
+  });
+}
 
 /** Exported drawing item with embedded strokes */
 export interface ExportDrawingItem extends FirecallItem {
@@ -57,7 +112,17 @@ export interface ExportFirecallAttachment {
   originalUrl: string;
 }
 
+/**
+ * Der komplette Einsatz als eine Datei.
+ *
+ * `call/{id}/livelocation` bleibt bewusst draußen: die Standorte sind nur
+ * während des laufenden Einsatzes gültig und in einer Kopie irreführend. Die
+ * Einsatz-Fotos im Google Drive ebenso — gesichert wird nur `driveFolderId`,
+ * siehe `docs/einsatz-backup.md`.
+ */
 export interface FirecallExport extends Firecall {
+  /** Format der Datei, siehe `BACKUP_VERSION`. */
+  backupVersion?: number;
   items: FirecallItem[];
   chat: ChatMessage[];
   layers: FirecallLayer[];
@@ -65,6 +130,8 @@ export interface FirecallExport extends Firecall {
   locations: FirecallLocation[];
   kostenersatz: KostenersatzCalculation[];
   auditlog: AuditLogEntry[];
+  /** Besatzung je Fahrzeug — `call/{id}/crew`. */
+  crew?: CrewAssignment[];
   firecallAttachments?: ExportFirecallAttachment[];
 }
 
@@ -102,7 +169,7 @@ export async function downloadAttachmentBase64(
   const meta = await getMetadata(src);
 
   return {
-    name: src.name.substring(37),
+    name: displayFileName(src.name),
     mimeType: meta.contentType,
     data: result,
   };
@@ -117,11 +184,16 @@ async function downloadFirecallAttachment(
   const meta = await getMetadata(src);
 
   return {
-    name: src.name.substring(37),
+    name: displayFileName(src.name),
     mimeType: meta.contentType,
     data: result,
     originalUrl: url,
   };
+}
+
+/** Bezeichnung eines Anhangs für Warnmeldungen. */
+function attachmentLabel(attachment: FcItemAttachment): string {
+  return typeof attachment === 'string' ? attachment : attachment.name;
 }
 
 /** Export drawing strokes for a single item */
@@ -176,7 +248,8 @@ async function exportHistorySnapshot(
 }
 
 export async function exportFirecall(
-  firecallId: string
+  firecallId: string,
+  onWarning?: BackupWarningHandler
 ): Promise<FirecallExport> {
   const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
   const firecall = (await getDoc(firecallDoc)).data() as Firecall;
@@ -206,6 +279,9 @@ export async function exportFirecall(
       query(collection(firecallDoc, FIRECALL_AUDITLOG_COLLECTION_ID))
     )
   ).docs.map((d) => ({ ...d.data(), id: d.id }) as AuditLogEntry);
+  const crew = (
+    await getDocs(query(collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID)))
+  ).docs.map((d) => ({ ...d.data(), id: d.id }) as CrewAssignment);
 
   // Export items with attachments and drawing strokes
   const exportItems = await Promise.all(
@@ -213,8 +289,13 @@ export async function exportFirecall(
       if (item.type === 'marker') {
         const m = item as FcMarker;
         if (m.attachments) {
-          m.attachments = await allSettled<FcAttachment>(
-            m.attachments?.map(downloadAttachmentBase64)
+          m.attachments = await settleReporting<FcAttachment>(
+            m.attachments.map((attachment) => ({
+              label: attachmentLabel(attachment),
+              run: () => downloadAttachmentBase64(attachment),
+            })),
+            'attachmentDownloadFailed',
+            onWarning
           );
         }
         return m;
@@ -241,13 +322,19 @@ export async function exportFirecall(
   // Export firecall-level attachments
   let firecallAttachments: ExportFirecallAttachment[] | undefined;
   if (firecall.attachments && firecall.attachments.length > 0) {
-    firecallAttachments = await allSettled<ExportFirecallAttachment>(
-      firecall.attachments.map(downloadFirecallAttachment)
+    firecallAttachments = await settleReporting<ExportFirecallAttachment>(
+      firecall.attachments.map((url) => ({
+        label: url,
+        run: () => downloadFirecallAttachment(url),
+      })),
+      'attachmentDownloadFailed',
+      onWarning
     );
   }
 
   return {
     ...firecall,
+    backupVersion: BACKUP_VERSION,
     items: exportItems,
     chat,
     layers,
@@ -255,6 +342,7 @@ export async function exportFirecall(
     locations,
     kostenersatz,
     auditlog,
+    crew,
     firecallAttachments,
   };
 }
@@ -296,7 +384,17 @@ async function commitInBatches(
   }
 }
 
-export async function importFirecall(firecall: FirecallExport) {
+export interface ImportFirecallOptions {
+  /** Zielgruppe. Ohne Angabe bleibt die Gruppe aus der Datei stehen. */
+  group?: string;
+  onWarning?: BackupWarningHandler;
+}
+
+export async function importFirecall(
+  firecall: FirecallExport,
+  options: ImportFirecallOptions = {}
+) {
+  const { group, onWarning } = options;
   const {
     items,
     chat,
@@ -305,10 +403,34 @@ export async function importFirecall(firecall: FirecallExport) {
     locations,
     kostenersatz,
     auditlog,
+    crew,
     firecallAttachments,
     id,
-    ...firecallData
+    backupVersion,
+    // Die Kopie hat keine eigenen Fahrtenbuch-Einträge. Bliebe der Zähler
+    // stehen, meldete die Einsatz-Übersicht erfasste Fahrten, die es nicht
+    // gibt — und niemand trägt sie mehr ein. `fahrtenbuchRoute` bleibt: der
+    // Weg zum Einsatzort ist derselbe.
+    fahrtenbuchEntryCount,
+    // Die alten URLs zeigen auf die Dateien des Quell-Einsatzes. Was die Kopie
+    // wirklich hat, steht erst nach dem Wiederhochladen fest.
+    attachments,
+    ...rest
   } = firecall;
+
+  if ((backupVersion ?? 1) > BACKUP_VERSION) {
+    onWarning?.({ code: 'newerBackupVersion', detail: `${backupVersion}` });
+  }
+
+  const firecallData = {
+    ...rest,
+    ...(firecallAttachments
+      ? { attachments: [] }
+      : attachments
+        ? { attachments }
+        : {}),
+    ...(group ? { group } : {}),
+  };
 
   const firecallDoc = await addDoc(
     collection(firestore, FIRECALL_COLLECTION_ID),
@@ -317,14 +439,22 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Re-upload firecall-level attachments and update the firecall document
   if (firecallAttachments?.length) {
-    const newUrls = await allSettled(
-      firecallAttachments.map(async (a) => {
-        const blob = blobFromBase64String(a.data, a.mimeType);
-        const uploadRef = await uploadFile(firecallDoc.id, a.name, blob, {
-          contentType: a.mimeType,
-        });
-        return uploadRef.toString();
-      })
+    const newUrls = await settleReporting(
+      firecallAttachments.map((a) => ({
+        label: a.name,
+        run: async () => {
+          const blob = blobFromBase64String(a.data, a.mimeType);
+          const uploadRef = await uploadFile(
+            firecallDoc.id,
+            storageFileName(a.name),
+            blob,
+            { contentType: a.mimeType }
+          );
+          return uploadRef.toString();
+        },
+      })),
+      'attachmentUploadFailed',
+      onWarning
     );
     if (newUrls.length > 0) {
       await updateDoc(firecallDoc, { attachments: newUrls });
@@ -341,25 +471,34 @@ export async function importFirecall(firecall: FirecallExport) {
     firecallDoc,
     FIRECALL_AUDITLOG_COLLECTION_ID
   );
+  const crewCol = collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID);
 
   // Upload marker attachments
-  const importItems = await allSettled(
+  const importItems = await Promise.all(
     items.map(async (i) => {
       if (i.type === 'marker') {
         const m = i as FcMarker;
         if (m.attachments) {
-          m.attachments = await allSettled(
-            m.attachments.map(async (m) => {
-              if (typeof m === 'string') {
-                return m;
-              }
-              const a = m as FcAttachment;
-              const blob = blobFromBase64String(a.data, a.mimeType);
-              const uploadRef = await uploadFile(firecallDoc.id, a.name, blob, {
-                contentType: a.mimeType,
-              });
-              return uploadRef.toString();
-            })
+          m.attachments = await settleReporting<FcItemAttachment>(
+            m.attachments.map((attachment) => ({
+              label: attachmentLabel(attachment),
+              run: async () => {
+                if (typeof attachment === 'string') {
+                  return attachment;
+                }
+                const a = attachment as FcAttachment;
+                const blob = blobFromBase64String(a.data, a.mimeType);
+                const uploadRef = await uploadFile(
+                  firecallDoc.id,
+                  storageFileName(a.name),
+                  blob,
+                  { contentType: a.mimeType }
+                );
+                return uploadRef.toString();
+              },
+            })),
+            'attachmentUploadFailed',
+            onWarning
           );
         }
       }
@@ -501,6 +640,16 @@ export async function importFirecall(firecall: FirecallExport) {
       auditlog.map((a) => ({
         ref: doc(auditlogCol, a.id || uuid()),
         data: a as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+
+  // Import crew assignments
+  if (crew?.length) {
+    await commitInBatches(
+      crew.map((c) => ({
+        ref: doc(crewCol, c.id || uuid()),
+        data: c as unknown as Record<string, unknown>,
       }))
     );
   }

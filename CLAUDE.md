@@ -22,6 +22,7 @@ wird** — dort steht jeweils das „warum", das sich aus dem Code nicht ableite
 | [docs/bug-reports.md](docs/bug-reports.md) | Bug-Report-Dialog, Verlauf, Screenshot-Aufnahme |
 | [docs/fahrtenbuch.md](docs/fahrtenbuch.md) | PDF-Export, Wochenbericht, Fahrzeug-Cache, Einsatzbezug und Freigabe-Link, Personennamen, Duplikatsprüfung, Änderungsrecht an einer Fahrt, Personen-Benutzer-Zuordnung, Zeiten beim Zweckwechsel, Mangel-Bilder, Gerätemeister-Rolle |
 | [docs/einsatz-drive-fotos.md](docs/einsatz-drive-fotos.md) | Einsatz-Fotos im Google Shared Drive |
+| [docs/einsatz-backup.md](docs/einsatz-backup.md) | Einsatz sichern und zurückspielen: Umfang, was bewusst fehlt, Gruppenwahl beim Import, Dateinamen von Anhängen |
 | [docs/strassen-routing.md](docs/strassen-routing.md) | Routing über Straße für Leitungen und Linien |
 | [docs/loeschwasserfoerderung.md](docs/loeschwasserfoerderung.md) | Löschwasserförderung an der Leitung: Reibungstabelle und ihre Quelle, Höhendaten, Pumpenstandorte |
 | [docs/pendelverkehr.md](docs/pendelverkehr.md) | Pendelverkehr an der Leitung und der Vergleich mit der Förderung: Umlaufformel, Füllstellen-Schranke, Fahrt-Routing, Planungswerte der Aufbauzeit, Seite „Löschwasserversorgung" |

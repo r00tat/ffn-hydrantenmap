@@ -20,6 +20,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { displayFileName } from '../../common/attachmentName';
 import { formatTimestamp } from '../../common/time-format';
 import { countCrewByVehicle } from '../../common/vehicle-utils';
 import useFirecall, { FirecallContext } from '../../hooks/useFirecall';
@@ -453,7 +454,7 @@ function PrintAttachment({ url }: { url: string }) {
       const dlUrl = await getDownloadURL(fileRef);
       setDownloadUrl(dlUrl);
       setIsImage(meta.contentType?.startsWith('image/') ?? false);
-      setFileName(fileRef.name.substring(37));
+      setFileName(displayFileName(fileRef.name));
     })();
   }, [url]);
 
