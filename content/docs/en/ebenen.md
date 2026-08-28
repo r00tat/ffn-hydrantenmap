@@ -94,3 +94,13 @@ A broken or unreachable service cannot break the map: missing tiles stay empty a
 :::info
 Custom map layers are **not** precached for offline use. Without a network they stay empty. The attribution is stored as plain text — HTML and links are not possible there.
 :::
+
+### Map layers when exchanging with lagekarte.info
+
+Custom map layers travel with the lagekarte.info export and come back on import:
+
+- **WMS layers** are written to the file's `wmslayers` field and are therefore visible in lagekarte.info itself.
+- **Tile layers (WMTS/XYZ)** are unknown to lagekarte.info. They only survive the way back into the operations map.
+- Opacity, format, zoom limits and order are unknown to lagekarte.info as well — they are nevertheless preserved on the way through lagekarte.info and back.
+
+Importing a file from lagekarte.info takes over its WMS layers as custom map layers. Layers whose address is not `https://` are skipped and reported as a warning in the preview.

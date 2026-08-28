@@ -10,6 +10,7 @@ import {
   type LagekarteGroup,
   type LagekarteParseResult,
 } from './types';
+import { mapLayersFromLagekarte } from './wmsLayers';
 
 /**
  * Erkennt eine Lagekarte-Datei. `groups` und benannte Untergruppen sind das
@@ -22,9 +23,19 @@ export function isLagekarteFile(raw: unknown): raw is LagekarteFile {
   if (candidate.type !== 'FeatureCollection') return false;
   if (!Array.isArray(candidate.groups)) return false;
   if (!Array.isArray(candidate.features)) return false;
-  return candidate.features.some(
+  const hasNamedGroup = candidate.features.some(
     (g) =>
       g && typeof g === 'object' && typeof (g as LagekarteGroup).name === 'string',
+  );
+  if (hasNamedGroup) return true;
+  // Eine Lagekarte kann ganz ohne Gruppen auskommen — ein Export, dessen
+  // einziger Inhalt eigene Kartenebenen sind, hat `features: []`
+  // (`fixtures/lagekarte-wmslayers.json`). Dann entscheiden die Felder, die
+  // nur lagekarte.info schreibt; ein gewöhnliches GeoJSON trägt sie nicht.
+  return (
+    Array.isArray(candidate.wmslayers) ||
+    Array.isArray(candidate.colors) ||
+    Array.isArray(candidate.messages)
   );
 }
 
@@ -253,5 +264,9 @@ export function parseLagekarteFile(
       }) as unknown as FirecallItem,
   );
 
-  return { layers, items, diaries, warnings };
+  // Eigene Kartenebenen: der `ffnd`-Block gewinnt, sonst wird aus dem
+  // `wmslayers`-Feld von lagekarte.info rekonstruiert.
+  const mapLayers = mapLayersFromLagekarte(file, warnings);
+
+  return { layers, items, diaries, mapLayers, warnings };
 }

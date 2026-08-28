@@ -4,6 +4,7 @@ import type {
   FirecallItem,
   FirecallLayer,
 } from '../../components/firebase/firestore';
+import type { FirecallMapLayer } from '../mapLayers';
 import type { GeoJsonFeatureColleaction } from '../../server/geojson';
 
 /**
@@ -70,6 +71,37 @@ export interface LagekarteFfndBlock {
   v: 1;
   item: FirecallItem;
   strokes?: DrawingStroke[];
+}
+
+/**
+ * Eine WMS-Ebene, wie lagekarte.info sie schreibt.
+ *
+ * Belegt in `captures/lagekarte (3).json`. **`bounds` steht hier als
+ * `west,süd,ost,nord`** — Länge zuerst, anders als in unserem
+ * `FirecallMapLayer.bounds`. Die Umrechnung steht in `wmsLayers.ts`.
+ */
+export interface LagekarteWmsLayer {
+  url: string;
+  /** Wert des `LAYERS`-Parameters. */
+  layer: string;
+  /** Anzeigename. */
+  name: string;
+  /** `west,süd,ost,nord` in Grad. */
+  bounds?: string;
+  /** Umgekehrt zu unserem `enabled`. */
+  disabled: boolean;
+}
+
+/**
+ * Unser Zusatzblock auf Dateiebene. lagekarte ignoriert ihn.
+ *
+ * Trägt, was `wmslayers` nicht kennt: Deckkraft, Format, Transparenz,
+ * Zoomgrenzen, Stapelung — und Kachel-Ebenen, für die es dort gar kein Feld
+ * gibt.
+ */
+export interface LagekarteFfndFileBlock {
+  v: 1;
+  mapLayers?: FirecallMapLayer[];
 }
 
 export type LagekarteFeatureType =
@@ -154,9 +186,11 @@ export interface LagekarteFile {
   history: LagekarteHistoryEntry[];
   /** Schema unbekannt — immer `[]` schreiben */
   colors: unknown[];
-  /** Schema unbekannt — immer `[]` schreiben */
-  wmslayers: unknown[];
+  /** Eigene WMS-Kartenebenen. */
+  wmslayers: LagekarteWmsLayer[];
   features: LagekarteGroup[];
+  /** Unser Zusatzblock. Fehlt in Dateien, die von lagekarte.info stammen. */
+  ffnd?: LagekarteFfndFileBlock;
 }
 
 /** Eingabe für den Export. */
@@ -164,6 +198,8 @@ export interface LagekarteSource {
   firecall: Firecall;
   items: FirecallItem[];
   layers: FirecallLayer[];
+  /** Eigene Kartenebenen (WMS/WMTS) des Einsatzes. */
+  mapLayers?: FirecallMapLayer[];
   /** Strokes je `drawing`-Item, Schlüssel = Item-Id */
   strokes: Record<string, DrawingStroke[]>;
   /** Statische GIS-Daten; fehlt, wenn die Server Action ausfiel */
@@ -181,5 +217,7 @@ export interface LagekarteParseResult {
   items: { item: FirecallItem; layerIndex: number }[];
   /** Tagebuch-Einträge aus `messages` — gehören in die Sammelebene */
   diaries: FirecallItem[];
+  /** Eigene Kartenebenen, ohne `id` — der Schreibpfad legt sie neu an. */
+  mapLayers: FirecallMapLayer[];
   warnings: string[];
 }

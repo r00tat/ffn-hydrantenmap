@@ -94,3 +94,13 @@ Ein nicht erreichbarer oder fehlerhafter Dienst kann die Karte nicht zerstören:
 :::info
 Eigene Kartenebenen werden **nicht** für den Offline-Betrieb vorgeladen. Ohne Netz bleiben sie leer. Die Quellenangabe wird als reiner Text übernommen — HTML und Links sind dort nicht möglich.
 :::
+
+### Kartenebenen beim Austausch mit lagekarte.info
+
+Eigene Kartenebenen gehen beim Export für lagekarte.info mit und kommen beim Import wieder an:
+
+- **WMS-Ebenen** landen im `wmslayers`-Feld der Datei und sind damit auch in lagekarte.info selbst sichtbar.
+- **Kachel-Ebenen (WMTS/XYZ)** kennt lagekarte.info nicht. Sie überleben nur den Weg zurück in die Einsatzkarte.
+- Deckkraft, Format, Zoomgrenzen und Reihenfolge kennt lagekarte.info ebenfalls nicht — beim Weg über lagekarte.info und zurück in die Einsatzkarte bleiben sie trotzdem erhalten.
+
+Beim Import einer Datei von lagekarte.info werden deren WMS-Ebenen als eigene Kartenebenen übernommen. Ebenen mit einer Adresse ohne `https://` werden dabei übersprungen und in der Vorschau als Warnung angezeigt.

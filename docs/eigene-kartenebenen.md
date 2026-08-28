@@ -164,6 +164,15 @@ React-Kontext findet.
   Neuladen der Seite wirken. Über den Key wird die Ebene stattdessen neu
   aufgebaut.
 
+## Wo die Kartenebenen mitgehen — und wo nicht
+
+| Weg | Kartenebenen dabei? |
+| --- | --- |
+| Backup eines Einsatzes (JSON-Export/Import, `useExport.ts`) | ja, als `mapLayers` |
+| Export/Import für lagekarte.info | ja — `wmslayers` plus `ffnd`-Block, siehe [docs/lagekarte-austausch.md](lagekarte-austausch.md) |
+| History-Snapshot (`useSaveHistory.ts`) | nein, absichtlich — siehe unten |
+| Service-Worker-Precaching | nein, absichtlich |
+
 ## Historie
 
 `useFirecallMapLayers` liest **ohne** die Historien-Pfadsegmente. Eine

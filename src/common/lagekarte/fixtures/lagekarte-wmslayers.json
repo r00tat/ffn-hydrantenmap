@@ -1,0 +1,53 @@
+{
+    "type": "FeatureCollection",
+    "name": "map",
+    "features": [],
+    "groups": [],
+    "notes": "",
+    "view": [
+        "47.946426",
+        "16.838608"
+    ],
+    "zoom": 16,
+    "colors": [],
+    "wmslayers": [
+        {
+            "url": "https://inspire.lfrz.gv.at/000801/ows?SERVICE=WMS&",
+            "layer": "Hochwasserrisikogebiete HQ100",
+            "name": "Hochwasserrisikogebiete HQ100",
+            "bounds": "8.468,45.501,19.638,49.713",
+            "disabled": true
+        },
+        {
+            "url": "https://inspire.lfrz.gv.at/000801/ows?SERVICE=WMS&",
+            "layer": "Hochwasserueberflutungsflaechen HQ100",
+            "name": "Hochwasserüberflutungsflächen HQ100",
+            "bounds": "8.468,45.501,19.638,49.713",
+            "disabled": true
+        },
+        {
+            "url": "https://inspire.lfrz.gv.at/000801/ows?SERVICE=WMS&",
+            "layer": "Isotopenniederschlagsmessstellen",
+            "name": "Isotopenniederschlagsmessstellen",
+            "bounds": "8.468,45.501,19.638,49.713",
+            "disabled": true
+        }
+    ],
+    "messages": [],
+    "history": [
+        {
+            "name": "Einsatzbeginn",
+            "timestamp": 1787900843,
+            "sp": {
+                "data": {
+                    "type": "FeatureCollection",
+                    "name": "map",
+                    "features": [],
+                    "groups": [],
+                    "notes": ""
+                },
+                "timestamp": 1787900843
+            }
+        }
+    ]
+}

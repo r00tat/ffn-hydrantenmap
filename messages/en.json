@@ -2699,7 +2699,8 @@
     "importLayers": "Layers from the situation map",
     "layerObjectCount": "{count, plural, =0 {Layer name (no objects)} one {Layer name (# object)} other {Layer name (# objects)}}",
     "diaryCount": "{count, plural, one {# diary entry} other {# diary entries}}",
-    "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}"
+    "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}",
+    "mapLayerCount": "{count, plural, one {# map layer} other {# map layers}}"
   },
   "rettungskarten": {
     "title": "Rescue sheets",

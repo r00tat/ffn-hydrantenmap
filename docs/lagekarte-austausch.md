@@ -138,8 +138,7 @@ in ihrer `options.g`.
 - **Genau ein `history`-Eintrag.** lagekarte schreibt selbst einen Snapshot mit
   dem aktuellen Stand. Unsere History-Snapshots mitzuexportieren würde die Datei
   vervielfachen, weil jeder Snapshot eine vollständige Item-Kopie ist.
-- **`colors` und `wmslayers` bleiben leer.** Ihr Schema ist in keinem Sample
-  belegt.
+- **`colors` bleibt leer.** Sein Schema ist in keinem Sample belegt.
 - **Der Ausschnitt der GIS-Daten** ist die Bounding-Box aller Einsatz-Elemente
   plus 300 m (`boundingBoxWithMargin`). Ein fixer Radius um die Einsatzmitte
   würde bei einer langen Zubringleitung die Hydranten am anderen Ende verlieren.
@@ -169,3 +168,53 @@ Der bestehende token-gesicherte Endpoint
 statischen GIS-Daten weiterhin als **Live-Overlay** für lagekarte.info. Der
 Dateiaustausch hier ist davon unabhängig und betrifft die **Einsatz-Lage**. Beide
 Wege bleiben bestehen.
+
+## Eigene Kartenebenen — `wmslayers`
+
+Das Feld war lange leer, weil sein Schema in keinem Sample stand. Mit einem
+Export, dessen einziger Inhalt drei WMS-Ebenen sind
+(`fixtures/lagekarte-wmslayers.json`), ist es belegt:
+
+```json
+{
+  "url": "https://inspire.lfrz.gv.at/000801/ows?SERVICE=WMS&",
+  "layer": "Hochwasserrisikogebiete HQ100",
+  "name": "Hochwasserrisikogebiete HQ100",
+  "bounds": "8.468,45.501,19.638,49.713",
+  "disabled": true
+}
+```
+
+Drei Fallen stecken darin:
+
+- **`bounds` steht als `west,süd,ost,nord`** — Länge zuerst, die BBox-Reihenfolge
+  von WMS und GeoJSON. Unser `FirecallMapLayer.bounds` folgt Leaflet mit
+  `süd,west,nord,ost`. Im Beispiel oben sind `8.468`/`19.638` Längen- und
+  `45.501`/`49.713` Breitengrade; ungedreht gelesen läge die Ebene im Indischen
+  Ozean. `boundsToLagekarte`/`boundsFromLagekarte` in
+  [wmsLayers.ts](../src/common/lagekarte/wmsLayers.ts) drehen in beide
+  Richtungen, ein Test hält die Werte des Referenz-Exports fest.
+- **`disabled` ist die Umkehrung unseres `enabled`.**
+- **Es gibt nur WMS.** Für eine Kachel-Ebene (`{z}/{x}/{y}`) hat lagekarte.info
+  kein Feld; `url` + `layer` allein tragen sie nicht.
+
+Was lagekarte.info außerdem nicht führt: Deckkraft, Format, Transparenz,
+Zoomgrenzen und Stapelung. Damit der Weg FFN → Datei → FFN trotzdem verlustfrei
+bleibt, schreibt der Export **zusätzlich** einen `ffnd`-Block auf Dateiebene —
+dieselbe Idee wie der `ffnd`-Block je Feature, nur eine Ebene höher:
+
+```json
+{ "wmslayers": [ … ], "ffnd": { "v": 1, "mapLayers": [ … ] } }
+```
+
+Der Import bevorzugt den eigenen Block und rekonstruiert nur dann aus
+`wmslayers`, wenn er fehlt — also bei einer Datei, die wirklich von
+lagekarte.info stammt. In beiden Fällen wird jede Adresse gegen
+`isSafeMapLayerUrl` geprüft: eine importierte Datei ist Fremdeingabe, auch wenn
+sie unseren Block trägt. Was durchfällt, landet als Warnung in der Vorschau.
+
+**Die Dateierkennung musste dafür nachgeben.** `isLagekarteFile` verlangte eine
+benannte Feature-Gruppe; eine Lagekarte, deren einziger Inhalt Kartenebenen sind,
+hat `groups: []` und `features: []` und wäre im Import in den CSV-Zweig gelaufen.
+Jetzt reicht ersatzweise eines der Felder, die nur lagekarte.info schreibt
+(`wmslayers`, `colors`, `messages`) — ein gewöhnliches GeoJSON trägt keines davon.
