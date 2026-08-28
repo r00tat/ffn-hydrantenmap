@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   formatRescueBuildYears,
   formatRescueSheetTitle,
+  rescuePictureSrc,
   toRescueSheetView,
 } from './sheetView';
-import { RescueVariant } from './types';
+import { RescueSheetView, RescueVariant } from './types';
 
 const VARIANT: RescueVariant = {
   id: '35',
@@ -134,5 +135,29 @@ describe('formatRescueBuildYears', () => {
         ),
       ),
     ).toBe('');
+  });
+});
+
+describe('rescuePictureSrc', () => {
+  const base: RescueSheetView = {
+    id: 'v1',
+    makeName: 'Tesla',
+    modelName: 'Model Y',
+    variantName: 'Model Y',
+    pictureUrl: 'https://api.rescue.euroncap.com/…/Tesla_Model_Y.png',
+  };
+
+  it('zeigt auf den eigenen Origin statt auf Euro NCAP', () => {
+    expect(rescuePictureSrc(base)).toBe('/api/rettungskarten/bild/v1');
+  });
+
+  it('maskiert die ID', () => {
+    expect(rescuePictureSrc({ ...base, id: 'a/b c' })).toBe(
+      '/api/rettungskarten/bild/a%2Fb%20c',
+    );
+  });
+
+  it('liefert nichts, wenn die Variante kein Bild hat', () => {
+    expect(rescuePictureSrc({ ...base, pictureUrl: undefined })).toBeUndefined();
   });
 });

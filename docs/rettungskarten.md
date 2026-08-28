@@ -54,6 +54,45 @@ liefe in unserem Origin. `safeUrl()` in
 daher alles andere. Der Host bleibt bewusst ungeprüft — eine Host-Liste würde
 beim nächsten Umzug des Blob-Storage still alle Dokumente ausblenden.
 
+## Die Fahrzeugbilder laufen über den eigenen Origin
+
+Die PDFs werden verlinkt, die Bilder **nicht**: sie kommen über
+`/api/rettungskarten/bild/<variantId>`. Der Grund ist kein Datenschutz und
+keine Bequemlichkeit, sondern ein Fehler bei Euro NCAP:
+
+**Alle Fahrzeugbilder werden mit `Content-Type: application/pdf` ausgeliefert.**
+Die Bytes sind einwandfreie PNGs — `picture_url` endet auf `.png`/`.PNG`, und
+ein `curl` liefert `PNG image data, 800 x 450` —, aber der Header behauptet
+etwas anderes. Für eine cross-origin-Antwort ohne CORS steht `application/pdf`
+auf der „never sniffed"-Liste von Chromes Opaque Response Blocking: der Browser
+verwirft die Antwort mit `net::ERR_BLOCKED_BY_ORB`, ohne die Bytes überhaupt
+anzusehen. Direkt verlinkt erschien deshalb **kein einziges** Fahrzeugbild —
+nicht nur bei einzelnen Fahrzeugen, sondern bei allen; nachgemessen mit
+Chromium: direkt `naturalWidth 0`, über den eigenen Origin `800 × 450`.
+
+Über den eigenen Origin greift ORB nicht. Die Route holt das Bild,
+**bestimmt den Typ aus den ersten Bytes** (`sniffImageType` in
+[`rescuePicture.ts`](../src/server/rescue/rescuePicture.ts)) und liefert es mit
+dem richtigen `Content-Type` und `X-Content-Type-Options: nosniff` aus. Was
+sich nicht als Bild ausweist, wird verworfen — sonst lieferte die Route
+beliebige fremde Bytes unter unserem Origin aus.
+
+**Die Größengrenze zieht beim Lesen, nicht danach.** `response.arrayBuffer()`
+würde erst die ganze Antwort in den Speicher holen und die Grenze anschließend
+prüfen — ein Dienst, der ohne `content-length` endlos sendet, brächte den
+Server damit zum Erliegen. `readCapped()` liest deshalb stückweise und bricht
+beim Überschreiten ab; `content-length` wird zusätzlich vorab geprüft.
+
+**Der Aufrufer nennt eine Varianten-ID, keine URL.** Die Adresse kommt aus dem
+serverseitig zwischengespeicherten Katalog. Damit ist die Route kein offener
+Proxy, und es gibt nichts gegen SSRF abzusichern, was `safeUrl()` beim Einlesen
+des Katalogs nicht schon geprüft hätte. Angemeldet wird über die
+Session-Cookie und nicht über `userRequired`: ein `<img src>` schickt keinen
+Authorization-Header.
+
+Sollte Euro NCAP den Content-Type eines Tages richtigstellen, kann der Umweg
+weg — nötig ist er dann nicht mehr, schaden tut er aber auch nicht.
+
 **Die API ist undokumentiert.** Sie kann jederzeit ausfallen oder ihr Format
 ändern. Deshalb ist jeder Aufrufer fehlertolerant: die Kennzeichenabfrage
 liefert dann leere Trefferlisten statt zu scheitern, die Suchseite zeigt einen
