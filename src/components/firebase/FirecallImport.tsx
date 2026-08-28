@@ -1,49 +1,118 @@
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+'use client';
 
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import FormControl from '@mui/material/FormControl';
+import FormHelperText from '@mui/material/FormHelperText';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
-import { useCallback, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useCallback, useMemo, useState } from 'react';
+import { NON_TENANT_GROUP_IDS } from '../../app/groups/groupTypes';
 import { formatTimestamp } from '../../common/time-format';
-import { FirecallExport, importFirecall } from '../../hooks/useExport';
+import useFirebaseLogin from '../../hooks/useFirebaseLogin';
+import {
+  type BackupProgress,
+  type BackupWarning,
+  type FirecallExport,
+  importFirecall,
+} from '../../hooks/useExport';
+import LinearProgressWithLabel from '../inputs/LinearProgressWithLabel';
+import { useSnackbar } from '../providers/SnackbarProvider';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 import readFileAsText from '../upload/readFile';
+import useBackupProgressText, {
+  backupProgressPercent,
+} from './useBackupProgressText';
+import useBackupWarningText from './useBackupWarningText';
 
 async function readFileAsJson(file: File): Promise<FirecallExport> {
   const result = await readFileAsText(file);
-  const firecallData = JSON.parse(result);
-  return firecallData;
+  return JSON.parse(result);
 }
 
 export default function FirecallImport() {
-  const [uploadInProgress, setUploadInProgress] = useState(false);
+  const t = useTranslations('backup');
+  const tCommon = useTranslations('common');
+  const showSnackbar = useSnackbar();
+  const warningText = useBackupWarningText();
+  const progressText = useBackupProgressText();
+  const { myGroups } = useFirebaseLogin();
 
-  const handleUpload = useCallback(async (files: FileList): Promise<void> => {
-    console.log(`firecall import upload change `, files);
+  const [pending, setPending] = useState<FirecallExport>();
+  const [targetGroup, setTargetGroup] = useState('');
+  const [progress, setProgress] = useState<BackupProgress>();
+  const importInProgress = progress !== undefined;
 
-    if (files) {
-      setUploadInProgress(true);
+  // Pseudo-Gruppen wie `allUsers` sind keine Mandanten und dürfen nie als
+  // Zielgruppe eines Einsatzes herauskommen, siehe `NON_TENANT_GROUP_IDS`.
+  const selectableGroups = useMemo(
+    () => myGroups.filter((g) => !NON_TENANT_GROUP_IDS.includes(g.id ?? '')),
+    [myGroups]
+  );
 
-      const refs = await Promise.allSettled(
-        Array.from(files).map(async (file) => {
-          console.log(`uploading ${file.name}`);
-          const firecallData = await readFileAsJson(file);
+  const handleFile = useCallback(
+    async (file: File) => {
+      try {
+        const firecallData = await readFileAsJson(file);
+        if (!firecallData?.name) {
+          throw new Error('missing name');
+        }
+        setPending(firecallData);
+        // Die Gruppe aus der Datei ist die Vorbelegung — aber nur, wenn sie
+        // für diesen Benutzer überhaupt freigegeben ist.
+        const fromFile = selectableGroups.some(
+          (g) => g.id === firecallData.group
+        )
+          ? (firecallData.group as string)
+          : (selectableGroups[0]?.id ?? '');
+        setTargetGroup(fromFile);
+      } catch (err) {
+        console.error('could not read firecall backup', err);
+        showSnackbar(t('fileInvalid'), 'error');
+      }
+    },
+    [selectableGroups, showSnackbar, t]
+  );
 
-          console.log(`importing firecall ${firecallData.name}`);
-          const ref = await importFirecall({
-            ...firecallData,
-            name: `${firecallData.name} Kopie ${formatTimestamp(new Date())}`,
-          });
-
-          console.debug(`import finished with ID: ${ref.id}`);
-          return ref;
-        })
+  const runImport = useCallback(async () => {
+    if (!pending) return;
+    const warnings: BackupWarning[] = [];
+    try {
+      const name = `${pending.name} Kopie ${formatTimestamp(new Date())}`;
+      await importFirecall(
+        { ...pending, name },
+        {
+          group: targetGroup || undefined,
+          onWarning: (warning) => warnings.push(warning),
+          onProgress: setProgress,
+        }
       );
-      // .filter((p) => p.status === 'fulfilled');
-      // .map((p) => (p as PromiseFulfilledResult<StorageReference>).value);
-      setUploadInProgress(false);
+      setPending(undefined);
+      if (warnings.length > 0) {
+        showSnackbar(
+          `${t('warningsTitle', { count: warnings.length })}: ${warnings
+            .map(warningText)
+            .join(' ')}`,
+          'warning'
+        );
+      } else {
+        showSnackbar(t('importSuccess', { name }), 'success');
+      }
+    } catch (err) {
+      console.error('firecall import failed', err);
+      showSnackbar(t('importFailed', { error: `${err}` }), 'error');
+    } finally {
+      setProgress(undefined);
     }
-  }, []);
+  }, [pending, targetGroup, showSnackbar, t, warningText]);
 
   return (
     <>
@@ -52,27 +121,87 @@ export default function FirecallImport() {
         variant="contained"
         startIcon={<CloudUploadIcon />}
       >
-        Einsatz importieren
+        {t('importButton')}
         <VisuallyHiddenInput
           type="file"
           accept="application/json"
-          // multiple
           onChange={(event) => {
-            (async () => {
-              if (event.target.files) {
-                await handleUpload(event.target.files);
-                event.target.value = '';
-              }
-            })();
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) {
+              handleFile(file);
+            }
           }}
         />
       </Button>
-      {uploadInProgress && (
-        <>
-          <Typography>Uploading ... </Typography>
-          <CircularProgress />
-        </>
-      )}
+
+      <Dialog
+        open={pending !== undefined}
+        onClose={() => !importInProgress && setPending(undefined)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{t('importTitle')}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" gutterBottom>
+            {t('importSource', { name: pending?.name ?? '' })}
+          </Typography>
+          {pending?.group && (
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              {t('fileGroup', { group: pending.group })}
+            </Typography>
+          )}
+          <FormControl fullWidth variant="standard" sx={{ mt: 2 }}>
+            <InputLabel id="firecall-import-group-label">
+              {t('targetGroup')}
+            </InputLabel>
+            <Select
+              labelId="firecall-import-group-label"
+              id="firecall-import-group"
+              label={t('targetGroup')}
+              value={targetGroup}
+              onChange={(event) => setTargetGroup(event.target.value)}
+            >
+              {selectableGroups.map((group) => (
+                <MenuItem key={`group-${group.id}`} value={group.id}>
+                  {group.name}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>{t('targetGroupHelp')}</FormHelperText>
+          </FormControl>
+          {progress && (
+            <Box sx={{ mt: 2 }}>
+              <LinearProgressWithLabel
+                variant={
+                  backupProgressPercent(progress) === undefined
+                    ? 'indeterminate'
+                    : 'determinate'
+                }
+                value={backupProgressPercent(progress) ?? 0}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {progressText(progress)}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setPending(undefined)}
+            disabled={importInProgress}
+          >
+            {tCommon('cancel')}
+          </Button>
+          <Button
+            onClick={runImport}
+            variant="contained"
+            disabled={importInProgress || !targetGroup}
+          >
+            {t('importAction')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

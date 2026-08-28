@@ -5,14 +5,14 @@ import {
   getDocs,
   orderBy,
   query,
-  writeBatch,
 } from 'firebase/firestore';
-import { addDoc, commitBatch, updateDoc } from '../lib/firestoreClient';
+import { addDoc, commitInBatches, updateDoc } from '../lib/firestoreClient';
 import { getBlob, getMetadata, getStorage, ref } from 'firebase/storage';
 import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
 import {
   AuditLogEntry,
+  CrewAssignment,
   DrawingStroke,
   FcAttachment,
   FcItemAttachment,
@@ -20,6 +20,7 @@ import {
   Firecall,
   FIRECALL_AUDITLOG_COLLECTION_ID,
   FIRECALL_COLLECTION_ID,
+  FIRECALL_CREW_COLLECTION_ID,
   FIRECALL_HISTORY_COLLECTION_ID,
   FIRECALL_ITEMS_COLLECTION_ID,
   FIRECALL_LAYERS_COLLECTION_ID,
@@ -35,7 +36,141 @@ import {
   KostenersatzCalculation,
   KOSTENERSATZ_SUBCOLLECTION,
 } from '../common/kostenersatz';
-import { allSettled } from '../common/promise';
+import { displayFileName, storageFileName } from '../common/attachmentName';
+import { mapWithConcurrency } from '../common/promise';
+
+/**
+ * Format des Sicherungs-JSON. Wird beim Export mitgeschrieben, damit ein
+ * künftiger Import eine ältere Datei erkennen und migrieren kann. Dateien ohne
+ * das Feld stammen aus der Zeit davor und gelten als Version 1.
+ */
+export const BACKUP_VERSION = 1;
+
+/**
+ * Was beim Sichern oder Zurückspielen nicht geklappt hat.
+ *
+ * Vorher verschwanden solche Fehler in einem `console.warn`: Ein Anhang, der
+ * sich nicht herunterladen ließ, fehlte im Backup, und die Datei sah dabei
+ * vollständig aus. Bei einer Sicherungsfunktion ist genau das die gefährlichste
+ * Eigenschaft, deshalb reicht der Aufrufer einen `onWarning`-Rückruf herein und
+ * zeigt die Meldungen an.
+ */
+export interface BackupWarning {
+  code:
+    | 'attachmentDownloadFailed'
+    | 'attachmentUploadFailed'
+    | 'newerBackupVersion';
+  /** Dateiname bzw. Fundstelle, soweit bekannt. */
+  file?: string;
+  detail?: string;
+}
+
+export type BackupWarningHandler = (warning: BackupWarning) => void;
+
+/**
+ * Stand einer laufenden Sicherung.
+ *
+ * `total` ist erst bekannt, wenn die Untersammlungen geladen sind — bis dahin
+ * meldet die Phase `structure` eine Null, und die Oberfläche zeigt einen
+ * unbestimmten Balken. Danach zählt `done` über alle Phasen hinweg monoton
+ * hoch, damit der Balken nie zurückspringt.
+ */
+export interface BackupProgress {
+  phase:
+    | 'structure'
+    | 'drawings'
+    | 'history'
+    | 'attachments'
+    | 'documents';
+  done: number;
+  total: number;
+  /** Was gerade fertig geworden ist — Dateiname, Snapshot-Beschreibung. */
+  label?: string;
+}
+
+export type BackupProgressHandler = (progress: BackupProgress) => void;
+
+/**
+ * Zählt den Fortschritt und meldet ihn weiter.
+ *
+ * Eine eigene kleine Klasse, weil derselbe Zähler von Stellen hochgezählt
+ * wird, die nichts voneinander wissen — dem Anhang-Download, den
+ * History-Einträgen und den Batch-Schreibvorgängen.
+ */
+class ProgressReporter {
+  private done = 0;
+  private total = 0;
+
+  constructor(private readonly onProgress?: BackupProgressHandler) {}
+
+  /** Gesamtzahl der Schritte, sobald sie feststeht. */
+  setTotal(total: number) {
+    this.total = total;
+  }
+
+  /** Meldet den aktuellen Stand, ohne ihn zu verändern. */
+  report(phase: BackupProgress['phase'], label?: string) {
+    this.onProgress?.({
+      phase,
+      done: this.done,
+      total: this.total,
+      label,
+    });
+  }
+
+  /** Schritte abhaken und melden. */
+  advance(phase: BackupProgress['phase'], label?: string, steps = 1) {
+    this.done += steps;
+    this.report(phase, label);
+  }
+}
+
+/**
+ * Wie viele Anhänge gleichzeitig geladen bzw. wie viele History-Einträge
+ * gleichzeitig abgefragt werden.
+ *
+ * Ohne Grenze stößt ein Einsatz mit 200 Auto-Snapshots 400 Abfragen auf einmal
+ * an und ein Export lädt alle Dateien gleichzeitig in den Speicher.
+ */
+const BACKUP_CONCURRENCY = 5;
+
+/**
+ * Wie `Promise.allSettled`, meldet Fehlschläge aber nach oben statt sie nur zu
+ * protokollieren.
+ */
+async function settleReporting<T>(
+  tasks: { label: string; run: () => Promise<T> }[],
+  code: BackupWarning['code'],
+  onWarning?: BackupWarningHandler,
+  progress?: ProgressReporter
+): Promise<T[]> {
+  const results = await mapWithConcurrency(
+    tasks,
+    BACKUP_CONCURRENCY,
+    async (task) => {
+      try {
+        return { ok: true as const, value: await task.run() };
+      } catch (reason) {
+        return { ok: false as const, reason };
+      } finally {
+        progress?.advance('attachments', task.label);
+      }
+    }
+  );
+
+  return results.flatMap((result, index) => {
+    if (result.ok) {
+      return [result.value];
+    }
+    console.warn(result.reason);
+    onWarning?.({
+      code,
+      file: tasks[index].label,
+      detail: `${result.reason}`,
+    });
+    return [];
+  });
+}
 
 /** Exported drawing item with embedded strokes */
 export interface ExportDrawingItem extends FirecallItem {
@@ -45,7 +180,11 @@ export interface ExportDrawingItem extends FirecallItem {
 
 /** History entry with snapshot data */
 export interface ExportHistoryEntry extends FirecallHistory {
-  snapshotItems?: FirecallItem[];
+  /**
+   * Zeichnungen im Snapshot tragen ihre Striche mit — die liegen in der
+   * Untersammlung `stroke` und nicht im Item-Dokument.
+   */
+  snapshotItems?: (FirecallItem | ExportDrawingItem)[];
   snapshotLayers?: FirecallLayer[];
 }
 
@@ -57,7 +196,17 @@ export interface ExportFirecallAttachment {
   originalUrl: string;
 }
 
+/**
+ * Der komplette Einsatz als eine Datei.
+ *
+ * `call/{id}/livelocation` bleibt bewusst draußen: die Standorte sind nur
+ * während des laufenden Einsatzes gültig und in einer Kopie irreführend. Die
+ * Einsatz-Fotos im Google Drive ebenso — gesichert wird nur `driveFolderId`,
+ * siehe `docs/einsatz-backup.md`.
+ */
 export interface FirecallExport extends Firecall {
+  /** Format der Datei, siehe `BACKUP_VERSION`. */
+  backupVersion?: number;
   items: FirecallItem[];
   chat: ChatMessage[];
   layers: FirecallLayer[];
@@ -65,6 +214,8 @@ export interface FirecallExport extends Firecall {
   locations: FirecallLocation[];
   kostenersatz: KostenersatzCalculation[];
   auditlog: AuditLogEntry[];
+  /** Besatzung je Fahrzeug — `call/{id}/crew`. */
+  crew?: CrewAssignment[];
   firecallAttachments?: ExportFirecallAttachment[];
 }
 
@@ -102,7 +253,7 @@ export async function downloadAttachmentBase64(
   const meta = await getMetadata(src);
 
   return {
-    name: src.name.substring(37),
+    name: displayFileName(src.name),
     mimeType: meta.contentType,
     data: result,
   };
@@ -117,20 +268,30 @@ async function downloadFirecallAttachment(
   const meta = await getMetadata(src);
 
   return {
-    name: src.name.substring(37),
+    name: displayFileName(src.name),
     mimeType: meta.contentType,
     data: result,
     originalUrl: url,
   };
 }
 
-/** Export drawing strokes for a single item */
+/** Bezeichnung eines Anhangs für Warnmeldungen. */
+function attachmentLabel(attachment: FcItemAttachment): string {
+  return typeof attachment === 'string' ? attachment : attachment.name;
+}
+
+/**
+ * Die Striche einer Zeichnung.
+ *
+ * `parentDoc` ist der Einsatz oder ein History-Eintrag — unter beiden liegt
+ * dieselbe Struktur `item/{id}/stroke`.
+ */
 async function exportDrawingStrokes(
-  firecallDoc: ReturnType<typeof doc>,
+  parentDoc: ReturnType<typeof doc>,
   itemId: string
 ): Promise<DrawingStroke[]> {
   const strokesRef = collection(
-    firecallDoc,
+    parentDoc,
     FIRECALL_ITEMS_COLLECTION_ID,
     itemId,
     'stroke'
@@ -153,7 +314,10 @@ async function exportDrawingStrokes(
 async function exportHistorySnapshot(
   firecallDoc: ReturnType<typeof doc>,
   historyId: string
-): Promise<{ snapshotItems: FirecallItem[]; snapshotLayers: FirecallLayer[] }> {
+): Promise<{
+  snapshotItems: (FirecallItem | ExportDrawingItem)[];
+  snapshotLayers: FirecallLayer[];
+}> {
   const historyRef = doc(
     firecallDoc,
     FIRECALL_HISTORY_COLLECTION_ID,
@@ -165,47 +329,90 @@ async function exportHistorySnapshot(
     getDocs(query(collection(historyRef, FIRECALL_LAYERS_COLLECTION_ID))),
   ]);
 
+  const snapshotItems = await Promise.all(
+    itemsSnap.docs.map(async (d) => {
+      const item = { ...d.data(), id: d.id } as FirecallItem;
+      if (item.type !== 'drawing') {
+        return item;
+      }
+      const strokes = await exportDrawingStrokes(historyRef, d.id);
+      return { ...item, strokes } as ExportDrawingItem;
+    })
+  );
+
   return {
-    snapshotItems: itemsSnap.docs.map(
-      (d) => ({ ...d.data(), id: d.id }) as FirecallItem
-    ),
+    snapshotItems,
     snapshotLayers: layersSnap.docs.map(
       (d) => ({ ...d.data(), id: d.id }) as FirecallLayer
     ),
   };
 }
 
-export async function exportFirecall(
-  firecallId: string
-): Promise<FirecallExport> {
-  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
-  const firecall = (await getDoc(firecallDoc)).data() as Firecall;
+export interface ExportFirecallOptions {
+  onWarning?: BackupWarningHandler;
+  onProgress?: BackupProgressHandler;
+}
 
-  const items = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallItem);
-  const chat = (await getDocs(query(collection(firecallDoc, 'chat')))).docs.map(
-    (d) => ({ ...d.data(), id: d.id }) as ChatMessage
+/** Anzahl der Anhänge an allen Markern. */
+function countItemAttachments(items: FirecallItem[]): number {
+  return items.reduce(
+    (sum, item) =>
+      sum +
+      (item.type === 'marker' ? ((item as FcMarker).attachments?.length ?? 0) : 0),
+    0
   );
-  const layers = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallLayer);
-  const history = (
-    await getDocs(query(collection(firecallDoc, FIRECALL_HISTORY_COLLECTION_ID)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallHistory);
-  const locations = (
-    await getDocs(
-      query(collection(firecallDoc, FIRECALL_LOCATIONS_COLLECTION_ID))
-    )
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as FirecallLocation);
-  const kostenersatz = (
-    await getDocs(query(collection(firecallDoc, KOSTENERSATZ_SUBCOLLECTION)))
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as KostenersatzCalculation);
-  const auditlog = (
-    await getDocs(
-      query(collection(firecallDoc, FIRECALL_AUDITLOG_COLLECTION_ID))
-    )
-  ).docs.map((d) => ({ ...d.data(), id: d.id }) as AuditLogEntry);
+}
+
+export async function exportFirecall(
+  firecallId: string,
+  options: ExportFirecallOptions = {}
+): Promise<FirecallExport> {
+  const { onWarning, onProgress } = options;
+  const progress = new ProgressReporter(onProgress);
+  // Wie viel zu tun ist, weiß erst der nächste Schritt.
+  progress.report('structure');
+
+  const firecallDoc = doc(firestore, FIRECALL_COLLECTION_ID, firecallId);
+
+  const readCollection = <T,>(path: string) =>
+    getDocs(query(collection(firecallDoc, path))).then((snapshot) =>
+      snapshot.docs.map((d) => ({ ...d.data(), id: d.id }) as T)
+    );
+
+  // Die acht Untersammlungen hängen nicht voneinander ab — nacheinander
+  // abgefragt wären das acht Round-Trips hintereinander.
+  const [
+    firecallSnapshot,
+    items,
+    chat,
+    layers,
+    history,
+    locations,
+    kostenersatz,
+    auditlog,
+    crew,
+  ] = await Promise.all([
+    getDoc(firecallDoc),
+    readCollection<FirecallItem>(FIRECALL_ITEMS_COLLECTION_ID),
+    readCollection<ChatMessage>('chat'),
+    readCollection<FirecallLayer>(FIRECALL_LAYERS_COLLECTION_ID),
+    readCollection<FirecallHistory>(FIRECALL_HISTORY_COLLECTION_ID),
+    readCollection<FirecallLocation>(FIRECALL_LOCATIONS_COLLECTION_ID),
+    readCollection<KostenersatzCalculation>(KOSTENERSATZ_SUBCOLLECTION),
+    readCollection<AuditLogEntry>(FIRECALL_AUDITLOG_COLLECTION_ID),
+    readCollection<CrewAssignment>(FIRECALL_CREW_COLLECTION_ID),
+  ]);
+
+  const firecall = firecallSnapshot.data() as Firecall;
+
+  const drawings = items.filter((item) => item.type === 'drawing' && item.id);
+  progress.setTotal(
+    drawings.length +
+      history.length +
+      countItemAttachments(items) +
+      (firecall.attachments?.length ?? 0)
+  );
+  progress.report('structure');
 
   // Export items with attachments and drawing strokes
   const exportItems = await Promise.all(
@@ -213,8 +420,14 @@ export async function exportFirecall(
       if (item.type === 'marker') {
         const m = item as FcMarker;
         if (m.attachments) {
-          m.attachments = await allSettled<FcAttachment>(
-            m.attachments?.map(downloadAttachmentBase64)
+          m.attachments = await settleReporting<FcAttachment>(
+            m.attachments.map((attachment) => ({
+              label: attachmentLabel(attachment),
+              run: () => downloadAttachmentBase64(attachment),
+            })),
+            'attachmentDownloadFailed',
+            onWarning,
+            progress
           );
         }
         return m;
@@ -222,6 +435,7 @@ export async function exportFirecall(
 
       if (item.type === 'drawing' && item.id) {
         const strokes = await exportDrawingStrokes(firecallDoc, item.id);
+        progress.advance('drawings', item.name);
         return { ...item, strokes } as ExportDrawingItem;
       }
 
@@ -230,24 +444,37 @@ export async function exportFirecall(
   );
 
   // Export history entries with snapshot data
-  const exportHistory: ExportHistoryEntry[] = await Promise.all(
-    history.map(async (h) => {
-      if (!h.id) return h as ExportHistoryEntry;
+  const exportHistory: ExportHistoryEntry[] = await mapWithConcurrency(
+    history,
+    BACKUP_CONCURRENCY,
+    async (h) => {
+      if (!h.id) {
+        progress.advance('history');
+        return h as ExportHistoryEntry;
+      }
       const snapshot = await exportHistorySnapshot(firecallDoc, h.id);
+      progress.advance('history', h.description);
       return { ...h, ...snapshot } as ExportHistoryEntry;
-    })
+    }
   );
 
   // Export firecall-level attachments
   let firecallAttachments: ExportFirecallAttachment[] | undefined;
   if (firecall.attachments && firecall.attachments.length > 0) {
-    firecallAttachments = await allSettled<ExportFirecallAttachment>(
-      firecall.attachments.map(downloadFirecallAttachment)
+    firecallAttachments = await settleReporting<ExportFirecallAttachment>(
+      firecall.attachments.map((url) => ({
+        label: displayFileName(url.split('/').pop() ?? url),
+        run: () => downloadFirecallAttachment(url),
+      })),
+      'attachmentDownloadFailed',
+      onWarning,
+      progress
     );
   }
 
   return {
     ...firecall,
+    backupVersion: BACKUP_VERSION,
     items: exportItems,
     chat,
     layers,
@@ -255,6 +482,7 @@ export async function exportFirecall(
     locations,
     kostenersatz,
     auditlog,
+    crew,
     firecallAttachments,
   };
 }
@@ -271,32 +499,133 @@ export const blobFromBase64String = (
   return new Blob([byteArray], { type: mimeType });
 };
 
+type ImportOperation = {
+  ref: ReturnType<typeof doc>;
+  data: Record<string, unknown>;
+};
+
 /**
- * Firestore writeBatch has a 500 operation limit. This helper commits in chunks.
+ * Schreibt gegen die Client-Instanz und hakt die geschriebenen Dokumente beim
+ * Fortschritt ab.
  *
- * Each chunk's commit is routed through `commitBatch` (→ `withFreshAuth`).
- * If a commit fails with an auth error, the central `withFreshAuth` wrapper
- * will refresh and retry only the failing chunk — previously committed chunks
- * remain in place.
+ * Als Closure statt als Funktion mit zwei Argumenten, damit die zwölf
+ * Aufrufstellen im Import schlank bleiben.
  */
-async function commitInBatches(
-  operations: Array<{
-    ref: ReturnType<typeof doc>;
-    data: Record<string, unknown>;
-  }>
-) {
-  const BATCH_LIMIT = 499;
-  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
-    const chunk = operations.slice(i, i + BATCH_LIMIT);
-    const batch = writeBatch(firestore);
-    chunk.forEach(({ ref: docRef, data }) => {
-      batch.set(docRef, data);
-    });
-    await commitBatch(batch);
-  }
+function commitOpsWith(progress: ProgressReporter) {
+  return async (operations: ImportOperation[]) => {
+    await commitInBatches(firestore, operations);
+    if (operations.length > 0) {
+      progress.advance('documents', undefined, operations.length);
+    }
+  };
 }
 
-export async function importFirecall(firecall: FirecallExport) {
+/**
+ * Schreiboperationen für die Striche aller Zeichnungen in `items`.
+ *
+ * `parentDoc` ist der Einsatz oder ein History-Eintrag — unter beiden liegt
+ * dieselbe Struktur `item/{id}/stroke`.
+ */
+function strokeImportOps(
+  parentDoc: ReturnType<typeof doc>,
+  items: (FirecallItem | ExportDrawingItem)[]
+): ImportOperation[] {
+  return items.flatMap((item) => {
+    const drawing = item as ExportDrawingItem;
+    if (item.type !== 'drawing' || !drawing.strokes?.length || !drawing.id) {
+      return [];
+    }
+    const strokeCol = collection(
+      parentDoc,
+      FIRECALL_ITEMS_COLLECTION_ID,
+      drawing.id,
+      'stroke'
+    );
+    return drawing.strokes.map((stroke) => {
+      const { id: _id, ...strokeData } = stroke as DrawingStroke & {
+        id?: string;
+      };
+      return {
+        ref: doc(strokeCol),
+        data: {
+          ...strokeData,
+          points: strokeData.points.flat(),
+        } as unknown as Record<string, unknown>,
+      };
+    });
+  });
+}
+
+/** Ein Item-Dokument ohne die Striche — die gehören in die Untersammlung. */
+function itemWithoutStrokes(
+  item: FirecallItem | ExportDrawingItem
+): Record<string, unknown> {
+  const { strokes: _strokes, ...itemData } = item as ExportDrawingItem;
+  return itemData as unknown as Record<string, unknown>;
+}
+
+export interface ImportFirecallOptions {
+  /** Zielgruppe. Ohne Angabe bleibt die Gruppe aus der Datei stehen. */
+  group?: string;
+  onWarning?: BackupWarningHandler;
+  onProgress?: BackupProgressHandler;
+}
+
+/** Striche aller Zeichnungen in `items`. */
+function countStrokes(items: (FirecallItem | ExportDrawingItem)[]): number {
+  return items.reduce(
+    (sum, item) => sum + ((item as ExportDrawingItem).strokes?.length ?? 0),
+    0
+  );
+}
+
+/**
+ * Wie viele Schritte `importFirecall` gleich gehen wird — jedes geschriebene
+ * Dokument einer und jeder hochgeladene Anhang einer.
+ *
+ * Steht bewusst neben dem Import und wird von einem Test dagegen gehalten:
+ * Weicht die Zahl von den tatsächlichen Schreibvorgängen ab, bleibt der Balken
+ * stehen oder läuft über.
+ */
+function countImportSteps(firecall: FirecallExport): number {
+  const history = firecall.history ?? [];
+
+  const documents =
+    firecall.items.length +
+    countStrokes(firecall.items) +
+    (firecall.chat?.length ?? 0) +
+    (firecall.layers?.length ?? 0) +
+    history.length +
+    history.reduce(
+      (sum, entry) =>
+        sum +
+        (entry.snapshotItems?.length ?? 0) +
+        countStrokes(entry.snapshotItems ?? []) +
+        (entry.snapshotLayers?.length ?? 0),
+      0
+    ) +
+    (firecall.locations?.length ?? 0) +
+    (firecall.kostenersatz?.length ?? 0) +
+    (firecall.auditlog?.length ?? 0) +
+    (firecall.crew?.length ?? 0);
+
+  const uploads =
+    (firecall.firecallAttachments?.length ?? 0) +
+    countItemAttachments(firecall.items);
+
+  return documents + uploads;
+}
+
+export async function importFirecall(
+  firecall: FirecallExport,
+  options: ImportFirecallOptions = {}
+) {
+  const { group, onWarning, onProgress } = options;
+  const progress = new ProgressReporter(onProgress);
+  progress.setTotal(countImportSteps(firecall));
+  progress.report('documents');
+  const commitOps = commitOpsWith(progress);
+
   const {
     items,
     chat,
@@ -305,10 +634,34 @@ export async function importFirecall(firecall: FirecallExport) {
     locations,
     kostenersatz,
     auditlog,
+    crew,
     firecallAttachments,
     id,
-    ...firecallData
+    backupVersion,
+    // Die Kopie hat keine eigenen Fahrtenbuch-Einträge. Bliebe der Zähler
+    // stehen, meldete die Einsatz-Übersicht erfasste Fahrten, die es nicht
+    // gibt — und niemand trägt sie mehr ein. `fahrtenbuchRoute` bleibt: der
+    // Weg zum Einsatzort ist derselbe.
+    fahrtenbuchEntryCount,
+    // Die alten URLs zeigen auf die Dateien des Quell-Einsatzes. Was die Kopie
+    // wirklich hat, steht erst nach dem Wiederhochladen fest.
+    attachments,
+    ...rest
   } = firecall;
+
+  if ((backupVersion ?? 1) > BACKUP_VERSION) {
+    onWarning?.({ code: 'newerBackupVersion', detail: `${backupVersion}` });
+  }
+
+  const firecallData = {
+    ...rest,
+    ...(firecallAttachments
+      ? { attachments: [] }
+      : attachments
+        ? { attachments }
+        : {}),
+    ...(group ? { group } : {}),
+  };
 
   const firecallDoc = await addDoc(
     collection(firestore, FIRECALL_COLLECTION_ID),
@@ -317,14 +670,23 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Re-upload firecall-level attachments and update the firecall document
   if (firecallAttachments?.length) {
-    const newUrls = await allSettled(
-      firecallAttachments.map(async (a) => {
-        const blob = blobFromBase64String(a.data, a.mimeType);
-        const uploadRef = await uploadFile(firecallDoc.id, a.name, blob, {
-          contentType: a.mimeType,
-        });
-        return uploadRef.toString();
-      })
+    const newUrls = await settleReporting(
+      firecallAttachments.map((a) => ({
+        label: a.name,
+        run: async () => {
+          const blob = blobFromBase64String(a.data, a.mimeType);
+          const uploadRef = await uploadFile(
+            firecallDoc.id,
+            storageFileName(a.name),
+            blob,
+            { contentType: a.mimeType }
+          );
+          return uploadRef.toString();
+        },
+      })),
+      'attachmentUploadFailed',
+      onWarning,
+      progress
     );
     if (newUrls.length > 0) {
       await updateDoc(firecallDoc, { attachments: newUrls });
@@ -341,25 +703,35 @@ export async function importFirecall(firecall: FirecallExport) {
     firecallDoc,
     FIRECALL_AUDITLOG_COLLECTION_ID
   );
+  const crewCol = collection(firecallDoc, FIRECALL_CREW_COLLECTION_ID);
 
   // Upload marker attachments
-  const importItems = await allSettled(
+  const importItems = await Promise.all(
     items.map(async (i) => {
       if (i.type === 'marker') {
         const m = i as FcMarker;
         if (m.attachments) {
-          m.attachments = await allSettled(
-            m.attachments.map(async (m) => {
-              if (typeof m === 'string') {
-                return m;
-              }
-              const a = m as FcAttachment;
-              const blob = blobFromBase64String(a.data, a.mimeType);
-              const uploadRef = await uploadFile(firecallDoc.id, a.name, blob, {
-                contentType: a.mimeType,
-              });
-              return uploadRef.toString();
-            })
+          m.attachments = await settleReporting<FcItemAttachment>(
+            m.attachments.map((attachment) => ({
+              label: attachmentLabel(attachment),
+              run: async () => {
+                if (typeof attachment === 'string') {
+                  return attachment;
+                }
+                const a = attachment as FcAttachment;
+                const blob = blobFromBase64String(a.data, a.mimeType);
+                const uploadRef = await uploadFile(
+                  firecallDoc.id,
+                  storageFileName(a.name),
+                  blob,
+                  { contentType: a.mimeType }
+                );
+                return uploadRef.toString();
+              },
+            })),
+            'attachmentUploadFailed',
+            onWarning,
+            progress
           );
         }
       }
@@ -368,47 +740,19 @@ export async function importFirecall(firecall: FirecallExport) {
   );
 
   // Import items (without drawing strokes in document data)
-  const itemOps = importItems.map((item) => {
-    const { strokes: _strokes, ...itemData } = item as ExportDrawingItem;
-    return {
+  await commitOps(
+    importItems.map((item) => ({
       ref: doc(itemCol, item.id || uuid()),
-      data: itemData as unknown as Record<string, unknown>,
-    };
-  });
-  await commitInBatches(itemOps);
+      data: itemWithoutStrokes(item),
+    }))
+  );
 
   // Import drawing strokes as sub-subcollections
-  const drawingItems = importItems.filter(
-    (i) => i.type === 'drawing'
-  ) as ExportDrawingItem[];
-  for (const drawing of drawingItems) {
-    if (drawing.strokes?.length && drawing.id) {
-      const strokeOps = drawing.strokes.map((stroke) => {
-        const { id: _id, ...strokeData } = stroke as DrawingStroke & {
-          id?: string;
-        };
-        return {
-          ref: doc(
-            collection(
-              firecallDoc,
-              FIRECALL_ITEMS_COLLECTION_ID,
-              drawing.id!,
-              'stroke'
-            )
-          ),
-          data: {
-            ...strokeData,
-            points: strokeData.points.flat(),
-          } as unknown as Record<string, unknown>,
-        };
-      });
-      await commitInBatches(strokeOps);
-    }
-  }
+  await commitOps(strokeImportOps(firecallDoc, importItems));
 
   // Import chat
   if (chat?.length) {
-    await commitInBatches(
+    await commitOps(
       chat.map((c) => ({
         ref: doc(chatCol, c.id || uuid()),
         data: c as unknown as Record<string, unknown>,
@@ -418,7 +762,7 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Import layers (keep IDs, as they are referenced by items)
   if (layers?.length) {
-    await commitInBatches(
+    await commitOps(
       layers.map((l) => ({
         ref: doc(layerCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,
@@ -441,7 +785,7 @@ export async function importFirecall(firecall: FirecallExport) {
     });
 
     // Write all history entries in batches
-    await commitInBatches(
+    await commitOps(
       historyRefs.map(({ ref: r, data }) => ({ ref: r, data }))
     );
 
@@ -450,19 +794,22 @@ export async function importFirecall(firecall: FirecallExport) {
       const { snapshotItems, snapshotLayers } = entry;
 
       if (snapshotItems?.length) {
-        await commitInBatches(
+        const snapshotItemCol = collection(
+          historyDocRef,
+          FIRECALL_ITEMS_COLLECTION_ID
+        );
+        await commitOps(
           snapshotItems.map((item) => ({
-            ref: doc(
-              collection(historyDocRef, FIRECALL_ITEMS_COLLECTION_ID),
-              item.id || uuid()
-            ),
-            data: item as unknown as Record<string, unknown>,
+            ref: doc(snapshotItemCol, item.id || uuid()),
+            data: itemWithoutStrokes(item),
           }))
         );
+        // Zeichnungen im Snapshot haben ihre Striche eine Ebene tiefer.
+        await commitOps(strokeImportOps(historyDocRef, snapshotItems));
       }
 
       if (snapshotLayers?.length) {
-        await commitInBatches(
+        await commitOps(
           snapshotLayers.map((layer) => ({
             ref: doc(
               collection(historyDocRef, FIRECALL_LAYERS_COLLECTION_ID),
@@ -477,7 +824,7 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Import locations
   if (locations?.length) {
-    await commitInBatches(
+    await commitOps(
       locations.map((l) => ({
         ref: doc(locationCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,
@@ -487,7 +834,7 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Import kostenersatz
   if (kostenersatz?.length) {
-    await commitInBatches(
+    await commitOps(
       kostenersatz.map((k) => ({
         ref: doc(kostenersatzCol, k.id || uuid()),
         data: k as unknown as Record<string, unknown>,
@@ -497,10 +844,20 @@ export async function importFirecall(firecall: FirecallExport) {
 
   // Import auditlog
   if (auditlog?.length) {
-    await commitInBatches(
+    await commitOps(
       auditlog.map((a) => ({
         ref: doc(auditlogCol, a.id || uuid()),
         data: a as unknown as Record<string, unknown>,
+      }))
+    );
+  }
+
+  // Import crew assignments
+  if (crew?.length) {
+    await commitOps(
+      crew.map((c) => ({
+        ref: doc(crewCol, c.id || uuid()),
+        data: c as unknown as Record<string, unknown>,
       }))
     );
   }

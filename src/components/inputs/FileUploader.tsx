@@ -11,8 +11,11 @@ import {
   UploadTaskSnapshot,
 } from 'firebase/storage';
 import { useCallback, useState } from 'react';
-import { v4 as uuid } from 'uuid';
 import { useFirecallId } from '../../hooks/useFirecall';
+import {
+  displayFileName,
+  storageFileName,
+} from '../../common/attachmentName';
 import app from '../firebase/firebase';
 import { useSnackbar } from '../providers/SnackbarProvider';
 import LinearProgressWithLabel from './LinearProgressWithLabel';
@@ -91,7 +94,7 @@ export default function FileUploader({
           Array.from(files).map(async (file) => {
             const ref = await uploadFile(
               firecallId,
-              `${uuid()}-${file.name}`,
+              storageFileName(file.name),
               file,
               {
                 contentType: file.type,
@@ -156,7 +159,7 @@ export default function FileUploader({
               <LinearProgressWithLabel
                 key={s.ref.name}
                 value={(s.bytesTransferred / s.totalBytes) * 100}
-                label={s.ref.name.substring(37)}
+                label={displayFileName(s.ref.name)}
               />
             ))}
         </>
