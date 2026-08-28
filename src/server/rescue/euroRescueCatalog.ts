@@ -66,14 +66,36 @@ function parseDocumentType(value: string | undefined): RescueDocumentType {
   return (value ?? '').toLowerCase().includes('guide') ? 'guide' : 'sheet';
 }
 
+/**
+ * Nur `https:`-URLs übernehmen. Die Adressen kommen aus einer fremden,
+ * nicht authentifizierten API und landen in der Oberfläche direkt in `href`
+ * und `src` — ein `javascript:` oder `data:` von dort liefe in unserem
+ * Origin. Der Host bleibt bewusst ungeprüft: die API liefert die Dokumente
+ * teils von `api.rescue.euroncap.com`, teils aus dem Azure-Blob-Storage von
+ * Euro NCAP, und eine Host-Liste würde beim nächsten Umzug still alles
+ * ausblenden.
+ */
+function safeUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    return new URL(value).protocol === 'https:' ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function mapDocuments(raw: RawDocument[] | undefined): RescueDocument[] {
-  return (raw ?? [])
-    .filter((doc): doc is RawDocument & { url: string } => !!doc?.url)
-    .map((doc) => ({
-      url: doc.url,
+  const documents: RescueDocument[] = [];
+  for (const doc of raw ?? []) {
+    const url = safeUrl(doc?.url);
+    if (!url) continue;
+    documents.push({
+      url,
       language: (doc.language ?? '').toUpperCase(),
       type: parseDocumentType(doc.type),
-    }));
+    });
+  }
+  return documents;
 }
 
 /** Nicht identifizierbare Einträge fallen raus, alles andere wird tolerant gelesen. */
@@ -92,7 +114,7 @@ function mapVariants(raw: RawVariant[]): RescueVariant[] {
       buildYearUntil: parseYear(entry.build_year_until),
       doors: entry.doors || undefined,
       powertrain: entry.powertrain || undefined,
-      pictureUrl: entry.picture_url || undefined,
+      pictureUrl: safeUrl(entry.picture_url),
       documents: mapDocuments(entry.documents),
     });
   }

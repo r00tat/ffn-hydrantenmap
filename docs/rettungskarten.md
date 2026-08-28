@@ -46,6 +46,14 @@ direkt auf `strescueeuprdwe01.blob.core.windows.net` statt auf die
 API-Domain; beide Formen kommen unverändert aus der API und werden unverändert
 verlinkt.
 
+**Nur `https:`-URLs werden übernommen.** Die Adressen der PDFs und Bilder
+kommen aus einer fremden, nicht authentifizierten API und landen in der
+Oberfläche direkt in `href` und `src`; ein `javascript:` oder `data:` von dort
+liefe in unserem Origin. `safeUrl()` in
+[`euroRescueCatalog.ts`](../src/server/rescue/euroRescueCatalog.ts) verwirft
+daher alles andere. Der Host bleibt bewusst ungeprüft — eine Host-Liste würde
+beim nächsten Umzug des Blob-Storage still alle Dokumente ausblenden.
+
 **Die API ist undokumentiert.** Sie kann jederzeit ausfallen oder ihr Format
 ändern. Deshalb ist jeder Aufrufer fehlertolerant: die Kennzeichenabfrage
 liefert dann leere Trefferlisten statt zu scheitern, die Suchseite zeigt einen

@@ -135,6 +135,57 @@ describe('loadRescueCatalog', () => {
     expect(variants[0].documents).toEqual([]);
   });
 
+  it('drops urls that are not https', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      response({
+        Documents: [
+          {
+            ...RAW_VARIANT,
+            picture_url: 'javascript:alert(1)',
+            documents: [
+              {
+                url: 'javascript:alert(1)',
+                language: 'DE',
+                type: 'Rescue Sheet',
+              },
+              {
+                url: 'data:text/html,<script>alert(1)</script>',
+                language: 'DE',
+                type: 'Rescue Sheet',
+              },
+              {
+                url: 'http://example.test/a1_DE.pdf',
+                language: 'DE',
+                type: 'Rescue Sheet',
+              },
+              {
+                url: 'not a url at all',
+                language: 'DE',
+                type: 'Rescue Sheet',
+              },
+              {
+                url: 'https://example.test/a1_DE.pdf',
+                language: 'DE',
+                type: 'Rescue Sheet',
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const [variant] = await loadRescueCatalog();
+
+    expect(variant.pictureUrl).toBeUndefined();
+    expect(variant.documents).toEqual([
+      {
+        url: 'https://example.test/a1_DE.pdf',
+        language: 'DE',
+        type: 'sheet',
+      },
+    ]);
+  });
+
   it('serves the cache instead of fetching again', async () => {
     vi.mocked(fetch).mockResolvedValue(
       response({ Documents: [RAW_VARIANT] }),
