@@ -50,6 +50,24 @@ describe('RescueSheetCard', () => {
     );
   });
 
+  it('loads the picture through our own origin, not from Euro NCAP', () => {
+    // Euro NCAP liefert seine PNGs mit `Content-Type: application/pdf`.
+    // Chrome verwirft eine solche cross-origin-Antwort per ORB
+    // (`net::ERR_BLOCKED_BY_ORB`) — direkt verlinkt erschien kein Bild.
+    renderWithIntl(<RescueSheetCard sheet={sheet} />);
+
+    const image = screen.getByRole('img', { name: 'Audi A3 Sportback' });
+    expect(image).toHaveAttribute('src', '/api/rettungskarten/bild/1');
+  });
+
+  it('shows no picture when the variant has none', () => {
+    renderWithIntl(
+      <RescueSheetCard sheet={{ ...sheet, pictureUrl: undefined }} />,
+    );
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('says so when no sheet is available', () => {
     renderWithIntl(
       <RescueSheetCard sheet={{ ...sheet, sheetUrl: undefined }} />,

@@ -76,3 +76,17 @@ export function formatRescueBuildYears(view: RescueSheetView): string {
   if (view.buildYearFrom === undefined) return '';
   return `${view.buildYearFrom}–${view.buildYearUntil ?? ''}`;
 }
+
+/**
+ * Die Adresse, unter der die Oberfläche das Fahrzeugbild holt.
+ *
+ * Bewusst nicht `view.pictureUrl`: Euro NCAP liefert seine PNGs mit
+ * `Content-Type: application/pdf`, und Chrome verwirft eine solche
+ * cross-origin-Antwort per Opaque Response Blocking
+ * (`net::ERR_BLOCKED_BY_ORB`), ohne die Bytes anzusehen. Über den eigenen
+ * Origin greift ORB nicht. Siehe docs/rettungskarten.md.
+ */
+export function rescuePictureSrc(view: RescueSheetView): string | undefined {
+  if (!view.pictureUrl || !view.id) return undefined;
+  return `/api/rettungskarten/bild/${encodeURIComponent(view.id)}`;
+}

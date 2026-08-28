@@ -14,6 +14,7 @@ import { useTranslations } from 'next-intl';
 import {
   formatRescueBuildYears,
   formatRescueSheetTitle,
+  rescuePictureSrc,
 } from '../../common/rescue/sheetView';
 import { RescueSheetView } from '../../common/rescue/types';
 
@@ -34,6 +35,7 @@ export default function RescueSheetCard({
 }: RescueSheetCardProps) {
   const t = useTranslations('rettungskarten');
   const years = formatRescueBuildYears(sheet);
+  const pictureSrc = rescuePictureSrc(sheet);
 
   const details = [
     sheet.bodyType,
@@ -52,10 +54,10 @@ export default function RescueSheetCard({
     >
       <CardContent>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-          {sheet.pictureUrl && (
+          {pictureSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={sheet.pictureUrl}
+              src={pictureSrc}
               alt={formatRescueSheetTitle(sheet)}
               width={120}
               style={{ maxWidth: '30%', height: 'auto', objectFit: 'contain' }}
