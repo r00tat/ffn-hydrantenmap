@@ -385,6 +385,7 @@
     "hydrantClusters": "Hydrant clusters",
     "hydrantCsvImport": "Hydrant CSV import",
     "kennzeichen": "License Plate Query",
+    "rettungskarten": "Rescue sheets",
     "kostenersatz": "Cost recovery",
     "layers": "Layers",
     "locations": "Operation sites",
@@ -2699,5 +2700,23 @@
     "layerObjectCount": "{count, plural, =0 {Layer name (no objects)} one {Layer name (# object)} other {Layer name (# objects)}}",
     "diaryCount": "{count, plural, one {# diary entry} other {# diary entries}}",
     "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}"
+  },
+  "rettungskarten": {
+    "title": "Rescue sheets",
+    "source": "Rescue sheets by Euro NCAP (Euro Rescue). The PDFs open directly at Euro NCAP and are not stored by us.",
+    "searchLabel": "Search vehicle",
+    "searchPlaceholder": "Make, model or year, e.g. Audi A3 2015",
+    "makesHeading": "Makes",
+    "resultCount": "{count, plural, one {# vehicle found} other {# vehicles found}}",
+    "noResults": "No vehicle found in the Euro Rescue catalogue.",
+    "errorUpstream": "The Euro NCAP rescue sheet catalogue is currently unavailable.",
+    "matchHeading": "Rescue sheet",
+    "noMatch": "There is no rescue sheet for this vehicle in the Euro Rescue catalogue. <link>Search manually</link>",
+    "otherVariants": "{count, plural, one {# other variant} other {# other variants}}",
+    "openSheet": "Rescue sheet ({language})",
+    "openGuide": "Rescue guide",
+    "noSheet": "No rescue sheet available",
+    "doorsValue": "{doors} doors",
+    "diaryLabel": "Rescue sheet"
   }
 }

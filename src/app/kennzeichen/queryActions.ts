@@ -1,6 +1,10 @@
 'use server';
 import 'server-only';
 
+import { getLocale } from 'next-intl/server';
+import { RescueSheetView } from '../../common/rescue/types';
+import { isLocale, DEFAULT_LOCALE } from '../../i18n/config';
+import { lookupRescueSheets } from '../../server/rescue/rescueSheetLookup';
 import { actionUserRequired } from '../auth';
 import { loadOebfvToken } from './tokenStore';
 import { parseFx, parseVehicleResult, Vehicle } from './parseVehicleData';
@@ -23,6 +27,12 @@ export interface KennzeichenQueryInput {
 
 export interface KennzeichenQueryResult {
   vehicles: Vehicle[];
+  /**
+   * Passende Rettungskarten je Fahrzeug, positionsgleich mit `vehicles` und
+   * absteigend nach Passgenauigkeit. Leer, wenn der Euro-Rescue-Katalog
+   * nichts hergibt oder gerade nicht erreichbar ist.
+   */
+  rescueSheets: RescueSheetView[][];
   noResult: boolean;
   system: KennzeichenSystem;
   error?: 'no-token' | 'not-authorized' | 'upstream';
@@ -114,13 +124,25 @@ export async function queryKennzeichen(
 
   if (!authorized) {
     await writeKennzeichenLog({ ...logBase, resultCount: 0, success: false });
-    return { vehicles: [], noResult: true, system, error: 'not-authorized' };
+    return {
+      vehicles: [],
+      rescueSheets: [],
+      noResult: true,
+      system,
+      error: 'not-authorized',
+    };
   }
 
   const token = await loadOebfvToken(groupId);
   if (!token) {
     await writeKennzeichenLog({ ...logBase, resultCount: 0, success: false });
-    return { vehicles: [], noResult: true, system, error: 'no-token' };
+    return {
+      vehicles: [],
+      rescueSheets: [],
+      noResult: true,
+      system,
+      error: 'no-token',
+    };
   }
 
   try {
@@ -131,10 +153,21 @@ export async function queryKennzeichen(
       resultCount: vehicles.length,
       success: true,
     });
-    return { vehicles, noResult, system };
+    const locale = await getLocale();
+    const rescueSheets = await lookupRescueSheets(
+      vehicles,
+      isLocale(locale) ? locale : DEFAULT_LOCALE
+    );
+    return { vehicles, rescueSheets, noResult, system };
   } catch (err) {
     console.error('ÖBFV Kennzeichenabfrage failed:', err);
     await writeKennzeichenLog({ ...logBase, resultCount: 0, success: false });
-    return { vehicles: [], noResult: true, system, error: 'upstream' };
+    return {
+      vehicles: [],
+      rescueSheets: [],
+      noResult: true,
+      system,
+      error: 'upstream',
+    };
   }
 }

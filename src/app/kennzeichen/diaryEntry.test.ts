@@ -4,6 +4,7 @@ import {
   KennzeichenDiaryLabels,
 } from './diaryEntry';
 import { Vehicle } from './parseVehicleData';
+import { RescueSheetView } from '../../common/rescue/types';
 
 const labels: KennzeichenDiaryLabels = {
   title: (plate) => `Kennzeichenabfrage ${plate}`,
@@ -21,6 +22,7 @@ const labels: KennzeichenDiaryLabels = {
     variante: 'Variante',
     version: 'Version',
   },
+  rescueSheet: 'Rettungskarte',
 };
 
 const fullVehicle: Vehicle = {
@@ -156,5 +158,81 @@ describe('buildKennzeichenDiaryEntry', () => {
     });
     expect(entry.name).toBe('Kennzeichenabfrage W 99999');
     expect(entry.beschreibung).toBe('Keine Zulassung gefunden.');
+  });
+});
+
+describe('buildKennzeichenDiaryEntry with rescue sheets', () => {
+  const sheet: RescueSheetView = {
+    id: '1',
+    makeName: 'Volkswagen',
+    modelName: 'Golf',
+    variantName: 'Golf',
+    bodyType: 'Hatchback',
+    buildYearFrom: 2019,
+    sheetUrl: 'https://example.test/golf_DE.pdf',
+    sheetLanguage: 'DE',
+  };
+
+  it('appends the rescue sheet link of the best match', () => {
+    const entry = buildKennzeichenDiaryEntry({
+      platePrefix: 'W',
+      plateNumber: '12345',
+      system: 'einsatz',
+      vehicles: [fullVehicle],
+      rescueSheets: [[sheet]],
+      noResult: false,
+      timestamp: '2026-07-20T10:00:00.000Z',
+      labels,
+    });
+
+    expect(entry.beschreibung).toContain(
+      'Rettungskarte: Volkswagen Golf (2019–): https://example.test/golf_DE.pdf',
+    );
+  });
+
+  it('keeps the sheets aligned with their vehicle', () => {
+    const entry = buildKennzeichenDiaryEntry({
+      platePrefix: 'W',
+      plateNumber: '12345',
+      system: 'einsatz',
+      vehicles: [fullVehicle, { ...fullVehicle, marke: 'Steyr', name: '680' }],
+      rescueSheets: [[sheet], []],
+      noResult: false,
+      timestamp: '2026-07-20T10:00:00.000Z',
+      labels,
+    });
+
+    const blocks = (entry.beschreibung ?? '').split('\n\n');
+    expect(blocks[0]).toContain('Rettungskarte: Volkswagen Golf');
+    expect(blocks[1]).not.toContain('Rettungskarte');
+  });
+
+  it('omits the line when the match has no document', () => {
+    const entry = buildKennzeichenDiaryEntry({
+      platePrefix: 'W',
+      plateNumber: '12345',
+      system: 'einsatz',
+      vehicles: [fullVehicle],
+      rescueSheets: [[{ ...sheet, sheetUrl: undefined }]],
+      noResult: false,
+      timestamp: '2026-07-20T10:00:00.000Z',
+      labels,
+    });
+
+    expect(entry.beschreibung).not.toContain('Rettungskarte');
+  });
+
+  it('works without any rescue information at all', () => {
+    const entry = buildKennzeichenDiaryEntry({
+      platePrefix: 'W',
+      plateNumber: '12345',
+      system: 'einsatz',
+      vehicles: [fullVehicle],
+      noResult: false,
+      timestamp: '2026-07-20T10:00:00.000Z',
+      labels,
+    });
+
+    expect(entry.beschreibung).not.toContain('Rettungskarte');
   });
 });
