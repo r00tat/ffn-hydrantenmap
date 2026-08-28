@@ -43,12 +43,30 @@ vi.mock('firebase/firestore', () => ({
   })),
 }));
 
+// Das Aufteilen auf mehrere Batches ist in `lib/firestoreClient` getestet.
+// Hier zählt nur, welche Dokumente `importFirecall` überhaupt übergibt.
+const mockCommitInBatches = vi.fn(
+  async (
+    _firestore: unknown,
+    operations: { ref: unknown; data: unknown }[]
+  ) => {
+    if (operations.length === 0) return;
+    const batch = { set: mockBatchSet, commit: mockBatchCommit };
+    operations.forEach(({ ref, data }) => batch.set(ref, data));
+    await mockBatchCommit();
+  }
+);
+
 vi.mock('../lib/firestoreClient', () => ({
   addDoc: vi.fn(() =>
     Promise.resolve({ id: 'new-firecall-id', path: 'call/new-firecall-id' })
   ),
   updateDoc: vi.fn(() => Promise.resolve()),
   commitBatch: vi.fn((batch: { commit: () => Promise<void> }) => batch.commit()),
+  commitInBatches: (...args: never[]) =>
+    (mockCommitInBatches as unknown as (...a: never[]) => Promise<void>)(
+      ...args
+    ),
 }));
 
 import {
@@ -62,7 +80,7 @@ import {
   exportFirecall,
   importFirecall,
 } from './useExport';
-import { writeBatch, getDocs } from 'firebase/firestore';
+import { getDocs } from 'firebase/firestore';
 import { getBlob, getMetadata, ref } from 'firebase/storage';
 import { addDoc, updateDoc } from '../lib/firestoreClient';
 import { uploadFile } from '../components/inputs/FileUploader';
@@ -218,6 +236,63 @@ describe('useExport', () => {
           vehicleId: 'v1',
           vehicleName: 'HLFA1',
           funktion: 'Maschinist',
+        },
+      ]);
+    });
+
+    it('should export the strokes of a drawing inside a history snapshot', async () => {
+      // The snapshot keeps drawings in its own item subcollection; their
+      // strokes live one level below and were missing from the backup.
+      (getDocs as Mock).mockImplementation((col: { path?: string }) => {
+        if (col?.path === 'history') {
+          return Promise.resolve({
+            docs: [
+              { id: 'h1', data: () => ({ description: 'Snapshot 1' }) },
+            ],
+          });
+        }
+        if (col?.path === 'item') {
+          return Promise.resolve({
+            docs: [
+              {
+                id: 'draw1',
+                data: () => ({ name: 'Drawing 1', type: 'drawing' }),
+              },
+            ],
+          });
+        }
+        if (col?.path === 'item/draw1/stroke') {
+          return Promise.resolve({
+            docs: [
+              {
+                id: 's1',
+                data: () => ({
+                  color: '#00ff00',
+                  width: 2,
+                  points: [47.0, 16.0, 47.2, 16.2],
+                  order: 0,
+                }),
+              },
+            ],
+          });
+        }
+        return Promise.resolve({ docs: [] });
+      });
+
+      const result = await exportFirecall('test-id');
+
+      const snapshotItems = result.history[0]
+        .snapshotItems as ExportDrawingItem[];
+      expect(snapshotItems[0].strokes).toEqual([
+        {
+          id: 's1',
+          color: '#00ff00',
+          width: 2,
+          points: [
+            [47.0, 16.0],
+            [47.2, 16.2],
+          ],
+          order: 0,
         },
       ]);
     });
@@ -383,8 +458,10 @@ describe('useExport', () => {
       expect(snapshotLayer).toBeDefined();
     });
 
-    it('should handle batch size limit by chunking', async () => {
-      // Create more than 499 items to trigger chunking
+    it('should hand every item over for writing, past the batch limit', async () => {
+      // 600 items exceed the 500 operation limit of a single writeBatch.
+      // The chunking itself is tested in lib/firestoreClient — what matters
+      // here is that nothing gets dropped on the way there.
       const items = Array.from({ length: 600 }, (_, i) => ({
         id: `item-${i}`,
         name: `Item ${i}`,
@@ -404,9 +481,10 @@ describe('useExport', () => {
 
       await importFirecall(firecallData);
 
-      // writeBatch should be called at least twice for items (600 items > 499 limit)
-      const batchCallCount = (writeBatch as Mock).mock.calls.length;
-      expect(batchCallCount).toBeGreaterThanOrEqual(2);
+      const itemOperations = mockCommitInBatches.mock.calls.find(
+        (call) => call[1].length === 600
+      );
+      expect(itemOperations).toBeDefined();
     });
 
     it('should handle empty optional collections gracefully', async () => {
@@ -632,6 +710,61 @@ describe('useExport', () => {
 
       const created = (addDoc as Mock).mock.calls[0][1] as Record<string, any>;
       expect(created.group).toBe('ffnd');
+    });
+
+    it('should import the strokes of a drawing inside a history snapshot', async () => {
+      const firecallData: FirecallExport = {
+        name: 'Snapshot Drawing Import',
+        items: [],
+        chat: [],
+        layers: [],
+        history: [
+          {
+            id: 'h1',
+            description: 'Snapshot 1',
+            createdAt: '2026-01-01T12:00:00Z',
+            snapshotItems: [
+              {
+                id: 'draw1',
+                name: 'Drawing 1',
+                type: 'drawing',
+                strokes: [
+                  {
+                    color: '#00ff00',
+                    width: 2,
+                    points: [
+                      [47.0, 16.0],
+                      [47.2, 16.2],
+                    ],
+                    order: 0,
+                  },
+                ],
+              } as ExportDrawingItem,
+            ],
+            snapshotLayers: [],
+          } as ExportHistoryEntry,
+        ],
+        locations: [],
+        kostenersatz: [],
+        auditlog: [],
+      };
+
+      await importFirecall(firecallData);
+
+      const written = mockBatchSet.mock.calls.map(
+        (call: any[]) => call[1]
+      ) as Record<string, any>[];
+
+      const stroke = written.find((data) => data && data.color === '#00ff00');
+      expect(stroke).toBeDefined();
+      expect(stroke!.points).toEqual([47.0, 16.0, 47.2, 16.2]);
+
+      // the item document itself must not carry the strokes array
+      const snapshotItem = written.find(
+        (data) => data && data.name === 'Drawing 1'
+      );
+      expect(snapshotItem).toBeDefined();
+      expect(snapshotItem).not.toHaveProperty('strokes');
     });
 
     it('should warn about a backup from a newer app version', async () => {

@@ -15,7 +15,7 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | --- | --- | --- |
 | `item` | `items` | inklusive der `stroke`-Untersammlung an Zeichnungen |
 | `layer` | `layers` | IDs bleiben erhalten, `item.layer` zeigt darauf |
-| `history` | `history` | je Eintrag `snapshotItems` und `snapshotLayers` |
+| `history` | `history` | je Eintrag `snapshotItems` (mit den Strichen der Zeichnungen) und `snapshotLayers` |
 | `location` | `locations` | Einsatzorte |
 | `kostenersatz` | `kostenersatz` | |
 | `auditlog` | `auditlog` | |
@@ -83,10 +83,23 @@ Sicherung, und die Datei sah dabei vollständig aus. Bei einer Sicherungsfunktio
 ist genau das die gefährlichste Eigenschaft — deshalb darf kein Fehlschlag mehr
 lautlos bleiben.
 
+## Zeichnungen in der History
+
+Die Striche einer Zeichnung liegen nicht im Item-Dokument, sondern in der
+Untersammlung `stroke` darunter — sowohl unter dem Einsatz als auch unter einem
+History-Eintrag (`history/{id}/item/{itemId}/stroke`).
+
+`useSaveHistory` hat lange nur `item` und `layer` kopiert. Jeder Snapshot
+enthielt damit eine leere Zeichnung, und `useDrawingStrokes` las die Striche
+immer vom aktuellen Stand — eine alte Lage zeigte also die Zeichnung von heute.
+Beides ist behoben: Der Snapshot nimmt die Striche mit, und `useDrawingStrokes`
+liest im History-Modus aus dem Snapshot.
+
+**Snapshots von vorher haben keine Striche.** Sie zeigen ihre Zeichnungen jetzt
+leer statt mit dem heutigen Stand — die Striche wurden damals schlicht nicht
+gesichert. Nachträglich lässt sich das nicht reparieren.
+
 ## Bekannte Grenzen
 
 - Der Export hält den gesamten Einsatz inklusive aller Anhänge als Base64 im
   Speicher. Bei sehr vielen Fotos wird die Datei entsprechend groß.
-- History-Snapshots enthalten keine Zeichenstriche: `useSaveHistory` kopiert nur
-  `item` und `layer`, nicht die `stroke`-Untersammlung. Das ist eine Lücke der
-  History selbst und schlägt auf die Sicherung durch.

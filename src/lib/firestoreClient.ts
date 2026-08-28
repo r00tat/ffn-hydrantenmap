@@ -5,9 +5,11 @@ import {
   updateDoc as fsUpdateDoc,
   addDoc as fsAddDoc,
   deleteDoc as fsDeleteDoc,
+  writeBatch,
   type DocumentReference,
   type CollectionReference,
   type DocumentData,
+  type Firestore,
   type SetOptions,
   type UpdateData,
   type WithFieldValue,
@@ -97,4 +99,30 @@ export function deleteDoc<
  */
 export function commitBatch(batch: WriteBatch): Promise<void> {
   return trackPendingWrite(withFreshAuth(() => batch.commit()));
+}
+
+/**
+ * Ein `writeBatch` fasst höchstens 500 Schreibvorgänge. Wer mehr zu schreiben
+ * hat — ein Import, ein History-Snapshot eines großen Einsatzes — teilt sie
+ * hiermit auf.
+ *
+ * Jede Teilmenge geht durch `commitBatch`, also durch `withFreshAuth`:
+ * Scheitert ein Commit an einem abgelaufenen Token, wird nur dieser Teil
+ * wiederholt, die bereits geschriebenen bleiben stehen.
+ */
+export async function commitInBatches(
+  firestore: Firestore,
+  operations: {
+    ref: DocumentReference;
+    data: DocumentData;
+  }[],
+): Promise<void> {
+  const BATCH_LIMIT = 499;
+  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(firestore);
+    for (const { ref, data } of operations.slice(i, i + BATCH_LIMIT)) {
+      batch.set(ref, data);
+    }
+    await commitBatch(batch);
+  }
 }

@@ -13,11 +13,59 @@ import {
   doc,
   getDocs,
   query,
-  writeBatch,
+  type DocumentData,
+  type DocumentReference,
 } from 'firebase/firestore';
-import { addDoc, commitBatch } from '../../lib/firestoreClient';
+import { addDoc, commitInBatches } from '../../lib/firestoreClient';
 import { formatTimestamp } from '../../common/time-format';
 import { useFirecallId } from '../useFirecall';
+
+/**
+ * Die Striche einer Zeichnung liegen nicht im Item-Dokument, sondern in der
+ * Untersammlung `stroke` darunter. Wer sie beim Snapshot vergisst, sichert
+ * eine leere Zeichnung — und genau das ist lange passiert.
+ */
+async function strokeOperations(
+  firecallId: string,
+  historyId: string,
+  items: FirecallItem[]
+) {
+  const drawings = items.filter((item) => item.type === 'drawing' && item.id);
+
+  const perDrawing = await Promise.all(
+    drawings.map(async (drawing) => {
+      const strokes = await getDocs(
+        query(
+          collection(
+            firestore,
+            FIRECALL_COLLECTION_ID,
+            firecallId,
+            FIRECALL_ITEMS_COLLECTION_ID,
+            drawing.id!,
+            'stroke'
+          )
+        )
+      );
+
+      return strokes.docs.map((strokeDoc) => ({
+        ref: doc(
+          firestore,
+          FIRECALL_COLLECTION_ID,
+          firecallId,
+          FIRECALL_HISTORY_COLLECTION_ID,
+          historyId,
+          FIRECALL_ITEMS_COLLECTION_ID,
+          drawing.id!,
+          'stroke',
+          strokeDoc.id
+        ) as DocumentReference,
+        data: strokeDoc.data() as DocumentData,
+      }));
+    })
+  );
+
+  return perDrawing.flat();
+}
 
 /**
  * saves the current state of all items in the firecall to the history collection
@@ -31,7 +79,6 @@ export const useSaveHistory = () => {
       console.info('saving history');
       setSaveInProgress(true);
       try {
-        const batch = writeBatch(firestore);
         const historyCollection = collection(
           firestore,
           FIRECALL_COLLECTION_ID,
@@ -46,7 +93,7 @@ export const useSaveHistory = () => {
         } as FirecallHistory);
         console.info(`new history doc: ${newHistoryDoc.id}`);
 
-        await Promise.all(
+        const perCollection = await Promise.all(
           [FIRECALL_ITEMS_COLLECTION_ID, FIRECALL_LAYERS_COLLECTION_ID].map(
             async (collectionName) => {
               console.info(`querying for items in ${collectionName} `);
@@ -56,19 +103,17 @@ export const useSaveHistory = () => {
                 firecallId,
                 collectionName
               );
-              const q = query(itemCollection);
-              const querySnapshot = await getDocs(q);
-              const items: FirecallItem[] = [];
-              querySnapshot.forEach((doc) => {
-                items.push({ ...doc.data(), id: doc.id } as FirecallItem);
-              });
+              const querySnapshot = await getDocs(query(itemCollection));
+              const items: FirecallItem[] = querySnapshot.docs.map(
+                (d) => ({ ...d.data(), id: d.id }) as FirecallItem
+              );
 
               console.info(
                 `found ${items.length} items in ${collectionName} for history`
               );
 
-              items.forEach((item) => {
-                const itemRef = doc(
+              const operations = items.map((item) => ({
+                ref: doc(
                   firestore,
                   FIRECALL_COLLECTION_ID,
                   firecallId,
@@ -76,13 +121,30 @@ export const useSaveHistory = () => {
                   newHistoryDoc.id,
                   collectionName,
                   item.id!
-                );
-                batch.set(itemRef, item);
-              });
+                ) as DocumentReference,
+                data: item as unknown as DocumentData,
+              }));
+
+              if (collectionName !== FIRECALL_ITEMS_COLLECTION_ID) {
+                return operations;
+              }
+
+              return [
+                ...operations,
+                ...(await strokeOperations(
+                  firecallId,
+                  newHistoryDoc.id,
+                  items
+                )),
+              ];
             }
           )
         );
-        await commitBatch(batch);
+
+        // Ein Batch fasst 500 Schreibvorgänge. Mit den Strichen einer
+        // Zeichnung wird die Grenze schnell erreicht, deshalb wird
+        // aufgeteilt statt in einem einzigen Batch zu schreiben.
+        await commitInBatches(firestore, perCollection.flat());
         console.info(`history ${newHistoryDoc.id} commited.`);
       } catch (err) {
         console.error(`failed to save history: ${err}`, err);

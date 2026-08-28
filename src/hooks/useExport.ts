@@ -5,9 +5,8 @@ import {
   getDocs,
   orderBy,
   query,
-  writeBatch,
 } from 'firebase/firestore';
-import { addDoc, commitBatch, updateDoc } from '../lib/firestoreClient';
+import { addDoc, commitInBatches, updateDoc } from '../lib/firestoreClient';
 import { getBlob, getMetadata, getStorage, ref } from 'firebase/storage';
 import { v4 as uuid } from 'uuid';
 import app, { firestore } from '../components/firebase/firebase';
@@ -100,7 +99,11 @@ export interface ExportDrawingItem extends FirecallItem {
 
 /** History entry with snapshot data */
 export interface ExportHistoryEntry extends FirecallHistory {
-  snapshotItems?: FirecallItem[];
+  /**
+   * Zeichnungen im Snapshot tragen ihre Striche mit — die liegen in der
+   * Untersammlung `stroke` und nicht im Item-Dokument.
+   */
+  snapshotItems?: (FirecallItem | ExportDrawingItem)[];
   snapshotLayers?: FirecallLayer[];
 }
 
@@ -196,13 +199,18 @@ function attachmentLabel(attachment: FcItemAttachment): string {
   return typeof attachment === 'string' ? attachment : attachment.name;
 }
 
-/** Export drawing strokes for a single item */
+/**
+ * Die Striche einer Zeichnung.
+ *
+ * `parentDoc` ist der Einsatz oder ein History-Eintrag — unter beiden liegt
+ * dieselbe Struktur `item/{id}/stroke`.
+ */
 async function exportDrawingStrokes(
-  firecallDoc: ReturnType<typeof doc>,
+  parentDoc: ReturnType<typeof doc>,
   itemId: string
 ): Promise<DrawingStroke[]> {
   const strokesRef = collection(
-    firecallDoc,
+    parentDoc,
     FIRECALL_ITEMS_COLLECTION_ID,
     itemId,
     'stroke'
@@ -225,7 +233,10 @@ async function exportDrawingStrokes(
 async function exportHistorySnapshot(
   firecallDoc: ReturnType<typeof doc>,
   historyId: string
-): Promise<{ snapshotItems: FirecallItem[]; snapshotLayers: FirecallLayer[] }> {
+): Promise<{
+  snapshotItems: (FirecallItem | ExportDrawingItem)[];
+  snapshotLayers: FirecallLayer[];
+}> {
   const historyRef = doc(
     firecallDoc,
     FIRECALL_HISTORY_COLLECTION_ID,
@@ -237,10 +248,19 @@ async function exportHistorySnapshot(
     getDocs(query(collection(historyRef, FIRECALL_LAYERS_COLLECTION_ID))),
   ]);
 
+  const snapshotItems = await Promise.all(
+    itemsSnap.docs.map(async (d) => {
+      const item = { ...d.data(), id: d.id } as FirecallItem;
+      if (item.type !== 'drawing') {
+        return item;
+      }
+      const strokes = await exportDrawingStrokes(historyRef, d.id);
+      return { ...item, strokes } as ExportDrawingItem;
+    })
+  );
+
   return {
-    snapshotItems: itemsSnap.docs.map(
-      (d) => ({ ...d.data(), id: d.id }) as FirecallItem
-    ),
+    snapshotItems,
     snapshotLayers: layersSnap.docs.map(
       (d) => ({ ...d.data(), id: d.id }) as FirecallLayer
     ),
@@ -359,29 +379,61 @@ export const blobFromBase64String = (
   return new Blob([byteArray], { type: mimeType });
 };
 
+type ImportOperation = {
+  ref: ReturnType<typeof doc>;
+  data: Record<string, unknown>;
+};
+
 /**
- * Firestore writeBatch has a 500 operation limit. This helper commits in chunks.
- *
- * Each chunk's commit is routed through `commitBatch` (→ `withFreshAuth`).
- * If a commit fails with an auth error, the central `withFreshAuth` wrapper
- * will refresh and retry only the failing chunk — previously committed chunks
- * remain in place.
+ * `commitInBatches` gegen die Client-Instanz — spart das `firestore`-Argument
+ * an den vielen Aufrufstellen unten.
  */
-async function commitInBatches(
-  operations: Array<{
-    ref: ReturnType<typeof doc>;
-    data: Record<string, unknown>;
-  }>
-) {
-  const BATCH_LIMIT = 499;
-  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
-    const chunk = operations.slice(i, i + BATCH_LIMIT);
-    const batch = writeBatch(firestore);
-    chunk.forEach(({ ref: docRef, data }) => {
-      batch.set(docRef, data);
+function commitOps(operations: ImportOperation[]) {
+  return commitInBatches(firestore, operations);
+}
+
+/**
+ * Schreiboperationen für die Striche aller Zeichnungen in `items`.
+ *
+ * `parentDoc` ist der Einsatz oder ein History-Eintrag — unter beiden liegt
+ * dieselbe Struktur `item/{id}/stroke`.
+ */
+function strokeImportOps(
+  parentDoc: ReturnType<typeof doc>,
+  items: (FirecallItem | ExportDrawingItem)[]
+): ImportOperation[] {
+  return items.flatMap((item) => {
+    const drawing = item as ExportDrawingItem;
+    if (item.type !== 'drawing' || !drawing.strokes?.length || !drawing.id) {
+      return [];
+    }
+    const strokeCol = collection(
+      parentDoc,
+      FIRECALL_ITEMS_COLLECTION_ID,
+      drawing.id,
+      'stroke'
+    );
+    return drawing.strokes.map((stroke) => {
+      const { id: _id, ...strokeData } = stroke as DrawingStroke & {
+        id?: string;
+      };
+      return {
+        ref: doc(strokeCol),
+        data: {
+          ...strokeData,
+          points: strokeData.points.flat(),
+        } as unknown as Record<string, unknown>,
+      };
     });
-    await commitBatch(batch);
-  }
+  });
+}
+
+/** Ein Item-Dokument ohne die Striche — die gehören in die Untersammlung. */
+function itemWithoutStrokes(
+  item: FirecallItem | ExportDrawingItem
+): Record<string, unknown> {
+  const { strokes: _strokes, ...itemData } = item as ExportDrawingItem;
+  return itemData as unknown as Record<string, unknown>;
 }
 
 export interface ImportFirecallOptions {
@@ -507,47 +559,19 @@ export async function importFirecall(
   );
 
   // Import items (without drawing strokes in document data)
-  const itemOps = importItems.map((item) => {
-    const { strokes: _strokes, ...itemData } = item as ExportDrawingItem;
-    return {
+  await commitOps(
+    importItems.map((item) => ({
       ref: doc(itemCol, item.id || uuid()),
-      data: itemData as unknown as Record<string, unknown>,
-    };
-  });
-  await commitInBatches(itemOps);
+      data: itemWithoutStrokes(item),
+    }))
+  );
 
   // Import drawing strokes as sub-subcollections
-  const drawingItems = importItems.filter(
-    (i) => i.type === 'drawing'
-  ) as ExportDrawingItem[];
-  for (const drawing of drawingItems) {
-    if (drawing.strokes?.length && drawing.id) {
-      const strokeOps = drawing.strokes.map((stroke) => {
-        const { id: _id, ...strokeData } = stroke as DrawingStroke & {
-          id?: string;
-        };
-        return {
-          ref: doc(
-            collection(
-              firecallDoc,
-              FIRECALL_ITEMS_COLLECTION_ID,
-              drawing.id!,
-              'stroke'
-            )
-          ),
-          data: {
-            ...strokeData,
-            points: strokeData.points.flat(),
-          } as unknown as Record<string, unknown>,
-        };
-      });
-      await commitInBatches(strokeOps);
-    }
-  }
+  await commitOps(strokeImportOps(firecallDoc, importItems));
 
   // Import chat
   if (chat?.length) {
-    await commitInBatches(
+    await commitOps(
       chat.map((c) => ({
         ref: doc(chatCol, c.id || uuid()),
         data: c as unknown as Record<string, unknown>,
@@ -557,7 +581,7 @@ export async function importFirecall(
 
   // Import layers (keep IDs, as they are referenced by items)
   if (layers?.length) {
-    await commitInBatches(
+    await commitOps(
       layers.map((l) => ({
         ref: doc(layerCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,
@@ -580,7 +604,7 @@ export async function importFirecall(
     });
 
     // Write all history entries in batches
-    await commitInBatches(
+    await commitOps(
       historyRefs.map(({ ref: r, data }) => ({ ref: r, data }))
     );
 
@@ -589,19 +613,22 @@ export async function importFirecall(
       const { snapshotItems, snapshotLayers } = entry;
 
       if (snapshotItems?.length) {
-        await commitInBatches(
+        const snapshotItemCol = collection(
+          historyDocRef,
+          FIRECALL_ITEMS_COLLECTION_ID
+        );
+        await commitOps(
           snapshotItems.map((item) => ({
-            ref: doc(
-              collection(historyDocRef, FIRECALL_ITEMS_COLLECTION_ID),
-              item.id || uuid()
-            ),
-            data: item as unknown as Record<string, unknown>,
+            ref: doc(snapshotItemCol, item.id || uuid()),
+            data: itemWithoutStrokes(item),
           }))
         );
+        // Zeichnungen im Snapshot haben ihre Striche eine Ebene tiefer.
+        await commitOps(strokeImportOps(historyDocRef, snapshotItems));
       }
 
       if (snapshotLayers?.length) {
-        await commitInBatches(
+        await commitOps(
           snapshotLayers.map((layer) => ({
             ref: doc(
               collection(historyDocRef, FIRECALL_LAYERS_COLLECTION_ID),
@@ -616,7 +643,7 @@ export async function importFirecall(
 
   // Import locations
   if (locations?.length) {
-    await commitInBatches(
+    await commitOps(
       locations.map((l) => ({
         ref: doc(locationCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,
@@ -626,7 +653,7 @@ export async function importFirecall(
 
   // Import kostenersatz
   if (kostenersatz?.length) {
-    await commitInBatches(
+    await commitOps(
       kostenersatz.map((k) => ({
         ref: doc(kostenersatzCol, k.id || uuid()),
         data: k as unknown as Record<string, unknown>,
@@ -636,7 +663,7 @@ export async function importFirecall(
 
   // Import auditlog
   if (auditlog?.length) {
-    await commitInBatches(
+    await commitOps(
       auditlog.map((a) => ({
         ref: doc(auditlogCol, a.id || uuid()),
         data: a as unknown as Record<string, unknown>,
@@ -646,7 +673,7 @@ export async function importFirecall(
 
   // Import crew assignments
   if (crew?.length) {
-    await commitInBatches(
+    await commitOps(
       crew.map((c) => ({
         ref: doc(crewCol, c.id || uuid()),
         data: c as unknown as Record<string, unknown>,
