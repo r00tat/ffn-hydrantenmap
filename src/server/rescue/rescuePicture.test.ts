@@ -75,6 +75,26 @@ describe('fetchRescuePicture', () => {
     ).toBeUndefined();
   });
 
+  it('bricht bei einer endlosen Antwort ab, statt sie zu puffern', async () => {
+    // Ohne content-length greift die Vorabprüfung nicht. Die Grenze muss
+    // deshalb beim Lesen ziehen — sonst begrenzt sie nichts.
+    const chunk = new Uint8Array(64 * 1024);
+    fetchMock.mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            controller.enqueue(chunk);
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    expect(
+      await fetchRescuePicture('https://api.example.test/a.png'),
+    ).toBeUndefined();
+  });
+
   it('verwirft eine Antwort, die per content-length zu groß ist', async () => {
     fetchMock.mockResolvedValue(
       imageResponse(PNG, { 'content-length': String(64 * 1024 * 1024) }),

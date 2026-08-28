@@ -77,6 +77,12 @@ dem richtigen `Content-Type` und `X-Content-Type-Options: nosniff` aus. Was
 sich nicht als Bild ausweist, wird verworfen — sonst lieferte die Route
 beliebige fremde Bytes unter unserem Origin aus.
 
+**Die Größengrenze zieht beim Lesen, nicht danach.** `response.arrayBuffer()`
+würde erst die ganze Antwort in den Speicher holen und die Grenze anschließend
+prüfen — ein Dienst, der ohne `content-length` endlos sendet, brächte den
+Server damit zum Erliegen. `readCapped()` liest deshalb stückweise und bricht
+beim Überschreiten ab; `content-length` wird zusätzlich vorab geprüft.
+
 **Der Aufrufer nennt eine Varianten-ID, keine URL.** Die Adresse kommt aus dem
 serverseitig zwischengespeicherten Katalog. Damit ist die Route kein offener
 Proxy, und es gibt nichts gegen SSRF abzusichern, was `safeUrl()` beim Einlesen

@@ -53,6 +53,48 @@ export function sniffImageType(bytes: Uint8Array): string | undefined {
 }
 
 /**
+ * Den Körper lesen und dabei zählen.
+ *
+ * `response.arrayBuffer()` würde erst die ganze Antwort in den Speicher holen
+ * und danach die Grenze prüfen — eine Grenze, die nichts begrenzt. Ein Dienst,
+ * der ohne `content-length` endlos sendet, brächte den Server damit zum
+ * Erliegen. Deshalb stückweise lesen und beim Überschreiten abbrechen.
+ */
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+): Promise<Uint8Array | undefined> {
+  const stream = response.body;
+  if (!stream) return undefined;
+
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return undefined;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const merged = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
+}
+
+/**
  * Ein Fahrzeugbild von Euro NCAP holen und als Bild ausweisen.
  *
  * Die Adresse stammt aus dem Katalog und nicht aus dem Request — die Route
@@ -79,8 +121,8 @@ export async function fetchRescuePicture(
     return undefined;
   }
 
-  const body = new Uint8Array(await response.arrayBuffer());
-  if (body.byteLength > MAX_PICTURE_BYTES) return undefined;
+  const body = await readCapped(response, MAX_PICTURE_BYTES);
+  if (!body) return undefined;
 
   const contentType = sniffImageType(body);
   if (!contentType) return undefined;
