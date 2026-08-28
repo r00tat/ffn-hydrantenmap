@@ -34,6 +34,27 @@ describe('isLagekarteFile', () => {
     expect(isLagekarteFile(minimal)).toBe(true);
   });
 
+  it('erkennt eine Lagekarte ohne Gruppen und ohne Elemente', () => {
+    // Ein Export, dessen einziger Inhalt eigene Kartenebenen sind. Ohne diese
+    // Erkennung liefe die Datei im Import in den CSV-Zweig.
+    expect(
+      isLagekarteFile({
+        ...minimal,
+        groups: [],
+        features: [],
+        wmslayers: [
+          {
+            url: 'https://inspire.lfrz.gv.at/000801/ows?SERVICE=WMS&',
+            layer: 'Hochwasserrisikogebiete HQ100',
+            name: 'Hochwasserrisikogebiete HQ100',
+            bounds: '8.468,45.501,19.638,49.713',
+            disabled: true,
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
   it('erkennt ein gewöhnliches GeoJSON nicht als Lagekarte-Datei', () => {
     expect(
       isLagekarteFile({

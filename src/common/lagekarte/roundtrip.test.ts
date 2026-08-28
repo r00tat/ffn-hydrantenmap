@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isLagekarteFile, parseLagekarteFile } from './fromLagekarte';
 import raw from './fixtures/lagekarte-export.json';
+import wmsRaw from './fixtures/lagekarte-wmslayers.json';
 import { buildLagekarteFile } from './toLagekarte';
 import type { LagekarteSource } from './types';
 
@@ -141,5 +142,114 @@ describe('Roundtrip mit einem echten lagekarte.info-Export', () => {
     expect(second.items.map((i) => i.layerIndex)).toEqual(
       first.items.map((i) => i.layerIndex),
     );
+  });
+});
+
+/**
+ * Der zweite Referenz-Export: eine Lagekarte, deren einziger Inhalt drei
+ * WMS-Ebenen sind. Er belegt das Schema von `wmslayers`, das vorher in keinem
+ * Sample stand — insbesondere die Reihenfolge in `bounds`.
+ */
+describe('WMS-Ebenen aus einem echten lagekarte.info-Export', () => {
+  it('wird als Lagekarte-Datei erkannt', () => {
+    expect(isLagekarteFile(wmsRaw)).toBe(true);
+  });
+
+  it('liest alle drei Ebenen ohne Warnung', () => {
+    const result = parseLagekarteFile(wmsRaw, 'Sammelebene');
+    expect(result.warnings).toEqual([]);
+    expect(result.mapLayers.map((l) => l.name)).toEqual([
+      'Hochwasserrisikogebiete HQ100',
+      'Hochwasserüberflutungsflächen HQ100',
+      'Isotopenniederschlagsmessstellen',
+    ]);
+  });
+
+  it('dreht die Ausdehnung in unsere Reihenfolge', () => {
+    // In der Datei steht `8.468,45.501,19.638,49.713` — west,süd,ost,nord.
+    // Als Leaflet-Rechteck gelesen läge die Ebene im Indischen Ozean.
+    const result = parseLagekarteFile(wmsRaw, 'Sammelebene');
+    expect(result.mapLayers[0].bounds).toBe('45.501,8.468,49.713,19.638');
+  });
+
+  it('übernimmt disabled als ausgeschaltet', () => {
+    const result = parseLagekarteFile(wmsRaw, 'Sammelebene');
+    expect(result.mapLayers.every((l) => l.enabled === false)).toBe(true);
+  });
+
+  it('schreibt die Ebenen wieder so hinaus, wie sie hereinkamen', () => {
+    const first = parseLagekarteFile(wmsRaw, 'Sammelebene');
+    const built = buildLagekarteFile({
+      firecall: { name: 'Roundtrip', lat: 47.9, lng: 16.8 },
+      items: [],
+      layers: [],
+      mapLayers: first.mapLayers,
+      strokes: {},
+    });
+
+    expect(built.wmslayers).toEqual(wmsRaw.wmslayers);
+  });
+
+  it('erhält über den ffnd-Block auch das, was lagekarte nicht kennt', () => {
+    const built = buildLagekarteFile({
+      firecall: { name: 'Roundtrip', lat: 47.9, lng: 16.8 },
+      items: [],
+      layers: [],
+      mapLayers: [
+        {
+          id: 'a',
+          name: 'Orthofoto',
+          overlayType: 'WMS',
+          url: 'https://gis.example.at/wms?',
+          wmsLayers: '1',
+          format: 'image/jpeg',
+          transparent: false,
+          opacity: 0.35,
+          maxNativeZoom: 18,
+          zIndex: 7,
+          enabled: true,
+        },
+        {
+          name: 'Kacheln',
+          overlayType: 'WMTS',
+          url: 'https://a.org/{z}/{x}/{y}.png',
+          opacity: 1,
+        },
+      ],
+      strokes: {},
+    });
+
+    // lagekarte bekommt nur die WMS-Ebene, und nur die Felder, die es kennt.
+    expect(built.wmslayers).toHaveLength(1);
+    expect(built.ffnd?.mapLayers).toHaveLength(2);
+
+    const back = parseLagekarteFile(built, 'Sammelebene');
+    expect(back.warnings).toEqual([]);
+    expect(back.mapLayers).toHaveLength(2);
+    expect(back.mapLayers[0]).toMatchObject({
+      name: 'Orthofoto',
+      opacity: 0.35,
+      format: 'image/jpeg',
+      transparent: false,
+      maxNativeZoom: 18,
+      zIndex: 7,
+    });
+    // Die Kachel-Ebene überlebt nur über den eigenen Block.
+    expect(back.mapLayers[1]).toMatchObject({
+      overlayType: 'WMTS',
+      url: 'https://a.org/{z}/{x}/{y}.png',
+    });
+    expect(back.mapLayers[0].id).toBeUndefined();
+  });
+
+  it('schreibt keinen ffnd-Block, wenn es keine Kartenebenen gibt', () => {
+    const built = buildLagekarteFile({
+      firecall: { name: 'Leer', lat: 47.9, lng: 16.8 },
+      items: [],
+      layers: [],
+      strokes: {},
+    });
+    expect(built.wmslayers).toEqual([]);
+    expect(built.ffnd).toBeUndefined();
   });
 });

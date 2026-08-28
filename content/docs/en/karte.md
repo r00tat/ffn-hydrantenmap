@@ -11,6 +11,7 @@ The map shows hydrants and other important points in the operation area. You can
 - **Different base maps** Orthophoto, Basemap, Basemap grey, OpenStreetMap, OpenTopoMap
 - **Overlay layers** Operation sites, distance, radius, position, power outages, water levels, weather stations, addresses
 - **WMS layers** Floods, risk zones, inundation areas (provided by the state of Burgenland)
+- **Custom map layers** Self-created WMS and tile services per operation, shown in the layer control under “Karte: …” (see [Ebenen](/docs/ebenen))
 - **Search a location** Enter an address or place name and view it on the map
 - **Editing mode with drawing tools** Place items on the map, draw lines and polygons
 - **Place items on the map** Add vehicles, markers, lines and areas to the active operation

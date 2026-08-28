@@ -25,6 +25,7 @@ import {
   type LagekarteOptions,
   type LagekarteSource,
 } from './types';
+import { toFfndMapLayers, toLagekarteWmsLayers } from './wmsLayers';
 
 /** Zuordnung Ebenen-Id → lagekarte-Gruppenname (`'eg_0'`, …). */
 export type GroupIdByLayer = Record<string, string>;
@@ -450,7 +451,7 @@ function messagesFor(items: FirecallItem[]): LagekarteMessage[] {
 
 /** Baut die vollständige Lagekarte-Datei. Reine Funktion. */
 export function buildLagekarteFile(source: LagekarteSource): LagekarteFile {
-  const { firecall, items, layers, strokes, gis } = source;
+  const { firecall, items, layers, strokes, gis, mapLayers } = source;
 
   const groups: LagekarteGroupEntry[] = layers.map((layer, index) => ({
     name: `eg_${index}`,
@@ -476,6 +477,7 @@ export function buildLagekarteFile(source: LagekarteSource): LagekarteFile {
     buildTaktischeZeichenGroup(items, groupByLayer, gisOptions),
   ];
 
+  const ffndMapLayers = toFfndMapLayers(mapLayers);
   const messages = messagesFor(items);
   const notes = messages.map((m) => `${m.date} — ${m.text}`).join('\n');
 
@@ -510,7 +512,12 @@ export function buildLagekarteFile(source: LagekarteSource): LagekarteFile {
     messages,
     history,
     colors: [],
-    wmslayers: [],
+    // Eigene Kartenebenen in dem Schema, das lagekarte.info selbst schreibt.
+    wmslayers: toLagekarteWmsLayers(mapLayers),
     features,
+    // Kachel-Ebenen, Deckkraft, Format, Zoomgrenzen: alles, was `wmslayers`
+    // nicht führt. lagekarte.info ignoriert den Block, unser Import bevorzugt
+    // ihn.
+    ...(ffndMapLayers.length ? { ffnd: { v: 1 as const, mapLayers: ffndMapLayers } } : {}),
   };
 }

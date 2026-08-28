@@ -2699,7 +2699,8 @@
     "importLayers": "Layers from the situation map",
     "layerObjectCount": "{count, plural, =0 {Layer name (no objects)} one {Layer name (# object)} other {Layer name (# objects)}}",
     "diaryCount": "{count, plural, one {# diary entry} other {# diary entries}}",
-    "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}"
+    "warningCount": "{count, plural, one {# element could not be read} other {# elements could not be read}}",
+    "mapLayerCount": "{count, plural, one {# map layer} other {# map layers}}"
   },
   "rettungskarten": {
     "title": "Rescue sheets",
@@ -2718,5 +2719,70 @@
     "noSheet": "No rescue sheet available",
     "doorsValue": "{doors} doors",
     "diaryLabel": "Rescue sheet"
+  },
+  "mapLayers": {
+    "title": "Custom map layers",
+    "intro": "WMS and tile services drawn on top of the base map. They show up in the map's layer control with a “Karte:” prefix and can be toggled there.",
+    "empty": "No custom map layer has been created for this operation yet.",
+    "add": "Add map layer",
+    "addTitle": "Add map layer",
+    "editTitle": "Edit map layer",
+    "deleteTitle": "Delete map layer",
+    "deleteConfirm": "Really delete the map layer “{name}”?",
+    "offlineHint": "Custom map layers are not precached for offline use. Without a network they stay empty.",
+    "defaultOn": "on by default",
+    "types": {
+      "WMS": "WMS",
+      "WMTS": "Tile URL (WMTS/XYZ)"
+    },
+    "fields": {
+      "name": "Name",
+      "beschreibung": "Description",
+      "overlayType": "Type",
+      "url": "URL",
+      "capabilitiesUrl": "GetCapabilities address",
+      "wmsLayers": "Layers (LAYERS)",
+      "format": "Format",
+      "transparent": "Transparent",
+      "opacity": "Opacity",
+      "maxZoom": "maxZoom",
+      "maxNativeZoom": "maxNativeZoom",
+      "bounds": "Bounds",
+      "attribution": "Attribution",
+      "enabled": "On by default",
+      "zIndex": "Order",
+      "tileSize": "Tile size"
+    },
+    "help": {
+      "urlWms": "GetMap endpoint of the service, e.g. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
+      "urlWmts": "Tile template with '{z}', '{x}' and '{y}', e.g. https://example.org/tiles/'{z}'/'{x}'/'{y}'.png",
+      "capabilitiesUrl": "Optional. Empty means the URL above. Remembered when querying so the layer selection is available again when editing.",
+      "knownService": "Selecting one queries the service right away. Other services via the address below.",
+      "wmsLayers": "Value of the LAYERS parameter. Separate multiple layers with commas.",
+      "bounds": "Optional, south,west,north,east in degrees — e.g. 46.82,15.98,48.16,17.17. No tiles are requested outside.",
+      "attribution": "Plain text. HTML is stripped.",
+      "zIndex": "Stacking of several custom map layers. Lower values sit below.",
+      "tileSize": "Edge length of the requested tile. Some services only serve one particular size."
+    },
+    "errors": {
+      "required": "Required",
+      "httpsRequired": "Only https addresses are allowed",
+      "templateRequired": "The template needs '{z}', '{x}' and '{y}'",
+      "invalidBounds": "Four values expected: south,west,north,east"
+    },
+    "capabilities": {
+      "known": "Known service",
+      "load": "Load layers from the service",
+      "loading": "Querying the service …",
+      "hint": "WMS only. The request runs through the server because the services do not send CORS headers.",
+      "select": "Layers found",
+      "filter": "type to filter …",
+      "multiHint": "select several using the check boxes. Settings are taken from the service.",
+      "found": "{count, plural, one {# layer found} other {# layers found}}",
+      "invalid-url": "The address is not a valid https URL.",
+      "unreachable": "The service did not respond.",
+      "no-layers": "No WMS with requestable layers was found at this address.",
+      "unsupportedCrs": "These layers do not advertise EPSG:3857 and will most likely stay empty on the map: {layers}"
+    }
   }
 }

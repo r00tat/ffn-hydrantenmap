@@ -1,5 +1,20 @@
 import { TileLayerOptions } from 'leaflet';
 import L from 'leaflet';
+import {
+  clampOpacity,
+  isRenderableMapLayer,
+  uniqueOverlayNames,
+  DEFAULT_MAP_OVERLAY_MAX_NATIVE_ZOOM,
+  DEFAULT_MAP_OVERLAY_MAX_ZOOM,
+  FirecallMapLayer,
+  mapLayerOverlayName,
+  parseMapLayerBounds,
+  sanitizeAttribution,
+} from '../../common/mapLayers';
+
+// GetCapabilities-URLs der Dienste, Layer-IDs des Landes Burgenland und die
+// Eigenheiten des WISA-Kachel-Caches (kein GetCapabilities, nur 512er-Kacheln,
+// nur WMS 1.1.1/EPSG:3857): docs/kartenlayer.md
 
 export interface TileOptions extends TileLayerOptions {
   [key: string]: any;
@@ -16,6 +31,38 @@ export interface TileConfig {
 
 export interface TileConfigs {
   [name: string]: TileConfig;
+}
+
+/**
+ * Kantenlänge einer WMS-Kachel, wenn die Konfiguration nichts vorgibt.
+ *
+ * Leaflets Vorgabe wäre 256. 512 ist hier die bessere Grundeinstellung: Der
+ * WISA-Cache beantwortet nur 512×512 und quittiert 256 mit `400`, und für die
+ * übrigen WMS-Dienste bedeutet es ein Viertel der Anfragen bei gleicher
+ * Auflösung — die Auflösung hängt am Verhältnis BBOX/Pixel, nicht an der
+ * Kachelgröße, `maxNativeZoom` bleibt also unberührt. Siehe
+ * docs/kartenlayer.md.
+ *
+ * Gilt nur für WMS. XYZ-/WMTS-Kacheln kommen fertig in 256 vom Server; dort
+ * bleibt es bei Leaflets Vorgabe.
+ */
+export const DEFAULT_WMS_TILE_SIZE = 512;
+
+/**
+ * Wird der Layer als WMS angefragt?
+ *
+ * Alles ohne `type` ist ein Kachel-Layer (XYZ/WMTS) und geht an `TileLayer`,
+ * `type: 'WMS'` an `WMSTileLayer`. Die Unterscheidung steht hier und nicht als
+ * Bedingung im JSX, damit die beiden Listen im Kartenaufbau nachweislich
+ * dieselbe Menge aufteilen.
+ */
+export function isWmsLayer(config: TileConfig): boolean {
+  return config.type === 'WMS';
+}
+
+/** Kachelgröße eines WMS-Layers: aus der Konfiguration, sonst der Standard. */
+export function wmsTileSize(config: TileConfig): number | L.Point {
+  return config.options?.tileSize ?? DEFAULT_WMS_TILE_SIZE;
 }
 
 export const availableLayers: TileConfigs = {
@@ -143,6 +190,14 @@ export const overlayLayers: TileConfigs = {
     enabled: true,
   },
 
+  // Die vier WISA-Overlays (oberflaechenwasser, riskareas, floodarea,
+  // floodarea_river) laufen über einen Kachel-Cache, nicht über einen
+  // WMS-Server: nur GetMap, nur VERSION=1.1.1 mit SRS=EPSG:3857, und
+  // ausschließlich 512x512 — jede andere Kantenlänge beantwortet der Dienst
+  // mit `400`. Das `tileSize` steht deshalb an jedem der vier Layer, obwohl es
+  // dem Standard entspricht: Es ist hier eine Zusage des Dienstes, kein
+  // Vorschlag. maxNativeZoom 19 ist ebenso die gemessene Obergrenze des
+  // Caches. Layerkatalog und Messwerte: docs/kartenlayer.md
   oberflaechenwasser: {
     name: 'Hochwasser Oberflächenwasser',
     // https://tiles.lfrz.gv.at/wisa_hw_risiko?LAYERS=ofa_maxd&FORMAT=image%2Fpng&TRANSPARENT=TRUE&TILED=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&SRS=EPSG%3A3857&BBOX=1876070.7619702,6099063.7000818,1877293.7544226,6100286.6925342&WIDTH=512&HEIGHT=512
@@ -157,6 +212,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'ofa_maxd',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -179,6 +235,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_risikobewertung',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -203,6 +260,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_gefahren_ueff',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -272,6 +330,7 @@ export const overlayLayers: TileConfigs = {
       type: 'normal',
       format: 'image/png',
       layers: 'hwrisiko_apsfr',
+      tileSize: 512,
       transparent: true,
       uppercase: true,
       bounds: [
@@ -292,3 +351,92 @@ export const createLayers = (
   });
   return layers;
 };
+
+/**
+ * Eine eigene Kartenebene als `TileConfig`.
+ *
+ * Damit lässt sich eine vom Benutzer angelegte Ebene überall dort einsetzen,
+ * wo bisher nur die fest eingebauten Ebenen aus `availableLayers` und
+ * `overlayLayers` standen — insbesondere in der Textur der 3D-Ansicht.
+ */
+export function mapLayerToTileConfig(layer: FirecallMapLayer): TileConfig {
+  const isWms = layer.overlayType === 'WMS';
+  return {
+    name: mapLayerOverlayName(layer),
+    url: layer.url,
+    type: isWms ? 'WMS' : 'WMTS',
+    enabled: layer.enabled === true,
+    ...(layer.beschreibung ? { description: layer.beschreibung } : {}),
+    options: {
+      maxZoom: layer.maxZoom ?? DEFAULT_MAP_OVERLAY_MAX_ZOOM,
+      maxNativeZoom: layer.maxNativeZoom ?? DEFAULT_MAP_OVERLAY_MAX_NATIVE_ZOOM,
+      attribution: sanitizeAttribution(layer.attribution),
+      opacity: clampOpacity(layer.opacity),
+      bounds: parseMapLayerBounds(layer.bounds),
+      transparent: layer.transparent !== false,
+      ...(isWms
+        ? {
+            layers: layer.wmsLayers ?? '',
+            format: layer.format || 'image/png',
+            uppercase: true,
+            ...(layer.tileSize ? { tileSize: layer.tileSize } : {}),
+          }
+        : {}),
+    },
+  };
+}
+
+/**
+ * Die darstellbaren eigenen Kartenebenen als `TileConfig`, in der Reihenfolge
+ * ihrer Stapelung und mit denselben eindeutigen Namen wie im Layer-Control.
+ *
+ * Karte und 3D-Ansicht müssen dieselben Namen benutzen: die Sichtbarkeit einer
+ * Überlagerung ist in Leaflet nur über ihren Namen zu erfahren.
+ */
+export function mapLayerTileConfigs(
+  layers: FirecallMapLayer[]
+): TileConfig[] {
+  const renderable = layers.filter(isRenderableMapLayer);
+  const names = uniqueOverlayNames(renderable);
+  return renderable.map((layer, index) => ({
+    ...mapLayerToTileConfig(layer),
+    name: names[index],
+  }));
+}
+
+/**
+ * Ein Schlüssel, der sich bei jeder Änderung ändert, die Leaflet an einer
+ * bestehenden Ebene **nicht** mehr übernimmt.
+ *
+ * `react-leaflet` aktualisiert an einer laufenden Kachelebene nur `opacity` und
+ * `zIndex`, bei einer reinen Kachelebene zusätzlich die URL. Ein geänderter
+ * `LAYERS`-Wert, ein anderes Format, eine andere Begrenzung — und bei WMS sogar
+ * eine andere Adresse — würden sonst erst nach einem Neuladen der Seite
+ * sichtbar. Als React-Key sorgt dieser Wert dafür, dass die Ebene stattdessen
+ * neu aufgebaut wird.
+ */
+export function mapLayerConfigKey(config: TileConfig): string {
+  const {
+    layers,
+    format,
+    transparent,
+    tileSize,
+    bounds,
+    maxZoom,
+    maxNativeZoom,
+    attribution,
+  } = config.options;
+  return JSON.stringify([
+    config.name,
+    config.type,
+    config.url,
+    layers,
+    format,
+    transparent,
+    tileSize,
+    bounds,
+    maxZoom,
+    maxNativeZoom,
+    attribution,
+  ]);
+}

@@ -23,6 +23,7 @@ import type {
 } from '../../../common/terrain/terrainTypes';
 import type { FirecallItem } from '../../firebase/firestore';
 import { getItemInstance } from '../../FirecallItems/elements';
+import type { TileConfig } from '../tiles';
 import { contourColor, contourLabelColor } from '../layers/hoehenlinien';
 import {
   chooseExaggeration,
@@ -75,6 +76,14 @@ export interface Gelaende3dDialogOptions {
    * gehört auch in die Textur.
    */
   overlays?: OverlayStates;
+  /**
+   * Die eigenen Kartenebenen des Einsatzes als Kachelkonfiguration.
+   *
+   * Kommt aus der Karte statt aus einem Hook: der Dialog soll keine eigene
+   * Firestore-Abfrage aufmachen, und die Namen müssen dieselben sein, unter
+   * denen die Ebenen in Leaflets Layer-Steuerung stehen.
+   */
+  customOverlays?: TileConfig[];
   items: FirecallItem[];
   equidistanceM: number;
   /**
@@ -104,6 +113,7 @@ export default function Gelaende3dDialog({
   zoom,
   baseLayerName,
   overlays = {},
+  customOverlays = [],
   items,
   equidistanceM,
   showContours: contoursInitially = true,
@@ -198,7 +208,7 @@ export default function Gelaende3dDialog({
           const texture = await composeTexture(
             config,
             grid,
-            activeOverlays(overlays)
+            activeOverlays(overlays, customOverlays)
           );
           if (!cancelled) scene.setTexture(texture, result, grid);
         }

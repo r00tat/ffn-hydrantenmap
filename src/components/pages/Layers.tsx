@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import AddIcon from '@mui/icons-material/Add';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Fab from '@mui/material/Fab';
@@ -47,6 +48,7 @@ import FirecallItemCard, {
 } from '../FirecallItems/FirecallItemCard';
 import FirecallItemDialog from '../FirecallItems/FirecallItemDialog';
 import { getItemInstance } from '../FirecallItems/elements';
+import MapLayersSection from '../Map/MapLayers/MapLayersSection';
 import LayerImport from '../firebase/LayerImport';
 import {
   FIRECALL_COLLECTION_ID,
@@ -375,6 +377,8 @@ export default function LayersPage() {
               items={layerItems['default']}
             />
           </Grid>
+          <Divider sx={{ my: 3 }} />
+          <MapLayersSection canEdit={canEdit} />
         </Box>
         {canEdit && (
           <Fab

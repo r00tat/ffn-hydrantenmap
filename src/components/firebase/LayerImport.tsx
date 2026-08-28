@@ -24,6 +24,7 @@ import {
 import type { LagekarteParseResult } from '../../common/lagekarte/types';
 import { formatTimestamp } from '../../common/time-format';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
+import { useFirecallMapLayerActions } from '../../hooks/useFirecallMapLayers';
 import DataSchemaEditor from '../FirecallItems/DataSchemaEditor';
 import VisuallyHiddenInput from '../upload/VisuallyHiddenInput';
 import readFileAsText from '../upload/readFile';
@@ -220,6 +221,7 @@ export default function LayerImport() {
   const [useMetadataAsLayerName, setUseMetadataAsLayerName] = useState(false);
   const [gpxAsPoints, setGpxAsPoints] = useState(false);
   const addFirecallItem = useFirecallItemAdd();
+  const { addMapLayer } = useFirecallMapLayerActions();
   const t = useTranslations('lagekarte');
 
   // --- File select ---
@@ -437,6 +439,12 @@ export default function LayerImport() {
           ),
         ]);
 
+        // Eigene Kartenebenen liegen neben den Elementen und tragen keine
+        // Ebenenzuordnung — sie sind Hintergrund, keine Lage.
+        for (const mapLayer of result.mapLayers) {
+          await addMapLayer(mapLayer);
+        }
+
         if (result.warnings.length) {
           console.warn('lagekarte import warnings', result.warnings);
         }
@@ -480,7 +488,7 @@ export default function LayerImport() {
     }
 
     setUploadInProgress(false);
-  }, [preview, gpxEffective, everyNth, layerName, addFirecallItem]);
+  }, [preview, gpxEffective, everyNth, layerName, addFirecallItem, addMapLayer]);
 
   // --- Computed values ---
   const effectivePreview =
@@ -876,6 +884,17 @@ export default function LayerImport() {
                       size="small"
                       label={t('diaryCount', {
                         count: preview.result.diaries.length,
+                      })}
+                    />
+                  )}
+                  {preview.result.mapLayers.length > 0 && (
+                    <Chip
+                      sx={{ mt: 1, mr: 1 }}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      label={t('mapLayerCount', {
+                        count: preview.result.mapLayers.length,
                       })}
                     />
                   )}

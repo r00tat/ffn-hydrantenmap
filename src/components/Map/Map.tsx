@@ -29,6 +29,7 @@ import UpdateMapPosition from './UpdateMapPosition';
 import { DistanceLayer } from './layers/DistanceLayer';
 import FirecallLayer from './layers/FirecallLayer';
 import HoseLineDraftLayer from './layers/HoseLineDraftLayer';
+import CustomMapLayers from './layers/CustomMapLayers';
 import LayerErrorBoundary from './layers/LayerErrorBoundary';
 import HoehenlinienLayer from './layers/HoehenlinienLayer';
 import { HOEHENLINIEN_LAYER_NAME } from './layers/hoehenlinien';
@@ -42,7 +43,12 @@ import StreckenkilometerLayer, {
 } from './layers/StreckenkilometerLayer';
 import WetterstationLayer from './layers/WetterstationLayer';
 import PositionMarker from './markers/PositionMarker';
-import { availableLayers, overlayLayers } from './tiles';
+import {
+  availableLayers,
+  isWmsLayer,
+  overlayLayers,
+  wmsTileSize,
+} from './tiles';
 
 function ActionButtons() {
   const map = useMap();
@@ -98,7 +104,7 @@ export default function Map() {
               name={layer.name}
               key={key}
             >
-              {layer.type === 'WMS' ? (
+              {isWmsLayer(layer) ? (
                 <WMSTileLayer
                   layers={layer.options.layers}
                   attribution={layer.options.attribution}
@@ -108,6 +114,7 @@ export default function Map() {
                   bounds={layer.options.bounds}
                   format={layer.options.format}
                   transparent={layer.options.transparent}
+                  tileSize={wmsTileSize(layer)}
                   key={key}
                 />
               ) : (
@@ -180,7 +187,7 @@ export default function Map() {
             </LayerErrorBoundary>
           </LayersControl.Overlay>
           {Object.entries(overlayLayers)
-            .filter(([key, layer]) => (layer.type || 'WTMS') == 'WTMS')
+            .filter(([, layer]) => !isWmsLayer(layer))
             .map(([key, layer]) => (
               <LayersControl.Overlay
                 name={layer.name}
@@ -199,7 +206,7 @@ export default function Map() {
               </LayersControl.Overlay>
             ))}
           {Object.entries(overlayLayers)
-            .filter(([key, layer]) => layer.type == 'WMS')
+            .filter(([, layer]) => isWmsLayer(layer))
             .map(([key, layer]) => (
               <LayersControl.Overlay name={layer.name} key={key}>
                 <WMSTileLayer
@@ -213,11 +220,12 @@ export default function Map() {
                   key={key}
                   format={layer.options.format}
                   transparent={layer.options.transparent}
-                  tileSize={512}
+                  tileSize={wmsTileSize(layer)}
                   uppercase={layer.options.uppercase}
                 />
               </LayersControl.Overlay>
             ))}
+          <CustomMapLayers />
         </LayersControl>
         <ScaleControl position="bottomright" metric={true} imperial={false} />
         <ScaleRatioControl />

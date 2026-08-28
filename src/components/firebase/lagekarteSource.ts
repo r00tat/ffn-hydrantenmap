@@ -1,4 +1,8 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore';
+import {
+  FIRECALL_MAP_LAYERS_COLLECTION_ID,
+  type FirecallMapLayer,
+} from '../../common/mapLayers';
 import type { LagekarteSource } from '../../common/lagekarte/types';
 import { firestore } from './firebase';
 import {
@@ -30,9 +34,12 @@ export async function loadLagekarteSource(
   }
   const firecall = { ...(firecallSnap.data() as Firecall), id: firecallId };
 
-  const [itemsSnap, layersSnap] = await Promise.all([
+  const [itemsSnap, layersSnap, mapLayersSnap] = await Promise.all([
     getDocs(query(collection(firecallDoc, FIRECALL_ITEMS_COLLECTION_ID))),
     getDocs(query(collection(firecallDoc, FIRECALL_LAYERS_COLLECTION_ID))),
+    getDocs(
+      query(collection(firecallDoc, FIRECALL_MAP_LAYERS_COLLECTION_ID))
+    ),
   ]);
 
   const items = itemsSnap.docs
@@ -42,6 +49,10 @@ export async function loadLagekarteSource(
   const layers = layersSnap.docs
     .map((d) => ({ ...d.data(), id: d.id }) as FirecallLayer)
     .filter(filterActiveItems);
+
+  const mapLayers = mapLayersSnap.docs
+    .map((d) => ({ ...d.data(), id: d.id }) as FirecallMapLayer)
+    .filter((l) => l.deleted !== true);
 
   const drawings = items.filter((i) => i.type === 'drawing' && i.id);
   const strokeLists = await Promise.all(
@@ -71,6 +82,7 @@ export async function loadLagekarteSource(
     firecall,
     items,
     layers,
+    mapLayers,
     strokes: Object.fromEntries(strokeLists),
   };
 }

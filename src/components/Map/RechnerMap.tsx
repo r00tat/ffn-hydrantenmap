@@ -16,7 +16,7 @@ import { defaultPosition } from '../../hooks/constants';
 import type { FirecallItem, MultiPointItem } from '../firebase/firestore';
 import { getConnectionPositions } from '../FirecallItems/elements/connection/distance';
 import LeitungenDraw from './Leitungen/Draw';
-import { availableLayers } from './tiles';
+import { availableLayers, isWmsLayer, wmsTileSize } from './tiles';
 
 /**
  * Die schmale Karte einer Rechenseite — geteilt von „Löschwasserversorgung"
@@ -102,7 +102,7 @@ export default function RechnerMap({ items, children }: RechnerMapProps) {
               name={layer.name}
               key={key}
             >
-              {layer.type === 'WMS' ? (
+              {isWmsLayer(layer) ? (
                 <WMSTileLayer
                   layers={layer.options.layers}
                   attribution={layer.options.attribution}
@@ -112,6 +112,7 @@ export default function RechnerMap({ items, children }: RechnerMapProps) {
                   bounds={layer.options.bounds}
                   format={layer.options.format}
                   transparent={layer.options.transparent}
+                  tileSize={wmsTileSize(layer)}
                 />
               ) : (
                 <TileLayer

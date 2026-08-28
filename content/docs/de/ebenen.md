@@ -65,3 +65,48 @@ Tipp: Nicht zugeordnete Elemente erscheinen in der Spalte "Elemente nicht zugeor
 :::info
 Tipp: Heatmaps eignen sich besonders für Messwerte (z.B. Strahlungswerte, Pegelstände). Die Interpolation berechnet Werte zwischen den Messpunkten.
 :::
+
+## Eigene Kartenebenen (WMS/WMTS)
+
+Neben den Ebenen für Einsatzelemente lassen sich **eigene Kartenebenen** anlegen: externe Kartendienste, die über die Basiskarte gelegt werden — der WMS eines Nachbarbezirks, ein Hochwasserdienst, ein Übungsplan. Sie erscheinen im Layer-Control der Karte mit dem Präfix „Karte:" und lassen sich dort ein- und ausschalten.
+
+Kartenebenen gehören zum Einsatz: alle am Einsatz beteiligten Benutzer sehen sie. Gäste über den Freigabe-Link sehen sie ebenfalls, können sie aber nicht ändern.
+
+### Kartenebene anlegen
+
+1. Auf der Seite "Ebenen" nach unten zum Abschnitt "Eigene Kartenebenen" scrollen
+2. "Kartenebene hinzufügen" klicken
+3. **Name** eingeben — er steht später im Layer-Control
+4. **Typ** wählen:
+   - **WMS** — GetMap-Endpoint eines Kartendienstes
+   - **Kachel-URL (WMTS/XYZ)** — Kachel-Template mit `{z}`, `{x}` und `{y}`
+5. Bei WMS: unter **Bekannter Dienst** einen der hinterlegten Kartendienste wählen — Adresse und Layer werden dann sofort geholt. Für alle anderen Dienste die **URL** eingeben (nur `https://`); eine `GetCapabilities`-Adresse darf direkt eingefügt werden, sie wird gemerkt und die Kartenadresse daraus ermittelt.
+6. Bei WMS: "Layer aus dem Dienst laden" klicken — die verfügbaren Layer werden aus dem `GetCapabilities` des Dienstes gelesen. In der Auswahl lassen sich **mehrere Layer anhaken**; Tippen filtert die Liste. Alternativ den `LAYERS`-Wert direkt eintragen.
+7. **Deckkraft** einstellen, damit die Basiskarte durchscheint
+8. Optional **Begrenzung** (`süd,west,nord,ost`), **maxZoom/maxNativeZoom**, **Quellenangabe** und **Reihenfolge** setzen
+9. **Standardmäßig aktiv** einschalten, wenn die Ebene beim Öffnen der Karte sichtbar sein soll
+10. Speichern
+
+:::info
+Ein nicht erreichbarer oder fehlerhafter Dienst kann die Karte nicht zerstören: fehlende Kacheln bleiben leer, die Basiskarte bleibt sichtbar.
+:::
+
+:::info
+Eigene Kartenebenen werden **nicht** für den Offline-Betrieb vorgeladen. Ohne Netz bleiben sie leer. Die Quellenangabe wird als reiner Text übernommen — HTML und Links sind dort nicht möglich.
+:::
+
+### Kartenebenen beim Austausch mit lagekarte.info
+
+Eigene Kartenebenen gehen beim Export für lagekarte.info mit und kommen beim Import wieder an:
+
+- **WMS-Ebenen** landen im `wmslayers`-Feld der Datei und sind damit auch in lagekarte.info selbst sichtbar.
+- **Kachel-Ebenen (WMTS/XYZ)** kennt lagekarte.info nicht. Sie überleben nur den Weg zurück in die Einsatzkarte.
+- Deckkraft, Format, Zoomgrenzen und Reihenfolge kennt lagekarte.info ebenfalls nicht — beim Weg über lagekarte.info und zurück in die Einsatzkarte bleiben sie trotzdem erhalten.
+
+Beim Import einer Datei von lagekarte.info werden deren WMS-Ebenen als eigene Kartenebenen übernommen. Ebenen mit einer Adresse ohne `https://` werden dabei übersprungen und in der Vorschau als Warnung angezeigt.
+
+Beim Anlegen einer WMS-Ebene füllt „Layer aus dem Dienst laden" fast das ganze Formular selbst: Name, Beschreibung, Quellenangabe, Ausdehnung, Bildformat und die feinste sinnvolle Zoomstufe kommen aus dem Dienst. Führt er nur einen Layer, wird der gleich übernommen; bei mehreren wählst du in „Gefundene Layer" aus, welche eingebunden werden sollen — auch mehrere zugleich.
+
+:::info
+Meldet ein Layer kein EPSG:3857, erscheint eine Warnung. Solche Layer bleiben in der Karte in der Regel leer, weil die Karte genau dieses Koordinatensystem anfragt.
+:::

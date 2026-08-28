@@ -1,6 +1,12 @@
 import L from 'leaflet';
 import type { TerrainBoundsLatLng } from '../../../common/terrain/terrainTypes';
-import { availableLayers, overlayLayers, type TileConfig } from '../tiles';
+import {
+  availableLayers,
+  DEFAULT_WMS_TILE_SIZE,
+  isWmsLayer,
+  overlayLayers,
+  type TileConfig,
+} from '../tiles';
 import { MAX_TEXTURE_PX } from './gelaende3d';
 import { isOverlayVisible, type OverlayStates } from './visibleItems';
 
@@ -102,8 +108,11 @@ export function findLayerConfig(name?: string): TileConfig | undefined {
  * Pegelstände, Live-Standorte) sind Marken und kein Kartenbild; sie ließen sich
  * nicht in eine Textur zeichnen.
  */
-export function activeOverlays(overlays: OverlayStates): TileConfig[] {
-  return Object.values(overlayLayers).filter((layer) =>
+export function activeOverlays(
+  overlays: OverlayStates,
+  custom: TileConfig[] = []
+): TileConfig[] {
+  return [...Object.values(overlayLayers), ...custom].filter((layer) =>
     isOverlayVisible(layer.name, overlays, layer.enabled === true)
   );
 }
@@ -123,10 +132,11 @@ export function tileUrl(
 /**
  * Kantenlänge einer WMS-Anfrage.
  *
- * `tileSize: 512` ist das, was die Karte in `Map.tsx` an `WMSTileLayer`
- * übergibt — und der WISA-Dienst (`tiles.lfrz.gv.at`) kennt nichts anderes.
+ * Dieselbe Kantenlänge, die die Karte an `WMSTileLayer` übergibt. Das Mosaik
+ * mischt mehrere Overlays in ein Raster, kann also nur eine Größe haben —
+ * deshalb der Standard aus `tiles.ts` und nicht die Angabe je Layer.
  */
-export const WMS_TILE_PX = 512;
+export const WMS_TILE_PX = DEFAULT_WMS_TILE_SIZE;
 
 /** Ein Mercator-Rechteck. */
 export interface MercBox {
@@ -235,7 +245,7 @@ async function drawLayer(
   config: TileConfig,
   grid: TileGrid
 ): Promise<void> {
-  if (config.type === 'WMS') {
+  if (isWmsLayer(config)) {
     await Promise.all(
       wmsBlocks(grid).map((block) =>
         loadImage(wmsUrl(config, block.box))
@@ -295,7 +305,11 @@ export async function composeTexture(
   // Parallel gezeichnet läge die Gefahrenkarte mal über und mal unter den
   // Adressen, je nachdem, welche Kachel zuerst da war.
   for (const overlay of overlays) {
+    // Die Deckkraft einer eigenen Kartenebene gehört auch in die Textur, sonst
+    // liegt in 3D undurchsichtig, was in der Karte durchscheint.
+    ctx.globalAlpha = (overlay.options?.opacity as number | undefined) ?? 1;
     await drawLayer(ctx, overlay, grid);
   }
+  ctx.globalAlpha = 1;
   return canvas;
 }

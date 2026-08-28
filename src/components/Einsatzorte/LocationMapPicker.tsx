@@ -23,7 +23,12 @@ import {
 } from 'react-leaflet';
 import L, { LatLng } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { availableLayers, overlayLayers } from '../Map/tiles';
+import {
+  availableLayers,
+  isWmsLayer,
+  overlayLayers,
+  wmsTileSize,
+} from '../Map/tiles';
 import Clusters from '../Map/Clusters';
 import { DistanceLayer } from '../Map/layers/DistanceLayer';
 import FirecallLayer from '../Map/layers/FirecallLayer';
@@ -228,7 +233,7 @@ export default function LocationMapPicker({
               </LayersControl.BaseLayer>
             ))}
             {Object.entries(overlayLayers)
-              .filter(([key, layer]) => (layer.type || 'WTMS') === 'WTMS')
+              .filter(([, layer]) => !isWmsLayer(layer))
               .map(([key, layer]) => (
                 <LayersControl.Overlay
                   name={layer.name}
@@ -247,7 +252,7 @@ export default function LocationMapPicker({
                 </LayersControl.Overlay>
               ))}
             {Object.entries(overlayLayers)
-              .filter(([key, layer]) => layer.type === 'WMS')
+              .filter(([, layer]) => isWmsLayer(layer))
               .map(([key, layer]) => (
                 <LayersControl.Overlay name={layer.name} key={key}>
                   <WMSTileLayer
@@ -261,7 +266,7 @@ export default function LocationMapPicker({
                     key={key}
                     format={layer.options.format}
                     transparent={layer.options.transparent}
-                    tileSize={512}
+                    tileSize={wmsTileSize(layer)}
                     uppercase={layer.options.uppercase}
                   />
                 </LayersControl.Overlay>
