@@ -385,6 +385,7 @@
     "hydrantClusters": "Hydrant Clusters",
     "hydrantCsvImport": "Hydranten CSV Import",
     "kennzeichen": "Kennzeichenabfrage",
+    "rettungskarten": "Rettungskarten",
     "kostenersatz": "Kostenersatz",
     "layers": "Ebenen",
     "locations": "Einsatzorte",
@@ -2674,5 +2675,23 @@
     "layerObjectCount": "{count, plural, =0 {Ebenenname (keine Objekte)} one {Ebenenname (# Objekt)} other {Ebenenname (# Objekte)}}",
     "diaryCount": "{count, plural, one {# Tagebucheintrag} other {# Tagebucheinträge}}",
     "warningCount": "{count, plural, one {# Element konnte nicht gelesen werden} other {# Elemente konnten nicht gelesen werden}}"
+  },
+  "rettungskarten": {
+    "title": "Rettungskarten",
+    "source": "Rettungskarten von Euro NCAP (Euro Rescue). Die PDFs werden direkt bei Euro NCAP geöffnet und nicht bei uns gespeichert.",
+    "searchLabel": "Fahrzeug suchen",
+    "searchPlaceholder": "Marke, Modell oder Baujahr, z.B. Audi A3 2015",
+    "makesHeading": "Marken",
+    "resultCount": "{count, plural, one {# Fahrzeug gefunden} other {# Fahrzeuge gefunden}}",
+    "noResults": "Kein Fahrzeug im Euro-Rescue-Katalog gefunden.",
+    "errorUpstream": "Der Rettungskarten-Katalog von Euro NCAP ist derzeit nicht erreichbar.",
+    "matchHeading": "Rettungskarte",
+    "noMatch": "Für dieses Fahrzeug gibt es keine Rettungskarte im Euro-Rescue-Katalog. <link>Manuell suchen</link>",
+    "otherVariants": "{count, plural, one {# weitere Variante} other {# weitere Varianten}}",
+    "openSheet": "Rettungskarte ({language})",
+    "openGuide": "Rescue Guide",
+    "noSheet": "Keine Rettungskarte hinterlegt",
+    "doorsValue": "{doors} Türen",
+    "diaryLabel": "Rettungskarte"
   }
 }

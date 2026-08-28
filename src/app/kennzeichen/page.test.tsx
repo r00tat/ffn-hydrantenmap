@@ -73,6 +73,7 @@ describe('KennzeichenPage', () => {
     vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
     vi.mocked(queryKennzeichen).mockResolvedValue({
       vehicles: [vehicle],
+      rescueSheets: [],
       noResult: false,
       system: 'einsatz',
     });
@@ -94,6 +95,7 @@ describe('KennzeichenPage', () => {
     vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
     vi.mocked(queryKennzeichen).mockResolvedValue({
       vehicles: [],
+      rescueSheets: [],
       noResult: true,
       system: 'einsatz',
     });
@@ -106,10 +108,73 @@ describe('KennzeichenPage', () => {
     expect(entry.beschreibung).toBe('Keine Zulassung gefunden.');
   });
 
+  it('shows the matching rescue sheet with the result', async () => {
+    vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
+    vi.mocked(queryKennzeichen).mockResolvedValue({
+      vehicles: [vehicle],
+      rescueSheets: [
+        [
+          {
+            id: '1',
+            makeName: 'Volkswagen',
+            modelName: 'Golf',
+            variantName: 'Golf',
+            buildYearFrom: 2019,
+            sheetUrl: 'https://example.test/golf_DE.pdf',
+            sheetLanguage: 'DE',
+          },
+        ],
+      ],
+      noResult: false,
+      system: 'einsatz',
+    });
+
+    renderWithIntl(<KennzeichenPage />);
+    await search();
+
+    const link = await screen.findByRole('link', {
+      name: /Rettungskarte \(DE\)/,
+    });
+    expect(link).toHaveAttribute('href', 'https://example.test/golf_DE.pdf');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('writes the rescue sheet link into the diary entry', async () => {
+    vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
+    vi.mocked(queryKennzeichen).mockResolvedValue({
+      vehicles: [vehicle],
+      rescueSheets: [
+        [
+          {
+            id: '1',
+            makeName: 'Volkswagen',
+            modelName: 'Golf',
+            variantName: 'Golf',
+            buildYearFrom: 2019,
+            sheetUrl: 'https://example.test/golf_DE.pdf',
+            sheetLanguage: 'DE',
+          },
+        ],
+      ],
+      noResult: false,
+      system: 'einsatz',
+    });
+
+    renderWithIntl(<KennzeichenPage />);
+    await search();
+
+    await waitFor(() => expect(addFirecallItem).toHaveBeenCalledTimes(1));
+    const entry = addFirecallItem.mock.calls[0][0] as Diary;
+    expect(entry.beschreibung).toContain(
+      'Rettungskarte: Volkswagen Golf (2019–): https://example.test/golf_DE.pdf',
+    );
+  });
+
   it('does not write a diary entry when the query failed', async () => {
     vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
     vi.mocked(queryKennzeichen).mockResolvedValue({
       vehicles: [],
+      rescueSheets: [],
       noResult: true,
       system: 'einsatz',
       error: 'upstream',
@@ -127,6 +192,7 @@ describe('KennzeichenPage', () => {
     vi.mocked(getGroupsWithOebfvConfig).mockResolvedValue(['ffnd']);
     vi.mocked(queryKennzeichen).mockResolvedValue({
       vehicles: [vehicle],
+      rescueSheets: [],
       noResult: false,
       system: 'einsatz',
     });
