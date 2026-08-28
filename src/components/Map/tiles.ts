@@ -379,6 +379,7 @@ export function mapLayerToTileConfig(layer: FirecallMapLayer): TileConfig {
             layers: layer.wmsLayers ?? '',
             format: layer.format || 'image/png',
             uppercase: true,
+            ...(layer.tileSize ? { tileSize: layer.tileSize } : {}),
           }
         : {}),
     },
@@ -419,6 +420,7 @@ export function mapLayerConfigKey(config: TileConfig): string {
     layers,
     format,
     transparent,
+    tileSize,
     bounds,
     maxZoom,
     maxNativeZoom,
@@ -431,6 +433,7 @@ export function mapLayerConfigKey(config: TileConfig): string {
     layers,
     format,
     transparent,
+    tileSize,
     bounds,
     maxZoom,
     maxNativeZoom,

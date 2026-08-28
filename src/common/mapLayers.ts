@@ -47,6 +47,14 @@ export interface FirecallMapLayer {
   capabilitiesUrl?: string;
   /** WMS `LAYERS`-Parameter, mehrere kommasepariert. */
   wmsLayers?: string;
+  /**
+   * Kantenlänge der angeforderten Kachel.
+   *
+   * Ohne Angabe gilt `DEFAULT_WMS_TILE_SIZE`. Manche Dienste sind hier nicht
+   * verhandlungsbereit — der WISA-Cache etwa beantwortet ausschließlich 512
+   * und quittiert 256 mit `400`.
+   */
+  tileSize?: number;
   format?: string;
   transparent?: boolean;
   /** 0 bis 1. Ohne Angabe undurchsichtig. */
@@ -296,6 +304,9 @@ export function normalizeMapLayer(
   const attribution = sanitizeAttribution(layer.attribution);
   if (attribution) normalized.attribution = attribution;
 
+  if (overlayType === 'WMS' && Number.isFinite(layer.tileSize)) {
+    normalized.tileSize = layer.tileSize;
+  }
   if (Number.isFinite(layer.maxZoom)) normalized.maxZoom = layer.maxZoom;
   if (Number.isFinite(layer.maxNativeZoom)) {
     normalized.maxNativeZoom = layer.maxNativeZoom;

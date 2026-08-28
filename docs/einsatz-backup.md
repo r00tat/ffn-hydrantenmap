@@ -15,6 +15,7 @@ Das Einsatz-Dokument selbst plus alle Untersammlungen unter `call/{id}`:
 | --- | --- | --- |
 | `item` | `items` | inklusive der `stroke`-Untersammlung an Zeichnungen |
 | `layer` | `layers` | IDs bleiben erhalten, `item.layer` zeigt darauf |
+| `mapLayer` | `mapLayers` | eigene WMS-/WMTS-Kartenebenen, s. [eigene-kartenebenen.md](eigene-kartenebenen.md) |
 | `history` | `history` | je Eintrag `snapshotItems` (mit den Strichen der Zeichnungen) und `snapshotLayers` |
 | `location` | `locations` | Einsatzorte |
 | `kostenersatz` | `kostenersatz` | |

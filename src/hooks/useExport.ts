@@ -789,7 +789,7 @@ export async function importFirecall(
 
   // Import own map layers (WMS/WMTS)
   if (mapLayers?.length) {
-    await commitInBatches(
+    await commitOps(
       mapLayers.map((l) => ({
         ref: doc(mapLayerCol, l.id || uuid()),
         data: l as unknown as Record<string, unknown>,

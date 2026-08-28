@@ -359,8 +359,8 @@ describe('useExport', () => {
 
       await exportFirecall('test-id');
 
-      // acht Untersammlungen, die nicht voneinander abhängen
-      expect(peak).toBe(8);
+      // neun Untersammlungen, die nicht voneinander abhängen
+      expect(peak).toBe(9);
     });
 
     it('should warn instead of silently dropping an attachment it cannot download', async () => {

@@ -3,8 +3,10 @@
 import { LayersControl, TileLayer, WMSTileLayer } from 'react-leaflet';
 import { useFirecallMapLayers } from '../../../hooks/useFirecallMapLayers';
 import {
+  isWmsLayer,
   mapLayerConfigKey,
   mapLayerTileConfigs,
+  wmsTileSize,
   type TileConfig,
 } from '../tiles';
 import LayerErrorBoundary from './LayerErrorBoundary';
@@ -34,7 +36,7 @@ function CustomMapLayer({
   const { options } = config;
   const zIndex = BASE_Z_INDEX + rank;
 
-  if (config.type === 'WMS') {
+  if (isWmsLayer(config)) {
     return (
       <WMSTileLayer
         url={config.url}
@@ -42,7 +44,7 @@ function CustomMapLayer({
         format={options.format}
         transparent={options.transparent}
         uppercase
-        tileSize={512}
+        tileSize={wmsTileSize(config)}
         opacity={options.opacity}
         maxZoom={options.maxZoom}
         maxNativeZoom={options.maxNativeZoom}
