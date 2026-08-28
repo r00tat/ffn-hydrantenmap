@@ -70,6 +70,12 @@ export const DEFAULT_MAP_OVERLAY_MAX_NATIVE_ZOOM = 19;
  * `http://` scheitert im Browser ohnehin an Mixed Content, und eine URL mit
  * `user:pass@` würde das Passwort in jedem Kachelaufruf und in der
  * Layer-Verwaltung mitschleppen.
+ *
+ * Bewusst **weniger** streng als `isPublicHttpsUrl` in `fetchTargetGuard.ts`:
+ * Kacheln holt der Browser des Benutzers, ein Dienst im eigenen Netz ist dort
+ * legitim. Nur wenn der **Server** eine eingegebene Adresse anfragt — beim
+ * `GetCapabilities` —, steht sie im Netz der Cloud-Run-Instanz und muss die
+ * strengere Prüfung bestehen. Die beiden nicht zusammenlegen.
  */
 export function isSafeMapLayerUrl(url?: string): boolean {
   if (!url) return false;

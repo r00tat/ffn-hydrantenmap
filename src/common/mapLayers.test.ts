@@ -149,6 +149,28 @@ describe('sanitizeAttribution', () => {
     expect(sanitizeAttribution('')).toBeUndefined();
     expect(sanitizeAttribution('   ')).toBeUndefined();
   });
+
+  // Die eigentliche Zusicherung: Leaflet setzt die Attribution per
+  // `innerHTML`. Solange im Ergebnis kein `<` und kein `>` mehr steht, kann
+  // daraus kein Element werden — egal, was in der Eingabe stand. Das
+  // Entfernen der Tags allein trüge nicht, das Maskieren danach tut es.
+  it('lässt unter keinen Umständen eine spitze Klammer stehen', () => {
+    const nasty = [
+      '<script>alert(1)</script>',
+      '<img src="x>" onerror="alert(1)">',
+      '<<script>script>alert(1)<</script>/script>',
+      '<svg/onload=alert(1)>',
+      '<a href="javascript:alert(1)">Quelle</a>',
+      '<!-- --><iframe src=//evil></iframe>',
+      'a < b > c',
+      '<div',
+      '>',
+    ];
+    for (const value of nasty) {
+      const result = sanitizeAttribution(value) ?? '';
+      expect(result, value).not.toMatch(/[<>]/);
+    }
+  });
 });
 
 describe('mapLayerOverlayName / uniqueOverlayNames', () => {

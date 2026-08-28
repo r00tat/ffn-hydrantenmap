@@ -66,8 +66,15 @@ Kachelanfrage und in der Layer-Verwaltung mitschleppen.
 
 Leaflet setzt die Attribution mit `innerHTML` in die Karte. Ein vom Benutzer
 eingegebener Wert ist damit ein Einfallstor. `sanitizeAttribution` entfernt
-deshalb alle Tags und maskiert den Rest — eine eigene Quelle lässt sich nicht
-verlinken. Das ist der Preis dafür, dass über das Feld kein Skript in die Karte
+deshalb alle Tags **und maskiert danach den Rest** — eine eigene Quelle lässt
+sich nicht verlinken.
+
+Die Reihenfolge trägt die Zusicherung: das Entfernen der Tags allein wäre über
+verschachtelte oder abgeschnittene Tags zu umgehen (`<img src="x>" onerror=…>`),
+das anschließende Maskieren lässt aber **kein einziges `<` oder `>`** im
+Ergebnis stehen. Ohne spitze Klammer kann `innerHTML` kein Element bauen. Ein
+Test in `mapLayers.test.ts` hält genau das fest, damit ein späterer Umbau die
+Reihenfolge nicht umdreht. Das ist der Preis dafür, dass über das Feld kein Skript in die Karte
 kommt; die fest eingebauten Ebenen dürfen weiterhin HTML tragen, weil ihre
 Attribution im Code steht und nicht in der Datenbank.
 
@@ -92,6 +99,39 @@ ohne jsdom testen. Zwei Eigenheiten des Formats sind darin abgebildet:
 
 Versucht wird erst 1.3.0, dann 1.1.1: ältere ArcGIS- und MapServer-Installationen
 beantworten jeweils nur eine der beiden Fassungen brauchbar.
+
+### Der Server fragt eine fremde Adresse an — die drei Schranken
+
+Das `GetCapabilities` ist die **einzige** Stelle, an der die Anwendung eine vom
+Benutzer eingegebene Adresse selbst abruft. Damit steht sie im Netz der
+Cloud-Run-Instanz und nicht im Browser: interne Dienste, das Metadaten-Endpoint
+der Plattform, Adressen im VPC wären über diesen Umweg anfragbar (SSRF).
+Dagegen stehen drei Schranken:
+
+1. **Vor dem Abruf** — `isPublicHttpsUrl`
+   ([src/common/fetchTargetGuard.ts](../src/common/fetchTargetGuard.ts)) verlangt
+   `https:` ohne Zugangsdaten und weist Loopback, private Netze, `169.254/16`,
+   interne Namensräume (`.internal`, `.local`, …), einteilige Namen und
+   IPv6-Literale ab.
+2. **Bei jedem Umzug** — `redirect: 'manual'` statt `'follow'`. Sonst ginge der
+   erste Aufruf an einen harmlosen öffentlichen Namen, dessen Antwort auf
+   `http://169.254.169.254/` verweist, und `fetch` folgte ungefragt. Jede
+   Station wird erneut geprüft, höchstens drei.
+3. **Beim Lesen** — der Körper wird stückweise gelesen und beim Überschreiten
+   der Grenze abgebrochen. `response.text()` hätte erst die ganze Antwort in den
+   Speicher geholt und danach die Grenze geprüft: eine Grenze, die nichts
+   begrenzt, und ein endlos sendender Dienst hätte den Server lahmgelegt.
+
+Was bleibt: die Prüfung sieht den **Namen**, nicht die aufgelöste Adresse. Ein
+öffentlicher Name, der auf `127.0.0.1` zeigt (DNS-Rebinding), käme durch. Das
+abzufangen hieße, selbst aufzulösen und die Verbindung an die geprüfte IP zu
+binden — mit `fetch` nicht möglich. Übrig bleibt ein blinder Abruf durch einen
+bereits angemeldeten Benutzer, dessen Antwort den Server nur als Liste von
+WMS-Layern verlässt.
+
+`isSafeMapLayerUrl` in `mapLayers.ts` ist bewusst **weniger** streng und bleibt
+es: Kacheln holt der Browser des Benutzers, ein Kartendienst im eigenen Netz ist
+dort legitim. Die beiden Prüfungen nicht zusammenlegen.
 
 Die Import-Hilfe gibt es **nur für WMS**. Ein WMTS-Capabilities liefert
 `ResourceURL`-Templates mit `{TileMatrix}/{TileRow}/{TileCol}` über einem
