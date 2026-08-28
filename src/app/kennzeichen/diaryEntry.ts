@@ -1,3 +1,8 @@
+import {
+  formatRescueBuildYears,
+  formatRescueSheetTitle,
+} from '../../common/rescue/sheetView';
+import { RescueSheetView } from '../../common/rescue/types';
 import { Diary } from '../../components/firebase/firestore';
 import { KennzeichenSystem } from './logEntry';
 import { Vehicle } from './parseVehicleData';
@@ -12,6 +17,7 @@ export interface KennzeichenDiaryLabels {
   noResult: string;
   vehicleHeading: (n: number) => string;
   fields: Record<keyof Vehicle, string>;
+  rescueSheet: string;
 }
 
 export interface KennzeichenDiaryInput {
@@ -19,6 +25,12 @@ export interface KennzeichenDiaryInput {
   plateNumber: string;
   system: KennzeichenSystem;
   vehicles: Vehicle[];
+  /**
+   * Rettungskarten-Treffer je Fahrzeug, positionsgleich mit `vehicles`.
+   * Übernommen wird der beste Treffer, damit im Tagebuch nachvollziehbar
+   * bleibt, welche Karte im Einsatz vorlag.
+   */
+  rescueSheets?: RescueSheetView[][];
   noResult: boolean;
   timestamp: string;
   labels: KennzeichenDiaryLabels;
@@ -47,6 +59,21 @@ function formatVehicle(
 }
 
 /**
+ * Zeile mit dem Link auf die Rettungskarte des besten Treffers. Ohne Treffer
+ * oder ohne hinterlegtes Dokument bleibt sie weg.
+ */
+function formatRescueSheet(
+  sheets: RescueSheetView[] | undefined,
+  label: string
+): string[] {
+  const best = sheets?.find((sheet) => sheet.sheetUrl);
+  if (!best?.sheetUrl) return [];
+  const years = formatRescueBuildYears(best);
+  const title = formatRescueSheetTitle(best) + (years ? ` (${years})` : '');
+  return [`${label}: ${title}: ${best.sheetUrl}`];
+}
+
+/**
  * Pure builder — assembles the Einsatztagebuch entry documenting a plate
  * query and its result. Multiple vehicles (Wechselkennzeichen) are rendered
  * as separate blocks, each with a heading.
@@ -66,13 +93,17 @@ export function buildKennzeichenDiaryEntry(
   if (input.noResult || input.vehicles.length === 0) {
     beschreibung = labels.noResult;
   } else if (input.vehicles.length === 1) {
-    beschreibung = formatVehicle(input.vehicles[0], labels.fields).join('\n');
+    beschreibung = [
+      ...formatVehicle(input.vehicles[0], labels.fields),
+      ...formatRescueSheet(input.rescueSheets?.[0], labels.rescueSheet),
+    ].join('\n');
   } else {
     beschreibung = input.vehicles
       .map((vehicle, idx) =>
         [
           labels.vehicleHeading(idx + 1),
           ...formatVehicle(vehicle, labels.fields),
+          ...formatRescueSheet(input.rescueSheets?.[idx], labels.rescueSheet),
         ].join('\n')
       )
       .join('\n\n');

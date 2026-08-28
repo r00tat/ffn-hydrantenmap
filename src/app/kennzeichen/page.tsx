@@ -23,6 +23,7 @@ import { buildKennzeichenDiaryEntry } from './diaryEntry';
 import type { KennzeichenQueryResult } from './queryActions';
 import type { KennzeichenSystem } from './logEntry';
 import type { Vehicle } from './parseVehicleData';
+import RescueSheetMatches from '../../components/Rettungskarten/RescueSheetMatches';
 import useFirecall, { useFirecallId } from '../../hooks/useFirecall';
 import useFirecallItemAdd from '../../hooks/useFirecallItemAdd';
 
@@ -31,6 +32,7 @@ type DiaryStatus = 'written' | 'failed' | 'no-firecall';
 
 const KennzeichenPage = () => {
   const t = useTranslations('kennzeichen');
+  const tRescue = useTranslations('rettungskarten');
   const firecall = useFirecall();
   const firecallId = useFirecallId();
   const addFirecallItem = useFirecallItemAdd();
@@ -79,6 +81,7 @@ const KennzeichenPage = () => {
           plateNumber,
           system: res.system,
           vehicles: res.vehicles,
+          rescueSheets: res.rescueSheets,
           noResult: res.noResult,
           timestamp: new Date().toISOString(),
           labels: {
@@ -97,6 +100,7 @@ const KennzeichenPage = () => {
               variante: t('fieldVariante'),
               version: t('fieldVersion'),
             },
+            rescueSheet: tRescue('diaryLabel'),
           },
         })
       );
@@ -125,7 +129,13 @@ const KennzeichenPage = () => {
       }
     } catch (err) {
       console.error('Query failed:', err);
-      setResult({ vehicles: [], noResult: true, system, error: 'upstream' });
+      setResult({
+        vehicles: [],
+        rescueSheets: [],
+        noResult: true,
+        system,
+        error: 'upstream',
+      });
     } finally {
       setQuerying(false);
     }
@@ -260,6 +270,9 @@ const KennzeichenPage = () => {
                         ))}
                       </TableBody>
                     </Table>
+                    <RescueSheetMatches
+                      sheets={result.rescueSheets[idx] ?? []}
+                    />
                   </Box>
                 ))}
             </Box>

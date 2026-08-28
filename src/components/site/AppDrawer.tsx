@@ -8,6 +8,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BiotechIcon from '@mui/icons-material/Biotech';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import BuildIcon from '@mui/icons-material/Build';
+import CarCrashIcon from '@mui/icons-material/CarCrash';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -312,6 +313,14 @@ export default function AppDrawer({
       children: [
         { text: t('blaulichtSms'), icon: <SmsIcon />, href: '/blaulicht-sms' },
         { text: t('kennzeichen'), icon: <PinIcon />, href: '/kennzeichen' },
+        {
+          // Eigener Menüpunkt: die Rettungskarte wird auch ohne vorherige
+          // Kennzeichenabfrage gebraucht, etwa wenn nur das Fahrzeug vor
+          // Augen ist.
+          text: t('rettungskarten'),
+          icon: <CarCrashIcon />,
+          href: '/rettungskarten',
+        },
         { text: t('ai'), icon: <AutoAwesomeIcon />, href: '/ai' },
       ],
     },
