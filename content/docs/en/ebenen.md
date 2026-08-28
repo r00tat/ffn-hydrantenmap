@@ -104,3 +104,9 @@ Custom map layers travel with the lagekarte.info export and come back on import:
 - Opacity, format, zoom limits and order are unknown to lagekarte.info as well — they are nevertheless preserved on the way through lagekarte.info and back.
 
 Importing a file from lagekarte.info takes over its WMS layers as custom map layers. Layers whose address is not `https://` are skipped and reported as a warning in the preview.
+
+When creating a WMS layer, "Load layers from the service" fills in most of the form by itself: name, description, attribution, bounds, image format and the finest sensible zoom level all come from the service. If it offers only one layer that one is taken straight away; if it offers several, pick the ones to include under "Layers found" — several at once is fine.
+
+:::info
+If a layer does not advertise EPSG:3857 a warning appears. Such layers usually stay empty on the map, because the map requests exactly that coordinate system.
+:::

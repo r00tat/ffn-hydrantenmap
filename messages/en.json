@@ -2749,7 +2749,8 @@
       "bounds": "Bounds",
       "attribution": "Attribution",
       "enabled": "On by default",
-      "zIndex": "Order"
+      "zIndex": "Order",
+      "tileSize": "Tile size"
     },
     "help": {
       "urlWms": "GetMap endpoint of the service, e.g. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
@@ -2757,7 +2758,8 @@
       "wmsLayers": "Value of the LAYERS parameter. Separate multiple layers with commas.",
       "bounds": "Optional, south,west,north,east in degrees — e.g. 46.82,15.98,48.16,17.17. No tiles are requested outside.",
       "attribution": "Plain text. HTML is stripped.",
-      "zIndex": "Stacking of several custom map layers. Lower values sit below."
+      "zIndex": "Stacking of several custom map layers. Lower values sit below.",
+      "tileSize": "Edge length of the requested tile. Some services only serve one particular size."
     },
     "errors": {
       "required": "Required",
@@ -2773,7 +2775,9 @@
       "found": "{count, plural, one {# layer found} other {# layers found}}",
       "invalid-url": "The address is not a valid https URL.",
       "unreachable": "The service did not respond.",
-      "no-layers": "No WMS with requestable layers was found at this address."
+      "no-layers": "No WMS with requestable layers was found at this address.",
+      "applied": "settings taken from the service",
+      "unsupportedCrs": "These layers do not advertise EPSG:3857 and will most likely stay empty on the map: {layers}"
     }
   }
 }

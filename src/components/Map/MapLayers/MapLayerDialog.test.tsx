@@ -81,12 +81,22 @@ describe('MapLayerDialog', () => {
     loadWmsCapabilities.mockResolvedValue({
       serviceUrl: 'https://gis.example.at/wms?',
       title: 'Orthofoto Burgenland',
-      formats: ['image/png'],
+      formats: ['image/png', 'image/jpeg'],
       layers: [
         {
           name: '1',
           title: 'Orthofoto aktuell',
+          abstract: 'Luftbild, 20 cm',
           bounds: '46.82,15.98,48.16,17.17',
+          attribution: 'Land Burgenland',
+          maxNativeZoom: 19,
+          crs: ['EPSG:3857'],
+          depth: 0,
+        },
+        {
+          name: '2',
+          title: 'Orthofoto 2020',
+          crs: ['EPSG:3857'],
           depth: 0,
         },
       ],
@@ -111,12 +121,49 @@ describe('MapLayerDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    // Alles, was der Dienst über den Layer sagt, steht im Formular.
     expect(onClose.mock.calls[0][0]).toMatchObject({
-      name: 'Orthofoto Burgenland',
+      name: 'Orthofoto aktuell',
+      beschreibung: 'Luftbild, 20 cm',
       url: 'https://gis.example.at/wms?',
       wmsLayers: '1',
       bounds: '46.82,15.98,48.16,17.17',
+      attribution: 'Land Burgenland',
+      maxNativeZoom: 19,
+      format: 'image/png',
     });
+  });
+
+  it('warnt vor einem Layer, den Leaflet nicht anfragen kann', async () => {
+    loadWmsCapabilities.mockResolvedValue({
+      serviceUrl: 'https://gis.example.at/wms?',
+      formats: ['image/png'],
+      layers: [
+        {
+          name: 'gk',
+          title: 'Nur GK M34',
+          crs: ['EPSG:31256'],
+          depth: 0,
+        },
+      ],
+    });
+    renderWithIntl(<MapLayerDialog onClose={vi.fn()} />);
+
+    await fill(/^URL/, 'https://gis.example.at/wms?');
+    await userEvent.click(
+      screen.getByRole('button', { name: /Layer aus dem Dienst laden/ })
+    );
+
+    // Der einzige Layer wird automatisch übernommen — und beanstandet.
+    // Der Offline-Hinweis ist ebenfalls ein Alert — gesucht ist der zur Warnung.
+    const warning = await waitFor(() => {
+      const found = screen
+        .getAllByRole('alert')
+        .find((el) => el.textContent?.includes('EPSG:3857'));
+      if (!found) throw new Error('Warnung zum Koordinatensystem fehlt');
+      return found;
+    });
+    expect(warning).toHaveTextContent('Nur GK M34');
   });
 
   it('meldet einen nicht erreichbaren Dienst, ohne die Eingabe zu verlieren', async () => {

@@ -100,6 +100,36 @@ ohne jsdom testen. Zwei Eigenheiten des Formats sind darin abgebildet:
 Versucht wird erst 1.3.0, dann 1.1.1: ältere ArcGIS- und MapServer-Installationen
 beantworten jeweils nur eine der beiden Fassungen brauchbar.
 
+### Was der Dienst über den Layer verrät
+
+`deriveMapLayerSettings`
+([src/common/mapLayerFromCapabilities.ts](../src/common/mapLayerFromCapabilities.ts))
+füllt aus dem Capabilities-Dokument fast das ganze Formular: Titel,
+Beschreibung (`<Abstract>`), Quellenangabe (`<Attribution><Title>`), Ausdehnung,
+Format und Zoomgrenze. Von Hand eingetragen wurde davon erfahrungsgemäß nichts.
+
+Drei Ableitungen sind nicht offensichtlich:
+
+- **`maxNativeZoom` aus der Maßstabsgrenze.** 1.3.0 nennt
+  `<MinScaleDenominator>`, 1.1.1 `<ScaleHint min>`. Die Grenze heißt „Min",
+  meint aber die **feinste** Stufe: der kleinere Nenner ist der größere
+  Maßstab. Abgerundet wird mit einem Zehntel Toleranz — die Dienste
+  veröffentlichen gerundet, ein `ScaleHint` von `0.4223` ergibt 18,99986 und
+  fiele sonst eine ganze Stufe zurück.
+- **Format nach `opaque`.** Meldet der Dienst den Layer als flächendeckend,
+  gewinnt JPEG (kleinere Kachel), sonst PNG (nur das kann Transparenz).
+- **Mehrere Layer in einer Anfrage:** Ausdehnung als **Vereinigung** (sonst
+  schnitte der engste die anderen weg), Zoomgrenze als **Minimum** (sonst
+  liefert der empfindlichste in den feinsten Stufen nichts mehr) — und nur
+  dann, wenn *alle* eine Grenze nennen.
+
+**Die Warnung zum Koordinatensystem ist kein Zierrat.** `L.TileLayer.WMS`
+fragt `EPSG:3857` an. Ein Dienst, der das nicht führt, antwortet mit einer
+Fehlermeldung statt einer Kachel — die Ebene bleibt still leer, und im Einsatz
+sucht man den Fehler woanders. Gemeldet wird nur, wenn der Layer überhaupt
+Koordinatensysteme nennt; die Angabe ist vererbbar und fehlt in der Praxis oft
+ganz.
+
 ### Der Server fragt eine fremde Adresse an — die drei Schranken
 
 Das `GetCapabilities` ist die **einzige** Stelle, an der die Anwendung eine vom
@@ -155,6 +185,9 @@ React-Kontext findet.
   Kachel nicht liefert.
 - **`zIndex` startet bei 300**, also über dem, was Leaflet den Basis- und
   Überlagerungsebenen im `tilePane` vergibt.
+- **Die Kachelgröße gehört zur Ebene** (`tileSize`, Vorgabe
+  `DEFAULT_WMS_TILE_SIZE`). Manche Dienste sind hier nicht
+  verhandlungsbereit — Hintergrund in [docs/kartenlayer.md](kartenlayer.md).
 - Jede Ebene hängt in einer eigenen `LayerErrorBoundary`: was beim Rendern
   scheitert, nimmt weder die übrigen Ebenen noch die Karte mit.
 - **Der React-Key ist eine Signatur der Konfiguration** (`mapLayerConfigKey`).

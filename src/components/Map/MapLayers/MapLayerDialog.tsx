@@ -14,6 +14,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import FormHelperText from '@mui/material/FormHelperText';
 import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
@@ -31,7 +32,12 @@ import {
   validateMapLayer,
 } from '../../../common/mapLayers';
 import type { WmsCapabilitiesLayer } from '../../../common/wmsCapabilities';
-import { loadWmsCapabilities } from '../../../app/actions/mapCapabilities';
+import { deriveMapLayerSettings } from '../../../common/mapLayerFromCapabilities';
+import {
+  loadWmsCapabilities,
+  type WmsCapabilitiesResult,
+} from '../../../app/actions/mapCapabilities';
+import { DEFAULT_WMS_TILE_SIZE } from '../tiles';
 
 export interface MapLayerDialogProps {
   /** Ohne Vorgabe wird eine neue Kartenebene angelegt. */
@@ -71,12 +77,28 @@ export default function MapLayerDialog({
   const [capabilitiesError, setCapabilitiesError] = useState<string | null>(
     null
   );
-  const [capabilitiesLayers, setCapabilitiesLayers] = useState<
-    WmsCapabilitiesLayer[]
-  >([]);
+  const [capabilities, setCapabilities] =
+    useState<WmsCapabilitiesResult | null>(null);
+  /** Layer, die der Dienst führt, aber nicht in EPSG:3857 liefert. */
+  const [unsupportedCrs, setUnsupportedCrs] = useState<string[]>([]);
+  const capabilitiesLayers: WmsCapabilitiesLayer[] = capabilities?.layers ?? [];
 
   const errors = useMemo(() => validateMapLayer(layer), [layer]);
   const isWms = layer.overlayType === 'WMS';
+
+  /**
+   * Was der Dienst an Bildformaten anbietet — und nur das. Ohne Auskunft
+   * bleiben die zwei, die jeder WMS kann. Der gerade gesetzte Wert steht
+   * immer mit in der Liste, sonst zeigte das Feld nichts an.
+   */
+  const formatChoices = useMemo(() => {
+    const offered = (capabilities?.formats ?? []).filter((f) =>
+      f.startsWith('image/')
+    );
+    const base = offered.length > 0 ? offered : [...MAP_OVERLAY_FORMATS];
+    const current = layer.format;
+    return current && !base.includes(current) ? [current, ...base] : base;
+  }, [capabilities, layer.format]);
 
   const setField = useCallback(
     <K extends keyof FirecallMapLayer>(
@@ -94,36 +116,60 @@ export default function MapLayerDialog({
     [errors, showErrors, t]
   );
 
+  /**
+   * Die Auswahl auf die Einstellungen abbilden.
+   *
+   * Ein Layer auszuwählen ist eine ausdrückliche Handlung — was der Dienst über
+   * ihn sagt, überschreibt deshalb, was vorher im Formular stand. Alle Felder
+   * bleiben sichtbar und änderbar.
+   */
+  const applySelection = useCallback(
+    (names: string[], source: WmsCapabilitiesResult) => {
+      const selected = names
+        .map((name) => source.layers.find((l) => l.name === name))
+        .filter((l): l is WmsCapabilitiesLayer => !!l);
+      const { settings, unsupportedCrs: unsupported } = deriveMapLayerSettings(
+        selected,
+        source
+      );
+      setUnsupportedCrs(unsupported);
+      setLayer((prev) => ({
+        ...prev,
+        ...settings,
+        // Einen selbst vergebenen Namen nicht überschreiben.
+        name: prev.name || settings.name,
+      }));
+    },
+    []
+  );
+
   const loadCapabilities = useCallback(async () => {
     setCapabilitiesLoading(true);
     setCapabilitiesError(null);
-    setCapabilitiesLayers([]);
+    setCapabilities(null);
+    setUnsupportedCrs([]);
     try {
       const result = await loadWmsCapabilities(layer.url);
       if (result.error) {
         setCapabilitiesError(t(`capabilities.${result.error}`));
         return;
       }
-      setCapabilitiesLayers(result.layers);
+      setCapabilities(result);
       setLayer((prev) => ({
         ...prev,
         url: result.serviceUrl || prev.url,
-        name: prev.name || result.title || prev.name,
-        // Ein Dienst, der kein PNG anbietet, kann nichts Transparentes
-        // liefern — dann ist JPEG die einzige sinnvolle Wahl.
-        format:
-          prev.format ||
-          (result.formats.includes('image/png')
-            ? 'image/png'
-            : result.formats[0]),
       }));
+      // Führt der Dienst genau einen Layer, gibt es nichts auszuwählen.
+      if (result.layers.length === 1) {
+        applySelection([result.layers[0].name], result);
+      }
     } catch (err) {
       console.error('GetCapabilities fehlgeschlagen', err);
       setCapabilitiesError(t('capabilities.unreachable'));
     } finally {
       setCapabilitiesLoading(false);
     }
-  }, [layer.url, t]);
+  }, [applySelection, layer.url, t]);
 
   const selectedCapabilityLayers = useMemo(
     () =>
@@ -136,18 +182,9 @@ export default function MapLayerDialog({
 
   const onCapabilitySelect = useCallback(
     (names: string[]) => {
-      setLayer((prev) => {
-        const bounds =
-          prev.bounds ||
-          capabilitiesLayers.find((c) => c.name === names[0])?.bounds;
-        return {
-          ...prev,
-          wmsLayers: names.join(','),
-          ...(bounds ? { bounds } : {}),
-        };
-      });
+      if (capabilities) applySelection(names, capabilities);
     },
-    [capabilitiesLayers]
+    [applySelection, capabilities]
   );
 
   const handleSave = useCallback(() => {
@@ -271,6 +308,20 @@ export default function MapLayerDialog({
                 </Select>
               </FormControl>
             )}
+            {capabilitiesLayers.length > 0 && (
+              <Typography variant="caption" component="div" color="text.secondary">
+                {t('capabilities.found', { count: capabilitiesLayers.length })}
+                {' — '}
+                {t('capabilities.applied')}
+              </Typography>
+            )}
+            {unsupportedCrs.length > 0 && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {t('capabilities.unsupportedCrs', {
+                  layers: unsupportedCrs.join(', '),
+                })}
+              </Alert>
+            )}
           </Box>
         )}
 
@@ -298,7 +349,7 @@ export default function MapLayerDialog({
                 label={t('fields.format')}
                 onChange={(e) => setField('format', e.target.value)}
               >
-                {MAP_OVERLAY_FORMATS.map((format) => (
+                {formatChoices.map((format) => (
                   <MenuItem key={format} value={format}>
                     {format}
                   </MenuItem>
@@ -366,6 +417,28 @@ export default function MapLayerDialog({
             helperText={t('help.zIndex')}
           />
         </Box>
+
+        {isWms && (
+          <FormControl fullWidth variant="standard" margin="dense">
+            <InputLabel id="map-layer-tilesize-label">
+              {t('fields.tileSize')}
+            </InputLabel>
+            <Select
+              labelId="map-layer-tilesize-label"
+              id="map-layer-tilesize"
+              value={layer.tileSize ?? DEFAULT_WMS_TILE_SIZE}
+              label={t('fields.tileSize')}
+              onChange={(e) => setField('tileSize', Number(e.target.value))}
+            >
+              {[256, 512, 1024].map((size) => (
+                <MenuItem key={size} value={size}>
+                  {size}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>{t('help.tileSize')}</FormHelperText>
+          </FormControl>
+        )}
 
         <TextField
           margin="dense"

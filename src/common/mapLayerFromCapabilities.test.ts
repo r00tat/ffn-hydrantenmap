@@ -34,6 +34,10 @@ describe('supportsLeafletCrs', () => {
   it('verdächtigt einen Dienst nicht, der gar nichts meldet', () => {
     // Die Angabe ist vererbbar und fehlt in der Praxis oft ganz.
     expect(supportsLeafletCrs(layer({ crs: [] }))).toBe(true);
+    // Und sie kommt über eine Server Action herein, kann also ganz fehlen.
+    expect(
+      supportsLeafletCrs({ ...layer(), crs: undefined as never })
+    ).toBe(true);
   });
 });
 

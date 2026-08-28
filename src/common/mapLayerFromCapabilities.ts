@@ -32,9 +32,11 @@ const LEAFLET_CRS_ALIASES = [LEAFLET_CRS, 'EPSG:900913', 'EPSG:102100'];
 /** Führt der Layer ein Koordinatensystem, mit dem Leaflet etwas anfangen kann? */
 export function supportsLeafletCrs(layer: WmsCapabilitiesLayer): boolean {
   // Ein Dienst, der gar nichts meldet, wird nicht verdächtigt: die Angabe ist
-  // vererbbar und fehlt in der Praxis oft ganz.
-  if (layer.crs.length === 0) return true;
-  return layer.crs.some((crs) =>
+  // vererbbar und fehlt in der Praxis oft ganz. `?? []` ist kein Zierrat — die
+  // Liste kommt über eine Server Action herein und muss nicht vollständig sein.
+  const crs = layer.crs ?? [];
+  if (crs.length === 0) return true;
+  return crs.some((crs) =>
     LEAFLET_CRS_ALIASES.includes(crs.trim().toUpperCase())
   );
 }

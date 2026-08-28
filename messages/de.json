@@ -2749,7 +2749,8 @@
       "bounds": "Begrenzung",
       "attribution": "Quellenangabe",
       "enabled": "Standardmäßig aktiv",
-      "zIndex": "Reihenfolge"
+      "zIndex": "Reihenfolge",
+      "tileSize": "Kachelgröße"
     },
     "help": {
       "urlWms": "GetMap-Endpoint des Dienstes, z. B. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
@@ -2757,7 +2758,8 @@
       "wmsLayers": "Wert des LAYERS-Parameters. Mehrere Layer kommasepariert.",
       "bounds": "Optional, süd,west,nord,ost in Grad — z. B. 46.82,15.98,48.16,17.17. Außerhalb werden keine Kacheln angefragt.",
       "attribution": "Reiner Text. HTML wird entfernt.",
-      "zIndex": "Stapelung mehrerer eigener Kartenebenen. Kleinere Werte liegen unten."
+      "zIndex": "Stapelung mehrerer eigener Kartenebenen. Kleinere Werte liegen unten.",
+      "tileSize": "Kantenlänge der angeforderten Kachel. Manche Dienste liefern nur eine bestimmte Größe."
     },
     "errors": {
       "required": "Pflichtfeld",
@@ -2773,7 +2775,9 @@
       "found": "{count, plural, one {# Layer gefunden} other {# Layer gefunden}}",
       "invalid-url": "Die Adresse ist keine gültige https-URL.",
       "unreachable": "Der Dienst hat nicht geantwortet.",
-      "no-layers": "Unter dieser Adresse wurde kein WMS mit anforderbaren Layern gefunden."
+      "no-layers": "Unter dieser Adresse wurde kein WMS mit anforderbaren Layern gefunden.",
+      "applied": "Einstellungen aus dem Dienst übernommen",
+      "unsupportedCrs": "Diese Layer melden kein EPSG:3857 und bleiben in der Karte vermutlich leer: {layers}"
     }
   }
 }

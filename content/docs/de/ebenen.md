@@ -104,3 +104,9 @@ Eigene Kartenebenen gehen beim Export für lagekarte.info mit und kommen beim Im
 - Deckkraft, Format, Zoomgrenzen und Reihenfolge kennt lagekarte.info ebenfalls nicht — beim Weg über lagekarte.info und zurück in die Einsatzkarte bleiben sie trotzdem erhalten.
 
 Beim Import einer Datei von lagekarte.info werden deren WMS-Ebenen als eigene Kartenebenen übernommen. Ebenen mit einer Adresse ohne `https://` werden dabei übersprungen und in der Vorschau als Warnung angezeigt.
+
+Beim Anlegen einer WMS-Ebene füllt „Layer aus dem Dienst laden" fast das ganze Formular selbst: Name, Beschreibung, Quellenangabe, Ausdehnung, Bildformat und die feinste sinnvolle Zoomstufe kommen aus dem Dienst. Führt er nur einen Layer, wird der gleich übernommen; bei mehreren wählst du in „Gefundene Layer" aus, welche eingebunden werden sollen — auch mehrere zugleich.
+
+:::info
+Meldet ein Layer kein EPSG:3857, erscheint eine Warnung. Solche Layer bleiben in der Karte in der Regel leer, weil die Karte genau dieses Koordinatensystem anfragt.
+:::
