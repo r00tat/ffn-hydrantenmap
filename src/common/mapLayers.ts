@@ -35,6 +35,16 @@ export interface FirecallMapLayer {
   overlayType: MapOverlayType;
   /** WMS: GetMap-Endpoint. WMTS: Kachel-Template mit `{z}`, `{x}`, `{y}`. */
   url: string;
+  /**
+   * Adresse, unter der das `GetCapabilities` des Dienstes liegt.
+   *
+   * Getrennt von `url`, weil beides auseinanderfallen kann: `url` muss die
+   * GetMap-Adresse sein, sonst kommt keine Kachel, und die nennt der Dienst im
+   * Capabilities oft selbst — unter einem anderen Pfad als dem eingegebenen.
+   * Ohne dieses Feld wäre die eingegebene Adresse nach dem Speichern verloren
+   * und die Layer-Auswahl beim Bearbeiten nicht mehr aufzurufen.
+   */
+  capabilitiesUrl?: string;
   /** WMS `LAYERS`-Parameter, mehrere kommasepariert. */
   wmsLayers?: string;
   format?: string;
@@ -272,6 +282,12 @@ export function normalizeMapLayer(
     const wmsLayers = layer.wmsLayers?.trim();
     if (wmsLayers) normalized.wmsLayers = wmsLayers;
     normalized.format = layer.format?.trim() || 'image/png';
+    const capabilities = layer.capabilitiesUrl?.trim();
+    // Nur eine brauchbare Adresse merken — eine kaputte hülfe beim Bearbeiten
+    // nicht und stünde nur der eingegebenen `url` im Weg.
+    if (capabilities && isSafeMapLayerUrl(capabilities)) {
+      normalized.capabilitiesUrl = capabilities;
+    }
   }
 
   const bounds = layer.bounds?.trim();

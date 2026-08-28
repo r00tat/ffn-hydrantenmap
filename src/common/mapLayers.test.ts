@@ -291,9 +291,28 @@ describe('normalizeMapLayer', () => {
   });
 
   it('führt bei Kachel-Ebenen keine WMS-Felder mit', () => {
-    const result = normalizeMapLayer(wmts({ wmsLayers: '1' }));
+    const result = normalizeMapLayer(
+      wmts({ wmsLayers: '1', capabilitiesUrl: 'https://a.org/wms?' })
+    );
     expect(result.wmsLayers).toBeUndefined();
     expect(result.format).toBeUndefined();
+    expect(result.capabilitiesUrl).toBeUndefined();
+  });
+
+  it('merkt sich die Capabilities-Adresse', () => {
+    // Ohne sie wäre die Layer-Auswahl beim Bearbeiten nicht mehr aufzurufen.
+    expect(
+      normalizeMapLayer(
+        wms({ capabilitiesUrl: ' https://a.org/caps.xml ' })
+      ).capabilitiesUrl
+    ).toBe('https://a.org/caps.xml');
+  });
+
+  it('verwirft eine unbrauchbare Capabilities-Adresse', () => {
+    expect(
+      normalizeMapLayer(wms({ capabilitiesUrl: 'http://a.org/caps.xml' }))
+        .capabilitiesUrl
+    ).toBeUndefined();
   });
 
   it('begrenzt die Deckkraft', () => {

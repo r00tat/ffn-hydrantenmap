@@ -4,6 +4,7 @@ import {
   childText,
   parseWmsCapabilities,
   parseXml,
+  serviceUrlForLayer,
   stripWmsRequestParams,
   zoomFromScaleDenominator,
   zoomFromScaleHint,
@@ -309,5 +310,78 @@ describe('parseWmsCapabilities — Einstellungen des Layers', () => {
     </WMT_MS_Capabilities>`);
     expect(caps.layers[0].crs).toEqual(['EPSG:4326', 'EPSG:3857']);
     expect(caps.layers[0].maxNativeZoom).toBe(19);
+  });
+});
+
+const capabilitiesGetMapUrl = `<?xml version="1.0"?>
+<WMS_Capabilities version="1.3.0">
+  <Service><Title>Dienst</Title></Service>
+  <Capability>
+    <Request><GetMap>
+      <Format>image/png</Format>
+      <DCPType><HTTP><Get>
+        <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink"
+          xlink:type="simple"
+          xlink:href="https://karten.example.at/mapserv?map=/data/ortho.map&amp;" />
+      </Get></HTTP></DCPType>
+    </GetMap></Request>
+    <Layer>
+      <Name>ortho</Name>
+      <Title>Orthofoto</Title>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>`;
+
+describe('parseWmsCapabilities — GetMap-Adresse', () => {
+  it('liest die Adresse aus dem OnlineResource der GetMap-Anfrage', () => {
+    expect(parseWmsCapabilities(capabilitiesGetMapUrl).getMapUrl).toBe(
+      'https://karten.example.at/mapserv?map=/data/ortho.map&'
+    );
+  });
+
+  it('lässt das Feld weg, wenn der Dienst nichts nennt', () => {
+    expect(parseWmsCapabilities(capabilities130).getMapUrl).toBeUndefined();
+  });
+});
+
+describe('serviceUrlForLayer', () => {
+  it('nimmt die Adresse, die der Dienst selbst nennt', () => {
+    // Wer sein Capabilities statisch ablegt, verrät die Kartenadresse nur hier.
+    expect(
+      serviceUrlForLayer(
+        'https://example.at/static/caps.xml',
+        'https://karten.example.at/mapserv?map=hochwasser'
+      )
+    ).toBe('https://karten.example.at/mapserv?map=hochwasser&');
+  });
+
+  it('kürzt die Anfrageparameter auch aus der genannten Adresse', () => {
+    expect(
+      serviceUrlForLayer(
+        'https://a.org/wms?REQUEST=GetCapabilities',
+        'https://a.org/wms?SERVICE=WMS&REQUEST=GetMap'
+      )
+    ).toBe('https://a.org/wms?');
+  });
+
+  it('bleibt bei der eingegebenen Adresse, wenn der Dienst http nennt', () => {
+    // Sehr verbreitet: der Dienst läuft längst über https, sein Capabilities
+    // trägt aber noch die alte Adresse. Die wäre im Browser Mixed Content.
+    expect(
+      serviceUrlForLayer(
+        'https://a.org/wms?REQUEST=GetCapabilities',
+        'http://a.org/wms?'
+      )
+    ).toBe('https://a.org/wms?');
+  });
+
+  it('bleibt bei der eingegebenen Adresse, wenn der Dienst nichts nennt', () => {
+    expect(serviceUrlForLayer('https://a.org/wms?VERSION=1.3.0')).toBe(
+      'https://a.org/wms?'
+    );
+  });
+
+  it('gibt eine unbrauchbare Eingabe unverändert zurück', () => {
+    expect(serviceUrlForLayer('nicht mal eine url')).toBe('nicht mal eine url');
   });
 });

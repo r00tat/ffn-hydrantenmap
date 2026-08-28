@@ -2740,6 +2740,7 @@
       "beschreibung": "Description",
       "overlayType": "Type",
       "url": "URL",
+      "capabilitiesUrl": "GetCapabilities address",
       "wmsLayers": "Layers (LAYERS)",
       "format": "Format",
       "transparent": "Transparent",
@@ -2755,6 +2756,7 @@
     "help": {
       "urlWms": "GetMap endpoint of the service, e.g. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
       "urlWmts": "Tile template with '{z}', '{x}' and '{y}', e.g. https://example.org/tiles/'{z}'/'{x}'/'{y}'.png",
+      "capabilitiesUrl": "Optional. Empty means the URL above. Remembered when querying so the layer selection is available again when editing.",
       "wmsLayers": "Value of the LAYERS parameter. Separate multiple layers with commas.",
       "bounds": "Optional, south,west,north,east in degrees — e.g. 46.82,15.98,48.16,17.17. No tiles are requested outside.",
       "attribution": "Plain text. HTML is stripped.",

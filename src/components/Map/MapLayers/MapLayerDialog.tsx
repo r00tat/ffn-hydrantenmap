@@ -24,7 +24,7 @@ import Switch from '@mui/material/Switch';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useTranslations } from 'next-intl';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FirecallMapLayer,
   MAP_OVERLAY_FORMATS,
@@ -143,33 +143,70 @@ export default function MapLayerDialog({
     []
   );
 
-  const loadCapabilities = useCallback(async () => {
-    setCapabilitiesLoading(true);
-    setCapabilitiesError(null);
-    setCapabilities(null);
-    setUnsupportedCrs([]);
-    try {
-      const result = await loadWmsCapabilities(layer.url);
-      if (result.error) {
-        setCapabilitiesError(t(`capabilities.${result.error}`));
-        return;
+  /**
+   * Wohin die Abfrage geht.
+   *
+   * Die eingegebene Capabilities-Adresse, sonst die Dienst-URL. Beides kann
+   * auseinanderfallen: nach der ersten Abfrage steht in `url` die vom Dienst
+   * genannte GetMap-Adresse, und die beantwortet nicht überall auch ein
+   * `GetCapabilities`.
+   */
+  const capabilitiesSource = (layer.capabilitiesUrl ?? '').trim() || layer.url;
+
+  const loadCapabilities = useCallback(
+    async (source: string, { silent = false } = {}) => {
+      if (!source) return;
+      setCapabilitiesLoading(true);
+      setCapabilitiesError(null);
+      setCapabilities(null);
+      setUnsupportedCrs([]);
+      try {
+        const result = await loadWmsCapabilities(source);
+        if (result.error) {
+          // Beim stillen Nachladen einer bestehenden Ebene ist ein Fehlschlag
+          // keine Warnung wert: bearbeitet werden soll sie trotzdem.
+          if (!silent) setCapabilitiesError(t(`capabilities.${result.error}`));
+          return;
+        }
+        setCapabilities(result);
+        setLayer((prev) => ({
+          ...prev,
+          url: result.serviceUrl || prev.url,
+          capabilitiesUrl: source,
+        }));
+        // Führt der Dienst genau einen Layer, gibt es nichts auszuwählen.
+        // Beim Nachladen bleibt stehen, was gespeichert ist — sonst überschriebe
+        // das bloße Öffnen des Dialogs von Hand geänderte Einstellungen.
+        if (!silent && result.layers.length === 1) {
+          applySelection([result.layers[0].name], result);
+        }
+      } catch (err) {
+        console.error('GetCapabilities fehlgeschlagen', err);
+        if (!silent) setCapabilitiesError(t('capabilities.unreachable'));
+      } finally {
+        setCapabilitiesLoading(false);
       }
-      setCapabilities(result);
-      setLayer((prev) => ({
-        ...prev,
-        url: result.serviceUrl || prev.url,
-      }));
-      // Führt der Dienst genau einen Layer, gibt es nichts auszuwählen.
-      if (result.layers.length === 1) {
-        applySelection([result.layers[0].name], result);
-      }
-    } catch (err) {
-      console.error('GetCapabilities fehlgeschlagen', err);
-      setCapabilitiesError(t('capabilities.unreachable'));
-    } finally {
-      setCapabilitiesLoading(false);
-    }
-  }, [applySelection, layer.url, t]);
+    },
+    [applySelection, t]
+  );
+
+  /**
+   * Beim Bearbeiten den Dienst gleich abfragen.
+   *
+   * Ohne das steht die Layer-Auswahl beim zweiten Öffnen leer da: die Liste der
+   * Layer kommt nur aus dem Capabilities, gespeichert ist bloß der
+   * `LAYERS`-Wert. Die Auswahl ließe sich dann nicht mehr ändern, ohne erst
+   * wieder von Hand abzufragen. Läuft genau einmal.
+   */
+  const autoLoaded = useRef(false);
+  useEffect(() => {
+    if (autoLoaded.current) return;
+    if (!existing?.id || existing.overlayType !== 'WMS') return;
+    const source = (existing.capabilitiesUrl ?? '').trim() || existing.url;
+    if (!source) return;
+    autoLoaded.current = true;
+    void loadCapabilities(source, { silent: true });
+  }, [existing, loadCapabilities]);
 
   const selectedCapabilityLayers = useMemo(
     () =>
@@ -252,6 +289,18 @@ export default function MapLayerDialog({
         />
 
         {isWms && (
+          <TextField
+            margin="dense"
+            variant="standard"
+            fullWidth
+            label={t('fields.capabilitiesUrl')}
+            value={layer.capabilitiesUrl ?? ''}
+            onChange={(e) => setField('capabilitiesUrl', e.target.value)}
+            helperText={t('help.capabilitiesUrl')}
+          />
+        )}
+
+        {isWms && (
           <Box sx={{ mt: 1 }}>
             <Button
               size="small"
@@ -262,8 +311,8 @@ export default function MapLayerDialog({
                   <TravelExploreIcon />
                 )
               }
-              disabled={capabilitiesLoading || !layer.url}
-              onClick={loadCapabilities}
+              disabled={capabilitiesLoading || !capabilitiesSource}
+              onClick={() => loadCapabilities(capabilitiesSource)}
             >
               {capabilitiesLoading
                 ? t('capabilities.loading')

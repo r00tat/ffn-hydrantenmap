@@ -2740,6 +2740,7 @@
       "beschreibung": "Beschreibung",
       "overlayType": "Typ",
       "url": "URL",
+      "capabilitiesUrl": "GetCapabilities-Adresse",
       "wmsLayers": "Layer (LAYERS)",
       "format": "Format",
       "transparent": "Transparent",
@@ -2755,6 +2756,7 @@
     "help": {
       "urlWms": "GetMap-Endpoint des Dienstes, z. B. https://gisenterprise.bgld.gv.at/arcgis/services/public/Orthofoto/MapServer/WMSServer?",
       "urlWmts": "Kachel-Template mit '{z}', '{x}' und '{y}', z. B. https://example.org/tiles/'{z}'/'{x}'/'{y}'.png",
+      "capabilitiesUrl": "Optional. Leer bedeutet: die URL oben. Wird beim Abfragen gemerkt, damit die Layer-Auswahl beim Bearbeiten wieder zur Verfügung steht.",
       "wmsLayers": "Wert des LAYERS-Parameters. Mehrere Layer kommasepariert.",
       "bounds": "Optional, süd,west,nord,ost in Grad — z. B. 46.82,15.98,48.16,17.17. Außerhalb werden keine Kacheln angefragt.",
       "attribution": "Reiner Text. HTML wird entfernt.",

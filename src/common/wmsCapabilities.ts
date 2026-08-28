@@ -12,6 +12,8 @@
  * beiden Seiten läuft, lässt sich außerdem ohne jsdom testen.
  */
 
+import { isSafeMapLayerUrl } from './mapLayers';
+
 export interface XmlNode {
   /** Tagname ohne Namensraum-Präfix. */
   name: string;
@@ -170,6 +172,16 @@ export interface WmsCapabilities {
   version?: string;
   /** Vom Dienst angebotene Bildformate für `GetMap`. */
   formats: string[];
+  /**
+   * Die Adresse, an die `GetMap` zu richten ist — laut dem Dienst selbst.
+   *
+   * Sie muss nicht die sein, die man eingegeben hat: Capabilities werden
+   * gelegentlich als statisches Dokument unter einem ganz anderen Pfad
+   * veröffentlicht, und manche Dienste trennen Metadaten- und Kartenendpunkt.
+   * Wer die eingegebene Adresse einfach um die Anfrageparameter kürzt, bekommt
+   * dann eine Kartenebene, die nie eine Kachel liefert.
+   */
+  getMapUrl?: string;
   layers: WmsCapabilitiesLayer[];
 }
 
@@ -263,6 +275,21 @@ function boundsOf(layer: XmlNode): string | undefined {
   return undefined;
 }
 
+/**
+ * Die Adresse aus `<DCPType><HTTP><Get><OnlineResource>` einer Anfrageart.
+ *
+ * `xlink:href` kommt beim Parsen ohne Namensraum an, deshalb `href`.
+ */
+function onlineResourceHref(request: XmlNode): string | undefined {
+  for (const dcp of childrenNamed(request, 'DCPType')) {
+    const http = childNamed(dcp, 'HTTP');
+    const get = http && childNamed(http, 'Get');
+    const href = get && childNamed(get, 'OnlineResource')?.attributes.href;
+    if (href?.trim()) return href.trim();
+  }
+  return undefined;
+}
+
 /** Die Quellenangabe eines Layers — `<Attribution><Title>`. */
 function attributionOf(layer: XmlNode): string | undefined {
   const attribution = childNamed(layer, 'Attribution');
@@ -312,6 +339,7 @@ export function parseWmsCapabilities(xml: string): WmsCapabilities {
         .map((node) => node.text.trim())
         .filter(Boolean)
     : [];
+  const getMapUrl = getMap ? onlineResourceHref(getMap) : undefined;
 
   /** Was der Dienst insgesamt sagt, gilt auch für den einzelnen Layer. */
   const serviceAttribution = service ? attributionOf(service) : undefined;
@@ -380,6 +408,7 @@ export function parseWmsCapabilities(xml: string): WmsCapabilities {
       : {}),
     ...(root.attributes.version ? { version: root.attributes.version } : {}),
     formats,
+    ...(getMapUrl ? { getMapUrl } : {}),
     layers,
   };
 }
@@ -434,4 +463,20 @@ export function stripWmsRequestParams(serviceUrl: string): string {
   }
   url.search = params.toString();
   return url.search ? `${url.toString()}&` : `${url.toString()}?`;
+}
+
+/**
+ * Die Adresse, an die die fertige Kartenebene ihre Kachelanfragen richtet.
+ *
+ * Vorrang hat, was der Dienst im Capabilities selbst nennt: die eingegebene
+ * Adresse kann auf ein statisch abgelegtes Metadatendokument zeigen, das keine
+ * einzige Kachel liefert. Nur wenn die Angabe fehlt oder unbrauchbar ist —
+ * viele Dienste tragen dort bis heute `http://` ein —, bleibt es bei der
+ * eingegebenen Adresse.
+ */
+export function serviceUrlForLayer(entered: string, declared?: string): string {
+  const candidate = declared && isSafeMapLayerUrl(declared) ? declared : entered;
+  return isSafeMapLayerUrl(candidate)
+    ? stripWmsRequestParams(candidate)
+    : entered;
 }

@@ -130,6 +130,33 @@ sucht man den Fehler woanders. Gemeldet wird nur, wenn der Layer überhaupt
 Koordinatensysteme nennt; die Angabe ist vererbbar und fehlt in der Praxis oft
 ganz.
 
+### Zwei Adressen, nicht eine
+
+`url` und `capabilitiesUrl` sind getrennte Felder, weil sie auseinanderfallen
+können:
+
+- **`url` muss die GetMap-Adresse sein**, sonst liefert die Ebene keine einzige
+  Kachel. Wer eine `…?REQUEST=GetCapabilities` einträgt und stehen lässt, bekommt
+  auf jede Kachelanfrage das Metadatendokument zurück. Deshalb kürzt
+  `stripWmsRequestParams` alle Parameter weg, die Leaflet selbst setzt.
+- **Die eingegebene Adresse ist nicht zwingend die GetMap-Adresse.** Capabilities
+  werden gelegentlich als statisches Dokument unter einem ganz anderen Pfad
+  abgelegt, und manche Dienste trennen Metadaten- und Kartenendpunkt. Der Dienst
+  nennt die richtige selbst, unter
+  `<GetMap><DCPType><HTTP><Get><OnlineResource>`; `serviceUrlForLayer` gibt ihr
+  den Vorrang. Nur wenn sie fehlt oder unbrauchbar ist, bleibt es bei der
+  eingegebenen — sehr häufig, weil viele Dienste dort bis heute `http://`
+  eintragen, was im Browser an Mixed Content scheiterte.
+
+Gemerkt wird die abgefragte Adresse deshalb in `capabilitiesUrl`. **Ohne sie
+wäre die Layer-Auswahl nach dem Speichern nicht mehr aufzurufen:** die Liste der
+wählbaren Layer gibt es nur im Capabilities-Dokument, gespeichert ist bloß der
+`LAYERS`-Wert. Beim Bearbeiten einer bestehenden WMS-Ebene fragt der Dialog
+darum einmal still nach — still heißt: ein Fehlschlag erzeugt keine Warnung
+(bearbeitet werden soll die Ebene trotzdem), und übernommen wird **nichts**.
+Sonst überschriebe das bloße Öffnen des Dialogs von Hand geänderte
+Einstellungen.
+
 ### Der Server fragt eine fremde Adresse an — die drei Schranken
 
 Das `GetCapabilities` ist die **einzige** Stelle, an der die Anwendung eine vom

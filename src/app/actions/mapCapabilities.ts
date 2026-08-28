@@ -5,7 +5,7 @@ import { isPublicHttpsUrl } from '../../common/fetchTargetGuard';
 import {
   capabilitiesUrl,
   parseWmsCapabilities,
-  stripWmsRequestParams,
+  serviceUrlForLayer,
   type WmsCapabilitiesLayer,
 } from '../../common/wmsCapabilities';
 import { actionUserRequired } from '../auth';
@@ -28,7 +28,10 @@ const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_REDIRECTS = 3;
 
 export interface WmsCapabilitiesResult {
-  /** Die um Anfrageparameter bereinigte Dienst-URL für die Kartenebene. */
+  /**
+   * Die Adresse für die Kachelanfragen: die vom Dienst genannte GetMap-Adresse,
+   * ersatzweise die eingegebene ohne ihre Anfrageparameter.
+   */
   serviceUrl: string;
   title?: string;
   version?: string;
@@ -158,8 +161,8 @@ export async function loadWmsCapabilities(
     const capabilities = parseWmsCapabilities(body);
     if (capabilities.layers.length > 0) {
       return {
-        serviceUrl: stripWmsRequestParams(serviceUrl),
         ...capabilities,
+        serviceUrl: serviceUrlForLayer(serviceUrl, capabilities.getMapUrl),
       };
     }
   }
